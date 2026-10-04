@@ -1028,14 +1028,14 @@ test('profile lookups run a few at a time', async () => {
       })
   );
   try {
-    const lookups = Array.from({ length: 8 }, (_, index) =>
+    const lookups = Array.from({ length: 26 }, (_, index) =>
       core.userProfile(`@user${index}:example.org`)
     );
     await vi.advanceTimersByTimeAsync(0);
     expect(fake.send).toHaveBeenCalledTimes(6);
     for (const resolve of release.splice(0)) resolve();
     await vi.advanceTimersByTimeAsync(0);
-    expect(fake.send).toHaveBeenCalledTimes(8);
+    expect(fake.send).toHaveBeenCalledTimes(26);
     for (const resolve of release.splice(0)) resolve();
     await Promise.all(lookups);
   } finally {
@@ -1050,12 +1050,12 @@ test('an urgent profile lookup skips the queue', async () => {
   const core = createCoreClient(() => fake.transport);
   fake.send.mockImplementation(() => new Promise(() => {}));
   try {
-    for (let index = 0; index < 8; index += 1) void core.userProfile(`@user${index}:example.org`);
+    for (let index = 0; index < 26; index += 1) void core.userProfile(`@user${index}:example.org`);
     await vi.advanceTimersByTimeAsync(0);
-    expect(fake.send).toHaveBeenCalledTimes(6);
+    expect(fake.send).toHaveBeenCalledTimes(24);
     void core.userProfile('@card:example.org', true);
     await vi.advanceTimersByTimeAsync(0);
-    expect(fake.send).toHaveBeenCalledTimes(7);
+    expect(fake.send).toHaveBeenCalledTimes(25);
   } finally {
     core.stop();
     vi.useRealTimers();
