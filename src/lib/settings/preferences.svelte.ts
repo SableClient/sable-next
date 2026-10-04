@@ -206,6 +206,7 @@ export interface Preferences {
   showPingCounts: boolean;
   showUnreadDots: boolean;
   uniformIcons: boolean;
+  tintRoomIcons: boolean;
   showSpaceEvents: boolean;
 
   hour24Clock: boolean;
@@ -473,6 +474,7 @@ const DEFAULTS: Preferences = {
   showPingCounts: true,
   showUnreadDots: true,
   uniformIcons: false,
+  tintRoomIcons: false,
   showSpaceEvents: true,
 
   hour24Clock: false,

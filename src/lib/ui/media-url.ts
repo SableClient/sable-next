@@ -6,7 +6,12 @@ import type { CoreCommands } from '#lib/core/commands.svelte.js';
 
 /* Not `SvelteMap`: callers read the cache from inside an effect, so a reactive
    miss re-runs every waiting media element each time any other one resolves. */
-type CachedMediaUrl = { url: string; bytes: number; ratio: number | undefined };
+type CachedMediaUrl = {
+  url: string;
+  bytes: number;
+  ratio: number | undefined;
+  type: string;
+};
 
 const objectUrls = new Map<string, CachedMediaUrl>();
 const pending = new Map<string, Promise<string>>();
@@ -144,6 +149,15 @@ export function cachedMediaUrl(
   return objectUrls.get(cacheKey(core.session?.account_id, source, width, height))?.url;
 }
 
+export function cachedMediaType(
+  core: Pick<CoreClient, 'session'>,
+  source: string,
+  width: number,
+  height: number
+): string | undefined {
+  return objectUrls.get(cacheKey(core.session?.account_id, source, width, height))?.type;
+}
+
 export function discardMediaUrl(
   core: Pick<CoreClient, 'session'>,
   source: string,
@@ -195,7 +209,12 @@ export function loadMediaUrl(
             if (holds.has(key)) displaced.set(key, [...(displaced.get(key) ?? []), previous.url]);
             else URL.revokeObjectURL(previous.url);
           }
-          objectUrls.set(key, { url: objectUrl, bytes: blob.size, ratio: aspectRatios.get(key) });
+          objectUrls.set(key, {
+            url: objectUrl,
+            bytes: blob.size,
+            ratio: aspectRatios.get(key),
+            type,
+          });
           objectUrlBytes += blob.size;
           evict(key);
           return objectUrl;

@@ -10,6 +10,7 @@
   import { pixelatedImage } from '#lib/ui/pixelated.js';
   import { automaticMediaRetryDelay, mediaRetryDelay } from '#lib/ui/media-retry.js';
   import {
+    cachedMediaType,
     cachedMediaUrl,
     discardMediaUrl,
     holdMediaUrl,
@@ -53,6 +54,7 @@
     onfailed?: () => void;
     retryable?: boolean;
     uniform?: boolean;
+    tint?: boolean;
     original?: boolean;
     autoplay?: boolean | null;
     spoilerReason?: string | null;
@@ -83,6 +85,7 @@
     onfailed,
     retryable = false,
     uniform = false,
+    tint = false,
     original = false,
     autoplay = null,
     spoilerReason = null,
@@ -187,6 +190,12 @@
     if (!image?.complete) return null;
     return dominantColor(image);
   });
+  let tinted = $derived(
+    tint &&
+      preferences.tintRoomIcons &&
+      imageLoaded &&
+      cachedMediaType(core, requested, requestedWidth, requestedHeight) === 'image/svg+xml'
+  );
   let animatedGif = $derived(animatedHint !== false && (mime === 'image/gif' || named('.gif')));
   let manualGif = $derived(animatedGif && !(autoplay ?? preferences.autoplayGifs));
   let paused = $derived((animated || original) && animationsPaused());
@@ -491,7 +500,7 @@
   {:else if url}
     <img
       bind:this={imageElement}
-      class="media-image-content"
+      class={['media-image-content', { tinted }]}
       style:background-color={plate ?? undefined}
       src={heldUrl}
       {alt}
@@ -505,6 +514,9 @@
         if (node instanceof HTMLImageElement && node.complete) loadedUrl = url;
       }}
     />
+    {#if tinted}
+      <span class="media-image-tint" style:--media-tint="url({url})" aria-hidden="true"></span>
+    {/if}
   {:else if showUnavailable}
     <span class="media-image-unavailable">
       <ImageBrokenIcon />
@@ -676,6 +688,17 @@
     height: 100%;
     object-fit: cover;
     width: 100%;
+  }
+
+  .media-image-content.tinted {
+    opacity: 0;
+  }
+
+  .media-image-tint {
+    background: currentcolor;
+    inset: 0;
+    mask: var(--media-tint) center / contain no-repeat;
+    position: absolute;
   }
 
   .pixelated .media-image-content {

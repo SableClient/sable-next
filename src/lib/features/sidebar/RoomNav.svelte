@@ -760,6 +760,7 @@
                 src={avatarUrl}
                 size="small"
                 uniform
+                recolor={!room?.is_direct}
               >
                 <RoomIcon
                   isCalendar={room?.room_type === CALENDAR_ROOM_TYPE}
@@ -1788,12 +1789,19 @@
     opacity: var(--opacity-p300);
   }
 
+  :global(.room-avatar-icon) :global(.media-image-tint) {
+    color: var(--sec-on-container);
+    opacity: var(--opacity-p300);
+  }
+
   :global(.room-avatar-icon.glyph .avatar-fallback) {
     background: none;
   }
 
   .room-row.unread :global(.room-avatar-icon.glyph),
-  .room-row[aria-current='page'] :global(.room-avatar-icon.glyph) {
+  .room-row[aria-current='page'] :global(.room-avatar-icon.glyph),
+  .room-row.unread :global(.room-avatar-icon .media-image-tint),
+  .room-row[aria-current='page'] :global(.room-avatar-icon .media-image-tint) {
     opacity: var(--opacity-p500);
   }
 

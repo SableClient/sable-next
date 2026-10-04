@@ -379,6 +379,35 @@ test('loads SVG images from the original rather than a thumbnail', async () => {
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/vector', 0, 0);
 });
 
+test('masks a vector avatar with its own bytes when tinting is on', async () => {
+  preferences.tintRoomIcons = true;
+  core.fetchMedia.mockResolvedValue(
+    new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"/>')
+  );
+  render(MediaImage, {
+    props: { source: 'mxc://example.org/tinted', alt: '', width: 96, height: 96, tint: true },
+  });
+  await settle();
+  await fireEvent.load(find('img'));
+
+  expect(find('.media-image-tint')).toBeTruthy();
+  expect(find('img').classList.contains('tinted')).toBe(true);
+  preferences.tintRoomIcons = false;
+});
+
+test('leaves a raster avatar untinted', async () => {
+  preferences.tintRoomIcons = true;
+  core.fetchMedia.mockResolvedValue(new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
+  render(MediaImage, {
+    props: { source: 'mxc://example.org/raster', alt: '', width: 96, height: 96, tint: true },
+  });
+  await settle();
+  await fireEvent.load(find('img'));
+
+  expect(document.querySelector('.media-image-tint')).toBeNull();
+  preferences.tintRoomIcons = false;
+});
+
 test('loads GIFs from the original so they animate', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   render(MediaImage, {

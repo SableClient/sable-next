@@ -480,6 +480,14 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'tintRoomIcons',
+        section: 'sidebar',
+        icon: PaletteIcon,
+        name: 'settings.tintRoomIcons',
+        description: 'settings.tintRoomIconsHint',
+        type: 'boolean',
+      },
+      {
         key: 'showRoomBanners',
         section: 'sidebar',
         icon: ImageIcon,

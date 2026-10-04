@@ -1975,6 +1975,8 @@
     "showUnreadDots": "Show dots on rooms with unread messages but no mention",
     "showSpaceEvents": "Show today's events in spaces",
     "uniformIcons": "Fill transparent room icons",
+    "tintRoomIcons": "Match vector room icons to the theme",
+    "tintRoomIconsHint": "Recolor uploaded SVG room icons with the sidebar text color.",
     "twitterEmoji": "Twitter emoji",
     "pixelatedImages": "Pixelated image scaling",
     "pixelatedImagesHint": "Smart uses nearest-neighbour scaling for images under 192 px.",

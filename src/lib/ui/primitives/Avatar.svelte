@@ -24,6 +24,7 @@
     color?: string;
     decorative?: boolean;
     uniform?: boolean;
+    recolor?: boolean;
     original?: boolean;
     class?: ClassValue;
     children?: Snippet;
@@ -39,6 +40,7 @@
     color,
     decorative = alt === undefined,
     uniform = false,
+    recolor = false,
     original = false,
     class: className = '',
     children,
@@ -89,6 +91,7 @@
       width={96}
       height={96}
       {uniform}
+      tint={recolor}
       {original}
       onloaded={() => {
         paintedSrc = src;
