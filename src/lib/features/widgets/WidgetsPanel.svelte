@@ -153,6 +153,8 @@
         <PanelHeaderButton label={$i18n.t('widgets.back')} onclick={() => (activeId = null)}>
           <ArrowLeftIcon />
         </PanelHeaderButton>
+      {:else}
+        <GridFourIcon aria-hidden="true" />
       {/if}
     {/snippet}
     {#snippet suffix()}
