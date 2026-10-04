@@ -10,6 +10,7 @@
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
   import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
+  import FingerprintIcon from 'phosphor-svelte/lib/FingerprintIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
@@ -30,7 +31,7 @@
   import { copyRoomLink } from '#lib/rooms/permalink.js';
   import { isQuiet, setQuiet } from '#lib/rooms/quiet-rooms.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
+  import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
@@ -235,6 +236,15 @@
   async function copyLink(): Promise<void> {
     if (!(await copyRoomLink(core, room))) toasts.error($i18n.t('errors.copyFailed'));
   }
+
+  async function copyId(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(room.room_id);
+    } catch (error) {
+      console.debug('[sable room] copy id failed', error);
+      toasts.error($i18n.t('errors.copyFailed'));
+    }
+  }
 </script>
 
 {#snippet optionsTrigger({ props }: { props: Record<string, unknown> })}
@@ -339,6 +349,12 @@
       <LinkIcon />
       {$i18n.t('room.menuCopyLink')}
     </ActionMenuItem>
+    {#if preferences.developerTools}
+      <ActionMenuItem onSelect={copyId}>
+        <FingerprintIcon />
+        {$i18n.t('room.menuCopyId')}
+      </ActionMenuItem>
+    {/if}
     <ActionMenuItem
       onSelect={() => {
         onSettings(room);
