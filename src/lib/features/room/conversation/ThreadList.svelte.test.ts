@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { render, screen, within } from '@testing-library/svelte';
+import { screen, within } from '@testing-library/svelte';
+import { renderWithTooltips } from '#lib/test-support/render-with-tooltips.js';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -88,7 +89,12 @@ test('lists thread roots page by page and opens the one picked', async () => {
     .mockResolvedValueOnce({ roots: [root('$a', 'First topic')], next_batch: 'next' })
     .mockResolvedValueOnce({ roots: [root('$b', 'Second topic')], next_batch: null });
   const onOpenThread = vi.fn();
-  render(ThreadList, { roomId: '!room:example.org', members: [], onOpenThread, onClose: vi.fn() });
+  renderWithTooltips(ThreadList, {
+    roomId: '!room:example.org',
+    members: [],
+    onOpenThread,
+    onClose: vi.fn(),
+  });
   await vi.waitFor(() => {
     expect(rows()).toHaveLength(1);
   });
@@ -109,7 +115,7 @@ test('lists thread roots page by page and opens the one picked', async () => {
 
 test('says so when a room has no threads', async () => {
   listThreads.mockResolvedValueOnce({ roots: [], next_batch: null });
-  render(ThreadList, {
+  renderWithTooltips(ThreadList, {
     roomId: '!room:example.org',
     members: [],
     onOpenThread: vi.fn(),
@@ -131,7 +137,12 @@ test('a root shows its reply count and latest reply instead of an open button', 
     next_batch: null,
   });
   const onOpenThread = vi.fn();
-  render(ThreadList, { roomId: '!room:example.org', members: [], onOpenThread, onClose: vi.fn() });
+  renderWithTooltips(ThreadList, {
+    roomId: '!room:example.org',
+    members: [],
+    onOpenThread,
+    onClose: vi.fn(),
+  });
 
   const summary = await screen.findByRole('button', { name: /3 replies/ });
   expect(summary).toHaveTextContent('Last word');
@@ -148,7 +159,7 @@ test('thread previews show the sender profile color and pronouns', async () => {
     pronouns: [{ summary: 'they/them', language: null }],
   });
   listThreads.mockResolvedValueOnce({ roots: [root('$a', 'First topic')], next_batch: null });
-  render(ThreadList, {
+  renderWithTooltips(ThreadList, {
     roomId: '!room:example.org',
     members: [],
     onOpenThread: vi.fn(),

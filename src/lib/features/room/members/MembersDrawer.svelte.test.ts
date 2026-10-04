@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { render, screen } from '@testing-library/svelte';
+import { screen } from '@testing-library/svelte';
+import { renderWithTooltips } from '#lib/test-support/render-with-tooltips.js';
 import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -51,7 +52,7 @@ const drawer = () => screen.getByRole('complementary');
 
 test('sorts members by power then name and opens their profile', async () => {
   const onMemberProfile = vi.fn();
-  render(MembersDrawer, {
+  renderWithTooltips(MembersDrawer, {
     props: {
       loading: false,
       members: [
@@ -102,7 +103,7 @@ test.each([
   { level: 50, name: 'Sentinel', icon: '🛡️' },
   { level: FOUNDER_POWER_LEVEL, name: 'Founder', icon: '👑' },
 ])('shows saved $name flair in the member list', async ({ level, name, icon }) => {
-  render(MembersDrawer, {
+  renderWithTooltips(MembersDrawer, {
     props: {
       loading: false,
       members: [
@@ -132,7 +133,7 @@ test.each([
 });
 
 test('waits for room role tags instead of briefly rendering default labels', async () => {
-  render(MembersDrawer, {
+  renderWithTooltips(MembersDrawer, {
     props: {
       loading: false,
       members: [
@@ -159,7 +160,7 @@ test('waits for room role tags instead of briefly rendering default labels', asy
 });
 
 test('resizes the desktop drawer with the keyboard', async () => {
-  render(MembersDrawer, {
+  renderWithTooltips(MembersDrawer, {
     props: { loading: false, members: [], onClose: vi.fn(), onMemberProfile: vi.fn() },
   });
   await tick();
@@ -172,13 +173,13 @@ test('resizes the desktop drawer with the keyboard', async () => {
 
 test('reopens the desktop drawer at the width it was resized to', async () => {
   const props = { loading: false, members: [], onClose: vi.fn(), onMemberProfile: vi.fn() };
-  const first = render(MembersDrawer, { props });
+  const first = renderWithTooltips(MembersDrawer, { props });
   await tick();
   screen.getByRole('slider').focus();
   await user.keyboard('{ArrowLeft}');
   first.unmount();
 
-  render(MembersDrawer, { props });
+  renderWithTooltips(MembersDrawer, { props });
   await tick();
 
   expect(drawer().style.width).toBe('282px');
@@ -187,7 +188,7 @@ test('reopens the desktop drawer at the width it was resized to', async () => {
 test('honours the sort preference and fetches the membership a filter names', async () => {
   setPreference('memberSort', 'name-desc');
   const loadMembership = vi.fn(() => Promise.resolve([]));
-  render(MembersDrawer, {
+  renderWithTooltips(MembersDrawer, {
     props: {
       loading: false,
       members: [
@@ -248,7 +249,7 @@ test('renders a first page of members and grows when the sentinel shows', async 
     kicked: false,
     service: false,
   }));
-  render(MembersDrawer, {
+  renderWithTooltips(MembersDrawer, {
     props: { loading: false, members, onClose: vi.fn(), onMemberProfile: vi.fn() },
   });
   await tick();
@@ -266,7 +267,7 @@ test('renders a first page of members and grows when the sentinel shows', async 
 test('sinks members without presence under offline and drops service members', async () => {
   offline.add('@zoe:example.org');
   offline.add('@amy:example.org');
-  render(MembersDrawer, {
+  renderWithTooltips(MembersDrawer, {
     props: {
       loading: false,
       members: [
@@ -315,7 +316,7 @@ test('sinks members without presence under offline and drops service members', a
 test('keeps power-level groups when presence grouping is off', async () => {
   setPreference('groupMembersByPresence', false);
   offline.add('@zoe:example.org');
-  render(MembersDrawer, {
+  renderWithTooltips(MembersDrawer, {
     props: {
       loading: false,
       members: [

@@ -709,6 +709,18 @@ test('the collapsed icon mode uses generic glyphs until the sidebar is collapsed
   expect(document.querySelectorAll('.room-row .room-icon')).toHaveLength(0);
 });
 
+test('a collapsed row carries the unread badge of its room', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!unread:example.org', name: 'Unread', unread: 4 }),
+    makeRoom({ room_id: '!read:example.org', name: 'Read' }),
+  ];
+
+  await mountNav({ collapsed: true });
+  const rows = Array.from(document.querySelectorAll('.room-row'));
+  expect(rows).toHaveLength(2);
+  expect(rows.map((row) => row.querySelectorAll('.room-collapsed-badge').length)).toEqual([1, 0]);
+});
+
 test('the sometimes icon mode keeps existing avatars in an expanded sidebar', async () => {
   setPreference('showRoomIcon', 'sometimes');
   roomsFixture.rooms = [

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { render, screen, within } from '@testing-library/svelte';
+import { screen, within } from '@testing-library/svelte';
+import { renderWithTooltips } from '#lib/test-support/render-with-tooltips.js';
 import { userEvent } from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 
@@ -87,7 +88,7 @@ const core = Object.assign(baseCore, {
 
 test('offers room settings and members from the calendar header', async () => {
   const user = userEvent.setup();
-  render(CalendarPage, { roomId: '!cal:x' });
+  renderWithTooltips(CalendarPage, { roomId: '!cal:x' });
 
   await user.click(screen.getByRole('button', { name: 'More options' }));
   expect(screen.getByRole('menuitem', { name: 'Settings' })).toBeInTheDocument();
@@ -95,7 +96,7 @@ test('offers room settings and members from the calendar header', async () => {
 });
 
 test('lists who answered each event, by name', async () => {
-  render(CalendarPage, { roomId: '!cal:x' });
+  renderWithTooltips(CalendarPage, { roomId: '!cal:x' });
 
   await vi.waitFor(() => {
     expect(screen.getAllByRole('definition').map((answer) => answer.textContent)).toEqual([
@@ -108,7 +109,7 @@ test('lists who answered each event, by name', async () => {
 });
 
 test('reloads when the core reports a change in this calendar, and only this one', async () => {
-  render(CalendarPage, { roomId: '!cal:x' });
+  renderWithTooltips(CalendarPage, { roomId: '!cal:x' });
   expect(await screen.findByRole('heading', { name: 'Raid' })).toBeInTheDocument();
   core.calendarEntries.mockClear();
 
@@ -151,7 +152,7 @@ test('answers and counts each occurrence of a recurring event on its own', async
     })
   );
   const user = userEvent.setup();
-  render(CalendarPage, { roomId: '!cal:x' });
+  renderWithTooltips(CalendarPage, { roomId: '!cal:x' });
   await vi.waitFor(() => {
     expect(screen.getAllByRole('heading', { name: 'Weekly' })).toHaveLength(2);
   });
@@ -188,7 +189,7 @@ test("the month view lists the selected day's events", async () => {
     })
   );
   const user = userEvent.setup();
-  render(CalendarPage, { roomId: '!cal:x' });
+  renderWithTooltips(CalendarPage, { roomId: '!cal:x' });
   await user.click(await screen.findByRole('button', { name: 'Month' }));
   const date = soon.toLocaleDateString(undefined, { dateStyle: 'full' });
   const cell = await screen.findByRole('gridcell', { name: `${date}, 1 event` });
@@ -200,7 +201,7 @@ test("the month view lists the selected day's events", async () => {
 
 test('arrow keys move the selected day and Enter opens a new event on it', async () => {
   const user = userEvent.setup();
-  render(CalendarPage, { roomId: '!cal:x' });
+  renderWithTooltips(CalendarPage, { roomId: '!cal:x' });
   await user.click(await screen.findByRole('button', { name: 'Month' }));
   const date = soon.toLocaleDateString(undefined, { dateStyle: 'full' });
   const cell = await screen.findByRole('gridcell', { name: `${date}, 1 event` });

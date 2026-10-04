@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { render, screen, type RenderResult } from '@testing-library/svelte';
+import { screen } from '@testing-library/svelte';
+import { renderWithTooltips } from '#lib/test-support/render-with-tooltips.js';
 import { userEvent } from '@testing-library/user-event';
 import { expect, test } from 'vitest';
 
@@ -36,8 +37,8 @@ function mountHeader(props: {
   chatOpen?: boolean;
   searchOpen?: boolean;
   membersOpen?: boolean;
-}): RenderResult<typeof RoomHeader> {
-  return render(RoomHeader, {
+}) {
+  return renderWithTooltips(RoomHeader, {
     props: {
       roomId: '!general:example.org',
       roomName: 'General',

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, screen } from '@testing-library/svelte';
+import { renderWithTooltips } from '#lib/test-support/render-with-tooltips.js';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -52,7 +53,7 @@ function setup(
     modal?: boolean;
   } = {}
 ) {
-  return render(RoomAttachments, {
+  return renderWithTooltips(RoomAttachments, {
     props: {
       roomId: '!room:example.org',
       members: [],
