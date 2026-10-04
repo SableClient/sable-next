@@ -92,6 +92,7 @@ afterEach(() => {
   setPreference('showPronouns', true);
   setPreference('showRoleTooltip', false);
   setPreference('showPronounPills', true);
+  core.profiles.clear();
   core.userProfile.mockReset();
   core.userProfile.mockRejectedValue(new Error('profile unavailable'));
 });

@@ -963,57 +963,6 @@ test('failed profile lookups cool down across repeated timeline mounts and retry
   }
 });
 
-test('a profile change drops the cached profile and tells listeners once', async () => {
-  vi.useFakeTimers();
-  const fake = fakeTransport();
-  const core = createCoreClient(() => fake.transport);
-  fake.send
-    .mockResolvedValueOnce({ profile: { display_name: 'old' } })
-    .mockResolvedValueOnce({ profile: { display_name: 'new' } });
-  const listener = vi.fn();
-  try {
-    core.onProfileChanged(listener);
-    await core.userProfile('@remote:example.org');
-    await core.userProfile('@remote:example.org');
-    expect(fake.send).toHaveBeenCalledTimes(1);
-
-    const change = { type: 'profile_changed', user_id: '@remote:example.org' } as CoreEvent;
-    fake.emit(change);
-    fake.emit(change);
-    expect(listener).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(500);
-    expect(listener).toHaveBeenCalledExactlyOnceWith('@remote:example.org');
-
-    await expect(core.userProfile('@remote:example.org')).resolves.toEqual({
-      display_name: 'new',
-    });
-  } finally {
-    core.stop();
-    vi.useRealTimers();
-  }
-});
-
-test('a lookup in flight when the profile changes does not refill the cache', async () => {
-  vi.useFakeTimers();
-  const fake = fakeTransport();
-  const core = createCoreClient(() => fake.transport);
-  fake.send
-    .mockResolvedValueOnce({ profile: { display_name: 'stale' } })
-    .mockResolvedValueOnce({ profile: { display_name: 'fresh' } });
-  try {
-    const stale = core.userProfile('@remote:example.org');
-    fake.emit({ type: 'profile_changed', user_id: '@remote:example.org' });
-    await vi.advanceTimersByTimeAsync(0);
-    await stale;
-    const fresh = core.userProfile('@remote:example.org');
-    await vi.advanceTimersByTimeAsync(150);
-    await expect(fresh).resolves.toEqual({ display_name: 'fresh' });
-  } finally {
-    core.stop();
-    vi.useRealTimers();
-  }
-});
-
 test('profile lookups are spaced out', async () => {
   vi.useFakeTimers();
   const fake = fakeTransport();

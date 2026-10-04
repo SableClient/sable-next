@@ -1,5 +1,6 @@
 import type { PerMessageProfileView, ProfileView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import type { ProfileStore } from '#lib/core/profile-store.svelte.js';
 
 export class MemberProfile {
   open = $state(false);
@@ -10,7 +11,11 @@ export class MemberProfile {
   failed = $state(false);
   #request = 0;
 
-  constructor(private readonly core: Pick<CoreClient, 'userProfile'>) {}
+  constructor(
+    private readonly core: Pick<CoreClient, 'userProfile'> & {
+      profiles: Pick<ProfileStore, 'peek'>;
+    }
+  ) {}
 
   close(): void {
     this.#request += 1;
@@ -35,7 +40,7 @@ export class MemberProfile {
     this.userId = userId;
     this.anchor = anchor;
     this.open = true;
-    this.profile = null;
+    this.profile = this.core.profiles.peek(userId);
     this.pmp = null;
     this.failed = false;
     try {
