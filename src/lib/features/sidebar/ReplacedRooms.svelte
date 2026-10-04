@@ -1,5 +1,6 @@
 <script lang="ts">
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
+  import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import type { RoomSummary } from '#src/generated/protocol';
 
@@ -10,6 +11,11 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
+  import {
+    dismissReplacedRoom,
+    isReplacedRoomDismissed,
+  } from './dismissed-replaced-rooms.svelte.js';
+
   interface Props {
     collapsed?: boolean;
   }
@@ -19,20 +25,21 @@
   const roomList = useRoomList();
   const headingId = $props.id();
 
-  let replaced = $state.raw<RoomSummary[]>([]);
+  let fetched = $state.raw<RoomSummary[]>([]);
+  let replaced = $derived(fetched.filter((room) => !isReplacedRoomDismissed(room.room_id)));
   let listedCount = $derived(roomList.rooms.length);
 
   $effect(() => {
     void listedCount;
     void core.commands.replacedRooms().then((rooms) => {
-      replaced = rooms;
+      fetched = rooms;
     });
   });
 
   async function leave(room: RoomSummary): Promise<void> {
     try {
       await core.commands.leaveRoom(room.room_id);
-      replaced = replaced.filter((other) => other.room_id !== room.room_id);
+      fetched = fetched.filter((other) => other.room_id !== room.room_id);
     } catch {
       toasts.error($i18n.t('room.leaveFailed'));
     }
@@ -69,6 +76,16 @@
             }}
           >
             <SignOutIcon />
+          </IconButton>
+          <IconButton
+            variant="ghost"
+            size="medium"
+            label={$i18n.t('room.replacedDismissLabel', { room: name })}
+            onclick={() => {
+              dismissReplacedRoom(room.room_id);
+            }}
+          >
+            <XIcon />
           </IconButton>
         </li>
       {/each}
