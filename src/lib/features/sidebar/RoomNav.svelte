@@ -849,6 +849,18 @@
                 </span>
               {/if}
             </span>
+          {:else if !typing}
+            <UnreadBadge
+              class="room-collapsed-badge"
+              {counts}
+              dm={room?.is_direct ?? false}
+              role="img"
+              aria-label={mentions > 0
+                ? $i18n.t('nav.unreadMentions', { count: mentions })
+                : unread > 0
+                  ? $i18n.t('nav.unreadMessages', { count: unread })
+                  : $i18n.t('nav.markedUnread')}
+            />
           {/if}
         </a>
       {/snippet}
@@ -2022,7 +2034,14 @@
     flex: none;
     justify-content: center;
     padding: 0;
+    position: relative;
     width: var(--avatar-size-small);
+  }
+
+  .room-list.collapsed .room-row :global(.room-collapsed-badge) {
+    position: absolute;
+    right: -0.25rem;
+    top: -0.125rem;
   }
 
   .room-list.collapsed .room-category {
