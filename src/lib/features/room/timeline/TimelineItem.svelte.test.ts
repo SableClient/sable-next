@@ -743,7 +743,11 @@ test.each(['connected', 'compact', 'expanded'] as const)(
     expect(name?.classList.contains('tinted')).toBe(true);
     expect(name?.style.getPropertyValue('--name-color-on-light')).toBe('#2244aa');
     expect(name?.style.getPropertyValue('--name-color-on-dark')).toBe('#88aaff');
-    expect(core.userProfile).toHaveBeenCalledWith('@bob:example.org');
+    expect(core.userProfile).toHaveBeenCalledWith(
+      '@bob:example.org',
+      false,
+      expect.any(AbortSignal)
+    );
   }
 );
 

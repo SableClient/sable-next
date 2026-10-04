@@ -42,7 +42,7 @@ const profileFailureRetryMs = 60 * 1000;
 const relationsCacheFreshMs = 60 * 1000;
 const MAX_PROFILE_CACHE_ENTRIES = 256;
 const MAX_RELATIONS_CACHE_ENTRIES = 128;
-const MAX_PROFILE_LOOKUPS = 6;
+const MAX_PROFILE_LOOKUPS = 24;
 const PROFILE_RATE_LIMIT_PAUSE_MS = 1000;
 const PROFILE_CHANGE_NOTIFY_MS = 500;
 const PROFILE_RETRY_AFTER_CAP_MS = 30_000;
@@ -168,7 +168,12 @@ export class CoreClient {
   >({ maxSize: MAX_PROFILE_CACHE_ENTRIES, maxAge: profileCacheFreshMs });
   private readonly profileRequests = new Map<
     string,
-    { accountId: string | null; request: Promise<ProfileView> }
+    {
+      accountId: string | null;
+      request: Promise<ProfileView>;
+      waiters: number;
+      cancel: () => void;
+    }
   >();
   private readonly profileFailures = new QuickLRU<
     string,
@@ -178,7 +183,10 @@ export class CoreClient {
   private readonly changedProfiles = new Set<string>();
   private profileChangeTimer: ReturnType<typeof setTimeout> | null = null;
   private profileLookups = 0;
-  private readonly profileLookupQueue: (() => void)[] = [];
+  private readonly profileLookupQueue: {
+    resolve: () => void;
+    reject: (reason: unknown) => void;
+  }[] = [];
   private profileResumeAt = 0;
   private readonly relationsCache = new QuickLRU<
     string,
@@ -504,7 +512,7 @@ export class CoreClient {
     }
   }
 
-  async userProfile(userId: string, urgent = false): Promise<ProfileView> {
+  async userProfile(userId: string, urgent = false, signal?: AbortSignal): Promise<ProfileView> {
     const accountId = this.session?.account_id ?? null;
     const cached = this.profileCache.get(userId);
     if (cached?.accountId === accountId) {
@@ -512,14 +520,17 @@ export class CoreClient {
     }
 
     const pending = this.profileRequests.get(userId);
-    if (pending?.accountId === accountId && !urgent) return pending.request;
+    if (pending?.accountId === accountId && !urgent) return this.awaitProfile(pending, signal);
 
     const failure = this.profileFailures.get(userId);
     if (failure?.accountId === accountId && !urgent) {
       throw failure.error;
     }
 
-    const request = this.lookUpProfile(userId, urgent)
+    const queued: { cancel: (() => void) | null } = { cancel: null };
+    const request = this.lookUpProfile(userId, urgent, (cancelQueued) => {
+      queued.cancel = cancelQueued;
+    })
       .then((profile) => {
         if (this.profileRequests.get(userId)?.request === request) {
           this.profileFailures.delete(userId);
@@ -529,19 +540,52 @@ export class CoreClient {
       })
       .catch((error: unknown) => {
         const rateLimited = error instanceof CoreError && error.detail.code === 'rate_limited';
-        if (!rateLimited && this.profileRequests.get(userId)?.request === request) {
+        const cancelled = error instanceof DOMException && error.name === 'AbortError';
+        if (!rateLimited && !cancelled && this.profileRequests.get(userId)?.request === request) {
           this.profileFailures.set(userId, { accountId, error });
         }
         throw error;
       });
-    this.profileRequests.set(userId, { accountId, request });
+    const entry = {
+      accountId,
+      request,
+      waiters: 0,
+      cancel: () => {
+        queued.cancel?.();
+      },
+    };
+    this.profileRequests.set(userId, entry);
     const clearRequest = () => {
       if (this.profileRequests.get(userId)?.request === request) {
         this.profileRequests.delete(userId);
       }
     };
     void request.then(clearRequest, clearRequest);
-    return request;
+    return this.awaitProfile(entry, signal);
+  }
+
+  private awaitProfile(
+    entry: { request: Promise<ProfileView>; waiters: number; cancel: () => void },
+    signal?: AbortSignal
+  ): Promise<ProfileView> {
+    entry.waiters += 1;
+    if (!signal) return entry.request;
+    return new Promise<ProfileView>((resolve, reject) => {
+      const onAbort = () => {
+        entry.waiters -= 1;
+        if (entry.waiters === 0) entry.cancel();
+        reject(new DOMException('The profile lookup was cancelled', 'AbortError'));
+      };
+      if (signal.aborted) {
+        onAbort();
+        return;
+      }
+      signal.addEventListener('abort', onAbort, { once: true });
+      const settled = () => {
+        signal.removeEventListener('abort', onAbort);
+      };
+      entry.request.then(resolve, reject).finally(settled);
+    });
   }
 
   onProfileChanged(listener: (userId: string) => void): () => void {
@@ -564,15 +608,30 @@ export class CoreClient {
     }, PROFILE_CHANGE_NOTIFY_MS);
   }
 
-  private async lookUpProfile(userId: string, urgent: boolean): Promise<ProfileView> {
+  private async lookUpProfile(
+    userId: string,
+    urgent: boolean,
+    onQueued: (cancel: () => void) => void
+  ): Promise<ProfileView> {
     if (urgent) return this.requestProfile(userId, true);
     if (this.profileLookups < MAX_PROFILE_LOOKUPS) this.profileLookups += 1;
-    else await new Promise<void>((resolve) => this.profileLookupQueue.push(resolve));
+    else {
+      await new Promise<void>((resolve, reject) => {
+        const waiting = { resolve, reject };
+        this.profileLookupQueue.push(waiting);
+        onQueued(() => {
+          const index = this.profileLookupQueue.indexOf(waiting);
+          if (index === -1) return;
+          this.profileLookupQueue.splice(index, 1);
+          reject(new DOMException('The profile lookup was cancelled', 'AbortError'));
+        });
+      });
+    }
     try {
       return await this.requestProfile(userId, false);
     } finally {
-      const next = this.profileLookupQueue.shift();
-      if (next) next();
+      const next = this.profileLookupQueue.pop();
+      if (next) next.resolve();
       else this.profileLookups -= 1;
     }
   }

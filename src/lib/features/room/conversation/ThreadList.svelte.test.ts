@@ -168,7 +168,11 @@ test('thread previews show the sender profile color and pronouns', async () => {
   });
 
   await vi.waitFor(() => {
-    expect(core.userProfile).toHaveBeenCalledWith('@ana:example.org');
+    expect(core.userProfile).toHaveBeenCalledWith(
+      '@ana:example.org',
+      false,
+      expect.any(AbortSignal)
+    );
     expect(screen.getByText('they/them')).toBeInTheDocument();
   });
   expect(document.querySelector('.message')?.getAttribute('style')).toContain(

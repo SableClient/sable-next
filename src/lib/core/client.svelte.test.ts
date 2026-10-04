@@ -1014,7 +1014,7 @@ test('a lookup in flight when the profile changes does not refill the cache', as
   }
 });
 
-test('profile lookups run a few at a time', async () => {
+test('profile lookups run a bounded number at a time', async () => {
   vi.useFakeTimers();
   const fake = fakeTransport();
   const core = createCoreClient(() => fake.transport);
@@ -1028,16 +1028,86 @@ test('profile lookups run a few at a time', async () => {
       })
   );
   try {
-    const lookups = Array.from({ length: 8 }, (_, index) =>
+    const lookups = Array.from({ length: 26 }, (_, index) =>
       core.userProfile(`@user${index}:example.org`)
     );
     await vi.advanceTimersByTimeAsync(0);
-    expect(fake.send).toHaveBeenCalledTimes(6);
+    expect(fake.send).toHaveBeenCalledTimes(24);
     for (const resolve of release.splice(0)) resolve();
     await vi.advanceTimersByTimeAsync(0);
-    expect(fake.send).toHaveBeenCalledTimes(8);
+    expect(fake.send).toHaveBeenCalledTimes(26);
     for (const resolve of release.splice(0)) resolve();
     await Promise.all(lookups);
+  } finally {
+    core.stop();
+    vi.useRealTimers();
+  }
+});
+
+test('the newest queued profile lookup runs first', async () => {
+  vi.useFakeTimers();
+  const fake = fakeTransport();
+  const core = createCoreClient(() => fake.transport);
+  const release: (() => void)[] = [];
+  fake.send.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        release.push(() => {
+          resolve({ profile: {} });
+        });
+      })
+  );
+  try {
+    for (let index = 0; index < 24; index += 1) void core.userProfile(`@old${index}:example.org`);
+    void core.userProfile('@older:example.org');
+    void core.userProfile('@newest:example.org');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fake.send).toHaveBeenCalledTimes(24);
+    release.shift()?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fake.send).toHaveBeenCalledTimes(25);
+    expect(fake.send.mock.calls[24]?.[0]).toMatchObject({ user_id: '@newest:example.org' });
+  } finally {
+    core.stop();
+    vi.useRealTimers();
+  }
+});
+
+test('a cancelled queued profile lookup is never sent', async () => {
+  vi.useFakeTimers();
+  const fake = fakeTransport();
+  const core = createCoreClient(() => fake.transport);
+  const release: (() => void)[] = [];
+  fake.send.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        release.push(() => {
+          resolve({ profile: {} });
+        });
+      })
+  );
+  try {
+    for (let index = 0; index < 24; index += 1) void core.userProfile(`@busy${index}:example.org`);
+    const cancelled = new AbortController();
+    const kept = new AbortController();
+    const first = core.userProfile('@shared:example.org', false, cancelled.signal);
+    const second = core.userProfile('@shared:example.org', false, kept.signal);
+    const alone = new AbortController();
+    const lonely = core.userProfile('@alone:example.org', false, alone.signal);
+    await vi.advanceTimersByTimeAsync(0);
+    cancelled.abort();
+    alone.abort();
+    await expect(first).rejects.toMatchObject({ name: 'AbortError' });
+    await expect(lonely).rejects.toMatchObject({ name: 'AbortError' });
+    for (const resolve of release.splice(0)) resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    const requested = fake.send.mock.calls.map(
+      ([command]) => (command as unknown as { user_id: string }).user_id
+    );
+    expect(requested).toContain('@shared:example.org');
+    expect(requested).not.toContain('@alone:example.org');
+    for (const resolve of release.splice(0)) resolve();
+    await expect(second).resolves.toEqual({});
   } finally {
     core.stop();
     vi.useRealTimers();
@@ -1050,12 +1120,12 @@ test('an urgent profile lookup skips the queue', async () => {
   const core = createCoreClient(() => fake.transport);
   fake.send.mockImplementation(() => new Promise(() => {}));
   try {
-    for (let index = 0; index < 8; index += 1) void core.userProfile(`@user${index}:example.org`);
+    for (let index = 0; index < 26; index += 1) void core.userProfile(`@user${index}:example.org`);
     await vi.advanceTimersByTimeAsync(0);
-    expect(fake.send).toHaveBeenCalledTimes(6);
+    expect(fake.send).toHaveBeenCalledTimes(24);
     void core.userProfile('@card:example.org', true);
     await vi.advanceTimersByTimeAsync(0);
-    expect(fake.send).toHaveBeenCalledTimes(7);
+    expect(fake.send).toHaveBeenCalledTimes(25);
   } finally {
     core.stop();
     vi.useRealTimers();

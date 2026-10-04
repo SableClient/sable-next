@@ -11,6 +11,7 @@ class ProfileSlot {
   #preview = false;
   #generation = 0;
   #retry: ReturnType<typeof setTimeout> | null = null;
+  #lookup: AbortController | null = null;
 
   constructor(private readonly core: CoreClient) {}
 
@@ -34,10 +35,14 @@ class ProfileSlot {
   #load(attempt: number): void {
     if (this.#retry !== null) clearTimeout(this.#retry);
     this.#retry = null;
+    this.#lookup?.abort();
+    this.#lookup = null;
     const generation = ++this.#generation;
     const userId = this.#userId;
     if (userId === null || this.#preview) return;
-    void this.core.userProfile(userId).then(
+    const lookup = new AbortController();
+    this.#lookup = lookup;
+    void this.core.userProfile(userId, false, lookup.signal).then(
       (profile) => {
         if (generation === this.#generation) this.profile = profile;
       },
