@@ -466,6 +466,11 @@
     onPickUnicode(best ?? text);
   }
 
+  function focusSearch(element: HTMLElement): void {
+    if (variant !== 'popover' || !window.matchMedia('(any-pointer: fine)').matches) return;
+    element.focus({ preventScroll: true });
+  }
+
   function attachSize(element: HTMLElement): (() => void) | undefined {
     return resizable ? trackBoardSize(element) : undefined;
   }
@@ -574,6 +579,7 @@
       placeholder={gifTab ? $i18n.t('composer.searchGifs') : $i18n.t('composer.searchPacks')}
       aria-label={gifTab ? $i18n.t('composer.searchGifs') : $i18n.t('composer.searchPacks')}
       onkeydown={submitQuery}
+      {@attach focusSearch}
     />
     {#if !gifTab && sections.length > 0}
       <p class="pack-visibility">{$i18n.t('composer.packMediaVisibility')}</p>
@@ -640,15 +646,7 @@
                     {/if}
                   </div>
                 {:else if row.kind === 'header'}
-                  <h3>
-                    {row.label}
-                    {#if row.pack}
-                      <span class="section-origin">{originLabels[row.pack.origin]}</span>
-                      {#if row.pack.attribution}
-                        <span class="section-attribution">{row.pack.attribution}</span>
-                      {/if}
-                    {/if}
-                  </h3>
+                  <h3>{row.label}</h3>
                 {:else if row.kind === 'cells'}
                   <div
                     class="unicode"
@@ -898,6 +896,10 @@
     width: var(--size-x100);
   }
 
+  .board :global(.media-image.pixelated .media-image-content) {
+    image-rendering: auto;
+  }
+
   .rail-pack {
     align-items: center;
     background: transparent;
@@ -951,12 +953,6 @@
     top: 0;
     width: max-content;
     z-index: 1;
-  }
-
-  .section-origin,
-  .section-attribution {
-    color: var(--surface-var-on-container);
-    font-weight: 400;
   }
 
   .grids ul {
