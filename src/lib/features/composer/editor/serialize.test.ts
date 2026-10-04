@@ -499,6 +499,14 @@ describe('plain text mode', () => {
     expect(plainTextOf(plainEditDoc(message.body, message.formatted ?? ''))).toBe(source);
   });
 
+  test('the shrug keeps its arm', () => {
+    const message = serializePlain(textDoc('top ¯\\_(ツ)_/¯ bottom'));
+
+    expect(message.body).toBe('top ¯\\_(ツ)_/¯ bottom');
+    expect(message.formatted).toBeNull();
+    expect(plainTextOf(richFromPlain(textDoc('¯\\_(ツ)_/¯')))).toBe('¯\\_(ツ)_/¯');
+  });
+
   test('all ASCII punctuation can be escaped', () => {
     for (let codePoint = 33; codePoint <= 126; codePoint += 1) {
       const character = String.fromCharCode(codePoint);
