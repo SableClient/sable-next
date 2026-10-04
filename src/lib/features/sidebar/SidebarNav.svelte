@@ -57,7 +57,7 @@
   const ROOM_NAV_WIDTH_STEP = 80;
   const ROOM_NAV_STORAGE_KEY = 'sable-room-navigation-width';
 
-  let { mobile = false, onNavigate, roomNavWidth = $bindable(224) }: Props = $props();
+  let { mobile = false, onNavigate, roomNavWidth = $bindable(288) }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
   const call = useCallSession();

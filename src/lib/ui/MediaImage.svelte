@@ -127,6 +127,9 @@
       intrinsicHeight > 0;
     return hasIntrinsicSize ? intrinsicWidth / intrinsicHeight : null;
   });
+  let intrinsicCssWidth = $derived(
+    eventRatio !== null && intrinsicWidth !== null ? `${String(intrinsicWidth)}px` : undefined
+  );
   let animated = $derived(
     animatedHint ??
       (ANIMATED_MIMES.includes(mime ?? '') ||
@@ -583,6 +586,7 @@
     ]}
     {style}
     style:--media-ratio={aspectRatio}
+    style:--media-width={intrinsicCssWidth}
     style:contain-intrinsic-inline-size="{width}px"
   >
     <span
@@ -639,6 +643,7 @@
     class={[className, 'media-image', 'interactive', { gif: manualGif, pixelated }]}
     {style}
     style:--media-ratio={aspectRatio}
+    style:--media-width={intrinsicCssWidth}
     style:contain-intrinsic-inline-size="{width}px"
     type="button"
     aria-label={mediaLabel}
@@ -655,6 +660,7 @@
     class={[className, 'media-image', { pixelated }]}
     {style}
     style:--media-ratio={aspectRatio}
+    style:--media-width={intrinsicCssWidth}
     style:contain-intrinsic-inline-size="{width}px"
   >
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
