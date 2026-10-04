@@ -49,10 +49,13 @@
     "registeringWith": "กำลังลงทะเบียนกับ",
     "accountProviderHint": "ผู้ให้บริการบัญชีของคุณเป็นผู้โฮสต์บัญชีและข้อมูลของคุณ คุณยังคงสามารถแชทกับทุกคนบน Matrix ได้ตามปกติ",
     "moreWaysToSignIn": "วิธีลงชื่อเข้าใช้เพิ่มเติม",
-    "hideOtherWaysToSignIn": "ซ่อนวิธีลงชื่อเข้าใช้อื่น ๆ"
+    "hideOtherWaysToSignIn": "ซ่อนวิธีลงชื่อเข้าใช้อื่น ๆ",
+    "continue": "ดำเนินการต่อ",
+    "loginIdentifierHint": "@you:server.org ก็ใช้ได้เช่นกัน"
   },
   "footer": {
-    "sourceCode": "ซอร์สโค้ด"
+    "sourceCode": "ซอร์สโค้ด",
+    "poweredBy": "ขับเคลื่อนโดย"
   },
   "errors": {
     "registrationUnavailable": "ผู้ให้บริการรายนี้ยังไม่เปิดรับบัญชีใหม่ในขณะนี้"
@@ -63,7 +66,8 @@
     "unavailable": "ไม่อยู่"
   },
   "settings": {
-    "logout": "ออกจากระบบ"
+    "logout": "ออกจากระบบ",
+    "settingsSync": "ซิงค์การตั้งค่าระหว่างอุปกรณ์ต่าง ๆ"
   },
   "shortcuts": {
     "paletteTitle": "ข้ามไปยังห้อง",
@@ -192,6 +196,77 @@
     "memberGroupOffline": "ออฟไลน์",
     "powerLevelModerator": "ผู้ดูแล",
     "powerLevelMember": "สมาชิก",
-    "markUnread": "ทำเครื่องหมายว่ายังไม่ได้อ่านจากตรงนี้"
+    "markUnread": "ทำเครื่องหมายว่ายังไม่ได้อ่านจากตรงนี้",
+    "memberGroup": {
+      "knock_retracted": "{{users}} ถอนคำขอเข้าห้อง",
+      "invitation_rejected": "{{users}} ปฏิเสธคำเชิญ",
+      "knocked": "{{users}} ขอเข้าห้อง",
+      "joined": "{{users}} เข้าร่วมห้อง",
+      "left": "{{users}} ออกจากห้อง"
+    },
+    "membership": {
+      "invitation_rejected": "{{user}} ปฏิเสธคำเชิญ",
+      "knock_accepted": "คำขอเข้าห้องของ {{user}} ได้รับการตอบรับ",
+      "invitation_revoked": "คำเชิญของ {{user}} ถูกยกเลิก",
+      "knocked": "{{user}} ขอเข้าห้อง",
+      "invitation_accepted": "{{user}} ตอบรับคำเชิญ",
+      "knock_denied": "คำขอเข้าห้องของ {{user}} ถูกปฏิเสธ",
+      "invited": "{{user}} ได้รับเชิญ",
+      "knock_retracted": "คำขอเข้าห้องของ {{user}} ถูกยกเลิก",
+      "banned": "{{user}} ถูกแบน",
+      "unbanned": "{{user}} ถูดปลดแบน",
+      "kicked": "{{user}} ถูกนำออก",
+      "kicked_and_banned": "{{user}} ถูกนำออกและแบน",
+      "joined": "{{user}} เข้าร่วมห้อง",
+      "left": "{{user}} ออกจากห้อง"
+    },
+    "profileAvatarRemoved": "{{user}} นำรูปโปรไฟล์ของตนออก",
+    "oneTyping": "{{name}} กำลังพิมพ์…",
+    "profileAvatarChanged": "{{user}} เปลี่ยนรูปโปรไฟล์ของตน",
+    "threeTyping": "{{name1}}, {{name2}} และ {{name3}} กำลังพิมพ์…",
+    "profileNameSet": "ชื่อที่แสดงของ {{user}} ถูกตั้งเป็น {{name}}",
+    "unknownTyping": "มีคนกำลังพิมพ์…",
+    "manyTyping": "{{name1}}, {{name2}} และอีก {{count, number}} คนกำลังพิมพ์…",
+    "profileNameChanged": "{{user}} เปลี่ยนชื่อเป็น {{name}}",
+    "profileNameRemoved": "ชื่อที่แสดงของ {{user}} ถูกลบออก",
+    "twoTyping": "{{name1}} และ {{name2}} กำลังพิมพ์…"
+  },
+  "setup": {
+    "resetOpenApproval": "เปิดผู้ให้บริการบัญชี",
+    "recoveryWrittenDown": "ฉันจดไว้แล้ว",
+    "resetContacts": "ผู้ติดต่อและอุปกรณ์อื่น ๆ ของคุณจะต้องยืนยันตัวตนของคุณอีกครั้ง",
+    "recoverySaveFirst": "เก็บคีย์ไว้ในที่ปลอดภัย จากนั้นทำเครื่องหมายในช่องเพื่อดำเนินการต่อ",
+    "recoverySaveDescription": "เก็บคีย์นี้ไว้ในที่ปลอดภัย คุณจะต้องใช้คีย์นี้เพื่ออ่านข้อความบนอุปกรณ์เครื่องใหม่ และระบบจะไม่แสดงคีย์นี้ให้เห็นอีก",
+    "back": "กลับ",
+    "recoveryDownloaded": "ดาวน์โหลดแล้ว",
+    "confirmTitle": "ยืนยันว่าเป็นคุณ",
+    "useAnotherDevice": "ใช้อุปกรณ์อื่น",
+    "resetHistory": "คุณจะสูญเสียประวัติข้อความที่จัดเก็บไว้บนเซิร์ฟเวอร์เท่านั้น",
+    "recoveryCopyFailed": "ไม่สามารถคัดลอกคีย์นี้ได้ ให้ดาวน์โหลดหรือจดบันทึกไว้แทน",
+    "confirmDescription": "ยืนยันอุปกรณ์นี้จากอุปกรณ์อีกเครื่องที่คุณลงชื่อเข้าใช้อยู่ หรือใช้คีย์กู้คืนของคุณ",
+    "cantConfirm": "ยืนยันไม่ได้?",
+    "confirmedTitle": "ยืนยันอุปกรณ์แล้ว",
+    "confirmedDescription": "อุปกรณ์นี้สามารถอ่านข้อความที่เข้ารหัสของคุณได้แล้ว",
+    "skipTitle": "ข้ามการยืนยันอุปกรณ์นี้หรือไม่?",
+    "resetApprove": "ผู้ให้บริการบัญชีของคุณต้องอนุมัติการรีเซ็ต โปรดอนุมัติที่นั่น แล้วค่อยกลับมา",
+    "syncDescription": "ซิงค์ธีม อีโมจิ และการตั้งค่าแถบด้านข้างระหว่างอุปกรณ์ต่าง ๆ โฮมเซิร์ฟเวอร์ของคุณสามารถอ่านข้อมูลที่ไม่ได้เข้ารหัสเหล่านี้ได้",
+    "syncNotNow": "เอาไว้ก่อน",
+    "recoveryDownloadFailed": "ไม่สามารถบันทึกคีย์นี้ได้ ให้คัดลอกหรือจดบันทึกไว้แทน",
+    "resetAction": "รีเซ็ตตัวตนดิจิทัลของฉัน",
+    "stageDeviceLabel": "ยืนยันว่าเป็นคุณ",
+    "recoveryCopy": "คัดลอก",
+    "recoveryCopied": "คัดลอกแล้ว",
+    "recoveryDownload": "ดาวน์โหลด",
+    "skipBody": "หากยังไม่มีการยืนยัน แอปของผู้อื่นอาจไม่แชร์คีย์ข้อความกับอุปกรณ์นี้ และอาจซ่อนข้อความที่คุณส่งจากอุปกรณ์นี้ไว้",
+    "resetWhen": "รีเซ็ตตัวตนดิจิทัลของคุณก็ต่อเมื่อคุณไม่สามารถเข้าถึงอุปกรณ์อื่นที่ได้รับการยืนยันแล้ว และไม่มีคีย์กู้คืนของคุณ",
+    "resetPassword": "ป้อนรหัสผ่านของคุณเพื่อรีเซ็ตตัวตนดิจิทัลของคุณ",
+    "resetUnderstood": "ฉันเข้าใจว่าการดำเนินการนี้ไม่สามารถย้อนกลับได้",
+    "skipAnyway": "ข้ามไปเลย",
+    "resetWaiting": "รอการอนุมัติ…",
+    "useRecoveryKey": "ใช้คีย์กู้คืน"
+  },
+  "qrLogin": {
+    "titleLogin": "ลงชื่อเข้าใช้ด้วยรหัส QR",
+    "signInWithQr": "ลงชื่อเข้าใช้ด้วยรหัส QR"
   }
 }

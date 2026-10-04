@@ -1012,7 +1012,6 @@
     "hideImage": "Hide {{name}}",
     "revealImage": "Reveal {{name}}",
     "jumpToUnread": "Jump to unread",
-    "newMessages": "New messages",
     "markRead": "Mark as read",
     "markReadFailed": "Could not mark this room as read. Try again.",
     "unreadJumpFailed": "Could not load unread messages. Try again.",

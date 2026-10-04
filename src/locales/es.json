@@ -36,7 +36,9 @@
     "createKindCalendar": "Calendario",
     "createEncryptionHint": "No se puede desactivar más tarde.",
     "createJoinRuleLabel": "Quién puede unirse",
-    "pinDenied": "No tienes permiso para fijar mensajes en esta sala."
+    "pinDenied": "No tienes permiso para fijar mensajes en esta sala.",
+    "createAliasLabel": "Dirección",
+    "createJoinRuleKnockRestrictedHint": "Cualquiera en {{space}} puede unirse; otros pueden solicitar unirse."
   },
   "timeline": {
     "membership": {
@@ -164,7 +166,15 @@
     "folderCollapse": "Colapsar {{name}}",
     "add": "Añadir una sala o un espacio",
     "unreadMentions": "{{count, number}} menciones",
-    "voiceRoom": "Sala de voz"
+    "voiceRoom": "Sala de voz",
+    "primary": "Navegación principal",
+    "manageAccountsDescription": "Cambiar de cuenta o eliminar cuentas de este dispositivo.",
+    "accounts": "Cuentas",
+    "showRoomList": "Mostrar lista de salas",
+    "navigate": "Navegar",
+    "messageSearch": "Buscar mensajes",
+    "switch": "Cambiar",
+    "joinWithAddress": "Unirse con dirección"
   },
   "home": {
     "startRoomDescription": "Crea una sala o espacio para tu grupo de amigos o comunidad.",
@@ -182,7 +192,6 @@
     "remove": "Eliminar {{name}}",
     "edit": "Editar {{name}}",
     "title": "Perfiles Por Mensaje",
-    "description": "Enviar mensajes con apariencia distinta desde una misma cuenta.",
     "removeTitle": "¿Eliminar {{name}}?"
   },
   "presence": {
