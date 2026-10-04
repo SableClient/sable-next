@@ -17,6 +17,12 @@
     "unifiedPushGatewayUrl": "https://matrix.gateway.unifiedpush.org/_matrix/push/v1/notify",
     "unifiedPushEmbeddedServerUrl": "https://ntfy.ow-ops.eu"
   },
+  "supporterAwards": {
+    "serviceUrl": "https://awards.sable.moe",
+    "keys": {
+      "1": "MQEJebxUXHl9QvvnB0uO11dAx6hlaqTe2hq/NadRjVk"
+    }
+  },
   "gifs": {
     "provider": "tenor",
     "proxyUrl": "gifs.sable.moe",

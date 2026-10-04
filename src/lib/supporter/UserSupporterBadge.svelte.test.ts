@@ -3,9 +3,12 @@
 import { render, screen } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
 
-vi.mock('#lib/config/links.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('#lib/config/links.js')>()),
-  SABLE_AWARDS_KEYS: { '1': '6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw' },
+vi.mock('#lib/supporter/config.js', () => ({
+  supporterConfig: () =>
+    Promise.resolve({
+      serviceUrl: 'https://awards.test',
+      keys: { '1': '6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw' },
+    }),
 }));
 
 import { FIXTURE_USER, VALID } from './fixtures.js';

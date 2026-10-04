@@ -23,6 +23,22 @@ test('offers to verify with Open Collective', async () => {
   expect(verify).toHaveBeenCalledOnce();
 });
 
+test('lets someone fetch a badge that was issued by hand', async () => {
+  const claim = vi.spyOn(supporter, 'claim').mockResolvedValue();
+  render(SupporterSettings);
+
+  await userEvent.click(screen.getByRole('button', { name: 'Check' }));
+
+  expect(claim).toHaveBeenCalledOnce();
+});
+
+test('reports when no badge was issued', () => {
+  supporter.status = 'none';
+  render(SupporterSettings);
+
+  expect(screen.getByText('No badge has been issued for this account.')).toBeInTheDocument();
+});
+
 test('shows progress and a cancel button while waiting', async () => {
   supporter.status = 'waiting';
   const cancel = vi.spyOn(supporter, 'cancel').mockImplementation(() => {});

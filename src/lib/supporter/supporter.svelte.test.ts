@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-vi.mock('#lib/config/links.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('#lib/config/links.js')>()),
-  SABLE_AWARDS_KEYS: { '1': '6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw' },
+vi.mock('#lib/supporter/config.js', () => ({
+  supporterConfig: () =>
+    Promise.resolve({
+      serviceUrl: 'https://awards.test',
+      keys: { '1': '6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw' },
+    }),
 }));
 vi.mock('#lib/platform/external-auth.js', () => ({
   openExternalAuthUrl: vi.fn(() => Promise.resolve()),
@@ -111,7 +114,7 @@ describe('verify', () => {
     expect(openExternalAuthUrl).toHaveBeenCalledWith(
       'https://opencollective.com/oauth/authorize?state=s'
     );
-    expect(startVerification).toHaveBeenCalledWith(openId);
+    expect(startVerification).toHaveBeenCalledWith('https://awards.test', openId);
 
     await vi.advanceTimersByTimeAsync(2000);
     expect(stub.setProfileField).not.toHaveBeenCalled();
@@ -185,6 +188,62 @@ describe('verify', () => {
     await done;
 
     expect(stub.setProfileField).not.toHaveBeenCalled();
+  });
+});
+
+describe('claim', () => {
+  test('stores an award that was issued by hand', async () => {
+    vi.mocked(fetchAwards).mockResolvedValue([VALID]);
+    const { stub, core } = makeCore(null);
+    supporter.start(core);
+    await vi.waitFor(() => {
+      expect(stub.userProfile).toHaveBeenCalled();
+    });
+
+    await supporter.claim();
+
+    expect(fetchAwards).toHaveBeenCalledWith('https://awards.test', FIXTURE_USER);
+    expect(stub.setProfileField).toHaveBeenCalledWith(SUPPORTER_FIELD, [VALID]);
+    expect(supporter.badge?.label).toBe('Donor');
+    expect(supporter.status).toBe('idle');
+  });
+
+  test('says so when nothing was issued', async () => {
+    const { stub, core } = makeCore(null);
+    supporter.start(core);
+    await vi.waitFor(() => {
+      expect(stub.userProfile).toHaveBeenCalled();
+    });
+
+    await supporter.claim();
+
+    expect(supporter.status).toBe('none');
+    expect(stub.setProfileField).not.toHaveBeenCalled();
+  });
+
+  test('never contacts the service on its own', async () => {
+    const { stub, core } = makeCore(null);
+    supporter.start(core);
+    await vi.waitFor(() => {
+      expect(stub.userProfile).toHaveBeenCalled();
+    });
+
+    expect(fetchAwards).not.toHaveBeenCalled();
+    expect(startVerification).not.toHaveBeenCalled();
+  });
+
+  test('fails when the lookup errors', async () => {
+    vi.mocked(fetchAwards).mockRejectedValue(new Error('offline'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { stub, core } = makeCore(null);
+    supporter.start(core);
+    await vi.waitFor(() => {
+      expect(stub.userProfile).toHaveBeenCalled();
+    });
+
+    await supporter.claim();
+
+    expect(supporter.status).toBe('failed');
   });
 });
 

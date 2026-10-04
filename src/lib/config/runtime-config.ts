@@ -28,8 +28,14 @@ export type CallsConfig = {
   livekitServiceUrl: string | null;
 };
 
+export type SupporterConfig = {
+  serviceUrl: string;
+  keys: Readonly<Record<string, string>>;
+};
+
 export type RuntimeConfig = {
   push: PushDetails | null;
+  supporter: SupporterConfig | null;
   gifs: GifsConfig;
   homeservers: HomeserversConfig;
   calls: CallsConfig;
@@ -56,6 +62,7 @@ const NO_CALLS: CallsConfig = { livekitServiceUrl: null };
 
 const EMPTY: RuntimeConfig = {
   push: null,
+  supporter: null,
   gifs: NO_GIFS,
   homeservers: BUILT_IN_HOMESERVERS,
   calls: NO_CALLS,
@@ -95,6 +102,28 @@ function parsePush(raw: unknown): PushDetails | null {
       ? { unifiedPushGatewayUrl: text(source.unifiedPushGatewayUrl) }
       : {}),
   };
+}
+
+const ED25519_PUBLIC_KEY = /^[A-Za-z0-9+/_-]{43}$/;
+
+/** Both halves are needed: a service nobody can verify is worse than none. */
+function parseSupporter(raw: unknown): SupporterConfig | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+
+  const source = raw as Record<string, unknown>;
+  const serviceUrl = text(source.serviceUrl)?.replace(/\/+$/, '');
+  if (!serviceUrl || !/^https?:\/\//.test(serviceUrl)) return null;
+
+  const keys =
+    typeof source.keys === 'object' && source.keys !== null && !Array.isArray(source.keys)
+      ? Object.entries(source.keys).flatMap(([id, key]) => {
+          const value = text(key);
+          return value && ED25519_PUBLIC_KEY.test(value) ? [[id, value] as const] : [];
+        })
+      : [];
+  if (keys.length === 0) return null;
+
+  return { serviceUrl, keys: Object.fromEntries(keys) };
 }
 
 function parseGifs(raw: unknown): GifsConfig {
@@ -141,6 +170,7 @@ export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
   const source = raw as Record<string, unknown>;
   return {
     push: parsePush(source.pushNotificationDetails),
+    supporter: parseSupporter(source.supporterAwards),
     gifs: parseGifs(source.gifs),
     homeservers: withDefaultAt(
       parseHomeservers(source.homeserverList, source.allowCustomHomeservers),
