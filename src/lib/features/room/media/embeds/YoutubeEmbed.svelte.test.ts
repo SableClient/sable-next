@@ -9,12 +9,15 @@ vi.mock('#lib/core/context.js');
 
 import type { UrlPreviewView } from '#src/generated/protocol';
 
+import { preferences } from '#lib/settings/preferences.svelte.js';
+
 import YoutubeEmbed from './YoutubeEmbed.svelte';
 
 declare const window: Window & { happyDOM: { settings: { disableIframePageLoading: boolean } } };
 window.happyDOM.settings.disableIframePageLoading = true;
 
 afterEach(() => {
+  preferences.urlPreviews = false;
   vi.unstubAllGlobals();
 });
 
@@ -60,6 +63,7 @@ test('shows the title and plays the video in place', async () => {
 });
 
 test('falls back to the homeserver preview for a video YouTube will not describe', async () => {
+  preferences.urlPreviews = true;
   vi.stubGlobal(
     'fetch',
     vi.fn(() => Promise.resolve(new Response('Not Found', { status: 404 })))

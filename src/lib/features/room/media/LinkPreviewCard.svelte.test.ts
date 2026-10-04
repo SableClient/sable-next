@@ -107,6 +107,17 @@ test('an in-flight request does not write into a torn-down component', async () 
   await tick();
 });
 
+test('renders no bundled preview while url previews are disabled', () => {
+  preferences.urlPreviews = false;
+  render(LinkPreviewCard, {
+    url: 'https://example.org/c',
+    encrypted: false,
+    bundled: preview({ url: 'https://example.org/c' }),
+  });
+
+  expect(screen.queryByRole('link')).not.toBeInTheDocument();
+});
+
 test('does nothing while url previews are disabled', async () => {
   preferences.urlPreviews = false;
   core.urlPreview.mockResolvedValue(preview());
@@ -244,6 +255,7 @@ test('a preview carrying a title stays a card even with an image', async () => {
 });
 
 test('uses a site-specific presentation for a recognised URL', () => {
+  preferences.urlPreviews = true;
   render(LinkPreviewCard, {
     url: 'https://youtu.be/MTn_bhTVr2U',
     encrypted: false,
@@ -287,6 +299,7 @@ test.each([
   ['https://example.org/image-only', null, null],
   ['https://youtu.be/MTn_bhTVr2U', 'A video', 'YouTube'],
 ])('the image at %s can be hidden without following its link', async (url, title, site_name) => {
+  preferences.urlPreviews = true;
   const onDocumentClick = vi.fn();
   document.addEventListener('click', onDocumentClick);
   render(LinkPreviewCard, {

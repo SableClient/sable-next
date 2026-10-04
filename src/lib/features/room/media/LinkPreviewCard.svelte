@@ -26,12 +26,12 @@
   );
 
   $effect(() => {
-    if (bundled !== null) {
-      preview = bundled;
-      return;
-    }
     if (!allowed) {
       preview = null;
+      return;
+    }
+    if (bundled !== null) {
+      preview = bundled;
       return;
     }
 
