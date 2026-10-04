@@ -585,17 +585,17 @@
               showOperatorList = false;
             }}
           />
-          {#if search.query !== ''}
-            <button
-              class="query-clear"
-              type="button"
-              aria-label={$i18n.t('search.clear')}
-              onclick={clearQuery}
-            >
-              <XIcon />
-            </button>
-          {/if}
         </div>
+        {#if search.query !== ''}
+          <button
+            class="query-clear"
+            type="button"
+            aria-label={$i18n.t('search.clear')}
+            onclick={clearQuery}
+          >
+            <XIcon />
+          </button>
+        {/if}
 
         {#if suggestions.length > 0}
           <div class="search-autocomplete">
@@ -840,6 +840,8 @@
   }
 
   .field {
+    --clear-size: 1.5rem;
+
     position: relative;
   }
 
@@ -849,6 +851,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-150);
+    padding-inline-end: calc(var(--space-200) + var(--clear-size) + var(--space-100));
     width: 100%;
   }
 
@@ -877,7 +880,7 @@
   }
 
   .query-clear {
-    --target: 1.5rem;
+    --target: var(--clear-size);
 
     align-items: center;
     background: none;
@@ -888,9 +891,12 @@
     display: flex;
     flex: 0 0 auto;
     height: var(--target);
+    inset-block-start: 50%;
+    inset-inline-end: var(--space-200);
     justify-content: center;
     padding: 0;
-    position: relative;
+    position: absolute;
+    transform: translateY(-50%);
     width: var(--target);
   }
 
