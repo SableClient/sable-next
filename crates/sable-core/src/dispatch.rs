@@ -689,11 +689,21 @@ impl Core {
                 event_id,
                 thread_root,
             } => {
-                self.timeline_for(&room_id, thread_root.as_ref())
+                let fetched = self
+                    .timeline_for(&room_id, thread_root.as_ref())
                     .await?
                     .fetch_details_for_event(&event_id)
-                    .await
-                    .or_failed(self, "fetch_event_details")?;
+                    .await;
+                match fetched {
+                    Err(TimelineError::EventNotInTimeline(_)) => {
+                        tracing::debug!(
+                            context = "fetch_event_details",
+                            "the event left the timeline"
+                        );
+                        return Err(CommandErr::Unavailable);
+                    }
+                    other => other.or_failed(self, "fetch_event_details")?,
+                }
 
                 Ok(CommandOk::FetchEventDetails)
             }
