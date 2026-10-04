@@ -43,12 +43,17 @@
   let settledPath = $state(page.url.pathname);
   let routeChanging = $derived(pathname !== settledPath && page.params.roomId === undefined);
   let spaceIndex = $derived(/^\/space\/[^/]+$/.test(pathname));
+  let spaceLobby = $derived(/^\/space\/[^/]+\/lobby$/.test(pathname));
   let defaultOpen = $derived(LIST_INDEX_PATHS.has(pathname) || spaceIndex);
   let pinnedOpen = $derived(BLANK_INDEX_PATHS.has(pathname) || spaceIndex);
   let pinnedClosed = $derived(MOBILE_QUICK_TOOLS_PATHS.has(pathname));
   let showMobileQuickTools = $derived(MOBILE_QUICK_TOOLS_PATHS.has(pathname));
   let showMobileBackBar = $derived(
-    !appLayout.matches && !pinnedOpen && !showMobileQuickTools && page.params.roomId === undefined
+    !appLayout.matches &&
+      !pinnedOpen &&
+      !showMobileQuickTools &&
+      !spaceLobby &&
+      page.params.roomId === undefined
   );
   let open = $derived(
     pinnedClosed

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { CoreError } from '#src/transport';
   import type { RoomPermissionsView, RoomSummary, SpaceChildEdge } from '#src/generated/protocol';
+  import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import ListBulletsIcon from 'phosphor-svelte/lib/ListBulletsIcon';
   import HashIcon from 'phosphor-svelte/lib/HashIcon';
@@ -37,6 +38,9 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
+  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import { backToRoomList } from '#lib/features/room/room-navigation.js';
 
   import {
     applyChildOverrides,
@@ -97,6 +101,7 @@
   const closed = new SvelteSet<string>();
   const visibleLevels = new SvelteSet<string>();
 
+  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   const hierarchy = new SpaceHierarchyLoader(core);
   let fetched = $derived(hierarchy.fetched);
   let overrides = $state.raw<ChildOrderOverride[]>([]);
@@ -586,6 +591,18 @@
       },
     })}
   >
+    {#if !appLayout.matches}
+      <div class="mobile-back-menu">
+        <IconButton
+          variant="ghost"
+          size="small"
+          label={$i18n.t('timeline.back')}
+          onclick={backToRoomList}
+        >
+          <BackIcon />
+        </IconButton>
+      </div>
+    {/if}
     {#if space}
       <div class="hero-menu">
         {#if preferences.developerTools}
@@ -884,11 +901,17 @@
   .hero {
     display: grid;
     justify-items: center;
-    padding: var(--space-500) 0 var(--space-300);
+    padding: var(--space-500) 0 var(--space-100);
     position: relative;
     text-align: center;
     -webkit-touch-callout: none;
     user-select: none;
+  }
+
+  .mobile-back-menu {
+    left: 0;
+    position: absolute;
+    top: var(--space-300);
   }
 
   .hero-menu {
