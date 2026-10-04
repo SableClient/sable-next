@@ -505,6 +505,43 @@ fn spoiler_bars(text: &str, index: usize) -> Option<(usize, &str)> {
     Some((inner.len() + 4, inner))
 }
 
+fn math_span(text: &str, index: usize) -> Option<(usize, String)> {
+    let rest = text.get(index..)?;
+    let before = text.get(..index)?.chars().next_back();
+    if before.is_some_and(|c| c.is_alphanumeric() || c == '$') {
+        return None;
+    }
+    let (display, body) = match rest.strip_prefix("$$") {
+        Some(body) => (true, body),
+        None => (false, rest.strip_prefix('$')?),
+    };
+    let inner = body.get(..body.find(if display { "$$" } else { "$" })?)?;
+    if inner.trim().is_empty() || (!display && inner.contains('\n')) {
+        return None;
+    }
+    if !display {
+        let after = body.get(inner.len() + 1..)?.chars().next();
+        let bounded = !inner.starts_with(char::is_whitespace)
+            && !inner.ends_with(char::is_whitespace)
+            && !inner.starts_with('[')
+            && !after.is_some_and(|c| c.is_ascii_digit());
+        if !bounded {
+            return None;
+        }
+    }
+    let latex = inner.trim();
+    let attribute = html_escape::encode_double_quoted_attribute(latex);
+    let tag = if display { "div" } else { "span" };
+    let consumed = inner.len() + if display { 4 } else { 2 };
+    Some((
+        consumed,
+        format!(
+            "<{tag} data-mx-maths=\"{attribute}\"><code>{}</code></{tag}>",
+            escape_html(latex)
+        ),
+    ))
+}
+
 fn hide_spoiler_bars(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut index = 0;
@@ -631,6 +668,18 @@ fn rewrite_mfm_at_depth(text: &str, depth: usize) -> String {
         if code_ticks.is_none()
             && rest.starts_with("$[")
             && let Some((consumed, element)) = mfm_element(rest, depth)
+        {
+            if let Some(before) = text.get(plain_start..index) {
+                html.push_str(&inline_markdown(before));
+            }
+            html.push_str(&element);
+            index += consumed;
+            plain_start = index;
+            continue;
+        }
+        if code_ticks.is_none()
+            && !rest.starts_with("$[")
+            && let Some((consumed, element)) = math_span(text, index)
         {
             if let Some(before) = text.get(plain_start..index) {
                 html.push_str(&inline_markdown(before));
@@ -1630,6 +1679,34 @@ mod tests {
         let html = display_html("plain words", Some("<script>alert(1)</script>"));
 
         assert_eq!(html, "<span data-plain-body>plain words</span>");
+    }
+
+    #[test]
+    fn plain_text_maths_becomes_a_maths_element() {
+        assert_eq!(
+            display_html("see $x^2$ now", None),
+            "<span data-plain-body>see <span data-mx-maths=\"x^2\"><code>x^2</code></span> now</span>"
+        );
+        assert_eq!(
+            display_html("$$a<b$$", None),
+            "<span data-plain-body><div data-mx-maths=\"a&lt;b\"><code>a&lt;b</code></div></span>"
+        );
+    }
+
+    #[test]
+    fn prices_and_code_are_not_maths() {
+        for body in [
+            "costs $5 and $10",
+            "a $ b $ c",
+            "`$x$`",
+            "\\$x$",
+            "$[unixtime 1]",
+        ] {
+            assert!(
+                !display_html(body, None).contains("data-mx-maths"),
+                "{body}"
+            );
+        }
     }
 
     #[test]
