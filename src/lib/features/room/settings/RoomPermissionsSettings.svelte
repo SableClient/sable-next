@@ -484,127 +484,6 @@
       </ul>
     </SettingsSection>
 
-    <SettingsSection headingId="room-perm-member-list" title={$i18n.t('room.memberListTitle')}>
-      <ul class="settings-rows">
-        <SettingsRow
-          title={$i18n.t('room.memberListRow')}
-          description={$i18n.t('room.memberListHint')}
-        >
-          <Select
-            value={alwaysListedFrom === null ? 'default' : String(alwaysListedFrom)}
-            aria-label={$i18n.t('room.memberListRow')}
-            disabled={!canEditMemberList || memberListSaving}
-            items={memberListChoices}
-            onValueChange={(next: string) => void saveMemberList(next)}
-          />
-        </SettingsRow>
-      </ul>
-      {#if memberListFailed}
-        <div class="settings-form">
-          <Alert variant="critical" role="alert">{$i18n.t('room.memberListFailed')}</Alert>
-        </div>
-      {/if}
-    </SettingsSection>
-
-    {#if canEdit && syncSpaceId}
-      <SettingsSection headingId="room-perm-sync" title={$i18n.t('room.permSyncTitle')}>
-        <ul class="settings-rows">
-          <SettingsRow
-            title={$i18n.t('room.permSyncRow', { space: spaceName(syncSpaceId) })}
-            description={$i18n.t('room.permSyncHint')}
-          >
-            {#if syncSpaceIds.length > 1}
-              <Select
-                value={syncSpaceId}
-                aria-label={$i18n.t('room.permSyncSpace')}
-                disabled={syncing}
-                items={syncSpaceIds.map((spaceId) => ({
-                  value: spaceId,
-                  label: spaceName(spaceId),
-                }))}
-                onValueChange={(next: string) => {
-                  syncChoice = next;
-                }}
-              />
-            {/if}
-            <Button
-              variant="secondary"
-              disabled={saving || syncing}
-              onclick={() => {
-                syncFailed = false;
-                syncConfirm = true;
-              }}
-            >
-              {$i18n.t('room.permSync')}
-            </Button>
-          </SettingsRow>
-        </ul>
-      </SettingsSection>
-    {/if}
-
-    {#if canEdit && childIds.length > 0}
-      <SettingsSection headingId="room-perm-children" title={$i18n.t('room.permChildrenTitle')}>
-        <ul class="settings-rows">
-          <SettingsRow
-            title={$i18n.t('room.permChildrenRow', { count: childIds.length })}
-            description={childResult
-              ? $i18n.t('room.permChildrenDone', {
-                  count: childResult.updated,
-                  skipped: childResult.skipped,
-                })
-              : $i18n.t('room.permChildrenHint')}
-          >
-            <Button
-              variant="secondary"
-              disabled={saving || childSyncing}
-              onclick={() => {
-                childResult = null;
-                childConfirm = true;
-              }}
-            >
-              {$i18n.t('room.permChildrenApply')}
-            </Button>
-          </SettingsRow>
-        </ul>
-      </SettingsSection>
-    {/if}
-
-    {#each groups as group (group.label)}
-      <SettingsSection headingId={`room-perm-${group.label}`} title={$i18n.t(group.label)}>
-        <ul class="settings-rows">
-          {#each group.items as item (item.label)}
-            {@const level = levelAt(levels, item.location)}
-            {@const tag = tagForLevel(roleTags, level)}
-            <SettingsRow title={$i18n.t(item.label)}>
-              {#if canEdit && level <= ownLevel}
-                <Select
-                  value={String(level)}
-                  aria-label={$i18n.t(item.label)}
-                  disabled={saving}
-                  items={options(level)}
-                  onValueChange={(next: string) => {
-                    void setLevel(item.location, Number(next));
-                  }}
-                />
-              {:else if tag}
-                <span class="role-chip">
-                  <span
-                    class="role-swatch"
-                    style:background-color={tag.color ?? undefined}
-                    aria-hidden="true"
-                  ></span>
-                  {#if tag.icon}<RoleTagIcon icon={tag.icon} class="role-icon" />{/if}
-                  <span class="role-name">{tag.name} ({level})</span>
-                </span>
-              {:else}
-                <span class="level">{levelLabel(level)}</span>
-              {/if}
-            </SettingsRow>
-          {/each}
-        </ul>
-      </SettingsSection>
-    {/each}
-
     {#if editingRole}
       <SettingsSection headingId="room-perm-role-editor" title={$i18n.t('room.permRoleEdit')}>
         <form
@@ -729,6 +608,127 @@
         </form>
       </SettingsSection>
     {/if}
+
+    <SettingsSection headingId="room-perm-member-list" title={$i18n.t('room.memberListTitle')}>
+      <ul class="settings-rows">
+        <SettingsRow
+          title={$i18n.t('room.memberListRow')}
+          description={$i18n.t('room.memberListHint')}
+        >
+          <Select
+            value={alwaysListedFrom === null ? 'default' : String(alwaysListedFrom)}
+            aria-label={$i18n.t('room.memberListRow')}
+            disabled={!canEditMemberList || memberListSaving}
+            items={memberListChoices}
+            onValueChange={(next: string) => void saveMemberList(next)}
+          />
+        </SettingsRow>
+      </ul>
+      {#if memberListFailed}
+        <div class="settings-form">
+          <Alert variant="critical" role="alert">{$i18n.t('room.memberListFailed')}</Alert>
+        </div>
+      {/if}
+    </SettingsSection>
+
+    {#if canEdit && syncSpaceId}
+      <SettingsSection headingId="room-perm-sync" title={$i18n.t('room.permSyncTitle')}>
+        <ul class="settings-rows">
+          <SettingsRow
+            title={$i18n.t('room.permSyncRow', { space: spaceName(syncSpaceId) })}
+            description={$i18n.t('room.permSyncHint')}
+          >
+            {#if syncSpaceIds.length > 1}
+              <Select
+                value={syncSpaceId}
+                aria-label={$i18n.t('room.permSyncSpace')}
+                disabled={syncing}
+                items={syncSpaceIds.map((spaceId) => ({
+                  value: spaceId,
+                  label: spaceName(spaceId),
+                }))}
+                onValueChange={(next: string) => {
+                  syncChoice = next;
+                }}
+              />
+            {/if}
+            <Button
+              variant="secondary"
+              disabled={saving || syncing}
+              onclick={() => {
+                syncFailed = false;
+                syncConfirm = true;
+              }}
+            >
+              {$i18n.t('room.permSync')}
+            </Button>
+          </SettingsRow>
+        </ul>
+      </SettingsSection>
+    {/if}
+
+    {#if canEdit && childIds.length > 0}
+      <SettingsSection headingId="room-perm-children" title={$i18n.t('room.permChildrenTitle')}>
+        <ul class="settings-rows">
+          <SettingsRow
+            title={$i18n.t('room.permChildrenRow', { count: childIds.length })}
+            description={childResult
+              ? $i18n.t('room.permChildrenDone', {
+                  count: childResult.updated,
+                  skipped: childResult.skipped,
+                })
+              : $i18n.t('room.permChildrenHint')}
+          >
+            <Button
+              variant="secondary"
+              disabled={saving || childSyncing}
+              onclick={() => {
+                childResult = null;
+                childConfirm = true;
+              }}
+            >
+              {$i18n.t('room.permChildrenApply')}
+            </Button>
+          </SettingsRow>
+        </ul>
+      </SettingsSection>
+    {/if}
+
+    {#each groups as group (group.label)}
+      <SettingsSection headingId={`room-perm-${group.label}`} title={$i18n.t(group.label)}>
+        <ul class="settings-rows">
+          {#each group.items as item (item.label)}
+            {@const level = levelAt(levels, item.location)}
+            {@const tag = tagForLevel(roleTags, level)}
+            <SettingsRow title={$i18n.t(item.label)}>
+              {#if canEdit && level <= ownLevel}
+                <Select
+                  value={String(level)}
+                  aria-label={$i18n.t(item.label)}
+                  disabled={saving}
+                  items={options(level)}
+                  onValueChange={(next: string) => {
+                    void setLevel(item.location, Number(next));
+                  }}
+                />
+              {:else if tag}
+                <span class="role-chip">
+                  <span
+                    class="role-swatch"
+                    style:background-color={tag.color ?? undefined}
+                    aria-hidden="true"
+                  ></span>
+                  {#if tag.icon}<RoleTagIcon icon={tag.icon} class="role-icon" />{/if}
+                  <span class="role-name">{tag.name} ({level})</span>
+                </span>
+              {:else}
+                <span class="level">{levelLabel(level)}</span>
+              {/if}
+            </SettingsRow>
+          {/each}
+        </ul>
+      </SettingsSection>
+    {/each}
   {/if}
 </div>
 
