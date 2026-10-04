@@ -1044,6 +1044,24 @@ test('profile lookups run a few at a time', async () => {
   }
 });
 
+test('an urgent profile lookup skips the queue', async () => {
+  vi.useFakeTimers();
+  const fake = fakeTransport();
+  const core = createCoreClient(() => fake.transport);
+  fake.send.mockImplementation(() => new Promise(() => {}));
+  try {
+    for (let index = 0; index < 8; index += 1) void core.userProfile(`@user${index}:example.org`);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fake.send).toHaveBeenCalledTimes(6);
+    void core.userProfile('@card:example.org', true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fake.send).toHaveBeenCalledTimes(7);
+  } finally {
+    core.stop();
+    vi.useRealTimers();
+  }
+});
+
 test('a rate-limited profile lookup waits out the hint and retries', async () => {
   vi.useFakeTimers();
   const fake = fakeTransport();

@@ -504,7 +504,7 @@ export class CoreClient {
     }
   }
 
-  async userProfile(userId: string): Promise<ProfileView> {
+  async userProfile(userId: string, urgent = false): Promise<ProfileView> {
     const accountId = this.session?.account_id ?? null;
     const cached = this.profileCache.get(userId);
     if (cached?.accountId === accountId) {
@@ -512,14 +512,14 @@ export class CoreClient {
     }
 
     const pending = this.profileRequests.get(userId);
-    if (pending?.accountId === accountId) return pending.request;
+    if (pending?.accountId === accountId && !urgent) return pending.request;
 
     const failure = this.profileFailures.get(userId);
-    if (failure?.accountId === accountId) {
+    if (failure?.accountId === accountId && !urgent) {
       throw failure.error;
     }
 
-    const request = this.lookUpProfile(userId)
+    const request = this.lookUpProfile(userId, urgent)
       .then((profile) => {
         if (this.profileRequests.get(userId)?.request === request) {
           this.profileFailures.delete(userId);
@@ -564,11 +564,22 @@ export class CoreClient {
     }, PROFILE_CHANGE_NOTIFY_MS);
   }
 
-  private async lookUpProfile(userId: string): Promise<ProfileView> {
+  private async lookUpProfile(userId: string, urgent: boolean): Promise<ProfileView> {
+    if (urgent) return this.requestProfile(userId, true);
     if (this.profileLookups < MAX_PROFILE_LOOKUPS) this.profileLookups += 1;
     else await new Promise<void>((resolve) => this.profileLookupQueue.push(resolve));
     try {
-      for (let retried = false; ; retried = true) {
+      return await this.requestProfile(userId, false);
+    } finally {
+      const next = this.profileLookupQueue.shift();
+      if (next) next();
+      else this.profileLookups -= 1;
+    }
+  }
+
+  private async requestProfile(userId: string, urgent: boolean): Promise<ProfileView> {
+    for (let retried = false; ; retried = true) {
+      if (!urgent || retried) {
         for (
           let wait = this.profileResumeAt - Date.now();
           wait > 0;
@@ -576,26 +587,22 @@ export class CoreClient {
         ) {
           await new Promise((resolve) => setTimeout(resolve, wait));
         }
-        try {
-          return (await this.ensureTransport().send({ type: 'user_profile', user_id: userId }))
-            .profile;
-        } catch (error) {
-          if (!(error instanceof CoreError) || error.detail.code !== 'rate_limited') throw error;
-          this.profileResumeAt = Math.max(
-            this.profileResumeAt,
-            Date.now() +
-              Math.min(
-                error.detail.retry_after_ms ?? PROFILE_RATE_LIMIT_PAUSE_MS,
-                PROFILE_RETRY_AFTER_CAP_MS
-              )
-          );
-          if (retried) throw error;
-        }
       }
-    } finally {
-      const next = this.profileLookupQueue.shift();
-      if (next) next();
-      else this.profileLookups -= 1;
+      try {
+        return (await this.ensureTransport().send({ type: 'user_profile', user_id: userId }))
+          .profile;
+      } catch (error) {
+        if (!(error instanceof CoreError) || error.detail.code !== 'rate_limited') throw error;
+        this.profileResumeAt = Math.max(
+          this.profileResumeAt,
+          Date.now() +
+            Math.min(
+              error.detail.retry_after_ms ?? PROFILE_RATE_LIMIT_PAUSE_MS,
+              PROFILE_RETRY_AFTER_CAP_MS
+            )
+        );
+        if (retried) throw error;
+      }
     }
   }
 
