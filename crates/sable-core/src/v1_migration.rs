@@ -21,6 +21,7 @@ use serde_json::Value;
 
 use crate::{
     Core,
+    errors::CoreError,
     session::{AccountRegistry, Credentials, PersistedAccount, PersistedSession},
 };
 
@@ -62,7 +63,7 @@ pub(crate) struct Import {
     imported: Vec<BTreeMap<String, u64>>,
 }
 
-fn decode<T: DeserializeOwned>(value: Value) -> Result<T, String> {
+fn decode<T: DeserializeOwned>(value: Value) -> Result<T, CoreError> {
     if value.get("ciphertext").is_some() {
         return Err("v1 crypto is encrypted; the original store key is required".into());
     }
@@ -95,19 +96,19 @@ fn key_parts(key: &str) -> Vec<String> {
     parts
 }
 
-fn parse_id<T: std::str::FromStr>(value: &str) -> Result<T, String> {
+fn parse_id<T: std::str::FromStr>(value: &str) -> Result<T, CoreError> {
     value
         .parse()
         .map_err(|_| "invalid v1 crypto identifier".into())
 }
 
-fn private_directory(path: &Path) -> Result<(), String> {
-    std::fs::create_dir_all(path).map_err(|error| error.to_string())?;
+fn private_directory(path: &Path) -> Result<(), CoreError> {
+    std::fs::create_dir_all(path).map_err(CoreError::backend)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
-            .map_err(|error| error.to_string())?;
+            .map_err(CoreError::backend)?;
     }
     Ok(())
 }
@@ -128,23 +129,23 @@ fn source_directory(roots: &[PathBuf], user: &str, device: &str) -> Option<PathB
     None
 }
 
-async fn snapshot_sqlite(source: PathBuf, target: PathBuf) -> Result<(), String> {
+async fn snapshot_sqlite(source: PathBuf, target: PathBuf) -> Result<(), CoreError> {
     tokio::task::spawn_blocking(move || {
         let connection = rusqlite::Connection::open_with_flags(
             source.join("matrix-sdk-crypto.sqlite3"),
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
         )
-        .map_err(|error| error.to_string())?;
+        .map_err(CoreError::backend)?;
         connection
             .backup("main", target.join("matrix-sdk-crypto.sqlite3"), None)
-            .map_err(|error| error.to_string())
+            .map_err(CoreError::backend)
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(CoreError::backend)?
 }
 
 impl LegacySession {
-    fn persisted(self) -> Result<PersistedSession, String> {
+    fn persisted(self) -> Result<PersistedSession, CoreError> {
         let homeserver = url::Url::parse(&self.base_url).map_err(|_| "invalid v1 homeserver")?;
         if !matches!(homeserver.scheme(), "https" | "http")
             || self.access_token.is_empty()
@@ -187,7 +188,7 @@ impl LegacySession {
 }
 
 impl Core {
-    pub async fn v1_migration_complete(&self) -> Result<bool, String> {
+    pub async fn v1_migration_complete(&self) -> Result<bool, CoreError> {
         if self.sessions.load().await?.is_some() {
             private_directory(Path::new(&self.store_id))?;
             tokio::fs::write(
@@ -195,17 +196,17 @@ impl Core {
                 b"1",
             )
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(CoreError::backend)?;
             return Ok(true);
         }
         match tokio::fs::metadata(Path::new(&self.store_id).join("v1-migration-complete")).await {
             Ok(metadata) => Ok(metadata.is_file()),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(error) => Err(error.to_string()),
+            Err(error) => Err(CoreError::backend(error)),
         }
     }
 
-    pub async fn skip_v1_migration(&self) -> Result<(), String> {
+    pub async fn skip_v1_migration(&self) -> Result<(), CoreError> {
         let _restore = self.restore_lock.lock().await;
         self.v1_migration.lock().await.take();
         private_directory(Path::new(&self.store_id))?;
@@ -214,7 +215,7 @@ impl Core {
             b"1",
         )
         .await
-        .map_err(|error| error.to_string())
+        .map_err(CoreError::backend)
     }
 
     pub async fn begin_v1_migration(
@@ -223,7 +224,7 @@ impl Core {
         active_user_id: Option<String>,
         snapshots: Vec<Option<IndexedDbSnapshot>>,
         native_roots: Vec<PathBuf>,
-    ) -> Result<(), String> {
+    ) -> Result<(), CoreError> {
         let _restore = self.restore_lock.lock().await;
         let mut migration = self.v1_migration.lock().await;
         if self.v1_migration_complete().await? {
@@ -242,7 +243,7 @@ impl Core {
         match tokio::fs::remove_dir_all(&directory).await {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error.to_string()),
+            Err(error) => return Err(CoreError::backend(error)),
         }
         private_directory(&directory)?;
         let mut registry = AccountRegistry::empty();
@@ -269,7 +270,7 @@ impl Core {
             }
             let store = SqliteCryptoStore::open(&target, None)
                 .await
-                .map_err(|error| error.to_string())?;
+                .map_err(CoreError::backend)?;
             if snapshot.is_none() {
                 validate_account(&store, &session).await?;
             }
@@ -309,7 +310,7 @@ impl Core {
         account_index: usize,
         table: &str,
         entries: Vec<Entry>,
-    ) -> Result<(), String> {
+    ) -> Result<(), CoreError> {
         if entries.len() > 128 {
             return Err("v1 migration batch is too large".into());
         }
@@ -346,7 +347,7 @@ impl Core {
         Ok(())
     }
 
-    pub async fn finish_v1_migration(&self) -> Result<(), String> {
+    pub async fn finish_v1_migration(&self) -> Result<(), CoreError> {
         let _restore = self.restore_lock.lock().await;
         let mut migration = self.v1_migration.lock().await;
         let import = migration.as_ref().ok_or("v1 migration was not started")?;
@@ -369,9 +370,9 @@ impl Core {
                 &account.store_id,
             )
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(CoreError::backend)?;
         }
-        let bytes = serde_json::to_vec(&import.registry).map_err(|error| error.to_string())?;
+        let bytes = serde_json::to_vec(&import.registry).map_err(CoreError::backend)?;
         self.sessions.save(bytes).await?;
         *self.accounts.lock().await = Some(import.registry);
         tokio::fs::write(
@@ -379,7 +380,7 @@ impl Core {
             b"1",
         )
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(CoreError::backend)?;
         Ok(())
     }
 }
@@ -387,11 +388,11 @@ impl Core {
 async fn validate_account(
     store: &SqliteCryptoStore,
     expected: &PersistedSession,
-) -> Result<Account, String> {
+) -> Result<Account, CoreError> {
     let account = store
         .load_account()
         .await
-        .map_err(|error| error.to_string())?
+        .map_err(CoreError::backend)?
         .ok_or("original v1 encryption identity is missing")?;
     if account.user_id().as_str() != expected.credentials.user_id()
         || account.device_id().as_str() != expected.credentials.device_id()
@@ -410,7 +411,7 @@ async fn import_batch(
     expected: &PersistedSession,
     table: &str,
     entries: Vec<Entry>,
-) -> Result<(), String> {
+) -> Result<(), CoreError> {
     let mut changes = Changes::default();
     let mut tracked = Vec::new();
     let mut custom = Vec::new();
@@ -432,7 +433,7 @@ async fn import_batch(
                             account: Some(account),
                         })
                         .await
-                        .map_err(|error| error.to_string())?;
+                        .map_err(CoreError::backend)?;
                 }
                 "private_identity" => {
                     changes.private_identity = Some(
@@ -572,13 +573,17 @@ async fn import_batch(
                 );
             }
             "lease_locks" => {}
-            _ => return Err(format!("unsupported v1 crypto store: {table}")),
+            _ => {
+                return Err(CoreError::Message(format!(
+                    "unsupported v1 crypto store: {table}"
+                )));
+            }
         }
     }
     store
         .save_changes(changes)
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(CoreError::backend)?;
     if !tracked.is_empty() {
         let borrowed: Vec<_> = tracked
             .iter()
@@ -587,13 +592,13 @@ async fn import_batch(
         store
             .save_tracked_users(&borrowed)
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(CoreError::backend)?;
     }
     for (key, value) in custom {
         store
             .set_custom_value(&key, value)
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(CoreError::backend)?;
     }
     Ok(())
 }

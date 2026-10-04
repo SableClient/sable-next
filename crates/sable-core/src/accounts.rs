@@ -1052,7 +1052,7 @@ fn oauth_device_delete_url(
 const CACHE_DATABASES: [&str; 2] = ["matrix-sdk-event-cache.sqlite3", "matrix-sdk-media.sqlite3"];
 
 #[cfg(not(target_family = "wasm"))]
-async fn reset_account_cache(account: &PersistedAccount) -> Result<(), String> {
+async fn reset_account_cache(account: &PersistedAccount) -> Result<(), crate::CoreError> {
     use matrix_sdk_base::crypto::store::CryptoStore as _;
 
     let store = std::path::Path::new(&account.store_id).join("store");
@@ -1064,14 +1064,14 @@ async fn reset_account_cache(account: &PersistedAccount) -> Result<(), String> {
 
     let crypto = matrix_sdk::SqliteCryptoStore::open(&store, None)
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(crate::CoreError::backend)?;
     crypto
         .remove_custom_value(&format!(
             "sliding_sync_store::room-list::{}::instance",
             account.session.credentials.user_id()
         ))
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(crate::CoreError::backend)?;
     drop(crypto);
 
     search::reset_state_cache(&store).await?;
@@ -1083,7 +1083,9 @@ async fn reset_account_cache(account: &PersistedAccount) -> Result<(), String> {
                 match std::fs::remove_file(&path) {
                     Ok(()) => {}
                     Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                    Err(error) => return Err(format!("{}: {error}", path.display())),
+                    Err(source) => {
+                        return Err(crate::store::StoreError::Path { path, source }.into());
+                    }
                 }
             }
         }
@@ -1117,7 +1119,7 @@ mod regression_tests {
 
     #[async_trait::async_trait]
     impl crate::store::SessionStore for DelayedSecondSave {
-        async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+        async fn load(&self) -> Result<Option<Vec<u8>>, crate::store::StoreError> {
             Ok(self
                 .bytes
                 .lock()
@@ -1125,7 +1127,7 @@ mod regression_tests {
                 .clone())
         }
 
-        async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {
+        async fn save(&self, bytes: Vec<u8>) -> Result<(), crate::store::StoreError> {
             if self
                 .attempts
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
@@ -1141,7 +1143,7 @@ mod regression_tests {
             Ok(())
         }
 
-        async fn clear(&self) -> Result<(), String> {
+        async fn clear(&self) -> Result<(), crate::store::StoreError> {
             Ok(())
         }
     }
@@ -1701,15 +1703,15 @@ mod regression_tests {
 
     #[async_trait::async_trait]
     impl crate::store::SessionStore for RejectSaves {
-        async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+        async fn load(&self) -> Result<Option<Vec<u8>>, crate::store::StoreError> {
             Ok(None)
         }
-        async fn save(&self, _: Vec<u8>) -> Result<(), String> {
+        async fn save(&self, _: Vec<u8>) -> Result<(), crate::store::StoreError> {
             self.attempts
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            Err("disk is full".to_owned())
+            Err(crate::store::StoreError::Message("disk is full".to_owned()))
         }
-        async fn clear(&self) -> Result<(), String> {
+        async fn clear(&self) -> Result<(), crate::store::StoreError> {
             Ok(())
         }
     }

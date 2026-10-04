@@ -1,3 +1,4 @@
+use crate::errors::CoreError;
 use matrix_sdk::Client;
 use matrix_sdk::ruma::TransactionId;
 use serde_json::{Value, json};
@@ -35,7 +36,7 @@ fn transient(error: &matrix_sdk::reqwest::Error) -> bool {
 }
 
 #[cfg(not(target_family = "wasm"))]
-async fn retry_transient<T, F, Fut>(mut request: F, delays: &[Duration]) -> Result<T, String>
+async fn retry_transient<T, F, Fut>(mut request: F, delays: &[Duration]) -> Result<T, CoreError>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, matrix_sdk::reqwest::Error>>,
@@ -47,14 +48,14 @@ where
                 tracing::debug!(%error, "retrying push gateway request");
                 matrix_sdk::sleep::sleep(*delay).await;
             }
-            Err(error) => return Err(error.to_string()),
+            Err(error) => return Err(CoreError::backend(error)),
         }
     }
-    request().await.map_err(|error| error.to_string())
+    request().await.map_err(CoreError::backend)
 }
 
 #[cfg(not(target_family = "wasm"))]
-async fn notify(url: &str, body: &Value) -> Result<Option<Vec<String>>, String> {
+async fn notify(url: &str, body: &Value) -> Result<Option<Vec<String>>, CoreError> {
     #[derive(serde::Deserialize)]
     struct NotifyResponse {
         #[serde(default)]
@@ -63,7 +64,7 @@ async fn notify(url: &str, body: &Value) -> Result<Option<Vec<String>>, String> 
 
     let http = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
         .build()
-        .map_err(|error| error.to_string())?;
+        .map_err(CoreError::backend)?;
     let body = body.to_string();
     let response = retry_transient(
         || async {
@@ -80,24 +81,23 @@ async fn notify(url: &str, body: &Value) -> Result<Option<Vec<String>>, String> 
         &NOTIFY_RETRY_DELAYS,
     )
     .await?;
-    let bytes = response.bytes().await.map_err(|error| error.to_string())?;
-    let answer: NotifyResponse =
-        serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+    let bytes = response.bytes().await.map_err(CoreError::backend)?;
+    let answer: NotifyResponse = serde_json::from_slice(&bytes).map_err(CoreError::backend)?;
     Ok(Some(answer.rejected))
 }
 
 #[cfg(target_family = "wasm")]
-async fn notify(url: &str, body: &Value) -> Result<Option<Vec<String>>, String> {
+async fn notify(url: &str, body: &Value) -> Result<Option<Vec<String>>, CoreError> {
     let http = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
         .build()
-        .map_err(|error| error.to_string())?;
+        .map_err(CoreError::backend)?;
     http.post(url)
         .header(matrix_sdk::reqwest::header::CONTENT_TYPE, "text/plain")
         .body(body.to_string())
         .fetch_mode_no_cors()
         .send()
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(CoreError::backend)?;
     Ok(None)
 }
 
@@ -174,7 +174,7 @@ pub async fn send_diagnostic_push(
     client: &Client,
     pushkey: &str,
     app_id: &str,
-) -> Result<DiagnosticPushView, String> {
+) -> Result<DiagnosticPushView, CoreError> {
     let pushers = crate::webpush::raw_pushers(client).await?;
     let Some(pusher) = pushers
         .into_iter()
@@ -302,7 +302,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(result, Ok(()));
+        result.unwrap();
         assert_eq!(attempts.load(Ordering::Relaxed), 3);
     }
 
@@ -330,7 +330,7 @@ mod tests {
         )
         .await;
 
-        assert_ne!(result.err(), None);
+        result.unwrap_err();
         assert_eq!(attempts.load(Ordering::Relaxed), 1);
     }
 }

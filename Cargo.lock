@@ -7099,6 +7099,7 @@ dependencies = [
  "specta-serde",
  "specta-typescript",
  "tempfile",
+ "thiserror 2.0.20",
  "time",
  "tokio",
  "tracing",

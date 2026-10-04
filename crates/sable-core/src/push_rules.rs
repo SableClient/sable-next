@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::errors::CoreError;
 use base64::Engine as _;
 use matrix_sdk::Client;
 use matrix_sdk::event_handler::EventHandlerDropGuard;
@@ -79,7 +80,7 @@ impl PushRules {
     /// # Errors
     ///
     /// When the server rejects a write.
-    pub async fn apply(&self, writes: Vec<RuleWrite>) -> Result<(), String> {
+    pub async fn apply(&self, writes: Vec<RuleWrite>) -> Result<(), CoreError> {
         let mut result = Ok(());
         let mut applied = false;
         for write in writes {
@@ -96,7 +97,7 @@ impl PushRules {
         result
     }
 
-    async fn send(&self, write: &RuleWrite) -> Result<(), String> {
+    async fn send(&self, write: &RuleWrite) -> Result<(), CoreError> {
         let sent = match write.clone() {
             RuleWrite::Put(rule) => self
                 .client
@@ -138,7 +139,7 @@ impl PushRules {
                 }
             }
         };
-        sent.map_err(|error| error.to_string())
+        sent.map_err(CoreError::backend)
     }
 }
 
@@ -478,10 +479,10 @@ pub fn plan_default_mode(
     rules: &Ruleset,
     direct: bool,
     mode: NotificationModeView,
-) -> Result<Vec<RuleWrite>, String> {
+) -> Result<Vec<RuleWrite>, CoreError> {
     let message = message_rule(direct);
     if rules.get(RuleKind::Underride, message.as_str()).is_none() {
-        return Err(format!("the server has no {message} rule"));
+        return Err(format!("the server has no {message} rule").into());
     }
     Ok(default_family(direct)
         .into_iter()
@@ -631,9 +632,9 @@ pub fn plan_mention(
     rules: &Ruleset,
     rule: MentionRuleView,
     mode: MentionNotificationModeView,
-) -> Result<Vec<RuleWrite>, String> {
-    let (kind, rule_id) = mention_rule(rules, rule)
-        .ok_or_else(|| "the server has no rule for this mention".to_owned())?;
+) -> Result<Vec<RuleWrite>, CoreError> {
+    let (kind, rule_id) =
+        mention_rule(rules, rule).ok_or("the server has no rule for this mention")?;
     Ok(plan_level(kind, &rule_id, mode, true))
 }
 
@@ -720,10 +721,10 @@ fn keyword_rule_id(rules: &Ruleset, keyword: &str) -> String {
 /// # Errors
 ///
 /// When the keyword is blank.
-pub fn plan_add_keyword(rules: &Ruleset, keyword: &str) -> Result<Vec<RuleWrite>, String> {
+pub fn plan_add_keyword(rules: &Ruleset, keyword: &str) -> Result<Vec<RuleWrite>, CoreError> {
     let pattern = keyword.trim();
     if pattern.is_empty() {
-        return Err("a keyword cannot be blank".to_owned());
+        return Err("a keyword cannot be blank".into());
     }
     if keyword_rules(rules, pattern).next().is_some() {
         return Ok(plan_keyword_mode(

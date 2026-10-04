@@ -309,7 +309,7 @@ async fn incomplete_snapshot_cannot_publish_even_when_the_account_is_valid() {
     .await
     .unwrap();
     assert_eq!(
-        core.finish_v1_migration().await.unwrap_err(),
+        core.finish_v1_migration().await.unwrap_err().to_string(),
         "v1 crypto snapshot is incomplete"
     );
     assert!(
@@ -430,7 +430,8 @@ async fn changed_oauth_issuer_is_rejected_before_restoring_tokens() {
     assert_eq!(
         crate::session::restore_credentials(&client, &legacy.persisted().unwrap())
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .to_string(),
         "saved OAuth issuer does not match the homeserver"
     );
     assert!(client.oauth().full_session().is_none());

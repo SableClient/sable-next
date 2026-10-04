@@ -1,12 +1,16 @@
+use crate::store::StoreError;
+
 #[cfg_attr(
     target_family = "wasm",
     expect(clippy::unused_async, reason = "the WASM store has nothing to await")
 )]
-pub(crate) async fn discard(base_store_id: &str, store_id: &str) -> Result<(), String> {
+pub(crate) async fn discard(base_store_id: &str, store_id: &str) -> Result<(), StoreError> {
     if store_id != base_store_id
         && !crate::session::removable_account_store(base_store_id, store_id)
     {
-        return Err("refusing to discard an unrelated account store".to_owned());
+        return Err(StoreError::Invalid(
+            "refusing to discard an unrelated account store",
+        ));
     }
     #[cfg(not(target_family = "wasm"))]
     return discard_files(base_store_id, store_id).await;
@@ -17,7 +21,7 @@ pub(crate) async fn discard(base_store_id: &str, store_id: &str) -> Result<(), S
 pub(crate) async fn carry_room_keys(
     store_id: &str,
     base: &matrix_sdk_base::BaseClient,
-) -> Result<usize, String> {
+) -> Result<usize, StoreError> {
     use matrix_sdk_base::crypto::store::CryptoStore;
 
     #[cfg(not(target_family = "wasm"))]
@@ -25,40 +29,42 @@ pub(crate) async fn carry_room_keys(
         let path = std::path::Path::new(store_id).join("store");
         if !tokio::fs::try_exists(path.join("matrix-sdk-crypto.sqlite3"))
             .await
-            .map_err(|error| error.to_string())?
+            .map_err(StoreError::backend)?
         {
             return Ok(0);
         }
         matrix_sdk::SqliteCryptoStore::open(path, None)
             .await
-            .map_err(|error| error.to_string())?
+            .map_err(StoreError::backend)?
     };
     #[cfg(target_family = "wasm")]
     let store = matrix_sdk_indexeddb::IndexeddbCryptoStore::open_with_name(store_id)
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(StoreError::backend)?;
 
     let sessions = store
         .get_inbound_group_sessions()
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(StoreError::backend)?;
     drop(store);
     let mut keys = Vec::with_capacity(sessions.len());
     for session in sessions {
         keys.push(session.export().await);
     }
     let machine = base.olm_machine().await;
-    let machine = machine.as_ref().ok_or("no olm machine")?;
+    let machine = machine
+        .as_ref()
+        .ok_or(StoreError::Invalid("no olm machine"))?;
     let result = machine
         .store()
         .import_exported_room_keys(keys, |_, _| {})
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(StoreError::backend)?;
     Ok(result.imported_count)
 }
 
 #[cfg(not(target_family = "wasm"))]
-async fn discard_files(base_store_id: &str, store_id: &str) -> Result<(), String> {
+async fn discard_files(base_store_id: &str, store_id: &str) -> Result<(), StoreError> {
     let root = std::path::Path::new(store_id);
     let paths = if store_id == base_store_id {
         vec![root.join("store"), root.join("cache")]
@@ -69,20 +75,20 @@ async fn discard_files(base_store_id: &str, store_id: &str) -> Result<(), String
         match tokio::fs::remove_dir_all(&path).await {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(format!("{}: {error}", path.display())),
+            Err(source) => return Err(StoreError::Path { path, source }),
         }
     }
     Ok(())
 }
 
 #[cfg(target_family = "wasm")]
-fn discard_databases(store_id: &str) -> Result<(), String> {
+fn discard_databases(store_id: &str) -> Result<(), StoreError> {
     use wasm_bindgen::JsCast;
 
     let factory: web_sys::IdbFactory = js_sys::Reflect::get(&js_sys::global(), &"indexedDB".into())
-        .map_err(|error| format!("{error:?}"))?
+        .map_err(|error| StoreError::Message(format!("{error:?}")))?
         .dyn_into()
-        .map_err(|_| "IndexedDB is not available".to_owned())?;
+        .map_err(|_| StoreError::Message("IndexedDB is not available".to_owned()))?;
     for suffix in [
         "",
         "::matrix-sdk-state",
@@ -94,7 +100,7 @@ fn discard_databases(store_id: &str) -> Result<(), String> {
     ] {
         factory
             .delete_database(&format!("{store_id}{suffix}"))
-            .map_err(|error| format!("{error:?}"))?;
+            .map_err(|error| StoreError::Message(format!("{error:?}")))?;
     }
     Ok(())
 }

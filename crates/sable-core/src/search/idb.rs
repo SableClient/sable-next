@@ -1,4 +1,6 @@
 use std::cell::RefCell;
+
+use crate::store::StoreError;
 use std::collections::HashMap;
 
 use js_sys::{Function, Promise, Uint8Array};
@@ -64,8 +66,8 @@ pub(super) fn attached(client: &matrix_sdk::Client) -> Attached {
     })
 }
 
-pub(super) async fn attach(client: &matrix_sdk::Client, store_id: &str) -> Result<(), String> {
-    let identity = identity(client).ok_or("the client has no session")?;
+pub(super) async fn attach(client: &matrix_sdk::Client, store_id: &str) -> Result<(), StoreError> {
+    let identity = identity(client).ok_or(StoreError::Invalid("the client has no session"))?;
     CONNECTIONS.with_borrow_mut(|connections| connections.remove(&identity));
     let database = open(&format!("{store_id}{DATABASE_SUFFIX}")).await?;
     let on_version_change = {
@@ -95,14 +97,14 @@ pub(super) async fn attach(client: &matrix_sdk::Client, store_id: &str) -> Resul
     Ok(())
 }
 
-async fn open(name: &str) -> Result<IdbDatabase, String> {
+async fn open(name: &str) -> Result<IdbDatabase, StoreError> {
     let factory: IdbFactory = js_sys::Reflect::get(&js_sys::global(), &"indexedDB".into())
-        .map_err(|error| failure(&error))?
+        .map_err(|error| StoreError::Message(failure(&error)))?
         .dyn_into()
-        .map_err(|_| "IndexedDB is not available".to_owned())?;
+        .map_err(|_| StoreError::Message("IndexedDB is not available".to_owned()))?;
     let request = factory
         .open_with_u32(name, DATABASE_VERSION)
-        .map_err(|error| failure(&error))?;
+        .map_err(|error| StoreError::Message(failure(&error)))?;
 
     let upgrade = {
         let request = request.clone();
@@ -124,10 +126,10 @@ async fn open(name: &str) -> Result<IdbDatabase, String> {
     request
         .result()
         .and_then(JsCast::dyn_into::<IdbDatabase>)
-        .map_err(|error| failure(&error))
+        .map_err(|error| StoreError::Message(failure(&error)))
 }
 
-async fn settled_open(request: &IdbOpenDbRequest) -> Result<(), String> {
+async fn settled_open(request: &IdbOpenDbRequest) -> Result<(), StoreError> {
     let mut handlers: Vec<Closure<dyn FnMut()>> = Vec::new();
     let promise = Promise::new(&mut |resolve: Function, reject: Function| {
         let succeeded = Closure::<dyn FnMut()>::new(move || {
@@ -153,10 +155,12 @@ async fn settled_open(request: &IdbOpenDbRequest) -> Result<(), String> {
     request.set_onsuccess(None);
     request.set_onerror(None);
     drop(handlers);
-    result.map(drop).map_err(|error| failure(&error))
+    result
+        .map(drop)
+        .map_err(|error| StoreError::Message(failure(&error)))
 }
 
-async fn finished(transaction: &IdbTransaction) -> Result<(), String> {
+async fn finished(transaction: &IdbTransaction) -> Result<(), StoreError> {
     let mut handlers: Vec<Closure<dyn FnMut()>> = Vec::new();
     let promise = Promise::new(&mut |resolve: Function, reject: Function| {
         let completed = Closure::<dyn FnMut()>::new(move || {
@@ -180,50 +184,54 @@ async fn finished(transaction: &IdbTransaction) -> Result<(), String> {
     transaction.set_onerror(None);
     transaction.set_onabort(None);
     drop(handlers);
-    result.map(drop).map_err(|error| failure(&error))
+    result
+        .map(drop)
+        .map_err(|error| StoreError::Message(failure(&error)))
 }
 
 fn transaction(
     database: &IdbDatabase,
     mode: IdbTransactionMode,
-) -> Result<(IdbTransaction, web_sys::IdbObjectStore), String> {
+) -> Result<(IdbTransaction, web_sys::IdbObjectStore), StoreError> {
     let transaction = database
         .transaction_with_str_and_mode(STORE, mode)
-        .map_err(|error| failure(&error))?;
+        .map_err(|error| StoreError::Message(failure(&error)))?;
     let store = transaction
         .object_store(STORE)
-        .map_err(|error| failure(&error))?;
+        .map_err(|error| StoreError::Message(failure(&error)))?;
     Ok((transaction, store))
 }
 
-pub(super) async fn get(database: &IdbDatabase, key: &str) -> Result<Option<Vec<u8>>, String> {
+pub(super) async fn get(database: &IdbDatabase, key: &str) -> Result<Option<Vec<u8>>, StoreError> {
     let (transaction, store) = transaction(database, IdbTransactionMode::Readonly)?;
     let request = store
         .get(&JsValue::from_str(key))
-        .map_err(|error| failure(&error))?;
+        .map_err(|error| StoreError::Message(failure(&error)))?;
     finished(&transaction).await?;
-    let value = request.result().map_err(|error| failure(&error))?;
+    let value = request
+        .result()
+        .map_err(|error| StoreError::Message(failure(&error)))?;
     if value.is_undefined() {
         return Ok(None);
     }
     value
         .dyn_into::<Uint8Array>()
         .map(|bytes| Some(bytes.to_vec()))
-        .map_err(|_| format!("{key} does not hold bytes"))
+        .map_err(|_| StoreError::Message(format!("{key} does not hold bytes")))
 }
 
-pub(super) async fn put(database: &IdbDatabase, key: &str, bytes: &[u8]) -> Result<(), String> {
+pub(super) async fn put(database: &IdbDatabase, key: &str, bytes: &[u8]) -> Result<(), StoreError> {
     let (transaction, store) = transaction(database, IdbTransactionMode::Readwrite)?;
     store
         .put_with_key(&Uint8Array::from(bytes), &JsValue::from_str(key))
-        .map_err(|error| failure(&error))?;
+        .map_err(|error| StoreError::Message(failure(&error)))?;
     finished(&transaction).await
 }
 
-pub(super) async fn delete(database: &IdbDatabase, key: &str) -> Result<(), String> {
+pub(super) async fn delete(database: &IdbDatabase, key: &str) -> Result<(), StoreError> {
     let (transaction, store) = transaction(database, IdbTransactionMode::Readwrite)?;
     store
         .delete(&JsValue::from_str(key))
-        .map_err(|error| failure(&error))?;
+        .map_err(|error| StoreError::Message(failure(&error)))?;
     finished(&transaction).await
 }

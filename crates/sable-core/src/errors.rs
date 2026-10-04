@@ -5,11 +5,67 @@ use matrix_sdk::authentication::oauth::error::{
 };
 use matrix_sdk::encryption::{recovery::RecoveryError, secret_storage::SecretStorageError};
 use matrix_sdk::ruma::api::error::{ErrorKind, RetryAfter};
+use matrix_sdk::{SendOutsideWasm, SyncOutsideWasm};
 use web_time::SystemTime;
 
 use crate::protocol::CommandErr;
 
 use crate::Core;
+
+#[cfg(not(target_family = "wasm"))]
+pub(crate) type Cause = Box<dyn std::error::Error + Send + Sync>;
+#[cfg(target_family = "wasm")]
+pub(crate) type Cause = Box<dyn std::error::Error>;
+
+pub(crate) trait Source:
+    std::error::Error + SendOutsideWasm + SyncOutsideWasm + 'static
+{
+}
+
+impl<T: std::error::Error + SendOutsideWasm + SyncOutsideWasm + 'static> Source for T {}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CoreError {
+    #[error("{0}")]
+    Invalid(&'static str),
+    #[error("{0}")]
+    Message(String),
+    #[error("{what}: {source}")]
+    Context {
+        what: &'static str,
+        #[source]
+        source: Cause,
+    },
+    #[error(transparent)]
+    Store(#[from] crate::store::StoreError),
+    #[error(transparent)]
+    Backend(Cause),
+}
+
+impl CoreError {
+    pub(crate) fn backend(error: impl Source) -> Self {
+        Self::Backend(Box::new(error))
+    }
+
+    pub(crate) fn context(what: &'static str, error: impl Source) -> Self {
+        Self::Context {
+            what,
+            source: Box::new(error),
+        }
+    }
+}
+
+impl From<String> for CoreError {
+    fn from(message: String) -> Self {
+        Self::Message(message)
+    }
+}
+
+impl From<&'static str> for CoreError {
+    fn from(message: &'static str) -> Self {
+        Self::Invalid(message)
+    }
+}
 
 pub(crate) fn retry_delay_ms(retry_after: &RetryAfter) -> Option<u64> {
     let delay = match retry_after {

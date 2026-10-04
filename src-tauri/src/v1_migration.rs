@@ -5,7 +5,11 @@ use crate::{AppState, BrowserEngine};
 
 #[tauri::command]
 pub async fn v1_migration_complete(state: State<'_, AppState>) -> Result<bool, String> {
-    state.core.v1_migration_complete().await
+    state
+        .core
+        .v1_migration_complete()
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -35,6 +39,7 @@ pub async fn begin_v1_migration(
         .core
         .begin_v1_migration(sessions, active_user_id, snapshots, roots)
         .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -48,14 +53,23 @@ pub async fn import_v1_crypto_batch(
         .core
         .import_v1_crypto_batch(account_index, &store, entries)
         .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 pub async fn skip_v1_migration(state: State<'_, AppState>) -> Result<(), String> {
-    state.core.skip_v1_migration().await
+    state
+        .core
+        .skip_v1_migration()
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 pub async fn finish_v1_migration(state: State<'_, AppState>) -> Result<(), String> {
-    state.core.finish_v1_migration().await
+    state
+        .core
+        .finish_v1_migration()
+        .await
+        .map_err(|error| error.to_string())
 }

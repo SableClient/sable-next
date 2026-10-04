@@ -1,14 +1,39 @@
 use async_trait::async_trait;
 use matrix_sdk::{SendOutsideWasm, SyncOutsideWasm};
 
-/// The core decides *what* to persist, the carrier *where*: a file natively,
-/// `IndexedDB` in a worker, which has no `localStorage`.
+use crate::errors::Cause;
+
+#[derive(Debug, thiserror::Error)]
+pub enum StoreError {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("{}: {source}", path.display())]
+    Path {
+        path: std::path::PathBuf,
+        source: std::io::Error,
+    },
+    #[error("{0}")]
+    Invalid(&'static str),
+    #[error("{0}")]
+    Message(String),
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    Backend(Cause),
+}
+
+impl StoreError {
+    pub(crate) fn backend(error: impl crate::errors::Source) -> Self {
+        Self::Backend(Box::new(error))
+    }
+}
+
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 pub trait SessionStore: SendOutsideWasm + SyncOutsideWasm + 'static {
-    async fn load(&self) -> Result<Option<Vec<u8>>, String>;
-    async fn save(&self, bytes: Vec<u8>) -> Result<(), String>;
-    async fn clear(&self) -> Result<(), String>;
+    async fn load(&self) -> Result<Option<Vec<u8>>, StoreError>;
+    async fn save(&self, bytes: Vec<u8>) -> Result<(), StoreError>;
+    async fn clear(&self) -> Result<(), StoreError>;
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -33,7 +58,7 @@ impl ExclusiveFileSessionStore {
         }
     }
 
-    async fn store(&self) -> Result<std::sync::Arc<FileSessionStore>, String> {
+    async fn store(&self) -> Result<std::sync::Arc<FileSessionStore>, StoreError> {
         let mut store = self.store.lock().await;
         if let Some(store) = store.as_ref() {
             return Ok(store.clone());
@@ -41,8 +66,7 @@ impl ExclusiveFileSessionStore {
         let directory = self.directory.clone();
         let opened = tokio::task::spawn_blocking(move || FileSessionStore::exclusive(directory))
             .await
-            .map_err(|error| error.to_string())?
-            .map_err(|error| error.to_string())?;
+            .map_err(StoreError::backend)??;
         let opened = std::sync::Arc::new(opened);
         *store = Some(opened.clone());
         Ok(opened)
@@ -52,13 +76,13 @@ impl ExclusiveFileSessionStore {
 #[cfg(not(target_family = "wasm"))]
 #[async_trait]
 impl SessionStore for ExclusiveFileSessionStore {
-    async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+    async fn load(&self) -> Result<Option<Vec<u8>>, StoreError> {
         self.store().await?.load().await
     }
-    async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {
+    async fn save(&self, bytes: Vec<u8>) -> Result<(), StoreError> {
         self.store().await?.save(bytes).await
     }
-    async fn clear(&self) -> Result<(), String> {
+    async fn clear(&self) -> Result<(), StoreError> {
         self.store().await?.clear().await
     }
 }
@@ -138,14 +162,17 @@ impl FileSessionStore {
         std::fs::read(&self.path)
     }
 
-    pub(crate) fn save_blocking(&self, bytes: &[u8]) -> Result<(), String> {
+    pub(crate) fn save_blocking(&self, bytes: &[u8]) -> Result<(), StoreError> {
         use std::io::Write;
-        self.prepare_directory().map_err(|e| e.to_string())?;
-        let parent = self.path.parent().ok_or("session directory is missing")?;
-        let mut temporary = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
-        temporary.write_all(bytes).map_err(|e| e.to_string())?;
-        temporary.as_file().sync_all().map_err(|e| e.to_string())?;
-        temporary.persist(&self.path).map_err(|e| e.to_string())?;
+        self.prepare_directory()?;
+        let parent = self
+            .path
+            .parent()
+            .ok_or(StoreError::Invalid("session directory is missing"))?;
+        let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
+        temporary.write_all(bytes)?;
+        temporary.as_file().sync_all()?;
+        temporary.persist(&self.path).map_err(StoreError::backend)?;
         Ok(())
     }
 }
@@ -153,7 +180,7 @@ impl FileSessionStore {
 #[cfg(not(target_family = "wasm"))]
 #[async_trait]
 impl SessionStore for FileSessionStore {
-    async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+    async fn load(&self) -> Result<Option<Vec<u8>>, StoreError> {
         let reader = Self {
             path: self.path.clone(),
             owner: self.owner.clone(),
@@ -161,27 +188,27 @@ impl SessionStore for FileSessionStore {
         tokio::task::spawn_blocking(move || match reader.read_blocking() {
             Ok(bytes) => Ok(Some(bytes)),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(error.to_string()),
+            Err(error) => Err(error.into()),
         })
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(StoreError::backend)?
     }
 
-    async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {
+    async fn save(&self, bytes: Vec<u8>) -> Result<(), StoreError> {
         let writer = Self {
             path: self.path.clone(),
             owner: self.owner.clone(),
         };
         tokio::task::spawn_blocking(move || writer.save_blocking(&bytes))
             .await
-            .map_err(|e| e.to_string())?
+            .map_err(StoreError::backend)?
     }
 
-    async fn clear(&self) -> Result<(), String> {
+    async fn clear(&self) -> Result<(), StoreError> {
         match tokio::fs::remove_file(&self.path).await {
             Ok(()) => Ok(()),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(error) => Err(error.to_string()),
+            Err(error) => Err(error.into()),
         }
     }
 }
@@ -194,7 +221,7 @@ pub struct MemorySessionStore {
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 impl SessionStore for MemorySessionStore {
-    async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+    async fn load(&self) -> Result<Option<Vec<u8>>, StoreError> {
         Ok(self
             .bytes
             .lock()
@@ -202,7 +229,7 @@ impl SessionStore for MemorySessionStore {
             .clone())
     }
 
-    async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {
+    async fn save(&self, bytes: Vec<u8>) -> Result<(), StoreError> {
         *self
             .bytes
             .lock()
@@ -210,7 +237,7 @@ impl SessionStore for MemorySessionStore {
         Ok(())
     }
 
-    async fn clear(&self) -> Result<(), String> {
+    async fn clear(&self) -> Result<(), StoreError> {
         *self
             .bytes
             .lock()
@@ -304,11 +331,11 @@ mod tests {
 
         store.save(b"first".to_vec()).await.unwrap();
         store.save(b"second".to_vec()).await.unwrap();
-        assert_eq!(store.load().await, Ok(Some(b"second".to_vec())));
+        assert_eq!(store.load().await.unwrap(), Some(b"second".to_vec()));
         assert!(!dir.join("session.tmp").exists());
 
         store.clear().await.unwrap();
-        assert_eq!(store.load().await, Ok(None));
+        assert_eq!(store.load().await.unwrap(), None);
 
         tokio::fs::remove_dir_all(&dir).await.unwrap();
     }

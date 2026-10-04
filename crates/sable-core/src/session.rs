@@ -1,5 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
+use crate::errors::CoreError;
 use matrix_sdk::{
     Client, ClientBuilder, ThreadingSupport,
     authentication::{
@@ -313,11 +314,11 @@ pub async fn restore_client(
 pub async fn restore_authenticated_client(
     store_id: &str,
     persisted: &PersistedSession,
-) -> Result<Client, String> {
+) -> Result<Client, CoreError> {
     validate_saved_crypto_store(store_id, persisted).await?;
     let client = restore_client(store_id, persisted, true)
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(CoreError::backend)?;
 
     restore_credentials(&client, persisted).await?;
     Ok(client)
@@ -327,7 +328,7 @@ pub async fn restore_authenticated_client(
 pub(crate) async fn restore_notification_client(
     store_id: &str,
     persisted: &PersistedSession,
-) -> Result<Client, String> {
+) -> Result<Client, CoreError> {
     validate_saved_crypto_store(store_id, persisted)
         .await
         .map_err(|error| {
@@ -340,7 +341,7 @@ pub(crate) async fn restore_notification_client(
     );
     let client = build_account_client(builder, store_id, false, true)
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(CoreError::backend)?;
     restore_credentials(&client, persisted).await?;
     Ok(client)
 }
@@ -348,22 +349,22 @@ pub(crate) async fn restore_notification_client(
 pub(crate) async fn restore_credentials(
     client: &Client,
     persisted: &PersistedSession,
-) -> Result<(), String> {
+) -> Result<(), CoreError> {
     if let Some(expected) = &persisted.oauth_issuer {
         let metadata = client
             .oauth()
             .server_metadata()
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(CoreError::backend)?;
         if metadata.issuer.as_str() != expected.as_str() {
-            return Err("saved OAuth issuer does not match the homeserver".to_owned());
+            return Err("saved OAuth issuer does not match the homeserver".into());
         }
     }
     match persisted.credentials.clone() {
         Credentials::Password(matrix) => client
             .restore_session(matrix)
             .await
-            .map_err(|error| error.to_string())?,
+            .map_err(CoreError::backend)?,
         Credentials::OAuth { client_id, user } => client
             .oauth()
             .restore_session(
@@ -371,7 +372,7 @@ pub(crate) async fn restore_credentials(
                 matrix_sdk::store::RoomLoadSettings::default(),
             )
             .await
-            .map_err(|error| error.to_string())?,
+            .map_err(CoreError::backend)?,
     }
 
     Ok(())
@@ -380,7 +381,7 @@ pub(crate) async fn restore_credentials(
 pub(crate) async fn validate_saved_crypto_store(
     store_id: &str,
     persisted: &PersistedSession,
-) -> Result<(), String> {
+) -> Result<(), CoreError> {
     use matrix_sdk_base::crypto::store::CryptoStore;
 
     #[cfg(not(target_family = "wasm"))]
@@ -388,39 +389,41 @@ pub(crate) async fn validate_saved_crypto_store(
         let path = std::path::Path::new(store_id).join("store");
         let metadata = tokio::fs::metadata(path.join("matrix-sdk-crypto.sqlite3"))
             .await
-            .map_err(|error| format!("saved crypto database is unavailable: {error}"))?;
+            .map_err(|error| CoreError::context("saved crypto database is unavailable", error))?;
         if !metadata.is_file() {
-            return Err("saved crypto database is not a file".to_owned());
+            return Err("saved crypto database is not a file".into());
         }
         matrix_sdk::SqliteCryptoStore::open(path, None)
             .await
-            .map_err(|error| format!("saved crypto database could not be opened: {error}"))?
+            .map_err(|error| {
+                CoreError::context("saved crypto database could not be opened", error)
+            })?
     };
     #[cfg(target_family = "wasm")]
     let store = matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None)
         .await
-        .map_err(|error| format!("saved crypto database could not be opened: {error}"))?
+        .map_err(|error| CoreError::context("saved crypto database could not be opened", error))?
         .crypto;
 
     let account = store
         .load_account()
         .await
-        .map_err(|error| format!("saved crypto identity could not be read: {error}"))?
-        .ok_or_else(|| "saved crypto identity is missing".to_owned())?;
+        .map_err(|error| CoreError::context("saved crypto identity could not be read", error))?
+        .ok_or("saved crypto identity is missing")?;
     if account.user_id().as_str() != persisted.credentials.user_id()
         || account.device_id().as_str() != persisted.credentials.device_id()
     {
-        return Err("saved crypto identity does not match the session".to_owned());
+        return Err("saved crypto identity does not match the session".into());
     }
     Ok(())
 }
 
-pub(crate) async fn repair_room_key_sharing(client: &Client) -> Result<(), String> {
+pub(crate) async fn repair_room_key_sharing(client: &Client) -> Result<(), CoreError> {
     let store = client.state_store();
     if store
         .get_custom_value(ROOM_KEY_SHARING_REPAIR_KEY)
         .await
-        .map_err(|error| error.to_string())?
+        .map_err(CoreError::backend)?
         .is_some()
     {
         return Ok(());
@@ -428,16 +431,14 @@ pub(crate) async fn repair_room_key_sharing(client: &Client) -> Result<(), Strin
 
     for room in client.joined_rooms() {
         if room.encryption_state().is_encrypted() {
-            room.discard_room_key()
-                .await
-                .map_err(|error| error.to_string())?;
+            room.discard_room_key().await.map_err(CoreError::backend)?;
         }
     }
 
     store
         .set_custom_value_no_read(ROOM_KEY_SHARING_REPAIR_KEY, vec![1])
         .await
-        .map_err(|error| error.to_string())
+        .map_err(CoreError::backend)
 }
 
 async fn build_account_client(

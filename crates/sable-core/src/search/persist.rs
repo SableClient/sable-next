@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
 use super::Document;
+use crate::store::StoreError;
 
 const SCHEMA: u32 = 5;
 const LEGACY_SCHEMAS: [u32; 2] = [3, 4];
@@ -141,49 +142,56 @@ fn encode(json: &[u8]) -> Vec<u8> {
     miniz_oxide::deflate::compress_to_vec_zlib(json, COMPRESSION_LEVEL)
 }
 
-fn decode(bytes: Vec<u8>) -> Result<Vec<u8>, String> {
+fn decode(bytes: Vec<u8>) -> Result<Vec<u8>, StoreError> {
     if bytes.first() == Some(&ZLIB_HEADER) {
-        miniz_oxide::inflate::decompress_to_vec_zlib(&bytes).map_err(|error| error.to_string())
+        miniz_oxide::inflate::decompress_to_vec_zlib(&bytes)
+            .map_err(|error| StoreError::Message(format!("{error:?}")))
     } else {
         Ok(bytes)
     }
 }
 
-async fn seam_get(client: &matrix_sdk::Client, key: &[u8]) -> Result<Option<Vec<u8>>, String> {
+async fn seam_get(client: &matrix_sdk::Client, key: &[u8]) -> Result<Option<Vec<u8>>, StoreError> {
     client
         .state_store()
         .get_custom_value(key)
         .await
-        .map_err(|error| error.to_string())
+        .map_err(StoreError::backend)
 }
 
-async fn seam_put(client: &matrix_sdk::Client, key: &[u8], bytes: Vec<u8>) -> Result<(), String> {
+async fn seam_put(
+    client: &matrix_sdk::Client,
+    key: &[u8],
+    bytes: Vec<u8>,
+) -> Result<(), StoreError> {
     client
         .state_store()
         .set_custom_value_no_read(key, bytes)
         .await
-        .map_err(|error| error.to_string())
+        .map_err(StoreError::backend)
 }
 
-async fn seam_delete(client: &matrix_sdk::Client, key: &[u8]) -> Result<(), String> {
+async fn seam_delete(client: &matrix_sdk::Client, key: &[u8]) -> Result<(), StoreError> {
     client
         .state_store()
         .remove_custom_value(key)
         .await
         .map(drop)
-        .map_err(|error| error.to_string())
+        .map_err(StoreError::backend)
 }
 
 #[cfg(target_family = "wasm")]
-fn text_key(key: &[u8]) -> Result<&str, String> {
-    std::str::from_utf8(key).map_err(|error| error.to_string())
+fn text_key(key: &[u8]) -> Result<&str, StoreError> {
+    std::str::from_utf8(key).map_err(StoreError::backend)
 }
 
 #[cfg(target_family = "wasm")]
-async fn get(client: &matrix_sdk::Client, key: &[u8]) -> Result<Option<Vec<u8>>, String> {
+async fn get(client: &matrix_sdk::Client, key: &[u8]) -> Result<Option<Vec<u8>>, StoreError> {
     let database = match super::idb::attached(client) {
         super::idb::Attached::Open(database) => database,
-        super::idb::Attached::Closed => return Err("the search database is closed".to_owned()),
+        super::idb::Attached::Closed => {
+            return Err(StoreError::Invalid("the search database is closed"));
+        }
         super::idb::Attached::Detached => return seam_get(client, key).await,
     };
     let text = text_key(key)?;
@@ -202,40 +210,40 @@ async fn get(client: &matrix_sdk::Client, key: &[u8]) -> Result<Option<Vec<u8>>,
 }
 
 #[cfg(not(target_family = "wasm"))]
-async fn get(client: &matrix_sdk::Client, key: &[u8]) -> Result<Option<Vec<u8>>, String> {
+async fn get(client: &matrix_sdk::Client, key: &[u8]) -> Result<Option<Vec<u8>>, StoreError> {
     seam_get(client, key).await
 }
 
 #[cfg(target_family = "wasm")]
-async fn put(client: &matrix_sdk::Client, key: &[u8], bytes: Vec<u8>) -> Result<(), String> {
+async fn put(client: &matrix_sdk::Client, key: &[u8], bytes: Vec<u8>) -> Result<(), StoreError> {
     match super::idb::attached(client) {
         super::idb::Attached::Open(database) => {
             super::idb::put(&database, text_key(key)?, &bytes).await
         }
-        super::idb::Attached::Closed => Err("the search database is closed".to_owned()),
+        super::idb::Attached::Closed => Err(StoreError::Invalid("the search database is closed")),
         super::idb::Attached::Detached => seam_put(client, key, bytes).await,
     }
 }
 
 #[cfg(not(target_family = "wasm"))]
-async fn put(client: &matrix_sdk::Client, key: &[u8], bytes: Vec<u8>) -> Result<(), String> {
+async fn put(client: &matrix_sdk::Client, key: &[u8], bytes: Vec<u8>) -> Result<(), StoreError> {
     seam_put(client, key, bytes).await
 }
 
 #[cfg(target_family = "wasm")]
-async fn delete(client: &matrix_sdk::Client, key: &[u8]) -> Result<(), String> {
+async fn delete(client: &matrix_sdk::Client, key: &[u8]) -> Result<(), StoreError> {
     match super::idb::attached(client) {
         super::idb::Attached::Open(database) => {
             super::idb::delete(&database, text_key(key)?).await?;
             seam_delete(client, key).await
         }
-        super::idb::Attached::Closed => Err("the search database is closed".to_owned()),
+        super::idb::Attached::Closed => Err(StoreError::Invalid("the search database is closed")),
         super::idb::Attached::Detached => seam_delete(client, key).await,
     }
 }
 
 #[cfg(not(target_family = "wasm"))]
-async fn delete(client: &matrix_sdk::Client, key: &[u8]) -> Result<(), String> {
+async fn delete(client: &matrix_sdk::Client, key: &[u8]) -> Result<(), StoreError> {
     seam_delete(client, key).await
 }
 
@@ -539,36 +547,34 @@ pub(super) async fn forget_crawl(client: &matrix_sdk::Client) -> bool {
 }
 
 #[cfg(not(target_family = "wasm"))]
-pub(crate) async fn reset_state_cache(path: &std::path::Path) -> Result<(), String> {
+pub(crate) async fn reset_state_cache(path: &std::path::Path) -> Result<(), StoreError> {
     use matrix_sdk::SqliteStateStore;
     use matrix_sdk_base::StateStore as _;
 
     let source = SqliteStateStore::open(path, None)
         .await
-        .map_err(|error| error.to_string())?;
-    let temporary = tempfile::tempdir_in(path).map_err(|error| error.to_string())?;
+        .map_err(StoreError::backend)?;
+    let temporary = tempfile::tempdir_in(path).map_err(StoreError::backend)?;
     let target = SqliteStateStore::open(temporary.path(), None)
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(StoreError::backend)?;
 
     let mut rooms: Vec<OwnedRoomId> = match copy_value(&source, &target, &rooms_key()).await? {
-        Some(bytes) => {
-            serde_json::from_slice(&decode(bytes)?).map_err(|error| error.to_string())?
-        }
+        Some(bytes) => serde_json::from_slice(&decode(bytes)?).map_err(StoreError::backend)?,
         None => Vec::new(),
     };
     let mut rooms_changed = false;
     for room in source
         .get_room_infos(&matrix_sdk::store::RoomLoadSettings::default())
         .await
-        .map_err(|error| error.to_string())?
+        .map_err(StoreError::backend)?
     {
         let room_id = room.room_id().to_owned();
         if !rooms.contains(&room_id)
             && source
                 .get_custom_value(&legacy_key(&room_id))
                 .await
-                .map_err(|error| error.to_string())?
+                .map_err(StoreError::backend)?
                 .is_some()
         {
             rooms.push(room_id);
@@ -579,7 +585,7 @@ pub(crate) async fn reset_state_cache(path: &std::path::Path) -> Result<(), Stri
         let _ = copy_value(&source, &target, &legacy_key(room_id)).await?;
         if let Some(bytes) = copy_value(&source, &target, &manifest_key(room_id)).await? {
             let manifest: Manifest =
-                serde_json::from_slice(&decode(bytes)?).map_err(|error| error.to_string())?;
+                serde_json::from_slice(&decode(bytes)?).map_err(StoreError::backend)?;
             for chunk in manifest.chunks {
                 let _ = copy_value(&source, &target, &chunk_key(room_id, chunk.id)).await?;
             }
@@ -589,29 +595,34 @@ pub(crate) async fn reset_state_cache(path: &std::path::Path) -> Result<(), Stri
         target
             .set_custom_value_no_read(
                 &rooms_key(),
-                encode(&serde_json::to_vec(&rooms).map_err(|error| error.to_string())?),
+                encode(&serde_json::to_vec(&rooms).map_err(StoreError::backend)?),
             )
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(StoreError::backend)?;
     }
     let _ = copy_value(&source, &target, &crawl_key()).await?;
-    target.close().await.map_err(|error| error.to_string())?;
-    source.close().await.map_err(|error| error.to_string())?;
+    target.close().await.map_err(StoreError::backend)?;
+    source.close().await.map_err(StoreError::backend)?;
 
     let database = matrix_sdk::STATE_STORE_DATABASE_NAME;
     let replacement = temporary.path().join(database);
     std::fs::File::open(&replacement)
         .and_then(|file| file.sync_all())
-        .map_err(|error| error.to_string())?;
+        .map_err(StoreError::backend)?;
     for suffix in ["-wal", "-shm"] {
         let sidecar = path.join(format!("{database}{suffix}"));
         match std::fs::remove_file(&sidecar) {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(format!("{}: {error}", sidecar.display())),
+            Err(source) => {
+                return Err(StoreError::Path {
+                    path: sidecar,
+                    source,
+                });
+            }
         }
     }
-    std::fs::rename(replacement, path.join(database)).map_err(|error| error.to_string())
+    std::fs::rename(replacement, path.join(database)).map_err(StoreError::backend)
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -619,18 +630,18 @@ async fn copy_value(
     source: &matrix_sdk::SqliteStateStore,
     target: &matrix_sdk::SqliteStateStore,
     key: &[u8],
-) -> Result<Option<Vec<u8>>, String> {
+) -> Result<Option<Vec<u8>>, StoreError> {
     use matrix_sdk_base::StateStore as _;
 
     let bytes = source
         .get_custom_value(key)
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(StoreError::backend)?;
     if let Some(bytes) = &bytes {
         target
             .set_custom_value_no_read(key, bytes.clone())
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(StoreError::backend)?;
     }
     Ok(bytes)
 }
@@ -644,15 +655,15 @@ mod codec_tests {
         let json = br#"{"version":5,"documents":[]}"#.repeat(200);
         let stored = encode(&json);
         assert!(stored.len() < json.len() / 4);
-        assert_eq!(decode(stored), Ok(json));
+        assert_eq!(decode(stored).unwrap(), json);
     }
 
     #[test]
     fn a_value_written_before_compression_passes_through() {
         let object = br#"{"version":5}"#.to_vec();
         let list = br#"["!a:b"]"#.to_vec();
-        assert_eq!(decode(object.clone()), Ok(object));
-        assert_eq!(decode(list.clone()), Ok(list));
+        assert_eq!(decode(object.clone()).unwrap(), object);
+        assert_eq!(decode(list.clone()).unwrap(), list);
     }
 
     #[cfg(not(target_family = "wasm"))]

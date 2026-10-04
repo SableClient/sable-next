@@ -12,6 +12,7 @@ mod calls;
 mod cosmetics;
 mod dispatch;
 mod errors;
+pub use errors::CoreError;
 pub(crate) use errors::ResultExt;
 pub mod image_packs;
 mod inbox;
@@ -631,16 +632,18 @@ mod tests {
 
     #[async_trait::async_trait]
     impl SessionStore for FailingClearSessionStore {
-        async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+        async fn load(&self) -> Result<Option<Vec<u8>>, crate::store::StoreError> {
             Ok(None)
         }
 
-        async fn save(&self, _bytes: Vec<u8>) -> Result<(), String> {
+        async fn save(&self, _bytes: Vec<u8>) -> Result<(), crate::store::StoreError> {
             Ok(())
         }
 
-        async fn clear(&self) -> Result<(), String> {
-            Err("storage unavailable".to_owned())
+        async fn clear(&self) -> Result<(), crate::store::StoreError> {
+            Err(crate::store::StoreError::Message(
+                "storage unavailable".to_owned(),
+            ))
         }
     }
 
@@ -650,16 +653,16 @@ mod tests {
 
     #[async_trait::async_trait]
     impl SessionStore for TestSessionStore {
-        async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+        async fn load(&self) -> Result<Option<Vec<u8>>, crate::store::StoreError> {
             Ok(self.bytes.lock().await.clone())
         }
 
-        async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {
+        async fn save(&self, bytes: Vec<u8>) -> Result<(), crate::store::StoreError> {
             *self.bytes.lock().await = Some(bytes);
             Ok(())
         }
 
-        async fn clear(&self) -> Result<(), String> {
+        async fn clear(&self) -> Result<(), crate::store::StoreError> {
             *self.bytes.lock().await = None;
             Ok(())
         }

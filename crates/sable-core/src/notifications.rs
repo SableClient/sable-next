@@ -1,3 +1,4 @@
+use crate::errors::CoreError;
 use matrix_sdk::Client;
 #[cfg(not(target_family = "wasm"))]
 use matrix_sdk::ruma::OwnedEventId;
@@ -314,10 +315,12 @@ async fn persist_push_session(
     base_store: &str,
     account_id: &str,
     client: &Client,
-) -> Result<(), String> {
-    let stored = store.load().await?.ok_or("push session is missing")?;
-    let (mut accounts, _) =
-        AccountRegistry::from_bytes(&stored, base_store).map_err(|error| error.to_string())?;
+) -> Result<(), crate::store::StoreError> {
+    let stored = store
+        .load()
+        .await?
+        .ok_or(crate::store::StoreError::Invalid("push session is missing"))?;
+    let (mut accounts, _) = AccountRegistry::from_bytes(&stored, base_store)?;
     let Some(account) = accounts
         .accounts
         .iter_mut()
@@ -330,7 +333,7 @@ async fn persist_push_session(
         return Ok(());
     };
     account.session = current.keeping_endpoint_of(&account.session);
-    let bytes = serde_json::to_vec(&accounts).map_err(|error| error.to_string())?;
+    let bytes = serde_json::to_vec(&accounts)?;
     store.save(bytes).await
 }
 
@@ -614,12 +617,12 @@ pub(crate) async fn invite_notification(
 /// # Errors
 ///
 /// When the address is not a gateway's.
-pub(crate) fn gateway(url: &str) -> Result<String, String> {
-    let parsed = Url::parse(url).map_err(|_| "the push gateway is not a URL".to_owned())?;
+pub(crate) fn gateway(url: &str) -> Result<String, CoreError> {
+    let parsed = Url::parse(url).map_err(|_| "the push gateway is not a URL")?;
     let plain = parsed.scheme() != "https";
     let addressed = !parsed.username().is_empty() || parsed.password().is_some();
     if plain || addressed || parsed.fragment().is_some() || parsed.path() != GATEWAY_PATH {
-        return Err(format!("{url} is not an https {GATEWAY_PATH} endpoint"));
+        return Err(format!("{url} is not an https {GATEWAY_PATH} endpoint").into());
     }
 
     Ok(parsed.to_string())
@@ -630,7 +633,7 @@ pub(crate) fn gateway(url: &str) -> Result<String, String> {
 /// # Errors
 ///
 /// When the gateway is not a push gateway, or the server rejects the registration.
-pub async fn set_pusher(client: &Client, pusher: PusherView) -> Result<(), String> {
+pub async fn set_pusher(client: &Client, pusher: PusherView) -> Result<(), CoreError> {
     let mut pusher_data = HttpPusherData::new(gateway(&pusher.url)?);
     let device_display_name = pusher_display_name(client, pusher.device_display_name).await;
     if pusher.event_id_only {
@@ -670,18 +673,22 @@ pub async fn set_pusher(client: &Client, pusher: PusherView) -> Result<(), Strin
             pusher.append,
         )
         .await
-        .map_err(|error| error.to_string())
+        .map_err(CoreError::backend)
 }
 
 /// # Errors
 ///
 /// When the server rejects the removal.
-pub async fn remove_pusher(client: &Client, pushkey: String, app_id: String) -> Result<(), String> {
+pub async fn remove_pusher(
+    client: &Client,
+    pushkey: String,
+    app_id: String,
+) -> Result<(), CoreError> {
     client
         .pusher()
         .delete(PusherIds::new(pushkey, app_id))
         .await
-        .map_err(|error| error.to_string())
+        .map_err(CoreError::backend)
 }
 
 const BACKFILL_GRACE_MS: u64 = 60_000;
@@ -1587,8 +1594,8 @@ mod tests {
     #[test]
     fn a_gateway_must_be_an_https_notify_endpoint() {
         assert_eq!(
-            gateway("https://sygnal.example/_matrix/push/v1/notify"),
-            Ok("https://sygnal.example/_matrix/push/v1/notify".to_owned())
+            gateway("https://sygnal.example/_matrix/push/v1/notify").unwrap(),
+            "https://sygnal.example/_matrix/push/v1/notify"
         );
 
         let accepted: Vec<&str> = [

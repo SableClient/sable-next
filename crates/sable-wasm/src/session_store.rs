@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use js_sys::{Function, Promise, Uint8Array};
-use sable_core::store::SessionStore;
+use sable_core::store::{SessionStore, StoreError};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
@@ -27,29 +27,29 @@ async fn call(function: &Function, argument: &JsValue) -> Result<JsValue, JsValu
 
 #[async_trait(?Send)]
 impl SessionStore for JsSessionStore {
-    async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+    async fn load(&self) -> Result<Option<Vec<u8>>, StoreError> {
         let value = call(&self.load, &JsValue::UNDEFINED)
             .await
-            .map_err(|error| format!("{error:?}"))?;
+            .map_err(|error| StoreError::Message(format!("{error:?}")))?;
         if value.is_null() || value.is_undefined() {
             return Ok(None);
         }
         Ok(Some(Uint8Array::new(&value).to_vec()))
     }
 
-    async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {
+    async fn save(&self, bytes: Vec<u8>) -> Result<(), StoreError> {
         let payload = Uint8Array::from(bytes.as_slice());
         call(&self.save, &payload.into())
             .await
             .map(|_| ())
-            .map_err(|error| format!("{error:?}"))
+            .map_err(|error| StoreError::Message(format!("{error:?}")))
     }
 
-    async fn clear(&self) -> Result<(), String> {
+    async fn clear(&self) -> Result<(), StoreError> {
         call(&self.clear, &JsValue::UNDEFINED)
             .await
             .map(|_| ())
-            .map_err(|error| format!("{error:?}"))
+            .map_err(|error| StoreError::Message(format!("{error:?}")))
     }
 }
 
@@ -79,10 +79,10 @@ mod tests {
         let store = store();
 
         store.save(vec![1, 2, 3]).await.expect("save");
-        assert_eq!(store.load().await, Ok(Some(vec![1, 2, 3])));
+        assert_eq!(store.load().await.unwrap(), Some(vec![1, 2, 3]));
 
         store.clear().await.expect("clear");
-        assert_eq!(store.load().await, Ok(None));
+        assert_eq!(store.load().await.unwrap(), None);
     }
 
     #[wasm_bindgen_test]

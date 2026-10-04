@@ -1,5 +1,6 @@
 use std::sync::atomic::Ordering;
 
+use crate::errors::CoreError;
 use matrix_sdk::{
     Client,
     ruma::api::{
@@ -104,23 +105,23 @@ impl Core {
         Ok(CommandOk::DownloadKeyBackup { download })
     }
 
-    pub(crate) async fn backup_status(&self, client: &Client) -> Result<BackupStatus, String> {
+    pub(crate) async fn backup_status(&self, client: &Client) -> Result<BackupStatus, CoreError> {
         let base = self
             .base_client()
             .await
-            .map_err(|error| format!("{error:?}"))?;
+            .map_err(|error| CoreError::Message(format!("{error:?}")))?;
         let machine = base.olm_machine().await;
         let machine = machine.as_ref().ok_or("no olm machine")?;
         let counts = machine
             .backup_machine()
             .room_key_counts()
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(CoreError::backend)?;
         let keys = machine
             .store()
             .load_backup_keys()
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(CoreError::backend)?;
         let current = current_backup(client).await?;
         let same_version = current
             .as_ref()
@@ -145,31 +146,31 @@ impl Core {
         &self,
         client: &Client,
         progress: impl Fn(BackupDownloadProgress),
-    ) -> Result<BackupDownloadProgress, String> {
+    ) -> Result<BackupDownloadProgress, CoreError> {
         let base = self
             .base_client()
             .await
-            .map_err(|error| format!("{error:?}"))?;
+            .map_err(|error| CoreError::Message(format!("{error:?}")))?;
         let machine = base.olm_machine().await;
         let machine = machine.as_ref().ok_or("no olm machine")?;
         let keys = machine
             .store()
             .load_backup_keys()
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(CoreError::backend)?;
         let (Some(key), Some(version)) = (keys.decryption_key, keys.backup_version) else {
-            return Err("backup is not enabled".to_owned());
+            return Err("backup is not enabled".into());
         };
         let current = current_backup(client)
             .await?
             .ok_or("backup is not enabled")?;
         if current.version != version || !matches_backup(Some(&key), &current) {
-            return Err("backup is not enabled".to_owned());
+            return Err("backup is not enabled".into());
         }
         let response = client
             .send(get_backup_keys::v3::Request::new(version.clone()))
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(CoreError::backend)?;
         let sessions: Vec<_> = response
             .rooms
             .into_iter()
@@ -201,7 +202,7 @@ impl Core {
                 .store()
                 .import_room_keys(exported, Some(&version), |_, _| {})
                 .await
-                .map_err(|error| error.to_string())?;
+                .map_err(CoreError::backend)?;
             counts.processed += batch.len();
             counts.imported += result.imported_count;
             counts.failed += batch.len() - result.total_count;
@@ -242,14 +243,14 @@ pub(crate) struct BackupDownloadProgress {
 
 async fn current_backup(
     client: &Client,
-) -> Result<Option<get_latest_backup_info::v3::Response>, String> {
+) -> Result<Option<get_latest_backup_info::v3::Response>, CoreError> {
     match client
         .send(get_latest_backup_info::v3::Request::new())
         .await
     {
         Ok(info) => Ok(Some(info)),
         Err(error) if error.client_api_error_kind() == Some(&ErrorKind::NotFound) => Ok(None),
-        Err(error) => Err(error.to_string()),
+        Err(error) => Err(CoreError::backend(error)),
     }
 }
 
