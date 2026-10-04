@@ -272,8 +272,3 @@
     transform: translateY(-50%);
   }
 }
-
-.composer-row.short .composer-before,
-.composer-row.short .composer-after {
-  align-self: start;
-}
