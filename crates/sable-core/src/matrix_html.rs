@@ -466,13 +466,6 @@ fn linkify_urls(text: &str) -> String {
         html.push_str(&escape_html(before));
         match kind {
             SpanKind::Email => html.push_str(&anchor(&format!("mailto:{link}"), link)),
-            SpanKind::Url if is_mxc_uri(link) => {
-                let _ = write!(
-                    html,
-                    "<img src=\"{}\">",
-                    html_escape::encode_double_quoted_attribute(link)
-                );
-            }
             SpanKind::Url => html.push_str(&anchor(link, link)),
             SpanKind::Msc => {
                 let number = link.get("msc".len()..).unwrap_or_default();
@@ -1797,24 +1790,16 @@ mod tests {
     }
 
     #[test]
-    fn a_bare_mxc_uri_renders_as_its_image() {
+    fn a_bare_mxc_uri_stays_plain_text() {
         let plain = display_html("hi mxc://example.org/pic. and https://example.org", None);
-        assert!(
-            plain.contains("hi <img src=\"mxc://example.org/pic\">."),
-            "{plain}"
-        );
+        assert!(plain.contains("hi mxc://example.org/pic. and "), "{plain}");
+        assert!(!plain.contains("<img"), "{plain}");
         assert!(plain.contains("<a href=\"https://example.org\""), "{plain}");
 
         let formatted = display_html("", Some("<p>see mxc://example.org/pic</p>"));
         assert!(
-            formatted.contains("<img src=\"mxc://example.org/pic\">"),
+            formatted.contains("see mxc://example.org/pic") && !formatted.contains("<img"),
             "{formatted}"
-        );
-
-        let invalid = display_html("mxc://example.org", None);
-        assert!(
-            !invalid.contains("<img") && !invalid.contains("<a "),
-            "{invalid}"
         );
     }
 

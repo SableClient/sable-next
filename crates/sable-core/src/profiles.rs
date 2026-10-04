@@ -308,19 +308,6 @@ mod tests {
     }
 
     #[test]
-    fn a_plain_bio_shows_a_bare_mxc_uri_as_its_image() {
-        let profile = view(&json!({
-            "gay.fomx.biography": { "m.text": [{ "body": "mxc://example.org/pic" }] },
-        }));
-        assert!(
-            profile
-                .bio
-                .unwrap()
-                .contains("<img src=\"mxc://example.org/pic\">")
-        );
-    }
-
-    #[test]
     fn legacy_status_fields_are_reported() {
         let profile = view(&json!({
             "m.status": { "text": "here" },
