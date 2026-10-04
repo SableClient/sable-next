@@ -1,4 +1,3 @@
-import { SABLE_AWARDS_KEYS } from '#lib/config/links.js';
 import { isRecord } from '#lib/guards.js';
 
 export interface Award {
@@ -112,7 +111,7 @@ export function isExpired(award: Award, now: number): boolean {
 export async function verifyAward(
   award: Award,
   userId: string,
-  keys: Readonly<Record<string, string>> = SABLE_AWARDS_KEYS,
+  keys: Readonly<Record<string, string>>,
   now: number = Date.now()
 ): Promise<boolean> {
   if (isExpired(award, now)) return false;
@@ -123,7 +122,7 @@ export async function verifyAward(
 export async function badgeFor(
   raw: string | null,
   userId: string,
-  keys: Readonly<Record<string, string>> = SABLE_AWARDS_KEYS,
+  keys: Readonly<Record<string, string>>,
   now: number = Date.now()
 ): Promise<SupporterBadgeData | null> {
   let best: SupporterBadgeData | null = null;

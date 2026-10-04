@@ -17,6 +17,7 @@
   );
   let waiting = $derived(supporter.status === 'waiting');
   let refreshing = $derived(supporter.status === 'refreshing');
+  let checking = $derived(supporter.status === 'checking');
 </script>
 
 <SettingsSection title={$i18n.t('settings.supporterTitle')} headingId="about-supporter">
@@ -57,6 +58,25 @@
           </Button>
         {/if}
       </SettingsRow>
+    {/if}
+    {#if !badge}
+      <SettingsRow
+        id="supporter-claim"
+        title={$i18n.t('settings.supporterClaim')}
+        description={$i18n.t('settings.supporterClaimHint')}
+      >
+        <Button
+          size="small"
+          loading={checking}
+          disabled={waiting}
+          onclick={() => void supporter.claim()}
+        >
+          {$i18n.t('settings.supporterClaimAction')}
+        </Button>
+      </SettingsRow>
+    {/if}
+    {#if supporter.status === 'none'}
+      <li class="settings-form status" aria-live="polite">{$i18n.t('settings.supporterNone')}</li>
     {/if}
     {#if supporter.status === 'failed'}
       <li class="settings-form error" role="alert">{$i18n.t('settings.supporterFailed')}</li>
