@@ -22,6 +22,7 @@
     mentions: 'room.notifyMentions',
   };
 
+  const modes: Exclude<NotificationModeView, 'mute'>[] = ['all', 'mentions'];
   const badgeModes: BadgeNotificationMode[] = ['all', 'mentions', 'quiet'];
   const badgeModeLabels: Record<BadgeNotificationMode, string> = {
     ...modeLabels,
@@ -86,10 +87,15 @@
   ): void {
     if (current) current = { ...current, [key]: mode };
 
-    void core.commands.setDefaultNotificationMode(isDirect, mode).catch(() => {
-      failed = true;
-      settingsChanges.version += 1;
-    });
+    void core.commands.setDefaultNotificationMode(isDirect, mode).then(
+      () => {
+        settingsChanges.version += 1;
+      },
+      () => {
+        failed = true;
+        settingsChanges.version += 1;
+      }
+    );
   }
 
   function saveMembership(enabled: boolean): void {
@@ -149,10 +155,7 @@
           <Select
             aria-label={`${$i18n.t('settings.notificationPush')}: ${$i18n.t(label)}`}
             value={current[key]}
-            items={badgeModes.map((mode) => ({
-              value: mode,
-              label: $i18n.t(badgeModeLabels[mode]),
-            }))}
+            items={modes.map((mode) => ({ value: mode, label: $i18n.t(modeLabels[mode]) }))}
             onValueChange={(value) => {
               savePush(key, direct, value as NotificationModeView);
             }}

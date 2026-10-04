@@ -8,6 +8,7 @@
   import { i18n } from '#lib/i18n.js';
   import { isQuiet, setQuiet } from '#lib/rooms/quiet-rooms.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSub from '#lib/ui/primitives/ActionMenuSub.svelte';
 
@@ -35,7 +36,15 @@
 
   let mode = $state<NotificationModeView | null | undefined>();
   let fallback = $state<NotificationModeView>('mentions');
-  let defaultLabel = $derived($i18n.t(modeLabels[fallback]));
+  let defaultQuiet = $derived(
+    fallback === 'mentions' &&
+      (roomList.byId(roomId)?.is_direct
+        ? preferences.badgeDefaultDirect
+        : preferences.badgeDefaultGroup) === 'quiet'
+  );
+  let defaultLabel = $derived(
+    $i18n.t(defaultQuiet ? 'room.notifyMentionsQuiet' : modeLabels[fallback])
+  );
 
   $effect(() => {
     void settingsChanges.version;
