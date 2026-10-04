@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Sable Next Nightly
+Name=Sable v2 Nightly
 Comment=A Matrix client
 Exec=sable-next %U
 Icon=moe.sable.next.Nightly

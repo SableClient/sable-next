@@ -1,4 +1,4 @@
-# <img src="src/lib/assets/res/svg/logo.svg" alt="Sable" width="32" height="32"> Sable Next
+# <img src="src/lib/assets/res/svg/logo.svg" alt="Sable" width="32" height="32"> Sable v2
 
 A from-scratch rewrite of [Sable](https://github.com/SableClient/Sable), with Svelte and Rust.
 
@@ -111,7 +111,7 @@ iOS builds are unsigned IPAs distributed through [AltStore](https://altstore.io)
 2. Tap a button above, or add the source manually:
    - AltStore: `altstore://source?url=https://git.sable.moe/SableClient/sable-next/releases/download/nightly/altstore-source.json`
    - SideStore: `sidestore://source?url=https://git.sable.moe/SableClient/sable-next/releases/download/nightly/altstore-source.json`
-3. Install Sable Next from the source. AltStore/SideStore re-sign the unsigned IPA with your personal development certificate at install time, so apps refresh every 7 days on a free account.
+3. Install Sable v2 from the source. AltStore/SideStore re-sign the unsigned IPA with your personal development certificate at install time, so apps refresh every 7 days on a free account.
 
 Both configs come from the `obtainium` and `altstore` jobs in [`tauri-build.yml`](.forgejo/workflows/tauri-build.yml).
 

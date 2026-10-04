@@ -4,7 +4,7 @@
 # The tauri bundler cannot carry the CEF runtime, so the packages are assembled
 # here instead.
 #
-# Usage: scripts/cef/package.sh [version] [display-name]
+# Usage: scripts/cef/package.sh [version] [display-name] [package-name]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -12,7 +12,10 @@ cd "$ROOT"
 
 VERSION="${1:-$(grep -m1 '"version":' src-tauri/tauri.conf.json | sed 's/.*: *"\(.*\)".*/\1/')}"
 : "${VERSION:?no version found in src-tauri/tauri.conf.json}"
-DISPLAY_NAME="${2:-Sable Next}"
+DISPLAY_NAME="${2:-Sable v2}"
+PKG_NAME="${3:-sable-next}"
+if [ "$PKG_NAME" = sable-next ]; then PKG_CONFLICTS=sable; else PKG_CONFLICTS=sable-next; fi
+export PKG_NAME PKG_CONFLICTS
 
 # deb sorts `~` before everything, so a prerelease stays below its release; rpm
 # says the same with a release below 1.
@@ -64,6 +67,9 @@ cat > "$PKGROOT/usr/bin/sable-next" <<'EOF'
 exec /opt/sable-next/sable-next "$@"
 EOF
 chmod 755 "$PKGROOT/usr/bin/sable-next"
+if [ "$PKG_NAME" = sable ]; then
+  ln -s sable-next "$PKGROOT/usr/bin/sable"
+fi
 cp -a "$WORK/stage/share/." "$PKGROOT/usr/share/"
 
 PKGROOT="$PKGROOT" PKG_ARCH="$NFPM_ARCH" PKG_VERSION="$DEB_VERSION" PKG_RELEASE=1 \

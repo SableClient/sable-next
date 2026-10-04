@@ -253,15 +253,14 @@ jobs:
           config_args=(--config src-tauri/tauri.ci.conf.json)
           if [ "$IS_NIGHTLY" = 'true' ]; then
             config_args+=(--config src-tauri/tauri.nightly.conf.json)
-            pnpm tauri:cef build "${config_args[@]}"
-            mise run cef:package "$VERSION" 'Sable Next Nightly'
+            package_args=('Sable v2 Nightly' sable-next)
           else
-            pnpm tauri build "${config_args[@]}"
-            node scripts/ci/normalize-linux-bundles.mjs "$VERSION" "$ARCH"
+            package_args=(Sable sable)
           fi
+          pnpm tauri:cef build "${config_args[@]}"
+          mise run cef:package "$VERSION" "${package_args[@]}"
           node scripts/ci/upload-sentry-symbols.mjs target/release
       - name: Check the CEF packages carry what they should
-        if: ${{ needs.setup-release.outputs.nightly == 'true' }}
         run: |
           deb="target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb"
           contents=$(dpkg-deb --contents "$deb")
@@ -536,7 +535,7 @@ jobs:
             "$ipa_size" \
             "https://git.sable.moe/SableClient/sable-next/releases/download/${TAG}/${ipa_name}" \
             "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-            "Sable Next $VERSION"
+            "Sable v2 $VERSION"
       - name: Attach AltStore source to release
         run: node scripts/ci/forgejo-release.mjs upload altstore-source.json
   updater-manifest:

@@ -31,7 +31,7 @@ const config = {
       id: isNightly ? 'moe.sable.next.nightly' : 'moe.sable.client',
       url: `${server}/${repository}`,
       author: 'SableClient',
-      name: isNightly ? 'Sable Next Nightly' : 'Sable',
+      name: isNightly ? 'Sable v2 Nightly' : 'Sable',
       installedVersion: null,
       latestVersion: version,
       apkUrls: JSON.stringify([[apkName, apkUrl]]),

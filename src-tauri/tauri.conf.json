@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Sable Next",
+  "productName": "Sable v2",
   "version": "1.22.9",
   "identifier": "moe.sable.next",
   "build": {
@@ -48,7 +48,7 @@
     "publisher": "SableClient",
     "copyright": "Copyright © SableClient contributors",
     "shortDescription": "A Matrix client",
-    "longDescription": "Sable Next, a Matrix client.",
+    "longDescription": "Sable v2, a Matrix client.",
     "license": "AGPL-3.0-or-later",
     "licenseFile": "../LICENSE",
     "category": "SocialNetworking",

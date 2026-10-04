@@ -1,15 +1,17 @@
 # yaml-language-server: $schema=https://nfpm.goreleaser.com/schema.json
 # scripts/cef/package.sh stages the tree.
 
-name: sable-next
+name: ${PKG_NAME}
 arch: ${PKG_ARCH}
 platform: linux
 version: ${PKG_VERSION}
 release: ${PKG_RELEASE}
 version_schema: semver
 section: net
+conflicts:
+  - ${PKG_CONFLICTS}
 maintainer: SableClient
-description: Sable Next, a Matrix client
+description: Sable v2, a Matrix client
 homepage: https://sable.moe
 
 contents:

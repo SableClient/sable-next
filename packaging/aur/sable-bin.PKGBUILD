@@ -7,13 +7,22 @@ pkgdesc="A Matrix client"
 arch=('x86_64' 'aarch64')
 url="https://git.sable.moe/SableClient/sable-next"
 license=('AGPL-3.0-or-later')
+# The bundled CEF runtime needs Chromium's system libraries, not webkit2gtk.
 depends=(
-  'webkit2gtk-4.1'
   'gtk3'
+  'nss'
+  'nspr'
+  'mesa'
+  'libdrm'
+  'libxkbcommon'
+  'alsa-lib'
+  'libcups'
+  'libpipewire'
   'libayatana-appindicator'
+  'xdg-utils'
+  'xorg-xwayland'
   'hicolor-icon-theme'
   'desktop-file-utils'
-  'xdg-utils'
 )
 provides=('sable')
 conflicts=('sable' 'sable-nightly-bin')

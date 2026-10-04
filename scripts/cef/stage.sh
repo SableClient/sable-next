@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
 STAGE="${1:-$ROOT/target/cef-stage}"
-DISPLAY_NAME="${2:-Sable Next}"
+DISPLAY_NAME="${2:-Sable v2}"
 PROFILE="${3:-release}"
 
 RUNTIME="$STAGE/runtime"
