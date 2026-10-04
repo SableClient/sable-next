@@ -5,9 +5,9 @@ import { join } from 'node:path';
 const [version, arch] = process.argv.slice(2);
 if (
   !/^\d+\.\d+\.\d+(?:[-+.][A-Za-z0-9.-]+)?$/.test(version ?? '') ||
-  !['x64', 'arm64'].includes(arch)
+  !['x86_64', 'aarch64'].includes(arch)
 )
-  throw new Error('Usage: normalize-linux-bundles.mjs <version> <x64|arm64>');
+  throw new Error('Usage: normalize-linux-bundles.mjs <version> <x86_64|aarch64>');
 for (const [type, extension] of [
   ['deb', '.deb'],
   ['rpm', '.rpm'],
