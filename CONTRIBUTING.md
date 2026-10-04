@@ -42,10 +42,6 @@ submit. For AI-generated output that status is ill-defined: training material is
 often under restrictive terms, and open source terms are not all AGPL-3.0
 compatible.
 
-Raise exceptions in [#sable:sable.moe](https://matrix.to/#/#sable:sable.moe)
-before writing code. An exception keeps the sign-off: you stay responsible for
-every line you submit, whatever produced it.
-
 ## Release notes and versioning (Knope)
 
 We use [Knope](https://knope.tech/) to turn change files into the changelog and the release. Its configuration is [`knope.toml`](./knope.toml), and it talks to Forgejo through the `[gitea]` section.
