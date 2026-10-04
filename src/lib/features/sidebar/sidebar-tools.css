@@ -32,10 +32,14 @@
   text-overflow: ellipsis;
 }
 
-.compact-tool svg,
-.desktop-tool svg {
+.compact-tool svg {
   height: var(--icon-size-medium);
   width: var(--icon-size-medium);
+}
+
+.desktop-tool svg {
+  height: var(--icon-size-small);
+  width: var(--icon-size-small);
 }
 
 .compact-tool[aria-current='page'],
