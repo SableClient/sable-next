@@ -3,7 +3,6 @@ import type { Award } from './award.js';
 export const FIXTURE_USER = '@alice:example.org';
 export const FIXTURE_KEYS = { '1': '6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw' };
 
-// Signed by the sable-awards service with a fixed seed; expires in 2100.
 export const VALID: Award = {
   signed: {
     content: { body: 'Donor' },

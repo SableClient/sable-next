@@ -4278,7 +4278,6 @@ pub struct ProfileView {
     /// Extended fields this client has no rendering for, kept so a profile that
     /// another client wrote is still readable here.
     pub extra: Vec<ProfileFieldView>,
-    /// The raw JSON of the awards field. The UI verifies it; the core cannot.
     pub supporter_awards: Option<String>,
     pub legacy_fields: Vec<String>,
 }

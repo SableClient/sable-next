@@ -106,7 +106,6 @@ function parsePush(raw: unknown): PushDetails | null {
 
 const ED25519_PUBLIC_KEY = /^[A-Za-z0-9+/_-]{43}$/;
 
-/** Both halves are needed: a service nobody can verify is worse than none. */
 function parseSupporter(raw: unknown): SupporterConfig | null {
   if (typeof raw !== 'object' || raw === null) return null;
 

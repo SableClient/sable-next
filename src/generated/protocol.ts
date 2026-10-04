@@ -756,7 +756,6 @@ export type ProfileView = {
 	 *  another client wrote is still readable here.
 	 */
 	extra: ProfileFieldView[],
-	/**  The raw JSON of the awards field. The UI verifies it; the core cannot. */
 	supporter_awards: string | null,
 	legacy_fields: string[],
 };
