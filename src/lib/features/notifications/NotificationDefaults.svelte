@@ -17,10 +17,15 @@
   import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
-  const modes: Exclude<NotificationModeView, 'mute'>[] = ['all', 'mentions'];
   const modeLabels: Record<Exclude<NotificationModeView, 'mute'>, string> = {
     all: 'room.notifyAll',
     mentions: 'room.notifyMentions',
+  };
+
+  const badgeModes: BadgeNotificationMode[] = ['all', 'mentions', 'quiet'];
+  const badgeModeLabels: Record<BadgeNotificationMode, string> = {
+    ...modeLabels,
+    quiet: 'room.notifyMentionsQuiet',
   };
 
   const badgeRows: {
@@ -112,7 +117,7 @@
         <Select
           aria-label={`${$i18n.t('settings.notificationBadges')}: ${$i18n.t(label)}`}
           value={preferences[key]}
-          items={modes.map((mode) => ({ value: mode, label: $i18n.t(modeLabels[mode]) }))}
+          items={badgeModes.map((mode) => ({ value: mode, label: $i18n.t(badgeModeLabels[mode]) }))}
           onValueChange={(value) => {
             setPreference(key, value as BadgeNotificationMode);
           }}
@@ -144,7 +149,10 @@
           <Select
             aria-label={`${$i18n.t('settings.notificationPush')}: ${$i18n.t(label)}`}
             value={current[key]}
-            items={modes.map((mode) => ({ value: mode, label: $i18n.t(modeLabels[mode]) }))}
+            items={badgeModes.map((mode) => ({
+              value: mode,
+              label: $i18n.t(badgeModeLabels[mode]),
+            }))}
             onValueChange={(value) => {
               savePush(key, direct, value as NotificationModeView);
             }}

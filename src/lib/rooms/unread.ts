@@ -10,7 +10,7 @@ export type RoomUnread = (room: RoomSummary) => UnreadCount;
 
 export const NO_UNREAD: UnreadCount = { unread: 0, highlight: 0, marked: false };
 
-export type BadgeNotificationMode = 'all' | 'mentions';
+export type BadgeNotificationMode = 'all' | 'mentions' | 'quiet';
 
 function counts(room: RoomSummary): UnreadCount {
   return {
@@ -68,6 +68,7 @@ export function applyBadgeMode(
   mode: BadgeNotificationMode | 'mute'
 ): UnreadCount {
   if (mode === 'mute') return count;
+  if (mode === 'quiet') return quietUnread(count);
   if (mode === 'mentions') return softUnread(count);
   return loudUnread(count);
 }
