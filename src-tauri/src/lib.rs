@@ -804,8 +804,12 @@ pub fn run() {
 
     let builder = tauri::Builder::<BrowserEngine>::new();
     #[cfg(any(target_os = "macos", target_os = "ios"))]
-    let builder = builder.on_web_content_process_terminate(|_| {
+    let builder = builder.on_web_content_process_terminate(|webview| {
         tracing::error!("webview content process terminated");
+        // WebKit leaves the page blank until reloaded.
+        if let Err(error) = webview.reload() {
+            tracing::error!(%error, "webview reload failed");
+        }
     });
     let builder = if let Some(client) = sentry_guard.as_ref() {
         builder.plugin(tauri_plugin_sentry::init_with_no_injection(client))
