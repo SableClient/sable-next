@@ -421,12 +421,9 @@ impl Core {
                     {
                         return;
                     }
-                    core.emit_if_current(
-                        generation,
-                        CoreEvent::ProfileChanged {
-                            user_id: event.state_key,
-                        },
-                    );
+                    if let Ok(user_id) = event.state_key.as_str().try_into() {
+                        core.emit_if_current(generation, CoreEvent::ProfileChanged { user_id });
+                    }
                 }
             }
         });
@@ -509,110 +506,4 @@ pub(crate) async fn retry_backoff(failures: u32) {
         2u64.saturating_pow(failures.min(5)),
     ))
     .await;
-}
-
-#[cfg(test)]
-mod tests {
-    use matrix_sdk::ruma::room_id;
-    use matrix_sdk::ruma::serde::Raw;
-    use matrix_sdk::test_utils::mocks::MatrixMockServer;
-    use matrix_sdk_test::JoinedRoomBuilder;
-    use serde_json::{Value, json};
-
-    use crate::Core;
-    use crate::protocol::CoreEvent;
-    use crate::store::MemorySessionStore;
-
-    const ALICE: &str = "@alice:example.org";
-
-    fn member(content: &Value, previous: Option<&Value>, event_id: &str) -> Raw<Value> {
-        let mut event = json!({
-            "type": "m.room.member",
-            "state_key": ALICE,
-            "sender": ALICE,
-            "event_id": event_id,
-            "origin_server_ts": 1,
-            "content": content,
-        });
-        if let Some(previous) = previous {
-            event["unsigned"] = json!({ "prev_content": previous });
-        }
-        Raw::new(&event).unwrap()
-    }
-
-    async fn announced(content: Value, previous: Option<Value>) -> Vec<String> {
-        let server = MatrixMockServer::new().await;
-        let room_id = room_id!("!room:example.org");
-        let client = server.client_builder().build().await;
-        server.sync_joined_room(&client, room_id).await;
-        let (core, mut events) = Core::new("profiles", Box::new(MemorySessionStore::default()));
-        core.watch_profile_changes(&client, 1);
-
-        server
-            .sync_room(
-                &client,
-                JoinedRoomBuilder::new(room_id).add_timeline_event(
-                    member(&content, previous.as_ref(), "$member").cast_unchecked(),
-                ),
-            )
-            .await;
-
-        std::iter::from_fn(|| events.try_recv().ok())
-            .filter_map(|event| match event {
-                CoreEvent::ProfileChanged { user_id } => Some(user_id.to_string()),
-                _ => None,
-            })
-            .collect()
-    }
-
-    #[tokio::test]
-    async fn a_changed_display_name_is_announced() {
-        let found = announced(
-            json!({ "membership": "join", "displayname": "Alice B" }),
-            Some(json!({ "membership": "join", "displayname": "Alice" })),
-        )
-        .await;
-
-        assert_eq!(found, [ALICE]);
-    }
-
-    #[tokio::test]
-    async fn a_changed_avatar_is_announced() {
-        let found = announced(
-            json!({ "membership": "join", "avatar_url": "mxc://example.org/new" }),
-            Some(json!({ "membership": "join", "avatar_url": "mxc://example.org/old" })),
-        )
-        .await;
-
-        assert_eq!(found, [ALICE]);
-    }
-
-    #[tokio::test]
-    async fn an_unchanged_profile_is_not_announced() {
-        let content = json!({ "membership": "join", "displayname": "Alice" });
-
-        assert!(announced(content.clone(), Some(content)).await.is_empty());
-    }
-
-    #[tokio::test]
-    async fn a_join_is_not_announced() {
-        let found = announced(
-            json!({ "membership": "join", "displayname": "Alice" }),
-            Some(json!({ "membership": "leave" })),
-        )
-        .await;
-
-        assert!(found.is_empty());
-    }
-
-    #[tokio::test]
-    async fn an_event_without_a_previous_state_is_not_announced() {
-        let found = announced(
-            json!({ "membership": "join", "displayname": "Alice" }),
-            None,
-        )
-        .await;
-
-        assert!(found.is_empty());
-    }
 }

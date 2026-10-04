@@ -69,6 +69,7 @@
   } from './timeline-format';
 
   import { MessageActionExecutor } from '../messages/message-action-controller.svelte.js';
+  import { TimelineItemProfiles } from './timeline-item-profiles.svelte';
 
   import type { MessageCallbacks } from '../messages/message-action-controller.svelte.js';
 
@@ -165,8 +166,8 @@
   const senderRoles = hasSenderRoles() ? useSenderRoles() : null;
   const dialogs = useMessageDialogs();
   const openMessageMenu = useMessageMenu();
-  let profilesActive = $derived(!preview || loadPreviewProfile);
-  let profile = $derived(profilesActive ? core.profiles.get(item.sender) : null);
+  const itemProfiles = new TimelineItemProfiles(core);
+  let profile = $derived(itemProfiles.sender);
   let senderCosmetics = $derived(roomCosmetics?.for(item.sender) ?? null);
   let senderTimezone = $derived(profile?.timezone ?? null);
   // Only a fallback: the core fills both fields, so most rows never scan.
@@ -240,8 +241,8 @@
   let replyCosmetics = $derived(
     replyPersona ? null : (roomCosmetics?.for(item.in_reply_to?.sender) ?? null)
   );
+  let replyProfile = $derived(itemProfiles.reply);
   let replySender = $derived(item.in_reply_to?.sender ?? null);
-  let replyProfile = $derived(profilesActive ? core.profiles.get(replySender) : null);
   let replyColors = $derived(
     senderDisplayColors(
       replySender ?? '',
@@ -321,6 +322,12 @@
     )
   );
   let senderRoleIcon = $derived(senderRole?.icon ?? null);
+
+  $effect(() => {
+    itemProfiles.sync(item.sender, replySender, preview && !loadPreviewProfile);
+  });
+
+  onDestroy(() => itemProfiles.dispose());
 
   const actionExecutor = new MessageActionExecutor(
     () => ({

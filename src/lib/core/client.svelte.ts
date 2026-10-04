@@ -17,7 +17,6 @@ import type {
 } from '#src/generated/protocol';
 
 import { createCommands } from './commands.svelte.js';
-import { ProfileStore } from './profile-store.svelte.js';
 import { invalidatePacks, isPackAccountDataEvent } from '#lib/emoji/load-packs.js';
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
@@ -38,9 +37,13 @@ import {
 type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
 export type { CallGrant, CreateRoomOptions, OutgoingMentions } from './commands.svelte.js';
 
+const profileCacheFreshMs = 2 * 60 * 1000;
+const profileFailureRetryMs = 60 * 1000;
 const relationsCacheFreshMs = 60 * 1000;
+const MAX_PROFILE_CACHE_ENTRIES = 256;
 const MAX_RELATIONS_CACHE_ENTRIES = 128;
 const PROFILE_LOOKUP_GAP_MS = 150;
+const PROFILE_CHANGE_NOTIFY_MS = 500;
 const PROFILE_LOOKUP_MAX_GAP_MS = 4000;
 const PROFILE_RETRY_AFTER_CAP_MS = 30_000;
 
@@ -156,13 +159,24 @@ export class CoreClient {
   private encryptionEvents = 0;
   private readonly accountChannel =
     typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('sable-active-account');
-  readonly profiles = new ProfileStore({
-    accountId: () => this.session?.account_id ?? null,
-    fetch: (userId) => this.lookUpProfile(userId),
-  });
   /* Nothing renders from these, and a reactive map would make every mounted
      profile card re-run its effect on any other user's cache write. */
   /* eslint-disable svelte/prefer-svelte-reactivity */
+  private readonly profileCache = new QuickLRU<
+    string,
+    { accountId: string | null; profile: ProfileView }
+  >({ maxSize: MAX_PROFILE_CACHE_ENTRIES, maxAge: profileCacheFreshMs });
+  private readonly profileRequests = new Map<
+    string,
+    { accountId: string | null; request: Promise<ProfileView> }
+  >();
+  private readonly profileFailures = new QuickLRU<
+    string,
+    { accountId: string | null; error: unknown }
+  >({ maxSize: MAX_PROFILE_CACHE_ENTRIES, maxAge: profileFailureRetryMs });
+  private readonly profileChangeListeners = new Set<(userId: string) => void>();
+  private readonly changedProfiles = new Set<string>();
+  private profileChangeTimer: ReturnType<typeof setTimeout> | null = null;
   private profileNextAt = 0;
   private profileGap = PROFILE_LOOKUP_GAP_MS;
   private readonly relationsCache = new QuickLRU<
@@ -489,8 +503,64 @@ export class CoreClient {
     }
   }
 
-  userProfile(userId: string): Promise<ProfileView> {
-    return this.profiles.load(userId);
+  async userProfile(userId: string): Promise<ProfileView> {
+    const accountId = this.session?.account_id ?? null;
+    const cached = this.profileCache.get(userId);
+    if (cached?.accountId === accountId) {
+      return cached.profile;
+    }
+
+    const pending = this.profileRequests.get(userId);
+    if (pending?.accountId === accountId) return pending.request;
+
+    const failure = this.profileFailures.get(userId);
+    if (failure?.accountId === accountId) {
+      throw failure.error;
+    }
+
+    const request = this.lookUpProfile(userId)
+      .then((profile) => {
+        if (this.profileRequests.get(userId)?.request === request) {
+          this.profileFailures.delete(userId);
+          this.profileCache.set(userId, { accountId, profile });
+        }
+        return profile;
+      })
+      .catch((error: unknown) => {
+        const rateLimited = error instanceof CoreError && error.detail.code === 'rate_limited';
+        if (!rateLimited && this.profileRequests.get(userId)?.request === request) {
+          this.profileFailures.set(userId, { accountId, error });
+        }
+        throw error;
+      });
+    this.profileRequests.set(userId, { accountId, request });
+    const clearRequest = () => {
+      if (this.profileRequests.get(userId)?.request === request) {
+        this.profileRequests.delete(userId);
+      }
+    };
+    void request.then(clearRequest, clearRequest);
+    return request;
+  }
+
+  onProfileChanged(listener: (userId: string) => void): () => void {
+    this.profileChangeListeners.add(listener);
+    return () => this.profileChangeListeners.delete(listener);
+  }
+
+  private invalidateProfile(userId: string): void {
+    this.profileCache.delete(userId);
+    this.profileFailures.delete(userId);
+    this.profileRequests.delete(userId);
+    this.changedProfiles.add(userId);
+    this.profileChangeTimer ??= setTimeout(() => {
+      this.profileChangeTimer = null;
+      const changed = [...this.changedProfiles];
+      this.changedProfiles.clear();
+      for (const id of changed) {
+        for (const listener of this.profileChangeListeners) listener(id);
+      }
+    }, PROFILE_CHANGE_NOTIFY_MS);
   }
 
   private async lookUpProfile(userId: string): Promise<ProfileView> {
@@ -688,7 +758,8 @@ export class CoreClient {
       field,
       value,
     });
-    if (this.session) this.profiles.invalidate(this.session.user_id);
+    this.profileCache.delete(this.session?.user_id ?? '');
+    this.profileFailures.delete(this.session?.user_id ?? '');
   }
 
   async uploadRoomAvatar(
@@ -742,7 +813,12 @@ export class CoreClient {
   }
 
   private resetCachedState(): void {
-    this.profiles.clear();
+    this.profileCache.clear();
+    this.profileRequests.clear();
+    this.profileFailures.clear();
+    this.changedProfiles.clear();
+    if (this.profileChangeTimer !== null) clearTimeout(this.profileChangeTimer);
+    this.profileChangeTimer = null;
     this.relationsCache.clear();
     this.sync = null;
     this.crashed = null;
@@ -959,7 +1035,7 @@ export class CoreClient {
         this.deviceList = event.devices;
         return;
       case 'profile_changed':
-        this.profiles.invalidate(event.user_id);
+        this.invalidateProfile(event.user_id);
         return;
       case 'search_coverage':
         this.searchCoverage = event.coverage;

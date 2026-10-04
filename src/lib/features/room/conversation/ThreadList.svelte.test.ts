@@ -53,7 +53,6 @@ const listThreads = vi.fn();
 Object.assign(core, { listThreads });
 
 afterEach(() => {
-  core.profiles.clear();
   listThreads.mockReset();
 });
 
