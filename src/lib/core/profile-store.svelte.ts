@@ -61,6 +61,7 @@ export class ProfileStore {
     { accountId: string | null; request: Promise<ProfileView> }
   >();
   readonly #signals = new Map<string, Signal>();
+  readonly #queued = new Set<string>();
   readonly #retries = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #changed = new Set<string>();
   #changeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -70,7 +71,7 @@ export class ProfileStore {
   get(userId: string | null): ProfileView | null {
     if (userId === null) return null;
     this.#signal(userId).track();
-    void this.load(userId).catch(() => {});
+    this.#queue(userId);
     return this.#current(userId)?.profile ?? null;
   }
 
@@ -113,6 +114,7 @@ export class ProfileStore {
     this.#failures.clear();
     this.#requests.clear();
     this.#changed.clear();
+    this.#queued.clear();
     if (this.#changeTimer !== null) clearTimeout(this.#changeTimer);
     this.#changeTimer = null;
     for (const timer of this.#retries.values()) clearTimeout(timer);
@@ -131,6 +133,16 @@ export class ProfileStore {
       this.#signals.set(userId, signal);
     }
     return signal;
+  }
+
+  #queue(userId: string): void {
+    const entry = this.#current(userId);
+    if (this.#queued.has(userId) || (entry && Date.now() - entry.fetchedAt < FRESH_MS)) return;
+    this.#queued.add(userId);
+    queueMicrotask(() => {
+      this.#queued.delete(userId);
+      void this.load(userId).catch(() => {});
+    });
   }
 
   #request(userId: string, accountId: string | null, attempts: number): Promise<ProfileView> {
