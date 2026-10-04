@@ -9,6 +9,15 @@ import { composerSchema } from './schema';
 
 const pattern = /(?<![^\s\uFFFC]):([^\s:\uFFFC]{1,100}):$/u;
 
+export function emoticonNode(image: PackImageView): ProseMirrorNode {
+  return composerSchema.nodes.emoticon.create({
+    url: image.url,
+    body: image.body,
+    shortcode: image.shortcode,
+    sourcePack: image.source_pack,
+  });
+}
+
 export function shortcodeNode(
   shortcode: string,
   emotes: readonly PackImageView[]
@@ -16,13 +25,7 @@ export function shortcodeNode(
   const matches = emotes.filter((candidate) => candidate.shortcode === shortcode);
   if (matches.length > 1) return null;
   const image = matches.at(0);
-  if (image)
-    return composerSchema.nodes.emoticon.create({
-      url: image.url,
-      body: image.body,
-      shortcode,
-      sourcePack: image.source_pack,
-    });
+  if (image) return emoticonNode(image);
 
   const emoji = emojiForShortcode(shortcode);
   return emoji ? composerSchema.text(emoji) : null;

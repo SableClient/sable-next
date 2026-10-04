@@ -80,6 +80,7 @@
   import type { ActiveColors, ColorKind, FormatAction } from './editor/formatting';
   import type { EmoteMedia } from './editor/node-views';
   import { composerSchema } from './editor/schema';
+  import { emoticonNode } from './editor/shortcodes';
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
   import {
     commandTextOf,
@@ -1088,14 +1089,7 @@
       return;
     }
 
-    editor.insert(
-      composerSchema.nodes.emoticon.create({
-        url: image.url,
-        body: image.body,
-        shortcode: image.shortcode,
-        sourcePack: image.source_pack,
-      })
-    );
+    editor.insert(emoticonNode(image));
     updateTyping();
   }
 
@@ -1214,7 +1208,7 @@
     const image = emotes.find((candidate) => candidate.shortcode === shortcode);
     if (!image) return composerSchema.text(suggestion.insert);
 
-    return composerSchema.nodes.emoticon.create({ url: image.url, shortcode });
+    return emoticonNode(image);
   }
 
   /** The servers cost a round trip, so the mention is inserted without them. */
