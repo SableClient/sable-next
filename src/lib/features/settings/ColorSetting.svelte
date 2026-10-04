@@ -221,15 +221,68 @@
     border: calc(var(--border-width) * 2) solid var(--bg-container);
     border-radius: 50%;
     box-shadow: 0 0 0 var(--border-width) var(--bg-on-container);
-    height: 0.75rem;
+    height: var(--hue-track);
     position: absolute;
     transform: translate(-50%, -50%);
     width: 0.75rem;
   }
 
   .hue-slider {
-    accent-color: var(--primary-main);
-    margin-top: var(--space-400);
+    --hue-track: 0.75rem;
+    --hue-thumb: 1rem;
+    --hue-strip: linear-gradient(
+      to right,
+      hwb(0deg 0% 0%),
+      hwb(60deg 0% 0%),
+      hwb(120deg 0% 0%),
+      hwb(180deg 0% 0%),
+      hwb(240deg 0% 0%),
+      hwb(300deg 0% 0%),
+      hwb(360deg 0% 0%)
+    );
+
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+    height: var(--hue-thumb);
+    margin: var(--space-400) 0 0;
     width: 100%;
+  }
+
+  .hue-slider::-webkit-slider-runnable-track {
+    background: var(--hue-strip);
+    border-radius: var(--radii-400);
+    height: var(--hue-track);
+  }
+
+  .hue-slider::-moz-range-track {
+    background: var(--hue-strip);
+    border-radius: var(--radii-400);
+    height: var(--hue-track);
+  }
+
+  .hue-slider::-webkit-slider-thumb {
+    appearance: none;
+    background: transparent;
+    border: calc(var(--border-width) * 2) solid var(--bg-container);
+    border-radius: 50%;
+    box-shadow: 0 0 0 var(--border-width) var(--bg-on-container);
+    height: var(--hue-thumb);
+    margin-top: calc((var(--hue-track) - var(--hue-thumb)) / 2);
+    width: var(--hue-thumb);
+  }
+
+  .hue-slider::-moz-range-thumb {
+    background: transparent;
+    border: calc(var(--border-width) * 2) solid var(--bg-container);
+    border-radius: 50%;
+    box-shadow: 0 0 0 var(--border-width) var(--bg-on-container);
+    height: var(--hue-thumb);
+    width: var(--hue-thumb);
+  }
+
+  .hue-slider:focus-visible {
+    outline: calc(var(--border-width) * 2) solid var(--focus-ring);
+    outline-offset: var(--border-width);
   }
 </style>
