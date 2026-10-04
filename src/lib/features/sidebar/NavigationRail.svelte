@@ -43,7 +43,6 @@
   import { resolveUnreadBadge } from '#lib/ui/primitives/unread-badge.js';
   import '#lib/ui/primitives/nav-tab.css';
   import CaretUpIcon from 'phosphor-svelte/lib/CaretUpIcon';
-  import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
   import CompassIcon from 'phosphor-svelte/lib/CompassIcon';
   import FolderOpenIcon from 'phosphor-svelte/lib/FolderOpenIcon';
@@ -54,6 +53,7 @@
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
   import UserQuickTools from './UserQuickTools.svelte';
 
   type RailSection = 'home' | 'unspaced' | 'direct';
@@ -193,7 +193,7 @@
       href: directRoot,
       activePrefix: '/direct',
       navigateHref: sectionHref(DIRECT_PATHS_KEY, directRoot),
-      icon: ChatsIcon,
+      icon: UsersIcon,
       label: 'nav.direct',
       unread: directUnread,
       dm: true,
