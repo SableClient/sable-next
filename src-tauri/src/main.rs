@@ -353,6 +353,12 @@ fn main() {
     #[cfg(all(feature = "cef", target_os = "linux"))]
     install_permission_policy();
 
+    #[cfg(all(feature = "cef", target_os = "linux"))]
+    tauri_runtime_cef::set_popup_policy(|request| {
+        !tauri_runtime_cef::NormalizedOrigin::parse(request.url)
+            .is_some_and(|origin| origin.is_app_local())
+    });
+
     app_lib::run();
 }
 
