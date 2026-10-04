@@ -141,6 +141,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       name_color_dark: null,
       animal: null,
       extra: [],
+      supporter_awards: null,
       legacy_fields: [],
     };
     const room: RoomSummary = {
@@ -816,6 +817,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         if (window.__e2eSwitchAccountError) throw new FakeCoreError('unavailable');
         return { type: 'switch_account', session };
       },
+      request_open_id_token: () => ({
+        type: 'request_open_id_token',
+        access_token: 'e2e-openid-token',
+        matrix_server_name: 'example.test',
+        expires_in: 3600,
+      }),
       homeserver_info: () => ({
         type: 'homeserver_info',
         homeserver: 'https://example.test',

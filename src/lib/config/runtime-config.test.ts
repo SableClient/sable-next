@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
 import { BUILT_IN_HOMESERVERS, parseRuntimeConfig } from './runtime-config';
 
@@ -196,4 +196,46 @@ test('password fields stay visible unless the deployment hides them outright', (
   expect(parseRuntimeConfig({ hideUsernamePasswordFields: true }).hideUsernamePasswordFields).toBe(
     true
   );
+});
+
+describe('supporterAwards', () => {
+  const key = 'MQEJebxUXHl9QvvnB0uO11dAx6hlaqTe2hq/NadRjVk';
+
+  test('reads the service and its pinned keys', () => {
+    const config = parseRuntimeConfig({
+      supporterAwards: { serviceUrl: 'https://awards.example.org/', keys: { '1': key } },
+    });
+
+    expect(config.supporter).toEqual({
+      serviceUrl: 'https://awards.example.org',
+      keys: { '1': key },
+    });
+  });
+
+  test('is off without a service or without a usable key', () => {
+    expect(parseRuntimeConfig({}).supporter).toBeNull();
+    expect(parseRuntimeConfig({ supporterAwards: { keys: { '1': key } } }).supporter).toBeNull();
+    expect(
+      parseRuntimeConfig({ supporterAwards: { serviceUrl: 'https://awards.example.org' } })
+        .supporter
+    ).toBeNull();
+    expect(
+      parseRuntimeConfig({
+        supporterAwards: { serviceUrl: 'https://awards.example.org', keys: { '1': 'short' } },
+      }).supporter
+    ).toBeNull();
+    expect(
+      parseRuntimeConfig({
+        supporterAwards: { serviceUrl: 'awards.example.org', keys: { '1': key } },
+      }).supporter
+    ).toBeNull();
+  });
+
+  test('drops a malformed key and keeps the good one', () => {
+    const config = parseRuntimeConfig({
+      supporterAwards: { serviceUrl: 'https://awards.example.org', keys: { '1': key, '2': 'bad' } },
+    });
+
+    expect(config.supporter?.keys).toEqual({ '1': key });
+  });
 });

@@ -354,6 +354,22 @@ impl Core {
                 })
             }
 
+            Command::RequestOpenIdToken => {
+                let response = self
+                    .client()
+                    .await?
+                    .account()
+                    .request_openid_token()
+                    .await
+                    .or_failed(self, "request_openid_token")?;
+
+                Ok(CommandOk::RequestOpenIdToken {
+                    access_token: response.access_token,
+                    matrix_server_name: response.matrix_server_name.to_string(),
+                    expires_in: u32::try_from(response.expires_in.as_secs()).unwrap_or(u32::MAX),
+                })
+            }
+
             Command::SubscribeRoomList => self.subscribe_room_list().await,
 
             Command::SubscribeTimeline {

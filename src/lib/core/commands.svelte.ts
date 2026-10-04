@@ -227,6 +227,14 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'cancel_registration' });
     },
 
+    async requestOpenIdToken(): Promise<{ access_token: string; matrix_server_name: string }> {
+      const response = await transport().send({ type: 'request_open_id_token' });
+      return {
+        access_token: response.access_token,
+        matrix_server_name: response.matrix_server_name,
+      };
+    },
+
     async homeserverInfo(): Promise<{
       homeserver: string;
       server: HomeserverSoftwareView | null;

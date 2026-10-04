@@ -1201,7 +1201,6 @@ export const settingsCategories: SettingsCategory[] = [
         icon: ImageIcon,
         name: 'settings.mediaAutoLoad',
         type: 'boolean',
-        unavailable: true,
       },
       {
         key: 'autoplayGifs',

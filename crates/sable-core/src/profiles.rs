@@ -14,7 +14,10 @@ const LEGACY_PROFILE_FIELDS: [&str; 4] = [
     "org.matrix.msc4426.status",
 ];
 
-const RENDERED_PROFILE_FIELDS: [&str; 23] = [
+const SUPPORTER_FIELD: &str = "moe.sable.app.supporter_awards";
+const MAX_SUPPORTER_FIELD_BYTES: usize = 16 * 1024;
+
+const RENDERED_PROFILE_FIELDS: [&str; 24] = [
     "displayname",
     "avatar_url",
     "m.biography",
@@ -38,6 +41,7 @@ const RENDERED_PROFILE_FIELDS: [&str; 23] = [
     "pet.plz.me",
     "pet.plz.my",
     "pet.plz.gib",
+    SUPPORTER_FIELD,
 ];
 
 fn profile_field<'a>(response: &'a ProfileResponse, name: &str) -> Option<&'a serde_json::Value> {
@@ -218,6 +222,13 @@ fn profile_animal(response: &ProfileResponse) -> Option<AnimalIdentityView> {
     (identity.is_animal.is_some() || identity.has_animal.is_some()).then_some(identity)
 }
 
+fn profile_supporter_awards(response: &ProfileResponse) -> Option<String> {
+    profile_field(response, SUPPORTER_FIELD)
+        .filter(|value| value.is_array())
+        .map(ToString::to_string)
+        .filter(|text| text.len() <= MAX_SUPPORTER_FIELD_BYTES)
+}
+
 fn profile_extra(response: &ProfileResponse) -> Vec<ProfileFieldView> {
     let mut extra = response
         .iter()
@@ -255,6 +266,7 @@ pub(crate) fn profile_view(user_id: OwnedUserId, response: &ProfileResponse) -> 
         name_color_dark,
         animal: profile_animal(response),
         extra: profile_extra(response),
+        supporter_awards: profile_supporter_awards(response),
         legacy_fields: LEGACY_PROFILE_FIELDS
             .into_iter()
             .filter(|name| profile_field(response, name).is_some())
@@ -348,5 +360,27 @@ mod tests {
             profile.extra[0].value,
             r#"{"description":"homepage","uri":"https://example.org"}"#
         );
+    }
+
+    #[test]
+    fn supporter_awards_are_passed_through_and_hidden_from_misc_data() {
+        let profile = view(&json!({
+            "moe.sable.app.supporter_awards": [{ "signed": { "id": "oc-1" } }]
+        }));
+
+        assert_eq!(
+            profile.supporter_awards.as_deref(),
+            Some(r#"[{"signed":{"id":"oc-1"}}]"#)
+        );
+        assert!(profile.extra.is_empty());
+    }
+
+    #[test]
+    fn a_malformed_or_oversized_awards_field_is_dropped() {
+        let not_a_list = view(&json!({ "moe.sable.app.supporter_awards": "nope" }));
+        assert_eq!(not_a_list.supporter_awards, None);
+
+        let huge = view(&json!({ "moe.sable.app.supporter_awards": ["x".repeat(20_000)] }));
+        assert_eq!(huge.supporter_awards, None);
     }
 }

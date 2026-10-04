@@ -24,6 +24,7 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import ImageBrokenIcon from 'phosphor-svelte/lib/ImageBrokenIcon';
   import ImageSpoilerControl from './ImageSpoilerControl.svelte';
+  import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
   import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
 
@@ -53,6 +54,7 @@
     onloaded?: () => void;
     onfailed?: () => void;
     retryable?: boolean;
+    deferrable?: boolean;
     uniform?: boolean;
     tint?: boolean;
     original?: boolean;
@@ -84,6 +86,7 @@
     onloaded,
     onfailed,
     retryable = false,
+    deferrable = false,
     uniform = false,
     tint = false,
     original = false,
@@ -110,6 +113,7 @@
   let paintedIndex = -1;
   let blurhashCanvas = $state<HTMLCanvasElement>();
   let loadedUrl = $state<string | null>(null);
+  let fetchedSource = $state<string | null>(null);
   let imageElement = $state<HTMLImageElement>();
   let sidewaysSource = $state<string | null>(null);
   let undecodableThumbnail = $state<string | null>(null);
@@ -157,6 +161,13 @@
     outcome?.key === requestKey
       ? outcome.url
       : (cachedMediaUrl(core, requested, requestedWidth, requestedHeight) ?? null)
+  );
+  let awaitingLoad = $derived(
+    deferrable &&
+      !preferences.mediaAutoLoad &&
+      fetchedSource !== source &&
+      url === null &&
+      outcome?.key !== requestKey
   );
   let failed = $derived(outcome?.key === requestKey && outcome.url === null);
   let undecodable = $derived(failed && outcome?.undecodable === true);
@@ -219,11 +230,13 @@
   const loading = mediaProgress(core, () => (!url && !failed ? requested : null));
   let sizeLabel = $derived(size !== null && size > 0 ? formatByteSize(size) : null);
   let mediaLabel = $derived(
-    manualGif
-      ? $i18n.t(gifPlaying ? 'timeline.stopGif' : 'timeline.playGif')
-      : alt
-        ? $i18n.t('timeline.openMedia', { name: alt })
-        : $i18n.t('timeline.openMediaUnnamed')
+    awaitingLoad
+      ? $i18n.t('timeline.loadMedia')
+      : manualGif
+        ? $i18n.t(gifPlaying ? 'timeline.stopGif' : 'timeline.playGif')
+        : alt
+          ? $i18n.t('timeline.openMedia', { name: alt })
+          : $i18n.t('timeline.openMediaUnnamed')
   );
   let retryLabel = $derived(
     retryWait === 0
@@ -269,6 +282,7 @@
     const requestSource = requested;
     const requestWidth = requestedWidth;
     const requestHeight = requestedHeight;
+    if (awaitingLoad) return;
     const release = holdMediaUrl(core, requestSource, requestWidth, requestHeight);
     if (
       outcome?.key === key ||
@@ -447,6 +461,10 @@
   /* A manual GIF is its own play/stop button, so the wrapper never swaps
      element and the canvas survives. */
   function activate(): void {
+    if (awaitingLoad) {
+      fetchedSource = source;
+      return;
+    }
     if (!manualGif) {
       onclick?.();
       return;
@@ -536,7 +554,10 @@
       {/if}
     </span>
   {/if}
-  {#if !showUnavailable && !url}
+  {#if awaitingLoad}
+    <span class="media-image-progress"><DownloadSimpleIcon size={24} aria-hidden="true" /></span>
+    {#if sizeLabel}<span class="media-image-size">{sizeLabel}</span>{/if}
+  {:else if !showUnavailable && !url}
     <span class="media-image-progress"><Spinner small /></span>
     {#if loading.percent !== null}
       <span class="media-image-size">
@@ -553,7 +574,7 @@
       'media-image',
       'spoilerable-media',
       {
-        interactive: !showUnavailable && (manualGif || onclick || href),
+        interactive: !showUnavailable && (manualGif || onclick || href || awaitingLoad),
         gif: manualGif,
         pixelated,
         painted,
@@ -569,7 +590,7 @@
       aria-hidden={spoilerHidden && !showUnavailable ? 'true' : undefined}
       inert={spoilerHidden && !showUnavailable}
     >
-      {#if !showUnavailable && href && !onclick}
+      {#if !showUnavailable && href && !onclick && !awaitingLoad}
         <a
           class="media-image-activation"
           {href}
@@ -583,7 +604,7 @@
           <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
           {@render content()}
         </a>
-      {:else if !showUnavailable && (manualGif || onclick)}
+      {:else if !showUnavailable && (manualGif || onclick || awaitingLoad)}
         <button
           class="media-image-activation"
           type="button"
@@ -613,7 +634,7 @@
       />
     {/if}
   </span>
-{:else if !showUnavailable && (manualGif || onclick)}
+{:else if !showUnavailable && (manualGif || onclick || awaitingLoad)}
   <button
     class={[className, 'media-image', 'interactive', { gif: manualGif, pixelated }]}
     {style}

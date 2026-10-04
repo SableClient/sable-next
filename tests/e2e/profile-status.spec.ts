@@ -94,6 +94,7 @@ for (const mobile of [false, true]) {
           localStorage.setItem('sable-preferences', JSON.stringify({ sendPresence }));
           (window as unknown as { __e2eProfilePatch: object }).__e2eProfilePatch = {
             status: { text: 'Working on Sable', emoji: '🚀' },
+            supporter_awards: null,
             legacy_fields: ['chat.commet.profile_status'],
           };
         }, sendPresence);

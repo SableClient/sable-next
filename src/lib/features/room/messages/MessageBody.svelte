@@ -131,6 +131,7 @@
       bind:spoilerHidden={imageSpoilerHidden}
       spoilerName={item.content.filename}
       retryable
+      deferrable
       onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
     />
     {#if !imageSpoilerHidden && showCaption && item.content.html}

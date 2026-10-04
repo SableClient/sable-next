@@ -25,6 +25,7 @@ function controller(existing: Partial<ProfileView> = {}) {
         pronouns: [],
         name_color_light: null,
         name_color_dark: null,
+        supporter_awards: null,
         legacy_fields: [],
         ...existing,
       } as ProfileView)
@@ -142,6 +143,7 @@ test('a field typed before the profile arrives is kept', async () => {
 test('a status save deletes the legacy status keys the profile still carries', async () => {
   const { profile, core } = controller({
     status: { text: 'around', emoji: null },
+    supporter_awards: null,
     legacy_fields: ['chat.commet.profile_status', 'moe.sable.app.bio'],
   });
   await profile.load();

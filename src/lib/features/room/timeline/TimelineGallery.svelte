@@ -69,6 +69,7 @@
           }
           spoilerName={item.filename}
           retryable
+          deferrable
           onclick={() => onOpen?.(index)}
         />
       {:else}

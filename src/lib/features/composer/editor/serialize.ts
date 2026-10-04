@@ -613,6 +613,10 @@ const markdownParser = new MarkdownParser(
 
 const ATOM_PLACEHOLDER = '\uFFFC';
 
+function parseMarkdown(source: string): ProseMirrorNode {
+  return markdownParser.parse(source.replaceAll('¯\\_(ツ)_/¯', '¯\\\\\\_(ツ)\\_/¯'));
+}
+
 export function atomText(node: ProseMirrorNode): string {
   const { emoticon, room_ping: roomPing, image, math_inline: math } = composerSchema.nodes;
   if (node.type === emoticon) return `:${node.attrs.shortcode as string}:`;
@@ -707,9 +711,7 @@ export function serializePlain(doc: ProseMirrorNode): ComposerMessage {
 
   const { source, atoms } = markdownSourceOf(doc);
   const parsed = linkMscs(
-    withoutTrailingParagraph(
-      flattenRoomPings(spliceAtoms(markdownParser.parse(source.trim()), atoms))
-    )
+    withoutTrailingParagraph(flattenRoomPings(spliceAtoms(parseMarkdown(source.trim()), atoms)))
   );
   return {
     body,
@@ -743,11 +745,11 @@ export function plainEditDoc(body: string, html: string): ProseMirrorNode {
 
 export function richFromPlain(doc: ProseMirrorNode): ProseMirrorNode {
   const { source, atoms } = markdownSourceOf(doc);
-  return spliceAtoms(markdownParser.parse(source.trim()), atoms);
+  return spliceAtoms(parseMarkdown(source.trim()), atoms);
 }
 
 export function markdownSlice(text: string): Slice {
-  const parsed = markdownParser.parse(text);
+  const parsed = parseMarkdown(text);
   const only = parsed.childCount === 1 ? parsed.firstChild : null;
   if (only?.type === composerSchema.nodes.paragraph) return new Slice(only.content, 0, 0);
   return new Slice(parsed.content, 0, 0);

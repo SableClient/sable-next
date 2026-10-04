@@ -70,6 +70,7 @@ const emptyProfile: ProfileView = {
   name_color_dark: null,
   animal: null,
   extra: [],
+  supporter_awards: null,
   legacy_fields: [],
 };
 

@@ -25,6 +25,7 @@
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
   import { endSystemCall, fulfillSystemAnswer } from '#lib/platform/calls.js';
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
+  import { supporter } from '#lib/supporter/supporter.svelte.js';
   import { PresenceStore, providePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { goto } from '$app/navigation';
   import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
@@ -733,6 +734,7 @@
     dismissedInvites.start(core);
     mediaPreviewSettings.start(core);
     profileOverrides.start(core);
+    supporter.start(core);
     return () => {
       roomList.stop();
       spaceSidebar.stop();
@@ -741,6 +743,7 @@
       dismissedInvites.stop();
       mediaPreviewSettings.stop();
       profileOverrides.stop();
+      supporter.stop();
     };
   });
 

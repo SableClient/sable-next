@@ -5,10 +5,7 @@ import { MemberProfile } from './member-profile.svelte.js';
 
 test('closing a profile prevents a pending failure from reopening or changing it', async () => {
   const request = Promise.withResolvers<ProfileView>();
-  const profile = new MemberProfile({
-    userProfile: () => request.promise,
-    profiles: { peek: () => null },
-  });
+  const profile = new MemberProfile({ userProfile: () => request.promise });
   const opening = profile.show('@old', document.createElement('button'));
   profile.close();
   request.reject(new Error('unavailable'));
@@ -24,7 +21,6 @@ test('a later profile remains selected when an earlier request completes', async
   const next = { display_name: 'Next' } as ProfileView;
   const profile = new MemberProfile({
     userProfile: vi.fn().mockReturnValueOnce(old.promise).mockResolvedValueOnce(next),
-    profiles: { peek: () => null },
   });
   const anchor = document.createElement('button');
   const first = profile.show('@old', anchor);
@@ -34,18 +30,4 @@ test('a later profile remains selected when an earlier request completes', async
   expect(profile.userId).toBe('@next');
   expect(profile.profile).toEqual(next);
   expect(profile.failed).toBe(false);
-});
-
-test('a cached profile is shown at once while it is refreshed', async () => {
-  const cached = { display_name: 'Cached' } as ProfileView;
-  const fresh = Promise.withResolvers<ProfileView>();
-  const profile = new MemberProfile({
-    userProfile: () => fresh.promise,
-    profiles: { peek: () => cached },
-  });
-  const opening = profile.show('@a', document.createElement('button'));
-  expect(profile.profile).toEqual(cached);
-  fresh.resolve({ display_name: 'Fresh' } as ProfileView);
-  await opening;
-  expect(profile.profile).toEqual({ display_name: 'Fresh' });
 });

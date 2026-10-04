@@ -140,6 +140,7 @@ pub enum Command {
     Logout,
     ResetLocalCache,
     HomeserverInfo,
+    RequestOpenIdToken,
 
     SubscribeRoomList,
     SubscribeTimeline {
@@ -1432,6 +1433,11 @@ pub enum CommandOk {
     HomeserverInfo {
         homeserver: String,
         server: Option<HomeserverSoftwareView>,
+    },
+    RequestOpenIdToken {
+        access_token: String,
+        matrix_server_name: String,
+        expires_in: u32,
     },
 
     /// The snapshot. Everything after it carries the same `subscription`.
@@ -4272,6 +4278,7 @@ pub struct ProfileView {
     /// Extended fields this client has no rendering for, kept so a profile that
     /// another client wrote is still readable here.
     pub extra: Vec<ProfileFieldView>,
+    pub supporter_awards: Option<String>,
     pub legacy_fields: Vec<String>,
 }
 

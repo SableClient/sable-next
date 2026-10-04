@@ -16,6 +16,7 @@
   import { hostsServiceWorker } from '#lib/platform/service-worker.js';
   import { checkForWebUpdate } from '#lib/platform/web-updates.svelte.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { supporter } from '#lib/supporter/supporter.svelte.js';
   import SableBrandMark from '#lib/ui/SableBrandMark.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
@@ -26,6 +27,8 @@
   import '#lib/ui/primitives/settings-row.css';
   import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
+
+  import SupporterSettings from './SupporterSettings.svelte';
 
   const core = useCoreClient();
   const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
@@ -134,6 +137,10 @@
       </div>
     </div>
   </header>
+
+  {#if supporter.enabled}
+    <SupporterSettings />
+  {/if}
 
   {#if info}
     <SettingsSection title={$i18n.t('settings.aboutHomeserver')} headingId="about-homeserver">

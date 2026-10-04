@@ -1,6 +1,7 @@
 export const PRONOUNS_FIELD = 'io.fsky.nyx.pronouns';
 export const NAME_COLOR_FIELD = 'eu.she-a.color';
 export const STATUS_FIELD = 'm.status';
+export const SUPPORTER_FIELD = 'moe.sable.app.supporter_awards';
 export const BANNER_FIELD = 'chat.commet.profile_banner';
 export const BIO_FIELD = 'gay.fomx.biography';
 export const LEGACY_BIO_FIELDS = ['moe.sable.app.bio', 'chat.commet.profile_bio'];

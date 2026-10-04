@@ -1,9 +1,5 @@
 import { vi } from 'vitest';
 
-import type { ProfileView } from '#src/generated/protocol';
-
-import { ProfileStore } from '../profile-store.svelte.js';
-
 const pending = () => new Promise<never>(() => {});
 
 export type CoreStub = ReturnType<typeof createCoreStub>;
@@ -28,19 +24,11 @@ export function createCoreStub<T extends Record<string, unknown>>(overrides = {}
     markRead: vi.fn<(...args: never[]) => Promise<void>>(() => Promise.resolve()),
     reactionShortcodes: vi.fn<(...args: never[]) => Promise<unknown[]>>(() => Promise.resolve([])),
     subscribeEvents: vi.fn(() => () => {}),
-    profiles: {
-      get: vi.fn(() => null),
-      load: vi.fn(() => Promise.reject(new Error('profile unavailable'))),
-    },
+    onProfileChanged: vi.fn(() => () => {}),
     ...overrides,
   };
 
-  const profiles = new ProfileStore({
-    accountId: () => null,
-    fetch: (userId) => stub.userProfile(userId as never) as Promise<ProfileView>,
-  });
-
-  return Object.assign(stub, { commands: stub, profiles });
+  return Object.assign(stub, { commands: stub });
 }
 
 export const core = createCoreStub();
