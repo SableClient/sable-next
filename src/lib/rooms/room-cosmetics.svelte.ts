@@ -37,6 +37,7 @@ export class RoomCosmetics {
   #roomId: string | null = null;
   #requestedSpace: string | null = null;
   #generation = 0;
+  #wanted = new Set<string>();
 
   constructor(private readonly core: CosmeticsCore) {}
 
@@ -70,35 +71,38 @@ export class RoomCosmetics {
       if (generation !== this.#generation) return;
       this.#users = new Map(found.users.map((user) => [user.user_id, user]));
       this.#spaceId = found.space_id;
-      void this.#loadProfiles(found.users, generation);
     } catch (error) {
       console.debug('[sable room] cosmetics unavailable', error);
     }
   }
 
-  async #loadProfiles(users: readonly SenderCosmeticsView[], generation: number): Promise<void> {
-    if (!this.core.userProfile) return;
-    for (let attempt = 0; attempt < PROFILE_LOAD_ATTEMPTS; attempt += 1) {
-      const missing = users.filter(
-        (user) =>
-          (user.space_display_name !== null || user.space_avatar_url !== null) &&
-          !this.#profiles.has(user.user_id)
-      );
-      if (missing.length === 0) return;
-      if (attempt > 0) {
-        await new Promise((resolve) => setTimeout(resolve, PROFILE_RETRY_MS * attempt));
+  #want(userId: string): void {
+    if (this.#wanted.has(userId) || !this.core.userProfile) return;
+    this.#wanted.add(userId);
+    const generation = this.#generation;
+    queueMicrotask(() => {
+      void this.#loadProfile(userId, generation);
+    });
+  }
+
+  async #loadProfile(userId: string, generation: number): Promise<void> {
+    try {
+      for (let attempt = 0; attempt < PROFILE_LOAD_ATTEMPTS; attempt += 1) {
+        if (attempt > 0) {
+          await new Promise((resolve) => setTimeout(resolve, PROFILE_RETRY_MS * attempt));
+        }
         if (generation !== this.#generation) return;
+        const profile = await this.core.userProfile?.(userId).catch(() => null);
+        if (generation !== this.#generation) return;
+        if (profile) {
+          const profiles = new Map(this.#profiles);
+          profiles.set(userId, profile);
+          this.#profiles = profiles;
+          return;
+        }
       }
-      const loaded = await Promise.all(
-        missing.map(
-          async (user) =>
-            [user.user_id, await this.core.userProfile?.(user.user_id).catch(() => null)] as const
-        )
-      );
-      if (generation !== this.#generation) return;
-      const profiles = new Map(this.#profiles);
-      for (const [userId, profile] of loaded) if (profile) profiles.set(userId, profile);
-      this.#profiles = profiles;
+    } finally {
+      this.#wanted.delete(userId);
     }
   }
   /* eslint-enable svelte/prefer-svelte-reactivity */
@@ -109,8 +113,12 @@ export class RoomCosmetics {
 
   identity(userId: string | null | undefined, own: ShownIdentity): ShownIdentity {
     const found = this.stored(userId);
-    const profile = userId ? this.#profiles.get(userId) : undefined;
-    if (!found || !profile) return own;
+    if (!userId || !found) return own;
+    const profile = this.#profiles.get(userId);
+    if (!profile) {
+      if (found.space_display_name !== null || found.space_avatar_url !== null) this.#want(userId);
+      return own;
+    }
     return {
       name:
         found.space_display_name !== null && own.name === profile.display_name
