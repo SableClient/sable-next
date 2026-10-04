@@ -6,8 +6,10 @@
     RoomPowerLevelsView,
     RoomSummary,
   } from '#src/generated/protocol';
+  import DoorOpenIcon from 'phosphor-svelte/lib/DoorOpenIcon';
   import GlobeIcon from 'phosphor-svelte/lib/GlobeIcon';
   import HandIcon from 'phosphor-svelte/lib/HandIcon';
+  import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import LockIcon from 'phosphor-svelte/lib/LockIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -375,7 +377,7 @@
                     value: 'restricted' as const,
                     label: $i18n.t('room.settingsJoinRuleRestricted'),
                     hint: $i18n.t('room.settingsJoinRuleRestrictedHint'),
-                    icon: LockIcon,
+                    icon: HouseIcon,
                   },
                 ]
               : []),
@@ -385,7 +387,7 @@
                     value: 'knock_restricted' as const,
                     label: $i18n.t('room.settingsJoinRuleKnockRestricted'),
                     hint: $i18n.t('room.settingsJoinRuleKnockRestrictedHint'),
-                    icon: HandIcon,
+                    icon: DoorOpenIcon,
                   },
                 ]
               : []),
