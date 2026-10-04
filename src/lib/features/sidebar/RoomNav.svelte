@@ -71,6 +71,7 @@
   import { bannerChanges, readRoomBanner } from '#lib/features/room/room-banner.svelte.js';
   import { goToPage, scopedSearchPath } from '#lib/features/room/room-navigation.js';
   import { CALENDAR_ROOM_TYPE } from '#lib/features/calendar/calendar-events.js';
+  import CalendarRowEvent from '#lib/features/calendar/CalendarRowEvent.svelte';
   import SpaceEvents from '#lib/features/calendar/SpaceEvents.svelte';
 
   import type { CallVoiceState } from '#lib/features/call/call-session.svelte.js';
@@ -800,6 +801,8 @@
                   >{#if peerStatus.emoji}<span class="room-status-emoji">{peerStatus.emoji}</span
                     >{/if}{peerStatus.text}</span
                 >
+              {:else if room?.room_type === CALENDAR_ROOM_TYPE && preferences.showSpaceEvents}
+                <CalendarRowEvent roomId={room.room_id} />
               {/if}
             </span>
             {#if room && live > 0}
