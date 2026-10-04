@@ -8,8 +8,9 @@ use tracing::{info, warn};
 use super::Document;
 use crate::store::StoreError;
 
-const SCHEMA: u32 = 6;
-const LEGACY_SCHEMAS: [u32; 0] = [];
+const SCHEMA: u32 = 5;
+pub(super) const DERIVATION: u32 = 1;
+const LEGACY_SCHEMAS: [u32; 2] = [3, 4];
 
 pub(super) type ChunkId = u32;
 
@@ -49,6 +50,10 @@ pub(super) struct Manifest {
     pub(super) pending_edits: Vec<Document>,
     #[serde(default)]
     pub(super) floor: u64,
+    #[serde(default)]
+    pub(super) derived: u32,
+    #[serde(default)]
+    pub(super) rederive_from: u64,
 }
 
 impl Manifest {
@@ -66,6 +71,8 @@ impl Manifest {
             pending_redactions: Vec::new(),
             pending_edits: Vec::new(),
             floor,
+            derived: DERIVATION,
+            rederive_from: 0,
         }
     }
 }
@@ -336,18 +343,20 @@ pub(super) async fn open(client: &matrix_sdk::Client, room_id: &OwnedRoomId) -> 
                 .map(|event_id| (event_id.clone(), stamps.get(event_id).copied().unwrap_or(0)))
                 .collect();
             let count = legacy.documents.len();
+            let mut manifest = Manifest::new(
+                1,
+                vec![ChunkEntry {
+                    id: 0,
+                    start: 0,
+                    bytes: 0,
+                    count,
+                }],
+                legacy.edits,
+                0,
+            );
+            manifest.derived = 0;
             Opened::Legacy(Restored {
-                manifest: Manifest::new(
-                    1,
-                    vec![ChunkEntry {
-                        id: 0,
-                        start: 0,
-                        bytes: 0,
-                        count,
-                    }],
-                    legacy.edits,
-                    0,
-                ),
+                manifest,
                 loaded: vec![(0, StoredChunk::new(legacy.documents, classified))],
                 legacy: true,
             })
@@ -456,8 +465,8 @@ async fn unlist_room(client: &matrix_sdk::Client, room_id: &OwnedRoomId) -> bool
     rooms.len() == before || write(client, &rooms_key(), &rooms).await.is_some()
 }
 
-const CRAWL_SCHEMA: u32 = 5;
-const CRAWL_SCHEMAS_READ: [u32; 1] = [5];
+const CRAWL_SCHEMA: u32 = 3;
+const CRAWL_SCHEMAS_READ: [u32; 2] = [3, 4];
 
 fn crawl_key() -> Vec<u8> {
     b"sable.search.crawl".to_vec()

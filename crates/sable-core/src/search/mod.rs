@@ -371,6 +371,7 @@ struct RoomIndex {
     pending_redactions: HashSet<OwnedEventId>,
     pending_edits: HashMap<OwnedEventId, Document>,
     floor: u64,
+    rederive_from: u64,
 }
 
 impl RoomIndex {
@@ -406,6 +407,7 @@ impl RoomIndex {
             pending_redactions: HashSet::new(),
             pending_edits: HashMap::new(),
             floor: 0,
+            rederive_from: 0,
         }
     }
 
@@ -415,6 +417,7 @@ impl RoomIndex {
             loaded,
             legacy,
         } = restored;
+        let stale = manifest.derived < persist::DERIVATION;
         let documents = loaded
             .iter()
             .map(|(_, stored)| stored.documents.len())
@@ -481,7 +484,13 @@ impl RoomIndex {
         if legacy {
             misplaced.extend(index.chunks.values().copied());
         }
-        index.dirty = !misplaced.is_empty()
+        index.rederive_from = if stale {
+            now_ms().saturating_sub(crawl::CRAWL_MAX_AGE_MS).max(1)
+        } else {
+            manifest.rederive_from
+        };
+        index.dirty = stale
+            || !misplaced.is_empty()
             || !index.pending_redactions.is_empty()
             || !index.pending_edits.is_empty();
         index.dirty_chunks = misplaced;
@@ -713,6 +722,7 @@ impl RoomIndex {
                 .collect(),
             self.floor,
         );
+        manifest.rederive_from = self.rederive_from;
         manifest.pending_redactions = self.pending_redactions.iter().cloned().collect();
         manifest.pending_edits = self.pending_edits.values().cloned().collect();
 
@@ -1476,16 +1486,36 @@ impl MessageIndex {
         }
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one sequential flow kept in a single function"
-    )]
     pub(crate) async fn ingest(
         &mut self,
         room_id: &OwnedRoomId,
         events: Vec<TimelineEvent>,
         cache: &RoomEventCache,
         rules: &RedactionRules,
+    ) -> usize {
+        self.ingest_with(room_id, events, cache, rules, false).await
+    }
+
+    pub(super) fn finish_rederive(&mut self, room_id: &OwnedRoomId) {
+        if let Some(index) = self.rooms.get_mut(room_id)
+            && index.rederive_from != 0
+        {
+            index.rederive_from = 0;
+            index.dirty = true;
+        }
+    }
+
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one sequential flow kept in a single function"
+    )]
+    pub(super) async fn ingest_with(
+        &mut self,
+        room_id: &OwnedRoomId,
+        events: Vec<TimelineEvent>,
+        cache: &RoomEventCache,
+        rules: &RedactionRules,
+        rederive: bool,
     ) -> usize {
         self.rooms
             .entry(room_id.clone())
@@ -1508,7 +1538,12 @@ impl MessageIndex {
                 continue;
             };
 
-            if index.already_classified(event_id) {
+            let rederiving = rederive
+                && index.rederive_from != 0
+                && event
+                    .timestamp_raw()
+                    .is_some_and(|ts| u64::from(ts.get()) >= index.rederive_from);
+            if index.already_classified(event_id) && !rederiving {
                 continue;
             }
             fresh += 1;
@@ -2550,8 +2585,14 @@ impl Core {
         let mut opened = Vec::new();
         for room_id in rooms {
             match persist::open(client, &room_id).await {
-                persist::Opened::Manifest(manifest) => opened.push((room_id, manifest)),
+                persist::Opened::Manifest(manifest) => {
+                    if manifest.derived < persist::DERIVATION {
+                        self.search_crawl.lock().await.discard(room_id.clone());
+                    }
+                    opened.push((room_id, manifest));
+                }
                 persist::Opened::Legacy(restored) => {
+                    self.search_crawl.lock().await.discard(room_id.clone());
                     self.search_index
                         .lock()
                         .await
@@ -5344,12 +5385,176 @@ mod tests {
             serde_json::from_str(include_str!("golden_documents.json")).expect("golden json");
         assert_eq!(
             documents, expected,
-            "document_of changed what it stores: update golden_documents.json and bump SCHEMA and CRAWL_SCHEMA"
+            "document_of changed what it stores: update golden_documents.json and bump persist::DERIVATION"
         );
     }
 
     #[async_test]
-    async fn test_a_blob_from_an_older_schema_is_discarded_and_its_checkpoint_dropped() {
+    async fn test_a_room_derived_by_older_code_keeps_its_documents_and_rederives_the_recent_window()
+    {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!derived:localhost").to_owned();
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server
+            .sync_room(&client, JoinedRoomBuilder::new(&room_id))
+            .await;
+
+        let mut index = chunked_room(10);
+        let mut flush = index.take_flush();
+        flush.manifest.derived = 0;
+        assert!(super::persist::list_room(&client, &room_id).await);
+        for (chunk, stored) in &flush.chunks {
+            assert!(
+                super::persist::write_chunk(&client, &room_id, *chunk, stored)
+                    .await
+                    .is_some()
+            );
+        }
+        assert!(super::persist::write_manifest(&client, &room_id, &flush.manifest).await);
+
+        let (core, _events) = crate::Core::new(
+            "search-derived",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        core.restore_persisted_index(&client).await;
+
+        {
+            let index = core.search_index.lock().await;
+            assert_eq!(in_room(&index, &room_id, "message", 50, 0).len(), 10);
+            assert!(index.rooms[&room_id].rederive_from > 0);
+            assert!(index.rooms[&room_id].dirty);
+        }
+
+        let mut progress = core.search_crawl.lock().await;
+        progress.restore(std::collections::BTreeMap::from([(
+            room_id.clone(),
+            super::persist::StoredCrawlRoom {
+                token: None,
+                reached_start: true,
+            },
+        )]));
+        assert!(!progress.checkpoints().contains_key(&room_id));
+        drop(progress);
+
+        core.flush_search_index(&client).await;
+        let super::persist::Opened::Manifest(reopened) =
+            super::persist::open(&client, &room_id).await
+        else {
+            panic!("the migrated room should be stored as a manifest");
+        };
+        assert_eq!(reopened.derived, super::persist::DERIVATION);
+        assert!(reopened.rederive_from > 0);
+
+        core.search_index.lock().await.finish_rederive(&room_id);
+        core.flush_search_index(&client).await;
+        let super::persist::Opened::Manifest(finished) =
+            super::persist::open(&client, &room_id).await
+        else {
+            panic!("the finished room should be stored as a manifest");
+        };
+        assert_eq!(finished.rederive_from, 0);
+
+        drop(room);
+    }
+
+    #[async_test]
+    async fn test_a_rederiving_ingest_repairs_a_classified_document_and_a_plain_one_does_not() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!rederive:localhost").to_owned();
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id).add_timeline_event(
+                    serde_json::from_value::<
+                        matrix_sdk::ruma::serde::Raw<
+                            matrix_sdk::ruma::events::AnySyncTimelineEvent,
+                        >,
+                    >(serde_json::json!({
+                        "type": "m.room.message",
+                        "event_id": "$gallery",
+                        "sender": "@erwan:localhost",
+                        "origin_server_ts": 5_000,
+                        "content": {
+                            "msgtype": "dm.filament.gallery",
+                            "body": "",
+                            "itemtypes": [{
+                                "itemtype": "m.file",
+                                "body": "notes.pdf",
+                                "url": "mxc://localhost/notes"
+                            }]
+                        }
+                    }))
+                    .expect("gallery event"),
+                ),
+            )
+            .await;
+        let (cache, _drop_handles) = client
+            .event_cache()
+            .room(&room_id)
+            .await
+            .expect("room event cache");
+        let events = cache.events().await.expect("cached events");
+
+        let mut index = MessageIndex::new();
+        index
+            .ingest(&room_id, events.clone(), &cache, &RedactionRules::V11)
+            .await;
+        let stale = |index: &mut MessageIndex| {
+            let room_index = index.rooms.get_mut(&room_id).expect("room");
+            let mut document = room_index
+                .document(&event_id!("$gallery").to_owned())
+                .cloned()
+                .expect("the gallery document");
+            document.media = Vec::new();
+            document.attachments = Vec::new();
+            room_index.upsert(document);
+        };
+        let media = |index: &MessageIndex| {
+            index.rooms[&room_id]
+                .document(&event_id!("$gallery").to_owned())
+                .map_or(0, |document| document.media.len())
+        };
+
+        stale(&mut index);
+        index
+            .ingest_with(&room_id, events.clone(), &cache, &RedactionRules::V11, true)
+            .await;
+        assert_eq!(media(&index), 0, "no window is open, so the skip holds");
+
+        index.rooms.get_mut(&room_id).expect("room").rederive_from = 1;
+        index
+            .ingest_with(
+                &room_id,
+                events.clone(),
+                &cache,
+                &RedactionRules::V11,
+                false,
+            )
+            .await;
+        assert_eq!(media(&index), 0, "only the crawl re-derives");
+
+        index
+            .ingest_with(&room_id, events.clone(), &cache, &RedactionRules::V11, true)
+            .await;
+        assert_eq!(media(&index), 1);
+
+        index.finish_rederive(&room_id);
+        stale(&mut index);
+        index
+            .ingest_with(&room_id, events, &cache, &RedactionRules::V11, true)
+            .await;
+        assert_eq!(media(&index), 0, "a finished room is skipped again");
+
+        drop(room);
+    }
+
+    #[async_test]
+    async fn test_a_v3_blob_from_main_is_split_into_chunks_without_a_recrawl() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let room_id = room_id!("!legacy:localhost").to_owned();
@@ -5358,10 +5563,30 @@ mod tests {
             .sync_room(&client, JoinedRoomBuilder::new(&room_id))
             .await;
 
+        let documents: Vec<super::Document> = (0..3_000)
+            .map(|seed| {
+                document(
+                    &format!("old{seed}"),
+                    &format!("archaeology {seed}"),
+                    "@erwan:localhost",
+                    seed,
+                    None,
+                    Vec::new(),
+                )
+            })
+            .collect();
+        let documents: Vec<serde_json::Value> = documents
+            .iter()
+            .map(|document| {
+                let mut json = serde_json::to_value(document).expect("document json");
+                json.as_object_mut().expect("an object").remove("media");
+                json
+            })
+            .collect();
         let legacy = serde_json::json!({
-            "version": 4,
-            "documents": [],
-            "classified": ["$old0"],
+            "version": 3,
+            "documents": documents,
+            "classified": ["$old0", "$reaction"],
             "edits": [],
         });
         client
@@ -5378,16 +5603,44 @@ mod tests {
             Box::new(crate::store::MemorySessionStore::default()),
         );
         core.restore_persisted_index(&client).await;
+        assert_eq!(
+            in_room(
+                &*core.search_index.lock().await,
+                &room_id,
+                "archaeology",
+                5_000,
+                0
+            )
+            .len(),
+            3_000
+        );
+        core.flush_search_index(&client).await;
 
+        let store = client.state_store();
         assert!(
-            client
-                .state_store()
+            store
                 .get_custom_value(format!("sable.search.documents.{room_id}").as_bytes())
                 .await
                 .expect("read")
                 .is_none()
         );
-        assert!(!core.search_index.lock().await.rooms.contains_key(&room_id));
+        assert_eq!(
+            super::persist::listed_rooms(&client).await,
+            vec![room_id.clone()]
+        );
+
+        let (second, _second_events) = crate::Core::new(
+            "search-legacy-second",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        second.restore_persisted_index(&client).await;
+        let index = second.search_index.lock().await;
+        assert_eq!(
+            in_room(&index, &room_id, "archaeology", 5_000, 0).len(),
+            3_000
+        );
+        assert!(index.rooms[&room_id].already_classified(event_id!("$reaction")));
+        assert!(index.rooms[&room_id].chunks.len() > 1);
 
         drop(room);
     }

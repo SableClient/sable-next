@@ -1420,7 +1420,7 @@ mod regression_tests {
             (
                 format!("sable.search.room.{room_id}").into_bytes(),
                 serde_json::to_vec(&serde_json::json!({
-                    "version": 6, "next_chunk": 2, "edits": [],
+                    "version": 5, "derived": 1, "next_chunk": 2, "edits": [],
                     "chunks": [
                         { "id": 0, "start": 0, "bytes": 100, "count": 1 },
                         { "id": 1, "start": 200, "bytes": 100, "count": 1 }
@@ -1430,7 +1430,7 @@ mod regression_tests {
             (
                 b"sable.search.crawl".to_vec(),
                 serde_json::to_vec(&serde_json::json!({
-                    "version": 5,
+                    "version": 3,
                     "rooms": { room_id.to_string(): { "token": "older-page", "reached_start": false } }
                 }))?,
             ),
@@ -1445,7 +1445,7 @@ mod regression_tests {
         for (id, timestamp) in [(0, 100), (1, 200)] {
             let key = format!("sable.search.chunk.{room_id}.{id}").into_bytes();
             let value = serde_json::to_vec(&serde_json::json!({
-                "version": 6,
+                "version": 5,
                 "documents": [{
                     "event_id": format!("$indexed-{id}"), "body": "retained archaeology",
                     "sender": "@alice:example.org", "origin_server_ts": timestamp,

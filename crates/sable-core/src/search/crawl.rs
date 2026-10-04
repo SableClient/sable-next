@@ -21,7 +21,7 @@ const CRAWL_BATCH: u16 = 100;
 const CRAWL_DEFAULT_BATCH: u16 = 50;
 const CRAWL_PAUSE: Duration = Duration::from_secs(3);
 const CRAWL_READABLE_PAUSE: Duration = Duration::from_secs(3);
-const CRAWL_MAX_AGE_MS: u64 = 26 * 7 * 24 * 60 * 60 * 1000;
+pub(super) const CRAWL_MAX_AGE_MS: u64 = 26 * 7 * 24 * 60 * 60 * 1000;
 const CRAWL_IDLE: Duration = Duration::from_secs(30);
 const CRAWL_BASE_EVENTS: usize = 20_000;
 const MAX_CRAWLED_EVENTS: usize = 200_000;
@@ -396,6 +396,7 @@ impl Core {
             let pause = match self.crawl_once(client, &room_id).await {
                 Ok(CrawlOutcome::Paused) => continue,
                 Ok(CrawlOutcome::Batch(outcome)) if outcome.reached_start => {
+                    self.search_index.lock().await.finish_rederive(&room_id);
                     let mut progress = self.search_crawl.lock().await;
                     progress.steady(&room_id);
                     progress.settle(room_id, outcome.exhausted);
@@ -733,7 +734,9 @@ impl Core {
 
             let (fresh, revision) = {
                 let mut index = self.search_index.lock().await;
-                let fresh = index.ingest(room_id, events, &cache, &rules).await;
+                let fresh = index
+                    .ingest_with(room_id, events, &cache, &rules, true)
+                    .await;
                 (fresh, index.revision(room_id))
             };
 
@@ -1256,7 +1259,7 @@ mod tests {
     }
 
     #[async_test]
-    async fn test_checkpoints_written_by_an_older_schema_are_dropped() {
+    async fn test_checkpoints_written_by_main_survive_the_upgrade() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         client
@@ -1274,7 +1277,13 @@ mod tests {
 
         let stored = super::super::persist::load_crawl(&client).await;
 
-        assert!(stored.rooms.is_empty());
+        assert_eq!(
+            stored
+                .rooms
+                .get(&room())
+                .and_then(|room| room.token.as_deref()),
+            Some("t42")
+        );
     }
 
     #[test]
