@@ -44,9 +44,7 @@
       <SettingsRow
         id="supporter-verify"
         title={$i18n.t('settings.supporterVerify')}
-        description={waiting
-          ? $i18n.t('settings.supporterWaiting')
-          : $i18n.t('settings.supporterHint')}
+        description={waiting ? $i18n.t('settings.supporterWaiting') : undefined}
       >
         {#if waiting}
           <Button size="small" onclick={() => supporter.cancel()}>
@@ -60,11 +58,7 @@
       </SettingsRow>
     {/if}
     {#if !badge}
-      <SettingsRow
-        id="supporter-claim"
-        title={$i18n.t('settings.supporterClaim')}
-        description={$i18n.t('settings.supporterClaimHint')}
-      >
+      <SettingsRow id="supporter-claim" title={$i18n.t('settings.supporterClaim')}>
         <Button
           size="small"
           loading={checking}
