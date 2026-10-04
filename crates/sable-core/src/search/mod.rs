@@ -1309,6 +1309,7 @@ impl MessageIndex {
                         start: *start,
                         room_id: room_id.clone(),
                         chunk: *chunk,
+                        skip: 0,
                     })
             })
             .collect();
@@ -1316,6 +1317,10 @@ impl MessageIndex {
         queue
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one sequential scan kept in a single function"
+    )]
     fn scan_cold(
         &self,
         room_id: &OwnedRoomId,
@@ -1323,10 +1328,15 @@ impl MessageIndex {
         query: &str,
         filter: &SearchFilter,
         terms: &FoldedTerms,
-        context: usize,
-    ) -> Vec<Hit> {
+        window: ColdWindow,
+    ) -> (Vec<Hit>, usize) {
+        let ColdWindow {
+            skip,
+            take,
+            context,
+        } = window;
         let Some(index) = self.rooms.get(room_id) else {
-            return Vec::new();
+            return (Vec::new(), 0);
         };
         let mut documents: Vec<Document> = stored
             .documents
@@ -1346,7 +1356,7 @@ impl MessageIndex {
             document.folded = document.body.to_lowercase();
         }
 
-        let matched: Vec<(usize, f64)> = if query.is_empty() {
+        let mut matched: Vec<(usize, f64)> = if query.is_empty() {
             documents
                 .iter()
                 .enumerate()
@@ -1381,6 +1391,20 @@ impl MessageIndex {
                 .collect()
         };
 
+        matched.sort_by(|left, right| {
+            right
+                .1
+                .partial_cmp(&left.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| {
+                    let id = |position: &usize| {
+                        documents.get(*position).map(|document| &document.event_id)
+                    };
+                    id(&left.0).cmp(&id(&right.0))
+                })
+        });
+        let total = matched.len();
+
         let line = |document: &Document| {
             (!document.body.is_empty() && !filter.not_senders.contains(&document.sender)).then(
                 || ContextLine {
@@ -1391,8 +1415,10 @@ impl MessageIndex {
                 },
             )
         };
-        matched
+        let hits = matched
             .into_iter()
+            .skip(skip)
+            .take(take)
             .filter_map(|(position, score)| {
                 let document = documents.get(position)?;
                 let mut before: Vec<ContextLine> = documents
@@ -1422,7 +1448,8 @@ impl MessageIndex {
                     after,
                 })
             })
-            .collect()
+            .collect();
+        (hits, total)
     }
 
     fn materialize(&self, ranked: Vec<Ranked<'_>>) -> Vec<Hit> {
@@ -1658,6 +1685,7 @@ struct OlderCursor {
     start: u64,
     room_id: OwnedRoomId,
     chunk: ChunkId,
+    skip: usize,
 }
 
 impl OlderCursor {
@@ -1670,19 +1698,42 @@ impl OlderCursor {
     }
 
     fn encode(&self) -> String {
-        format!("{}:{}:{}", self.start, self.chunk, self.room_id)
+        format!(
+            "{}:{}:{}:{}",
+            self.start, self.chunk, self.skip, self.room_id
+        )
     }
 
     fn decode(cursor: &str) -> Option<Self> {
-        let mut parts = cursor.splitn(3, ':');
+        let mut parts = cursor.splitn(4, ':');
         let start = parts.next()?.parse().ok()?;
         let chunk = parts.next()?.parse().ok()?;
+        let skip = parts.next()?.parse().ok()?;
         let room_id = OwnedRoomId::try_from(parts.next()?).ok()?;
         Some(Self {
             start,
             room_id,
             chunk,
+            skip,
         })
+    }
+}
+
+#[derive(Clone, Copy)]
+struct ColdWindow {
+    skip: usize,
+    take: usize,
+    context: usize,
+}
+
+impl ColdWindow {
+    #[cfg(test)]
+    const fn all(context: usize) -> Self {
+        Self {
+            skip: 0,
+            take: usize::MAX,
+            context,
+        }
     }
 }
 
@@ -2475,9 +2526,13 @@ impl Core {
         for _ in 0..COLD_CHUNKS_PER_PAGE {
             let queue = self.search_index.lock().await.cold_queue(&filter);
             let mut remaining = queue.into_iter().filter(|candidate| {
-                after.as_ref().is_none_or(|after| {
-                    OlderCursor::order(after, candidate) == std::cmp::Ordering::Less
-                })
+                after
+                    .as_ref()
+                    .is_none_or(|after| match OlderCursor::order(after, candidate) {
+                        std::cmp::Ordering::Less => true,
+                        std::cmp::Ordering::Equal => after.skip > 0,
+                        std::cmp::Ordering::Greater => false,
+                    })
             });
             let Some(position) = remaining.next() else {
                 next = None;
@@ -2490,14 +2545,36 @@ impl Core {
                     persist::StoredChunk::new(Vec::new(), Vec::new())
                 }
             };
-            hits.extend(self.search_index.lock().await.scan_cold(
+            let skip = after
+                .as_ref()
+                .filter(|after| OlderCursor::order(after, &position) == std::cmp::Ordering::Equal)
+                .map_or(0, |after| after.skip);
+            let room = limit.saturating_sub(hits.len()).max(1);
+            let (found, total) = self.search_index.lock().await.scan_cold(
                 &position.room_id,
                 &stored,
                 query,
                 &filter,
                 &terms,
-                context,
-            ));
+                ColdWindow {
+                    skip,
+                    take: room,
+                    context,
+                },
+            );
+            let consumed = skip + room;
+            if consumed < total {
+                hits.extend(found);
+                next = Some(
+                    OlderCursor {
+                        skip: consumed,
+                        ..position
+                    }
+                    .encode(),
+                );
+                break;
+            }
+            hits.extend(found);
             next = remaining.next().map(|_| position.encode());
             after = Some(position);
             if next.is_none()
@@ -4710,6 +4787,88 @@ mod tests {
         assert_eq!(older[0].before[0].event_id, event_id!("$o0"));
         assert_eq!(older[0].after[0].event_id, event_id!("$o2"));
         assert!(next.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_an_older_page_is_capped_and_resumes_inside_the_chunk() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let core = logged_in(&server, &client, "search-older-cap").await;
+        let rooms = [
+            room_id!("!older-cap-a:localhost").to_owned(),
+            room_id!("!older-cap-b:localhost").to_owned(),
+        ];
+        {
+            let mut index = core.search_index.lock().await;
+            *index = MessageIndex::with_budgets(usize::MAX, usize::MAX);
+            for (offset, room) in rooms.iter().enumerate() {
+                let mut room_index = super::RoomIndex::new();
+                for seed in 0..3_000_u64 {
+                    room_index.upsert(document(
+                        &format!("{offset}c{seed}"),
+                        &format!("archive entry w{seed}x"),
+                        "@erwan:localhost",
+                        seed * 2 + offset as u64,
+                        None,
+                        Vec::new(),
+                    ));
+                }
+                index.rooms.insert(room.clone(), room_index);
+            }
+        }
+        core.flush_search_index(&client).await;
+        let mut cold = 0;
+        {
+            let mut index = core.search_index.lock().await;
+            for room in &rooms {
+                let room_index = index.rooms.get_mut(room).expect("room");
+                let chunks: Vec<_> = room_index.chunks.values().copied().collect();
+                for chunk in chunks.iter().take(chunks.len() - 1) {
+                    room_index.unload(*chunk);
+                }
+                cold += room_index.documents.len();
+            }
+        }
+        let on_disk = 6_000 - cold;
+        assert!(on_disk > 100);
+
+        for (query, scope) in [
+            ("", vec![rooms[0].clone()]),
+            ("", rooms.to_vec()),
+            ("archive", vec![rooms[0].clone()]),
+            ("archive", Vec::new()),
+        ] {
+            for order in [
+                super::SearchOrder::Rank,
+                super::SearchOrder::Recent,
+                super::SearchOrder::Oldest,
+            ] {
+                let filter = super::SearchFilter {
+                    rooms: scope.clone(),
+                    ..super::SearchFilter::default()
+                };
+                let mut cursor = core.older_start(&filter).await.expect("a cold chunk");
+                let mut seen = std::collections::HashSet::new();
+                loop {
+                    let (page, next) = core
+                        .search_older(query, &filter, order, 30, &cursor, 0)
+                        .await;
+                    assert!(page.len() <= 30, "{query:?} {order:?}: {} hits", page.len());
+                    for hit in &page {
+                        assert!(
+                            seen.insert(hit.event_id.clone()),
+                            "{query:?} {order:?}: {} repeated",
+                            hit.event_id
+                        );
+                    }
+                    let Some(next) = next else { break };
+                    cursor = next;
+                }
+                let expected =
+                    on_disk / 2 * scope.len().max(1) * if scope.is_empty() { 2 } else { 1 };
+                assert_eq!(seen.len(), expected, "{query:?} {order:?} {}", scope.len());
+            }
+        }
     }
 
     #[test]
@@ -7164,8 +7323,9 @@ mod stress {
                         &super::SearchFilter::default(),
                         std::collections::HashSet::new(),
                     ),
-                    1,
+                    super::ColdWindow::all(1),
                 )
+                .0
                 .len()
         });
         let cold_scan = started.elapsed();
