@@ -19,6 +19,8 @@ sentry {
     ignoredBuildTypes.set(setOf("debug"))
 }
 
+val fossBuild = providers.environmentVariable("SABLE_FOSS").orNull == "1"
+
 val tauriProperties = Properties().apply {
     val propFile = file("tauri.properties")
     if (propFile.exists()) {
@@ -36,7 +38,7 @@ android {
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "moe.sable.next"
-        missingDimensionStrategy("push", "gms")
+        missingDimensionStrategy("push", if (fossBuild) "foss" else "gms")
         minSdk = 24
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
@@ -149,6 +151,8 @@ apply(from = "tauri.build.gradle.kts")
 
 // Native FCM push (Sygnal): applies only once google-services.json is added to this
 // directory, so builds without Firebase configured still succeed.
-if (file("google-services.json").exists()) {
+// Skipped for FOSS builds: the plugin injects the Firebase project ids as string
+// resources even when no Firebase library is linked.
+if (!fossBuild && file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
 }

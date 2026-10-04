@@ -8,9 +8,6 @@
     "app-icon:default",
     "deep-link:default",
     "edge-to-edge:default",
-    "geolocation:allow-check-permissions",
-    "geolocation:allow-request-permissions",
-    "geolocation:allow-get-current-position",
     "livekit-mobile:default",
     "opener:allow-open-url",
     "sentry:default"

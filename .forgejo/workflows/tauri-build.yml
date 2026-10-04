@@ -329,6 +329,8 @@ jobs:
         uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
         with:
           name: web-assets
+      - name: Drop assets the native app never loads
+        run: rm -rf dist/deepfilternet3 dist/_app/immutable/workers
       - name: Set up app
         uses: ./.forgejo/actions/setup
         with:
@@ -390,6 +392,24 @@ jobs:
           echo "password=$ANDROID_KEY_PASSWORD" >> keystore.properties
           base64 -d <<< "$ANDROID_KEY_BASE64" > "$RUNNER_TEMP/keystore.jks"
           echo "storeFile=$RUNNER_TEMP/keystore.jks" >> keystore.properties
+      - name: Build FOSS Android APKs
+        if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+        env:
+          SABLE_FOSS: '1'
+        run: |
+          unset VITE_SENTRY_DSN VITE_SENTRY_ENVIRONMENT SENTRY_AUTH_TOKEN SENTRY_ORG SENTRY_PROJECT
+          mv src-tauri/capabilities/geolocation.json "$RUNNER_TEMP/geolocation.json"
+          pnpm tauri android build --config src-tauri/tauri.ci.conf.json --apk --split-per-abi \
+            --target aarch64 armv7 -- --no-default-features --features wry
+          mv "$RUNNER_TEMP/geolocation.json" src-tauri/capabilities/geolocation.json
+          for pair in 'arm64:aarch64' 'arm:armv7'; do
+            flavor="${pair%%:*}"
+            abi="${pair##*:}"
+            dir="src-tauri/gen/android/app/build/outputs/apk/$flavor/release"
+            apk="$(find "$dir" -name '*.apk' -type f | head -n 1)"
+            [ -n "$apk" ] || { echo "FOSS $abi APK not found" >&2; exit 1; }
+            mv "$apk" "$dir/sable-next-${VERSION}-android-${abi}-foss.apk"
+          done
       - name: Build Android bundles
         run: |
           config_args=(--config src-tauri/tauri.ci.conf.json)

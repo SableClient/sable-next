@@ -81,7 +81,7 @@ tauri-plugin-android-fs = "=29.0.0"
 # Push drags in Firebase and APNs, which only these two builds should carry.
 [target."cfg(any(target_os = \"android\", target_os = \"ios\"))".dependencies]
 tauri-plugin-app-icon = { version = "0.1.0", git = "https://github.com/SableClient/tauri-plugin-app-icon", rev = "bab80ae17f6d018702e472c539d0f02eba480c21" }
-tauri-plugin-geolocation = "2.3.3"
+tauri-plugin-geolocation = { version = "2.3.3", optional = true }
 tauri-plugin-notifications = { version = "0.5.0", git = "https://github.com/SableClient/tauri-plugin-notifications.git", rev = "f230395e47f326cc09bcf644f7952d57cab518f7", default-features = false, features = [
   "push-notifications",
 ] }
@@ -154,8 +154,9 @@ objc2-photos = { version = "0.3.2", default-features = false, features = [
 # Exactly one must be on. The Linux release build passes
 # `--no-default-features --features cef`; everything else takes the default.
 [features]
-default = ["wry"]
+default = ["wry", "geolocation"]
 wry = ["tauri/wry", "dep:webkit2gtk"]
+geolocation = ["dep:tauri-plugin-geolocation"]
 cef = [
   "dep:tauri-runtime-cef",
   "dep:winit",
