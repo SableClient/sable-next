@@ -112,6 +112,7 @@ const DISPLAY_AUDIO_CAPTURE: ScreenShareCaptureOptions = {
     echoCancellation: false,
     noiseSuppression: false,
     autoGainControl: false,
+    restrictOwnAudio: true,
   },
   systemAudio: 'include',
 };

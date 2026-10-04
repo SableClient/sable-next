@@ -443,7 +443,11 @@ test('a share without our own audio capture asks the browser for stereo system a
     true,
     expect.objectContaining({
       systemAudio: 'include',
-      audio: expect.objectContaining({ channelCount: 2, echoCancellation: false }) as unknown,
+      audio: expect.objectContaining({
+        channelCount: 2,
+        echoCancellation: false,
+        restrictOwnAudio: true,
+      }) as unknown,
     }),
     expect.objectContaining({ forceStereo: true, dtx: false, red: false })
   );
