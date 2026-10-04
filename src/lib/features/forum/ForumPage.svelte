@@ -27,6 +27,7 @@
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import RoomBannerStrip from '#lib/features/room/RoomBannerStrip.svelte';
   import { copyRoomLink } from '#lib/rooms/permalink.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
@@ -248,6 +249,7 @@
           }
         : undefined}
     />
+    <RoomBannerStrip roomId={resolvedRoomId} />
     <div class="forum-content">
       <div class="forum-compose-area">
         <p class="forum-composer-hint">{$i18n.t('forum.newThreadHint')}</p>

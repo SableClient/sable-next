@@ -17,6 +17,7 @@
   import { eventTimelinePath } from '#lib/features/room/event-timeline.js';
   import { memberName } from '#lib/features/room/members/members.js';
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
+  import RoomBannerStrip from '#lib/features/room/RoomBannerStrip.svelte';
   import RoomHeaderMenu from '#lib/features/room/RoomHeaderMenu.svelte';
   import RoomInviteDialog from '#lib/features/room/RoomInviteDialog.svelte';
   import MessageReportDialog from '#lib/features/room/messages/MessageReportDialog.svelte';
@@ -435,6 +436,7 @@
       />
     {/snippet}
   </PanelHeader>
+  <RoomBannerStrip {roomId} />
 
   <div class="calendar-content">
     <div class="calendar-range">
