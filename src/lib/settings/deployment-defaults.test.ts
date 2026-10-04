@@ -15,7 +15,10 @@ async function loadWith(stored: Record<string, unknown> | null) {
 }
 
 function persisted(): Record<string, unknown> {
-  return JSON.parse(localStorage.getItem('sable-preferences') ?? '{}') as Record<string, unknown>;
+  const { schema: _schema, ...stored } = JSON.parse(
+    localStorage.getItem('sable-preferences') ?? '{}'
+  ) as Record<string, unknown>;
+  return stored;
 }
 
 function syncedSettings(snapshot: { content: unknown }): Record<string, unknown> {

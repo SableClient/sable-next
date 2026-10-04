@@ -8,6 +8,7 @@ import { readJson, writeJson } from '#lib/platform/local-json.js';
 import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
 import type { BadgeNotificationMode } from '#lib/rooms/unread.js';
 import { readV1Preferences } from '#lib/migrations/v1/preferences.js';
+import { migrateSettings, SETTINGS_SCHEMA } from './migrations.js';
 
 export type { BadgeNotificationMode };
 
@@ -648,25 +649,6 @@ export function sanitize(stored: Record<string, unknown>, base: Preferences): Pr
   return next;
 }
 
-function mergeNotificationSwitch(stored: Record<string, unknown>, next: Preferences): Preferences {
-  if (stored.desktopNotifications === false) next.systemNotifications = false;
-  return next;
-}
-
-const LEGACY_FONT_SCALES: Record<string, number> = {
-  smallest: 0.75,
-  small: 0.9375,
-  large: 1.125,
-  largest: 1.25,
-  huge: 1.5,
-};
-
-function mergeFontScale(stored: Record<string, unknown>, next: Preferences): Preferences {
-  if (stored.pageZoom !== undefined || typeof stored.fontScale !== 'string') return next;
-  next.pageZoom = LEGACY_FONT_SCALES[stored.fontScale] ?? next.pageZoom;
-  return next;
-}
-
 const explicit = new SvelteSet<keyof Preferences>();
 
 function load(): Preferences {
@@ -674,18 +656,20 @@ function load(): Preferences {
 
   const current = read(STORAGE_KEY) ?? read(LEGACY_STORAGE_KEY);
   const migrated = current === null ? readV1Preferences() : null;
-  const stored = current ?? migrated;
-  if (!stored) return { ...DEFAULTS };
+  const raw = current ?? migrated;
+  if (!raw) return { ...DEFAULTS };
 
-  const loaded = mergeFontScale(
-    stored,
-    mergeNotificationSwitch(stored, sanitize(stored, DEFAULTS))
-  );
+  const stored = migrateSettings(raw, raw.schema);
+  const loaded = sanitize(stored, DEFAULTS);
   for (const key of PREFERENCE_KEYS) {
     if (key in stored || loaded[key] !== DEFAULTS[key]) explicit.add(key);
   }
   if (migrated !== null) {
-    writeJson(STORAGE_KEY, stored, '[sable settings] migrated preferences not persisted');
+    writeJson(
+      STORAGE_KEY,
+      { ...stored, schema: SETTINGS_SCHEMA },
+      '[sable settings] migrated preferences not persisted'
+    );
   }
   return loaded;
 }
@@ -728,7 +712,7 @@ export function applyDeploymentDefaults(raw: Record<string, unknown>): void {
 
 function persist(): void {
   untrack(() => {
-    const stored: Partial<Record<keyof Preferences, unknown>> = {};
+    const stored: Record<string, unknown> = { schema: SETTINGS_SCHEMA };
     for (const key of explicit) stored[key] = preferences[key];
     writeJson(STORAGE_KEY, stored, '[sable settings] preferences not persisted');
   });

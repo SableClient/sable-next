@@ -1,4 +1,5 @@
 import { readThemes, type StoredThemes } from './custom-themes.svelte.js';
+import { migrateSettings, SETTINGS_SCHEMA } from './migrations.js';
 import { PREFERENCE_KEYS, sanitize } from './preferences.svelte.js';
 import type { Preferences } from './preferences.svelte.js';
 
@@ -52,6 +53,7 @@ export const NON_SYNCABLE_KEYS = new Set<keyof Preferences>([
 
 export interface SettingsSyncContent {
   v: number;
+  schema: number;
   settings: Partial<Preferences>;
   themes: StoredThemes;
 }
@@ -93,6 +95,7 @@ export function prepareSettings(
   return {
     content: {
       v: SETTINGS_SYNC_VERSION,
+      schema: SETTINGS_SCHEMA,
       settings,
       themes: {
         themes: kept,
@@ -122,10 +125,11 @@ export function applySettings(
   const content = data as Record<string, unknown>;
   if (content.v !== SETTINGS_SYNC_VERSION) return null;
 
-  const remote = content.settings;
-  if (remote === null || typeof remote !== 'object' || Array.isArray(remote)) return null;
+  const received = content.settings;
+  if (received === null || typeof received !== 'object' || Array.isArray(received)) return null;
 
-  const merged = sanitize(remote as Record<string, unknown>, current);
+  const remote = migrateSettings(received as Record<string, unknown>, content.schema);
+  const merged = sanitize(remote, current);
   for (const key of NON_SYNCABLE_KEYS) {
     (merged as unknown as Record<string, unknown>)[key] = current[key];
   }
