@@ -896,7 +896,28 @@
     }
     void controller?.jumpTo(null, 'start', !shouldReduceMotion());
   }
+  function onEscape(event: KeyboardEvent): void {
+    if (
+      event.key !== 'Escape' ||
+      event.defaultPrevented ||
+      event.repeat ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      event.shiftKey ||
+      !active ||
+      !onMarkRead ||
+      (event.target instanceof Element && event.target.closest('[role="dialog"], [role="menu"]'))
+    ) {
+      return;
+    }
+    event.preventDefault();
+    jumpToLatest();
+    if (unread.active || hasUnread) void markAllRead();
+  }
 </script>
+
+<svelte:window onkeydown={onEscape} />
 
 <TimelineReadReceipt
   {timeline}

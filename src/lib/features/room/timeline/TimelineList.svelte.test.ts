@@ -2377,6 +2377,36 @@ test('marking the unread bar as read keeps it on failure and clears it on succes
   expect(screen.queryByRole('button', { name: 'Jump to unread' })).not.toBeInTheDocument();
 });
 
+test('Escape jumps to the latest message and marks the room read', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [
+    readMarker('marker'),
+    ...Array.from({ length: 12 }, (_, i) => item(`new-${i}`)),
+  ];
+  const mark = vi.fn().mockResolvedValue(undefined);
+  const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        landingEventId: '$new-10',
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+        onMarkRead: mark,
+      },
+    },
+  });
+  unreadViewport();
+  await tick();
+  await runAnimationFrames();
+  jumps.mockClear();
+  await userEvent.keyboard('{Escape}');
+  await tick();
+  expect(jumps).toHaveBeenCalledWith(null, 'start', expect.anything());
+  expect(mark).toHaveBeenCalledOnce();
+});
+
 test('an unread search with no history progress is bounded and can be retried', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('later-1'), item('later-2'), item('later-3')];
