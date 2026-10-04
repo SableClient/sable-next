@@ -676,6 +676,10 @@
       link.kind === 'event' ? link.eventId : null,
       via
     );
+    if (link.kind === 'event' && target === `${page.url.pathname}${page.url.search}`) {
+      jumpToEvent(link.eventId);
+      return;
+    }
     void afterOverlayPops().then(() => goto(target));
   }
 
@@ -720,7 +724,14 @@
   // A history entry, so back is a way out of the anchor.
   function jumpToEvent(eventId: string): void {
     if (eventId === page.url.searchParams.get('event')) {
-      timelineList?.jumpToEvent(eventId);
+      if (!timelineList?.jumpToEvent(eventId)) {
+        void activeTimeline.start(
+          timelineOwner,
+          resolvedRoomId,
+          eventId,
+          preferences.showHiddenEvents
+        );
+      }
       return;
     }
     const target = roomUrl(eventId);

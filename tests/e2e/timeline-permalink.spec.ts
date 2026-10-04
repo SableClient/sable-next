@@ -63,3 +63,57 @@ test('scrolls forward out of a permalink whose context is shorter than the viewp
     )
     .toBe(true);
 });
+
+test('a repeated reply jump centres the target again', async ({
+  page,
+  app,
+  timeline,
+  admin,
+  deepRoom,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  const distantEventId = deepRoom.eventIds[20];
+  const replyBody = `Answering something older ${String(Date.now())}`;
+  await admin.sendMessage(deepRoom.roomId, replyBody, {
+    'm.relates_to': { 'm.in_reply_to': { event_id: distantEventId } },
+  });
+
+  await app.openRoom(deepRoom.roomId);
+  await timeline.expectRevealed();
+
+  const reply = timeline.container
+    .locator('.item')
+    .filter({ hasText: replyBody })
+    .locator('.reply-preview');
+  await expect(reply).toBeVisible({ timeout: 20_000 });
+  await reply.click();
+  await expect(timeline.itemByEventId(distantEventId)).toBeVisible({ timeout: 30_000 });
+
+  const offsetFromCentre = async (): Promise<number> => {
+    if ((await timeline.itemByEventId(distantEventId).count()) === 0)
+      return Number.POSITIVE_INFINITY;
+    const row = await timeline.itemByEventId(distantEventId).boundingBox();
+    const viewport = await timeline.viewport.boundingBox();
+    if (!row || !viewport) return Number.POSITIVE_INFINITY;
+    return Math.abs(row.y + row.height / 2 - (viewport.y + viewport.height / 2));
+  };
+  await expect.poll(offsetFromCentre, { timeout: 10_000 }).toBeLessThan(120);
+
+  await timeline.viewport.hover();
+  await expect
+    .poll(
+      async () => {
+        if (await reply.isVisible()) return true;
+        await page.mouse.wheel(0, 900);
+        return false;
+      },
+      { intervals: Array.from({ length: 120 }, () => 250), timeout: 60_000 }
+    )
+    .toBe(true);
+  expect(await offsetFromCentre()).toBeGreaterThan(300);
+
+  await reply.click();
+  await expect.poll(offsetFromCentre, { timeout: 10_000 }).toBeLessThan(120);
+});

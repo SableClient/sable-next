@@ -860,11 +860,20 @@
     unreadNavigation?.abort();
     unread.clear();
   }
-  export function jumpToEvent(eventId: string): void {
+  let replayingEventId = $state<string | null>(null);
+  async function replayHighlight(eventId: string): Promise<void> {
+    replayingEventId = eventId;
+    await tick();
+    await new Promise(requestAnimationFrame);
+    if (replayingEventId === eventId) replayingEventId = null;
+  }
+  export function jumpToEvent(eventId: string): boolean {
     const key = entryFor(eventId)?.key;
-    if (!key || !controller) return;
+    if (!key || !controller) return false;
     focus.cancel();
-    void controller.jumpTo(key, 'start', !shouldReduceMotion());
+    void controller.jumpTo(key, 'center', !shouldReduceMotion());
+    if (eventId === (focusEventId ?? landedEventId)) void replayHighlight(eventId);
+    return true;
   }
 
   export function stepReply(direction: ReplyDirection): string | null {
@@ -1063,6 +1072,7 @@
                       ? personas(item.thread_summary.latest_event_id)
                       : null}
                     highlighted={item.event_id !== null &&
+                      item.event_id !== replayingEventId &&
                       item.event_id === (focusEventId ?? landedEventId)}
                     selected={replyEventId !== null && item.event_id === replyEventId}
                     {onMatrixLink}
