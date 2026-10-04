@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import process from 'node:process';
 
@@ -40,27 +40,42 @@ if (check) {
 const git = (...gitArgs) =>
   execFileSync('git', gitArgs, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
-function previousTag() {
+function fromChangelog() {
+  if (!existsSync('CHANGELOG.md')) return [];
+  const changelog = readFileSync('CHANGELOG.md', 'utf8');
+  const start = changelog.indexOf(`\n## ${version} `);
+  if (start === -1) return [];
+  const rest = changelog.slice(start + 1);
+  const end = rest.indexOf('\n## ', 1);
+  return (end === -1 ? rest : rest.slice(0, end))
+    .split('\n')
+    .filter((line) => line.startsWith('* '))
+    .map((line) => `- ${line.slice(2).replace(/ by @\S+( in #\d+)?\.?$/, '')}`);
+}
+
+function fromCommits() {
+  let tag;
   try {
-    return git('describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*', 'HEAD');
+    tag = git('describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*', 'HEAD');
   } catch {
-    return undefined;
+    tag = undefined;
   }
+  const subjects = git('log', '--no-merges', '--format=%s', tag ? `${tag}..HEAD` : 'HEAD').split(
+    '\n'
+  );
+  const bullets = [];
+  for (const subject of subjects) {
+    const match = /^(\w+)(?:\(([^)]+)\))?!?: (.+)$/.exec(subject);
+    if (!match || !KINDS.has(match[1])) continue;
+    const text = match[3].replace(/ \(#\d+\)$/, '');
+    const bullet = `- ${text[0].toUpperCase()}${text.slice(1)}`;
+    if (!bullets.includes(bullet)) bullets.push(bullet);
+  }
+  return bullets;
 }
 
-const tag = previousTag();
-const subjects = git('log', '--no-merges', '--format=%s', tag ? `${tag}..HEAD` : 'HEAD').split(
-  '\n'
-);
-
-const bullets = [];
-for (const subject of subjects) {
-  const match = /^(\w+)(?:\(([^)]+)\))?!?: (.+)$/.exec(subject);
-  if (!match || !KINDS.has(match[1])) continue;
-  const text = match[3].replace(/ \(#\d+\)$/, '');
-  const bullet = `- ${text[0].toUpperCase()}${text.slice(1)}`;
-  if (!bullets.includes(bullet)) bullets.push(bullet);
-}
+const fromFile = fromChangelog();
+const bullets = fromFile.length > 0 ? fromFile : fromCommits();
 
 const size = (text) => Buffer.byteLength(text, 'utf8');
 let changelog = '';

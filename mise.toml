@@ -29,6 +29,15 @@ run = ["mise install", "pnpm install"]
 sources = ['mise.toml', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']
 outputs = ['node_modules/.pnpm/lock.yaml']
 
+[tasks.knope]
+description = "Run Knope, the changelog and release tool"
+run = "knope"
+tools = { "github:knope-dev/knope" = { version = "0.23.0", version_prefix = "knope/v" } }
+
+[tasks."knope:document-change"]
+description = "Document a change with Knope"
+run = { task = "knope", args = ["document-change"] }
+
 [tasks.dev]
 description = "Build development WASM and start SvelteKit (port 3000 for Tauri)"
 alias = "d"

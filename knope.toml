@@ -1,0 +1,94 @@
+[package]
+versioned_files = [
+  "package.json",
+  "src-tauri/tauri.conf.json",
+  "src-tauri/Cargo.toml",
+  "Cargo.lock",
+]
+changelog = "CHANGELOG.md"
+extra_changelog_sections = [
+  { name = "Security", types = [
+    "security",
+  ] },
+  { name = "Breaking Changes", types = [
+    "major",
+  ] },
+  { name = "Features", types = [
+    "minor",
+  ] },
+  { name = "Fixes", types = [
+    "patch",
+  ] },
+  { name = "Documentation", types = [
+    "docs",
+  ] },
+  { name = "Notes", types = [
+    "note",
+  ] },
+]
+
+[changes]
+ignore_conventional_commits = true
+
+[[workflows]]
+name = "prepare-release"
+help_text = "Prepare a release PR"
+
+[[workflows.steps]]
+type = "Command"
+command = "git switch -c release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Command"
+command = "node scripts/fastlane-changelog.mjs $version && git add fastlane/metadata/android/en-US/changelogs"
+
+[[workflows.steps]]
+type = "Command"
+command = "node scripts/flatpak-metainfo-release.mjs $version && git add packaging/flatpak/moe.sable.client.metainfo.xml"
+
+[[workflows.steps]]
+type = "Command"
+command = "git commit -m \"chore: prepare release $version\""
+
+[[workflows.steps]]
+type = "Command"
+command = "git push --force --set-upstream origin release"
+
+[[workflows.steps]]
+type = "CreatePullRequest"
+base = "main"
+
+[workflows.steps.title]
+template = "chore: prepare release $version"
+
+[workflows.steps.body]
+template = """
+> [!IMPORTANT]
+> Merging this PR will create a new release.
+
+$changelog"""
+
+[[workflows]]
+name = "release"
+help_text = "Create a Forgejo release"
+
+[[workflows.steps]]
+type = "Release"
+
+[[workflows]]
+name = "document-change"
+help_text = "Create a new change file to be included in the next release"
+
+[[workflows.steps]]
+type = "CreateChangeFile"
+
+[gitea]
+owner = "SableClient"
+repo = "sable-next"
+host = "https://git.sable.moe"
+
+[release_notes]
+change_templates = ["* $summary"]

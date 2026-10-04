@@ -1,6 +1,6 @@
 {
   "name": "sable-next",
-  "version": "0.0.1",
+  "version": "1.22.9",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
@@ -27,6 +27,8 @@
     "stylelint:fix": "stylelint \"src/**/*.{css,svelte}\" --fix",
     "fmt": "oxfmt .",
     "fmt:check": "oxfmt --check .",
+    "knope": "mise run knope --",
+    "document-change": "mise run knope:document-change",
     "wasm:build": "mise exec -- node scripts/build-wasm.mjs --release",
     "wasm:dev": "mise exec -- node scripts/build-wasm.mjs",
     "wasm:watch": "mise exec -- watchexec --restart --watch crates/sable-core --watch crates/sable-wasm -- pnpm wasm:dev",

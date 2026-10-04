@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  release:
+    name: Create release
+    if: ${{ github.head_ref == 'release' && github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Set up mise
+        uses: https://github.com/jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: '2026.9.13'
+          github_token: ''
+          cache: true
+          env: false
+          install: false
+
+      - name: Trust project mise configuration
+        run: mise settings set trusted_config_paths "$GITHUB_WORKSPACE"
+
+      - name: Create release
+        run: mise run knope -- release --verbose
+        env:
+          GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}
