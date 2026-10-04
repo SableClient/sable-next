@@ -9,6 +9,7 @@ use matrix_sdk::utils::UrlOrQuery;
 use url::Url;
 
 use crate::ResultExt;
+use crate::errors::CoreError;
 use crate::protocol::{AuthIntent, CommandErr, CommandOk, LoginIdentifier};
 
 use crate::session::{Credentials, PersistedSession};
@@ -24,7 +25,7 @@ impl Core {
         let Some(account_id) = account_id else {
             return Ok(None);
         };
-        let account = self
+        let mut account = self
             .accounts()
             .await?
             .accounts
@@ -32,9 +33,17 @@ impl Core {
             .find(|account| account.account_id == account_id && account.needs_reauth)
             .ok_or(CommandErr::NotLoggedIn)?;
         if !account.device_invalidated {
-            session::validate_saved_crypto_store(&account.store_id, &account.session)
-                .await
-                .or_failed(self, "reauth_crypto_store")?;
+            match session::validate_saved_crypto_store(&account.store_id, &account.session).await {
+                Ok(()) => {}
+                Err(CoreError::Invalid(reason)) => {
+                    tracing::warn!(reason, "reauthenticating on a new device");
+                    self.mark_account_needs_reauth(Some(&account_id), true)
+                        .await?;
+                    account.device_invalidated = true;
+                    account.session.credentials.discard_tokens();
+                }
+                Err(error) => return Err(self.failed("reauth_crypto_store", error)),
+            }
         }
         Ok(Some(account))
     }
@@ -733,6 +742,37 @@ mod tests {
         if let Some(session) = core.take_session().await {
             session.sync_service.stop().await;
         }
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn a_store_without_an_identity_falls_back_to_a_new_device() {
+        let directory = tempfile::tempdir().unwrap();
+        let base = directory.path().join("data");
+        let base = base.to_str().unwrap();
+        let store = session::account_store_id(base, "a1");
+        let path = std::path::Path::new(&store).join("store");
+        std::fs::create_dir_all(&path).unwrap();
+        matrix_sdk::SqliteCryptoStore::open(path, None)
+            .await
+            .unwrap();
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "version": 1, "active_account_id": null, "next_account_id": 2,
+            "accounts": [{"account_id": "a1", "store_id": store, "needs_reauth": true, "device_invalidated": false,
+                "session": {"homeserver": "https://example.org", "resolved_homeserver": "https://example.org",
+                    "credentials": {"kind": "password", "user_id": "@alice:example.org", "device_id": "OLD", "access_token": "old"}}
+            }]
+        })).unwrap();
+        let (registry, _) = session::AccountRegistry::from_bytes(&bytes, base).unwrap();
+        let (core, _) = Core::new(base, Box::new(crate::store::MemorySessionStore::default()));
+        *core.accounts.lock().await = Some(registry);
+        let account = core
+            .reauthentication_account(Some("a1".into()))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(account.device_invalidated);
+        assert!(core.accounts().await.unwrap().accounts[0].device_invalidated);
     }
 
     #[cfg(not(target_family = "wasm"))]
