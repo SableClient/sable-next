@@ -45,6 +45,7 @@
   import { TimelineEventIndex } from './timeline-event-index';
   import {
     cumulativeReadBy,
+    cumulativeReadTimestamps,
     isCollapsed,
     latestEventId,
     mergeAggregations,
@@ -282,6 +283,7 @@
     )
   );
   let readersByItem = $derived(cumulativeReadBy(timeline.items));
+  let receiptTimestampsByItem = $derived(cumulativeReadTimestamps(timeline.items));
   let menuOpen = $state(false);
   const pagination = new TimelinePagination(
     () => timeline,
@@ -944,6 +946,7 @@
   {members}
   {currentUserId}
   readers={(item) => readersByItem.get(item.id) ?? item.read_by}
+  receiptTimestamps={(item) => receiptTimestampsByItem.get(item.id) ?? item.read_timestamps}
   {canRedactOwn}
   {canRedactOthers}
   {onMatrixLink}

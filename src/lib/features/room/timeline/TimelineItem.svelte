@@ -499,6 +499,7 @@
   <span class="receipt-slot" bind:clientWidth={receiptWidth}>
     <ReadReceiptStack
       readers={receiptReaders}
+      timestamps={item.read_timestamps}
       {members}
       expanded={dialogs.isOpen(item, 'receipts')}
       onProfile={onSenderProfile}

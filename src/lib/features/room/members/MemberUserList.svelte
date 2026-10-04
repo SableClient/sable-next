@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type { MemberView } from '#src/generated/protocol';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
@@ -17,6 +18,7 @@
     closeLabel?: string;
     onClose?: () => void;
     showHeader?: boolean;
+    secondary?: Snippet<[string]>;
   }
 
   let {
@@ -28,6 +30,7 @@
     closeLabel = $i18n.t('timeline.closeMembers'),
     onClose,
     showHeader = true,
+    secondary: secondaryContent,
   }: Props = $props();
 </script>
 
@@ -48,7 +51,9 @@
     <ul class:flush={!showHeader}>
       {#each userIds as userId (userId)}
         <li>
-          <MemberIdentityRow class="member" {userId} {members} onProfile={onMemberProfile} />
+          <MemberIdentityRow class="member" {userId} {members} onProfile={onMemberProfile}>
+            {#snippet secondary()}{@render secondaryContent?.(userId)}{/snippet}
+          </MemberIdentityRow>
         </li>
       {/each}
     </ul>

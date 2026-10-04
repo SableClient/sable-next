@@ -3035,6 +3035,9 @@ pub struct TimelineItemView {
     /// Already reduced by the SDK to one receipt per user.
     #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
     pub read_by: Vec<OwnedUserId>,
+    /// Available receipt timestamps in milliseconds since the Unix epoch.
+    #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, specta_typescript::Number>))]
+    pub read_timestamps: std::collections::BTreeMap<String, u64>,
     /// MSC4144. When set, this is the identity to show as the sender; `sender`
     /// stays the account that actually sent it and must remain reachable.
     pub per_message_profile: Option<PerMessageProfileView>,

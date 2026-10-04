@@ -14,6 +14,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
 });
 
 import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
+import { formatMessageTimestamp } from '#lib/ui/date-time.js';
 
 import RoomReadReceipts from './RoomReadReceipts.svelte';
 
@@ -37,6 +38,7 @@ test('opens the seen-by list from the overflow chip', async () => {
     RoomReadReceipts,
     {
       readers,
+      timestamps: { [readers[0]]: 1_700_000_000_000 },
       members: readers.map((id, index) => member(id, `User ${String(index)}`)),
       onMemberProfile: () => {},
     },
@@ -49,6 +51,8 @@ test('opens the seen-by list from the overflow chip', async () => {
   await user.click(overflow);
   const list = await screen.findByRole('complementary');
   expect(within(list).getByText('User 0')).toBeInTheDocument();
+  expect(within(list).getByText(formatMessageTimestamp(1_700_000_000_000))).toBeInTheDocument();
+  expect(list.querySelectorAll('time')).toHaveLength(1);
   await user.click(within(list).getByRole('button', { name: 'Close read receipts' }));
 });
 

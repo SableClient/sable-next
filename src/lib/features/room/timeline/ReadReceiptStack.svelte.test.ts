@@ -7,6 +7,7 @@ import { expect, test, vi } from 'vitest';
 vi.mock('#lib/core/context.js');
 
 import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
+import { formatMessageTimestamp } from '#lib/ui/date-time.js';
 
 import ReadReceiptStack from './ReadReceiptStack.svelte';
 
@@ -53,6 +54,33 @@ test('opens profiles from each face', async () => {
 
   await user.click(bob);
   expect(onProfile).toHaveBeenCalledWith('@bob:example.org', bob);
+});
+
+test('shows available receipt times in the face tooltip and updates them', async () => {
+  const user = userEvent.setup();
+  const timestamp = 1_700_000_000_000;
+  const instance = render(
+    ReadReceiptStack,
+    {
+      readers: ['@bob:example.org', '@carol:example.org'],
+      timestamps: { '@bob:example.org': timestamp },
+      members,
+      onOpen: () => {},
+    },
+    { wrapper: TooltipProvider }
+  );
+
+  await user.hover(screen.getByRole('button', { name: 'Bob' }));
+  const time = await screen.findByText(formatMessageTimestamp(timestamp));
+  const tooltip = time.closest('[data-tooltip-content]');
+  if (!tooltip) throw new Error('Receipt time has no tooltip');
+  expect(tooltip).toHaveTextContent(formatMessageTimestamp(timestamp));
+  expect(tooltip.querySelector('time')).toHaveAttribute(
+    'datetime',
+    new Date(timestamp).toISOString()
+  );
+  await instance.rerender({ timestamps: {} });
+  expect(tooltip.querySelector('time')).not.toBeInTheDocument();
 });
 
 test('caps faces and opens the list from overflow', async () => {

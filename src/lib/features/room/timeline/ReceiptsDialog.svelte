@@ -8,15 +8,23 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
   import MemberUserList from '../members/MemberUserList.svelte';
+  import ReadReceiptTime from './ReadReceiptTime.svelte';
 
   interface Props {
     open?: boolean;
     readers: readonly string[];
+    timestamps?: Readonly<Record<string, number>>;
     members: readonly MemberView[];
     onMemberProfile?: (userId: string, anchor: HTMLElement) => void;
   }
 
-  let { open = $bindable(false), readers, members, onMemberProfile }: Props = $props();
+  let {
+    open = $bindable(false),
+    readers,
+    timestamps = {},
+    members,
+    onMemberProfile,
+  }: Props = $props();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let desktop = $derived(appLayout.matches);
 </script>
@@ -30,7 +38,11 @@
       {members}
       {onMemberProfile}
       showHeader={false}
-    />
+    >
+      {#snippet secondary(userId: string)}
+        <ReadReceiptTime timestamp={timestamps[userId]} />
+      {/snippet}
+    </MemberUserList>
   </div>
 {/snippet}
 

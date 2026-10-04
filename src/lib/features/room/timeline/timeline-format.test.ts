@@ -14,6 +14,7 @@ import { stateEventSubject, stateEventText, type Translate } from './state-event
 import {
   canRedact,
   cumulativeReadBy,
+  cumulativeReadTimestamps,
   eventBefore,
   isCollapsed,
   isMessageRow,
@@ -60,6 +61,27 @@ test('a message keeps its own readers alongside later ones', () => {
   ] as TimelineItemView[];
 
   expect(cumulativeReadBy(timeline).get('a')).toEqual(['@bob:example.org', '@carol:example.org']);
+});
+
+test('receipt times follow the latest reader position without inventing missing times', () => {
+  const timeline: TimelineItemView[] = [
+    {
+      ...message,
+      id: 'old',
+      read_by: ['@bob:example.org', '@carol:example.org'],
+      read_timestamps: { '@bob:example.org': 100, '@carol:example.org': 200 },
+    },
+    {
+      ...message,
+      id: 'new',
+      read_by: ['@bob:example.org', '@carol:example.org'],
+      read_timestamps: { '@bob:example.org': 300 },
+    },
+  ];
+
+  const timestamps = cumulativeReadTimestamps(timeline);
+  expect(timestamps.get('new')).toEqual({ '@bob:example.org': 300 });
+  expect(timestamps.get('old')).toEqual({ '@bob:example.org': 300 });
 });
 
 test('the read marker for a marked-unread message is the event before it', () => {

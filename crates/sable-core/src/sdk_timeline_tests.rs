@@ -88,6 +88,76 @@ fn event_ids(
 }
 
 #[tokio::test]
+async fn timeline_view_preserves_available_read_receipt_timestamps() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!receipts:example.org");
+    let event_id = event_id!("$read");
+    let bob = user_id!("@bob:example.org");
+    let carol = user_id!("@carol:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let timestamp = matrix_sdk::ruma::MilliSecondsSinceUnixEpoch::from_system_time(
+        std::time::SystemTime::UNIX_EPOCH + Duration::from_millis(1_700_000_000_000),
+    )
+    .unwrap();
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.text_msg("read me").event_id(event_id))
+                .add_receipt(
+                    factory
+                        .read_receipts()
+                        .add_with_timestamp(
+                            event_id,
+                            bob,
+                            ReceiptType::Read,
+                            ReceiptThread::Unthreaded,
+                            Some(timestamp),
+                        )
+                        .add_with_timestamp(
+                            event_id,
+                            carol,
+                            ReceiptType::Read,
+                            ReceiptThread::Unthreaded,
+                            None,
+                        )
+                        .into_event(),
+                ),
+        )
+        .await;
+    let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
+        .await
+        .unwrap();
+    let items = timeline.items().await;
+    let item = items
+        .iter()
+        .find(|item| item.as_event().and_then(|event| event.event_id()) == Some(event_id))
+        .unwrap();
+    let view = crate::view::timeline_item(
+        item,
+        client.user_id(),
+        &BTreeSet::new(),
+        &Default::default(),
+        &Default::default(),
+    );
+    assert!(view.read_by.iter().any(|reader| reader == bob));
+    assert!(view.read_by.iter().any(|reader| reader == carol));
+    assert_eq!(
+        view.read_timestamps.get(bob.as_str()),
+        Some(&1_700_000_000_000)
+    );
+    assert!(!view.read_timestamps.contains_key(carol.as_str()));
+    let serialized = serde_json::to_value(&view).unwrap();
+    assert_eq!(
+        serialized["read_timestamps"][bob.as_str()],
+        1_700_000_000_000_u64
+    );
+}
+
+#[tokio::test]
 async fn live_timeline_receives_sync_and_reconciles_a_limited_gap() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

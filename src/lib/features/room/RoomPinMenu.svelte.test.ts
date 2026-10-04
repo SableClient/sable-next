@@ -56,6 +56,7 @@ const image = {
   reactions: [],
   is_own: false,
   read_by: [],
+  read_timestamps: {},
   per_message_profile: null,
   bundled_link_previews: [],
   link_previews_removed: null,

@@ -6,9 +6,11 @@
 
   import MemberUserList from '../members/MemberUserList.svelte';
   import ReadReceiptStack from './ReadReceiptStack.svelte';
+  import ReadReceiptTime from './ReadReceiptTime.svelte';
 
   interface Props {
     readers: readonly string[];
+    timestamps?: Readonly<Record<string, number>>;
     members: readonly MemberView[];
     visible?: boolean;
     open?: boolean;
@@ -17,6 +19,7 @@
 
   let {
     readers,
+    timestamps = {},
     members,
     visible = true,
     open = $bindable(false),
@@ -35,6 +38,7 @@
   {#if visible}
     <ReadReceiptStack
       {readers}
+      {timestamps}
       {members}
       expanded={open}
       onProfile={onMemberProfile}
@@ -63,7 +67,11 @@
     onClose={() => {
       open = false;
     }}
-  />
+  >
+    {#snippet secondary(userId: string)}
+      <ReadReceiptTime timestamp={timestamps[userId]} />
+    {/snippet}
+  </MemberUserList>
 </ResponsivePopover>
 
 <style>

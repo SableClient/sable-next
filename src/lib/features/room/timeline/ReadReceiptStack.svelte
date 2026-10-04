@@ -17,13 +17,14 @@
 
   interface Props {
     readers: readonly string[];
+    timestamps?: Readonly<Record<string, number>>;
     members: readonly MemberView[];
     expanded?: boolean;
     onOpen: (anchor: HTMLButtonElement) => void;
     onProfile?: (userId: string, anchor: HTMLElement) => void;
   }
 
-  let { readers, members, expanded = false, onOpen, onProfile }: Props = $props();
+  let { readers, timestamps = {}, members, expanded = false, onOpen, onProfile }: Props = $props();
 
   const coarse = createMediaQuery('(pointer: coarse)');
   let root = $state<HTMLElement | null>(null);
@@ -77,6 +78,7 @@
           userId={reader.userId}
           name={reader.name}
           avatar={reader.avatar}
+          timestamp={timestamps[reader.userId]}
           {onProfile}
           onHover={() => setShifts(index)}
         />

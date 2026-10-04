@@ -25,6 +25,7 @@
     showStatus?: boolean;
     powerTag?: PowerLevelTag | null;
     trailing?: Snippet;
+    secondary?: Snippet;
   }
 
   let {
@@ -35,6 +36,7 @@
     showStatus = false,
     powerTag = null,
     trailing,
+    secondary,
   }: Props = $props();
   const core = useCoreClient();
   const presenceStore = usePresenceStore();
@@ -107,6 +109,7 @@
         nameClass="member-name"
         compact={pronouns.length === 0}
       />
+      {@render secondary?.()}
       {#if userStatus}
         <span
           class="member-identity-status"

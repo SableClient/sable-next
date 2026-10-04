@@ -21,6 +21,7 @@ function item(id: string, options: Partial<TimelineItemView> = {}): TimelineItem
     reactions: [],
     is_own: false,
     read_by: [],
+    read_timestamps: {},
     ...options,
     per_message_profile: options.per_message_profile ?? null,
     bundled_link_previews: options.bundled_link_previews ?? [],

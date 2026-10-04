@@ -9,16 +9,18 @@
 
   import { senderDisplayColors } from '../members/members.js';
   import '../members/sender-identity.css';
+  import ReadReceiptTime from './ReadReceiptTime.svelte';
 
   interface Props {
     userId: string;
     name: string;
     avatar: string | null;
+    timestamp?: number;
     onProfile?: (userId: string, anchor: HTMLElement) => void;
     onHover: () => void;
   }
 
-  let { userId, name, avatar, onProfile, onHover }: Props = $props();
+  let { userId, name, avatar, timestamp, onProfile, onHover }: Props = $props();
 
   const core = useCoreClient();
   const roomCosmetics = useRoomCosmetics();
@@ -64,6 +66,7 @@
   >
     {name}
   </span>
+  <ReadReceiptTime {timestamp} />
 {/snippet}
 
 <Tooltip label={name} trigger={faceTrigger} content={nameTooltip} />

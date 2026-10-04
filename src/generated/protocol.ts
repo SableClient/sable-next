@@ -1363,6 +1363,8 @@ export type TimelineItemView = {
 	is_own: boolean,
 	/**  Already reduced by the SDK to one receipt per user. */
 	read_by: string[],
+	/**  Available receipt timestamps in milliseconds since the Unix epoch. */
+	read_timestamps: { [key in string]: number },
 	/**
 	 *  MSC4144. When set, this is the identity to show as the sender; `sender`
 	 *  stays the account that actually sent it and must remain reachable.

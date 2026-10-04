@@ -332,16 +332,18 @@
   let showReceiptFooter = $derived(
     !preferences.hideReadReceipts && preferences.readReceiptPlacement === 'room'
   );
-  let latestReadBy = $derived.by(() => {
-    if (!showReceiptFooter) return [];
-    const userId = core.session?.user_id;
+  let latestReceiptItem = $derived.by(() => {
+    if (!showReceiptFooter) return null;
     for (let index = timeline.items.length - 1; index >= 0; index -= 1) {
       const item = timeline.items[index];
       if (!item.event_id) continue;
-      return item.read_by.filter((readerId) => readerId !== userId);
+      return item;
     }
-    return [];
+    return null;
   });
+  let latestReadBy = $derived(
+    latestReceiptItem?.read_by.filter((readerId) => readerId !== core.session?.user_id) ?? []
+  );
   let receiptMembers = $derived(
     memberLoader.members.filter((member) => latestReadBy.includes(member.user_id))
   );
@@ -998,6 +1000,7 @@
           <RoomReadReceipts
             bind:open={receiptsOpen}
             readers={latestReadBy}
+            timestamps={latestReceiptItem?.read_timestamps}
             members={receiptMembers}
             visible={timelineAtBottom}
             onMemberProfile={openProfile}

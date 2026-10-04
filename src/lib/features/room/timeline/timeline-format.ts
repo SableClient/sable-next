@@ -264,6 +264,7 @@ export function withReadMarkerBefore(
     reactions: [],
     is_own: false,
     read_by: [],
+    read_timestamps: {},
     per_message_profile: null,
     bundled_link_previews: [],
     link_previews_removed: null,
@@ -346,6 +347,29 @@ export function latestEventId(items: readonly TimelineItemView[]): string | null
     if (eventId) return eventId;
   }
   return null;
+}
+
+/** Preserve the latest receipt's time, including when it has no timestamp. */
+export function cumulativeReadTimestamps(
+  items: readonly TimelineItemView[]
+): Map<string, Readonly<Record<string, number>>> {
+  const timestamps = new Map<string, Readonly<Record<string, number>>>();
+  const seen = new Set<string>();
+  let cumulative: Record<string, number> = {};
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    const fresh = item.read_by.filter((userId) => !seen.has(userId));
+    if (fresh.length > 0) {
+      cumulative = { ...cumulative };
+      for (const userId of fresh) {
+        seen.add(userId);
+        const timestamp = item.read_timestamps?.[userId];
+        if (timestamp !== undefined) cumulative[userId] = timestamp;
+      }
+    }
+    timestamps.set(item.id, cumulative);
+  }
+  return timestamps;
 }
 
 export type ReplyDirection = 'older' | 'newer';
