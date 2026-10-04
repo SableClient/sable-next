@@ -92,7 +92,7 @@ impl<T, E: Display> ResultExt<T> for Result<T, E> {
 }
 
 impl Core {
-    pub(crate) fn failed(&self, context: &str, error: impl Display) -> CommandErr {
+    pub fn failed(&self, context: &str, error: impl Display) -> CommandErr {
         let log_id = format!("e{}", self.next_log_id.fetch_add(1, Ordering::Relaxed));
         tracing::error!(log_id, context, "{error}");
         CommandErr::Failed { log_id }

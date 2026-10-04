@@ -4,12 +4,9 @@
 mod session_store;
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     io::{self, Write},
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::Arc,
 };
 
 use js_sys::Function;
@@ -46,17 +43,9 @@ fn encode_batch(batch: &[CoreEvent]) -> Option<String> {
     serde_json::to_string(&kept).ok()
 }
 
-/// The rejection payload must stay valid `CommandErr` JSON, so never
-/// interpolate a message into hand-written JSON.
-fn err_json(error: impl std::fmt::Display) -> String {
-    serde_json::to_string(&CommandErr::Failed {
-        log_id: error.to_string(),
-    })
-    .unwrap_or_else(|_| r#"{"code":"failed","log_id":"serialization failed"}"#.to_owned())
-}
-
 fn js_err(error: &CommandErr) -> String {
-    serde_json::to_string(error).unwrap_or_else(err_json)
+    serde_json::to_string(error)
+        .unwrap_or_else(|_| r#"{"code":"failed","log_id":"serialization failed"}"#.to_owned())
 }
 
 const DEFAULT_LOG_FILTER: &str = "info,matrix_sdk::http_client=off,matrix_sdk::latest_events::latest_event::builder=off,matrix_sdk_base::room::display_name=off";
@@ -90,11 +79,10 @@ fn init_tracing(filter: &str) {
 thread_local! {
     static PANIC_NOTIFIER: RefCell<Option<Function>> = const { RefCell::new(None) };
     static LOG_NOTIFIER: RefCell<Option<Function>> = const { RefCell::new(None) };
+    static PANIC_HOOK_CHAINED: Cell<bool> = const { Cell::new(false) };
+    static LOG_CAPTURE: Cell<bool> = const { Cell::new(false) };
+    static LOG_NOTIFYING: Cell<bool> = const { Cell::new(false) };
 }
-
-static PANIC_HOOK_CHAINED: AtomicBool = AtomicBool::new(false);
-static LOG_CAPTURE: AtomicBool = AtomicBool::new(false);
-static LOG_NOTIFYING: AtomicBool = AtomicBool::new(false);
 
 struct JsLogWriter {
     capturing: bool,
@@ -116,14 +104,14 @@ impl Write for JsLogWriter {
 
 impl Drop for JsLogWriter {
     fn drop(&mut self) {
-        if !self.capturing || self.line.is_empty() || LOG_NOTIFYING.swap(true, Ordering::Relaxed) {
+        if !self.capturing || self.line.is_empty() || LOG_NOTIFYING.replace(true) {
             return;
         }
         let notify = LOG_NOTIFIER.with_borrow(Clone::clone);
         if let Some(notify) = notify {
             let _ = notify.call1(&JsValue::NULL, &JsValue::from_str(&self.line));
         }
-        LOG_NOTIFYING.store(false, Ordering::Relaxed);
+        LOG_NOTIFYING.set(false);
     }
 }
 
@@ -134,7 +122,7 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeJsLogWriter {
 
     fn make_writer(&'a self) -> Self::Writer {
         JsLogWriter {
-            capturing: LOG_CAPTURE.load(Ordering::Relaxed),
+            capturing: LOG_CAPTURE.get(),
             line: String::new(),
         }
     }
@@ -144,8 +132,7 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeJsLogWriter {
     /// Sentry's `reportCoreError` feeds on.
     fn make_writer_for(&'a self, meta: &tracing::Metadata<'_>) -> Self::Writer {
         JsLogWriter {
-            capturing: LOG_CAPTURE.load(Ordering::Relaxed)
-                || meta.level() == &tracing::Level::ERROR,
+            capturing: LOG_CAPTURE.get() || meta.level() == &tracing::Level::ERROR,
             line: String::new(),
         }
     }
@@ -155,7 +142,7 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeJsLogWriter {
 pub fn set_panic_handler(notify: Function) {
     PANIC_NOTIFIER.with_borrow_mut(|slot| *slot = Some(notify));
 
-    if PANIC_HOOK_CHAINED.swap(true, Ordering::Relaxed) {
+    if PANIC_HOOK_CHAINED.replace(true) {
         return;
     }
     console_error_panic_hook::set_once();
@@ -178,7 +165,7 @@ pub fn set_log_handler(notify: Function) {
 
 #[wasm_bindgen(js_name = setLogCapture)]
 pub fn set_log_capture(enabled: bool) {
-    LOG_CAPTURE.store(enabled, Ordering::Relaxed);
+    LOG_CAPTURE.set(enabled);
 }
 
 /// The web carrier, mirroring `src-tauri/src/lib.rs`. JSON both ways, so the
@@ -232,10 +219,12 @@ impl SableCore {
     /// Returns a JSON-encoded command error when parsing or dispatch fails.
     #[wasm_bindgen(js_name = submitCommand)]
     pub async fn submit_command(&self, command: String) -> Result<String, String> {
-        let command: Command = serde_json::from_str(&command).map_err(err_json)?;
+        let command: Command = serde_json::from_str(&command)
+            .map_err(|error| js_err(&self.core.failed("submit_command", error)))?;
 
         match Box::pin(self.core.dispatch(command)).await {
-            Ok(response) => serde_json::to_string(&response).map_err(err_json),
+            Ok(response) => serde_json::to_string(&response)
+                .map_err(|error| js_err(&self.core.failed("submit_command", error))),
             Err(error) => Err(js_err(&error)),
         }
     }
@@ -279,7 +268,8 @@ impl SableCore {
     /// Returns a JSON-encoded command error when queuing fails.
     #[wasm_bindgen(js_name = sendAttachment)]
     pub async fn send_attachment(&self, request: String, bytes: Vec<u8>) -> Result<(), String> {
-        let request = serde_json::from_str(&request).map_err(err_json)?;
+        let request = serde_json::from_str(&request)
+            .map_err(|error| js_err(&self.core.failed("send_attachment", error)))?;
 
         self.core
             .send_attachment(request, bytes)
@@ -292,10 +282,9 @@ impl SableCore {
     /// Returns a JSON-encoded command error when an attachment is invalid or sending fails.
     #[wasm_bindgen(js_name = sendGallery)]
     pub async fn send_gallery(&self, request: String, items: String) -> Result<(), String> {
-        let request = serde_json::from_str(&request).map_err(err_json)?;
-        let items = serde_json::from_str(&items).map_err(|_| {
-            serde_json::to_string(&CommandErr::InvalidMedia).unwrap_or_else(err_json)
-        })?;
+        let request = serde_json::from_str(&request)
+            .map_err(|error| js_err(&self.core.failed("send_gallery", error)))?;
+        let items = serde_json::from_str(&items).map_err(|_| js_err(&CommandErr::InvalidMedia))?;
         self.core
             .send_gallery(request, items)
             .await
@@ -349,7 +338,7 @@ mod tests {
     use js_sys::Function;
     use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
 
-    use super::{SableCore, err_json};
+    use super::SableCore;
 
     wasm_bindgen_test_configure!(run_in_shared_worker);
 
@@ -373,21 +362,20 @@ mod tests {
     }
 
     #[wasm_bindgen_test]
-    fn a_failure_is_reported_as_command_err_json() {
-        let error = command_err(&err_json("boom"));
-
-        assert_eq!(error["code"], "failed");
-        assert_eq!(error["log_id"], "boom");
-    }
-
-    #[wasm_bindgen_test]
     async fn an_unparseable_command_rejects_with_a_protocol_error() {
         let rejection = core()
             .submit_command("not json".to_owned())
             .await
             .expect_err("an unparseable command must reject");
 
-        command_err(&rejection);
+        let error = command_err(&rejection);
+
+        assert_eq!(error["code"], "failed");
+        assert!(
+            error["log_id"]
+                .as_str()
+                .is_some_and(|id| id.starts_with('e'))
+        );
     }
 
     #[wasm_bindgen_test]
