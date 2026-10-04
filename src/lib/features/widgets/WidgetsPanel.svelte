@@ -314,20 +314,24 @@
   .widgets-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-100);
+    gap: var(--space-150);
     overflow-y: auto;
     padding: var(--space-300);
   }
 
   .widgets-item {
     align-items: center;
-    background: var(--surface-var-container);
-    border: var(--border-width) solid var(--surface-var-container-line);
-    border-radius: var(--radius);
-    color: var(--surface-var-on-container);
+    background: var(--surface-container);
+    border-radius: var(--radius-inner);
+    color: var(--surface-on-container);
     display: flex;
-    gap: var(--space-100);
-    padding-inline-end: var(--space-100);
+    gap: var(--space-150);
+    padding-inline-end: var(--space-300);
+  }
+
+  .widgets-item:hover {
+    background: var(--surface-container-hover);
+    box-shadow: inset 0 0 0 var(--border-width) var(--surface-container-line);
   }
 
   .widgets-item button:first-child {
