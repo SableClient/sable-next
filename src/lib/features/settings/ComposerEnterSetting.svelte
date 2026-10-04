@@ -1,7 +1,7 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import { preferences, setPreference, type EnterKey } from '#lib/settings/preferences.svelte.js';
-  import { enterSettingLabels, settingFocusId } from '#lib/settings/registry.js';
+  import { settingFocusId } from '#lib/settings/registry.js';
   import Switcher from '#lib/ui/primitives/Switcher.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import '#lib/ui/primitives/settings-row.css';
@@ -13,7 +13,6 @@
     { value: 'adaptive', label: 'settings.composerEnterAdaptive' },
   ] as const;
   const mode = $derived<EnterKey>(preferences.enterForNewline);
-  const labels = $derived(enterSettingLabels(mode));
 </script>
 
 <ul class="settings-rows">
