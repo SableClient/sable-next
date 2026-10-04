@@ -141,6 +141,10 @@
   margin-inline: var(--space-100);
 }
 
+.composer-row:not(.short) .composer-board-slot.is-separator {
+  justify-content: flex-end;
+}
+
 .composer-before {
   align-self: end;
   grid-area: before;
