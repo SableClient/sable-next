@@ -11,7 +11,7 @@
   }
 
   let { children }: Props = $props();
-  let roomNavWidth = $state(224);
+  let roomNavWidth = $state(288);
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
 </script>
 
