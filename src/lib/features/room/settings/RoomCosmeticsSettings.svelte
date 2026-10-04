@@ -105,6 +105,13 @@
     if (name !== savedName) return $i18n.t('room.cosmeticsApplyRoomsSaveFirst');
     return $i18n.t('room.cosmeticsApplyRoomsHint', { count: applyTargets.length });
   });
+  let customized = $derived(
+    savedName !== '' ||
+      avatar !== null ||
+      colorOnLight !== '' ||
+      colorOnDark !== '' ||
+      savedPronouns !== ''
+  );
   let canManage = $derived(permissions?.can_change_power_levels ?? false);
   let membersSetPronouns = $derived(
     effectiveLevels?.events[COSMETIC_EVENT_TYPES.pronoun] === MEMBER_LEVEL
@@ -279,6 +286,25 @@
     });
   }
 
+  function resetLook(): void {
+    void save('reset', async (target, self) => {
+      await writeMember(target, self, { displayname: profileName, avatar_url: profileAvatar });
+      name = '';
+      savedName = '';
+      avatar = null;
+      if (colorOnLight || colorOnDark) {
+        await writeMemberColors(core.commands, target, self, { kind: 'clear' });
+        colorOnLight = '';
+        colorOnDark = '';
+      }
+      if (canSetPronouns && savedPronouns !== '') {
+        await core.commands.sendStateEvent(target, COSMETIC_EVENT_TYPES.pronoun, self, {});
+        pronouns = '';
+        savedPronouns = '';
+      }
+    });
+  }
+
   function allowMembers(eventType: string, allowed: boolean): void {
     const base = effectiveLevels;
     if (!base) return;
@@ -416,6 +442,15 @@
             onclick={savePronouns}>{$i18n.t('room.cosmeticsSave')}</Button
           >
         </div>
+      </SettingsRow>
+      <SettingsRow
+        title={$i18n.t('room.cosmeticsReset')}
+        description={$i18n.t('room.cosmeticsResetHint')}
+        disabled={!customized}
+      >
+        <Button size="small" disabled={saving !== null || !customized} onclick={resetLook}>
+          {$i18n.t('room.cosmeticsResetAction')}
+        </Button>
       </SettingsRow>
     </ul>
   </SettingsSection>
