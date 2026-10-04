@@ -98,7 +98,7 @@ async fn timeline_view_preserves_available_read_receipt_timestamps() {
     let carol = user_id!("@carol:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
     let timestamp = matrix_sdk::ruma::MilliSecondsSinceUnixEpoch::from_system_time(
-        std::time::SystemTime::UNIX_EPOCH + Duration::from_millis(1_700_000_000_000),
+        std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
     )
     .unwrap();
     server.mock_room_state_encryption().plain().mount().await;
@@ -140,8 +140,8 @@ async fn timeline_view_preserves_available_read_receipt_timestamps() {
         item,
         client.user_id(),
         &BTreeSet::new(),
-        &Default::default(),
-        &Default::default(),
+        &crate::view::Highlights::default(),
+        &crate::view::LocalContent::default(),
     );
     assert!(view.read_by.iter().any(|reader| reader == bob));
     assert!(view.read_by.iter().any(|reader| reader == carol));

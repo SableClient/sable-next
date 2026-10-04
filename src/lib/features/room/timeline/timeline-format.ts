@@ -363,8 +363,9 @@ export function cumulativeReadTimestamps(
       cumulative = { ...cumulative };
       for (const userId of fresh) {
         seen.add(userId);
-        const timestamp = item.read_timestamps?.[userId];
-        if (timestamp !== undefined) cumulative[userId] = timestamp;
+        if (Object.hasOwn(item.read_timestamps, userId)) {
+          cumulative[userId] = item.read_timestamps[userId];
+        }
       }
     }
     timestamps.set(item.id, cumulative);
