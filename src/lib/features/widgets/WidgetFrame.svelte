@@ -72,6 +72,7 @@
     background: var(--surface-container);
     border: 0;
     border-radius: var(--radius);
+    display: block;
     height: 100%;
     width: 100%;
   }
