@@ -25,13 +25,13 @@ test('a long run of unclosed colours stays literal', () => {
   }
 });
 
-test('the fallback label uses English when another locale is requested', async () => {
+test('the fallback label follows the active language', async () => {
   const english = utcFallbackLabel('1970-01-01T00:00:00Z');
   expect(english).toContain('Jan');
   expect(english).toMatch(/\(UTC\)$/);
 
   await setLanguage('fr');
-  expect(utcFallbackLabel('1970-01-01T00:00:00Z')).toContain('Jan');
+  expect(utcFallbackLabel('1970-01-01T00:00:00Z')).toContain('janv.');
 });
 
 test('the fallback label keeps the offset the time was written in', () => {

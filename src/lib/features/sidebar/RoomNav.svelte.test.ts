@@ -72,7 +72,7 @@ const presenceFixture = vi.hoisted(() => ({
 }));
 
 vi.mock('#lib/rooms/presence.svelte.js', () => ({
-  usePresenceStore: () => ({ get: () => presenceFixture.entry }),
+  usePresenceStore: () => ({ get: () => presenceFixture.entry, peek: () => presenceFixture.entry }),
 }));
 
 import { setGroupsFavourites } from './favourite-grouping.svelte.js';

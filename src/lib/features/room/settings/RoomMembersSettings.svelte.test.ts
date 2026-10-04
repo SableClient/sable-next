@@ -28,7 +28,7 @@ const core = Object.assign(baseCore, {
 });
 
 vi.mock('#lib/rooms/presence.svelte.js', () => ({
-  usePresenceStore: () => ({ get: () => null }),
+  usePresenceStore: () => ({ get: () => null, peek: () => null }),
 }));
 
 import RoomMembersSettings from './RoomMembersSettings.svelte';

@@ -19,6 +19,7 @@ export function createCoreStub<T extends Record<string, unknown>>(overrides = {}
     unjoinedSpaceParents: vi.fn<(...args: never[]) => Promise<unknown[]>>(() =>
       Promise.resolve([])
     ),
+    replacedRooms: vi.fn<(...args: never[]) => Promise<unknown[]>>(() => Promise.resolve([])),
     setRoomTag: vi.fn<(...args: never[]) => Promise<void>>(() => Promise.resolve()),
     markRead: vi.fn<(...args: never[]) => Promise<void>>(() => Promise.resolve()),
     reactionShortcodes: vi.fn<(...args: never[]) => Promise<unknown[]>>(() => Promise.resolve([])),
