@@ -2,13 +2,14 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   isTauri: vi.fn(() => false),
+  invoke: vi.fn(),
   osType: vi.fn(() => 'linux'),
   checkPermissions: vi.fn(),
   requestPermissions: vi.fn(),
   getCurrentPosition: vi.fn(),
 }));
 
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: mocks.isTauri }));
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: mocks.isTauri, invoke: mocks.invoke }));
 vi.mock('@tauri-apps/plugin-os', () => ({ type: mocks.osType }));
 vi.mock('@tauri-apps/plugin-geolocation', () => ({
   checkPermissions: mocks.checkPermissions,
@@ -16,7 +17,7 @@ vi.mock('@tauri-apps/plugin-geolocation', () => ({
   getCurrentPosition: mocks.getCurrentPosition,
 }));
 
-import { currentFix, locates } from './geolocation';
+import { currentFix, locates, locationOffered } from './geolocation';
 
 const original = Object.getOwnPropertyDescriptor(navigator, 'geolocation');
 
@@ -113,4 +114,24 @@ test('a refused native permission is told apart from a failure', async () => {
   mocks.getCurrentPosition.mockRejectedValue(new Error('no provider'));
 
   await expect(currentFix()).resolves.toEqual({ kind: 'unavailable' });
+});
+
+test.each([
+  ['carries the plugin', true],
+  ['was built without the plugin', false],
+])('a native build that %s reports it', async (_name, present) => {
+  mocks.isTauri.mockReturnValue(true);
+  mocks.osType.mockReturnValue('android');
+  mocks.invoke.mockResolvedValue(present);
+
+  await expect(locationOffered()).resolves.toBe(present);
+  expect(mocks.invoke).toHaveBeenCalledWith('has_geolocation');
+});
+
+test('a native build that cannot answer offers no location', async () => {
+  mocks.isTauri.mockReturnValue(true);
+  mocks.osType.mockReturnValue('android');
+  mocks.invoke.mockRejectedValue(new Error('unknown command'));
+
+  await expect(locationOffered()).resolves.toBe(false);
 });

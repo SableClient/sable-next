@@ -164,6 +164,22 @@ dependencies {
 
 apply(from = "tauri.build.gradle.kts")
 
+val sortTauriConfig by tasks.registering {
+    val config = file("src/main/assets/tauri.conf.json")
+    doLast {
+        if (!config.exists()) return@doLast
+        fun sorted(value: Any?): Any? = when (value) {
+            is Map<*, *> -> value.entries.sortedBy { it.key as String }.associate { it.key to sorted(it.value) }
+            is List<*> -> value.map(::sorted)
+            else -> value
+        }
+        config.writeText(groovy.json.JsonOutput.toJson(sorted(groovy.json.JsonSlurper().parse(config))))
+    }
+}
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
+    dependsOn(sortTauriConfig)
+}
+
 // Native FCM push (Sygnal): applies only once google-services.json is added to this
 // directory, so builds without Firebase configured still succeed.
 // Skipped for FOSS builds: the plugin injects the Firebase project ids as string

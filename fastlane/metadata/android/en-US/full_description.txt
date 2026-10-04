@@ -1,0 +1,12 @@
+Sable is a Matrix client built to enhance the user experience with quality-of-life features, cosmetics, utilities, and sheer usability. It is a fork of Cinny.
+
+Features:
+
+* End-to-end encrypted messaging, with encrypted push notification previews decrypted on-device
+* Push without Google Play Services, through UnifiedPush
+* Voice and video calls over MatrixRTC
+* Spaces, threads, and forum rooms
+* Customisable app icons, themes, and a configurable GIF provider
+* Message reporting, forwarding, and read-receipt controls
+
+Sable is free software licensed under the AGPL-3.0. Crash reporting is opt-in and disabled until you consent.

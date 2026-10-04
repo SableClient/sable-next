@@ -289,6 +289,11 @@ async fn send_attachment_base64(
 }
 
 #[tauri::command]
+const fn has_geolocation() -> bool {
+    cfg!(feature = "geolocation")
+}
+
+#[tauri::command]
 async fn upload_media_base64(
     state: State<'_, AppState>,
     request: Base64Invoke,
@@ -915,6 +920,7 @@ pub fn run() {
             share_inbox::share_inbox_read,
             share_inbox::share_inbox_clear,
             sentry::set_native_sentry_enabled,
+            has_geolocation,
             #[cfg(target_os = "ios")]
             ios::save_media_to_photos,
             #[cfg(target_os = "ios")]

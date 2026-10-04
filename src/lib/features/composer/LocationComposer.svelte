@@ -4,7 +4,7 @@
   import MapTrifoldIcon from 'phosphor-svelte/lib/MapTrifoldIcon';
 
   import { i18n } from '#lib/i18n.js';
-  import { currentFix, locates } from '#lib/platform/geolocation.js';
+  import { currentFix, locates, locationOffered } from '#lib/platform/geolocation.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
@@ -26,6 +26,13 @@
   let label = $state('');
   let locating = $state(false);
   let failure = $state<string | null>(null);
+  let offered = $state(locates());
+
+  $effect(() => {
+    void locationOffered().then((available) => {
+      offered = available;
+    });
+  });
 
   let geoUri = $derived(geoUriFor(coordinate(latitude), coordinate(longitude)));
   let pin = $derived.by(() => {
@@ -108,7 +115,7 @@
     <h2>{$i18n.t('composer.locationTitle')}</h2>
     <p class="explain">{$i18n.t('composer.locationExplain')}</p>
 
-    {#if locates()}
+    {#if offered}
       <Button variant="ghost" class="locate" disabled={locating} onclick={locate}>
         {#if locating}
           <Spinner small />

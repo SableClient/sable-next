@@ -7,6 +7,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 const geolocation = vi.hoisted(() => ({
   currentFix: vi.fn(),
   locates: vi.fn(() => true),
+  locationOffered: vi.fn(() => Promise.resolve(true)),
 }));
 
 vi.mock('#lib/platform/geolocation.js', () => geolocation);
@@ -97,7 +98,17 @@ test('a refused fix leaves manual entry usable', async () => {
 
 test('a webview without geolocation offers no button for it', async () => {
   geolocation.locates.mockReturnValue(false);
+  geolocation.locationOffered.mockResolvedValue(false);
   await setup();
 
   expect(useCurrent()).not.toBeInTheDocument();
+});
+
+test('a build without the native plugin takes the button back once it knows', async () => {
+  geolocation.locationOffered.mockResolvedValue(false);
+  await setup();
+
+  await vi.waitFor(() => {
+    expect(useCurrent()).not.toBeInTheDocument();
+  });
 });

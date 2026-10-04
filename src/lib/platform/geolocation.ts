@@ -1,4 +1,4 @@
-import { isTauri } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import {
   checkPermissions,
   getCurrentPosition,
@@ -18,6 +18,11 @@ export type FixResult =
 export function locates(): boolean {
   if (isTauri()) return isNativeMobile();
   return typeof navigator !== 'undefined' && 'geolocation' in navigator;
+}
+
+export function locationOffered(): Promise<boolean> {
+  if (!isNativeMobile()) return Promise.resolve(locates());
+  return invoke<boolean>('has_geolocation').catch(() => false);
 }
 
 async function nativeFix(timeoutMs: number): Promise<FixResult> {

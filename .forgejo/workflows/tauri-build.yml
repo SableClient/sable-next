@@ -397,6 +397,7 @@ jobs:
         env:
           SABLE_FOSS: '1'
         run: |
+          node scripts/fastlane-changelog.mjs "$VERSION" --check
           unset VITE_SENTRY_DSN VITE_SENTRY_ENVIRONMENT SENTRY_AUTH_TOKEN SENTRY_ORG SENTRY_PROJECT
           mv src-tauri/capabilities/geolocation.json "$RUNNER_TEMP/geolocation.json"
           pnpm tauri android build --config src-tauri/tauri.ci.conf.json --apk --split-per-abi \
