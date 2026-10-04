@@ -5390,8 +5390,7 @@ mod tests {
     }
 
     #[async_test]
-    async fn test_a_room_derived_by_older_code_keeps_its_documents_and_rederives_the_recent_window()
-    {
+    async fn test_a_stale_derivation_keeps_documents_and_opens_a_rederive_window() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let room_id = room_id!("!derived:localhost").to_owned();
@@ -5459,7 +5458,7 @@ mod tests {
     }
 
     #[async_test]
-    async fn test_a_rederiving_ingest_repairs_a_classified_document_and_a_plain_one_does_not() {
+    async fn test_only_the_crawl_rederives_classified_documents() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         client.event_cache().subscribe().expect("event cache");
@@ -5524,7 +5523,7 @@ mod tests {
         index
             .ingest_with(&room_id, events.clone(), &cache, &RedactionRules::V11, true)
             .await;
-        assert_eq!(media(&index), 0, "no window is open, so the skip holds");
+        assert_eq!(media(&index), 0);
 
         index.rooms.get_mut(&room_id).expect("room").rederive_from = 1;
         index
@@ -5536,7 +5535,7 @@ mod tests {
                 false,
             )
             .await;
-        assert_eq!(media(&index), 0, "only the crawl re-derives");
+        assert_eq!(media(&index), 0);
 
         index
             .ingest_with(&room_id, events.clone(), &cache, &RedactionRules::V11, true)
@@ -5548,7 +5547,7 @@ mod tests {
         index
             .ingest_with(&room_id, events, &cache, &RedactionRules::V11, true)
             .await;
-        assert_eq!(media(&index), 0, "a finished room is skipped again");
+        assert_eq!(media(&index), 0);
 
         drop(room);
     }
