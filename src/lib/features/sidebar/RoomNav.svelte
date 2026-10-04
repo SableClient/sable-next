@@ -1568,6 +1568,9 @@
     flex: none;
     gap: var(--space-100);
     justify-content: center;
+  }
+
+  .room-status:has(> *) {
     min-width: 1.5rem;
   }
 
@@ -1578,6 +1581,14 @@
   }
 
   @media (any-hover: hover) and (any-pointer: fine) {
+    .room-row-wrap:not(:has(.room-status > *, .voice-live)):is(:hover, :focus-within) .room-row,
+    .room-row-wrap:not(:has(.room-status > *, .voice-live)):has(
+        :global(.room-options-trigger[data-state='open'])
+      )
+      .room-row {
+      padding-right: calc(var(--space-100) + 1.5rem);
+    }
+
     .room-options-slot {
       margin-right: var(--space-100);
       pointer-events: none;

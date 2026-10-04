@@ -20,6 +20,7 @@ import type {
 
 export type RoomCoreMode =
   | 'ready'
+  | 'room_name_overflow'
   | 'thread_links'
   | 'thread_error'
   | 'loading'
@@ -145,7 +146,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     const room: RoomSummary = {
       room_id: '!room:example.test',
       canonical_alias: null,
-      name: 'General',
+      name: workerMode === 'room_name_overflow' ? 'Room name fits until hover' : 'General',
       topic: null,
       avatar_url: null,
       is_direct: false,
@@ -169,13 +170,15 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       supports_knock_restricted: false,
       space_children: [],
       unread:
-        workerMode === 'unread_history' || workerMode === 'unread_context_error'
-          ? 9_995
-          : workerMode === 'unread_catchup'
-            ? 75
-            : 2,
-      notifying: 2,
-      highlight: 1,
+        workerMode === 'room_name_overflow'
+          ? 0
+          : workerMode === 'unread_history' || workerMode === 'unread_context_error'
+            ? 9_995
+            : workerMode === 'unread_catchup'
+              ? 75
+              : 2,
+      notifying: workerMode === 'room_name_overflow' ? 0 : 2,
+      highlight: workerMode === 'room_name_overflow' ? 0 : 1,
       marked_unread: false,
       latest_event: {
         sender: '@alice:example.test',
