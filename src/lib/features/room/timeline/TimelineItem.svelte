@@ -1819,7 +1819,7 @@
   }
 
   .message.layout-bubble .message-main > * {
-    max-width: 100%;
+    max-width: min(50rem, 100%);
     min-width: 0;
   }
 
