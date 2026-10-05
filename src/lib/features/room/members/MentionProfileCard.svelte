@@ -9,6 +9,7 @@
     RoomPermissionsView,
     MutualRoomView,
     ProfileFieldView,
+    PerMessageProfileView,
   } from '#src/generated/protocol';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
@@ -76,6 +77,7 @@
   import { MemberProfileRelations } from './member-profile-relations.svelte';
   import { MemberProfileActions, moderationErrorMessage } from './member-profile-actions';
   import UserSecurityDialog from './UserSecurityDialog.svelte';
+  import PersonaCard from './PersonaCard.svelte';
 
   interface Props {
     userId: string;
@@ -85,6 +87,9 @@
     permissions?: RoomPermissionsView | null;
     powerTags?: PowerLevelTagMap | null;
     profile: ProfileView | null;
+    pmp?: PerMessageProfileView | null;
+    onOpenAccount?: () => void;
+    onNestedMenuOpenChange?: (open: boolean) => void;
     onAvatarClick?: (source: string, displayName: string) => void;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onPowerLevelChange?: (roomId: string, userId: string, level: number) => void;
@@ -100,6 +105,9 @@
     permissions = null,
     powerTags = null,
     profile,
+    pmp = null,
+    onOpenAccount,
+    onNestedMenuOpenChange,
     onAvatarClick,
     onMatrixLink,
     onPowerLevelChange,
@@ -438,24 +446,37 @@
 {/snippet}
 
 {#snippet actionRow()}
-  <ActionMenu label={$i18n.t('timeline.profileShare')} align="start">
-    {#snippet trigger({ props })}
-      <Pill {...props}>
-        <ShareNetworkIcon size={14} />
-        {$i18n.t('timeline.profileShare')}
-      </Pill>
-    {/snippet}
-    <IconContext values={{ 'aria-hidden': 'true' }}>
-      <ActionMenuItem onSelect={copyUserId}>
-        {$i18n.t('timeline.profileCopyId')}
-      </ActionMenuItem>
-      <ActionMenuItem onSelect={copyProfileLink}>
-        {$i18n.t('timeline.profileCopyLink')}
-      </ActionMenuItem>
-    </IconContext>
-  </ActionMenu>
+  {#if pmp && onOpenAccount}
+    <Pill onclick={onOpenAccount}>{$i18n.t('timeline.openAccount')}</Pill>
+  {:else}
+    <ActionMenu
+      label={$i18n.t('timeline.profileShare')}
+      align="start"
+      onOpenChange={onNestedMenuOpenChange}
+    >
+      {#snippet trigger({ props })}
+        <Pill {...props}>
+          <ShareNetworkIcon size={14} />
+          {$i18n.t('timeline.profileShare')}
+        </Pill>
+      {/snippet}
+      <IconContext values={{ 'aria-hidden': 'true' }}>
+        <ActionMenuItem onSelect={copyUserId}>
+          {$i18n.t('timeline.profileCopyId')}
+        </ActionMenuItem>
+        <ActionMenuItem onSelect={copyProfileLink}>
+          {$i18n.t('timeline.profileCopyLink')}
+        </ActionMenuItem>
+      </IconContext>
+    </ActionMenu>
+  {/if}
   {#if !isSelf}
-    <ActionMenu label={mutualLabel} class="profile-mutual-menu" align="start">
+    <ActionMenu
+      label={mutualLabel}
+      class="profile-mutual-menu"
+      align="start"
+      onOpenChange={onNestedMenuOpenChange}
+    >
       {#snippet trigger({ props })}
         <Pill {...props}>
           <ChatsIcon size={14} />
@@ -471,7 +492,7 @@
       {@render mutualRoomRows()}
     </ActionMenu>
   {/if}
-  <ActionMenu label={$i18n.t('timeline.profileMoreActions')}>
+  <ActionMenu label={$i18n.t('timeline.profileMoreActions')} onOpenChange={onNestedMenuOpenChange}>
     {#snippet trigger({ props })}
       <Pill {...props} iconOnly aria-label={$i18n.t('timeline.profileMoreActions')}>
         <DotsThreeIcon size={14} />
@@ -728,42 +749,58 @@
   {/if}
 {/snippet}
 
-<ProfileCard
-  {displayName}
-  {userId}
-  {avatarUrl}
-  avatarLabel={$i18n.t('timeline.profileAvatar', { name: displayName })}
-  {onAvatarClick}
-  {color}
-  heroColor={currentProfile?.hero_color}
-  heroBrightness={currentProfile?.hero_brightness}
-  bannerUrl={currentProfile?.banner_url}
-  status={userStatus?.text}
-  statusEmoji={userStatus?.emoji}
-  presence={presence?.presence}
-  presenceLabel={presenceLabel ?? ''}
-  nameColorLight={overrideColors === null
-    ? null
-    : (overrideColors?.light ??
-      cosmetics?.colorOnLight ??
-      currentProfile?.name_color_light ??
-      roleTag?.color)}
-  nameColorDark={overrideColors === null
-    ? null
-    : (overrideColors?.dark ??
-      cosmetics?.colorOnDark ??
-      currentProfile?.name_color_dark ??
-      roleTag?.color)}
-  meta={profileLoading ? metaPlaceholder : hasMeta ? metaRow : undefined}
-  below={profileBelow}
-  pronouns={pronounRow}
-  children={showFailure || currentProfile?.bio ? bioPanel : undefined}
-  footer={extra.length > 0 ? miscData : undefined}
-  headerAction={variant === 'popover' && canMessage ? messageAction : undefined}
-  composer={variant === 'sheet' && canMessage ? composer : undefined}
-  insetBody
-  {variant}
-/>
+{#if pmp}
+  <PersonaCard
+    profile={pmp}
+    accountId={userId}
+    accountName={realName}
+    accountProfile={currentProfile}
+    member={roomMember}
+    {powerTags}
+    {onAvatarClick}
+    {variant}
+    below={profileBelow}
+    headerAction={variant === 'popover' && canMessage ? messageAction : undefined}
+    composer={variant === 'sheet' && canMessage ? composer : undefined}
+  />
+{:else}
+  <ProfileCard
+    {displayName}
+    {userId}
+    {avatarUrl}
+    avatarLabel={$i18n.t('timeline.profileAvatar', { name: displayName })}
+    {onAvatarClick}
+    {color}
+    heroColor={currentProfile?.hero_color}
+    heroBrightness={currentProfile?.hero_brightness}
+    bannerUrl={currentProfile?.banner_url}
+    status={userStatus?.text}
+    statusEmoji={userStatus?.emoji}
+    presence={presence?.presence}
+    presenceLabel={presenceLabel ?? ''}
+    nameColorLight={overrideColors === null
+      ? null
+      : (overrideColors?.light ??
+        cosmetics?.colorOnLight ??
+        currentProfile?.name_color_light ??
+        roleTag?.color)}
+    nameColorDark={overrideColors === null
+      ? null
+      : (overrideColors?.dark ??
+        cosmetics?.colorOnDark ??
+        currentProfile?.name_color_dark ??
+        roleTag?.color)}
+    meta={profileLoading ? metaPlaceholder : hasMeta ? metaRow : undefined}
+    below={profileBelow}
+    pronouns={pronounRow}
+    children={showFailure || currentProfile?.bio ? bioPanel : undefined}
+    footer={extra.length > 0 ? miscData : undefined}
+    headerAction={variant === 'popover' && canMessage ? messageAction : undefined}
+    composer={variant === 'sheet' && canMessage ? composer : undefined}
+    insetBody
+    {variant}
+  />
+{/if}
 
 <MessageReportDialog
   bind:open={reportOpen}
