@@ -1790,8 +1790,8 @@
   }
 
   :global(.room-avatar-icon) :global(.media-image-tint) {
-    color: var(--sec-on-container);
-    opacity: var(--opacity-p300);
+    color: var(--bg-on-container);
+    opacity: 1;
   }
 
   :global(.room-avatar-icon.glyph .avatar-fallback) {
@@ -1799,9 +1799,7 @@
   }
 
   .room-row.unread :global(.room-avatar-icon.glyph),
-  .room-row[aria-current='page'] :global(.room-avatar-icon.glyph),
-  .room-row.unread :global(.room-avatar-icon .media-image-tint),
-  .room-row[aria-current='page'] :global(.room-avatar-icon .media-image-tint) {
+  .room-row[aria-current='page'] :global(.room-avatar-icon.glyph) {
     opacity: var(--opacity-p500);
   }
 
