@@ -1671,9 +1671,11 @@
     white-space: nowrap;
   }
 
+  /* WebKit uses a clipped inline-block's bottom as its baseline. */
   :global(.reply-name) {
-    display: inline-block; /* can't */
+    display: inline-block;
     overflow: clip;
+    vertical-align: top;
   }
 
   .reply-compact {

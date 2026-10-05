@@ -142,6 +142,52 @@ test('a compact connected reply keeps its connector clear of the name gutter', a
   expect(connectorLeft).toBeGreaterThanOrEqual(gutterRight);
 });
 
+test('a mobile connected reply aligns its preview text with the sender name', async ({
+  app,
+  core,
+  page,
+  installRoomCore,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    localStorage.setItem('sable-preferences', JSON.stringify({ replyPreviewStyle: 'connected' }));
+  });
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await core.emitTimelineDiff(await core.subscription(), [
+    {
+      op: 'push_back',
+      value: {
+        ...timelineItem('aligned-reply', 'Replying to Alice'),
+        sender: '@bob:example.test',
+        sender_name: 'Bob',
+        in_reply_to: {
+          event_id: '$general-1:example.test',
+          sender: '@alice:example.test',
+          sender_mentioned: false,
+          sender_name: 'Alice',
+          body: 'General message 1',
+        },
+      },
+    },
+  ]);
+
+  const reply = page.locator('[data-item-id="aligned-reply"] .reply-connected');
+  await expect(reply).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const offset = await reply.evaluate((node) => {
+    const name = node.querySelector('.reply-name');
+    const body = node.querySelector('.reply-body');
+    if (!name || !body) throw new Error('Missing reply text');
+    const range = document.createRange();
+    range.selectNodeContents(name);
+    const nameTop = range.getBoundingClientRect().top;
+    range.selectNodeContents(body);
+    return Math.abs(nameTop - range.getBoundingClientRect().top);
+  });
+  expect(offset).toBeLessThanOrEqual(1);
+});
+
 test('a pinned dark theme corrects names for the dark ground on a light browser', async ({
   app,
   page,
