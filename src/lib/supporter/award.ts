@@ -6,14 +6,21 @@ export interface Award {
     sender: string;
     user_id_hash: string;
     expires_at?: number;
-    content: { body: string };
+    content: { body: string; tier?: string };
   };
   signatures: Record<string, string>;
 }
 
 export interface SupporterBadgeData {
   label: string;
+  tier: string | null;
   expiresAt: number | null;
+}
+
+const TIER_RANK: Readonly<Record<string, number>> = { ceo: 1 };
+
+function tierRank(tier: string | null): number {
+  return (tier && TIER_RANK[tier]) || 0;
 }
 
 const MAX_LABEL_CHARS = 24;
@@ -26,6 +33,7 @@ function isAward(value: unknown): value is Award {
     typeof user_id_hash === 'string' &&
     isRecord(content) &&
     typeof content.body === 'string' &&
+    (content.tier === undefined || typeof content.tier === 'string') &&
     (expires_at === undefined || typeof expires_at === 'number') &&
     Object.values(value.signatures).every((signature) => typeof signature === 'string')
   );
@@ -129,10 +137,19 @@ export async function badgeFor(
   for (const award of parseAwards(raw)) {
     if (!(await verifyAward(award, userId, keys, now))) continue;
     const expiresAt = award.signed.expires_at ?? null;
-    if (best && (best.expiresAt === null || (expiresAt !== null && expiresAt <= best.expiresAt))) {
-      continue;
+    const tier = award.signed.content.tier ?? null;
+    if (best) {
+      const rank = tierRank(tier);
+      const bestRank = tierRank(best.tier);
+      if (rank < bestRank) continue;
+      if (
+        rank === bestRank &&
+        (best.expiresAt === null || (expiresAt !== null && expiresAt <= best.expiresAt))
+      ) {
+        continue;
+      }
     }
-    best = { label: award.signed.content.body.trim().slice(0, MAX_LABEL_CHARS), expiresAt };
+    best = { label: award.signed.content.body.trim().slice(0, MAX_LABEL_CHARS), tier, expiresAt };
   }
   return best && best.label ? best : null;
 }

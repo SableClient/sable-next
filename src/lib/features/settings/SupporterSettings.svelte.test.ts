@@ -53,7 +53,7 @@ test('shows progress and a cancel button while waiting', async () => {
 });
 
 test('shows the active badge and lets it be removed', async () => {
-  supporter.badge = { label: 'Donor', expiresAt: 4102444800 };
+  supporter.badge = { label: 'Donor', tier: null, expiresAt: 4102444800 };
   const remove = vi.spyOn(supporter, 'remove').mockResolvedValue();
   render(SupporterSettings);
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ceoArt from './ceo.png';
   import { APP_ICON_STOPS, SABLE_PATHS } from './icon-art.js';
   import {
     supporterButtonText,
@@ -59,43 +60,47 @@
         />{/each}
     </linearGradient>
   </defs>
-  {#if shape === 'circle'}
-    <circle fill={backing} cx="256" cy="256" r="256" />
-  {:else if shape === 'heart'}
-    <path
-      fill={backing}
-      d="M256 492 58 302C-64 184 43 5 166 56c38 16 65 44 90 77 25-33 52-61 90-77 123-51 230 128 108 246Z"
-    />
-  {:else if shape === 'square'}
-    <rect fill={backing} width="512" height="512" rx="112" />
-  {/if}
-  <g
-    transform={shape === 'heart'
-      ? 'translate(82 55) scale(.68)'
-      : shape === 'square'
-        ? 'translate(26 26) scale(.9)'
-        : undefined}
-  >
-    <path fill={stops ? 'url(#' + id + ')' : 'currentColor'} d={SABLE_PATHS[0]} />
-    <path fill={backing} opacity="0.45" d={SABLE_PATHS[1]} />
-    {#if chosen === 'propeller'}
-      <path fill="var(--supporter-red)" d="M125 174C146 81 277 69 324 150L225 174Z" />
-      <path fill="var(--supporter-yellow)" d="M125 174C138 107 175 87 222 96L237 171Z" />
+  {#if chosen === 'ceo'}
+    <image href={ceoArt} width="512" height="512" />
+  {:else}
+    {#if shape === 'circle'}
+      <circle fill={backing} cx="256" cy="256" r="256" />
+    {:else if shape === 'heart'}
       <path
-        fill="var(--supporter-propeller-blue)"
-        d="M122 171Q233 178 337 143L351 150Q227 203 122 183Z"
+        fill={backing}
+        d="M256 492 58 302C-64 184 43 5 166 56c38 16 65 44 90 77 25-33 52-61 90-77 123-51 230 128 108 246Z"
       />
-      <path stroke="var(--supporter-propeller-blue)" stroke-width="7" d="M224 104 214 44" />
-      <ellipse
-        fill="var(--supporter-propeller-blue)"
-        cx="211"
-        cy="48"
-        rx="84"
-        ry="8"
-        transform="rotate(-18 211 48)"
-      />
+    {:else if shape === 'square'}
+      <rect fill={backing} width="512" height="512" rx="112" />
     {/if}
-  </g>
+    <g
+      transform={shape === 'heart'
+        ? 'translate(82 55) scale(.68)'
+        : shape === 'square'
+          ? 'translate(26 26) scale(.9)'
+          : undefined}
+    >
+      <path fill={stops ? 'url(#' + id + ')' : 'currentColor'} d={SABLE_PATHS[0]} />
+      <path fill={backing} opacity="0.45" d={SABLE_PATHS[1]} />
+      {#if chosen === 'propeller'}
+        <path fill="var(--supporter-red)" d="M125 174C146 81 277 69 324 150L225 174Z" />
+        <path fill="var(--supporter-yellow)" d="M125 174C138 107 175 87 222 96L237 171Z" />
+        <path
+          fill="var(--supporter-propeller-blue)"
+          d="M122 171Q233 178 337 143L351 150Q227 203 122 183Z"
+        />
+        <path stroke="var(--supporter-propeller-blue)" stroke-width="7" d="M224 104 214 44" />
+        <ellipse
+          fill="var(--supporter-propeller-blue)"
+          cx="211"
+          cy="48"
+          rx="84"
+          ry="8"
+          transform="rotate(-18 211 48)"
+        />
+      {/if}
+    </g>
+  {/if}
 </svg>
 
 <style>

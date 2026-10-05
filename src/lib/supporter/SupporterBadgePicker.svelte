@@ -11,23 +11,28 @@
     supporterAppearance,
     SUPPORTER_VARIANTS,
     SUPPORTER_SHAPES,
+    variantAvailable,
     type SupporterAppearance,
   } from './variants.js';
 
   let {
     value,
     name: donorName,
+    tier = null,
     disabled = false,
     onChange,
   }: {
     value: SupporterAppearance;
     name?: string;
+    tier?: string | null;
     disabled?: boolean;
     onChange: (patch: Partial<SupporterAppearance>) => void | Promise<void>;
   } = $props();
   const name = $props.id();
   const defaults = supporterAppearance();
-  const iconVariants = SUPPORTER_VARIANTS.filter((variant) => variant !== 'custom');
+  let iconVariants = $derived(
+    SUPPORTER_VARIANTS.filter((variant) => variant !== 'custom' && variantAvailable(variant, tier))
+  );
   const colorLabels = {
     color: 'customColor',
     backgroundColor: 'backgroundColor',

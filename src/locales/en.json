@@ -2491,7 +2491,8 @@
       "intersex": "Intersex",
       "lesbian": "Lesbian",
       "mlm": "MLM",
-      "pride": "Pride"
+      "pride": "Pride",
+      "ceo": "CEO"
     },
     "serverSearch": "Search on the server",
     "serverSearchHint": "Lets the homeserver search one unencrypted room. Off keeps queries local.",

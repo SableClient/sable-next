@@ -15,8 +15,16 @@ export const SUPPORTER_VARIANTS = [
   'lesbian',
   'mlm',
   'pride',
+  'ceo',
 ] as const;
 export type SupporterVariant = (typeof SUPPORTER_VARIANTS)[number];
+const VARIANT_TIER: Partial<Record<SupporterVariant, string>> = { ceo: 'ceo' };
+
+export function variantAvailable(variant: SupporterVariant, tier: string | null): boolean {
+  const required = VARIANT_TIER[variant];
+  return !required || required === tier;
+}
+
 export const SUPPORTER_SHAPES = ['none', 'circle', 'heart', 'square'] as const;
 export type SupporterShape = (typeof SUPPORTER_SHAPES)[number];
 export type SupporterAppearance = {
