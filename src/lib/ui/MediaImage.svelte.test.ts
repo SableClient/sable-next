@@ -288,6 +288,36 @@ test('keeps the unavailable state while an automatic retry is in flight', async 
   vi.useRealTimers();
 });
 
+test('a remounted image does not ask again for a source still held', async () => {
+  vi.useFakeTimers();
+  core.fetchMedia.mockRejectedValue(new Error('media unavailable'));
+  const props = {
+    source: 'mxc://dead.example/remounted',
+    alt: 'Avatar',
+    width: 96,
+    height: 96,
+  };
+
+  render(MediaImage, { props }).unmount();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(core.fetchMedia).toHaveBeenCalledTimes(1);
+
+  const remounted = render(MediaImage, { props });
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(core.fetchMedia).toHaveBeenCalledTimes(1);
+
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+
+  const latecomer = render(MediaImage, { props });
+  await vi.advanceTimersByTimeAsync(2_000);
+  expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+
+  latecomer.unmount();
+  remounted.unmount();
+  vi.useRealTimers();
+});
+
 test('a manual retry shows its progress instead of the unavailable state', async () => {
   vi.useFakeTimers();
   core.fetchMedia

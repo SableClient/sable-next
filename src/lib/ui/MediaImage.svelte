@@ -98,8 +98,9 @@
   }: Props = $props();
   const core = useCoreClient();
   let outcome = $state.raw<{ key: string; url: string | null; undecodable?: true } | null>(null);
-  let backoff = $derived({ source, attempt: 0, manual: 0, automatic: 0, at: 0 });
+  let backoff = $derived({ source, attempt: 0, forced: 0, manual: 0, automatic: 0, at: 0 });
   let attempt = $derived(backoff.attempt);
+  let forced = $derived(backoff.forced);
   let clock = $state(Date.now());
   let gifPreview = $state<HTMLCanvasElement>();
   let gifImage = $state<HTMLImageElement>();
@@ -295,7 +296,7 @@
     }
 
     let active = true;
-    const load = attempt > 0 ? retryMediaUrl : loadMediaUrl;
+    const load = attempt > 0 && forced === attempt ? retryMediaUrl : loadMediaUrl;
     void load(core, requestSource, requestWidth, requestHeight, mime)
       .then((nextUrl) => {
         if (!active) return;
@@ -426,7 +427,8 @@
     if (undecodable) await core.commands.forgetMedia(requested).catch(() => undefined);
     undecodableThumbnail = null;
     outcome = null;
-    backoff = { ...backoff, attempt: backoff.attempt + 1, manual: backoff.manual + 1, at: 0 };
+    const next = backoff.attempt + 1;
+    backoff = { ...backoff, attempt: next, forced: next, manual: backoff.manual + 1, at: 0 };
   }
 
   /* The fallback where frames cannot be decoded. `drawImage` copies an animated

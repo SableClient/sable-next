@@ -470,3 +470,95 @@ test('a media server the core refuses is not asked again until it says so, even 
   await expect(retryMediaUrl(core, source, 0, 0)).resolves.toBe('blob:refused');
   expect(fetchMedia).toHaveBeenCalledTimes(2);
 });
+
+function failingCore(accountId: string, fetchMedia: () => Promise<Uint8Array<ArrayBuffer>>) {
+  return {
+    session: session(accountId, '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
+    commands: { fetchMedia: vi.fn(fetchMedia) },
+  };
+}
+
+test('each failure of a source holds it for twice as long as the last', async () => {
+  vi.useFakeTimers();
+  const core = failingCore('account-doubling', () => Promise.reject(new Error('Unavailable')));
+  const source = 'mxc://dead.example/doubling';
+
+  await expect(loadMediaUrl(core, source, 96, 96)).rejects.toThrow();
+  await vi.advanceTimersByTimeAsync(1_999);
+  await expect(loadMediaUrl(core, source, 96, 96)).rejects.toThrow('Media unavailable');
+  expect(core.commands.fetchMedia).toHaveBeenCalledOnce();
+
+  await vi.advanceTimersByTimeAsync(1);
+  await expect(loadMediaUrl(core, source, 96, 96)).rejects.toThrow('Unavailable');
+  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(2);
+
+  await vi.advanceTimersByTimeAsync(3_999);
+  await expect(loadMediaUrl(core, source, 96, 96)).rejects.toThrow('Media unavailable');
+  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(2);
+
+  await vi.advanceTimersByTimeAsync(1);
+  await expect(loadMediaUrl(core, source, 96, 96)).rejects.toThrow('Unavailable');
+  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(3);
+});
+
+test('callers sharing a request count as one failure', async () => {
+  vi.useFakeTimers();
+  const core = failingCore('account-shared-failure', () =>
+    Promise.reject(new Error('Unavailable'))
+  );
+  const source = 'mxc://dead.example/shared';
+
+  await Promise.allSettled([
+    loadMediaUrl(core, source, 96, 96),
+    loadMediaUrl(core, source, 96, 96),
+    loadMediaUrl(core, source, 96, 96),
+  ]);
+  expect(core.commands.fetchMedia).toHaveBeenCalledOnce();
+
+  await vi.advanceTimersByTimeAsync(2_000);
+  await expect(loadMediaUrl(core, source, 96, 96)).rejects.toThrow('Unavailable');
+  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(2);
+});
+
+test('a manual retry asks again whatever the hold, and starts the count over', async () => {
+  vi.useFakeTimers();
+  const core = failingCore('account-manual', () => Promise.reject(new Error('Unavailable')));
+  const source = 'mxc://dead.example/manual';
+
+  await expect(loadMediaUrl(core, source, 96, 96)).rejects.toThrow('Unavailable');
+  await vi.advanceTimersByTimeAsync(2_000);
+  await expect(loadMediaUrl(core, source, 96, 96)).rejects.toThrow('Unavailable');
+
+  await expect(retryMediaUrl(core, source, 96, 96)).rejects.toThrow('Unavailable');
+  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(3);
+
+  await vi.advanceTimersByTimeAsync(2_000);
+  await expect(loadMediaUrl(core, source, 96, 96)).rejects.toThrow('Unavailable');
+  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(4);
+});
+
+test('a success forgets the failures', async () => {
+  vi.useFakeTimers();
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:recovered-after-failures');
+  const fetch = vi
+    .fn<() => Promise<Uint8Array<ArrayBuffer>>>()
+    .mockRejectedValueOnce(new Error('Unavailable'))
+    .mockRejectedValueOnce(new Error('Unavailable'))
+    .mockResolvedValueOnce(new Uint8Array([1]))
+    .mockRejectedValue(new Error('Unavailable'));
+  const core = failingCore('account-forgiven', fetch);
+  const source = 'mxc://flaky.example/forgiven';
+
+  await expect(loadMediaUrl(core, source, 0, 0)).rejects.toThrow();
+  await vi.advanceTimersByTimeAsync(2_000);
+  await expect(loadMediaUrl(core, source, 0, 0)).rejects.toThrow();
+  await vi.advanceTimersByTimeAsync(4_000);
+  await expect(loadMediaUrl(core, source, 0, 0)).resolves.toBe('blob:recovered-after-failures');
+
+  const other = 'mxc://flaky.example/forgiven-again';
+  await expect(loadMediaUrl(core, other, 0, 0)).rejects.toThrow('Unavailable');
+  await vi.advanceTimersByTimeAsync(2_000);
+  await expect(loadMediaUrl(core, other, 0, 0)).rejects.toThrow('Unavailable');
+  expect(fetch).toHaveBeenCalledTimes(5);
+});
