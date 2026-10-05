@@ -84,9 +84,17 @@ test('a focus id that is not a setting is kept for the heading it may name', () 
   });
 });
 
-test('builds a marked, shareable link that parses back', () => {
-  const href = buildSettingsLink(APP, 'timeline', 'hide-read-receipts');
-  expect(href).toContain('moe.sable.client.action=settings');
+test.each([
+  [APP, APP],
+  ['http://localhost:3000', 'http://localhost:3000'],
+  ['tauri://localhost', 'https://next.sable.moe'],
+  ['http://tauri.localhost', 'https://next.sable.moe'],
+  ['https://tauri.localhost', 'https://next.sable.moe'],
+])('builds a shareable settings link from %s', (origin, linkOrigin) => {
+  const href = buildSettingsLink(origin, 'timeline', 'hide-read-receipts');
+  expect(href).toBe(
+    `${linkOrigin}/settings/timeline?focus=hide-read-receipts&moe.sable.client.action=settings`
+  );
   expect(parseSettingsLink(href, 'https://elsewhere.example')).toEqual({
     section: 'timeline',
     focus: 'hide-read-receipts',

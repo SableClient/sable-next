@@ -78,9 +78,12 @@ export function parseSettingsLink(href: string, origin: string): SettingsLink | 
   return parsePath(hashPath, hashSearch, sameOrigin);
 }
 
-/** Always marked, so the link still resolves from another origin. */
+/** Uses the public web origin for bundled apps and marks links for other deployments. */
 export function buildSettingsLink(origin: string, section: string, focus?: string): string {
-  const url = new URL(`/settings/${section}`, origin);
+  const app = new URL(origin);
+  const desktopApp =
+    app.hostname === 'tauri.localhost' || (app.protocol === 'tauri:' && app.host === 'localhost');
+  const url = new URL(`/settings/${section}`, desktopApp ? 'https://next.sable.moe' : origin);
   if (focus !== undefined) url.searchParams.set('focus', focus);
   url.searchParams.set(SETTINGS_LINK_ACTION_PARAM, SETTINGS_LINK_ACTION);
   return url.toString();
