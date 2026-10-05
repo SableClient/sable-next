@@ -84,25 +84,41 @@ struct AppState {
 /// reference until the renderer answers - 51200 of those and the app aborts.
 const EVENT_BATCH_LIMIT: usize = 256;
 
+const EVENT_BACKLOG_LIMIT: usize = 4096;
+
 #[derive(Default)]
-struct EventSink(Mutex<Option<Channel<Vec<CoreEvent>>>>);
+struct EventSink(Mutex<SinkState>);
+
+#[derive(Default)]
+struct SinkState {
+    channel: Option<Channel<Vec<CoreEvent>>>,
+    backlog: Vec<CoreEvent>,
+}
 
 impl EventSink {
     fn replace(&self, channel: Channel<Vec<CoreEvent>>) {
-        *self
+        let mut state = self
             .0
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(channel);
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut pending = std::mem::take(&mut state.backlog);
+        while !pending.is_empty() {
+            let tail = pending.split_off(pending.len().min(EVENT_BATCH_LIMIT));
+            let _ = channel.send(std::mem::replace(&mut pending, tail));
+        }
+        state.channel = Some(channel);
     }
 
     fn send(&self, events: Vec<CoreEvent>) {
-        let channel = self
+        let mut state = self
             .0
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        if let Some(channel) = channel {
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(channel) = state.channel.clone() {
+            drop(state);
             let _ = channel.send(events);
+        } else if state.backlog.len() < EVENT_BACKLOG_LIMIT {
+            state.backlog.extend(events);
         }
     }
 }
@@ -461,6 +477,7 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     #[cfg(mobile)]
     network::attach(&core);
     let pushing = core.clone();
+    tauri::async_runtime::spawn(restore_ahead_of_webview(core.clone()));
     #[cfg(target_os = "android")]
     let _ = cold_push::CORE.set(core.clone());
     app.manage(AppState {
@@ -678,6 +695,15 @@ fn open_external_url(app: AppHandle<BrowserEngine>, url: String) -> Result<(), C
     app.opener()
         .open_url(parsed.to_string(), None::<String>)
         .map_err(|_| CommandErr::Unavailable)
+}
+
+async fn restore_ahead_of_webview(core: Arc<Core>) {
+    if !matches!(core.v1_migration_complete().await, Ok(true)) {
+        return;
+    }
+    if let Err(error) = Box::pin(core.dispatch(Command::Restore)).await {
+        log::warn!("Early session restore failed: {error:?}");
+    }
 }
 
 fn spawn_event_pump<R: tauri::Runtime>(
@@ -954,7 +980,7 @@ mod tests {
 
     use super::EventSink;
     use sable_core::protocol::CoreEvent;
-    use tauri::ipc::Channel;
+    use tauri::ipc::{Channel, InvokeResponseBody};
 
     #[test]
     fn replaces_the_event_channel_after_a_frontend_reload() {
@@ -994,6 +1020,42 @@ mod tests {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner),
             1
+        );
+    }
+
+    #[test]
+    fn replays_events_sent_before_the_first_subscription_in_batches() {
+        let batches = Arc::new(Mutex::new(Vec::new()));
+        let seen = batches.clone();
+        let channel = Channel::new(move |body| {
+            let InvokeResponseBody::Json(json) = body else {
+                unreachable!("events are serialised as JSON");
+            };
+            let events: Vec<serde_json::Value> = serde_json::from_str(&json).unwrap();
+            seen.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push(events.len());
+            Ok(())
+        });
+
+        let sink = EventSink::default();
+        sink.send(
+            (0..300)
+                .map(|_| CoreEvent::SessionEnded {
+                    reason: "early".to_owned(),
+                })
+                .collect(),
+        );
+        sink.replace(channel);
+        sink.send(vec![CoreEvent::SessionEnded {
+            reason: "live".to_owned(),
+        }]);
+
+        assert_eq!(
+            *batches
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            [256, 44, 1]
         );
     }
 }
