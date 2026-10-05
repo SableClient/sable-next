@@ -6,6 +6,7 @@
   import type { ProfileView, SessionInfo } from '#src/generated/protocol';
   import { runtimeConfig } from '#lib/config/runtime-config.js';
   import { useCoreClient } from '#lib/core/context.js';
+  import { defaultSettingsSection } from '#lib/features/settings/settings-navigation.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';
   import { i18n } from '#lib/i18n.js';
@@ -98,10 +99,13 @@
   }
 
   function openProfile(): void {
-    void goto(resolve('settings/account'), {
-      shallow: true,
-      state: { settings: { section: 'account' } },
-    });
+    const section = defaultSettingsSection();
+    if (mode === 'mobile') {
+      void goto(resolve(`settings/${section}`));
+      return;
+    }
+
+    void goto(resolve(`settings/${section}`), { shallow: true, state: { settings: { section } } });
   }
 
   async function logoutAccount(accountId: string): Promise<void> {
