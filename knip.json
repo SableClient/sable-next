@@ -3,6 +3,7 @@
   "entry": [
     "src/worker/core.worker.ts",
     "scripts/**/*.mjs",
+    "tests/fixtures/generate-v1-crypto.mjs",
     "tests/e2e/global.setup.ts",
     "tests/e2e/global.teardown.ts",
     "tests/e2e/fixtures/*.ts"
@@ -11,11 +12,18 @@
     "config": [
       "playwright.config.ts",
       "playwright.preload.config.ts",
+      "playwright.migration.config.ts",
       "playwright.timeline.config.ts"
     ]
   },
-  "ignoreDependencies": ["@fontsource-variable/nunito", "wrangler", "@sentry/browser"],
-  "ignoreBinaries": ["mise", "ditto", "wasm-bindgen"],
+  "ignoreDependencies": [
+    "@fontsource-variable/nunito",
+    "@sableclient/twemoji-font",
+    "wrangler",
+    "@sentry/browser"
+  ],
+  "ignoreBinaries": ["mise", "ditto", "wasm-bindgen", "dsymutil", "cc", "strip"],
+  "ignoreUnresolved": ["/index.mjs"],
   "rules": {
     "exports": "off",
     "types": "off",

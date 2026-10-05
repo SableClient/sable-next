@@ -587,7 +587,8 @@ test('the sender zone reaches a time chip without rebuilding the body', async ()
   render(FormattedBodyHarness, { props });
   await settle();
 
-  const chip = screen.getByRole('button', { name: /1970/ });
+  const chip = document.querySelector<HTMLButtonElement>('.time-chip');
+  if (!chip) throw new Error('time chip missing');
   const spoiler = screen.getByRole('button', { name: 'secret' });
   await user.click(spoiler);
   expect(spoiler.ariaPressed).toBe('false');
@@ -600,7 +601,7 @@ test('the sender zone reaches a time chip without rebuilding the body', async ()
   props.senderTimezone = 'Asia/Tokyo';
   await settle();
 
-  expect(screen.getByRole('button', { name: /1970/ })).toBe(chip);
+  expect(document.querySelector('.time-chip')).toBe(chip);
   expect(spoiler.ariaPressed).toBe('false');
   expect(chip.ariaLabel).toContain('Asia/Tokyo');
   expect(document.querySelector('.tooltip')?.textContent).toContain('Asia/Tokyo');

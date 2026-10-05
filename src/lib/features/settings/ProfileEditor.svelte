@@ -189,6 +189,7 @@
       edited: false,
     },
     in_reply_to: null,
+    forum_title: null,
     thread_root: null,
     thread_summary: null,
     reactions: [],
