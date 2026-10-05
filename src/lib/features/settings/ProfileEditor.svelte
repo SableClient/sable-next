@@ -1,7 +1,12 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
 
-  import type { BrightnessView, ProfileFieldView, ProfileView } from '#src/generated/protocol';
+  import type {
+    BrightnessView,
+    ProfileFieldView,
+    ProfileView,
+    TimelineItemView,
+  } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n, t } from '#lib/i18n.js';
   import {
@@ -41,6 +46,21 @@
   import { isActiveSpace } from '#lib/features/sidebar/nav-rooms.js';
   import { bioHtml, bioMarkdown, bioTexts } from './bio-markdown.js';
   import ColorSetting from './ColorSetting.svelte';
+  import { type SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
+
+  import {
+    MessageDialogs,
+    provideMessageDialogs,
+  } from '#lib/features/room/messages/message-dialogs.svelte.js';
+  import {
+    OpenMessageMenu,
+    provideMessageMenu,
+  } from '#lib/features/room/messages/message-menu-open.svelte.js';
+  import {
+    PinnedEvents,
+    providePinnedEvents,
+  } from '#lib/features/room/timeline/pinned-events.svelte.js';
+  import TimelineItem from '#lib/features/room/timeline/TimelineItem.svelte';
 
   interface Props {
     profile: ProfileView;
@@ -68,6 +88,9 @@
 
   let { profile, userId, onSaved }: Props = $props();
   const core = useCoreClient();
+  providePinnedEvents(new PinnedEvents(core.commands));
+  provideMessageDialogs(new MessageDialogs());
+  provideMessageMenu(new OpenMessageMenu());
 
   const supportedZones =
     typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
@@ -140,6 +163,43 @@
     hero_brightness: draft.hero ? draft.brightness : null,
     name_color_light: draft.light || null,
     name_color_dark: draft.dark || null,
+  });
+
+  const previewCosmetics = $derived<SenderCosmetics>({
+    colorOnLight: previewProfile.name_color_light,
+    colorOnDark: previewProfile.name_color_dark,
+    pronouns: previewProfile.pronouns,
+  });
+
+  const previewMessage = $derived<TimelineItemView>({
+    id: 'profile-message-preview',
+    event_id: null,
+    transaction_id: null,
+    send_state: null,
+    sender: profile.user_id,
+    sender_name: draft.name.trim() || null,
+    sender_avatar: avatarPreview ?? (draft.avatarRemoved ? null : profile.avatar_url),
+    timestamp: Date.now(),
+    content: {
+      kind: 'message',
+      body: 'See you at six?',
+      html: 'See you at six?',
+      emote: false,
+      notice: false,
+      edited: false,
+    },
+    in_reply_to: null,
+    thread_root: null,
+    thread_summary: null,
+    reactions: [],
+    is_own: true,
+    read_by: [],
+    read_timestamps: {},
+    per_message_profile: null,
+    bundled_link_previews: [],
+    link_previews_removed: null,
+    mention: 'none',
+    forwarded: null,
   });
 
   $effect(() => {
@@ -393,6 +453,13 @@
       aria-labelledby="profile-tab-preview"
     >
       <MentionProfileCard {userId} member={null} roomId="" profile={previewProfile} />
+      <TimelineItem
+        item={previewMessage}
+        collapsed={false}
+        layout={preferences.layout}
+        overrideCosmetics={previewCosmetics}
+        preview
+      />
     </div>
   {/if}
   <div
@@ -757,7 +824,14 @@
   }
 
   .preview-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-400);
     padding: var(--space-400);
+  }
+
+  .preview-panel > :global(.message) {
+    border-radius: var(--radius);
   }
 
   .extra-list {

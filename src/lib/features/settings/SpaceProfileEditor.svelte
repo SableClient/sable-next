@@ -6,6 +6,7 @@
     ProfileView,
     RoomPermissionsView,
     RoomPowerLevelsView,
+    TimelineItemView,
   } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import {
@@ -13,6 +14,7 @@
     pronounContent,
     writeMemberColors,
   } from '#lib/features/composer/slash-commands.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import MentionProfileCard from '#lib/features/room/members/MentionProfileCard.svelte';
   import { canSendState } from '#lib/features/room/settings/permission-groups.js';
   import { senderColor } from '../room/timeline/timeline-format';
@@ -21,8 +23,10 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import TimelineItem from '#lib/features/room/timeline/TimelineItem.svelte';
   import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
   import ColorSetting from './ColorSetting.svelte';
+  import { type SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import './profile-editor.css';
 
   interface Props {
@@ -101,6 +105,43 @@
     };
     walk(space);
     return found;
+  });
+
+  const previewCosmetics = $derived<SenderCosmetics>({
+    colorOnLight: previewProfile.name_color_light,
+    colorOnDark: previewProfile.name_color_dark,
+    pronouns: previewProfile.pronouns,
+  });
+
+  const previewMessage = $derived<TimelineItemView>({
+    id: 'profile-message-preview',
+    event_id: null,
+    transaction_id: null,
+    send_state: null,
+    sender: profile.user_id,
+    sender_name: previewProfile.display_name,
+    sender_avatar: previewProfile.avatar_url,
+    timestamp: Date.now(),
+    content: {
+      kind: 'message',
+      body: 'See you at six?',
+      html: 'See you at six?',
+      emote: false,
+      notice: false,
+      edited: false,
+    },
+    in_reply_to: null,
+    thread_root: null,
+    thread_summary: null,
+    reactions: [],
+    is_own: true,
+    read_by: [],
+    read_timestamps: {},
+    per_message_profile: null,
+    bundled_link_previews: [],
+    link_previews_removed: null,
+    mention: 'none',
+    forwarded: null,
   });
 
   $effect(() => {
@@ -281,6 +322,13 @@
 {#if tab === 'preview'}
   <div class="preview-panel" role="tabpanel" id="profile-panel-preview">
     <MentionProfileCard {userId} member={null} roomId="" profile={previewProfile} />
+    <TimelineItem
+      item={previewMessage}
+      collapsed={false}
+      layout={preferences.layout}
+      overrideCosmetics={previewCosmetics}
+      preview
+    />
   </div>
 {:else}
   <div role="tabpanel" id="profile-panel-edit" aria-busy={loading}>
@@ -409,6 +457,13 @@
 
 <style>
   .preview-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-400);
     padding: var(--space-400);
+  }
+
+  .preview-panel > :global(.message) {
+    border-radius: var(--radius);
   }
 </style>
