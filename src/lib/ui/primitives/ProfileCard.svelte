@@ -396,7 +396,7 @@
     display: flex;
     gap: var(--space-100);
     min-height: calc(var(--profile-avatar-size) / 2);
-    padding: 0 var(--space-200);
+    padding: 0 var(--space-400);
     pointer-events: none;
     position: relative;
   }
