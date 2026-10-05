@@ -43,7 +43,6 @@
     "hidePassword": "ซ่อนรหัสผ่าน",
     "signInWithPassword": "ลงชื่อเข้าใช้ด้วยรหัสผ่าน",
     "signInTitle": "ลงชื่อเข้าใช้",
-    "newToMatrixQuestion": "เพิ่งเริ่มใช้ Matrix ใช่ไหม?",
     "createAccount": "สร้างบัญชี",
     "createAccountOnServer": "สร้างบัญชีบน {{server}}",
     "registeringWith": "กำลังลงทะเบียนกับ",

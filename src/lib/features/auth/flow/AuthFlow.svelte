@@ -350,6 +350,7 @@
           qrLoginOpen = true;
         }}
     onCreateAccount={showCreateAccount ? showRegistrationStage : undefined}
+    onCancel={isAddingAccount ? () => goto(resolve('home')) : undefined}
     followUserServer={!reauthAccountId()}
   />
 {/snippet}
@@ -369,7 +370,15 @@
     }}
   />
   <section class="auth-content" aria-labelledby="sable-title">
-    <AuthHeader {hasLoggedInBefore} title={isSetupRoute ? $i18n.t('setup.title') : undefined} />
+    <AuthHeader
+      {hasLoggedInBefore}
+      title={isSetupRoute
+        ? $i18n.t('setup.title')
+        : isAddingAccount
+          ? $i18n.t('auth.addAccount')
+          : undefined}
+    />
+
     <div class="auth-main">
       {#if core.status === 'starting' || core.status === 'idle' || (core.status === 'signed-out' && !hasCompletedInitialHomeserverCheck)}
         <div class="bootstrap" role="status">

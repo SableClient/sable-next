@@ -1188,7 +1188,6 @@
     "enterConfirmPassword": "Confirmă-ți parola.",
     "enterEmail": "Introdu adresa de email.",
     "enterRegistrationToken": "Introdu tokenul de înregistrare.",
-    "newToMatrixQuestion": "Încă nu ai folosit Matrix?",
     "createAccount": "Crează cont",
     "createServerAccount": "Crează cont {{server}}",
     "createAccountOnServer": "Crează cont pe {{server}}",

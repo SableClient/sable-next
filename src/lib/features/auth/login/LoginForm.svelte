@@ -40,6 +40,7 @@
     onLogin: () => Promise<void>;
     onQrLogin?: () => void;
     onCreateAccount?: () => void;
+    onCancel?: () => void;
     followUserServer?: boolean;
   }
 
@@ -60,6 +61,7 @@
     onQrLogin,
     onLogin,
     onCreateAccount,
+    onCancel,
     followUserServer = true,
   }: Props = $props();
 
@@ -298,19 +300,22 @@
   </div>
 </form>
 
-{#if onCreateAccount}
-  <div class="account-switch">
-    <span>{$i18n.t('auth.newToMatrixQuestion')}</span>
-    <button
-      class="account-switch-button"
+<div class="account-switch">
+  {#if onCancel}
+    <Button variant="ghost" type="button" onclick={onCancel}>
+      {$i18n.t('auth.cancelAddingAccount')}
+    </Button>
+  {:else if onCreateAccount}
+    <Button
+      variant="ghost"
       type="button"
       disabled={isLoginControlsDisabled}
       onclick={onCreateAccount}
     >
       {$i18n.t('auth.createAccount')}
-    </button>
-  </div>
-{/if}
+    </Button>
+  {/if}
+</div>
 
 <style>
   .actions {
@@ -327,41 +332,6 @@
     justify-content: center;
     padding-top: var(--space-200);
     text-align: center;
-  }
-
-  .account-switch-button {
-    background: transparent;
-    border: 0;
-    color: var(--primary-main);
-    cursor: pointer;
-    font: inherit;
-    font-weight: var(--font-weight-bold);
-    padding: 0;
-    text-decoration: underline;
-    text-underline-offset: 0.15em;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .account-switch-button {
-      transition:
-        color var(--motion-normal) var(--motion-easing-standard),
-        text-decoration-color var(--motion-normal) var(--motion-easing-standard);
-    }
-  }
-
-  .account-switch-button:hover {
-    color: var(--primary-main-hover);
-  }
-
-  .account-switch-button:focus-visible {
-    border-radius: var(--radii-200);
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: 0.15rem;
-  }
-
-  .account-switch-button:disabled {
-    cursor: default;
-    opacity: 0.65;
   }
 
   .login-form {

@@ -1160,7 +1160,6 @@
     "enterConfirmPassword": "Confirmez votre mot de passe.",
     "enterEmail": "Saisissez votre adresse e-mail.",
     "enterRegistrationToken": "Saisissez votre jeton d’inscription.",
-    "newToMatrixQuestion": "Nouveau sur Matrix ?",
     "createAccount": "Créer un compte",
     "createServerAccount": "Créer un compte sur {{server}}",
     "createAccountOnServer": "Créer un compte sur {{server}}",
