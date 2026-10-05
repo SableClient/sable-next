@@ -55,7 +55,7 @@
   import SenderName from '../members/SenderName.svelte';
   import RoleTagIcon from '../members/RoleTagIcon.svelte';
   import { hasSenderRoles, useSenderRoles } from '../members/sender-roles.js';
-  import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
+  import { useRoomCosmetics, type SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import ForwardedLine from '../messages/ForwardedLine.svelte';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import { useMessageDialogs } from '../messages/message-dialogs.svelte.js';
@@ -111,6 +111,7 @@
     onMenuOpenChange?: (open: boolean) => void;
     placeholder?: boolean;
     placeholderCharacters?: number;
+    overrideCosmetics?: SenderCosmetics | null;
   }
 
   let {
@@ -154,6 +155,7 @@
     onMenuOpenChange,
     placeholder = false,
     placeholderCharacters = 35,
+    overrideCosmetics = null,
   }: Props = $props();
 
   let defaultEmoteSize = $derived(preferences.timelineEmoteSize === 'default');
@@ -168,7 +170,7 @@
   const openMessageMenu = useMessageMenu();
   const itemProfiles = new TimelineItemProfiles(core);
   let profile = $derived(itemProfiles.sender);
-  let senderCosmetics = $derived(roomCosmetics?.for(item.sender) ?? null);
+  let senderCosmetics = $derived(overrideCosmetics ?? roomCosmetics?.for(item.sender) ?? null);
   let senderTimezone = $derived(profile?.timezone ?? null);
   // Only a fallback: the core fills both fields, so most rows never scan.
   let senderMember = $derived(
