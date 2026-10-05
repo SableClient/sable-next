@@ -13,6 +13,8 @@ import type {
   DirectoryRoomType,
   EditVersionView,
   EncryptionStatusView,
+  EventNotificationsView,
+  EventNotificationView,
   KeyBackupStatusView,
   KeyBackupDownloadView,
   HomeserverSoftwareView,
@@ -1737,13 +1739,13 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'set_mention_notifications', rule, mode });
     },
 
-    async membershipNotifications(): Promise<boolean | null> {
-      const response = await transport().send({ type: 'membership_notifications' });
-      return response.enabled;
+    async eventNotifications(): Promise<EventNotificationsView> {
+      const response = await transport().send({ type: 'event_notifications' });
+      return response.events;
     },
 
-    async setMembershipNotifications(enabled: boolean): Promise<void> {
-      await transport().send({ type: 'set_membership_notifications', enabled });
+    async setEventNotification(event: EventNotificationView, enabled: boolean): Promise<void> {
+      await transport().send({ type: 'set_event_notification', event, enabled });
     },
 
     async masterMute(): Promise<boolean | null> {

@@ -19,9 +19,9 @@ use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 use tokio::sync::{RwLock, broadcast};
 
 use crate::protocol::{
-    DefaultNotificationModesView, KeywordNotificationView, MentionNotificationModeView,
-    MentionNotificationsView, MentionRuleView, NotificationModeView, NotificationSettingsView,
-    RoomNotificationModeView,
+    DefaultNotificationModesView, EventNotificationView, EventNotificationsView,
+    KeywordNotificationView, MentionNotificationModeView, MentionNotificationsView,
+    MentionRuleView, NotificationModeView, NotificationSettingsView, RoomNotificationModeView,
 };
 
 pub struct PushRules {
@@ -508,6 +508,9 @@ pub fn plan_default_mode(
         .collect())
 }
 
+const SUPPRESS_BRIDGE_STATUS: &str = "moe.sable.suppress_bridge_status";
+const SUPPRESS_REACTIONS: &str = "moe.sable.suppress_reactions";
+
 #[must_use]
 pub fn plan_alignment(rules: &Ruleset) -> Vec<RuleWrite> {
     let mut writes: Vec<_> = [true, false]
@@ -535,28 +538,47 @@ pub fn plan_alignment(rules: &Ruleset) -> Vec<RuleWrite> {
         .flatten()
         .collect();
 
-    let rule_id = "moe.sable.suppress_bridge_status";
-    let existing = rules.override_.iter().find(|rule| rule.rule_id == rule_id);
-    if existing.is_none() {
-        writes.push(RuleWrite::Put(NewPushRule::Override(
+    writes.extend(silence_event_type(
+        rules,
+        SUPPRESS_BRIDGE_STATUS,
+        "com.beeper.message_send_status",
+        None,
+    ));
+    writes.extend(silence_event_type(
+        rules,
+        SUPPRESS_REACTIONS,
+        "m.reaction",
+        Some(PredefinedOverrideRuleId::Reaction.as_str()),
+    ));
+    writes
+}
+
+fn silence_event_type(
+    rules: &Ruleset,
+    rule_id: &str,
+    event_type: &str,
+    covered_by: Option<&str>,
+) -> Option<RuleWrite> {
+    let has = |id: &str| rules.override_.iter().find(|rule| rule.rule_id == id);
+    match has(rule_id) {
+        Some(rule) if rule.enabled => None,
+        Some(_) => Some(RuleWrite::Enabled {
+            kind: RuleKind::Override,
+            rule_id: rule_id.to_owned(),
+            enabled: true,
+        }),
+        None if covered_by.is_some_and(|id| has(id).is_some()) => None,
+        None => Some(RuleWrite::Put(NewPushRule::Override(
             NewConditionalPushRule::new(
                 rule_id.to_owned(),
                 vec![PushCondition::EventMatch(EventMatchConditionData::new(
                     "type".to_owned(),
-                    "com.beeper.message_send_status".to_owned(),
+                    event_type.to_owned(),
                 ))],
                 vec![],
             ),
-        )));
+        ))),
     }
-    if existing.is_some_and(|rule| !rule.enabled) {
-        writes.push(RuleWrite::Enabled {
-            kind: RuleKind::Override,
-            rule_id: rule_id.to_owned(),
-            enabled: true,
-        });
-    }
-    writes
 }
 
 const ENCRYPTED_EVENT_RULES: [&str; 2] = [
@@ -638,14 +660,109 @@ pub fn plan_mention(
     Ok(plan_level(kind, &rule_id, mode, true))
 }
 
+fn event_rule(rules: &Ruleset, event: EventNotificationView) -> Option<(RuleKind, String)> {
+    let candidates = match event {
+        EventNotificationView::Membership => {
+            vec![(
+                RuleKind::Override,
+                PredefinedOverrideRuleId::MemberEvent.as_str(),
+            )]
+        }
+        EventNotificationView::Reactions => vec![
+            (
+                RuleKind::Override,
+                PredefinedOverrideRuleId::Reaction.as_str(),
+            ),
+            (RuleKind::Override, SUPPRESS_REACTIONS),
+        ],
+        EventNotificationView::Edits => {
+            vec![(
+                RuleKind::Override,
+                PredefinedOverrideRuleId::SuppressEdits.as_str(),
+            )]
+        }
+        EventNotificationView::Notices => {
+            vec![(
+                RuleKind::Override,
+                PredefinedOverrideRuleId::SuppressNotices.as_str(),
+            )]
+        }
+        EventNotificationView::Invites => {
+            vec![(
+                RuleKind::Override,
+                PredefinedOverrideRuleId::InviteForMe.as_str(),
+            )]
+        }
+        EventNotificationView::Calls => {
+            vec![(
+                RuleKind::Underride,
+                PredefinedUnderrideRuleId::Call.as_str(),
+            )]
+        }
+    };
+    candidates
+        .into_iter()
+        .find(|(kind, id)| rules.get(kind.clone(), id).is_some())
+        .map(|(kind, id)| (kind, id.to_owned()))
+}
+
+fn event_actions(event: EventNotificationView) -> Vec<Action> {
+    match event {
+        EventNotificationView::Invites => vec![
+            Action::Notify,
+            Action::SetTweak(Tweak::Sound(SoundTweakValue::Default)),
+        ],
+        EventNotificationView::Calls => vec![
+            Action::Notify,
+            Action::SetTweak(Tweak::Sound("ring".into())),
+        ],
+        _ => vec![Action::Notify],
+    }
+}
+
+fn event_notifies(rules: &Ruleset, event: EventNotificationView) -> Option<bool> {
+    let (kind, rule_id) = event_rule(rules, event)?;
+    rules.get(kind, &rule_id).map(rule_notifies)
+}
+
 #[must_use]
-pub fn membership_notifications(rules: &Ruleset) -> Option<bool> {
-    rules
-        .get(
-            RuleKind::Override,
-            PredefinedOverrideRuleId::MemberEvent.as_str(),
-        )
-        .map(rule_notifies)
+pub fn event_notifications(rules: &Ruleset) -> EventNotificationsView {
+    EventNotificationsView {
+        membership: event_notifies(rules, EventNotificationView::Membership),
+        reactions: event_notifies(rules, EventNotificationView::Reactions),
+        edits: event_notifies(rules, EventNotificationView::Edits),
+        notices: event_notifies(rules, EventNotificationView::Notices),
+        invites: event_notifies(rules, EventNotificationView::Invites),
+        calls: event_notifies(rules, EventNotificationView::Calls),
+    }
+}
+
+/// # Errors
+///
+/// When the server has no rule for this kind of event.
+pub fn plan_event(
+    rules: &Ruleset,
+    event: EventNotificationView,
+    enabled: bool,
+) -> Result<Vec<RuleWrite>, CoreError> {
+    let (kind, rule_id) =
+        event_rule(rules, event).ok_or("the server has no rule for this kind of event")?;
+    Ok(vec![
+        RuleWrite::Actions {
+            kind: kind.clone(),
+            rule_id: rule_id.clone(),
+            actions: if enabled {
+                event_actions(event)
+            } else {
+                vec![]
+            },
+        },
+        RuleWrite::Enabled {
+            kind,
+            rule_id,
+            enabled: true,
+        },
+    ])
 }
 
 #[must_use]
@@ -799,12 +916,15 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        RuleWrite, default_modes, keywords, level_actions, master_muted, membership_notifications,
-        mention_notifications, plan_add_keyword, plan_alignment, plan_default_mode,
-        plan_keyword_mode, plan_master, plan_membership, plan_mention, plan_remove_keyword,
-        plan_room_mode, pushes_every_encrypted_event, room_mode,
+        RuleWrite, SUPPRESS_BRIDGE_STATUS, SUPPRESS_REACTIONS, default_modes, event_notifications,
+        event_notifies, keywords, level_actions, master_muted, mention_notifications,
+        plan_add_keyword, plan_alignment, plan_default_mode, plan_event, plan_keyword_mode,
+        plan_master, plan_mention, plan_remove_keyword, plan_room_mode,
+        pushes_every_encrypted_event, room_mode,
     };
-    use crate::protocol::{MentionNotificationModeView, MentionRuleView, NotificationModeView};
+    use crate::protocol::{
+        EventNotificationView, MentionNotificationModeView, MentionRuleView, NotificationModeView,
+    };
 
     fn describe(writes: &[RuleWrite]) -> Vec<String> {
         writes
@@ -1063,18 +1183,32 @@ mod tests {
         assert!(plan_alignment(&rules).is_empty());
 
         rules
-            .set_enabled(
-                RuleKind::Override,
-                "moe.sable.suppress_bridge_status",
-                false,
-            )
+            .set_enabled(RuleKind::Override, SUPPRESS_BRIDGE_STATUS, false)
             .unwrap();
         let aligned = applied(rules.clone(), plan_alignment(&rules));
         assert!(
             aligned
-                .get(RuleKind::Override, "moe.sable.suppress_bridge_status")
+                .get(RuleKind::Override, SUPPRESS_BRIDGE_STATUS)
                 .unwrap()
                 .enabled()
+        );
+        assert!(plan_alignment(&aligned).is_empty());
+    }
+
+    #[test]
+    fn reactions_are_silenced_only_when_the_account_lacks_the_default_rule() {
+        let defaults = Ruleset::server_default(me());
+        let kept = applied(defaults.clone(), plan_alignment(&defaults));
+        assert!(kept.get(RuleKind::Override, SUPPRESS_REACTIONS).is_none());
+
+        let mut old = defaults;
+        old.override_
+            .retain(|rule| rule.rule_id != PredefinedOverrideRuleId::Reaction.as_str());
+        let aligned = applied(old.clone(), plan_alignment(&old));
+        assert!(
+            aligned
+                .get(RuleKind::Override, SUPPRESS_REACTIONS)
+                .is_some()
         );
         assert!(plan_alignment(&aligned).is_empty());
     }
@@ -1199,24 +1333,94 @@ mod tests {
     }
 
     #[test]
-    fn a_notifying_member_event_rule_reads_as_on() {
-        let mut rules = Ruleset::server_default(me());
-        assert_eq!(membership_notifications(&rules), Some(false));
+    fn each_event_rule_reads_as_on_only_while_it_notifies() {
+        use EventNotificationView::{Calls, Edits, Invites, Membership, Notices, Reactions};
 
-        rules = applied(rules.clone(), plan_membership(true));
-        assert_eq!(membership_notifications(&rules), Some(true));
+        let defaults = Ruleset::server_default(me());
+        let read = |rules: &Ruleset| {
+            let view = event_notifications(rules);
+            [
+                view.membership,
+                view.reactions,
+                view.edits,
+                view.notices,
+                view.invites,
+                view.calls,
+            ]
+        };
+        assert_eq!(
+            read(&defaults),
+            [
+                Some(false),
+                Some(false),
+                Some(false),
+                Some(false),
+                Some(true),
+                Some(true)
+            ]
+        );
 
-        rules
-            .set_enabled(
-                RuleKind::Override,
-                PredefinedOverrideRuleId::MemberEvent.as_str(),
-                false,
+        for event in [Membership, Reactions, Edits, Notices, Invites, Calls] {
+            let on = applied(
+                defaults.clone(),
+                plan_event(&defaults, event, true).unwrap(),
+            );
+            assert_eq!(event_notifies(&on, event), Some(true));
+            let off = applied(on.clone(), plan_event(&on, event, false).unwrap());
+            assert_eq!(event_notifies(&off, event), Some(false));
+        }
+    }
+
+    #[test]
+    fn turning_an_event_back_on_restores_the_spec_actions() {
+        let defaults = Ruleset::server_default(me());
+        let off = applied(
+            defaults.clone(),
+            plan_event(&defaults, EventNotificationView::Calls, false).unwrap(),
+        );
+        let on = applied(
+            off.clone(),
+            plan_event(&off, EventNotificationView::Calls, true).unwrap(),
+        );
+        let actions = |rules: &Ruleset| {
+            serde_json::to_value(
+                rules
+                    .get(
+                        RuleKind::Underride,
+                        PredefinedUnderrideRuleId::Call.as_str(),
+                    )
+                    .unwrap()
+                    .actions(),
             )
-            .unwrap();
-        assert_eq!(membership_notifications(&rules), Some(false));
+            .unwrap()
+        };
+        assert_eq!(actions(&on), actions(&defaults));
+    }
 
+    #[test]
+    fn a_reaction_toggle_falls_back_to_the_rule_alignment_added() {
+        let mut rules = Ruleset::server_default(me());
+        rules
+            .override_
+            .retain(|rule| rule.rule_id != PredefinedOverrideRuleId::Reaction.as_str());
+        assert_eq!(event_notifications(&rules).reactions, None);
+
+        let aligned = applied(rules.clone(), plan_alignment(&rules));
+        assert_eq!(event_notifications(&aligned).reactions, Some(false));
+        let on = applied(
+            aligned.clone(),
+            plan_event(&aligned, EventNotificationView::Reactions, true).unwrap(),
+        );
+        assert_eq!(event_notifications(&on).reactions, Some(true));
+        assert!(plan_alignment(&on).is_empty());
+    }
+
+    #[test]
+    fn a_missing_event_rule_has_no_state_and_no_plan() {
+        let mut rules = Ruleset::server_default(me());
         rules.override_.clear();
-        assert_eq!(membership_notifications(&rules), None);
+        assert_eq!(event_notifications(&rules).membership, None);
+        plan_event(&rules, EventNotificationView::Membership, true).unwrap_err();
     }
 
     #[test]

@@ -5,6 +5,7 @@ import type {
   CommandOk,
   CoreEvent,
   EncryptionStatusView,
+  EventNotificationsView,
   ImagePackView,
   KeywordNotificationView,
   MentionNotificationsView,
@@ -530,7 +531,14 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     let unreadContextOpened = false;
     const notificationKeywords: KeywordNotificationView[] = [];
     let defaultGroupMode: 'all' | 'mentions' = 'mentions';
-    let membershipNotifications: boolean | null = false;
+    const eventNotifications: EventNotificationsView = {
+      membership: false,
+      reactions: false,
+      edits: false,
+      notices: false,
+      invites: true,
+      calls: true,
+    };
     let masterMute: boolean | null = false;
     const mentionNotificationModes: MentionNotificationsView = {
       room: 'notify',
@@ -1123,10 +1131,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'mention_notifications',
         modes: mentionNotificationModes,
       }),
-      membership_notifications: () => ({
-        type: 'membership_notifications',
-        enabled: membershipNotifications,
-      }),
+      event_notifications: () => ({ type: 'event_notifications', events: eventNotifications }),
       master_mute: () => ({ type: 'master_mute', muted: masterMute }),
       web_pusher_support: () => ({ type: 'web_pusher_support', vapid: null }),
       web_pushers: () => ({ type: 'web_pushers', pushers: [] }),
@@ -1664,9 +1669,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           defaultGroupMode = command.mode;
         return { type: 'set_default_notification_mode' };
       },
-      set_membership_notifications: (command) => {
-        membershipNotifications = command.enabled;
-        return { type: 'set_membership_notifications' };
+      set_event_notification: (command) => {
+        eventNotifications[command.event] = command.enabled;
+        return { type: 'set_event_notification' };
       },
       set_master_mute: (command) => {
         masterMute = command.muted;

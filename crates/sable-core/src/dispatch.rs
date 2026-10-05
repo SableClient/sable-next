@@ -2197,10 +2197,8 @@ impl Core {
                 ),
             }),
 
-            Command::MembershipNotifications => Ok(CommandOk::MembershipNotifications {
-                enabled: push_rules::membership_notifications(
-                    &self.push_rules().await?.snapshot().await,
-                ),
+            Command::EventNotifications => Ok(CommandOk::EventNotifications {
+                events: push_rules::event_notifications(&self.push_rules().await?.snapshot().await),
             }),
 
             Command::MasterMute => Ok(CommandOk::MasterMute {
@@ -2380,14 +2378,16 @@ impl Core {
                 Ok(CommandOk::SetMentionNotifications)
             }
 
-            Command::SetMembershipNotifications { enabled } => {
-                self.push_rules()
-                    .await?
-                    .apply(push_rules::plan_membership(enabled))
+            Command::SetEventNotification { event, enabled } => {
+                let rules = self.push_rules().await?;
+                let writes = push_rules::plan_event(&rules.snapshot().await, event, enabled)
+                    .or_failed(self, "set_event_notification")?;
+                rules
+                    .apply(writes)
                     .await
-                    .or_failed(self, "set_membership_notifications")?;
+                    .or_failed(self, "set_event_notification")?;
 
-                Ok(CommandOk::SetMembershipNotifications)
+                Ok(CommandOk::SetEventNotification)
             }
 
             Command::SetMasterMute { muted } => {

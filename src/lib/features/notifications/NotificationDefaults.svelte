@@ -1,5 +1,10 @@
 <script lang="ts">
-  import type { DefaultNotificationModesView, NotificationModeView } from '#src/generated/protocol';
+  import type {
+    DefaultNotificationModesView,
+    EventNotificationsView,
+    EventNotificationView,
+    NotificationModeView,
+  } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -47,13 +52,22 @@
     { key: 'group', label: 'settings.notificationDefaultGroup', direct: false },
   ];
 
-  const membershipItems = [
+  const eventRows: { key: EventNotificationView; label: string }[] = [
+    { key: 'membership', label: 'settings.notificationMembership' },
+    { key: 'reactions', label: 'settings.notificationReactions' },
+    { key: 'edits', label: 'settings.notificationEdits' },
+    { key: 'notices', label: 'settings.notificationNotices' },
+    { key: 'invites', label: 'settings.notificationInvites' },
+    { key: 'calls', label: 'settings.notificationCalls' },
+  ];
+
+  const eventItems = [
     { value: 'on', label: 'settings.mentionsNotify' },
     { value: 'off', label: 'settings.mentionsOff' },
   ];
 
   let current = $state<DefaultNotificationModesView | null>(null);
-  let membership = $state<boolean | null>(null);
+  let events = $state<EventNotificationsView | null>(null);
   let muted = $state<boolean | null>(null);
   let failed = $state(false);
   $effect(() => {
@@ -70,9 +84,9 @@
       .catch(() => {
         if (alive) failed = true;
       });
-    void core.commands.membershipNotifications().then(
-      (enabled) => {
-        if (alive) membership = enabled;
+    void core.commands.eventNotifications().then(
+      (view) => {
+        if (alive) events = view;
       },
       () => undefined
     );
@@ -115,10 +129,10 @@
     });
   }
 
-  function saveMembership(enabled: boolean): void {
-    membership = enabled;
+  function saveEvent(event: EventNotificationView, enabled: boolean): void {
+    if (events) events = { ...events, [event]: enabled };
 
-    void core.commands.setMembershipNotifications(enabled).catch(() => {
+    void core.commands.setEventNotification(event, enabled).catch(() => {
       failed = true;
       settingsChanges.version += 1;
     });
@@ -192,17 +206,21 @@
         {/if}
       </SettingsRow>
     {/each}
-    {#if membership !== null}
-      <SettingsRow title={$i18n.t('settings.notificationMembership')}>
-        <Select
-          aria-label={$i18n.t('settings.notificationMembership')}
-          value={membership ? 'on' : 'off'}
-          items={membershipItems.map((item) => ({ value: item.value, label: $i18n.t(item.label) }))}
-          onValueChange={(value) => {
-            saveMembership(value === 'on');
-          }}
-        />
-      </SettingsRow>
+    {#if events}
+      {#each eventRows as { key, label } (key)}
+        {#if events[key] !== null}
+          <SettingsRow title={$i18n.t(label)}>
+            <Select
+              aria-label={$i18n.t(label)}
+              value={events[key] ? 'on' : 'off'}
+              items={eventItems.map((item) => ({ value: item.value, label: $i18n.t(item.label) }))}
+              onValueChange={(value) => {
+                saveEvent(key, value === 'on');
+              }}
+            />
+          </SettingsRow>
+        {/if}
+      {/each}
     {/if}
   </ul>
 </section>

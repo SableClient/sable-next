@@ -182,7 +182,7 @@ pub enum Command {
     },
     DefaultNotificationModes,
     MentionNotifications,
-    MembershipNotifications,
+    EventNotifications,
     MasterMute,
     Notification {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -1191,7 +1191,8 @@ pub enum Command {
         rule: MentionRuleView,
         mode: MentionNotificationModeView,
     },
-    SetMembershipNotifications {
+    SetEventNotification {
+        event: EventNotificationView,
         enabled: bool,
     },
     SetMasterMute {
@@ -1492,8 +1493,8 @@ pub enum CommandOk {
     MentionNotifications {
         modes: MentionNotificationsView,
     },
-    MembershipNotifications {
-        enabled: Option<bool>,
+    EventNotifications {
+        events: EventNotificationsView,
     },
     MasterMute {
         muted: Option<bool>,
@@ -1927,7 +1928,7 @@ pub enum CommandOk {
     SetRoomNotificationMode,
     SetDefaultNotificationMode,
     SetMentionNotifications,
-    SetMembershipNotifications,
+    SetEventNotification,
     SetMasterMute,
 
     SetDirect,
@@ -4068,6 +4069,29 @@ pub struct MentionNotificationsView {
     pub user: Option<MentionNotificationModeView>,
     pub display_name: Option<MentionNotificationModeView>,
     pub username: Option<MentionNotificationModeView>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum EventNotificationView {
+    Membership,
+    Reactions,
+    Edits,
+    Notices,
+    Invites,
+    Calls,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct EventNotificationsView {
+    pub membership: Option<bool>,
+    pub reactions: Option<bool>,
+    pub edits: Option<bool>,
+    pub notices: Option<bool>,
+    pub invites: Option<bool>,
+    pub calls: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
