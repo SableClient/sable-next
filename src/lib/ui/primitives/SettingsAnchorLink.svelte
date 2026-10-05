@@ -12,6 +12,7 @@
   }
 
   const HOSTS = '.setting-row, .settings-section-header, .settings-heading-row';
+  const CONTROLS = 'button, a, input, select, textarea, [role="switch"], [role="combobox"]';
 
   let { anchor }: Props = $props();
   const link = settingsAnchors()?.link;
@@ -32,6 +33,7 @@
       const host = button.closest(HOSTS);
       if (!host) return undefined;
       return longPress({
+        enabled: (event) => !(event.target instanceof Element && event.target.closest(CONTROLS)),
         onPress: () => {
           copy(build).then(
             () => toasts.info($i18n.t('settings.linkCopied')),

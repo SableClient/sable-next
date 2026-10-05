@@ -6,7 +6,7 @@ export const SCHEDULE_PRESS_MS = 800;
 const LONG_PRESS_SLOP_PX = 10;
 
 export interface LongPressOptions {
-  enabled?: () => boolean;
+  enabled?: (event: MouseEvent) => boolean;
   stopPropagation?: boolean;
   delayMs?: number;
   onPress: (event: MouseEvent) => void;
@@ -73,7 +73,7 @@ export class LongPress {
     this.touch = event.pointerType !== 'mouse';
     this.fired = false;
     if (event.pointerType === 'mouse') return;
-    if (this.options.enabled && !this.options.enabled()) return;
+    if (this.options.enabled && !this.options.enabled(event)) return;
 
     this.pressing = true;
     this.#held = true;
@@ -85,7 +85,7 @@ export class LongPress {
 
   fire(event: MouseEvent): void {
     this.cancel();
-    if (this.options.enabled && !this.options.enabled()) return;
+    if (this.options.enabled && !this.options.enabled(event)) return;
     this.fired = true;
     hapticFeedback('medium');
     armTrailingClickSwallow();

@@ -162,6 +162,24 @@ test('a disabled press never arms', () => {
   vi.useRealTimers();
 });
 
+test('enabled sees the press that started it', () => {
+  vi.useFakeTimers();
+  const onPress = vi.fn();
+  const press = new LongPress({
+    enabled: (event) => (event.target as Element).tagName !== 'BUTTON',
+    onPress,
+  });
+
+  press.start(pointer({ target: document.createElement('button') }));
+  vi.advanceTimersByTime(1000);
+  expect(onPress).not.toHaveBeenCalled();
+
+  press.start(pointer({ target: document.createElement('div') }));
+  vi.advanceTimersByTime(LONG_PRESS_MS);
+  expect(onPress).toHaveBeenCalledOnce();
+  vi.useRealTimers();
+});
+
 test('cancelling drops a timer that a virtualised row would otherwise leave running', () => {
   vi.useFakeTimers();
   const onPress = vi.fn();
