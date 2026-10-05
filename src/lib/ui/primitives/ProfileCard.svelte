@@ -337,6 +337,7 @@
     --profile-ink: var(--bg-on-container);
     --profile-card-ground: var(--profile-hero);
     --profile-panel-ground: var(--profile-hero-panel);
+    --profile-pronoun-ground: var(--profile-card-ground);
     --profile-text-muted: var(--profile-hero-muted);
     --profile-icon: var(--profile-text-muted);
     --profile-chip-line: color-mix(in oklab, var(--profile-ink) 45%, var(--profile-panel-ground));
@@ -543,17 +544,21 @@
     padding: var(--space-300) var(--space-400) var(--space-400);
   }
 
-  .profile-card-popover.tinted.profile-card-inset-body {
+  .profile-card.tinted.profile-card-inset-body {
     padding-bottom: var(--space-200);
   }
 
-  .profile-card-popover.tinted.profile-card-inset-body .profile-card-identity {
+  .profile-card-sheet.tinted.profile-card-inset-body {
+    padding-bottom: calc(var(--space-200) + var(--sheet-inset-bottom));
+  }
+
+  .profile-card.tinted.profile-card-inset-body .profile-card-identity {
     padding-inline: 0;
     padding-bottom: 0;
     padding-top: 0;
   }
 
-  .profile-card-popover.tinted.profile-card-inset-body .profile-card-body {
+  .profile-card.tinted.profile-card-inset-body .profile-card-body {
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius-inner);
@@ -656,7 +661,7 @@
     margin: 0 var(--space-400) var(--space-300);
   }
 
-  .profile-card-popover.tinted.profile-card-inset-body .profile-card-panel {
+  .profile-card.tinted.profile-card-inset-body .profile-card-panel {
     margin-inline: 0;
     margin-top: var(--space-200);
   }
@@ -676,14 +681,14 @@
     color: var(--profile-ink);
   }
 
-  .profile-card-popover.tinted.profile-card-inset-body .profile-card-panel.framed {
+  .profile-card.tinted.profile-card-inset-body .profile-card-panel.framed {
     background: var(--profile-hero);
     border: 0;
     border-radius: var(--radii-400);
     box-shadow: inset 0 1px 2px color-mix(in srgb, var(--profile-ink) 12%, transparent);
   }
 
-  .profile-card-popover.tinted.profile-card-inset-body .profile-card-footer {
+  .profile-card.tinted.profile-card-inset-body .profile-card-footer {
     display: flex;
     flex-direction: column;
     text-align: center;
@@ -715,7 +720,7 @@
     outline-offset: calc(-1 * var(--focus-ring-width));
   }
 
-  .profile-card-popover.tinted.profile-card-inset-body .profile-card-bio {
+  .profile-card.tinted.profile-card-inset-body .profile-card-bio {
     margin-block: 0;
     max-height: 12.5rem;
     padding: var(--space-200);
@@ -746,11 +751,15 @@
     padding: 0 var(--space-400) var(--space-400);
   }
 
+  .profile-card.tinted.profile-card-inset-body .profile-card-composer {
+    padding: var(--space-200) 0 0;
+  }
+
   .profile-card-below {
     padding: 0 var(--space-400) var(--space-400);
   }
 
-  .profile-card-popover.tinted.profile-card-inset-body .profile-card-below {
+  .profile-card.tinted.profile-card-inset-body .profile-card-below {
     padding: var(--space-200) 0 0;
   }
 
@@ -758,7 +767,7 @@
     border-top: var(--border-width) solid var(--profile-line);
   }
 
-  .profile-card-popover.tinted.profile-card-inset-body .profile-card-footer.divided {
+  .profile-card.tinted.profile-card-inset-body .profile-card-footer.divided {
     border-top: 0;
   }
 

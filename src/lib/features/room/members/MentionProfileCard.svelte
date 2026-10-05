@@ -761,7 +761,7 @@
   footer={extra.length > 0 ? miscData : undefined}
   headerAction={variant === 'popover' && canMessage ? messageAction : undefined}
   composer={variant === 'sheet' && canMessage ? composer : undefined}
-  insetBody={variant === 'popover'}
+  insetBody
   {variant}
 />
 
@@ -848,7 +848,7 @@
   }
 
   :global(.profile-pronoun-pill) {
-    --pronoun-pill-ground: var(--profile-panel-ground);
+    --pronoun-pill-ground: var(--profile-pronoun-ground, var(--profile-panel-ground));
 
     color: var(--profile-text-muted);
   }
