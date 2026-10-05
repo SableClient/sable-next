@@ -774,9 +774,6 @@ async fn discover_gateway(core: &Arc<sable_core::Core>, endpoint: &str) -> Optio
     gateway_from_response(Box::pin(core.dispatch(command)).await)
 }
 
-/// A homeserver advertising MSC4174 would otherwise take a reader who chose a
-/// UnifiedPush distributor, whose own Matrix gateway delivers without the
-/// homeserver's web push.
 #[cfg(any(mobile, test))]
 fn prefers_distributor_gateway(config: &PushConfig, registration: &Registration) -> bool {
     config.provider.as_deref() == Some("unifiedpush")
