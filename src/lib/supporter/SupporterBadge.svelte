@@ -60,6 +60,7 @@
     lesbian: ['var(--supporter-orange)', 'var(--supporter-bisexual-pink)'],
     mlm: ['var(--supporter-teal)', 'var(--supporter-bisexual-blue)'],
     pride: ['var(--supporter-orange)', 'var(--supporter-purple)'],
+    ceo: ['var(--supporter-gold)', 'var(--supporter-gold)'],
   };
   let customStyle = $derived.by(() => {
     const [start, end] =
