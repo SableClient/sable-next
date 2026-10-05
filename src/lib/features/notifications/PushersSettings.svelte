@@ -92,7 +92,9 @@
 
   function holdFocus(event: Event): void {
     const target = event.currentTarget;
-    if (target instanceof HTMLElement) target.closest('li')?.focus({ preventScroll: true });
+    if (target instanceof HTMLElement) {
+      (target.closest('li') ?? section)?.focus({ preventScroll: true });
+    }
   }
 
   function startRemoval(pusher: RegisteredPusherView, event: Event): void {
@@ -114,6 +116,7 @@
   }
 
   async function remove(pusher: RegisteredPusherView): Promise<void> {
+    if (removing !== null) return;
     const key = keyOf(pusher);
     removing = key;
     error = null;
@@ -130,6 +133,32 @@
       if (alive) removing = null;
     }
   }
+
+  async function removeAll(): Promise<void> {
+    if (removing !== null || pushers.length === 0) return;
+    removing = 'all';
+    error = null;
+    const removed: string[] = [];
+    let failed = false;
+    for (const pusher of [...pushers]) {
+      try {
+        await core.commands.removePusher(pusher.pushkey, pusher.app_id);
+        removed.push(keyOf(pusher));
+      } catch (cause) {
+        console.warn('[sable notifications] removing a pusher failed', cause);
+        failed = true;
+      }
+    }
+    if (!alive) return;
+    section?.focus({ preventScroll: true });
+    confirming = null;
+    pushers = pushers.filter((pusher) => !removed.includes(keyOf(pusher)));
+    await reload();
+    if (alive) {
+      if (failed) error = 'settings.pushersRemoveAllFailed';
+      removing = null;
+    }
+  }
 </script>
 
 <section
@@ -143,17 +172,50 @@
       <h3 id="pushers-heading" data-settings-outline>{$i18n.t('settings.pushers')}</h3>
       <SettingsAnchorLink anchor="pushers-heading" />
     </div>
+    {#if pushers.length > 0 && confirming !== 'all'}
+      <Button
+        variant="danger"
+        size="small"
+        disabled={loading || removing !== null}
+        onclick={(event) => {
+          holdFocus(event);
+          confirming = 'all';
+        }}
+      >
+        {$i18n.t('settings.pushersRemoveAll')}
+      </Button>
+    {/if}
     <IconButton
       variant="ghost"
       size="small"
       label={$i18n.t('settings.pushersRefresh')}
       onclick={() => void reload()}
-      disabled={loading}
+      disabled={loading || removing !== null}
     >
       <ArrowClockwiseIcon />
     </IconButton>
   </div>
   <p class="hint settings-description">{$i18n.t('settings.pushersHint')}</p>
+
+  {#if confirming === 'all'}
+    <form
+      class="pusher-confirm"
+      onsubmit={(event) => {
+        event.preventDefault();
+        void removeAll();
+      }}
+    >
+      <span>{$i18n.t('settings.pushersConfirmAll')}</span>
+      <div class="pusher-confirm-actions">
+        <Button type="submit" variant="danger" size="small" loading={removing === 'all'}>
+          {$i18n.t('settings.pushersRemoveAll')}
+        </Button>
+        <Button variant="ghost" size="small" disabled={removing !== null} onclick={cancelRemoval}>
+          {$i18n.t('settings.cancel')}
+        </Button>
+      </div>
+    </form>
+  {/if}
 
   {#if error}
     <Alert variant="warning" role="status">
@@ -258,6 +320,7 @@
               <Button
                 variant="danger"
                 size="small"
+                disabled={removing !== null}
                 onclick={(event) => {
                   startRemoval(pusher, event);
                 }}
@@ -308,6 +371,7 @@
   .pushers-head {
     align-items: center;
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-200);
   }
 
