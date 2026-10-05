@@ -2,8 +2,12 @@ import { isTauri } from '@tauri-apps/api/core';
 
 import type { Transport } from './index';
 import { createTauriTransport } from './tauri';
-import { createWebTransport } from './web';
+import { createWebTransport, prewarmWebWorker } from './web';
 
 export function createTransport(): Transport {
   return isTauri() ? createTauriTransport() : createWebTransport();
+}
+
+export function prewarmTransport(): void {
+  if (!isTauri()) prewarmWebWorker();
 }

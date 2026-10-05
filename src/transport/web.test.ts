@@ -60,6 +60,7 @@ class FakePort {
 
 class FakeSharedWorker extends EventTarget {
   static last: FakeSharedWorker | null = null;
+  static created = 0;
   port = new FakePort();
   url: URL;
 
@@ -67,12 +68,14 @@ class FakeSharedWorker extends EventTarget {
     super();
     this.url = new URL(url);
     FakeSharedWorker.last = this;
+    FakeSharedWorker.created += 1;
   }
 }
 
 beforeEach(() => {
   vi.useFakeTimers();
   FakeSharedWorker.last = null;
+  FakeSharedWorker.created = 0;
   vi.stubGlobal('SharedWorker', FakeSharedWorker);
   vi.stubGlobal('self', { location: new URL('https://sable.test/room') });
 });
@@ -108,6 +111,32 @@ test('uses a WASM-specific worker URL', async () => {
 
   expect(FakeSharedWorker.last?.url.searchParams.get('wasm')).toBeTruthy();
 }, 20_000);
+
+test('adopts a prewarmed worker instead of opening a second one', async () => {
+  const { createWebTransport, prewarmWebWorker } = await import('./web');
+  prewarmWebWorker();
+  prewarmWebWorker();
+  expect(FakeSharedWorker.created).toBe(1);
+
+  const transport = createWebTransport();
+  void transport.send({ type: 'room_members', room_id: '!r:example.org' } as never);
+
+  expect(FakeSharedWorker.created).toBe(1);
+  expect(FakeSharedWorker.last?.port.posted).toHaveLength(1);
+});
+
+test('a prewarmed worker that failed to load rejects the first request', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  const { createWebTransport, prewarmWebWorker } = await import('./web');
+  prewarmWebWorker();
+  FakeSharedWorker.last?.dispatchEvent(Object.assign(new Event('error'), { message: 'no module' }));
+
+  const transport = createWebTransport();
+
+  await expect(
+    transport.send({ type: 'room_members', room_id: '!r:example.org' } as never)
+  ).rejects.toThrow();
+});
 
 test('uses an in-memory event cache in an iOS PWA', async () => {
   vi.stubGlobal('navigator', {

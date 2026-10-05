@@ -12,6 +12,7 @@ import { scrubSentryEvent } from '#lib/observability/sentry-event.js';
 import { untrackFetch } from '#lib/observability/untracked-fetch.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { CoreError } from '#src/transport';
+import { prewarmTransport } from './transport/create';
 
 const dsn = import.meta.env.VITE_SENTRY_DSN;
 const environment = import.meta.env.VITE_SENTRY_ENVIRONMENT ?? import.meta.env.MODE;
@@ -20,6 +21,7 @@ const sampleEverything = environment === 'development' || environment === 'previ
 
 installDynamicImportRecovery();
 tolerateUnknownListeners();
+prewarmTransport();
 
 if (dsn && preferences.errorReporting) {
   Sentry.init({

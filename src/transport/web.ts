@@ -52,6 +52,44 @@ function requestLabel(request: WorkerRequest): RequestLabel | undefined {
   return undefined;
 }
 
+interface PrewarmedWorker {
+  worker: SharedWorker;
+  failure: string | null;
+}
+
+let prewarmed: PrewarmedWorker | null = null;
+
+function openWorker(): SharedWorker {
+  const workerUrl = new URL(coreWorkerUrl, self.location.href);
+  // Shared workers outlive tabs, so changing their URL prevents an old glue
+  // module from being paired with a freshly generated WASM binary.
+  workerUrl.searchParams.set('wasm', wasmVersion);
+  const matchMedia = Reflect.get(globalThis, 'matchMedia') as
+    | ((query: string) => MediaQueryList)
+    | undefined;
+  const standalone =
+    matchMedia?.('(display-mode: standalone)').matches === true ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  const iosPwa = /iPhone|iPad|iPod/.test(navigator.userAgent) && standalone;
+  if (iosPwa) workerUrl.searchParams.set('event-cache', 'memory');
+  const logFilter = new URLSearchParams(self.location.search).get('log');
+  if (logFilter) workerUrl.searchParams.set('log', logFilter);
+
+  return new SharedWorker(workerUrl, {
+    type: 'module',
+    name: 'sable-core',
+  });
+}
+
+export function prewarmWebWorker(): void {
+  if (prewarmed || typeof SharedWorker === 'undefined') return;
+  const entry: PrewarmedWorker = { worker: openWorker(), failure: null };
+  on(entry.worker, 'error', (event) => {
+    entry.failure ??= (event as ErrorEvent).message || 'unknown error';
+  });
+  prewarmed = entry;
+}
+
 export function createWebTransport(): Transport {
   const listeners = new Set<(event: CoreEvent) => void>();
   // Which reply belongs to which id is a runtime fact, so it cannot be typed.
@@ -164,25 +202,9 @@ export function createWebTransport(): Transport {
   function connect(): SharedWorker {
     if (worker) return worker;
 
-    const workerUrl = new URL(coreWorkerUrl, self.location.href);
-    // Shared workers outlive tabs, so changing their URL prevents an old glue
-    // module from being paired with a freshly generated WASM binary.
-    workerUrl.searchParams.set('wasm', wasmVersion);
-    const matchMedia = Reflect.get(globalThis, 'matchMedia') as
-      | ((query: string) => MediaQueryList)
-      | undefined;
-    const standalone =
-      matchMedia?.('(display-mode: standalone)').matches === true ||
-      (navigator as Navigator & { standalone?: boolean }).standalone === true;
-    const iosPwa = /iPhone|iPad|iPod/.test(navigator.userAgent) && standalone;
-    if (iosPwa) workerUrl.searchParams.set('event-cache', 'memory');
-    const logFilter = new URLSearchParams(self.location.search).get('log');
-    if (logFilter) workerUrl.searchParams.set('log', logFilter);
-
-    const nextWorker = new SharedWorker(workerUrl, {
-      type: 'module',
-      name: 'sable-core',
-    });
+    const adopted = prewarmed;
+    prewarmed = null;
+    const nextWorker = adopted?.worker ?? openWorker();
 
     // Only the worker failing to load reaches here. Runtime failures inside it
     // are reported to its own global scope, so the worker forwards those itself.
@@ -248,6 +270,12 @@ export function createWebTransport(): Transport {
     nextWorker.port.start();
     if (debugLogs) nextWorker.port.postMessage({ debugLogs: true });
     worker = nextWorker;
+    if (adopted?.failure) {
+      const failure = adopted.failure;
+      queueMicrotask(() => {
+        if (worker === nextWorker) handleCrash(`shared worker failed to start: ${failure}`);
+      });
+    }
     return nextWorker;
   }
 
