@@ -655,7 +655,7 @@ pub fn master_muted(rules: &Ruleset) -> Option<bool> {
             RuleKind::Override,
             PredefinedOverrideRuleId::Master.as_str(),
         )
-        .map(|rule| rule.enabled())
+        .map(ruma::push::AnyPushRuleRef::enabled)
 }
 
 #[must_use]
