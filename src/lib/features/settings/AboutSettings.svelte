@@ -27,6 +27,8 @@
   import '#lib/ui/primitives/settings-row.css';
   import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
+  import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
+  import CopySimpleIcon from 'phosphor-svelte/lib/CopySimpleIcon';
 
   import SupporterSettings from './SupporterSettings.svelte';
 
@@ -43,6 +45,15 @@
   let updateCheckResult = $state<'available' | 'current' | 'mobile-available' | 'failed' | null>(
     null
   );
+
+  let versionCopied = $state(false);
+  async function copyVersion(): Promise<void> {
+    await navigator.clipboard.writeText(version);
+    versionCopied = true;
+    setTimeout(() => {
+      versionCopied = false;
+    }, 2000);
+  }
 
   $effect(() => {
     let cancelled = false;
@@ -116,7 +127,19 @@
     <div>
       <div class="product-name">
         <h1>Sable</h1>
-        <span>{version}</span>
+        <button
+          class="version-copy-button"
+          type="button"
+          title={$i18n.t(versionCopied ? 'settings.copied' : 'settings.copy')}
+          onclick={() => void copyVersion()}
+        >
+          {version}
+          {#if versionCopied}
+            <CheckIcon size="1em" aria-hidden="true" />
+          {:else}
+            <CopySimpleIcon size="1em" aria-hidden="true" />
+          {/if}
+        </button>
       </div>
       <p>{$i18n.t('settings.aboutTagline')}</p>
       <div class="product-actions">
@@ -277,7 +300,7 @@
 
   .product-name,
   .product-actions {
-    align-items: center;
+    align-items: baseline;
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-300);
@@ -289,7 +312,22 @@
     margin: 0;
   }
 
-  .product-name span,
+  .version-copy-button {
+    align-items: end;
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    font-size: var(--font-size-subheading);
+    gap: var(--space-150);
+    height: var(--line-height-heading);
+    line-height: var(--line-height-heading);
+    margin: 0;
+    padding: 0;
+    user-select: text;
+  }
+
+  .version-copy-button,
   p,
   .value {
     color: var(--surface-var-on-container);
