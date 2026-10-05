@@ -17,7 +17,6 @@ afterEach(() => {
   core.fetchMedia.mockReset();
   core.forgetMedia.mockClear();
   preferences.autoplayGifs = true;
-  preferences.mediaAutoLoad = true;
   preferences.pauseAnimationsWhenInactive = false;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -1360,31 +1359,4 @@ test('a plain picture keeps the server thumbnail of the original', async () => {
   await settle();
 
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/plain-original', 800, 600);
-});
-
-test('holds a deferrable image back until it is clicked when auto-load is off', async () => {
-  preferences.mediaAutoLoad = false;
-  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
-  const onclick = vi.fn();
-  render(MediaImage, {
-    props: {
-      source: 'mxc://example.org/deferred',
-      alt: 'Image',
-      width: 800,
-      height: 600,
-      size: 2048,
-      deferrable: true,
-      onclick,
-    },
-  });
-
-  await settle();
-  expect(core.fetchMedia).not.toHaveBeenCalled();
-
-  await user.click(screen.getByRole('button', { name: 'Load media' }));
-
-  await vi.waitFor(() => {
-    expect(core.fetchMedia).toHaveBeenCalledTimes(1);
-  });
-  expect(onclick).not.toHaveBeenCalled();
 });

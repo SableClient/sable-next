@@ -90,14 +90,15 @@
             {disabled}
             forceDropdown={setting.key === 'profileChangePropagation'}
             aria-label={$i18n.t(setting.name)}
-            value={preferences[key]}
+            value={setting.getValue?.() ?? preferences[key]}
             items={setting.options.map((option) => ({
               value: option.value,
               label: option.literal ? option.label : $i18n.t(option.label),
               labelClass: option.literal ? 'literal-label' : undefined,
             }))}
             onValueChange={(value) => {
-              setPreference(key, value as Preferences[typeof key]);
+              if (setting.setValue) setting.setValue(value);
+              else setPreference(key, value as Preferences[typeof key]);
               setting.onChange?.(value);
             }}
           />

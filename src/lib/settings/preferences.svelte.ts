@@ -15,6 +15,7 @@ export type { BadgeNotificationMode };
 export type ThreadPresentation = 'timeline' | 'panel';
 export type TimelineLayout = 'modern' | 'compact' | 'bubble';
 export type MessageSpacing = 'compact' | 'cozy' | 'roomy';
+export type MediaAutoLoad = 'on' | 'private' | 'off';
 export type TimelineEmoteSize = 'default' | '20' | '24' | '32' | '48' | '64';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type WeekStart = 'sunday' | 'monday' | 'saturday';
@@ -264,7 +265,7 @@ export interface Preferences {
   presenceStatusMessage: string;
   loadingAnimal: string;
 
-  mediaAutoLoad: boolean;
+  mediaAutoLoad: MediaAutoLoad;
   autoplayGifs: boolean;
   pauseAnimationsWhenInactive: boolean;
   autoplayStickers: boolean;
@@ -365,6 +366,7 @@ type EnumPreference = Exclude<
 >;
 
 const ENUMS = {
+  mediaAutoLoad: ['on', 'private', 'off'],
   language: languageValues,
   layout: ['modern', 'compact', 'bubble'],
   threadPresentation: ['timeline', 'panel'],
@@ -532,7 +534,7 @@ const DEFAULTS: Preferences = {
   presenceStatusMessage: '',
   loadingAnimal: '',
 
-  mediaAutoLoad: true,
+  mediaAutoLoad: 'on',
   autoplayGifs: true,
   pauseAnimationsWhenInactive: false,
   autoplayStickers: true,
@@ -628,7 +630,8 @@ function legacyEnterKey(value: unknown): unknown {
 export function sanitize(stored: Record<string, unknown>, base: Preferences): Preferences {
   const next = { ...base };
   for (const key of PREFERENCE_KEYS) {
-    const value = key === 'enterForNewline' ? legacyEnterKey(stored[key]) : stored[key];
+    let value = key === 'enterForNewline' ? legacyEnterKey(stored[key]) : stored[key];
+    if (key === 'mediaAutoLoad' && typeof value === 'boolean') value = value ? 'on' : 'off';
     const allowed: readonly string[] | undefined =
       key in ENUMS ? ENUMS[key as keyof typeof ENUMS] : undefined;
     if (allowed) {

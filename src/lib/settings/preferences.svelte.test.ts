@@ -7,6 +7,13 @@ import {
   withComposerSeparatorCount,
 } from './preferences.svelte.js';
 
+test.each([
+  [true, 'on'],
+  [false, 'off'],
+] as const)('migrates media loading %s as %s', (stored, expected) => {
+  expect(sanitize({ mediaAutoLoad: stored }, preferences).mediaAutoLoad).toBe(expected);
+});
+
 test('keeps the cached loading animal', () => {
   expect(sanitize({ loadingAnimal: 'otter' }, preferences).loadingAnimal).toBe('otter');
 });

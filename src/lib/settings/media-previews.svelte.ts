@@ -2,11 +2,12 @@ import type { RoomJoinRuleView } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { isRecord } from '#lib/guards.js';
+import { preferences, setPreference, type MediaAutoLoad } from './preferences.svelte.js';
 
 export const MEDIA_PREVIEW_EVENT = 'm.media_preview_config';
 export const UNSTABLE_MEDIA_PREVIEW_EVENT = 'io.element.msc4278.media_preview_config';
 
-export type MediaPreviews = 'on' | 'private' | 'off';
+export type MediaPreviews = MediaAutoLoad;
 export type InviteAvatars = 'on' | 'off';
 
 export interface MediaPreviewConfig {
@@ -49,7 +50,7 @@ class MediaPreviewSettings {
   private stopEvents: (() => void) | null = null;
 
   get mediaPreviews(): MediaPreviews {
-    return this.global.media_previews ?? 'on';
+    return this.global.media_previews ?? preferences.mediaAutoLoad;
   }
 
   get inviteAvatars(): InviteAvatars {
@@ -99,6 +100,9 @@ class MediaPreviewSettings {
     try {
       await core.commands.setAccountData(MEDIA_PREVIEW_EVENT, merged);
       await core.commands.setAccountData(UNSTABLE_MEDIA_PREVIEW_EVENT, merged);
+      if (this.global === merged && next.media_previews !== undefined) {
+        setPreference('mediaAutoLoad', next.media_previews);
+      }
     } catch (error) {
       if (this.global === merged) this.global = previous;
       throw error;
@@ -114,6 +118,9 @@ class MediaPreviewSettings {
       const content = stable ?? (await core.commands.accountData(UNSTABLE_MEDIA_PREVIEW_EVENT));
       if (generation === this.generation && read === this.reads) {
         this.global = parseMediaPreviewConfig(content);
+        if (this.global.media_previews !== undefined) {
+          setPreference('mediaAutoLoad', this.global.media_previews);
+        }
       }
     } catch (error) {
       console.debug('[sable settings] media preview settings unavailable', error);

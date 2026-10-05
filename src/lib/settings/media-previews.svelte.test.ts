@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { preferences } from './preferences.svelte.js';
 
 import {
   MEDIA_PREVIEW_EVENT,
@@ -25,6 +26,7 @@ function fakeCore(accountData: Record<string, unknown>) {
 
 afterEach(() => {
   mediaPreviewSettings.stop();
+  preferences.mediaAutoLoad = 'on';
 });
 
 test('an unknown value is treated as off, a missing one inherits', () => {
@@ -56,6 +58,7 @@ test('reads the stable type first, then the unstable one', async () => {
     expect(mediaPreviewSettings.mediaPreviews).toBe('private');
   });
   expect(mediaPreviewSettings.inviteAvatars).toBe('on');
+  expect(preferences.mediaAutoLoad).toBe('private');
 });
 
 test('writes both types so other clients see the change', async () => {
@@ -69,4 +72,16 @@ test('writes both types so other clients see the change', async () => {
     invite_avatars: 'off',
   });
   expect(mediaPreviewSettings.inviteAvatars).toBe('off');
+  preferences.mediaAutoLoad = 'off';
+  expect(mediaPreviewSettings.mediaPreviews).toBe('off');
+  await mediaPreviewSettings.set({ media_previews: 'on' });
+  expect(preferences.mediaAutoLoad).toBe('on');
+  expect(setAccountData).toHaveBeenCalledWith(MEDIA_PREVIEW_EVENT, {
+    invite_avatars: 'off',
+    media_previews: 'on',
+  });
+  expect(setAccountData).toHaveBeenCalledWith(UNSTABLE_MEDIA_PREVIEW_EVENT, {
+    invite_avatars: 'off',
+    media_previews: 'on',
+  });
 });

@@ -1,4 +1,5 @@
 import type { Component } from 'svelte';
+import i18next from 'i18next';
 import ArrowsOutLineVerticalIcon from 'phosphor-svelte/lib/ArrowsOutLineVerticalIcon';
 import AtIcon from 'phosphor-svelte/lib/AtIcon';
 import BellIcon from 'phosphor-svelte/lib/BellIcon';
@@ -67,6 +68,8 @@ import YoutubeLogoIcon from 'phosphor-svelte/lib/YoutubeLogoIcon';
 
 import { playNotificationSound } from '#lib/features/notifications/sound.js';
 import { currentLocale, setLanguage } from '#lib/i18n.js';
+import { toasts } from '#lib/ui/toasts.svelte.js';
+import { mediaPreviewSettings } from './media-previews.svelte.js';
 import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { hasNativeCalls } from '#lib/platform/calls.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
@@ -92,6 +95,7 @@ import {
 import type {
   EnterKey,
   FreeTextPreference,
+  MediaAutoLoad,
   Preferences,
   RangePreference,
 } from './preferences.svelte';
@@ -155,6 +159,8 @@ export interface SelectSetting extends BaseSetting {
   type: 'select';
   key: SelectPreference;
   options: SettingOption[];
+  getValue?: () => string;
+  setValue?: (value: string) => void;
   onChange?: (value: string) => void;
 }
 
@@ -1200,7 +1206,18 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'playback',
         icon: ImageIcon,
         name: 'settings.mediaAutoLoad',
-        type: 'boolean',
+        type: 'select',
+        options: [
+          { value: 'on', label: 'settings.mediaAutoLoadAll' },
+          { value: 'private', label: 'settings.mediaAutoLoadPrivate' },
+          { value: 'off', label: 'settings.mediaAutoLoadNever' },
+        ],
+        getValue: () => mediaPreviewSettings.mediaPreviews,
+        setValue: (value) => {
+          void mediaPreviewSettings.set({ media_previews: value as MediaAutoLoad }).catch(() => {
+            toasts.error(i18next.t('errors.actionFailed'));
+          });
+        },
       },
       {
         key: 'autoplayGifs',

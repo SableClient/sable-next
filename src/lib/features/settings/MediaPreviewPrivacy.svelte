@@ -3,9 +3,7 @@
   import {
     mediaPreviewSettings,
     type MediaPreviewConfig,
-    type MediaPreviews,
   } from '#lib/settings/media-previews.svelte.js';
-  import Select from '#lib/ui/primitives/Select.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -22,23 +20,6 @@
 </script>
 
 <ul class="settings-rows">
-  <SettingsRow
-    title={$i18n.t('settings.mediaPreviews')}
-    description={$i18n.t('settings.mediaPreviewsHint')}
-  >
-    <Select
-      value={mediaPreviewSettings.mediaPreviews}
-      aria-label={$i18n.t('settings.mediaPreviews')}
-      items={[
-        { value: 'on', label: $i18n.t('settings.mediaPreviewsOn') },
-        { value: 'private', label: $i18n.t('settings.mediaPreviewsPrivate') },
-        { value: 'off', label: $i18n.t('settings.mediaPreviewsOff') },
-      ]}
-      onValueChange={(value) => {
-        save({ media_previews: value as MediaPreviews });
-      }}
-    />
-  </SettingsRow>
   <SettingsRow title={$i18n.t('settings.inviteAvatars')} control={avatarsId}>
     <Switch
       id={avatarsId}

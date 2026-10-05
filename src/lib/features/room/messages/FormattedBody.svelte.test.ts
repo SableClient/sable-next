@@ -52,6 +52,7 @@ afterEach(() => {
   core.roomPreview.mockResolvedValue({ name: null });
   roomList.rooms = [];
   preferences.pauseAnimationsWhenInactive = false;
+  preferences.mediaAutoLoad = 'on';
   vi.restoreAllMocks();
 });
 
@@ -688,13 +689,16 @@ test('inline images wait behind a prompt where the media preview setting says so
   mediaPreviewSettings.global = {};
 });
 
-test('inline images load at once where media previews are on', async () => {
-  mediaPreviewSettings.global = { media_previews: 'private' };
+test('enabling all rooms reveals inline images without refreshing', async () => {
+  preferences.mediaAutoLoad = 'private';
   render(FormattedBodyMediaHarness, {
-    props: { html: '<img src="https://example.org/cat.png" alt="cat">', joinRule: 'invite' },
+    props: { html: '<img src="https://example.org/cat.png" alt="cat">', joinRule: 'public' },
   });
   await tick();
 
+  expect(screen.getByRole('button', { name: 'Show images' })).toBeInTheDocument();
+  preferences.mediaAutoLoad = 'on';
+  await tick();
   expect(screen.getByRole('img', { name: 'cat' })).toHaveAttribute(
     'src',
     'https://example.org/cat.png'
