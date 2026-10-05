@@ -594,9 +594,7 @@ export class CoreClient {
   }
 
   refreshUserProfile(userId: string): Promise<ProfileView> {
-    this.profileCache.delete(userId);
-    this.profileFailures.delete(userId);
-    this.profileRequests.delete(userId);
+    this.invalidateProfile(userId);
     return this.userProfile(userId, true);
   }
 

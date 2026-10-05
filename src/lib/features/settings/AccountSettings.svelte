@@ -49,7 +49,7 @@
 
   function refreshProfile(): void {
     if (!userId) return;
-    void core.userProfile(userId).then((next) => {
+    void core.refreshUserProfile(userId).then((next) => {
       profile = next;
     });
   }

@@ -64,14 +64,20 @@
     const userId = core.session?.user_id;
     if (!userId) return;
     let cancelled = false;
-    void core.userProfile(userId).then(
-      (nextProfile) => {
-        if (!cancelled) profile = nextProfile;
-      },
-      () => {}
-    );
+    const load = () =>
+      core.userProfile(userId).then(
+        (nextProfile) => {
+          if (!cancelled) profile = nextProfile;
+        },
+        () => {}
+      );
+    void load();
+    const unsubscribe = core.onProfileChanged((changed) => {
+      if (changed === userId) void load();
+    });
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   });
 
