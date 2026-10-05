@@ -52,25 +52,16 @@ test('shows progress and a cancel button while waiting', async () => {
   expect(cancel).toHaveBeenCalledOnce();
 });
 
-test('shows the active badge with its expiry and lets it be removed', async () => {
+test('shows the active badge and lets it be removed', async () => {
   supporter.badge = { label: 'Donor', expiresAt: 4102444800 };
   const remove = vi.spyOn(supporter, 'remove').mockResolvedValue();
   render(SupporterSettings);
 
   expect(screen.getByText('Supporter badge active')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /^Donor ·/ })).toBeInTheDocument();
-  expect(screen.getByText(/Valid until/)).toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
 
   expect(remove).toHaveBeenCalledOnce();
-});
-
-test('does not offer a refresh for a permanent badge', () => {
-  supporter.badge = { label: 'Donor', expiresAt: null };
-  render(SupporterSettings);
-
-  expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
-  expect(screen.queryByText(/Valid until/)).not.toBeInTheDocument();
 });
 
 test('says so when verification failed', () => {

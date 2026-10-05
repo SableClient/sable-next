@@ -16,6 +16,7 @@ import {
 
 const POLL_INTERVAL_MS = 2_000;
 const POLL_TIMEOUT_MS = 10 * 60 * 1000;
+const STEP_TIMEOUT_MS = 15_000;
 const REFRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type SupporterStatus = 'idle' | 'waiting' | 'refreshing' | 'checking' | 'none' | 'failed';
@@ -31,6 +32,17 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
       },
       { once: true }
     );
+  });
+}
+
+function withTimeout<T>(work: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('timed out'));
+    }, STEP_TIMEOUT_MS);
+    work.then(resolve, reject).finally(() => {
+      clearTimeout(timer);
+    });
   });
 }
 
@@ -99,9 +111,9 @@ class Supporter {
     try {
       const url = await startVerification(
         config.serviceUrl,
-        await core.commands.requestOpenIdToken()
+        await withTimeout(core.commands.requestOpenIdToken())
       );
-      await openExternalAuthUrl(url);
+      await withTimeout(openExternalAuthUrl(url));
 
       const deadline = Date.now() + POLL_TIMEOUT_MS;
       while (!aborted() && Date.now() < deadline) {

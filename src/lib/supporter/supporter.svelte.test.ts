@@ -119,7 +119,9 @@ test('loads customization and preserves it independently of the signed award', a
     extra: [{ key: SUPPORTER_BADGE_FIELD, value: JSON.stringify(appearance) }],
   });
   supporter.start(core);
-  await vi.waitFor(() => expect(supporter.badge?.label).toBe('Donor'));
+  await vi.waitFor(() => {
+    expect(supporter.badge?.label).toBe('Donor');
+  });
   expect(supporter.appearance).toEqual(appearance);
   const award = supporter.badge;
   await supporter.selectAppearance({ variant: 'pride', buttonColor: '#ABC' });
@@ -203,6 +205,22 @@ describe('verify', () => {
 
     expect(supporter.status).toBe('failed');
     expect(openExternalAuthUrl).not.toHaveBeenCalled();
+  });
+
+  test('fails instead of waiting forever when the browser launch never answers', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(openExternalAuthUrl).mockReturnValueOnce(new Promise(() => {}));
+    const { stub, core } = makeCore(null);
+    supporter.start(core);
+    await vi.waitFor(() => {
+      expect(stub.userProfile).toHaveBeenCalled();
+    });
+
+    const done = supporter.verify();
+    await vi.advanceTimersByTimeAsync(20_000);
+    await done;
+
+    expect(supporter.status).toBe('failed');
   });
 
   test('ignores an award it already holds', async () => {

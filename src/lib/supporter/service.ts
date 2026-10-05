@@ -13,8 +13,13 @@ export class SupporterServiceError extends Error {
   }
 }
 
+const REQUEST_TIMEOUT_MS = 15_000;
+
 async function request(serviceUrl: string, path: string, init?: RequestInit): Promise<unknown> {
-  const response = await fetch(`${serviceUrl}${path}`, init);
+  const response = await fetch(`${serviceUrl}${path}`, {
+    ...init,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
   if (!response.ok) throw new SupporterServiceError(response.status);
   return response.json();
 }

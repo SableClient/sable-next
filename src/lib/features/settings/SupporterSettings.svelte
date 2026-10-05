@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { currentLocale, i18n } from '#lib/i18n.js';
+  import { i18n } from '#lib/i18n.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { supporter } from '#lib/supporter/supporter.svelte.js';
   import SupporterBadge from '#lib/supporter/SupporterBadge.svelte';
@@ -13,13 +13,6 @@
   let name = $derived(core.session?.user_id.split(':', 1)[0]);
 
   let badge = $derived(supporter.badge);
-  let validUntil = $derived(
-    badge?.expiresAt
-      ? new Intl.DateTimeFormat(currentLocale(), { dateStyle: 'medium' }).format(
-          badge.expiresAt * 1000
-        )
-      : null
-  );
   let waiting = $derived(supporter.status === 'waiting');
   let refreshing = $derived(supporter.status === 'refreshing');
   let checking = $derived(supporter.status === 'checking');
@@ -38,24 +31,8 @@
 <SettingsSection title={$i18n.t('settings.supporterTitle')} headingId="about-supporter">
   <ul class="settings-rows">
     {#if badge}
-      <SettingsRow
-        id="supporter-active"
-        title={$i18n.t('settings.supporterActive')}
-        description={validUntil
-          ? $i18n.t('settings.supporterValidUntil', { date: validUntil })
-          : ''}
-      >
+      <SettingsRow id="supporter-active" title={$i18n.t('settings.supporterActive')}>
         <SupporterBadge label={badge.label} {name} isOwnBadge {...supporter.appearance} />
-        {#if badge.expiresAt}
-          <Button
-            size="small"
-            loading={refreshing}
-            disabled={supporter.removing}
-            onclick={() => void supporter.refresh()}
-          >
-            {$i18n.t('settings.supporterRefresh')}
-          </Button>
-        {/if}
         <Button
           size="small"
           loading={supporter.removing}
