@@ -989,3 +989,16 @@ test('a table cell keeps its line breaks and pills in the body', () => {
 
   expect(serializeComposer(doc).body).toBe('| h |\n| --- |\n| a b Alice |');
 });
+
+test('a non-breaking space after a list dash still starts a list', () => {
+  const { doc, paragraph, hard_break: hardBreak } = composerSchema.nodes;
+  const line = (text: string) => composerSchema.text(text);
+  const message = serializePlain(
+    doc.create(
+      null,
+      paragraph.create(null, [line('-\u00a0test'), hardBreak.create(), line('- test')])
+    )
+  );
+  expect(message.body).toBe('- test\n- test');
+  expect(message.formatted).toBe('<ul><li>test</li><li>test</li></ul>');
+});

@@ -698,7 +698,7 @@ function spliceAtoms(node: ProseMirrorNode, atoms: ProseMirrorNode[]): ProseMirr
 
 /** Plain-text mode: what was typed is the body, parsed as markdown for the HTML. */
 export function serializePlain(doc: ProseMirrorNode): ComposerMessage {
-  const body = plainTextOf(doc).trim();
+  const body = plainTextOf(doc).replaceAll('\u00a0', ' ').trim();
   const mentions = mentionsOf(doc);
   const imageSourcePacks = imageSourcePacksOf(doc);
   if (body === '')
@@ -711,7 +711,9 @@ export function serializePlain(doc: ProseMirrorNode): ComposerMessage {
 
   const { source, atoms } = markdownSourceOf(doc);
   const parsed = linkMscs(
-    withoutTrailingParagraph(flattenRoomPings(spliceAtoms(parseMarkdown(source.trim()), atoms)))
+    withoutTrailingParagraph(
+      flattenRoomPings(spliceAtoms(parseMarkdown(source.replaceAll('\u00a0', ' ').trim()), atoms))
+    )
   );
   return {
     body,
