@@ -130,6 +130,13 @@
   function logout(): void {
     void signOut.request(() => logoutWithPush(core, pushOverride()));
   }
+
+  function openStatusEdit(): void {
+    void goto(resolve('settings/account?editStatus'), {
+      shallow: true,
+      state: { settings: { section: 'account' } },
+    });
+  }
 </script>
 
 {#snippet ownAvatar()}
@@ -190,7 +197,26 @@
         statusEmoji={userStatus?.emoji}
         nameColorLight={activeProfile?.name_color_light}
         nameColorDark={activeProfile?.name_color_dark}
-      />
+      >
+        {#snippet statusField()}
+          <button
+            type="button"
+            class="account-profile-status-button"
+            onclick={openStatusEdit}
+            aria-label={$i18n.t('nav.editStatus')}
+          >
+            <p class="account-profile-status-text explicit-scrollbar" role="region">
+              {#if userStatus?.emoji}<span class="account-profile-status-emoji"
+                  >{userStatus?.emoji}</span
+                >{/if}
+              {#if userStatus?.text}{userStatus?.text}{:else}<span
+                  class="account-profile-status-placeholder"
+                  >{$i18n.t('settings.statusPlaceholder')}</span
+                >{/if}
+            </p>
+          </button>
+        {/snippet}
+      </ProfileCard>
       <AccountMenuItems
         accounts={core.accounts}
         profiles={accountProfiles}
@@ -268,5 +294,64 @@
   .logout-dialog h2,
   .logout-dialog p {
     margin: 0;
+  }
+
+  .account-profile-status-text {
+    -webkit-box-orient: vertical;
+    box-orient: vertical;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    margin: 0;
+    max-height: var(--space-1000);
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    overscroll-behavior: contain;
+    padding: 0;
+  }
+
+  :global(.account-profile-header .profile-card-status) {
+    padding: 0;
+  }
+
+  :global(.account-profile-header .profile-card-status):has(.account-profile-status-button:hover) {
+    filter: brightness(1.1);
+    translate: 0 -1px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    :global(html:not([data-reduced-motion='on']) .account-profile-header .profile-card-status) {
+      transition:
+        filter var(--motion-normal) var(--motion-easing-standard),
+        translate var(--motion-fast) var(--ease-smooth-out);
+    }
+  }
+
+  .account-profile-status-button {
+    background: none;
+    border: 1px transparent solid;
+    border-radius: var(--radius);
+    color: inherit;
+    cursor: pointer;
+    display: inline-block;
+    min-width: var(--space-700);
+    padding: var(--space-200);
+  }
+
+  .account-profile-status-text:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+
+  .account-profile-status-placeholder {
+    opacity: 0.5;
+  }
+
+  :global(.account-profile-header .profile-card-status:hover .account-profile-status-text),
+  :global(.account-profile-header .profile-card-status:focus-within .account-profile-status-text) {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow-y: auto;
   }
 </style>
