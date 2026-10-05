@@ -329,6 +329,13 @@ impl Core {
             return layer;
         }
 
+        let fetch = self.cosmetics_fetch_lock(room.room_id());
+        let _fetching = fetch.lock().await;
+        let cached = self.cosmetics_cache().get(room.room_id());
+        if let Some(layer) = cached {
+            return layer;
+        }
+
         match client
             .send(get_state_events::v3::Request::new(
                 room.room_id().to_owned(),
@@ -351,6 +358,15 @@ impl Core {
                 stored_layer(room).await.unwrap_or_default()
             }
         }
+    }
+
+    fn cosmetics_fetch_lock(&self, room_id: &RoomId) -> Arc<tokio::sync::Mutex<()>> {
+        let mut locks = self
+            .cosmetics_fetches
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        locks.retain(|_, lock| Arc::strong_count(lock) > 1);
+        locks.entry(room_id.to_owned()).or_default().clone()
     }
 
     fn cosmetics_cache(&self) -> std::sync::MutexGuard<'_, CosmeticsCache> {
@@ -657,6 +673,35 @@ mod tests {
             assert_eq!(found.users[0].color_on_light.as_deref(), Some("#123456"));
             assert_eq!(found.users[0].pronouns, [pronoun("they/them", Some("en"))]);
         }
+    }
+
+    #[tokio::test]
+    async fn concurrent_reads_of_one_room_share_a_single_fetch() {
+        let server = MatrixMockServer::new().await;
+        let room_id = room_id!("!room:example.org");
+        let space_id = room_id!("!space:example.org");
+        let client = joined(&server, &[room_id, space_id]).await;
+        let (core, _events) = Core::new("cosmetics", Box::new(MemorySessionStore::default()));
+        serve_state(
+            &server,
+            room_id,
+            json!([state(COLOR_EVENT, ALICE, &json!({ "color": "#123456" }))]),
+            1,
+        )
+        .await;
+        serve_state(&server, space_id, json!([]), 1).await;
+        let room = client.get_room(room_id).unwrap();
+
+        let found = futures_util::future::join_all(
+            (0..5).map(|_| core.cosmetics_for(&client, &room, Some(space_id.to_owned()))),
+        )
+        .await;
+
+        assert!(
+            found
+                .iter()
+                .all(|view| view.users[0].color_on_light.as_deref() == Some("#123456"))
+        );
     }
 
     #[tokio::test]
