@@ -254,11 +254,13 @@
 }
 
 .composer-row.short .editor {
-  padding: var(--space-100) var(--space-200);
+  --editor-padding-block: max(var(--space-100), calc((var(--target) - 1lh) / 2));
+
+  padding: var(--editor-padding-block) var(--space-200);
 }
 
 .composer-row.short .editor::before {
-  top: var(--space-100);
+  top: var(--editor-padding-block);
 }
 
 @media (any-pointer: fine) {
