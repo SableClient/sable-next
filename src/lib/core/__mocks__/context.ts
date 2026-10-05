@@ -13,6 +13,9 @@ export function createCoreStub<T extends Record<string, unknown>>(overrides = {}
     userProfile: vi.fn<(...args: never[]) => Promise<unknown>>(() =>
       Promise.reject(new Error('profile unavailable'))
     ),
+    refreshUserProfile: vi.fn<(...args: never[]) => Promise<unknown>>(() =>
+      Promise.reject(new Error('profile unavailable'))
+    ),
     roomPermissions: vi.fn<(...args: never[]) => Promise<unknown>>(pending),
     roomStateEvent: vi.fn<(...args: never[]) => Promise<unknown>>(() => Promise.resolve(null)),
     roomViaServers: vi.fn<(...args: never[]) => Promise<string[]>>(() => Promise.resolve([])),

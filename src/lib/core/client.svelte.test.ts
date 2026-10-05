@@ -1351,3 +1351,43 @@ test('a stale login callback that fails does not discard the first status read',
   expect(core.status).toBe('ready');
   core.stop();
 });
+
+test('refreshing a profile skips the cached copy and refills it', async () => {
+  const fake = fakeTransport();
+  const core = createCoreClient(() => fake.transport);
+  fake.send
+    .mockResolvedValueOnce({ profile: { display_name: 'stale' } })
+    .mockResolvedValueOnce({ profile: { display_name: 'live' } });
+  try {
+    await core.userProfile('@remote:example.org');
+    await expect(core.refreshUserProfile('@remote:example.org')).resolves.toEqual({
+      display_name: 'live',
+    });
+    await expect(core.userProfile('@remote:example.org')).resolves.toEqual({
+      display_name: 'live',
+    });
+    expect(fake.send).toHaveBeenCalledTimes(2);
+  } finally {
+    core.stop();
+  }
+});
+
+test('writing a profile field invalidates the cached profile', async () => {
+  vi.useFakeTimers();
+  const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(() => fake.transport);
+  const listener = vi.fn();
+  try {
+    await core.start();
+    core.onProfileChanged(listener);
+    await core.userProfile(session.user_id);
+    await core.setProfileField('displayname', 'new');
+    await vi.advanceTimersByTimeAsync(500);
+    expect(listener).toHaveBeenCalledExactlyOnceWith(session.user_id);
+    await core.userProfile(session.user_id);
+    expect(fake.sent.filter((command) => command.type === 'user_profile')).toHaveLength(2);
+  } finally {
+    core.stop();
+    vi.useRealTimers();
+  }
+});

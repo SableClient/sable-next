@@ -593,6 +593,13 @@ export class CoreClient {
     return () => this.profileChangeListeners.delete(listener);
   }
 
+  refreshUserProfile(userId: string): Promise<ProfileView> {
+    this.profileCache.delete(userId);
+    this.profileFailures.delete(userId);
+    this.profileRequests.delete(userId);
+    return this.userProfile(userId, true);
+  }
+
   private invalidateProfile(userId: string): void {
     this.profileCache.delete(userId);
     this.profileFailures.delete(userId);
@@ -827,8 +834,8 @@ export class CoreClient {
       field,
       value,
     });
-    this.profileCache.delete(this.session?.user_id ?? '');
-    this.profileFailures.delete(this.session?.user_id ?? '');
+    const userId = this.session?.user_id;
+    if (userId) this.invalidateProfile(userId);
   }
 
   async uploadRoomAvatar(
