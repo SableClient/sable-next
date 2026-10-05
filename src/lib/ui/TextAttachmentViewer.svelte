@@ -178,7 +178,7 @@
     line-height: var(--code-line-height);
     margin: 0;
     max-height: 12rem;
-    overflow: hidden;
+    overflow: auto hidden;
     padding: var(--space-200);
     white-space: pre;
   }
