@@ -1151,6 +1151,12 @@
       -webkit-touch-callout: none;
       user-select: none;
     }
+
+    .message :global(.formatted-body),
+    .message :global(pre),
+    .message :global(code) {
+      user-select: none;
+    }
   }
 
   .message {
