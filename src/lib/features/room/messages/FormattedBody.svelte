@@ -696,9 +696,6 @@
   .formatted-body {
     /* Relative so inline code keeps its ratio inside a heading too. */
     --inline-code-scale: 0.9em;
-
-    max-width: 100%;
-    min-width: 0;
   }
 
   .formatted-body,
