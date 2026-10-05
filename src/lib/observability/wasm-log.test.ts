@@ -27,6 +27,15 @@ describe('wasmErrorTitle', () => {
     expect(title).not.toContain('$abcdefghijkl');
     expect(title).not.toContain('@alice:example.org');
   });
+
+  test('keeps a multi-line pretty-printed error on one line', () => {
+    const title = wasmErrorTitle(
+      'ERROR matrix_sdk_ui::sync_service: Error while processing room list: Some(\n    Http(\n        Timeout,\n    ),\n)'
+    );
+    expect(title).toBe(
+      'matrix_sdk_ui::sync_service: Error while processing room list: Some( Http( Timeout, ), )'
+    );
+  });
 });
 
 describe('wasmErrorFingerprint', () => {

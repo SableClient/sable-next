@@ -1,6 +1,6 @@
 import { scrubMatrixIds } from './scrubbers';
 
-const TITLE_LIMIT = 240;
+const TITLE_LIMIT = 600;
 
 export type WasmLogLevel = 'error' | 'warn' | 'info';
 
@@ -12,7 +12,12 @@ export function wasmLogLevel(line: string): WasmLogLevel {
 }
 
 export function wasmErrorTitle(line: string): string {
-  const message = scrubMatrixIds(line.replace(/^\s*ERROR\s+/, '').trim());
+  const message = scrubMatrixIds(
+    line
+      .replace(/^\s*ERROR\s+/, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
   return message.length > TITLE_LIMIT ? `${message.slice(0, TITLE_LIMIT)}…` : message;
 }
 
