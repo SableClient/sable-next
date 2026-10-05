@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, untrack } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
 
   import type {
     BrightnessView,
@@ -210,6 +210,17 @@
       setAvatar(null);
       editKey = undefined;
     });
+  });
+
+  onMount(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('editStatus') !== null) {
+      const accountStatusInput = document.getElementById('account-status');
+      if (accountStatusInput && accountStatusInput instanceof HTMLInputElement) {
+        accountStatusInput.focus();
+        accountStatusInput.select();
+      }
+    }
   });
 
   onDestroy(() => {
