@@ -763,10 +763,25 @@ async fn distributor_gateway(
     if !is_direct_unified_push(registration, config) {
         return None;
     }
+    discover_gateway(core, &registration.token).await
+}
+
+#[cfg(mobile)]
+async fn discover_gateway(core: &Arc<sable_core::Core>, endpoint: &str) -> Option<String> {
     let command = sable_core::protocol::Command::DiscoverPushGateway {
-        endpoint: registration.token.clone(),
+        endpoint: endpoint.to_owned(),
     };
     gateway_from_response(Box::pin(core.dispatch(command)).await)
+}
+
+/// A homeserver advertising MSC4174 would otherwise take a reader who chose a
+/// UnifiedPush distributor, whose own Matrix gateway delivers without the
+/// homeserver's web push.
+#[cfg(any(mobile, test))]
+fn prefers_distributor_gateway(config: &PushConfig, registration: &Registration) -> bool {
+    config.provider.as_deref() == Some("unifiedpush")
+        && !config.gateway_override
+        && is_unified_push_endpoint(&registration.token)
 }
 
 #[cfg(any(mobile, test))]
@@ -825,11 +840,15 @@ async fn register_with_distributor<R: Runtime>(
         server_vapid.map_or_else(|| config.vapid_key.clone(), str::to_owned),
     ))
     .await?;
-    if server_vapid.is_none()
-        && distributor_gateway(core, &registration, config)
+    let hosts_gateway = if server_vapid.is_some() {
+        prefers_distributor_gateway(config, &registration)
+            && discover_gateway(core, &registration.token).await.is_some()
+    } else {
+        distributor_gateway(core, &registration, config)
             .await
             .is_some()
-    {
+    };
+    if hosts_gateway {
         return register(None).await;
     }
     Ok(registration)
@@ -1120,6 +1139,29 @@ mod tests {
         registration.auth = None;
         registration.token = "fcm-token".to_owned();
         assert!(!super::is_direct_unified_push(&registration, &config));
+    }
+
+    #[test]
+    fn only_a_chosen_unifiedpush_distributor_displaces_msc4174_for_its_gateway() {
+        let mut config: super::PushConfig = serde_json::from_value(serde_json::json!({
+            "gateway_url": "https://sygnal.example/_matrix/push/v1/notify",
+            "vapid_key": "key", "web_app_id": "web", "event_id_only": true,
+            "provider": "unifiedpush",
+        }))
+        .expect("push config");
+        let registration = Registration {
+            token: "https://ntfy.example/topic".to_owned(),
+            p256dh: Some("key".to_owned()),
+            auth: Some("auth".to_owned()),
+        };
+        assert!(super::prefers_distributor_gateway(&config, &registration));
+        config.provider = Some("embedded".to_owned());
+        assert!(!super::prefers_distributor_gateway(&config, &registration));
+        config.provider = Some("auto".to_owned());
+        assert!(!super::prefers_distributor_gateway(&config, &registration));
+        config.provider = Some("unifiedpush".to_owned());
+        config.gateway_override = true;
+        assert!(!super::prefers_distributor_gateway(&config, &registration));
     }
 
     #[test]
