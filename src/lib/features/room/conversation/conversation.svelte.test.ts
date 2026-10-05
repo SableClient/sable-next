@@ -54,12 +54,17 @@ function setup(
       toggleReaction,
     },
   } as unknown as CoreClient;
-  const personas = {
+  const stub = {
     personas: [],
     selectionFor: () => null,
     disabledIn: () => false,
     select: () => Promise.resolve(),
     ...store,
+  };
+  const personas = {
+    ...stub,
+    associationFor: (id: string) =>
+      stub.disabledIn(id) ? false : (stub.selectionFor(id) ?? undefined),
   } as unknown as PersonaStore;
   const timeline = { items, aggregations: [], subscriptionId: 7 } as unknown as RoomTimeline;
 

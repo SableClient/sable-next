@@ -4,7 +4,7 @@ import type { PersonaSelectionView, PersonaView } from '#src/generated/protocol'
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
-import { reorderPersonas } from './persona.js';
+import { reorderPersonas, type PersonaAssociation } from './persona.js';
 
 export class PersonaStore {
   personas = $state.raw<PersonaView[]>([]);
@@ -80,6 +80,10 @@ export class PersonaStore {
 
   selectionFor(roomId: string | null): PersonaSelectionView | null {
     return roomId === null ? this.account : (this.rooms[roomId] ?? null);
+  }
+
+  associationFor(roomId: string): PersonaAssociation {
+    return this.disabledIn(roomId) ? false : (this.rooms[roomId] ?? undefined);
   }
 
   disabledIn(roomId: string): boolean {

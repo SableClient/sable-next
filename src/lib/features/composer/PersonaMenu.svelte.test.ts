@@ -73,5 +73,25 @@ test('offers the space tab only when the room is in a space', () => {
     'true'
   );
   expect(screen.getByText('personas.pickerNone')).toBeInTheDocument();
+  expect(screen.getByText('personas.pickerOffSpace')).toBeInTheDocument();
   expect(screen.queryByText('personas.pickerOff')).toBeNull();
+});
+
+test('a space that is off marks its off option and not the default', () => {
+  render(PersonaMenu, {
+    personas: [],
+    selected: null,
+    disabled: true,
+    scope: 'space',
+    hasSpace: true,
+    onScope: vi.fn(),
+    onChoose: vi.fn(),
+    onDisable: vi.fn(),
+  });
+
+  const off = screen.getByRole('button', { name: 'personas.pickerOffSpace' });
+  expect(off.querySelectorAll('svg')).toHaveLength(2);
+  expect(
+    screen.getByRole('button', { name: 'personas.pickerNone' }).querySelectorAll('svg')
+  ).toHaveLength(0);
 });

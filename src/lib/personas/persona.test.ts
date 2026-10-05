@@ -178,6 +178,28 @@ describe('resolvePersona', () => {
     ).toBe('Kris');
   });
 
+  it('stops at a room or space that is off, and takes a proxy with it', () => {
+    const account = { persona_id: 'Kris', valid_until: null };
+    const space = { persona_id: 'Robin', valid_until: null };
+    expect(
+      resolvePersona({ personas, spaces: [false, space], account, now: 1000 })
+    ).toBeUndefined();
+    expect(
+      resolvePersona({ personas, proxied: robin, spaces: [false], account, now: 1000 })
+    ).toBeUndefined();
+    expect(resolvePersona({ personas, room: false, spaces: [space], now: 1000 })).toBeUndefined();
+  });
+
+  it('lets a room selection override a space that is off', () => {
+    const resolved = resolvePersona({
+      personas,
+      room: { persona_id: 'Robin', valid_until: null },
+      spaces: [false],
+      now: 1000,
+    });
+    expect(resolved?.id).toBe('Robin');
+  });
+
   it('ignores a selection pointing at a deleted persona', () => {
     const resolved = resolvePersona({
       personas,

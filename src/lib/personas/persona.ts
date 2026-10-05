@@ -44,6 +44,8 @@ function live(selection: PersonaSelectionView | undefined, now: number): boolean
   return selection.valid_until === null || selection.valid_until > now;
 }
 
+export type PersonaAssociation = PersonaSelectionView | false | undefined;
+
 export function resolvePersona({
   personas,
   proxied,
@@ -54,19 +56,19 @@ export function resolvePersona({
 }: {
   personas: readonly PersonaView[];
   proxied?: PersonaView | undefined;
-  room?: PersonaSelectionView | undefined;
-  spaces?: readonly (PersonaSelectionView | undefined)[];
+  room?: PersonaAssociation;
+  spaces?: readonly PersonaAssociation[];
   account?: PersonaSelectionView | undefined;
   now: number;
 }): PersonaView | undefined {
-  if (proxied) return proxied;
-
+  let inherited: PersonaView | undefined;
   for (const selection of [room, ...spaces, account]) {
+    if (selection === false) return undefined;
     if (!live(selection, now)) continue;
-    const selected = personaById(personas, selection?.persona_id);
-    if (selected) return selected;
+    inherited = personaById(personas, selection?.persona_id);
+    if (inherited) break;
   }
-  return undefined;
+  return proxied ?? inherited;
 }
 
 export interface ProxyMatch {

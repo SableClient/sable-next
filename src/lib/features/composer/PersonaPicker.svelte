@@ -7,7 +7,7 @@
   import { page } from '$app/state';
   import MessageReproxyDialog from '#lib/features/room/messages/MessageReproxyDialog.svelte';
   import { i18n } from '#lib/i18n.js';
-  import { personaById } from '#lib/personas/persona.js';
+  import { resolvePersona } from '#lib/personas/persona.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
@@ -43,13 +43,15 @@
   let spaces = $derived(personaSpaces(roomList.rooms, roomId, page.params.spaceId));
   let scopeTarget = $derived(scope === 'room' ? roomId : scope === 'space' ? spaces.target : null);
   let selected = $derived(personas.selectionFor(scopeTarget));
-  let disabled = $derived(personas.disabledIn(roomId));
+  let disabled = $derived(scopeTarget !== null && personas.disabledIn(scopeTarget));
   let active = $derived(
-    disabled
-      ? null
-      : ([roomId, ...spaces.order, null]
-          .map((id) => personaById(personas.personas, personas.selectionFor(id)?.persona_id))
-          .find((persona) => persona !== undefined) ?? null)
+    resolvePersona({
+      personas: personas.personas,
+      room: personas.associationFor(roomId),
+      spaces: spaces.order.map((id) => personas.associationFor(id)),
+      account: personas.selectionFor(null) ?? undefined,
+      now: Date.now(),
+    }) ?? null
   );
   let shown = $derived(edit ? edit.current : active);
   let label = $derived(
@@ -86,7 +88,8 @@
 
   function disable(): void {
     open = false;
-    personas.disable(roomId).catch((cause: unknown) => {
+    if (scopeTarget === null) return;
+    personas.disable(scopeTarget).catch((cause: unknown) => {
       console.warn('[sable personas] the selection could not be saved', cause);
       toasts.error($i18n.t('errors.actionFailed'));
     });

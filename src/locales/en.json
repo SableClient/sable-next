@@ -3145,6 +3145,7 @@
     "pickerLabel": "Send as",
     "pickerNone": "Default",
     "pickerOff": "No profile in this room",
+    "pickerOffSpace": "No profile in this space",
     "pickerOffGlobal": "No profile",
     "pickerHeading": "Send as",
     "scopeRoom": "This room",

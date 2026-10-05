@@ -36,7 +36,6 @@
     onChoose,
     onDisable,
   }: Props = $props();
-  let off = $derived(scope === 'room' && disabled);
   let query = $state('');
   let filteredPersonas = $derived(
     personas.filter((persona) => {
@@ -98,7 +97,7 @@
         >
           <Avatar size="small"><ProhibitIcon /></Avatar>
           <span class="persona-option-name">{$i18n.t('personas.pickerOffGlobal')}</span>
-          {#if !selected && !off}<CheckIcon />{/if}
+          {#if !selected && !disabled}<CheckIcon />{/if}
         </button>
       </li>
     {/if}
@@ -113,16 +112,18 @@
         >
           <Avatar initials="?" size="small" />
           <span class="persona-option-name">{$i18n.t('personas.pickerNone')}</span>
-          {#if !selected && !off}<CheckIcon />{/if}
+          {#if !selected && !disabled}<CheckIcon />{/if}
         </button>
       </li>
     {/if}
-    {#if scope === 'room'}
+    {#if scope === 'room' || scope === 'space'}
       <li>
         <button type="button" class="persona-option" onclick={onDisable}>
           <Avatar size="small"><ProhibitIcon /></Avatar>
-          <span class="persona-option-name">{$i18n.t('personas.pickerOff')}</span>
-          {#if off}<CheckIcon />{/if}
+          <span class="persona-option-name"
+            >{$i18n.t(scope === 'room' ? 'personas.pickerOff' : 'personas.pickerOffSpace')}</span
+          >
+          {#if disabled}<CheckIcon />{/if}
         </button>
       </li>
     {/if}

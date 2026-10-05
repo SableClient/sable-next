@@ -636,13 +636,12 @@ export class Conversation {
     formatted: string | null
   ): { body: string; formatted: string | null; persona: PerMessageProfileView | null } {
     const personas = this.#personas;
-    if (personas.disabledIn(targetRoomId)) return { body, formatted, persona: null };
     const proxied = preferences.personaProxying ? resolveProxy(personas.personas, body) : undefined;
     const persona = resolvePersona({
       personas: personas.personas,
       proxied: proxied?.persona,
-      room: personas.selectionFor(targetRoomId) ?? undefined,
-      spaces: this.#spaceIds(targetRoomId).map((id) => personas.selectionFor(id) ?? undefined),
+      room: personas.associationFor(targetRoomId),
+      spaces: this.#spaceIds(targetRoomId).map((id) => personas.associationFor(id)),
       account: personas.selectionFor(null) ?? undefined,
       now: Date.now(),
     });
