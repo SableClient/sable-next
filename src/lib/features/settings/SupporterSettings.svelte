@@ -36,7 +36,7 @@
 </script>
 
 <SettingsSection title={$i18n.t('settings.supporterTitle')} headingId="about-supporter">
-  <ul class="settings">
+  <ul class="settings-rows">
     {#if badge}
       <SettingsRow
         id="supporter-active"
