@@ -1,6 +1,9 @@
 <script lang="ts">
   import PronounPill from '#lib/ui/primitives/PronounPill.svelte';
-  import type { PerMessageProfileView } from '#src/generated/protocol';
+  import type { PerMessageProfileView, ProfileView } from '#src/generated/protocol';
+  import { useCoreClient } from '#lib/core/context.js';
+  import UserSupporterBadge from '#lib/supporter/UserSupporterBadge.svelte';
+  import { profileSupporterAppearance } from '#lib/supporter/variants.js';
 
   import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -13,6 +16,7 @@
     profile: PerMessageProfileView;
     accountId: string;
     accountName: string;
+    accountProfile?: ProfileView | null;
     variant?: 'popover' | 'sheet';
     onOpenAccount?: () => void;
     onAvatarClick?: (source: string, displayName: string) => void;
@@ -22,10 +26,13 @@
     profile,
     accountId,
     accountName,
+    accountProfile = null,
     variant = 'popover',
     onOpenAccount,
     onAvatarClick,
   }: Props = $props();
+  const core = useCoreClient();
+  let ownerProfile = $derived(accountProfile?.user_id === accountId ? accountProfile : null);
   let displayName = $derived(profile.display_name ?? accountName);
   let accountLabel = $derived(displayName === accountName ? accountId : accountName);
 </script>
@@ -45,6 +52,16 @@
     {#if preferences.showPronouns && profile.pronouns.length > 0}
       <PronounPill pronouns={profile.pronouns} class="persona-profile-pronoun-pill" />
     {/if}
+    {#if ownerProfile?.supporter_awards}
+      <UserSupporterBadge
+        userId={accountId}
+        awards={ownerProfile.supporter_awards}
+        name={displayName}
+        isOwnBadge={core.session?.user_id === accountId}
+        class="persona-profile-supporter-badge"
+        {...profileSupporterAppearance(ownerProfile.extra)}
+      />
+    {/if}
   {/snippet}
   {#snippet actions()}
     {#if onOpenAccount}
@@ -54,6 +71,12 @@
 </ProfileCard>
 
 <style>
+  :global(.persona-profile-supporter-badge) {
+    align-self: center;
+    margin-inline: auto calc(-1 * var(--space-100));
+    order: 1;
+  }
+
   :global(.persona-profile-pronoun-pill) {
     --profile-text-muted: color-mix(in oklab, var(--sec-main) 55%, var(--bg-on-container));
 

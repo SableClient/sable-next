@@ -1514,8 +1514,12 @@
   "supporter": {
     "donor": "Donor",
     "badgeDescription": "{{name}} helps fund Sable's development, you can too.",
+    "badgeDonorDescription": "{{name}} helps fund Sable's development, just like you. Thank you!",
+    "badgeOwnDescription": "Thank you for helping fund Sable's development!",
     "badgeDonate": "Donate to Sable",
+    "badgeDonateAgain": "Support Sable",
     "badgeHint": "Any amount earns a badge, even $1!",
+    "badgeDonorHint": "Thanks for making Sable possible.",
     "chooseBadge": "Choose your donor badge",
     "chooseBadgeHint": "Pick a Sable to display on your profile.",
     "backgroundShape": "Badge background shape",

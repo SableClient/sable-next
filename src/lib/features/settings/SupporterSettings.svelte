@@ -45,7 +45,7 @@
           ? $i18n.t('settings.supporterValidUntil', { date: validUntil })
           : ''}
       >
-        <SupporterBadge label={badge.label} {name} {...supporter.appearance} />
+        <SupporterBadge label={badge.label} {name} isOwnBadge {...supporter.appearance} />
         {#if badge.expiresAt}
           <Button
             size="small"

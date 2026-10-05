@@ -16,6 +16,7 @@
     args: {
       label: 'Donor',
       name: 'Alex',
+      viewerIsDonor: false,
       ...supporterAppearance(),
     },
     argTypes: {
@@ -34,6 +35,14 @@
 </script>
 
 <Story name="Playground" />
+
+<Story name="Already donated" asChild>
+  <SupporterBadge label="Donor" name="Alex" viewerIsDonor />
+</Story>
+
+<Story name="Own badge" asChild>
+  <SupporterBadge label="Donor" name="Alex" isOwnBadge />
+</Story>
 
 <Story name="Variants" asChild>
   <div class="row">

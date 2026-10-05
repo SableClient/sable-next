@@ -66,7 +66,7 @@
         />
       {/each}
     </div>
-    <SupporterBadge label={$i18n.t('supporter.donor')} name={donorName} {...draft} />
+    <SupporterBadge label={$i18n.t('supporter.donor')} name={donorName} isOwnBadge {...draft} />
   </div>
 {/snippet}
 

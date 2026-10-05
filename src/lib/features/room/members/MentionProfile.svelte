@@ -88,6 +88,7 @@
         accountId={userId}
         accountName={member?.display_name ?? ''}
         profile={pmp}
+        accountProfile={profile}
         onOpenAccount={onOpenMainAccount}
         {onAvatarClick}
         variant={sheet ? 'sheet' : 'popover'}

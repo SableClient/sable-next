@@ -22,11 +22,7 @@ export class MemberProfile {
   }
 
   showPmp(userId: string, anchor: HTMLElement, pmp: PerMessageProfileView): void {
-    this.userId = userId;
-    this.anchor = anchor;
-    this.open = true;
-    this.failed = false;
-    this.profile = null;
+    void this.show(userId, anchor);
     this.pmp = pmp;
   }
 

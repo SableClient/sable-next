@@ -408,6 +408,7 @@
       {userId}
       awards={currentProfile.supporter_awards}
       name={displayName}
+      isOwnBadge={isSelf}
       class="profile-supporter-badge"
       {...profileSupporterAppearance(currentProfile.extra)}
     />

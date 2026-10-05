@@ -10,6 +10,7 @@
     userId: string;
     awards: string | null;
     name?: string;
+    isOwnBadge?: boolean;
     class?: ClassValue;
   };
 

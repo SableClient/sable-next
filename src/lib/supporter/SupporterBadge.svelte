@@ -9,6 +9,7 @@
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
 
   import SupporterMark from './SupporterMark.svelte';
+  import { supporter } from './supporter.svelte.js';
   import {
     supporterAppearance,
     supporterButtonText,
@@ -20,10 +21,21 @@
     label: string;
     name?: string;
     title?: string;
+    viewerIsDonor?: boolean;
+    isOwnBadge?: boolean;
     class?: ClassValue;
   };
 
-  let { label, name, title, class: className = '', ...appearance }: Props = $props();
+  let {
+    label,
+    name,
+    title,
+    viewerIsDonor,
+    isOwnBadge = false,
+    class: className = '',
+    ...appearance
+  }: Props = $props();
+  let donated = $derived(viewerIsDonor ?? (isOwnBadge || Boolean(supporter.badge)));
   let selected = $derived(supporterAppearance(appearance));
   let { variant, color, customCardColors, cardColor, buttonColor } = $derived(selected);
   const id = $props.id();
@@ -113,7 +125,16 @@
         <SupporterMark {...selected} />
       </div>
       <h2 id={`${id}-heading`}>{label}</h2>
-      <p id={`${id}-description`}>{$i18n.t('supporter.badgeDescription', { name: donorName })}</p>
+      <p id={`${id}-description`}>
+        {$i18n.t(
+          isOwnBadge
+            ? 'supporter.badgeOwnDescription'
+            : donated
+              ? 'supporter.badgeDonorDescription'
+              : 'supporter.badgeDescription',
+          { name: donorName }
+        )}
+      </p>
       <LinkButton
         href={SABLE_DONATE_URL}
         target="_blank"
@@ -122,9 +143,11 @@
         class="supporter-card-donate"
       >
         <HeartIcon aria-hidden="true" weight="fill" />
-        {$i18n.t('supporter.badgeDonate')}
+        {$i18n.t(donated ? 'supporter.badgeDonateAgain' : 'supporter.badgeDonate')}
       </LinkButton>
-      <small class="supporter-card-hint">{$i18n.t('supporter.badgeHint')}</small>
+      <small class="supporter-card-hint"
+        >{$i18n.t(donated ? 'supporter.badgeDonorHint' : 'supporter.badgeHint')}</small
+      >
     </Popover.Content>
   </Popover.Portal>
 </Popover.Root>
