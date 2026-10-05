@@ -135,6 +135,7 @@ export type SendMessageOptions = {
   linkPreviews?: UrlPreviewView[];
   imageSourcePacks?: ImageSourcePackReferenceView[];
   botCommand?: unknown;
+  forumTitle?: string | null;
 };
 
 export type SendAttachmentOptions = {
@@ -853,6 +854,7 @@ export function createCommands(transport: () => Transport) {
         link_previews: $state.snapshot(options.linkPreviews ?? []),
         image_source_packs: $state.snapshot(options.imageSourcePacks ?? []),
         bot_command: $state.snapshot(options.botCommand ?? null),
+        forum_title: options.forumTitle ?? null,
       });
     },
 
@@ -988,6 +990,7 @@ export function createCommands(transport: () => Transport) {
         mentions: [...mentions.userIds],
         mentions_room: mentions.room,
         persona: $state.snapshot(options.persona ?? null),
+        forum_title: options.forumTitle ?? null,
       });
     },
 

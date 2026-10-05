@@ -124,6 +124,7 @@ impl Core {
         mentions: Vec<OwnedUserId>,
         mentions_room: bool,
         persona: Option<PerMessageProfileView>,
+        forum_title: Option<String>,
     ) -> Result<(), CommandErr> {
         let edited = edit_content(
             body,
@@ -163,7 +164,7 @@ impl Core {
                 .make_edit_event(&event_id, edited)
                 .await
                 .or_failed(self, "edit_message")?;
-            self.edit_with_persona(&room, &content, persona.as_ref())
+            self.edit_with_persona(&room, &content, persona.as_ref(), forum_title)
                 .await?;
         }
 
@@ -1085,6 +1086,7 @@ mod tests {
             mentions: Vec::new(),
             mentions_room: false,
             persona: None,
+            forum_title: None,
         })
         .await
         .unwrap();

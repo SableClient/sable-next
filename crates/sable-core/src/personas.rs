@@ -528,8 +528,10 @@ impl Core {
         room: &Room,
         content: &AnyMessageLikeEventContent,
         profile: Option<&PerMessageProfileView>,
+        forum_title: Option<String>,
     ) -> Result<(), CommandErr> {
         let event_type = content.event_type().to_string();
+        let title = crate::dispatch::forum_title_value(forum_title);
         let mut value = serde_json::to_value(content).or_failed(self, "edit_with_persona")?;
 
         let update = |content: &mut Value| {
@@ -540,6 +542,9 @@ impl Core {
                 object.remove("m.per_message_profile");
             }
             ensure_empty_mentions(content);
+            if let (Some(title), Some(object)) = (&title, content.as_object_mut()) {
+                object.insert(crate::view::FORUM_TITLE.to_owned(), title.clone());
+            }
         };
         update(&mut value);
         if let Some(content) = value.get_mut("m.new_content") {

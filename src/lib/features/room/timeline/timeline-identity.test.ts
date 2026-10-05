@@ -28,6 +28,7 @@ function item(id: string, options: Partial<TimelineItemView> = {}): TimelineItem
     link_previews_removed: null,
     mention: options.mention ?? 'none',
     forwarded: options.forwarded ?? null,
+    forum_title: options.forum_title ?? null,
   };
 }
 

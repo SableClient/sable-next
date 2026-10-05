@@ -836,6 +836,7 @@ pub fn aggregation_item(
         link_previews_removed: None,
         mention: MentionView::None,
         forwarded: None,
+        forum_title: None,
     }
 }
 
@@ -922,6 +923,7 @@ pub async fn standalone_item(
         link_previews_removed: link_previews_removed(raw.message()),
         per_message_profile: message_profile,
         forwarded: original.content.as_ref().and_then(forward_meta),
+        forum_title: None,
     })
 }
 
@@ -960,6 +962,7 @@ pub fn timeline_item(
             let bundled_link_previews = bundled_link_previews(raw.message());
             let link_previews_removed = link_previews_removed(raw.message());
             let forwarded = forwarded(event, &raw);
+            let forum_title = forum_title(raw.message());
 
             TimelineItemView {
                 id,
@@ -976,28 +979,16 @@ pub fn timeline_item(
                 in_reply_to: in_reply_to(event.content()),
                 thread_root: msg_like(event.content()).and_then(|msg| msg.thread_root.clone()),
                 thread_summary: thread_summary(event.content()),
-                reactions: if event
-                    .original_json()
-                    .is_none_or(crate::reactions::can_annotate)
-                {
-                    reactions(event.reactions())
-                } else {
-                    Vec::new()
-                },
+                reactions: annotatable_reactions(event),
                 is_own: event.is_own(),
                 read_by: event.read_receipts().keys().cloned().collect(),
-                read_timestamps: event
-                    .read_receipts()
-                    .iter()
-                    .filter_map(|(user_id, receipt)| {
-                        receipt.ts.map(|ts| (user_id.to_string(), ts.0.into()))
-                    })
-                    .collect(),
+                read_timestamps: read_timestamps(event),
                 per_message_profile: message_profile,
                 bundled_link_previews,
                 link_previews_removed,
                 mention,
                 forwarded,
+                forum_title,
             }
         }
 
@@ -1035,9 +1026,29 @@ pub fn timeline_item(
                 link_previews_removed: None,
                 mention: MentionView::None,
                 forwarded: None,
+                forum_title: None,
             }
         }
     }
+}
+
+fn annotatable_reactions(event: &EventTimelineItem) -> Vec<ReactionGroup> {
+    if event
+        .original_json()
+        .is_none_or(crate::reactions::can_annotate)
+    {
+        reactions(event.reactions())
+    } else {
+        Vec::new()
+    }
+}
+
+fn read_timestamps(event: &EventTimelineItem) -> BTreeMap<String, u64> {
+    event
+        .read_receipts()
+        .iter()
+        .filter_map(|(user_id, receipt)| receipt.ts.map(|ts| (user_id.to_string(), ts.0.into())))
+        .collect()
 }
 
 fn send_state(state: &EventSendState) -> SendStateView {
@@ -1615,6 +1626,7 @@ pub(crate) const CALL_MEMBER_TYPE: &str = "org.matrix.msc3401.call.member";
 pub(crate) const CALL_TYPE: &str = "org.matrix.msc3401.call";
 
 pub(crate) const FORUM_ROOM_TYPE: &str = "pl.chrome.forum";
+pub(crate) const FORUM_TITLE: &str = "moe.sable.forum.title";
 
 pub(crate) const RTC_SLOT_TYPE: &str = "org.matrix.msc4143.rtc.slot";
 
@@ -1716,6 +1728,11 @@ fn forward_meta(content: &serde_json::Value) -> Option<ForwardedView> {
         room_id: id(meta, "room_id").and_then(|room| room.try_into().ok()),
         event_id: id(meta, "event_id").and_then(|event| event.try_into().ok()),
     })
+}
+
+fn forum_title(content: Option<&serde_json::Value>) -> Option<String> {
+    let title = content?.get(FORUM_TITLE)?.as_str()?.trim();
+    (!title.is_empty()).then(|| title.to_owned())
 }
 
 fn link_previews_removed(content: Option<&serde_json::Value>) -> Option<bool> {
@@ -2512,6 +2529,15 @@ mod tests {
         );
         let serialized = serde_json::to_value(view).unwrap();
         assert_eq!(serialized["kind"], "call_invite");
+    }
+
+    #[test]
+    fn reads_the_forum_title_and_ignores_blank_ones() {
+        let titled = json!({ "body": "x", super::FORUM_TITLE: "  Rules  " });
+        assert_eq!(super::forum_title(Some(&titled)).as_deref(), Some("Rules"));
+        let blank = json!({ "body": "x", super::FORUM_TITLE: "   " });
+        assert_eq!(super::forum_title(Some(&blank)), None);
+        assert_eq!(super::forum_title(Some(&json!({ "body": "x" }))), None);
     }
 
     #[test]

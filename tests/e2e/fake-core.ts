@@ -438,6 +438,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             link_previews_removed: null,
             mention: 'none',
             forwarded: null,
+            forum_title: null,
           };
         }
       );

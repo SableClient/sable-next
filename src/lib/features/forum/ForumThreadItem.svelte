@@ -23,6 +23,8 @@
     onReact?: (eventId: string, key: string) => void;
     loadImagePacks: (roomId: string) => Promise<import('#src/generated/protocol').ImagePackView[]>;
     onCopyLink: (eventId: string) => void;
+    pinned?: boolean;
+    onPin?: (eventId: string) => void;
   }
 
   let {
@@ -35,6 +37,8 @@
     onReact,
     loadImagePacks,
     onCopyLink,
+    pinned = false,
+    onPin,
   }: Props = $props();
   let deleteOpen = $state(false);
   let sheetOpen = $state(false);
@@ -59,6 +63,8 @@
     onCopyText:
       thread.preview === '' ? undefined : () => void navigator.clipboard.writeText(thread.preview),
     onCopyLink: () => onCopyLink(thread.eventId),
+    onPin: onPin ? () => onPin(thread.eventId) : undefined,
+    pinned,
     onDelete: canDelete ? () => (deleteOpen = true) : undefined,
   });
   const openMessageMenu = useMessageMenu();
@@ -88,6 +94,7 @@
   <article
     class:pressed={rowPress.pressing}
     class:unread={thread.unread}
+    class:pinned
     class="forum-thread-card"
     onpointerdown={rowPress.start}
     onpointermove={rowPress.move}
@@ -102,6 +109,9 @@
         if (opensFrom(event)) onOpen(thread.eventId);
       }}
     >
+      {#if thread.title}
+        <h3 class="forum-thread-title">{thread.title}</h3>
+      {/if}
       <MessagePreview {roomId} eventId={thread.eventId} item={thread.item}>
         {#snippet fallback()}
           <span class="forum-thread-preview">{thread.preview}</span>
@@ -167,6 +177,10 @@
     position: relative;
   }
 
+  .forum-thread-card.pinned {
+    border-color: var(--primary-main);
+  }
+
   .forum-thread-card.unread {
     box-shadow: inset 0.1875rem 0 0 var(--primary-main);
   }
@@ -188,6 +202,14 @@
   .forum-thread-card.pressed {
     background: var(--surface-container-hover);
     color: var(--surface-on-container);
+  }
+
+  .forum-thread-title {
+    color: var(--surface-on-container);
+    font-size: var(--font-size-subheading);
+    font-weight: var(--font-weight-600);
+    margin: 0;
+    overflow-wrap: anywhere;
   }
 
   .forum-thread-time {

@@ -25,6 +25,7 @@ export function timelineItem(id: string, body: string): TimelineItemView {
     link_previews_removed: null,
     mention: 'none',
     forwarded: null,
+    forum_title: null,
   };
 }
 

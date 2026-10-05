@@ -33,6 +33,7 @@ function item(overrides: Partial<TimelineItemView> & { id: string }): TimelineIt
     link_previews_removed: null,
     mention: 'none',
     forwarded: null,
+    forum_title: null,
     ...overrides,
   };
 }
@@ -187,4 +188,14 @@ test('keeps the root details needed for its own forum actions', () => {
     html: '<strong>Original</strong>',
     mediaCaption: false,
   });
+});
+
+test('carries the post title onto the thread', () => {
+  const titled = item({ id: 'titled', forum_title: 'Rules' });
+  const plain = item({ id: 'plain' });
+
+  const threads = collectForumThreads([titled, plain], null);
+
+  expect(threads.find((thread) => thread.eventId === '$titled')?.title).toBe('Rules');
+  expect(threads.find((thread) => thread.eventId === '$plain')?.title).toBeNull();
 });

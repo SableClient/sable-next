@@ -242,6 +242,8 @@ pub enum Command {
         #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Unknown>))]
         bot_command: Option<serde_json::Value>,
+        #[serde(default)]
+        forum_title: Option<String>,
     },
     SendRawEvent {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -344,6 +346,8 @@ pub enum Command {
         mentions_room: bool,
         #[serde(default)]
         persona: Option<PerMessageProfileView>,
+        #[serde(default)]
+        forum_title: Option<String>,
     },
     /// The filled-in details arrive as a timeline diff, not as the response.
     FetchEventDetails {
@@ -3061,6 +3065,7 @@ pub struct TimelineItemView {
     pub link_previews_removed: Option<bool>,
     pub mention: MentionView,
     pub forwarded: Option<ForwardedView>,
+    pub forum_title: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

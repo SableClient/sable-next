@@ -448,6 +448,7 @@ impl Core {
                 link_previews,
                 image_source_packs,
                 bot_command,
+                forum_title,
             } => {
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let (body, formatted, persona) = match persona {
@@ -474,6 +475,7 @@ impl Core {
                             image_source_pack_references(&image_source_packs),
                         ),
                         (crate::bot_commands::COMMAND_FIELD, bot_command),
+                        (view::FORUM_TITLE, forum_title_value(forum_title)),
                     ],
                 );
                 timeline
@@ -682,6 +684,7 @@ impl Core {
                 mentions,
                 mentions_room,
                 persona,
+                forum_title,
             } => {
                 self.edit_message(
                     &room_id,
@@ -695,6 +698,7 @@ impl Core {
                     mentions,
                     mentions_room,
                     persona,
+                    forum_title,
                 )
                 .await?;
                 Ok(CommandOk::EditMessage)
@@ -3199,6 +3203,13 @@ fn extra_content<const N: usize>(
         }
     }
     extra
+}
+
+pub(crate) fn forum_title_value(title: Option<String>) -> Option<serde_json::Value> {
+    title
+        .map(|title| title.trim().to_owned())
+        .filter(|title| !title.is_empty())
+        .map(serde_json::Value::String)
 }
 
 fn empty_mentions_extra() -> Option<serde_json::Map<String, serde_json::Value>> {

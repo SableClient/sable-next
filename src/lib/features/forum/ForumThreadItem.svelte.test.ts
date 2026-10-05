@@ -76,12 +76,14 @@ const root: TimelineItemView = {
   link_previews_removed: null,
   mention: 'none',
   forwarded: null,
+  forum_title: null,
 };
 
 const thread: ForumThread = {
   id: 'thread-row',
   item: root,
   eventId: '$thread:example.org',
+  title: null,
   sender: '@alice:example.org',
   senderName: 'Alice',
   senderAvatar: null,

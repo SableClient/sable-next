@@ -65,6 +65,7 @@ function failed(action: string): (error: unknown) => void {
 export class Conversation {
   context = $state<ComposerContext | null>(null);
   scheduledRevision = $state(0);
+  forumTitle = $state('');
 
   readonly #core: CoreClient;
   readonly #personas: PersonaStore;
@@ -142,8 +143,10 @@ export class Conversation {
           mediaCaption: pending.mediaCaption,
           threadRoot: this.#threadRoot,
           persona: pending.persona ?? null,
+          forumTitle: this.forumTitle,
         }
       );
+      this.forumTitle = '';
       this.context = null;
       return;
     }
@@ -188,7 +191,9 @@ export class Conversation {
       persona: outgoing.persona,
       linkPreviews,
       imageSourcePacks,
+      forumTitle: this.#threadRoot === null && !pending?.eventId ? this.forumTitle : null,
     });
+    this.forumTitle = '';
     this.context = null;
   };
 
@@ -526,6 +531,7 @@ export class Conversation {
     const item = this.#timeline.items.find(
       (entry) => entry.event_id === eventId || entry.transaction_id === eventId
     );
+    this.forumTitle = item?.forum_title ?? '';
     this.context = {
       kind: 'edit',
       eventId,

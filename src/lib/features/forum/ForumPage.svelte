@@ -11,6 +11,7 @@
   import { Conversation } from '#lib/features/room/conversation/conversation.svelte.js';
   import {
     PinnedEvents,
+    pinErrorMessage,
     providePinnedEvents,
   } from '#lib/features/room/timeline/pinned-events.svelte.js';
   import {
@@ -34,6 +35,7 @@
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import { ForumThreads } from './forum-threads.svelte.js';
@@ -41,6 +43,7 @@
   import ForumThreadList from './ForumThreadList.svelte';
 
   const AUTO_FILL_ROUNDS = 10;
+  const FORUM_TITLE_MAX = 150;
 
   interface Props {
     roomId: string;
@@ -111,6 +114,13 @@
     void pinnedEvents.load(resolvedRoomId);
   });
 
+  let wasEditing = false;
+  $effect(() => {
+    const editing = conversation.context?.kind === 'edit';
+    if (wasEditing && !editing) conversation.forumTitle = '';
+    wasEditing = editing;
+  });
+
   $effect(() => {
     if (threadRootId === null) return;
     const activeRoomId = resolvedRoomId;
@@ -155,6 +165,13 @@
     void core.commands.deleteThread(resolvedRoomId, eventId, reason).catch((error: unknown) => {
       console.warn('[sable forum] deleting a thread failed', error);
       toasts.error($i18n.t('errors.actionFailed'));
+    });
+  }
+
+  function togglePin(eventId: string): void {
+    pinnedEvents.toggle(resolvedRoomId, eventId).catch((error: unknown) => {
+      console.warn('[sable forum] pinning a thread failed', error);
+      toasts.error(pinErrorMessage(error));
     });
   }
 
@@ -253,6 +270,13 @@
     <div class="forum-content">
       <div class="forum-compose-area">
         <p class="forum-composer-hint">{$i18n.t('forum.newThreadHint')}</p>
+        <TextInput
+          bind:value={conversation.forumTitle}
+          maxlength={FORUM_TITLE_MAX}
+          placeholder={$i18n.t('forum.titlePlaceholder')}
+          aria-label={$i18n.t('forum.titleLabel')}
+          disabled={permissions ? !permissions.can_post : false}
+        />
         <ConversationComposer
           {conversation}
           roomId={resolvedRoomId}
@@ -274,6 +298,8 @@
         loadImagePacks={core.commands.imagePacks}
         onCopyLink={copyEventLink}
         onLoadMore={loadMoreThreads}
+        isPinned={(eventId) => pinnedEvents.has(eventId)}
+        onPin={permissions?.can_pin ? togglePin : undefined}
       />
     </div>
   </div>
@@ -342,6 +368,10 @@
   .forum-compose-area {
     flex: 0 0 auto;
     padding: var(--space-400) var(--space-400) var(--space-200);
+  }
+
+  .forum-compose-area :global(.text-input) {
+    margin-bottom: var(--space-200);
   }
 
   .forum-composer-hint {

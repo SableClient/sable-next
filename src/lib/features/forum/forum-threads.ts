@@ -4,6 +4,7 @@ export interface ForumThread {
   id: string;
   item: TimelineItemView;
   eventId: string;
+  title: string | null;
   sender: string | null;
   senderName: string | null;
   senderAvatar: string | null;
@@ -81,6 +82,7 @@ export function collectForumThreads(
       id: root.id,
       item: root,
       eventId: rootId,
+      title: root.forum_title,
       sender: root.sender,
       senderName: root.sender_name,
       senderAvatar: root.sender_avatar,

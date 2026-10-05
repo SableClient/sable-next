@@ -270,6 +270,7 @@ export function withReadMarkerBefore(
     link_previews_removed: null,
     mention: 'none',
     forwarded: null,
+    forum_title: null,
   };
   return [...rest.slice(0, index), marker, ...rest.slice(index)];
 }

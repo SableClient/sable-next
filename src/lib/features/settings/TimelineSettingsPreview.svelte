@@ -70,6 +70,7 @@
     link_previews_removed: null,
     mention: 'none',
     forwarded: null,
+    forum_title: null,
   } satisfies TimelineItemView;
 
   const ownReply = {
