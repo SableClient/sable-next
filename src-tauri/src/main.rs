@@ -133,7 +133,7 @@ fn cef_command_line_args(proxy: Option<&str>) -> Vec<(String, Option<String>)> {
         ),
         (
             "enable-features".into(),
-            Some("SharedArrayBuffer,WebRtcPipeWireCamera".into()),
+            Some("SharedArrayBuffer,WebRtcPipeWireCamera,WebRTCPipeWireCapturer".into()),
         ),
         (
             "disable-features".into(),
