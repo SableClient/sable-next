@@ -851,9 +851,13 @@
     text-decoration: none;
   }
 
+  .formatted-body :global([data-mx-spoiler]:not([data-image-spoiler])) {
+    background: var(--surface-container-active);
+    border-radius: var(--radius);
+  }
+
   .formatted-body :global([data-mx-spoiler]:not([data-image-spoiler], [aria-pressed='false'])) {
     background: var(--surface-var-on-container);
-    border-radius: var(--radius);
     color: transparent;
     cursor: pointer;
   }
