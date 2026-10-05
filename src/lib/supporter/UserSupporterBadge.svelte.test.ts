@@ -15,17 +15,22 @@ import { FIXTURE_USER, VALID } from './fixtures.js';
 import UserSupporterBadge from './UserSupporterBadge.svelte';
 
 test('shows the label of a verified award', async () => {
-  render(UserSupporterBadge, { userId: FIXTURE_USER, awards: JSON.stringify([VALID]) });
+  render(UserSupporterBadge, {
+    userId: FIXTURE_USER,
+    awards: JSON.stringify([VALID]),
+    class: 'profile-supporter-badge',
+  });
 
-  expect(await screen.findByText('Donor')).toBeInTheDocument();
-  expect(screen.getByTitle('Backs Sable on Open Collective')).toBeInTheDocument();
+  expect(
+    await screen.findByRole('button', { name: 'Donor · Backs Sable on Open Collective' })
+  ).toHaveClass('profile-supporter-badge');
 });
 
 test('shows nothing when the award belongs to another account', async () => {
   render(UserSupporterBadge, { userId: '@mallory:example.org', awards: JSON.stringify([VALID]) });
 
   await vi.waitFor(() => {
-    expect(screen.queryByText('Donor')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Donor/ })).not.toBeInTheDocument();
   });
 });
 
@@ -35,6 +40,6 @@ test('shows nothing for a forged label', async () => {
   render(UserSupporterBadge, { userId: FIXTURE_USER, awards: JSON.stringify([forged]) });
 
   await vi.waitFor(() => {
-    expect(screen.queryByText('Founder')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Founder/ })).not.toBeInTheDocument();
   });
 });

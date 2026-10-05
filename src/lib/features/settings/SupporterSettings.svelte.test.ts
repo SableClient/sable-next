@@ -8,6 +8,8 @@ import { supporter } from '#lib/supporter/supporter.svelte.js';
 
 import SupporterSettings from './SupporterSettings.svelte';
 
+vi.mock('#lib/core/context.js');
+
 afterEach(() => {
   supporter.badge = null;
   supporter.status = 'idle';
@@ -56,7 +58,7 @@ test('shows the active badge with its expiry and lets it be removed', async () =
   render(SupporterSettings);
 
   expect(screen.getByText('Supporter badge active')).toBeInTheDocument();
-  expect(screen.getByText('Donor')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /^Donor ·/ })).toBeInTheDocument();
   expect(screen.getByText(/Valid until/)).toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
 

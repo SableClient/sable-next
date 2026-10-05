@@ -1,6 +1,8 @@
 <script lang="ts">
   import PronounPill from '#lib/ui/primitives/PronounPill.svelte';
   import UserSupporterBadge from '#lib/supporter/UserSupporterBadge.svelte';
+  import { profileSupporterAppearance } from '#lib/supporter/variants.js';
+  import { SUPPORTER_BADGE_FIELD } from '#lib/profile/fields.js';
   import type {
     MemberView,
     ProfileView,
@@ -205,7 +207,9 @@
 
     return $i18n.t('timeline.animalNeed', { identity, need: animal.animal_need });
   });
-  let extra = $derived(currentProfile?.extra ?? []);
+  let extra = $derived(
+    (currentProfile?.extra ?? []).filter((field) => field.key !== SUPPORTER_BADGE_FIELD)
+  );
   let showFailure = $derived(failed && !currentProfile && roomMember === null);
   let profileLoading = $derived(!currentProfile && !failed);
   let isSelf = $derived(core.session?.user_id === userId);
@@ -400,7 +404,13 @@
     <PronounPill class="profile-pronoun-pill" {pronouns} />
   {/if}
   {#if currentProfile?.supporter_awards}
-    <UserSupporterBadge {userId} awards={currentProfile.supporter_awards} />
+    <UserSupporterBadge
+      {userId}
+      awards={currentProfile.supporter_awards}
+      name={displayName}
+      class="profile-supporter-badge"
+      {...profileSupporterAppearance(currentProfile.extra)}
+    />
   {/if}
 {/snippet}
 {#snippet metaRow()}
@@ -828,6 +838,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  :global(.profile-supporter-badge) {
+    align-self: center;
+    margin-inline: auto calc(-1 * var(--space-100));
+    order: 1;
   }
 
   :global(.profile-pronoun-pill) {

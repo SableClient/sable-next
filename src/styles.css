@@ -91,6 +91,22 @@ html {
   --crit-on-container: #6e0b0b;
 
   /* Other */
+  --supporter-gold: #e8c783;
+  --supporter-card-bg: #24212e;
+  --supporter-purple: #9987f7;
+  --supporter-white: #fff;
+  --supporter-black: #000;
+  --supporter-propeller-blue: #2676a7;
+  --supporter-blue: #55cdfc;
+  --supporter-pink: #f7a8b8;
+  --supporter-red: #ed2224;
+  --supporter-yellow: #f5d52e;
+  --supporter-green: #b8f483;
+  --supporter-silver: #b9b9b9;
+  --supporter-bisexual-pink: #d60270;
+  --supporter-bisexual-blue: #5369d3;
+  --supporter-orange: #ef7627;
+  --supporter-teal: #26ceaa;
   --focus-ring: rgb(110 86 207 / 40%);
   --shadow-color: rgb(0 0 0 / 10%);
   --overlay: rgb(0 0 0 / 40%);

@@ -1,16 +1,19 @@
 <script lang="ts">
-  import { i18n } from '#lib/i18n.js';
+  import type { ClassValue } from 'svelte/elements';
 
   import { badgeFor, type SupporterBadgeData } from './award.js';
   import { supporterConfig } from './config.js';
   import SupporterBadge from './SupporterBadge.svelte';
+  import type { SupporterAppearance } from './variants.js';
 
-  type Props = {
+  type Props = Partial<SupporterAppearance> & {
     userId: string;
     awards: string | null;
+    name?: string;
+    class?: ClassValue;
   };
 
-  let { userId, awards }: Props = $props();
+  let { userId, awards, name, ...appearance }: Props = $props();
   let badge = $state.raw<SupporterBadgeData | null>(null);
 
   $effect(() => {
@@ -34,5 +37,9 @@
 </script>
 
 {#if badge}
-  <SupporterBadge label={badge.label} title={$i18n.t('timeline.profileSupporter')} />
+  <SupporterBadge
+    label={badge.label}
+    name={name?.trim() || userId.split(':', 1)[0]}
+    {...appearance}
+  />
 {/if}

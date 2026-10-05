@@ -1511,6 +1511,34 @@
   "combobox": {
     "showOptions": "Show options"
   },
+  "supporter": {
+    "donor": "Donor",
+    "badgeDescription": "{{name}} helps fund Sable's development, you can too.",
+    "badgeDonate": "Donate to Sable",
+    "badgeHint": "Any amount earns a badge, even $1!",
+    "chooseBadge": "Choose your donor badge",
+    "chooseBadgeHint": "Pick a Sable to display on your profile.",
+    "backgroundShape": "Badge background shape",
+    "customBackground": "Custom badge background",
+    "backgroundColor": "Badge background color",
+    "shapes": {
+      "none": "None",
+      "circle": "Circle",
+      "heart": "Heart",
+      "square": "Rounded square"
+    },
+    "customColor": "Badge color",
+    "customColorHint": "Choose any color for your Sable badge.",
+    "customCardColors": "Custom card colors",
+    "customCardColorsHint": "Choose colors for the card background and donate button.",
+    "cardColor": "Card background color",
+    "buttonColor": "Donate button color",
+    "colors": {
+      "gold": "Gold",
+      "custom": "Custom color"
+    },
+    "badgeSaveFailed": "Could not save your badge. Try again."
+  },
   "settings": {
     "threadPresentation": "Threads and discussions",
     "threadPresentationHint": "On small screens, threads always use the full conversation view.",

@@ -3,11 +3,16 @@ import { untrack } from 'svelte';
 import type { SupporterConfig } from '#lib/config/runtime-config.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { openExternalAuthUrl } from '#lib/platform/external-auth.js';
-import { SUPPORTER_FIELD } from '#lib/profile/fields.js';
+import { SUPPORTER_FIELD, SUPPORTER_BADGE_FIELD } from '#lib/profile/fields.js';
 
 import { badgeFor, type Award, type SupporterBadgeData } from './award.js';
 import { supporterConfig } from './config.js';
 import { fetchAwards, refreshAwards, startVerification } from './service.js';
+import {
+  profileSupporterAppearance,
+  supporterAppearance,
+  type SupporterAppearance,
+} from './variants.js';
 
 const POLL_INTERVAL_MS = 2_000;
 const POLL_TIMEOUT_MS = 10 * 60 * 1000;
@@ -44,10 +49,14 @@ class Supporter {
   badge = $state.raw<SupporterBadgeData | null>(null);
   status = $state<SupporterStatus>('idle');
   config = $state.raw<SupporterConfig | null>(null);
+  appearance = $state(supporterAppearance());
+  savingAppearance = $state(false);
+  removing = $state(false);
 
   private core: CoreClient | null = null;
   private generation = 0;
   private abort: AbortController | null = null;
+  private appearanceSave: Promise<void> | null = null;
 
   get enabled(): boolean {
     return this.config !== null;
@@ -67,6 +76,10 @@ class Supporter {
     this.config = null;
     this.badge = null;
     this.status = 'idle';
+    this.appearance = supporterAppearance();
+    this.savingAppearance = false;
+    this.removing = false;
+    this.appearanceSave = null;
   }
 
   cancel(): void {
@@ -143,9 +156,37 @@ class Supporter {
   }
 
   async remove(): Promise<void> {
-    if (!this.core) return;
-    await this.core.setProfileField(SUPPORTER_FIELD, null);
-    this.badge = null;
+    const core = this.core;
+    if (!core || this.removing) return;
+    const generation = this.generation;
+    this.removing = true;
+    try {
+      await this.appearanceSave?.catch(() => {});
+      await core.setProfileField(SUPPORTER_BADGE_FIELD, null);
+      if (generation === this.generation) this.appearance = supporterAppearance();
+      await core.setProfileField(SUPPORTER_FIELD, null);
+      if (generation === this.generation) this.badge = null;
+    } finally {
+      if (generation === this.generation) this.removing = false;
+    }
+  }
+
+  async selectAppearance(patch: Partial<SupporterAppearance>): Promise<void> {
+    const core = this.core;
+    if (!core || !this.badge || this.savingAppearance || this.removing) return;
+    const generation = this.generation;
+    const appearance = supporterAppearance({ ...this.appearance, ...patch });
+    this.savingAppearance = true;
+    try {
+      this.appearanceSave = core.setProfileField(SUPPORTER_BADGE_FIELD, appearance);
+      await this.appearanceSave;
+      if (generation === this.generation) this.appearance = appearance;
+    } finally {
+      if (generation === this.generation) {
+        this.savingAppearance = false;
+        this.appearanceSave = null;
+      }
+    }
   }
 
   private async adopt(
@@ -172,6 +213,7 @@ class Supporter {
     try {
       const profile = await core.userProfile(userId);
       if (generation !== this.generation) return;
+      this.appearance = profileSupporterAppearance(profile.extra);
       this.badge = await badgeFor(profile.supporter_awards, userId, config.keys);
       if (needsRefresh(profile.supporter_awards, this.badge)) await this.refresh();
     } catch (error) {

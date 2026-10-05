@@ -19,11 +19,12 @@ vi.mock('./service.js', () => ({
 import { createCoreStub } from '#lib/core/__mocks__/context.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { openExternalAuthUrl } from '#lib/platform/external-auth.js';
-import { SUPPORTER_FIELD } from '#lib/profile/fields.js';
+import { SUPPORTER_FIELD, SUPPORTER_BADGE_FIELD } from '#lib/profile/fields.js';
 
 import { EXPIRED, FIXTURE_USER, VALID } from './fixtures.js';
 import { fetchAwards, refreshAwards, startVerification } from './service.js';
 import { supporter } from './supporter.svelte.js';
+import { supporterAppearance } from './variants.js';
 
 const openId = { access_token: 'tok', matrix_server_name: 'example.org' };
 
@@ -61,6 +62,7 @@ describe('start', () => {
       expect(supporter.badge?.label).toBe('Donor');
     });
     expect(refreshAwards).not.toHaveBeenCalled();
+    expect(supporter.appearance).toEqual(supporterAppearance());
   });
 
   test('has no badge for a profile without awards', async () => {
@@ -71,6 +73,9 @@ describe('start', () => {
     });
     expect(supporter.badge).toBeNull();
     expect(refreshAwards).not.toHaveBeenCalled();
+    await supporter.selectAppearance({ variant: 'pride' });
+    expect(stub.setProfileField).not.toHaveBeenCalled();
+    expect(supporter.appearance).toEqual(supporterAppearance());
   });
 
   test('refreshes an award that has expired', async () => {
@@ -99,6 +104,32 @@ describe('start', () => {
   });
 });
 
+test('loads customization and preserves it independently of the signed award', async () => {
+  const { stub, core } = makeCore([VALID]);
+  const appearance = {
+    ...supporterAppearance(),
+    variant: 'custom' as const,
+    shape: 'heart' as const,
+    customBackground: true,
+    backgroundColor: '#ffeedd',
+    color: '#123456',
+  };
+  stub.userProfile.mockResolvedValue({
+    supporter_awards: JSON.stringify([VALID]),
+    extra: [{ key: SUPPORTER_BADGE_FIELD, value: JSON.stringify(appearance) }],
+  });
+  supporter.start(core);
+  await vi.waitFor(() => expect(supporter.badge?.label).toBe('Donor'));
+  expect(supporter.appearance).toEqual(appearance);
+  const award = supporter.badge;
+  await supporter.selectAppearance({ variant: 'pride', buttonColor: '#ABC' });
+  expect(stub.setProfileField).toHaveBeenCalledWith(SUPPORTER_BADGE_FIELD, {
+    ...appearance,
+    variant: 'pride',
+    buttonColor: '#aabbcc',
+  });
+  expect(supporter.badge).toBe(award);
+});
 describe('verify', () => {
   test('opens Open Collective, polls, and stores the award once it appears', async () => {
     vi.mocked(fetchAwards).mockResolvedValueOnce([]).mockResolvedValue([VALID]);
@@ -248,16 +279,28 @@ describe('claim', () => {
 });
 
 describe('remove', () => {
-  test('clears the profile field and the badge', async () => {
+  test('clears the award and customization after any pending appearance save', async () => {
     const { stub, core } = makeCore([VALID]);
     supporter.start(core);
     await vi.waitFor(() => {
       expect(supporter.badge).not.toBeNull();
     });
 
-    await supporter.remove();
+    let finishSave!: () => void;
+    stub.setProfileField.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSave = resolve;
+        })
+    );
+    const saving = supporter.selectAppearance({ variant: 'pride', shape: 'heart' });
+    const removing = supporter.remove();
+    finishSave();
+    await Promise.all([saving, removing]);
 
+    expect(stub.setProfileField).toHaveBeenNthCalledWith(2, SUPPORTER_BADGE_FIELD, null);
     expect(stub.setProfileField).toHaveBeenCalledWith(SUPPORTER_FIELD, null);
     expect(supporter.badge).toBeNull();
+    expect(supporter.appearance).toEqual(supporterAppearance());
   });
 });
