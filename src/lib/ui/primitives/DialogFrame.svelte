@@ -3,6 +3,7 @@
   import type { Snippet } from 'svelte';
 
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
+  import { suppressBanners } from '#lib/ui/banner-suppression.svelte.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   type DialogVariant = 'drawer' | 'settings' | 'verification' | 'sheet' | 'fullscreen';
@@ -45,6 +46,10 @@
     )
       event.preventDefault();
   }
+
+  $effect(() => {
+    if (open === true) return suppressBanners();
+  });
 
   holdOverlayBack(
     () => open === true && !ownsBack,

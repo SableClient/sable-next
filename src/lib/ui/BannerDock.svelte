@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
+  import { bannerSuppression } from './banner-suppression.svelte.js';
   import { composerClearance } from './composer-clearance.svelte.js';
 
   interface Props {
@@ -10,7 +11,11 @@
   let { children }: Props = $props();
 </script>
 
-<div class="dock" style:--composer-clearance={`${String(composerClearance.px)}px`}>
+<div
+  class="dock"
+  class:suppressed={bannerSuppression.count > 0}
+  style:--composer-clearance={`${String(composerClearance.px)}px`}
+>
   {@render children()}
 </div>
 
@@ -34,8 +39,7 @@
     width: min(34rem, 100%);
   }
 
-  :global(body:has(.composer-autocomplete)) .dock,
-  :global(body:has(.dialog-content[data-state='open'])) .dock {
+  .dock.suppressed {
     visibility: hidden;
   }
 </style>

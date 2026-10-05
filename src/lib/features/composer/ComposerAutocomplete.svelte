@@ -1,6 +1,7 @@
 <script lang="ts">
   import '#lib/ui/primitives/menu.css';
   import { i18n } from '#lib/i18n.js';
+  import { suppressBanners } from '#lib/ui/banner-suppression.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
 
@@ -16,6 +17,8 @@
   }
 
   let { id, optionId, heading, suggestions, active, onSelect }: Props = $props();
+
+  $effect(suppressBanners);
 
   function keepActiveInView(node: HTMLElement): void {
     node.querySelector(`[data-index="${String(active)}"]`)?.scrollIntoView({ block: 'nearest' });
