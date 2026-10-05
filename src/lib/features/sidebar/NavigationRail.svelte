@@ -466,6 +466,7 @@
   }
 
   const monitor = dragList.autoScroll();
+  let previousPath = '';
 
   afterNavigate(() => {
     if (mobile) return;
@@ -478,6 +479,18 @@
       return path === href || path.startsWith(`${href}/`);
     });
     const key = sectionRoots.find(([, root]) => under(path, root))?.[0] ?? space?.room_id;
+    const spaceParam = page.params.spaceId;
+    const bounced = spaceParam
+      ? sectionRoots.find(
+          ([, root]) => previousPath === `${root}/${encodeURIComponent(spaceParam)}`
+        )
+      : undefined;
+    previousPath = page.url.pathname;
+
+    if (bounced) {
+      spacePaths = { ...spacePaths, [bounced[0]]: bounced[1] };
+      saveSpacePath(bounced[0], bounced[1]);
+    }
     if (key === undefined || spacePaths[key] === path) return;
 
     spacePaths = { ...spacePaths, [key]: path };

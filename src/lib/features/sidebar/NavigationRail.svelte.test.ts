@@ -652,6 +652,21 @@ test('records the active desktop home and rooms routes', async () => {
   });
 });
 
+test('a space opened through the rooms tab does not become the rooms tab target', async () => {
+  renderRail({ spaces: [] });
+  await tick();
+
+  visit('/rooms/!space%3Aexample.org?via=example.org');
+  navigated();
+  visit('/space/!space%3Aexample.org/lobby', { spaceId: '!space:example.org' });
+  navigated();
+  visit('/rooms');
+  navigated();
+
+  expect(tab('nav.unspaced')).toHaveAttribute('href', '/rooms');
+  expect(savedSpacePaths().rooms).toBe('/rooms');
+});
+
 test('offers join by address from the add button', async () => {
   const visited: string[] = [];
   renderRail({
