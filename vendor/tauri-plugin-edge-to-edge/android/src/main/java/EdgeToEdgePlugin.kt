@@ -206,10 +206,6 @@ class EdgeToEdgePlugin(private val activity: Activity) : Plugin(activity) {
                     windowInsets: WindowInsetsCompat,
                     runningAnimations: MutableList<WindowInsetsAnimationCompat>,
                 ): WindowInsetsCompat {
-                    cachedKeyboardVisible = isKeyboardDocked(windowInsets)
-                    cachedKeyboardHeight = windowInsets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-                    injectSafeAreaToWebView(cachedInsets, cachedKeyboardVisible, cachedKeyboardHeight)
-
                     return windowInsets
                 }
 
