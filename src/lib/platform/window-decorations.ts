@@ -86,13 +86,23 @@ export const showSnapLayouts = (): Promise<void> => snapLayouts('show_snap_layou
 export const releaseSnapLayouts = (): Promise<void> => snapLayouts('release_snap_layouts');
 export const dismissSnapLayouts = (): Promise<void> => snapLayouts('dismiss_snap_layouts');
 
+const MAXIMIZE_SETTLE_MS = 150;
+
 export async function watchMaximized(onChange: (maximized: boolean) => void): Promise<() => void> {
   const window = await currentWindow();
   onChange(await window.isMaximized());
 
-  return window.onResized(() => {
+  let settle: ReturnType<typeof setTimeout> | undefined;
+  const unlisten = await window.onResized(() => {
     void window.isMaximized().then(onChange);
+    clearTimeout(settle);
+    settle = setTimeout(() => void window.isMaximized().then(onChange), MAXIMIZE_SETTLE_MS);
   });
+
+  return () => {
+    clearTimeout(settle);
+    unlisten();
+  };
 }
 
 export async function watchWindowFocus(onChange: (focused: boolean) => void): Promise<() => void> {
