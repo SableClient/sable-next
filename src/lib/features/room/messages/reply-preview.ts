@@ -55,10 +55,6 @@ export function replyPreviewBody(content: TimelineItemContentView): string {
       return content.body;
     case 'poll':
       return content.poll.question;
-    case 'state_event':
-      return content.event_type;
-    case 'hidden_event':
-      return content.event_type;
     default:
       return '';
   }

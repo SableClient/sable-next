@@ -24,6 +24,7 @@
     stripReplyFallback,
   } from '../members/members.js';
   import { previewableLinks } from '../media/link-preview.js';
+  import { stateEventText } from './state-event-text';
   import LinkEmbed from '../media/embeds/LinkEmbed.svelte';
   import { MessageSwipe } from '../messages/message-swipe.svelte.js';
   import { i18n } from '#lib/i18n.js';
@@ -237,7 +238,20 @@
   let replyName = $derived(
     replyIsPinged && !replyNameBase.startsWith('@') ? `@${replyNameBase}` : replyNameBase
   );
-  let replyBody = $derived(stripReplyFallback(item.in_reply_to?.body ?? '', replyPersona));
+  let replyBody = $derived.by(() => {
+    const target = item.in_reply_to ? events?.get(item.in_reply_to.event_id) : null;
+    const kind = target?.content.kind;
+    if (
+      target &&
+      (kind === 'membership' ||
+        kind === 'profile_change' ||
+        kind === 'state_event' ||
+        kind === 'hidden_event')
+    ) {
+      return stateEventText(target, $i18n.t);
+    }
+    return stripReplyFallback(item.in_reply_to?.body ?? '', replyPersona);
+  });
   let replyCosmetics = $derived(
     replyPersona ? null : (roomCosmetics?.for(item.in_reply_to?.sender) ?? null)
   );

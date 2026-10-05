@@ -1531,3 +1531,32 @@ test('compact layout shows the time alone and keeps the full date in the title (
   expect(time).toHaveTextContent(/^\d{1,2}:\d{2}/);
   expect(time?.getAttribute('title')).toContain(String(new Date(lastWeek.timestamp).getFullYear()));
 });
+
+test('quotes a reply to a membership event as its timeline text', async () => {
+  const target: TimelineItemView = {
+    ...item(false),
+    id: 'member',
+    event_id: '$original',
+    content: {
+      kind: 'membership',
+      user_id: '@nex:example.org',
+      change: 'left',
+      display_name: 'nex',
+      reason: null,
+    },
+  };
+  const base = replyItem('');
+  const reply: TimelineItemView = {
+    ...base,
+    in_reply_to: base.in_reply_to && { ...base.in_reply_to, body: null },
+  };
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: { item: reply, collapsed: false, events: { get: () => target } as never },
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.reply-body')?.textContent).toBe('nex left the room');
+});

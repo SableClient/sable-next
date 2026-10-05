@@ -97,7 +97,7 @@ test('an event with no body still yields a quotable empty preview', () => {
       content: null,
       redacts: null,
     })
-  ).toBe('m.key.verification.start');
+  ).toBe('');
 });
 
 test('a spoiler stays hidden in the preview', () => {

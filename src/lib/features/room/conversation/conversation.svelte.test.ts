@@ -364,7 +364,7 @@ test('a visible reaction aggregation can be replied to', () => {
     kind: 'reply',
     eventId: '$reaction:example.org',
     sender: 'Ana',
-    body: 'm.reaction',
+    body: 'Ana reacted with 🎉',
   });
 });
 

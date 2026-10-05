@@ -37,6 +37,7 @@ import {
 } from '#lib/personas/persona.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
 import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+import { stateEventText } from '#lib/features/room/timeline/state-event-text.js';
 import { isMessageRow } from '#lib/features/room/timeline/timeline-format.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
@@ -490,7 +491,7 @@ export class Conversation {
       eventId,
       sender: item.per_message_profile?.display_name ?? item.sender_name ?? item.sender,
       silentReply: item.sender === this.#core.session?.user_id || !preferences.mentionInReplies,
-      body: version?.body ?? replyPreviewBody(item.content),
+      body: version?.body ?? (replyPreviewBody(item.content) || stateEventText(item, t)),
       html: version?.html ?? (item.content.kind === 'message' ? item.content.html : null),
     };
   };

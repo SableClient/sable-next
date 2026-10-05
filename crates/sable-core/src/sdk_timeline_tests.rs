@@ -2012,7 +2012,7 @@ async fn a_reply_to_an_uncaptioned_gallery_quotes_its_file_names() {
 }
 
 #[tokio::test]
-async fn replies_to_state_and_membership_events_quote_their_type() {
+async fn replies_to_state_and_membership_events_carry_no_body() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     client.event_cache().subscribe().unwrap();
@@ -2055,8 +2055,8 @@ async fn replies_to_state_and_membership_events_quote_their_type() {
         .and_then(|view| view.in_reply_to.as_ref())
         .expect("a membership reply");
 
-    assert_eq!(state_reply.body.as_deref(), Some("m.room.name"));
-    assert_eq!(membership_reply.body.as_deref(), Some("m.room.member"));
+    assert_eq!(state_reply.body, None);
+    assert_eq!(membership_reply.body, None);
 }
 
 fn state_changes(

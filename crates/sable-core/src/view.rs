@@ -2157,11 +2157,6 @@ fn reply_preview_body(content: &TimelineItemContent) -> Option<String> {
             MsgLikeKind::Poll(state) => Some(state.results().question),
             _ => None,
         },
-        TimelineItemContent::MembershipChange(_) | TimelineItemContent::ProfileChange(_) => {
-            Some("m.room.member".to_owned())
-        }
-        TimelineItemContent::OtherState(state) => Some(state.content().event_type().to_string()),
-        TimelineItemContent::FailedToParseState { event_type, .. } => Some(event_type.to_string()),
         _ => None,
     }
 }
