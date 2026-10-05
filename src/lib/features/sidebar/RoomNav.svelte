@@ -1036,7 +1036,6 @@
 
   <div class="room-nav-content">
     <RoomInvites {collapsed} {invites} />
-    {#if unspacedSection}<ReplacedRooms {collapsed} />{/if}
 
     <div class="room-nav-actions" class:collapsed>
       {#snippet action(href: string, label: string, icon: Component)}
@@ -1214,6 +1213,7 @@
         </div>
       {/if}
     </div>
+    {#if unspacedSection}<ReplacedRooms {collapsed} />{/if}
   </div>
 </section>
 
