@@ -63,7 +63,7 @@ import { filesFromSources, pastedImageSources } from './pasted-images';
 import { mfmTimeInputRule } from './mfm';
 import { traceComposerInput } from './input-trace';
 import { queryKey, queryPlugin } from './query-plugin';
-import { composerSchema, parseMatrixHtml } from './schema';
+import { codeLanguage, composerSchema, parseMatrixHtml } from './schema';
 import {
   composerMarkdown,
   markdownFromSlice,
@@ -229,7 +229,9 @@ const openFence: Command = (state, dispatch) => {
       position = lineStart + 1;
     }
     dispatch(
-      tr.setBlockType(position, position, codeBlock, { language: match[1] }).scrollIntoView()
+      tr
+        .setBlockType(position, position, codeBlock, { language: codeLanguage(match[1]) })
+        .scrollIntoView()
     );
   }
   return true;
@@ -426,8 +428,20 @@ function trailingParagraph(): Plugin {
   return new Plugin({
     appendTransaction: (transactions, _old, state) => {
       if (!transactions.some((tr) => tr.docChanged)) return null;
-      const last = state.doc.lastChild;
-      if (!last || last.type === composerSchema.nodes.paragraph) return null;
+      const { doc } = state;
+      const last = doc.lastChild;
+      if (!last) return null;
+      if (last.type === composerSchema.nodes.paragraph) {
+        let from = doc.content.size;
+        for (let index = doc.childCount - 1; index > 0; index -= 1) {
+          const child = doc.child(index);
+          const before = doc.child(index - 1);
+          if (child.content.size > 0 || before.type !== child.type || before.content.size > 0)
+            break;
+          from -= child.nodeSize;
+        }
+        return from === doc.content.size ? null : state.tr.delete(from, doc.content.size);
+      }
       if (last.type === composerSchema.nodes.code_block) return null;
       const tr = state.tr.insert(state.doc.content.size, composerSchema.nodes.paragraph.create());
       for (const plugin of state.plugins) {

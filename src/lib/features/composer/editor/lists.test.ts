@@ -300,3 +300,9 @@ test('a line break on an empty last item leaves the list', () => {
   expect(tx(model)).toBe('<ol><li><p>one</p></li></ol><p>|</p>');
   expect(sent()).toBe(0);
 });
+
+test('backspace on an empty item after a sublist moves into the sublist', () => {
+  const model = cm('<ul><li><p>a</p><ul><li><p>one</p></li></ul></li><li><p>|</p></li></ul>');
+  backspace(model);
+  expect(tx(model)).toBe('<ul><li><p>a</p><ul><li><p>one|</p></li></ul></li></ul>');
+});

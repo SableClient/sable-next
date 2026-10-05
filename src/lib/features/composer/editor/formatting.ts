@@ -10,7 +10,13 @@ import {
   type NodeType,
 } from 'prosemirror-model';
 import { liftListItem, sinkListItem, splitListItem, wrapInList } from 'prosemirror-schema-list';
-import { TextSelection, type Command, type EditorState, type Transaction } from 'prosemirror-state';
+import {
+  Selection,
+  TextSelection,
+  type Command,
+  type EditorState,
+  type Transaction,
+} from 'prosemirror-state';
 import { canJoin, findWrapping } from 'prosemirror-transform';
 import { wrapIn } from 'prosemirror-commands';
 
@@ -397,8 +403,13 @@ export const joinListItemBackward: Command = (state, dispatch) => {
   if (!canJoin(state.doc, boundary)) return false;
   if (dispatch) {
     const tr = state.tr.join(boundary);
-    const inner = tr.mapping.map($from.before());
-    if (canJoin(tr.doc, inner)) tr.join(inner);
+    const inner = tr.doc.resolve(tr.mapping.map($from.before()));
+    if (inner.nodeBefore?.type === inner.nodeAfter?.type && canJoin(tr.doc, inner.pos)) {
+      tr.join(inner.pos);
+    } else if (inner.nodeAfter?.content.size === 0) {
+      tr.delete(inner.pos, inner.pos + inner.nodeAfter.nodeSize);
+      tr.setSelection(Selection.near(tr.doc.resolve(inner.pos), -1));
+    }
     dispatch(tr.scrollIntoView());
   }
   return true;

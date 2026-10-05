@@ -224,3 +224,35 @@ test('a rich edit of any sent message reproduces its html', () => {
     { numRuns: 100 }
   );
 });
+
+const BLOCKS = /^(?:BLOCKQUOTE|UL|OL|LI|H[1-6]|PRE|TABLE|HR)$/;
+
+const blockSkeleton = (markup: string): string => {
+  const holder = document.createElement('div');
+  holder.innerHTML = markup;
+  const tokens: string[] = [];
+  const walk = (node: Element): void => {
+    for (const child of node.children) {
+      const block = BLOCKS.test(child.tagName);
+      if (block) tokens.push(child.tagName);
+      walk(child);
+      if (block) tokens.push(`/${child.tagName}`);
+    }
+  };
+  walk(holder);
+  return tokens.join(' ').replaceAll(/\/(UL|OL) \1 /g, '');
+};
+
+test('the markdown body and the html body describe the same blocks', () => {
+  const renderer = new MarkdownIt({ breaks: true });
+  fc.assert(
+    fc.property(htmlDoc, (source) => {
+      const message = serializeComposer(source);
+      if (message.formatted === null) return;
+      expect(blockSkeleton(renderer.render(message.body)), JSON.stringify(message)).toBe(
+        blockSkeleton(message.formatted)
+      );
+    }),
+    { numRuns: 200 }
+  );
+});

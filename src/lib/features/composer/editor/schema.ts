@@ -25,6 +25,10 @@ export function emoticonLabel(node: ProseMirrorNode): string {
   return body && !body.startsWith('mxc://') ? body : `:${node.attrs.shortcode as string}:`;
 }
 
+export function codeLanguage(word: string): string {
+  return /^[\w-]+$/.test(word) ? word : '';
+}
+
 function languageOf(dom: HTMLElement): string {
   const classes = `${dom.className} ${dom.querySelector('code')?.className ?? ''}`;
   return /(?:^|\s)language-([\w-]+)/.exec(classes)?.[1] ?? '';

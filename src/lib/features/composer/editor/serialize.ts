@@ -20,7 +20,7 @@ import type { ImageSourcePackReferenceView } from '#src/generated/protocol';
 import { mfmUnixtime, parseMfmColor, parseMfmUnixtime, utcFallbackLabel } from '../time-markup';
 import { mfmPlugin } from './mfm';
 import { isMscLink, linkMscs } from './msc-links';
-import { composerSchema, parseMatrixHtml, ROOM_PING } from './schema';
+import { codeLanguage, composerSchema, parseMatrixHtml, ROOM_PING } from './schema';
 import { docToMarkdown } from './to-markdown';
 
 export interface ComposerMessage {
@@ -177,11 +177,74 @@ const markdown = new MarkdownSerializer(
 );
 
 function withoutTrailingParagraph(doc: ProseMirrorNode): ProseMirrorNode {
-  const last = doc.lastChild;
-  if (doc.childCount < 2 || !last) return doc;
-  if (last.type !== composerSchema.nodes.paragraph || last.content.size > 0) return doc;
+  const kept: ProseMirrorNode[] = [];
+  doc.forEach((child) => kept.push(child));
+  while (kept.length > 1) {
+    const last = kept.at(-1);
+    if (last?.type !== composerSchema.nodes.paragraph || last.content.size > 0) break;
+    kept.pop();
+  }
 
-  return doc.copy(doc.content.cut(0, doc.content.size - last.nodeSize));
+  return kept.length === doc.childCount ? doc : doc.copy(Fragment.fromArray(kept));
+}
+
+function trimmedText(node: ProseMirrorNode, trim: (text: string) => string): ProseMirrorNode[] {
+  const text = trim(node.text ?? '');
+  return text === '' ? [] : [composerSchema.text(text, node.marks)];
+}
+
+const DROPPED_WHEN_BLANK = new Set([
+  'code_block',
+  'blockquote',
+  'bullet_list',
+  'ordered_list',
+  'list_item',
+]);
+
+function blank(node: ProseMirrorNode): boolean {
+  if (node.isLeaf) return false;
+  if (node.isTextblock) return node.content.size === 0;
+  let empty = true;
+  node.forEach((child) => {
+    empty &&= blank(child);
+  });
+  return empty;
+}
+
+function normalizedBlocks(node: ProseMirrorNode): ProseMirrorNode {
+  if (node.isLeaf || node.type === composerSchema.nodes.code_block) return node;
+
+  const children: ProseMirrorNode[] = [];
+  node.forEach((child) => {
+    if (child.isText && child.text?.includes('\n')) {
+      child.text.split('\n').forEach((line, index) => {
+        if (index > 0) children.push(composerSchema.nodes.hard_break.create());
+        if (line !== '') children.push(composerSchema.text(line, child.marks));
+      });
+      return;
+    }
+    const normalized = normalizedBlocks(child);
+    if (!DROPPED_WHEN_BLANK.has(normalized.type.name) || !blank(normalized)) {
+      children.push(normalized);
+    }
+  });
+  if (node.isTextblock) {
+    for (;;) {
+      const last = children.at(-1);
+      if (last?.type === composerSchema.nodes.hard_break) children.pop();
+      else if (last?.isText && last.text?.trimEnd() !== last.text)
+        children.splice(-1, 1, ...trimmedText(last, (text) => text.trimEnd()));
+      else break;
+    }
+    for (;;) {
+      const first = children.at(0);
+      if (first?.type === composerSchema.nodes.hard_break) children.shift();
+      else if (first?.isText && first.text?.trimStart() !== first.text)
+        children.splice(0, 1, ...trimmedText(first, (text) => text.trimStart()));
+      else break;
+    }
+  }
+  return node.copy(Fragment.fromArray(children));
 }
 
 function flattenRoomPings(node: ProseMirrorNode): ProseMirrorNode {
@@ -292,6 +355,13 @@ function html(doc: ProseMirrorNode): string {
     paragraph.replaceWith(...paragraph.childNodes);
   }
 
+  const spaced = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
+  for (let node = spaced.nextNode(); node; node = spaced.nextNode()) {
+    if (node instanceof Text && !node.parentElement?.closest('pre')) {
+      node.data = node.data.replaceAll(/ (?= )/g, '\u00A0');
+    }
+  }
+
   const texts = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
   const literalMfm: { node: Text; offset: number }[] = [];
   for (let node = texts.nextNode(); node; node = texts.nextNode()) {
@@ -397,7 +467,7 @@ function imageSourcePacksOf(doc: ProseMirrorNode): ImageSourcePackReferenceView[
 
 export function serializeComposer(doc: ProseMirrorNode): ComposerMessage {
   const mentions = mentionsOf(doc);
-  const source = withoutTrailingParagraph(flattenRoomPings(doc));
+  const source = withoutTrailingParagraph(normalizedBlocks(flattenRoomPings(doc)));
   const sourceWasPlain = isPlain(source);
   const flat = expandMfm(source);
   const linked = linkMscs(flat);
@@ -566,7 +636,7 @@ const PARSE_TOKENS: Record<string, ParseSpec> = {
   fence: {
     block: 'code_block',
     noCloseToken: true,
-    getAttrs: (token) => ({ language: token.info.trim().split(/\s+/)[0] ?? '' }),
+    getAttrs: (token) => ({ language: codeLanguage(token.info.trim().split(/\s+/)[0] ?? '') }),
   },
   hardbreak: { node: 'hard_break' },
   softbreak: { node: 'hard_break' },

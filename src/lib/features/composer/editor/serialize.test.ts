@@ -364,6 +364,54 @@ test('a quote survives both ways', () => {
   expect(message.formatted).toBe('<blockquote><p>quoted</p></blockquote>');
 });
 
+test('a line break ending a quote is not sent', () => {
+  const message = serializeComposer(
+    docOf(
+      blockquote.create(
+        null,
+        para([composerSchema.text('quoted'), composerSchema.nodes.hard_break.create()])
+      )
+    )
+  );
+
+  expect(message.body).toBe('> quoted');
+  expect(message.formatted).toBe('<blockquote><p>quoted</p></blockquote>');
+});
+
+test('runs of spaces survive html whitespace collapsing', () => {
+  const message = serializeComposer(
+    docOf(para([composerSchema.text('a    '), composerSchema.text('b', [strong.create()])]))
+  );
+
+  expect(message.formatted).toBe('a&nbsp;&nbsp;&nbsp; <strong>b</strong>');
+});
+
+test('a newline character in a paragraph is sent as a line break', () => {
+  const message = serializeComposer(
+    docOf(para([composerSchema.text('one\ntwo '), composerSchema.text('x', [strong.create()])]))
+  );
+
+  expect(message.formatted).toBe('one<br>two <strong>x</strong>');
+});
+
+test('blank blocks and edge breaks are not sent', () => {
+  const { code_block, hard_break } = composerSchema.nodes;
+  const message = serializeComposer(
+    docOf(
+      blockquote.create(null, code_block.create()),
+      para([hard_break.create(), composerSchema.text(' text ', [strong.create()])])
+    )
+  );
+
+  expect(message.formatted).toBe('<strong>text</strong>');
+});
+
+test('a fence info string that is not a language is dropped', () => {
+  const message = serializeComposer(doc.create(null, markdownSlice('```>\ncode\n```').content));
+
+  expect(message.formatted).toBe('<pre><code>code</code></pre>');
+});
+
 test('a link keeps its target', () => {
   const message = serializeComposer(
     docOf(para(composerSchema.text('docs', [link.create({ href: 'https://example.org' })])))

@@ -187,7 +187,7 @@ describe('attachVia', () => {
     const doc = editor.doc();
 
     expect(doc && serializeComposer(doc).formatted).toBe(
-      '<a href="https://matrix.to/#/!abc:example.org?via=sable.moe">#Sable</a> '
+      '<a href="https://matrix.to/#/!abc:example.org?via=sable.moe">#Sable</a>'
     );
   });
 

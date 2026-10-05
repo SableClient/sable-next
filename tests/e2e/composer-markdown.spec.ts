@@ -144,4 +144,52 @@ for (const mobile of [false, true]) {
     await expect(code).toHaveJSProperty('textContent', 'fn main() {\n    let x = 1;\n}');
     await expect(app.composer.locator('p').last()).toHaveText('after');
   });
+
+  test(`${prefix}leaving a block sends no blank lines or stray breaks`, async ({
+    page,
+    app,
+    installRoomCore,
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('sable-preferences', JSON.stringify({ richTextComposer: true }));
+    });
+    await installRoomCore('ready');
+    await app.openRoom('!room:example.test');
+    const coarse = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+    const newline = coarse ? 'Enter' : 'Shift+Enter';
+
+    let sent = 0;
+    for (const [keys, formatted] of [
+      [['> quote', newline, newline, 'after'], '<blockquote><p>quote</p></blockquote><p>after</p>'],
+      [['> quote', newline], '<blockquote><p>quote</p></blockquote>'],
+      [['> quote', newline, newline], '<blockquote><p>quote</p></blockquote>'],
+      [
+        ['- one', newline, 'two', newline, newline, 'after'],
+        '<ul><li>one</li><li>two</li></ul><p>after</p>',
+      ],
+      [['- one', newline, newline, newline], '<ul><li>one</li></ul>'],
+    ] as const) {
+      await app.composer.click();
+      for (const key of keys) {
+        if (key === newline) await page.keyboard.press(key);
+        else await page.keyboard.type(key);
+      }
+      await app.sendMessage.click();
+      sent += 1;
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => window.__e2eCommandPayloads.filter((c) => c.type === 'send_message').length
+          )
+        )
+        .toBe(sent);
+      expect(
+        await page.evaluate(() =>
+          window.__e2eCommandPayloads.findLast((c) => c.type === 'send_message')
+        ),
+        keys.join(' ⏎ ')
+      ).toMatchObject({ formatted });
+      await expect(app.composer).toBeEmpty();
+    }
+  });
 }

@@ -14,6 +14,7 @@ import {
   sent,
   softBreak,
   tx,
+  view,
 } from './model-harness';
 
 afterEach(resetModel);
@@ -130,6 +131,13 @@ test('a double line break at the end of a quote exits it', () => {
   softBreak(model);
   softBreak(model);
   expect(tx(model)).toBe('<blockquote><p>Text</p></blockquote><p>|</p>');
+});
+
+test('exiting a quote does not stack a second empty paragraph below it', () => {
+  const model = cm('<blockquote><p>Text|</p></blockquote>');
+  softBreak(model);
+  softBreak(model);
+  expect(view(model).state.doc.childCount).toBe(2);
 });
 
 test('a double line break mid-quote does not exit it', () => {
