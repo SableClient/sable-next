@@ -487,6 +487,7 @@ impl Core {
                 attachment_info: info,
                 caption: None,
                 thumbnail: None,
+                extra_content: None,
             });
         }
 

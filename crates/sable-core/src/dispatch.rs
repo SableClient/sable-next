@@ -34,8 +34,8 @@ use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
 use matrix_sdk::ruma::room::RoomType;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
-    MilliSecondsSinceUnixEpoch, OwnedMxcUri, OwnedRoomId, OwnedUserId, RoomId, RoomOrAliasId,
-    ServerName, UInt, events::room::member::MembershipState,
+    MilliSecondsSinceUnixEpoch, OwnedMxcUri, OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt,
+    events::room::member::MembershipState,
 };
 use matrix_sdk::ruma::{
     RoomVersionId, api::client::discovery::get_capabilities::v3::RoomVersionStability,
@@ -2120,10 +2120,7 @@ impl Core {
                     .client()
                     .await?
                     .subscribe_to_ignore_user_list_changes()
-                    .get()
-                    .iter()
-                    .filter_map(|user_id| user_id.parse().ok())
-                    .collect::<Vec<OwnedUserId>>();
+                    .get();
                 users.sort();
 
                 Ok(CommandOk::IgnoredUsers { users })
