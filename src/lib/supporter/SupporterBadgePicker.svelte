@@ -90,7 +90,7 @@
         />
         <span class="badge-option-mark"><SupporterMark {...draft} {variant} /></span>
         <span
-          >{variant === 'gold'
+          >{variant === 'gold' || variant === 'ghost' || variant === 'evil'
             ? $i18n.t(`supporter.colors.${variant}`)
             : $i18n.t(`settings.appIcons.${variant}`)}</span
         >

@@ -52,6 +52,8 @@
   const palettes = {
     gold: ['var(--supporter-gold)', 'var(--supporter-gold)'],
     propeller: ['var(--supporter-yellow)', 'var(--supporter-red)'],
+    ghost: ['var(--supporter-white)', 'var(--supporter-silver)'],
+    evil: ['var(--supporter-red)', 'var(--supporter-evil)'],
     agender: ['var(--supporter-green)', 'var(--supporter-silver)'],
     bisexual: ['var(--supporter-bisexual-pink)', 'var(--supporter-bisexual-blue)'],
     trans: ['var(--supporter-blue)', 'var(--supporter-pink)'],

@@ -1539,6 +1539,8 @@
     "buttonColor": "Donate button color",
     "colors": {
       "gold": "Gold",
+      "ghost": "Ghosable",
+      "evil": "Sablevil",
       "custom": "Custom color"
     },
     "badgeSaveFailed": "Could not save your badge. Try again."

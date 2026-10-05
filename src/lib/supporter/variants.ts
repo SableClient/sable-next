@@ -7,6 +7,8 @@ export const SUPPORTER_VARIANTS = [
   'gold',
   'custom',
   'propeller',
+  'ghost',
+  'evil',
   'agender',
   'bisexual',
   'trans',

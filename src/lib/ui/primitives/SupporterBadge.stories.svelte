@@ -44,6 +44,10 @@
   <SupporterBadge label="Donor" name="Alex" isOwnBadge />
 </Story>
 
+<Story name="Ghosable" args={{ variant: 'ghost' }} />
+
+<Story name="Sablevil" args={{ variant: 'evil' }} />
+
 <Story name="Variants" asChild>
   <div class="row">
     {#each SUPPORTER_VARIANTS as variant (variant)}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import ceoArt from './ceo.png';
-  import { APP_ICON_STOPS, SABLE_PATHS } from './icon-art.js';
+  import { APP_ICON_STOPS, GHOST_SABLE_PATH, SABLE_EYE_PATH, SABLE_PATHS } from './icon-art.js';
   import {
     supporterButtonText,
     supporterColor,
@@ -80,7 +80,10 @@
           ? 'translate(26 26) scale(.9)'
           : undefined}
     >
-      <path fill={stops ? 'url(#' + id + ')' : 'currentColor'} d={SABLE_PATHS[0]} />
+      <path
+        fill={stops ? 'url(#' + id + ')' : 'currentColor'}
+        d={chosen === 'ghost' ? GHOST_SABLE_PATH : SABLE_PATHS[0]}
+      />
       <path fill={backing} opacity="0.45" d={SABLE_PATHS[1]} />
       {#if chosen === 'propeller'}
         <path fill="var(--supporter-red)" d="M125 174C146 81 277 69 324 150L225 174Z" />
@@ -98,6 +101,8 @@
           ry="8"
           transform="rotate(-18 211 48)"
         />
+      {:else if chosen === 'evil'}
+        <path fill="var(--supporter-red)" d={SABLE_EYE_PATH} />
       {/if}
     </g>
   {/if}
@@ -114,5 +119,13 @@
 
   .supporter-mark[data-variant='propeller'] {
     color: var(--supporter-purple);
+  }
+
+  .supporter-mark[data-variant='ghost'] {
+    color: var(--supporter-white);
+  }
+
+  .supporter-mark[data-variant='evil'] {
+    color: var(--supporter-evil);
   }
 </style>
