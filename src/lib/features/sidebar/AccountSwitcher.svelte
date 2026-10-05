@@ -98,7 +98,10 @@
   }
 
   function openProfile(): void {
-    void goto(resolve('settings/account'));
+    void goto(resolve('settings/account'), {
+      shallow: true,
+      state: { settings: { section: 'account' } },
+    });
   }
 
   async function logoutAccount(accountId: string): Promise<void> {
