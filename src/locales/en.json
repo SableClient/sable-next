@@ -3157,9 +3157,9 @@
     "scopeRoom": "This room",
     "scopeSpace": "This space",
     "scopeAccount": "Everywhere",
-    "scopeLatchOff": "Disabled",
-    "scopeLatchRoom": "Latch in room",
-    "scopeLatchAccount": "Latch globally",
+    "scopeLatchOff": "Never",
+    "scopeLatchRoom": "Room",
+    "scopeLatchAccount": "Global",
     "sendingAs": "Sending as {{name}}",
     "clearSelection": "Send as default again"
   },
