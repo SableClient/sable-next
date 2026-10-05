@@ -50,6 +50,12 @@
 </main>
 
 <style>
+  @media (pointer: fine) {
+    .app-page-shell {
+      user-select: text;
+    }
+  }
+
   .app-page-shell {
     margin: 0 auto;
     max-width: 52rem;
