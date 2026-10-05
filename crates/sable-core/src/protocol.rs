@@ -183,6 +183,7 @@ pub enum Command {
     DefaultNotificationModes,
     MentionNotifications,
     MembershipNotifications,
+    MasterMute,
     Notification {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1193,6 +1194,9 @@ pub enum Command {
     SetMembershipNotifications {
         enabled: bool,
     },
+    SetMasterMute {
+        muted: bool,
+    },
 
     SetRoomName {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -1490,6 +1494,9 @@ pub enum CommandOk {
     },
     MembershipNotifications {
         enabled: Option<bool>,
+    },
+    MasterMute {
+        muted: Option<bool>,
     },
     /// `Some` carries the VAPID key subscriptions must be minted under.
     WebPusherSupport {
@@ -1921,6 +1928,7 @@ pub enum CommandOk {
     SetDefaultNotificationMode,
     SetMentionNotifications,
     SetMembershipNotifications,
+    SetMasterMute,
 
     SetDirect,
     SetRoomName,

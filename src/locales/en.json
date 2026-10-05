@@ -2200,6 +2200,8 @@
     "notificationDefaultDirect": "Direct messages",
     "notificationDefaultGroup": "Rooms",
     "notificationMembership": "Joins, leaves and profile changes",
+    "notificationMasterMute": "Mute all notifications",
+    "notificationMasterMuteHint": "Silences every room on your account, on every device and client. Another app may have turned this on.",
     "notificationDefaultsFailed": "Those notification settings could not be saved.",
     "mentions": "Mentions",
     "mentionsHint": "Applies in every room you have not muted, whatever that room's own level.",

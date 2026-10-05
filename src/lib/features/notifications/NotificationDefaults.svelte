@@ -12,6 +12,7 @@
   import SettingsAnchorLink from '#lib/ui/primitives/SettingsAnchorLink.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import Switch from '#lib/ui/primitives/Switch.svelte';
 
   import { settingsChanges } from './notifications.svelte';
   import '#lib/ui/primitives/settings-row.css';
@@ -53,6 +54,7 @@
 
   let current = $state<DefaultNotificationModesView | null>(null);
   let membership = $state<boolean | null>(null);
+  let muted = $state<boolean | null>(null);
   let failed = $state(false);
   $effect(() => {
     void settingsChanges.version;
@@ -71,6 +73,12 @@
     void core.commands.membershipNotifications().then(
       (enabled) => {
         if (alive) membership = enabled;
+      },
+      () => undefined
+    );
+    void core.commands.masterMute().then(
+      (value) => {
+        if (alive) muted = value;
       },
       () => undefined
     );
@@ -96,6 +104,15 @@
         settingsChanges.version += 1;
       }
     );
+  }
+
+  function saveMute(value: boolean): void {
+    muted = value;
+
+    void core.commands.setMasterMute(value).catch(() => {
+      failed = true;
+      settingsChanges.version += 1;
+    });
   }
 
   function saveMembership(enabled: boolean): void {
@@ -149,6 +166,18 @@
   {/if}
 
   <ul class="settings-rows">
+    {#if muted !== null}
+      <SettingsRow
+        title={$i18n.t('settings.notificationMasterMute')}
+        description={$i18n.t('settings.notificationMasterMuteHint')}
+      >
+        <Switch
+          label={$i18n.t('settings.notificationMasterMute')}
+          checked={muted}
+          onCheckedChange={saveMute}
+        />
+      </SettingsRow>
+    {/if}
     {#each pushRows as { key, label, direct } (key)}
       <SettingsRow title={$i18n.t(label)}>
         {#if current}

@@ -2206,6 +2206,10 @@ impl Core {
                 ),
             }),
 
+            Command::MasterMute => Ok(CommandOk::MasterMute {
+                muted: push_rules::master_muted(&self.push_rules().await?.snapshot().await),
+            }),
+
             Command::SetPusher { pusher } => {
                 notifications::set_pusher(&self.client().await?, pusher)
                     .await
@@ -2387,6 +2391,16 @@ impl Core {
                     .or_failed(self, "set_membership_notifications")?;
 
                 Ok(CommandOk::SetMembershipNotifications)
+            }
+
+            Command::SetMasterMute { muted } => {
+                self.push_rules()
+                    .await?
+                    .apply(push_rules::plan_master(muted))
+                    .await
+                    .or_failed(self, "set_master_mute")?;
+
+                Ok(CommandOk::SetMasterMute)
             }
 
             Command::Notification { room_id, event_id } => {

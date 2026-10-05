@@ -531,6 +531,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     const notificationKeywords: KeywordNotificationView[] = [];
     let defaultGroupMode: 'all' | 'mentions' = 'mentions';
     let membershipNotifications: boolean | null = false;
+    let masterMute: boolean | null = false;
     const mentionNotificationModes: MentionNotificationsView = {
       room: 'notify',
       user: 'loud',
@@ -1126,6 +1127,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'membership_notifications',
         enabled: membershipNotifications,
       }),
+      master_mute: () => ({ type: 'master_mute', muted: masterMute }),
       web_pusher_support: () => ({ type: 'web_pusher_support', vapid: null }),
       web_pushers: () => ({ type: 'web_pushers', pushers: [] }),
       ping_push_gateway: () => ({ type: 'ping_push_gateway', reached: null }),
@@ -1665,6 +1667,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       set_membership_notifications: (command) => {
         membershipNotifications = command.enabled;
         return { type: 'set_membership_notifications' };
+      },
+      set_master_mute: (command) => {
+        masterMute = command.muted;
+        return { type: 'set_master_mute' };
       },
       send_state_event: (command) => {
         if (command.event_type === 'im.vector.modular.widgets')

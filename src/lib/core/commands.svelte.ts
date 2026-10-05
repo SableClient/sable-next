@@ -1746,6 +1746,15 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'set_membership_notifications', enabled });
     },
 
+    async masterMute(): Promise<boolean | null> {
+      const response = await transport().send({ type: 'master_mute' });
+      return response.muted;
+    },
+
+    async setMasterMute(muted: boolean): Promise<void> {
+      await transport().send({ type: 'set_master_mute', muted });
+    },
+
     async setDefaultNotificationMode(direct: boolean, mode: NotificationModeView): Promise<void> {
       await transport().send({
         type: 'set_default_notification_mode',

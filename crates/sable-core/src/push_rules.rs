@@ -649,6 +649,25 @@ pub fn membership_notifications(rules: &Ruleset) -> Option<bool> {
 }
 
 #[must_use]
+pub fn master_muted(rules: &Ruleset) -> Option<bool> {
+    rules
+        .get(
+            RuleKind::Override,
+            PredefinedOverrideRuleId::Master.as_str(),
+        )
+        .map(|rule| rule.enabled())
+}
+
+#[must_use]
+pub fn plan_master(muted: bool) -> Vec<RuleWrite> {
+    vec![RuleWrite::Enabled {
+        kind: RuleKind::Override,
+        rule_id: PredefinedOverrideRuleId::Master.to_string(),
+        enabled: muted,
+    }]
+}
+
+#[must_use]
 pub fn plan_membership(enabled: bool) -> Vec<RuleWrite> {
     let rule_id = PredefinedOverrideRuleId::MemberEvent.to_string();
     vec![
@@ -780,10 +799,10 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        RuleWrite, default_modes, keywords, level_actions, membership_notifications,
+        RuleWrite, default_modes, keywords, level_actions, master_muted, membership_notifications,
         mention_notifications, plan_add_keyword, plan_alignment, plan_default_mode,
-        plan_keyword_mode, plan_membership, plan_mention, plan_remove_keyword, plan_room_mode,
-        pushes_every_encrypted_event, room_mode,
+        plan_keyword_mode, plan_master, plan_membership, plan_mention, plan_remove_keyword,
+        plan_room_mode, pushes_every_encrypted_event, room_mode,
     };
     use crate::protocol::{MentionNotificationModeView, MentionRuleView, NotificationModeView};
 
@@ -1162,6 +1181,21 @@ mod tests {
             MentionNotificationModeView::Off,
         )
         .unwrap_err();
+    }
+
+    #[test]
+    fn the_master_rule_reads_as_muted_only_while_enabled() {
+        let mut rules = Ruleset::server_default(me());
+        assert_eq!(master_muted(&rules), Some(false));
+
+        rules = applied(rules.clone(), plan_master(true));
+        assert_eq!(master_muted(&rules), Some(true));
+
+        rules = applied(rules.clone(), plan_master(false));
+        assert_eq!(master_muted(&rules), Some(false));
+
+        rules.override_.clear();
+        assert_eq!(master_muted(&rules), None);
     }
 
     #[test]
