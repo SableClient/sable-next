@@ -34,7 +34,6 @@ tauri = { version = "2.11.3", default-features = false, features = [
   "dbus",
   "devtools",
   "dynamic-acl",
-  "macos-proxy",
   "tray-icon",
   "x11",
 ] }
@@ -73,6 +72,9 @@ tauri-plugin-process = "2"
 tauri-plugin-notifications = { version = "0.5.0", git = "https://github.com/SableClient/tauri-plugin-notifications.git", rev = "ff53d440d8274feee3e69b3bcc4406933b446e0a", default-features = false, features = [
   "notify-rust",
 ] }
+
+[target."cfg(target_os = \"macos\")".dependencies]
+tauri = { version = "2.11.3", default-features = false, features = ["macos-proxy"] }
 
 # The system bar icon contrast is only reachable through the Activity's window.
 [target."cfg(target_os = \"android\")".dependencies]
