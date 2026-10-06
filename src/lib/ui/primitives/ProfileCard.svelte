@@ -304,6 +304,12 @@
 </section>
 
 <style>
+  @media (pointer: fine) {
+    .profile-card {
+      user-select: text;
+    }
+  }
+
   .profile-card {
     /* --sec-main alone fails 4.5:1 on the light background at this text
        size, so small words get a stronger mix and it is left to icons. */
