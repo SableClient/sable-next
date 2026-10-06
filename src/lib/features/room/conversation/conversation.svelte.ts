@@ -659,6 +659,11 @@ export class Conversation {
         .catch(() => {});
     }
 
+    let personaUpdatedTimestamp = persona;
+    personaUpdatedTimestamp.last_used = Date.now();
+
+    personas.save(personaUpdatedTimestamp, persona.id)
+
     return {
       body: proxied?.body ?? body,
       formatted: proxied ? stripProxyHtml(formatted, proxied.trigger) : formatted,

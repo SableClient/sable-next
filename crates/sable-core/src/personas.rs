@@ -24,6 +24,7 @@ const SELECTION_PREFIX: &str = "fyi.cisnt.permessageprofile";
 const PRONOUNS: &str = "io.fsky.nyx.pronouns";
 const COLORS: &str = "eu.she-a.color";
 const PKIMPORT: &str = "net.f0rest.pkimport";
+const LAST_USED: &str = "net.f0rest.last_used";
 const TRIGGER_SUFFIX: &str = "net.f0rest.suffix";
 const TRIGGER_CIRCUMFIX: &str = "net.f0rest.circumfix";
 
@@ -127,6 +128,7 @@ fn pluralkit_from_json(value: Option<&Value>) -> Option<PluralkitImportView> {
 fn persona_from_json(value: &Value) -> Option<PersonaView> {
     let id = text(value.get("id"))?;
     let display_name = value.get("displayname").and_then(Value::as_str)?.to_owned();
+    let last_used = value.get(LAST_USED).and_then(Value::as_u64);
 
     let triggers = value.get("triggers").and_then(Value::as_array).map_or_else(
         || value.get("trigger").map_or_else(Vec::new, triggers_from_v2),
@@ -142,6 +144,7 @@ fn persona_from_json(value: &Value) -> Option<PersonaView> {
         color_on_dark: color(value, "on_dark"),
         triggers,
         pluralkit: pluralkit_from_json(value.get(PKIMPORT)),
+        last_used,
     })
 }
 
@@ -252,6 +255,10 @@ fn persona_to_json(persona: &PersonaView) -> Value {
                 .collect(),
         ),
     );
+
+    if let Some(last_used) = &persona.last_used {
+        object.insert(LAST_USED.to_owned(), (*last_used).into());
+    }
 
     Value::Object(object)
 }

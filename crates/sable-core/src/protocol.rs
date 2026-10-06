@@ -3395,6 +3395,8 @@ pub struct PersonaView {
     #[serde(default)]
     pub triggers: Vec<PersonaTriggerView>,
     pub pluralkit: Option<PluralkitImportView>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub last_used: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

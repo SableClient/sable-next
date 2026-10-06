@@ -699,6 +699,7 @@ export type PersonaView = {
 	color_on_dark: string | null,
 	triggers: PersonaTriggerView[],
 	pluralkit: PluralkitImportView | null,
+	last_used: number | null,
 };
 
 export type PluralkitImportView = {
