@@ -41,6 +41,7 @@
       variant="sheet"
       unicode
       stickers={false}
+      reactions
       onPick={(image: PackImageView) => {
         pick(image.url, image.source_pack);
       }}

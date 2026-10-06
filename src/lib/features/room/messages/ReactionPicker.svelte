@@ -72,7 +72,14 @@
       aria-label={label}
     >
       {#key revision}
-        <EmoteBoard {roomId} unicode stickers={false} onPick={pickImage} onPickUnicode={pick} />
+        <EmoteBoard
+          {roomId}
+          unicode
+          stickers={false}
+          reactions
+          onPick={pickImage}
+          onPickUnicode={pick}
+        />
       {/key}
     </Popover.Content>
   </Popover.Portal>

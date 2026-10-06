@@ -34,6 +34,7 @@
     unicode?: boolean;
     /** A reaction key cannot be a sticker. */
     stickers?: boolean;
+    reactions?: boolean;
     gifs?: { config: GifsConfig; providerSetting: GifProviderSetting } | null;
     onPick: (image: PackImageView, usage: ImageUsageView) => void;
     onPickUnicode?: (emoji: string) => void;
@@ -48,6 +49,7 @@
     resizable = false,
     unicode = false,
     stickers = true,
+    reactions = false,
     gifs = null,
     onPick,
     onPickUnicode,
@@ -203,7 +205,14 @@
     const images = recentImages
       .filter((image) => !emojiTab || !recentReactions.includes(image.url))
       .map((image): Cell => ({ image }));
-    return emojiTab ? [...recentReactions.map((emoji): Cell => ({ emoji })), ...images] : images;
+    if (!emojiTab) return images;
+    const all = sections.flatMap((section) => section.images);
+    const recent = recentReactions.map((emoji): Cell => {
+      const image = all.find((candidate) => candidate.url === emoji);
+      return image ? { image } : { emoji };
+    });
+    const cells = reactions ? recent : recent.filter((cell) => !isUnresolvedImage(cell));
+    return [...cells, ...images];
   });
 
   let groupSections = $derived(
@@ -231,7 +240,7 @@
       : groupSections
   );
 
-  let showFreeText = $derived(onPickUnicode !== undefined && searching);
+  let showFreeText = $derived(reactions && onPickUnicode !== undefined && searching);
   let imageCell = $derived(
     imageMeasure?.tab === tab
       ? imageMeasure
@@ -386,6 +395,10 @@
     return () => observer.disconnect();
   }
 
+  function isUnresolvedImage(cell: Cell): boolean {
+    return 'emoji' in cell && cell.emoji.startsWith('mxc://');
+  }
+
   function uniqueReactions(): string[] {
     return [...new Set(readRecentReactions())];
   }
@@ -470,6 +483,7 @@
     if (text === '') return;
     event.preventDefault();
     const best = searchEmojis.at(0);
+    if (best === undefined && !reactions) return;
     if (best !== undefined) rememberReaction(best);
     onPickUnicode(best ?? text);
   }
