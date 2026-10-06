@@ -2506,7 +2506,7 @@
       "lesbian": "Lesbian",
       "mlm": "MLM",
       "pride": "Pride",
-      "ceo": "CEO"
+      "ceo": "Ceoable"
     },
     "serverSearch": "Search on the server",
     "serverSearchHint": "Lets the homeserver search one unencrypted room. Off keeps queries local.",

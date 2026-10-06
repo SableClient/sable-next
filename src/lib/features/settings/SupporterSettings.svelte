@@ -82,7 +82,6 @@
     <SupporterBadgePicker
       value={supporter.appearance}
       {name}
-      tier={badge.tier}
       disabled={supporter.savingAppearance || supporter.removing}
       onChange={selectAppearance}
     />

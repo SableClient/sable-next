@@ -104,34 +104,39 @@ describe('start', () => {
   });
 });
 
-test('loads customization and preserves it independently of the signed award', async () => {
-  const { stub, core } = makeCore([VALID]);
-  const appearance = {
-    ...supporterAppearance(),
-    variant: 'custom' as const,
-    shape: 'heart' as const,
-    customBackground: true,
-    backgroundColor: '#ffeedd',
-    color: '#123456',
-  };
-  stub.userProfile.mockResolvedValue({
-    supporter_awards: JSON.stringify([VALID]),
-    extra: [{ key: SUPPORTER_BADGE_FIELD, value: JSON.stringify(appearance) }],
-  });
-  supporter.start(core);
-  await vi.waitFor(() => {
+test.each(['pride', 'ceo'] as const)(
+  'loads %s customization independently of the signed award',
+  async (variant) => {
+    const { stub, core } = makeCore([VALID]);
+    const appearance = {
+      ...supporterAppearance(),
+      variant: 'custom' as const,
+      shape: 'heart' as const,
+      customBackground: true,
+      backgroundColor: '#ffeedd',
+      color: '#123456',
+    };
+    stub.userProfile.mockResolvedValue({
+      supporter_awards: JSON.stringify([VALID]),
+      extra: [{ key: SUPPORTER_BADGE_FIELD, value: JSON.stringify(appearance) }],
+    });
+    supporter.start(core);
+    await vi.waitFor(() => {
+      expect(supporter.badge?.label).toBe('Donor');
+    });
+    expect(supporter.appearance).toEqual(appearance);
+    const award = supporter.badge;
+    await supporter.selectAppearance({ variant, buttonColor: '#ABC' });
+    expect(stub.setProfileField).toHaveBeenCalledWith(SUPPORTER_BADGE_FIELD, {
+      ...appearance,
+      variant,
+      buttonColor: '#aabbcc',
+    });
+    expect(supporter.badge).toBe(award);
     expect(supporter.badge?.label).toBe('Donor');
-  });
-  expect(supporter.appearance).toEqual(appearance);
-  const award = supporter.badge;
-  await supporter.selectAppearance({ variant: 'pride', buttonColor: '#ABC' });
-  expect(stub.setProfileField).toHaveBeenCalledWith(SUPPORTER_BADGE_FIELD, {
-    ...appearance,
-    variant: 'pride',
-    buttonColor: '#aabbcc',
-  });
-  expect(supporter.badge).toBe(award);
-});
+    expect(supporter.badge?.tier).toBeNull();
+  }
+);
 describe('verify', () => {
   test('opens Open Collective, polls, and stores the award once it appears', async () => {
     vi.mocked(fetchAwards).mockResolvedValueOnce([]).mockResolvedValue([VALID]);
