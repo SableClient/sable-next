@@ -88,7 +88,7 @@
           onOpen={() => onOpen?.(index)}
         />
       {/if}
-      {#if item.caption && !imageHidden(item, index)}
+      {#if item.caption}
         <p class="item-caption">{item.caption}</p>
       {:else if item.kind === 'image' && !imageHidden(item, index) && preferences.alwaysShowAltText}
         <p class="item-caption">{item.filename}</p>

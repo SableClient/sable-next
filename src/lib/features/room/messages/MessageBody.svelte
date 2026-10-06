@@ -95,6 +95,11 @@
       spoiler === null ? 'timeline.hiddenMedia' : 'timeline.spoilerMedia'
     )}
   </Button>
+  {#if item.content.kind === 'video' && showCaption && item.content.html}
+    <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
+  {:else if item.content.kind === 'video' && showCaption && item.content.caption}
+    <p class="body">{item.content.caption}</p>
+  {/if}
 {:else if item.content.kind === 'redacted'}
   <p class="redacted">
     <TrashIcon size={14} aria-hidden="true" />
@@ -174,9 +179,9 @@
       retryable
       onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
     />
-    {#if !imageSpoilerHidden && showCaption && item.content.html}
+    {#if showCaption && item.content.html}
       <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
-    {:else if !imageSpoilerHidden && showCaption && item.content.caption}
+    {:else if showCaption && item.content.caption}
       <p class="body">{item.content.caption}</p>
     {:else if !imageSpoilerHidden && !item.content.caption && preferences.alwaysShowAltText}
       <p class="body">{item.content.filename}</p>
