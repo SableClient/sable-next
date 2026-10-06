@@ -32,6 +32,8 @@ export function renameLegacyThemeIdentifiers(css: string): string {
     .replace(/--sable-([a-z0-9-]+)/g, (_, name: string) =>
       name === 'shadow' ? '--shadow-color' : `--${name}`
     )
+    .replace(/--font-secondary(?![a-z0-9-])/g, '--font-family')
+    .replace(/--font-monospace(?![a-z0-9-])/g, '--font-family-mono')
     .replace(/\.sable-([a-z0-9-]+)/g, (_, name: string) => {
       if (LEGACY_CLASS_ALIASES[name]) return `.${LEGACY_CLASS_ALIASES[name]}`;
       return name.startsWith('button-') ? `.btn-${name.slice('button-'.length)}` : `.${name}`;

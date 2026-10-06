@@ -44,6 +44,8 @@ describe('renameLegacyThemeIdentifiers', () => {
     ],
     ['.sable-switch-thumb { color: red; }', '.switch-thumb { color: red; }'],
     ['.sable-progress { color: red; }', '.progress-track { color: red; }'],
+    ["--font-secondary: 'Oxanium', sans-serif;", "--font-family: 'Oxanium', sans-serif;"],
+    ['--font-monospace: monospace;', '--font-family-mono: monospace;'],
   ])('rewrites %s', (legacy, expected) => {
     expect(renameLegacyThemeIdentifiers(legacy)).toBe(expected);
   });
