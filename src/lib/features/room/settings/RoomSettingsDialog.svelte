@@ -16,6 +16,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import SettingsNav from '#lib/ui/primitives/SettingsNav.svelte';
+  import { leaveUnlessUnsaved } from '#lib/ui/unsaved-guard.js';
 
   import RoomAbbreviationsSettings from './RoomAbbreviationsSettings.svelte';
   import RoomAppearanceSettings from './RoomAppearanceSettings.svelte';
@@ -87,7 +88,15 @@
   });
 
   function close(): void {
-    onOpenChange(false);
+    leaveUnlessUnsaved(() => {
+      onOpenChange(false);
+    });
+  }
+
+  function show(next: RoomSettingsSectionId | null): void {
+    leaveUnlessUnsaved(() => {
+      section = next;
+    });
   }
 
   function sectionLabel(id: string): string {
@@ -108,7 +117,7 @@
     {nav}
     {content}
     onBack={() => {
-      section = null;
+      show(null);
     }}
     onClose={close}
   />
@@ -127,7 +136,7 @@
     activeId={state.openSection}
     ariaLabel={$i18n.t('room.settingsSections')}
     onSelect={(_, id) => {
-      section = id as RoomSettingsSectionId;
+      show(id as RoomSettingsSectionId);
     }}
     showChevron={!state.desktop}
     large={!state.desktop}

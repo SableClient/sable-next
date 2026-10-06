@@ -13,6 +13,8 @@ export const afterNavigate = vi.fn((listener: () => void) => {
   listeners.add(listener);
 });
 
+export const beforeNavigate = vi.fn();
+
 export function navigated(): void {
   for (const listener of listeners) listener();
 }
@@ -21,4 +23,5 @@ export function resetNavigation(): void {
   listeners.clear();
   goto.mockClear();
   afterNavigate.mockClear();
+  beforeNavigate.mockClear();
 }

@@ -20,6 +20,7 @@ Object.assign(core, { uploadMedia: mocks.uploadMedia });
 
 import ImagePackEditor from './ImagePackEditor.svelte';
 import { packEventContent, type PackDraft } from './pack-content.js';
+import { beforeNavigate } from '#lib/test-support/app-navigation.js';
 import { leaveUnlessUnsaved } from '#lib/ui/unsaved-guard.js';
 
 function pack(usage: ImagePackView['usage']): ImagePackView {
@@ -314,4 +315,43 @@ test('Save writes the pack and then leaves', async () => {
     expect(proceed).toHaveBeenCalledOnce();
   });
   expect(applied.map((draft) => draft.attribution)).toEqual(['x']);
+});
+
+type NavigationHook = (navigation: {
+  from: { url: URL } | null;
+  to: { url: URL } | null;
+  type: string;
+  willUnload: boolean;
+  cancel: () => void;
+}) => void;
+
+function navigate(to: string, from = 'http://localhost/rooms/a'): () => void {
+  const hook = beforeNavigate.mock.calls.at(-1)?.[0] as NavigationHook;
+  const cancel = vi.fn();
+  hook({
+    from: { url: new URL(from) },
+    to: { url: new URL(to) },
+    type: 'link',
+    willUnload: false,
+    cancel,
+  });
+  return cancel;
+}
+
+test('navigating to another page with unsaved edits is cancelled and asks', async () => {
+  renderDirtyEditor([]);
+  await userEvent.type(screen.getByRole('textbox', { name: 'Attribution' }), 'x');
+
+  const cancel = navigate('http://localhost/rooms/b');
+
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(await screen.findByRole('button', { name: 'Keep editing' })).toBeInTheDocument();
+});
+
+test('navigating with nothing edited, or within the same url, is left alone', async () => {
+  renderDirtyEditor([]);
+  expect(navigate('http://localhost/rooms/b')).not.toHaveBeenCalled();
+
+  await userEvent.type(screen.getByRole('textbox', { name: 'Attribution' }), 'x');
+  expect(navigate('http://localhost/rooms/a')).not.toHaveBeenCalled();
 });

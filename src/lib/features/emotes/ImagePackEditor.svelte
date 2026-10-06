@@ -69,12 +69,12 @@
 
   let dirty = $derived(draft !== null);
   let rejected = $derived(draft === null ? null : invalidShortcode(draft.images));
-  let leaving = $state<(() => void) | null>(null);
+  let leaving = $state.raw<{ proceed: () => void; stay?: () => void } | null>(null);
 
   holdUnsaved({
     dirty: () => canEdit && dirty && leaving === null,
-    ask: (proceed) => {
-      leaving = proceed;
+    ask: (proceed, stay) => {
+      leaving = { proceed, stay };
     },
   });
 
@@ -275,21 +275,23 @@
   }
 
   function stay(): void {
+    const pending = leaving;
     leaving = null;
+    pending?.stay?.();
   }
 
   function discardAndLeave(): void {
-    const proceed = leaving;
+    const pending = leaving;
     leaving = null;
     draft = null;
-    proceed?.();
+    pending?.proceed();
   }
 
   async function saveAndLeave(): Promise<void> {
-    const proceed = leaving;
+    const pending = leaving;
     if (!(await apply())) return;
     leaving = null;
-    proceed?.();
+    pending?.proceed();
   }
 </script>
 
@@ -573,7 +575,14 @@
 </div>
 
 {#if leaving !== null}
-  <DialogFrame open variant="verification" label={$i18n.t('emotes.leaveTitle')}>
+  <DialogFrame
+    open
+    variant="verification"
+    label={$i18n.t('emotes.leaveTitle')}
+    onOpenChange={(next) => {
+      if (!next) stay();
+    }}
+  >
     <div class="leave">
       <h2>{$i18n.t('emotes.leaveTitle')}</h2>
       <p>{$i18n.t('emotes.leaveHint')}</p>

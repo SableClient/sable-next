@@ -23,6 +23,15 @@ const core = Object.assign(baseCore, {
   roomHasSpaceParent: vi.fn(),
 });
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
+const guard = vi.hoisted(() => ({
+  leave: vi.fn<(proceed: () => void, stay?: () => void) => void>((proceed) => {
+    proceed();
+  }),
+}));
+vi.mock('#lib/ui/unsaved-guard.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/ui/unsaved-guard.js')>()),
+  leaveUnlessUnsaved: guard.leave,
+}));
 
 import RoomSettingsDialog from './RoomSettingsDialog.svelte';
 
@@ -108,6 +117,9 @@ async function setup(
 
 afterEach(() => {
   vi.clearAllMocks();
+  guard.leave.mockImplementation((proceed) => {
+    proceed();
+  });
 });
 
 test('does not offer to replace an unsupported join rule without permission', async () => {
@@ -176,4 +188,20 @@ test('members who cannot edit packs still see the emoji section', async () => {
   await setup(false);
 
   expect(screen.getByRole('button', { name: /room\.settingsEmojis/ })).toBeInTheDocument();
+});
+
+test('switching section waits for the unsaved-changes answer', async () => {
+  const held: (() => void)[] = [];
+  guard.leave.mockImplementation((proceed) => {
+    held.push(proceed);
+  });
+  const user = userEvent.setup();
+  await setup(false);
+
+  await user.click(screen.getByRole('button', { name: /room\.settingsDeveloper/ }));
+  expect(held).toHaveLength(1);
+  expect(screen.queryByText('room.devBrowserTitle')).toBeNull();
+
+  held[0]();
+  expect((await screen.findAllByText('room.devBrowserTitle')).length).toBeGreaterThan(0);
 });
