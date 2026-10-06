@@ -15,6 +15,19 @@ export function resetDocumentScroll(): void {
   window.scrollTo(0, 0);
 }
 
+function revealFocusedField(viewport: VisualViewport): void {
+  const scroller = document.scrollingElement;
+  const field = document.activeElement;
+  if (!scroller || scroller.scrollHeight <= scroller.clientHeight + 1) return;
+  if (!(field instanceof HTMLElement) || !field.matches('input, textarea, [contenteditable]'))
+    return;
+  const { top, bottom } = field.getBoundingClientRect();
+  const visibleTop = viewport.offsetTop;
+  const visibleBottom = visibleTop + viewport.height;
+  if (top >= visibleTop && bottom <= visibleBottom) return;
+  window.scrollBy(0, (top + bottom - visibleTop - visibleBottom) / 2);
+}
+
 export function trackKeyboardInset(): () => void {
   const os = document.documentElement.dataset.tauriOs;
   // Android resizes the native webview for the IME. iOS overlays it instead,
@@ -49,7 +62,12 @@ export function trackKeyboardInset(): () => void {
     const until = performance.now() + 1000;
     const step = (): void => {
       write();
-      settleFrame = performance.now() < until ? requestAnimationFrame(step) : 0;
+      if (performance.now() < until) {
+        settleFrame = requestAnimationFrame(step);
+      } else {
+        settleFrame = 0;
+        revealFocusedField(viewport);
+      }
     };
     settleFrame = requestAnimationFrame(step);
   };
