@@ -17,8 +17,8 @@ export const homeservers = {
   get allowCustom(): boolean {
     return state.allowCustom;
   },
-  get items(): { value: string; label: string }[] {
-    return state.list.map((value) => ({ value, label: value }));
+  get items(): { value: string; label: string; labelClass: string }[] {
+    return state.list.map((value) => ({ value, label: value, labelClass: 'literal-label' }));
   },
 };
 

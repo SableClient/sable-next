@@ -5,6 +5,7 @@ import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import HomeserverPicker from './HomeserverPicker.svelte';
+import { homeservers } from './homeservers.svelte.js';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -49,4 +50,9 @@ test('a blur or a blank field cancels the pending settle', async () => {
 
   expect(onblur).toHaveBeenCalledOnce();
   expect(onsettle).not.toHaveBeenCalled();
+});
+
+test('server names are never capitalised in the fixed list', () => {
+  expect(homeservers.items.length).toBeGreaterThan(0);
+  expect(homeservers.items.every((item) => item.labelClass === 'literal-label')).toBe(true);
 });
