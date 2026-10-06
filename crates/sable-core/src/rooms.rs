@@ -6,13 +6,15 @@ use matrix_sdk::ruma::api::client::directory::get_public_rooms_filtered;
 use matrix_sdk::ruma::api::client::membership::joined_rooms;
 use matrix_sdk::ruma::api::client::space::get_hierarchy;
 use matrix_sdk::ruma::directory::{Filter, RoomTypeFilter};
+use matrix_sdk::ruma::events::AnySyncTimelineEvent;
 use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
 use matrix_sdk::ruma::events::room::tombstone::RoomTombstoneEventContent;
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt};
 use matrix_sdk::send_queue::SendHandle;
 use matrix_sdk::{Client, EncryptionState, RoomMemberships, RoomState};
-use matrix_sdk_base::{RoomInfo, RoomInfoNotableUpdateReasons};
+use matrix_sdk_base::{RawStateEventWithKeys, RoomInfo, RoomInfoNotableUpdateReasons};
 
 use crate::ResultExt;
 use crate::protocol::{CommandErr, CommandOk, DirectoryRoomType, JoinRuleView};
@@ -24,6 +26,46 @@ const HIERARCHY_PAGE_SIZE: u32 = 100;
 const HIERARCHY_MAX_DEPTH: u32 = 1;
 const DIRECTORY_PAGE_SIZE: u32 = 30;
 const OWN_MEMBER_FILL_MAX_MEMBERS: u64 = 50;
+
+pub(crate) fn repair_unreadable_tombstones(
+    client: &Client,
+) -> matrix_sdk::event_handler::EventHandlerHandle {
+    client.add_event_handler(|raw: Raw<AnySyncTimelineEvent>, room: Room| async move {
+        let Ok(mut event) = raw.deserialize_as_unchecked::<serde_json::Value>() else {
+            return;
+        };
+        let empty_replacement = event.get("type").and_then(|kind| kind.as_str())
+            == Some("m.room.tombstone")
+            && event.get("state_key").and_then(|key| key.as_str()) == Some("")
+            && event
+                .pointer("/content/replacement_room")
+                .and_then(|room| room.as_str())
+                == Some("");
+        if !empty_replacement || room.is_tombstoned() {
+            return;
+        }
+        if let Some(content) = event.get_mut("content").and_then(|c| c.as_object_mut()) {
+            content.insert("replacement_room".into(), room.room_id().as_str().into());
+        }
+        let Ok(sanitized) = Raw::new(&event) else {
+            return;
+        };
+        let Some(mut keys) =
+            RawStateEventWithKeys::try_from_raw_state_event(sanitized.cast_unchecked())
+        else {
+            return;
+        };
+        let saved = room
+            .update_and_save_room_info(|mut info| {
+                info.handle_state_event(&mut keys);
+                (info, RoomInfoNotableUpdateReasons::NONE)
+            })
+            .await;
+        if let Err(error) = saved {
+            tracing::warn!("could not record an unreadable tombstone: {error}");
+        }
+    })
+}
 
 pub(crate) async fn reconcile_memberships(client: &Client) -> Result<(), matrix_sdk::Error> {
     let joined = client
@@ -575,6 +617,36 @@ mod tests {
     #[test]
     fn an_unknown_encryption_state_is_treated_as_encrypted() {
         assert!(maybe_encrypted(&EncryptionState::Unknown));
+    }
+
+    #[tokio::test]
+    async fn a_tombstone_with_an_empty_replacement_still_closes_the_room() {
+        use matrix_sdk::ruma::{room_id, serde::Raw};
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use matrix_sdk_test::JoinedRoomBuilder;
+        use serde_json::json;
+
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let _handle = super::repair_unreadable_tombstones(&client);
+        let room_id = room_id!("!archived:example.org");
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).add_timeline_event(
+                    Raw::new(&json!({
+                        "type": "m.room.tombstone", "state_key": "", "event_id": "$archive",
+                        "sender": "@admin:example.org", "origin_server_ts": 1,
+                        "content": {"body": "This room has been archived.", "replacement_room": ""}
+                    }))
+                    .unwrap()
+                    .cast_unchecked(),
+                ),
+            )
+            .await;
+
+        let room = client.get_room(room_id).unwrap();
+        assert!(room.is_tombstoned());
     }
 
     #[tokio::test]

@@ -69,3 +69,10 @@ test('a replacement is a room id, never an alias or a free string', () => {
   expect(readReplacementId('!has space:example.org')).toBeNull();
   expect(readReplacementId('')).toBeNull();
 });
+
+test('an archived room has no replacement to join', () => {
+  expect(readTombstone({ replacement_room: '', body: 'This room has been archived.' })).toEqual({
+    replacement: null,
+    body: 'This room has been archived.',
+  });
+});

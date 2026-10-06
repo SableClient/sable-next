@@ -43,7 +43,10 @@ export function readTombstone(content: unknown): {
 
   const tombstone = content as { replacement_room?: unknown; body?: unknown };
   return {
-    replacement: typeof tombstone.replacement_room === 'string' ? tombstone.replacement_room : null,
+    replacement:
+      typeof tombstone.replacement_room === 'string' && tombstone.replacement_room !== ''
+        ? tombstone.replacement_room
+        : null,
     body: typeof tombstone.body === 'string' && tombstone.body !== '' ? tombstone.body : null,
   };
 }
