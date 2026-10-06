@@ -909,6 +909,9 @@
     "stateChangesMore_other": "Show {{count, number}} more changes",
     "stateChangesLess": "Show fewer changes",
     "memberGroup": {
+      "showEvents_one": "Show {{count, number}} event",
+      "showEvents_other": "Show {{count, number}} events",
+      "hideEvents": "Hide events",
       "joined": "{{users}} joined the room",
       "left": "{{users}} left the room",
       "invitation_rejected": "{{users}} declined the invitation",

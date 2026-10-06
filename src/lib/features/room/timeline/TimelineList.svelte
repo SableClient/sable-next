@@ -928,6 +928,47 @@
   }
 </script>
 
+{#snippet timelineItem(item: TimelineItemView, collapsed = false, unreadCount = 0)}
+  <TimelineItem
+    {item}
+    {collapsed}
+    {unreadCount}
+    replyPersona={item.in_reply_to ? personas(item.in_reply_to.event_id) : null}
+    threadPersona={item.thread_summary ? personas(item.thread_summary.latest_event_id) : null}
+    highlighted={item.event_id !== null &&
+      item.event_id !== replayingEventId &&
+      item.event_id === (focusEventId ?? landedEventId)}
+    selected={replyEventId !== null && item.event_id === replyEventId}
+    {onMatrixLink}
+    {onCopyLink}
+    {onMarkUnread}
+    {onSenderProfile}
+    {onMentionUser}
+    {onRetrySend}
+    {onCancelSend}
+    {currentUserId}
+    {onToggleReaction}
+    {onReply}
+    {onOpenThread}
+    {onEdit}
+    {onDelete}
+    {canRedactOwn}
+    {canRedactOthers}
+    {canPin}
+    {encrypted}
+    {members}
+    layout={preferences.layout}
+    alignOwn={preferences.alignOwnMessages}
+    {onJumpToEvent}
+    {onOpenMedia}
+    {onVotePoll}
+    {onEndPoll}
+    {events}
+    onMenuOpenChange={setMenuOpen}
+    {roomId}
+  />
+{/snippet}
+
 <svelte:window onkeydown={onEscape} />
 
 <TimelineReadReceipt
@@ -1064,48 +1105,14 @@
                 {#if timelineStart && item.content.kind === 'timeline_start'}
                   {@render timelineStart()}
                 {:else if group}
-                  <TimelineMemberGroup items={group} {members} {onSenderProfile} />
-                {:else}
-                  <TimelineItem
-                    {item}
-                    {collapsed}
-                    unreadCount={row.value.unreadCount}
-                    replyPersona={item.in_reply_to ? personas(item.in_reply_to.event_id) : null}
-                    threadPersona={item.thread_summary
-                      ? personas(item.thread_summary.latest_event_id)
-                      : null}
-                    highlighted={item.event_id !== null &&
-                      item.event_id !== replayingEventId &&
-                      item.event_id === (focusEventId ?? landedEventId)}
-                    selected={replyEventId !== null && item.event_id === replyEventId}
-                    {onMatrixLink}
-                    {onCopyLink}
-                    {onMarkUnread}
-                    {onSenderProfile}
-                    {onMentionUser}
-                    {onRetrySend}
-                    {onCancelSend}
-                    {currentUserId}
-                    {onToggleReaction}
-                    {onReply}
-                    {onOpenThread}
-                    {onEdit}
-                    {onDelete}
-                    {canRedactOwn}
-                    {canRedactOthers}
-                    {canPin}
-                    {encrypted}
+                  <TimelineMemberGroup
+                    items={group}
                     {members}
-                    layout={preferences.layout}
-                    alignOwn={preferences.alignOwnMessages}
-                    {onJumpToEvent}
-                    {onOpenMedia}
-                    {onVotePoll}
-                    {onEndPoll}
-                    {events}
-                    onMenuOpenChange={setMenuOpen}
-                    {roomId}
+                    {onSenderProfile}
+                    renderItem={timelineItem}
                   />
+                {:else}
+                  {@render timelineItem(item, collapsed, row.value.unreadCount)}
                 {/if}
               </div>
             {/each}

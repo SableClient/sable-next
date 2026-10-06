@@ -15,6 +15,10 @@ import { TIMELINE_LAYOUT } from './timeline-layout';
 import { MAX_EMPTY_REFILLS } from './timeline-pagination.svelte.js';
 
 vi.mock('#lib/core/context.js');
+vi.mock('#lib/platform/overlay-back.svelte.js', () => ({
+  holdOverlayBack: () => {},
+  afterOverlayPops: () => Promise.resolve(),
+}));
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({ useRoomList: () => ({ rooms: [] }) }));
 vi.mock('#lib/personas/personas.svelte.js', () => ({
   usePersonaStore: () => ({ personas: [], load: () => Promise.resolve() }),
@@ -24,6 +28,7 @@ vi.mock('../messages/event-items.svelte.js', () => ({
 }));
 
 import TimelineListHarness from './TimelineListHarness.test.svelte';
+import { core } from '#lib/core/__mocks__/context.js';
 
 let animationFrames: FrameRequestCallback[];
 
@@ -157,6 +162,51 @@ function timelineViewport(): HTMLElement {
   if (!(element instanceof HTMLElement)) throw new Error('timeline viewport wrapper not found');
   return element;
 }
+
+test('expanding a member group exposes the original event source', async () => {
+  const roomTimeline = timeline();
+  const source = JSON.stringify({ event_id: '$first' });
+  const eventSource = vi.fn(() => Promise.resolve(source));
+  Object.assign(core.commands, { eventSource });
+  roomTimeline.items = ['first', 'last'].map((id): TimelineItemView => ({
+    ...item(id),
+    content: {
+      kind: 'membership',
+      change: 'joined',
+      user_id: '@alice:example.org',
+      display_name: 'Alice',
+      reason: null,
+    },
+  }));
+  roomTimeline.backwardPagination = 'end';
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        roomId: '!room:example.org',
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+  viewport();
+  await runAnimationFrames();
+
+  const toggle = screen.getByRole('button', { name: 'Show 2 events' });
+  toggle.focus();
+  await userEvent.keyboard('{Enter}');
+  await runAnimationFrames();
+  expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  const rows = document.querySelectorAll('.member-group-events .event-row');
+  expect(rows).toHaveLength(2);
+  await userEvent.pointer({ keys: '[MouseRight]', target: rows[0] });
+  await runAnimationFrames();
+  await userEvent.click(screen.getByRole('menuitem', { name: 'View source' }));
+  await runAnimationFrames();
+  expect(eventSource).toHaveBeenCalledWith('!room:example.org', '$first');
+  expect(screen.getByRole('dialog', { name: 'Message source' })).toHaveTextContent(source);
+});
 
 test('fills a short live timeline until the server reports the timeline start', async () => {
   const roomTimeline = timeline();

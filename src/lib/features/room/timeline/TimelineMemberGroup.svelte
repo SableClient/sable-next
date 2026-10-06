@@ -1,11 +1,15 @@
 <script lang="ts">
-  import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
+  import type { Snippet } from 'svelte';
+  import { cubicOut } from 'svelte/easing';
+  import { slide } from 'svelte/transition';
+  import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
 
   import type { MemberView, TimelineItemView } from '#src/generated/protocol';
 
   import { currentLocale, i18n } from '#lib/i18n.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import { motionMs, MOTION_MS } from '#lib/ui/motion.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
@@ -15,11 +19,19 @@
 
   interface Props {
     items: readonly TimelineItemView[];
+    renderItem: Snippet<[TimelineItemView]>;
     members?: readonly MemberView[];
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
   }
 
-  let { items, members = [], onSenderProfile }: Props = $props();
+  let { items, renderItem, members = [], onSenderProfile }: Props = $props();
+  const eventsId = $props.id();
+  let expanded = $state(false);
+  let toggleLabel = $derived(
+    $i18n.t(`timeline.memberGroup.${expanded ? 'hideEvents' : 'showEvents'}`, {
+      count: items.length,
+    })
+  );
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let desktop = $derived(appLayout.matches);
   let segments = $derived(memberGroupSegments(items));
@@ -48,7 +60,19 @@
 {/snippet}
 
 <p class="member-group">
-  <span class="state-icon" aria-hidden="true"><UsersIcon /></span>
+  <button
+    class="state-icon expand-events"
+    type="button"
+    aria-label={toggleLabel}
+    title={toggleLabel}
+    aria-expanded={expanded}
+    aria-controls={eventsId}
+    onclick={() => {
+      expanded = !expanded;
+    }}
+  >
+    <CaretDownIcon aria-hidden="true" />
+  </button>
   <span
     >{#each tokens as token, index (index)}{#if token.kind === 'text'}{token.text}{:else if token.kind === 'user'}{#if onSenderProfile}<StateEventSubjectName
             userId={token.userId}
@@ -64,6 +88,19 @@
         >{/if}{/each}</span
   >
 </p>
+
+<div id={eventsId} inert={!expanded}>
+  {#if expanded}
+    <div
+      class="member-group-events"
+      transition:slide={{ duration: motionMs(MOTION_MS.fast), easing: cubicOut }}
+    >
+      {#each items as item (item.id)}
+        {@render renderItem(item)}
+      {/each}
+    </div>
+  {/if}
+</div>
 
 {#if open}
   {#if desktop}
@@ -99,6 +136,41 @@
   .state-icon :global(svg) {
     height: var(--icon-size-small);
     width: var(--icon-size-small);
+  }
+
+  .expand-events {
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    min-height: var(--space-600);
+    padding: 0;
+  }
+
+  .expand-events[aria-expanded='false'] :global(svg) {
+    transform: rotate(-90deg);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .expand-events :global(svg) {
+      transition: transform var(--duration-fast) var(--ease-smooth-out);
+    }
+  }
+
+  .expand-events:is(:hover, :focus-visible) {
+    background: var(--surface-var-container-hover);
+    border-radius: var(--radii-200);
+  }
+
+  .expand-events:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--space-050);
+  }
+
+  .member-group-events {
+    display: grid;
+    gap: var(--space-100);
+    margin-block-start: var(--space-100);
   }
 
   .others {
