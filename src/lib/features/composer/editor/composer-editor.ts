@@ -844,6 +844,13 @@ export class ComposerEditor {
           clipboardTextSerializer: (slice) => markdownFromSlice(slice),
           handleDrop: (_view, event) => this.handleFiles(filesFrom(event.dataTransfer)),
           handleDOMEvents: {
+            blur: (blurView) => {
+              const selection = getSelection();
+              if (selection?.anchorNode && blurView.dom.contains(selection.anchorNode)) {
+                selection.removeAllRanges();
+              }
+              return false;
+            },
             keydown: (_view, event) => {
               if (event.key === 'Escape' && !event.isComposing) {
                 if (this.options.onNavigate('Escape')) event.preventDefault();

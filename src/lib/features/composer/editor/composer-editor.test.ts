@@ -2339,3 +2339,17 @@ describe('a pasted user id becomes a mention', () => {
     expect(mentions(editor)).toEqual([]);
   });
 });
+
+test('blurring the editor leaves no DOM selection inside it', () => {
+  const editor = open();
+  editor.focus();
+  const surface = view(editor).dom;
+  const range = document.createRange();
+  range.selectNodeContents(surface);
+  getSelection()?.removeAllRanges();
+  getSelection()?.addRange(range);
+
+  surface.dispatchEvent(new FocusEvent('blur'));
+
+  expect(getSelection()?.rangeCount).toBe(0);
+});
