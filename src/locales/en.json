@@ -946,6 +946,7 @@
     "newMessages_one": "{{count, number}} new message",
     "newMessages_other": "{{count, number}} new messages",
     "callInvite": "{{user}} sent a call invitation",
+    "verificationRequest": "{{user}} requested verification",
     "malformedEvent": "Could not read event: {{type}}",
     "liveLocation": "Live location",
     "liveLocationActive": "Sharing live location",

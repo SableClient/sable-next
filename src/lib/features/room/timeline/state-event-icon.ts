@@ -14,6 +14,7 @@ import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import PhoneDisconnectIcon from 'phosphor-svelte/lib/PhoneDisconnectIcon';
 import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
 import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
+import ShieldCheckIcon from 'phosphor-svelte/lib/ShieldCheckIcon';
 import SignInIcon from 'phosphor-svelte/lib/SignInIcon';
 import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
 import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
@@ -74,6 +75,8 @@ export function stateEventIcon(item: TimelineItemView): Component {
       return content.change ? stateChangeIcon(content.change) : HashIcon;
     case 'call_invite':
       return PhoneIcon;
+    case 'verification_request':
+      return ShieldCheckIcon;
     case 'redacted':
       return TrashIcon;
     case 'hidden_event':

@@ -118,6 +118,10 @@ export function stateEventText(item: TimelineItemView, t: Translate): string {
       return t('timeline.callInvite', {
         user: item.sender_name ?? item.sender ?? t('timeline.unknownSender'),
       });
+    case 'verification_request':
+      return t('timeline.verificationRequest', {
+        user: item.sender_name ?? item.sender ?? t('timeline.unknownSender'),
+      });
     case 'malformed':
       return t('timeline.malformedEvent', { type: content.event_type });
     case 'membership':

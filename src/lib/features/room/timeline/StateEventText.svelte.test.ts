@@ -52,6 +52,7 @@ function membership(change: 'left' | 'joined', userId: string, name: string): Ti
 
 test.each([
   [{ kind: 'call_invite' }, 'Alice sent a call invitation'],
+  [{ kind: 'verification_request' }, 'Alice requested verification'],
   [{ kind: 'malformed', event_type: 'm.room.message' }, 'Could not read event: m.room.message'],
 ] satisfies [TimelineItemView['content'], string][])(
   'renders the event notice for %j',

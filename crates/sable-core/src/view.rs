@@ -1906,6 +1906,7 @@ fn message_content(
                 })
                 .collect(),
         },
+        MessageType::VerificationRequest(_) => TimelineItemContentView::VerificationRequest,
         _ => text_message(message, profile, raw),
     }
 }

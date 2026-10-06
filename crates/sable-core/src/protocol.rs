@@ -3658,6 +3658,7 @@ pub enum TimelineItemContentView {
         updated_at: Option<u64>,
     },
     CallInvite,
+    VerificationRequest,
     Malformed {
         event_type: String,
     },

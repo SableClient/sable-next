@@ -1300,7 +1300,7 @@ html: string | null; source: string; mime: string | null; size: number | null } 
  *  The coordinates are absent for a `geo:` URI we cannot read; `geo_uri` is
  *  passed through as sent either way.
  */
-{ kind: "location"; body: string; geo_uri: string; latitude: number | null; longitude: number | null } | { kind: "live_location"; body: string; latitude: number | null; longitude: number | null; live: boolean; expires_at: number; updated_at: number | null } | { kind: "call_invite" } | { kind: "malformed"; event_type: string } |
+{ kind: "location"; body: string; geo_uri: string; latitude: number | null; longitude: number | null } | { kind: "live_location"; body: string; latitude: number | null; longitude: number | null; live: boolean; expires_at: number; updated_at: number | null } | { kind: "call_invite" } | { kind: "verification_request" } | { kind: "malformed"; event_type: string } |
 /**  MSC4274. */
 { kind: "gallery";
 /**  The caption shared by the whole set. */

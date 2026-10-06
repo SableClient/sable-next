@@ -35,6 +35,7 @@ fn describe_message(msgtype: &MessageType) -> String {
         MessageType::Audio(_) => "sent an audio file".to_owned(),
         MessageType::File(_) => "sent a file".to_owned(),
         MessageType::Gallery(_) => "sent a gallery".to_owned(),
+        MessageType::VerificationRequest(_) => "requested verification".to_owned(),
         _ => msgtype.body().to_owned(),
     }
 }
@@ -83,7 +84,7 @@ mod tests {
             ),
             (
                 json!({"msgtype": "m.key.verification.request", "body": "verify", "methods": ["m.sas.v1"], "from_device": "DEVICE", "to": "@alice:example.org"}),
-                "verify",
+                "requested verification",
             ),
             (
                 json!({"msgtype": "com.example.message", "body": "custom"}),

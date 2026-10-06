@@ -199,7 +199,7 @@
     sender={item.sender}
     threadRoot={item.thread_root}
   />
-{:else if item.content.kind === 'call_invite' || item.content.kind === 'malformed'}
+{:else if item.content.kind === 'call_invite' || item.content.kind === 'verification_request' || item.content.kind === 'malformed'}
   <p class="state">
     {@render stateGutter()}
     <StateEventText {item} {members} {onSenderProfile} />
