@@ -1,4 +1,12 @@
-let desktopMembersPreferred = true;
+import { readText, writeText } from '#lib/platform/local-json.js';
+
+const membersStorageKey = 'sable-members-open';
+let desktopMembersPreferred = readText(membersStorageKey) !== 'false';
+
+function preferDesktopMembers(open: boolean): void {
+  desktopMembersPreferred = open;
+  writeText(membersStorageKey, String(open));
+}
 
 export class RoomPanels {
   threadRootId = $state<string | null>(null);
@@ -59,7 +67,7 @@ export class RoomPanels {
     this.#closeAll();
     if (desktop) {
       this.desktopMembersOpen = open;
-      desktopMembersPreferred = open;
+      preferDesktopMembers(open);
     } else this.membersOpen = open;
     return open;
   }
@@ -67,7 +75,7 @@ export class RoomPanels {
   closeMembers(desktop: boolean): void {
     if (desktop) {
       this.desktopMembersOpen = false;
-      desktopMembersPreferred = false;
+      preferDesktopMembers(false);
     } else this.membersOpen = false;
   }
 }

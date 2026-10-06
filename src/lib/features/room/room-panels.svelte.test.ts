@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { RoomPanels } from './room-panels.svelte.js';
 
 test('opening a thread closes competing panels', () => {
@@ -52,4 +52,23 @@ test('a closed desktop member list stays closed in the next room', () => {
   expect(new RoomPanels().desktopMembersOpen).toBe(false);
   first.toggleMembers(true);
   expect(new RoomPanels().desktopMembersOpen).toBe(true);
+});
+
+test('the desktop member list preference survives a reload', async () => {
+  const stored = new Map<string, string>();
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      stored.set(key, value);
+    },
+  });
+  new RoomPanels().closeMembers(true);
+  vi.resetModules();
+  const reloaded = await import('./room-panels.svelte.js');
+  expect(new reloaded.RoomPanels().desktopMembersOpen).toBe(false);
+  new reloaded.RoomPanels().toggleMembers(true);
+  vi.resetModules();
+  const again = await import('./room-panels.svelte.js');
+  expect(new again.RoomPanels().desktopMembersOpen).toBe(true);
+  vi.unstubAllGlobals();
 });
