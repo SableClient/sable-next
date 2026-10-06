@@ -1561,3 +1561,31 @@ test('quotes a reply to a membership event as its timeline text', async () => {
 
   expect(document.querySelector('.reply-body')?.textContent).toBe('nex left the room');
 });
+
+test('shows the live member name over the one captured on the item', async () => {
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: {
+        item: { ...item(false), sender_name: 'Old Alice' },
+        collapsed: false,
+        members: [
+          {
+            user_id: '@alice:example.org',
+            display_name: 'New Alice',
+            avatar_url: null,
+            power_level: 0,
+            membership: 'join',
+            member_ts: null,
+            kicked: false,
+            service: false,
+          },
+        ],
+      },
+    },
+  });
+  await tick();
+
+  expect(document.body.textContent).toContain('New Alice');
+  expect(document.body.textContent).not.toContain('Old Alice');
+});

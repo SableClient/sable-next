@@ -56,13 +56,20 @@ export function senderDisplayColors(
   };
 }
 
+const memberIndexes = new WeakMap<readonly MemberView[], Map<string, MemberView>>();
+
 export function findMember(
   members: readonly MemberView[],
   userId: string | null | undefined
 ): MemberView | undefined {
   if (!userId) return undefined;
 
-  return members.find((member) => member.user_id === userId);
+  let index = memberIndexes.get(members);
+  if (!index) {
+    index = new Map(members.map((member) => [member.user_id, member]));
+    memberIndexes.set(members, index);
+  }
+  return index.get(userId);
 }
 
 export function memberName(members: readonly MemberView[], userId: string): string {

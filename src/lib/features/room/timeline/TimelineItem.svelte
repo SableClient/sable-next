@@ -173,15 +173,10 @@
   let profile = $derived(itemProfiles.sender);
   let senderCosmetics = $derived(overrideCosmetics ?? roomCosmetics?.for(item.sender) ?? null);
   let senderTimezone = $derived(profile?.timezone ?? null);
-  // Only a fallback: the core fills both fields, so most rows never scan.
-  let senderMember = $derived(
-    item.sender_name === null || item.sender_avatar === null
-      ? findMember(members, item.sender)
-      : undefined
-  );
+  let senderMember = $derived(findMember(members, item.sender));
   let roomIdentity = $derived({
-    name: item.sender_name ?? senderMember?.display_name ?? null,
-    avatar: item.sender_avatar ?? senderMember?.avatar_url ?? null,
+    name: senderMember?.display_name ?? item.sender_name ?? null,
+    avatar: senderMember?.avatar_url ?? item.sender_avatar ?? null,
   });
   let spaceIdentity = $derived(roomCosmetics?.identity(item.sender, roomIdentity) ?? roomIdentity);
   let accountName = $derived(
@@ -222,8 +217,8 @@
   let replyIdentity = $derived.by(() => {
     const own = {
       name:
-        item.in_reply_to?.sender_name ??
         findMember(members, item.in_reply_to?.sender)?.display_name ??
+        item.in_reply_to?.sender_name ??
         null,
       avatar: null,
     };
