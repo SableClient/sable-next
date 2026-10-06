@@ -406,6 +406,50 @@ test('a diff after an empty first answer replaces the painted snapshot rather th
   roomList.stop();
 });
 
+test('waits for a room to be listed, and gives up after the timeout', async () => {
+  const listed = { room_id: '!listed:example.org' } as RoomSummary;
+  const late = { room_id: '!late:example.org' } as RoomSummary;
+  const eventListeners: ((event: unknown) => void)[] = [];
+  const core = {
+    subscribeEvents: vi.fn((listener: (event: unknown) => void) => {
+      eventListeners.push(listener);
+      return () => {};
+    }),
+    commands: {
+      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [listed] })),
+      roomNotificationModes: vi.fn(() => Promise.resolve([])),
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+  await roomList.start();
+
+  await roomList.whenListed(listed.room_id, 60_000);
+
+  let arrived = false;
+  const waiting = roomList.whenListed(late.room_id, 60_000).then(() => {
+    arrived = true;
+  });
+  await Promise.resolve();
+  expect(arrived).toBe(false);
+  eventListeners[0]?.({
+    type: 'room_list_diff',
+    subscription: 1,
+    diffs: [{ op: 'append', values: [late] }],
+  });
+  await waiting;
+
+  vi.useFakeTimers();
+  try {
+    const missing = roomList.whenListed('!missing:example.org', 10_000);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await missing;
+  } finally {
+    vi.useRealTimers();
+  }
+  roomList.stop();
+});
+
 test('persists the live room list for the next launch', async () => {
   vi.useFakeTimers();
   const stored = stubLocalStorage();

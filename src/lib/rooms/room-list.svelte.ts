@@ -101,6 +101,8 @@ export class RoomList {
   private snapshotAccountId: string | null = null;
   private snapshotWriteTimer: ReturnType<typeof setTimeout> | undefined;
   private snapshotDirty = false;
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- resolved from setRooms, never rendered
+  private readonly listedWaiters = new Set<{ roomId: string; resolve: () => void }>();
   private presentationActive = true;
   private live = $state(false);
 
@@ -116,6 +118,21 @@ export class RoomList {
 
   byId(roomId: string | null | undefined): RoomSummary | undefined {
     return roomId === null || roomId === undefined ? undefined : this.roomsById.get(roomId);
+  }
+
+  whenListed(roomId: string, timeoutMs: number): Promise<void> {
+    if (this.rooms.some((room) => room.room_id === roomId)) return Promise.resolve();
+    return new Promise((resolve) => {
+      const waiter = { roomId, resolve: finish };
+      const timer = setTimeout(finish, timeoutMs);
+      this.listedWaiters.add(waiter);
+      const waiters = this.listedWaiters;
+      function finish(): void {
+        clearTimeout(timer);
+        waiters.delete(waiter);
+        resolve();
+      }
+    });
   }
 
   labelFor(roomId: string): string {
@@ -298,6 +315,9 @@ export class RoomList {
   private setRooms(rooms: RoomSummary[]): void {
     this.live = true;
     this.rooms = rooms;
+    for (const waiter of this.listedWaiters) {
+      if (rooms.some((room) => room.room_id === waiter.roomId)) waiter.resolve();
+    }
     this.scheduleSnapshotWrite();
     void this.loadNotificationModes(
       rooms.filter((room) => !this.notificationModes.has(room.room_id))

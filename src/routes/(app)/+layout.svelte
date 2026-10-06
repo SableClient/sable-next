@@ -660,7 +660,7 @@
         ? openNotification(roomId, eventId)
         : openNativeNotification(core, { userId, roomId, eventId }, openNotification);
     void opened.catch((error: unknown) => {
-      console.debug('[sable notifications] notification not opened', error);
+      console.warn('[sable notifications] notification not opened', error);
     });
   });
 
@@ -747,9 +747,12 @@
     };
   });
 
+  const NOTIFIED_ROOM_WAIT_MS = 10_000;
+
   async function openNotification(roomId: string, eventId: string | null): Promise<void> {
     await tick();
     await roomList.start();
+    await roomList.whenListed(roomId, NOTIFIED_ROOM_WAIT_MS);
     await goto(roomSectionPath(roomList.rooms, roomId), {
       state: eventId === null ? {} : { notified: eventId },
     });
@@ -797,7 +800,7 @@
       }),
       watchNativeNotificationClicks((target) => {
         void openNativeNotification(core, target, openNotification).catch((error: unknown) => {
-          console.debug('[sable notifications] notification not opened', error);
+          console.warn('[sable notifications] notification not opened', error);
         });
       }),
     ])
