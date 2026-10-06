@@ -47,13 +47,14 @@
   .settings-section-header {
     align-items: flex-start;
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-400);
     justify-content: space-between;
     padding: var(--space-200) var(--space-300) var(--space-100);
   }
 
   .settings-section-heading {
-    flex: 1;
+    flex: 1 1 10rem;
     min-width: 0;
   }
 
@@ -92,7 +93,9 @@
   }
 
   .settings-section-actions {
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    max-width: 100%;
+    min-width: 0;
   }
 
   @media (width >= 42rem) {

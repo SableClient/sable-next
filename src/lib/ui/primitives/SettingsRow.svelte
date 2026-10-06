@@ -95,7 +95,7 @@
   }
 
   .row-copy {
-    flex: 1 1 0;
+    flex: 1 1 9rem;
     min-width: min(var(--space-1100), 100%);
     position: relative;
   }
@@ -107,7 +107,7 @@
   .row-name {
     align-items: center;
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: var(--space-200);
   }
 

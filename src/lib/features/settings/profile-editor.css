@@ -136,6 +136,7 @@
 }
 
 .profile-section .scope-select {
+  max-width: 100%;
   min-width: 12rem;
 }
 
@@ -153,7 +154,7 @@
 .profile-section .field-grid {
   display: grid;
   gap: var(--space-300);
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
 }
 
 .profile-section .bio-toolbar {
