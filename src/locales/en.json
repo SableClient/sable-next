@@ -1013,6 +1013,8 @@
     "playVoiceMessage": "Play voice message",
     "pauseVoiceMessage": "Pause voice message",
     "voiceMessagePosition": "Voice message position",
+    "voiceMessageSpeed": "Playback speed {{speed}}×",
+    "voiceMessageVolume": "Voice message volume",
     "mediaUnavailable": "Media unavailable",
     "mediaUnavailableDetail": "This media may have been deleted or its server is offline.",
     "openMedia": "Open {{name}}",

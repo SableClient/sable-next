@@ -257,3 +257,25 @@ test('a video shows its thumbnail and waits for play before fetching', async () 
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/waiting-poster', 800, 600);
   expect(document.querySelector('.media-poster')).not.toBeNull();
 });
+
+test('voice message speed button cycles the playback rate', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  render(MediaContent, {
+    props: {
+      kind: 'audio',
+      source: 'mxc://example.org/voice',
+      mime: 'audio/ogg',
+      filename: 'Voice message',
+      durationMs: 4200,
+      waveform: [0, 0.5, 1],
+    },
+  });
+  await settle();
+
+  const audio = document.querySelector('audio');
+  const button = screen.getByRole('button', { name: /Playback speed/ });
+  expect(button).toHaveTextContent('1×');
+  await userEvent.click(button);
+  expect(button).toHaveTextContent('1.25×');
+  expect(audio?.playbackRate).toBe(1.25);
+});
