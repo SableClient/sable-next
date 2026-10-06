@@ -128,6 +128,14 @@ fn cef_command_line_args(proxy: Option<&str>) -> Vec<(String, Option<String>)> {
         ("--skia-resource-cache-limit-mb".into(), Some("64".into())),
         ("--renderer-process-limit".into(), Some("2".into())),
         (
+            "blink-settings".into(),
+            Some(
+                "primaryPointerType=4,availablePointerTypes=4,\
+                 primaryHoverType=2,availableHoverTypes=2"
+                    .into(),
+            ),
+        ),
+        (
             "autoplay-policy".into(),
             Some("no-user-gesture-required".into()),
         ),
@@ -395,6 +403,20 @@ mod tests {
             name == "enable-features"
                 && value.as_deref().is_some_and(|features| {
                     features.split(',').any(|f| f == "WebRtcPipeWireCamera")
+                })
+        }));
+    }
+
+    #[test]
+    fn cef_reports_a_fine_hovering_pointer() {
+        let args = cef_command_line_args(None);
+
+        assert!(args.iter().any(|(name, value)| {
+            name == "blink-settings"
+                && value.as_deref().is_some_and(|settings| {
+                    ["primaryPointerType=4", "primaryHoverType=2"]
+                        .iter()
+                        .all(|setting| settings.split(',').any(|s| s == *setting))
                 })
         }));
     }
