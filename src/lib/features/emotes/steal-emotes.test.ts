@@ -150,6 +150,17 @@ test('the merge keeps the images already in the pack and everything else in the 
   });
 });
 
+test('a stolen image that matches the pack usage carries no usage of its own', () => {
+  const next = mergedPackContent({ pack: { usage: ['sticker'] } }, [
+    { shortcode: 'party', url: 'mxc://mine/party', body: null, usage: ['sticker'], info: null },
+    { shortcode: 'wave', url: 'mxc://mine/wave', body: null, usage: ['emoticon'], info: null },
+  ]);
+  const images = next.images as Record<string, { usage?: string[] }>;
+
+  expect(images.party.usage).toBeUndefined();
+  expect(images.wave.usage).toEqual(['emoticon']);
+});
+
 test('a taken shortcode is suffixed rather than overwriting an emote you already have', () => {
   const next = mergedPackContent({ images: { wave: { url: 'mxc://mine/old' } } }, [
     { shortcode: 'wave', url: 'mxc://mine/new', body: null, usage: ['emoticon'], info: null },

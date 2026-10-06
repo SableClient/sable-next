@@ -17,6 +17,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
+  import Switcher from '#lib/ui/primitives/Switcher.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
@@ -28,6 +29,7 @@
     normalizeShortcode,
     packDraft,
     shortcodeWithoutExtension,
+    setImageUsage,
     togglePackUsage,
     uniqueShortcode,
     type PackDraft,
@@ -77,6 +79,20 @@
   function toggleUsage(usage: ImageUsageView, on: boolean): void {
     const next = togglePackUsage(current, usage, on);
     if (next !== null) edit(next);
+  }
+
+  function imageUsageChoice(image: PackImageDraft): string {
+    return image.usage.length === 1 ? image.usage[0] : 'both';
+  }
+
+  function chooseImageUsage(image: PackImageDraft, choice: string): void {
+    edit(
+      setImageUsage(
+        current,
+        image.shortcode,
+        choice === 'both' ? ALL_USAGES : [choice as ImageUsageView]
+      )
+    );
   }
 
   function removeImage(target: PackImageDraft): void {
@@ -350,6 +366,19 @@
                 original
               />
             {/snippet}
+            <Switcher
+              label={$i18n.t('emotes.imageUsage', { shortcode: image.shortcode })}
+              value={imageUsageChoice(image)}
+              disabled={!canEdit || busy}
+              items={[
+                { value: 'emoticon', label: $i18n.t('emotes.usageEmoji') },
+                { value: 'sticker', label: $i18n.t('emotes.usageSticker') },
+                { value: 'both', label: $i18n.t('emotes.usageBoth') },
+              ]}
+              onValueChange={(choice) => {
+                chooseImageUsage(image, choice);
+              }}
+            />
             {#if renaming === image.shortcode}
               <TextInput
                 bind:value={renameDraft}

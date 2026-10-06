@@ -76,6 +76,19 @@ export function togglePackUsage(
   };
 }
 
+export function setImageUsage(
+  draft: PackDraft,
+  shortcode: string,
+  usage: ImageUsageView[]
+): PackDraft {
+  return {
+    ...draft,
+    images: draft.images.map((image) =>
+      image.shortcode === shortcode ? { ...image, usage } : image
+    ),
+  };
+}
+
 export interface PackImageInfoContent {
   w?: number;
   h?: number;
@@ -106,6 +119,26 @@ export function invalidShortcode(images: PackImageDraft[]): string | null {
   return null;
 }
 
+export function readPackUsage(pack: unknown): ImageUsageView[] {
+  const declared =
+    typeof pack === 'object' && pack !== null ? (pack as { usage?: unknown }).usage : undefined;
+  if (!Array.isArray(declared)) return ALL_USAGES;
+  const usage = ALL_USAGES.filter((entry) => declared.includes(entry));
+  return usage.length === 0 ? ALL_USAGES : usage;
+}
+
+export function imageContent(
+  image: PackImageDraft,
+  packUsage: ImageUsageView[]
+): Record<string, unknown> {
+  return {
+    url: image.url,
+    body: image.body ?? undefined,
+    usage: imageUsageContent(image.usage, packUsage),
+    info: infoContent(image.info),
+  };
+}
+
 export function packEventContent(draft: PackDraft): Record<string, unknown> {
   const rejected = invalidShortcode(draft.images);
   if (rejected !== null) throw new Error(`Invalid or duplicate shortcode: ${rejected}`);
@@ -117,15 +150,7 @@ export function packEventContent(draft: PackDraft): Record<string, unknown> {
       usage: usageContent(draft.usage),
     },
     images: Object.fromEntries(
-      draft.images.map((image) => [
-        image.shortcode,
-        {
-          url: image.url,
-          body: image.body ?? undefined,
-          usage: imageUsageContent(image.usage, draft.usage),
-          info: infoContent(image.info),
-        },
-      ])
+      draft.images.map((image) => [image.shortcode, imageContent(image, draft.usage)])
     ),
   };
 }

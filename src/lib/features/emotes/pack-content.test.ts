@@ -7,6 +7,7 @@ import {
   normalizeShortcode,
   packDraft,
   packEventContent,
+  setImageUsage,
   shortcodeWithoutExtension,
   suffixRename,
   togglePackUsage,
@@ -209,4 +210,20 @@ test('refuses duplicate shortcodes before one image can overwrite another', () =
   const draft = packDraft(pack());
   draft.images.push({ ...draft.images[0], url: 'mxc://a/c' });
   expect(() => packEventContent(draft)).toThrow('Invalid or duplicate shortcode');
+});
+
+test('an image can be limited to one usage and is then written with its own usage key', () => {
+  const draft = setImageUsage(packDraft(pack()), 'wave', ['sticker']);
+
+  expect(draft.images[0].usage).toEqual(['sticker']);
+  const content = packEventContent(draft) as { images: { wave: { usage?: string[] } } };
+  expect(content.images.wave.usage).toEqual(['sticker']);
+});
+
+test('an image set back to the pack usage drops its own usage key', () => {
+  const limited = setImageUsage(packDraft(pack()), 'wave', ['emoticon']);
+  const draft = setImageUsage(limited, 'wave', ['emoticon', 'sticker']);
+
+  const content = packEventContent(draft) as { images: { wave: { usage?: string[] } } };
+  expect(content.images.wave.usage).toBeUndefined();
 });

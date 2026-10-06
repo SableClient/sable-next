@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -171,4 +171,24 @@ test('pressing Enter in the shortcode field saves the rename', async () => {
     expect(applied).toHaveLength(1);
   });
   expect(applied[0].images.map((image) => image.shortcode)).toEqual(['hello']);
+});
+
+test('an image can be switched from sticker to emoji and saved', async () => {
+  const applied: PackDraft[] = [];
+  render(ImagePackEditor, {
+    props: {
+      pack: pack(['emoticon', 'sticker']),
+      canEdit: true,
+      onApply: (draft: PackDraft) => {
+        applied.push(draft);
+        return Promise.resolve();
+      },
+    },
+  });
+
+  const group = screen.getByRole('radiogroup', { name: 'Where :wave: can be used' });
+  await userEvent.click(within(group).getByLabelText('Emoji'));
+  const draft = await appliedDraft(applied);
+
+  expect(draft.images[0].usage).toEqual(['emoticon']);
 });

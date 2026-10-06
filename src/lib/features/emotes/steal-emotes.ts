@@ -8,11 +8,11 @@ import { imageMime } from '#lib/ui/media-url.js';
 import { extensionFor } from './pack-archive.js';
 import type { PackTransferCore } from './pack-transfer.js';
 import {
-  infoContent,
+  imageContent,
   normalizeShortcode,
+  readPackUsage,
   shortcodeWithoutExtension,
   uniqueShortcode,
-  usageContent,
   type PackImageDraft,
 } from './pack-content.js';
 
@@ -133,14 +133,10 @@ export function mergedPackContent(
   const images: Record<string, unknown> =
     typeof held === 'object' && held !== null ? { ...held } : {};
 
+  const packUsage = readPackUsage(pack.pack);
   for (const image of additions) {
     const shortcode = uniqueShortcode(image.shortcode, (candidate) => candidate in images);
-    images[shortcode] = {
-      url: image.url,
-      body: image.body ?? undefined,
-      usage: usageContent(image.usage),
-      info: infoContent(image.info),
-    };
+    images[shortcode] = imageContent(image, packUsage);
   }
 
   return { ...pack, images };
