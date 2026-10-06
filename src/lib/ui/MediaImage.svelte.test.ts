@@ -47,26 +47,6 @@ test('does not retry a failed media request in a render loop', async () => {
   expect(core.fetchMedia).toHaveBeenCalledTimes(1);
 });
 
-test('requests a larger thumbnail without changing its displayed dimensions', async () => {
-  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
-  render(MediaImage, {
-    props: {
-      source: 'mxc://example.org/retina-thumbnail',
-      alt: 'Image',
-      width: 48,
-      height: 48,
-      thumbnailWidth: 96,
-      thumbnailHeight: 96,
-    },
-  });
-
-  await settle();
-
-  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/retina-thumbnail', 96, 96);
-  expect(document.querySelector('img')).toHaveAttribute('width', '48');
-  expect(document.querySelector('img')).toHaveAttribute('height', '48');
-});
-
 test('scrolling back through a sticker pack reuses loaded previews', async () => {
   const stickerCount = 100;
   core.fetchMedia.mockResolvedValue(new Uint8Array([1]));

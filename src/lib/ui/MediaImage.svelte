@@ -39,8 +39,6 @@
     title?: string;
     width: number;
     height: number;
-    thumbnailWidth?: number;
-    thumbnailHeight?: number;
     intrinsicWidth?: number | null;
     intrinsicHeight?: number | null;
     mime?: string | null;
@@ -70,8 +68,6 @@
     title,
     width,
     height,
-    thumbnailWidth = width,
-    thumbnailHeight = height,
     intrinsicWidth = null,
     intrinsicHeight = null,
     mime = null,
@@ -152,8 +148,8 @@
       ? thumbnail
       : source
   );
-  let requestedWidth = $derived(asIs ? 0 : thumbnailWidth);
-  let requestedHeight = $derived(asIs ? 0 : thumbnailHeight);
+  let requestedWidth = $derived(asIs ? 0 : width);
+  let requestedHeight = $derived(asIs ? 0 : height);
   let requestKey = $derived(
     `${String(attempt)}:${String(requestedWidth)}x${String(requestedHeight)}:${requested}`
   );

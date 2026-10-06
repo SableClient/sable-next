@@ -712,8 +712,7 @@
                               alt=""
                               width={64}
                               height={64}
-                              thumbnailWidth={128}
-                              thumbnailHeight={128}
+                              original
                             />
                           {:else}
                             <span class="unicode-text">{source}</span>
@@ -745,8 +744,7 @@
                             alt={image.body ?? image.shortcode}
                             width={cellSize}
                             height={cellSize}
-                            thumbnailWidth={cellSize * 2}
-                            thumbnailHeight={cellSize * 2}
+                            original
                           />
                         </button>
                       </li>
@@ -793,8 +791,7 @@
                   alt={packName(section.pack)}
                   width={24}
                   height={24}
-                  thumbnailWidth={48}
-                  thumbnailHeight={48}
+                  original
                 />
               </button>
             {/each}
