@@ -13,6 +13,7 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
+  import { MOTION_MS, shouldReduceMotion } from '#lib/ui/motion.js';
   import ReactionSheet from './ReactionSheet.svelte';
   import { reactionSummary } from './reaction-summary.js';
   import {
@@ -59,6 +60,7 @@
   }: Props = $props();
 
   let pressIndex = 0;
+  let tapAnimation: Animation | undefined;
   const core = useCoreClient();
   let imagePacks = $state.raw<ImagePackView[]>([]);
   let sentShortcodes = $state.raw<ReadonlyMap<string, string>>(new Map());
@@ -85,6 +87,7 @@
 
   onDestroy(() => {
     press.cancel();
+    tapAnimation?.cancel();
   });
 
   $effect(() => {
@@ -140,12 +143,20 @@
           count: reaction.senders.length,
         })}
         disabled={eventId === null}
-        onclick={() => {
+        onclick={(event) => {
           if (press.fired) {
             press.fired = false;
             return;
           }
-          if (eventId) onToggleReaction?.(eventId, reaction.key);
+          if (!eventId || !onToggleReaction) return;
+          tapAnimation?.cancel();
+          if (!shouldReduceMotion()) {
+            tapAnimation = event.currentTarget.animate(
+              [{ transform: 'scale(0.96)' }, { transform: 'scale(1)' }],
+              { duration: MOTION_MS.quick, easing: 'ease-out' }
+            );
+          }
+          onToggleReaction(eventId, reaction.key);
         }}
         oncontextmenu={(event) => openDetails(event, index)}
         onpointerdown={(event) => {
