@@ -107,7 +107,7 @@ test.each(['image', 'video', 'audio', 'file'] as const)(
     render(MessageBody, { item: item(attachment(kind)), canRedactOthers: false });
     await tick();
 
-    const mention = screen.getByRole('link', { name: 'Ana' });
+    const mention = screen.getByRole('link', { name: '@ana' });
     expect(mention).toHaveAttribute('data-matrix-link', 'user');
     expect(screen.getByRole('img', { name: 'party' })).toHaveAttribute('data-mx-emoticon');
   }

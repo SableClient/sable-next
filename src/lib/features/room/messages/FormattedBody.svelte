@@ -336,8 +336,7 @@
       void html;
       for (const anchor of node.querySelectorAll<HTMLAnchorElement>('a[data-matrix-link="user"]')) {
         const link = parseMatrixLink(anchor.href);
-        const bare = anchor.textContent.trim() === anchor.getAttribute('href')?.trim();
-        if (link?.kind === 'user' && bare) {
+        if (link?.kind === 'user') {
           anchor.textContent = mentionLabel(link.userId, memberNames);
         }
       }
