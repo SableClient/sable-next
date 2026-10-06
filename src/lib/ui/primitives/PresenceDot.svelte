@@ -23,17 +23,35 @@
   data-presence={presence}
   role="img"
   aria-label={label}
-></span>
+>
+  <svg viewBox="0 0 10 10" aria-hidden="true">
+    {#if presence === 'unavailable'}
+      <path d="M5 0A5 5 0 1 0 10 5A4 4 0 0 1 5 0Z" />
+    {:else if presence === 'offline'}
+      <circle cx="5" cy="5" r="3.5" fill="none" stroke="currentColor" stroke-width="2" />
+    {:else}
+      <circle cx="5" cy="5" r="5" />
+    {/if}
+  </svg>
+</span>
 
 <style>
   .presence-dot {
-    background: var(--sec-main);
+    background: var(--presence-ring, var(--bg-container));
     border-radius: var(--radii-round);
     box-shadow: 0 0 0 var(--border-width-500) var(--presence-ring, var(--bg-container));
+    color: var(--sec-main);
     display: inline-block;
     flex: none;
     height: var(--space-150);
     width: var(--space-150);
+  }
+
+  .presence-dot svg {
+    display: block;
+    fill: currentcolor;
+    height: 100%;
+    width: 100%;
   }
 
   .presence-dot-medium {
@@ -47,10 +65,10 @@
   }
 
   .presence-dot[data-presence='online'] {
-    background: var(--success-main);
+    color: var(--success-main);
   }
 
   .presence-dot[data-presence='unavailable'] {
-    background: var(--warn-main);
+    color: var(--warn-main);
   }
 </style>

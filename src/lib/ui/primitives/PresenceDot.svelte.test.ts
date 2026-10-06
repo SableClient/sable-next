@@ -16,3 +16,15 @@ test('applies the caller class alongside its own', () => {
 
   expect(screen.getByRole('img', { name: 'Away' })).toHaveClass('presence-dot', 'custom');
 });
+
+test.each([
+  ['online', 'circle', 'path'],
+  ['unavailable', 'path', 'circle'],
+  ['offline', 'circle[fill="none"]', 'path'],
+] as const)('draws %s with its own shape', (presence, shown, hidden) => {
+  render(PresenceDot, { presence, label: presence });
+
+  const dot = screen.getByRole('img', { name: presence });
+  expect(dot.querySelector(shown)).not.toBeNull();
+  expect(dot.querySelector(hidden)).toBeNull();
+});
