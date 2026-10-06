@@ -351,6 +351,9 @@ test('sends multiple staged files as one gallery', async () => {
   submit();
   await tick();
 
+  await vi.waitFor(() => {
+    expect(gallery).toHaveBeenCalledTimes(1);
+  });
   expect(gallery).toHaveBeenCalledWith('!room:example.org', [first, second], {
     caption: null,
     formattedCaption: null,
@@ -376,6 +379,9 @@ test('sends each staged file on its own when galleries are off', async () => {
   await tick();
 
   expect(gallery).not.toHaveBeenCalled();
+  await vi.waitFor(() => {
+    expect(attachment).toHaveBeenCalledTimes(2);
+  });
   expect(attachment).toHaveBeenNthCalledWith(1, '!room:example.org', first, { spoiler: false });
   expect(attachment).toHaveBeenNthCalledWith(2, '!room:example.org', second, { spoiler: false });
 });
@@ -501,7 +507,9 @@ test('stages files dropped on the composer, and drops one on demand', async () =
   submit();
   await tick();
 
-  expect(attachment).toHaveBeenCalledTimes(1);
+  await vi.waitFor(() => {
+    expect(attachment).toHaveBeenCalledTimes(1);
+  });
   expect(attachment).toHaveBeenCalledWith('!room:example.org', second, { spoiler: false });
 });
 
@@ -547,6 +555,9 @@ test('text rides a lone attachment as its caption', async () => {
   submit();
   await tick();
 
+  await vi.waitFor(() => {
+    expect(attachment).toHaveBeenCalledTimes(1);
+  });
   expect(attachment).toHaveBeenCalledWith('!room:example.org', file, {
     caption: 'look at this',
     formattedCaption: null,
@@ -1377,6 +1388,9 @@ test('a staged picture marked as a spoiler is sent as one', async () => {
   submit();
   await tick();
 
+  await vi.waitFor(() => {
+    expect(attachment).toHaveBeenCalledTimes(1);
+  });
   expect(attachment).toHaveBeenCalledWith('!room:example.org', file, { spoiler: true });
 });
 

@@ -90,6 +90,7 @@
   } from './editor/serialize';
   import { isServerScheduleUnsupported, ScheduledOriginalKept, sendFailure } from './send-failure';
   import { SendQueue } from './send-queue';
+  import { stripMetadata } from './strip-metadata';
   import {
     ADMIN_PREFIX,
     adminBot,
@@ -905,7 +906,7 @@
         if (gallery) {
           await onSendGallery(
             roomId,
-            unsent.map((item) => item.file),
+            await Promise.all(unsent.map((item) => stripMetadata(item.file))),
             {
               caption: message.body || null,
               formattedCaption: message.formatted,
@@ -920,7 +921,7 @@
           const [next, ...rest] = unsent;
           await onSendAttachment(
             roomId,
-            next.file,
+            await stripMetadata(next.file),
             captioned
               ? {
                   caption: message.body,
@@ -987,7 +988,12 @@
     try {
       for (const attachment of attachments) {
         delayIds.push(
-          await core.commands.scheduleAttachment(roomId, attachment.file, dueTs, attachment.spoiler)
+          await core.commands.scheduleAttachment(
+            roomId,
+            await stripMetadata(attachment.file),
+            dueTs,
+            attachment.spoiler
+          )
         );
       }
       if (message.body !== '') {
