@@ -512,7 +512,7 @@ jobs:
     needs: [setup-release, build-nightly-flatpak]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    if: ${{ always() && needs.setup-release.outputs.nightly == 'true' }}
+    if: ${{ !cancelled() && needs.setup-release.outputs.nightly == 'true' }}
     permissions:
       actions: read
       contents: read
