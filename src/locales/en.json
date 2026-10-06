@@ -914,6 +914,7 @@
       "invitation_rejected": "{{users}} declined the invitation",
       "knocked": "{{users}} asked to join",
       "knock_retracted": "{{users}} withdrew their request to join",
+      "other": "Membership updated for {{users}}",
       "avatar": "{{users}} changed their avatar",
       "others_one": "{{count, number}} other",
       "others_other": "{{count, number}} others",
@@ -923,6 +924,7 @@
         "invitation_rejected": "Declined the invitation",
         "knocked": "Asked to join",
         "knock_retracted": "Withdrew their request",
+        "other": "Membership updated",
         "avatar": "Changed their avatar"
       }
     },

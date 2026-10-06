@@ -8,6 +8,7 @@ export type MemberGroupCategory =
   | 'invitation_rejected'
   | 'knocked'
   | 'knock_retracted'
+  | 'other'
   | 'avatar';
 
 const MEMBERSHIP_CATEGORIES: Partial<Record<MembershipChangeView, MemberGroupCategory>> = {
@@ -17,6 +18,7 @@ const MEMBERSHIP_CATEGORIES: Partial<Record<MembershipChangeView, MemberGroupCat
   invitation_rejected: 'invitation_rejected',
   knocked: 'knocked',
   knock_retracted: 'knock_retracted',
+  other: 'other',
 };
 
 const MAX_NAMES = 3;
