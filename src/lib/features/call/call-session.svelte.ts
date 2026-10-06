@@ -201,6 +201,10 @@ export class CallSession {
     return this.#media?.capabilities.audioRoutes;
   }
 
+  get audioInputs(): CallTransportCapabilities['audioInputs'] {
+    return this.#media?.capabilities.audioInputs;
+  }
+
   async selectAudioRoute(routeId: string): Promise<void> {
     await this.#media?.capabilities.audioRoutes?.select(routeId);
   }

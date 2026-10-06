@@ -7,6 +7,10 @@ export function isNativeMobile(): boolean {
   return os === 'ios' || os === 'android';
 }
 
+export function isAndroid(): boolean {
+  return isTauri() && osType() === 'android';
+}
+
 export function supportsKeyboardShortcuts(): boolean {
   if (isNativeMobile()) return false;
   return typeof matchMedia !== 'function' || matchMedia('(any-pointer: fine)').matches;

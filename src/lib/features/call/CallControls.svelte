@@ -43,6 +43,7 @@
     onSwitchDevice?: (kind: MediaDeviceKind, deviceId: string) => void;
     onSwitchCamera?: () => void;
     audioRoutes?: CallTransportCapabilities['audioRoutes'];
+    audioInputs?: CallTransportCapabilities['audioInputs'];
     onOpenSettings?: (event: MouseEvent) => void;
     extra?: Snippet;
     action?: Snippet;
@@ -64,6 +65,7 @@
     onSwitchDevice,
     onSwitchCamera,
     audioRoutes,
+    audioInputs,
     onOpenSettings,
     extra,
     action,
@@ -79,6 +81,8 @@
   let outputMenu = $state(false);
   let routes = $derived(compact ? undefined : audioRoutes);
   let outputGrouped = $derived(grouped || routes !== undefined);
+  let inputs = $derived(compact ? undefined : audioInputs);
+  let inputGrouped = $derived(grouped || inputs !== undefined);
   let cameraMenu = $state(false);
 
   function shortcut(id: ShortcutId): string {
@@ -119,7 +123,7 @@
   {#snippet micButton(props: Record<string, unknown>)}
     <IconButton
       {...props}
-      variant={grouped ? 'ghost' : microphoneEnabled ? neutral : 'danger'}
+      variant={inputGrouped ? 'ghost' : microphoneEnabled ? neutral : 'danger'}
       {size}
       label={micLabel}
       aria-disabled={ready ? undefined : 'true'}
@@ -133,7 +137,14 @@
     </IconButton>
   {/snippet}
   {#snippet micMenuSnippet()}
-    {#if devices}
+    {#if inputs}
+      <CallRouteMenu
+        bind:open={micMenu}
+        label={$i18n.t('call.microphoneDevices')}
+        list={inputs.list}
+        onSelect={(inputId) => void inputs?.select(inputId)}
+      />
+    {:else if devices}
       <CallDeviceMenu
         bind:open={micMenu}
         kinds={['audioinput']}
@@ -146,8 +157,9 @@
     `${micLabel}${shortcut('call.toggleMute')}${pending}`,
     micButton,
     micMenuSnippet,
-    devices ? () => (micMenu = true) : undefined,
-    microphoneEnabled ? 'neutral' : 'danger'
+    devices || inputs ? () => (micMenu = true) : undefined,
+    microphoneEnabled ? 'neutral' : 'danger',
+    inputGrouped
   )}
 
   {#snippet deafenButton(props: Record<string, unknown>)}

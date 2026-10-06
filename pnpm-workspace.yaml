@@ -11,7 +11,7 @@ allowBuilds:
 onlyBuiltDependencies:
   - esbuild
 minimumReleaseAgeExclude:
-  - '@sableclient/tauri-plugin-livekit-mobile@0.4.0'
+  - '@sableclient/tauri-plugin-livekit-mobile@0.4.0 || 0.5.0'
   - '@sentry/browser-utils@11.0.0'
   - '@sentry/browser@11.0.0'
   - '@sentry/bundler-plugins@11.0.0'

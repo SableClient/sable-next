@@ -81,6 +81,10 @@ export type CallTransportCapabilities = {
     list: () => Promise<CallAudioRoute[]>;
     select: (routeId: string) => Promise<void>;
   };
+  audioInputs?: {
+    list: () => Promise<CallAudioRoute[]>;
+    select: (inputId: string) => Promise<void>;
+  };
   screenShare?: {
     setEnabled: (
       enabled: boolean,

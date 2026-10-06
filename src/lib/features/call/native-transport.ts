@@ -5,6 +5,7 @@ import type {
 import { uint8ArrayToBase64 } from 'uint8array-extras';
 
 import { loadNativeCalls } from '#lib/platform/calls.js';
+import { isAndroid } from '#lib/platform/os.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import type {
@@ -208,6 +209,18 @@ export async function createNativeTransport(
           adopt(await plugin.setAudioRoute({ callId, routeId }));
         },
       },
+      audioInputs: isAndroid()
+        ? {
+            list: async () => {
+              const response = await plugin.getAudioRoutes({ callId });
+              adopt(response.receiver);
+              return response.inputs ?? [];
+            },
+            select: async (inputId) => {
+              adopt(await plugin.setAudioInput({ callId, inputId }));
+            },
+          }
+        : undefined,
       screenShare: {
         setEnabled: async (enabled) => {
           adopt(await plugin.setNativeCallScreenShareEnabled({ callId, enabled }));
