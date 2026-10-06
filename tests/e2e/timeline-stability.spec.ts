@@ -1675,11 +1675,13 @@ test('a message sent while reading history leaves the reader in place', async ({
 });
 
 test('keeps jump to latest hidden within a page of the end and shows it a page away', async ({
+  page,
   app,
   timeline,
   core,
   installRoomCore,
 }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await installRoomCore('ready');
   await app.openRoom('!room:example.test');
   await loadScrollableHistory(core, timeline);
@@ -1692,6 +1694,22 @@ test('keeps jump to latest hidden within a page of the end and shows it a page a
   await timeline.scrollAboveBottomAndNotify(height + 30);
   await timeline.waitForScrollSettled();
   await expect(timeline.jumpToLatest).toBeVisible();
+
+  const faded = await timeline.viewport.evaluate(async (viewport) => {
+    const control = document.querySelector<HTMLElement>('.jump-to-latest-motion');
+    if (!control) throw new Error('Jump control missing');
+    viewport.scrollTop = viewport.scrollHeight - viewport.clientHeight;
+    viewport.dispatchEvent(new Event('scroll'));
+    let faded = false;
+    for (let frame = 0; frame < 30 && control.isConnected; frame++) {
+      await new Promise(requestAnimationFrame);
+      const opacity = Number.parseFloat(getComputedStyle(control).opacity);
+      faded ||= control.inert && opacity > 0 && opacity < 1;
+    }
+    return faded;
+  });
+  expect(faded).toBe(true);
+  await expect(timeline.jumpToLatest).toBeHidden();
 });
 
 test('shows jump to latest for a sent echo while reading a page back and returns to it', async ({

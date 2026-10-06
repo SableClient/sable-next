@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onDestroy, tick, untrack, type Snippet } from 'svelte';
   import { on } from 'svelte/events';
-  import { fade } from 'svelte/transition';
+  import { fade, fly } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
   import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
@@ -15,7 +16,7 @@
   import { windowActivity } from '#lib/platform/window-activity.js';
   import type { ResumeAnchor, RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
-  import { motionMs, shouldReduceMotion } from '#lib/ui/motion.js';
+  import { MOTION_MS, motionMs, shouldReduceMotion } from '#lib/ui/motion.js';
   import {
     TimelineWindow,
     type TimelineEntry,
@@ -1155,17 +1156,23 @@
   </div>
 
   {#if revealed && visibleItems.length > 0 && (live ? jumpToLatestVisible : onJumpToLive !== undefined)}
-    <IconButton
-      type="button"
-      class="jump-to-latest"
-      variant="secondary"
-      size="medium"
-      label={$i18n.t('timeline.jumpToLatest')}
-      title={$i18n.t('timeline.jumpToLatest')}
-      onclick={jumpToLatest}
+    <div
+      class="jump-to-latest-motion"
+      in:fly={{ y: 4, duration: motionMs(200), easing: cubicOut }}
+      out:fade={{ duration: motionMs(MOTION_MS.quick) }}
     >
-      <ArrowDownIcon />
-    </IconButton>
+      <IconButton
+        type="button"
+        class="jump-to-latest"
+        variant="secondary"
+        size="medium"
+        label={$i18n.t('timeline.jumpToLatest')}
+        title={$i18n.t('timeline.jumpToLatest')}
+        onclick={jumpToLatest}
+      >
+        <ArrowDownIcon />
+      </IconButton>
+    </div>
   {/if}
 
   {#if typingUsers.length > 0 || footTrailingVisible}
@@ -1398,6 +1405,13 @@
     flex: none;
   }
 
+  .jump-to-latest-motion {
+    inset-inline-end: var(--page-gutter);
+    bottom: calc(var(--timeline-foot-height) + var(--space-200));
+    position: absolute;
+    z-index: 4;
+  }
+
   :global(button.jump-to-latest) {
     --button-height: var(--timeline-indicator-size);
     --button-container: var(--surface-var-container);
@@ -1408,10 +1422,6 @@
 
     background-image: none;
     border-radius: 50%;
-    bottom: calc(var(--timeline-foot-height) + var(--space-200));
     box-shadow: var(--shadow-float);
-    inset-inline-end: var(--page-gutter);
-    position: absolute;
-    z-index: 4;
   }
 </style>

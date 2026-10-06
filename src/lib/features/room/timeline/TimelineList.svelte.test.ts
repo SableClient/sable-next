@@ -1402,7 +1402,7 @@ test('shows the jump control once the reader is a page behind the latest message
   expect(document.querySelector('.jump-to-latest')).not.toBeNull();
 
   await dragTo(element, end - element.clientHeight, end - element.clientHeight + 1);
-  expect(document.querySelector('.jump-to-latest')).toBeNull();
+  expect(document.querySelector('.jump-to-latest-motion')).toHaveAttribute('inert');
 });
 
 test('follows an own echo appended while the reader is still near latest', async () => {
