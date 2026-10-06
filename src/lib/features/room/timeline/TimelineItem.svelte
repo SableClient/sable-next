@@ -444,14 +444,15 @@
   let engaged = $state(false);
   let actionsPinned = $state(false);
 
-  function engage(): void {
+  function engage(event: FocusEvent | PointerEvent): void {
+    if (event instanceof FocusEvent && !(event.target as Element).matches(':focus-visible')) return;
     engaged = true;
   }
 
   function disengage(event: FocusEvent | PointerEvent): void {
     if (event instanceof FocusEvent && event.relatedTarget instanceof Node) {
       if (messageRow?.contains(event.relatedTarget)) return;
-    } else if (!(event instanceof FocusEvent) && messageRow?.matches(':focus-within')) {
+    } else if (!(event instanceof FocusEvent) && messageRow?.matches(':has(:focus-visible)')) {
       return;
     }
     engaged = false;
