@@ -349,6 +349,7 @@
     display: inline-block;
     min-width: var(--space-700);
     padding: var(--space-200);
+    text-align: start;
   }
 
   .account-profile-status-text:focus-visible {
