@@ -1662,6 +1662,11 @@
     background: var(--bg-container-hover);
   }
 
+  .room-list > .room-row-wrap:not(:focus-within, :has(.room-category)) {
+    contain-intrinsic-size: auto 2.25rem;
+    content-visibility: auto;
+  }
+
   @media (any-hover: hover) and (any-pointer: fine) {
     .room-row-wrap:hover {
       --room-icon-plate: var(--bg-container-hover);
