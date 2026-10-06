@@ -35,7 +35,7 @@ import type {
 import { idleTransportState, ignoreError, ScreenAudioError } from './call-transport';
 import { MatrixKeyProvider } from './key-provider';
 import { createMicrophoneFilter, supportsVoiceFilter } from './voice-filter';
-import { videoPublishOptions, videoResolution } from './video-quality';
+import { screenCaptureOptions, videoPublishOptions, videoResolution } from './video-quality';
 import type { CallTelemetry } from './call-telemetry';
 
 const qualityOf = (quality: ConnectionQuality): CallConnectionQuality => {
@@ -134,15 +134,16 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     preferences.callCameraCodec,
     preferences.callSimulcast
   );
-  const screenCapture: ScreenShareCaptureOptions =
-    preferences.callScreenResolution === 'auto'
-      ? {}
-      : { resolution: videoResolution(preferences.callScreenResolution) };
+  const screenCapture: ScreenShareCaptureOptions = screenCaptureOptions(
+    preferences.callScreenResolution,
+    preferences.callScreenFramerate
+  );
   const screenPublish = videoPublishOptions(
     'screen',
     preferences.callScreenBitrate,
     preferences.callScreenCodec,
-    preferences.callSimulcast
+    preferences.callSimulcast,
+    preferences.callScreenFramerate
   );
 
   const room = (options.createRoom ?? ((config) => new LivekitRoom(config)))({

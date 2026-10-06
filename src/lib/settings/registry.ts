@@ -78,6 +78,7 @@ import { syncTelemetryConsent } from '#lib/platform/telemetry.js';
 import { supportsDesktopWindow, supportsTray } from '#lib/platform/window-decorations.js';
 
 import {
+  CALL_SCREEN_FRAMERATES,
   CALL_VIDEO_BITRATES,
   CALL_VIDEO_CODECS,
   CALL_VIDEO_RESOLUTIONS,
@@ -126,6 +127,11 @@ const callBitrateOptions: SettingOption[] = CALL_VIDEO_BITRATES.map((value) =>
   value === 'auto'
     ? { value, label: 'settings.callVideoAutomatic' }
     : { value, label: `${value} kbps`, literal: true }
+);
+const callFramerateOptions: SettingOption[] = CALL_SCREEN_FRAMERATES.map((value) =>
+  value === 'auto'
+    ? { value, label: 'settings.callVideoAutomatic' }
+    : { value, label: `${value} fps`, literal: true }
 );
 const callCodecOptions: SettingOption[] = CALL_VIDEO_CODECS.map((value) =>
   value === 'auto'
@@ -1461,6 +1467,15 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.callScreenBitrate',
         type: 'select',
         options: callBitrateOptions,
+        supported: () => !hasNativeCalls(),
+      },
+      {
+        key: 'callScreenFramerate',
+        section: 'call-screens',
+        icon: MonitorIcon,
+        name: 'settings.callScreenFramerate',
+        type: 'select',
+        options: callFramerateOptions,
         supported: () => !hasNativeCalls(),
       },
       {

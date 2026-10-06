@@ -206,6 +206,26 @@ test.each([false, true])(
   }
 );
 
+test('screen frame rate caps capture and encoding', async () => {
+  preferences.callScreenFramerate = '60';
+  const fixture = roomFixture();
+  const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
+  try {
+    await transport.connect(connectOptions);
+    await transport.capabilities.screenShare?.setEnabled(true);
+    expect(fixture.localParticipant.setScreenShareEnabled).toHaveBeenLastCalledWith(
+      true,
+      expect.objectContaining({ resolution: { width: 1920, height: 1080, frameRate: 60 } }),
+      expect.objectContaining({
+        screenShareEncoding: { maxBitrate: 8_000_000, maxFramerate: 60 },
+      })
+    );
+  } finally {
+    preferences.callScreenFramerate = 'auto';
+    await transport.disconnect();
+  }
+});
+
 test('HDR sharing uses the screen resolution and publish quality', async () => {
   preferences.callScreenResolution = '480';
   preferences.callScreenBitrate = '500';

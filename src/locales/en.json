@@ -2184,6 +2184,7 @@
     "callCameraCodec": "Camera codec",
     "callScreenResolution": "Screen sharing resolution",
     "callScreenBitrate": "Screen sharing maximum bitrate",
+    "callScreenFramerate": "Screen sharing frame rate",
     "callScreenCodec": "Screen sharing codec",
     "callSimulcast": "Use simulcast",
     "callSimulcastHint": "Sends camera and screen video at several quality levels. Uses more bandwidth and processing.",

@@ -78,6 +78,8 @@ export const CALL_VIDEO_BITRATES = [
   '16000',
 ] as const;
 export const CALL_VIDEO_CODECS = ['auto', 'vp8', 'h264', 'vp9', 'av1'] as const;
+export const CALL_SCREEN_FRAMERATES = ['auto', '15', '30', '60'] as const;
+export type CallScreenFramerate = (typeof CALL_SCREEN_FRAMERATES)[number];
 export type CallVideoResolution = (typeof CALL_VIDEO_RESOLUTIONS)[number];
 export type CallVideoBitrate = (typeof CALL_VIDEO_BITRATES)[number];
 export type CallVideoCodec = (typeof CALL_VIDEO_CODECS)[number];
@@ -311,6 +313,7 @@ export interface Preferences {
   callCameraCodec: CallVideoCodec;
   callScreenResolution: CallVideoResolution;
   callScreenBitrate: CallVideoBitrate;
+  callScreenFramerate: CallScreenFramerate;
   callScreenCodec: CallVideoCodec;
   callSimulcast: boolean;
 
@@ -401,6 +404,7 @@ const ENUMS = {
   callCameraCodec: CALL_VIDEO_CODECS,
   callScreenResolution: CALL_VIDEO_RESOLUTIONS,
   callScreenBitrate: CALL_VIDEO_BITRATES,
+  callScreenFramerate: CALL_SCREEN_FRAMERATES,
   callScreenCodec: CALL_VIDEO_CODECS,
   badgeDefaultDirect: ['all', 'mentions', 'quiet'],
   badgeDefaultGroup: ['all', 'mentions', 'quiet'],
@@ -580,6 +584,7 @@ const DEFAULTS: Preferences = {
   callCameraCodec: 'auto',
   callScreenResolution: 'auto',
   callScreenBitrate: 'auto',
+  callScreenFramerate: 'auto',
   callScreenCodec: 'auto',
   callSimulcast: true,
 
