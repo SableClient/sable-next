@@ -76,6 +76,13 @@ test('mod+shift+n matches the uppercase key browsers report for it', () => {
   ).toBe(true);
 });
 
+test('a shifted letter binding does not match the unshifted key', () => {
+  expect(matchesBinding('mod+shift+v', event({ key: 'v', ctrlKey: true }), false)).toBe(false);
+  expect(
+    matchesBinding('mod+shift+v', event({ key: 'V', ctrlKey: true, shiftKey: true }), false)
+  ).toBe(true);
+});
+
 test('a named key binding requires an exact shiftKey match', () => {
   expect(matchesBinding('alt+shift+down', event({ key: 'ArrowDown', altKey: true }), false)).toBe(
     false

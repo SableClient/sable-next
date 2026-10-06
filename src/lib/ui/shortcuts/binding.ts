@@ -82,6 +82,7 @@ export function matchesBinding(binding: string, event: KeyboardEventLike, isMac:
   if (event.metaKey !== requiredMeta) return false;
   if (event.altKey !== parsed.alt) return false;
   if (isNamedKey(parsed.key) && event.shiftKey !== parsed.shift) return false;
+  if (parsed.shift && !event.shiftKey) return false;
 
   return event.key.toLowerCase() === parsed.key;
 }

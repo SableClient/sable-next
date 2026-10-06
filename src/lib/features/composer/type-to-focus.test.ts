@@ -34,6 +34,14 @@ test('leaves named keys, shortcuts and the space bar alone', () => {
   expect(shouldFocusComposer(press('n', undefined, { altKey: true }))).toBe(false);
 });
 
+test('claims a paste shortcut, plain or not', () => {
+  expect(shouldFocusComposer(press('v', undefined, { ctrlKey: true }))).toBe(true);
+  expect(shouldFocusComposer(press('v', undefined, { metaKey: true }))).toBe(true);
+  expect(shouldFocusComposer(press('V', undefined, { ctrlKey: true, shiftKey: true }))).toBe(true);
+  expect(shouldFocusComposer(press('v', undefined, { ctrlKey: true, altKey: true }))).toBe(false);
+  expect(shouldFocusComposer(press('v'))).toBe(true);
+});
+
 test('leaves a press inside an editable target alone', () => {
   const input = mount('<input />');
   expect(shouldFocusComposer(press('a', input))).toBe(false);
