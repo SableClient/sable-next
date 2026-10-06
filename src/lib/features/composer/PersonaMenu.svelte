@@ -37,6 +37,7 @@
     onDisable,
   }: Props = $props();
   let query = $state('');
+  let grid = $derived(!query);
   let filteredPersonas = $derived(
     personas.filter((persona) => {
       const needle = query.trim().toLocaleLowerCase();
@@ -59,6 +60,79 @@
   );
 </script>
 
+{#snippet listItem(persona: PersonaView | null, kind: 'default' | 'disable' | 'offGlobal' | 'off')}
+  <li>
+    <button
+      type="button"
+      class="persona-option"
+      onclick={() => {
+        (kind === 'disable' ? onDisable : onChoose)(persona);
+      }}
+    >
+      {#if persona}
+        {@const light = persona.color_on_light ?? persona.color_on_dark}
+        {@const dark = persona.color_on_dark ?? persona.color_on_light}
+        <Avatar id={persona.id} src={persona.avatar_url} name={persona.display_name} size="small" />
+        <span
+          class="persona-option-name sender-identity-name"
+          class:tinted={light !== null}
+          style:--name-color-on-light={nameColorOnLight(light) ?? undefined}
+          style:--name-color-on-dark={nameColorOnDark(dark) ?? undefined}
+          >{persona.display_name}</span
+        >
+        {#if selected?.persona_id === persona.id}<CheckIcon />{/if}
+      {:else if kind === 'disable'}
+        <Avatar size="small"><ProhibitIcon /></Avatar>
+        <span class="persona-option-name"
+          >{$i18n.t(scope === 'room' ? 'personas.pickerOff' : 'personas.pickerOffSpace')}</span
+        >
+        {#if disabled}<CheckIcon />{/if}
+      {:else if kind === 'offGlobal'}
+        <Avatar initials="?" size="small" />
+        <span class="persona-option-name">{$i18n.t('personas.pickerOffGlobal')}</span>
+        {#if !selected && !disabled}<CheckIcon />{/if}
+      {:else}
+        <Avatar initials="?" size="small" />
+        <span class="persona-option-name">{$i18n.t('personas.pickerNone')}</span>
+        {#if !selected && !disabled}<CheckIcon />{/if}
+      {/if}
+    </button>
+  </li>
+{/snippet}
+
+{#snippet gridItem(persona: PersonaView | null, kind: 'default' | 'disable' | 'offGlobal' | 'off')}
+  <li>
+    <button
+      type="button"
+      class="persona-grid-option"
+      class:selected={kind === 'disable'
+        ? disabled
+        : kind === 'default'
+          ? !!persona && selected?.persona_id === persona.id
+          : !selected && !disabled}
+      onclick={() => {
+        console.info(onChoose);
+        (kind === 'disable' ? onDisable : onChoose)(persona);
+      }}
+    >
+      {#if persona}
+        <Avatar
+          id={persona.id}
+          src={persona.avatar_url}
+          name={persona.display_name}
+          size="medium"
+        />
+      {:else if kind === 'disable'}
+        <Avatar size="medium"><ProhibitIcon /></Avatar>
+      {:else if kind === 'offGlobal'}
+        <Avatar initials="?" size="medium" />
+      {:else}
+        <Avatar initials="?" size="medium" />
+      {/if}
+    </button>
+  </li>
+{/snippet}
+
 <div class="persona-menu">
   <div class="persona-scopes" role="tablist" aria-label={$i18n.t('personas.pickerHeading')}>
     {#each scopes as tab (tab.id)}
@@ -76,6 +150,21 @@
     {/each}
   </div>
 
+  <ul class="persona-options" class:grid>
+    {#if scope === 'account'}
+      {@render (grid ? gridItem : listItem)(null, 'offGlobal')}
+    {/if}
+    {#if scope === 'room' || scope === 'space'}
+      {@render (grid ? gridItem : listItem)(null, 'off')}
+    {/if}
+    {#if scope === 'room' || scope === 'space'}
+      {@render (grid ? gridItem : listItem)(null, 'disable')}
+    {/if}
+    {#each filteredPersonas as persona, index (`${index}:${persona.id}`)}
+      {@render (grid ? gridItem : listItem)(persona, 'default')}
+    {/each}
+  </ul>
+
   <TextInput
     class="persona-search"
     bind:value={query}
@@ -84,78 +173,6 @@
     placeholder={$i18n.t('personas.search')}
     aria-label={$i18n.t('personas.search')}
   />
-
-  <ul class="persona-options">
-    {#if scope === 'account'}
-      <li>
-        <button
-          type="button"
-          class="persona-option"
-          onclick={() => {
-            onChoose(null);
-          }}
-        >
-          <Avatar size="small"><ProhibitIcon /></Avatar>
-          <span class="persona-option-name">{$i18n.t('personas.pickerOffGlobal')}</span>
-          {#if !selected && !disabled}<CheckIcon />{/if}
-        </button>
-      </li>
-    {/if}
-    {#if scope === 'room' || scope === 'space'}
-      <li>
-        <button
-          type="button"
-          class="persona-option"
-          onclick={() => {
-            onChoose(null);
-          }}
-        >
-          <Avatar initials="?" size="small" />
-          <span class="persona-option-name">{$i18n.t('personas.pickerNone')}</span>
-          {#if !selected && !disabled}<CheckIcon />{/if}
-        </button>
-      </li>
-    {/if}
-    {#if scope === 'room' || scope === 'space'}
-      <li>
-        <button type="button" class="persona-option" onclick={onDisable}>
-          <Avatar size="small"><ProhibitIcon /></Avatar>
-          <span class="persona-option-name"
-            >{$i18n.t(scope === 'room' ? 'personas.pickerOff' : 'personas.pickerOffSpace')}</span
-          >
-          {#if disabled}<CheckIcon />{/if}
-        </button>
-      </li>
-    {/if}
-    {#each filteredPersonas as persona, index (`${index}:${persona.id}`)}
-      {@const light = persona.color_on_light ?? persona.color_on_dark}
-      {@const dark = persona.color_on_dark ?? persona.color_on_light}
-      <li>
-        <button
-          type="button"
-          class="persona-option"
-          onclick={() => {
-            onChoose(persona);
-          }}
-        >
-          <Avatar
-            id={persona.id}
-            src={persona.avatar_url}
-            name={persona.display_name}
-            size="small"
-          />
-          <span
-            class="persona-option-name sender-identity-name"
-            class:tinted={light !== null}
-            style:--name-color-on-light={nameColorOnLight(light) ?? undefined}
-            style:--name-color-on-dark={nameColorOnDark(dark) ?? undefined}
-            >{persona.display_name}</span
-          >
-          {#if selected?.persona_id === persona.id}<CheckIcon />{/if}
-        </button>
-      </li>
-    {/each}
-  </ul>
 </div>
 
 <style>
@@ -182,12 +199,29 @@
   }
 
   .persona-options {
-    display: grid;
+    display: flex;
+    flex-flow: column nowrap;
+    height: 18rem;
     list-style: none;
     margin: 0;
-    max-height: 18rem;
     overflow-y: auto;
     padding: 0;
+  }
+
+  .persona-options.grid {
+    align-content: flex-end;
+    display: flex;
+    flex-flow: row wrap;
+    gap: var(--space-200);
+    padding: var(--space-200);
+    padding-block: var(--space-200);
+
+    > * {
+      display: flex;
+      flex: 1;
+      flex-direction: row;
+      justify-content: center;
+    }
   }
 
   :global(.persona-search) {
@@ -198,8 +232,26 @@
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     font: inherit;
-    margin-inline: var(--space-200);
+    margin-inline: 0;
     padding: var(--space-200) var(--space-300);
+  }
+
+  .persona-grid-option {
+    background: none;
+    border: 0;
+    border-radius: var(--radius);
+    padding: 0;
+  }
+
+  .persona-grid-option.selected {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  .persona-grid-option:hover,
+  .persona-grid-option:focus-visible {
+    outline: var(--focus-ring-width) solid var(--surface-container-line);
+    outline-offset: var(--focus-ring-offset);
   }
 
   .persona-option {
@@ -219,7 +271,7 @@
 
   .persona-option:hover,
   .persona-option:focus-visible {
-    background: var(--surface-container);
+    background: var(--surface-var-container);
     color: var(--surface-on-container);
   }
 
