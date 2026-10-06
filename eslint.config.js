@@ -95,6 +95,10 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/lib/platform/*-worklet.js'],
+    languageOptions: { globals: { ...globals.audioWorklet } },
+  },
+  {
     // SvelteKit keeps the service worker out of the app's tsconfig, since it
     // compiles against webworker libs rather than the DOM's.
     files: ['src/service-worker.ts'],

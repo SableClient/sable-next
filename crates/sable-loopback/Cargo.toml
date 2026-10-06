@@ -1,0 +1,22 @@
+[package]
+name = "sable-loopback"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+tauri = ["dep:tauri", "dep:serde"]
+
+[dependencies]
+log = "0.4"
+
+[target.'cfg(windows)'.dependencies]
+wasapi = "0.25.0"
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+tauri = { version = "2.11.3", default-features = false, optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+[lints]
+workspace = true

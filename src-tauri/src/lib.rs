@@ -681,6 +681,31 @@ async fn stop_screen_audio() {
     let _ = tauri::async_runtime::spawn_blocking(screen_audio::stop).await;
 }
 
+#[cfg(target_os = "windows")]
+#[tauri::command]
+async fn start_screen_audio_stream(
+    selection: sable_loopback::capture::Selection,
+    frames: tauri::ipc::Channel<tauri::ipc::Response>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || sable_loopback::share::start(&selection, frames))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+async fn screen_audio_apps() -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(sable_loopback::share::list_apps)
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+async fn stop_screen_audio() {
+    let _ = tauri::async_runtime::spawn_blocking(sable_loopback::share::stop).await;
+}
+
 #[tauri::command]
 #[expect(
     clippy::needless_pass_by_value,
@@ -909,9 +934,11 @@ pub fn run() {
             open_external_url,
             #[cfg(target_os = "linux")]
             start_screen_audio,
-            #[cfg(target_os = "linux")]
+            #[cfg(target_os = "windows")]
+            start_screen_audio_stream,
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
             stop_screen_audio,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
             screen_audio_apps,
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             hdr_monitors,

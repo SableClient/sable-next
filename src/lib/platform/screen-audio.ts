@@ -1,7 +1,8 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { type as osType } from '@tauri-apps/plugin-os';
+import { type as osType, version as osVersion } from '@tauri-apps/plugin-os';
 
 import { readJson, writeJson } from './local-json';
+import { startScreenAudioStream, stopScreenAudioStream } from './screen-audio-stream';
 
 export type ScreenAudioChoice =
   | { kind: 'none' }
@@ -10,6 +11,7 @@ export type ScreenAudioChoice =
 
 export const SCREEN_AUDIO_LABEL = 'Sable screen audio';
 
+const WINDOWS_LOOPBACK_BUILD = 19041;
 const CHOICE_KEY = 'sable-screen-audio-choice';
 const DEVICE_ATTEMPTS = 20;
 const DEVICE_POLL_MS = 100;
@@ -37,8 +39,18 @@ export function listScreenAudioApps(): Promise<string[]> {
   return invoke<string[]>('screen_audio_apps');
 }
 
+function windowsBuild(): number {
+  return Number(osVersion().split('.').at(2));
+}
+
 export function screenAudioSupported(): boolean {
-  return isTauri() && osType() === 'linux';
+  if (!isTauri()) return false;
+  const os = osType();
+  return os === 'linux' || (os === 'windows' && windowsBuild() >= WINDOWS_LOOPBACK_BUILD);
+}
+
+export function screenAudioPicksMany(): boolean {
+  return osType() === 'linux';
 }
 
 async function findInput(label: string): Promise<MediaDeviceInfo | null> {
@@ -56,6 +68,7 @@ async function findInput(label: string): Promise<MediaDeviceInfo | null> {
 export async function captureScreenAudio(
   selection: Exclude<ScreenAudioChoice, { kind: 'none' }>
 ): Promise<MediaStreamTrack> {
+  if (osType() === 'windows') return startScreenAudioStream(selection);
   const label = await invoke<string>('start_screen_audio', { selection });
   try {
     const device = await findInput(label);
@@ -79,5 +92,5 @@ export async function captureScreenAudio(
 }
 
 export function stopScreenAudio(): Promise<void> {
-  return invoke('stop_screen_audio');
+  return osType() === 'windows' ? stopScreenAudioStream() : invoke('stop_screen_audio');
 }

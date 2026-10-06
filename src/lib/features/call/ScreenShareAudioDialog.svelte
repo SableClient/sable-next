@@ -9,6 +9,7 @@
   import {
     lastScreenAudioChoice,
     listScreenAudioApps,
+    screenAudioPicksMany,
     type ScreenAudioChoice,
   } from '#lib/platform/screen-audio.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
@@ -28,6 +29,7 @@
 
   let { onShare, onCancel }: Props = $props();
 
+  const many = screenAudioPicksMany();
   const last = lastScreenAudioChoice();
   let kind = $state<Kind>(last.kind);
   let excluded = $state<string[]>(last.kind === 'system' ? last.exclude : []);
@@ -39,6 +41,7 @@
   let picked = $derived(kind === 'system' ? excluded : included);
   let apps = $derived([...new Set([...playing, ...picked])].sort((a, b) => a.localeCompare(b)));
   let ready = $derived(kind !== 'apps' || included.length > 0);
+  let listed = $derived(kind === 'apps' || (kind === 'system' && many));
 
   let options = $derived([
     {
@@ -55,8 +58,8 @@
     },
     {
       value: 'apps' as const,
-      label: $i18n.t('call.screenAudioApps'),
-      hint: $i18n.t('call.screenAudioAppsHint'),
+      label: $i18n.t(many ? 'call.screenAudioApps' : 'call.screenAudioAppsOne'),
+      hint: $i18n.t(many ? 'call.screenAudioAppsHint' : 'call.screenAudioAppsOneHint'),
       icon: AppWindowIcon,
     },
   ]);
@@ -76,13 +79,17 @@
 
   let requested = false;
   $effect(() => {
-    if (kind === 'none' || requested) return;
+    if (!listed || requested) return;
     requested = true;
     void refresh();
   });
 
   function toggle(app: string): void {
-    const next = picked.includes(app) ? picked.filter((name) => name !== app) : [...picked, app];
+    const next = !many
+      ? [app]
+      : picked.includes(app)
+        ? picked.filter((name) => name !== app)
+        : [...picked, app];
     if (kind === 'system') excluded = next;
     else included = next;
   }
@@ -121,11 +128,17 @@
       }}
     />
 
-    {#if kind !== 'none'}
+    {#if listed}
       <section class="apps" aria-labelledby="screen-audio-apps">
         <header>
           <h3 id="screen-audio-apps">
-            {$i18n.t(kind === 'system' ? 'call.screenAudioExclude' : 'call.screenAudioInclude')}
+            {$i18n.t(
+              kind === 'system'
+                ? 'call.screenAudioExclude'
+                : many
+                  ? 'call.screenAudioInclude'
+                  : 'call.screenAudioIncludeOne'
+            )}
           </h3>
           <IconButton
             variant="subtle"
@@ -151,7 +164,8 @@
               <li>
                 <label>
                   <input
-                    type="checkbox"
+                    type={many ? 'checkbox' : 'radio'}
+                    name="screen-audio-app"
                     checked={picked.includes(app)}
                     onchange={() => {
                       toggle(app);

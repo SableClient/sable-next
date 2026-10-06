@@ -7,6 +7,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 const platform = vi.hoisted(() => ({
   listScreenAudioApps: vi.fn<() => Promise<string[]>>(),
   lastScreenAudioChoice: vi.fn(() => ({ kind: 'none' as const })),
+  screenAudioPicksMany: vi.fn(() => true),
 }));
 vi.mock('#lib/platform/screen-audio.js', () => platform);
 
@@ -14,6 +15,7 @@ import ScreenShareAudioDialog from './ScreenShareAudioDialog.svelte';
 
 afterEach(() => {
   platform.listScreenAudioApps.mockReset();
+  platform.screenAudioPicksMany.mockReturnValue(true);
 });
 
 function open() {
@@ -85,4 +87,19 @@ test('keeps the remembered apps on screen when the list cannot be read', async (
 
   expect(await screen.findByRole('alert')).toHaveTextContent(/Refresh to try again/);
   expect(screen.getByRole('checkbox', { name: /mpv/ })).toBeChecked();
+});
+
+test('on a platform that shares one app, every app needs no list and a pick replaces the last', async () => {
+  platform.screenAudioPicksMany.mockReturnValue(false);
+  platform.listScreenAudioApps.mockResolvedValue(['chrome', 'Spotify']);
+  const { onShare, user } = open();
+
+  await user.click(await screen.findByRole('radio', { name: /Every app/ }));
+  expect(platform.listScreenAudioApps).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('radio', { name: /One app/ }));
+  await user.click(await screen.findByRole('radio', { name: 'chrome' }));
+  await user.click(screen.getByRole('radio', { name: 'Spotify' }));
+  await user.click(screen.getByRole('button', { name: 'Share' }));
+
+  expect(onShare).toHaveBeenCalledWith({ kind: 'apps', include: ['Spotify'] });
 });
