@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { RoomJoinRuleView, TimelineItemView } from '#src/generated/protocol';
+  import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 
   import MessageBody from './MessageBody.svelte';
   import {
@@ -10,11 +11,14 @@
   interface Props {
     item: TimelineItemView;
     joinRule: RoomJoinRuleView;
+    onOpenMedia?: (eventId: string) => void;
   }
 
-  let { item, joinRule }: Props = $props();
+  let { item, joinRule, onOpenMedia }: Props = $props();
 
   provideRoomMediaPreviews(new RoomMediaPreviews(() => joinRule));
 </script>
 
-<MessageBody {item} canRedactOthers={false} />
+<TooltipProvider>
+  <MessageBody {item} {onOpenMedia} canRedactOthers={false} />
+</TooltipProvider>

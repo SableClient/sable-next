@@ -476,9 +476,9 @@ test('a recycled image does not inherit the previous image reveal or caption sta
   expect(screen.getByRole('button', { name: 'Reveal photo.png' })).toBeInTheDocument();
 });
 
-test('a sticker can be hidden without opening its viewer', async () => {
+test('a sticker has an emote tooltip that stays hidden with the sticker', async () => {
   const onOpenMedia = vi.fn();
-  render(MessageBody, {
+  render(MessageBodyMediaHarness, {
     item: item({
       kind: 'sticker',
       body: 'Cat sticker',
@@ -487,12 +487,30 @@ test('a sticker can be hidden without opening its viewer', async () => {
       width: 128,
       height: 128,
     }),
-    canRedactOthers: false,
+    joinRule: 'invite',
     onOpenMedia,
   });
 
+  const sticker = screen.getByRole('button', { name: 'Open Cat sticker' });
+  await userEvent.hover(sticker);
+  const tooltip = document.querySelector('.tooltip');
+  expect(tooltip).toHaveTextContent('Cat sticker');
+  expect(tooltip?.querySelector('.emote-card-image')).toBeInTheDocument();
+  await userEvent.unhover(sticker);
+  expect(document.querySelector('.tooltip')).not.toBeInTheDocument();
+  await userEvent.tab();
+  expect(sticker).toHaveFocus();
+  expect(document.querySelector('.tooltip')).toHaveTextContent('Cat sticker');
+  await userEvent.keyboard('{Escape}');
+  expect(document.querySelector('.tooltip')).not.toBeInTheDocument();
+  await userEvent.click(sticker);
+  expect(onOpenMedia).toHaveBeenCalledExactlyOnceWith('$item');
+  onOpenMedia.mockClear();
+
   await userEvent.click(screen.getByRole('button', { name: 'Hide Cat sticker' }));
   expect(document.querySelector('.spoilerable-media')).toHaveClass('spoilered');
+  await userEvent.hover(screen.getByRole('group', { name: 'Cat sticker' }));
+  expect(document.querySelector('.tooltip')).not.toBeInTheDocument();
   expect(onOpenMedia).not.toHaveBeenCalled();
 });
 

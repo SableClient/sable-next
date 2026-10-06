@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { on } from 'svelte/events';
   import type { TimelineItemView, MemberView } from '#src/generated/protocol';
 
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
@@ -6,6 +7,7 @@
   import MediaContent from '#lib/ui/MediaContent.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { i18n } from '#lib/i18n.js';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
@@ -72,6 +74,14 @@
     return spoiler !== null;
   });
   let showCaption = $derived(preferences.captionPosition !== 'hidden');
+  let stickerAnchor = $state<HTMLElement | null>(null);
+  let stickerHovered = $state(false);
+
+  function dismissStickerTooltip(node: HTMLElement) {
+    return on(node, 'keydown', (event) => {
+      if (event.key === 'Escape') stickerHovered = false;
+    });
+  }
 </script>
 
 {#if ((item.content.kind !== 'image' && spoiler !== null) || hiddenByPolicy) && revealedSpoiler !== spoilerKey}
@@ -93,21 +103,52 @@
       : $i18n.t('timeline.redacted')}
   </p>
 {:else if item.content.kind === 'sticker'}
-  <MediaImage
-    class="sticker privacy-media"
-    autoplay={preferences.autoplayStickers}
-    source={item.content.source}
-    alt={item.content.body}
-    title={item.content.body}
-    width={304}
-    height={304}
-    intrinsicWidth={item.content.width}
-    intrinsicHeight={item.content.height}
-    mime={item.content.mime}
-    bind:spoilerHidden={imageSpoilerHidden}
-    retryable
-    onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
-  />
+  {@const sticker = item.content}
+  <div
+    class="sticker"
+    role="group"
+    aria-label={sticker.body}
+    bind:this={stickerAnchor}
+    onpointerenter={(event) => (stickerHovered = event.pointerType !== 'touch')}
+    onpointerleave={() => (stickerHovered = false)}
+    onfocusin={() => (stickerHovered = true)}
+    onfocusout={() => (stickerHovered = false)}
+    {@attach dismissStickerTooltip}
+  >
+    <MediaImage
+      class="privacy-media"
+      autoplay={preferences.autoplayStickers}
+      source={sticker.source}
+      alt={sticker.body}
+      width={304}
+      height={304}
+      intrinsicWidth={sticker.width}
+      intrinsicHeight={sticker.height}
+      mime={sticker.mime}
+      bind:spoilerHidden={imageSpoilerHidden}
+      retryable
+      onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
+    />
+  </div>
+  {#if stickerHovered && !imageSpoilerHidden}
+    <Tooltip label={sticker.body} open customAnchor={stickerAnchor} side="top">
+      {#snippet content()}
+        <span class="emote-card">
+          <MediaImage
+            class="emote-card-image"
+            source={sticker.source}
+            alt=""
+            width={64}
+            height={64}
+            mime={sticker.mime}
+            original
+            autoplay={preferences.autoplayStickers}
+          />
+          <span class="emote-card-name">{sticker.body}</span>
+        </span>
+      {/snippet}
+    </Tooltip>
+  {/if}
   {#if !imageSpoilerHidden && preferences.alwaysShowAltText}<p class="body">
       {item.content.body}
     </p>{/if}
@@ -271,6 +312,26 @@
 
   :global(.sticker) + .body {
     margin-top: var(--space-200);
+  }
+
+  .emote-card {
+    align-items: center;
+    display: flex;
+    gap: var(--space-300);
+  }
+
+  .emote-card :global(.emote-card-image) {
+    height: var(--space-800);
+    width: var(--space-800);
+  }
+
+  .emote-card :global(.media-image-content) {
+    object-fit: contain;
+  }
+
+  .emote-card-name {
+    font-size: var(--font-size-subheading);
+    font-weight: var(--font-weight-medium);
   }
 
   :global(.media) {
