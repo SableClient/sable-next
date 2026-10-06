@@ -26,7 +26,11 @@ function subspace(joinRule: RoomJoinRuleView): HierarchyRoomView {
   };
 }
 
-function mount(joinRule: RoomJoinRuleView, joinedIds: string[]) {
+function mount(
+  joinRule: RoomJoinRuleView,
+  joinedIds: string[],
+  rights: { canManage?: boolean; canManageOwner?: boolean } = {}
+) {
   const onJoin = vi.fn();
   const section: HierarchySection = {
     space: subspace(joinRule),
@@ -50,7 +54,10 @@ function mount(joinRule: RoomJoinRuleView, joinedIds: string[]) {
     joining: new Set<string>(),
     knocked: new Set<string>(),
     joinErrors: new Map<string, string>(),
-    canManage: false,
+    canManage: rights.canManage ?? false,
+    canManageOwner: rights.canManageOwner ?? false,
+    canLeaveParent: () => true,
+    canDropInto: () => true,
     label: (child: HierarchyRoomView) => child.name ?? child.room_id,
     onToggle: noop,
     onVisible: noop,
@@ -99,3 +106,22 @@ test('a joined subspace offers no join', () => {
 
   expect(screen.queryByRole('button', { name: 'Join' })).not.toBeInTheDocument();
 });
+
+test.each([
+  [{ canManage: true }, true, false],
+  [{ canManageOwner: true }, false, true],
+])(
+  'a subspace header offers what its own and its parent space let you change (%o)',
+  async (rights, creates, arranges) => {
+    const { user } = mount('public', ['!root:example.org', '!sub:example.org'], rights);
+
+    await user.click(screen.getByRole('button', { name: 'Room options' }));
+
+    expect(
+      (await screen.findAllByRole('menuitem')).some((item) =>
+        item.textContent.includes('Create room in space')
+      )
+    ).toBe(creates);
+    expect(screen.queryByRole('menuitem', { name: 'Move up' }) !== null).toBe(arranges);
+  }
+);

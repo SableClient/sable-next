@@ -46,6 +46,9 @@
     knocked: ReadonlySet<string>;
     joinErrors: ReadonlyMap<string, string>;
     canManage: boolean;
+    canManageOwner: boolean;
+    canLeaveParent: (roomId: string) => boolean;
+    canDropInto: (source: LobbyDragItem, parentId: string) => boolean;
     label: (child: HierarchyRoomView) => string;
     onToggle: (key: string) => void;
     onVisible: (key: string) => void;
@@ -82,6 +85,9 @@
     knocked,
     joinErrors,
     canManage,
+    canManageOwner,
+    canLeaveParent,
+    canDropInto,
     label,
     onToggle,
     onVisible,
@@ -115,6 +121,7 @@
     return dragList.dropTarget(
       { parentId: section.parentId, roomId },
       {
+        accepts: (source) => canDropInto(source, section.parentId),
         onState: (next) => {
           if (roomId === null) headerDrop = next !== null;
           else dropState = next;
@@ -244,36 +251,36 @@
               {/if}
             </ActionMenuItem>
           {/if}
-          {#if canManage}
+          {#if (canManage && joinedSpace) || canManageOwner}
             <ActionMenuSeparator />
-            {#if joinedSpace}
-              <ActionMenuItem
-                onSelect={() => {
-                  onCreateIn(sectionSpace.room_id, 'create-room');
-                }}
-              >
-                <PlusIcon size={16} />{$i18n.t('nav.createRoomInSpace')}
-              </ActionMenuItem>
-              <ActionMenuItem
-                onSelect={() => {
-                  onCreateIn(sectionSpace.room_id, 'create-space');
-                }}
-              >
-                <UsersThreeIcon size={16} />{$i18n.t('nav.createSubspace')}
-              </ActionMenuItem>
-            {/if}
-            {#if section.ownerId !== null}
-              {@const ownerId = section.ownerId}
-              <ActionMenuItem
-                onSelect={() => {
-                  onSetSuggested(ownerId, sectionSpace.room_id, !section.suggested);
-                }}
-              >
-                <StarFourIcon size={16} />{$i18n.t(
-                  section.suggested ? 'room.lobbyUnmarkSuggested' : 'room.lobbyMarkSuggested'
-                )}
-              </ActionMenuItem>
-            {/if}
+          {/if}
+          {#if canManage && joinedSpace}
+            <ActionMenuItem
+              onSelect={() => {
+                onCreateIn(sectionSpace.room_id, 'create-room');
+              }}
+            >
+              <PlusIcon size={16} />{$i18n.t('nav.createRoomInSpace')}
+            </ActionMenuItem>
+            <ActionMenuItem
+              onSelect={() => {
+                onCreateIn(sectionSpace.room_id, 'create-space');
+              }}
+            >
+              <UsersThreeIcon size={16} />{$i18n.t('nav.createSubspace')}
+            </ActionMenuItem>
+          {/if}
+          {#if canManageOwner && section.ownerId !== null}
+            {@const ownerId = section.ownerId}
+            <ActionMenuItem
+              onSelect={() => {
+                onSetSuggested(ownerId, sectionSpace.room_id, !section.suggested);
+              }}
+            >
+              <StarFourIcon size={16} />{$i18n.t(
+                section.suggested ? 'room.lobbyUnmarkSuggested' : 'room.lobbyMarkSuggested'
+              )}
+            </ActionMenuItem>
             <ActionMenuItem
               onSelect={() => {
                 onMoveSubspace(section, -1);
@@ -430,7 +437,7 @@
                     >
                       <ArrowDownIcon size={16} />{$i18n.t('room.lobbyMoveDown')}
                     </ActionMenuItem>
-                    {#if otherTargets.length > 0}
+                    {#if otherTargets.length > 0 && canLeaveParent(child.room_id)}
                       <ActionMenuSub label={$i18n.t('room.lobbyMoveTo')}>
                         {#snippet trigger()}
                           <ArrowsLeftRightIcon size={16} />{$i18n.t('room.lobbyMoveTo')}

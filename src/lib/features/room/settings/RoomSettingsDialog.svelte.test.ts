@@ -171,3 +171,9 @@ test.each([false, true])('non-admins can inspect and copy data (space: %s)', asy
   await click('room.devDataCopy');
   expect(await navigator.clipboard.readText()).toBe((field as HTMLTextAreaElement).value);
 });
+
+test('members who cannot edit packs still see the emoji section', async () => {
+  await setup(false);
+
+  expect(screen.getByRole('button', { name: /room\.settingsEmojis/ })).toBeInTheDocument();
+});

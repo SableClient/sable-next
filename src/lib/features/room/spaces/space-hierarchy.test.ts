@@ -135,7 +135,7 @@ test('a manager still gets a heading for a subspace holding no rooms', () => {
     room('!empty', { is_space: true }),
   ];
 
-  const sections = buildHierarchySections(rooms, '!space', {}, true);
+  const sections = buildHierarchySections(rooms, '!space', {}, () => true);
   expect(sections.map((section) => section.space?.room_id ?? null)).toEqual([null, '!empty']);
 });
 

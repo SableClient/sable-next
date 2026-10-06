@@ -243,3 +243,40 @@ test('offers the roles created in the room alongside the default ones', async ()
     );
   });
 });
+
+test('offers no role above your own and asks before lowering your own', async () => {
+  const me: MemberView = {
+    ...alice,
+    user_id: '@me:example.org',
+    display_name: 'Me',
+    power_level: 50,
+  };
+  core.session = { user_id: '@me:example.org' };
+  core.roomMembers.mockResolvedValue([alice, me]);
+  core.setUserPowerLevel.mockReset().mockResolvedValue(undefined);
+  const user = await renderMembers({
+    ...permissions,
+    own_power_level: 50,
+    can_change_power_levels: true,
+  });
+  const roleOf = (name: string) =>
+    within(screen.getByText(name).closest('li') ?? document.body).getByRole('button', {
+      name: 'Change role',
+    });
+
+  await user.click(roleOf('Alice'));
+  expect(await screen.findByRole('option', { name: /Moderator/ })).toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: /Admin/ })).toBeNull();
+  await user.keyboard('{Escape}');
+
+  await user.click(roleOf('Me'));
+  await user.click(await screen.findByRole('option', { name: /Member/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Give up your own role?' });
+  expect(core.setUserPowerLevel).not.toHaveBeenCalled();
+
+  await user.click(within(dialog).getByRole('button', { name: 'Lower my role' }));
+  await vi.waitFor(() => {
+    expect(core.setUserPowerLevel).toHaveBeenCalledWith('!room:example.org', '@me:example.org', 0);
+  });
+  core.session = null;
+});

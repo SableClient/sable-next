@@ -37,6 +37,7 @@ export function dropInstructionAt(
 export interface DropTargetOptions<T> {
   allowInto?: boolean;
   axis?: 'vertical' | 'horizontal';
+  accepts?: (source: T) => boolean;
   onState: (state: DropState<T> | null) => void;
   onDrop: (source: T, target: T, instruction: DropInstruction) => void;
 }
@@ -95,7 +96,7 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
       };
     },
 
-    dropTarget(item, { allowInto = false, axis = 'vertical', onState, onDrop }) {
+    dropTarget(item, { allowInto = false, axis = 'vertical', accepts, onState, onDrop }) {
       return (node) => {
         const instructionAt = (event: DragEvent): DropInstruction => {
           const box = node.getBoundingClientRect();
@@ -106,7 +107,7 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
         };
 
         const over = (event: DragEvent): void => {
-          if (dragged === null) return;
+          if (dragged === null || accepts?.(dragged) === false) return;
 
           event.preventDefault();
           if (equals(dragged, item)) {
@@ -129,7 +130,7 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
 
         const drop = (event: DragEvent): void => {
           const source = dragged;
-          if (source === null) return;
+          if (source === null || accepts?.(source) === false) return;
 
           event.preventDefault();
           event.stopPropagation();

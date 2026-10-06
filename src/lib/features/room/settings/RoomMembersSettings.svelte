@@ -15,6 +15,7 @@
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
@@ -41,6 +42,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import {
+    FOUNDER_POWER_LEVEL,
     parsePowerLevelTags,
     POWER_LEVEL_TAGS_EVENT_TYPE,
     type PowerLevelTagMap,
@@ -88,6 +90,9 @@
   let roomId = $derived(room?.room_id ?? null);
   let ownPowerLevel = $derived(permissions?.own_power_level ?? 0);
   let canSetPower = $derived(permissions?.can_change_power_levels ?? false);
+  let selfId = $derived(core.session?.user_id ?? null);
+  let selfDemotion = $state<{ member: MemberView; level: number } | null>(null);
+  let powerResets = $state(0);
   let isDirect = $derived(room?.is_direct ?? false);
   let canInviteInline = $derived(
     (permissions?.can_invite ?? false) && !isDirect && tab !== 'ban' && tab !== 'knock'
@@ -234,6 +239,12 @@
     return member.power_level >= ownPowerLevel;
   }
 
+  function canChangePower(member: MemberView): boolean {
+    if (!canSetPower) return false;
+    if (member.user_id === selfId) return ownPowerLevel < FOUNDER_POWER_LEVEL;
+    return !outranked(member);
+  }
+
   async function act(
     userId: string,
     action: () => Promise<unknown>,
@@ -268,6 +279,7 @@
     );
     for (const [level, tag] of Object.entries(powerTags)) labels[String(Number(level))] = tag.name;
     const known = Object.entries(labels)
+      .filter(([level]) => Number(level) <= ownPowerLevel)
       .sort(([left], [right]) => Number(right) - Number(left))
       .map(([value, label]) => ({ value, label }));
     const current = String(member.power_level);
@@ -275,9 +287,13 @@
     return [{ value: current, label: current }, ...known];
   }
 
-  function setPower(member: MemberView, level: number): void {
+  function setPower(member: MemberView, level: number, confirmed = false): void {
     const target = roomId;
     if (!target || level === member.power_level) return;
+    if (member.user_id === selfId && !confirmed) {
+      selfDemotion = { member, level };
+      return;
+    }
     void act(
       member.user_id,
       () => core.commands.setUserPowerLevel(target, member.user_id, level),
@@ -499,16 +515,18 @@
                   </Button>
                 {/if}
               {:else}
-                {#if canSetPower && !outranked(member)}
-                  <Select
-                    value={String(member.power_level)}
-                    aria-label={$i18n.t('timeline.profileChangePower')}
-                    disabled={busy === member.user_id}
-                    items={powerOptions(member)}
-                    onValueChange={(next: string) => {
-                      setPower(member, Number(next));
-                    }}
-                  />
+                {#if canChangePower(member)}
+                  {#key powerResets}
+                    <Select
+                      value={String(member.power_level)}
+                      aria-label={$i18n.t('timeline.profileChangePower')}
+                      disabled={busy === member.user_id}
+                      items={powerOptions(member)}
+                      onValueChange={(next: string) => {
+                        setPower(member, Number(next));
+                      }}
+                    />
+                  {/key}
                 {:else}
                   <span class="power">{powerLabel(member.power_level)}</span>
                 {/if}
@@ -621,6 +639,27 @@
   onOpenChange={(open: boolean) => {
     inviteOpen = open;
     if (!open) void load();
+  }}
+/>
+
+<ConfirmDialog
+  open={selfDemotion !== null}
+  title={$i18n.t('timeline.profileDemoteSelfTitle')}
+  description={$i18n.t('timeline.profileDemoteSelfBody')}
+  confirmLabel={$i18n.t('timeline.profileDemoteSelfConfirm')}
+  onOpenChange={(next: boolean) => {
+    if (next || selfDemotion === null) return;
+    selfDemotion = null;
+    powerResets += 1;
+  }}
+  onCancel={() => {
+    selfDemotion = null;
+    powerResets += 1;
+  }}
+  onConfirm={() => {
+    const pending = selfDemotion;
+    selfDemotion = null;
+    if (pending) setPower(pending.member, pending.level, true);
   }}
 />
 

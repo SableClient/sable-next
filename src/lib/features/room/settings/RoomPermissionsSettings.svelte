@@ -120,6 +120,7 @@
   );
   let ownLevel = $derived(permissions?.own_power_level ?? 0);
   let canEditMemberList = $derived(canSendState(levels, ownLevel, MEMBER_LIST_EVENT_TYPE));
+  let canEditRoles = $derived(canSendState(levels, ownLevel, POWER_LEVEL_TAGS_EVENT_TYPE));
 
   let syncChoice = $state<string | null>(null);
   let syncConfirm = $state(false);
@@ -438,7 +439,7 @@
             >
               <ListChecksIcon />
             </IconButton>
-            {#if canEdit && level <= ownLevel}
+            {#if canEditRoles && level <= ownLevel}
               <IconButton
                 variant="subtle"
                 size="small"
@@ -474,7 +475,7 @@
             </li>
           {/if}
         {/each}
-        {#if canEdit}
+        {#if canEditRoles}
           <li class="settings-form role-add-row">
             <Button variant="secondary" onclick={startAddRole} disabled={saving}>
               {$i18n.t('room.permRoleAdd')}

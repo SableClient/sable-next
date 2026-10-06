@@ -5,7 +5,12 @@ import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { describe, expect, test, vi } from 'vitest';
 
-import type { MemberView, MutualRoomView, ProfileView } from '#src/generated/protocol';
+import type {
+  MemberView,
+  MutualRoomView,
+  ProfileView,
+  RoomPermissionsView,
+} from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -782,6 +787,43 @@ test('toasts a failed role change and reports nothing', async () => {
     expect(toastError).toHaveBeenCalled();
   });
   expect(onPowerLevelChange).not.toHaveBeenCalled();
+});
+
+test('asks before lowering your own role', async () => {
+  core.setUserPowerLevel.mockReset().mockResolvedValue(undefined);
+  render(MentionProfileCard, {
+    props: {
+      userId: '@me:example.org',
+      roomId: '!room:example.org',
+      ownPowerLevel: 100,
+      permissions: {
+        own_power_level: 100,
+        can_change_power_levels: true,
+      } as RoomPermissionsView,
+      member: {
+        user_id: '@me:example.org',
+        display_name: 'Me',
+        avatar_url: null,
+        power_level: 100,
+        membership: 'join',
+        member_ts: null,
+        kicked: false,
+        service: false,
+      },
+      profile: emptyProfile,
+    },
+  });
+  await tick();
+
+  await chooseAction('Change role');
+  await user.click(await screen.findByRole('menuitem', { name: /Moderator/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Give up your own role?' });
+  expect(core.setUserPowerLevel).not.toHaveBeenCalled();
+
+  await user.click(within(dialog).getByRole('button', { name: 'Lower my role' }));
+  await vi.waitFor(() => {
+    expect(core.setUserPowerLevel).toHaveBeenCalledWith('!room:example.org', '@me:example.org', 50);
+  });
 });
 
 test('lists mutual rooms in a menu of their own, with direct messages last', async () => {

@@ -128,10 +128,13 @@
     );
     void afterOverlayPops().then(() => goto(target));
   }
-  let permissions = $state<RoomPermissionsView | null>(null);
+  let permissionsById = $state.raw(new Map<string, RoomPermissionsView>());
+  let permissionsSpace: string | null = null;
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- request bookkeeping, never rendered from
+  const requestedPermissions = new Set<string>();
 
   let spaceId = $derived(space?.room_id ?? null);
-  let canManage = $derived(permissions?.can_manage_children ?? false);
+  let canManage = $derived(canManageIn(spaceId));
   let joinedIds = $derived(
     new Set(roomList.rooms.filter((room) => room.state === 'joined').map((room) => room.room_id))
   );
@@ -159,7 +162,7 @@
         loaded: hierarchy.loadedLevels,
         failed: hierarchy.failedLevels,
       },
-      canManage
+      canManageIn
     )
       .map((section) => ({
         ...section,
@@ -170,12 +173,12 @@
           section.rooms.length > 0 ||
           !section.loaded ||
           section.failed ||
-          (canManage && section.space !== null)
+          (section.space !== null && canManageIn(section.parentId))
       );
   });
   let moveTargets = $derived(
     merged
-      .filter((room) => room.is_space)
+      .filter((room) => room.is_space && canManageIn(room.room_id))
       .map((room) => ({
         id: room.room_id,
         name: room.room_id === spaceId ? (space?.name ?? label(room)) : label(room),
@@ -250,24 +253,56 @@
     if (kept.length !== overrides.length) overrides = kept;
   });
 
-  $effect(() => {
-    const target = spaceId;
-    if (!target) return;
+  let permissionTargets = $derived(
+    merged
+      .filter(
+        (room) => joinedIds.has(room.room_id) && (room.is_space || boundToParent(room.join_rule))
+      )
+      .map((room) => room.room_id)
+  );
 
-    let current = true;
-    permissions = null;
-    void core.commands
-      .roomPermissions(target)
-      .then((next) => {
-        if (current) permissions = next;
-      })
-      .catch((error: unknown) => {
-        console.debug('[sable lobby] permissions unavailable', error);
-      });
-    return () => {
-      current = false;
-    };
+  $effect(() => {
+    const targets = permissionTargets;
+    const current = spaceId;
+    if (current !== permissionsSpace) {
+      permissionsSpace = current;
+      requestedPermissions.clear();
+      permissionsById = new Map();
+    }
+    for (const roomId of targets) {
+      if (requestedPermissions.has(roomId)) continue;
+      requestedPermissions.add(roomId);
+      void core.commands
+        .roomPermissions(roomId)
+        .then((next) => {
+          if (permissionsSpace !== current) return;
+          permissionsById = new Map([...permissionsById, [roomId, next]]);
+        })
+        .catch((error: unknown) => {
+          console.debug('[sable lobby] permissions unavailable', error);
+        });
+    }
   });
+
+  function canManageIn(roomId: string | null): boolean {
+    return roomId !== null && (permissionsById.get(roomId)?.can_manage_children ?? false);
+  }
+
+  function boundToParent(joinRule: string | null): boolean {
+    return joinRule === 'restricted' || joinRule === 'knock_restricted';
+  }
+
+  function canLeaveParent(roomId: string): boolean {
+    const room = merged.find((candidate) => candidate.room_id === roomId);
+    if (!room || !boundToParent(room.join_rule)) return true;
+    return permissionsById.get(roomId)?.can_change_join_rule ?? false;
+  }
+
+  function canDropInto(source: LobbyDragItem, parentId: string): boolean {
+    if (!canManageIn(parentId)) return false;
+    if (source.parentId === parentId || source.roomId === null) return true;
+    return canLeaveParent(source.roomId);
+  }
 
   function open(child: HierarchyRoomView): void {
     const target = roomPathParamFromId(child.room_id);
@@ -460,7 +495,7 @@
     target: LobbyDragItem,
     instruction: DropInstruction
   ): void {
-    if (source.roomId === null) return;
+    if (source.roomId === null || !canDropInto(source, target.parentId)) return;
     if (source.parentId !== target.parentId) {
       void moveRoom(source.parentId, source.roomId, target.parentId);
       return;
@@ -793,7 +828,10 @@
         {joining}
         knocked={knockedIds}
         {joinErrors}
-        {canManage}
+        canManage={canManageIn(section.parentId)}
+        canManageOwner={canManageIn(section.ownerId)}
+        {canLeaveParent}
+        {canDropInto}
         {label}
         onToggle={toggle}
         onVisible={(key) => visibleLevels.add(key)}

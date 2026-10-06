@@ -53,6 +53,7 @@
   import ActionMenuSub from '#lib/ui/primitives/ActionMenuSub.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -68,7 +69,7 @@
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import { powerTag } from './power-tags.js';
   import RoleTagIcon from './RoleTagIcon.svelte';
-  import type { PowerLevelTagMap } from '../settings/power-level-tags.js';
+  import { FOUNDER_POWER_LEVEL, type PowerLevelTagMap } from '../settings/power-level-tags.js';
   import { senderColor } from '../timeline/timeline-format';
 
   import '#lib/ui/primitives/menu.css';
@@ -250,10 +251,12 @@
     !isSelf && roomMember?.membership === 'ban' && (permissions?.can_ban ?? false)
   );
   let canSetPower = $derived(
-    !isSelf &&
-      (permissions?.can_change_power_levels ?? false) &&
-      ownPowerLevel > (roomMember?.power_level ?? 0)
+    (permissions?.can_change_power_levels ?? false) &&
+      (isSelf
+        ? ownPowerLevel < FOUNDER_POWER_LEVEL
+        : ownPowerLevel > (roomMember?.power_level ?? 0))
   );
+  let selfDemotion = $state<number | null>(null);
   // The spec caps what you may grant at your own level.
   let powerRoles = $derived(
     [
@@ -363,6 +366,11 @@
   }
 
   function setPowerLevel(level: number): void {
+    if (isSelf && selfDemotion === null) {
+      selfDemotion = level;
+      return;
+    }
+    selfDemotion = null;
     const target = roomId;
     const user = userId;
     void profileActions.setPowerLevel(target, user, level).then(
@@ -825,6 +833,22 @@
   {userId}
   {displayName}
   onOpenChange={(next) => (securityOpen = next)}
+/>
+
+<ConfirmDialog
+  open={selfDemotion !== null}
+  title={$i18n.t('timeline.profileDemoteSelfTitle')}
+  description={$i18n.t('timeline.profileDemoteSelfBody')}
+  confirmLabel={$i18n.t('timeline.profileDemoteSelfConfirm')}
+  onOpenChange={(next: boolean) => {
+    if (!next) selfDemotion = null;
+  }}
+  onCancel={() => {
+    selfDemotion = null;
+  }}
+  onConfirm={() => {
+    if (selfDemotion !== null) setPowerLevel(selfDemotion);
+  }}
 />
 
 <DialogFrame

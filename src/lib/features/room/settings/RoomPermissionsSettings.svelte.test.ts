@@ -144,6 +144,28 @@ test('saves a role emoji with its name and colour', async () => {
   });
 });
 
+test.each([
+  [undefined, true],
+  [100, false],
+])('role editing follows the role-tag event level (%s)', async (tagsLevel, allowed) => {
+  core.session = { user_id: '@mod:example.org' };
+  core.roomPowerLevels.mockResolvedValue({
+    ...base,
+    events: tagsLevel === undefined ? {} : { 'in.cinny.room.power_level_tags': tagsLevel },
+  });
+  core.roomStateEvent.mockResolvedValue({ '50': { name: 'Sentinel' } });
+
+  render(RoomPermissionsSettings, {
+    room,
+    permissions: { own_power_level: 50, can_change_power_levels: false } as RoomPermissionsView,
+  });
+  const [label] = await screen.findAllByText('Sentinel (50)');
+  const row = within(label.closest('li') ?? document.body);
+
+  expect(row.queryByRole('button', { name: 'Edit role' }) !== null).toBe(allowed);
+  expect(screen.queryByRole('button', { name: 'Add role' }) !== null).toBe(allowed);
+});
+
 test('lets a founder add colour and an icon to the founder role', async () => {
   core.session = { user_id: '@admin:example.org' };
   core.roomPowerLevels.mockResolvedValue(base);

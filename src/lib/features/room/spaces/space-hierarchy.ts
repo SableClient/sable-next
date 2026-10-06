@@ -164,7 +164,7 @@ export function buildHierarchySections(
   rooms: readonly HierarchyRoomView[],
   rootId: string,
   levels: { loaded?: ReadonlySet<string>; failed?: ReadonlySet<string> } = {},
-  keepEmpty = false
+  keepEmpty: (spaceId: string) => boolean = () => false
 ): HierarchySection[] {
   const byId = new Map(rooms.map((room) => [room.room_id, room]));
   const sections: HierarchySection[] = [];
@@ -209,7 +209,7 @@ export function buildHierarchySections(
       ownRooms.length > 0 ||
       !described(spaceId) ||
       refused(spaceId) ||
-      (keepEmpty && space !== null)
+      (space !== null && keepEmpty(spaceId))
     ) {
       sections.push({
         space,
