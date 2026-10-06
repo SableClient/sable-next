@@ -33,8 +33,13 @@ export type SupporterConfig = {
   keys: Readonly<Record<string, string>>;
 };
 
+export type EmbedsConfig = {
+  serviceUrl: string | null;
+};
+
 export type RuntimeConfig = {
   push: PushDetails | null;
+  embeds: EmbedsConfig;
   supporter: SupporterConfig | null;
   gifs: GifsConfig;
   homeservers: HomeserversConfig;
@@ -60,8 +65,11 @@ export const BUILT_IN_HOMESERVERS: HomeserversConfig = {
 
 const NO_CALLS: CallsConfig = { livekitServiceUrl: null };
 
+const NO_EMBEDS: EmbedsConfig = { serviceUrl: null };
+
 const EMPTY: RuntimeConfig = {
   push: null,
+  embeds: NO_EMBEDS,
   supporter: null,
   gifs: NO_GIFS,
   homeservers: BUILT_IN_HOMESERVERS,
@@ -140,6 +148,13 @@ function parseGifs(raw: unknown): GifsConfig {
   };
 }
 
+function parseEmbeds(raw: unknown): EmbedsConfig {
+  if (typeof raw !== 'object' || raw === null) return NO_EMBEDS;
+
+  const serviceUrl = text((raw as Record<string, unknown>).serviceUrl)?.replace(/\/+$/, '');
+  return { serviceUrl: serviceUrl && /^https?:\/\//.test(serviceUrl) ? serviceUrl : null };
+}
+
 function parseCalls(raw: unknown): CallsConfig {
   if (typeof raw !== 'object' || raw === null) return NO_CALLS;
 
@@ -169,6 +184,7 @@ export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
   const source = raw as Record<string, unknown>;
   return {
     push: parsePush(source.pushNotificationDetails),
+    embeds: parseEmbeds(source.embeds),
     supporter: parseSupporter(source.supporterAwards),
     gifs: parseGifs(source.gifs),
     homeservers: withDefaultAt(

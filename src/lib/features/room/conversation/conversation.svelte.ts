@@ -28,7 +28,7 @@ import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/provi
 import { replyFallbackFromSource } from '#lib/features/room/messages/reply-fallback.js';
 import { replyPreviewBody, type ReplyVersion } from '#lib/features/room/messages/reply-preview.js';
 import { previewableLinks } from '#lib/features/room/media/link-preview.js';
-import { loadUrlPreview } from '#lib/features/room/media/link-preview-cache.js';
+import { previewSources, resolveUrlPreview } from '#lib/features/room/media/link-preview-cache.js';
 import {
   projectPersona,
   resolvePersona,
@@ -103,12 +103,11 @@ export class Conversation {
   }
 
   async #bundledLinkPreviews(html: string | null): Promise<UrlPreviewView[]> {
-    const enabled =
-      this.#encrypted() === false ? preferences.urlPreviews : preferences.encryptedUrlPreviews;
-    if (!enabled) return [];
+    const sources = previewSources(this.#encrypted());
+    if (!sources.server && !sources.client) return [];
     if (!html) return [];
     const previews = await Promise.all(
-      previewableLinks(html).map((url) => loadUrlPreview(this.#core.commands, url))
+      previewableLinks(html).map((url) => resolveUrlPreview(this.#core.commands, url, sources))
     );
     return previews.filter((preview) => preview !== null);
   }

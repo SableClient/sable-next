@@ -482,6 +482,7 @@ pub enum Command {
     },
     UrlPreview {
         url: String,
+        service: Option<String>,
     },
     ListThreads {
         #[cfg_attr(feature = "typegen", specta(type = String))]

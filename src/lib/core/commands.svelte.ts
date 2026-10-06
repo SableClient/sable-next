@@ -469,8 +469,8 @@ export function createCommands(transport: () => Transport) {
       return { items: response.items, next_batch: response.next_batch };
     },
 
-    async urlPreview(url: string): Promise<UrlPreviewView | null> {
-      const response = await transport().send({ type: 'url_preview', url });
+    async urlPreview(url: string, service: string | null): Promise<UrlPreviewView | null> {
+      const response = await transport().send({ type: 'url_preview', url, service });
       return response.preview;
     },
 

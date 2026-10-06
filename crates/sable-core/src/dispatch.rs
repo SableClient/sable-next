@@ -75,6 +75,41 @@ fn preview_refused(error: &matrix_sdk::HttpError) -> bool {
         .is_some_and(|api_error| api_error.status_code.as_u16() == 403)
 }
 
+async fn soliditas_preview(
+    base: &str,
+    target: &str,
+) -> Result<Option<serde_json::Value>, CommandErr> {
+    let mut endpoint = url::Url::parse(&format!(
+        "{}/_soliditas/preview_url",
+        base.trim_end_matches('/')
+    ))
+    .map_err(|_| CommandErr::Unavailable)?;
+    endpoint.query_pairs_mut().append_pair("url", target);
+
+    let builder = crate::tls::apply(matrix_sdk::reqwest::Client::builder());
+    #[cfg(not(target_family = "wasm"))]
+    let builder = builder.timeout(std::time::Duration::from_secs(10));
+    let http = builder.build().map_err(|_| CommandErr::Unavailable)?;
+    let response = http.get(endpoint).send().await.map_err(|error| {
+        tracing::warn!("soliditas preview failed: {}", error.without_url());
+        CommandErr::Unavailable
+    })?;
+
+    let status = response.status();
+    if status.is_client_error() {
+        return Ok(None);
+    }
+    if !status.is_success() {
+        tracing::warn!("soliditas preview answered {status}");
+        return Err(CommandErr::Unavailable);
+    }
+    let body = response
+        .bytes()
+        .await
+        .map_err(|_| CommandErr::Unavailable)?;
+    Ok(serde_json::from_slice(&body).ok())
+}
+
 pub(crate) const PREVIEW_THEME_COLOR: &str = "com.sable.theme_color";
 pub(crate) const PREVIEW_CARD: &str = "com.sable.card";
 pub(crate) const PREVIEW_AUTHOR: &str = "com.sable.author_name";
@@ -1134,7 +1169,13 @@ impl Core {
                 Ok(CommandOk::RoomAttachments { items, next_batch })
             }
 
-            Command::UrlPreview { url } => {
+            Command::UrlPreview { url, service } => {
+                if let Some(base) = service {
+                    let data = soliditas_preview(&base, &url).await?;
+                    let preview = data.and_then(|data| url_preview(url, &data));
+                    return Ok(CommandOk::UrlPreview { preview });
+                }
+
                 let sent = self
                     .client()
                     .await?
@@ -3902,5 +3943,64 @@ mod tests {
             ),
             Some(serde_json::json!({"url": "mxc://example.org/banner"}))
         );
+    }
+
+    #[tokio::test]
+    async fn soliditas_preview_asks_the_worker_with_the_url() {
+        use wiremock::{
+            Mock, MockServer, ResponseTemplate,
+            matchers::{method, path, query_param},
+        };
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/_soliditas/preview_url"))
+            .and(query_param("url", "https://example.org/a?b=1&c=2"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({"og:title": "Hi"})),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let data = super::soliditas_preview(
+            &format!("{}/", server.uri()),
+            "https://example.org/a?b=1&c=2",
+        )
+        .await
+        .expect("answered");
+        assert_eq!(
+            data.as_ref().and_then(|d| d["og:title"].as_str()),
+            Some("Hi")
+        );
+    }
+
+    #[tokio::test]
+    async fn soliditas_preview_treats_a_refused_url_as_no_preview() {
+        use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        let data = super::soliditas_preview(&server.uri(), "https://example.org/a")
+            .await
+            .expect("answered");
+        assert!(data.is_none());
+    }
+
+    #[tokio::test]
+    async fn soliditas_preview_reports_a_server_failure() {
+        use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(502))
+            .mount(&server)
+            .await;
+
+        let error = super::soliditas_preview(&server.uri(), "https://example.org/a")
+            .await
+            .unwrap_err();
+        assert!(matches!(error, super::CommandErr::Unavailable));
     }
 }

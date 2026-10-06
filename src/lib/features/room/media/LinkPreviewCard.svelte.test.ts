@@ -8,11 +8,14 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { UrlPreviewView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
+vi.mock('#lib/config/runtime-config.js', () => ({
+  runtimeConfig: () => Promise.resolve({ embeds: { serviceUrl: 'https://embeds.test' } }),
+}));
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
 
 const core = Object.assign(baseCore, {
-  urlPreview: vi.fn<() => Promise<UrlPreviewView | null>>(),
+  urlPreview: vi.fn<(url: string, service: string | null) => Promise<UrlPreviewView | null>>(),
 });
 
 import LinkPreviewCard from './LinkPreviewCard.svelte';
@@ -43,6 +46,8 @@ afterEach(() => {
   core.urlPreview.mockReset();
   preferences.urlPreviews = false;
   preferences.encryptedUrlPreviews = false;
+  preferences.clientEmbeds = false;
+  preferences.encryptedClientEmbeds = false;
   vi.restoreAllMocks();
 });
 
@@ -157,7 +162,61 @@ test('an encrypted room needs its own consent, and an unknown one is treated as 
   await Promise.resolve();
   await tick();
 
-  expect(core.urlPreview).toHaveBeenCalledWith('https://example.org/f');
+  expect(core.urlPreview).toHaveBeenCalledWith('https://example.org/f', null);
+});
+
+async function settle(): Promise<void> {
+  await tick();
+  await Promise.resolve();
+  await tick();
+  await Promise.resolve();
+  await tick();
+}
+
+test('client-side embeds alone preview without asking the homeserver', async () => {
+  preferences.clientEmbeds = true;
+  core.urlPreview.mockResolvedValue(preview({ url: 'https://example.org/c1' }));
+  render(LinkPreviewCard, { url: 'https://example.org/c1', encrypted: false });
+  await settle();
+
+  expect(core.urlPreview).toHaveBeenCalledTimes(1);
+  expect(core.urlPreview).toHaveBeenCalledWith('https://example.org/c1', 'https://embeds.test');
+  expect(screen.getByRole('link', { name: /Example/ })).toBeInTheDocument();
+});
+
+test('the homeserver is asked only when the client side has no answer', async () => {
+  preferences.clientEmbeds = true;
+  preferences.urlPreviews = true;
+  core.urlPreview.mockImplementation((_url, service) =>
+    Promise.resolve(service !== null ? null : preview({ url: 'https://example.org/c2' }))
+  );
+  render(LinkPreviewCard, { url: 'https://example.org/c2', encrypted: false });
+  await settle();
+
+  expect(core.urlPreview.mock.calls).toEqual([
+    ['https://example.org/c2', 'https://embeds.test'],
+    ['https://example.org/c2', null],
+  ]);
+  expect(screen.getByRole('link', { name: /Example/ })).toBeInTheDocument();
+});
+
+test('a client-side answer is not followed by a homeserver request', async () => {
+  preferences.clientEmbeds = true;
+  preferences.urlPreviews = true;
+  core.urlPreview.mockResolvedValue(preview({ url: 'https://example.org/c3' }));
+  render(LinkPreviewCard, { url: 'https://example.org/c3', encrypted: false });
+  await settle();
+
+  expect(core.urlPreview).toHaveBeenCalledTimes(1);
+});
+
+test('an encrypted room needs its own consent for client-side embeds', async () => {
+  preferences.clientEmbeds = true;
+  core.urlPreview.mockResolvedValue(preview());
+  render(LinkPreviewCard, { url: 'https://example.org/c4', encrypted: true });
+  await settle();
+
+  expect(core.urlPreview).not.toHaveBeenCalled();
 });
 
 test('an image-only preview renders inline instead of as a card', async () => {

@@ -1313,6 +1313,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'embeds',
         icon: BrowserIcon,
         name: 'settings.encryptedClientEmbeds',
+        description: 'settings.encryptedClientEmbedsHint',
         type: 'boolean',
         gatedBy: 'clientEmbeds',
       },
