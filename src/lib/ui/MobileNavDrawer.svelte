@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import type { Snippet } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
@@ -32,6 +32,10 @@
   let gesture: Gesture | undefined;
   let settleFrame: number | undefined;
   let routeFrame: number | undefined;
+  let track: HTMLDivElement | undefined;
+  let inertOpen = $state<boolean | undefined>();
+  let inertTimer: ReturnType<typeof setTimeout> | undefined;
+  let focusContentOnSettle = false;
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   /** Routes whose own index is the room list. Anywhere else the list would
       hide the page that was asked for behind an inert panel. Keyed on the path
@@ -63,6 +67,37 @@
       : pinnedOpen ||
           (page.state.mobileDrawer === undefined ? defaultOpen : page.state.mobileDrawer === 'open')
   );
+  let panelsOpen = $derived(inertOpen ?? open);
+
+  function settleInert() {
+    clearTimeout(inertTimer);
+    inertTimer = undefined;
+    inertOpen = open;
+    if (!focusContentOnSettle || open) return;
+    focusContentOnSettle = false;
+    requestAnimationFrame(() => {
+      document.getElementById('main-content')?.focus();
+    });
+  }
+
+  $effect(() => {
+    const next = open;
+    const current = untrack(() => inertOpen);
+    if (current === next) return;
+    const duration =
+      current === undefined || !track
+        ? 0
+        : parseFloat(getComputedStyle(track).transitionDuration) * 1000;
+    if (!duration) {
+      settleInert();
+      return;
+    }
+    inertTimer = setTimeout(settleInert, duration + 100);
+    return () => {
+      clearTimeout(inertTimer);
+    };
+  });
+
   const pageMeta = $state({
     title: '',
   });
@@ -115,12 +150,12 @@
       replace: true,
       state: { ...page.state, mobileDrawer: next ? 'open' : 'closed' },
     });
+    if (!next) {
+      focusContentOnSettle = true;
+      return;
+    }
     requestAnimationFrame(() => {
-      if (next) {
-        document.getElementById('drawer-toggle')?.focus();
-        return;
-      }
-      document.getElementById('main-content')?.focus();
+      document.getElementById('drawer-toggle')?.focus();
     });
   }
 
@@ -234,6 +269,7 @@
     {$i18n.t('nav.mobilePanelInstructions')}
   </p>
   <div
+    bind:this={track}
     class="drawer-track"
     class:open
     class:dragging
@@ -241,11 +277,15 @@
     style:transform={position === undefined
       ? undefined
       : `translate3d(${String(position)}px, 0, 0)`}
+    ontransitionend={(event) => {
+      if (event.target !== event.currentTarget || event.propertyName !== 'transform') return;
+      if (inertTimer !== undefined) settleInert();
+    }}
   >
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <section
       class="drawer-panel navigation-panel"
-      inert={!open || appLayout.matches}
+      inert={!panelsOpen || appLayout.matches}
       onclick={revealCurrentPage}
     >
       {#if !appLayout.matches}
@@ -256,7 +296,7 @@
       class="drawer-panel content-panel"
       class:with-quick-tools={showMobileQuickTools}
       class:with-back-bar={showMobileBackBar}
-      inert={open && !appLayout.matches}
+      inert={panelsOpen && !appLayout.matches}
     >
       {#if showMobileBackBar}
         <PanelHeader class="mobile-back-bar" title={pageTitle}>

@@ -73,6 +73,49 @@ test('mobile: the room back arrow slides the list over the room, and a swipe ret
   }
 });
 
+test('mobile: the panels swap inert only once the slide has settled', async ({
+  app,
+  page,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  const navigation = page.locator('.navigation-panel');
+  const content = page.locator('.content-panel');
+  await expect(navigation).toHaveJSProperty('inert', true);
+  await expect(content).toHaveJSProperty('inert', false);
+
+  const sampling = page.evaluate(
+    () =>
+      new Promise<{ offset: number; contentInert: boolean }[]>((resolve) => {
+        const track = document.querySelector('.drawer-track');
+        const panel = document.querySelector<HTMLElement>('.content-panel');
+        const samples: { offset: number; contentInert: boolean }[] = [];
+        const started = performance.now();
+        const sample = () => {
+          if (track && panel) {
+            samples.push({
+              offset: new DOMMatrix(getComputedStyle(track).transform).m41,
+              contentInert: panel.inert,
+            });
+          }
+          if (performance.now() - started < 600) requestAnimationFrame(sample);
+          else resolve(samples);
+        };
+        requestAnimationFrame(sample);
+      })
+  );
+  await page.getByRole('button', { name: 'Back to rooms', exact: true }).click();
+  const samples = await sampling;
+
+  const width = page.viewportSize()?.width ?? 0;
+  const sliding = samples.filter(({ offset }) => offset < -1 && offset > -width + 1);
+  expect(sliding.length).toBeGreaterThan(0);
+  expect(sliding.filter(({ contentInert }) => contentInert)).toEqual([]);
+  await expect(content).toHaveJSProperty('inert', true);
+  await expect(navigation).toHaveJSProperty('inert', false);
+});
+
 test('mobile: a tab away from the room list jumps rather than sliding the list off', async ({
   page,
   installRoomCore,
