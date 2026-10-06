@@ -2076,8 +2076,8 @@
 
   .room-list.collapsed .room-row :global(.room-collapsed-badge) {
     position: absolute;
-    right: -0.25rem;
-    top: -0.125rem;
+    right: 0.125rem;
+    top: 0.125rem;
   }
 
   .room-list.collapsed .room-category {
