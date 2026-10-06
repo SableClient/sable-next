@@ -714,9 +714,13 @@ test('shows a generic message when the kick fails for another reason', async () 
   );
 });
 
-async function changeRoleToModerator(onPowerLevelChange: () => void): Promise<void> {
+async function openRoleMenu(
+  onPowerLevelChange: () => void,
+  powerTags: Record<number, { name: string; color: null; icon: null }> = {}
+) {
   const instance = render(MentionProfileCard, {
     props: {
+      powerTags,
       userId: '@alice:example.org',
       roomId: '!room:example.org',
       ownPowerLevel: 100,
@@ -752,6 +756,11 @@ async function changeRoleToModerator(onPowerLevelChange: () => void): Promise<vo
   await tick();
 
   await chooseAction('Change role');
+  return instance;
+}
+
+async function changeRoleToModerator(onPowerLevelChange: () => void): Promise<void> {
+  const instance = await openRoleMenu(onPowerLevelChange);
   await user.click(await screen.findByRole('menuitem', { name: /Moderator/ }));
   await vi.waitFor(() => {
     expect(core.setUserPowerLevel).toHaveBeenCalledWith(
@@ -773,6 +782,15 @@ test('reports a successful role change so the member list can follow it', async 
 
   expect(onPowerLevelChange).toHaveBeenCalledWith('!room:example.org', '@alice:example.org', 50);
   expect(toastError).not.toHaveBeenCalled();
+});
+
+test('offers the custom roles of the room when changing a role', async () => {
+  const instance = await openRoleMenu(vi.fn(), {
+    75: { name: 'Steward', color: null, icon: null },
+  });
+
+  expect(await screen.findByRole('menuitem', { name: /Steward/ })).toBeInTheDocument();
+  instance.unmount();
 });
 
 test('toasts a failed role change and reports nothing', async () => {

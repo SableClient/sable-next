@@ -259,12 +259,15 @@
   let selfDemotion = $state<number | null>(null);
   // The spec caps what you may grant at your own level.
   let powerRoles = $derived(
-    [
-      { level: 100, label: powerTag(100, $i18n.t, powerTags ?? {}).name },
-      { level: 50, label: powerTag(50, $i18n.t, powerTags ?? {}).name },
-      { level: 0, label: powerTag(0, $i18n.t, powerTags ?? {}).name },
-      { level: -1, label: powerTag(-1, $i18n.t, powerTags ?? {}).name },
-    ].filter((role) => role.level <= ownPowerLevel && role.level !== (roomMember?.power_level ?? 0))
+    [...new Set([100, 50, 0, -1, ...Object.keys(powerTags ?? {}).map(Number)])]
+      .filter(
+        (level) =>
+          level <= ownPowerLevel &&
+          level !== FOUNDER_POWER_LEVEL &&
+          level !== (roomMember?.power_level ?? 0)
+      )
+      .sort((left, right) => right - left)
+      .map((level) => ({ level, label: powerTag(level, $i18n.t, powerTags ?? {}).name }))
   );
   let profileLink = $derived(`https://matrix.to/#/${userId}`);
   const canShareLink = typeof navigator !== 'undefined' && 'share' in navigator;
