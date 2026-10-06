@@ -34,4 +34,18 @@ describe('applyCustomTweaks', () => {
     applyCustomTweaks([]);
     applyQuickCss('');
   });
+
+  it('keeps quick CSS after stylesheets added later', async () => {
+    applyQuickCss('.btn { color: blue; }');
+    const lazy = document.createElement('style');
+    lazy.id = 'lazy-component';
+    document.head.append(lazy);
+
+    await Promise.resolve();
+
+    expect(document.head.lastElementChild?.id).toBe('sable-quick-css');
+
+    lazy.remove();
+    applyQuickCss('');
+  });
 });

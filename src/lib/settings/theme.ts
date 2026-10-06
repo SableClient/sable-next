@@ -82,6 +82,18 @@ export function applyQuickCss(css: string): void {
 
   const style = existing ?? createStyle(QUICK_CSS_STYLE_ID, null);
   style.textContent = css;
+  keepQuickCssLast();
+}
+
+let headObserver: MutationObserver | undefined;
+
+function keepQuickCssLast(): void {
+  if (headObserver) return;
+  headObserver = new MutationObserver(() => {
+    const style = document.getElementById(QUICK_CSS_STYLE_ID);
+    if (style && document.head.lastElementChild !== style) document.head.append(style);
+  });
+  headObserver.observe(document.head, { childList: true });
 }
 
 function createStyle(id: string, anchor: Element | null): HTMLStyleElement {
