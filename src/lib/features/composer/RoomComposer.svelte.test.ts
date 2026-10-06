@@ -775,6 +775,43 @@ test('replying to the same event restores focus to the editor', async () => {
   });
 });
 
+test('finishing an edit keeps focus in the editor', async () => {
+  let setContext: ((next: ComposerContext | null) => void) | undefined;
+  setup({
+    roomId: '!room:example.org',
+    context: { kind: 'edit', eventId: '$one:example.org', body: 'original' },
+    registerContext: (set) => {
+      setContext = set;
+    },
+  });
+  await tick();
+
+  const editor = document.querySelector('[role="combobox"]');
+  if (!(editor instanceof HTMLElement)) throw new Error('editor not found');
+  await vi.waitFor(() => {
+    expect(document.activeElement).toBe(editor);
+  });
+
+  setContext?.(null);
+  await tick();
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+
+  expect(document.activeElement).toBe(editor);
+});
+
+test('staging files returns focus to the editor', async () => {
+  setup({ roomId: '!room:example.org' });
+  await tick();
+
+  const editor = document.querySelector('[role="combobox"]');
+  if (!(editor instanceof HTMLElement)) throw new Error('editor not found');
+  expect(document.activeElement).not.toBe(editor);
+
+  await pick(new File(['one'], 'one.png', { type: 'image/png' }));
+
+  expect(document.activeElement).toBe(editor);
+});
+
 test('a long reply sender keeps both context actions in the composer', async () => {
   setup({
     roomId: '!room:example.org',

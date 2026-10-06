@@ -657,12 +657,11 @@
     if (context === previousContext) return;
 
     const wasActive = previousContext !== null;
-    const wasEditing = previousContext?.kind === 'edit' || previousContext?.kind === 'schedule';
     previousContext = context;
     const frame = requestAnimationFrame(() => {
       if (context !== null) {
         editor.focus();
-      } else if (wasActive && (wasEditing || !desktop) && !sending) {
+      } else if (wasActive && !desktop && !sending) {
         editor.blur();
         const activeElement = document.activeElement;
         if (activeElement instanceof HTMLElement) activeElement.blur();
@@ -1124,6 +1123,7 @@
 
       error = null;
       staged = stageFiles(staged, files, () => nextStagedId++, preferences.imageMetadata);
+      if (desktop) editor.focus();
     } catch (cause) {
       if (current()) {
         const failure = sendFailure(cause);
