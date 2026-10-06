@@ -1,7 +1,9 @@
 import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
 
+import { parseSettingsLink } from '../settings/settings-link';
+
 function isPreviewable(href: string): boolean {
-  if (parseMatrixLink(href)) return false;
+  if (parseMatrixLink(href) || parseSettingsLink(href, location.origin)) return false;
   try {
     const url = new URL(href);
     return url.protocol === 'http:' || url.protocol === 'https:';

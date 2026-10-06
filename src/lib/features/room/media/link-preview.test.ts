@@ -52,6 +52,13 @@ describe('previewableLinks', () => {
     expect(previewableLinks(html)).toEqual(['https://example.org/x']);
   });
 
+  it('skips a settings link', () => {
+    const html =
+      '<a href="https://next.sable.moe/settings/media?focus=url-previews&amp;moe.sable.client.action=settings">s</a> ' +
+      `<a href="${location.origin}/settings/appearance">s</a> <a href="https://example.org/x">x</a>`;
+    expect(previewableLinks(html)).toEqual(['https://example.org/x']);
+  });
+
   it('skips a matrix: uri', () => {
     const html =
       '<a href="matrix:r/room:example.org">room</a> <a href="https://example.org/x">x</a>';
