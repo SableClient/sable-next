@@ -693,6 +693,14 @@
     void afterOverlayPops().then(() => goto(target));
   }
 
+  function handleProfileLink(link: MatrixLink, anchor: HTMLAnchorElement): void {
+    if (link.kind === 'user' && memberProfile.anchor) {
+      openProfile(link.userId, memberProfile.anchor);
+      return;
+    }
+    handleMatrixLink(link, anchor);
+  }
+
   function copyEventLink(eventId: string): void {
     void writeEventLink(eventId);
   }
@@ -1442,7 +1450,7 @@
     pmp={memberProfile.pmp}
     failed={memberProfile.failed}
     onAvatarClick={openProfileAvatar}
-    onMatrixLink={handleMatrixLink}
+    onMatrixLink={handleProfileLink}
     onPowerLevelChange={(target, userId, level) => {
       memberLoader.setPowerLevel(target, userId, level);
     }}
