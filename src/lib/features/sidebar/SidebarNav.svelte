@@ -8,7 +8,7 @@
   import ActiveCallBar from '#lib/features/call/ActiveCallBar.svelte';
   import { useCallSession } from '#lib/features/call/call-session.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
-  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import {
     addUnread,
     spacesContainingRoom,
@@ -63,8 +63,10 @@
   const call = useCallSession();
   let pathname = $state(page.url.pathname);
   let spaceId = $state(page.params.spaceId);
+  let roomId = $state(page.params.roomId);
 
   afterNavigate(() => {
+    roomId = page.params.roomId;
     if (page.url.pathname === '/inbox' || page.url.pathname === '/search') return;
     pathname = page.url.pathname;
     spaceId = page.params.spaceId;
@@ -125,8 +127,10 @@
   let allDirectRooms = $derived(
     roomList.rooms.filter((room) => room.state === 'joined' && room.is_direct)
   );
+  let openRoomId = $derived(findRoomByPathId(roomList.rooms, roomId)?.room_id);
+  let otherDirectRooms = $derived(allDirectRooms.filter((room) => room.room_id !== openRoomId));
   let directRooms = $derived(
-    allDirectRooms
+    otherDirectRooms
       .filter((room) => hasUnread(roomList.badgeUnreadFor(room)))
       .sort(
         (left, right) => (right.latest_event?.timestamp ?? 0) - (left.latest_event?.timestamp ?? 0)
@@ -135,7 +139,7 @@
   );
   let directUnread = $derived(
     unreadCounts(
-      allDirectRooms.filter(
+      otherDirectRooms.filter(
         (room) => !directRooms.some((directRoom) => directRoom.room_id === room.room_id)
       )
     )

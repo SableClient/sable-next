@@ -10,6 +10,7 @@ vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 import { visit } from '#lib/test-support/app-state.js';
+import { navigated } from '#lib/test-support/app-navigation.js';
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 const fixture = vi.hoisted(() => ({ roomList: null as RoomList | null }));
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
@@ -148,6 +149,19 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
   expect(dm).toHaveAttribute('href', '/direct/!dm%3Aexample.org');
   expect(within(dm).getByText('1').closest('.unread-badge')).toBeInTheDocument();
   expect(dm).toHaveAccessibleDescription('nav.unreadMessages:1');
+
+  visit('/direct/!dm%3Aexample.org', { roomId: room.room_id });
+  navigated();
+  await tick();
+  expect(screen.queryByRole('link', { name: 'Alice' })).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('link', { name: 'nav.direct' }).querySelector('.unread-badge')
+  ).toBeNull();
+
+  visit('/rooms');
+  navigated();
+  await tick();
+  expect(screen.getByRole('link', { name: 'Alice' })).toBeInTheDocument();
 
   for (const listener of listeners)
     listener({
