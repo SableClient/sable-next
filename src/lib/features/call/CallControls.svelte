@@ -23,6 +23,8 @@
   import { longPress } from '#lib/ui/long-press.svelte.js';
 
   import CallDeviceMenu from './CallDeviceMenu.svelte';
+  import CallRouteMenu from './CallRouteMenu.svelte';
+  import type { CallTransportCapabilities } from './call-transport';
   import { supportsDeviceSelection } from './devices';
 
   interface Props {
@@ -40,6 +42,7 @@
     onHangUp?: () => void;
     onSwitchDevice?: (kind: MediaDeviceKind, deviceId: string) => void;
     onSwitchCamera?: () => void;
+    audioRoutes?: CallTransportCapabilities['audioRoutes'];
     onOpenSettings?: (event: MouseEvent) => void;
     extra?: Snippet;
     action?: Snippet;
@@ -60,6 +63,7 @@
     onHangUp,
     onSwitchDevice,
     onSwitchCamera,
+    audioRoutes,
     onOpenSettings,
     extra,
     action,
@@ -73,6 +77,8 @@
   let pending = $derived(ready ? '' : ` · ${$i18n.t('call.waitingForMedia')}`);
   let micMenu = $state(false);
   let outputMenu = $state(false);
+  let routes = $derived(compact ? undefined : audioRoutes);
+  let outputGrouped = $derived(grouped || routes !== undefined);
   let cameraMenu = $state(false);
 
   function shortcut(id: ShortcutId): string {
@@ -93,17 +99,18 @@
   button: Snippet<[Record<string, unknown>]>,
   menu?: Snippet,
   onHold?: () => void,
-  tone?: 'neutral' | 'danger' | 'primary'
+  tone?: 'neutral' | 'danger' | 'primary',
+  split: boolean = grouped
 )}
   <div
-    class={['control', grouped && menu && 'group']}
-    data-tone={grouped && menu ? tone : undefined}
+    class={['control', split && menu && 'group']}
+    data-tone={split && menu ? tone : undefined}
     {@attach longPress({ enabled: () => onHold !== undefined, onPress: () => onHold?.() })}
   >
     <Tooltip label={tip} side={compact ? 'right' : 'top'}>
       {#snippet trigger({ props })}{@render button(props)}{/snippet}
     </Tooltip>
-    {#if grouped && menu}<span class="divider" aria-hidden="true"></span>{/if}
+    {#if split && menu}<span class="divider" aria-hidden="true"></span>{/if}
     {@render menu?.()}
   </div>
 {/snippet}
@@ -147,7 +154,7 @@
     {#if onToggleDeafen}
       <IconButton
         {...props}
-        variant={grouped ? 'ghost' : deafened ? 'danger' : neutral}
+        variant={outputGrouped ? 'ghost' : deafened ? 'danger' : neutral}
         {size}
         label={deafenLabel}
         onclick={onToggleDeafen}
@@ -161,7 +168,7 @@
     {:else}
       <IconButton
         {...props}
-        variant={grouped ? 'ghost' : neutral}
+        variant={outputGrouped ? 'ghost' : neutral}
         {size}
         label={$i18n.t('call.outputDevices')}
         onclick={() => (outputMenu = true)}
@@ -171,7 +178,14 @@
     {/if}
   {/snippet}
   {#snippet deafenMenu()}
-    {#if devices}
+    {#if routes}
+      <CallRouteMenu
+        bind:open={outputMenu}
+        label={$i18n.t('call.outputDevices')}
+        list={routes.list}
+        onSelect={(routeId) => void routes?.select(routeId)}
+      />
+    {:else if devices}
       <CallDeviceMenu
         bind:open={outputMenu}
         kinds={['audiooutput']}
@@ -186,8 +200,9 @@
       : $i18n.t('call.outputDevices'),
     deafenButton,
     deafenMenu,
-    devices ? () => (outputMenu = true) : undefined,
-    deafened ? 'danger' : 'neutral'
+    devices || routes ? () => (outputMenu = true) : undefined,
+    deafened ? 'danger' : 'neutral',
+    outputGrouped
   )}
 
   {#snippet cameraButton(props: Record<string, unknown>)}

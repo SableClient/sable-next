@@ -325,6 +325,7 @@
           ? undefined
           : (kind, deviceId) => void session.switchDevice(kind, deviceId)}
         onSwitchCamera={session.canSwitchCamera ? () => void session.switchCamera() : undefined}
+        audioRoutes={session.audioRoutes}
         onOpenSettings={onOpenSettings ? openCallSettings : undefined}
       />
       {#if busy}

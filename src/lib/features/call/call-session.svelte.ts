@@ -14,6 +14,7 @@ import type {
   CallEncryptionKey,
   CallParticipant,
   CallTransport,
+  CallTransportCapabilities,
   CallTransportState,
   ScreenSource,
 } from './call-transport';
@@ -194,6 +195,14 @@ export class CallSession {
 
   get localVideo(): CallVideoOverlay | undefined {
     return this.#media?.capabilities.localVideo;
+  }
+
+  get audioRoutes(): CallTransportCapabilities['audioRoutes'] {
+    return this.#media?.capabilities.audioRoutes;
+  }
+
+  async selectAudioRoute(routeId: string): Promise<void> {
+    await this.#media?.capabilities.audioRoutes?.select(routeId);
   }
 
   get canSwitchCamera(): boolean {
