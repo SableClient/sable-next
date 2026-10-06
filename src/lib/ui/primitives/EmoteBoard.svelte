@@ -363,7 +363,8 @@
       if (!(cell instanceof HTMLElement)) return;
       const style = getComputedStyle(list);
       // Measure the row width after space is reserved for the scrollbar.
-      gridWidth = size?.inlineSize ?? Number.parseFloat(style.width);
+      const measured = size?.inlineSize ?? Number.parseFloat(style.width);
+      if (Number.isFinite(measured)) gridWidth = measured;
       const width = cell.offsetWidth;
       const gap = Number.parseFloat(style.columnGap) || 0;
       const row = cell.offsetHeight + (Number.parseFloat(style.marginBottom) || 0);
