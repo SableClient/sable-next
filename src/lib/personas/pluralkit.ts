@@ -99,6 +99,7 @@ export function personaFromPluralkit(
       avatar_url: member.avatar_url ?? null,
       description: member.description ?? null,
     },
+    last_used: null,
   };
 }
 

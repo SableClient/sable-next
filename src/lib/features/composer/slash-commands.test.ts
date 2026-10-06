@@ -506,6 +506,7 @@ test('/pmpproxy appends a persona trigger', async () => {
     color_on_dark: null,
     triggers: [],
     pluralkit: null,
+    last_used: null,
   } satisfies PersonaView;
   commands.personas.mockResolvedValueOnce({
     personas: [persona],

@@ -107,6 +107,7 @@
             }))
             .filter((trigger) => trigger.prefix !== null || trigger.suffix !== null),
           pluralkit: persona?.pluralkit ?? null,
+          last_used: persona?.last_used ?? null,
         },
         persona?.id ?? null
       );
