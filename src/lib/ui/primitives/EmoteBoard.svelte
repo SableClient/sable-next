@@ -71,6 +71,7 @@
     | { id: string; kind: 'images'; images: PackImageView[]; pack: ImagePackView | null };
   const PACK_HEADER_HEIGHT = 52;
   const GRID_GAP = 4;
+  const EMOJI_CELL = 48;
 
   let narrowSheet = $state(false);
 
@@ -86,7 +87,10 @@
     });
   });
 
-  const emojiColumns = $derived(narrowSheet ? 6 : 8);
+  let emojiRowWidth = $state(0);
+  const emojiColumns = $derived(
+    Math.max(narrowSheet ? 6 : 8, Math.floor((emojiRowWidth + GRID_GAP) / (EMOJI_CELL + GRID_GAP)))
+  );
 
   let packs = $state.raw<ImagePackView[]>([]);
   let loading = $state(true);
@@ -669,6 +673,7 @@
                       class="row"
                       role="row"
                       bind:clientHeight={cellRowHeight}
+                      bind:clientWidth={emojiRowWidth}
                       style={`grid-template-columns: repeat(${String(emojiColumns)}, minmax(0, 1fr))`}
                     >
                       {#each row.cells as cell, column (column)}
