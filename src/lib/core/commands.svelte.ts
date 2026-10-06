@@ -85,6 +85,7 @@ import type {
   WebPusherView,
 } from '#src/generated/protocol';
 import { measureAttachment } from './attachment-info';
+import { withResolvedMime } from '#lib/platform/files.js';
 import { formatByteSize } from '#lib/ui/byte-size.js';
 import { CoreError, type Transport } from '../../transport';
 
@@ -1440,10 +1441,11 @@ export function createCommands(transport: () => Transport) {
 
     async scheduleAttachment(
       roomId: string,
-      file: File,
+      picked: File,
       dueTs: number,
       spoiler = false
     ): Promise<string> {
+      const file = withResolvedMime(picked);
       await validateAttachments([file]);
       const support = await transport().send({ type: 'delayed_events_supported' });
       if (!support.supported) throw new CoreError({ code: 'delayed_events_unsupported' });
@@ -1591,9 +1593,10 @@ export function createCommands(transport: () => Transport) {
 
     async sendAttachment(
       roomId: string,
-      file: File,
+      picked: File,
       options: SendAttachmentOptions = {}
     ): Promise<void> {
+      const file = withResolvedMime(picked);
       await validateAttachments([file]);
       const info = await measureAttachment(file);
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -1623,7 +1626,7 @@ export function createCommands(transport: () => Transport) {
       if (files.length < 2) throw new Error('A gallery needs at least two attachments');
       await validateAttachments(files);
       const attachments = await Promise.all(
-        files.map(async (file) => ({
+        files.map(withResolvedMime).map(async (file) => ({
           roomId,
           filename: file.name,
           mime: file.type || 'application/octet-stream',

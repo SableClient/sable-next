@@ -200,7 +200,9 @@ async function saveAndroidFile(
 }
 
 const MIME_BY_EXTENSION: Record<string, string> = {
+  '3gp': 'video/3gpp',
   aac: 'audio/aac',
+  amr: 'audio/amr',
   apng: 'image/apng',
   avif: 'image/avif',
   flac: 'audio/flac',
@@ -212,6 +214,8 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   json: 'application/json',
   m4a: 'audio/mp4',
   m4v: 'video/mp4',
+  mka: 'audio/x-matroska',
+  mkv: 'video/x-matroska',
   mov: 'video/quicktime',
   mp3: 'audio/mpeg',
   mp4: 'video/mp4',
@@ -224,8 +228,10 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   svg: 'image/svg+xml',
   txt: 'text/plain',
   wav: 'audio/wav',
+  weba: 'audio/webm',
   webm: 'video/webm',
   webp: 'image/webp',
+  wma: 'audio/x-ms-wma',
   zip: 'application/zip',
 };
 
@@ -254,6 +260,15 @@ function withImageExtension(filename: string, mime: string): string {
 export function mimeFromName(name: string): string {
   const extension = name.includes('.') ? name.split('.').pop()?.toLowerCase() : undefined;
   return (extension && MIME_BY_EXTENSION[extension]) || 'application/octet-stream';
+}
+
+const AMBIGUOUS_MIMES = new Set(['', 'application/octet-stream', 'application/ogg']);
+
+export function withResolvedMime(file: File): File {
+  if (!AMBIGUOUS_MIMES.has(file.type)) return file;
+  const mime = mimeFromName(file.name);
+  if (mime === 'application/octet-stream') return file;
+  return new File([file], file.name, { type: mime, lastModified: file.lastModified });
 }
 
 /** `null` when the caller should fall back to `<input type="file">`. */

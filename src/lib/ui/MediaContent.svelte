@@ -56,7 +56,7 @@
     source,
     mime,
     filename,
-    kind,
+    kind: declaredKind,
     onOpen,
     width = null,
     height = null,
@@ -69,6 +69,9 @@
     class: className = '',
   }: Props = $props();
   const core = useCoreClient();
+  let kind = $derived(
+    declaredKind === 'file' && mime?.toLowerCase().startsWith('audio/') ? 'audio' : declaredKind
+  );
   let url = $state<string | null>(null);
   let videoEl = $state<HTMLVideoElement>();
   let failed = $state(false);

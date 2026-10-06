@@ -11,6 +11,7 @@ import {
   savesNatively,
   shareFile,
   sharesNatively,
+  withResolvedMime,
 } from './files';
 
 const mocks = vi.hoisted(() => ({
@@ -118,6 +119,21 @@ test('an archive and an animated png carry the type their handler needs', () => 
 test('an unknown or absent extension falls back to a generic type', () => {
   expect(mimeFromName('archive.zzz')).toBe('application/octet-stream');
   expect(mimeFromName('README')).toBe('application/octet-stream');
+});
+
+test.each(['', 'application/octet-stream', 'application/ogg'])(
+  'an ogg file reported as %j resolves to audio/ogg',
+  (type) => {
+    const file = new File([new Uint8Array(1)], 'memo.ogg', { type });
+    expect(withResolvedMime(file).type).toBe('audio/ogg');
+  }
+);
+
+test('a file with a trustworthy type is left untouched', () => {
+  const file = new File([new Uint8Array(1)], 'memo.ogg', { type: 'video/ogg' });
+  expect(withResolvedMime(file)).toBe(file);
+  const unknown = new File([new Uint8Array(1)], 'blob.zzz', { type: '' });
+  expect(withResolvedMime(unknown)).toBe(unknown);
 });
 
 test('a wildcard accept expands to every extension of that type', () => {

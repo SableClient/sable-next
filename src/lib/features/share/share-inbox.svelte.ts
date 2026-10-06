@@ -1,4 +1,5 @@
 import type { SharedBatch } from '#lib/platform/share-target.js';
+import { withResolvedMime } from '#lib/platform/files.js';
 import {
   clearSharedBatch,
   drainSharedContent,
@@ -53,9 +54,11 @@ export class ShareInbox {
     const read = await Promise.all(
       refs.map(async (ref) => {
         const bytes = await readSharedFile(ref.batchId, ref.fileName);
-        return new File([bytes as BlobPart], displayFileName(ref.fileName), {
-          type: ref.mime ?? 'application/octet-stream',
-        });
+        return withResolvedMime(
+          new File([bytes as BlobPart], displayFileName(ref.fileName), {
+            type: ref.mime ?? 'application/octet-stream',
+          })
+        );
       })
     );
     return [...read, ...this.#webFiles];
