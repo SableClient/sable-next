@@ -282,6 +282,7 @@ export interface Preferences {
   youtubeEmbeds: boolean;
   tiktokEmbeds: boolean;
   instagramEmbeds: boolean;
+  blueskyEmbeds: boolean;
 
   systemNotifications: boolean;
   badgeDefaultDirect: BadgeNotificationMode;
@@ -555,6 +556,7 @@ const DEFAULTS: Preferences = {
   youtubeEmbeds: false,
   tiktokEmbeds: false,
   instagramEmbeds: false,
+  blueskyEmbeds: false,
 
   systemNotifications: true,
   badgeDefaultDirect: 'all',
