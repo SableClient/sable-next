@@ -1,5 +1,6 @@
 import type { Component } from 'svelte';
 import GlobeSimpleIcon from 'phosphor-svelte/lib/GlobeSimpleIcon';
+import ChatsCircleIcon from 'phosphor-svelte/lib/ChatsCircleIcon';
 import CalendarDotsIcon from 'phosphor-svelte/lib/CalendarDotsIcon';
 import HashStraightIcon from 'phosphor-svelte/lib/HashStraightIcon';
 import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
@@ -12,6 +13,7 @@ export type RoomIconOverlay = 'globe' | 'lock';
 
 export type RoomIconShape = {
   isCalendar?: boolean;
+  isForum?: boolean;
   isSpace?: boolean;
   isVoice?: boolean;
   joinRule?: RoomJoinRuleView | null;
@@ -45,6 +47,8 @@ export function roomIconComponent(room: RoomIconShape): Component {
   }
 
   if (room.isCalendar === true) return CalendarDotsIcon;
+
+  if (room.isForum === true) return ChatsCircleIcon;
 
   return HashStraightIcon;
 }

@@ -13,13 +13,14 @@
 
   let {
     isCalendar = false,
+    isForum = false,
     isSpace = false,
     isVoice = false,
     joinRule = null,
     weight = 'regular',
   }: Props = $props();
 
-  let room = $derived({ isCalendar, isSpace, isVoice, joinRule });
+  let room = $derived({ isCalendar, isForum, isSpace, isVoice, joinRule });
   let overlay = $derived(roomIconOverlay(room));
   let Glyph = $derived(roomIconComponent(room));
   let glyphWeight = $derived(roomIconWeight(room, weight));

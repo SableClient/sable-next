@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 
 import GlobeSimpleIcon from 'phosphor-svelte/lib/GlobeSimpleIcon';
 import CalendarDotsIcon from 'phosphor-svelte/lib/CalendarDotsIcon';
+import ChatsCircleIcon from 'phosphor-svelte/lib/ChatsCircleIcon';
 import HashStraightIcon from 'phosphor-svelte/lib/HashStraightIcon';
 import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
 import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
@@ -27,6 +28,7 @@ test('a space and a voice room carry the join rule in the glyph, not a badge', (
 
 test('a calendar room uses its calendar glyph', () => {
   expect(roomIconComponent({ isCalendar: true })).toBe(CalendarDotsIcon);
+  expect(roomIconComponent({ isForum: true })).toBe(ChatsCircleIcon);
 });
 
 test('a restricted rule reads as neither open nor locked', () => {

@@ -71,6 +71,7 @@
   import { bannerChanges, readRoomBanner } from '#lib/features/room/room-banner.svelte.js';
   import { goToPage, scopedSearchPath } from '#lib/features/room/room-navigation.js';
   import { CALENDAR_ROOM_TYPE } from '#lib/features/calendar/calendar-events.js';
+  import { FORUM_ROOM_TYPE } from '#lib/features/forum/forum-detection.js';
   import CalendarRowEvent from '#lib/features/calendar/CalendarRowEvent.svelte';
   import SpaceEvents from '#lib/features/calendar/SpaceEvents.svelte';
 
@@ -776,6 +777,7 @@
               >
                 <RoomIcon
                   isCalendar={room?.room_type === CALENDAR_ROOM_TYPE}
+                  isForum={room?.room_type === FORUM_ROOM_TYPE}
                   isSpace={room?.is_space ?? false}
                   isVoice={room?.is_voice ?? false}
                   joinRule={room?.join_rule ?? null}
@@ -795,6 +797,7 @@
             <span class="room-icon" aria-hidden="true">
               <RoomIcon
                 isCalendar={room?.room_type === CALENDAR_ROOM_TYPE}
+                isForum={room?.room_type === FORUM_ROOM_TYPE}
                 isSpace={room?.is_space ?? false}
                 isVoice={room?.is_voice ?? false}
                 joinRule={room?.join_rule ?? null}
@@ -1814,6 +1817,7 @@
 
   :global(.room-avatar-icon) :global(.media-image-tint) {
     color: var(--bg-on-container);
+    inset: calc((var(--avatar-size) - var(--icon-size-small)) / 2);
     opacity: 1;
   }
 
