@@ -42,3 +42,19 @@ test('refuses paths outside the immutable directory', () => {
 
   assert.deepEqual(carry, []);
 });
+
+test('keeps the newest assets within the file limit', () => {
+  const { files, carry } = mergeRetained(
+    {
+      '_app/immutable/chunks/older.js': '2026-10-08T00:00:00.000Z',
+      '_app/immutable/chunks/newer.js': '2026-10-09T00:00:00.000Z',
+    },
+    ['_app/immutable/chunks/current.js'],
+    now,
+    7,
+    2
+  );
+
+  assert.deepEqual(carry, ['_app/immutable/chunks/newer.js']);
+  assert.equal(Object.keys(files).length, 2);
+});

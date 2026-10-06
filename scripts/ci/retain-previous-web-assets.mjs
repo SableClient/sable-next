@@ -5,14 +5,25 @@ import { fileURLToPath } from 'node:url';
 const IMMUTABLE = '_app/immutable/';
 const MANIFEST = '_app/retained.json';
 const MAX_AGE_DAYS = 7;
+const MAX_FILES = 15_000;
 const CONCURRENCY = 8;
 
-export function mergeRetained(previous, current, now, maxAgeDays = MAX_AGE_DAYS) {
+export function mergeRetained(
+  previous,
+  current,
+  now,
+  maxAgeDays = MAX_AGE_DAYS,
+  maxFiles = MAX_FILES
+) {
   const cutoff = now.getTime() - maxAgeDays * 86_400_000;
   const stamp = now.toISOString();
   const files = Object.fromEntries(current.map((path) => [path, stamp]));
   const carry = [];
-  for (const [path, seen] of Object.entries(previous)) {
+  const newestFirst = Object.entries(previous).sort(
+    ([, a], [, b]) => Date.parse(b) - Date.parse(a)
+  );
+  for (const [path, seen] of newestFirst) {
+    if (current.length + carry.length >= maxFiles) break;
     if (path in files || !path.startsWith(IMMUTABLE) || path.includes('..')) continue;
     if (Date.parse(seen) < cutoff) continue;
     files[path] = seen;
