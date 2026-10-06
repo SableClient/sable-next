@@ -1109,6 +1109,7 @@
     "readReceipts": "Read receipts",
     "markUnread": "Mark as unread from here",
     "closeReadReceipts": "Close read receipts",
+    "closeMemberList": "Close list",
     "seenBy": "Seen by",
     "inVoiceNames": "In voice: {{names}}",
     "seenByNames": "Seen by {{names}}. Open the list.",

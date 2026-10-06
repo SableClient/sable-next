@@ -7,11 +7,8 @@
   import type { MemberView, TimelineItemView } from '#src/generated/protocol';
 
   import { currentLocale, i18n } from '#lib/i18n.js';
-  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
-  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import { motionMs, MOTION_MS } from '#lib/ui/motion.js';
-  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import ResponsiveDialog from '#lib/ui/primitives/ResponsiveDialog.svelte';
 
   import { memberGroupSegments, memberGroupSummary } from '../members/member-groups';
   import MemberUserList from '../members/MemberUserList.svelte';
@@ -32,8 +29,6 @@
       count: items.length,
     })
   );
-  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
-  let desktop = $derived(appLayout.matches);
   let segments = $derived(memberGroupSegments(items));
   let tokens = $derived(memberGroupSummary(segments, $i18n.t, currentLocale()));
   let open = $state(false);
@@ -46,7 +41,7 @@
   );
 </script>
 
-{#snippet list()}
+{#snippet list(desktop: boolean)}
   <div class="member-group-dialog" class:sheet={!desktop}>
     <h2>{title}</h2>
     <MemberUserList
@@ -103,15 +98,12 @@
 </div>
 
 {#if open}
-  {#if desktop}
-    <DialogFrame bind:open variant="verification" label={title}>
-      {@render list()}
-    </DialogFrame>
-  {:else}
-    <BottomSheet bind:open label={title} closeLabel={$i18n.t('timeline.closeMembers')}>
-      {@render list()}
-    </BottomSheet>
-  {/if}
+  <ResponsiveDialog
+    bind:open
+    label={title}
+    closeLabel={$i18n.t('timeline.closeMembers')}
+    children={list}
+  />
 {/if}
 
 <style>

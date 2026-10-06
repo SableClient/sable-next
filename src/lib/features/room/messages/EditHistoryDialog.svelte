@@ -6,10 +6,7 @@
   import type { EditVersionView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
-  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
-  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
-  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import ResponsiveDialog from '#lib/ui/primitives/ResponsiveDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import FormattedBody from './FormattedBody.svelte';
@@ -35,8 +32,6 @@
     onThread,
     onDelete,
   }: Props = $props();
-  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
-  let desktop = $derived(appLayout.matches);
 
   function act(version: EditVersionView, action?: (version: EditVersionView) => void): void {
     open = false;
@@ -44,7 +39,7 @@
   }
 </script>
 
-{#snippet content()}
+{#snippet content(desktop: boolean)}
   <div class="edit-history" class:sheet={!desktop}>
     <h2>{$i18n.t('timeline.editHistoryTitle')}</h2>
     <ol class="edit-history-versions">
@@ -106,19 +101,12 @@
   </div>
 {/snippet}
 
-{#if desktop}
-  <DialogFrame bind:open variant="verification" label={$i18n.t('timeline.editHistoryTitle')}>
-    {@render content()}
-  </DialogFrame>
-{:else}
-  <BottomSheet
-    bind:open
-    label={$i18n.t('timeline.editHistoryTitle')}
-    closeLabel={$i18n.t('timeline.closeEditHistory')}
-  >
-    {@render content()}
-  </BottomSheet>
-{/if}
+<ResponsiveDialog
+  bind:open
+  label={$i18n.t('timeline.editHistoryTitle')}
+  closeLabel={$i18n.t('timeline.closeEditHistory')}
+  children={content}
+/>
 
 <style>
   .edit-history {

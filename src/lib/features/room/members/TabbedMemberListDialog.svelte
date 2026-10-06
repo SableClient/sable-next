@@ -3,8 +3,9 @@
 
   import type { MemberView } from '#src/generated/protocol';
 
+  import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import ResponsiveDialog from '#lib/ui/primitives/ResponsiveDialog.svelte';
 
   import MemberIdentityRow from './MemberIdentityRow.svelte';
 
@@ -36,44 +37,51 @@
   let selected = $derived<T | undefined>(tabs[Math.min(active, tabs.length - 1)]);
 </script>
 
-<DialogFrame bind:open variant="verification" label={title}>
-  <div class="member-list-dialog">
-    <h2>{title}</h2>
-    <div class="tabs" role="tablist" aria-label={title}>
-      {#each tabs as item, index (tabKey(item))}
-        <Button
-          size="small"
-          variant="ghost"
-          class="member-list-tab choice"
-          role="tab"
-          aria-selected={selected !== undefined && tabKey(item) === tabKey(selected)}
-          onclick={() => {
-            active = index;
-          }}
-        >
-          {@render tab(item)}
-          {userIds(item).length}
-        </Button>
-      {/each}
-    </div>
-    {#if selected !== undefined}
-      <ul>
-        {#each userIds(selected) as userId (userId)}
-          <li>
-            <MemberIdentityRow {userId} {members} onProfile={onMemberProfile} />
-            {@render memberAction?.(selected, userId)}
-          </li>
+<ResponsiveDialog bind:open label={title} closeLabel={$i18n.t('timeline.closeMemberList')}>
+  {#snippet children(desktop)}
+    <div class="member-list-dialog" class:sheet={!desktop}>
+      <h2>{title}</h2>
+      <div class="tabs" role="tablist" aria-label={title}>
+        {#each tabs as item, index (tabKey(item))}
+          <Button
+            size="small"
+            variant="ghost"
+            class="member-list-tab choice"
+            role="tab"
+            aria-selected={selected !== undefined && tabKey(item) === tabKey(selected)}
+            onclick={() => {
+              active = index;
+            }}
+          >
+            {@render tab(item)}
+            {userIds(item).length}
+          </Button>
         {/each}
-      </ul>
-    {/if}
-  </div>
-</DialogFrame>
+      </div>
+      {#if selected !== undefined}
+        <ul>
+          {#each userIds(selected) as userId (userId)}
+            <li>
+              <MemberIdentityRow {userId} {members} onProfile={onMemberProfile} />
+              {@render memberAction?.(selected, userId)}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+  {/snippet}
+</ResponsiveDialog>
 
 <style>
   .member-list-dialog {
     display: grid;
     gap: var(--space-300);
     width: min(24rem, calc(100vw - 2rem));
+  }
+
+  .member-list-dialog.sheet {
+    padding: 0 var(--space-400);
+    width: auto;
   }
 
   h2 {
