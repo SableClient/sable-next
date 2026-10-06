@@ -202,16 +202,21 @@ fn apply_env_defaults(defaults: &[(&str, std::ffi::OsString)]) {
 
 #[cfg(target_os = "linux")]
 fn mark_own_audio() {
-    let marker = app_lib::screen_audio::SELF_MARKER;
-    let value = match std::env::var("PULSE_PROP") {
-        Ok(existing) if existing.contains(marker) => return,
-        Ok(existing) if !existing.trim().is_empty() => format!("{existing} {marker}"),
-        _ => marker.to_owned(),
+    append_pulse_prop("PULSE_PROP", app_lib::screen_audio::SELF_MARKER);
+    append_pulse_prop("PULSE_PROP_OVERRIDE", "application.name=Sable");
+}
+
+#[cfg(target_os = "linux")]
+fn append_pulse_prop(key: &str, prop: &str) {
+    let value = match std::env::var(key) {
+        Ok(existing) if existing.contains(prop) => return,
+        Ok(existing) if !existing.trim().is_empty() => format!("{existing} {prop}"),
+        _ => prop.to_owned(),
     };
     // SAFETY: single-threaded, before anything Tauri or CEF spawns a thread.
     #[expect(unsafe_code, reason = "FFI call")]
     unsafe {
-        std::env::set_var("PULSE_PROP", value);
+        std::env::set_var(key, value);
     }
 }
 

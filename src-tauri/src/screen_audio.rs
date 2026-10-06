@@ -48,7 +48,10 @@ impl Default for Selection {
 }
 
 fn app_name(props: &DictRef) -> Option<String> {
-    if props.get(SELF_MARKER_KEY).is_some() || is_own_process(props) {
+    if props.get(SELF_MARKER_KEY).is_some()
+        || props.get("node.link-group").is_some()
+        || is_own_process(props)
+    {
         return None;
     }
     props
@@ -607,6 +610,16 @@ mod tests {
         let props = pw::properties::properties! {
             "application.name" => "Sable",
             "application.process.id" => pid.as_str(),
+        };
+
+        assert_eq!(app_name(props.dict()), None);
+    }
+
+    #[test]
+    fn leaves_out_streams_that_relay_a_sink() {
+        let props = pw::properties::properties! {
+            "node.name" => "output.combined_alsa_output.usb",
+            "node.link-group" => "combine-sink-5847-13",
         };
 
         assert_eq!(app_name(props.dict()), None);
