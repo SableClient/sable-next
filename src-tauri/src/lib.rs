@@ -4,6 +4,8 @@
 //! except to move bytes or to reach something only this process has: the push
 //! registration, the system browser, the crash reporter.
 
+#[cfg(target_os = "linux")]
+mod app_dirs;
 #[cfg(any(all(feature = "cef", target_os = "linux"), test))]
 mod deep_link_delivery;
 #[cfg(any(all(feature = "cef", target_os = "linux"), all(test, unix)))]

@@ -3,29 +3,46 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
+#[cfg(target_os = "linux")]
 fn consent_path() -> Option<std::path::PathBuf> {
-    #[cfg(target_os = "windows")]
-    {
-        std::env::var_os("LOCALAPPDATA")
-            .or_else(|| std::env::var_os("APPDATA"))
-            .map(|root| std::path::PathBuf::from(root).join("sable-next/sentry-consent"))
+    let path = crate::app_dirs::config_dir()?.join("sentry-consent");
+    let state = std::env::var_os("XDG_STATE_HOME")
+        .map(std::path::PathBuf::from)
+        .filter(|dir| dir.is_absolute())
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".local/state"))
+        })?;
+    let legacy = state.join("sable-next/sentry-consent");
+    if crate::app_dirs::adopt_file(&legacy, &path).is_ok() && path.exists() {
+        let _ = std::fs::remove_file(&legacy);
     }
+    Some(path)
+}
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        let home = std::env::var_os("HOME")?;
-        #[cfg(any(target_os = "macos", target_os = "ios"))]
-        let path = std::path::PathBuf::from(home)
-            .join("Library/Application Support/Sable Next/sentry-consent");
-        #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-        let path = std::env::var_os("XDG_STATE_HOME")
-            .map_or_else(
-                || std::path::PathBuf::from(home).join(".local/state"),
-                std::path::PathBuf::from,
-            )
-            .join("sable-next/sentry-consent");
-        Some(path)
-    }
+#[cfg(target_os = "windows")]
+fn consent_path() -> Option<std::path::PathBuf> {
+    std::env::var_os("LOCALAPPDATA")
+        .or_else(|| std::env::var_os("APPDATA"))
+        .map(|root| std::path::PathBuf::from(root).join("sable-next/sentry-consent"))
+}
+
+#[cfg(target_os = "android")]
+fn consent_path() -> Option<std::path::PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    let state = std::env::var_os("XDG_STATE_HOME").map_or_else(
+        || std::path::PathBuf::from(&home).join(".local/state"),
+        std::path::PathBuf::from,
+    );
+    Some(state.join("sable-next/sentry-consent"))
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+fn consent_path() -> Option<std::path::PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    Some(
+        std::path::PathBuf::from(home)
+            .join("Library/Application Support/Sable Next/sentry-consent"),
+    )
 }
 
 fn consent() -> bool {
@@ -35,6 +52,9 @@ fn consent() -> bool {
 fn persist_consent(enabled: bool) {
     let Some(path) = consent_path() else { return };
     if let Some(parent) = path.parent() {
+        #[cfg(target_os = "linux")]
+        let _ = crate::app_dirs::create_private_dir(parent);
+        #[cfg(not(target_os = "linux"))]
         let _ = std::fs::create_dir_all(parent);
     }
     let _ = std::fs::write(path, if enabled { b"1" } else { b"0" });

@@ -4,6 +4,9 @@ use std::{
     sync::{Mutex, PoisonError},
 };
 
+const FILE: &str = "permissions.json";
+const LEGACY_DIR: &str = "moe.sable.next";
+
 pub struct Grants {
     path: Option<PathBuf>,
     known: &'static [&'static str],
@@ -48,11 +51,18 @@ impl Grants {
 }
 
 fn store_path() -> Option<PathBuf> {
-    let config = std::env::var_os("XDG_CONFIG_HOME")
-        .filter(|dir| !dir.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| Path::new(&home).join(".config")))?;
-    Some(config.join("moe.sable.next").join("permissions.json"))
+    let path = crate::app_dirs::config_dir()?.join(FILE);
+    // Both channels used to share the stable directory.
+    if let Some(legacy) = legacy_path()
+        && let Err(error) = crate::app_dirs::adopt_file(&legacy, &path)
+    {
+        log::warn!("could not migrate permission grants: {error}");
+    }
+    Some(path)
+}
+
+fn legacy_path() -> Option<PathBuf> {
+    Some(crate::app_dirs::config_root()?.join(LEGACY_DIR).join(FILE))
 }
 
 fn read(path: &Path, known: &'static [&'static str]) -> HashSet<&'static str> {
@@ -72,7 +82,7 @@ fn write(path: &Path, granted: &HashSet<&'static str>) {
     kinds.sort_unstable();
     let written = path
         .parent()
-        .map_or(Ok(()), std::fs::create_dir_all)
+        .map_or(Ok(()), crate::app_dirs::create_private_dir)
         .and_then(|()| std::fs::write(path, serde_json::to_vec(&kinds).unwrap_or_default()));
     if let Err(error) = written {
         log::warn!("could not remember a permission grant: {error}");
