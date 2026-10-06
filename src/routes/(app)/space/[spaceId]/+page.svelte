@@ -19,7 +19,7 @@
 
     const target = untrack(() => {
       if (!space) return null;
-      const param = roomPathParam(space);
+      const param = roomPathParam(space, roomList.rooms);
       return spaceIndexRedirect(
         resolve('/(app)/space/[spaceId]', { spaceId: param }),
         savedSpacePaths()[space.room_id],

@@ -103,10 +103,37 @@ test('a space itself opens at its lobby', () => {
   expect(roomSectionPath(rooms, '!space:example.org')).toBe('/space/!space%3Aexample.org/lobby');
 });
 
-test('the canonical alias wins over the room id, matching the sidebar links', () => {
+test('an aliased room uses its canonical alias, matching the sidebar links', () => {
   const rooms = [room('!general:example.org', { canonical_alias: '#general:example.org' })];
   expect(roomSectionPath(rooms, '!general:example.org')).toBe('/rooms/%23general%3Aexample.org');
+  expect(roomSectionPath(rooms, '#general:example.org')).toBe('/rooms/%23general%3Aexample.org');
 });
+
+test.each([true, false])(
+  'spaces sharing an alias remain distinct with tombstone %s',
+  (tombstoned) => {
+    const rooms = [
+      room('!old:example.org', {
+        is_space: true,
+        canonical_alias: '#community:example.org',
+        is_tombstoned: tombstoned,
+      }),
+      room('!current:example.org', { is_space: true, canonical_alias: '#community:example.org' }),
+    ];
+    const aliasPath = '/space/%23community%3Aexample.org/lobby';
+    const paths = tombstoned
+      ? ['/space/!old%3Aexample.org/lobby', aliasPath]
+      : [aliasPath, '/space/!current%3Aexample.org/lobby'];
+
+    for (const [index, space] of rooms.entries()) {
+      expect(permalinkTarget(rooms, encodeURIComponent(space.room_id))).toEqual({
+        kind: 'room',
+        path: paths[index],
+      });
+    }
+    expect(roomSectionPath(rooms, '#community:example.org')).toBe(aliasPath);
+  }
+);
 
 test('an unknown room still resolves, so the timeline can report the failure', () => {
   expect(roomSectionPath([], '!missing:example.org')).toBe('/rooms/!missing%3Aexample.org');

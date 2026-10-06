@@ -58,14 +58,11 @@ vi.mock('$app/paths', () => ({
   },
 }));
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
-vi.mock('#lib/rooms/room-list.svelte.js', () => ({
+vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   useRoomList: () => roomsFixture,
-  findRoomByPathId: (rooms: readonly RoomSummary[], pathId: string | undefined) =>
-    rooms.find((room) => room.room_id === pathId || room.canonical_alias === pathId),
   roomLabel: (room: RoomSummary) => room.name ?? room.canonical_alias ?? room.room_id,
   roomAvatarUrl: (room: RoomSummary) => room.avatar_url,
-  roomPathParam: (room: RoomSummary) => encodeURIComponent(room.canonical_alias ?? room.room_id),
-  roomPathParamFromId: (roomId: string) => encodeURIComponent(roomId),
 }));
 const presenceFixture = vi.hoisted(() => ({
   entry: null as { statusMessage: string | null } | null,

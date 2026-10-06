@@ -44,7 +44,7 @@ function sectionPath(
   const parentSpace = room ? rootSpaceOf(rooms, room.room_id) : undefined;
   if (parentSpace) {
     return resolve('/(app)/space/[spaceId]/[roomId]', {
-      spaceId: roomPathParam(parentSpace),
+      spaceId: roomPathParam(parentSpace, rooms),
       roomId: roomParam,
     });
   }
@@ -64,7 +64,7 @@ export function roomSectionPath(
   const base = sectionPath(
     rooms,
     room,
-    room ? roomPathParam(room) : roomPathParamFromId(roomIdOrAlias)
+    room ? roomPathParam(room, rooms) : roomPathParamFromId(roomIdOrAlias)
   );
 
   const query = new URLSearchParams();

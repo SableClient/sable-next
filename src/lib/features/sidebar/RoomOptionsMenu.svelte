@@ -338,7 +338,7 @@
     {#if room.is_space}
       <ActionMenuItem
         onSelect={() => {
-          void goto(spaceTimelinePath(room));
+          void goto(spaceTimelinePath(room, roomList.rooms));
         }}
       >
         <ListBulletsIcon />

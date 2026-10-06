@@ -9,7 +9,7 @@
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
-  import { roomPathParam } from '#lib/rooms/room-list.svelte.js';
+  import { roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { addUnread, type UnreadCount } from '#lib/rooms/spaces.js';
   import { NO_UNREAD, roomUnread, type RoomUnread } from '#lib/rooms/unread.js';
   import {
@@ -126,6 +126,7 @@
     onUnpin,
   }: Props = $props();
 
+  const roomList = useRoomList();
   const uid = $props.id();
 
   function unreadId(key: string): string {
@@ -211,7 +212,9 @@
   let directItems = $derived<RailItem[]>(
     directRooms.map((room) => {
       const name = spaceName(room.name, room.room_id);
-      const href = resolve('/(app)/direct/[roomId]', { roomId: roomPathParam(room) });
+      const href = resolve('/(app)/direct/[roomId]', {
+        roomId: roomPathParam(room, roomList.rooms),
+      });
 
       return {
         href,
@@ -373,8 +376,12 @@
     if (space === undefined) return null;
 
     const name = spaceName(space.name, space.room_id);
-    const href = resolve('/(app)/space/[spaceId]', { spaceId: roomPathParam(space) });
-    const lobby = resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(space) });
+    const href = resolve('/(app)/space/[spaceId]', {
+      spaceId: roomPathParam(space, roomList.rooms),
+    });
+    const lobby = resolve('/(app)/space/[spaceId]/lobby', {
+      spaceId: roomPathParam(space, roomList.rooms),
+    });
     const savedPath = spacePaths[space.room_id];
 
     return {
@@ -475,7 +482,9 @@
     const search = new URLSearchParams(kept).toString();
     const path = `${page.url.pathname}${search ? `?${search}` : ''}${page.url.hash}`;
     const space = spaces.find((candidate) => {
-      const href = resolve('/(app)/space/[spaceId]', { spaceId: roomPathParam(candidate) });
+      const href = resolve('/(app)/space/[spaceId]', {
+        spaceId: roomPathParam(candidate, roomList.rooms),
+      });
       return path === href || path.startsWith(`${href}/`);
     });
     const key = sectionRoots.find(([, root]) => under(path, root))?.[0] ?? space?.room_id;

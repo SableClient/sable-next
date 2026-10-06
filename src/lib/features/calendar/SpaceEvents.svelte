@@ -3,7 +3,7 @@
   import type { RoomSummary } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { roomLabel, roomPathParam } from '#lib/rooms/room-list.svelte.js';
+  import { roomLabel, roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { formatTime } from '#lib/ui/date-time.js';
   import CalendarBlankIcon from 'phosphor-svelte/lib/CalendarBlankIcon';
   import {
@@ -25,6 +25,7 @@
   let { spaceId, rooms, onNavigate }: Props = $props();
 
   const core = useCoreClient();
+  const roomList = useRoomList();
 
   interface Today {
     room: RoomSummary;
@@ -83,7 +84,7 @@
       {#each shown as { room, occurrence } (`${room.room_id}|${occurrence.item.eventId}|${String(occurrence.start)}`)}
         {@const href = resolve('/(app)/space/[spaceId]/[roomId]', {
           spaceId,
-          roomId: roomPathParam(room),
+          roomId: roomPathParam(room, roomList.rooms),
         })}
         <li>
           <a class="space-event selection-layer" {href} onclick={() => onNavigate?.(href)}>

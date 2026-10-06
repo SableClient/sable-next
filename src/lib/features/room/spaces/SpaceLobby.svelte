@@ -278,7 +278,7 @@
     if (!space) return;
     void goto(
       resolve('/(app)/space/[spaceId]/[roomId]', {
-        spaceId: roomPathParam(space),
+        spaceId: roomPathParam(space, roomList.rooms),
         roomId: target,
       })
     );
@@ -614,7 +614,7 @@
                 size="small"
                 label={$i18n.t('room.menuShowSpaceTimeline')}
                 onclick={() => {
-                  void goto(spaceTimelinePath(space));
+                  void goto(spaceTimelinePath(space, roomList.rooms));
                 }}
               >
                 <ListBulletsIcon />
@@ -668,7 +668,7 @@
               onSelect={() => {
                 void goto(
                   resolve('/(app)/space/[spaceId]/create-room', {
-                    spaceId: roomPathParam(managed),
+                    spaceId: roomPathParam(managed, roomList.rooms),
                   })
                 );
               }}
@@ -679,7 +679,7 @@
               onSelect={() => {
                 void goto(
                   resolve('/(app)/space/[spaceId]/create-space', {
-                    spaceId: roomPathParam(managed),
+                    spaceId: roomPathParam(managed, roomList.rooms),
                   })
                 );
               }}

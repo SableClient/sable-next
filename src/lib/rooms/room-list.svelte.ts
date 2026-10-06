@@ -33,8 +33,13 @@ type RoomNotificationModes = { room: NotificationModeView | null; fallback: Noti
 const NOTIFICATION_MODE_BATCH = 200;
 const SNAPSHOT_WRITE_DELAY_MS = 1_000;
 
-export function roomPathId(room: RoomSummary): string {
-  return room.canonical_alias ?? room.room_id;
+/** Only use an alias when it resolves locally to this room. */
+export function roomPathId(room: RoomSummary, rooms: readonly RoomSummary[]): string {
+  const alias = room.canonical_alias;
+  if (!room.is_tombstoned && alias && findRoomByPathId(rooms, alias)?.room_id === room.room_id) {
+    return alias;
+  }
+  return room.room_id;
 }
 
 /** `resolve()` inserts route parameters verbatim, including `#`. */
@@ -42,8 +47,8 @@ export function roomPathParamFromId(roomId: string): string {
   return encodeURIComponent(roomId);
 }
 
-export function roomPathParam(room: RoomSummary): string {
-  return roomPathParamFromId(roomPathId(room));
+export function roomPathParam(room: RoomSummary, rooms: readonly RoomSummary[]): string {
+  return roomPathParamFromId(roomPathId(room, rooms));
 }
 
 function directPeer(room: RoomSummary): string | null {
@@ -65,7 +70,10 @@ export function findRoomByPathId(
   rooms: readonly RoomSummary[],
   pathId: string | undefined
 ): RoomSummary | undefined {
-  return rooms.find((room) => room.room_id === pathId || room.canonical_alias === pathId);
+  if (pathId === undefined) return undefined;
+  return rooms.find(
+    (room) => room.room_id === pathId || (!room.is_tombstoned && room.canonical_alias === pathId)
+  );
 }
 
 const NOBODY_TYPING: readonly string[] = [];

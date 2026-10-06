@@ -78,9 +78,12 @@
   let eventTimeline = $derived(page.url.searchParams.get('timeline') === 'events');
   $effect(() => {
     if (!space || eventTimeline) return;
-    void goto(resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(space) }), {
-      replace: true,
-    });
+    void goto(
+      resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(space, roomList.rooms) }),
+      {
+        replace: true,
+      }
+    );
   });
 </script>
 

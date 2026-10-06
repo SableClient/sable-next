@@ -204,7 +204,9 @@
   let createRoomHref = $derived(
     activeSpace === null
       ? resolve('create-room')
-      : resolve('/(app)/space/[spaceId]/create-room', { spaceId: roomPathParam(activeSpace) })
+      : resolve('/(app)/space/[spaceId]/create-room', {
+          spaceId: roomPathParam(activeSpace, roomList.rooms),
+        })
   );
 
   // A space browses its own children through the lobby; the public directory is
@@ -212,7 +214,9 @@
   let browseHref = $derived(
     activeSpace === null
       ? resolve('explore')
-      : resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(activeSpace) })
+      : resolve('/(app)/space/[spaceId]/lobby', {
+          spaceId: roomPathParam(activeSpace, roomList.rooms),
+        })
   );
 
   let searchHref = $derived(
@@ -226,7 +230,9 @@
   let createSpaceHref = $derived(
     activeSpace === null
       ? resolve('create-space')
-      : resolve('/(app)/space/[spaceId]/create-space', { spaceId: roomPathParam(activeSpace) })
+      : resolve('/(app)/space/[spaceId]/create-space', {
+          spaceId: roomPathParam(activeSpace, roomList.rooms),
+        })
   );
   let createSpaceLabel = $derived(
     activeSpace === null ? $i18n.t('nav.createSpace') : $i18n.t('nav.createSubspace')
@@ -248,7 +254,9 @@
   }
 
   function openLobby(room: RoomSummary): void {
-    navigateTo(resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(room) }));
+    navigateTo(
+      resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(room, roomList.rooms) })
+    );
   }
 
   // Held by id so the dialogs follow the live summary.
@@ -435,7 +443,9 @@
   }
 
   function roomHref(row: RoomNavRow) {
-    const routeId = row.room ? roomPathParam(row.room) : roomPathParamFromId(row.roomId);
+    const routeId = row.room
+      ? roomPathParam(row.room, roomList.rooms)
+      : roomPathParamFromId(row.roomId);
     if (directSection) {
       return resolve('/(app)/direct/[roomId]', { roomId: routeId });
     }
@@ -443,7 +453,9 @@
     if (row.parentSpaceId) {
       const parentSpace = findRoomByPathId(roomList.rooms, row.parentSpaceId);
       return resolve('/(app)/space/[spaceId]/[roomId]', {
-        spaceId: parentSpace ? roomPathParam(parentSpace) : roomPathParamFromId(row.parentSpaceId),
+        spaceId: parentSpace
+          ? roomPathParam(parentSpace, roomList.rooms)
+          : roomPathParamFromId(row.parentSpaceId),
         roomId: routeId,
       });
     }
@@ -973,7 +985,9 @@
   {#snippet navLink(item: SpaceTreeSpace)}
     {@const room = item.room}
     {@const name = roomLabel(room)}
-    {@const href = resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(room) })}
+    {@const href = resolve('/(app)/space/[spaceId]/lobby', {
+      spaceId: roomPathParam(room, roomList.rooms),
+    })}
     {@const active = pathname === href}
     <div class="room-row-wrap">
       {@render threadLines(item.threads)}
@@ -1102,7 +1116,11 @@
     </div>
 
     {#if !collapsed && activeSpace && preferences.showSpaceEvents && calendarRooms.length > 0}
-      <SpaceEvents spaceId={roomPathParam(activeSpace)} rooms={calendarRooms} {onNavigate} />
+      <SpaceEvents
+        spaceId={roomPathParam(activeSpace, roomList.rooms)}
+        rooms={calendarRooms}
+        {onNavigate}
+      />
     {/if}
 
     {#if favourites.length > 0}
