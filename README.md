@@ -27,6 +27,21 @@ can run while the development server is using `src/generated/wasm/`.
 
 Run `mise tasks` for the full list.
 
+## Customization
+
+Edit [`static/config.json`](static/config.json) to customize homeservers and client
+defaults. With Docker, copy it to `config.json`, edit it, and mount it:
+
+```yaml
+services:
+  sable:
+    image: git.sable.moe/sableclient/sable-next:dev
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./config.json:/app/config.json:ro
+```
+
 ## Apps (Tauri)
 
 Native builds use [Tauri](https://v2.tauri.app). Targets: **Windows**, **macOS**, **Linux**, **Android**, and **iOS**.
