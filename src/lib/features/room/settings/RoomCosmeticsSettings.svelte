@@ -9,6 +9,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import {
     COSMETIC_EVENT_TYPES,
+    MEMBER_COLOR_FIELD,
     pronounContent,
     writeMemberColors,
   } from '#lib/features/composer/slash-commands.js';
@@ -201,7 +202,7 @@
   async function writeMember(
     target: string,
     self: string,
-    fields: Partial<Record<'displayname' | 'avatar_url', string | null>>
+    fields: Partial<Record<string, string | null>>
   ): Promise<void> {
     const rest = Object.fromEntries(
       Object.entries(
@@ -281,12 +282,16 @@
 
   function resetLook(): void {
     void save('reset', async (target, self) => {
-      await writeMember(target, self, { displayname: profileName, avatar_url: profileAvatar });
+      await writeMember(target, self, {
+        displayname: profileName,
+        avatar_url: profileAvatar,
+        [MEMBER_COLOR_FIELD]: null,
+      });
       name = '';
       savedName = '';
       avatar = null;
       if (colorOnLight || colorOnDark) {
-        await writeMemberColors(core.commands, target, self, { kind: 'clear' });
+        await core.commands.sendStateEvent(target, COSMETIC_EVENT_TYPES.color, self, {});
         colorOnLight = '';
         colorOnDark = '';
       }

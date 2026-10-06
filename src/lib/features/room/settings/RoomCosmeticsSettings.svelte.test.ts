@@ -83,3 +83,46 @@ test('reset is enabled when the profile cannot be fetched', async () => {
 
   expect(await screen.findByRole('button', { name: 'room.cosmeticsResetAction' })).toBeEnabled();
 });
+
+test('reset writes the member event once and drops the colours with it', async () => {
+  core.refreshUserProfile.mockResolvedValue({
+    display_name: 'Live',
+    avatar_url: 'mxc://example.org/live',
+  });
+  core.roomStateEvent.mockImplementation((_room, type) =>
+    Promise.resolve(
+      type === 'm.room.member'
+        ? {
+            membership: 'join',
+            displayname: 'Custom',
+            avatar_url: 'mxc://example.org/custom',
+            'eu.she-a.color': { on_light: '#112233' },
+          }
+        : null
+    )
+  );
+  const user = userEvent.setup();
+  render(RoomCosmeticsSettings, { room, permissions: null, levels: null });
+
+  await user.click(await screen.findByRole('button', { name: 'room.cosmeticsResetAction' }));
+
+  await vi.waitFor(() => {
+    expect(core.sendStateEvent).toHaveBeenCalledWith(
+      '!room:example.org',
+      'moe.sable.room.cosmetics.color',
+      '@me:example.org',
+      {}
+    );
+  });
+  const memberWrites = core.sendStateEvent.mock.calls.filter(
+    ([, type]) => (type as string) === 'm.room.member'
+  );
+  expect(memberWrites).toEqual([
+    [
+      '!room:example.org',
+      'm.room.member',
+      '@me:example.org',
+      { membership: 'join', displayname: 'Live', avatar_url: 'mxc://example.org/live' },
+    ],
+  ]);
+});

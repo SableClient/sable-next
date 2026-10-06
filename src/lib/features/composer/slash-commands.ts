@@ -302,7 +302,7 @@ function isReset(text: string): boolean {
 }
 
 // Unstable prefix for the `m.color_preference` field from MSC4522.
-const MEMBER_COLOR_FIELD = 'eu.she-a.color';
+export const MEMBER_COLOR_FIELD = 'eu.she-a.color';
 
 export type ColorUpdate =
   | { kind: 'clear' }
