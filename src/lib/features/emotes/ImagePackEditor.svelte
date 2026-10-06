@@ -19,6 +19,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Switcher from '#lib/ui/primitives/Switcher.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
+  import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
 
@@ -76,9 +77,29 @@
     return current.images.some((image) => image.shortcode === candidate);
   }
 
+  async function persist(change: (base: PackDraft) => PackDraft): Promise<void> {
+    await onApply?.(change($state.snapshot(saved)));
+    if (draft !== null) draft = change(draft);
+  }
+
+  async function save(change: (base: PackDraft) => PackDraft): Promise<void> {
+    if (busy) return;
+
+    busy = true;
+    failed = false;
+    try {
+      await persist(change);
+    } catch (error) {
+      console.warn('[sable emotes] the pack could not be saved', error);
+      failed = true;
+    } finally {
+      busy = false;
+    }
+  }
+
   function toggleUsage(usage: ImageUsageView, on: boolean): void {
-    const next = togglePackUsage(current, usage, on);
-    if (next !== null) edit(next);
+    if (togglePackUsage(current, usage, on) === null) return;
+    void save((base) => togglePackUsage(base, usage, on) ?? base);
   }
 
   function imageUsageChoice(image: PackImageDraft): string {
@@ -86,34 +107,30 @@
   }
 
   function chooseImageUsage(image: PackImageDraft, choice: string): void {
-    edit(
-      setImageUsage(
-        current,
-        image.shortcode,
-        choice === 'both' ? ALL_USAGES : [choice as ImageUsageView]
-      )
-    );
+    const usage = choice === 'both' ? ALL_USAGES : [choice as ImageUsageView];
+    void save((base) => setImageUsage(base, image.shortcode, usage));
   }
 
   function removeImage(target: PackImageDraft): void {
-    edit({
-      ...current,
-      images: current.images.filter((image) => image.shortcode !== target.shortcode),
-    });
+    void save((base) => ({
+      ...base,
+      images: base.images.filter((image) => image.shortcode !== target.shortcode),
+    }));
   }
 
   function commitRename(target: PackImageDraft): void {
+    if (renaming !== target.shortcode) return;
     const wanted = normalizeShortcode(renameDraft);
     renaming = null;
     if (wanted === '' || wanted === target.shortcode) return;
 
     const next = uniqueShortcode(wanted, taken);
-    edit({
-      ...current,
-      images: current.images.map((image) =>
+    void save((base) => ({
+      ...base,
+      images: base.images.map((image) =>
         image.shortcode === target.shortcode ? { ...image, shortcode: next } : image
       ),
-    });
+    }));
   }
 
   async function addImages(event: Event & { currentTarget: HTMLInputElement }): Promise<void> {
@@ -148,7 +165,7 @@
         });
       }
       shortcode = '';
-      edit({ ...current, images: [...current.images, ...added] });
+      await persist((base) => ({ ...base, images: [...base.images, ...added] }));
     } catch (error) {
       console.warn('[sable emotes] the image could not be uploaded', error);
       failed = true;
@@ -169,8 +186,7 @@
       const upright = await uprightJpeg(file);
       const bytes = new Uint8Array(await upright.arrayBuffer());
       const avatarUrl = await core.commands.uploadMedia(upright.type || 'image/*', bytes);
-      await onApply?.({ ...$state.snapshot(saved), avatarUrl });
-      if (draft !== null) draft = { ...draft, avatarUrl };
+      await persist((base) => ({ ...base, avatarUrl }));
     } catch (error) {
       console.warn('[sable emotes] the pack avatar could not be saved', error);
       failed = true;
@@ -221,13 +237,13 @@
       }
 
       const [first] = imported;
-      edit({
-        ...current,
-        name: current.name === '' ? (first?.name ?? '') : current.name,
-        avatarUrl: current.avatarUrl ?? first?.avatarUrl ?? null,
-        attribution: current.attribution === '' ? (first?.attribution ?? '') : current.attribution,
-        images: [...current.images, ...added],
-      });
+      await persist((base) => ({
+        ...base,
+        name: base.name === '' ? (first?.name ?? '') : base.name,
+        avatarUrl: base.avatarUrl ?? first?.avatarUrl ?? null,
+        attribution: base.attribution === '' ? (first?.attribution ?? '') : base.attribution,
+        images: [...base.images, ...added],
+      }));
     } catch (error) {
       console.warn('[sable emotes] the pack file could not be read', error);
       transferFailed = 'import';
@@ -279,7 +295,7 @@
       <div class="meta">
         <MediaImage
           class="pack-avatar"
-          source={current.avatarUrl ?? current.images[0]?.url ?? ''}
+          source={current.avatarUrl ?? pack?.avatar_url ?? current.images[0]?.url ?? ''}
           alt=""
           width={56}
           height={56}
@@ -312,6 +328,7 @@
         <TextInput
           id="pack-name"
           value={current.name}
+          placeholder={pack?.name ?? ''}
           readonly={!canEdit}
           oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
             edit({ ...current, name: event.currentTarget.value });
@@ -319,11 +336,12 @@
         />
       </FormField>
       <FormField fieldId="pack-attribution" label={$i18n.t('emotes.packAttribution')}>
-        <TextInput
+        <TextArea
           id="pack-attribution"
           value={current.attribution}
+          rows={3}
           readonly={!canEdit}
-          oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
+          oninput={(event: Event & { currentTarget: HTMLTextAreaElement }) => {
             edit({ ...current, attribution: event.currentTarget.value });
           }}
         />
@@ -387,10 +405,7 @@
                   commitRename(image);
                 }}
                 onkeydown={(event: KeyboardEvent) => {
-                  if (event.key === 'Enter') {
-                    commitRename(image);
-                    if (rejected === null) void apply();
-                  }
+                  if (event.key === 'Enter') commitRename(image);
                   if (event.key === 'Escape') renaming = null;
                 }}
               />

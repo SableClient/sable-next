@@ -124,8 +124,7 @@
     }
   }
 
-  async function send(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
+  async function send(): Promise<void> {
     const target = roomId;
     if (!target || !canSend || sending) return;
 
@@ -243,7 +242,13 @@
     title={$i18n.t('room.devStateTitle')}
     description={$i18n.t('room.devStateDescription')}
   >
-    <form class="settings-form" onsubmit={send} {@attach revealEditor}>
+    <form
+      class="settings-form"
+      onsubmit={(event) => {
+        event.preventDefault();
+      }}
+      {@attach revealEditor}
+    >
       <FormField fieldId="room-dev-type" label={$i18n.t('room.devEventType')}>
         <TextInput
           id="room-dev-type"
@@ -285,7 +290,14 @@
           {$i18n.t('room.devLoad')}
         </Button>
         {#if canEditState}
-          <Button type="submit" loading={sending} disabled={eventType.trim() === ''}>
+          <Button
+            type="button"
+            loading={sending}
+            disabled={eventType.trim() === ''}
+            onclick={() => {
+              void send();
+            }}
+          >
             {$i18n.t('room.devSend')}
           </Button>
         {/if}

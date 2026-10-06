@@ -4219,9 +4219,13 @@ pub struct ImagePackView {
     pub room_id: Option<String>,
     pub name: Option<String>,
     pub avatar_url: Option<String>,
+    pub declared_name: Option<String>,
+    pub declared_avatar_url: Option<String>,
     pub attribution: Option<String>,
     pub usage: Vec<ImageUsageView>,
     pub images: Vec<PackImageView>,
+    pub stable_event: bool,
+    pub legacy_event: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

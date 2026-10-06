@@ -139,24 +139,30 @@ pub fn pack_view(
         })
         .collect();
 
+    let name = content
+        .pack
+        .as_ref()
+        .and_then(|meta| meta.display_name.clone());
+    let avatar_url = content
+        .pack
+        .as_ref()
+        .and_then(|meta| meta.avatar_url.clone());
     ImagePackView {
         id,
         origin,
         room_id,
-        name: content
-            .pack
-            .as_ref()
-            .and_then(|meta| meta.display_name.clone()),
-        avatar_url: content
-            .pack
-            .as_ref()
-            .and_then(|meta| meta.avatar_url.clone()),
+        declared_name: name.clone(),
+        declared_avatar_url: avatar_url.clone(),
+        name,
+        avatar_url,
         attribution: content
             .pack
             .as_ref()
             .and_then(|meta| meta.attribution.clone()),
         usage: usages(pack_usage),
         images,
+        stable_event: false,
+        legacy_event: false,
     }
 }
 
@@ -223,10 +229,17 @@ impl PackCache {
 #[derive(Clone, Default)]
 struct RoomPackState {
     packs: BTreeMap<String, RoomPackEvent>,
+    legacy: BTreeSet<String>,
     canonical_parents: Vec<SpaceParentEvent>,
 }
 
 impl RoomPackState {
+    fn note_legacy(&mut self, pack: &RoomPackEvent) {
+        if pack.event_type == ROOM_EMOTES && !pack.content.is_deleted() {
+            self.legacy.insert(pack.state_key.clone());
+        }
+    }
+
     fn from_server(state: &[Raw<AnyStateEvent>]) -> Self {
         let mut parsed = Self::default();
         for raw in state {
@@ -237,6 +250,7 @@ impl RoomPackState {
                     continue;
                 }
                 if pack.event_type == ROOM_EMOTES {
+                    parsed.note_legacy(&pack);
                     parsed.packs.entry(pack.state_key.clone()).or_insert(pack);
                     continue;
                 }
@@ -604,6 +618,7 @@ impl Core {
                     RawAnySyncOrStrippedState::Stripped(raw) => raw.json(),
                 };
                 if let Ok(pack) = serde_json::from_str::<RoomPackEvent>(json.get()) {
+                    stored.note_legacy(&pack);
                     stored.packs.insert(pack.state_key.clone(), pack);
                 }
             }
@@ -675,12 +690,16 @@ impl Core {
             if event.content.is_deleted() {
                 continue;
             }
+            let stable_event = event.event_type == ROOM_IMAGE_PACK;
+            let legacy_event = state.legacy.contains(&state_key);
             let mut view = pack_view(
                 event.content,
                 state_key,
                 origin,
                 Some(room.room_id().to_string()),
             );
+            view.stable_event = stable_event;
+            view.legacy_event = legacy_event;
             if let Some(server) = &own_server {
                 for image in &mut view.images {
                     if let Some(source) = &mut image.source_pack {
@@ -1112,6 +1131,105 @@ mod server_tests {
                 .collect::<Vec<_>>(),
             [("live", ImagePackOriginView::Space)]
         );
+    }
+
+    #[tokio::test]
+    async fn a_room_pack_keeps_its_declared_meta_and_reports_both_formats() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!room:example.org");
+        let state = |event_type: &str, key: &str, content: serde_json::Value| {
+            Raw::new(&json!({
+                "type": event_type, "state_key": key, "event_id": format!("${event_type}{key}"),
+                "sender": "@alice:example.org", "origin_server_ts": 1, "content": content
+            }))
+            .unwrap()
+            .cast_unchecked()
+        };
+        let images = json!({"wave": {"url": "mxc://example.org/wave"}});
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).add_state_bulk([
+                    state("m.room.name", "", json!({"name": "Neo"})),
+                    state(
+                        "m.room.avatar",
+                        "",
+                        json!({"url": "mxc://example.org/room"}),
+                    ),
+                    state("im.ponies.room_emotes", "old", json!({"images": images})),
+                    state("im.ponies.room_emotes", "both", json!({"images": images})),
+                    state("m.room.image_pack", "both", json!({"images": images})),
+                    state(
+                        "m.room.image_pack",
+                        "new",
+                        json!({"pack": {"avatar_url": "mxc://example.org/cat"}, "images": images}),
+                    ),
+                ]),
+            )
+            .await;
+        let core = core();
+        let service = Arc::new(
+            matrix_sdk_ui::sync_service::SyncService::builder(client.clone())
+                .build()
+                .await
+                .unwrap(),
+        );
+        *core.session.write().await = Some(crate::session::Session {
+            account_id: "a1".to_owned(),
+            client,
+            sync_service: service,
+            homeserver: server.server().uri(),
+            oauth: false,
+        });
+        let crate::protocol::CommandOk::ImagePacks { packs, .. } =
+            core.image_packs(room_id.to_owned(), true).await.unwrap()
+        else {
+            panic!("unexpected response")
+        };
+        let summary = packs
+            .iter()
+            .map(|pack| {
+                (
+                    pack.id.as_str(),
+                    pack.avatar_url.as_deref(),
+                    pack.declared_avatar_url.as_deref(),
+                    pack.declared_name.as_deref(),
+                    pack.stable_event,
+                    pack.legacy_event,
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            summary,
+            [
+                (
+                    "both",
+                    Some("mxc://example.org/room"),
+                    None,
+                    None,
+                    true,
+                    true
+                ),
+                (
+                    "new",
+                    Some("mxc://example.org/cat"),
+                    Some("mxc://example.org/cat"),
+                    None,
+                    true,
+                    false
+                ),
+                (
+                    "old",
+                    Some("mxc://example.org/room"),
+                    None,
+                    None,
+                    false,
+                    true
+                ),
+            ]
+        );
+        assert!(packs.iter().all(|pack| pack.name.as_deref() == Some("Neo")));
     }
 
     #[tokio::test]

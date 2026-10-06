@@ -40,6 +40,10 @@ function pack(overrides: Partial<ImagePackView> = {}): ImagePackView {
     room_id: '!r:example.org',
     name: 'Blobs',
     avatar_url: 'mxc://old/av',
+    declared_name: 'Blobs',
+    declared_avatar_url: 'mxc://old/av',
+    stable_event: true,
+    legacy_event: false,
     attribution: 'CC BY 4.0',
     usage: ['emoticon', 'sticker'],
     images: [
@@ -134,7 +138,12 @@ test('an archive recompressed by another tool still imports', async () => {
 
 test('two packs export into one archive without colliding', async () => {
   const core = fakeCore(media);
-  const second = pack({ id: 'more', name: 'More', images: pack().images.slice(0, 1) });
+  const second = pack({
+    id: 'more',
+    name: 'More',
+    declared_name: 'More',
+    images: pack().images.slice(0, 1),
+  });
   const files = unzipSync(await buildArchive(core, [packDraft(pack()), packDraft(second)]));
 
   expect(files).toHaveProperty(['images/0-blob_wave.png']);
@@ -152,6 +161,7 @@ test('a shared image is fetched and stored once', async () => {
   const core = fakeCore(media);
   const shared = pack({
     avatar_url: 'mxc://old/wave',
+    declared_avatar_url: 'mxc://old/wave',
     images: pack().images.slice(0, 1),
   });
   const files = unzipSync(await buildArchive(core, [packDraft(shared)]));

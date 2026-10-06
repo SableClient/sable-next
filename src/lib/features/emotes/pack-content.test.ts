@@ -21,6 +21,10 @@ function pack(overrides: Partial<ImagePackView> = {}): ImagePackView {
     room_id: '!r:example.org',
     name: 'Blobs',
     avatar_url: 'mxc://a/av',
+    declared_name: 'Blobs',
+    declared_avatar_url: 'mxc://a/av',
+    stable_event: true,
+    legacy_event: false,
     attribution: 'CC BY 4.0',
     usage: ['emoticon', 'sticker'],
     images: [

@@ -20,8 +20,8 @@ export interface PackDraft {
 
 export function packDraft(pack: ImagePackView): PackDraft {
   return {
-    name: pack.name ?? '',
-    avatarUrl: pack.avatar_url,
+    name: pack.declared_name ?? '',
+    avatarUrl: pack.declared_avatar_url,
     attribution: pack.attribution ?? '',
     usage: pack.usage,
     images: pack.images.map((image) => ({

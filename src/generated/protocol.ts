@@ -450,9 +450,13 @@ export type ImagePackView = {
 	room_id: string | null,
 	name: string | null,
 	avatar_url: string | null,
+	declared_name: string | null,
+	declared_avatar_url: string | null,
 	attribution: string | null,
 	usage: ImageUsageView[],
 	images: PackImageView[],
+	stable_event: boolean,
+	legacy_event: boolean,
 };
 
 export type ImageSourcePackReferenceView = {

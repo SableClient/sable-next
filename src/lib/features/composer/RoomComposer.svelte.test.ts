@@ -67,6 +67,10 @@ const packs: ImagePackView[] = [
     room_id: '!room:example.org',
     name: 'Room pack',
     avatar_url: null,
+    declared_name: null,
+    declared_avatar_url: null,
+    stable_event: false,
+    legacy_event: false,
     attribution: null,
     usage: ['emoticon', 'sticker'],
     images: [

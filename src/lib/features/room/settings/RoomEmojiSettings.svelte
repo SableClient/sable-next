@@ -61,6 +61,9 @@
   );
   let roomPacks = $derived(packs.filter((pack) => pack.room_id === roomId));
   let viewingPack = $derived(roomPacks.find((pack) => pack.id === viewing) ?? null);
+  let legacyOnly = $derived(roomPacks.filter((pack) => pack.legacy_event && !pack.stable_event));
+  let legacyCopies = $derived(roomPacks.filter((pack) => pack.legacy_event && pack.stable_event));
+  let confirmingLegacyRemoval = $state(false);
 
   $effect(() => {
     void roomId;
@@ -152,6 +155,40 @@
     if (!pack) return;
     await deletePack(pack);
     packToRemove = null;
+  }
+
+  async function updateLegacy(
+    targets: ImagePackView[],
+    write: (target: string, stateKey: string) => Promise<void>
+  ): Promise<void> {
+    const target = roomId;
+    if (!target || busy) return;
+
+    busy = true;
+    failed = false;
+    try {
+      for (const pack of targets) await write(target, pack.id);
+    } catch (error) {
+      console.warn('[sable room] legacy packs not updated', error);
+      failed = true;
+    } finally {
+      invalidatePacks(core.commands);
+      await load();
+      busy = false;
+    }
+  }
+
+  function convertLegacyPacks(): Promise<void> {
+    return updateLegacy(legacyOnly, async (target, stateKey) => {
+      const legacy = await core.commands.roomStateEvent(target, ROOM_EMOTES_EVENT_TYPE, stateKey);
+      if (typeof legacy !== 'object' || legacy === null || Object.keys(legacy).length === 0) return;
+      await core.commands.sendStateEvent(target, ROOM_IMAGE_PACK_EVENT_TYPE, stateKey, legacy);
+    });
+  }
+
+  async function removeLegacyCopies(): Promise<void> {
+    await updateLegacy(legacyCopies, (_target, stateKey) => clearLegacyPack(stateKey));
+    confirmingLegacyRemoval = false;
   }
 
   async function applyDraft(pack: ImagePackView, draft: PackDraft): Promise<void> {
@@ -256,9 +293,51 @@
           {/each}
         </ul>
       </SettingsSection>
+      {#if canEdit && (legacyOnly.length > 0 || legacyCopies.length > 0)}
+        <SettingsSection
+          headingId="room-emojis-legacy"
+          title={$i18n.t('room.emojisLegacyTitle')}
+          description={$i18n.t('room.emojisLegacyHint')}
+        >
+          <div class="settings-form legacy-actions">
+            {#if legacyOnly.length > 0}
+              <Button
+                disabled={busy}
+                onclick={() => {
+                  void convertLegacyPacks();
+                }}
+              >
+                {$i18n.t('room.emojisLegacyConvert', { count: legacyOnly.length })}
+              </Button>
+            {/if}
+            {#if legacyCopies.length > 0}
+              <Button
+                disabled={busy}
+                onclick={() => {
+                  confirmingLegacyRemoval = true;
+                }}
+              >
+                {$i18n.t('room.emojisLegacyRemove', { count: legacyCopies.length })}
+              </Button>
+            {/if}
+          </div>
+        </SettingsSection>
+      {/if}
     {/if}
   {/if}
 </div>
+
+<ConfirmDialog
+  open={confirmingLegacyRemoval}
+  onOpenChange={(next: boolean) => {
+    if (!next && busy === false) confirmingLegacyRemoval = false;
+  }}
+  title={$i18n.t('room.emojisLegacyRemoveConfirm')}
+  description={$i18n.t('room.emojisLegacyRemoveHint')}
+  confirmLabel={$i18n.t('room.remove')}
+  {busy}
+  onConfirm={() => void removeLegacyCopies()}
+/>
 
 <ConfirmDialog
   open={packToRemove !== null}
@@ -282,6 +361,12 @@
 
   .viewer-header {
     display: flex;
+  }
+
+  .legacy-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-300);
   }
 
   .inline {

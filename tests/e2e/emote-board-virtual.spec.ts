@@ -16,6 +16,10 @@ const packs: ImagePackView[] = packIds.map((id, packIndex) => ({
   room_id: '!room:example.test',
   name: id,
   avatar_url: null,
+  declared_name: null,
+  declared_avatar_url: null,
+  stable_event: false,
+  legacy_event: false,
   attribution: null,
   usage: ['emoticon', 'sticker'],
   images: Array.from({ length: packIndex === 31 ? 60 : 80 }, (_, index) => ({

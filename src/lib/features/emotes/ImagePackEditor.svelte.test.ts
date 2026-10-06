@@ -26,8 +26,12 @@ function pack(usage: ImagePackView['usage']): ImagePackView {
     room_id: '!r:example.org',
     name: 'Stickers',
     avatar_url: null,
+    declared_name: 'Stickers',
+    declared_avatar_url: null,
     attribution: null,
     usage,
+    stable_event: true,
+    legacy_event: false,
     images: [
       {
         shortcode: 'wave',
@@ -62,8 +66,9 @@ async function pickImage(): Promise<void> {
 }
 
 async function appliedDraft(applied: PackDraft[]): Promise<PackDraft> {
-  await userEvent.click(button('Apply changes'));
-  if (applied.length === 0) throw new Error('the draft was never applied');
+  await vi.waitFor(() => {
+    expect(applied).toHaveLength(1);
+  });
   return applied[0];
 }
 
@@ -191,4 +196,57 @@ test('an image can be switched from sticker to emoji and saved', async () => {
   const draft = await appliedDraft(applied);
 
   expect(draft.images[0].usage).toEqual(['emoticon']);
+});
+
+test('an upload never writes the room avatar or name into the pack', async () => {
+  mocks.uploadMedia.mockResolvedValue('mxc://example.org/party');
+  const applied: PackDraft[] = [];
+  render(ImagePackEditor, {
+    props: {
+      pack: {
+        ...pack(['sticker']),
+        name: 'Room',
+        avatar_url: 'mxc://example.org/room',
+        declared_name: null,
+      },
+      canEdit: true,
+      onApply: (draft: PackDraft) => {
+        applied.push(draft);
+        return Promise.resolve();
+      },
+    },
+  });
+
+  await pickImage();
+  const content = packEventContent(await appliedDraft(applied));
+
+  expect(content.pack).toEqual({
+    display_name: undefined,
+    avatar_url: undefined,
+    attribution: undefined,
+    usage: ['sticker'],
+  });
+});
+
+test('an attribution keeps its line breaks', async () => {
+  const applied: PackDraft[] = [];
+  render(ImagePackEditor, {
+    props: {
+      pack: pack(['sticker']),
+      canEdit: true,
+      onApply: (draft: PackDraft) => {
+        applied.push(draft);
+        return Promise.resolve();
+      },
+    },
+  });
+
+  await userEvent.type(
+    screen.getByRole('textbox', { name: 'Attribution' }),
+    'Art by A{Enter}CC BY'
+  );
+  await userEvent.click(button('Apply changes'));
+  const draft = await appliedDraft(applied);
+
+  expect(draft.attribution).toBe('Art by A\nCC BY');
 });

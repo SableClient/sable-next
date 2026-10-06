@@ -1,9 +1,15 @@
 // @vitest-environment happy-dom
 
 import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { ImagePackView, RoomSummary } from '#src/generated/protocol';
+import type {
+  ImagePackView,
+  RoomPermissionsView,
+  RoomPowerLevelsView,
+  RoomSummary,
+} from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
@@ -23,6 +29,10 @@ function pack(overrides: Partial<ImagePackView>): ImagePackView {
     room_id: '!space:home.example',
     name: 'Stickers',
     avatar_url: null,
+    declared_name: 'Stickers',
+    declared_avatar_url: null,
+    stable_event: true,
+    legacy_event: false,
     attribution: null,
     usage: [],
     images: [],
@@ -45,4 +55,32 @@ test('a pack enabled for every room is still listed in its own room', async () =
   expect(await screen.findByText('Stickers')).toBeTruthy();
   expect(screen.queryByText('Parent pack')).toBeNull();
   expect(screen.queryByText('room.emojisEmpty')).toBeNull();
+});
+
+test('a legacy-only pack is copied verbatim to the stable event type', async () => {
+  const legacy = { pack: { display_name: 'Neo', 'x.custom': 1 }, images: {} };
+  core.imagePacks.mockResolvedValue([pack({ stable_event: false, legacy_event: true })]);
+  core.roomStateEvent.mockResolvedValue(legacy);
+  const sendStateEvent = vi.fn<() => Promise<void>>(() => Promise.resolve());
+  Object.assign(core, { sendStateEvent });
+  const room = { room_id: '!space:home.example' } as RoomSummary;
+  const levels = { events: {}, state_default: 50 } as unknown as RoomPowerLevelsView;
+  const permissions = { own_power_level: 100 } as RoomPermissionsView;
+  render(RoomEmojiSettings, { room, permissions, levels });
+
+  await userEvent.click(await screen.findByRole('button', { name: 'room.emojisLegacyConvert:1' }));
+
+  await vi.waitFor(() => {
+    expect(sendStateEvent).toHaveBeenCalledWith(
+      '!space:home.example',
+      'm.room.image_pack',
+      'stickers',
+      legacy
+    );
+  });
+  expect(core.roomStateEvent).toHaveBeenCalledWith(
+    '!space:home.example',
+    'im.ponies.room_emotes',
+    'stickers'
+  );
 });

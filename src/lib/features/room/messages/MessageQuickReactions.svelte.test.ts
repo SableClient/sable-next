@@ -18,6 +18,10 @@ const packs = [
     room_id: null,
     name: 'Cats',
     avatar_url: null,
+    declared_name: null,
+    declared_avatar_url: null,
+    stable_event: false,
+    legacy_event: false,
     attribution: null,
     usage: ['emoticon'],
     images: [
