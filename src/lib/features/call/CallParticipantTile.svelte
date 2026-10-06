@@ -1,6 +1,8 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import MicrophoneSlashIcon from 'phosphor-svelte/lib/MicrophoneSlashIcon';
+  import CornersInIcon from 'phosphor-svelte/lib/CornersInIcon';
+  import CornersOutIcon from 'phosphor-svelte/lib/CornersOutIcon';
   import MonitorIcon from 'phosphor-svelte/lib/MonitorIcon';
   import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
@@ -88,6 +90,17 @@
   let volume = $derived(participantVolume(volumeKey));
   let volumeOpen = $state(false);
   let revealed = $state(false);
+  let element = $state<HTMLLIElement>();
+  let fullscreen = $state(false);
+  const fullscreenAvailable =
+    typeof document !== 'undefined' &&
+    document.fullscreenEnabled &&
+    typeof HTMLElement.prototype.requestFullscreen === 'function';
+
+  function toggleFullscreen(): void {
+    if (fullscreen) void document.exitFullscreen();
+    else void element?.requestFullscreen();
+  }
 
   function reveal(event: PointerEvent): void {
     if (event.pointerType !== 'touch') return;
@@ -158,6 +171,8 @@
   class:revealed
   class:audible={screen && adjustable}
   class:video-on={videoOn}
+  bind:this={element}
+  onfullscreenchange={() => (fullscreen = document.fullscreenElement === element)}
   onpointerup={reveal}
   oncontextmenu={openVolume}
 >
@@ -221,6 +236,21 @@
           <PushPinSlashIcon />
         {:else}
           <PushPinIcon />
+        {/if}
+      </IconButton>
+    {/if}
+    {#if screen && videoOn && fullscreenAvailable}
+      <IconButton
+        variant="ghost"
+        size="small"
+        class="tile-action"
+        label={$i18n.t(fullscreen ? 'call.exitFullscreen' : 'call.fullscreen')}
+        onclick={toggleFullscreen}
+      >
+        {#if fullscreen}
+          <CornersInIcon />
+        {:else}
+          <CornersOutIcon />
         {/if}
       </IconButton>
     {/if}
@@ -327,6 +357,10 @@
 
   .tile.video-on {
     background: var(--picker-black);
+  }
+
+  .tile:fullscreen {
+    border-radius: 0;
   }
 
   .video {
