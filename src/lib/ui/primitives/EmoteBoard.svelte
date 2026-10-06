@@ -345,7 +345,6 @@
 
   function trackGridSize(element: HTMLElement): () => void {
     const update = (size?: ResizeObserverSize): void => {
-      gridWidth = size?.inlineSize ?? element.clientWidth;
       gridHeight = size?.blockSize ?? element.clientHeight;
     };
     update();
@@ -359,10 +358,12 @@
   }
 
   function measureImageRow(list: HTMLElement): () => void {
-    const update = (): void => {
+    const update = (size?: ResizeObserverSize): void => {
       const cell = list.firstElementChild;
       if (!(cell instanceof HTMLElement)) return;
       const style = getComputedStyle(list);
+      // Measure the row width after space is reserved for the scrollbar.
+      gridWidth = size?.inlineSize ?? Number.parseFloat(style.width);
       const width = cell.offsetWidth;
       const gap = Number.parseFloat(style.columnGap) || 0;
       const row = cell.offsetHeight + (Number.parseFloat(style.marginBottom) || 0);
@@ -373,7 +374,9 @@
     update();
     if (typeof ResizeObserver === 'undefined') return () => {};
 
-    const observer = new ResizeObserver(update);
+    const observer = new ResizeObserver(([entry]) => {
+      update(entry.contentBoxSize[0]);
+    });
     observer.observe(list);
     return () => observer.disconnect();
   }
