@@ -89,13 +89,13 @@ function handleAndroidDeleteBackward(view: EditorView): void {
   if (!cursor || cursor.pos <= 0) return;
 
   const position = cursor.pos;
-  const contentSize = view.state.doc.content.size;
+  const doc = view.state.doc;
   window.setTimeout(() => {
     // The IME already changed the DOM, so let ProseMirror's observer handle it.
     const cursorAfter =
       view.state.selection instanceof TextSelection ? view.state.selection.$cursor : null;
     if (!cursorAfter || cursorAfter.pos !== position) return;
-    if (view.state.doc.content.size !== contentSize) return;
+    if (!view.state.doc.eq(doc)) return;
     if (view.someProp('handleKeyDown', (handler) => handler(view, androidBackspaceKeyEvent())))
       return;
     view.dispatch(view.state.tr.delete(position - 1, position));
