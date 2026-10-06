@@ -118,7 +118,6 @@
           ? !!persona && selected?.persona_id === persona.id
           : !selected && !disabled}
       onclick={() => {
-        console.info(onChoose);
         (kind === 'disable' ? onDisable : onChoose)(persona);
       }}
       aria-label={label}

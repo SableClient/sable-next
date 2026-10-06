@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, screen } from '@testing-library/svelte';
 import { renderWithTooltips } from '#lib/test-support/render-with-tooltips.js';
 import { expect, test, vi } from 'vitest';
 
@@ -24,8 +24,8 @@ function persona(id: string, color: string | null): PersonaView {
   };
 }
 
-test('a persona with a name colour is listed in that colour', () => {
-  render(PersonaMenu, {
+test('a persona with a name colour is listed in that colour', async () => {
+  renderWithTooltips(PersonaMenu, {
     personas: [persona('Tinted', '#c04040'), persona('Plain', null)],
     selected: null,
     disabled: false,
@@ -34,19 +34,19 @@ test('a persona with a name colour is listed in that colour', () => {
     onChoose: vi.fn(),
     onDisable: vi.fn(),
   });
-  const search = screen.getByRole('input');
-  search.fill('tinted');
+  const search = screen.getByRole('searchbox');
+  await fireEvent.input(search, { target: { value: 'tinted' } });
 
   const tinted = screen.getByText('Tinted');
   expect(tinted).toHaveClass('tinted');
   expect(tinted.style.getPropertyValue('--name-color-on-light')).not.toBe('');
 
-  search.fill('plain');
+  await fireEvent.input(search, { target: { value: 'plain' } });
   expect(screen.getByText('Plain')).not.toHaveClass('tinted');
 });
 
 test('lists personas with duplicate IDs without crashing', () => {
-  render(PersonaMenu, {
+  renderWithTooltips(PersonaMenu, {
     personas: [persona('duplicate', null), persona('duplicate', null)],
     selected: null,
     disabled: false,
@@ -56,7 +56,7 @@ test('lists personas with duplicate IDs without crashing', () => {
     onDisable: vi.fn(),
   });
 
-  expect(screen.getAllByText('duplicate')).toHaveLength(2);
+  expect(screen.getAllByRole('button', { name: 'duplicate' })).toHaveLength(2);
 });
 
 test('offers the space tab only when the room is in a space', () => {
@@ -78,9 +78,9 @@ test('offers the space tab only when the room is in a space', () => {
     'aria-selected',
     'true'
   );
-  expect(screen.getByText('personas.pickerNone')).toBeInTheDocument();
-  expect(screen.getByText('personas.pickerOffSpace')).toBeInTheDocument();
-  expect(screen.queryByText('personas.pickerOff')).toBeNull();
+  expect(screen.getByRole('button', { name: 'personas.pickerNone' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'personas.pickerOffSpace' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'personas.pickerOff' })).toBeNull();
 });
 
 test('a space that is off marks its off option and not the default', () => {
@@ -96,8 +96,6 @@ test('a space that is off marks its off option and not the default', () => {
   });
 
   const off = screen.getByRole('button', { name: 'personas.pickerOffSpace' });
-  expect(off).toHaveClass("selected");
-  expect(
-    screen.getByRole('button', { name: 'personas.pickerNone' })
-  ).not.toHaveClass("selected");
+  expect(off).toHaveClass('selected');
+  expect(screen.getByRole('button', { name: 'personas.pickerNone' })).not.toHaveClass('selected');
 });
