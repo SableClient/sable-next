@@ -378,6 +378,8 @@
   }
 
   .dock :global(.btn.test-mic) {
+    --button-height: var(--control-height-500);
+
     border-radius: var(--radius-inner);
     border-width: var(--border-width);
   }
