@@ -3,6 +3,7 @@
 </script>
 
 <script lang="ts">
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
 
@@ -101,6 +102,12 @@
 {/snippet}
 
 {#snippet gridItem(persona: PersonaView | null, kind: 'default' | 'disable' | 'offGlobal' | 'off')}
+  {@const label = persona
+    ? persona.display_name
+    : kind === 'disable'
+      ? $i18n.t(scope === 'room' ? 'personas.pickerOff' : 'personas.pickerOffSpace')
+      : $i18n.t(scope === 'account' ? 'personas.pickerOffGlobal' : 'personas.pickerNone')}
+
   <li>
     <button
       type="button"
@@ -114,21 +121,28 @@
         console.info(onChoose);
         (kind === 'disable' ? onDisable : onChoose)(persona);
       }}
+      aria-label={label}
     >
-      {#if persona}
-        <Avatar
-          id={persona.id}
-          src={persona.avatar_url}
-          name={persona.display_name}
-          size="medium"
-        />
-      {:else if kind === 'disable'}
-        <Avatar size="medium"><ProhibitIcon /></Avatar>
-      {:else if kind === 'offGlobal'}
-        <Avatar initials="?" size="medium" />
-      {:else}
-        <Avatar initials="?" size="medium" />
-      {/if}
+      <Tooltip {label} side="bottom">
+        {#snippet trigger({ props: tip })}
+          <div {...tip}>
+            {#if persona}
+              <Avatar
+                id={persona.id}
+                src={persona.avatar_url}
+                name={persona.display_name}
+                size="medium"
+              />
+            {:else if kind === 'disable'}
+              <Avatar id={null} size="medium" name={label}><ProhibitIcon /></Avatar>
+            {:else if kind === 'offGlobal'}
+              <Avatar id={null} initials="?" size="medium" name={label} />
+            {:else}
+              <Avatar id={null} initials="?" size="medium" name={label} />
+            {/if}
+          </div>
+        {/snippet}
+      </Tooltip>
     </button>
   </li>
 {/snippet}

@@ -23,6 +23,7 @@ function persona(id: string, triggers: PersonaTriggerView[] = []): PersonaView {
     color_on_dark: null,
     triggers,
     pluralkit: null,
+    last_used: null,
   };
 }
 

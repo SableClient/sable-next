@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { render, screen } from '@testing-library/svelte';
+import { renderWithTooltips } from '#lib/test-support/render-with-tooltips.js';
 import { expect, test, vi } from 'vitest';
 
 import type { PersonaView } from '#src/generated/protocol';
@@ -19,6 +20,7 @@ function persona(id: string, color: string | null): PersonaView {
     color_on_dark: color,
     triggers: [],
     pluralkit: null,
+    last_used: null,
   };
 }
 
@@ -32,10 +34,14 @@ test('a persona with a name colour is listed in that colour', () => {
     onChoose: vi.fn(),
     onDisable: vi.fn(),
   });
+  const search = screen.getByRole('input');
+  search.fill('tinted');
 
   const tinted = screen.getByText('Tinted');
   expect(tinted).toHaveClass('tinted');
   expect(tinted.style.getPropertyValue('--name-color-on-light')).not.toBe('');
+
+  search.fill('plain');
   expect(screen.getByText('Plain')).not.toHaveClass('tinted');
 });
 
@@ -63,11 +69,11 @@ test('offers the space tab only when the room is in a space', () => {
     onChoose: vi.fn(),
     onDisable: vi.fn(),
   };
-  const { unmount } = render(PersonaMenu, props);
+  const { unmount } = renderWithTooltips(PersonaMenu, props);
   expect(screen.queryByRole('tab', { name: 'personas.scopeSpace' })).toBeNull();
   unmount();
 
-  render(PersonaMenu, { ...props, hasSpace: true });
+  renderWithTooltips(PersonaMenu, { ...props, hasSpace: true });
   expect(screen.getByRole('tab', { name: 'personas.scopeSpace' })).toHaveAttribute(
     'aria-selected',
     'true'
@@ -78,7 +84,7 @@ test('offers the space tab only when the room is in a space', () => {
 });
 
 test('a space that is off marks its off option and not the default', () => {
-  render(PersonaMenu, {
+  renderWithTooltips(PersonaMenu, {
     personas: [],
     selected: null,
     disabled: true,
@@ -90,8 +96,8 @@ test('a space that is off marks its off option and not the default', () => {
   });
 
   const off = screen.getByRole('button', { name: 'personas.pickerOffSpace' });
-  expect(off.querySelectorAll('svg')).toHaveLength(2);
+  expect(off).toHaveClass("selected");
   expect(
-    screen.getByRole('button', { name: 'personas.pickerNone' }).querySelectorAll('svg')
-  ).toHaveLength(0);
+    screen.getByRole('button', { name: 'personas.pickerNone' })
+  ).not.toHaveClass("selected");
 });

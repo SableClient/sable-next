@@ -659,10 +659,10 @@ export class Conversation {
         .catch(() => {});
     }
 
-    let personaUpdatedTimestamp = persona;
+    const personaUpdatedTimestamp = persona;
     personaUpdatedTimestamp.last_used = Date.now();
 
-    personas.save(personaUpdatedTimestamp, persona.id)
+    personas.save(personaUpdatedTimestamp, persona.id).catch(failed('updating persona timestamp'));
 
     return {
       body: proxied?.body ?? body,

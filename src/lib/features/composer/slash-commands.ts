@@ -800,6 +800,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
           color_on_dark: existing?.color_on_dark ?? null,
           triggers: existing?.triggers ?? [],
           pluralkit: existing?.pluralkit ?? null,
+          last_used: existing?.last_used ?? null,
         },
         existing ? id : null
       );

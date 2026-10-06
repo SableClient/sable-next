@@ -59,6 +59,7 @@ function setup(
     selectionFor: () => null,
     disabledIn: () => false,
     select: () => Promise.resolve(),
+    save: () => Promise.resolve(),
     ...store,
   };
   const personas = {
@@ -540,6 +541,7 @@ function proxying() {
         color_on_dark: null,
         triggers: [{ prefix: 'k:', suffix: null, keep_trigger: false }],
         pluralkit: null,
+        last_used: null,
       },
     ],
   });
@@ -593,6 +595,7 @@ test('personas off in a room ignore the selection and proxy triggers', async () 
     color_on_dark: null,
     triggers: [{ prefix: 'k:', suffix: null, keep_trigger: false }],
     pluralkit: null,
+    last_used: null,
   };
   const select = vi.fn(() => Promise.resolve());
   const { conversation, sendMessage } = setup([], '@kris:example.org', {

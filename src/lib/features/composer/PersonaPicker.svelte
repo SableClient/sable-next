@@ -53,7 +53,9 @@
       now: Date.now(),
     }) ?? null
   );
-  let sortedPersonas = $derived(personas.personas.toSorted((a, b) => (b.last_used ?? 0) - (a.last_used ?? 0)) );
+  let sortedPersonas = $derived(
+    personas.personas.slice().sort((a, b) => (b.last_used ?? 0) - (a.last_used ?? 0))
+  );
   let shown = $derived(edit ? edit.current : active);
   let label = $derived(
     shown
