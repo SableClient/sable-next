@@ -19,6 +19,7 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import Switcher from '#lib/ui/primitives/Switcher.svelte';
   import MemberIdentityRow from '../members/MemberIdentityRow.svelte';
   import {
     MEMBERSHIP_FILTERS,
@@ -346,21 +347,19 @@
 </script>
 
 <div class="section">
-  <div class="tabs" role="tablist" aria-label={$i18n.t('room.settingsMembers')}>
-    {#each MEMBERSHIP_FILTERS as entry (entry)}
-      <button
-        type="button"
-        role="tab"
-        aria-selected={tab === entry}
-        class="choice"
-        onclick={() => {
-          tab = entry;
-          search = '';
-        }}
-      >
-        {$i18n.t(MEMBERSHIP_FILTER_LABELS[entry])}
-      </button>
-    {/each}
+  <div class="tabs">
+    <Switcher
+      label={$i18n.t('room.settingsMembers')}
+      items={MEMBERSHIP_FILTERS.map((entry) => ({
+        value: entry,
+        label: $i18n.t(MEMBERSHIP_FILTER_LABELS[entry]),
+      }))}
+      value={tab}
+      onValueChange={(next) => {
+        tab = next as MembershipFilter;
+        search = '';
+      }}
+    />
     <div class="sort">
       <ActionMenu label={$i18n.t('timeline.memberSort')}>
         {#snippet trigger({ props })}

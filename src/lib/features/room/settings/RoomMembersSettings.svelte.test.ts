@@ -77,7 +77,7 @@ test('offers approval and denial for join requests', async () => {
   render(RoomMembersSettings, { room, permissions: { ...permissions, can_invite: true } });
   const user = userEvent.setup();
 
-  await user.click(screen.getByRole('tab', { name: 'Requests' }));
+  await user.click(screen.getByRole('radio', { name: 'Requests' }));
   await screen.findByText('Alice');
   expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Deny' })).toBeInTheDocument();
@@ -90,7 +90,7 @@ test.each(['Approve', 'Deny'])('answers a join request with %s', async (action) 
   core.sendStateEvent.mockResolvedValue('$denied:example.org');
   render(RoomMembersSettings, { room, permissions: { ...permissions, can_invite: true } });
   const user = userEvent.setup();
-  await user.click(screen.getByRole('tab', { name: 'Requests' }));
+  await user.click(screen.getByRole('radio', { name: 'Requests' }));
   await screen.findByText('Alice');
   await user.click(screen.getByRole('button', { name: action }));
 
