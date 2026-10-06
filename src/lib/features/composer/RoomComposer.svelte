@@ -34,7 +34,11 @@
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { enterInsertsNewline } from '#lib/settings/enter-key.svelte.js';
-  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import {
+    preferences,
+    setPreference,
+    type ImageMetadata,
+  } from '#lib/settings/preferences.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { REORDER_DRAG_TYPE } from '#lib/ui/drag-list.js';
@@ -70,6 +74,7 @@
     filesFrom,
     restoreFile,
     stageFiles,
+    setMetadata,
     toggleSpoiler,
     unstageFile,
     type StagedFile,
@@ -906,7 +911,7 @@
         if (gallery) {
           await onSendGallery(
             roomId,
-            await Promise.all(unsent.map((item) => stripMetadata(item.file))),
+            await Promise.all(unsent.map((item) => stripMetadata(item.file, item.metadata))),
             {
               caption: message.body || null,
               formattedCaption: message.formatted,
@@ -921,7 +926,7 @@
           const [next, ...rest] = unsent;
           await onSendAttachment(
             roomId,
-            await stripMetadata(next.file),
+            await stripMetadata(next.file, next.metadata),
             captioned
               ? {
                   caption: message.body,
@@ -990,7 +995,7 @@
         delayIds.push(
           await core.commands.scheduleAttachment(
             roomId,
-            await stripMetadata(attachment.file),
+            await stripMetadata(attachment.file, attachment.metadata),
             dueTs,
             attachment.spoiler
           )
@@ -1118,7 +1123,7 @@
       }
 
       error = null;
-      staged = stageFiles(staged, files, () => nextStagedId++);
+      staged = stageFiles(staged, files, () => nextStagedId++, preferences.imageMetadata);
     } catch (cause) {
       if (current()) {
         const failure = sendFailure(cause);
@@ -1483,6 +1488,9 @@
             }}
             onToggleSpoiler={(id: number) => {
               staged = toggleSpoiler(staged, id);
+            }}
+            onSetMetadata={(id: number, metadata: ImageMetadata) => {
+              staged = setMetadata(staged, id, metadata);
             }}
           />
         {/if}

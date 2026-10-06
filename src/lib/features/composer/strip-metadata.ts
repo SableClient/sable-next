@@ -1,9 +1,12 @@
+import type { ImageMetadata } from '#lib/settings/preferences.svelte.js';
+
 type Bytes = Uint8Array<ArrayBuffer>;
+type Scope = Exclude<ImageMetadata, 'keep'>;
 
 const PNG_SIGNATURE = '\x89PNG\r\n\x1a\n';
-const PNG_METADATA_CHUNKS = new Set(['eXIf', 'tEXt', 'zTXt', 'iTXt', 'tIME']);
+const PNG_TEXT_CHUNKS = new Set(['eXIf', 'tEXt', 'zTXt', 'iTXt', 'tIME']);
 const WEBP_METADATA_CHUNKS = new Set(['EXIF', 'XMP ']);
-const JPEG_DROPPED_MARKERS = new Set([0xe1, 0xed, 0xfe]);
+const JPEG_METADATA_MARKERS = new Set([0xe1, 0xed, 0xfe]);
 const HEIF_BRANDS = new Set([
   'heic',
   'heix',
@@ -16,11 +19,17 @@ const HEIF_BRANDS = new Set([
   'avif',
 ]);
 const XMP_CONTENT_TYPE = 'application/rdf+xml';
+const GPS_IFD_TAG = 0x8825;
+const ORIENTATION_TAG = 0x0112;
+const TIFF_TYPE_SIZES = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8];
 
-export async function stripMetadata(file: File): Promise<File> {
-  if (!file.type.startsWith('image/') && !/\.(heic|heif|avif)$/i.test(file.name)) return file;
+export const canStrip = (file: File): boolean =>
+  file.type.startsWith('image/') || /\.(heic|heif|avif)$/i.test(file.name);
+
+export async function stripMetadata(file: File, mode: ImageMetadata): Promise<File> {
+  if (mode === 'keep' || !canStrip(file)) return file;
   try {
-    const stripped = stripBytes(new Uint8Array(await file.arrayBuffer()));
+    const stripped = stripBytes(new Uint8Array(await file.arrayBuffer()), mode);
     if (!stripped) return file;
     return new File([stripped], file.name, { type: file.type, lastModified: file.lastModified });
   } catch {
@@ -28,11 +37,14 @@ export async function stripMetadata(file: File): Promise<File> {
   }
 }
 
-export function stripBytes(bytes: Bytes): Bytes | null {
-  if (bytes[0] === 0xff && bytes[1] === 0xd8) return stripJpeg(bytes);
-  if (ascii(bytes, 0, 8) === PNG_SIGNATURE) return stripPng(bytes);
-  if (ascii(bytes, 0, 4) === 'RIFF' && ascii(bytes, 8, 4) === 'WEBP') return stripWebp(bytes);
-  if (ascii(bytes, 4, 4) === 'ftyp' && HEIF_BRANDS.has(ascii(bytes, 8, 4))) return stripHeif(bytes);
+export function stripBytes(bytes: Bytes, scope: Scope): Bytes | null {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return stripJpeg(bytes, scope);
+  if (ascii(bytes, 0, 8) === PNG_SIGNATURE) return stripPng(bytes, scope);
+  if (ascii(bytes, 0, 4) === 'RIFF' && ascii(bytes, 8, 4) === 'WEBP')
+    return stripWebp(bytes, scope);
+  if (ascii(bytes, 4, 4) === 'ftyp' && HEIF_BRANDS.has(ascii(bytes, 8, 4))) {
+    return stripHeif(bytes, scope);
+  }
   return null;
 }
 
@@ -54,7 +66,55 @@ function concat(parts: readonly Uint8Array[]): Bytes {
   return out;
 }
 
-function stripJpeg(bytes: Bytes): Bytes | null {
+const mentionsLocation = (bytes: Uint8Array): boolean =>
+  ascii(bytes, 0, bytes.length).includes('GPS');
+
+function tiffEntries(
+  tiff: Uint8Array,
+  ifd: number
+): { view: DataView; little: boolean; at: number[] } {
+  const view = viewOf(tiff);
+  const little = tiff[0] === 0x49;
+  const at: number[] = [];
+  if (ifd + 2 <= tiff.length) {
+    const count = view.getUint16(ifd, little);
+    for (let index = 0; index < count && ifd + 2 + (index + 1) * 12 <= tiff.length; index += 1) {
+      at.push(ifd + 2 + index * 12);
+    }
+  }
+  return { view, little, at };
+}
+
+function tiffTag(
+  tiff: Uint8Array,
+  tag: number
+): { view: DataView; little: boolean; entry: number } | null {
+  if (tiff.length < 8) return null;
+  const { view, little, at } = tiffEntries(tiff, viewOf(tiff).getUint32(4, tiff[0] === 0x49));
+  const entry = at.find((position) => view.getUint16(position, little) === tag);
+  return entry === undefined ? null : { view, little, entry };
+}
+
+function exifOrientation(tiff: Uint8Array): number {
+  const found = tiffTag(tiff, ORIENTATION_TAG);
+  return found ? found.view.getUint16(found.entry + 8, found.little) : 1;
+}
+
+function clearGps(tiff: Uint8Array): void {
+  const found = tiffTag(tiff, GPS_IFD_TAG);
+  if (!found) return;
+  const ifd = found.view.getUint32(found.entry + 8, found.little);
+  const gps = tiffEntries(tiff, ifd);
+  for (const entry of gps.at) {
+    const type = gps.view.getUint16(entry + 2, gps.little);
+    const size = (TIFF_TYPE_SIZES[type] ?? 1) * gps.view.getUint32(entry + 4, gps.little);
+    const value = gps.view.getUint32(entry + 8, gps.little);
+    if (size > 4 && value + size <= tiff.length) tiff.fill(0, value, value + size);
+  }
+  tiff.fill(0, ifd, ifd + 2 + gps.at.length * 12);
+}
+
+function stripJpeg(bytes: Bytes, scope: Scope): Bytes | null {
   const parts: Uint8Array[] = [bytes.subarray(0, 2)];
   let orientation = 1;
   let position = 2;
@@ -72,10 +132,17 @@ function stripJpeg(bytes: Bytes): Bytes | null {
     }
     const end = position + 2 + viewOf(bytes).getUint16(position + 2);
     if (end < position + 4 || end > bytes.length) return null;
-    if (marker === 0xe1 && ascii(bytes, position + 4, 6) === 'Exif\0\0') {
-      orientation = exifOrientation(bytes.subarray(position + 10, end));
+    const segment = bytes.slice(position, end);
+    const isExif = marker === 0xe1 && ascii(segment, 4, 6) === 'Exif\0\0';
+    if (isExif) orientation = exifOrientation(segment.subarray(10));
+    if (scope === 'all') {
+      if (!JPEG_METADATA_MARKERS.has(marker)) parts.push(segment);
+    } else if (isExif) {
+      clearGps(segment.subarray(10));
+      parts.push(segment);
+    } else if (marker !== 0xe1 || !mentionsLocation(segment)) {
+      parts.push(segment);
     }
-    if (!JPEG_DROPPED_MARKERS.has(marker)) parts.push(bytes.subarray(position, end));
     position = end;
   }
   return null;
@@ -91,44 +158,49 @@ function orientationSegment(orientation: number): Uint8Array {
   view.setUint16(12, 0x2a);
   view.setUint32(14, 8);
   view.setUint16(18, 1);
-  view.setUint16(20, 0x0112);
+  view.setUint16(20, ORIENTATION_TAG);
   view.setUint16(22, 3);
   view.setUint32(24, 1);
   view.setUint16(28, orientation);
   return segment;
 }
 
-function exifOrientation(tiff: Uint8Array): number {
-  if (tiff.length < 8) return 1;
-  const little = tiff[0] === 0x49;
-  const view = viewOf(tiff);
-  const ifd = view.getUint32(4, little);
-  if (ifd + 2 > tiff.length) return 1;
-  const count = view.getUint16(ifd, little);
-  for (let index = 0; index < count; index += 1) {
-    const entry = ifd + 2 + index * 12;
-    if (entry + 12 > tiff.length) return 1;
-    if (view.getUint16(entry, little) === 0x0112) return view.getUint16(entry + 8, little);
-  }
-  return 1;
+const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let bit = 0; bit < 8; bit += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
-function stripPng(bytes: Bytes): Bytes | null {
+function stripPng(bytes: Bytes, scope: Scope): Bytes | null {
   const parts: Uint8Array[] = [bytes.subarray(0, 8)];
   const view = viewOf(bytes);
   let position = 8;
   while (position + 12 <= bytes.length) {
     const end = position + 12 + view.getUint32(position);
     if (end > bytes.length) return null;
-    if (!PNG_METADATA_CHUNKS.has(ascii(bytes, position + 4, 4))) {
-      parts.push(bytes.subarray(position, end));
+    const type = ascii(bytes, position + 4, 4);
+    const chunk = bytes.slice(position, end);
+    if (scope === 'all') {
+      if (!PNG_TEXT_CHUNKS.has(type)) parts.push(chunk);
+    } else if (type === 'eXIf') {
+      clearGps(chunk.subarray(8, chunk.length - 4));
+      viewOf(chunk).setUint32(chunk.length - 4, crc32(chunk.subarray(4, chunk.length - 4)));
+      parts.push(chunk);
+    } else if (type !== 'iTXt' || !mentionsLocation(chunk)) {
+      parts.push(chunk);
     }
     position = end;
   }
   return position === bytes.length ? concat(parts) : null;
 }
 
-function stripWebp(bytes: Bytes): Bytes | null {
+function stripWebp(bytes: Bytes, scope: Scope): Bytes | null {
   const parts: Uint8Array[] = [bytes.subarray(0, 12)];
   const view = viewOf(bytes);
   let position = 12;
@@ -137,9 +209,15 @@ function stripWebp(bytes: Bytes): Bytes | null {
     const end = position + 8 + size + (size & 1);
     if (end > bytes.length) return null;
     const type = ascii(bytes, position, 4);
-    if (!WEBP_METADATA_CHUNKS.has(type)) {
-      const chunk = bytes.slice(position, end);
+    const chunk = bytes.slice(position, end);
+    if (scope === 'all') {
+      if (!WEBP_METADATA_CHUNKS.has(type)) parts.push(chunk);
       if (type === 'VP8X') chunk[8] &= ~0x0c;
+    } else if (type === 'EXIF') {
+      const prefix = ascii(chunk, 8, 6) === 'Exif\0\0' ? 6 : 0;
+      clearGps(chunk.subarray(8 + prefix, 8 + size));
+      parts.push(chunk);
+    } else if (type !== 'XMP ' || !mentionsLocation(chunk)) {
       parts.push(chunk);
     }
     position = end;
@@ -186,9 +264,9 @@ function cString(bytes: Uint8Array, start: number, end: number): { text: string;
   return { text: ascii(bytes, start, stop - start), next: stop + 1 };
 }
 
-function metadataItems(bytes: Uint8Array, iinf: Box): Set<number> {
+function metadataItems(bytes: Uint8Array, iinf: Box): Map<number, 'exif' | 'xmp'> {
   const view = viewOf(bytes);
-  const items = new Set<number>();
+  const items = new Map<number, 'exif' | 'xmp'>();
   const entries = view.getUint8(iinf.body) === 0 ? 2 : 4;
   for (const infe of boxes(bytes, iinf.body + 4 + entries, iinf.end)) {
     const version = view.getUint8(infe.body);
@@ -198,17 +276,15 @@ function metadataItems(bytes: Uint8Array, iinf: Box): Set<number> {
     const typeAt = infe.body + 4 + idSize + 2;
     const type = ascii(bytes, typeAt, 4);
     const name = cString(bytes, typeAt + 4, infe.end);
-    if (
-      type === 'Exif' ||
-      (type === 'mime' && cString(bytes, name.next, infe.end).text === XMP_CONTENT_TYPE)
-    ) {
-      items.add(id);
+    if (type === 'Exif') items.set(id, 'exif');
+    else if (type === 'mime' && cString(bytes, name.next, infe.end).text === XMP_CONTENT_TYPE) {
+      items.set(id, 'xmp');
     }
   }
   return items;
 }
 
-function stripHeif(bytes: Bytes): Bytes | null {
+function stripHeif(bytes: Bytes, scope: Scope): Bytes | null {
   const meta = boxes(bytes, 0, bytes.length).find((box) => box.type === 'meta');
   if (!meta) return null;
   const inner = boxes(bytes, meta.body + 4, meta.end);
@@ -247,8 +323,13 @@ function stripHeif(bytes: Bytes): Bytes | null {
       const length = read(at, lengthSize);
       at += lengthSize;
       const start = base + offset;
-      if (targets.has(id) && fromFile && start + length <= out.length)
-        out.fill(0, start, start + length);
+      const kind = targets.get(id);
+      if (!kind || !fromFile || start + length > out.length) continue;
+      const data = out.subarray(start, start + length);
+      if (scope === 'all' || (kind === 'xmp' && mentionsLocation(data))) data.fill(0);
+      else if (kind === 'exif' && length > 4) {
+        clearGps(data.subarray(4 + viewOf(data).getUint32(0)));
+      }
     }
   }
   return out;

@@ -11,7 +11,14 @@ import { SCHEDULE_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import { guardTouchClicks } from '#lib/ui/trailing-click.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
-import { cleanup, fireEvent, render, screen, type RenderResult } from '@testing-library/svelte';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+  type RenderResult,
+} from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -1400,6 +1407,67 @@ test('a document carries no spoiler control', async () => {
   await pick(new File(['report'], 'report.pdf', { type: 'application/pdf' }));
 
   expect(document.querySelector('.staged-spoiler')).toBeNull();
+});
+
+test('a staged picture offers a metadata choice per file', async () => {
+  setup({ roomId: '!room:example.org' });
+
+  await pick(new File(['x'], 'cat.png', { type: 'image/png' }));
+  await press(document.querySelector('.staged-options'));
+
+  await press(await screen.findByRole('menuitem', { name: 'Metadata' }));
+  const rows = await screen.findAllByRole('menuitem', { name: /location|metadata|Keep/ });
+  expect(rows.map((row) => row.textContent.trim())).toEqual([
+    '✓ Remove location',
+    'Remove all metadata',
+    'Keep all metadata',
+  ]);
+  await press(rows[2]);
+  await vi.waitFor(() => {
+    expect(document.querySelector('.staged-options')?.className).toContain('staged-spoiler-on');
+  });
+});
+
+test('on a narrow screen the metadata choice is made in a bottom sheet', async () => {
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+  setup({ roomId: '!room:example.org' });
+
+  await pick(new File(['x'], 'cat.png', { type: 'image/png' }));
+  await press(document.querySelector('.staged-options'));
+  await press(await screen.findByRole('menuitem', { name: 'Metadata' }));
+  await press(await screen.findByRole('menuitemradio', { name: 'Keep all metadata' }));
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('.staged-options')?.className).toContain('staged-spoiler-on');
+  });
+  vi.unstubAllGlobals();
+});
+
+test('the staged viewer offers the same metadata choice', async () => {
+  setup({ roomId: '!room:example.org' });
+
+  await pick(new File(['x'], 'cat.png', { type: 'image/png' }));
+  await press(document.querySelector('.thumb'));
+  const viewer = await screen.findByRole('dialog');
+  await press(within(viewer).getByRole('button', { name: /Options for cat.png/ }));
+  await press(await screen.findByRole('menuitem', { name: 'Metadata' }));
+  await press(await screen.findByRole('menuitem', { name: 'Remove all metadata' }));
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('.staged-options')?.className).toContain('staged-spoiler-on');
+  });
+});
+
+test('a document carries no metadata control', async () => {
+  setup({ roomId: '!room:example.org' });
+
+  await pick(new File(['report'], 'report.pdf', { type: 'application/pdf' }));
+
+  expect(document.querySelector('.staged-options')).toBeNull();
 });
 
 test('a send tap sends immediately', async () => {

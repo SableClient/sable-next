@@ -5,11 +5,13 @@
   import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
   import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
   import ImageBrokenIcon from 'phosphor-svelte/lib/ImageBrokenIcon';
+  import SlidersHorizontalIcon from 'phosphor-svelte/lib/SlidersHorizontalIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
+  import { preferences, type ImageMetadata } from '#lib/settings/preferences.svelte.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -21,6 +23,8 @@
   } from '#lib/ui/swipe-gesture.js';
 
   import { objectSource, previewKind, type StagedFile } from './composer-files';
+  import StagedImageOptions from './StagedImageOptions.svelte';
+  import { canStrip } from './strip-metadata';
 
   interface Props {
     files: readonly StagedFile[];
@@ -28,9 +32,10 @@
     onClose: () => void;
     onRemove: (id: number) => void;
     onToggleSpoiler: (id: number) => void;
+    onSetMetadata: (id: number, metadata: ImageMetadata) => void;
   }
 
-  let { files, selectedId, onClose, onRemove, onToggleSpoiler }: Props = $props();
+  let { files, selectedId, onClose, onRemove, onToggleSpoiler, onSetMetadata }: Props = $props();
 
   let currentId = $state(untrack(() => selectedId));
   let index = $derived(
@@ -248,6 +253,23 @@
             <EyeSlashIcon aria-hidden="true" />
             {$i18n.t('composer.spoiler')}
           </Button>
+          {#if kind === 'image' && canStrip(item.file)}
+            <StagedImageOptions {item} {onSetMetadata}>
+              {#snippet trigger({ props })}
+                <Button
+                  {...props}
+                  variant="ghost"
+                  class={[
+                    item.metadata !== preferences.imageMetadata && 'staged-viewer-spoiler-on',
+                  ]}
+                  aria-label={$i18n.t('composer.imageOptions', { name: item.file.name })}
+                >
+                  <SlidersHorizontalIcon aria-hidden="true" />
+                  {$i18n.t('composer.options')}
+                </Button>
+              {/snippet}
+            </StagedImageOptions>
+          {/if}
           <Button
             variant="ghost"
             aria-label={$i18n.t('composer.removeAttachment', { name: item.file.name })}

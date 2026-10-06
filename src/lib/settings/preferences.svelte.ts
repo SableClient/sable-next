@@ -16,6 +16,7 @@ export type ThreadPresentation = 'timeline' | 'panel';
 export type TimelineLayout = 'modern' | 'compact' | 'bubble';
 export type MessageSpacing = 'compact' | 'cozy' | 'roomy';
 export type MediaAutoLoad = 'on' | 'private' | 'off';
+export type ImageMetadata = 'location' | 'all' | 'keep';
 export type TimelineEmoteSize = 'default' | '20' | '24' | '32' | '48' | '64';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type WeekStart = 'sunday' | 'monday' | 'saturday';
@@ -251,6 +252,7 @@ export interface Preferences {
   scheduleInEncryptedRooms: boolean;
   sendAttachmentAsCaption: boolean;
   sendAttachmentsAsGallery: boolean;
+  imageMetadata: ImageMetadata;
 
   personaPicker: boolean;
   personaProxying: boolean;
@@ -370,6 +372,7 @@ type EnumPreference = Exclude<
 
 const ENUMS = {
   mediaAutoLoad: ['on', 'private', 'off'],
+  imageMetadata: ['location', 'all', 'keep'],
   language: languageValues,
   layout: ['modern', 'compact', 'bubble'],
   threadPresentation: ['timeline', 'panel'],
@@ -522,6 +525,7 @@ const DEFAULTS: Preferences = {
   scheduleInEncryptedRooms: true,
   sendAttachmentAsCaption: true,
   sendAttachmentsAsGallery: true,
+  imageMetadata: 'location',
 
   personaPicker: true,
   personaProxying: false,

@@ -1,7 +1,10 @@
+import type { ImageMetadata } from '#lib/settings/preferences.svelte.js';
+
 export interface StagedFile {
   id: number;
   file: File;
   spoiler: boolean;
+  metadata: ImageMetadata;
 }
 
 export function filesFrom(transfer: DataTransfer | null): File[] {
@@ -17,9 +20,10 @@ export function filesFrom(transfer: DataTransfer | null): File[] {
 export function stageFiles(
   staged: readonly StagedFile[],
   files: readonly File[],
-  nextId: () => number
+  nextId: () => number,
+  metadata: ImageMetadata = 'location'
 ): StagedFile[] {
-  return [...staged, ...files.map((file) => ({ id: nextId(), file, spoiler: false }))];
+  return [...staged, ...files.map((file) => ({ id: nextId(), file, spoiler: false, metadata }))];
 }
 
 export function unstageFile(staged: readonly StagedFile[], id: number): StagedFile[] {
@@ -28,6 +32,14 @@ export function unstageFile(staged: readonly StagedFile[], id: number): StagedFi
 
 export function toggleSpoiler(staged: readonly StagedFile[], id: number): StagedFile[] {
   return staged.map((item) => (item.id === id ? { ...item, spoiler: !item.spoiler } : item));
+}
+
+export function setMetadata(
+  staged: readonly StagedFile[],
+  id: number,
+  metadata: ImageMetadata
+): StagedFile[] {
+  return staged.map((item) => (item.id === id ? { ...item, metadata } : item));
 }
 
 export type PreviewKind = 'image' | 'video';

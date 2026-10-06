@@ -29,6 +29,7 @@ import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
 import KeyReturnIcon from 'phosphor-svelte/lib/KeyReturnIcon';
 import KeyboardIcon from 'phosphor-svelte/lib/KeyboardIcon';
 import LayoutIcon from 'phosphor-svelte/lib/LayoutIcon';
+import MapPinIcon from 'phosphor-svelte/lib/MapPinIcon';
 import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 import LinkSimpleIcon from 'phosphor-svelte/lib/LinkSimpleIcon';
 import LockIcon from 'phosphor-svelte/lib/LockIcon';
@@ -1097,6 +1098,19 @@ export const settingsCategories: SettingsCategory[] = [
         icon: SquaresFourIcon,
         name: 'settings.sendAttachmentsAsGallery',
         type: 'boolean',
+      },
+      {
+        key: 'imageMetadata',
+        section: 'sending',
+        icon: MapPinIcon,
+        name: 'settings.imageMetadata',
+        description: 'settings.imageMetadataHint',
+        type: 'select',
+        options: [
+          { value: 'location', label: 'settings.imageMetadataLocation' },
+          { value: 'all', label: 'settings.imageMetadataAll' },
+          { value: 'keep', label: 'settings.imageMetadataKeep' },
+        ],
       },
       {
         key: 'composerFormatButton',
