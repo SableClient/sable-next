@@ -5,6 +5,7 @@
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { suppressBanners } from '#lib/ui/banner-suppression.svelte.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { leaveUnlessUnsaved } from '#lib/ui/unsaved-guard.js';
 
   type DialogVariant = 'drawer' | 'settings' | 'verification' | 'sheet' | 'fullscreen';
 
@@ -34,6 +35,18 @@
     children,
   }: Props = $props();
 
+  function setOpen(next: boolean | undefined): void {
+    if (next !== false) {
+      open = next;
+      onOpenChange?.(true);
+      return;
+    }
+    leaveUnlessUnsaved(() => {
+      open = false;
+      onOpenChange?.(false);
+    });
+  }
+
   function submit(event: SubmitEvent): void {
     event.preventDefault();
     onConfirm?.();
@@ -60,7 +73,7 @@
   );
 </script>
 
-<Dialog.Root bind:open {onOpenChange}>
+<Dialog.Root bind:open={() => open, setOpen}>
   <Dialog.Portal>
     <Dialog.Overlay class={['dialog-backdrop', `dialog-backdrop-${variant}`]} {...overlayLayer()} />
     <Dialog.Content

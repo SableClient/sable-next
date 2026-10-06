@@ -32,6 +32,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { leaveUnlessUnsaved } from '#lib/ui/unsaved-guard.js';
 
   import { canSendState } from './permission-groups';
 
@@ -206,7 +207,9 @@
       <Button
         size="small"
         onclick={() => {
-          viewing = null;
+          leaveUnlessUnsaved(() => {
+            viewing = null;
+          });
         }}
       >
         <ArrowLeftIcon />

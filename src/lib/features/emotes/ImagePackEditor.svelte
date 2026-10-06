@@ -13,6 +13,8 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
@@ -21,6 +23,7 @@
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { holdUnsaved } from '#lib/ui/unsaved-guard.js';
   import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
 
   import {
@@ -66,6 +69,14 @@
 
   let dirty = $derived(draft !== null);
   let rejected = $derived(draft === null ? null : invalidShortcode(draft.images));
+  let leaving = $state<(() => void) | null>(null);
+
+  holdUnsaved({
+    dirty: () => canEdit && dirty && leaving === null,
+    ask: (proceed) => {
+      leaving = proceed;
+    },
+  });
 
   function edit(next: PackDraft): void {
     draft = next;
@@ -77,29 +88,9 @@
     return current.images.some((image) => image.shortcode === candidate);
   }
 
-  async function persist(change: (base: PackDraft) => PackDraft): Promise<void> {
-    await onApply?.(change($state.snapshot(saved)));
-    if (draft !== null) draft = change(draft);
-  }
-
-  async function save(change: (base: PackDraft) => PackDraft): Promise<void> {
-    if (busy) return;
-
-    busy = true;
-    failed = false;
-    try {
-      await persist(change);
-    } catch (error) {
-      console.warn('[sable emotes] the pack could not be saved', error);
-      failed = true;
-    } finally {
-      busy = false;
-    }
-  }
-
   function toggleUsage(usage: ImageUsageView, on: boolean): void {
-    if (togglePackUsage(current, usage, on) === null) return;
-    void save((base) => togglePackUsage(base, usage, on) ?? base);
+    const next = togglePackUsage(current, usage, on);
+    if (next !== null) edit(next);
   }
 
   function imageUsageChoice(image: PackImageDraft): string {
@@ -107,30 +98,34 @@
   }
 
   function chooseImageUsage(image: PackImageDraft, choice: string): void {
-    const usage = choice === 'both' ? ALL_USAGES : [choice as ImageUsageView];
-    void save((base) => setImageUsage(base, image.shortcode, usage));
+    edit(
+      setImageUsage(
+        current,
+        image.shortcode,
+        choice === 'both' ? ALL_USAGES : [choice as ImageUsageView]
+      )
+    );
   }
 
   function removeImage(target: PackImageDraft): void {
-    void save((base) => ({
-      ...base,
-      images: base.images.filter((image) => image.shortcode !== target.shortcode),
-    }));
+    edit({
+      ...current,
+      images: current.images.filter((image) => image.shortcode !== target.shortcode),
+    });
   }
 
   function commitRename(target: PackImageDraft): void {
-    if (renaming !== target.shortcode) return;
     const wanted = normalizeShortcode(renameDraft);
     renaming = null;
     if (wanted === '' || wanted === target.shortcode) return;
 
     const next = uniqueShortcode(wanted, taken);
-    void save((base) => ({
-      ...base,
-      images: base.images.map((image) =>
+    edit({
+      ...current,
+      images: current.images.map((image) =>
         image.shortcode === target.shortcode ? { ...image, shortcode: next } : image
       ),
-    }));
+    });
   }
 
   async function addImages(event: Event & { currentTarget: HTMLInputElement }): Promise<void> {
@@ -165,7 +160,7 @@
         });
       }
       shortcode = '';
-      await persist((base) => ({ ...base, images: [...base.images, ...added] }));
+      edit({ ...current, images: [...current.images, ...added] });
     } catch (error) {
       console.warn('[sable emotes] the image could not be uploaded', error);
       failed = true;
@@ -186,7 +181,8 @@
       const upright = await uprightJpeg(file);
       const bytes = new Uint8Array(await upright.arrayBuffer());
       const avatarUrl = await core.commands.uploadMedia(upright.type || 'image/*', bytes);
-      await persist((base) => ({ ...base, avatarUrl }));
+      await onApply?.({ ...$state.snapshot(saved), avatarUrl });
+      if (draft !== null) draft = { ...draft, avatarUrl };
     } catch (error) {
       console.warn('[sable emotes] the pack avatar could not be saved', error);
       failed = true;
@@ -237,13 +233,13 @@
       }
 
       const [first] = imported;
-      await persist((base) => ({
-        ...base,
-        name: base.name === '' ? (first?.name ?? '') : base.name,
-        avatarUrl: base.avatarUrl ?? first?.avatarUrl ?? null,
-        attribution: base.attribution === '' ? (first?.attribution ?? '') : base.attribution,
-        images: [...base.images, ...added],
-      }));
+      edit({
+        ...current,
+        name: current.name === '' ? (first?.name ?? '') : current.name,
+        avatarUrl: current.avatarUrl ?? first?.avatarUrl ?? null,
+        attribution: current.attribution === '' ? (first?.attribution ?? '') : current.attribution,
+        images: [...current.images, ...added],
+      });
     } catch (error) {
       console.warn('[sable emotes] the pack file could not be read', error);
       transferFailed = 'import';
@@ -260,20 +256,40 @@
     else await importArchives(picked);
   }
 
-  async function apply(): Promise<void> {
-    if (draft === null || busy) return;
+  async function apply(): Promise<boolean> {
+    if (draft === null || busy) return false;
 
     busy = true;
     failed = false;
     try {
       await onApply?.($state.snapshot(draft));
       draft = null;
+      return true;
     } catch (error) {
       console.warn('[sable emotes] the pack could not be saved', error);
       failed = true;
+      return false;
     } finally {
       busy = false;
     }
+  }
+
+  function stay(): void {
+    leaving = null;
+  }
+
+  function discardAndLeave(): void {
+    const proceed = leaving;
+    leaving = null;
+    draft = null;
+    proceed?.();
+  }
+
+  async function saveAndLeave(): Promise<void> {
+    const proceed = leaving;
+    if (!(await apply())) return;
+    leaving = null;
+    proceed?.();
   }
 </script>
 
@@ -405,7 +421,10 @@
                   commitRename(image);
                 }}
                 onkeydown={(event: KeyboardEvent) => {
-                  if (event.key === 'Enter') commitRename(image);
+                  if (event.key === 'Enter') {
+                    commitRename(image);
+                    if (rejected === null) void apply();
+                  }
                   if (event.key === 'Escape') renaming = null;
                 }}
               />
@@ -523,7 +542,7 @@
     {#if failed}
       <Alert variant="critical" role="alert">{$i18n.t('emotes.saveFailed')}</Alert>
     {/if}
-    <div class="save-bar">
+    <div class="save-bar" class:pending={dirty}>
       {#if dirty}
         <p class="save-status" role="status">{$i18n.t('emotes.unsaved')}</p>
       {/if}
@@ -552,6 +571,34 @@
     </div>
   {/if}
 </div>
+
+{#if leaving !== null}
+  <DialogFrame open variant="verification" label={$i18n.t('emotes.leaveTitle')}>
+    <div class="leave">
+      <h2>{$i18n.t('emotes.leaveTitle')}</h2>
+      <p>{$i18n.t('emotes.leaveHint')}</p>
+      {#if failed}
+        <Alert variant="critical" role="alert">{$i18n.t('emotes.saveFailed')}</Alert>
+      {/if}
+      <DialogActions>
+        <Button onclick={stay} disabled={busy}>{$i18n.t('emotes.leaveStay')}</Button>
+        <Button variant="danger" onclick={discardAndLeave} disabled={busy}>
+          {$i18n.t('emotes.leaveDiscard')}
+        </Button>
+        <Button
+          variant="primary"
+          loading={busy}
+          disabled={rejected !== null}
+          onclick={() => {
+            void saveAndLeave();
+          }}
+        >
+          {$i18n.t('emotes.leaveSave')}
+        </Button>
+      </DialogActions>
+    </div>
+  </DialogFrame>
+{/if}
 
 <style>
   .pack-editor {
@@ -602,10 +649,38 @@
     justify-content: flex-end;
   }
 
+  .save-bar.pending {
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
+    border-radius: var(--radius);
+    bottom: var(--space-300);
+    box-shadow: var(--shadow-e200);
+    color: var(--bg-on-container);
+    padding: var(--space-200) var(--space-300);
+    position: sticky;
+    z-index: 1;
+  }
+
+  .leave {
+    display: grid;
+    gap: var(--space-300);
+    width: min(24rem, calc(100vw - 2rem));
+  }
+
+  .leave h2,
+  .leave p {
+    margin: 0;
+  }
+
   .save-status {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
     margin-right: auto;
+  }
+
+  .save-bar.pending .save-status {
+    color: var(--bg-on-container);
+    font-weight: var(--font-weight-medium);
   }
 </style>

@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('#lib/core/context.js');
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 
 import { core } from '#lib/core/__mocks__/context.js';
 
@@ -18,6 +20,7 @@ Object.assign(core, { uploadMedia: mocks.uploadMedia });
 
 import ImagePackEditor from './ImagePackEditor.svelte';
 import { packEventContent, type PackDraft } from './pack-content.js';
+import { leaveUnlessUnsaved } from '#lib/ui/unsaved-guard.js';
 
 function pack(usage: ImagePackView['usage']): ImagePackView {
   return {
@@ -66,9 +69,8 @@ async function pickImage(): Promise<void> {
 }
 
 async function appliedDraft(applied: PackDraft[]): Promise<PackDraft> {
-  await vi.waitFor(() => {
-    expect(applied).toHaveLength(1);
-  });
+  await userEvent.click(button('Apply changes'));
+  if (applied.length === 0) throw new Error('the draft was never applied');
   return applied[0];
 }
 
@@ -245,8 +247,71 @@ test('an attribution keeps its line breaks', async () => {
     screen.getByRole('textbox', { name: 'Attribution' }),
     'Art by A{Enter}CC BY'
   );
-  await userEvent.click(button('Apply changes'));
   const draft = await appliedDraft(applied);
 
   expect(draft.attribution).toBe('Art by A\nCC BY');
+});
+
+function renderDirtyEditor(applied: PackDraft[]): void {
+  render(ImagePackEditor, {
+    props: {
+      pack: pack(['sticker']),
+      canEdit: true,
+      onApply: (draft: PackDraft) => {
+        applied.push(draft);
+        return Promise.resolve();
+      },
+    },
+  });
+}
+
+test('leaving with nothing edited goes straight through', () => {
+  renderDirtyEditor([]);
+  const proceed = vi.fn();
+
+  leaveUnlessUnsaved(proceed);
+
+  expect(proceed).toHaveBeenCalledOnce();
+});
+
+test('leaving with unsaved edits asks first, and Keep editing stays', async () => {
+  renderDirtyEditor([]);
+  await userEvent.type(screen.getByRole('textbox', { name: 'Attribution' }), 'x');
+  const proceed = vi.fn();
+
+  leaveUnlessUnsaved(proceed);
+  await userEvent.click(await screen.findByRole('button', { name: 'Keep editing' }));
+
+  expect(proceed).not.toHaveBeenCalled();
+  expect(screen.queryByRole('button', { name: 'Keep editing' })).toBeNull();
+  expect(button('Apply changes')).toBeEnabled();
+});
+
+test('Discard leaves without saving', async () => {
+  const applied: PackDraft[] = [];
+  renderDirtyEditor(applied);
+  await userEvent.type(screen.getByRole('textbox', { name: 'Attribution' }), 'x');
+  const proceed = vi.fn();
+
+  leaveUnlessUnsaved(proceed);
+  await userEvent.click(await screen.findByRole('button', { name: 'Discard' }));
+
+  expect(proceed).toHaveBeenCalledOnce();
+  expect(applied).toHaveLength(0);
+});
+
+test('Save writes the pack and then leaves', async () => {
+  const applied: PackDraft[] = [];
+  renderDirtyEditor(applied);
+  await userEvent.type(screen.getByRole('textbox', { name: 'Attribution' }), 'x');
+  const proceed = vi.fn();
+
+  leaveUnlessUnsaved(proceed);
+  const save = await screen.findByRole('button', { name: 'Save' });
+  await userEvent.click(save);
+
+  await vi.waitFor(() => {
+    expect(proceed).toHaveBeenCalledOnce();
+  });
+  expect(applied.map((draft) => draft.attribution)).toEqual(['x']);
 });
