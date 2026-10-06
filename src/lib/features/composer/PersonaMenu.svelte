@@ -209,9 +209,9 @@
   }
 
   .persona-options.grid {
-    align-content: flex-end;
+    align-content: flex-start;
     display: flex;
-    flex-flow: row wrap;
+    flex-flow: row wrap-reverse;
     gap: var(--space-200);
     padding: var(--space-200);
     padding-block: var(--space-200);
