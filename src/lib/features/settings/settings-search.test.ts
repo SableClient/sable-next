@@ -139,3 +139,15 @@ describe('enter setting search', () => {
     }
   }, 10_000);
 });
+
+describe('alt text setting search', () => {
+  it('is found by the term "alt text"', async () => {
+    const { settingsCategories } = await import('#lib/settings/registry.js');
+    const copy: Record<string, string> = {
+      'settings.alwaysShowAltText': 'Always show image descriptions',
+      'settings.terms.altText': 'Alt text',
+    };
+    const hits = searchSettings('alt text', settingsCategories, (key) => copy[key] ?? key);
+    expect(hits.some((entry) => entry.setting.key === 'alwaysShowAltText')).toBe(true);
+  }, 10_000);
+});

@@ -256,6 +256,7 @@ const telemetrySettings: SettingDefinition[] = import.meta.env.VITE_SENTRY_DSN
         section: 'diagnostics',
         icon: BugIcon,
         name: 'settings.errorReporting',
+        terms: ['settings.terms.errorReporting'],
         description: 'settings.errorReportingHint',
         type: 'boolean',
         requiresReload: true,
@@ -393,6 +394,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'emoji-images',
         icon: SmileyIcon,
         name: 'settings.twitterEmoji',
+        terms: ['settings.terms.twitterEmoji'],
         type: 'boolean',
       },
       {
@@ -440,6 +442,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'app-language',
         icon: TranslateIcon,
         name: 'settings.language',
+        terms: ['settings.terms.language'],
         type: 'select',
         options: [
           { value: SYSTEM_LANGUAGE, label: 'settings.languageSystem' },
@@ -458,6 +461,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'themes',
         icon: MoonIcon,
         name: 'settings.theme',
+        terms: ['settings.terms.theme'],
         type: 'select',
         options: [
           { value: 'system', label: 'settings.themeSystem' },
@@ -555,6 +559,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'accessibility',
         icon: MagnifyingGlassPlusIcon,
         name: 'settings.pageZoom',
+        terms: ['settings.terms.pageZoom'],
         type: 'range',
         step: 0.05,
         applyOnCommit: true,
@@ -564,6 +569,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'accessibility',
         icon: TextAaIcon,
         name: 'settings.fontScale',
+        terms: ['settings.terms.textScale'],
         type: 'range',
         step: 0.05,
         applyOnCommit: true,
@@ -606,6 +612,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'accessibility',
         icon: WheelchairMotionIcon,
         name: 'settings.reducedMotion',
+        terms: ['settings.terms.reducedMotion'],
         type: 'boolean',
       },
       {
@@ -613,6 +620,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'accessibility',
         icon: EyeIcon,
         name: 'settings.alwaysShowAltText',
+        terms: ['settings.terms.altText'],
         type: 'boolean',
       },
     ],
@@ -875,6 +883,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'time-date',
         icon: ClockIcon,
         name: 'settings.hour24Clock',
+        terms: ['settings.terms.hour24Clock'],
         type: 'boolean',
       },
       {
@@ -895,6 +904,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'time-date',
         icon: CalendarBlankIcon,
         name: 'settings.weekStart',
+        terms: ['settings.terms.weekStart'],
         type: 'select',
         options: [
           { value: 'sunday', label: 'settings.weekStartSunday' },
@@ -935,6 +945,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'receipts-typing',
         icon: ChecksIcon,
         name: 'settings.hideReadReceipts',
+        terms: ['settings.terms.hideReadReceipts'],
         description: 'settings.hideReadReceiptsHint',
         type: 'boolean',
       },
@@ -954,6 +965,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'receipts-typing',
         icon: DotsThreeIcon,
         name: 'settings.hideTypingIndicators',
+        terms: ['settings.terms.typing'],
         type: 'boolean',
       },
       {
@@ -1169,6 +1181,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'activity',
         icon: KeyboardIcon,
         name: 'settings.sendTypingNotifications',
+        terms: ['settings.terms.typing'],
         type: 'boolean',
       },
       {
@@ -1176,6 +1189,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'activity',
         icon: EyeIcon,
         name: 'settings.sendReadReceipts',
+        terms: ['settings.terms.sendReadReceipts'],
         description: 'settings.sendReadReceiptsHint',
         type: 'boolean',
       },
@@ -1184,6 +1198,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'activity',
         icon: PulseIcon,
         name: 'settings.sendPresence',
+        terms: ['settings.terms.sendPresence'],
         description: 'settings.sendPresenceHint',
         type: 'boolean',
       },
@@ -1192,6 +1207,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'blurring',
         icon: ImageIcon,
         name: 'settings.blurMedia',
+        terms: ['settings.terms.blurMedia'],
         type: 'boolean',
       },
       {
@@ -1244,6 +1260,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'playback',
         icon: FilmStripIcon,
         name: 'settings.autoplayGifs',
+        terms: ['settings.terms.autoplayGifs'],
         type: 'boolean',
       },
       {
@@ -1265,6 +1282,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'previews',
         icon: LinkSimpleIcon,
         name: 'settings.urlPreviews',
+        terms: ['settings.terms.urlPreviews'],
         type: 'boolean',
       },
       {
@@ -1386,6 +1404,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'sounds',
         icon: SpeakerHighIcon,
         name: 'settings.notificationSounds',
+        terms: ['settings.terms.notificationSounds'],
         type: 'boolean',
       },
       {
@@ -1515,6 +1534,7 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'microphone',
         icon: MicrophoneIcon,
         name: 'settings.noiseSuppression',
+        terms: ['settings.terms.noiseSuppression'],
         type: 'boolean',
       },
       {

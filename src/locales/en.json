@@ -1580,6 +1580,27 @@
       "interface": "Interface",
       "behavior": "Behavior"
     },
+    "terms": {
+      "altText": "Alt text, alternative text, image description, accessibility",
+      "autoplayGifs": "Animated, moving images, gif",
+      "blurMedia": "Spoiler, NSFW, hide images, privacy",
+      "errorReporting": "Sentry, crash reports, telemetry, analytics",
+      "hideReadReceipts": "Seen, read marker, receipts",
+      "hour24Clock": "Military time, 24 hour, 12 hour, am pm",
+      "language": "Locale, translation, i18n",
+      "noiseSuppression": "Krisp, background noise, denoise, microphone",
+      "notificationSounds": "Ping, chime, sound, ringtone",
+      "pageZoom": "Zoom, UI size, scale, magnify",
+      "reducedMotion": "Animations, transitions, motion sickness",
+      "sendPresence": "Presence, away, offline, last seen, invisible",
+      "sendReadReceipts": "Seen, read marker, receipts",
+      "textScale": "Font size, bigger text, zoom",
+      "theme": "Dark mode, light mode, colours, colors, appearance",
+      "twitterEmoji": "Twemoji, emoji style, emoji font",
+      "typing": "Typing indicator, is typing",
+      "urlPreviews": "Embeds, unfurl, link cards, url preview",
+      "weekStart": "Monday, Sunday, calendar, week"
+    },
     "groups": {
       "themes": "Themes",
       "language": "Language",
