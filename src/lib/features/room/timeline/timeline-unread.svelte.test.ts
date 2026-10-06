@@ -116,3 +116,12 @@ test('redacting a hidden unread target advances the jump to its next visible mes
   expect(unread.firstEventId).toBe('$next');
   expect(unread.blocking).toBe(true);
 });
+
+test('reaching the latest message unblocks receipts even when the marker lookup failed', async () => {
+  const unread = new TimelineUnread();
+  await unread.initialize([message('later')], true, () => Promise.reject(new Error('offline')));
+  expect(unread.failed).toBe(true);
+  expect(unread.blocking).toBe(true);
+  unread.reachLatest();
+  expect(unread.blocking).toBe(false);
+});

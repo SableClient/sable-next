@@ -47,6 +47,24 @@ test('the reveal from notifications preserves unread until jumping', async ({
   await expect.poll(() => core.commands()).toContain('mark_read');
 });
 
+test('the reveal from notifications sends a receipt once the reader reaches the latest message', async ({
+  page,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('unread');
+  await page.goto(notified);
+  await timeline.expectRevealed();
+  await expect(timeline.message('General message 5')).not.toBeInViewport();
+  await page.waitForTimeout(650);
+  expect((await core.commands()).filter((command) => command === 'mark_read')).toHaveLength(0);
+  await timeline.scrollToBottomAndNotify();
+  await expect(timeline.message('General message 19')).toBeInViewport();
+  await expect(timeline.message('General message 5')).not.toBeInViewport();
+  await expect.poll(() => core.commands()).toContain('mark_read');
+});
+
 test('the reveal offers mark as read', async ({ page, timeline, core, installRoomCore }) => {
   await installRoomCore('unread');
   await page.goto(notified);
@@ -85,9 +103,8 @@ test('the reveal stays readable when marker context fails', async ({
   await timeline.expectRevealed();
   await expect(timeline.message('General message 9999')).toBeInViewport();
   await expect(page.getByRole('button', { name: 'Jump to unread' })).toBeVisible();
-  await page.waitForTimeout(650);
-  expect((await core.commands()).filter((command) => command === 'mark_read')).toHaveLength(0);
   expect(await page.evaluate(() => window.__e2ePaginationDirections)).not.toContain('backward');
+  await expect.poll(() => core.commands()).toContain('mark_read');
 });
 
 test('the reveal can read forwards from unread and jump to the live room', async ({

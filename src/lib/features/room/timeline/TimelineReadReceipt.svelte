@@ -7,6 +7,7 @@
   import { readReceiptEventId } from './timeline-format';
 
   const COALESCE_MS = 500;
+  const RETRY_MS = [1_000, 5_000, 30_000];
 
   interface Props {
     timeline: RoomTimeline;
@@ -24,17 +25,23 @@
   let readingEventId: string | null = null;
   let pendingEventId: string | null = null;
   let coalesceTimer: ReturnType<typeof setTimeout> | undefined;
+  let failures = 0;
 
   function send(eventId: string): void {
     readingEventId = eventId;
     void onRead(eventId)
       .then(() => {
         lastReadEventId = eventId;
+        failures = 0;
       })
-      .catch(() => {})
+      .catch(() => {
+        failures += 1;
+        pendingEventId ??= eventId;
+      })
       .finally(() => {
         if (readingEventId === eventId) readingEventId = null;
-        flush();
+        if (failures === 0) flush();
+        else coalesceTimer ??= setTimeout(flush, RETRY_MS[Math.min(failures, RETRY_MS.length) - 1]);
       });
   }
 

@@ -275,6 +275,7 @@
   let jumpToLatestVisible = $state(false);
   let opening = false;
   let filling = $state(false);
+  let opened = $state(false);
   let disposed = false;
   let refillPending = false;
   const fetchedItems = useEventItems();
@@ -339,9 +340,9 @@
   });
   $effect(() => {
     unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
-    if (active && revealed && unreadInView && document.visibilityState === 'visible') {
-      unread.observe(unread.firstEventId);
-    }
+    if (!active || !revealed || document.visibilityState !== 'visible') return;
+    if (unreadInView) unread.observe(unread.firstEventId);
+    else if (live && windowState.pinned && opened && !jumpingUnread) unread.reachLatest();
   });
   let hadUnread = untrack(() => hasUnread);
   $effect(() => {
@@ -583,7 +584,10 @@
       pagination.exhausted = false;
     } finally {
       filling = false;
-      if (!disposed) revealed = true;
+      if (!disposed) {
+        revealed = true;
+        opened = true;
+      }
     }
   }
   $effect(() => {

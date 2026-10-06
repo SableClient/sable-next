@@ -91,6 +91,10 @@ export class TimelineUnread {
     }
   }
 
+  reachLatest(): void {
+    if (this.active) this.reached = true;
+  }
+
   dismiss(): void {
     this.active = false;
     this.reached = true;

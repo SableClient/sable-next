@@ -1193,11 +1193,9 @@ test('retries marking the latest event read after a failed request', async () =>
   await runAnimationFrames();
   await vi.advanceTimersByTimeAsync(500);
   expect(read).toHaveBeenCalledTimes(1);
-  await Promise.resolve();
-
-  roomTimeline.items = [...roomTimeline.items];
-  await tick();
-  await vi.advanceTimersByTimeAsync(500);
+  await vi.advanceTimersByTimeAsync(999);
+  expect(read).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
 
   expect(read).toHaveBeenCalledTimes(2);
   instance.unmount();
@@ -2319,6 +2317,41 @@ test('a notification below unread keeps the bar and blocks receipts until jumpin
   expect(screen.queryByRole('button', { name: 'Jump to unread' })).not.toBeInTheDocument();
   await vi.waitFor(() => {
     expect(read).toHaveBeenCalled();
+  });
+});
+
+test('a notification below unread sends the receipt once the reader reaches the latest message', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [
+    item('read'),
+    readMarker('marker'),
+    ...Array.from({ length: 12 }, (_, i) => item(`new-${i}`)),
+  ];
+  const read = vi.fn().mockResolvedValue(undefined);
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        landingEventId: '$new-10',
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: read,
+      },
+    },
+  });
+  const element = unreadViewport();
+  await tick();
+  await runAnimationFrames();
+  await new Promise((resolve) => setTimeout(resolve, 550));
+  expect(read).not.toHaveBeenCalled();
+
+  element.scrollTop = element.scrollHeight - element.clientHeight;
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
+  await runAnimationFrames();
+
+  await vi.waitFor(() => {
+    expect(read).toHaveBeenCalledWith('$new-11', true);
   });
 });
 
