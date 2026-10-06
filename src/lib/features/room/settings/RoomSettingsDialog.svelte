@@ -26,7 +26,6 @@
   import RoomMembersSettings from './RoomMembersSettings.svelte';
   import RoomPermissionsSettings from './RoomPermissionsSettings.svelte';
   import { roomSettingsSections, type RoomSettingsSectionId } from './room-settings-sections';
-  import { canSendState } from './permission-groups';
 
   interface Props {
     open: boolean;
@@ -49,18 +48,7 @@
 
   let roomId = $derived(room?.room_id ?? null);
   let roomName = $derived(room?.name ?? room?.room_id ?? '');
-  let ownPowerLevel = $derived(permissions?.own_power_level ?? 0);
-
-  function editable(eventType: string): boolean {
-    return levels === null || canSendState(levels, ownPowerLevel, eventType);
-  }
-
-  let sections = $derived(
-    roomSettingsSections(room?.is_space ?? false).filter((entry) => {
-      if (entry.id === 'emojis-stickers') return editable('m.room.image_pack');
-      return true;
-    })
-  );
+  let sections = $derived(roomSettingsSections(room?.is_space ?? false));
 
   $effect(() => {
     void roomId;
