@@ -760,7 +760,6 @@ export class ComposerEditor {
           indentCode(this.markdownMode())(state, dispatch, view) ||
           sinkListEntry(state, dispatch, view),
         'Shift-Tab': outdentCode,
-        Escape: () => this.options.onNavigate('Escape'),
         Enter: this.enter,
         'Shift-Enter': this.shiftEnter,
         'Mod-Enter': () => this.submit(),
@@ -846,6 +845,10 @@ export class ComposerEditor {
           handleDrop: (_view, event) => this.handleFiles(filesFrom(event.dataTransfer)),
           handleDOMEvents: {
             keydown: (_view, event) => {
+              if (event.key === 'Escape' && !event.isComposing) {
+                if (this.options.onNavigate('Escape')) event.preventDefault();
+                return true;
+              }
               if (event.key === 'Enter' && hasIosKeyboardContextQuirk()) {
                 this.iosEnter = { shift: event.shiftKey, handled: false };
               }

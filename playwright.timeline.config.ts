@@ -6,6 +6,7 @@ export default defineConfig({
     'timeline-stability.spec.ts',
     'timeline-gap.spec.ts',
     'timeline-keyboard.spec.ts',
+    'timeline-escape.spec.ts',
     'timeline-lifecycle.spec.ts',
     'timeline-media.spec.ts',
     'timeline-media-hold.spec.ts',
