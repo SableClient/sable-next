@@ -1,3 +1,4 @@
+import { catalogFileUrl, fetchCatalogFile } from '#lib/features/settings/theme-catalog.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
 
 import type { ResolvedTheme } from './theme.js';
@@ -34,16 +35,26 @@ function isCustomTheme(value: unknown): value is CustomTheme {
     typeof theme.id === 'string' &&
     typeof theme.name === 'string' &&
     (theme.kind === 'light' || theme.kind === 'dark') &&
-    typeof theme.css === 'string'
+    hasCss(theme)
   );
 }
 
 function isCustomTweak(value: unknown): value is CustomTweak {
   if (value === null || typeof value !== 'object') return false;
   const tweak = value as Partial<CustomTweak>;
-  return (
-    typeof tweak.id === 'string' && typeof tweak.name === 'string' && typeof tweak.css === 'string'
-  );
+  return typeof tweak.id === 'string' && typeof tweak.name === 'string' && hasCss(tweak);
+}
+
+export function isCatalogReference(entry: { source?: unknown }): boolean {
+  return catalogFileUrl(entry.source) !== null;
+}
+
+function hasCss(entry: { css?: unknown; source?: unknown }): boolean {
+  return typeof entry.css === 'string' || isCatalogReference(entry);
+}
+
+function withCss<T extends { css?: string }>(entry: T): T & { css: string } {
+  return { ...entry, css: entry.css ?? '' };
 }
 
 export function readThemes(data: unknown): StoredThemes | null {
@@ -52,8 +63,8 @@ export function readThemes(data: unknown): StoredThemes | null {
   if (!Array.isArray(value.themes)) return null;
 
   return {
-    themes: value.themes.filter(isCustomTheme),
-    tweaks: Array.isArray(value.tweaks) ? value.tweaks.filter(isCustomTweak) : [],
+    themes: value.themes.filter(isCustomTheme).map(withCss),
+    tweaks: Array.isArray(value.tweaks) ? value.tweaks.filter(isCustomTweak).map(withCss) : [],
     lightThemeId: typeof value.lightThemeId === 'string' ? value.lightThemeId : null,
     darkThemeId: typeof value.darkThemeId === 'string' ? value.darkThemeId : null,
     enabledTweakIds: Array.isArray(value.enabledTweakIds)
@@ -150,4 +161,32 @@ export function previewTheme(preview: ThemePreview): void {
 
 export function clearThemePreview(): void {
   themePreview.current = null;
+}
+
+export async function hydrateCatalogThemes(): Promise<void> {
+  const missing = [...customThemes.themes, ...customThemes.tweaks].filter(
+    (entry) => entry.css === '' && entry.source !== undefined && isCatalogReference(entry)
+  );
+  if (missing.length === 0) return;
+
+  const fetched: Record<string, string> = {};
+  await Promise.all(
+    missing.map(async (entry) => {
+      try {
+        fetched[entry.id] = await fetchCatalogFile(entry.source ?? '');
+      } catch (error) {
+        console.debug('[sable themes] catalog theme not fetched', entry.name, error);
+      }
+    })
+  );
+  if (Object.keys(fetched).length === 0) return;
+
+  const fill = <T extends { id: string; css: string }>(entries: T[]): T[] =>
+    entries.map((entry) => {
+      const css = fetched[entry.id] as string | undefined;
+      return entry.css === '' && css !== undefined ? { ...entry, css } : entry;
+    });
+  customThemes.themes = fill(customThemes.themes);
+  customThemes.tweaks = fill(customThemes.tweaks);
+  persist();
 }

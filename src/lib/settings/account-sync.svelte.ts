@@ -9,6 +9,7 @@ export type AccountSyncStatus = 'idle' | 'syncing' | 'partial' | 'error';
 export interface SyncedSnapshot {
   content: unknown;
   partial?: boolean;
+  skipped?: string[];
 }
 
 export interface SyncedDocument {
@@ -39,6 +40,7 @@ function detach(snapshot: SyncedSnapshot): SyncedSnapshot {
 export class AccountSync {
   status = $state<AccountSyncStatus>('idle');
   lastSyncedAt = $state<number | null>(null);
+  skipped = $state<string[]>([]);
 
   #core: CoreClient | null = null;
   #generation = 0;
@@ -211,7 +213,11 @@ export class AccountSync {
   }
 
   #refresh(): void {
-    const statuses = [...this.#states.values()].map((state) => state.status);
+    const states = [...this.#states.values()];
+    this.skipped = states.flatMap((state) =>
+      state.status === 'partial' ? (state.pending?.skipped ?? []) : []
+    );
+    const statuses = states.map((state) => state.status);
     this.status =
       statuses.find((status) => status === 'error') ??
       statuses.find((status) => status === 'syncing') ??

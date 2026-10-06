@@ -1873,7 +1873,7 @@
     "syncStatusNever": "Not synced yet",
     "syncStatusIdle": "Last synced at {{time}}",
     "syncStatusSyncing": "Syncing…",
-    "syncStatusPartial": "Synced, but a custom theme was too large to upload.",
+    "syncStatusPartial": "Synced, but {{names}} could not be uploaded: custom themes and tweaks may total {{limit}} MiB. They stay on this device.",
     "syncStatusError": "Sync failed; it will retry on the next change.",
     "settingsFileTitle": "Settings file",
     "settingsFileHint": "Exports or imports preferences, custom themes and push gateway settings.",

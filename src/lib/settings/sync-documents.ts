@@ -34,7 +34,7 @@ import {
 import type { SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
 
 import type { SyncedDocument } from './account-sync.svelte.js';
-import { customThemes, replaceCustomThemes } from './custom-themes.svelte.js';
+import { customThemes, hydrateCatalogThemes, replaceCustomThemes } from './custom-themes.svelte.js';
 import { applyPreferences, isExplicitPreference, preferences } from './preferences.svelte.js';
 import { applySettings, prepareSettings, SETTINGS_ACCOUNT_DATA_TYPE } from './sync.js';
 import { v1SettingsFallback, v1WorkspaceFallback } from '#lib/migrations/v1/documents.js';
@@ -56,7 +56,11 @@ export const settingsDocument: SyncedDocument = {
   snapshot() {
     const prepared = prepareSettings(preferences, customThemes, isExplicitPreference);
     excludedThemeIds = prepared.excludedThemeIds;
-    return { content: prepared.content, partial: prepared.excludedThemeIds.length > 0 };
+    const excluded = new Set(prepared.excludedThemeIds);
+    const skipped = [...customThemes.themes, ...customThemes.tweaks]
+      .filter((entry) => excluded.has(entry.id))
+      .map((entry) => entry.name);
+    return { content: prepared.content, partial: skipped.length > 0, skipped };
   },
 
   adopt(content) {
@@ -65,6 +69,7 @@ export const settingsDocument: SyncedDocument = {
 
     applyPreferences(applied.preferences, applied.keys);
     replaceCustomThemes(applied.themes);
+    void hydrateCatalogThemes();
     return true;
   },
 };

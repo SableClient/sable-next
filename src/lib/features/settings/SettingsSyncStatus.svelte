@@ -2,6 +2,7 @@
   import { i18n } from '#lib/i18n.js';
   import { formatTime } from '#lib/ui/date-time.js';
   import { accountSync } from '#lib/settings/account-sync.svelte.js';
+  import { SYNCED_THEME_LIMIT_MIB } from '#lib/settings/sync.js';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
 
   const status = $derived.by(() => {
@@ -9,7 +10,10 @@
       case 'syncing':
         return $i18n.t('settings.syncStatusSyncing');
       case 'partial':
-        return $i18n.t('settings.syncStatusPartial');
+        return $i18n.t('settings.syncStatusPartial', {
+          names: accountSync.skipped.join(', '),
+          limit: SYNCED_THEME_LIMIT_MIB,
+        });
       case 'error':
         return $i18n.t('settings.syncStatusError');
       default:
