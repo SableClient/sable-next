@@ -336,7 +336,10 @@
       void html;
       for (const anchor of node.querySelectorAll<HTMLAnchorElement>('a[data-matrix-link="user"]')) {
         const link = parseMatrixLink(anchor.href);
-        if (link?.kind === 'user') anchor.textContent = mentionLabel(link.userId, memberNames);
+        const bare = anchor.textContent.trim() === anchor.getAttribute('href')?.trim();
+        if (link?.kind === 'user' && bare) {
+          anchor.textContent = mentionLabel(link.userId, memberNames);
+        }
       }
       for (const chip of node.querySelectorAll<HTMLElement>('.time-chip')) {
         const time = chip.querySelector('time');

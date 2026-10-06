@@ -89,10 +89,11 @@ test.each([
 });
 
 test.each([
-  ['\u2190', '@ezera'],
-  ['Ana', '@ezera'],
-  ['@ezera:example.org', '@ezera'],
-])('labels a user mention from the id, not the author text %s', async (label, expected) => {
+  ['\u2190', '\u2190'],
+  ['Ana', 'Ana'],
+  ['hello', 'hello'],
+  ['https://matrix.to/#/@ezera:example.org', '@ezera'],
+])('keeps the author text of a user mention %s', async (label, expected) => {
   render(FormattedBody, {
     props: { html: `<a href="https://matrix.to/#/@ezera:example.org">${label}</a>` },
   });
@@ -505,7 +506,7 @@ test('keeps a matrix link out of the app when nothing handles it', async () => {
   });
   await tick();
 
-  const anchor = screen.getByRole('link', { name: '@ana' });
+  const anchor = screen.getByRole('link', { name: 'Ana' });
   expect(anchor).toHaveAttribute('data-matrix-link', 'user');
   expect(anchor).toHaveAttribute('target', '_blank');
   expect(anchor).toHaveAttribute('rel', 'noopener noreferrer');
@@ -721,3 +722,13 @@ test.each([
 
   expect(document.querySelector('pre code')?.querySelector('span')).toBeNull();
 });
+
+test.each(['https://matrix.to/#/@ezera:example.org', 'matrix:u/ezera:example.org'])(
+  'renders the same text for a user mention on %s',
+  async (href) => {
+    render(FormattedBody, { props: { html: `<a href="${href}">hello</a>` } });
+    await tick();
+
+    expect(screen.getByRole('link', { name: 'hello' })).toHaveAttribute('data-matrix-link', 'user');
+  }
+);

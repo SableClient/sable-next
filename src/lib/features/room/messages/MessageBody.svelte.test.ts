@@ -107,7 +107,7 @@ test.each(['image', 'video', 'audio', 'file'] as const)(
     render(MessageBody, { item: item(attachment(kind)), canRedactOthers: false });
     await tick();
 
-    const mention = screen.getByRole('link', { name: '@ana' });
+    const mention = screen.getByRole('link', { name: 'Ana' });
     expect(mention).toHaveAttribute('data-matrix-link', 'user');
     expect(screen.getByRole('img', { name: 'party' })).toHaveAttribute('data-mx-emoticon');
   }
@@ -567,7 +567,7 @@ test.each(['image', 'file'] as const)('a hidden caption is not rendered for %s',
   await tick();
 
   expect(screen.queryByText('caption')).not.toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: '@ana' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Ana' })).not.toBeInTheDocument();
 });
 
 test('media is held behind a prompt where the media preview setting says so (MSC4278)', async () => {

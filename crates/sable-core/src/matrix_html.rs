@@ -1489,6 +1489,19 @@ mod tests {
     }
 
     #[test]
+    fn preview_body_keeps_mention_link_text() {
+        for href in [
+            "https://matrix.to/#/@alice:example.org",
+            "matrix:u/alice:example.org",
+        ] {
+            assert_eq!(
+                preview_body("hello", Some(&format!("<a href=\"{href}\">hello</a>"))),
+                "hello"
+            );
+        }
+    }
+
+    #[test]
     fn preview_body_hides_spoilers() {
         assert_eq!(
             preview_body(
