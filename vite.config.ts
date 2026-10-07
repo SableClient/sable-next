@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 import { isAbsolute, relative, resolve } from 'node:path';
 
 import { fetchDeepFilterNet } from './scripts/fetch-deepfilternet.mjs';
+import { emojiDataPlugin } from './scripts/emoji-data-plugin.mjs';
 
 const wasmOutput = process.env.SABLE_WASM_OUTPUT ?? 'src/generated/wasm';
 
@@ -43,6 +44,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    emojiDataPlugin(),
     {
       name: 'deepfilternet-assets',
       buildStart: async () => {

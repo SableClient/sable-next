@@ -1,68 +1,21 @@
-import emojibaseShortcodes from 'emojibase-data/en/shortcodes/emojibase.json';
-import joypixelsShortcodes from 'emojibase-data/en/shortcodes/joypixels.json';
-import compact from 'emojibase-data/en/compact.json';
+import { emojiRawRecords } from 'virtual:sable-emoji-data';
 
-export { QUICK_REACTIONS } from './quick-reactions';
+import type { EmojiGroupId } from './emoji-groups.js';
+import { emojiGroupOrder } from './emoji-groups.js';
+
+export { QUICK_REACTIONS } from './quick-reactions.js';
+export type { EmojiGroupId } from './emoji-groups.js';
 
 export interface ReactionEmoji {
   emoji: string;
   shortcode: string;
-  keywords: string[];
+  keywords: readonly string[];
 }
-
-export type EmojiGroupId =
-  | 'people'
-  | 'nature'
-  | 'food'
-  | 'activity'
-  | 'travel'
-  | 'object'
-  | 'symbol'
-  | 'flag';
 
 export interface EmojiGroup {
   id: EmojiGroupId;
   emojis: ReactionEmoji[];
 }
-
-// Group 2 (component) has no bucket, so a miss here is expected.
-const groupOf: Partial<Record<number, EmojiGroupId>> = {
-  0: 'people',
-  1: 'people',
-  3: 'nature',
-  4: 'food',
-  5: 'travel',
-  6: 'activity',
-  7: 'object',
-  8: 'symbol',
-  9: 'flag',
-};
-
-const shortcodeMaps = [joypixelsShortcodes, emojibaseShortcodes] as Record<
-  string,
-  string | string[] | undefined
->[];
-
-function shortcodesFor(hexcode: string): string[] {
-  const found: string[] = [];
-  for (const map of shortcodeMaps) {
-    const entry = map[hexcode];
-    if (typeof entry === 'string') found.push(entry);
-    else if (Array.isArray(entry)) found.push(...entry);
-  }
-  return found;
-}
-
-const order: EmojiGroupId[] = [
-  'people',
-  'nature',
-  'food',
-  'activity',
-  'travel',
-  'object',
-  'symbol',
-  'flag',
-];
 
 function build(): {
   groups: EmojiGroup[];
@@ -70,35 +23,34 @@ function build(): {
   byEmoji: Map<string, string>;
   byShortcode: Map<string, string>;
 } {
-  const buckets = new Map<EmojiGroupId, ReactionEmoji[]>();
+  const groups: EmojiGroup[] = emojiGroupOrder.map((id) => ({ id, emojis: [] }));
   const all: ReactionEmoji[] = [];
   const byEmoji = new Map<string, string>();
   const byShortcode = new Map<string, string>();
 
-  for (const entry of compact) {
-    const id: EmojiGroupId | undefined = groupOf[entry.group ?? 8];
-    if (id === undefined) continue;
-
-    const codes = shortcodesFor(entry.hexcode);
+  for (const [unicode, codes, keywords, groupIndex] of emojiRawRecords) {
     const shortcode = codes[0];
     if (!shortcode) continue;
 
     const item: ReactionEmoji = {
-      emoji: entry.unicode,
+      emoji: unicode,
       shortcode,
-      keywords: [...new Set([...codes.slice(1), ...entry.label.toLowerCase().split(/\s+/)])],
+      keywords,
     };
 
-    const bucket = buckets.get(id);
-    if (bucket) bucket.push(item);
-    else buckets.set(id, [item]);
+    const targetGroup = groups[groupIndex];
+    targetGroup.emojis.push(item);
     all.push(item);
-    byEmoji.set(entry.unicode, shortcode);
-    for (const code of codes) if (!byShortcode.has(code)) byShortcode.set(code, entry.unicode);
+    byEmoji.set(unicode, shortcode);
+    for (const code of codes) {
+      if (!byShortcode.has(code)) {
+        byShortcode.set(code, unicode);
+      }
+    }
   }
 
   return {
-    groups: order.map((id) => ({ id, emojis: buckets.get(id) ?? [] })),
+    groups,
     all,
     byEmoji,
     byShortcode,
@@ -111,7 +63,7 @@ export const emojiGroups: readonly EmojiGroup[] = built.groups;
 export const REACTION_EMOJI: readonly ReactionEmoji[] = built.all;
 
 export function searchReactionEmoji(query: string, limit = 24): ReactionEmoji[] {
-  const needle = query.trim().toLowerCase().replace(/^:/, '');
+  const needle = query.trim().toLowerCase().replace(/^:|:$/g, '');
   if (!needle) return [];
 
   const scored: { entry: ReactionEmoji; score: number }[] = [];
