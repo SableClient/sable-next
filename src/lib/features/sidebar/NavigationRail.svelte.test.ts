@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
+const listed = vi.hoisted((): RoomSummary[] => []);
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
@@ -24,7 +25,9 @@ vi.mock('$app/paths', () => ({
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   roomPathParam: (room: RoomSummary) => encodeURIComponent(room.room_id),
-  useRoomList: () => ({ rooms: [], quietRoomIds: new Set() }),
+  findRoomByPathId: (rooms: RoomSummary[], pathId: string) =>
+    rooms.find((room) => room.room_id === pathId || room.canonical_alias === pathId),
+  useRoomList: () => ({ rooms: listed, quietRoomIds: new Set() }),
 }));
 vi.mock('#lib/core/context.js');
 
@@ -662,6 +665,22 @@ test('a space opened through the rooms tab does not become the rooms tab target'
   navigated();
   visit('/rooms');
   navigated();
+
+  expect(tab('nav.unspaced')).toHaveAttribute('href', '/rooms');
+  expect(savedSpacePaths().rooms).toBe('/rooms');
+});
+
+test('a space joined by address does not become the rooms tab target', async () => {
+  listed.push({ ...space('!space:example.org'), canonical_alias: '#space:example.org' });
+  renderRail({ spaces: [] });
+  await tick();
+
+  visit('/rooms/!space%3Aexample.org');
+  navigated();
+  visit('/space/%23space%3Aexample.org/lobby', { spaceId: '#space:example.org' });
+  navigated();
+  listed.length = 0;
+  await tick();
 
   expect(tab('nav.unspaced')).toHaveAttribute('href', '/rooms');
   expect(savedSpacePaths().rooms).toBe('/rooms');
