@@ -49,7 +49,15 @@ function text(value: unknown): string | null {
 export function reactionKey(content: unknown): string | null {
   if (!isRecord(content)) return null;
   const shortcode = text(content.shortcode) ?? text(content['com.beeper.reaction.shortcode']);
-  if (shortcode) return `:${shortcode}:`;
+  const name = shortcode
+    ?.trim()
+    .replace(/^:+|:+$/g, '')
+    .trim();
+  return name ? `:${name}:` : reactionSource(content);
+}
+
+export function reactionSource(content: unknown): string | null {
+  if (!isRecord(content)) return null;
   const relation = content['m.relates_to'];
   return isRecord(relation) ? text(relation.key) : null;
 }

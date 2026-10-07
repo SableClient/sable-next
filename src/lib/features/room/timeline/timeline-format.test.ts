@@ -826,6 +826,15 @@ test('a hidden reaction reports the key it carries', () => {
   expect(stateEventText(reaction({ shortcode: 'party', 'm.relates_to': { key: 'x' } }), t)).toBe(
     'timeline.hiddenReaction:{"user":"Alice","key":":party:"}'
   );
+  expect(
+    stateEventText(
+      reaction({ shortcode: ':party:', 'm.relates_to': { key: 'mxc://example.org/party' } }),
+      t
+    )
+  ).toBe('timeline.hiddenReaction:{"user":"Alice","key":":party:"}');
+  expect(stateEventText(reaction({ shortcode: '::', 'm.relates_to': { key: '👍' } }), t)).toBe(
+    'timeline.hiddenReaction:{"user":"Alice","key":"👍"}'
+  );
   expect(stateEventText(reaction({ 'm.relates_to': {} }), t)).toBe(
     'timeline.hiddenEvent:{"user":"Alice","type":"m.reaction"}'
   );

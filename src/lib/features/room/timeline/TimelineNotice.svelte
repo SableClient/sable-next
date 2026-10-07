@@ -8,14 +8,16 @@
   import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import EditDiff from '../messages/EditDiff.svelte';
+  import EmoteCard from '../messages/EmoteCard.svelte';
   import EventTargetPreview from '../messages/EventTargetPreview.svelte';
   import { isCustomReaction } from '../messages/reaction-emote-label';
   import StateContentDiff from '../messages/StateContentDiff.svelte';
   import StateEventText from './StateEventText.svelte';
   import { stateEventIcon } from './state-event-icon';
-  import { reactionKey } from './state-event-text';
+  import { reactionKey, reactionSource } from './state-event-text';
   import {
     isEditEvent,
     redactionTarget,
@@ -59,20 +61,20 @@
     }
     return null;
   });
-  let customReaction = $derived.by((): string | null => {
-    const content = item.content;
-    if (content.kind !== 'hidden_event' || content.event_type !== 'm.reaction') return null;
-    const key = reactionKey(content.content);
-    return key !== null && isCustomReaction(key) ? key : null;
-  });
-  let redactedReaction = $derived.by((): boolean => {
-    const content = item.content;
-    return (
-      content.kind === 'hidden_event' &&
-      content.event_type === 'm.reaction' &&
-      reactionKey(content.content) === null
-    );
-  });
+  let reaction = $derived(
+    item.content.kind === 'hidden_event' && item.content.event_type === 'm.reaction'
+      ? item.content
+      : null
+  );
+  let reactionLabel = $derived(reactionKey(reaction?.content));
+  let source = $derived(reactionSource(reaction?.content));
+  let customReaction = $derived(source !== null && isCustomReaction(source) ? source : null);
+  let customReactionLabel = $derived(
+    reactionLabel !== null && !isCustomReaction(reactionLabel)
+      ? reactionLabel
+      : $i18n.t('timeline.customEmote')
+  );
+  let redactedReaction = $derived(reaction !== null && reactionLabel === null);
   let targetAbove = $derived(preferences.replyPreviewStyle !== 'expanded');
   let pins = $derived.by(() => {
     const content = item.content;
@@ -83,6 +85,26 @@
     ].slice(0, MAX_PIN_PREVIEWS);
   });
 </script>
+
+{#snippet reactionImageContent()}
+  {#if customReaction}
+    <Tooltip label={customReactionLabel} variant="inline" side="top">
+      <MediaImage
+        class="state-emote"
+        source={customReaction}
+        alt={customReactionLabel}
+        width={64}
+        height={64}
+        original
+      />
+      {#snippet content()}
+        <EmoteCard label={customReactionLabel}>
+          <MediaImage source={customReaction} alt="" width={64} height={64} original />
+        </EmoteCard>
+      {/snippet}
+    </Tooltip>
+  {/if}
+{/snippet}
 
 {#snippet targetDetail(target: string)}
   <div class={['state-detail', { 'target-above': targetAbove }]}>
@@ -159,17 +181,12 @@
   {#if targetAbove}{@render targetDetail(hiddenTarget)}{/if}
   <p class="state">
     {@render stateGutter()}
-    <span
-      ><StateEventText {item} {members} {onSenderProfile} />{#if customReaction}
-        <MediaImage
-          class="state-emote"
-          source={customReaction}
-          alt={$i18n.t('timeline.customEmote')}
-          width={64}
-          height={64}
-          original
-        />{/if}</span
-    >
+    <StateEventText
+      {item}
+      {members}
+      {onSenderProfile}
+      reaction={customReaction ? reactionImageContent : undefined}
+    />
   </p>
   {#if !targetAbove}{@render targetDetail(hiddenTarget)}{/if}
 {:else if item.content.kind === 'hidden_event'}
@@ -279,11 +296,11 @@
   }
 
   .state :global(.state-emote) {
+    display: inline-block;
     height: 1lh;
-    margin-inline-start: var(--space-100);
     object-fit: contain;
     vertical-align: bottom;
-    width: auto;
+    width: calc(1lh * var(--media-ratio));
   }
 
   .redacted-label {

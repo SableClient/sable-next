@@ -15,6 +15,7 @@
   import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
   import { MOTION_MS, shouldReduceMotion } from '#lib/ui/motion.js';
   import ReactionSheet from './ReactionSheet.svelte';
+  import EmoteCard from './EmoteCard.svelte';
   import { reactionSummary } from './reaction-summary.js';
   import {
     hasRoomMediaPreviews,
@@ -203,21 +204,13 @@
       $i18n.t
     )}
     {#snippet emoteCard()}
-      <span class="emote-card">
+      <EmoteCard label={summary} variant="reaction">
         {#if isCustomReaction(reaction.key)}
-          <MediaImage
-            class="emote-card-image"
-            source={reaction.key}
-            alt=""
-            width={64}
-            height={64}
-            original
-          />
+          <MediaImage source={reaction.key} alt="" width={64} height={64} original />
         {:else}
           <span class="emote-card-emoji" aria-hidden="true">{reaction.key}</span>
         {/if}
-        <span>{summary}</span>
-      </span>
+      </EmoteCard>
     {/snippet}
     <Tooltip
       label={summary}
@@ -321,19 +314,6 @@
     max-width: 9.375rem;
     object-fit: contain;
     width: calc(1.125rem * var(--media-ratio));
-  }
-
-  .emote-card {
-    align-items: center;
-    display: flex;
-    gap: var(--space-300);
-  }
-
-  .emote-card :global(.emote-card-image) {
-    flex: none;
-    height: var(--space-900);
-    object-fit: contain;
-    width: var(--space-900);
   }
 
   .emote-card-emoji {

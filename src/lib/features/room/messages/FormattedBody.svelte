@@ -38,6 +38,7 @@
   import { parseSettingsLink } from '../settings/settings-link';
   import { replyPreviewBody } from './reply-preview';
   import { FormattedBodyImages } from './formatted-body-images';
+  import EmoteCard from './EmoteCard.svelte';
   import ImageSpoilerControl from '#lib/ui/ImageSpoilerControl.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
@@ -641,16 +642,11 @@
 {/if}
 
 {#snippet emoteCard()}
-  <span class="emote-card">
+  <EmoteCard label={definition}>
     {#if emote?.src}
-      <img
-        class={['emote-card-image', { pixelated: emote.classList.contains('pixelated') }]}
-        src={emote.src}
-        alt=""
-      />
+      <img class:pixelated={emote.classList.contains('pixelated')} src={emote.src} alt="" />
     {/if}
-    <span class="emote-card-name">{definition}</span>
-  </span>
+  </EmoteCard>
 {/snippet}
 
 {#snippet linkCard()}
@@ -669,23 +665,6 @@
 {/if}
 
 <style>
-  .emote-card {
-    align-items: center;
-    display: flex;
-    gap: var(--space-300);
-  }
-
-  .emote-card-image {
-    height: var(--space-800);
-    object-fit: contain;
-    width: var(--space-800);
-  }
-
-  .emote-card-image.pixelated {
-    image-rendering: pixelated;
-  }
-
-  .emote-card-name,
   .link-card {
     font-size: var(--font-size-subheading);
     font-weight: var(--font-weight-medium);

@@ -15,6 +15,7 @@
 
   import { previewableLinks } from '../media/link-preview.js';
   import FormattedBody from './FormattedBody.svelte';
+  import EmoteCard from './EmoteCard.svelte';
   import LinkEmbed from '../media/embeds/LinkEmbed.svelte';
   import TimelineGallery from '../timeline/TimelineGallery.svelte';
   import { galleryItemId } from '../media/media-items.js';
@@ -138,9 +139,8 @@
   {#if stickerHovered && !imageSpoilerHidden}
     <Tooltip label={sticker.body} open customAnchor={stickerAnchor} side="top">
       {#snippet content()}
-        <span class="emote-card">
+        <EmoteCard label={sticker.body}>
           <MediaImage
-            class="emote-card-image"
             source={sticker.source}
             alt=""
             width={64}
@@ -149,8 +149,7 @@
             original
             autoplay={preferences.autoplayStickers}
           />
-          <span class="emote-card-name">{sticker.body}</span>
-        </span>
+        </EmoteCard>
       {/snippet}
     </Tooltip>
   {/if}
@@ -317,26 +316,6 @@
 
   :global(.sticker) + .body {
     margin-top: var(--space-200);
-  }
-
-  .emote-card {
-    align-items: center;
-    display: flex;
-    gap: var(--space-300);
-  }
-
-  .emote-card :global(.emote-card-image) {
-    height: var(--space-800);
-    width: var(--space-800);
-  }
-
-  .emote-card :global(.media-image-content) {
-    object-fit: contain;
-  }
-
-  .emote-card-name {
-    font-size: var(--font-size-subheading);
-    font-weight: var(--font-weight-medium);
   }
 
   :global(.media) {
