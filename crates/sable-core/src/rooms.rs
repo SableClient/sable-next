@@ -92,9 +92,10 @@ pub(crate) async fn reconcile_memberships(client: &Client) -> Result<(), matrix_
     Ok(())
 }
 
-pub(crate) async fn poll_memberships(client: Client) {
+pub(crate) async fn poll_memberships(core: std::sync::Arc<crate::Core>, client: Client) {
     loop {
         matrix_sdk::sleep::sleep(MEMBERSHIP_POLL_INTERVAL).await;
+        core.wait_until_active().await;
         if let Err(error) = reconcile_memberships(&client).await {
             tracing::debug!("could not poll room memberships: {error}");
         }

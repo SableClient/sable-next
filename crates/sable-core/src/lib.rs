@@ -155,6 +155,9 @@ pub struct Core {
     search_network: search::CrawlNetwork,
     search_foreground: AtomicBool,
     app_active: AtomicBool,
+    app_wake: tokio::sync::Notify,
+    sync_suspended: AtomicBool,
+    activity_lock: Mutex<()>,
     server_search_enabled: AtomicBool,
     read_room: std::sync::Mutex<Option<OwnedRoomId>>,
     search_index: Mutex<search::MessageIndex>,
@@ -264,6 +267,9 @@ impl Core {
             search_network: search::CrawlNetwork::default(),
             search_foreground: AtomicBool::new(true),
             app_active: AtomicBool::new(true),
+            app_wake: tokio::sync::Notify::new(),
+            sync_suspended: AtomicBool::new(false),
+            activity_lock: Mutex::new(()),
             server_search_enabled: AtomicBool::new(true),
             read_room: std::sync::Mutex::new(None),
             next_subscription: AtomicU32::new(1),
@@ -395,6 +401,37 @@ impl Core {
 
     pub fn set_app_active(&self, active: bool) {
         self.app_active.store(active, Ordering::Relaxed);
+        if active {
+            self.app_wake.notify_waiters();
+        }
+    }
+
+    pub async fn apply_app_activity(self: &Arc<Self>, active: bool) {
+        let _serial = self.activity_lock.lock().await;
+        if self.app_active.load(Ordering::Relaxed) != active {
+            return;
+        }
+        let Ok(sync_service) = self.sync_service().await else {
+            return;
+        };
+        if active {
+            if self.sync_suspended.swap(false, Ordering::SeqCst) {
+                sync_service.start().await;
+            }
+        } else if self.call_sessions.lock().await.is_empty() {
+            self.sync_suspended.store(true, Ordering::SeqCst);
+            sync_service.stop().await;
+        }
+    }
+
+    pub(crate) async fn wait_until_active(&self) {
+        loop {
+            let woken = self.app_wake.notified();
+            if self.app_active.load(Ordering::Relaxed) {
+                return;
+            }
+            woken.await;
+        }
     }
 
     pub fn set_search_network_unmetered(&self, unmetered: bool) {

@@ -72,6 +72,7 @@ impl Core {
                 let mut since: Option<String> = None;
 
                 loop {
+                    core.wait_until_active().await;
                     let mut request = sync_events::v3::Request::new();
                     request.filter =
                         Some(sync_events::v3::Filter::FilterDefinition(presence_filter()));

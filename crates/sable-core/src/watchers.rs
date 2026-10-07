@@ -390,12 +390,12 @@ impl Core {
         );
     }
 
-    pub(crate) fn watch_joined_invites(&self, client: &matrix_sdk::Client) {
+    pub(crate) fn watch_joined_invites(self: &Arc<Self>, client: &matrix_sdk::Client) {
         self.track_session_task(
             spawn(crate::rooms::reconcile_joined_invites(client.clone())).abort_on_drop(),
         );
         self.track_session_task(
-            spawn(crate::rooms::poll_memberships(client.clone())).abort_on_drop(),
+            spawn(crate::rooms::poll_memberships(self.clone(), client.clone())).abort_on_drop(),
         );
     }
 

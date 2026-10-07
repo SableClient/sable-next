@@ -547,6 +547,9 @@ fn hide_to_tray_on_close(window: &tauri::Window<BrowserEngine>, event: &tauri::W
 }
 
 #[cfg(mobile)]
+const SYNC_STOP_DELAY: std::time::Duration = std::time::Duration::from_secs(3);
+
+#[cfg(mobile)]
 fn update_mobile_activity(window: &tauri::Window<BrowserEngine>, event: &tauri::WindowEvent) {
     let active = match event {
         tauri::WindowEvent::Suspended => false,
@@ -554,7 +557,14 @@ fn update_mobile_activity(window: &tauri::Window<BrowserEngine>, event: &tauri::
         _ => return,
     };
     if let Some(state) = window.try_state::<AppState>() {
-        state.core.set_app_active(active);
+        let core = state.core.clone();
+        core.set_app_active(active);
+        tauri::async_runtime::spawn(async move {
+            if !active {
+                tokio::time::sleep(SYNC_STOP_DELAY).await;
+            }
+            core.apply_app_activity(active).await;
+        });
     }
 }
 

@@ -807,7 +807,9 @@ impl Core {
             spawn(async move {
                 let mut failures = 0u32;
                 while let Some(state) = states.next().await {
-                    if core.account_locked.load(Ordering::SeqCst) {
+                    if core.account_locked.load(Ordering::SeqCst)
+                        || core.sync_suspended.load(Ordering::SeqCst)
+                    {
                         continue;
                     }
                     let stalled = matches!(
@@ -842,7 +844,9 @@ impl Core {
                         }
                         failures = failures.saturating_add(1);
                         crate::watchers::retry_backoff(failures).await;
-                        if !core.account_locked.load(Ordering::SeqCst) {
+                        if !core.account_locked.load(Ordering::SeqCst)
+                            && !core.sync_suspended.load(Ordering::SeqCst)
+                        {
                             restarted.start().await;
                         }
                     } else {
