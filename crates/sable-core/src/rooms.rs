@@ -26,6 +26,7 @@ const HIERARCHY_PAGE_SIZE: u32 = 100;
 const HIERARCHY_MAX_DEPTH: u32 = 1;
 const DIRECTORY_PAGE_SIZE: u32 = 30;
 const OWN_MEMBER_FILL_MAX_MEMBERS: u64 = 50;
+const MEMBERSHIP_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
 
 pub(crate) fn repair_unreadable_tombstones(
     client: &Client,
@@ -89,6 +90,15 @@ pub(crate) async fn reconcile_memberships(client: &Client) -> Result<(), matrix_
         .await?;
     }
     Ok(())
+}
+
+pub(crate) async fn poll_memberships(client: Client) {
+    loop {
+        matrix_sdk::sleep::sleep(MEMBERSHIP_POLL_INTERVAL).await;
+        if let Err(error) = reconcile_memberships(&client).await {
+            tracing::debug!("could not poll room memberships: {error}");
+        }
+    }
 }
 
 pub(crate) async fn reconcile_joined_invites(client: Client) {

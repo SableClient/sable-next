@@ -394,6 +394,9 @@ impl Core {
         self.track_session_task(
             spawn(crate::rooms::reconcile_joined_invites(client.clone())).abort_on_drop(),
         );
+        self.track_session_task(
+            spawn(crate::rooms::poll_memberships(client.clone())).abort_on_drop(),
+        );
     }
 
     pub(crate) fn watch_profile_changes(
