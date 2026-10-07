@@ -233,6 +233,80 @@ async fn a_replayed_message_alerts_once() {
 }
 
 #[tokio::test]
+async fn a_message_delivered_late_by_a_resumed_sync_does_not_alert() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!late:example.org");
+    server.mock_room_state_encryption().plain().mount().await;
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(factory.member(client.user_id().unwrap()))
+                .add_state_event(factory.default_power_levels()),
+        )
+        .await;
+    let (core, mut events) = watching(&server, &client).await;
+    let rules = matrix_sdk::ruma::push::Ruleset::server_default(client.user_id().unwrap());
+    let long_ago = MilliSecondsSinceUnixEpoch::from_system_time(
+        std::time::SystemTime::now() - Duration::from_secs(600),
+    )
+    .unwrap();
+    let message = |event_id: &str, sent: MilliSecondsSinceUnixEpoch| {
+        json!({
+            "type": "m.room.message", "event_id": event_id, "room_id": room_id,
+            "sender": *ALICE, "origin_server_ts": sent,
+            "content": { "msgtype": "m.text", "body": event_id }
+        })
+    };
+    for (event_id, sent) in [
+        ("$late", long_ago),
+        ("$live", MilliSecondsSinceUnixEpoch::now()),
+    ] {
+        let event = message(event_id, sent);
+        Mock::given(method("GET"))
+            .and(path_regex(format!(
+                r"/context/.*{}$",
+                event_id.trim_start_matches('$')
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "event": event, "events_before": [], "events_after": [],
+                "state": [], "start": "s", "end": "e"
+            })))
+            .mount(server.server())
+            .await;
+        server
+            .mock_sync()
+            .ok_and_run(&client, |builder| {
+                builder.add_global_account_data(factory.push_rules(rules.clone()));
+                builder.add_joined_room(
+                    JoinedRoomBuilder::new(room_id)
+                        .set_unread_notifications_count(
+                            json!({"notification_count": 1, "highlight_count": 0}),
+                        )
+                        .add_timeline_event(
+                            matrix_sdk::ruma::serde::Raw::new(&event)
+                                .unwrap()
+                                .cast_unchecked::<matrix_sdk::ruma::events::AnySyncTimelineEvent>(),
+                        ),
+                );
+            })
+            .await;
+    }
+
+    assert_eq!(
+        next_notification(&mut events)
+            .await
+            .event_id
+            .map(|event_id| event_id.to_string()),
+        Some("$live".to_owned()),
+        "a message from before the gap is a catch-up, not an arrival"
+    );
+    core.session_tasks.lock().unwrap().clear();
+}
+
+#[tokio::test]
 #[expect(
     clippy::too_many_lines,
     reason = "one sequential flow kept in a single function"
