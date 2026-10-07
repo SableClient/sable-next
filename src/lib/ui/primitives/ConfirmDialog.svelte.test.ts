@@ -32,6 +32,16 @@ test('reports a cancel', async () => {
   expect(onConfirm).not.toHaveBeenCalled();
 });
 
+test('tells the owner of a one-way open prop that cancel closed it', async () => {
+  const user = userEvent.setup();
+  const onOpenChange = vi.fn();
+  render(ConfirmDialog, { open: true, title: 'Remove', confirmLabel: 'Remove', onOpenChange });
+
+  await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+  expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false);
+});
+
 test('renders a field, the chosen confirm variant and an error line', async () => {
   render(ConfirmDialog, {
     open: true,

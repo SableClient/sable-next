@@ -42,6 +42,7 @@
 
   function cancel(): void {
     open = false;
+    onOpenChange?.(false);
     onCancel?.();
   }
 </script>
