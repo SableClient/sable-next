@@ -634,6 +634,10 @@
       if (draftTimeout !== undefined || preEdit !== undefined) return;
 
       const draft = readDraft(key, activeDraftAccount);
+      if (draft) {
+        staged = draft.staged;
+        nextStagedId = draft.nextStagedId;
+      }
       editor.clear();
       if (draft?.doc) editor.setDoc(composerSchema.nodeFromJSON(draft.doc));
     });

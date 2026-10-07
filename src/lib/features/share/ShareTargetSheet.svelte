@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import { readDraft, writeDraft } from '#lib/features/composer/composer-drafts.svelte.js';
+  import { injectDraft, readDraft } from '#lib/features/composer/composer-drafts.svelte.js';
   import { stageFiles } from '#lib/features/composer/composer-files.js';
   import { i18n } from '#lib/i18n.js';
   import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
@@ -40,7 +40,7 @@
       const existing = readDraft(roomId, accountId);
       let nextStagedId = existing?.nextStagedId ?? 0;
 
-      writeDraft(
+      injectDraft(
         roomId,
         {
           doc: appendPlainText(existing?.doc, text),

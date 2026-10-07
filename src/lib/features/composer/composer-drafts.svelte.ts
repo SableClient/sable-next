@@ -44,6 +44,13 @@ export function writeDraft(roomId: string, draft: ComposerDraft, accountId = '')
   revision.value += 1;
 }
 
+export function injectDraft(roomId: string, draft: ComposerDraft, accountId = ''): void {
+  const { adopted } = stateFor(accountId);
+  writeDraft(roomId, draft, accountId);
+  adopted.set(roomId, (adopted.get(roomId) ?? 0) + 1);
+  remote.value += 1;
+}
+
 export function clearDraft(roomId: string, accountId = ''): void {
   const { drafts, discarded } = stateFor(accountId);
   const doc = drafts.get(roomId)?.doc;
