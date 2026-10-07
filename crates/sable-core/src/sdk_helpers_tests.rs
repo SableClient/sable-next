@@ -381,7 +381,6 @@ async fn event_focus_clears_its_explicit_sync_subscription_after_unsubscribing()
 
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!focus:example.org");
     let target = event_id!("$target");
     server.sync_joined_room(&client, room_id).await;
@@ -2216,7 +2215,6 @@ async fn event_cached_reports_only_events_the_cache_holds() {
 
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!cached:example.org");
     let factory = EventFactory::new()
         .room(room_id)

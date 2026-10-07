@@ -320,7 +320,6 @@ async fn bridge_status_events_do_not_notify() {
 
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!signal:example.org");
     let bot = user_id!("@signalbot:example.org");
     let factory = EventFactory::new().room(room_id).sender(bot);

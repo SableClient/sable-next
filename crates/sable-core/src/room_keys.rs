@@ -254,7 +254,6 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
             matrix_sdk::ruma::TransactionId::new()
         );
         let client = crate::session::mock_account_client(server, &store_id).await;
-        client.event_cache().subscribe().unwrap();
         let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
         let (core, _events) = Core::new(
             store.path().to_str().unwrap(),
@@ -363,13 +362,13 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
     }
 
     #[tokio::test]
-    async fn history_keys_keep_the_wire_field_other_clients_read() {
+    async fn history_keys_use_the_spec_wire_field() {
         let session = outbound_session(room_id!("!history:example.org"));
         let mut key = exported(&session).await;
         key.shared_history = true;
         let wire = serde_json::to_value(&key).unwrap();
-        assert_eq!(wire["m.shared_history"], true);
-        assert!(wire.get("shared_history").is_none());
+        assert_eq!(wire["shared_history"], true);
+        assert!(wire.get("m.shared_history").is_none());
     }
 
     async fn backup_metadata(

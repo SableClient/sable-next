@@ -208,7 +208,6 @@ mod tests {
         for reactions_first in [false, true] {
             let server = MatrixMockServer::new().await;
             let client = server.client_builder().build().await;
-            client.event_cache().subscribe().unwrap();
             server.mock_room_state_encryption().plain().mount().await;
             let room_id = room_id!("!reactions:example.org");
             let factory = EventFactory::new().room(room_id).sender(*ALICE);

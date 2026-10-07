@@ -3708,7 +3708,6 @@ mod tests {
     async fn test_a_room_with_no_new_activity_is_indexed_from_its_persisted_cache() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!quiet:localhost").to_owned();
         let factory = EventFactory::new()
@@ -3746,7 +3745,6 @@ mod tests {
     async fn test_search_watcher_releases_paginated_room_cache() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
         let room_id = room_id!("!retention:localhost").to_owned();
         let factory = EventFactory::new()
             .room(&room_id)
@@ -3826,7 +3824,6 @@ mod tests {
     async fn test_back_pagination_reaches_the_index_and_notifies_it() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!backfill:localhost").to_owned();
         let factory = EventFactory::new()
@@ -3907,7 +3904,6 @@ mod tests {
     async fn test_an_encrypted_rooms_plaintext_is_searchable_and_edits_replace_the_body() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!search:localhost").to_owned();
         let original_id = event_id!("$original");
@@ -3977,7 +3973,6 @@ mod tests {
     async fn test_an_edit_crawled_before_its_original_keeps_the_new_body() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!crawl:localhost").to_owned();
         let original_id = event_id!("$original");
@@ -4031,7 +4026,6 @@ mod tests {
     async fn test_a_thread_reply_is_marked_and_keeps_the_mark_through_an_edit() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!threads:localhost").to_owned();
         let thread_root = event_id!("$root");
@@ -4162,7 +4156,6 @@ mod tests {
     async fn test_a_redaction_drops_the_message_from_the_index() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!redact:localhost").to_owned();
         let target_id = event_id!("$target");
@@ -4214,7 +4207,6 @@ mod tests {
     async fn test_pagination_walks_one_ordering_without_repeating_a_hit() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!paging:localhost").to_owned();
         let room = server.sync_joined_room(&client, &room_id).await;
@@ -4271,7 +4263,6 @@ mod tests {
     async fn test_leaving_a_room_forgets_its_documents() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!forget:localhost").to_owned();
         let room = server.sync_joined_room(&client, &room_id).await;
@@ -4996,7 +4987,6 @@ mod tests {
     async fn test_the_gallery_fills_in_media_for_a_migrated_message() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
         let room_id = room_id!("!hydrate:localhost").to_owned();
         server.mock_room_state_encryption().plain().mount().await;
         let room = server
@@ -5074,7 +5064,6 @@ mod tests {
     async fn test_the_crawl_resumes_from_the_checkpoint_it_persisted() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!resume:localhost").to_owned();
         let factory = EventFactory::new()
@@ -5178,7 +5167,6 @@ mod tests {
     async fn test_the_crawler_deepens_a_room_and_records_reaching_its_start() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!crawl:localhost").to_owned();
         let factory = EventFactory::new()
@@ -5620,7 +5608,6 @@ mod tests {
     async fn test_only_the_crawl_rederives_classified_documents() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!rederive:localhost").to_owned();
         server.mock_room_state_encryption().plain().mount().await;
@@ -5841,7 +5828,6 @@ mod tests {
     async fn test_a_flushed_index_is_searchable_in_the_next_session() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!persisted:localhost").to_owned();
         let factory = EventFactory::new()
@@ -5967,7 +5953,6 @@ mod tests {
     async fn test_a_restored_room_does_not_charge_the_crawl_budget_again() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!budget:localhost").to_owned();
         let factory = EventFactory::new()
@@ -6030,7 +6015,6 @@ mod tests {
     async fn test_a_failed_room_reports_partial_not_complete() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!failed:localhost").to_owned();
         server.mock_room_state_encryption().plain().mount().await;
@@ -6070,7 +6054,6 @@ mod tests {
     async fn test_a_room_walked_to_its_start_reports_complete() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!walked:localhost").to_owned();
         let factory = EventFactory::new()
@@ -6138,7 +6121,6 @@ mod tests {
     async fn test_a_spent_budget_reports_stopped_even_with_rooms_left() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!stopped:localhost").to_owned();
         server.mock_room_state_encryption().plain().mount().await;
@@ -6185,7 +6167,6 @@ mod tests {
     async fn test_the_crawl_serves_every_room_before_deepening_one() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let busy = room_id!("!busy:localhost").to_owned();
         let quiet = room_id!("!quiet:localhost").to_owned();
@@ -6317,7 +6298,6 @@ mod tests {
     async fn test_an_unencrypted_room_is_searched_on_the_homeserver() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!plain:localhost").to_owned();
         server.mock_room_state_encryption().plain().mount().await;
@@ -6359,7 +6339,6 @@ mod tests {
     async fn test_an_encrypted_room_is_never_searched_on_the_homeserver() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!secret:localhost").to_owned();
         let sender = user_id!("@erwan:localhost");
@@ -6430,7 +6409,6 @@ mod tests {
 
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!attachments:localhost").to_owned();
         let factory = EventFactory::new()
@@ -6528,7 +6506,6 @@ mod tests {
 
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!gallery-attachments:localhost").to_owned();
         server.mock_room_state_encryption().plain().mount().await;
@@ -6625,7 +6602,6 @@ mod tests {
     async fn test_a_homeserver_that_cannot_search_falls_back_to_the_local_index() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!plain:localhost").to_owned();
         server.mock_room_state_encryption().plain().mount().await;
@@ -6684,7 +6660,6 @@ mod tests {
     async fn test_a_dated_query_stays_local_even_for_an_unencrypted_room() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!plain:localhost").to_owned();
         server.mock_room_state_encryption().plain().mount().await;
@@ -6739,7 +6714,6 @@ mod tests {
     async fn test_a_filter_only_query_stays_local_even_for_an_unencrypted_room() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!plain:localhost").to_owned();
         let sender = user_id!("@erwan:localhost");
@@ -6916,7 +6890,6 @@ mod tests {
 
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!edited:localhost").to_owned();
         let original_id = event_id!("$original");
@@ -6978,7 +6951,6 @@ mod tests {
     async fn test_an_edit_crawled_a_batch_before_its_original_is_fixed_up_when_it_lands() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!split:localhost").to_owned();
         let original_id = event_id!("$original");
@@ -7036,7 +7008,6 @@ mod tests {
     async fn test_an_edit_from_someone_else_is_ignored() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!forged:localhost").to_owned();
         let original_id = event_id!("$original");
@@ -7097,7 +7068,6 @@ mod tests {
     async fn test_redacting_an_edit_brings_the_previous_body_back() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room_id!("!unedited:localhost").to_owned();
         let original_id = event_id!("$original");

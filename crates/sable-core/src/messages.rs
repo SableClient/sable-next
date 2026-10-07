@@ -882,7 +882,6 @@ mod tests {
     async fn forwarding_uses_latest_valid_edit_even_when_relations_are_unordered() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().unwrap();
         let source = room_id!("!source:example.org");
         let target = room_id!("!target:example.org");
         server.sync_joined_room(&client, source).await;
@@ -940,7 +939,6 @@ mod tests {
     async fn edit_history_lists_the_original_then_valid_edits_by_time() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().unwrap();
         let room = room_id!("!history:example.org");
         server.sync_joined_room(&client, room).await;
         server.mock_room_state_encryption().plain().mount().await;
@@ -1004,7 +1002,6 @@ mod tests {
     async fn event_items_render_the_latest_valid_edit_and_skip_missing_events() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().unwrap();
         let room = room_id!("!pins:example.org");
         server.sync_joined_room(&client, room).await;
         server.mock_room_state_encryption().plain().mount().await;
@@ -1079,7 +1076,6 @@ mod tests {
     async fn forwarding_media_from_a_private_room_keeps_the_attachment() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().unwrap();
         let source = room_id!("!private:example.org");
         let target = room_id!("!target:example.org");
         server.sync_joined_room(&client, source).await;
@@ -1131,7 +1127,6 @@ mod tests {
         use matrix_sdk::ruma::events::room::message::{Relation, RoomMessageEventContent};
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().unwrap();
         client.send_queue().set_enabled(false).await;
         let room_id = room_id!("!pending:example.org");
         server.sync_joined_room(&client, room_id).await;
@@ -1206,7 +1201,6 @@ mod tests {
         use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().unwrap();
         let room_id = room_id!("!thread:example.org");
         let root = event_id!("$root");
         let factory = EventFactory::new().room(room_id).sender(*ALICE);
@@ -1290,7 +1284,6 @@ mod tests {
         use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().unwrap();
         let room_id = room_id!("!thread:example.org");
         let root = event_id!("$root");
         let factory = EventFactory::new().room(room_id).sender(*ALICE);

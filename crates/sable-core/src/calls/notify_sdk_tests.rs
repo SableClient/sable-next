@@ -19,7 +19,6 @@ use crate::{Core, protocol::Command, session::Session, store::MemorySessionStore
 async fn core_declines_legacy_notifications_but_rejects_invalid_and_own_events() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     server.mock_room_state_encryption().plain().mount().await;
     let room_id = room_id!("!legacy-call:example.org");
     let room = server.sync_joined_room(&client, room_id).await;

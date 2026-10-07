@@ -91,7 +91,6 @@ fn event_ids(
 async fn timeline_view_preserves_available_read_receipt_timestamps() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!receipts:example.org");
     let event_id = event_id!("$read");
     let bob = user_id!("@bob:example.org");
@@ -161,7 +160,6 @@ async fn timeline_view_preserves_available_read_receipt_timestamps() {
 async fn live_timeline_receives_sync_and_reconciles_a_limited_gap() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!timeline:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -199,7 +197,6 @@ async fn live_timeline_receives_sync_and_reconciles_a_limited_gap() {
 async fn live_timeline_back_paginates_through_the_event_cache() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!pagination:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -234,7 +231,6 @@ async fn live_timeline_back_paginates_through_the_event_cache() {
 async fn hidden_events_admit_only_events_the_sdk_can_render() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!hidden:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
     let target = event_id!("$target");
@@ -272,7 +268,6 @@ async fn hidden_events_admit_only_events_the_sdk_can_render() {
 async fn a_failed_send_wedges_the_room_queue_until_it_is_re_enabled() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!wedged:example.org");
 
     server.mock_room_state_encryption().plain().mount().await;
@@ -406,7 +401,6 @@ async fn custom_room_state_reads_from_the_server_when_not_in_the_store() {
 async fn timeline_subscriptions_remain_active_until_each_is_unsubscribed() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let first_room_id = room_id!("!first:example.org");
     let second_room_id = room_id!("!second:example.org");
     server.sync_joined_room(&client, first_room_id).await;
@@ -476,7 +470,6 @@ async fn timeline_subscriptions_remain_active_until_each_is_unsubscribed() {
 async fn live_timeline_reports_its_back_pagination_status() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!pagination-status:example.org");
     server.sync_joined_room(&client, room_id).await;
     server.mock_room_state_encryption().plain().mount().await;
@@ -521,7 +514,6 @@ async fn live_timeline_reports_its_back_pagination_status() {
 async fn concurrent_first_access_returns_one_live_timeline() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!race:example.org");
     server.sync_joined_room(&client, room_id).await;
     server.mock_room_state_encryption().plain().mount().await;
@@ -546,7 +538,6 @@ async fn concurrent_first_access_returns_one_live_timeline() {
 async fn inactive_timelines_use_least_recently_used_eviction() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     server.mock_room_state_encryption().plain().mount().await;
     let room_ids = [
         room_id!("!room1:example.org").to_owned(),
@@ -585,7 +576,6 @@ async fn inactive_timelines_use_least_recently_used_eviction() {
 async fn explicit_room_subscription_delivers_simplified_sliding_sync_events() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!sliding:example.org");
     let sliding_sync = client
         .sliding_sync("timeline-test")
@@ -657,7 +647,6 @@ async fn explicit_room_subscription_delivers_simplified_sliding_sync_events() {
 async fn a_sticker_reaches_the_server_as_an_m_sticker_event() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!cleared:example.org");
     server.sync_joined_room(&client, room_id).await;
     server.mock_room_state_encryption().plain().mount().await;
@@ -815,7 +804,6 @@ async fn media_replies_preserve_silent_mentions_on_the_wire() {
             }
             let server = MatrixMockServer::new().await;
             let client = server.client_builder().build().await;
-            client.event_cache().subscribe().unwrap();
             let room_id = room_id!("!silent-media:example.org");
             let target = event_id!("$target");
             let sender = user_id!("@ana:example.org");
@@ -1000,7 +988,6 @@ async fn attachments_use_the_server_upload_limit_instead_of_100_mib() {
 async fn a_gallery_mixing_a_picture_and_a_pdf_sends_each_as_its_own_itemtype() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!send-gallery:example.org");
     server.sync_joined_room(&client, room_id).await;
     server.mock_room_state_encryption().plain().mount().await;
@@ -1107,7 +1094,6 @@ async fn a_gallery_mixing_a_picture_and_a_pdf_sends_each_as_its_own_itemtype() {
 async fn a_room_read_elsewhere_reports_the_server_unread_count() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!read-elsewhere:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -1144,7 +1130,6 @@ async fn a_room_read_elsewhere_reports_the_server_unread_count() {
 async fn a_count_truncated_by_the_local_cache_falls_back_to_the_server_count() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!truncated:example.org");
     let me = client
         .user_id()
@@ -1201,7 +1186,6 @@ async fn a_count_truncated_by_the_local_cache_falls_back_to_the_server_count() {
 async fn a_server_that_pushes_every_encrypted_event_does_not_count_them_as_unread() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!pushes-everything:example.org");
     let me = client
         .user_id()
@@ -1267,7 +1251,6 @@ async fn a_server_that_pushes_every_encrypted_event_does_not_count_them_as_unrea
 async fn unread_reply_counts_persist_until_read() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!old-mentions:example.org");
     let me = client
         .user_id()
@@ -1367,7 +1350,6 @@ async fn unread_reply_counts_persist_until_read() {
 async fn a_receipt_on_the_latest_event_clears_a_stale_server_count() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!caught-up:example.org");
     let me = client
         .user_id()
@@ -1466,7 +1448,6 @@ fn poll_content(
 async fn a_poll_carries_its_tally_and_the_answer_this_account_picked() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!poll:example.org");
     let own = client.user_id().expect("a logged-in client").to_owned();
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
@@ -1528,7 +1509,6 @@ async fn a_poll_that_repeats_an_answer_id_lists_it_once() {
 
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!poll-repeat:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
     let answers = UnstablePollAnswers::try_from(vec![
@@ -1567,7 +1547,6 @@ async fn a_poll_that_repeats_an_answer_id_lists_it_once() {
 async fn an_undisclosed_poll_withholds_its_tally_until_it_closes() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!undisclosed:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
     let start = event_id!("$poll");
@@ -1630,7 +1609,6 @@ fn contents(
 async fn a_poll_kind_we_do_not_recognise_withholds_its_tally() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!custom:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
     let start = event_id!("$poll");
@@ -1671,7 +1649,6 @@ async fn a_poll_kind_we_do_not_recognise_withholds_its_tally() {
 async fn a_location_reaches_the_view_with_its_coordinates_parsed() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!location:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -1719,7 +1696,6 @@ async fn live_location_beacons_reach_the_view_as_updated_coordinates() {
     use matrix_sdk::ruma::MilliSecondsSinceUnixEpoch;
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!live-location:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
     let timestamp = MilliSecondsSinceUnixEpoch::now();
@@ -1769,7 +1745,6 @@ async fn live_location_beacons_reach_the_view_as_updated_coordinates() {
 async fn a_notice_is_marked_as_one_rather_than_read_as_speech() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!notice:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -1810,7 +1785,6 @@ async fn a_notice_is_marked_as_one_rather_than_read_as_speech() {
 async fn a_gallery_reaches_the_view_as_one_item_per_attachment() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!gallery:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -1855,7 +1829,6 @@ async fn a_gallery_reaches_the_view_as_one_item_per_attachment() {
 async fn a_gallery_item_carries_what_a_single_attachment_does() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!gallery-items:example.org");
 
     server.mock_room_state_encryption().plain().mount().await;
@@ -1933,7 +1906,6 @@ async fn a_gallery_item_carries_what_a_single_attachment_does() {
 async fn a_reply_quotes_formatted_text() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!formatted-reply:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -1972,7 +1944,6 @@ async fn a_reply_quotes_formatted_text() {
 async fn a_reply_to_an_uncaptioned_gallery_quotes_its_file_names() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!gallery-reply:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -2015,7 +1986,6 @@ async fn a_reply_to_an_uncaptioned_gallery_quotes_its_file_names() {
 async fn replies_to_state_and_membership_events_carry_no_body() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!state-reply:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -2077,7 +2047,6 @@ fn state_changes(
 async fn a_renamed_room_carries_both_names_and_a_new_topic_carries_its_text() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!named:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -2114,7 +2083,6 @@ async fn a_renamed_room_carries_both_names_and_a_new_topic_carries_its_text() {
 async fn a_pin_change_reports_what_was_added_and_dropped() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!pinned:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -2150,7 +2118,6 @@ async fn a_pin_change_reports_what_was_added_and_dropped() {
 async fn joining_a_call_is_worded_as_a_join() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!call:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -2253,7 +2220,6 @@ async fn an_unavailable_homeserver_is_retryable_rather_than_a_logged_failure() {
 async fn fetching_members_names_a_bridge_ghost_the_sync_never_shipped() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!bridged:example.org");
     let ghost = user_id!("@whatsapp_33612345678:example.org");
     let factory = EventFactory::new().room(room_id).sender(ghost);
@@ -2336,9 +2302,7 @@ async fn dispatch_mark_read(
 }
 
 #[expect(
-    clippy::unwrap_used,
     clippy::expect_used,
-    clippy::too_many_lines,
     reason = "test code; one sequential flow kept in a single function"
 )]
 async fn mark_read_body(
@@ -2358,7 +2322,6 @@ async fn mark_read_body(
         .on_builder(|builder| builder.with_threading_support(crate::session::THREADING_SUPPORT))
         .build()
         .await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!receipts:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -2462,7 +2425,6 @@ async fn mark_read_body(
 async fn marking_unread_writes_the_room_account_data_flag() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!unread:example.org");
 
     server.mock_room_state_encryption().plain().mount().await;
@@ -2519,7 +2481,6 @@ async fn marking_unread_writes_the_room_account_data_flag() {
 async fn marking_unread_from_a_message_walks_the_read_marker_back() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!unread-from:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -2631,7 +2592,6 @@ async fn a_receipt_short_of_the_latest_message_leaves_the_marker() {
         .on_builder(|builder| builder.with_threading_support(crate::session::THREADING_SUPPORT))
         .build()
         .await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!receipts:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
     server.mock_room_state_encryption().plain().mount().await;
@@ -2674,7 +2634,6 @@ async fn a_receipt_short_of_the_latest_message_leaves_the_marker() {
 async fn read_marker_for(fully_read: bool) -> CommandOk {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!marker:example.org");
     let me = client
         .user_id()
@@ -3075,7 +3034,6 @@ async fn sliding_sync_room_summary_prefers_avatar_state_over_the_avatar_property
 async fn a_mention_is_loud_from_the_ruleset_not_the_stamped_flag() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let own_user_id = client.user_id().expect("a logged-in user").to_owned();
     let room_id = room_id!("!mention:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
@@ -3139,7 +3097,6 @@ async fn a_mention_is_loud_from_the_ruleset_not_the_stamped_flag() {
 async fn a_deleted_mention_is_not_highlighted() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let own_user_id = client.user_id().expect("a logged-in user").to_owned();
     let room_id = room_id!("!deleted-mention:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
@@ -3218,7 +3175,6 @@ async fn a_deleted_mention_is_not_highlighted() {
 async fn a_redaction_the_server_rejects_restores_the_message() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let own_user_id = client.user_id().expect("a logged-in user").to_owned();
     let room_id = room_id!("!rejected-redaction:example.org");
     let factory = EventFactory::new().room(room_id).sender(&own_user_id);
@@ -3320,7 +3276,6 @@ const TIME_HTML: &str = "<time datetime=\"1970-01-01T00:00:00Z\">1 Jan 1970, 00:
 async fn a_time_element_survives_the_sdk_sanitizer() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!time:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
 
@@ -3348,7 +3303,6 @@ async fn a_time_element_survives_the_sdk_sanitizer() {
 async fn an_edit_renders_the_formatted_body_of_its_new_content() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!edited-time:example.org");
     let factory = EventFactory::new().room(room_id).sender(*ALICE);
     let original = event_id!("$original");
@@ -3390,7 +3344,6 @@ async fn an_edit_renders_the_formatted_body_of_its_new_content() {
 async fn a_local_echo_keeps_the_formatted_body_it_was_sent_with() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!echo-time:example.org");
 
     server.mock_room_state_encryption().plain().mount().await;
@@ -3522,7 +3475,6 @@ async fn an_invite_joined_without_a_required_state_member_becomes_joined() {
 async fn redacting_an_event_outside_the_timeline_redacts_it_in_the_room() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!calendar:example.org");
     server.sync_joined_room(&client, room_id).await;
     server.mock_room_state_encryption().plain().mount().await;
@@ -3787,7 +3739,6 @@ async fn a_synced_calendar_entry_tells_the_page_to_reload() {
 async fn an_emptied_state_event_is_a_state_event_not_a_deleted_message() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
     let room_id = room_id!("!cleared:example.org");
     let cleared = |id: &str| {
         serde_json::from_value::<

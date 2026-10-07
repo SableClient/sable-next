@@ -907,7 +907,6 @@ mod tests {
     async fn test_the_metrics_count_batches_and_pushbacks() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
         let room_id = room();
         server.sync_joined_room(&client, &room_id).await;
         server
@@ -972,7 +971,6 @@ mod tests {
     async fn test_metered_crawl_pauses_and_resumes() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
         let room_id = room();
         server.sync_joined_room(&client, &room_id).await;
         server
@@ -1085,7 +1083,6 @@ mod tests {
     async fn test_a_room_without_a_cursor_starts_behind_what_sync_delivered() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
         let room_id = room();
         let joined = server
             .sync_room(
@@ -1163,7 +1160,6 @@ mod tests {
     async fn test_a_server_error_backs_the_crawl_off_instead_of_dropping_the_room() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
         let room_id = room();
         server.sync_joined_room(&client, &room_id).await;
         server.mock_room_messages().error500().mount().await;
@@ -1328,7 +1324,6 @@ mod tests {
     async fn test_a_checkpoint_is_not_persisted_ahead_of_the_documents_it_skips() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room();
         let factory = EventFactory::new()
@@ -1386,7 +1381,6 @@ mod tests {
     async fn test_the_crawl_stops_a_room_below_its_floor() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room();
         let factory = EventFactory::new()
@@ -1447,7 +1441,6 @@ mod tests {
     async fn test_the_crawl_stops_a_room_older_than_its_age_limit() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let room_id = room();
         let factory = EventFactory::new()
@@ -1504,7 +1497,6 @@ mod tests {
     async fn test_a_room_that_is_gone_is_not_written_off_for_good() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let (core, _events) = crate::Core::new(
             "crawl-gone",
@@ -1532,7 +1524,6 @@ mod tests {
     async fn test_the_crawl_reaches_an_encrypted_room_before_one_the_server_can_search() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
-        client.event_cache().subscribe().expect("event cache");
 
         let sender = user_id!("@erwan:localhost");
         let plain_id = room_id!("!plain:localhost").to_owned();

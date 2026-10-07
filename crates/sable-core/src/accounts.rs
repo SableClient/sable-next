@@ -703,10 +703,6 @@ impl Core {
         generation: u64,
     ) -> Result<(), CommandErr> {
         let oauth = client.oauth().full_session().is_some();
-        client
-            .event_cache()
-            .subscribe()
-            .or_failed(self, "subscribe_event_cache")?;
         if let Err(error) = session::repair_room_key_sharing(&client).await {
             tracing::warn!(%error, "repairing room key sharing failed");
         }
@@ -1168,7 +1164,6 @@ mod regression_tests {
             .mount()
             .await;
         let client = server.client_builder().no_server_versions().build().await;
-        client.event_cache().subscribe().unwrap();
         let room = server
             .sync_joined_room(&client, room_id!("!regression:example.org"))
             .await;

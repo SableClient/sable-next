@@ -76,7 +76,7 @@ webpki-roots = "1"
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 matrix-sdk = { workspace = true, features = ["indexeddb", "js", "automatic-room-key-forwarding"] }
-matrix-sdk-indexeddb = { version = "0.19.1", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "4aea59dd962fd65393d7ed30b37656d1dc10ae7f", default-features = false, features = [
+matrix-sdk-indexeddb = { version = "0.19.1", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "e727310508c9b13483c1fe1f3ee51f2984dae750", default-features = false, features = [
   "e2e-encryption",
   "state-store",
   "event-cache-store",
@@ -102,8 +102,8 @@ getrandom = { version = "0.4", features = ["wasm_js"] }
 
 [dev-dependencies]
 matrix-sdk = { workspace = true, features = ["testing"] }
-matrix-sdk-test = { version = "0.19.1", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "4aea59dd962fd65393d7ed30b37656d1dc10ae7f" }
-matrix-sdk-test-utils = { version = "0.19.1", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "4aea59dd962fd65393d7ed30b37656d1dc10ae7f" }
+matrix-sdk-test = { version = "0.19.1", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "e727310508c9b13483c1fe1f3ee51f2984dae750" }
+matrix-sdk-test-utils = { version = "0.19.1", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "e727310508c9b13483c1fe1f3ee51f2984dae750" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 wiremock = "0.6"
