@@ -9,7 +9,7 @@
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
-  import { roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { findRoomByPathId, roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { addUnread, type UnreadCount } from '#lib/rooms/spaces.js';
   import { NO_UNREAD, roomUnread, type RoomUnread } from '#lib/rooms/unread.js';
   import {
@@ -256,6 +256,23 @@
     return path === root || path.startsWith(`${root}/`);
   }
 
+  function decodedSegment(path: string, root: string): string | null {
+    if (!path.startsWith(`${root}/`)) return null;
+    const segment = path.slice(root.length + 1);
+    if (segment.includes('/')) return null;
+    try {
+      return decodeURIComponent(segment);
+    } catch {
+      return null;
+    }
+  }
+
+  function samePathRoom(previous: string | null, current: string): boolean {
+    if (previous === null) return false;
+    const idOf = (pathId: string) => findRoomByPathId(roomList.rooms, pathId)?.room_id ?? pathId;
+    return idOf(previous) === idOf(current);
+  }
+
   function sectionHref(key: string, root: string): string {
     return spaceNavigationHref(root, spacePaths[key], mobile, root);
   }
@@ -490,8 +507,8 @@
     const key = sectionRoots.find(([, root]) => under(path, root))?.[0] ?? space?.room_id;
     const spaceParam = page.params.spaceId;
     const bounced = spaceParam
-      ? sectionRoots.find(
-          ([, root]) => previousPath === `${root}/${encodeURIComponent(spaceParam)}`
+      ? sectionRoots.find(([, root]) =>
+          samePathRoom(decodedSegment(previousPath, root), spaceParam)
         )
       : undefined;
     previousPath = page.url.pathname;
