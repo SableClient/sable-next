@@ -14,26 +14,38 @@ case "$(uname -m)" in
   *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
 esac
 
-CEF_DIR="$(
-  find "$ROOT/target" -type d -name "cef_linux_$CEF_ARCH" \
-    -path "*/$PROFILE/build/*" -print -quit 2>/dev/null || true
-)"
-if [ -z "$CEF_DIR" ]; then
-  echo "cef_linux_$CEF_ARCH not found under target/**/$PROFILE/build — build with --features cef first." >&2
-  exit 1
-fi
-
-CEF_LIB="$CEF_DIR/libcef.so"
-[ -f "$CEF_LIB" ] || { echo "libcef.so not found in $CEF_DIR." >&2; exit 1; }
-
-# A runtime left over from an older crate aborts at startup with no useful
-# message, and carries no version file, so read the major out of the library.
 CEF_VERSION="$(awk '
   /^\[\[package\]\]$/ { in_cef = 0 }
   /^name = "cef"$/ { in_cef = 1 }
   in_cef && /^version = / { gsub(/"/, "", $3); print $3; exit }
 ' "$ROOT/Cargo.lock")"
 [ -n "$CEF_VERSION" ] || { echo "no resolved cef version in Cargo.lock." >&2; exit 1; }
+
+# The crate version is `<crate>+<cef build>`, and the build script unpacks
+# `cef_binary_<cef build>+g…` into its own out dir. A cached target holds one
+# per version it has built, so take the one the lockfile resolves to rather than
+# the first one found.
+CEF_BUILD="${CEF_VERSION#*+}"
+CEF_DIR=""
+while IFS= read -r candidate; do
+  if grep -qF "cef_binary_${CEF_BUILD}+" "$candidate/archive.json" 2>/dev/null; then
+    CEF_DIR="$candidate"
+    break
+  fi
+done < <(
+  find "$ROOT/target" -type d -name "cef_linux_$CEF_ARCH" \
+    -path "*/$PROFILE/build/*" 2>/dev/null
+)
+if [ -z "$CEF_DIR" ]; then
+  echo "no cef_linux_$CEF_ARCH for CEF build $CEF_BUILD under target/**/$PROFILE/build — build with --features cef first." >&2
+  exit 1
+fi
+
+CEF_LIB="$CEF_DIR/libcef.so"
+[ -f "$CEF_LIB" ] || { echo "libcef.so not found in $CEF_DIR." >&2; exit 1; }
+
+# The archive match above is the real check; the library carries its own
+# version too, so read the major out of it as a second guard.
 
 RUNTIME_MAJOR="$(
   strings -a "$CEF_LIB" \
