@@ -9,6 +9,7 @@ const outDir = join(root, 'src-tauri', 'icons', 'installer');
 const iconPath = join(root, 'src-tauri', 'icons', 'icon.png');
 
 const BG = [0x24, 0x23, 0x2c, 255];
+const WIX_TEXT_BG = [255, 255, 255, 255];
 const ACCENT = [0x99, 0x87, 0xf7, 255];
 const MUTED = [0x40, 0x3f, 0x4c, 255];
 const ARROW = [0xbd, 0xb6, 0xec, 180];
@@ -394,14 +395,15 @@ async function main() {
   pasteLogo(sidebar, logo, 96, 82, 120);
   await writeAsset('nsis-sidebar.bmp', sidebar, encodeBmp);
 
-  const banner = solid(493, 58);
+  const banner = solid(493, 58, WIX_TEXT_BG);
   fillRect(banner, 0, 0, 5, 57, ACCENT);
-  pasteLogo(banner, logo, 44, 40, 29);
+  pasteLogo(banner, logo, 44, 453, 29);
   await writeAsset('wix-banner.bmp', banner, encodeBmp);
 
-  const dialog = solid(493, 312);
-  fillRect(dialog, 0, 0, 492, 5, ACCENT);
-  pasteLogo(dialog, logo, 140, 246, 140);
+  const dialog = solid(493, 312, WIX_TEXT_BG);
+  fillRect(dialog, 0, 0, 163, 311, BG);
+  fillRect(dialog, 0, 0, 163, 5, ACCENT);
+  pasteLogo(dialog, logo, 120, 82, 140);
   await writeAsset('wix-dialog.bmp', dialog, encodeBmp);
 
   const dmg = solid(660, 400);
