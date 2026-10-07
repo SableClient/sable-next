@@ -38,6 +38,7 @@
   import {
     activeCustomThemeCss,
     activeTweakCss,
+    hydrateCatalogThemes,
     themePreview,
   } from '#lib/settings/custom-themes.svelte.js';
   import {
@@ -65,7 +66,9 @@
       systemPrefersDark = media.matches;
     };
     updateSystemTheme();
+    void hydrateCatalogThemes();
     const stopListening = on(media, 'change', updateSystemTheme);
+    const stopHydrating = on(window, 'online', () => void hydrateCatalogThemes());
 
     if (isTauri()) {
       document.documentElement.dataset.tauriOs = osType();
@@ -83,6 +86,7 @@
     void core.start();
     return () => {
       stopListening();
+      stopHydrating();
       stopTrackingKeyboard();
       stopGuardingClicks();
       stopInspectorShortcut();

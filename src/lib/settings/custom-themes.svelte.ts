@@ -163,7 +163,16 @@ export function clearThemePreview(): void {
   themePreview.current = null;
 }
 
-export async function hydrateCatalogThemes(): Promise<void> {
+let hydrating: Promise<void> | null = null;
+
+export function hydrateCatalogThemes(): Promise<void> {
+  hydrating ??= fillCatalogThemes().finally(() => {
+    hydrating = null;
+  });
+  return hydrating;
+}
+
+async function fillCatalogThemes(): Promise<void> {
   const missing = [...customThemes.themes, ...customThemes.tweaks].filter(
     (entry) => entry.css === '' && entry.source !== undefined && isCatalogReference(entry)
   );

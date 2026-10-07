@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import {
   customThemes,
+  hydrateCatalogThemes,
   installCustomTheme,
   installCustomTweak,
   removeCustomTheme,
@@ -12,6 +13,7 @@ import {
 } from './custom-themes.svelte.js';
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   replaceCustomThemes({
     themes: [],
     tweaks: [],
@@ -51,4 +53,44 @@ test('removing a tweak also disables it', () => {
 
   expect(customThemes.tweaks).toEqual([]);
   expect(customThemes.enabledTweakIds).toEqual([]);
+});
+
+const CATALOG_THEME = 'https://raw.githubusercontent.com/SableClient/themes/main/themes/night.css';
+
+function holdEmptyCatalogTheme(): void {
+  replaceCustomThemes({
+    themes: [{ id: 'night', name: 'Night', kind: 'dark', css: '', source: CATALOG_THEME }],
+    tweaks: [],
+    lightThemeId: null,
+    darkThemeId: 'night',
+    enabledTweakIds: [],
+  });
+}
+
+test('a catalog theme synced without css is refetched and persisted', async () => {
+  const fetchMock = vi.fn(() => Promise.resolve(new Response('/* @sable-theme */')));
+  vi.stubGlobal('fetch', fetchMock);
+  holdEmptyCatalogTheme();
+
+  await Promise.all([hydrateCatalogThemes(), hydrateCatalogThemes()]);
+
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(customThemes.themes[0]?.css).toBe('/* @sable-theme */');
+  expect(localStorage.getItem('sable-custom-themes')).toContain('@sable-theme');
+});
+
+test('a failed catalog fetch is retried by the next hydration', async () => {
+  const fetchMock = vi
+    .fn<() => Promise<Response>>()
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce(new Response('/* @sable-theme */'));
+  vi.stubGlobal('fetch', fetchMock);
+  vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+  holdEmptyCatalogTheme();
+
+  await hydrateCatalogThemes();
+  expect(customThemes.themes[0]?.css).toBe('');
+
+  await hydrateCatalogThemes();
+  expect(customThemes.themes[0]?.css).toBe('/* @sable-theme */');
 });
