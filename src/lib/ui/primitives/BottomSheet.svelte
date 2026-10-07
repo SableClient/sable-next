@@ -121,11 +121,16 @@
 
   function scrolledAway(from: Element | null, boundary: Element): boolean {
     for (let element = from; element; element = element.parentElement) {
-      const { overflowY } = getComputedStyle(element);
+      const { overflowY, flexDirection, flexWrap } = getComputedStyle(element);
+      const reversed =
+        flexDirection === 'column-reverse' ||
+        (flexDirection.startsWith('row') && flexWrap === 'wrap-reverse');
       if (
         (overflowY === 'auto' || overflowY === 'scroll') &&
         element.scrollHeight > element.clientHeight &&
-        element.scrollTop > 0
+        (reversed
+          ? element.scrollTop > element.clientHeight - element.scrollHeight + 1
+          : element.scrollTop > 0)
       ) {
         return true;
       }
