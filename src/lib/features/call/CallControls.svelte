@@ -8,7 +8,6 @@
   import MonitorArrowUpIcon from 'phosphor-svelte/lib/MonitorArrowUpIcon';
   import HeadphonesIcon from 'phosphor-svelte/lib/HeadphonesIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
-  import SpeakerSlashIcon from 'phosphor-svelte/lib/SpeakerSlashIcon';
   import PhoneDisconnectIcon from 'phosphor-svelte/lib/PhoneDisconnectIcon';
   import GearSixIcon from 'phosphor-svelte/lib/GearSixIcon';
   import type { Snippet } from 'svelte';
@@ -171,11 +170,7 @@
         label={deafenLabel}
         onclick={onToggleDeafen}
       >
-        {#if deafened}
-          <SpeakerSlashIcon weight="fill" />
-        {:else}
-          <HeadphonesIcon />
-        {/if}
+        <HeadphonesIcon weight={deafened ? 'fill' : 'regular'} />
       </IconButton>
     {:else}
       <IconButton

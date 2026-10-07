@@ -2,6 +2,7 @@
 
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
+import HeadphonesIcon from 'phosphor-svelte/lib/HeadphonesIcon';
 import { expect, test, vi } from 'vitest';
 
 import CallControlsHarness from './CallControlsHarness.test.svelte';
@@ -31,6 +32,37 @@ test('uses the shared button variants for the call toggles', () => {
   expect(button('Unmute microphone')).toHaveClass('btn-danger');
   expect(button('Turn camera off')).toHaveClass('btn-primary');
   expect(button('Deafen')).toHaveClass('btn-secondary');
+});
+
+test('deafening keeps the headphones and only fills them', () => {
+  const icon = (weight: 'regular' | 'fill') => {
+    const { container, unmount } = render(HeadphonesIcon, { weight });
+    const path = container.querySelector('path')?.getAttribute('d');
+    unmount();
+    return path;
+  };
+  const { unmount } = mountControls({ microphoneEnabled: true, cameraEnabled: true });
+  const idle = button('Deafen').querySelector('path')?.getAttribute('d');
+  unmount();
+  render(CallControlsHarness, {
+    props: {
+      microphoneEnabled: true,
+      cameraEnabled: true,
+      screenShareEnabled: false,
+      deafened: true,
+      ready: true,
+      canScreenShare: false,
+      onToggleMicrophone: vi.fn(),
+      onToggleCamera: vi.fn(),
+      onToggleScreenShare: vi.fn(),
+      onToggleDeafen: vi.fn(),
+      onHangUp: vi.fn(),
+    },
+  });
+  const deafened = button('Undeafen').querySelector('path')?.getAttribute('d');
+
+  expect(idle).toBe(icon('regular'));
+  expect(deafened).toBe(icon('fill'));
 });
 
 test('keeps a muted mic legible and focusable while media is not ready', async () => {
