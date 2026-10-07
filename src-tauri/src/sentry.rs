@@ -234,6 +234,9 @@ pub fn init() -> Option<sentry::ClientInitGuard> {
     options.before_send_log = Some(Arc::new(|log| {
         CONSENT.load(Ordering::Relaxed).then(|| scrub_log(log))
     }));
+    #[cfg(desktop)]
+    let options =
+        options.add_integration(sentry::integrations::minidump::MinidumpIntegration::new());
 
     Some(sentry::init(options))
 }

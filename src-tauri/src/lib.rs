@@ -851,19 +851,6 @@ pub fn run() {
     // Before the threads Tauri spawns, so they inherit the panic handler.
     let sentry_guard = sentry::init();
     install_logging();
-    #[cfg(desktop)]
-    let sentry_minidump_guard =
-        sentry_guard
-            .as_ref()
-            .and_then(|guard| match tauri_plugin_sentry::minidump::init(guard) {
-                Ok(handle) => Some(handle),
-                Err(error) => {
-                    tracing::error!(%error, "native crash reporter could not start");
-                    None
-                }
-            });
-    #[cfg(desktop)]
-    let _ = &sentry_minidump_guard;
 
     let builder = tauri::Builder::<BrowserEngine>::new();
     #[cfg(any(target_os = "macos", target_os = "ios"))]
