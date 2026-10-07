@@ -495,15 +495,6 @@ body {
   height: 100%;
 }
 
-@media (display-mode: standalone) {
-  @supports (-webkit-touch-callout: none) {
-    :root:not([data-tauri-os]),
-    :root:not([data-tauri-os]) body {
-      height: 100vh;
-    }
-  }
-}
-
 input,
 textarea,
 [contenteditable],
