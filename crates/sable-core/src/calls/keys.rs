@@ -247,15 +247,25 @@ impl KeyDistributor {
         let encryption = room.client().encryption();
         let mut devices = Vec::new();
         let mut reached = Vec::new();
+        let mut queried = Vec::new();
         for target in targets {
             if target.is_own(&self.user_id, &self.device_id) {
                 reached.push(target.clone());
                 continue;
             }
-            match encryption
+            let mut device = encryption
                 .get_device(&target.user_id, &target.device_id)
-                .await
-            {
+                .await;
+            if matches!(device, Ok(None)) && !queried.contains(&target.user_id) {
+                queried.push(target.user_id.clone());
+                if let Err(error) = encryption.request_user_identity(&target.user_id).await {
+                    tracing::warn!(?error, "could not query a call member's devices");
+                }
+                device = encryption
+                    .get_device(&target.user_id, &target.device_id)
+                    .await;
+            }
+            match device {
                 Ok(Some(device)) => {
                     devices.push(device);
                     reached.push(target.clone());
@@ -531,5 +541,83 @@ mod tests {
             }
             .is_legacy_room_call()
         );
+    }
+}
+
+#[cfg(all(test, not(target_family = "wasm")))]
+#[expect(clippy::unwrap_used, reason = "test code")]
+mod sdk_tests {
+    use matrix_sdk::ruma::{device_id, owned_room_id, owned_user_id, room_id, user_id};
+    use matrix_sdk::test_utils::mocks::MatrixMockServer;
+    use serde_json::json;
+    use wiremock::matchers::{method, path_regex};
+    use wiremock::{Mock, ResponseTemplate};
+
+    use super::super::membership::CallMember;
+    use super::{KeyDistributor, OutboundKey};
+
+    fn member(user_id: &str, device_id: &str) -> CallMember {
+        CallMember {
+            user_id: user_id.try_into().unwrap(),
+            device_id: device_id.into(),
+            member_id: None,
+            identity: format!("{user_id}:{device_id}"),
+            mode: crate::protocol::CallMode::Legacy,
+            created_ts: 100,
+            joined_ts: 100,
+            expires_at_ms: None,
+            foci: Vec::new(),
+            screen_sharing: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_media_key_reaches_a_device_the_store_has_not_seen() {
+        let server = MatrixMockServer::new().await;
+        server.mock_crypto_endpoints_preset().await;
+        let alice = server
+            .client_builder_for_crypto_end_to_end(
+                user_id!("@alice:example.org"),
+                device_id!("ALICE"),
+            )
+            .build()
+            .await;
+        let bob = server
+            .client_builder_for_crypto_end_to_end(user_id!("@bob:example.org"), device_id!("BOB"))
+            .build()
+            .await;
+        server.mock_sync().ok_and_run(&bob, |_| {}).await;
+        let room = server
+            .sync_joined_room(&alice, room_id!("!call:example.org"))
+            .await;
+        assert!(
+            alice
+                .encryption()
+                .get_device(user_id!("@bob:example.org"), device_id!("BOB"))
+                .await
+                .unwrap()
+                .is_none()
+        );
+        Mock::given(method("PUT"))
+            .and(path_regex(r"/sendToDevice/m\.room\.encrypted/"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+
+        let distributor = KeyDistributor::new(
+            owned_room_id!("!call:example.org"),
+            owned_user_id!("@alice:example.org"),
+            "ALICE".into(),
+            "@alice:example.org:ALICE".to_owned(),
+            "@alice:example.org:ALICE".to_owned(),
+        );
+        let key = OutboundKey::generate(0, 100).unwrap();
+        let bob_member = member("@bob:example.org", "BOB");
+        let reached = distributor
+            .send(&room, &key, std::slice::from_ref(&bob_member))
+            .await;
+
+        assert_eq!(reached, vec![bob_member]);
     }
 }
