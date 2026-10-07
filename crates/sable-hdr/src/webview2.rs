@@ -6,7 +6,7 @@ use webview2_com::Microsoft::Web::WebView2::Win32::{
     COREWEBVIEW2_SHARED_BUFFER_ACCESS_READ_ONLY, ICoreWebView2_17, ICoreWebView2Controller,
     ICoreWebView2Environment, ICoreWebView2Environment12, ICoreWebView2SharedBuffer,
 };
-use windows_core_061::{HSTRING, Interface};
+use windows::core::{HSTRING, Interface};
 
 pub const SLOTS: usize = 3;
 
@@ -44,7 +44,7 @@ impl Ring {
         width: u32,
         height: u32,
         generation: u32,
-    ) -> windows_core_061::Result<Self> {
+    ) -> windows::core::Result<Self> {
         let environment: ICoreWebView2Environment12 = environment.cast()?;
         // SAFETY: a plain COM getter on a live controller, on its own thread.
         let webview: ICoreWebView2_17 = unsafe { controller.CoreWebView2()? }.cast()?;

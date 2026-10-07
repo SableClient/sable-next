@@ -22,8 +22,7 @@ windows = { version = "0.62.2", features = [
   "Win32_Graphics_Gdi",
 ] }
 windows-capture = "2.0.1"
-webview2-com = "0.38.2"
-windows-core-061 = { package = "windows-core", version = "0.61.2" }
+webview2-com = "0.39.1"
 tauri = { version = "2.11.3", default-features = false, features = ["wry"], optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 
