@@ -51,8 +51,12 @@ function crash(message: string, stack?: string): void {
   }, 0);
 }
 
+core.catch((error: unknown) => {
+  crash(`core failed to start: ${String(error)}`, errorStack(error));
+});
+
 // A SharedWorker's runtime failures never reach the pages that opened it, so
-// they ride the same channel as a Rust panic. A failed `init()` lands here too.
+// they ride the same channel as a Rust panic.
 self.addEventListener('error', (event) => {
   crash(
     `worker error: ${event.message}`,
@@ -61,6 +65,10 @@ self.addEventListener('error', (event) => {
   );
 });
 self.addEventListener('unhandledrejection', (event) => {
+  if (!(event.reason instanceof WebAssembly.RuntimeError)) {
+    boundary.handleLog(`ERROR unhandled rejection in worker: ${String(event.reason)}`);
+    return;
+  }
   crash(`unhandled rejection in worker: ${String(event.reason)}`, errorStack(event.reason));
 });
 
