@@ -40,6 +40,7 @@
   let selected = $derived(supporterAppearance(appearance));
   let { variant, color, customCardColors, cardColor, buttonColor } = $derived(selected);
   const id = $props.id();
+  let open = $state(false);
   const nameSegments = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   let donorName = $derived.by(() => {
     let shortened = '';
@@ -108,7 +109,9 @@
   });
 </script>
 
-<Popover.Root>
+<svelte:window onblur={() => (open = false)} />
+
+<Popover.Root bind:open>
   <Popover.Trigger
     class={['supporter-badge', className]}
     data-supporter-variant={variant}
@@ -156,6 +159,7 @@
         rel="noopener noreferrer"
         block
         class="supporter-card-donate"
+        onclick={() => (open = false)}
       >
         <HeartIcon aria-hidden="true" weight="fill" />
         {$i18n.t(donated ? 'supporter.badgeDonateAgain' : 'supporter.badgeDonate')}
