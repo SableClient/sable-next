@@ -74,6 +74,19 @@ export function imageMime(bytes: Uint8Array): string | undefined {
   return undefined;
 }
 
+function videoMime(bytes: Uint8Array): string | undefined {
+  if (startsWith(bytes, [0x1a, 0x45, 0xdf, 0xa3])) return 'video/webm';
+  if (!startsWith(bytes, [0x66, 0x74, 0x79, 0x70], 4)) return undefined;
+  const brand = String.fromCharCode(...bytes.subarray(8, 12));
+  if (['avif', 'avis', 'heic', 'heix', 'mif1', 'msf1'].includes(brand)) return undefined;
+  return brand === 'qt  ' ? 'video/quicktime' : 'video/mp4';
+}
+
+function blobType(mime: string | null | undefined, bytes: Uint8Array): string {
+  if (mime && mime !== 'application/octet-stream') return mime;
+  return imageMime(bytes) ?? videoMime(bytes) ?? '';
+}
+
 function measure(key: string, type: string, blob: Blob): Promise<void> | null {
   // An empty type is a sniffer miss: encrypted attachments often carry no mime.
   const worthDecoding = type === '' || type.startsWith('image/');
@@ -210,7 +223,7 @@ export function loadMediaUrl(
   const request = core.commands
     .fetchMedia(source, width, height)
     .then((bytes) => {
-      const type = mime ?? imageMime(bytes) ?? '';
+      const type = blobType(mime, bytes);
       const blob = new Blob([bytes], { type });
       const publish = (): string => {
         const objectUrl = URL.createObjectURL(blob);

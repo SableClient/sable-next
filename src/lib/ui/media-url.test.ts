@@ -562,3 +562,18 @@ test('a success forgets the failures', async () => {
   await expect(loadMediaUrl(core, other, 0, 0)).rejects.toThrow('Unavailable');
   expect(fetch).toHaveBeenCalledTimes(5);
 });
+
+test('an image sent as octet-stream is served with its own type', async () => {
+  const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:octet');
+  const core = {
+    session: session('account-octet', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
+    commands: {
+      fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))),
+    },
+  };
+
+  await loadMediaUrl(core, 'mxc://example.org/image.bin', 0, 0, 'application/octet-stream');
+
+  expect(createObjectURL.mock.calls[0]?.[0]).toMatchObject({ type: 'image/png' });
+});
