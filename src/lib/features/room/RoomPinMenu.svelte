@@ -192,8 +192,10 @@
 {#snippet pinTrigger({ props }: { props: Record<string, unknown> })}
   <PanelHeaderButton {...props} class="pin-button selection-open" label={$i18n.t('room.pinsTitle')}>
     <PushPinIcon weight={open ? 'fill' : 'regular'} />
-    {#if unreadCount > 0}
-      <span class="pin-badge" aria-hidden="true">{unreadCount}</span>
+    {#if pinnedIds.length > 0}
+      <span class="pin-badge" class:unread={unreadCount > 0} aria-hidden="true"
+        >{pinnedIds.length}</span
+      >
     {/if}
   </PanelHeaderButton>
 {/snippet}
@@ -318,9 +320,9 @@
   }
 
   .pin-badge {
-    background: var(--primary-main);
+    background: var(--surface-container-active);
     border-radius: var(--radius-pill);
-    color: var(--primary-on-main);
+    color: var(--surface-on-container);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     left: 0;
@@ -330,6 +332,11 @@
     position: absolute;
     text-align: center;
     top: 0;
+  }
+
+  .pin-badge.unread {
+    background: var(--primary-main);
+    color: var(--primary-on-main);
   }
 
   .pin-header {

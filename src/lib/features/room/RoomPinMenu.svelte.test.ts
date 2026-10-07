@@ -21,7 +21,7 @@ import RoomPinMenuHarness from './RoomPinMenuHarness.test.svelte';
 const core = Object.assign(baseCore, {
   pinnedEvents: vi.fn(() => Promise.resolve(['$image', '$second'])),
   eventItems: vi.fn(() => Promise.resolve([image, secondImage])),
-  roomAccountData: vi.fn(() => Promise.resolve(null)),
+  roomAccountData: vi.fn((): Promise<unknown> => Promise.resolve(null)),
   setRoomAccountData: vi.fn(() => Promise.resolve()),
   roomCosmetics: vi.fn(() => Promise.resolve({ users: [], space_id: null })),
 });
@@ -123,5 +123,23 @@ test.each([
   await vi.waitFor(() => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Pinned messages' })).not.toBeInTheDocument();
+  });
+});
+
+test('shows the total pin count on the button, even once the pins are read', async () => {
+  core.roomAccountData.mockResolvedValueOnce({ hash: 'x', count: 2, last_seen_id: '$second' });
+  render(RoomPinMenuHarness, {
+    menu: {
+      roomId: '!room:example.org',
+      members: [],
+      canPin: false,
+      onJump: vi.fn(),
+      onOpenMedia: vi.fn(),
+    },
+  });
+
+  const button = screen.getByRole('button', { name: 'Pinned messages' });
+  await vi.waitFor(() => {
+    expect(button).toHaveTextContent('2');
   });
 });
