@@ -23,7 +23,7 @@ env:
   FORGEJO_REPOSITORY: ${{ github.repository }}
   FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
   # Each nightly is ~1.5 GB of bundles on a node with ~100 GB of disk.
-  NIGHTLY_KEEP: 5
+  NIGHTLY_KEEP: 100
   SCCACHE_BUCKET: sccache
   SCCACHE_S3_KEY_PREFIX: sable-next
   SCCACHE_ENDPOINT: https://s3.erwanleboucher.dev
