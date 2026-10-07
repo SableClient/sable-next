@@ -175,6 +175,20 @@ impl Core {
                 let Ok(sync_service) = core.sync_service().await else {
                     return;
                 };
+                let live_since = Arc::new(notifications::LiveSince::new(session_start));
+                let mut states = sync_service.state();
+                let resumes = live_since.clone();
+                let _resume_tracker = spawn(async move {
+                    let mut running = matches!(states.get(), SyncState::Running);
+                    while let Some(state) = states.next().await {
+                        let now_running = matches!(state, SyncState::Running);
+                        if now_running && !running {
+                            resumes.resume(MilliSecondsSinceUnixEpoch::now());
+                        }
+                        running = now_running;
+                    }
+                })
+                .abort_on_drop();
                 let setup = NotificationProcessSetup::SingleProcess { sync_service };
                 let Ok(notifications_client) = NotificationClient::new(client.clone(), setup).await
                 else {
@@ -214,7 +228,7 @@ impl Core {
                             };
                             if Some(event.sender()) == client.user_id()
                                 || notifications::is_backfill(
-                                    session_start,
+                                    live_since.get(),
                                     event.origin_server_ts(),
                                 )
                                 || notifications::is_read(&room, event.origin_server_ts()).await

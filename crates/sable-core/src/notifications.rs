@@ -693,6 +693,24 @@ pub async fn remove_pusher(
 
 const BACKFILL_GRACE_MS: u64 = 60_000;
 
+pub(crate) struct LiveSince(std::sync::atomic::AtomicU64);
+
+impl LiveSince {
+    pub(crate) fn new(at: MilliSecondsSinceUnixEpoch) -> Self {
+        Self(std::sync::atomic::AtomicU64::new(at.get().into()))
+    }
+
+    pub(crate) fn resume(&self, at: MilliSecondsSinceUnixEpoch) {
+        self.0
+            .store(at.get().into(), std::sync::atomic::Ordering::SeqCst);
+    }
+
+    pub(crate) fn get(&self) -> MilliSecondsSinceUnixEpoch {
+        let at = self.0.load(std::sync::atomic::Ordering::SeqCst);
+        MilliSecondsSinceUnixEpoch(matrix_sdk::ruma::UInt::new_wrapping(at))
+    }
+}
+
 #[must_use]
 pub fn is_backfill(
     session_start: MilliSecondsSinceUnixEpoch,
@@ -753,8 +771,8 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        ColdPush, cold_push_store_dir, decrypt_cold_push, fetch_cold_push_event, gateway,
-        is_backfill, push_account, restore_push_client,
+        ColdPush, LiveSince, cold_push_store_dir, decrypt_cold_push, fetch_cold_push_event,
+        gateway, is_backfill, push_account, restore_push_client,
     };
     use crate::preview::describe;
     use crate::protocol::PushFetchView;
@@ -1579,6 +1597,18 @@ mod tests {
                 "a notification for {case} would read as a bare sender name"
             );
         }
+    }
+
+    #[test]
+    fn a_resumed_sync_moves_the_backfill_cutoff() {
+        let live_since = LiveSince::new(ts(100_000));
+        assert!(!is_backfill(live_since.get(), ts(200_000)));
+
+        live_since.resume(ts(1_000_000));
+
+        assert!(is_backfill(live_since.get(), ts(200_000)));
+        assert!(!is_backfill(live_since.get(), ts(950_000)));
+        assert!(!is_backfill(live_since.get(), ts(1_000_000)));
     }
 
     #[test]
