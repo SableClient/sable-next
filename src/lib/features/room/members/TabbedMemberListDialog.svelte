@@ -119,7 +119,7 @@
     list-style: none;
     margin: 0;
     max-height: 16rem;
-    overflow-y: auto;
+    overflow: hidden auto;
     padding: 0;
   }
 
@@ -127,5 +127,10 @@
     align-items: center;
     display: flex;
     gap: var(--space-200);
+  }
+
+  li > :global(.member-identity-row) {
+    flex: 1;
+    width: auto;
   }
 </style>
