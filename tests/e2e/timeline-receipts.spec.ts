@@ -199,7 +199,7 @@ test('receipts beside text, reactions, an embed or an image add no row of their 
         {
           url: 'https://example.test/page',
           title: 'Example page',
-          description: 'A description of the page long enough to fill the whole card width',
+          description: 'A description of the page',
           site_name: 'Example',
           image: null,
           image_mime: null,
