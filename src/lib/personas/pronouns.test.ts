@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  parsePronouns,
   preferredPronouns,
   pronounPillLimit,
   splitDisplayNamePronouns,
@@ -9,6 +10,22 @@ import {
 } from './pronouns';
 
 const set = (summary: string, language: string | null) => ({ summary, language });
+
+describe('parsePronouns', () => {
+  it('reads a language prefix', () => {
+    expect(parsePronouns('en:she/her, pl: ona/jej')).toEqual([
+      set('she/her', 'en'),
+      set('ona/jej', 'pl'),
+    ]);
+  });
+
+  it('reads a parenthesised language and an untagged set', () => {
+    expect(parsePronouns('she/her (EN), they/them')).toEqual([
+      set('she/her', 'en'),
+      set('they/them', null),
+    ]);
+  });
+});
 
 describe('splitDisplayNamePronouns', () => {
   it('splits a parenthesised pronoun set out of the name', () => {

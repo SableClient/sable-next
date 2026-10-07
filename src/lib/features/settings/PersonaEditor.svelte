@@ -7,7 +7,8 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { formatPronouns, parsePronouns } from '#lib/personas/pronouns.js';
+  import { parsePronouns } from '#lib/personas/pronouns.js';
+  import { pronounText } from '#lib/profile/pronouns.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -43,7 +44,7 @@
     untrack(() => {
       name = persona?.display_name ?? '';
       avatarUrl = persona?.avatar_url ?? null;
-      pronouns = formatPronouns(persona?.pronouns ?? []);
+      pronouns = pronounText(persona?.pronouns ?? []);
       colorLight = persona?.color_on_light ?? '';
       colorDark = persona?.color_on_dark ?? '';
       triggers = persona?.triggers.map((trigger) => ({ ...trigger })) ?? [];

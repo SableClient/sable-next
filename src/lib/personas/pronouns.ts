@@ -8,6 +8,8 @@ export function parsePronouns(input: string): PronounView[] {
     .map((entry) => entry.trim())
     .filter((entry) => entry !== '')
     .map((entry) => {
+      const prefixed = /^([a-z]{2,8}(?:-[a-z0-9]{1,8})*)\s*:\s*(.+)$/i.exec(entry);
+      if (prefixed) return { summary: prefixed[2].trim(), language: prefixed[1].toLowerCase() };
       const match = /^(.*?)(?:\s*\(([^)]+)\))?$/.exec(entry);
       return {
         summary: match?.[1]?.trim() || entry,
