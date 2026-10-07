@@ -7,9 +7,7 @@ use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId};
 use matrix_sdk_base::event_cache::Event;
 use matrix_sdk_ui::eyeball_im::VectorDiff;
 use matrix_sdk_ui::room_list_service::RoomListLoadingState;
-use matrix_sdk_ui::room_list_service::filters::{
-    new_filter_all, new_filter_deduplicate_versions, new_filter_non_left,
-};
+use matrix_sdk_ui::room_list_service::filters::new_filter_non_left;
 use matrix_sdk_ui::timeline::{EventSendState, SendTarget, Timeline, TimelineItem};
 
 use crate::ResultExt;
@@ -74,10 +72,7 @@ impl Core {
 
             let loading = room_list.loading_state();
             let (stream, controller) = room_list.entries_with_dynamic_adapters(ROOM_LIST_PAGE_SIZE);
-            controller.set_filter(Box::new(new_filter_all(vec![
-                Box::new(new_filter_non_left()),
-                Box::new(new_filter_deduplicate_versions()),
-            ])));
+            controller.set_filter(Box::new(new_filter_non_left()));
 
             // Refreshed from each diff before constructing synchronous summaries.
             let mut room_cache: HashMap<OwnedRoomId, view::RoomInfo> = HashMap::new();

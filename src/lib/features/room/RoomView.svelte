@@ -9,7 +9,6 @@
     PerMessageProfileView,
   } from '#src/generated/protocol';
   import { goto } from '$app/navigation';
-  import { resolve } from '$app/paths';
   import { page } from '$app/state';
 
   import { voiceChat } from '#lib/features/room/voice-chat.svelte.js';
@@ -45,12 +44,7 @@
     searchInRoom,
     trackRoomEntry,
   } from './room-navigation.js';
-  import {
-    findRoomByPathId,
-    roomLabel,
-    roomPathParamFromId,
-    useRoomList,
-  } from '#lib/rooms/room-list.svelte.js';
+  import { findRoomByPathId, roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { provideRoomCosmetics, RoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
@@ -896,17 +890,9 @@
     panelMediaItems = null;
   }
 
-  function tombstoneSuccessorPath(id: string, isSpace: boolean): string {
-    const param = roomPathParamFromId(id);
-    return isSpace
-      ? resolve('/(app)/space/[spaceId]', { spaceId: param })
-      : resolve('/(app)/rooms/[roomId]', { roomId: param });
-  }
-
   function openTombstoneSuccessor(): void {
     if (!roomSession.tombstoneReplacementId) return;
-    const isSpace = tombstoneSuccessor?.is_space ?? resolvedRoom?.is_space ?? false;
-    void goto(tombstoneSuccessorPath(roomSession.tombstoneReplacementId, isSpace));
+    void goto(roomSectionPath(roomList.rooms, roomSession.tombstoneReplacementId));
   }
 
   async function joinTombstoneSuccessor(): Promise<void> {
@@ -918,8 +904,8 @@
     try {
       const via = await core.commands.roomViaServers(resolvedRoomId);
       const joinedId = await core.commands.joinRoom(target, via);
-      const isSpace = resolvedRoom?.is_space ?? false;
-      void goto(tombstoneSuccessorPath(joinedId, isSpace));
+      await roomList.whenListed(joinedId, 10_000);
+      void goto(roomSectionPath(roomList.rooms, joinedId));
     } catch (error) {
       console.warn('[sable room] joining the replacement room failed', error);
       tombstoneJoinFailed = true;

@@ -14,6 +14,7 @@ function parentSpaceOf(rooms: readonly RoomSummary[], roomId: string): RoomSumma
     (space) =>
       space.is_space &&
       space.state === 'joined' &&
+      !space.is_tombstoned &&
       space.space_children.some((child) => child.room_id === roomId)
   );
 }

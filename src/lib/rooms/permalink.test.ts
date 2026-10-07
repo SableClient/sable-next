@@ -86,11 +86,12 @@ test('a cycle between spaces still resolves to one of them', () => {
   );
 });
 
-test('a space the user has not joined does not claim its children', () => {
+test.each(['invited', 'tombstoned'])('a %s space does not claim its children', (status) => {
   const rooms = [
     room('!space:example.org', {
       is_space: true,
-      state: 'invited',
+      state: status === 'invited' ? 'invited' : 'joined',
+      is_tombstoned: status === 'tombstoned',
       space_children: [child('!inner:example.org')],
     }),
     room('!inner:example.org'),

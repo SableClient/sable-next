@@ -21,10 +21,17 @@ use crate::{
     store::MemorySessionStore,
 };
 
-#[expect(clippy::unwrap_used, reason = "test code")]
 async fn core(server: &MatrixMockServer, client: matrix_sdk::Client) -> Arc<Core> {
+    core_with_events(server, client).await.0
+}
+
+#[expect(clippy::unwrap_used, reason = "test code")]
+async fn core_with_events(
+    server: &MatrixMockServer,
+    client: matrix_sdk::Client,
+) -> (Arc<Core>, tokio::sync::mpsc::UnboundedReceiver<CoreEvent>) {
     let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
-    let (core, _events) = Core::new("helpers-test", Box::new(MemorySessionStore::default()));
+    let (core, events) = Core::new("helpers-test", Box::new(MemorySessionStore::default()));
     *core.session.write().await = Some(Session {
         account_id: "test".into(),
         client,
@@ -32,7 +39,68 @@ async fn core(server: &MatrixMockServer, client: matrix_sdk::Client) -> Arc<Core
         homeserver: server.server().uri(),
         oauth: false,
     });
-    core
+    (core, events)
+}
+
+#[tokio::test]
+async fn room_list_keeps_joined_rooms_redirected_to_a_joined_successor() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let old_id = room_id!("!old:example.org");
+    let new_id = room_id!("!new:example.org");
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder
+                .add_joined_room(
+                    JoinedRoomBuilder::new(old_id).add_state_event(
+                        Raw::new(&json!({
+                            "type": "m.room.tombstone", "state_key": "",
+                            "sender": "@alice:example.org", "event_id": "$grave",
+                            "origin_server_ts": 1,
+                            "content": {"body": "moved", "replacement_room": new_id}
+                        }))
+                        .unwrap()
+                        .cast_unchecked(),
+                    ),
+                )
+                .add_joined_room(JoinedRoomBuilder::new(new_id));
+        })
+        .await;
+    let (core, mut events) = core_with_events(&server, client).await;
+    let CommandOk::SubscribeRoomList { subscription, .. } =
+        core.dispatch(Command::SubscribeRoomList).await.unwrap()
+    else {
+        panic!("wrong response")
+    };
+    let diffs = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            if let Some(CoreEvent::RoomListDiff {
+                subscription: current,
+                diffs,
+            }) = events.recv().await
+                && current == subscription
+            {
+                break diffs;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    let rooms = diffs
+        .into_iter()
+        .find_map(|diff| match diff {
+            crate::protocol::VectorDiff::Reset { values } => Some(values),
+            _ => None,
+        })
+        .expect("initial room list snapshot");
+    let old = rooms.iter().find(|room| room.room_id == old_id).unwrap();
+    assert!(old.is_tombstoned);
+    assert!(matches!(old.state, crate::protocol::RoomStateView::Joined));
+    assert!(rooms.iter().any(|room| room.room_id == new_id));
+    core.dispatch(Command::Unsubscribe { subscription })
+        .await
+        .unwrap();
 }
 
 #[tokio::test]

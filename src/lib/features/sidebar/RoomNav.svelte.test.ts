@@ -414,6 +414,32 @@ test('home links a room to its own section', async () => {
   expect(row('Plain')).toHaveAttribute('href', '/home/!plain%3Aexample.org');
 });
 
+test('a joined tombstoned room remains visible in the space that contains it', async () => {
+  visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!root:example.org',
+      name: 'Root',
+      is_space: true,
+      space_children: [
+        {
+          room_id: '!old:example.org',
+          via: [],
+          order: null,
+          origin_server_ts: 1,
+          suggested: false,
+        },
+      ],
+    }),
+    makeRoom({ room_id: '!old:example.org', name: 'Old room', is_tombstoned: true }),
+  ];
+
+  await mountNav();
+
+  expect(roomNames()).toEqual(['Old room']);
+  expect(row('Old room')).toHaveAttribute('href', '/space/!root%3Aexample.org/!old%3Aexample.org');
+});
+
 test('expanded room disclosures do not use the active-route surface', async () => {
   visit('/space/!root%3Aexample.org/!room%3Aexample.org', { spaceId: '!root:example.org' });
   roomsFixture.rooms = [

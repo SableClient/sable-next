@@ -310,7 +310,7 @@
 
     const roomsById = new Map(
       roomList.rooms
-        .filter((room) => room.state === 'joined' && !room.is_tombstoned)
+        .filter((room) => room.state === 'joined' && !(room.is_space && room.is_tombstoned))
         .map((room) => [room.room_id, room])
     );
     return buildSpaceTree(space, roomsById, Number(preferences.subspaceHierarchyLimit));
@@ -321,7 +321,7 @@
   let listedRooms = $derived.by<RoomNavRow[]>(() => {
     if (directSection) {
       return roomList.rooms
-        .filter((room) => room.state === 'joined' && room.is_direct)
+        .filter((room) => room.state === 'joined' && room.is_direct && !room.is_tombstoned)
         .map(roomRow)
         .sort(byRecency);
     }
@@ -338,6 +338,7 @@
       .filter(
         (room) =>
           room.state === 'joined' &&
+          !room.is_tombstoned &&
           !room.is_space &&
           !(unspacedSection && room.is_direct) &&
           !claimedByJoinedSpace.has(room.room_id)

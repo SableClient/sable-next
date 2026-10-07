@@ -26,24 +26,16 @@
   const roomList = useRoomList();
   const headingId = $props.id();
 
-  let fetched = $state.raw<RoomSummary[]>([]);
-  let replaced = $derived(fetched);
-  let pendingCount = $derived(
-    fetched.filter((room) => !isReplacedRoomDismissed(room.room_id)).length
+  let replaced = $derived(
+    roomList.rooms.filter((room) => room.state === 'joined' && room.is_tombstoned)
   );
-  let listedCount = $derived(roomList.rooms.length);
-
-  $effect(() => {
-    void listedCount;
-    void core.commands.replacedRooms().then((rooms) => {
-      fetched = rooms;
-    });
-  });
+  let pendingCount = $derived(
+    replaced.filter((room) => !isReplacedRoomDismissed(room.room_id)).length
+  );
 
   async function leave(room: RoomSummary): Promise<void> {
     try {
       await core.commands.leaveRoom(room.room_id);
-      fetched = fetched.filter((other) => other.room_id !== room.room_id);
     } catch {
       toasts.error($i18n.t('room.leaveFailed'));
     }
