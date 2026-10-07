@@ -170,6 +170,12 @@ jobs:
         with:
           install-mise-tools: 'false'
 
+      - name: Restore DeepFilterNet assets
+        uses: https://github.com/actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: static/deepfilternet3
+          key: deepfilternet3-${{ hashFiles('scripts/fetch-deepfilternet.mjs') }}
+
       - name: Restore Playwright browsers
         id: browsers
         uses: https://github.com/actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

@@ -78,7 +78,7 @@ export default defineConfig({
         'SABLE_WASM_OUTPUT=src/generated/wasm pnpm exec vite dev --host 127.0.0.1 --port 4186 --strictPort',
       url: migrationOrigin,
       reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
+      timeout: 600_000,
     },
   ],
 });
