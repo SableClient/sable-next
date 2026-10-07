@@ -219,7 +219,7 @@ fn join_rule_content(
     }
 }
 
-fn state_event_content(raw: &str) -> Option<serde_json::Value> {
+pub(crate) fn state_event_content(raw: &str) -> Option<serde_json::Value> {
     let value = serde_json::from_str::<serde_json::Value>(raw).ok()?;
     let is_event = value
         .as_object()

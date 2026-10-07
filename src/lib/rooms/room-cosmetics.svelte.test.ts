@@ -99,4 +99,46 @@ describe('RoomCosmetics.identity', () => {
       vi.useRealTimers();
     }
   });
+
+  test('a profile change is fetched again rather than compared against the old profile', async () => {
+    const listeners = new Set<(userId: string) => void>();
+    const userProfile = vi
+      .fn()
+      .mockResolvedValueOnce(profile)
+      .mockResolvedValue({ ...profile, display_name: 'New Alice' });
+    const store = new RoomCosmetics({
+      commands: {
+        roomCosmetics: vi.fn().mockResolvedValue({
+          space_id: '!space:example.org',
+          users: [
+            {
+              user_id: ALICE,
+              color_on_light: null,
+              color_on_dark: null,
+              pronouns: [],
+              space_display_name: 'Space Alice',
+              space_avatar_url: null,
+            },
+          ],
+        }),
+      },
+      subscribeEvents: () => () => {},
+      userProfile,
+      onProfileChanged: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    });
+    const stop = store.watch();
+    void store.load('!room:example.org', '!space:example.org');
+    await settled(store);
+
+    for (const listener of listeners) listener(ALICE);
+
+    await vi.waitFor(() => {
+      expect(store.identity(ALICE, { name: 'New Alice', avatar: null }).name).toBe('Space Alice');
+    });
+    stop();
+    expect(listeners.size).toBe(0);
+  });
 });

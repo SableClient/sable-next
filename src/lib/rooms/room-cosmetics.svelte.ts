@@ -14,6 +14,7 @@ interface CosmeticsCore {
   commands: Pick<CoreCommands, 'roomCosmetics'>;
   subscribeEvents: (onEvent: (event: CoreEvent) => void) => () => void;
   userProfile?: (userId: string) => Promise<ProfileIdentity | null>;
+  onProfileChanged?: (listener: (userId: string) => void) => () => void;
 }
 
 export interface ShownIdentity {
@@ -46,10 +47,20 @@ export class RoomCosmetics {
   }
 
   watch(): () => void {
-    return this.core.subscribeEvents((event) => {
+    const stopEvents = this.core.subscribeEvents((event) => {
       if (event.type !== 'room_cosmetics_changed') return;
       if (event.room_id === this.#roomId || event.room_id === this.#spaceId) void this.#fetch();
     });
+    const stopProfiles = this.core.onProfileChanged?.((userId) => {
+      if (!this.#profiles.has(userId)) return;
+      const profiles = new Map(this.#profiles);
+      profiles.delete(userId);
+      this.#profiles = profiles;
+    });
+    return () => {
+      stopEvents();
+      stopProfiles?.();
+    };
   }
 
   async load(roomId: string, spaceId: string | null): Promise<void> {
