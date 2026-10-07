@@ -5,7 +5,10 @@ use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::MilliSecondsSinceUnixEpoch;
 use matrix_sdk::ruma::events::room::member::{MembershipState, OriginalSyncRoomMemberEvent};
 use matrix_sdk::ruma::events::typing::SyncTypingEvent;
-use matrix_sdk::ruma::events::{AnyGlobalAccountDataEvent, AnyStrippedStateEvent};
+use matrix_sdk::ruma::events::{
+    AnyGlobalAccountDataEvent, AnyStrippedStateEvent, AnySyncTimelineEvent,
+};
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk_ui::sync_service::State as SyncState;
 
 use crate::protocol::{CoreEvent, SyncStatus};
@@ -406,30 +409,68 @@ impl Core {
     ) {
         let handle = client.add_event_handler({
             let core = self.clone();
-            move |event: OriginalSyncRoomMemberEvent| {
+            move |event: OriginalSyncRoomMemberEvent, room: matrix_sdk::Room| {
                 let core = core.clone();
                 async move {
                     let Some(previous) = event.prev_content() else {
                         return;
                     };
-                    let content = &event.content;
-                    if content.membership != MembershipState::Join
-                        || previous.membership != MembershipState::Join
+                    if previous.membership != MembershipState::Join
+                        || (event.content.displayname == previous.displayname
+                            && event.content.avatar_url == previous.avatar_url)
                     {
                         return;
                     }
-                    if content.displayname == previous.displayname
-                        && content.avatar_url == previous.avatar_url
+                    core.emit_profile_changed(generation, &room, &event);
+                }
+            }
+        });
+        self.track_session_handler(client, handle);
+
+        let handle = client.add_event_handler({
+            let core = self.clone();
+            move |raw: Raw<AnySyncTimelineEvent>, room: matrix_sdk::Room| {
+                let core = core.clone();
+                async move {
+                    if raw.get_field::<String>("type").ok().flatten().as_deref()
+                        != Some("m.room.member")
                     {
                         return;
                     }
-                    if let Ok(user_id) = event.state_key.as_str().try_into() {
-                        core.emit_if_current(generation, CoreEvent::ProfileChanged { user_id });
+                    let Ok(event) = raw.deserialize_as_unchecked::<OriginalSyncRoomMemberEvent>()
+                    else {
+                        return;
+                    };
+                    if event.prev_content().is_none() {
+                        core.emit_profile_changed(generation, &room, &event);
                     }
                 }
             }
         });
         self.track_session_handler(client, handle);
+    }
+
+    fn emit_profile_changed(
+        &self,
+        generation: u64,
+        room: &matrix_sdk::Room,
+        event: &OriginalSyncRoomMemberEvent,
+    ) {
+        if event.content.membership != MembershipState::Join {
+            return;
+        }
+        let Ok(user_id) = event.state_key.as_str().try_into() else {
+            return;
+        };
+        self.emit_if_current(
+            generation,
+            CoreEvent::ProfileChanged {
+                room_id: room.room_id().to_owned(),
+                user_id,
+                display_name: event.content.displayname.clone(),
+                avatar_url: event.content.avatar_url.as_ref().map(ToString::to_string),
+            },
+        );
     }
 
     pub(crate) fn watch_space_sidebar(
@@ -508,4 +549,131 @@ pub(crate) async fn retry_backoff(failures: u32) {
         2u64.saturating_pow(failures.min(5)),
     ))
     .await;
+}
+
+#[cfg(test)]
+mod tests {
+    use matrix_sdk::ruma::room_id;
+    use matrix_sdk::ruma::serde::Raw;
+    use matrix_sdk::test_utils::mocks::MatrixMockServer;
+    use matrix_sdk_test::JoinedRoomBuilder;
+    use serde_json::{Value, json};
+    use tokio::sync::mpsc::UnboundedReceiver;
+
+    use crate::Core;
+    use crate::protocol::CoreEvent;
+    use crate::store::MemorySessionStore;
+
+    const ALICE: &str = "@alice:example.org";
+
+    fn member<T>(
+        event_id: &str,
+        user_id: &str,
+        content: &Value,
+        previous: Option<&Value>,
+    ) -> Raw<T> {
+        let mut event = json!({
+            "type": "m.room.member",
+            "state_key": user_id,
+            "sender": user_id,
+            "event_id": event_id,
+            "origin_server_ts": 1,
+            "content": content,
+        });
+        if let Some(previous) = previous {
+            event["unsigned"] = json!({ "prev_content": previous });
+        }
+        Raw::new(&event).unwrap().cast_unchecked()
+    }
+
+    fn changes(
+        events: &mut UnboundedReceiver<CoreEvent>,
+    ) -> Vec<(String, String, Option<String>, Option<String>)> {
+        std::iter::from_fn(|| events.try_recv().ok())
+            .filter_map(|event| match event {
+                CoreEvent::ProfileChanged {
+                    room_id,
+                    user_id,
+                    display_name,
+                    avatar_url,
+                } => Some((
+                    room_id.to_string(),
+                    user_id.to_string(),
+                    display_name,
+                    avatar_url,
+                )),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_rename_carries_the_room_and_the_new_profile() {
+        let server = MatrixMockServer::new().await;
+        let room_id = room_id!("!room:example.org");
+        let client = server.client_builder().build().await;
+        let (core, mut events) = Core::new("watchers", Box::new(MemorySessionStore::default()));
+        core.watch_profile_changes(&client, 1);
+        let old = json!({ "membership": "join", "displayname": "Alice" });
+        let new = json!({
+            "membership": "join",
+            "displayname": "Alicia",
+            "avatar_url": "mxc://example.org/alicia"
+        });
+        let recoloured = json!({
+            "membership": "join",
+            "displayname": "Alicia",
+            "avatar_url": "mxc://example.org/alicia",
+            "eu.she-a.color": { "on_light": "#123456" }
+        });
+
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(member("$renamed", ALICE, &new, Some(&old)))
+                    .add_timeline_event(member("$recoloured", ALICE, &recoloured, Some(&new))),
+            )
+            .await;
+
+        assert_eq!(
+            changes(&mut events),
+            [(
+                room_id.to_string(),
+                ALICE.to_owned(),
+                Some("Alicia".to_owned()),
+                Some("mxc://example.org/alicia".to_owned()),
+            )]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_timeline_rename_without_prev_content_still_counts() {
+        let server = MatrixMockServer::new().await;
+        let room_id = room_id!("!room:example.org");
+        let client = server.client_builder().build().await;
+        let (core, mut events) = Core::new("watchers", Box::new(MemorySessionStore::default()));
+        core.watch_profile_changes(&client, 1);
+        let bob = json!({ "membership": "join", "displayname": "Bob" });
+        let alicia = json!({ "membership": "join", "displayname": "Alicia" });
+
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_state_event(member("$state", "@bob:example.org", &bob, None))
+                    .add_timeline_event(member("$renamed", ALICE, &alicia, None)),
+            )
+            .await;
+
+        assert_eq!(
+            changes(&mut events),
+            [(
+                room_id.to_string(),
+                ALICE.to_owned(),
+                Some("Alicia".to_owned()),
+                None
+            )]
+        );
+    }
 }

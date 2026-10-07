@@ -2227,7 +2227,11 @@ pub enum CoreEvent {
 
     ProfileChanged {
         #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
         user_id: OwnedUserId,
+        display_name: Option<String>,
+        avatar_url: Option<String>,
     },
 
     BotCommandsChanged {

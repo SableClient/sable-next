@@ -977,7 +977,13 @@ test('a profile change drops the cached profile and tells listeners once', async
     await core.userProfile('@remote:example.org');
     expect(fake.send).toHaveBeenCalledTimes(1);
 
-    const change = { type: 'profile_changed', user_id: '@remote:example.org' } as CoreEvent;
+    const change: CoreEvent = {
+      type: 'profile_changed',
+      room_id: '!room:example.org',
+      user_id: '@remote:example.org',
+      display_name: null,
+      avatar_url: null,
+    };
     fake.emit(change);
     fake.emit(change);
     expect(listener).not.toHaveBeenCalled();
@@ -1002,7 +1008,13 @@ test('a lookup in flight when the profile changes does not refill the cache', as
     .mockResolvedValueOnce({ profile: { display_name: 'fresh' } });
   try {
     const stale = core.userProfile('@remote:example.org');
-    fake.emit({ type: 'profile_changed', user_id: '@remote:example.org' });
+    fake.emit({
+      type: 'profile_changed',
+      room_id: '!room:example.org',
+      user_id: '@remote:example.org',
+      display_name: null,
+      avatar_url: null,
+    });
     await vi.advanceTimersByTimeAsync(0);
     await stale;
     const fresh = core.userProfile('@remote:example.org');

@@ -116,6 +116,11 @@ export interface ReplyFallback {
   body: string;
 }
 
+interface SenderProfile {
+  name: string | null;
+  avatar: string | null;
+}
+
 export class RoomTimeline {
   items = $state.raw<TimelineItemView[]>([]);
   aggregations = $state.raw<TimelineItemView[]>([]);
@@ -164,6 +169,8 @@ export class RoomTimeline {
   private backwardPaginationCompletion: BackwardPaginationState | null = null;
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- read only while publishing items, which is what renders
   private readonly replyFallbacks = new Map<string, ReplyFallback>();
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- read only while publishing items, which is what renders
+  private readonly senderProfiles = new Map<string, SenderProfile>();
 
   private backwardPaginationStartFirstEventId: string | null = null;
   private backwardPaginationBoundaryChanged = false;
@@ -179,7 +186,40 @@ export class RoomTimeline {
 
   provideReplyFallback(eventId: string, fallback: ReplyFallback): void {
     this.replyFallbacks.set(eventId, fallback);
-    this.items = this.withReplyFallbacks(this.items);
+    this.items = this.published(this.items);
+  }
+
+  private published(items: TimelineItemView[]): TimelineItemView[] {
+    return this.withSenderProfiles(this.withReplyFallbacks(items));
+  }
+
+  private withSenderProfiles(items: TimelineItemView[]): TimelineItemView[] {
+    if (this.senderProfiles.size === 0) return items;
+    let next: TimelineItemView[] | null = null;
+    for (const [index, item] of items.entries()) {
+      const sender = item.sender === null ? undefined : this.senderProfiles.get(item.sender);
+      const reply = item.in_reply_to;
+      const replied = reply?.sender ? this.senderProfiles.get(reply.sender) : undefined;
+      const senderStale =
+        sender !== undefined &&
+        (item.sender_name !== sender.name || item.sender_avatar !== sender.avatar);
+      const replyStale =
+        reply !== null && replied !== undefined && reply.sender_name !== replied.name;
+      if (!senderStale && !replyStale) continue;
+      next ??= [...items];
+      next[index] = {
+        ...item,
+        ...(senderStale && { sender_name: sender.name, sender_avatar: sender.avatar }),
+        ...(replyStale && { in_reply_to: { ...reply, sender_name: replied.name } }),
+      };
+    }
+    return next ?? items;
+  }
+
+  private renamed(userId: string, profile: SenderProfile): void {
+    this.senderProfiles.set(userId, profile);
+    if (this.stagedItems !== null) this.stagedItems = this.published(this.stagedItems);
+    this.items = this.published(this.items);
   }
 
   private withReplyFallbacks(items: TimelineItemView[]): TimelineItemView[] {
@@ -454,6 +494,7 @@ export class RoomTimeline {
     if (!preserveSnapshot) {
       this.items = [];
       this.replyFallbacks.clear();
+      this.senderProfiles.clear();
       this.aggregations = [];
       this.hasSnapshot = false;
       this.readMarkerEventId = null;
@@ -503,6 +544,12 @@ export class RoomTimeline {
     this.state = 'pending';
     const pending: Extract<CoreEvent, { type: 'timeline_diff' }>[] = [];
     const stopEvents = this.core.subscribeEvents((event) => {
+      if (event.type === 'profile_changed') {
+        if (session === this.session && event.room_id === roomId) {
+          this.renamed(event.user_id, { name: event.display_name, avatar: event.avatar_url });
+        }
+        return;
+      }
       if (
         event.type !== 'timeline_diff' &&
         event.type !== 'timeline_pagination' &&
@@ -521,7 +568,7 @@ export class RoomTimeline {
         return;
       if (event.type === 'timeline_diff') {
         const before = this.stagedItems ?? this.items;
-        const items = this.withReplyFallbacks(applyDiffs(before, event.diffs));
+        const items = this.published(applyDiffs(before, event.diffs));
         if (this.stagedItems !== null) this.stagedItems = items;
         else this.items = items;
         if (event.diffs.some((diff) => diff.op === 'clear' || diff.op === 'reset')) {
@@ -622,7 +669,7 @@ export class RoomTimeline {
     }
 
     this.subscription = response.subscription;
-    const items = this.withReplyFallbacks(
+    const items = this.published(
       applyDiffs(
         response.items,
         pending

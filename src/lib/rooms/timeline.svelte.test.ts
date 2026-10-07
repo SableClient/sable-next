@@ -1304,3 +1304,57 @@ test('a reply fallback fills the preview now and on every later diff', async () 
   });
   expect(timeline.items.at(-1)?.in_reply_to?.body).toBe('Reacted');
 });
+
+test('a rename in the room relabels the loaded rows the SDK left on the old name', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org');
+  const reply: TimelineItemView = {
+    ...item('reply'),
+    sender: '@bob:example.org',
+    sender_name: 'Bob',
+    in_reply_to: {
+      event_id: '$initial',
+      sender: '@alice:example.org',
+      sender_mentioned: false,
+      sender_name: 'Alice',
+      body: 'initial',
+    },
+  };
+  core.emit({ type: 'timeline_diff', subscription: 1, diffs: [{ op: 'push_back', value: reply }] });
+  const bobRow = timeline.items.at(-1);
+
+  core.emit({
+    type: 'profile_changed',
+    room_id: '!room:example.org',
+    user_id: '@alice:example.org',
+    display_name: 'Alicia',
+    avatar_url: 'mxc://example.org/alicia',
+  });
+  core.emit({
+    type: 'profile_changed',
+    room_id: '!other:example.org',
+    user_id: '@bob:example.org',
+    display_name: 'Robert',
+    avatar_url: null,
+  });
+
+  expect(timeline.items[0]).toMatchObject({
+    sender_name: 'Alicia',
+    sender_avatar: 'mxc://example.org/alicia',
+  });
+  expect(timeline.items.at(-1)?.sender_name).toBe('Bob');
+  expect(timeline.items.at(-1)?.in_reply_to?.sender_name).toBe('Alicia');
+  expect(timeline.items.at(-1)).not.toBe(bobRow);
+
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [{ op: 'push_back', value: item('late') }],
+  });
+  expect(timeline.items.at(-1)?.sender_name).toBe('Alicia');
+
+  await timeline.stop();
+  await timeline.start('!room:example.org');
+  expect(timeline.items[0]?.sender_name).toBe('Alice');
+});
