@@ -115,11 +115,11 @@ windows = { version = "0.62.2", features = [
 [target."cfg(target_os = \"linux\")".dependencies]
 gtk = "0.18"
 webkit2gtk = { version = "2.0", features = ["v2_34"], optional = true }
-tauri-runtime-cef = { version = "0.1.0", git = "https://github.com/SableClient/tauri-runtime-cef", rev = "2e43e05f5f0cbc9b19a4dbb2318e95b0e9d43c2e", optional = true }
+tauri-runtime-cef = { version = "0.1.0", git = "https://github.com/SableClient/tauri-runtime-cef", rev = "8b2e630815452da137ac898aee149a8e7663dc61", optional = true }
 # The CEF runtime currently uses the beta.2 drag event API. Keep Cargo from
 # selecting beta.3, which removed its paths and DragMoved payloads.
 winit = { version = "=0.31.0-beta.2", optional = true }
-cef = { version = "=150.2.1", optional = true }
+cef = { version = "=151.8.1", optional = true }
 sha2 = { version = "0.11", optional = true }
 # Auto-download stays off: fetching a codec build would make Sable the one
 # distributing an H.264 decoder.
