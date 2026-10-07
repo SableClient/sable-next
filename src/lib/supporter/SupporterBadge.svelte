@@ -61,6 +61,8 @@
     agendergradient: ['var(--supporter-green)', 'var(--supporter-silver)'],
     bisexual: ['var(--supporter-bisexual-pink)', 'var(--supporter-bisexual-blue)'],
     bisexualgradient: ['var(--supporter-bisexual-pink)', 'var(--supporter-bisexual-blue)'],
+    pansexual: ['var(--supporter-pansexual-pink)', 'var(--supporter-pansexual-blue)'],
+    pansexualgradient: ['var(--supporter-pansexual-pink)', 'var(--supporter-pansexual-blue)'],
     trans: ['var(--supporter-blue)', 'var(--supporter-pink)'],
     transgradient: ['var(--supporter-blue)', 'var(--supporter-pink)'],
     intersex: ['var(--supporter-yellow)', 'var(--supporter-purple)'],

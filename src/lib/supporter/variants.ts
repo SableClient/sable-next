@@ -13,6 +13,8 @@ export const SUPPORTER_VARIANTS = [
   'agendergradient',
   'bisexual',
   'bisexualgradient',
+  'pansexual',
+  'pansexualgradient',
   'trans',
   'transgradient',
   'intersex',

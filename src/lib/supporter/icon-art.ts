@@ -2,6 +2,7 @@ import logo from '#lib/assets/res/svg/logo.svg?raw';
 import ghost from './ghost.svg?raw';
 import agender from '#lib/features/settings/app-icons/agender.svg?raw';
 import bisexual from '#lib/features/settings/app-icons/bisexual.svg?raw';
+import pansexual from '#lib/features/settings/app-icons/pansexual.svg?raw';
 import transgradient from '#lib/features/settings/app-icons/transgradient.svg?raw';
 import intersex from '#lib/features/settings/app-icons/intersex.svg?raw';
 import lesbian from '#lib/features/settings/app-icons/lesbian.svg?raw';
@@ -18,6 +19,8 @@ export const APP_ICON_STOPS = Object.fromEntries(
     agendergradient: agender,
     bisexual,
     bisexualgradient: bisexual,
+    pansexual,
+    pansexualgradient: pansexual,
     transgradient,
     intersex,
     intersexgradient: intersex,
@@ -63,6 +66,11 @@ export const CRISP_PRIDE_STOPS: Partial<Record<string, Array<{ color: string; of
       { color: 'var(--supporter-bisexual-blue)', offset: '0.6' },
       { color: 'var(--supporter-bisexual-blue)', offset: '1' },
     ],
+    pansexual: stripeStops([
+      'var(--supporter-pansexual-pink)',
+      'var(--supporter-pansexual-yellow)',
+      'var(--supporter-pansexual-blue)',
+    ]),
     trans: stripeStops([
       'var(--supporter-blue)',
       'var(--supporter-pink)',
