@@ -23,6 +23,7 @@
 
   let devices = $state<CallDevice[]>([]);
   let denied = $state(false);
+  let unlockError = $state<string | null>(null);
   let level = $state(0);
   let testing = $state(false);
   let stopTest: (() => void) | undefined;
@@ -99,11 +100,18 @@
           <Button
             variant="secondary"
             size="small"
-            onclick={() => void unlockCallDevices().then(refresh)}
+            onclick={() =>
+              void unlockCallDevices().then((error) => {
+                unlockError = error;
+                return refresh();
+              })}
           >
             {$i18n.t('settings.callDevicesAllow')}
           </Button>
         </div>
+        {#if unlockError}
+          <p>{$i18n.t('settings.callDevicesFailed', { reason: unlockError })}</p>
+        {/if}
       </Alert>
     {/if}
 

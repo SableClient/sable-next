@@ -2099,6 +2099,7 @@
     "callDeviceSystemDefault": "System default",
     "callDevicesPermission": "Allow microphone access to name your devices.",
     "callDevicesAllow": "Allow access",
+    "callDevicesFailed": "Microphone access failed: {{reason}}",
     "callDevicesUnsupported": "This platform does not let the app choose devices.",
     "callOutputVolume": "Output volume",
     "callMicTest": "Test microphone",

@@ -38,10 +38,16 @@ export async function listCallDevices(): Promise<{ devices: CallDevice[]; denied
   }
 }
 
-export async function unlockCallDevices(): Promise<void> {
-  const stream = await navigator.mediaDevices
-    .getUserMedia({ audio: true, video: true })
-    .catch(() => navigator.mediaDevices.getUserMedia({ audio: true }))
-    .catch(() => null);
-  for (const track of stream?.getTracks() ?? []) track.stop();
+export async function unlockCallDevices(): Promise<string | null> {
+  try {
+    const stream = await navigator.mediaDevices
+      .getUserMedia({ audio: true, video: true })
+      .catch(() => navigator.mediaDevices.getUserMedia({ audio: true }));
+    for (const track of stream.getTracks()) track.stop();
+    return null;
+  } catch (error) {
+    const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    console.warn('[sable call] microphone access failed', reason);
+    return reason;
+  }
 }

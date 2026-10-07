@@ -94,3 +94,26 @@ test.each([
     await user.keyboard('{Escape}');
   }
 });
+
+test('shows why microphone access failed', async () => {
+  const enumerateDevices = vi.fn(() =>
+    Promise.resolve([{ deviceId: '', kind: 'audioinput', label: '' }])
+  );
+  const getUserMedia = vi.fn(() =>
+    Promise.reject(new DOMException('Could not start audio source', 'NotReadableError'))
+  );
+  const mediaDevices = Object.assign(new EventTarget(), { enumerateDevices, getUserMedia });
+  vi.stubGlobal('navigator', { mediaDevices });
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  const user = userEvent.setup();
+
+  render(CallDeviceSettings);
+  await user.click(await screen.findByRole('button', { name: 'settings.callDevicesAllow' }));
+
+  expect(
+    await screen.findByText(
+      'settings.callDevicesFailed:NotReadableError: Could not start audio source'
+    )
+  ).toBeInTheDocument();
+  expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
+});
