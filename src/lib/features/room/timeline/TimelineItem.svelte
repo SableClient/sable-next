@@ -1408,6 +1408,7 @@
 
   .receipt-slot {
     display: flex;
+    user-select: none;
   }
 
   .message-content > .receipt-slot {
@@ -1433,6 +1434,7 @@
   .receipt-space {
     display: inline-block;
     inline-size: var(--receipt-reserve);
+    user-select: none;
   }
 
   .has-receipts:global([data-receipt-narrow]) {
@@ -1914,9 +1916,11 @@
   }
 
   .message:not(.layout-bubble) .message-main > .receipt-tail {
+    block-size: var(--size-x300);
     flex: none;
     inline-size: calc(var(--receipt-reserve) + var(--space-200));
     margin-inline-start: auto;
+    user-select: none;
   }
 
   .message.layout-bubble:not(.own.align-own)
