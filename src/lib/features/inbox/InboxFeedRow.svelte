@@ -14,15 +14,25 @@
     children: Snippet;
     trailing: Snippet;
     message?: Snippet;
+    compact?: boolean;
   }
 
-  let { roomId, eventId, name, class: className, children, trailing, message }: Props = $props();
+  let {
+    roomId,
+    eventId,
+    name,
+    class: className,
+    children,
+    trailing,
+    message,
+    compact = false,
+  }: Props = $props();
   const roomList = useRoomList();
 
   let avatarUrl = $derived(roomList.byId(roomId)?.avatar_url ?? null);
 </script>
 
-<li class={className}>
+<li class={[className, { compact }]}>
   <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath resolves the route itself -->
   <a class="row" href={roomSectionPath(roomList.rooms, roomId, eventId)} draggable="false">
     <Avatar id={roomId} src={avatarUrl} {name} />
@@ -75,6 +85,19 @@
     flex: 1 0 100%;
     min-width: 0;
     padding: 0 0 var(--space-200) var(--space-400);
+  }
+
+  .compact .row {
+    gap: var(--space-200);
+    padding: var(--space-200) var(--space-300);
+  }
+
+  .compact .row :global(.avatar-root) {
+    --avatar-size: var(--avatar-size-200);
+  }
+
+  .compact .message {
+    padding: 0 0 var(--space-200);
   }
 
   .body {

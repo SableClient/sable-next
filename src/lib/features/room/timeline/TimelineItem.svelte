@@ -503,7 +503,9 @@
   }
 
   let nameOpensProfile = $derived(
-    preferences.usernameClick === 'profile' && onSenderProfile !== undefined && item.sender !== null
+    (preferences.usernameClick === 'profile' || onMentionUser === undefined) &&
+      onSenderProfile !== undefined &&
+      item.sender !== null
   );
   let nameMentions = $derived(
     !nameOpensProfile && onMentionUser !== undefined && item.sender !== null

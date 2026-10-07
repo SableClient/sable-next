@@ -1,4 +1,4 @@
-import type { BookmarkView, RoomSummary } from '#src/generated/protocol';
+import type { BookmarkView, InboxItemView, RoomSummary } from '#src/generated/protocol';
 
 import { formatTime } from '#lib/ui/date-time.js';
 import { currentLocale } from '#lib/i18n.js';
@@ -7,6 +7,36 @@ import type { UnreadCount } from '#lib/rooms/spaces.js';
 
 export type NotificationFilter = 'all' | 'mentions' | 'direct';
 export type InboxTab = 'notifications' | 'invites' | 'requests';
+
+export const NOTIFICATION_GROUP_LIMIT = 5;
+
+export interface NotificationGroup {
+  roomId: string;
+  latest: InboxItemView;
+  items: InboxItemView[];
+  hasMore: boolean;
+  firstEventId: string;
+  read: boolean;
+  highlight: boolean;
+}
+
+export function groupNotifications(items: readonly InboxItemView[]): NotificationGroup[] {
+  const rooms = new Map<string, InboxItemView[]>();
+  for (const item of [...items].sort((left, right) => right.ts - left.ts)) {
+    const group = rooms.get(item.room_id) ?? [];
+    group.push(item);
+    rooms.set(item.room_id, group);
+  }
+  return [...rooms].map(([roomId, entries]) => ({
+    roomId,
+    latest: entries[0],
+    items: entries.slice(0, NOTIFICATION_GROUP_LIMIT),
+    hasMore: entries.length > NOTIFICATION_GROUP_LIMIT,
+    firstEventId: entries[entries.length - 1].event_id,
+    read: entries.every((item) => item.read),
+    highlight: entries.some((item) => item.highlight),
+  }));
+}
 
 export function parseInboxTab(value: string | null): InboxTab {
   return value === 'invites' || value === 'requests' ? value : 'notifications';

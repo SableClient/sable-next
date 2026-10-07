@@ -69,7 +69,7 @@
     estimateRowSize,
     mediaColumnPx,
     TIMELINE_LAYOUT,
-    TIMELINE_LAYOUT_STYLE,
+    timelineLayoutStyle,
   } from './timeline-layout';
 
   import type { MessageCallbacks } from '../messages/message-action-controller.svelte.js';
@@ -1019,7 +1019,7 @@
 
 <div
   class={['timeline-content', `spacing-${preferences.messageSpacing}`]}
-  style={TIMELINE_LAYOUT_STYLE}
+  style={timelineLayoutStyle(preferences.messageSpacing)}
 >
   {#if revealed && unread.active && !unread.loading && (!unreadInView || unreadError !== null)}
     <div class="unread-bar">
@@ -1204,9 +1204,6 @@
   .timeline-content {
     --timeline-foot-height: var(--size-x300);
     --timeline-indicator-size: var(--target-hit);
-    --timeline-group-gap: var(--space-200);
-    --timeline-row-gap: var(--space-300);
-    --timeline-row-padding: var(--space-100);
 
     display: flex;
     flex: 1;
@@ -1215,14 +1212,6 @@
     min-height: 0;
     min-width: 0;
     position: relative;
-  }
-
-  .timeline-content.spacing-compact {
-    --timeline-row-padding: var(--space-050);
-  }
-
-  .timeline-content.spacing-roomy {
-    --timeline-row-padding: var(--space-200);
   }
 
   @media (width >= 48rem) and (any-hover: hover) and (any-pointer: fine) {

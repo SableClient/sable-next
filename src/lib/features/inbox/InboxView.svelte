@@ -78,7 +78,7 @@
 <style>
   :global(.inbox) {
     display: grid;
-    gap: var(--space-500);
+    gap: var(--space-300);
   }
 
   :global(.inbox-tabs) {

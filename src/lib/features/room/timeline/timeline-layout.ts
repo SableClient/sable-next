@@ -1,4 +1,5 @@
 import type { TimelineItemContentView } from '#src/generated/protocol';
+import type { MessageSpacing } from '#lib/settings/preferences.svelte.js';
 
 export const TIMELINE_LAYOUT = {
   historyPrefetchItems: 25,
@@ -22,6 +23,20 @@ export const TIMELINE_LAYOUT_STYLE = [
   `--timeline-media-min:${String(TIMELINE_LAYOUT.mediaMinRem)}rem`,
   `--timeline-sticker-width:${String(TIMELINE_LAYOUT.stickerWidthRem)}rem`,
 ].join(';');
+
+export function timelineLayoutStyle(spacing: MessageSpacing): string {
+  const padding = {
+    compact: 'var(--space-050)',
+    cozy: 'var(--space-100)',
+    roomy: 'var(--space-200)',
+  }[spacing];
+  return [
+    TIMELINE_LAYOUT_STYLE,
+    '--timeline-row-gap:var(--space-300)',
+    '--timeline-group-gap:var(--space-200)',
+    `--timeline-row-padding:${padding}`,
+  ].join(';');
+}
 
 const ROOT_FONT_PX = 16;
 const DEFAULT_PICTURE_RATIO = 4 / 3;

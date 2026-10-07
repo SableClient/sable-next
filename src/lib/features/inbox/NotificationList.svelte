@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { InboxItemView } from '#src/generated/protocol';
+  import type { InboxItemView, PerMessageProfileView } from '#src/generated/protocol';
+  import { goto } from '$app/navigation';
   import { onDestroy, tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import AtIcon from 'phosphor-svelte/lib/AtIcon';
@@ -8,17 +9,22 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { i18n } from '#lib/i18n.js';
-  import { formatMessageTimestamp } from '#lib/ui/date-time.js';
   import {
     backfillSignal,
     focusRowAt,
-    formatCompactTimestamp,
-    type NotificationFilter,
+    groupNotifications,
     senderName,
+    type NotificationFilter,
   } from './inbox';
   import { InboxFeed } from './inbox-feed.svelte';
   import InboxFeedRow from './InboxFeedRow.svelte';
   import MessagePreview from '#lib/features/room/messages/MessagePreview.svelte';
+  import MentionProfile from '#lib/features/room/members/MentionProfile.svelte';
+  import { MemberProfile } from '#lib/features/room/members/member-profile.svelte.js';
+  import type { MatrixLink } from '#lib/rooms/matrix-link.js';
+  import { roomSectionPath } from '#lib/rooms/permalink.js';
+  import { splitVia } from '#lib/rooms/join-address.js';
+  import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import InboxSectionHeader from './InboxSectionHeader.svelte';
   import { markRoomUnread } from '#lib/features/sidebar/nav-rooms.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -37,9 +43,14 @@
   let { filter, onFilter, limit }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
+  const memberProfile = new MemberProfile(core);
+  let profileRoomId = $state('');
   const headingId = $props.id();
   const feed = new InboxFeed(core.commands);
-  onDestroy(() => feed.dispose());
+  onDestroy(() => {
+    feed.dispose();
+    memberProfile.close();
+  });
   const marking = new SvelteSet<string>();
   const readNow = new SvelteSet<string>();
   const filters: readonly NotificationFilter[] = ['direct', 'mentions', 'all'];
@@ -85,17 +96,34 @@
       .filter((item) => includeRead || !item.read)
   );
 
-  function roomName(item: InboxItemView): string {
-    return roomList.labelFor(item.room_id);
+  let groups = $derived(groupNotifications(rows).slice(0, size));
+
+  function openMessage(roomId: string, eventId: string): void {
+    void afterOverlayPops().then(() => goto(roomSectionPath(roomList.rooms, roomId, eventId)));
   }
 
-  function sender(item: InboxItemView): string {
-    return item.sender_name ?? senderName(item.sender);
+  function openProfile(
+    roomId: string,
+    userId: string,
+    anchor: HTMLElement,
+    pmp?: PerMessageProfileView | null
+  ): void {
+    profileRoomId = roomId;
+    if (pmp) memberProfile.showPmp(userId, anchor, pmp);
+    else void memberProfile.show(userId, anchor);
   }
 
-  function preview(item: InboxItemView): string {
-    if (item.body !== null) return item.body;
-    return $i18n.t(item.encrypted ? 'inbox.encryptedMessage' : 'inbox.noPreview');
+  function handleMatrixLink(roomId: string, link: MatrixLink, anchor: HTMLAnchorElement): void {
+    if (link.kind === 'user') openProfile(roomId, link.userId, anchor);
+    else {
+      const path = roomSectionPath(
+        roomList.rooms,
+        link.roomId,
+        link.kind === 'event' ? link.eventId : null,
+        splitVia(anchor.href).via
+      );
+      void afterOverlayPops().then(() => goto(path));
+    }
   }
 
   function emptyLabel(): string {
@@ -123,7 +151,7 @@
 
   async function markRead(item: InboxItemView, element: HTMLElement): Promise<void> {
     if (marking.has(item.event_id)) return;
-    const index = rows.findIndex((row) => row.event_id === item.event_id);
+    const index = groups.findIndex((group) => group.roomId === item.room_id);
     const hadFocus = element.contains(document.activeElement);
     const covered = feed.items.filter(
       (candidate) => candidate.room_id === item.room_id && candidate.ts <= item.ts
@@ -134,8 +162,8 @@
       for (const candidate of covered) readNow.add(candidate.event_id);
       await tick();
       if (hadFocus)
-        focusRowAt(section, heading, includeRead ? index : Math.min(index, rows.length - 1));
-      toasts.undoable($i18n.t('inbox.markedRead', { room: roomName(item) }), {
+        focusRowAt(section, heading, includeRead ? index : Math.min(index, groups.length - 1));
+      toasts.undoable($i18n.t('inbox.markedRead', { room: roomList.labelFor(item.room_id) }), {
         label: $i18n.t('inbox.undo'),
         onUndo: () => {
           for (const candidate of covered) readNow.delete(candidate.event_id);
@@ -205,55 +233,68 @@
     {/if}
   {:else}
     <ul class="feed">
-      {#each rows as item (item.event_id)}
+      {#each groups as group (group.roomId)}
+        {@const name = roomList.labelFor(group.roomId)}
         <InboxFeedRow
-          roomId={item.room_id}
-          eventId={item.event_id}
-          name={roomName(item)}
-          class={{ read: item.read }}
+          compact
+          roomId={group.roomId}
+          eventId={group.latest.event_id}
+          {name}
+          class={{ read: group.read }}
         >
           <span class="head">
-            <span class="name">{roomName(item)}</span>
-            {#if item.highlight}
-              <span class="mention" role="img" aria-label={$i18n.t('inbox.mention')}>
-                <AtIcon aria-hidden="true" />
-              </span>
-            {/if}
-            <time
-              class="when"
-              datetime={new Date(item.ts).toISOString()}
-              title={formatMessageTimestamp(item.ts)}>{formatCompactTimestamp(item.ts)}</time
-            >
+            <span class="name">{name}</span>
+            {#if group.highlight}<AtIcon aria-label={$i18n.t('inbox.mention')} />{/if}
           </span>
           {#snippet message()}
-            <MessagePreview roomId={item.room_id} eventId={item.event_id}>
-              {#snippet fallback()}
-                <span class="foot">
-                  <span class="sender">{sender(item)}</span>
-                  <span class={['preview', { placeholder: item.body === null }]}
-                    >{preview(item)}</span
-                  >
-                </span>
-              {/snippet}
-            </MessagePreview>
-          {/snippet}
-          {#snippet trailing()}
-            {#if item.read}
-              <span class="mark-read-spacer" aria-hidden="true"></span>
-            {:else}
-              <IconButton
-                class="mark-read"
-                variant="ghost"
-                size="small"
-                disabled={marking.has(item.event_id)}
-                label={$i18n.t('inbox.markRead', { room: roomName(item) })}
-                onclick={(event) => {
-                  const element = event.currentTarget.closest('li');
-                  if (element) void markRead(item, element);
+            {#each group.items as item, index (item.event_id)}
+              <MessagePreview
+                timeline
+                roomId={group.roomId}
+                eventId={item.event_id}
+                previousEventId={group.items[index - 1]?.event_id}
+                loadPreviewProfile
+                onSenderProfile={(userId, anchor, pmp) =>
+                  openProfile(group.roomId, userId, anchor, pmp)}
+                onMatrixLink={(link, anchor) => handleMatrixLink(group.roomId, link, anchor)}
+                onJumpToEvent={(eventId) => openMessage(group.roomId, eventId)}
+                onOpenMedia={(eventId) => openMessage(group.roomId, eventId)}
+                timeAction={{
+                  label: $i18n.t('inbox.openMessage'),
+                  run: () => openMessage(group.roomId, item.event_id),
                 }}
               >
-                <ChecksIcon />
-              </IconButton>
+                {#snippet fallback()}
+                  <p class="preview">
+                    <strong>{item.sender_name ?? senderName(item.sender)}</strong>
+                    {item.body ??
+                      $i18n.t(item.encrypted ? 'inbox.encryptedMessage' : 'inbox.noPreview')}
+                  </p>
+                {/snippet}
+              </MessagePreview>
+            {/each}
+            {#if group.hasMore}
+              <Button
+                variant="ghost"
+                size="small"
+                onclick={() => openMessage(group.roomId, group.firstEventId)}
+              >
+                {$i18n.t('inbox.moreNotifications')}
+              </Button>
+            {/if}
+          {/snippet}
+          {#snippet trailing()}
+            {#if !group.read}
+              <IconButton
+                variant="ghost"
+                size="small"
+                disabled={marking.has(group.latest.event_id)}
+                label={$i18n.t('inbox.markRead', { room: name })}
+                onclick={(event) => {
+                  const element = event.currentTarget.closest('li');
+                  if (element) void markRead(group.latest, element);
+                }}><ChecksIcon /></IconButton
+              >
             {/if}
           {/snippet}
         </InboxFeedRow>
@@ -274,6 +315,18 @@
     </Button>
   {/if}
 </section>
+
+<MentionProfile
+  bind:open={memberProfile.open}
+  userId={memberProfile.userId}
+  anchor={memberProfile.anchor}
+  roomId={profileRoomId}
+  member={null}
+  profile={memberProfile.profile}
+  pmp={memberProfile.pmp}
+  failed={memberProfile.failed}
+  onMatrixLink={(link, anchor) => handleMatrixLink(profileRoomId, link, anchor)}
+/>
 
 <style>
   section {
@@ -302,85 +355,33 @@
 
   .feed {
     background: var(--bg-container);
-    border: var(--border-width) solid var(--bg-container-line);
-    border-radius: var(--radius);
+    border-block: var(--border-width) solid var(--bg-container-line);
     color: var(--bg-on-container);
     list-style: none;
     margin: 0;
-    overflow: hidden;
     padding: 0;
   }
 
-  .head,
-  .foot {
-    align-items: baseline;
+  .head {
+    align-items: center;
     display: flex;
     gap: var(--space-200);
     min-width: 0;
   }
 
   .name {
-    flex: 0 1 auto;
+    font-size: var(--font-size-label);
     font-weight: var(--font-weight-medium);
-    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .sender {
-    flex: 0 1 auto;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-medium);
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .when {
-    color: var(--surface-var-on-container);
-    flex: 0 0 auto;
-    font-size: var(--font-size-small);
-    font-variant-numeric: tabular-nums;
-    margin-left: auto;
-    padding-left: var(--space-200);
-  }
-
-  .preview {
-    color: var(--surface-var-on-container);
-    flex: 1;
-    font-size: var(--font-size-small);
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .preview.placeholder {
-    font-style: italic;
-  }
-
-  .mention {
+  .head :global(svg) {
     color: var(--primary-main);
-    display: flex;
-    flex: 0 0 auto;
-  }
-
-  .mention :global(svg) {
+    flex-shrink: 0;
     height: var(--icon-size-small);
     width: var(--icon-size-small);
-  }
-
-  .mark-read-spacer {
-    flex: 0 0 auto;
-    width: var(--control-height-300);
-  }
-
-  @media (pointer: coarse) {
-    .mark-read-spacer {
-      width: 2.75rem;
-    }
   }
 
   :global(.read) .name {
@@ -388,8 +389,9 @@
     font-weight: var(--font-weight-normal);
   }
 
-  :global(.read) .mention {
-    color: var(--surface-var-on-container);
+  .preview {
+    font-size: var(--font-size-editor);
+    margin: var(--space-100) 0;
   }
 
   .empty {

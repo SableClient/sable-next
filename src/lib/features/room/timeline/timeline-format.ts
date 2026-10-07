@@ -319,7 +319,7 @@ export function isCollapsed(
     current.sender !== null &&
     current.sender === previous.sender &&
     personaKey(current) === personaKey(previous) &&
-    current.timestamp - previous.timestamp < 120_000
+    Math.abs(current.timestamp - previous.timestamp) < 120_000
   );
 }
 

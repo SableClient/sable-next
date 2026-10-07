@@ -95,6 +95,8 @@
     "notificationsEmptyHistory": "No notifications on this device yet.",
     "showRead": "Show read",
     "loadOlder": "Load older",
+    "moreNotifications": "View older messages in this room",
+    "openMessage": "Open message in room",
     "checking": "Checking your rooms…",
     "loadFailed": "Could not load notifications.",
     "retry": "Try again",

@@ -1,5 +1,7 @@
 import type { InboxFilter, InboxItemView } from '#src/generated/protocol';
+import { SvelteSet } from 'svelte/reactivity';
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
+import { NOTIFICATION_GROUP_LIMIT } from './inbox';
 
 export type InboxFeedCommands = Pick<CoreCommands, 'inboxNotifications' | 'backfillInbox'>;
 
@@ -23,10 +25,19 @@ export class InboxFeed {
     if (this.#disposed) return;
     const revision = ++this.#revision;
     try {
-      const page = await this.commands.inboxNotifications(filter, includeRead, limit);
-      if (revision !== this.#revision) return;
-      this.items = page.items;
-      this.hasMore = page.hasMore;
+      let queryLimit = limit * NOTIFICATION_GROUP_LIMIT;
+      for (;;) {
+        const page = await this.commands.inboxNotifications(filter, includeRead, queryLimit);
+        if (revision !== this.#revision) return;
+        const groups = new SvelteSet(page.items.map((item) => item.room_id)).size;
+        if (page.hasMore && groups < limit && page.items.length >= queryLimit) {
+          queryLimit *= 2;
+          continue;
+        }
+        this.items = page.items;
+        this.hasMore = page.hasMore || groups > limit;
+        break;
+      }
       this.#loadFailed = false;
     } catch (error) {
       if (revision !== this.#revision) return;
