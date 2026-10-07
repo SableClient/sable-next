@@ -124,7 +124,7 @@ fn encode(
     audio: bool,
 ) -> Result<(), CommandErr> {
     let mut command = FfmpegCommand::new();
-    command.arg("-y").input(source.to_string_lossy());
+    command.arg("-y").input(source);
     // STREAM_MIME always promises Opus, so a silent track stands in for one the
     // source lacks.
     if !audio {
@@ -135,7 +135,7 @@ fn encode(
             .map("1:a:0")
             .arg("-shortest");
     }
-    command.args(ENCODE_ARGS).output(partial.to_string_lossy());
+    command.args(ENCODE_ARGS).output(partial);
     if tracing::enabled!(tracing::Level::DEBUG) {
         command.print_command();
     }
