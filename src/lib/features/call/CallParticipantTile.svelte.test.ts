@@ -73,6 +73,34 @@ test('our own camera on a native call is a slot for the native view', () => {
   expect(localVideo.clear).toHaveBeenCalled();
 });
 
+test('a watched remote screen on a native call is a slot for the native view', () => {
+  const remoteVideo = {
+    place: vi.fn(() => Promise.resolve()),
+    clear: vi.fn(() => Promise.resolve()),
+  };
+  const { container, unmount } = render(CallParticipantTile, {
+    participant: {
+      identity: 'bob',
+      screenShare: { id: 'TR_1', muted: false, subscribed: true },
+    },
+    source: 'screen',
+    room: undefined,
+    remoteVideo,
+    watchingScreen: true,
+    onWatchScreen: vi.fn(),
+    name: 'Bob',
+    userId: '@bob:example.org',
+    avatar: null,
+  });
+
+  expect(container.querySelector('video')).not.toBeInTheDocument();
+  expect(container.querySelector('div.video')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: "Stop watching Bob's screen" })).toBeInTheDocument();
+
+  unmount();
+  expect(remoteVideo.clear).toHaveBeenCalled();
+});
+
 test('the volume button still toggles the panel closed', async () => {
   const user = mountTile();
   await openFromContextMenu(user);

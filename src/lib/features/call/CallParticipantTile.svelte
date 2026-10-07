@@ -21,7 +21,12 @@
   import Slider from '#lib/ui/primitives/Slider.svelte';
 
   import { cameraVisible, type CallTileSource } from './call-layout';
-  import type { CallParticipant, CallVideoOverlay } from './call-transport';
+  import type {
+    CallParticipant,
+    CallRemoteVideoOverlay,
+    CallVideoOverlay,
+    CallVideoRect,
+  } from './call-transport';
   import { nativeVideoSlot } from './native-video-overlay';
   import {
     MAX_PARTICIPANT_VOLUME,
@@ -35,6 +40,7 @@
     source: CallTileSource;
     room: LivekitRoom | undefined;
     localVideo?: CallVideoOverlay;
+    remoteVideo?: CallRemoteVideoOverlay;
     name: string;
     userId: string;
     avatar: string | null;
@@ -51,6 +57,7 @@
     source,
     room,
     localVideo,
+    remoteVideo,
     name,
     userId,
     avatar,
@@ -147,6 +154,16 @@
     };
   }
 
+  let remoteSlot = $derived.by(() => {
+    const trackId = participant.screenShare?.id;
+    if (!remoteVideo || !screen || trackId === undefined) return undefined;
+    const identity = participant.identity;
+    return {
+      place: (rect: CallVideoRect) => remoteVideo.place({ ...rect, identity, trackId }),
+      clear: () => remoteVideo.clear(),
+    };
+  });
+
   function attachVideo(node: HTMLVideoElement) {
     if (videoTrackId === undefined) return;
     const identity = untrack(() => participant.identity);
@@ -171,6 +188,7 @@
   class:revealed
   class:audible={screen && adjustable}
   class:video-on={videoOn}
+  class:overlaid={videoOn && remoteSlot !== undefined}
   bind:this={element}
   onfullscreenchange={() => (fullscreen = document.fullscreenElement === element)}
   onpointerup={reveal}
@@ -178,6 +196,8 @@
 >
   {#if videoOn && localVideo && !screen}
     <div class="video" {@attach nativeVideoSlot(localVideo)}></div>
+  {:else if videoOn && remoteSlot}
+    <div class="video" {@attach nativeVideoSlot(remoteSlot)}></div>
   {:else if videoOn}
     <video
       class="video"
@@ -464,6 +484,28 @@
     font-size: var(--font-size-small);
     margin: 0;
     max-inline-size: 100%;
+  }
+
+  .overlaid {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .overlaid .video {
+    block-size: auto;
+    flex: 1;
+    min-block-size: 0;
+    order: 1;
+  }
+
+  .overlaid .stop-watching {
+    min-block-size: calc(var(--control-height-300) + var(--space-200));
+    padding: var(--space-100) var(--space-200);
+    position: static;
+  }
+
+  .overlaid .tag {
+    display: none;
   }
 
   .muted {

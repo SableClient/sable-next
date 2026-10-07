@@ -23,6 +23,8 @@ const plugin = {
   clearNativeCallLocalVideoOverlay: vi.fn(() =>
     Promise.resolve(snapshot(4, { cameraEnabled: true }))
   ),
+  setNativeCallRemoteVideoOverlay: vi.fn(() => Promise.resolve(snapshot(7))),
+  clearNativeCallRemoteVideoOverlay: vi.fn(() => Promise.resolve(snapshot(8))),
   getAudioRoutes: vi.fn(() =>
     Promise.resolve({
       routes: [],
@@ -70,6 +72,22 @@ test('the native transport places and clears the local video overlay', async () 
 
   await transport?.capabilities.localVideo?.clear();
   expect(plugin.clearNativeCallLocalVideoOverlay).toHaveBeenCalledWith({ callId: '7' });
+});
+
+test('the native transport places the remote video over a tile', async () => {
+  const transport = await createNativeTransport('7', '@erwan:example.org:PHONE');
+  const rect = { x: 1, y: 2, width: 3, height: 4, devicePixelRatio: 2 };
+
+  await transport?.capabilities.remoteVideo?.place({ ...rect, identity: 'bob', trackId: 'TR_1' });
+  expect(plugin.setNativeCallRemoteVideoOverlay).toHaveBeenCalledWith({
+    callId: '7',
+    participantIdentity: 'bob',
+    trackId: 'TR_1',
+    ...rect,
+  });
+
+  await transport?.capabilities.remoteVideo?.clear();
+  expect(plugin.clearNativeCallRemoteVideoOverlay).toHaveBeenCalledWith({ callId: '7' });
 });
 
 test('the native transport lists and selects microphones on Android only', async () => {

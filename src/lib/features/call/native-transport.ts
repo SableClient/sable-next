@@ -199,6 +199,21 @@ export async function createNativeTransport(
           adopt(await plugin.clearNativeCallLocalVideoOverlay({ callId }));
         },
       },
+      remoteVideo: {
+        place: async ({ identity, trackId, ...rect }) => {
+          adopt(
+            await plugin.setNativeCallRemoteVideoOverlay({
+              callId,
+              participantIdentity: identity,
+              trackId,
+              ...rect,
+            })
+          );
+        },
+        clear: async () => {
+          adopt(await plugin.clearNativeCallRemoteVideoOverlay({ callId }));
+        },
+      },
       audioRoutes: {
         list: async () => {
           const response = await plugin.getAudioRoutes({ callId });

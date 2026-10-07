@@ -74,9 +74,15 @@ export type CallVideoOverlay = {
   clear: () => Promise<void>;
 };
 
+export type CallRemoteVideoOverlay = {
+  place: (rect: CallVideoRect & { identity: string; trackId: string }) => Promise<void>;
+  clear: () => Promise<void>;
+};
+
 export type CallTransportCapabilities = {
   camera?: { switch: () => Promise<void> };
   localVideo?: CallVideoOverlay;
+  remoteVideo?: CallRemoteVideoOverlay;
   audioRoutes?: {
     list: () => Promise<CallAudioRoute[]>;
     select: (routeId: string) => Promise<void>;

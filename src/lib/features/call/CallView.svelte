@@ -111,6 +111,9 @@
       session.watchedScreenShareIds
     )
   );
+  let remoteVideoKey = $derived(
+    tiles.find((tile) => tile.source === 'screen' && tile.watching && !tile.participant.local)?.key
+  );
   let others = $derived(
     tiles.filter((tile) => tile.source === 'camera' && !tile.participant.local).length
   );
@@ -467,6 +470,7 @@
     source={item.source}
     room={session.roomFor(item.participant.backendId)}
     localVideo={item.participant.local ? session.localVideo : undefined}
+    remoteVideo={item.key === remoteVideoKey ? session.remoteVideo : undefined}
     name={tileNames.get(item.participant.identity) ?? profile.name}
     userId={profile.userId}
     avatar={profile.avatar}

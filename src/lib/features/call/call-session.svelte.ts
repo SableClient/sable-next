@@ -29,7 +29,7 @@ import { cameraVisible, screenShareVisible, type CallPin } from './call-layout';
 import { participantKeys } from './participant-keys';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { DEVICE_PREFERENCE } from './devices';
-import type { CallBackendGrant, CallVideoOverlay } from './call-transport';
+import type { CallBackendGrant, CallRemoteVideoOverlay, CallVideoOverlay } from './call-transport';
 
 export type CallLifecycle = 'idle' | 'joining' | 'connecting' | 'active' | 'leaving' | 'failed';
 
@@ -195,6 +195,10 @@ export class CallSession {
 
   get localVideo(): CallVideoOverlay | undefined {
     return this.#media?.capabilities.localVideo;
+  }
+
+  get remoteVideo(): CallRemoteVideoOverlay | undefined {
+    return this.#media?.capabilities.remoteVideo;
   }
 
   get audioRoutes(): CallTransportCapabilities['audioRoutes'] {
