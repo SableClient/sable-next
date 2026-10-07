@@ -1553,6 +1553,14 @@ mod tests {
 
         assert_eq!(reply.title(), "Reply");
         assert!(!reply.foreground());
+
+        let mark_read = category
+            .actions()
+            .iter()
+            .find(|action| action.id() == "sable-mark-read")
+            .expect("a mark-as-read action");
+
+        assert!(!mark_read.foreground());
     }
 
     #[test]

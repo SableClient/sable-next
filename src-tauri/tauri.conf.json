@@ -111,7 +111,7 @@
               "inputButtonTitle": "Send",
               "inputPlaceholder": "Message"
             },
-            { "id": "sable-mark-read", "title": "Mark as read" }
+            { "id": "sable-mark-read", "title": "Mark as read", "foreground": false }
           ]
         }
       ]
