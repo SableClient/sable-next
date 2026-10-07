@@ -58,6 +58,7 @@
   let pinnedIds = $state.raw<string[]>([]);
   let shownIds = $state.raw<string[]>([]);
   let entries = $state.raw<ReadonlyMap<string, TimelineItemView>>(new Map());
+  let pending = $state.raw<ReadonlySet<string>>(new Set());
   let marker = $state.raw<PinReadMarker | null>(null);
   let currentHash = $state<string | null>(null);
   let run = 0;
@@ -117,17 +118,34 @@
       const ids = await core.commands.pinnedEvents(target);
       if (current !== run) return;
       pinnedIds = ids;
-
-      const loaded = await core.commands.eventItems(target, ids);
-      if (current !== run) return;
-      entries = new Map(loaded.map((item) => [item.event_id ?? item.id, item]));
       shownIds = ids;
-      eventItems.put(target, loaded);
+      entries = new Map(
+        ids.flatMap((id) => {
+          const item = entries.get(id) ?? eventItems.peek(target, id);
+          return item ? [[id, item] as const] : [];
+        })
+      );
+      pending = new Set(ids.filter((id) => !entries.has(id)));
+      for (const id of ids) void resolve(target, id, current);
       await markSeen(target, ids);
     } catch (error) {
       console.debug('[sable room] pins unavailable', error);
     } finally {
       if (current === run) loading = false;
+    }
+  }
+
+  async function resolve(target: string, id: string, current: number): Promise<void> {
+    try {
+      const items = await core.commands.eventItems(target, [id]);
+      const item = items.find((candidate) => candidate.event_id === id);
+      if (current !== run || !item) return;
+      entries = new Map([...entries, [id, item]]);
+      eventItems.put(target, [item]);
+    } catch (error) {
+      console.debug('[sable room] pin unavailable', error);
+    } finally {
+      if (current === run) pending = new Set([...pending].filter((pendingId) => pendingId !== id));
     }
   }
 
@@ -221,36 +239,53 @@
       <ul class="pin-list">
         {#each ordered as eventId (eventId)}
           <li class="pin-item" class:fresh={isNewPin(pinnedIds, marker, eventId)}>
-            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-            <div
-              class="pin-open"
-              onclick={(event) => {
-                if (!opensFrom(event)) return;
-                jump(eventId);
-              }}
-            >
-              <MessagePreview
-                {roomId}
-                {eventId}
-                item={entries.get(eventId) ?? null}
-                {members}
-                loadPreviewProfile
-                timeAction={{ label: $i18n.t('room.pinsJump'), run: () => jump(eventId) }}
-                onJumpToEvent={jump}
-                onOpenMedia={openMedia}
+            {#if pending.has(eventId)}
+              <p class="pin-status" role="status"><Spinner small /></p>
+            {:else}
+              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+              <div
+                class="pin-open"
+                onclick={(event) => {
+                  if (!opensFrom(event)) return;
+                  jump(eventId);
+                }}
               >
-                {#snippet fallback()}
-                  <div class="pin-unreadable">
-                    <button
-                      class="pin-unreadable-open"
-                      type="button"
-                      aria-label={$i18n.t('room.pinsJump')}
-                      onclick={() => jump(eventId)}
-                    >
-                      {$i18n.t('room.pinsUnreadable')}
-                    </button>
+                <MessagePreview
+                  {roomId}
+                  {eventId}
+                  item={entries.get(eventId) ?? null}
+                  {members}
+                  loadPreviewProfile
+                  timeAction={{ label: $i18n.t('room.pinsJump'), run: () => jump(eventId) }}
+                  onJumpToEvent={jump}
+                  onOpenMedia={openMedia}
+                >
+                  {#snippet fallback()}
+                    <div class="pin-unreadable">
+                      <button
+                        class="pin-unreadable-open"
+                        type="button"
+                        aria-label={$i18n.t('room.pinsJump')}
+                        onclick={() => jump(eventId)}
+                      >
+                        {$i18n.t('room.pinsUnreadable')}
+                      </button>
+                      {#if canPin}
+                        <IconButton
+                          variant="ghost"
+                          size="small"
+                          label={$i18n.t('timeline.unpinMessage')}
+                          onclick={() => void unpin(eventId)}
+                        >
+                          <PushPinSlashIcon />
+                        </IconButton>
+                      {/if}
+                    </div>
+                  {/snippet}
+                  {#snippet headerAction()}
                     {#if canPin}
                       <IconButton
+                        class="pin-unpin"
                         variant="ghost"
                         size="small"
                         label={$i18n.t('timeline.unpinMessage')}
@@ -259,23 +294,10 @@
                         <PushPinSlashIcon />
                       </IconButton>
                     {/if}
-                  </div>
-                {/snippet}
-                {#snippet headerAction()}
-                  {#if canPin}
-                    <IconButton
-                      class="pin-unpin"
-                      variant="ghost"
-                      size="small"
-                      label={$i18n.t('timeline.unpinMessage')}
-                      onclick={() => void unpin(eventId)}
-                    >
-                      <PushPinSlashIcon />
-                    </IconButton>
-                  {/if}
-                {/snippet}
-              </MessagePreview>
-            </div>
+                  {/snippet}
+                </MessagePreview>
+              </div>
+            {/if}
           </li>
         {/each}
       </ul>

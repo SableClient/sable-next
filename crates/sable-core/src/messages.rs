@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use futures_util::future::join_all;
 use matrix_sdk::deserialized_responses::TimelineEvent;
@@ -576,6 +576,63 @@ impl Core {
             .collect())
     }
 
+    pub(crate) async fn watch_pinned(&self, room_id: &OwnedRoomId) {
+        if self
+            .pinned_caches
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .contains_key(room_id)
+        {
+            return;
+        }
+        let Ok(room) = self.room(room_id).await else {
+            return;
+        };
+        match room.client().event_cache().pinned_events(room_id).await {
+            Ok(entry) => {
+                self.pinned_caches
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .insert(room_id.clone(), entry);
+            }
+            Err(error) => tracing::debug!(%room_id, "pinned events cache unavailable: {error}"),
+        }
+    }
+
+    async fn pinned_snapshot(
+        &self,
+        room_id: &OwnedRoomId,
+    ) -> HashMap<OwnedEventId, (TimelineEvent, Vec<TimelineEvent>)> {
+        let cache = self
+            .pinned_caches
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(room_id)
+            .map(|(cache, _)| cache.clone());
+        let Some(cache) = cache else {
+            return HashMap::new();
+        };
+        let Ok((events, _)) = cache.subscribe().await else {
+            return HashMap::new();
+        };
+
+        let mut targets = HashMap::new();
+        let mut edits = Vec::new();
+        for event in events {
+            if let Some(target) = replaced_event(&event) {
+                edits.push((target, event));
+            } else if let Some(event_id) = event.event_id().map(ToOwned::to_owned) {
+                targets.insert(event_id, (event, Vec::new()));
+            }
+        }
+        for (target, edit) in edits {
+            if let Some((_, replacements)) = targets.get_mut(&target) {
+                replacements.push(edit);
+            }
+        }
+        targets
+    }
+
     pub(crate) async fn event_items(
         &self,
         room_id: &OwnedRoomId,
@@ -583,31 +640,56 @@ impl Core {
     ) -> Result<Vec<TimelineItemView>, CommandErr> {
         let room = self.room(room_id).await?;
         let push = room.push_context().await.ok().flatten();
-        let (room, push) = (&room, push.as_ref());
-        let items = join_all(event_ids.iter().map(|event_id| async move {
-            let (event, replacements) = room
-                .load_or_fetch_event_with_relations(
-                    event_id,
-                    Some(vec![RelationType::Replacement]),
-                    None,
-                )
-                .await
-                .inspect_err(|error| tracing::debug!(%event_id, "event item unavailable: {error}"))
-                .ok()?;
-            let latest = valid_replacements(&event, &replacements)
-                .max_by_key(|replacement| {
-                    replacement
-                        .raw()
-                        .get_field::<MilliSecondsSinceUnixEpoch>("origin_server_ts")
-                        .ok()
-                        .flatten()
-                })
-                .cloned();
-            standalone_item(room, event, latest, push).await
-        }))
-        .await;
-        Ok(items.into_iter().flatten().collect())
+        let cached = self.pinned_snapshot(room_id).await;
+        let (room, push, cached) = (&room, push.as_ref(), &cached);
+        let mut items = Vec::with_capacity(event_ids.len());
+        for chunk in event_ids.chunks(PINNED_FETCH_CONCURRENCY) {
+            let loaded = join_all(chunk.iter().map(|event_id| async move {
+                let (event, replacements) = match cached.get(event_id) {
+                    Some(hit) => hit.clone(),
+                    None => room
+                        .load_or_fetch_event_with_relations(
+                            event_id,
+                            Some(vec![RelationType::Replacement]),
+                            None,
+                        )
+                        .await
+                        .inspect_err(|error| {
+                            tracing::debug!(%event_id, "event item unavailable: {error}");
+                        })
+                        .ok()?,
+                };
+                let latest = valid_replacements(&event, &replacements)
+                    .max_by_key(|replacement| {
+                        replacement
+                            .raw()
+                            .get_field::<MilliSecondsSinceUnixEpoch>("origin_server_ts")
+                            .ok()
+                            .flatten()
+                    })
+                    .cloned();
+                standalone_item(room, event, latest, push).await
+            }))
+            .await;
+            items.extend(loaded.into_iter().flatten());
+        }
+        Ok(items)
     }
+}
+
+const PINNED_FETCH_CONCURRENCY: usize = 10;
+
+fn replaced_event(event: &TimelineEvent) -> Option<OwnedEventId> {
+    let content = event
+        .raw()
+        .get_field::<serde_json::Value>("content")
+        .ok()
+        .flatten()?;
+    let relation = content.get("m.relates_to")?;
+    if relation.get("rel_type")?.as_str()? != "m.replace" {
+        return None;
+    }
+    relation.get("event_id")?.as_str()?.parse().ok()
 }
 
 fn valid_replacements<'a>(

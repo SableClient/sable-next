@@ -27,6 +27,10 @@ export class EventItems {
     return found;
   }
 
+  peek(roomId: string, eventId: string): TimelineItemView | null {
+    return this.#items.get(this.#key(roomId, eventId)) ?? null;
+  }
+
   put(roomId: string, items: readonly TimelineItemView[]): void {
     for (const item of items) {
       if (item.event_id !== null) this.#items.set(this.#key(roomId, item.event_id), item);

@@ -1269,6 +1269,9 @@ impl Core {
                     self.room_state_events(&room_id, WIDGETS_EVENT_TYPE),
                     self.pinned_events(&room_id),
                 );
+                if pinned_event_ids.as_ref().is_ok_and(|ids| !ids.is_empty()) {
+                    self.watch_pinned(&room_id).await;
+                }
                 let predecessor = self
                     .room(&room_id)
                     .await
