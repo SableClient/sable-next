@@ -493,7 +493,15 @@ body {
 html,
 body {
   height: 100%;
-  height: 100dvh;
+}
+
+@media (display-mode: standalone) {
+  @supports (-webkit-touch-callout: none) {
+    :root:not([data-tauri-os]),
+    :root:not([data-tauri-os]) body {
+      height: 100vh;
+    }
+  }
 }
 
 input,
