@@ -32,7 +32,7 @@
   <span {...rest} class={['pronoun-pill-container', className]}>
     {#each splitPronouns.visible as pronoun, index (index)}
       <span class={['pronoun-pill', pillClass]} lang={pronoun.language ?? undefined}
-        >{pronoun.summary}</span
+        >{pronoun.summary}<span class="pronoun-pill-cap" aria-hidden="true"></span></span
       >
     {/each}
     {#if splitPronouns.overflow.length > 0}
@@ -67,15 +67,12 @@
     z-index: 0;
   }
 
-  .pronoun-pill:not(:last-child)::before {
+  .pronoun-pill-cap {
     background: inherit;
     border-radius: var(--radii-0);
     border-bottom-right-radius: var(--radii-pill);
     border-top-right-radius: var(--radii-pill);
-
-    /* Hides visual element from screen readers */
-    content: '...' / '';
-    display: block;
+    display: none;
     height: 1rem;
     line-height: 1rem;
     padding: 0 var(--space-050);
@@ -83,6 +80,14 @@
     position: absolute;
     right: -1.5em;
     z-index: -1;
+  }
+
+  .pronoun-pill:not(:last-child) .pronoun-pill-cap {
+    display: block;
+  }
+
+  .pronoun-pill-cap::before {
+    content: '...';
   }
 
   .pronoun-pill:first-child {

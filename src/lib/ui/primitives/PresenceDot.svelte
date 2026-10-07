@@ -37,14 +37,28 @@
 
 <style>
   .presence-dot {
-    background: var(--presence-ring, var(--bg-container));
-    border-radius: var(--radii-round);
-    box-shadow: 0 0 0 var(--border-width-500) var(--presence-ring, var(--bg-container));
     color: var(--sec-main);
     display: inline-block;
     flex: none;
     height: var(--space-150);
+    isolation: isolate;
     width: var(--space-150);
+  }
+
+  :where(.presence-dot) {
+    position: relative;
+  }
+
+  .presence-dot::before {
+    background: radial-gradient(
+      circle closest-side,
+      var(--presence-ring, var(--bg-container)) 100%,
+      transparent 0
+    );
+    content: '';
+    inset: calc(-1 * var(--border-width-500));
+    position: absolute;
+    z-index: -1;
   }
 
   .presence-dot svg {
