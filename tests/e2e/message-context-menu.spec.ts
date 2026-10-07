@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import en from '../../src/locales/en.json' with { type: 'json' };
 
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { timelineItem } from './fixtures/timeline-items';
@@ -57,6 +58,27 @@ test('right-clicking the same message again reopens the menu at the pointer', as
   await expect(menu(page)).toHaveCount(1);
   const second = await menu(page).boundingBox();
   expect(second?.x).toBeGreaterThan((first?.x ?? 0) + 100);
+});
+
+test('a hover action still fires when the row loses hover and focus mid-press', async ({
+  page,
+  timeline,
+}) => {
+  const row = timeline.itemById('menu-2').locator('article.message');
+  await row.hover();
+  const reply = row.locator('.message-actions').getByRole('button', {
+    name: en.timeline.reply,
+    exact: true,
+  });
+  await reply.hover();
+  await page.mouse.down();
+  await reply.dispatchEvent('focusout', { relatedTarget: null });
+  await row.dispatchEvent('pointerleave', { pointerType: 'mouse', buttons: 1 });
+  await page.mouse.up();
+
+  await expect(
+    page.getByText(en.composer.replyingTo.replace('{{name}}', '')).first()
+  ).toBeVisible();
 });
 
 test.describe('mobile reactions', () => {

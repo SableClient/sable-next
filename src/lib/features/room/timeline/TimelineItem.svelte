@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, type Snippet } from 'svelte';
+  import { on } from 'svelte/events';
 
   import type {
     MemberView,
@@ -429,6 +430,7 @@
   function rowPointerDown(event: PointerEvent): void {
     rowPress.start(event);
     rowDoubleTap.down(event);
+    if (event.pointerType === 'mouse') holdEngagement();
   }
 
   function rowPointerUp(event: PointerEvent): void {
@@ -443,6 +445,20 @@
 
   let engaged = $state(false);
   let actionsPinned = $state(false);
+  let pressing = false;
+
+  function holdEngagement(): void {
+    pressing = true;
+    const release = (event: PointerEvent): void => {
+      stopUp();
+      stopCancel();
+      pressing = false;
+      const under = document.elementFromPoint(event.clientX, event.clientY);
+      if (!under || !messageRow?.contains(under)) engaged = false;
+    };
+    const stopUp = on(window, 'pointerup', release, { capture: true });
+    const stopCancel = on(window, 'pointercancel', release, { capture: true });
+  }
 
   function engage(event: FocusEvent | PointerEvent): void {
     if (event instanceof FocusEvent && !(event.target as Element).matches(':focus-visible')) return;
@@ -450,6 +466,7 @@
   }
 
   function disengage(event: FocusEvent | PointerEvent): void {
+    if (pressing) return;
     if (event instanceof FocusEvent && event.relatedTarget instanceof Node) {
       if (messageRow?.contains(event.relatedTarget)) return;
     } else if (!(event instanceof FocusEvent) && messageRow?.matches(':has(:focus-visible)')) {
