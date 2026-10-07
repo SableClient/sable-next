@@ -3,7 +3,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
-import SentryCli from '@sentry/cli';
+import { SentryCli } from '@sentry/cli';
 
 export async function collectSymbols(root) {
   const symbols = [];
