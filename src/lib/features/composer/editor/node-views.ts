@@ -166,6 +166,13 @@ export function composerNodeViews(
       }),
     emoticon: (node) => new EmoticonNodeView(node, media),
     image: (node) => new ImageNodeView(node, media),
+    mfm_time: (node) => {
+      const dom = document.createElement('time');
+      dom.className = 'composer-time';
+      dom.dateTime = node.attrs.datetime as string;
+      dom.textContent = node.attrs.label as string;
+      return { dom };
+    },
   };
 }
 

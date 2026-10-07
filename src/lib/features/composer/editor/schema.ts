@@ -249,7 +249,7 @@ export const composerSchema = new Schema({
       ],
       toDOM: (node) => [
         'time',
-        { class: 'composer-time', datetime: node.attrs.datetime as string },
+        { datetime: node.attrs.datetime as string },
         node.attrs.label as string,
       ],
     },
