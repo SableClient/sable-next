@@ -8,8 +8,10 @@
     SABLE_PATHS,
   } from './icon-art.js';
   import {
+    isSupporterColors,
     supporterButtonText,
     supporterColor,
+    supporterGradientAngle,
     supporterVariant,
     DEFAULT_SUPPORTER_BACKGROUND_COLOR,
     type SupporterAppearance,
@@ -21,15 +23,37 @@
     customBackground = false,
     backgroundColor = DEFAULT_SUPPORTER_BACKGROUND_COLOR,
     color,
+    colors,
+    gradientAngle,
   }: Partial<SupporterAppearance> = $props();
   const id = $props.id();
   let chosen = $derived(supporterVariant(variant));
-  let stops = $derived(CRISP_PRIDE_STOPS[chosen] ?? APP_ICON_STOPS[chosen]);
+  let customStops = $derived.by(() => {
+    if (chosen !== 'custom' || !isSupporterColors(colors)) return null;
+    const count = colors.length;
+    return colors.map((col, index) => ({
+      color: supporterColor(col),
+      offset: String(index / (count - 1)),
+    }));
+  });
+  let customCoords = $derived.by(() => {
+    const angle = supporterGradientAngle(gradientAngle);
+    const rad = ((angle - 90) * Math.PI) / 180;
+    const dx = Math.cos(rad);
+    const dy = Math.sin(rad);
+    const x1 = Math.round((0.5 - 0.5 * dx) * 1000) / 10;
+    const y1 = Math.round((0.5 - 0.5 * dy) * 1000) / 10;
+    const x2 = Math.round((0.5 + 0.5 * dx) * 1000) / 10;
+    const y2 = Math.round((0.5 + 0.5 * dy) * 1000) / 10;
+    return { x1: `${x1}%`, y1: `${y1}%`, x2: `${x2}%`, y2: `${y2}%` };
+  });
+  let stops = $derived(customStops ?? CRISP_PRIDE_STOPS[chosen] ?? APP_ICON_STOPS[chosen]);
   let isVertical = $derived(chosen in CRISP_PRIDE_STOPS && chosen !== 'intersex');
   let backing = $derived(
     customBackground
       ? supporterColor(backgroundColor, DEFAULT_SUPPORTER_BACKGROUND_COLOR)
-      : chosen === 'custom' && supporterButtonText(color) === 'var(--supporter-white)'
+      : chosen === 'custom' &&
+          supporterButtonText(colors?.[0] ?? color) === 'var(--supporter-white)'
         ? 'var(--supporter-white)'
         : 'var(--supporter-card-bg)'
   );
@@ -38,7 +62,7 @@
 <svg
   class="supporter-mark"
   data-variant={chosen}
-  style:color={chosen === 'custom' ? supporterColor(color) : undefined}
+  style:color={chosen === 'custom' && !customStops ? supporterColor(color) : undefined}
   viewBox="0 0 512 512"
   fill="none"
   aria-hidden="true"
@@ -53,7 +77,13 @@
           />{/each}
       </radialGradient>
     {:else}
-      <linearGradient {id} x1="0" y1="0" x2={isVertical ? '0' : '1'} y2={isVertical ? '1' : '0'}>
+      <linearGradient
+        {id}
+        x1={customStops ? customCoords.x1 : '0'}
+        y1={customStops ? customCoords.y1 : '0'}
+        x2={customStops ? customCoords.x2 : isVertical ? '0' : '1'}
+        y2={customStops ? customCoords.y2 : isVertical ? '1' : '0'}
+      >
         {#each stops ?? [] as stop, index (index)}<stop
             offset={stop.offset}
             stop-color={stop.color}

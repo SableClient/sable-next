@@ -317,9 +317,10 @@ describe('remove', () => {
         })
     );
     const saving = supporter.selectAppearance({ variant: 'pride', shape: 'heart' });
+    const queued = supporter.selectAppearance({ shape: 'square' });
     const removing = supporter.remove();
     finishSave();
-    await Promise.all([saving, removing]);
+    await Promise.all([saving, queued, removing]);
 
     expect(stub.setProfileField).toHaveBeenNthCalledWith(2, SUPPORTER_BADGE_FIELD, null);
     expect(stub.setProfileField).toHaveBeenCalledWith(SUPPORTER_FIELD, null);

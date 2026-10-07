@@ -69,6 +69,7 @@ class Supporter {
   private generation = 0;
   private abort: AbortController | null = null;
   private appearanceSave: Promise<void> | null = null;
+  private pendingAppearance: SupporterAppearance | null = null;
 
   get enabled(): boolean {
     return this.config !== null;
@@ -92,6 +93,7 @@ class Supporter {
     this.savingAppearance = false;
     this.removing = false;
     this.appearanceSave = null;
+    this.pendingAppearance = null;
   }
 
   cancel(): void {
@@ -170,6 +172,7 @@ class Supporter {
   async remove(): Promise<void> {
     const core = this.core;
     if (!core || this.removing) return;
+    this.pendingAppearance = null;
     const generation = this.generation;
     this.removing = true;
     try {
@@ -185,18 +188,37 @@ class Supporter {
 
   async selectAppearance(patch: Partial<SupporterAppearance>): Promise<void> {
     const core = this.core;
-    if (!core || !this.badge || this.savingAppearance || this.removing) return;
-    const generation = this.generation;
-    const appearance = supporterAppearance({ ...this.appearance, ...patch });
+    if (!core || !this.badge || this.removing) return;
+    const saved = this.appearance;
+    this.pendingAppearance = supporterAppearance({ ...this.appearance, ...patch });
+    this.appearance = this.pendingAppearance;
+    if (this.appearanceSave) return this.appearanceSave;
+
     this.savingAppearance = true;
+    this.appearanceSave = this.saveAppearance(core, this.generation, saved);
+    return this.appearanceSave;
+  }
+
+  private async saveAppearance(
+    core: CoreClient,
+    generation: number,
+    saved: SupporterAppearance
+  ): Promise<void> {
     try {
-      this.appearanceSave = core.setProfileField(SUPPORTER_BADGE_FIELD, appearance);
-      await this.appearanceSave;
-      if (generation === this.generation) this.appearance = appearance;
+      while (generation === this.generation && this.pendingAppearance) {
+        const appearance = this.pendingAppearance;
+        this.pendingAppearance = null;
+        await core.setProfileField(SUPPORTER_BADGE_FIELD, appearance);
+        saved = appearance;
+      }
+    } catch (error) {
+      if (generation === this.generation) this.appearance = saved;
+      throw error;
     } finally {
       if (generation === this.generation) {
         this.savingAppearance = false;
         this.appearanceSave = null;
+        this.pendingAppearance = null;
       }
     }
   }

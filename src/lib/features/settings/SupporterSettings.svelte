@@ -82,7 +82,7 @@
     <SupporterBadgePicker
       value={supporter.appearance}
       {name}
-      disabled={supporter.savingAppearance || supporter.removing}
+      disabled={supporter.removing}
       onChange={selectAppearance}
     />
     {#if variantFailed}<p class="settings-form error" role="alert">

@@ -1,16 +1,28 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import { tick } from 'svelte';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
+
   import SupporterMark from './SupporterMark.svelte';
   import SupporterBadge from './SupporterBadge.svelte';
   import ColorSetting from '#lib/features/settings/ColorSetting.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Slider from '#lib/ui/primitives/Slider.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import {
-    isSupporterColor,
-    supporterColor,
-    supporterAppearance,
-    SUPPORTER_VARIANTS,
+    DEFAULT_GRADIENT_ANGLE,
+    DEFAULT_SUPPORTER_COLOR,
+    DEFAULT_SUPPORTER_GRADIENT_COLOR,
+    MAX_SUPPORTER_GRADIENT_COLORS,
     SUPPORTER_SHAPES,
+    SUPPORTER_VARIANTS,
+    isSupporterColor,
+    isSupporterColors,
+    supporterAppearance,
+    supporterColor,
+    supporterGradientAngle,
     type SupporterAppearance,
   } from './variants.js';
 
@@ -35,7 +47,15 @@
     buttonColor: 'buttonColor',
   };
   type ColorKey = keyof typeof colorLabels;
-  let draft = $derived({ ...value });
+  let draft = $derived({
+    ...value,
+    colors: isSupporterColors(value.colors) ? [...value.colors] : undefined,
+    gradientAngle: value.gradientAngle ?? DEFAULT_GRADIENT_ANGLE,
+  });
+
+  let liveAngle = $state<number | null>(null);
+  let displayAngle = $derived(liveAngle ?? draft.gradientAngle ?? DEFAULT_GRADIENT_ANGLE);
+  let isGradient = $derived(isSupporterColors(draft.colors));
 
   async function update(patch: Partial<SupporterAppearance>): Promise<void> {
     draft = { ...draft, ...patch };
@@ -43,7 +63,11 @@
       await onChange(patch);
     } finally {
       await tick();
-      draft = { ...value };
+      draft = {
+        ...value,
+        colors: isSupporterColors(value.colors) ? [...value.colors] : undefined,
+        gradientAngle: value.gradientAngle ?? DEFAULT_GRADIENT_ANGLE,
+      };
     }
   }
 
@@ -51,6 +75,55 @@
     if (!isSupporterColor(next)) return;
     const normalized = supporterColor(next, defaults[key]);
     if (normalized !== value[key]) await update({ [key]: normalized });
+  }
+
+  async function commitColors(colors: string[]): Promise<void> {
+    await update({ colors, color: colors[0] });
+  }
+
+  async function commitGradientColor(index: number): Promise<void> {
+    const nextHex = draft.colors?.[index];
+    if (!isSupporterColor(nextHex)) return;
+    const colors = [...(draft.colors ?? [])];
+    colors[index] = supporterColor(nextHex);
+    await commitColors(colors);
+  }
+
+  async function addGradientColor(): Promise<void> {
+    const colors = draft.colors ?? [];
+    if (colors.length >= MAX_SUPPORTER_GRADIENT_COLORS) return;
+    const last = colors.at(-1) ?? DEFAULT_SUPPORTER_GRADIENT_COLOR;
+    await commitColors([...colors, last]);
+  }
+
+  async function removeGradientColor(index: number): Promise<void> {
+    const colors = draft.colors ?? [];
+    if (colors.length <= 2) return;
+    await commitColors(colors.filter((_, i) => i !== index));
+  }
+
+  async function commitGradientAngle(angle: number): Promise<void> {
+    const normalized = supporterGradientAngle(angle);
+    if (normalized !== value.gradientAngle) {
+      await update({ gradientAngle: normalized });
+    }
+  }
+
+  async function toggleGradient(enabled: boolean): Promise<void> {
+    if (enabled) {
+      const initial = [value.color, DEFAULT_SUPPORTER_GRADIENT_COLOR];
+      await update({
+        colors: initial,
+        color: initial[0],
+        gradientAngle: value.gradientAngle ?? DEFAULT_GRADIENT_ANGLE,
+      });
+    } else {
+      await update({
+        colors: undefined,
+        gradientAngle: undefined,
+        color: draft.colors?.[0] ?? value.color,
+      });
+    }
   }
 </script>
 
@@ -66,7 +139,13 @@
         />
       {/each}
     </div>
-    <SupporterBadge label={$i18n.t('supporter.donor')} name={donorName} isOwnBadge {...draft} />
+    <SupporterBadge
+      label={$i18n.t('supporter.donor')}
+      name={donorName}
+      isOwnBadge
+      {...draft}
+      gradientAngle={displayAngle}
+    />
   </div>
 {/snippet}
 
@@ -80,7 +159,7 @@
           type="radio"
           {name}
           value={variant}
-          bind:group={draft.variant}
+          checked={draft.variant === variant}
           onchange={() => void update({ variant })}
         />
         <span class="badge-option-mark"><SupporterMark {...draft} {variant} /></span>
@@ -98,7 +177,7 @@
         type="radio"
         {name}
         value="custom"
-        bind:group={draft.variant}
+        checked={draft.variant === 'custom'}
         onchange={() => void update({ variant: 'custom' })}
       />
       <span class="custom-copy"
@@ -108,7 +187,92 @@
       >
     </label>
     {#if draft.variant === 'custom'}
-      {@render colorEditor(['color'])}
+      <div class="custom-gradient-toggle">
+        <div class="badge-background">
+          <span class="custom-copy"
+            ><strong>{$i18n.t('supporter.customGradient')}</strong><small
+              >{$i18n.t('supporter.customGradientHint')}</small
+            ></span
+          >
+          <Switch
+            checked={isGradient}
+            {disabled}
+            label={$i18n.t('supporter.customGradient')}
+            onCheckedChange={(enabled) => void toggleGradient(enabled)}
+          />
+        </div>
+      </div>
+      {#if !isGradient}
+        {@render colorEditor(['color'])}
+      {:else}
+        <div class="custom-editor">
+          <div class="card-color-settings">
+            {#if draft.colors}
+              {#each draft.colors.map((_, i) => i) as i (i)}
+                <div class="gradient-stop-row">
+                  <div class="gradient-stop-input">
+                    <ColorSetting
+                      label={$i18n.t('supporter.colorIndex', { index: i + 1 })}
+                      bind:value={draft.colors[i]}
+                      onCommit={() => void commitGradientColor(i)}
+                      onReset={() => {
+                        if (!draft.colors) return;
+                        const next = [...draft.colors];
+                        next[i] =
+                          i === 0 ? DEFAULT_SUPPORTER_COLOR : DEFAULT_SUPPORTER_GRADIENT_COLOR;
+                        void commitColors(next);
+                      }}
+                    />
+                  </div>
+                  {#if draft.colors.length > 2}
+                    <IconButton
+                      label={$i18n.t('common.remove')}
+                      size="small"
+                      variant="ghost"
+                      onclick={() => void removeGradientColor(i)}
+                    >
+                      <TrashIcon />
+                    </IconButton>
+                  {/if}
+                </div>
+              {/each}
+            {/if}
+            {#if (draft.colors?.length ?? 0) < MAX_SUPPORTER_GRADIENT_COLORS}
+              <Button variant="secondary" size="small" onclick={() => void addGradientColor()}>
+                <PlusIcon />
+                {$i18n.t('supporter.addColor')}
+              </Button>
+            {/if}
+            <div class="gradient-angle-control">
+              <div class="gradient-angle-header">
+                <span>{$i18n.t('supporter.gradientAngle')}</span>
+                <span class="gradient-angle-value">{displayAngle}°</span>
+              </div>
+              <Slider
+                min={0}
+                max={360}
+                step={5}
+                label={$i18n.t('supporter.gradientAngle')}
+                value={displayAngle}
+                oninput={(angle) => {
+                  liveAngle = angle;
+                }}
+                oncommit={(angle) => {
+                  liveAngle = null;
+                  void commitGradientAngle(angle);
+                }}
+              />
+            </div>
+          </div>
+          <SupporterBadge
+            label={$i18n.t('supporter.donor')}
+            name={donorName}
+            isOwnBadge
+            {...draft}
+            gradientAngle={displayAngle}
+          />
+        </div>
+      {/if}
     {/if}
   </div>
   <fieldset class="shape-picker">
@@ -120,10 +284,12 @@
             type="radio"
             name={`${name}-shape`}
             value={shape}
-            bind:group={draft.shape}
+            checked={draft.shape === shape}
             onchange={() => void update({ shape })}
           />
-          <span class="badge-option-mark"><SupporterMark {...draft} {shape} /></span>
+          <span class="badge-option-mark"
+            ><SupporterMark {...draft} gradientAngle={displayAngle} {shape} /></span
+          >
           <span>{$i18n.t(`supporter.shapes.${shape}`)}</span>
         </label>
       {/each}
@@ -193,6 +359,38 @@
     border-top: var(--border-width) solid var(--surface-container-line);
     margin-top: var(--space-400);
     padding-top: var(--space-400);
+  }
+
+  .custom-gradient-toggle {
+    margin-top: var(--space-300);
+  }
+
+  .gradient-stop-row {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
+  }
+
+  .gradient-stop-input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .gradient-angle-control {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-200);
+    margin-top: var(--space-200);
+  }
+
+  .gradient-angle-header {
+    display: flex;
+    font-size: var(--font-size-label);
+    justify-content: space-between;
+  }
+
+  .gradient-angle-value {
+    color: var(--sec-main);
   }
 
   .custom-choice {

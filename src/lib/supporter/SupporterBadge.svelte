@@ -11,6 +11,7 @@
   import SupporterMark from './SupporterMark.svelte';
   import { supporter } from './supporter.svelte.js';
   import {
+    isSupporterColors,
     supporterAppearance,
     supporterButtonText,
     supporterColor,
@@ -38,7 +39,7 @@
   }: Props = $props();
   let donated = $derived(viewerIsDonor ?? (isOwnBadge || Boolean(supporter.badge)));
   let selected = $derived(supporterAppearance(appearance));
-  let { variant, color, customCardColors, cardColor, buttonColor } = $derived(selected);
+  let { variant, color, colors, customCardColors, cardColor, buttonColor } = $derived(selected);
   const id = $props.id();
   let open = $state(false);
   const nameSegments = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
@@ -78,7 +79,9 @@
   let customStyle = $derived.by(() => {
     const [start, end] =
       variant === 'custom'
-        ? [supporterColor(color), supporterColor(color)]
+        ? isSupporterColors(colors)
+          ? [supporterColor(colors[0]), supporterColor(colors.at(-1))]
+          : [supporterColor(color), supporterColor(color)]
         : (palettes[variant] ?? palettes.gold);
     const ground = cardColor;
     const button = customCardColors

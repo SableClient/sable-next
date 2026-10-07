@@ -1471,6 +1471,11 @@
     },
     "customColor": "Badge color",
     "customColorHint": "Choose any color for your Sable badge.",
+    "customGradient": "Custom gradient",
+    "customGradientHint": "Blend up to 5 colors for your Sable badge.",
+    "gradientAngle": "Gradient angle",
+    "addColor": "Add color",
+    "colorIndex": "Color {{index}}",
     "customCardColors": "Custom card colors",
     "customCardColorsHint": "Choose colors for the card background and donate button.",
     "cardColor": "Card background color",
@@ -1479,7 +1484,7 @@
       "gold": "Gold",
       "ghost": "Ghosable",
       "evil": "Sablevil",
-      "custom": "Custom color"
+      "custom": "Custom color or gradient"
     },
     "badgeSaveFailed": "Could not save your badge. Try again."
   },
