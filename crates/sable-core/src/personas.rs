@@ -390,6 +390,7 @@ pub(crate) fn fallback_body(
     body: &str,
     formatted: Option<&str>,
     profile: &PerMessageProfileView,
+    edit: bool,
 ) -> Option<(String, String)> {
     if !profile.has_fallback {
         return None;
@@ -408,8 +409,8 @@ pub(crate) fn fallback_body(
         html_escape::encode_text(&name)
     );
 
-    let (marker, body) = split_edit_marker(body);
-    let formatted = formatted.map(|html| split_edit_marker(html).1.to_owned());
+    let (marker, body) = split_edit_marker(body, edit);
+    let formatted = formatted.map(|html| split_edit_marker(html, edit).1.to_owned());
     let stripped = body.strip_prefix(&plain_prefix).unwrap_or(body);
 
     let formatted = match formatted {
@@ -432,7 +433,7 @@ pub(crate) fn outgoing_with_fallback(
     formatted: Option<String>,
     profile: &PerMessageProfileView,
 ) -> (String, Option<String>, PerMessageProfileView) {
-    match fallback_body(&body, formatted.as_deref(), profile) {
+    match fallback_body(&body, formatted.as_deref(), profile, false) {
         Some((body, formatted)) => (body, Some(formatted), profile.clone()),
         None => (body, formatted, without_fallback(profile)),
     }
@@ -453,7 +454,8 @@ pub(crate) fn stamp_profile(content: &mut Value, profile: &PerMessageProfileView
         .and_then(Value::as_str)
         .map(ToOwned::to_owned);
 
-    let Some((body, formatted)) = fallback_body(&raw_body, raw_formatted.as_deref(), profile)
+    let edit = object.contains_key("m.new_content");
+    let Some((body, formatted)) = fallback_body(&raw_body, raw_formatted.as_deref(), profile, edit)
     else {
         object.insert(
             PER_MESSAGE_PROFILE.to_owned(),
@@ -470,9 +472,10 @@ pub(crate) fn stamp_profile(content: &mut Value, profile: &PerMessageProfileView
 
 const EDIT_MARKER: &str = "* ";
 
-fn split_edit_marker(value: &str) -> (&str, &str) {
+fn split_edit_marker(value: &str, edit: bool) -> (&str, &str) {
     value
         .strip_prefix(EDIT_MARKER)
+        .filter(|_| edit)
         .map_or(("", value), |rest| (EDIT_MARKER, rest))
 }
 
@@ -979,6 +982,53 @@ mod tests {
     }
 
     #[test]
+    fn a_message_opening_with_a_bullet_is_not_an_edit() {
+        let (body, formatted, _) = outgoing_with_fallback(
+            "* one\n* two".to_owned(),
+            Some("<ul><li>one</li><li>two</li></ul>".to_owned()),
+            &profile("Kris", true),
+        );
+
+        assert_eq!(body, "Kris: * one\n* two");
+        assert_eq!(
+            formatted.as_deref(),
+            Some(
+                "<strong data-mx-profile-fallback>Kris: </strong><ul><li>one</li><li>two</li></ul>"
+            )
+        );
+    }
+
+    #[test]
+    fn an_edit_keeps_its_marker_ahead_of_the_prefix() {
+        let mut content = json!({
+            "msgtype": "m.text",
+            "body": "* * one",
+            "format": "org.matrix.custom.html",
+            "formatted_body": "* <ul><li>one</li></ul>",
+            "m.new_content": {
+                "msgtype": "m.text",
+                "body": "* one",
+                "format": "org.matrix.custom.html",
+                "formatted_body": "<ul><li>one</li></ul>",
+            },
+        });
+        let persona = profile("Kris", true);
+        stamp_profile(&mut content, &persona);
+        stamp_profile(&mut content["m.new_content"], &persona);
+
+        assert_eq!(content["body"], "* Kris: * one");
+        assert_eq!(
+            content["formatted_body"],
+            "* <strong data-mx-profile-fallback>Kris: </strong><ul><li>one</li></ul>"
+        );
+        assert_eq!(content["m.new_content"]["body"], "Kris: * one");
+        assert_eq!(
+            content["m.new_content"]["formatted_body"],
+            "<strong data-mx-profile-fallback>Kris: </strong><ul><li>one</li></ul>"
+        );
+    }
+
+    #[test]
     fn the_fallback_prefixes_both_bodies_once() {
         let mut content = json!({ "msgtype": "m.text", "body": "hello" });
         stamp_profile(&mut content, &profile("Kris", true));
@@ -1041,7 +1091,7 @@ mod tests {
                 .get("has_fallback")
                 .is_none()
         );
-        assert!(fallback_body("hello", None, &nameless).is_none());
+        assert!(fallback_body("hello", None, &nameless, false).is_none());
     }
 
     #[test]
