@@ -2171,7 +2171,7 @@
     "mediaAutoLoadNever": "Never",
     "autoplayGifs": "Autoplay GIFs",
     "pauseAnimationsWhenInactive": "Pause animations when the window is inactive",
-    "autoplayStickers": "Autoplay stickers",
+    "autoplayStickers": "Autoplay stickers and emoji",
     "gifProvider": "GIF search provider",
     "gifProviderDefault": "Client default",
     "gifProviderKlipy": "Klipy",

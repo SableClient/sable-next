@@ -187,15 +187,19 @@
   function paint(image: HTMLImageElement, url: string): void {
     image.onload = () => {
       pixelateEmote(image);
-      holdStillFrame(image, animationsPaused());
+      holdStillFrame(image, stillFor(image));
     };
     image.src = url;
     delete image.dataset.mediaPending;
   }
 
+  function stillFor(image: HTMLImageElement): boolean {
+    const emoticon = image.dataset.mxEmoticon !== undefined;
+    return animationsPaused() || (emoticon && !preferences.autoplayStickers);
+  }
+
   function holdAnimations(node: HTMLElement): void {
-    const paused = animationsPaused();
-    for (const image of node.querySelectorAll('img')) holdStillFrame(image, paused);
+    for (const image of node.querySelectorAll('img')) holdStillFrame(image, stillFor(image));
   }
 
   function fallbackLabel(image: HTMLImageElement, emoticon: boolean): string {
