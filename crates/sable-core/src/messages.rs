@@ -19,7 +19,7 @@ use matrix_sdk_ui::timeline::TimelineEventItemId;
 
 use crate::Core;
 use crate::ResultExt;
-use crate::dispatch::BUNDLED_LINK_PREVIEWS;
+use crate::dispatch::{BUNDLED_LINK_PREVIEWS, LEGACY_BUNDLED_LINK_PREVIEWS};
 use crate::matrix_html::{
     display_html, has_profile_fallback_html, strip_profile_fallback_body,
     strip_profile_fallback_html,
@@ -88,7 +88,9 @@ pub(crate) fn previews_removed_edit(
     }
     let mut new_content = latest_message(event)?.as_object()?.clone();
     new_content.remove("m.relates_to");
-    new_content.insert(BUNDLED_LINK_PREVIEWS.to_owned(), serde_json::json!([]));
+    for field in [BUNDLED_LINK_PREVIEWS, LEGACY_BUNDLED_LINK_PREVIEWS] {
+        new_content.insert(field.to_owned(), serde_json::json!([]));
+    }
 
     let mut edit = new_content.clone();
     for field in ["body", "formatted_body"] {

@@ -18,7 +18,7 @@ use matrix_sdk::ruma::events::room::message::{
     UnstableAmplitude,
 };
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
-use matrix_sdk::ruma::events::room::{ImageInfo, MediaSource};
+use matrix_sdk::ruma::events::room::{EncryptedFile, ImageInfo, MediaSource};
 use matrix_sdk::ruma::events::space::child::{
     HierarchySpaceChildEvent, SpaceChildEventContent, SpaceChildOrd,
 };
@@ -1742,32 +1742,50 @@ fn forum_title(content: Option<&serde_json::Value>) -> Option<String> {
     (!title.is_empty()).then(|| title.to_owned())
 }
 
+fn bundled_previews_field(content: Option<&serde_json::Value>) -> Option<&serde_json::Value> {
+    let content = content?;
+    content
+        .get(crate::dispatch::BUNDLED_LINK_PREVIEWS)
+        .or_else(|| content.get(crate::dispatch::LEGACY_BUNDLED_LINK_PREVIEWS))
+}
+
 fn link_previews_removed(content: Option<&serde_json::Value>) -> Option<bool> {
-    content?
-        .get(crate::dispatch::BUNDLED_LINK_PREVIEWS)?
-        .as_array()?
-        .is_empty()
-        .then_some(true)
+    bundled_previews_field(content)?.as_array()?;
+    bundled_link_previews(content).is_empty().then_some(true)
 }
 
 fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<UrlPreviewView> {
     let mut seen = BTreeSet::new();
-    content
-        .and_then(|content| content.get(crate::dispatch::BUNDLED_LINK_PREVIEWS))
+    let body = content
+        .and_then(|content| content.get("body"))
+        .and_then(serde_json::Value::as_str);
+    bundled_previews_field(content)
         .and_then(serde_json::Value::as_array)
         .map_or_else(Vec::new, |bundles| {
             bundles
                 .iter()
                 .filter_map(|bundle| {
                     let text = |key| bundle.get(key).and_then(serde_json::Value::as_str);
-                    let url = text("matched_url").or_else(|| text("og:url"))?.to_owned();
+                    let url = text("matrix:matched_url")
+                        .or_else(|| text("matched_url"))
+                        .or_else(|| text("og:url"))?
+                        .to_owned();
                     if !(url.starts_with("https://") || url.starts_with("http://")) {
                         return None;
                     }
+                    if body.is_some_and(|body| !body.contains(&url)) {
+                        return None;
+                    }
                     let dimension = |key| bundle.get(key).and_then(serde_json::Value::as_u64);
-                    let image = text("og:image")
-                        .filter(|image| image.starts_with("mxc://"))
-                        .map(ToOwned::to_owned);
+                    let image = bundle
+                        .get("matrix:image:encrypted")
+                        .and_then(|file| serde_json::from_value::<EncryptedFile>(file.clone()).ok())
+                        .map(|file| media_source(&MediaSource::Encrypted(Box::new(file))))
+                        .or_else(|| {
+                            text("og:image")
+                                .filter(|image| image.starts_with("mxc://"))
+                                .map(ToOwned::to_owned)
+                        });
                     Some(UrlPreviewView {
                         url,
                         title: text("og:title").map(ToOwned::to_owned),
@@ -2590,6 +2608,65 @@ mod tests {
 
         let absent = json!({ "body": "see https://example.org" });
         assert_eq!(super::link_previews_removed(Some(&absent)), None);
+    }
+
+    #[test]
+    fn reads_the_stable_field_ahead_of_the_legacy_one() {
+        let previews = bundled_link_previews(Some(&json!({
+            "m.url_previews": [{ "matrix:matched_url": "https://example.org/new", "og:title": "New" }],
+            "com.beeper.linkpreviews": [{ "matched_url": "https://example.org/old", "og:title": "Old" }],
+        })));
+
+        assert_eq!(previews.len(), 1);
+        assert_eq!(previews[0].url, "https://example.org/new");
+        assert_eq!(
+            super::link_previews_removed(Some(&json!({ "m.url_previews": [] }))),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn an_encrypted_thumbnail_becomes_a_serialized_source() {
+        let previews = bundled_link_previews(Some(&json!({
+            "body": "https://example.org",
+            "m.url_previews": [{
+                "matrix:matched_url": "https://example.org",
+                "og:title": "Example",
+                "matrix:image:encrypted": {
+                    "url": "mxc://example.org/thumb",
+                    "key": {
+                        "kty": "oct", "key_ops": ["encrypt", "decrypt"], "alg": "A256CTR",
+                        "k": "GRAgOUnbbkcd-UWoX5kTiIXJII81qwpSCnxLd5X6pxU", "ext": true
+                    },
+                    "iv": "kZeoJfx4ehoAAAAAAAAAAA",
+                    "hashes": { "sha256": "WDOJYFegjAHNlaJmOhEPpE/3reYeD1pRvPVcta4Tgbg" },
+                    "v": "v2"
+                },
+            }],
+        })));
+
+        let image = previews[0].image.as_deref().unwrap();
+        assert!(image.contains("mxc://example.org/thumb") && image.starts_with('{'));
+    }
+
+    #[test]
+    fn a_preview_for_a_url_missing_from_the_body_is_ignored() {
+        let previews = bundled_link_previews(Some(&json!({
+            "body": "no link here",
+            "m.url_previews": [{ "matrix:matched_url": "https://example.org", "og:title": "X" }],
+        })));
+
+        assert!(previews.is_empty());
+    }
+
+    #[test]
+    fn a_list_with_no_usable_entry_still_suppresses_body_scanning() {
+        let content = json!({
+            "body": "no link here",
+            "m.url_previews": [{ "matrix:matched_url": "https://example.org" }],
+        });
+
+        assert_eq!(super::link_previews_removed(Some(&content)), Some(true));
     }
 
     #[test]

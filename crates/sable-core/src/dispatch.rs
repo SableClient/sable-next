@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use std::sync::{Arc, atomic::Ordering};
 
 use matrix_sdk::RoomMemberships;
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
+use matrix_sdk::media::{MediaFormat, MediaRequestParameters};
 use matrix_sdk::room::ListThreadsOptions;
 use matrix_sdk::room::Receipts;
 use matrix_sdk::ruma::RoomAliasId;
@@ -22,12 +24,12 @@ use matrix_sdk::ruma::api::federation::discovery::get_server_version;
 use matrix_sdk::ruma::events::InitialStateEvent;
 use matrix_sdk::ruma::events::fully_read::FullyReadEventContent;
 use matrix_sdk::ruma::events::relation::{InReplyTo, Reply, Thread};
-use matrix_sdk::ruma::events::room::ImageInfo;
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::create::{PreviousRoom, RoomCreateEventContent};
 use matrix_sdk::ruma::events::room::encryption::RoomEncryptionEventContent;
 use matrix_sdk::ruma::events::room::message::Relation;
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, RoomPowerLevelsEventContent};
+use matrix_sdk::ruma::events::room::{ImageInfo, MediaSource};
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
 use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
@@ -501,10 +503,20 @@ impl Core {
                     .with_reply(&room_id, content, reply, thread_root.clone(), "send_reply")
                     .await?;
 
+                let encrypted_images = self
+                    .encrypted_preview_images(&room_id, &link_previews)
+                    .await;
                 let extra = extra_content(
                     persona.as_ref().map(crate::personas::profile_extra_content),
                     [
-                        (BUNDLED_LINK_PREVIEWS, bundled_link_previews(&link_previews)),
+                        (
+                            BUNDLED_LINK_PREVIEWS,
+                            bundled_link_previews(&link_previews, &encrypted_images, true),
+                        ),
+                        (
+                            LEGACY_BUNDLED_LINK_PREVIEWS,
+                            bundled_link_previews(&link_previews, &encrypted_images, false),
+                        ),
                         (
                             IMAGE_SOURCE_PACKS,
                             image_source_pack_references(&image_source_packs),
@@ -3236,7 +3248,15 @@ impl Core {
     }
 }
 
-pub(crate) const BUNDLED_LINK_PREVIEWS: &str = "com.beeper.linkpreviews";
+const MAX_PREVIEW_IMAGE_BYTES: usize = 8 * 1024 * 1024;
+
+struct EncryptedPreviewImage {
+    file: serde_json::Value,
+    size: u64,
+}
+
+pub(crate) const BUNDLED_LINK_PREVIEWS: &str = "m.url_previews";
+pub(crate) const LEGACY_BUNDLED_LINK_PREVIEWS: &str = "com.beeper.linkpreviews";
 const IMAGE_SOURCE_PACKS: &str = "com.beeper.msc4459.image_source_packs";
 
 fn extra_content<const N: usize>(
@@ -3312,14 +3332,23 @@ fn image_source_pack_references(
     })
 }
 
-fn bundled_link_previews(previews: &[UrlPreviewView]) -> Option<serde_json::Value> {
+fn bundled_link_previews(
+    previews: &[UrlPreviewView],
+    encrypted_images: &HashMap<String, EncryptedPreviewImage>,
+    stable: bool,
+) -> Option<serde_json::Value> {
     (!previews.is_empty()).then(|| {
         serde_json::Value::Array(
             previews
                 .iter()
                 .map(|preview| {
                     let mut bundle = serde_json::Map::new();
-                    bundle.insert("matched_url".to_owned(), preview.url.clone().into());
+                    let matched_key = if stable {
+                        "matrix:matched_url"
+                    } else {
+                        "matched_url"
+                    };
+                    bundle.insert(matched_key.to_owned(), preview.url.clone().into());
                     bundle.insert("og:url".to_owned(), preview.url.clone().into());
                     if let Some(title) = &preview.title {
                         bundle.insert("og:title".to_owned(), title.clone().into());
@@ -3330,7 +3359,15 @@ fn bundled_link_previews(previews: &[UrlPreviewView]) -> Option<serde_json::Valu
                     if let Some(site_name) = &preview.site_name {
                         bundle.insert("og:site_name".to_owned(), site_name.clone().into());
                     }
-                    if let Some(image) = &preview.image {
+                    if let Some(encrypted) = encrypted_images.get(&preview.url) {
+                        if stable {
+                            bundle.insert(
+                                "matrix:image:encrypted".to_owned(),
+                                encrypted.file.clone(),
+                            );
+                            bundle.insert("matrix:image:size".to_owned(), encrypted.size.into());
+                        }
+                    } else if let Some(image) = &preview.image {
                         bundle.insert("og:image".to_owned(), image.clone().into());
                     }
                     if let Some(width) = preview.image_width {
@@ -3408,6 +3445,49 @@ fn membership_filter(memberships: &[MembershipView]) -> RoomMemberships {
 }
 
 impl Core {
+    async fn encrypted_preview_images(
+        &self,
+        room_id: &OwnedRoomId,
+        previews: &[UrlPreviewView],
+    ) -> HashMap<String, EncryptedPreviewImage> {
+        let mut images = HashMap::new();
+        let Ok(room) = self.room(room_id).await else {
+            return images;
+        };
+        if !room.encryption_state().is_encrypted() {
+            return images;
+        }
+        let client = room.client();
+        for preview in previews {
+            let Some(image) = preview
+                .image
+                .as_deref()
+                .filter(|image| image.starts_with("mxc://"))
+            else {
+                continue;
+            };
+            let request = MediaRequestParameters {
+                source: MediaSource::Plain(OwnedMxcUri::from(image)),
+                format: MediaFormat::File,
+            };
+            let Ok(data) = client.media().get_media_content(&request, false).await else {
+                continue;
+            };
+            if data.len() > MAX_PREVIEW_IMAGE_BYTES {
+                continue;
+            }
+            let size = data.len() as u64;
+            let mut reader = std::io::Cursor::new(data);
+            let Ok(file) = client.upload_encrypted_file(&mut reader).await else {
+                continue;
+            };
+            if let Ok(file) = serde_json::to_value(&file) {
+                images.insert(preview.url.clone(), EncryptedPreviewImage { file, size });
+            }
+        }
+        images
+    }
+
     async fn room_permissions(
         &self,
         room_id: &OwnedRoomId,
@@ -3806,6 +3886,44 @@ mod tests {
                 .contains(&owned_user_id!("@one:example.org"))
         );
         assert!(!mentions.room);
+    }
+
+    #[test]
+    fn an_encrypted_preview_image_replaces_og_image_in_the_stable_field_only() {
+        let preview = crate::protocol::UrlPreviewView {
+            url: "https://example.org".to_owned(),
+            title: Some("Example".to_owned()),
+            description: None,
+            site_name: None,
+            image: Some("mxc://example.org/plain".to_owned()),
+            image_mime: None,
+            image_width: None,
+            image_height: None,
+            video: None,
+            theme_color: None,
+            card: None,
+            author_name: None,
+        };
+        let images = std::collections::HashMap::from([(
+            preview.url.clone(),
+            super::EncryptedPreviewImage {
+                file: serde_json::json!({ "url": "mxc://example.org/enc" }),
+                size: 42,
+            },
+        )]);
+
+        let previews = [preview];
+        let stable = super::bundled_link_previews(&previews, &images, true).unwrap();
+        assert_eq!(stable[0]["matrix:image:size"], 42);
+        assert_eq!(
+            stable[0]["matrix:image:encrypted"]["url"],
+            "mxc://example.org/enc"
+        );
+        assert!(stable[0].get("og:image").is_none());
+
+        let legacy = super::bundled_link_previews(&previews, &images, false).unwrap();
+        assert!(legacy[0].get("og:image").is_none());
+        assert!(legacy[0].get("matrix:image:encrypted").is_none());
     }
 
     #[test]

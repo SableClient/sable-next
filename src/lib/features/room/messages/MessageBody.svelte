@@ -240,9 +240,15 @@
     {/if}
   </div>
 {/if}
-{#each previewLinks as url (url)}
-  <LinkEmbed {url} {encrypted} />
-{/each}
+{#if item.content.kind === 'gallery' && item.bundled_link_previews.length > 0}
+  {#each item.bundled_link_previews as preview (preview.url)}
+    <LinkEmbed url={preview.url} bundled={preview} {encrypted} />
+  {/each}
+{:else}
+  {#each previewLinks as url (url)}
+    <LinkEmbed {url} {encrypted} />
+  {/each}
+{/if}
 
 <style>
   .body {
