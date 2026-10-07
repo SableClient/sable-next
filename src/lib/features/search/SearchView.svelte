@@ -150,6 +150,12 @@
 
   onMount(() => void core.refreshSearchCoverage());
 
+  $effect(() => {
+    if (!input || untrack(() => compact.matches)) return;
+    input.focus();
+    suggestionsOpen = false;
+  });
+
   let coverage = $derived(
     coverageMessage(core.searchCoverage, core.searchCoverageUnavailable, (key, options) =>
       $i18n.t(key, options)
@@ -578,6 +584,9 @@
             oninput={onInput}
             onkeydown={onKeydown}
             onfocus={() => {
+              suggestionsOpen = true;
+            }}
+            onclick={() => {
               suggestionsOpen = true;
             }}
             onblur={() => {

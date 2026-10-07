@@ -64,6 +64,7 @@ test('the room header search button opens a search panel scoped to that room', a
 
   const panel = page.getByRole('complementary', { name: en.common.searchMessages });
   await expect(chips(panel)).toHaveText(/in:\s*General/);
+  await expect(searchField(page)).toBeFocused();
   await expect(searchField(page)).toHaveValue('');
   await searchField(page).fill('message');
   await expect(panel.locator('.hit-row').first()).toBeVisible(INDEXED);
@@ -176,6 +177,7 @@ test('the search shortcut in a room scopes the search to it', async ({
 
   await expect(page).toHaveURL(/\/search\?q=/);
   await expect(chips(page)).toHaveText(/in:\s*General/);
+  await expect(searchField(page)).toBeFocused();
 });
 
 test('a submitted search is offered again from an empty field', async ({ page }) => {
@@ -185,7 +187,7 @@ test('a submitted search is offered again from an empty field', async ({ page })
   await field.press('Enter');
 
   await page.goto('/search');
-  await field.focus();
+  await field.click();
 
   const recent = page.getByRole('option', { name: 'rollback plan' });
   await expect(page.getByRole('listbox', { name: en.search.recentSearches })).toBeVisible();
