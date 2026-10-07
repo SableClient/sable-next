@@ -5,10 +5,12 @@
     TimelineItemView,
   } from '#src/generated/protocol';
   import type { Snippet } from 'svelte';
+  import { on } from 'svelte/events';
 
   import MessageScope from './MessageScope.svelte';
   import TimelineItem from '../timeline/TimelineItem.svelte';
   import { useEventItems } from './event-items.svelte.js';
+  import { opensFrom } from './message-preview';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import { TIMELINE_LAYOUT_STYLE, timelineLayoutStyle } from '../timeline/timeline-layout';
   import { isCollapsed } from '../timeline/timeline-format';
@@ -58,11 +60,20 @@
   let collapsed = $derived(
     shown && previous ? isCollapsed([previous, shown], 1, preferences.replyPreviewStyle) : false
   );
+
+  function openMessage(node: HTMLElement): () => void {
+    return on(node, 'click', (event) => {
+      if (!event.defaultPrevented && event.button === 0 && opensFrom(event))
+        onJumpToEvent?.(eventId);
+    });
+  }
 </script>
 
 <div
   class={['message-preview', { timeline, collapsed, 'group-start': previousEventId && !collapsed }]}
+  class:clickable={timeline && onJumpToEvent !== undefined}
   style={timeline ? timelineLayoutStyle(preferences.messageSpacing) : TIMELINE_LAYOUT_STYLE}
+  {@attach timeline && onJumpToEvent ? openMessage : undefined}
 >
   {#if shown}
     {#key roomId}
@@ -106,6 +117,10 @@
     box-sizing: border-box;
     padding: var(--timeline-row-padding) var(--page-gutter);
     width: 100%;
+  }
+
+  .clickable {
+    cursor: pointer;
   }
 
   .timeline.collapsed {
