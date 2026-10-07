@@ -2,7 +2,7 @@ import { expect, test, type Locator } from '@playwright/test';
 
 import { installFakeCore } from './fake-core';
 
-const FILES = 'https://raw.githubusercontent.com/SableClient/themes/main/';
+const FILES = 'https://git.sable.moe/SableClient/themes/raw/branch/main/';
 const NAMES = Array.from({ length: 60 }, (_, index) => `Theme ${String(index).padStart(2, '0')}`);
 
 test.use({ storageState: { cookies: [], origins: [] }, serviceWorkers: 'block' });

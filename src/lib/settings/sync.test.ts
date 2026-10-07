@@ -236,7 +236,7 @@ describe('applySettings', () => {
   });
 
   describe('catalog themes', () => {
-    const source = 'https://raw.githubusercontent.com/SableClient/themes/main/dark/night.sable.css';
+    const source = 'https://git.sable.moe/SableClient/themes/raw/branch/main/dark/night.sable.css';
     const catalog = { ...theme('night', oversized()), source };
 
     it('uploads a reference without css and outside the budget', () => {

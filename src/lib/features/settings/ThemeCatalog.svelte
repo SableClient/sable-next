@@ -1,5 +1,6 @@
 <script lang="ts">
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
+  import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
   import { untrack } from 'svelte';
 
@@ -22,6 +23,7 @@
     entryName,
     filterCatalog,
     loadCatalog,
+    resetCatalog,
     type CatalogEntry,
     type CatalogFilter,
   } from './theme-catalog';
@@ -129,6 +131,12 @@
     }
   }
 
+  function refresh(): void {
+    resetCatalog();
+    entries = [];
+    void load();
+  }
+
   function installedTheme(entry: CatalogEntry): CustomTheme | undefined {
     return customThemes.themes.find((theme) => theme.source === entry.fullUrl);
   }
@@ -156,14 +164,23 @@
     <header class="catalog-head">
       <div class="catalog-title">
         <h2>{$i18n.t('settings.themeCatalogTitle')}</h2>
-        <IconButton
-          variant="ghost"
-          size="small"
-          label={$i18n.t('settings.themeCatalogClose')}
-          onclick={() => {
-            open = false;
-          }}><XIcon /></IconButton
-        >
+        <div class="catalog-actions">
+          <IconButton
+            variant="ghost"
+            size="small"
+            label={$i18n.t('common.refresh')}
+            disabled={loading}
+            onclick={refresh}><ArrowClockwiseIcon /></IconButton
+          >
+          <IconButton
+            variant="ghost"
+            size="small"
+            label={$i18n.t('settings.themeCatalogClose')}
+            onclick={() => {
+              open = false;
+            }}><XIcon /></IconButton
+          >
+        </div>
       </div>
       <div class="tabs" role="tablist" aria-label={$i18n.t('settings.themeCatalogTitle')}>
         {#each tabs as option (option.value)}
@@ -410,6 +427,11 @@
     align-items: center;
     display: flex;
     justify-content: space-between;
+  }
+
+  .catalog-actions {
+    align-items: center;
+    display: flex;
   }
 
   h2,

@@ -7,9 +7,11 @@ import {
   type ThemeFileMetadata,
 } from '#lib/settings/theme-file.js';
 
-export const CATALOG_URL = 'https://raw.githubusercontent.com/SableClient/themes/main/catalog.json';
-const CATALOG_FILES = 'https://raw.githubusercontent.com/SableClient/themes/';
+export const CATALOG_URL = 'https://git.sable.moe/SableClient/themes/raw/branch/main/catalog.json';
+const CATALOG_FILES = 'https://git.sable.moe/SableClient/themes/raw/branch/';
 const DESCRIBE_CONCURRENCY = 6;
+
+let cache: RequestCache = 'default';
 
 interface CatalogRow {
   basename: string;
@@ -63,7 +65,7 @@ function rows(value: unknown): CatalogRow[] {
 export async function fetchCatalogFile(url: string): Promise<string> {
   const safe = catalogFileUrl(url);
   if (safe === null) throw new Error('catalog file outside the catalog');
-  const response = await fetch(safe, { credentials: 'omit', referrerPolicy: 'no-referrer' });
+  const response = await fetch(safe, { credentials: 'omit', referrerPolicy: 'no-referrer', cache });
   if (!response.ok) throw new Error(`catalog file answered ${String(response.status)}`);
   const css = await response.text();
   if (css.length > MAX_THEME_FILE_BYTES) throw new Error('catalog file too large');
@@ -71,7 +73,11 @@ export async function fetchCatalogFile(url: string): Promise<string> {
 }
 
 export async function fetchCatalog(): Promise<{ themes: CatalogRow[]; tweaks: CatalogRow[] }> {
-  const response = await fetch(CATALOG_URL, { credentials: 'omit', referrerPolicy: 'no-referrer' });
+  const response = await fetch(CATALOG_URL, {
+    credentials: 'omit',
+    referrerPolicy: 'no-referrer',
+    cache,
+  });
   if (!response.ok) throw new Error(`catalog answered ${String(response.status)}`);
   const data: unknown = await response.json();
   if (!isRecord(data) || !Array.isArray(data.themes)) throw new Error('catalog unreadable');
@@ -112,6 +118,11 @@ export async function describeCatalog(
 }
 
 let loaded: CatalogEntry[] | null = null;
+
+export function resetCatalog(): void {
+  loaded = null;
+  cache = 'no-cache';
+}
 
 export async function loadCatalog(onEntry: (entry: CatalogEntry) => void): Promise<void> {
   if (loaded) {

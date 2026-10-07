@@ -1,8 +1,14 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import type { ThemeFileMetadata } from '#lib/settings/theme-file.js';
 
-import { catalogFileUrl, filterCatalog, type CatalogEntry } from './theme-catalog';
+import {
+  catalogFileUrl,
+  filterCatalog,
+  loadCatalog,
+  resetCatalog,
+  type CatalogEntry,
+} from './theme-catalog';
 
 function entry(
   kind: CatalogEntry['kind'],
@@ -62,12 +68,12 @@ test('the search matches the name, the author and the tags', () => {
 });
 
 test.each([
-  'http://raw.githubusercontent.com/SableClient/themes/main/night.sable.css',
-  'https://raw.githubusercontent.com/someone/else/main/night.sable.css',
+  'http://git.sable.moe/SableClient/themes/raw/branch/main/night.sable.css',
+  'https://git.sable.moe/someone/else/raw/branch/main/night.sable.css',
   'https://evil.example/night.sable.css',
-  'https://raw.githubusercontent.com/SableClient/themes/main/night.sable.css?track=1',
-  'https://user:pass@raw.githubusercontent.com/SableClient/themes/main/x.sable.css',
-  'https://raw.githubusercontent.com/SableClient/themes/../other/x.sable.css',
+  'https://git.sable.moe/SableClient/themes/raw/branch/main/night.sable.css?track=1',
+  'https://user:pass@git.sable.moe/SableClient/themes/raw/branch/main/x.sable.css',
+  'https://git.sable.moe/SableClient/themes/raw/branch/../other/x.sable.css',
   'data:text/css,.x{}',
   'javascript:alert(1)',
   42,
@@ -76,6 +82,22 @@ test.each([
 });
 
 test('a catalogue file in the catalogue repository is accepted', () => {
-  const url = 'https://raw.githubusercontent.com/SableClient/themes/main/themes/night.sable.css';
+  const url = 'https://git.sable.moe/SableClient/themes/raw/branch/main/themes/night.sable.css';
   expect(catalogFileUrl(url)).toBe(url);
+});
+
+test('a reset catalogue is fetched again, revalidating past the HTTP cache', async () => {
+  const fetch = vi.fn(() => Promise.resolve(Response.json({ version: 1, themes: [], tweaks: [] })));
+  vi.stubGlobal('fetch', fetch);
+  await loadCatalog(() => {});
+  await loadCatalog(() => {});
+  expect(fetch).toHaveBeenCalledTimes(1);
+  resetCatalog();
+  await loadCatalog(() => {});
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(fetch).toHaveBeenLastCalledWith(
+    expect.any(String),
+    expect.objectContaining({ cache: 'no-cache' })
+  );
+  vi.unstubAllGlobals();
 });

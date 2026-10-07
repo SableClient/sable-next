@@ -55,7 +55,7 @@ test('removing a tweak also disables it', () => {
   expect(customThemes.enabledTweakIds).toEqual([]);
 });
 
-const CATALOG_THEME = 'https://raw.githubusercontent.com/SableClient/themes/main/themes/night.css';
+const CATALOG_THEME = 'https://git.sable.moe/SableClient/themes/raw/branch/main/themes/night.css';
 
 function holdEmptyCatalogTheme(): void {
   replaceCustomThemes({
