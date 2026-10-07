@@ -23,7 +23,7 @@ env:
   FORGEJO_REPOSITORY: ${{ github.repository }}
   FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
   # Each nightly is ~1.5 GB of bundles on a node with ~100 GB of disk.
-  NIGHTLY_KEEP: 100
+  NIGHTLY_KEEP: 20
   SCCACHE_BUCKET: sccache
   SCCACHE_S3_KEY_PREFIX: sable-next
   SCCACHE_ENDPOINT: https://s3.erwanleboucher.dev
@@ -647,6 +647,10 @@ jobs:
             protect="$protect,$(curl -fsS "$repo/objects/${commit:0:2}/${commit:2}.commit" \
               | grep -aoE 'download/nightly-[^/]+' | cut -d/ -f2 | tr '\n' ',')"
           done
+          mkdir channel
+          node scripts/ci/forgejo-release.mjs download --tag nightly --pattern '*.json' --dir channel
+          protect="$protect,$(cat channel/*.json | grep -oE 'download/nightly-[^/]+' \
+            | cut -d/ -f2 | sort -u | tr '\n' ',')"
           node scripts/ci/forgejo-release.mjs prune --keep "$NIGHTLY_KEEP" --protect "$protect"
   distribute-aur:
     name: Publish to the AUR
