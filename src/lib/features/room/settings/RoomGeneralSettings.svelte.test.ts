@@ -104,7 +104,7 @@ test('saves an access change with join-rule permission alone', async () => {
   render(RoomGeneralSettings, { room, permissions, levels, onClose: () => {} });
 
   await user.click(await screen.findByRole('radio', { name: /room\.settingsJoinRulePublic/ }));
-  await user.click(screen.getByRole('button', { name: 'room.settingsSave' }));
+  await user.click(screen.getByRole('button', { name: 'common.save' }));
 
   await vi.waitFor(() => {
     expect(core.setRoomJoinRule).toHaveBeenCalledWith('!room:example.org', 'public');
@@ -118,12 +118,14 @@ test('an unsaved change raises the save bar, and reset discards it', async () =>
   const user = userEvent.setup();
   render(RoomGeneralSettings, { room, permissions, levels, onClose: () => {} });
 
-  expect(screen.queryByText('room.settingsUnsaved')).not.toBeInTheDocument();
+  expect(screen.queryByText('common.youHaveUnsavedChanges')).not.toBeInTheDocument();
   await user.click(await screen.findByRole('radio', { name: /room\.settingsJoinRulePublic/ }));
-  expect(screen.getByText('room.settingsUnsaved').closest('.save-bar')).toHaveClass('pending');
+  expect(screen.getByText('common.youHaveUnsavedChanges').closest('.save-bar')).toHaveClass(
+    'pending'
+  );
 
-  await user.click(screen.getByRole('button', { name: 'room.settingsReset' }));
-  expect(screen.queryByText('room.settingsUnsaved')).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'room.settingsSave' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: 'common.reset' }));
+  expect(screen.queryByText('common.youHaveUnsavedChanges')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'common.save' })).toBeDisabled();
   expect(core.setRoomJoinRule).not.toHaveBeenCalled();
 });

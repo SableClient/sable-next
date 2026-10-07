@@ -116,7 +116,7 @@
           onOpenChange(false);
         }}
       >
-        {$i18n.t('room.leaveCancel')}
+        {$i18n.t('common.cancel')}
       </Button>
       {#if children && children.order.length > 0}
         <Button variant="danger" loading={leaving} onclick={confirmAll}>

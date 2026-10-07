@@ -109,9 +109,9 @@
         ? 'timeline.profileOverrideSealedHint'
         : 'timeline.profileOverrideHint'
   )}
-  confirmLabel={$i18n.t('timeline.profileOverrideSave')}
+  confirmLabel={$i18n.t('common.save')}
   confirmVariant="secondary"
-  cancelLabel={$i18n.t('timeline.profileOverrideCancel')}
+  cancelLabel={$i18n.t('common.cancel')}
   busy={busy || locked}
   error={failed ? $i18n.t('errors.actionFailed') : null}
   onConfirm={confirm}
@@ -127,7 +127,7 @@
           void pickAvatar(event.currentTarget.files?.[0]);
         }}
       />
-      {$i18n.t('timeline.profileOverrideAvatar')}
+      {$i18n.t('common.chooseAPicture')}
     </label>
     {#if avatar !== undefined}
       <Button variant="ghost" size="small" onclick={() => (avatar = undefined)}>

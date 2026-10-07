@@ -375,7 +375,7 @@
       title={isSetupRoute
         ? $i18n.t('setup.title')
         : isAddingAccount
-          ? $i18n.t('auth.addAccount')
+          ? $i18n.t('common.addAccount')
           : undefined}
     />
 
@@ -383,7 +383,7 @@
       {#if core.status === 'starting' || core.status === 'idle' || (core.status === 'signed-out' && !hasCompletedInitialHomeserverCheck)}
         <div class="bootstrap" role="status">
           <Spinner />
-          <p>{$i18n.t('auth.starting')}</p>
+          <p>{$i18n.t('common.startingSable')}</p>
         </div>
       {:else if isSetupRoute}
         <SetupFlow />

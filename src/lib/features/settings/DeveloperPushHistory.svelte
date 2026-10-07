@@ -55,7 +55,7 @@
       </Button>
       {#if entries && entries.length > 0}
         <Button variant="secondary" size="small" onclick={() => void clear()}>
-          {$i18n.t('settings.developerPushHistoryClear')}
+          {$i18n.t('common.clear')}
         </Button>
       {/if}
     </div>

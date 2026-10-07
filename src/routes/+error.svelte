@@ -83,7 +83,7 @@
     {/if}
 
     <Button class="error-reload" size="medium" onclick={reloadApp}
-      >{$i18n.t('errors.reload')}</Button
+      >{$i18n.t('common.reload')}</Button
     >
   </div>
 </main>

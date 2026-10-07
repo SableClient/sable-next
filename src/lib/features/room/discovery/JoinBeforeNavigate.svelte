@@ -159,7 +159,7 @@
             ? 'join.knockFailed'
             : failedAction === 'withdraw'
               ? 'join.withdrawFailed'
-              : 'join.failed'
+              : 'common.theRoomCouldNotBeJoined'
         )}
       </p>
     {/if}
@@ -172,7 +172,7 @@
     {:else}
       {#if !mustKnock}
         <Button onclick={() => void join()} disabled={busy}>
-          {busy && !offerKnock ? $i18n.t('join.joining') : $i18n.t('join.action')}
+          {busy && !offerKnock ? $i18n.t('join.joining') : $i18n.t('common.join')}
         </Button>
       {/if}
       {#if offerKnock}
@@ -186,7 +186,7 @@
           <label for={reasonId}>{$i18n.t('join.knockReason')}</label>
           <TextInput id={reasonId} bind:value={reason} maxlength={500} autocomplete="off" />
           <Button type="submit" variant={mustKnock ? 'secondary' : 'ghost'} disabled={busy}>
-            {busy ? $i18n.t('join.knocking') : $i18n.t('join.knockAction')}
+            {busy ? $i18n.t('join.knocking') : $i18n.t('common.askToJoin')}
           </Button>
         </form>
       {/if}

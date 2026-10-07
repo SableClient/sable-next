@@ -242,7 +242,7 @@
     <div class="bulk-bar">
       <label class="bulk-select-all">
         <input type="checkbox" checked={allSelected} disabled={busy} onchange={toggleAll} />
-        {$i18n.t('room.addressesSelectAll')}
+        {$i18n.t('common.selectAll')}
       </label>
       {#if chosen.length > 0}
         <span class="bulk-count">
@@ -277,7 +277,7 @@
               pendingRemoval = chosen;
             }}
           >
-            {$i18n.t('room.addressesDeleteSelected')}
+            {$i18n.t('common.delete')}
           </Button>
         </div>
       {/if}
@@ -339,7 +339,7 @@
         <TextInput
           bind:value={draft}
           placeholder={$i18n.t('room.addressesPlaceholder')}
-          aria-label={$i18n.t('room.addressesAdd')}
+          aria-label={$i18n.t('common.add')}
           onkeydown={(event: KeyboardEvent) => {
             if (event.key !== 'Enter') return;
             event.preventDefault();
@@ -347,7 +347,7 @@
           }}
         />
         <Button disabled={draft.trim() === '' || busy} onclick={add}>
-          {$i18n.t('room.addressesAdd')}
+          {$i18n.t('common.add')}
         </Button>
       </div>
     </div>
@@ -362,7 +362,7 @@
   title={pendingRemoval.length === 1
     ? $i18n.t('room.addressesRemoveConfirm', { alias: pendingRemoval[0] })
     : $i18n.t('room.addressesRemoveManyConfirm', { count: pendingRemoval.length })}
-  confirmLabel={$i18n.t('room.remove')}
+  confirmLabel={$i18n.t('common.remove')}
   {busy}
   onConfirm={() => void confirmRemoval()}
 />

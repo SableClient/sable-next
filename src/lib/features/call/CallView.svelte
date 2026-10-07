@@ -350,7 +350,7 @@
         <p>{$i18n.t(DEVICE_ERROR_KEY[session.deviceError])}</p>
         <div class="notice-actions">
           <Button variant="ghost" onclick={() => session.clearDeviceError()}>
-            {$i18n.t('call.dismiss')}
+            {$i18n.t('common.dismiss')}
           </Button>
           {#if onOpenSettings}
             <Button
@@ -386,7 +386,7 @@
             </Button>
             {#if failure !== 'busy'}
               <Button variant="primary" onclick={() => void session.retry()}>
-                {$i18n.t('call.retry')}
+                {$i18n.t('common.tryAgain')}
               </Button>
             {/if}
           {/snippet}
@@ -438,7 +438,7 @@
             {#if onInvite}
               <Button variant="secondary" onclick={onInvite}>
                 <UserPlusIcon aria-hidden="true" weight="bold" />
-                {$i18n.t('call.invite')}
+                {$i18n.t('common.invitePeople')}
               </Button>
             {/if}
           </li>

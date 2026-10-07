@@ -157,10 +157,10 @@
         {/if}
         <div class="editor-actions">
           <Button variant="ghost" size="small" onclick={() => (selected = undefined)}>
-            {$i18n.t('settings.developerAccountDataClose')}
+            {$i18n.t('common.close')}
           </Button>
           <Button type="submit" variant="primary" size="small" loading={saving}>
-            {$i18n.t('settings.developerAccountDataSave')}
+            {$i18n.t('common.save')}
           </Button>
         </div>
       </form>

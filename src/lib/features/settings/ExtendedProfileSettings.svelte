@@ -95,8 +95,7 @@
           bind:value={userToBlock}
           placeholder={$i18n.t('settings.blockedUsersPlaceholder')}
         />
-        <Button type="submit" loading={saving === 'block'}>{$i18n.t('settings.blockButton')}</Button
-        >
+        <Button type="submit" loading={saving === 'block'}>{$i18n.t('common.block')}</Button>
       </form>
       {#if ignored.length}<ul class="ignored-users">
           {#each ignored as userId (userId)}<li>
@@ -104,7 +103,7 @@
                 variant="danger"
                 size="small"
                 loading={saving === userId}
-                onclick={() => void unblock(userId)}>{$i18n.t('settings.unblockButton')}</Button
+                onclick={() => void unblock(userId)}>{$i18n.t('common.unblock')}</Button
               >
             </li>{/each}
         </ul>{/if}

@@ -74,7 +74,7 @@
         </ul>
         <label class="understood">
           <input type="checkbox" bind:checked={understood} disabled={reset.busy} />
-          {$i18n.t('settings.resetIdentityUnderstood')}
+          {$i18n.t('common.iUnderstandThisCannotBeUndone')}
         </label>
       {:else if reset.phase === 'password'}
         <Label for="reset-identity-password">{$i18n.t('settings.resetIdentityPassword')}</Label>
@@ -97,7 +97,7 @@
       {#if reset.phase === 'done'}
         <Button type="submit">{$i18n.t('settings.savedRecoveryKey')}</Button>
       {:else}
-        <Button type="button" variant="ghost" onclick={close}>{$i18n.t('settings.cancel')}</Button>
+        <Button type="button" variant="ghost" onclick={close}>{$i18n.t('common.cancel')}</Button>
         {#if reset.phase === 'approve'}
           <Button type="button" variant="danger" loading={reset.busy} onclick={approve}>
             {$i18n.t('settings.resetIdentityOpenApproval')}

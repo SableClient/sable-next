@@ -131,7 +131,7 @@
             onOpenChange(false);
           }}
         >
-          {$i18n.t('room.inviteCancel')}
+          {$i18n.t('common.cancel')}
         </Button>
         <Button
           loading={converting}
@@ -147,7 +147,7 @@
         {$i18n.t('room.inviteBody', { name: room?.name ?? room?.room_id ?? '' })}
       </p>
 
-      <FormField fieldId="room-invite-user" label={$i18n.t('room.createInviteLabel')}>
+      <FormField fieldId="room-invite-user" label={$i18n.t('common.invitePeople')}>
         <TextInput
           id="room-invite-user"
           bind:value={draft}
@@ -189,7 +189,9 @@
       {/if}
 
       {#if invalid}
-        <Alert variant="critical" role="alert">{$i18n.t('room.createInviteInvalid')}</Alert>
+        <Alert variant="critical" role="alert"
+          >{$i18n.t('common.aUserIdLooksLikeSomeoneserver')}</Alert
+        >
       {:else if failed}
         <Alert variant="critical" role="alert">{$i18n.t('room.inviteSendFailed')}</Alert>
       {:else if invited}
@@ -205,7 +207,7 @@
             onOpenChange(false);
           }}
         >
-          {$i18n.t('room.inviteClose')}
+          {$i18n.t('common.close')}
         </Button>
         <Button
           loading={inviting}

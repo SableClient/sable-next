@@ -460,15 +460,11 @@
   {#if pmp && onOpenAccount}
     <Pill onclick={onOpenAccount}>{$i18n.t('timeline.openAccount')}</Pill>
   {:else}
-    <ActionMenu
-      label={$i18n.t('timeline.profileShare')}
-      align="start"
-      onOpenChange={onNestedMenuOpenChange}
-    >
+    <ActionMenu label={$i18n.t('common.share')} align="start" onOpenChange={onNestedMenuOpenChange}>
       {#snippet trigger({ props })}
         <Pill {...props}>
           <ShareNetworkIcon size={14} />
-          {$i18n.t('timeline.profileShare')}
+          {$i18n.t('common.share')}
         </Pill>
       {/snippet}
       <IconContext values={{ 'aria-hidden': 'true' }}>
@@ -503,9 +499,9 @@
       {@render mutualRoomRows()}
     </ActionMenu>
   {/if}
-  <ActionMenu label={$i18n.t('timeline.profileMoreActions')} onOpenChange={onNestedMenuOpenChange}>
+  <ActionMenu label={$i18n.t('timeline.moreActions')} onOpenChange={onNestedMenuOpenChange}>
     {#snippet trigger({ props })}
-      <Pill {...props} iconOnly aria-label={$i18n.t('timeline.profileMoreActions')}>
+      <Pill {...props} iconOnly aria-label={$i18n.t('timeline.moreActions')}>
         <DotsThreeIcon size={14} />
       </Pill>
     {/snippet}
@@ -878,7 +874,7 @@
         <TextInput id={moderationFieldId} bind:value={moderationReason} autocomplete="off" />
       </FormField>
       <div class="moderation-actions">
-        <Button variant="ghost" onclick={cancelModeration}>{$i18n.t('timeline.cancel')}</Button>
+        <Button variant="ghost" onclick={cancelModeration}>{$i18n.t('common.cancel')}</Button>
         <Button variant="danger" loading={moderationBusy} onclick={confirmModeration}>
           {moderationAction === 'ban'
             ? $i18n.t('timeline.profileBan')

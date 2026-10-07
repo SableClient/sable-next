@@ -55,7 +55,7 @@
   {anchor}
   class="read-receipts-popover"
   align="end"
-  label={$i18n.t('timeline.readReceipts')}
+  label={$i18n.t('common.readReceipts')}
   closeLabel={$i18n.t('timeline.closeReadReceipts')}
 >
   <MemberUserList

@@ -57,11 +57,11 @@
     <TextInput
       id={fieldId}
       bind:value={search}
-      placeholder={$i18n.t('timeline.forwardSearch')}
-      aria-label={$i18n.t('timeline.forwardSearch')}
+      placeholder={$i18n.t('common.searchRooms')}
+      aria-label={$i18n.t('common.searchRooms')}
     />
     {#if targets.length === 0}
-      <p class="empty">{$i18n.t('timeline.forwardEmpty')}</p>
+      <p class="empty">{$i18n.t('common.noRoomsMatchThatSearch')}</p>
     {:else}
       <ul class="targets">
         {#each targets as room (room.room_id)}
@@ -93,7 +93,7 @@
           ? ''
           : $i18n.t('timeline.forwardSelected', { count: selected.length })}
       </span>
-      <Button variant="ghost" onclick={cancel}>{$i18n.t('timeline.forwardCancel')}</Button>
+      <Button variant="ghost" onclick={cancel}>{$i18n.t('common.cancel')}</Button>
       <Button disabled={selected.length === 0} onclick={send}>
         {$i18n.t('timeline.forwardSend')}
       </Button>

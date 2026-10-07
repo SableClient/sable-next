@@ -108,7 +108,7 @@
       >
       <Dialog.Description>{$i18n.t('timeline.profileEncryptionDescription')}</Dialog.Description>
     </div>
-    <Button size="small" onclick={() => onOpenChange(false)}>{$i18n.t('settings.close')}</Button>
+    <Button size="small" onclick={() => onOpenChange(false)}>{$i18n.t('common.close')}</Button>
   </header>
 
   <div class="security-body" style="overflow-y: auto">
@@ -182,11 +182,7 @@
                     onclick={() => void setBlocked(device)}
                     disabled={blocking !== null}
                   >
-                    {$i18n.t(
-                      device.blocked
-                        ? 'timeline.profileUnblockDevice'
-                        : 'timeline.profileBlockDevice'
-                    )}
+                    {$i18n.t(device.blocked ? 'common.unblock' : 'common.block')}
                   </Button>
                 </div>
               </li>

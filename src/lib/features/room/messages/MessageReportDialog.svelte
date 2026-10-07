@@ -41,7 +41,7 @@
       variant="ghost"
       onclick={() => {
         open = false;
-      }}>{$i18n.t('timeline.cancel')}</Button
+      }}>{$i18n.t('common.cancel')}</Button
     >
   </FormActions>
 </DialogFrame>

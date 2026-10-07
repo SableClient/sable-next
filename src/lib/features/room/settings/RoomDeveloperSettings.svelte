@@ -165,7 +165,8 @@
     >
       {#if browseFailed}
         <div class="settings-form">
-          <Alert variant="critical" role="alert">{$i18n.t('room.devFailed')}</Alert>
+          <Alert variant="critical" role="alert">{$i18n.t('common.theStateEventWasRejected')}</Alert
+          >
         </div>
       {/if}
       {#if stateTypes.length > 0}
@@ -221,9 +222,7 @@
       <div class="settings-form">
         <div class="actions">
           <Button variant="secondary" loading={browsing} onclick={() => void browse()}>
-            {stateTypes.length > 0
-              ? $i18n.t('room.devBrowserReload')
-              : $i18n.t('room.devBrowserLoad')}
+            {stateTypes.length > 0 ? $i18n.t('common.reload') : $i18n.t('room.devBrowserLoad')}
           </Button>
           <Button
             variant="secondary"
@@ -270,7 +269,7 @@
       {#if outcome === 'json'}
         <Alert variant="critical" role="alert">{$i18n.t('room.devInvalidJson')}</Alert>
       {:else if outcome === 'failed'}
-        <Alert variant="critical" role="alert">{$i18n.t('room.devFailed')}</Alert>
+        <Alert variant="critical" role="alert">{$i18n.t('common.theStateEventWasRejected')}</Alert>
       {:else if outcome === 'missing'}
         <Alert variant="info" role="status">{$i18n.t('room.devMissing')}</Alert>
       {:else if sent}

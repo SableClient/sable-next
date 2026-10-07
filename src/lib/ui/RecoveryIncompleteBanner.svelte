@@ -45,7 +45,7 @@
     {/snippet}
     {#snippet actions()}
       <Button variant="ghost" size="small" onclick={dismiss}>
-        {$i18n.t('settings.unverifiedBannerDismiss')}
+        {$i18n.t('common.dismiss')}
       </Button>
       <Button variant="primary" size="small" onclick={unlock}>
         {$i18n.t('settings.recoveryIncompleteAction')}

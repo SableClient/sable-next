@@ -426,10 +426,10 @@ for (const context of ['desktop', 'mobile'] as const) {
     const editor = thread.locator('[contenteditable="true"]').first();
     await expect(thread.getByRole('heading', { name: 'Release discussion' })).toBeVisible();
     await editor.fill('Keep draft after retry');
-    await expect(thread.getByRole('button', { name: en.timeline.retryLoad })).toBeVisible();
+    await expect(thread.getByRole('button', { name: en.common.tryAgain })).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('thread-failed.png') });
-    await thread.getByRole('button', { name: en.timeline.retryLoad }).click();
-    await expect(thread.getByRole('button', { name: en.timeline.retryLoad })).toHaveCount(0);
+    await thread.getByRole('button', { name: en.common.tryAgain }).click();
+    await expect(thread.getByRole('button', { name: en.common.tryAgain })).toHaveCount(0);
     await expect(thread.locator('.message').first()).toBeVisible();
     await expect(editor).toHaveText('Keep draft after retry');
   });

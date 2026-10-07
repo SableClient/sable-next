@@ -92,7 +92,7 @@
     <Alert variant="critical" role="alert">
       <p>{$i18n.t('room.membersRequestsFailed')}</p>
       <Button variant="secondary" size="small" onclick={() => void load()}>
-        {$i18n.t('inbox.retry')}
+        {$i18n.t('common.tryAgain')}
       </Button>
     </Alert>
   {/if}

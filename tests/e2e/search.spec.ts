@@ -8,7 +8,7 @@ const test = base.extend({
   storageState: ({ workerSearchCorpus }, use) => use(workerSearchCorpus.statePath),
 });
 
-const SEARCH_FIELD = en.search.title;
+const SEARCH_FIELD = en.common.searchMessages;
 const INDEXED = { timeout: COLD_BOOT_TIMEOUT };
 
 function group(page: Page, name: string) {
@@ -60,9 +60,9 @@ test('the room header search button opens a search panel scoped to that room', a
   await page.waitForURL(/\/rooms\/.+/);
   const roomUrl = page.url();
 
-  await page.getByRole('button', { name: en.search.open }).click();
+  await page.getByRole('button', { name: en.common.searchMessages }).click();
 
-  const panel = page.getByRole('complementary', { name: en.search.title });
+  const panel = page.getByRole('complementary', { name: en.common.searchMessages });
   await expect(chips(panel)).toHaveText(/in:\s*General/);
   await expect(searchField(page)).toHaveValue('');
   await searchField(page).fill('message');

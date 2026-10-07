@@ -152,8 +152,8 @@
   fallback={() => defaultSettingsSection()}
   label={$i18n.t('settings.title')}
   description={$i18n.t('settings.dialogDescription')}
-  closeLabel={$i18n.t('settings.close')}
-  backLabel={$i18n.t('settings.back')}
+  closeLabel={$i18n.t('common.close')}
+  backLabel={$i18n.t('common.back')}
   {sectionLabel}
   {heading}
   {nav}

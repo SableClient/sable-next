@@ -102,7 +102,7 @@ test('logs out a suspended secondary account while keeping the current account a
 
 test('cancelling logout keeps the suspended account saved', async () => {
   const { user, dialog } = await requestLogout(suspended.user_id);
-  await user.click(within(dialog).getByRole('button', { name: 'settings.cancel' }));
+  await user.click(within(dialog).getByRole('button', { name: 'common.cancel' }));
 
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(core.accounts).toEqual([current, suspended]);

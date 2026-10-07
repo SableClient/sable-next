@@ -78,7 +78,7 @@
   <section class="space-events" aria-label={$i18n.t('calendar.spaceEvents')}>
     <h3 class="space-events-heading">
       <CalendarBlankIcon aria-hidden="true" />
-      <span>{$i18n.t('calendar.today')}</span>
+      <span>{$i18n.t('common.today')}</span>
     </h3>
     <ul class="space-events-list">
       {#each shown as { room, occurrence } (`${room.room_id}|${occurrence.item.eventId}|${String(occurrence.start)}`)}

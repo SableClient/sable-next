@@ -691,11 +691,11 @@
     {#if canManage && space}
       {@const managed = space}
       <div class="hero-actions">
-        <ActionMenu label={$i18n.t('room.lobbyAdd')}>
+        <ActionMenu label={$i18n.t('common.add')}>
           {#snippet trigger({ props })}
             <Button {...props} variant="primary" size="small" class="hero-action">
               <PlusIcon />
-              {$i18n.t('room.lobbyAdd')}
+              {$i18n.t('common.add')}
             </Button>
           {/snippet}
           <IconContext values={{ 'aria-hidden': 'true', size: 16 }}>
@@ -792,7 +792,7 @@
             size="small"
             onclick={() => {
               retry(target);
-            }}>{$i18n.t('room.lobbyRetry')}</Button
+            }}>{$i18n.t('common.retry')}</Button
           >
         </div>
       {/if}
@@ -888,7 +888,7 @@
         variant="ghost"
         onclick={() => {
           topicOpen = false;
-        }}>{$i18n.t('room.lobbyTopicClose')}</Button
+        }}>{$i18n.t('common.close')}</Button
       >
     </DialogActions>
   </div>

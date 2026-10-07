@@ -36,7 +36,7 @@ function setup(props: { mobile?: boolean; compact?: boolean } = { mobile: true }
 test('the mobile bar links navigation and inbox as pages, not overlays', async () => {
   setup();
 
-  const navigate = screen.getByRole('link', { name: 'shortcuts.openRoomSearch' });
+  const navigate = screen.getByRole('link', { name: 'shortcuts.paletteTitle' });
   expect(navigate).toHaveAttribute('href', '/navigate');
   await fireEvent.click(navigate);
   expect(paletteState.open).toBe(false);

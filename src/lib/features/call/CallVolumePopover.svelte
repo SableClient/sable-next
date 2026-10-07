@@ -35,7 +35,7 @@
   align="center"
   class="call-volume-popover"
   label={$i18n.t('call.participantVolume', { name })}
-  closeLabel={$i18n.t('call.dismiss')}
+  closeLabel={$i18n.t('common.dismiss')}
 >
   <div class="volume">
     <p>{$i18n.t('call.participantVolume', { name })}</p>

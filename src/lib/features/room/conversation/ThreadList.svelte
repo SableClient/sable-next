@@ -148,7 +148,7 @@
       {:else if nextBatch !== null || failed}
         <div class="thread-list-more">
           <Button size="small" variant="secondary" onclick={() => void load(nextBatch)}>
-            {failed ? $i18n.t('timeline.threadsRetry') : $i18n.t('timeline.threadsLoadMore')}
+            {failed ? $i18n.t('common.tryAgain') : $i18n.t('timeline.threadsLoadMore')}
           </Button>
         </div>
       {/if}

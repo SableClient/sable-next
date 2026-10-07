@@ -236,14 +236,14 @@
         })
   );
   let createSpaceLabel = $derived(
-    activeSpace === null ? $i18n.t('nav.createSpace') : $i18n.t('nav.createSubspace')
+    activeSpace === null ? $i18n.t('common.createSpace') : $i18n.t('nav.createSubspace')
   );
   let browseLabel = $derived(
     activeSpace === null ? $i18n.t('nav.exploreSpaces') : $i18n.t('nav.lobby')
   );
 
   let createRoomLabel = $derived(
-    activeSpace === null ? $i18n.t('nav.createRoom') : $i18n.t('nav.createRoomInSpace')
+    activeSpace === null ? $i18n.t('common.createRoom') : $i18n.t('nav.createRoomInSpace')
   );
 
   function navigateTo(href: string): void {
@@ -672,7 +672,7 @@
   {#snippet listMenuItems()}
     <ActionMenuItem disabled={!sectionUnread} onSelect={markSectionRead}>
       <ChecksIcon />
-      {$i18n.t('nav.markSectionRead')}
+      {$i18n.t('common.markAsRead')}
     </ActionMenuItem>
     <ActionMenuItem
       closeOnSelect={false}

@@ -266,7 +266,7 @@
           class="panel-nav previous"
           type="button"
           onclick={onBack}
-          aria-label={$i18n.t('auth.back')}><CaretLeftIcon /></button
+          aria-label={$i18n.t('common.back')}><CaretLeftIcon /></button
         >
       {/if}
       {#if canForward}

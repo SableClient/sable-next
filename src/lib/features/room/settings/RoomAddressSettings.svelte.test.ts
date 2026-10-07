@@ -34,10 +34,7 @@ test('a bare address is created on your own server, not the room id', async () =
   const room = { room_id: '!v12roomhashwithoutserver' } as RoomSummary;
   render(RoomAddressSettings, { room, levels, ownPowerLevel: 100 });
 
-  await user.type(
-    await screen.findByRole('textbox', { name: 'room.addressesAdd' }),
-    'lounge{Enter}'
-  );
+  await user.type(await screen.findByRole('textbox', { name: 'common.add' }), 'lounge{Enter}');
 
   expect(core.createRoomAlias).toHaveBeenCalledWith(
     '!v12roomhashwithoutserver',

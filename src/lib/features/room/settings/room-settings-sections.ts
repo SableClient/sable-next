@@ -32,7 +32,7 @@ const ALL: readonly (RoomSettingsSection & { spaceOnly?: boolean })[] = [
   { id: 'appearance', label: 'room.settingsAppearance', icon: PaletteIcon, spaceOnly: true },
   { id: 'cosmetics', label: 'room.settingsCosmetics', icon: PaintBrushIcon },
   { id: 'emojis-stickers', label: 'room.settingsEmojis', icon: SmileyIcon },
-  { id: 'developer-tools', label: 'room.settingsDeveloper', icon: TerminalIcon },
+  { id: 'developer-tools', label: 'common.developerTools', icon: TerminalIcon },
 ];
 
 export function roomSettingsSections(isSpace: boolean): readonly RoomSettingsSection[] {

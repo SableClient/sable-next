@@ -35,7 +35,7 @@ test.each(['closing settings', 'stopping the test'])(
       expect(start).toHaveBeenCalledOnce();
     });
     if (ending === 'closing settings') instance.unmount();
-    else await user.click(screen.getByRole('button', { name: 'settings.callMicTestStop' }));
+    else await user.click(screen.getByRole('button', { name: 'common.stopTest' }));
     meter.resolve(stop);
     await waitFor(() => {
       expect(stop).toHaveBeenCalledOnce();

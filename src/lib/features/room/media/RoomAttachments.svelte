@@ -459,7 +459,7 @@
         class="link-jump"
         variant="ghost"
         size="small"
-        label={`${$i18n.t('timeline.attachmentsJump')}: ${senderOf(item)}, ${formatDate(item.timestamp)}`}
+        label={`${$i18n.t('common.jumpToMessage')}: ${senderOf(item)}, ${formatDate(item.timestamp)}`}
         onclick={() => {
           jump(item.event_id);
         }}
@@ -563,7 +563,7 @@
         <div class="attachments-failure" role="alert">
           <p>{$i18n.t('timeline.attachmentsFailed')}</p>
           <Button size="small" variant="secondary" onclick={() => pager.retry()}>
-            {$i18n.t('timeline.attachmentsRetry')}
+            {$i18n.t('common.tryAgain')}
           </Button>
         </div>
       {:else if loading && items.length > 0}
@@ -571,7 +571,7 @@
       {:else if !exhausted && !loading}
         <div class="attachments-more" {@attach nearEnd}>
           <Button size="small" variant="secondary" onclick={loadMore}>
-            {$i18n.t('timeline.attachmentsLoadMore')}
+            {$i18n.t('common.loadMore')}
           </Button>
         </div>
       {/if}

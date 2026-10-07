@@ -114,7 +114,7 @@
     <IconButton
       variant="subtle"
       size="small"
-      label={$i18n.t('settings.refresh')}
+      label={$i18n.t('common.refresh')}
       disabled={loading || busy}
       onclick={() => void refresh()}
     >

@@ -58,7 +58,7 @@ test('an unjoined parent space is joined through its via servers, then opened', 
   const user = userEvent.setup();
   render(RoomSpacesSettings, { room });
 
-  await user.click(await screen.findByRole('button', { name: 'room.spaceJoin' }));
+  await user.click(await screen.findByRole('button', { name: 'common.join' }));
 
   expect(core.joinRoom).toHaveBeenCalledWith('!other:far.example', ['far.example']);
   expect(goto).toHaveBeenCalledOnce();

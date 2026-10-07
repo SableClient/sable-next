@@ -47,7 +47,7 @@
         {$i18n.t('settings.chooseVerificationMethod')}
       </Dialog.Description>
     </div>
-    <IconButton variant="ghost" size="small" label={$i18n.t('settings.close')} onclick={close}>
+    <IconButton variant="ghost" size="small" label={$i18n.t('common.close')} onclick={close}>
       <XIcon />
     </IconButton>
   </div>

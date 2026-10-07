@@ -510,7 +510,7 @@
 {#if panel}
   {@render content()}
 {:else}
-  <AppPageShell title={$i18n.t('search.title')} density="compact">
+  <AppPageShell title={$i18n.t('common.searchMessages')} density="compact">
     {@render content()}
   </AppPageShell>
 {/if}
@@ -573,8 +573,8 @@
               : undefined}
             placeholder={field.chips.length > 0
               ? ''
-              : $i18n.t(compact.matches ? 'search.placeholderShort' : 'search.placeholder')}
-            aria-label={$i18n.t('search.title')}
+              : $i18n.t(compact.matches ? 'common.searchMessages' : 'search.placeholder')}
+            aria-label={$i18n.t('common.searchMessages')}
             oninput={onInput}
             onkeydown={onKeydown}
             onfocus={() => {
@@ -667,7 +667,8 @@
         <Alert variant="critical" role="alert">
           <p>{$i18n.t('search.failed')}</p>
           <div class="alert-actions">
-            <Button size="small" onclick={() => search.schedule()}>{$i18n.t('search.retry')}</Button
+            <Button size="small" onclick={() => search.schedule()}
+              >{$i18n.t('common.tryAgain')}</Button
             >
           </div>
         </Alert>

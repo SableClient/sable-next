@@ -224,7 +224,7 @@
       <Alert variant="warning">
         <p>{$i18n.t('settings.customThemesErrorLoad')}</p>
         <Button variant="secondary" size="small" onclick={() => void load()}>
-          {$i18n.t('settings.themeCatalogRetry')}
+          {$i18n.t('common.tryAgain')}
         </Button>
       </Alert>
     {:else}
@@ -271,7 +271,7 @@
                             oninstall(entry);
                           }}
                         >
-                          {$i18n.t('settings.themeFileInstall')}
+                          {$i18n.t('common.install')}
                         </Button>
                       {/if}
                       {#if failedEntry === entry.fullUrl}
@@ -335,7 +335,7 @@
                         oninstall(entry);
                       }}
                     >
-                      {$i18n.t('settings.themeFileInstall')}
+                      {$i18n.t('common.install')}
                     </Button>
                   {/if}
                 </li>

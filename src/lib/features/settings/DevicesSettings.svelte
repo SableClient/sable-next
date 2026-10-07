@@ -279,7 +279,7 @@
   <IconButton
     variant="subtle"
     size="small"
-    label={$i18n.t('settings.refresh')}
+    label={$i18n.t('common.refresh')}
     onclick={refresh}
     disabled={loading}
   >
@@ -369,7 +369,7 @@
                 >{$i18n.t(
                   status.recovery === 'enabled'
                     ? 'settings.resetRecoveryKey'
-                    : 'settings.setUpRecovery'
+                    : 'common.setUpRecovery'
                 )}</strong
               >
               <p>
@@ -389,9 +389,7 @@
               }}
             >
               {$i18n.t(
-                status.recovery === 'enabled'
-                  ? 'settings.resetRecoveryKey'
-                  : 'settings.setUpRecovery'
+                status.recovery === 'enabled' ? 'settings.resetRecoveryKey' : 'common.setUpRecovery'
               )}
             </Button>
           </div>
@@ -440,7 +438,7 @@
                 disabled={bulkBusy}
                 onchange={toggleSelectAll}
               />
-              {$i18n.t('settings.selectAllDevices')}
+              {$i18n.t('common.selectAll')}
             </label>
             {#if bulkSelected.size > 0}
               <span class="bulk-count"
@@ -491,7 +489,7 @@
                 {$i18n.t('settings.removeSelectedDevices')}
               </Button>
               <Button variant="ghost" disabled={bulkBusy} onclick={cancelBulkRemoval}>
-                {$i18n.t('settings.cancel')}
+                {$i18n.t('common.cancel')}
               </Button>
             </div>
           </form>
@@ -601,7 +599,7 @@
                           }}
                         >
                           <TrashIcon aria-hidden="true" />
-                          {$i18n.t('settings.remove')}
+                          {$i18n.t('common.remove')}
                         </ActionMenuItem>
                       </ActionMenu>
                     {/if}

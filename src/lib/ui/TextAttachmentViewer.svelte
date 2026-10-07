@@ -136,10 +136,10 @@
       <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- an object URL for the media bytes, not a route -->
       <LinkButton href={src} download={name} size="small" onclick={onDownload}>
         <DownloadSimpleIcon aria-hidden="true" />
-        {$i18n.t('timeline.downloadFile')}
+        {$i18n.t('common.download')}
       </LinkButton>
       <Button variant="primary" size="small" onclick={copy}>
-        {copied ? $i18n.t('timeline.copied') : $i18n.t('timeline.copyAll')}
+        {copied ? $i18n.t('common.copied') : $i18n.t('timeline.copyAll')}
       </Button>
     </header>
     <div class="text-viewer-scroll">

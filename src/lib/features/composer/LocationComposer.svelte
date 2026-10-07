@@ -161,10 +161,10 @@
     {:else}
       <Button variant="ghost" class="reveal-map" disabled={loadingMap} onclick={showMap}>
         <MapTrifoldIcon />
-        {loadingMap ? $i18n.t('composer.locationMapLoading') : $i18n.t('composer.locationShowMap')}
+        {loadingMap ? $i18n.t('common.loadingMap') : $i18n.t('composer.locationShowMap')}
       </Button>
       {#if mapFailed}
-        <Alert variant="critical" role="alert">{$i18n.t('composer.locationMapFailed')}</Alert>
+        <Alert variant="critical" role="alert">{$i18n.t('common.theMapCouldNotBeLoaded')}</Alert>
       {/if}
     {/if}
 
@@ -173,7 +173,7 @@
     </FormField>
 
     <DialogActions>
-      <Button variant="ghost" onclick={cancel}>{$i18n.t('composer.locationCancel')}</Button>
+      <Button variant="ghost" onclick={cancel}>{$i18n.t('common.cancel')}</Button>
       <Button disabled={geoUri === null} onclick={send}>{$i18n.t('composer.locationSend')}</Button>
     </DialogActions>
   </div>

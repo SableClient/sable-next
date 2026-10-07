@@ -210,7 +210,7 @@
         />
         <Button type="submit" size="small" disabled={!canAdd || adding} loading={adding}>
           <PlusIcon />
-          {$i18n.t('settings.notificationKeywordsAdd')}
+          {$i18n.t('common.add')}
         </Button>
       </div>
     </div>
@@ -223,7 +223,7 @@
     if (!next && removingKeyword === null) pendingRemoval = null;
   }}
   title={$i18n.t('settings.notificationKeywordsConfirm', { keyword: pendingRemoval ?? '' })}
-  confirmLabel={$i18n.t('settings.removeButton')}
+  confirmLabel={$i18n.t('common.remove')}
   busy={removingKeyword !== null}
   onConfirm={() => void confirmRemoval()}
 />

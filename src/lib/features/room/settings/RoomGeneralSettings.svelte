@@ -266,11 +266,11 @@
         {/snippet}
         {#if canEditAvatar}
           <Button size="small" disabled={saving} onclick={() => avatarInput?.click()}>
-            {$i18n.t('room.settingsAvatarChange')}
+            {$i18n.t('common.changeAvatar')}
           </Button>
           {#if room?.avatar_url}
             <Button size="small" variant="ghost" disabled={saving} onclick={removeAvatar}>
-              {$i18n.t('room.settingsAvatarRemove')}
+              {$i18n.t('common.removeAvatar')}
             </Button>
           {/if}
         {/if}
@@ -291,11 +291,11 @@
       >
         {#if canEditBanner}
           <Button size="small" disabled={saving} onclick={() => bannerInput?.click()}>
-            {$i18n.t('room.settingsBannerChange')}
+            {$i18n.t('common.changeBanner')}
           </Button>
           {#if banner}
             <Button size="small" variant="ghost" disabled={saving} onclick={removeBanner}>
-              {$i18n.t('room.settingsBannerRemove')}
+              {$i18n.t('common.removeBanner')}
             </Button>
           {/if}
         {/if}
@@ -357,7 +357,7 @@
             },
             {
               value: 'invite',
-              label: $i18n.t('room.settingsJoinRuleInvite'),
+              label: $i18n.t('room.createJoinRuleInvite'),
               hint: $i18n.t('room.settingsJoinRuleInviteHint'),
               icon: LockIcon,
             },
@@ -365,7 +365,7 @@
               ? [
                   {
                     value: 'knock' as const,
-                    label: $i18n.t('room.settingsJoinRuleKnock'),
+                    label: $i18n.t('common.askToJoin'),
                     hint: $i18n.t('room.settingsJoinRuleKnockHint'),
                     icon: HandIcon,
                   },
@@ -375,7 +375,7 @@
               ? [
                   {
                     value: 'restricted' as const,
-                    label: $i18n.t('room.settingsJoinRuleRestricted'),
+                    label: $i18n.t('room.createJoinRuleRestricted'),
                     hint: $i18n.t('room.settingsJoinRuleRestrictedHint'),
                     icon: HouseIcon,
                   },
@@ -409,7 +409,7 @@
       <RoomSpacesSettings {room} />
       {#if room?.is_direct}
         <SettingsRow
-          title={$i18n.t('room.settingsDirectLabel')}
+          title={$i18n.t('common.directMessage')}
           description={$i18n.t('room.settingsDirectHint')}
         >
           {#if canEditName && room.name}
@@ -434,17 +434,17 @@
       {#if failed}
         <p class="save-status error" role="alert">{$i18n.t('room.settingsFailed')}</p>
       {:else if dirty}
-        <p class="save-status" role="status">{$i18n.t('room.settingsUnsaved')}</p>
+        <p class="save-status" role="status">{$i18n.t('common.youHaveUnsavedChanges')}</p>
       {:else if saved}
         <p class="save-status" role="status">{$i18n.t('room.settingsSaved')}</p>
       {/if}
       {#if dirty}
         <Button variant="ghost" disabled={saving} onclick={resetDraft}>
-          {$i18n.t('room.settingsReset')}
+          {$i18n.t('common.reset')}
         </Button>
       {/if}
       <Button variant="primary" disabled={!dirty || saving} loading={saving} onclick={save}>
-        {$i18n.t('room.settingsSave')}
+        {$i18n.t('common.save')}
       </Button>
     </div>
   {/if}

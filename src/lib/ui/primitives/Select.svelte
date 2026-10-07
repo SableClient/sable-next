@@ -117,7 +117,7 @@
   <BottomSheet
     bind:open={sheetOpen}
     label={ariaLabel ?? placeholder ?? ''}
-    closeLabel={$i18n.t('settings.close')}
+    closeLabel={$i18n.t('common.close')}
   >
     <div class="select-sheet" role="radiogroup" aria-label={ariaLabel}>
       {#if ariaLabel}<p class="select-sheet-title">{ariaLabel}</p>{/if}

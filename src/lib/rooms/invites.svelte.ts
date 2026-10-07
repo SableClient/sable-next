@@ -56,7 +56,7 @@ export class InviteActions {
     toasts.undoable(
       t('inbox.inviteDeclined', { room: room.name ?? room.canonical_alias ?? roomId }),
       {
-        label: t('inbox.undo'),
+        label: t('common.undo'),
         onUndo: () => {
           declining.delete(roomId);
         },
@@ -76,7 +76,7 @@ export class InviteActions {
     if (pending.length === 0) return;
     for (const room of pending) declining.add(room.room_id);
     toasts.undoable(t('inbox.invitesDeclined', { count: pending.length }), {
-      label: t('inbox.undo'),
+      label: t('common.undo'),
       onUndo: () => {
         for (const room of pending) declining.delete(room.room_id);
       },

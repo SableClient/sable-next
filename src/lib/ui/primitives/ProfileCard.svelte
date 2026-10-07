@@ -259,7 +259,7 @@
       <button
         class="profile-card-user-id"
         type="button"
-        title={$i18n.t(copied ? 'settings.copied' : 'settings.copy')}
+        title={$i18n.t(copied ? 'common.copied' : 'common.copy')}
         onclick={() => void copyUserId()}
       >
         {userId}

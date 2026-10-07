@@ -210,7 +210,7 @@
     } catch (failure) {
       if (current === run) {
         console.warn('[sable space] profile unavailable', failure);
-        error = t('room.cosmeticsFailed');
+        error = t('room.settingsFailed');
       }
     } finally {
       if (current === run) loading = false;
@@ -271,7 +271,7 @@
       setAvatar(null);
     } catch (failure) {
       console.warn('[sable space] profile not saved', failure);
-      error = t('room.cosmeticsFailed');
+      error = t('room.settingsFailed');
     } finally {
       saving = false;
     }
@@ -392,7 +392,7 @@
                   if (file) setAvatar(file);
                 }}
               />
-              {$i18n.t('room.cosmeticsAvatarChange')}
+              {$i18n.t('common.changePicture')}
             </label>
             {#if draft.avatar || avatarFile}
               <Button
@@ -436,8 +436,7 @@
             <Button
               size="small"
               disabled={saving || dirty || applyTargets.length === 0}
-              onclick={() => void applyToRooms()}
-              >{$i18n.t('room.cosmeticsApplyRoomsAction')}</Button
+              onclick={() => void applyToRooms()}>{$i18n.t('common.apply')}</Button
             >
           </div>
         </fieldset>
@@ -448,9 +447,9 @@
             {$i18n.t('settings.unsavedChanges')}
           </p>{/if}
         <Button type="submit" variant="primary" disabled={!dirty || loading} loading={saving}
-          >{$i18n.t('settings.saveButton')}</Button
+          >{$i18n.t('common.save')}</Button
         >
-        <Button disabled={!dirty || saving} onclick={cancel}>{$i18n.t('settings.cancel')}</Button>
+        <Button disabled={!dirty || saving} onclick={cancel}>{$i18n.t('common.cancel')}</Button>
       </div>
     </form>
   </div>

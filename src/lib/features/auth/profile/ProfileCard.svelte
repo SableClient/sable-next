@@ -107,14 +107,14 @@
               if (input instanceof HTMLInputElement) input.value = '';
             }}
           >
-            {$i18n.t('auth.removeAvatar')}
+            {$i18n.t('common.removeAvatar')}
           </Button>
         {/if}
       </div>
     </div>
   </div>
 
-  <FormField dense fieldId="profile-display-name" label={$i18n.t('auth.displayName')}>
+  <FormField dense fieldId="profile-display-name" label={$i18n.t('common.displayName')}>
     <TextInput
       id="profile-display-name"
       value={displayName}
@@ -130,7 +130,7 @@
     <TextInput
       id="profile-pronouns"
       value={pronouns}
-      placeholder={$i18n.t('settings.pronounsPlaceholder')}
+      placeholder={$i18n.t('common.theythemEnsheher')}
       oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
         onPronouns(event.currentTarget.value);
       }}
@@ -156,7 +156,7 @@
           id="profile-status"
           value={status}
           maxlength={255}
-          placeholder={$i18n.t('settings.statusPlaceholder')}
+          placeholder={$i18n.t('common.whatAreYouUpTo')}
           oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
             onStatus(event.currentTarget.value);
           }}
@@ -181,12 +181,12 @@
               id="profile-banner"
               type="file"
               accept="image/*"
-              aria-label={$i18n.t(bannerPreview ? 'settings.changeBanner' : 'settings.saveBanner')}
+              aria-label={$i18n.t(bannerPreview ? 'common.changeBanner' : 'settings.saveBanner')}
               onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
                 onBanner(event.currentTarget.files?.[0] ?? null);
               }}
             />
-            {$i18n.t(bannerPreview ? 'settings.changeBanner' : 'settings.saveBanner')}
+            {$i18n.t(bannerPreview ? 'common.changeBanner' : 'settings.saveBanner')}
           </label>
           {#if bannerPreview}
             <Button
@@ -198,7 +198,7 @@
                 if (input instanceof HTMLInputElement) input.value = '';
               }}
             >
-              {$i18n.t('settings.removeButton')}
+              {$i18n.t('common.remove')}
             </Button>
           {/if}
         </div>

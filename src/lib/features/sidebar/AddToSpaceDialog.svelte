@@ -82,7 +82,7 @@
     </ul>
   {/if}
   <div class="actions">
-    <Button variant="ghost" onclick={close}>{$i18n.t('room.leaveCancel')}</Button>
+    <Button variant="ghost" onclick={close}>{$i18n.t('common.cancel')}</Button>
     <Button variant="primary" disabled={selected.size === 0} onclick={apply}>
       {$i18n.t('room.addToSpaceApply', { count: selected.size })}
     </Button>

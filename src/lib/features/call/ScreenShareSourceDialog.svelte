@@ -81,9 +81,9 @@
 
     <DialogActions>
       <Button type="button" variant="ghost" onclick={onCancel}>
-        {$i18n.t('settings.cancel')}
+        {$i18n.t('common.cancel')}
       </Button>
-      <Button type="submit">{$i18n.t('call.screenAudioShare')}</Button>
+      <Button type="submit">{$i18n.t('common.share')}</Button>
     </DialogActions>
   </div>
 </DialogFrame>

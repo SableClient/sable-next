@@ -600,10 +600,10 @@
               </Button>
             {/if}
             <Button type="button" variant="ghost" onclick={cancelEditRole} disabled={roleSaving}>
-              {$i18n.t('room.permRoleCancel')}
+              {$i18n.t('common.cancel')}
             </Button>
             <Button type="submit" loading={roleSaving} disabled={roleNameDraft.trim() === ''}>
-              {$i18n.t('room.permRoleSave')}
+              {$i18n.t('common.save')}
             </Button>
           </div>
         </form>
@@ -688,7 +688,7 @@
                 childConfirm = true;
               }}
             >
-              {$i18n.t('room.permChildrenApply')}
+              {$i18n.t('common.apply')}
             </Button>
           </SettingsRow>
         </ul>
@@ -747,7 +747,7 @@
   bind:open={childConfirm}
   title={$i18n.t('room.permChildrenConfirm', { count: childIds.length })}
   description={$i18n.t('room.permSyncConfirmHint')}
-  confirmLabel={$i18n.t('room.permChildrenApply')}
+  confirmLabel={$i18n.t('common.apply')}
   busy={childSyncing}
   onConfirm={() => void syncChildren()}
 />

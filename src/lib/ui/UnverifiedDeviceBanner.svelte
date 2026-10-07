@@ -58,10 +58,10 @@
     {/snippet}
     {#snippet actions()}
       <Button variant="ghost" size="small" onclick={dismiss}>
-        {$i18n.t('settings.unverifiedBannerDismiss')}
+        {$i18n.t('common.dismiss')}
       </Button>
       <Button variant="primary" size="small" onclick={verify}>
-        {$i18n.t('settings.unverifiedBannerVerify')}
+        {$i18n.t('common.verify')}
       </Button>
     {/snippet}
   </Banner>

@@ -138,7 +138,7 @@
     <ActionMenuSeparator />
     <ActionMenuItem onSelect={onAddAccount}>
       <PlusIcon aria-hidden="true" />
-      <span>{$i18n.t('nav.addAccount')}</span>
+      <span>{$i18n.t('common.addAccount')}</span>
     </ActionMenuItem>
   </ActionMenuSub>
 {/if}

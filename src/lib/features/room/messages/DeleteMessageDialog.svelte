@@ -40,7 +40,7 @@
   {title}
   {description}
   {confirmLabel}
-  cancelLabel={$i18n.t('timeline.cancel')}
+  cancelLabel={$i18n.t('common.cancel')}
   onConfirm={confirm}
   onCancel={cancel}
 >

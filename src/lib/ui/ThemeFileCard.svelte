@@ -86,14 +86,14 @@
       disabled={installed}
       onclick={() => (confirming = true)}
     >
-      {installed ? $i18n.t('settings.themeFileInstalled') : $i18n.t('settings.themeFileInstall')}
+      {installed ? $i18n.t('settings.themeFileInstalled') : $i18n.t('common.install')}
     </Button>
   </div>
   <ConfirmDialog
     bind:open={confirming}
     title={$i18n.t('settings.themeFileConfirmTitle', { name: title })}
     description={$i18n.t('settings.themeFileConfirmHint')}
-    confirmLabel={$i18n.t('settings.themeFileInstall')}
+    confirmLabel={$i18n.t('common.install')}
     confirmVariant="primary"
     onConfirm={install}
   />

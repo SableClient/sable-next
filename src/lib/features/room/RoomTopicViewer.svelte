@@ -30,7 +30,7 @@
         variant="ghost"
         onclick={() => {
           onOpenChange(false);
-        }}>{$i18n.t('room.topicClose')}</Button
+        }}>{$i18n.t('common.close')}</Button
       >
     </DialogActions>
   </div>

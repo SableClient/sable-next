@@ -228,7 +228,7 @@
                 disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
                 onclick={onQrLogin}
               >
-                <QrCodeIcon size={18} aria-hidden="true" />{$i18n.t('qrLogin.signInWithQr')}
+                <QrCodeIcon size={18} aria-hidden="true" />{$i18n.t('qrLogin.titleLogin')}
               </Button>
             {/if}
           </div>

@@ -68,11 +68,11 @@
   </FormField>
 
   {#if failed}
-    <Alert variant="critical" role="alert">{$i18n.t('room.joinFailed')}</Alert>
+    <Alert variant="critical" role="alert">{$i18n.t('common.theRoomCouldNotBeJoined')}</Alert>
   {/if}
 
   <Button type="submit" variant="primary" loading={joining} disabled={address.trim() === ''}>
-    {$i18n.t('room.joinSubmit')}
+    {$i18n.t('common.join')}
   </Button>
 </form>
 

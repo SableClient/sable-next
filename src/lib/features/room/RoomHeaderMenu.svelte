@@ -80,7 +80,7 @@
 
 <ActionMenu
   bind:open
-  label={$i18n.t('room.menuMoreOptions')}
+  label={$i18n.t('common.moreOptions')}
   class="room-options-menu"
   onOpenChange={(next) => {
     if (next) opened = true;
@@ -90,7 +90,7 @@
     <PanelHeaderButton
       {...props}
       class="room-menu-button selection-open"
-      label={$i18n.t('room.menuMoreOptions')}
+      label={$i18n.t('common.moreOptions')}
     >
       <DotsThreeVerticalIcon weight={open ? 'fill' : 'regular'} />
     </PanelHeaderButton>
@@ -100,7 +100,7 @@
     {#if unread}
       <ActionMenuItem onSelect={onMarkRead}>
         <ChecksIcon />
-        {$i18n.t('room.menuMarkRead')}
+        {$i18n.t('common.markAsRead')}
       </ActionMenuItem>
     {:else}
       <ActionMenuItem disabled={!room} onSelect={onMarkUnread}>
@@ -148,7 +148,7 @@
       {#if onAttachments}
         <ActionMenuItem onSelect={onAttachments}>
           <ImagesIcon />
-          {$i18n.t('timeline.attachmentsOpen')}
+          {$i18n.t('timeline.attachmentsTitle')}
         </ActionMenuItem>
       {/if}
       <ActionMenuSeparator />

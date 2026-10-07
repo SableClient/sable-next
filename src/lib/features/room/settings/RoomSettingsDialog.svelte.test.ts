@@ -139,7 +139,7 @@ test('offers space-based rules to a room in a space', async () => {
   await setup(true, true);
 
   expect(
-    await screen.findByRole('radio', { name: /room\.settingsJoinRuleRestricted/ })
+    await screen.findByRole('radio', { name: /room\.createJoinRuleRestricted/ })
   ).toBeInTheDocument();
   expect(
     screen.getByRole('radio', { name: /room\.settingsJoinRuleKnockRestricted/ })
@@ -162,7 +162,7 @@ test.each([false, true])('non-admins can inspect and copy data (space: %s)', asy
   const click = (label: string) =>
     user.click(screen.getByRole('button', { name: new RegExp(label.replace('.', '\\.')) }));
 
-  await click('room.settingsDeveloper');
+  await click('common.developerTools');
   expect(
     screen.getByRole('heading', {
       name: isSpace ? 'room.devSpaceDataTitle' : 'room.devRoomDataTitle',
@@ -199,7 +199,7 @@ test('switching section waits for the unsaved-changes answer', async () => {
   const user = userEvent.setup();
   await setup(false);
 
-  await user.click(screen.getByRole('button', { name: /room\.settingsDeveloper/ }));
+  await user.click(screen.getByRole('button', { name: /common\.developerTools/ }));
   expect(held).toHaveLength(1);
   expect(screen.queryByText('room.devBrowserTitle')).toBeNull();
 

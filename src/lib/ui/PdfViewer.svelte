@@ -138,7 +138,7 @@
       <div class="pdf-error">
         <WarningIcon />
         <p>{$i18n.t('pdf.loadFailed')}</p>
-        <Button size="small" onclick={retry}>{$i18n.t('pdf.retry')}</Button>
+        <Button size="small" onclick={retry}>{$i18n.t('common.retry')}</Button>
       </div>
     {:else}
       <div class="pdf-canvas-frame" role="img" aria-label={canvasLabel}>

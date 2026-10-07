@@ -105,7 +105,7 @@
   {#if permission === 'prompt'}
     <Button onclick={allow}>
       <BellRingingIcon aria-hidden="true" />
-      {$i18n.t('setup.notificationsAllow')}
+      {$i18n.t('common.allowNotifications')}
     </Button>
   {/if}
 

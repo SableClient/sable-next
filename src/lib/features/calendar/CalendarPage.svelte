@@ -486,7 +486,7 @@
         <PanelHeaderButton label={$i18n.t('calendar.nextMonth')} onclick={() => moveMonth(1)}>
           <NextIcon />
         </PanelHeaderButton>
-        <Button size="small" variant="ghost" onclick={goToday}>{$i18n.t('calendar.today')}</Button>
+        <Button size="small" variant="ghost" onclick={goToday}>{$i18n.t('common.today')}</Button>
       </div>
       <div
         class="calendar-grid"
@@ -560,7 +560,7 @@
           <EmptyState title={$i18n.t('calendar.loadFailed')}>
             {#snippet actions()}
               <Button size="small" onclick={() => void load(resolvedRoomId)}>
-                {$i18n.t('calendar.retry')}
+                {$i18n.t('common.tryAgain')}
               </Button>
             {/snippet}
           </EmptyState>
@@ -622,10 +622,10 @@
                       {/each}
                       {#if canChange(item)}
                         <Button size="small" variant="ghost" onclick={() => openEdit(item)}>
-                          {$i18n.t('calendar.edit')}
+                          {$i18n.t('common.edit')}
                         </Button>
                         <Button size="small" variant="ghost" onclick={() => (deleting = item)}>
-                          {$i18n.t('calendar.delete')}
+                          {$i18n.t('common.delete')}
                         </Button>
                       {/if}
                     </div>
@@ -653,7 +653,7 @@
 />
 <MessageReportDialog
   bind:open={reportOpen}
-  title={$i18n.t('room.reportTitle')}
+  title={$i18n.t('room.menuReport')}
   hint={$i18n.t('room.reportHint')}
   onReport={(reason) => {
     const target = resolvedRoomId;
@@ -682,9 +682,9 @@
   }}
   title={$i18n.t('calendar.deleteTitle')}
   description={$i18n.t('calendar.deleteExplain')}
-  confirmLabel={$i18n.t('calendar.delete')}
+  confirmLabel={$i18n.t('common.delete')}
   confirmVariant="danger"
-  cancelLabel={$i18n.t('calendar.cancel')}
+  cancelLabel={$i18n.t('common.cancel')}
   busy={deleteBusy}
   onConfirm={() => void remove()}
 />

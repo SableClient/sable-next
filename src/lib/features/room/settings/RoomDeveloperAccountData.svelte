@@ -101,7 +101,7 @@
     {#if outcome === 'json'}
       <Alert variant="critical" role="alert">{$i18n.t('room.devInvalidJson')}</Alert>
     {:else if outcome === 'failed'}
-      <Alert variant="critical" role="alert">{$i18n.t('room.devFailed')}</Alert>
+      <Alert variant="critical" role="alert">{$i18n.t('common.theStateEventWasRejected')}</Alert>
     {:else if outcome === 'missing'}
       <Alert variant="info" role="status">{$i18n.t('room.devMissing')}</Alert>
     {:else if outcome === 'saved'}
@@ -118,7 +118,7 @@
         {$i18n.t('room.devLoad')}
       </Button>
       <Button type="submit" loading={saving} disabled={eventType.trim() === ''}>
-        {$i18n.t('room.devSave')}
+        {$i18n.t('common.save')}
       </Button>
     </div>
   </form>

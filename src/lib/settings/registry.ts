@@ -405,9 +405,9 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.pixelatedImagesHint',
         type: 'select',
         options: [
-          { value: 'always', label: 'settings.pixelatedImagesAlways' },
+          { value: 'always', label: 'common.always' },
           { value: 'smart', label: 'settings.pixelatedImagesSmart' },
-          { value: 'never', label: 'settings.pixelatedImagesNever' },
+          { value: 'never', label: 'common.never' },
         ],
       },
       {
@@ -445,7 +445,7 @@ export const settingsCategories: SettingsCategory[] = [
         terms: ['settings.terms.language'],
         type: 'select',
         options: [
-          { value: SYSTEM_LANGUAGE, label: 'settings.languageSystem' },
+          { value: SYSTEM_LANGUAGE, label: 'common.system' },
           ...availableLocales.map((code) => ({
             value: code,
             label: localeLabel(code),
@@ -464,9 +464,9 @@ export const settingsCategories: SettingsCategory[] = [
         terms: ['settings.terms.theme'],
         type: 'select',
         options: [
-          { value: 'system', label: 'settings.themeSystem' },
-          { value: 'dark', label: 'settings.themeDark' },
-          { value: 'light', label: 'settings.themeLight' },
+          { value: 'system', label: 'common.system' },
+          { value: 'dark', label: 'common.dark' },
+          { value: 'light', label: 'common.light' },
         ],
       },
       {
@@ -476,10 +476,10 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.showRoomIcon',
         type: 'select',
         options: [
-          { value: 'always', label: 'settings.showRoomIconAlways' },
+          { value: 'always', label: 'common.always' },
           { value: 'sometimes', label: 'settings.showRoomIconSometimes' },
           { value: 'collapsed', label: 'settings.showRoomIconCollapsed' },
-          { value: 'never', label: 'settings.showRoomIconNever' },
+          { value: 'never', label: 'common.never' },
         ],
       },
       {
@@ -1188,7 +1188,7 @@ export const settingsCategories: SettingsCategory[] = [
         key: 'sendReadReceipts',
         section: 'activity',
         icon: EyeIcon,
-        name: 'settings.sendReadReceipts',
+        name: 'common.readReceipts',
         terms: ['settings.terms.sendReadReceipts'],
         description: 'settings.sendReadReceiptsHint',
         type: 'boolean',
@@ -1246,7 +1246,7 @@ export const settingsCategories: SettingsCategory[] = [
         options: [
           { value: 'on', label: 'settings.mediaAutoLoadAll' },
           { value: 'private', label: 'settings.mediaAutoLoadPrivate' },
-          { value: 'off', label: 'settings.mediaAutoLoadNever' },
+          { value: 'off', label: 'common.never' },
         ],
         getValue: () => mediaPreviewSettings.mediaPreviews,
         setValue: (value) => {
@@ -1648,7 +1648,7 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'personas.latching',
         type: 'select',
         options: [
-          { value: 'off', label: 'personas.scopeLatchOff' },
+          { value: 'off', label: 'common.never' },
           { value: 'room', label: 'personas.scopeLatchRoom' },
           { value: 'account', label: 'personas.scopeLatchAccount' },
         ],
@@ -1669,7 +1669,7 @@ export const settingsCategories: SettingsCategory[] = [
     name: 'settings.developerTitle',
     icon: CodeIcon,
     sections: [
-      { id: 'developer-options', name: 'settings.groups.developerTools' },
+      { id: 'developer-options', name: 'common.developerTools' },
       { id: 'developer-sync-diagnostics', name: 'settings.developerSyncTitle' },
       { id: 'developer-account-data', name: 'settings.developerAccountDataTitle' },
       { id: 'developer-notifications', name: 'settings.developerNotificationsTitle' },

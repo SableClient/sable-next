@@ -129,7 +129,7 @@ test('a deployment without account switching offers neither switching nor adding
 
   expect(menu.getByRole('menuitem', { name: 'nav.editProfile' })).toBeInTheDocument();
   expect(menu.queryByRole('menuitem', { name: 'nav.switchAccount' })).not.toBeInTheDocument();
-  expect(menu.queryByRole('menuitem', { name: 'nav.addAccount' })).not.toBeInTheDocument();
+  expect(menu.queryByRole('menuitem', { name: 'common.addAccount' })).not.toBeInTheDocument();
 });
 
 test('a signed-out account says so and offers to sign in again', async () => {

@@ -158,7 +158,7 @@
         onkeydown={handleKeydown}
       >
         <header class="staged-viewer-bar">
-          <IconButton label={$i18n.t('viewer.close')} variant="ghost" onclick={onClose}>
+          <IconButton label={$i18n.t('common.close')} variant="ghost" onclick={onClose}>
             <XIcon />
           </IconButton>
           <div class="staged-viewer-title">
@@ -276,7 +276,7 @@
             onclick={remove}
           >
             <TrashIcon aria-hidden="true" />
-            {$i18n.t('composer.remove')}
+            {$i18n.t('common.remove')}
           </Button>
         </footer>
       </Dialog.Content>

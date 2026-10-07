@@ -326,7 +326,7 @@
 
   let originLabels: Record<ImagePackView['origin'], string> = $derived({
     account: $i18n.t('composer.packMine'),
-    room: $i18n.t('composer.packRoom'),
+    room: $i18n.t('common.thisRoom'),
     global: $i18n.t('composer.packGlobal'),
     space: $i18n.t('composer.packSpace'),
   });

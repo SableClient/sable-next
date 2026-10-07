@@ -19,7 +19,7 @@
     guard.risk === 'unverified'
       ? 'settings.logoutWarning.verify'
       : guard.risk === 'no_recovery' || guard.risk === 'no_backup'
-        ? 'settings.logoutWarning.setUpRecovery'
+        ? 'common.setUpRecovery'
         : null
   );
 

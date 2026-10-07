@@ -4,6 +4,6 @@
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
 </script>
 
-<AppPageShell title={$i18n.t('room.createTitle')} description={$i18n.t('room.createDescription')}>
+<AppPageShell title={$i18n.t('common.createARoom')} description={$i18n.t('room.createDescription')}>
   <CreateRoomForm />
 </AppPageShell>

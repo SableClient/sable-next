@@ -37,7 +37,7 @@
       .filter((device) => device.kind === kind)
       .map((device) => ({
         value: device.deviceId,
-        label: device.label || $i18n.t('settings.callDevicesUnnamed'),
+        label: device.label || $i18n.t('settings.unnamedDevice'),
       })),
   ];
 
@@ -180,7 +180,7 @@
             <div class="fill" style={`inline-size: ${String(Math.round(level * 100))}%`}></div>
           </div>
           <Button variant="secondary" size="small" onclick={() => void toggleTest()}>
-            {$i18n.t(testing ? 'settings.callMicTestStop' : 'settings.callMicTest')}
+            {$i18n.t(testing ? 'common.stopTest' : 'settings.callMicTest')}
           </Button>
         </div>
       </div>

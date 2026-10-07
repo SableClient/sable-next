@@ -35,9 +35,7 @@
       onclick={() => void copyToken()}
       disabled={!core.session}
     >
-      {$i18n.t(
-        copied ? 'settings.developerAccessTokenCopied' : 'settings.developerAccessTokenCopy'
-      )}
+      {$i18n.t(copied ? 'common.copied' : 'settings.developerAccessTokenCopy')}
     </Button>
   </SettingsRow>
 </ul>

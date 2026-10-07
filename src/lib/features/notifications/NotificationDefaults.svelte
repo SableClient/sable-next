@@ -39,7 +39,7 @@
     key: 'badgeDefaultDirect' | 'badgeDefaultGroup';
     label: string;
   }[] = [
-    { key: 'badgeDefaultDirect', label: 'settings.notificationDefaultDirect' },
+    { key: 'badgeDefaultDirect', label: 'common.directMessages' },
     { key: 'badgeDefaultGroup', label: 'settings.notificationDefaultGroup' },
   ];
 
@@ -48,7 +48,7 @@
     label: string;
     direct: boolean;
   }[] = [
-    { key: 'direct', label: 'settings.notificationDefaultDirect', direct: true },
+    { key: 'direct', label: 'common.directMessages', direct: true },
     { key: 'group', label: 'settings.notificationDefaultGroup', direct: false },
   ];
 

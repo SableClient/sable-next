@@ -75,14 +75,14 @@
   {open}
   {onOpenChange}
   variant="verification"
-  label={$i18n.t('room.jumpTitle')}
+  label={$i18n.t('room.menuJumpToTime')}
   onConfirm={() => void jump()}
 >
   <div class="jump">
-    <h2>{$i18n.t('room.jumpTitle')}</h2>
+    <h2>{$i18n.t('room.menuJumpToTime')}</h2>
     <p class="explain">{$i18n.t('room.jumpBody')}</p>
 
-    <DateTimeField label={$i18n.t('room.jumpMoment')} bind:value />
+    <DateTimeField label={$i18n.t('common.dateAndTime')} bind:value />
 
     <div class="shortcuts">
       <Button
@@ -90,14 +90,14 @@
         variant="secondary"
         onclick={() => {
           setDay(0);
-        }}>{$i18n.t('room.jumpToday')}</Button
+        }}>{$i18n.t('common.today')}</Button
       >
       <Button
         size="small"
         variant="secondary"
         onclick={() => {
           setDay(1);
-        }}>{$i18n.t('room.jumpYesterday')}</Button
+        }}>{$i18n.t('common.yesterday')}</Button
       >
       <Button
         size="small"
@@ -119,7 +119,7 @@
         variant="ghost"
         onclick={() => {
           onOpenChange(false);
-        }}>{$i18n.t('room.jumpCancel')}</Button
+        }}>{$i18n.t('common.cancel')}</Button
       >
       <Button type="submit" loading={searching}>{$i18n.t('room.jumpSubmit')}</Button>
     </DialogActions>

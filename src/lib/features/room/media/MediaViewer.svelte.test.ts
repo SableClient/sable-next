@@ -203,7 +203,7 @@ test('jumps to the selected message from More', async () => {
   });
 
   await user.click(screen.getByRole('button', { name: 'timeline.moreActions' }));
-  await user.click(await screen.findByRole('menuitem', { name: 'viewer.jumpToMessage' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'common.jumpToMessage' }));
 
   expect(onJump).toHaveBeenCalledExactlyOnceWith('$image');
 });

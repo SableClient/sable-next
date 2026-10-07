@@ -451,7 +451,7 @@
           document.getElementById(`profile-tab-${tab}`)?.focus();
         }}
       >
-        {$i18n.t(id === 'edit' ? 'settings.profileEdit' : 'settings.profilePreviewTab')}
+        {$i18n.t(id === 'edit' ? 'common.edit' : 'settings.profilePreviewTab')}
       </button>
     {/each}
   </div>
@@ -506,20 +506,20 @@
               class="inline-edit"
               bind:value={draft.status}
               aria-label={$i18n.t('settings.status')}
-              placeholder={$i18n.t('settings.statusPlaceholder')}
+              placeholder={$i18n.t('common.whatAreYouUpTo')}
               maxlength={256}
             />
           {/snippet}
           {#snippet nameField()}
             <div class="caption-field">
               <label class="caption" for="account-display-name"
-                >{$i18n.t('settings.displayName')}</label
+                >{$i18n.t('common.displayName')}</label
               >
               <TextInput
                 id="account-display-name"
                 class="inline-edit hero-name"
                 bind:value={draft.name}
-                placeholder={$i18n.t('settings.displayName')}
+                placeholder={$i18n.t('common.displayName')}
                 autocomplete="nickname"
                 maxlength={255}
               />
@@ -573,10 +573,10 @@
                   if (file) stageAvatar(file);
                 }}
               />
-              {$i18n.t(hasAvatar ? 'settings.changeAvatar' : 'settings.uploadAvatar')}
+              {$i18n.t(hasAvatar ? 'common.changeAvatar' : 'settings.uploadAvatar')}
             </label>
             {#if hasAvatar}<Button variant="secondary" size="small" onclick={removeAvatar}
-                >{$i18n.t('settings.removeAvatar')}</Button
+                >{$i18n.t('common.removeAvatar')}</Button
               >{/if}
             <label class="file-button btn btn-secondary btn-small">
               <input
@@ -589,7 +589,7 @@
                   if (file) void stageBanner(file);
                 }}
               />
-              {draft.banner ? $i18n.t('settings.changeBanner') : $i18n.t('settings.saveBanner')}
+              {draft.banner ? $i18n.t('common.changeBanner') : $i18n.t('settings.saveBanner')}
             </label>
             {#if draft.banner}<Button
                 variant="secondary"
@@ -597,7 +597,7 @@
                 loading={uploadingBanner}
                 onclick={() => {
                   draft.banner = null;
-                }}>{$i18n.t('settings.removeBanner')}</Button
+                }}>{$i18n.t('common.removeBanner')}</Button
               >{/if}
           {/snippet}
           {#snippet footer()}
@@ -622,8 +622,8 @@
                       class="inline-edit"
                       bind:value={draft.brightness}
                       items={[
-                        { value: 'light', label: $i18n.t('settings.profileColorsBrightnessLight') },
-                        { value: 'dark', label: $i18n.t('settings.profileColorsBrightnessDark') },
+                        { value: 'light', label: $i18n.t('common.light') },
+                        { value: 'dark', label: $i18n.t('common.dark') },
                       ]}
                     />
                   </div>
@@ -766,14 +766,14 @@
                   variant="danger"
                   size="small"
                   aria-label={$i18n.t('settings.otherProfileFieldsRemove')}
-                  onclick={removeExtra}>{$i18n.t('settings.removeButton')}</Button
+                  onclick={removeExtra}>{$i18n.t('common.remove')}</Button
                 >
                 <Button
                   size="small"
                   aria-label={$i18n.t('settings.otherProfileFieldsCancel')}
                   onclick={() => (editKey = undefined)}
                 >
-                  {$i18n.t('settings.cancel')}
+                  {$i18n.t('common.cancel')}
                 </Button>
               </div>
             </div>
@@ -783,7 +783,7 @@
                 size="small"
                 onclick={() => {
                   editKey = { key: '', value: '', original: '' };
-                }}>{$i18n.t('settings.addButton')}</Button
+                }}>{$i18n.t('common.add')}</Button
               >
             </div>
           {/if}
@@ -798,9 +798,9 @@
           type="submit"
           variant="primary"
           disabled={!dirty || uploadingBanner}
-          loading={saving}>{$i18n.t('settings.saveButton')}</Button
+          loading={saving}>{$i18n.t('common.save')}</Button
         >
-        <Button disabled={!dirty || saving} onclick={cancel}>{$i18n.t('settings.cancel')}</Button>
+        <Button disabled={!dirty || saving} onclick={cancel}>{$i18n.t('common.cancel')}</Button>
       </div>
     </form>
   </div>

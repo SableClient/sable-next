@@ -30,7 +30,7 @@
           void grantPermission().then((allowed) => {
             granted = allowed;
           });
-        }}>{$i18n.t('settings.notificationPermissionAction')}</Button
+        }}>{$i18n.t('common.allowNotifications')}</Button
       >
     </Alert>
   </div>

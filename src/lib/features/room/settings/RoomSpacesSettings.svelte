@@ -133,7 +133,7 @@
               disabled={entry.via.length === 0}
               onclick={() => join(entry)}
             >
-              {$i18n.t('room.spaceJoin')}
+              {$i18n.t('common.join')}
             </Button>
           {/if}
         </li>

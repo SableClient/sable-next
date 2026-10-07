@@ -128,9 +128,7 @@
           loading={stage.name === 'downloading'}
           onclick={() => void install()}
         >
-          {stage.name === 'failed'
-            ? $i18n.t('settings.updateBannerRetry')
-            : $i18n.t('settings.updateBannerInstall')}
+          {stage.name === 'failed' ? $i18n.t('common.retry') : $i18n.t('common.install')}
         </Button>
       {/if}
     {/snippet}

@@ -51,7 +51,7 @@ test('creates an unencrypted chat when the switch is turned off', async () => {
   core.createDm.mockResolvedValue('!dm:example.org');
   render(CreateChatForm);
 
-  await userEvent.setup().click(screen.getByRole('switch', { name: 'direct.encryptionLabel' }));
+  await userEvent.setup().click(screen.getByRole('switch', { name: 'common.endtoendEncryption' }));
   await submit('@alice:example.org');
   await vi.waitFor(() => {
     expect(core.createDm).toHaveBeenCalledWith('@alice:example.org', false);
@@ -65,7 +65,7 @@ test('rejects an input that is not a user id without calling the core', async ()
 
   expect(core.createDm).not.toHaveBeenCalled();
   expect(input()).toBeInvalid();
-  expect(input()).toHaveAccessibleDescription('direct.invalid');
+  expect(input()).toHaveAccessibleDescription('common.aUserIdLooksLikeSomeoneserver');
 });
 
 test('reports a failed creation and stays on the page', async () => {

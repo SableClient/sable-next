@@ -49,7 +49,7 @@
 </script>
 
 <SettingsRow
-  title={$i18n.t('room.encryptionTitle')}
+  title={$i18n.t('common.endtoendEncryption')}
   description={enabled ? $i18n.t('room.encryptionOn') : $i18n.t('room.encryptionOff')}
 >
   {#if enabled}
@@ -61,18 +61,18 @@
         confirming = true;
       }}
     >
-      {$i18n.t('room.encryptionEnable')}
+      {$i18n.t('room.permEncryption')}
     </Button>
   {/if}
 </SettingsRow>
 
 <ConfirmDialog
   bind:open={confirming}
-  title={$i18n.t('room.encryptionEnable')}
+  title={$i18n.t('room.permEncryption')}
   description={$i18n.t('room.encryptionConfirm')}
-  confirmLabel={$i18n.t('room.encryptionEnable')}
+  confirmLabel={$i18n.t('room.permEncryption')}
   confirmVariant="secondary"
-  cancelLabel={$i18n.t('room.encryptionCancel')}
+  cancelLabel={$i18n.t('common.cancel')}
   busy={enabling}
   error={failed ? $i18n.t('room.encryptionFailed') : null}
   onConfirm={() => {

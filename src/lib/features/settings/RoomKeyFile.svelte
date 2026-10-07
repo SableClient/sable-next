@@ -164,7 +164,7 @@
           {$i18n.t('settings.roomKeysExportAction')}
         </Button>
         <Button variant="ghost" disabled={exporting} onclick={closeExport}>
-          {$i18n.t('settings.cancel')}
+          {$i18n.t('common.cancel')}
         </Button>
       </div>
     </form>
@@ -178,7 +178,7 @@
     >
       {#if !importFile}
         <Button variant="secondary" size="small" onclick={() => void pickImport()}>
-          {$i18n.t('settings.roomKeysImportAction')}
+          {$i18n.t('common.import')}
         </Button>
       {/if}
       <input
@@ -218,10 +218,10 @@
       />
       <div class="form-actions">
         <Button type="submit" loading={importing}>
-          {$i18n.t('settings.roomKeysImportAction')}
+          {$i18n.t('common.import')}
         </Button>
         <Button variant="ghost" disabled={importing} onclick={closeImport}>
-          {$i18n.t('settings.cancel')}
+          {$i18n.t('common.cancel')}
         </Button>
       </div>
     </form>

@@ -130,7 +130,7 @@
         <button
           class="version-copy-button"
           type="button"
-          title={$i18n.t(versionCopied ? 'settings.copied' : 'settings.copy')}
+          title={$i18n.t(versionCopied ? 'common.copied' : 'common.copy')}
           onclick={() => void copyVersion()}
         >
           {version}
@@ -145,7 +145,7 @@
       <div class="product-actions">
         <LinkButton href={SABLE_SOURCE_URL} target="_blank" rel="noopener noreferrer" size="small">
           <CodeIcon aria-hidden="true" />
-          {$i18n.t('settings.aboutSource')}
+          {$i18n.t('common.sourceCode')}
         </LinkButton>
         <LinkButton
           href={SABLE_DONATE_URL}
@@ -155,7 +155,7 @@
           size="small"
         >
           <HeartIcon aria-hidden="true" />
-          {$i18n.t('settings.aboutSupport')}
+          {$i18n.t('common.supportSable')}
         </LinkButton>
       </div>
     </div>
@@ -253,7 +253,7 @@
             confirmingReset = true;
           }}
         >
-          {$i18n.t('settings.aboutReset')}
+          {$i18n.t('common.reset')}
         </Button>
       </SettingsRow>
       {#if resetFailed}
@@ -267,7 +267,7 @@
   bind:open={confirmingReset}
   title={$i18n.t('settings.aboutResetCacheConfirmTitle')}
   description={$i18n.t('settings.aboutResetCacheConfirmDescription')}
-  confirmLabel={$i18n.t('settings.aboutReset')}
+  confirmLabel={$i18n.t('common.reset')}
   busy={resetting}
   onConfirm={() => void resetCaches()}
 />

@@ -45,7 +45,7 @@
 
   const mobileTools = [
     { href: '/rooms', icon: ChatsIcon, label: 'nav.messages' },
-    { href: '/navigate', icon: ListMagnifyingGlassIcon, label: 'shortcuts.openRoomSearch' },
+    { href: '/navigate', icon: ListMagnifyingGlassIcon, label: 'shortcuts.paletteTitle' },
     { href: '/inbox', icon: BellIcon, label: 'nav.inbox' },
   ] as const;
   const mobileSlotCount = mobileTools.length + 1;
@@ -94,13 +94,13 @@
       {...props}
       type="button"
       class="quick-tool {toolClass} nav-tab nav-tab-outlined selection-layer"
-      aria-label={$i18n.t('shortcuts.openRoomSearch')}
+      aria-label={$i18n.t('shortcuts.paletteTitle')}
       onclick={() => (paletteState.open = true)}
     >
       <span class="tool-icon" aria-hidden="true"><ListMagnifyingGlassIcon /></span>
     </button>
   {/snippet}
-  <Tooltip label={$i18n.t('shortcuts.openRoomSearch')} {side} trigger={switcherTrigger} />
+  <Tooltip label={$i18n.t('shortcuts.paletteTitle')} {side} trigger={switcherTrigger} />
 {/snippet}
 
 {#if mobile}

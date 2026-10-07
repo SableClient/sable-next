@@ -98,7 +98,7 @@
       </Button>
       {#if data}
         <Button variant="secondary" disabled={loading} onclick={() => void copy()}>
-          {$i18n.t(copied ? 'room.devDataCopied' : 'room.devDataCopy')}
+          {$i18n.t(copied ? 'common.copied' : 'room.devDataCopy')}
         </Button>
         <Button variant="secondary" disabled={loading} onclick={() => void download()}>
           {$i18n.t('room.devDataDownload')}

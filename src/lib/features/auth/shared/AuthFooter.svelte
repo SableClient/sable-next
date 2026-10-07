@@ -6,7 +6,7 @@
 <footer class="auth-footer">
   <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external project URL -->
   <a href={SABLE_SOURCE_URL} rel="noopener noreferrer" target="_blank">
-    {$i18n.t('footer.sourceCode')}
+    {$i18n.t('common.sourceCode')}
   </a>
   <span aria-hidden="true">·</span>
   <span

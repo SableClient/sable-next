@@ -51,12 +51,7 @@
       {/if}
     </IconButton>
   {/if}
-  <IconButton
-    size="small"
-    variant="ghost"
-    label={$i18n.t('composer.cancelContext')}
-    onclick={onCancel}
-  >
+  <IconButton size="small" variant="ghost" label={$i18n.t('common.cancel')} onclick={onCancel}>
     <XIcon />
   </IconButton>
 </div>

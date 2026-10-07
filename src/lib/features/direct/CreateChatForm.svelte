@@ -45,7 +45,7 @@
   <FormField
     fieldId="create-chat-user"
     label={$i18n.t('direct.userIdLabel')}
-    error={invalid ? $i18n.t('direct.invalid') : null}
+    error={invalid ? $i18n.t('common.aUserIdLooksLikeSomeoneserver') : null}
   >
     <TextInput
       id="create-chat-user"
@@ -61,12 +61,12 @@
 
   <div class="row">
     <div class="row-text">
-      <span class="field-label">{$i18n.t('direct.encryptionLabel')}</span>
+      <span class="field-label">{$i18n.t('common.endtoendEncryption')}</span>
       <p class="hint">{$i18n.t('direct.encryptionHint')}</p>
     </div>
     <Switch
       checked={encrypted}
-      label={$i18n.t('direct.encryptionLabel')}
+      label={$i18n.t('common.endtoendEncryption')}
       onCheckedChange={(next: boolean) => {
         encrypted = next;
       }}

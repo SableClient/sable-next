@@ -31,7 +31,7 @@
   title={$i18n.t('composer.linkTitle')}
   confirmLabel={$i18n.t('composer.linkApply')}
   confirmVariant="secondary"
-  cancelLabel={$i18n.t('composer.linkCancel')}
+  cancelLabel={$i18n.t('common.cancel')}
   onConfirm={apply}
   onCancel={reset}
 >

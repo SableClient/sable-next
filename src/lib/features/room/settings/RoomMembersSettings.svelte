@@ -564,7 +564,7 @@
   {#if inviteQuery}
     <SettingsSection
       headingId="room-settings-members-invite"
-      title={$i18n.t('room.membersInviteHeading')}
+      title={$i18n.t('common.invitePeople')}
     >
       {#if inviteFailed}
         <div class="settings-form">
@@ -689,7 +689,7 @@
       </FormField>
       <div class="moderation-actions">
         <Button type="button" variant="ghost" disabled={moderationBusy} onclick={cancelModeration}>
-          {$i18n.t('timeline.cancel')}
+          {$i18n.t('common.cancel')}
         </Button>
         <Button type="submit" variant="danger" loading={moderationBusy}>
           {moderationTarget.action === 'ban'

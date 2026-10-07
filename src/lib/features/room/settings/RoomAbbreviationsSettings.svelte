@@ -351,7 +351,7 @@
                 <IconButton
                   variant="subtle"
                   size="small"
-                  label={$i18n.t('room.abbreviationsCancel')}
+                  label={$i18n.t('common.cancel')}
                   disabled={busy}
                   onclick={resetForm}
                 >
@@ -412,7 +412,7 @@
     if (!next && busy === false) pendingRemoval = null;
   }}
   title={$i18n.t('room.abbreviationsRemoveConfirm', { term: pendingRemoval?.term ?? '' })}
-  confirmLabel={$i18n.t('room.remove')}
+  confirmLabel={$i18n.t('common.remove')}
   {busy}
   onConfirm={confirmRemoval}
 />

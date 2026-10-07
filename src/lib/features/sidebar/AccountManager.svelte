@@ -182,7 +182,7 @@
     </span>
     <span class="status-bubble-text" class:placeholder={!ownStatus}
       >{#if userStatus?.emoji}<span>{userStatus.emoji}</span>
-      {/if}{ownStatus || $i18n.t('presence.statusMessagePlaceholder')}</span
+      {/if}{ownStatus || $i18n.t('common.whatAreYouUpTo')}</span
     >
   </button>
 {/snippet}
@@ -221,7 +221,7 @@
       <h2 id="account-list-title">{$i18n.t('nav.accounts')}</h2>
       {#if accountSwitching}
         <Button variant="secondary" onclick={() => void goto(resolve('login?addAccount=1'))}
-          ><PlusIcon aria-hidden="true" />{$i18n.t('nav.addAccount')}</Button
+          ><PlusIcon aria-hidden="true" />{$i18n.t('common.addAccount')}</Button
         >
       {/if}
     </header>
@@ -275,14 +275,14 @@
             {#if active}<CheckCircleIcon aria-hidden="true" />{/if}
           </Button>
           {#if !active}
-            <ActionMenu label={`${$i18n.t('nav.moreOptions')}: ${account.user_id}`}>
+            <ActionMenu label={`${$i18n.t('common.moreOptions')}: ${account.user_id}`}>
               {#snippet trigger({ props })}
                 <IconButton
                   {...props}
                   variant="ghost"
                   size="large"
                   class="selection-open"
-                  label={`${$i18n.t('nav.moreOptions')}: ${account.user_id}`}
+                  label={`${$i18n.t('common.moreOptions')}: ${account.user_id}`}
                 >
                   <DotsThreeVerticalIcon />
                 </IconButton>
@@ -315,7 +315,7 @@
 <BottomSheet
   bind:open={statusOpen}
   label={$i18n.t('presence.setStatus')}
-  closeLabel={$i18n.t('settings.cancel')}
+  closeLabel={$i18n.t('common.cancel')}
 >
   <form
     class="status-sheet"
@@ -338,19 +338,19 @@
         bind:value={statusDraft}
         disabled={statusSaving}
         maxlength={120}
-        placeholder={$i18n.t('presence.statusMessagePlaceholder')}
+        placeholder={$i18n.t('common.whatAreYouUpTo')}
       />
     </FormField>
     {#if statusError}<Alert variant="critical" role="alert">{statusError}</Alert>{/if}
     <DialogActions>
       <Button variant="ghost" disabled={statusSaving} onclick={() => (statusOpen = false)}
-        >{$i18n.t('settings.cancel')}</Button
+        >{$i18n.t('common.cancel')}</Button
       >
       <Button
         type="submit"
         loading={statusSaving}
         disabled={statusDraft.trim() === ownStatus && presenceDraft === preferences.presence}
-        >{$i18n.t('presence.statusMessageSave')}</Button
+        >{$i18n.t('common.save')}</Button
       >
     </DialogActions>
   </form>
@@ -377,7 +377,7 @@
     <p>{$i18n.t('nav.removeAccountDescription')}</p>
     <DialogActions>
       <Button variant="ghost" disabled={removing} onclick={() => (removeAccountId = null)}
-        >{$i18n.t('settings.cancel')}</Button
+        >{$i18n.t('common.cancel')}</Button
       >
       <Button variant="danger" loading={removing} onclick={() => void removeAccount()}
         >{$i18n.t('nav.removeAccount')}</Button

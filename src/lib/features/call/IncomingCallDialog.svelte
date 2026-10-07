@@ -52,7 +52,7 @@
           }}
         >
           <PhoneDisconnectIcon aria-hidden="true" />
-          {$i18n.t('call.decline')}
+          {$i18n.t('common.decline')}
         </Button>
         <Button
           variant="primary"
@@ -65,7 +65,7 @@
           {:else}
             <PhoneIcon aria-hidden="true" />
           {/if}
-          {$i18n.t('call.accept')}
+          {$i18n.t('common.accept')}
         </Button>
       </div>
     </div>

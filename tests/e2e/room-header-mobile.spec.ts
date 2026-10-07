@@ -12,7 +12,7 @@ test('mobile: the room header keeps search and the menu, the rest moves into the
   await app.openRoom('!room:example.test');
 
   const header = page.locator('.room-header');
-  await expect(header.getByRole('button', { name: en.search.open })).toBeVisible();
+  await expect(header.getByRole('button', { name: en.common.searchMessages })).toBeVisible();
   await expect(header.getByRole('button', { name: 'More options' })).toBeVisible();
   await expect(header.getByRole('button', { name: 'Members' })).toHaveCount(0);
   await expect(header.getByRole('button', { name: 'Threads' })).toHaveCount(0);

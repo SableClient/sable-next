@@ -31,7 +31,7 @@
     description = null,
     confirmLabel,
     confirmVariant = 'danger',
-    cancelLabel = $i18n.t('settings.cancel'),
+    cancelLabel = $i18n.t('common.cancel'),
     busy = false,
     error = null,
     onConfirm,

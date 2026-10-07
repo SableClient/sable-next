@@ -20,14 +20,14 @@
   <p class="composer-error-text">{message}</p>
   {#if onRetry}
     <Button variant="danger" size="small" class="composer-error-retry" onclick={onRetry}>
-      {$i18n.t('composer.sendRetry')}
+      {$i18n.t('common.retry')}
     </Button>
   {/if}
   <IconButton
     variant="ghost"
     size="small"
     class="composer-error-dismiss"
-    label={$i18n.t('composer.dismissError')}
+    label={$i18n.t('common.dismiss')}
     onclick={onDismiss}
   >
     <XIcon />

@@ -272,7 +272,7 @@
     {#if room.is_space || unread}
       <ActionMenuItem disabled={!unread} onSelect={markRead}>
         <ChecksIcon />
-        {$i18n.t('room.menuMarkRead')}
+        {$i18n.t('common.markAsRead')}
       </ActionMenuItem>
     {:else}
       <ActionMenuItem onSelect={markUnread}>
@@ -400,7 +400,7 @@
         }}
       >
         <UsersThreeIcon />
-        {$i18n.t('room.menuAddToSpace')}
+        {$i18n.t('room.createParentLabel')}
       </ActionMenuItem>
     {/if}
 

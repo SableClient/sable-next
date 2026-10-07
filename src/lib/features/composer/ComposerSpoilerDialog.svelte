@@ -29,7 +29,7 @@
   description={$i18n.t('composer.spoilerExplain')}
   confirmLabel={$i18n.t('composer.spoilerApply')}
   confirmVariant="secondary"
-  cancelLabel={$i18n.t('composer.linkCancel')}
+  cancelLabel={$i18n.t('common.cancel')}
   onConfirm={apply}
   onCancel={cancel}
 >

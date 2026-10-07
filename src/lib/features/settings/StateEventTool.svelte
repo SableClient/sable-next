@@ -90,9 +90,11 @@
   </FormField>
 
   {#if error === 'json'}
-    <Alert variant="critical" role="alert">{$i18n.t('settings.stateEventInvalidJson')}</Alert>
+    <Alert variant="critical" role="alert"
+      >{$i18n.t('settings.developerAccountDataInvalidJson')}</Alert
+    >
   {:else if error === 'failed'}
-    <Alert variant="critical" role="alert">{$i18n.t('settings.stateEventFailed')}</Alert>
+    <Alert variant="critical" role="alert">{$i18n.t('common.theStateEventWasRejected')}</Alert>
   {:else if sent}
     <Alert variant="success" role="status">{$i18n.t('settings.stateEventSent')}</Alert>
   {/if}

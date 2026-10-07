@@ -66,7 +66,9 @@
     />
     {#if candidates.length === 0}
       <p class="empty">
-        {search.trim() === '' ? $i18n.t('room.lobbyAddNothing') : $i18n.t('room.lobbyAddNoMatch')}
+        {search.trim() === ''
+          ? $i18n.t('room.lobbyAddNothing')
+          : $i18n.t('common.noRoomsMatchThatSearch')}
       </p>
     {:else}
       <ul class="candidates">
@@ -94,15 +96,15 @@
     {/if}
 
     <div class="suggested">
-      <span>{$i18n.t('room.lobbyAddSuggested')}</span>
-      <Switch bind:checked={suggested} label={$i18n.t('room.lobbyAddSuggested')} />
+      <span>{$i18n.t('room.lobbyMarkSuggested')}</span>
+      <Switch bind:checked={suggested} label={$i18n.t('room.lobbyMarkSuggested')} />
     </div>
 
     <div class="actions">
-      <Button variant="ghost" onclick={reset}>{$i18n.t('room.lobbyAddCancel')}</Button>
+      <Button variant="ghost" onclick={reset}>{$i18n.t('common.cancel')}</Button>
       <Button disabled={selected.length === 0} onclick={add}>
         {selected.length === 0
-          ? $i18n.t('room.lobbyAdd')
+          ? $i18n.t('common.add')
           : $i18n.t(
               kind === 'spaces' ? 'room.lobbyAddSpacesConfirm' : 'room.lobbyAddRoomsConfirm',
               {

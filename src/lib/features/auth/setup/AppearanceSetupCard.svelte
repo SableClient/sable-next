@@ -24,7 +24,7 @@
         preferences.theme === 'system' ? 'setup.appearanceSystem' : 'setup.appearancePinned',
         {
           mode: $i18n
-            .t(preferences.theme === 'light' ? 'settings.themeLight' : 'settings.themeDark')
+            .t(preferences.theme === 'light' ? 'common.light' : 'common.dark')
             .toLowerCase(),
         }
       )}

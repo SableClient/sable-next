@@ -152,7 +152,7 @@
         if (media.microphone) testing = !testing;
       }}
     >
-      {testing && media.microphone ? $i18n.t('call.stopMicTest') : $i18n.t('call.testMic')}
+      {testing && media.microphone ? $i18n.t('common.stopTest') : $i18n.t('call.testMic')}
     </Button>
   {/snippet}
   {#if media.microphone}

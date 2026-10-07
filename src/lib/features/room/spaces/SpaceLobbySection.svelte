@@ -204,8 +204,8 @@
             knocked.has(sectionSpace.room_id)
               ? 'room.lobbyKnockSent'
               : spaceAction === 'knock'
-                ? 'room.lobbyKnock'
-                : 'room.lobbyJoin'
+                ? 'common.askToJoin'
+                : 'common.join'
           )}
         </Button>
       {/if}
@@ -286,14 +286,14 @@
                 onMoveSubspace(section, -1);
               }}
             >
-              <ArrowUpIcon size={16} />{$i18n.t('room.lobbyMoveUp')}
+              <ArrowUpIcon size={16} />{$i18n.t('room.menuMoveUp')}
             </ActionMenuItem>
             <ActionMenuItem
               onSelect={() => {
                 onMoveSubspace(section, 1);
               }}
             >
-              <ArrowDownIcon size={16} />{$i18n.t('room.lobbyMoveDown')}
+              <ArrowDownIcon size={16} />{$i18n.t('room.menuMoveDown')}
             </ActionMenuItem>
             <ActionMenuItem
               destructive
@@ -301,7 +301,7 @@
                 pendingSubspaceRemoval = true;
               }}
             >
-              <TrashIcon size={16} />{$i18n.t('room.lobbyRemove')}
+              <TrashIcon size={16} />{$i18n.t('common.remove')}
             </ActionMenuItem>
           {/if}
         </IconContext>
@@ -344,7 +344,7 @@
             <div class="room-text">
               <span class="room-name">
                 {label(child)}
-                {#if child.is_voice}<span class="badge">{$i18n.t('nav.voiceRoom')}</span>{/if}
+                {#if child.is_voice}<span class="badge">{$i18n.t('common.voiceRoom')}</span>{/if}
                 {#if entry.suggested}<span class="badge">{$i18n.t('room.lobbySuggested')}</span
                   >{/if}
               </span>
@@ -389,8 +389,8 @@
                     knocked.has(child.room_id)
                       ? 'room.lobbyKnockSent'
                       : action === 'knock'
-                        ? 'room.lobbyKnock'
-                        : 'room.lobbyJoin'
+                        ? 'common.askToJoin'
+                        : 'common.join'
                   )}
                 </Button>
               {/if}
@@ -428,14 +428,14 @@
                         onMove(section, child.room_id, -1);
                       }}
                     >
-                      <ArrowUpIcon size={16} />{$i18n.t('room.lobbyMoveUp')}
+                      <ArrowUpIcon size={16} />{$i18n.t('room.menuMoveUp')}
                     </ActionMenuItem>
                     <ActionMenuItem
                       onSelect={() => {
                         onMove(section, child.room_id, 1);
                       }}
                     >
-                      <ArrowDownIcon size={16} />{$i18n.t('room.lobbyMoveDown')}
+                      <ArrowDownIcon size={16} />{$i18n.t('room.menuMoveDown')}
                     </ActionMenuItem>
                     {#if otherTargets.length > 0 && canLeaveParent(child.room_id)}
                       <ActionMenuSub label={$i18n.t('room.lobbyMoveTo')}>
@@ -459,7 +459,7 @@
                         removeEntry(entry);
                       }}
                     >
-                      <TrashIcon size={16} />{$i18n.t('room.lobbyRemove')}
+                      <TrashIcon size={16} />{$i18n.t('common.remove')}
                     </ActionMenuItem>
                   {/if}
                 </IconContext>
@@ -479,7 +479,7 @@
             size="small"
             onclick={() => {
               onRetry(section.parentId);
-            }}>{$i18n.t('room.lobbyRetry')}</Button
+            }}>{$i18n.t('common.retry')}</Button
           >
         </p>
       {/if}
@@ -495,7 +495,7 @@
   title={$i18n.t('room.lobbyRemoveConfirm', {
     room: section.space ? label(section.space) : '',
   })}
-  confirmLabel={$i18n.t('room.lobbyRemove')}
+  confirmLabel={$i18n.t('common.remove')}
   onConfirm={() => {
     pendingSubspaceRemoval = false;
     onRemoveSubspace(section);
@@ -508,7 +508,7 @@
     if (!next) pendingRemoval = null;
   }}
   title={$i18n.t('room.lobbyRemoveConfirm', { room: pendingRemoval?.label ?? '' })}
-  confirmLabel={$i18n.t('room.lobbyRemove')}
+  confirmLabel={$i18n.t('common.remove')}
   onConfirm={confirmRemoval}
 />
 

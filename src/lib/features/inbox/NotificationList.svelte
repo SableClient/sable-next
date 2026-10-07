@@ -164,7 +164,7 @@
       if (hadFocus)
         focusRowAt(section, heading, includeRead ? index : Math.min(index, groups.length - 1));
       toasts.undoable($i18n.t('inbox.markedRead', { room: roomList.labelFor(item.room_id) }), {
-        label: $i18n.t('inbox.undo'),
+        label: $i18n.t('common.undo'),
         onUndo: () => {
           for (const candidate of covered) readNow.delete(candidate.event_id);
           markRoomUnread(item.room_id, core.commands);
@@ -219,7 +219,7 @@
         size="small"
         onclick={() => {
           void feed.backfill(includeRead).then(() => feed.load(filter, includeRead, size));
-        }}>{$i18n.t('inbox.retry')}</Button
+        }}>{$i18n.t('common.tryAgain')}</Button
       >
     </div>
   {/if}

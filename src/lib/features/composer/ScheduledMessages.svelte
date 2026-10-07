@@ -100,7 +100,7 @@
   function deleteRemote(delayId: string): void {
     hold(delayId);
     toasts.undoable($i18n.t('composer.scheduledDeleted'), {
-      label: $i18n.t('composer.undo'),
+      label: $i18n.t('common.undo'),
       onUndo: () => {
         settle(delayId);
       },
@@ -143,7 +143,7 @@
     const accountId = core.session?.account_id ?? '';
     dequeue(message.id, accountId);
     toasts.undoable($i18n.t('composer.scheduledDeleted'), {
-      label: $i18n.t('composer.undo'),
+      label: $i18n.t('common.undo'),
       onUndo: () => {
         enqueue(message, accountId);
       },
@@ -173,7 +173,7 @@
         {#if onEditMessage}
           <ActionMenuItem onSelect={onEditMessage}>
             <PencilSimpleIcon />
-            {$i18n.t('composer.scheduledEdit')}
+            {$i18n.t('common.edit')}
           </ActionMenuItem>
         {/if}
         <ActionMenuItem onSelect={onSendNow}>
@@ -182,7 +182,7 @@
         </ActionMenuItem>
         <ActionMenuItem destructive onSelect={onDelete}>
           <TrashIcon />
-          {$i18n.t('composer.scheduledDelete')}
+          {$i18n.t('common.delete')}
         </ActionMenuItem>
       </IconContext>
     </ActionMenu>

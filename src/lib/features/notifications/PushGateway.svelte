@@ -253,7 +253,7 @@
         apply(draft);
       }}
     >
-      {$i18n.t('settings.pushGatewayApply')}
+      {$i18n.t('common.apply')}
     </Button>
     <Button
       variant="secondary"

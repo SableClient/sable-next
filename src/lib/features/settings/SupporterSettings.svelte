@@ -39,7 +39,7 @@
           disabled={supporter.savingAppearance || refreshing}
           onclick={() => void supporter.remove()}
         >
-          {$i18n.t('settings.supporterRemove')}
+          {$i18n.t('common.remove')}
         </Button>
       </SettingsRow>
     {:else}
@@ -50,11 +50,11 @@
       >
         {#if waiting}
           <Button size="small" onclick={() => supporter.cancel()}>
-            {$i18n.t('settings.supporterCancel')}
+            {$i18n.t('common.cancel')}
           </Button>
         {:else}
           <Button size="small" onclick={() => void supporter.verify()}>
-            {$i18n.t('settings.supporterVerifyAction')}
+            {$i18n.t('common.verify')}
           </Button>
         {/if}
       </SettingsRow>

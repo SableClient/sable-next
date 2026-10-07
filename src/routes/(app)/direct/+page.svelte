@@ -4,6 +4,6 @@
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
 </script>
 
-<AppPageShell title={$i18n.t('nav.direct')} description={$i18n.t('direct.description')}>
+<AppPageShell title={$i18n.t('common.directMessages')} description={$i18n.t('direct.description')}>
   <CreateChatForm />
 </AppPageShell>

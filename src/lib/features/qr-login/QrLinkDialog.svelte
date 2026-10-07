@@ -48,7 +48,7 @@
   let grant = $derived(mode === 'grant');
   let validCheckCode = $derived(/^\d{2}$/.test(checkCode));
   let title = $derived($i18n.t(grant ? 'qrLogin.titleGrant' : 'qrLogin.titleLogin'));
-  let otherSide = $derived($i18n.t(grant ? 'qrLogin.signInWithQr' : 'qrLogin.linkDevice'));
+  let otherSide = $derived($i18n.t(grant ? 'qrLogin.titleLogin' : 'qrLogin.titleGrant'));
   let inProgress = $derived(
     progress === null || (progress.stage !== 'done' && progress.stage !== 'failed')
   );
@@ -146,7 +146,7 @@
         <VerificationQrScanner onScan={(data: Uint8Array) => void flow.scanned(data)} />
       </div>
       <div class="qr-actions">
-        <Button class="qr-action" onclick={restart}>{$i18n.t('qrLogin.back')}</Button>
+        <Button class="qr-action" onclick={restart}>{$i18n.t('common.back')}</Button>
       </div>
     {:else if progress === null}
       <div class="qr-actions">
@@ -216,22 +216,22 @@
     {:else if progress.stage === 'done'}
       <div class="qr-actions">
         <Button variant="primary" class="qr-action" onclick={close}>
-          {$i18n.t('qrLogin.close')}
+          {$i18n.t('common.close')}
         </Button>
       </div>
     {:else if progress.stage === 'failed'}
       <Alert variant="critical">{failureText(progress.reason)}</Alert>
       <div class="qr-actions">
         <Button variant="primary" class="qr-action" onclick={restart}>
-          {$i18n.t('qrLogin.tryAgain')}
+          {$i18n.t('common.tryAgain')}
         </Button>
-        <Button class="qr-action" onclick={close}>{$i18n.t('qrLogin.close')}</Button>
+        <Button class="qr-action" onclick={close}>{$i18n.t('common.close')}</Button>
       </div>
     {/if}
 
     {#if inProgress}
       <Button variant="ghost" size="small" class="qr-action qr-cancel" onclick={close}>
-        {$i18n.t('qrLogin.cancel')}
+        {$i18n.t('common.cancel')}
       </Button>
     {/if}
   </div>

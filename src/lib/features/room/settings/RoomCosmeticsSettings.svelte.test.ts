@@ -59,7 +59,7 @@ test('reset writes the live profile when the room profile only matches a stale o
   const user = userEvent.setup();
   render(RoomCosmeticsSettings, { room, permissions: null, levels: null });
 
-  const reset = await screen.findByRole('button', { name: 'room.cosmeticsResetAction' });
+  const reset = await screen.findByRole('button', { name: 'common.reset' });
   expect(reset).toBeEnabled();
   await user.click(reset);
 
@@ -81,7 +81,7 @@ test('reset is enabled when the profile cannot be fetched', async () => {
   core.refreshUserProfile.mockRejectedValue(new Error('offline'));
   render(RoomCosmeticsSettings, { room, permissions: null, levels: null });
 
-  expect(await screen.findByRole('button', { name: 'room.cosmeticsResetAction' })).toBeEnabled();
+  expect(await screen.findByRole('button', { name: 'common.reset' })).toBeEnabled();
 });
 
 test('reset writes the member event once and drops the colours with it', async () => {
@@ -104,7 +104,7 @@ test('reset writes the member event once and drops the colours with it', async (
   const user = userEvent.setup();
   render(RoomCosmeticsSettings, { room, permissions: null, levels: null });
 
-  await user.click(await screen.findByRole('button', { name: 'room.cosmeticsResetAction' }));
+  await user.click(await screen.findByRole('button', { name: 'common.reset' }));
 
   await vi.waitFor(() => {
     expect(core.sendStateEvent).toHaveBeenCalledWith(

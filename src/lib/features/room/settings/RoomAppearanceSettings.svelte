@@ -29,10 +29,10 @@
         mode: $i18n.t(`settings.showRoomIcon${label(preferences.showRoomIcon)}`),
       }),
     },
-    { value: 'always', label: $i18n.t('settings.showRoomIconAlways') },
+    { value: 'always', label: $i18n.t('common.always') },
     { value: 'sometimes', label: $i18n.t('settings.showRoomIconSometimes') },
     { value: 'collapsed', label: $i18n.t('settings.showRoomIconCollapsed') },
-    { value: 'never', label: $i18n.t('settings.showRoomIconNever') },
+    { value: 'never', label: $i18n.t('common.never') },
   ]);
 
   function label(mode: ShowRoomIcon): string {

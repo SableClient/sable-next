@@ -156,7 +156,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
   await tick();
   expect(screen.queryByRole('link', { name: 'Alice' })).not.toBeInTheDocument();
   expect(
-    screen.getByRole('link', { name: 'nav.direct' }).querySelector('.unread-badge')
+    screen.getByRole('link', { name: 'common.directMessages' }).querySelector('.unread-badge')
   ).toBeNull();
 
   visit('/rooms');

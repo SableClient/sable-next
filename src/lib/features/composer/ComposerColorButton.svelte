@@ -108,9 +108,7 @@
           spellcheck={false}
           autocomplete="off"
         />
-        <Button type="submit" size="small" disabled={!custom}
-          >{$i18n.t('composer.colorApply')}</Button
-        >
+        <Button type="submit" size="small" disabled={!custom}>{$i18n.t('common.apply')}</Button>
       </form>
       {#if removable && value !== null}
         <Button

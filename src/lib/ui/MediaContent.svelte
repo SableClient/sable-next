@@ -152,7 +152,7 @@
   const loading = mediaProgress(core, () => (!url && !failed ? source : null));
   let retryLabel = $derived(
     retryWait === 0
-      ? $i18n.t('timeline.retryMedia')
+      ? $i18n.t('common.retry')
       : $i18n.t('timeline.retryMediaIn', { count: Math.ceil(retryWait / 1000) })
   );
 
@@ -364,7 +364,7 @@
           <DownloadSimpleIcon aria-hidden="true" />
           {sizeLabel
             ? $i18n.t('timeline.downloadFileSized', { size: sizeLabel })
-            : $i18n.t('timeline.downloadFile')}
+            : $i18n.t('common.download')}
         </LinkButton>
       </div>
     {/if}
@@ -380,7 +380,7 @@
           <DownloadSimpleIcon aria-hidden="true" />
           {sizeLabel
             ? $i18n.t('timeline.downloadFileSized', { size: sizeLabel })
-            : $i18n.t('timeline.downloadFile')}
+            : $i18n.t('common.download')}
         </Button>
       </div>
     {/if}

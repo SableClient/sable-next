@@ -981,14 +981,14 @@
     <CommandPalette bind:open={paletteState.open} />
     <ShortcutsHelpDialog bind:open={shortcutsHelpState.open} />
     <ShareTargetSheet inbox={shareInbox} />
-    <ToastRegion dismissLabel={$i18n.t('errors.dismissToast')} />
+    <ToastRegion dismissLabel={$i18n.t('common.dismiss')} />
   {/key}
 {:else if core.status === 'error'}
   <main class="app-status" aria-labelledby="app-status-title">
     <div class="app-status-card" role="alert">
       <h1 id="app-status-title">{$i18n.t('app.unableToStart')}</h1>
       <p>{$i18n.t('app.startFailed')}</p>
-      <Button onclick={() => void core.start()}>{$i18n.t('app.tryAgain')}</Button>
+      <Button onclick={() => void core.start()}>{$i18n.t('common.tryAgain')}</Button>
     </div>
   </main>
 {:else}
@@ -998,7 +998,7 @@
       <h1 id="app-status-title">
         {loadingAnimal
           ? $i18n.t('app.pettingAnimal', { animal: loadingAnimal })
-          : $i18n.t('app.starting')}
+          : $i18n.t('common.startingSable')}
       </h1>
     </div>
   </main>

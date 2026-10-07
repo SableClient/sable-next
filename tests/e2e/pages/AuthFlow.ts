@@ -25,7 +25,7 @@ export class AuthFlow {
     this.passwordSignInButton = page.getByRole('button', { name: 'Sign in with password' });
     this.setupCard = page.locator('.auth-card.active');
     const stages = page.getByRole('navigation', { name: en.auth.stageNavigation });
-    this.previousStageButton = stages.getByRole('button', { name: en.auth.back, exact: true });
+    this.previousStageButton = stages.getByRole('button', { name: en.common.back, exact: true });
     this.nextStageButton = stages.getByRole('button', { name: en.auth.next, exact: true });
   }
 

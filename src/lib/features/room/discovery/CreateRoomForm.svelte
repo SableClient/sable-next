@@ -244,7 +244,7 @@
           },
           {
             value: 'voice',
-            label: $i18n.t('room.createKindVoice'),
+            label: $i18n.t('common.voiceRoom'),
             hint: $i18n.t('room.createKindVoiceHint'),
             icon: SpeakerHighIcon,
           },
@@ -329,11 +329,11 @@
           {
             value: 'invite',
             label: $i18n.t('room.createJoinRuleInvite'),
-            hint: $i18n.t('room.createJoinRuleInviteHint'),
+            hint: $i18n.t('room.createAccessPrivateHint'),
           },
           {
             value: 'knock',
-            label: $i18n.t('room.createJoinRuleKnock'),
+            label: $i18n.t('common.askToJoin'),
             hint: $i18n.t('room.createJoinRuleKnockHint'),
             disabled: !knockSupported,
           },
@@ -373,7 +373,7 @@
 
   <div class="row">
     <div class="row-text">
-      <span class="field-label">{$i18n.t('room.createEncryptionLabel')}</span>
+      <span class="field-label">{$i18n.t('common.endtoendEncryption')}</span>
       <p class="hint">
         {encryptable
           ? $i18n.t('room.createEncryptionHint')
@@ -383,7 +383,7 @@
     <Switch
       checked={encryptable && encrypted}
       disabled={!encryptable}
-      label={$i18n.t('room.createEncryptionLabel')}
+      label={$i18n.t('common.endtoendEncryption')}
       onCheckedChange={(next: boolean) => {
         encrypted = next;
       }}
@@ -420,7 +420,7 @@
     </div>
   </details>
 
-  <FormField fieldId="create-room-invite" label={$i18n.t('room.createInviteLabel')}>
+  <FormField fieldId="create-room-invite" label={$i18n.t('common.invitePeople')}>
     <div class="invite-row">
       <TextInput
         id="create-room-invite"
@@ -430,10 +430,10 @@
         aria-invalid={inviteInvalid}
         onkeydown={onInviteKeydown}
       />
-      <Button onclick={addInvite}>{$i18n.t('room.createInviteAdd')}</Button>
+      <Button onclick={addInvite}>{$i18n.t('common.add')}</Button>
     </div>
     {#if inviteInvalid}
-      <p class="error">{$i18n.t('room.createInviteInvalid')}</p>
+      <p class="error">{$i18n.t('common.aUserIdLooksLikeSomeoneserver')}</p>
     {/if}
     {#if invites.length > 0}
       <ul class="invites">
@@ -461,7 +461,7 @@
   {/if}
 
   <Button type="submit" variant="primary" disabled={!canSubmit} loading={submitting}>
-    {effectiveKind === 'space' ? $i18n.t('room.createSubmitSpace') : $i18n.t('room.createSubmit')}
+    {effectiveKind === 'space' ? $i18n.t('common.createSpace') : $i18n.t('common.createRoom')}
   </Button>
 </form>
 

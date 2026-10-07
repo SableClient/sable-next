@@ -319,7 +319,7 @@
 
 <div class="section">
   {#if failed}
-    <Alert variant="critical" role="alert">{$i18n.t('room.cosmeticsFailed')}</Alert>
+    <Alert variant="critical" role="alert">{$i18n.t('room.settingsFailed')}</Alert>
   {/if}
 
   <SettingsSection
@@ -341,7 +341,7 @@
           <Avatar id={userId} src={avatar ?? profileAvatar} name={previewName} />
         {/snippet}
         <Button size="small" disabled={saving !== null} onclick={() => avatarInput?.click()}>
-          {$i18n.t('room.cosmeticsAvatarChange')}
+          {$i18n.t('common.changePicture')}
         </Button>
         {#if avatar}
           <Button size="small" variant="ghost" disabled={saving !== null} onclick={resetAvatar}>
@@ -373,7 +373,7 @@
           <Button
             variant="secondary"
             disabled={name === savedName || saving === 'name'}
-            onclick={saveName}>{$i18n.t('room.cosmeticsSave')}</Button
+            onclick={saveName}>{$i18n.t('common.save')}</Button
           >
         </div>
       </SettingsRow>
@@ -388,7 +388,7 @@
             disabled={saving !== null || applyTargets.length === 0 || name !== savedName}
             onclick={applyToRooms}
           >
-            {$i18n.t('room.cosmeticsApplyRoomsAction')}
+            {$i18n.t('common.apply')}
           </Button>
         </SettingsRow>
       {/if}
@@ -437,7 +437,7 @@
           <Button
             variant="secondary"
             disabled={!canSetPronouns || pronouns === savedPronouns || saving === 'pronouns'}
-            onclick={savePronouns}>{$i18n.t('room.cosmeticsSave')}</Button
+            onclick={savePronouns}>{$i18n.t('common.save')}</Button
           >
         </div>
       </SettingsRow>
@@ -446,7 +446,7 @@
         description={$i18n.t('room.cosmeticsResetHint')}
       >
         <Button size="small" disabled={saving !== null} onclick={resetLook}>
-          {$i18n.t('room.cosmeticsResetAction')}
+          {$i18n.t('common.reset')}
         </Button>
       </SettingsRow>
     </ul>

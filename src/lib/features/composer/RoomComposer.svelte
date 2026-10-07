@@ -1480,7 +1480,7 @@
               staged = unstageFile(staged, id);
               if (!removed) return;
               toasts.undoable($i18n.t('composer.attachmentRemoved', { name: removed.file.name }), {
-                label: $i18n.t('composer.undo'),
+                label: $i18n.t('common.undo'),
                 onUndo: () => {
                   staged = restoreFile(staged, removed, index);
                 },

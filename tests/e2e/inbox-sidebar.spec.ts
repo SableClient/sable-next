@@ -6,7 +6,7 @@ test.use({ storageState: SIGNED_OUT });
 for (const mobile of [false, true]) {
   for (const [path, title] of [
     ['/rooms/!room%3Aexample.test', en.nav.unspaced],
-    ['/direct', en.nav.direct],
+    ['/direct', en.common.directMessages],
     ['/space/!alpha%3Aexample.test/lobby', 'Alpha'],
   ]) {
     test(`${mobile ? 'mobile: ' : ''}Inbox preserves the sidebar from ${path}`, async ({

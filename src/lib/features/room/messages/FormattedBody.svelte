@@ -458,7 +458,7 @@
       copy.type = 'button';
       copy.className = 'code-action';
       copy.dataset.codeCopy = '';
-      copy.textContent = $i18n.t('timeline.copyCode');
+      copy.textContent = $i18n.t('common.copy');
       header.append(copy);
 
       if (long) {
@@ -513,9 +513,9 @@
     void navigator.clipboard
       .writeText(block.textContent)
       .then(() => {
-        label.textContent = $i18n.t('timeline.copiedCode');
+        label.textContent = $i18n.t('common.copied');
         setTimeout(() => {
-          if (label.isConnected) label.textContent = $i18n.t('timeline.copyCode');
+          if (label.isConnected) label.textContent = $i18n.t('common.copy');
         }, 1500);
       })
       .catch((error: unknown) => {

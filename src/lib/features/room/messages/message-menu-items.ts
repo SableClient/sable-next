@@ -150,7 +150,7 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
   if (actions.onDownload) {
     rows.push({
       key: 'download',
-      label: 'timeline.downloadFile',
+      label: 'common.download',
       icon: DownloadIcon,
       run: actions.onDownload,
     });
@@ -199,7 +199,7 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
   if (actions.onReadReceipts) {
     rows.push({
       key: 'receipts',
-      label: 'timeline.readReceipts',
+      label: 'common.readReceipts',
       icon: ReceiptIcon,
       run: actions.onReadReceipts,
     });
@@ -215,7 +215,7 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
   if (actions.onViewSource) {
     rows.push({
       key: 'source',
-      label: 'timeline.viewSource',
+      label: 'common.viewSource',
       icon: CodeIcon,
       run: actions.onViewSource,
     });

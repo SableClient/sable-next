@@ -198,8 +198,8 @@
   </IconButton>
   <BottomSheet
     bind:open
-    label={$i18n.t('personas.pickerHeading')}
-    closeLabel={$i18n.t('personas.cancel')}
+    label={$i18n.t('personas.pickerLabel')}
+    closeLabel={$i18n.t('common.cancel')}
     onOpenChange={handleOpenChange}
   >
     <PersonaMenu

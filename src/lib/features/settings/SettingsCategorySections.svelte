@@ -175,7 +175,7 @@
           location.reload();
         }}
       >
-        {$i18n.t('settings.telemetryReloadAction')}
+        {$i18n.t('common.reload')}
       </Button>
     </Alert>
   {/if}

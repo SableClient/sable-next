@@ -34,7 +34,7 @@ export function formatMessageTimestamp(timestamp: number): string {
 
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
   if (isSameCalendarDay(date, yesterday)) {
-    return t('timeline.messageTimestamp', { date: t('timeline.yesterday'), time });
+    return t('timeline.messageTimestamp', { date: t('common.yesterday'), time });
   }
 
   const sameYear = date.getFullYear() === now.getFullYear();
@@ -54,8 +54,8 @@ export function formatDate(timestamp: number): string {
   const date = new Date(timestamp);
   const today = new Date();
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-  if (isSameCalendarDay(date, today)) return t('timeline.today');
-  if (isSameCalendarDay(date, yesterday)) return t('timeline.yesterday');
+  if (isSameCalendarDay(date, today)) return t('common.today');
+  if (isSameCalendarDay(date, yesterday)) return t('common.yesterday');
 
   const day = pad(date.getDate());
   const month = pad(date.getMonth() + 1);

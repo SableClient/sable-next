@@ -35,14 +35,14 @@ export interface ShortcutDefinition {
 export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'navigation.openRoomSearch',
-    labelKey: 'shortcuts.openRoomSearch',
+    labelKey: 'shortcuts.paletteTitle',
     category: 'navigation',
     binding: 'mod+k',
     allowInEditable: true,
   },
   {
     id: 'app.searchMessages',
-    labelKey: 'shortcuts.searchMessages',
+    labelKey: 'common.searchMessages',
     category: 'general',
     binding: 'mod+f',
     allowInEditable: true,
@@ -55,7 +55,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   },
   {
     id: 'app.createRoom',
-    labelKey: 'shortcuts.createRoom',
+    labelKey: 'common.createARoom',
     category: 'general',
     binding: 'mod+shift+n',
   },

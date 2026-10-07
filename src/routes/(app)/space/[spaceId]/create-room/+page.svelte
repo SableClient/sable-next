@@ -12,7 +12,7 @@
 
 <AppPageShell
   eyebrow={space?.name ?? undefined}
-  title={$i18n.t('room.createTitle')}
+  title={$i18n.t('common.createARoom')}
   description={$i18n.t('room.createDescription')}
 >
   <CreateRoomForm mode="room" parentSpaceId={space?.room_id ?? null} />

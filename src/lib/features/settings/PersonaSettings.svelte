@@ -339,7 +339,7 @@
           {$i18n.t('personas.importFile')}
         </Button>
         <Button type="submit" size="small" loading={importing}>
-          {$i18n.t('personas.importAction')}
+          {$i18n.t('common.import')}
         </Button>
       </div>
       <input
@@ -371,7 +371,7 @@
           disabled={importing || restoring}
           onclick={() => void chooseBackup()}
         >
-          {$i18n.t('personas.restore')}
+          {$i18n.t('common.restore')}
         </Button>
         <Button
           variant="secondary"
@@ -429,7 +429,7 @@
   }}
   title={$i18n.t('personas.restoreTitle')}
   description={$i18n.t('personas.restoreConfirm')}
-  confirmLabel={$i18n.t('personas.restore')}
+  confirmLabel={$i18n.t('common.restore')}
   busy={restoring}
   onConfirm={() => void confirmRestore()}
 />

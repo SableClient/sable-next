@@ -29,13 +29,13 @@
   <pre class="source">{source}</pre>
   <FormActions>
     <Button variant="secondary" onclick={copy}>
-      {copied ? $i18n.t('timeline.copied') : $i18n.t('timeline.copy')}
+      {copied ? $i18n.t('common.copied') : $i18n.t('common.copy')}
     </Button>
     <Button
       variant="ghost"
       onclick={() => {
         open = false;
-      }}>{$i18n.t('timeline.cancel')}</Button
+      }}>{$i18n.t('common.cancel')}</Button
     >
   </FormActions>
 </DialogFrame>

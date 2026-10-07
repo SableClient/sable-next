@@ -24,7 +24,7 @@
 </script>
 
 {#snippet content(desktop: boolean)}
-  <h2>{$i18n.t('timeline.reproxyTitle')}</h2>
+  <h2>{$i18n.t('timeline.reproxyMessage')}</h2>
   <ul class="reproxy-options" class:dialog={desktop}>
     <li>
       <button
@@ -64,7 +64,7 @@
 
 <ResponsiveDialog
   bind:open
-  label={$i18n.t('timeline.reproxyTitle')}
+  label={$i18n.t('timeline.reproxyMessage')}
   closeLabel={$i18n.t('timeline.closeMenu')}
   children={content}
 />

@@ -243,7 +243,7 @@
   {/if}
 
   <div class="actions">
-    <Button variant="ghost" onclick={onDone}>{$i18n.t('bugReport.cancel')}</Button>
+    <Button variant="ghost" onclick={onDone}>{$i18n.t('common.cancel')}</Button>
     <Button type="submit" variant="primary" disabled={!canSubmit}>
       {$i18n.t(
         type === 'bug' && sentryEnabled ? 'bugReport.submit' : 'bugReport.openOnForgeAction'

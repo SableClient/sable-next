@@ -7,7 +7,7 @@ export interface NavSectionLabels {
 }
 
 const LABELS: Record<NavSectionKind, NavSectionLabels> = {
-  direct: { list: 'nav.chats', empty: 'nav.chatsEmpty', title: 'nav.direct' },
+  direct: { list: 'nav.chats', empty: 'nav.chatsEmpty', title: 'common.directMessages' },
   unspaced: { list: 'nav.rooms', empty: 'nav.unspacedEmpty', title: 'nav.unspaced' },
   space: { list: 'nav.rooms', empty: 'nav.roomsUnavailable', title: 'nav.space' },
   home: { list: 'nav.rooms', empty: 'nav.roomsUnavailable', title: 'nav.home' },

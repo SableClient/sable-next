@@ -224,7 +224,7 @@
                 >{/if}
               {#if userStatus?.text}{userStatus?.text}{:else}<span
                   class="account-profile-status-placeholder"
-                  >{$i18n.t('settings.statusPlaceholder')}</span
+                  >{$i18n.t('common.whatAreYouUpTo')}</span
                 >{/if}
             </p>
           </button>
@@ -267,7 +267,7 @@
       <p>{accountToLogout.user_id}</p>
       <DialogActions>
         <Button variant="ghost" disabled={switching} onclick={() => (logoutAccountId = null)}
-          >{$i18n.t('settings.cancel')}</Button
+          >{$i18n.t('common.cancel')}</Button
         >
         <Button
           variant="danger"

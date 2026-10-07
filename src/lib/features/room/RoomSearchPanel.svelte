@@ -24,7 +24,7 @@
 
 <aside
   class="room-search"
-  aria-label={$i18n.t('search.title')}
+  aria-label={$i18n.t('common.searchMessages')}
   style:width={`${panelWidth.width}rem`}
 >
   <ResizeHandle
@@ -38,7 +38,7 @@
     onResize={(next) => panelWidth.resize(next)}
     onCommit={() => panelWidth.commit()}
   />
-  <PanelHeader title={$i18n.t('search.title')}>
+  <PanelHeader title={$i18n.t('common.searchMessages')}>
     {#snippet prefix()}
       <MagnifyingGlassIcon aria-hidden="true" />
     {/snippet}

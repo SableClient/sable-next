@@ -27,7 +27,7 @@
   <SettingsSection headingId="account-devices" title={$i18n.t('settings.signedInDevices')}>
     <ul class="settings-rows">
       <SettingsRow
-        title={$i18n.t('qrLogin.linkDevice')}
+        title={$i18n.t('qrLogin.titleGrant')}
         description={$i18n.t('qrLogin.linkDeviceHint')}
       >
         <Button onclick={() => (linkingDevice = true)}>

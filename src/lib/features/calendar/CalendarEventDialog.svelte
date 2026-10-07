@@ -158,7 +158,7 @@
         id="{fieldId}-repeat"
         bind:value={frequency}
         items={[
-          { value: NEVER, label: $i18n.t('calendar.repeatNever') },
+          { value: NEVER, label: $i18n.t('common.never') },
           { value: 'daily', label: $i18n.t('calendar.repeatDaily') },
           { value: 'weekly', label: $i18n.t('calendar.repeatWeekly') },
           { value: 'monthly', label: $i18n.t('calendar.repeatMonthly') },
@@ -188,9 +188,9 @@
         variant="ghost"
         onclick={() => {
           onOpenChange(false);
-        }}>{$i18n.t('calendar.cancel')}</Button
+        }}>{$i18n.t('common.cancel')}</Button
       >
-      <Button type="submit" loading={saving} disabled={!valid}>{$i18n.t('calendar.save')}</Button>
+      <Button type="submit" loading={saving} disabled={!valid}>{$i18n.t('common.save')}</Button>
     </DialogActions>
   </form>
 </DialogFrame>

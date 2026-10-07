@@ -162,7 +162,7 @@
         onclick={() => (open = false)}
       >
         <HeartIcon aria-hidden="true" weight="fill" />
-        {$i18n.t(donated ? 'supporter.badgeDonateAgain' : 'supporter.badgeDonate')}
+        {$i18n.t(donated ? 'common.supportSable' : 'supporter.badgeDonate')}
       </LinkButton>
       <small class="supporter-card-hint"
         >{$i18n.t(donated ? 'supporter.badgeDonorHint' : 'supporter.badgeHint')}</small

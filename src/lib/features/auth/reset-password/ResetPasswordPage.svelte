@@ -78,7 +78,7 @@
       {#if starting || reset.step === 'checking'}
         <div class="bootstrap" role="status">
           <Spinner />
-          <p>{$i18n.t(starting ? 'auth.starting' : 'auth.checkingProvider')}</p>
+          <p>{$i18n.t(starting ? 'common.startingSable' : 'auth.checkingProvider')}</p>
         </div>
       {:else}
         <div class="reset-card-slot">

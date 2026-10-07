@@ -53,7 +53,7 @@
   <div class="banner" class:crash={notice.kind === 'crash'} role="alert">
     <p class="message">{notice.text}</p>
     {#if notice.kind === 'crash'}
-      <Button size="small" variant="danger" onclick={reload}>{$i18n.t('errors.reload')}</Button>
+      <Button size="small" variant="danger" onclick={reload}>{$i18n.t('common.reload')}</Button>
     {/if}
   </div>
 {/if}

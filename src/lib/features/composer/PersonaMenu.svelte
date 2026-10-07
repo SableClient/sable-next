@@ -53,7 +53,7 @@
   let scopes = $derived(
     (
       [
-        { id: 'room', label: 'personas.scopeRoom' },
+        { id: 'room', label: 'common.thisRoom' },
         { id: 'space', label: 'personas.scopeSpace' },
         { id: 'account', label: 'personas.scopeAccount' },
       ] as const
@@ -147,7 +147,7 @@
 {/snippet}
 
 <div class="persona-menu">
-  <div class="persona-scopes" role="tablist" aria-label={$i18n.t('personas.pickerHeading')}>
+  <div class="persona-scopes" role="tablist" aria-label={$i18n.t('personas.pickerLabel')}>
     {#each scopes as tab (tab.id)}
       <button
         type="button"

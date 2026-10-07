@@ -256,7 +256,7 @@
                   item={entries.get(eventId) ?? null}
                   {members}
                   loadPreviewProfile
-                  timeAction={{ label: $i18n.t('room.pinsJump'), run: () => jump(eventId) }}
+                  timeAction={{ label: $i18n.t('common.jumpToMessage'), run: () => jump(eventId) }}
                   onJumpToEvent={jump}
                   onOpenMedia={openMedia}
                 >
@@ -265,7 +265,7 @@
                       <button
                         class="pin-unreadable-open"
                         type="button"
-                        aria-label={$i18n.t('room.pinsJump')}
+                        aria-label={$i18n.t('common.jumpToMessage')}
                         onclick={() => jump(eventId)}
                       >
                         {$i18n.t('room.pinsUnreadable')}

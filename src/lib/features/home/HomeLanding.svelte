@@ -69,7 +69,7 @@
       </LinkButton>
       <LinkButton href={SABLE_SOURCE_URL} target="_blank" rel="noreferrer noopener" variant="ghost">
         <GithubLogoIcon aria-hidden="true" />
-        {$i18n.t('home.viewSource')}
+        {$i18n.t('common.viewSource')}
       </LinkButton>
       <LinkButton
         href={SABLE_DONATE_URL}

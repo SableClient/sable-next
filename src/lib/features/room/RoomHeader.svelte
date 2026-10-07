@@ -74,7 +74,7 @@
       ? $i18n.t('timeline.inVoiceNames', {
           names: [...new Set(inVoice.map((entry) => entry.name))].join(', '),
         })
-      : $i18n.t('nav.voiceRoom')
+      : $i18n.t('common.voiceRoom')
   );
   let topicShown = $derived(topic !== null && topic.trim() !== '' && onTopic !== null);
 </script>
@@ -124,7 +124,7 @@
   {#snippet suffix()}
     <PanelHeaderButton
       class="search-button"
-      label={$i18n.t('search.open')}
+      label={$i18n.t('common.searchMessages')}
       aria-pressed={searchOpen}
       onclick={onSearch}
     >

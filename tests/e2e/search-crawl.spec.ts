@@ -16,7 +16,7 @@ test('the background crawl makes history searchable without opening the room', a
   await expect(app.roomLink(TIMELINE_ROOM_NAME)).toBeVisible({ timeout: 15_000 });
 
   await page.goto('/search');
-  const field = page.getByRole('combobox', { name: en.search.title });
+  const field = page.getByRole('combobox', { name: en.common.searchMessages });
   const hit = page.locator('.hit-message').getByText(DEEP_MESSAGE, { exact: true });
 
   await expect

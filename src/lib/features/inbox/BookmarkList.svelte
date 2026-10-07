@@ -57,7 +57,7 @@
     await tick();
     if (hadFocus) focusRowAt(section, heading, index);
     toasts.undoable($i18n.t('inbox.bookmarkRemoved', { room: name }), {
-      label: $i18n.t('inbox.undo'),
+      label: $i18n.t('common.undo'),
       onUndo: () => {
         void toggle(bookmark).then((restored) => {
           if (restored) void bookmarks.load();
@@ -87,7 +87,7 @@
       <TextInput
         type="search"
         bind:value={query}
-        placeholder={$i18n.t('inbox.bookmarksSearchPlaceholder')}
+        placeholder={$i18n.t('inbox.bookmarksSearchLabel')}
       />
     </label>
   {/if}

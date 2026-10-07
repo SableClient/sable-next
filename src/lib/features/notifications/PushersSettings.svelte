@@ -211,7 +211,7 @@
           {$i18n.t('settings.pushersRemoveAll')}
         </Button>
         <Button variant="ghost" size="small" disabled={removing !== null} onclick={cancelRemoval}>
-          {$i18n.t('settings.cancel')}
+          {$i18n.t('common.cancel')}
         </Button>
       </div>
     </form>
@@ -239,7 +239,7 @@
               <div class="pusher-name-line">
                 <span class="pusher-name">{name}</span>
                 {#if pusher.pushkey === ownKey}
-                  <StatusBadge variant="primary" label={$i18n.t('settings.pushersThisDevice')} />
+                  <StatusBadge variant="primary" label={$i18n.t('settings.currentDevice')} />
                 {:else if ownApps.includes(pusher.app_id)}
                   <StatusBadge variant="neutral" label="Sable" />
                 {/if}
@@ -266,7 +266,7 @@
                   onclick={() => void copyValue(`app\u0000${key}`, pusher.app_id)}
                 >
                   {#if copied === `app\u0000${key}`}
-                    {$i18n.t('settings.copied')}
+                    {$i18n.t('common.copied')}
                   {:else}
                     <code>{pusher.app_id}</code>
                   {/if}
@@ -279,7 +279,7 @@
                   onclick={() => void copyValue(`key\u0000${key}`, pusher.pushkey)}
                 >
                   {#if copied === `key\u0000${key}`}
-                    {$i18n.t('settings.copied')}
+                    {$i18n.t('common.copied')}
                   {:else}
                     <code>{pusher.pushkey}</code>
                   {/if}
@@ -292,7 +292,7 @@
                   title={gateway}
                   aria-label={$i18n.t(
                     copied === `gateway\u0000${key}`
-                      ? 'settings.copied'
+                      ? 'common.copied'
                       : 'settings.pushersCopyProvider'
                   )}
                   onclick={() => void copyValue(`gateway\u0000${key}`, gateway)}
@@ -302,7 +302,7 @@
                     <span class="pusher-gateway-label">
                       {$i18n.t(
                         copied === `gateway\u0000${key}`
-                          ? 'settings.copied'
+                          ? 'common.copied'
                           : 'settings.pushersProvider'
                       )}
                     </span>
@@ -325,7 +325,7 @@
                   startRemoval(pusher, event);
                 }}
               >
-                {$i18n.t('settings.pushersRemove')}
+                {$i18n.t('common.remove')}
               </Button>
             {/if}
           </div>
@@ -347,7 +347,7 @@
                   loading={removing === key}
                   aria-label={$i18n.t('settings.pushersRemoveNamed', { name })}
                 >
-                  {$i18n.t('settings.pushersRemove')}
+                  {$i18n.t('common.remove')}
                 </Button>
                 <Button
                   type="button"
@@ -356,7 +356,7 @@
                   disabled={removing === key}
                   onclick={cancelRemoval}
                 >
-                  {$i18n.t('settings.cancel')}
+                  {$i18n.t('common.cancel')}
                 </Button>
               </div>
             </form>

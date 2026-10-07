@@ -33,7 +33,11 @@
         <ListBulletsIcon />
       </PanelHeaderButton>
     {/if}
-    <PanelHeaderButton class="search-button" label={$i18n.t('search.open')} onclick={onSearch}>
+    <PanelHeaderButton
+      class="search-button"
+      label={$i18n.t('common.searchMessages')}
+      onclick={onSearch}
+    >
       <MagnifyingGlassIcon />
     </PanelHeaderButton>
   {/snippet}

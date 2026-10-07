@@ -186,7 +186,7 @@
             href: resolve('/(app)/search'),
             activePrefix: '/search',
             icon: MagnifyingGlassIcon,
-            label: 'search.title',
+            label: 'common.searchMessages',
           } satisfies RailItem,
         ]
       : []),
@@ -195,7 +195,7 @@
       activePrefix: '/direct',
       navigateHref: sectionHref(DIRECT_PATHS_KEY, directRoot),
       icon: UsersIcon,
-      label: 'nav.direct',
+      label: 'common.directMessages',
       unread: directUnread,
       dm: true,
       section: 'direct',
@@ -230,8 +230,8 @@
   );
 
   const createEntries = [
-    { href: resolve('create-room'), label: 'nav.createRoom', icon: PlusIcon },
-    { href: resolve('create-space'), label: 'nav.createSpace', icon: HouseIcon },
+    { href: resolve('create-room'), label: 'common.createRoom', icon: PlusIcon },
+    { href: resolve('create-space'), label: 'common.createSpace', icon: HouseIcon },
     {
       href: `${resolve('explore')}#explore-join-by-address`,
       label: 'nav.joinWithAddress',
@@ -902,7 +902,7 @@
       }}
     >
       <ChecksIcon />
-      {$i18n.t('nav.markSectionRead')}
+      {$i18n.t('common.markAsRead')}
     </ActionMenuItem>
   </ActionMenu>
 {/if}
@@ -922,7 +922,7 @@
       }}
     >
       <ChecksIcon />
-      {$i18n.t('nav.markSectionRead')}
+      {$i18n.t('common.markAsRead')}
     </ActionMenuItem>
     <ActionMenuSeparator />
     <ActionMenuItem

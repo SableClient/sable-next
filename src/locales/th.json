@@ -1,24 +1,18 @@
 {
   "nav": {
-    "createRoom": "สร้างห้อง",
     "exploreSpaces": "สำรวจพื้นที่ต่าง ๆ",
     "messageSearch": "ค้นหาข้อความ",
     "rooms": "ห้อง",
     "unspaced": "ห้องภายนอกพื้นที่",
     "switchAccount": "สลับบัญชี",
     "editProfile": "แก้ไขโปรไฟล์",
-    "addAccount": "เพิ่มบัญชี",
     "settings": "การตั้งค่า",
-    "direct": "ข้อความส่วนตัว",
     "newChat": "แชทใหม่",
-    "markSectionRead": "ทำเครื่องหมายว่าอ่านแล้ว",
     "createRoomInSpace": "สร้างห้องในพื้นที่",
-    "createSpace": "สร้างห้อง",
     "joinWithAddress": "เข้าร่วมด้วยที่อยู่"
   },
   "home": {
     "getSupport": "รับความช่วยเหลือ",
-    "viewSource": "ดูซอร์สโค้ด",
     "supportDevelopment": "บริจาค",
     "nextStepsTitle": "คุณอยากจะทำอะไร?",
     "findCommunityTitle": "ค้นหาชุมชน",
@@ -31,7 +25,6 @@
   "auth": {
     "welcome": "ยินดีต้อนรับสู่ Sable",
     "welcomeBack": "ยินดีต้อนรับกลับ",
-    "starting": "กำลังเริ่ม Sable…",
     "accountProvider": "ผู้ให้บริการบัญชี",
     "checkingProvider": "กำลังตรวจสอบผู้ให้บริการ…",
     "opening": "กำลังเปิด…",
@@ -53,7 +46,6 @@
     "loginIdentifierHint": "@you:server.org ก็ใช้ได้เช่นกัน"
   },
   "footer": {
-    "sourceCode": "ซอร์สโค้ด",
     "poweredBy": "ขับเคลื่อนโดย"
   },
   "errors": {
@@ -70,17 +62,11 @@
   },
   "shortcuts": {
     "paletteTitle": "ข้ามไปยังห้อง",
-    "paletteLabel": "ข้ามไปยังห้อง",
-    "openRoomSearch": "ข้ามไปยังห้อง",
-    "searchMessages": "ค้นหาข้อความ",
-    "palettePlaceholder": "ค้นหาห้อง",
     "paletteEmpty": "ไม่มีห้องที่ตรงกับการค้นหาของคุณ",
     "paletteRecents": "ล่าสุด",
     "paletteHint": "# ห้อง · * พื้นที่ · @ ข้อความส่วนตัว"
   },
   "search": {
-    "title": "ค้นหาข้อความ",
-    "open": "ค้นหาข้อความ",
     "placeholder": "ค้นหาข้อความ เช่น from:ada in:#general has:image",
     "hint": "ค้นหาข้อความที่อุปกรณ์นี้โหลดไว้แล้ว โดยใช้คำสั่งต่างๆ เช่น from:, in:, mentions:, has:, before:, after:, during:, \"ข้อความคำต่อคำ\" และ -exclude หากค่าที่ค้นหามีเว้นวรรค ให้ใส่เครื่องหมายอัญประกาศกำกับไว้ เช่น in:\"Design crew\"",
     "orderRank": "ตามความเกี่ยวข้อง",
@@ -97,7 +83,6 @@
     "submit": "เริ่มแชท"
   },
   "room": {
-    "menuMarkRead": "ทำเครื่องหมายว่าอ่านแล้ว",
     "menuInvite": "เชิญ",
     "menuCopyLink": "คัดลอกลิงก์ห้อง",
     "menuSettings": "การตั้งค่า",
@@ -114,8 +99,6 @@
     "notifyMentions": "การกล่าวถึงและคำสำคัญ",
     "notifyMute": "ปิดการแจ้งเตือน",
     "menuJumpToTime": "ข้ามไปยังเวลา",
-    "jumpTitle": "ข้ามไปยังเวลา",
-    "createTitle": "สร้างห้อง",
     "createSpaceTitle": "สร้างพื้นที่",
     "createSubspaceTitle": "สร้างพื้นที่ย่อย",
     "createNameLabel": "ชื่อ",
@@ -132,15 +115,12 @@
     "createAccessPrivateHint": "เฉพาะผู้ที่คุณเชิญเท่านั้นที่สามารถเข้าร่วมได้",
     "createAccessPublic": "สาธารณะ",
     "createAccessPublicHint": "เผยแพร่ในสารบัญและสามารถเข้าร่วมได้ผ่านลิงก์",
-    "createEncryptionLabel": "การเข้ารหัสแบบต้นทางถึงปลายทาง",
     "createEncryptionHint": "ไม่สามารถปิดในภายหลังได้",
     "createEncryptionUnavailable": "ห้องและพื้นที่สาธารณะจะไม่ได้รับการเข้ารหัส",
     "createParentLabel": "เพิ่มไปยังพื้นที่",
     "createParentNone": "ไม่เพิ่ม",
     "createJoinRuleLabel": "ใครเข้าร่วมได้บ้าง",
     "createJoinRuleInvite": "เฉพาะผู้ได้รับเชิญเท่านั้น",
-    "createJoinRuleInviteHint": "เฉพาะผู้ที่คุณเชิญเท่านั้นที่สามารถเข้าร่วมได้",
-    "createJoinRuleKnock": "ขอเข้าร่วม",
     "createJoinRuleKnockHint": "ใคร ๆ ก็สามารถขอเข้าร่วมได้ โดยมีสมาชิกเป็นผู้ตัดสินใจ",
     "createJoinRuleRestricted": "สมาชิกของพื้นที่",
     "createJoinRuleRestrictedHint": "ทุกคนใน {{space}} สามารถเข้าร่วมได้โดยไม่ต้องมีคำเชิญ",
@@ -159,14 +139,10 @@
     "createVersionDefault": "ค่าเริ่มต้นของเซิร์ฟเวอร์ ({{version}})",
     "createVersionDefaultUnknown": "ค่าเริ่มต้นของเซิร์ฟเวอร์",
     "createVersionUnstable": "{{version}} (ไม่เสถียร)",
-    "createInviteLabel": "เชิญผู้คน",
     "createInvitePlaceholder": "@someone:server",
-    "createSubmit": "สร้างห้อง",
-    "createSubmitSpace": "สร้างพื้นที่",
     "joinTitle": "เข้าร่วมด้วยที่อยู่",
     "directoryTitle": "สำรวจห้อง",
     "directoryDescription": "เลือกดูห้องที่เผยแพร่ในสารบัญของเซิร์ฟเวอร์ หรือเข้าร่วมห้องโดยระบุที่อยู่",
-    "directorySearchPlaceholder": "ค้นหาห้อง",
     "directoryServerPlaceholder": "เซิร์ฟเวอร์ของคุณ",
     "directoryTotal_other": "{{count, number}} ห้อง",
     "leaveSpaceChildrenRoomsCount_other": "{{count, number}} ห้อง",
@@ -175,9 +151,7 @@
     "joinExamplesLabel": "รูปแบบของที่อยู่เป็นดังนี้:",
     "joinAddressLabel": "ที่อยู่",
     "joinAddressPlaceholder": "#room:server",
-    "joinSubmit": "เข้าร่วม",
     "joinInvalid": "นั่นดูไม่เหมือนที่อยู่ห้องหรือลิงก์ matrix.to เลย",
-    "joinFailed": "ไม่สามารถเข้าร่วมห้องได้",
     "directorySearch": "ค้นหา"
   },
   "timeline": {
@@ -236,7 +210,6 @@
     "resetContacts": "ผู้ติดต่อและอุปกรณ์อื่น ๆ ของคุณจะต้องยืนยันตัวตนของคุณอีกครั้ง",
     "recoverySaveFirst": "เก็บคีย์ไว้ในที่ปลอดภัย จากนั้นทำเครื่องหมายในช่องเพื่อดำเนินการต่อ",
     "recoverySaveDescription": "เก็บคีย์นี้ไว้ในที่ปลอดภัย คุณจะต้องใช้คีย์นี้เพื่ออ่านข้อความบนอุปกรณ์เครื่องใหม่ และระบบจะไม่แสดงคีย์นี้ให้เห็นอีก",
-    "back": "กลับ",
     "recoveryDownloaded": "ดาวน์โหลดแล้ว",
     "confirmTitle": "ยืนยันว่าเป็นคุณ",
     "useAnotherDevice": "ใช้อุปกรณ์อื่น",
@@ -253,19 +226,37 @@
     "recoveryDownloadFailed": "ไม่สามารถบันทึกคีย์นี้ได้ ให้คัดลอกหรือจดบันทึกไว้แทน",
     "resetAction": "รีเซ็ตตัวตนดิจิทัลของฉัน",
     "stageDeviceLabel": "ยืนยันว่าเป็นคุณ",
-    "recoveryCopy": "คัดลอก",
-    "recoveryCopied": "คัดลอกแล้ว",
-    "recoveryDownload": "ดาวน์โหลด",
     "skipBody": "หากยังไม่มีการยืนยัน แอปของผู้อื่นอาจไม่แชร์คีย์ข้อความกับอุปกรณ์นี้ และอาจซ่อนข้อความที่คุณส่งจากอุปกรณ์นี้ไว้",
     "resetWhen": "รีเซ็ตตัวตนดิจิทัลของคุณก็ต่อเมื่อคุณไม่สามารถเข้าถึงอุปกรณ์อื่นที่ได้รับการยืนยันแล้ว และไม่มีคีย์กู้คืนของคุณ",
     "resetPassword": "ป้อนรหัสผ่านของคุณเพื่อรีเซ็ตตัวตนดิจิทัลของคุณ",
-    "resetUnderstood": "ฉันเข้าใจว่าการดำเนินการนี้ไม่สามารถย้อนกลับได้",
     "skipAnyway": "ข้ามไปเลย",
     "resetWaiting": "รอการอนุมัติ…",
     "useRecoveryKey": "ใช้คีย์กู้คืน"
   },
   "qrLogin": {
-    "titleLogin": "ลงชื่อเข้าใช้ด้วยรหัส QR",
-    "signInWithQr": "ลงชื่อเข้าใช้ด้วยรหัส QR"
+    "titleLogin": "ลงชื่อเข้าใช้ด้วยรหัส QR"
+  },
+  "common": {
+    "createRoom": "สร้างห้อง",
+    "addAccount": "เพิ่มบัญชี",
+    "directMessages": "ข้อความส่วนตัว",
+    "markAsRead": "ทำเครื่องหมายว่าอ่านแล้ว",
+    "createSpace": "สร้างห้อง",
+    "viewSource": "ดูซอร์สโค้ด",
+    "startingSable": "กำลังเริ่ม Sable…",
+    "sourceCode": "ซอร์สโค้ด",
+    "searchMessages": "ค้นหาข้อความ",
+    "searchRooms": "ค้นหาห้อง",
+    "createARoom": "สร้างห้อง",
+    "endtoendEncryption": "การเข้ารหัสแบบต้นทางถึงปลายทาง",
+    "askToJoin": "ขอเข้าร่วม",
+    "invitePeople": "เชิญผู้คน",
+    "join": "เข้าร่วม",
+    "theRoomCouldNotBeJoined": "ไม่สามารถเข้าร่วมห้องได้",
+    "back": "กลับ",
+    "copy": "คัดลอก",
+    "copied": "คัดลอกแล้ว",
+    "download": "ดาวน์โหลด",
+    "iUnderstandThisCannotBeUndone": "ฉันเข้าใจว่าการดำเนินการนี้ไม่สามารถย้อนกลับได้"
   }
 }

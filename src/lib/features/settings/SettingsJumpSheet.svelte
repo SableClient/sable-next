@@ -38,7 +38,7 @@
 <BottomSheet
   bind:open
   label={$i18n.t('settings.outlineLabel', { section: title })}
-  closeLabel={$i18n.t('settings.close')}
+  closeLabel={$i18n.t('common.close')}
 >
   <div class="jump-sheet">
     <p class="jump-title">{title}</p>

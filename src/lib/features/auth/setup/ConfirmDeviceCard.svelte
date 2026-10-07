@@ -93,7 +93,7 @@
 {#snippet backButton()}
   <Button class="confirm-device-back" variant="ghost" size="small" onclick={leaveView}>
     <ArrowLeftIcon aria-hidden="true" />
-    {$i18n.t('setup.back')}
+    {$i18n.t('common.back')}
   </Button>
 {/snippet}
 
@@ -208,7 +208,7 @@
         </AuthInfoBox>
         <label class="confirm-device-understood">
           <input type="checkbox" bind:checked={understood} disabled={reset.busy} />
-          {$i18n.t('setup.resetUnderstood')}
+          {$i18n.t('common.iUnderstandThisCannotBeUndone')}
         </label>
         <AuthStatusSlot message={reset.error} />
         <Button

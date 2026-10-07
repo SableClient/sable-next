@@ -131,7 +131,7 @@
       <div class="identity-actions">
         <label class="file-button btn btn-secondary btn-small">
           <input type="file" accept="image/*" onchange={(event) => void pickAvatar(event)} />
-          {$i18n.t('personas.avatarChoose')}
+          {$i18n.t('common.chooseAPicture')}
         </label>
         {#if avatarUrl}
           <Button
@@ -165,7 +165,7 @@
         name="persona-pronouns"
         bind:value={pronouns}
         autocomplete="off"
-        placeholder={$i18n.t('personas.pronounsPlaceholder')}
+        placeholder={$i18n.t('common.theythemEnsheher')}
       />
     </label>
 
@@ -254,9 +254,9 @@
           onOpenChange(false);
         }}
       >
-        {$i18n.t('personas.cancel')}
+        {$i18n.t('common.cancel')}
       </Button>
-      <Button type="submit" loading={saving}>{$i18n.t('personas.save')}</Button>
+      <Button type="submit" loading={saving}>{$i18n.t('common.save')}</Button>
     </DialogActions>
   </form>
 </DialogFrame>

@@ -94,10 +94,10 @@
           open = false;
         }}
       >
-        {$i18n.t('timeline.cancel')}
+        {$i18n.t('common.cancel')}
       </Button>
       <Button type="submit" variant="primary" disabled={busy || !ready} loading={busy}>
-        {$i18n.t('emotes.stealConfirm')}
+        {$i18n.t('common.add')}
       </Button>
     </DialogActions>
   </div>

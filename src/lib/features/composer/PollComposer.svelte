@@ -127,7 +127,7 @@
     </div>
 
     <DialogActions>
-      <Button variant="ghost" onclick={cancel}>{$i18n.t('composer.pollCancel')}</Button>
+      <Button variant="ghost" onclick={cancel}>{$i18n.t('common.cancel')}</Button>
       <Button disabled={!valid} onclick={create}>{$i18n.t('composer.pollCreate')}</Button>
     </DialogActions>
   </div>

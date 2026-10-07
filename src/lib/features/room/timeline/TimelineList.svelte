@@ -1012,7 +1012,7 @@
   <Alert variant="critical" role="alert">
     {$i18n.t('timeline.loadFailed')}
     <Button type="button" onclick={() => void resumeLive().catch(() => {})}
-      >{$i18n.t('timeline.resumeLiveRetry')}</Button
+      >{$i18n.t('common.tryAgain')}</Button
     >
   </Alert>
 {/if}
@@ -1041,7 +1041,7 @@
       </Button>
       {#if onMarkRead}
         <Button variant="ghost" loading={markingRead} onclick={() => void markAllRead()}>
-          <span>{$i18n.t('timeline.markRead')}</span>
+          <span>{$i18n.t('common.markAsRead')}</span>
           <CheckIcon />
         </Button>
       {/if}
@@ -1144,7 +1144,7 @@
       <EmptyState class="timeline-empty" title={$i18n.t('timeline.loadFailed')}>
         {#snippet actions()}
           {#if onRetryLoad}
-            <Button onclick={() => void onRetryLoad?.()}>{$i18n.t('timeline.retryLoad')}</Button>
+            <Button onclick={() => void onRetryLoad?.()}>{$i18n.t('common.tryAgain')}</Button>
           {/if}
         {/snippet}
       </EmptyState>

@@ -85,7 +85,7 @@
     pendingReverts = [...carried, revert];
     const count = pendingReverts.length;
     const id = toasts.undoable(count > 1 ? t('settings.themeChanges', { count }) : message, {
-      label: t('settings.undo'),
+      label: t('common.undo'),
       onUndo: () => {
         const reverts = pendingReverts;
         pendingReverts = [];
@@ -316,7 +316,7 @@
       {#each SLOTS as slot (slot)}
         {@const theme = customThemes.themes.find((item) => item.id === selectedCustomThemeId(slot))}
         <ThemeTile
-          name={$i18n.t(slot === 'light' ? 'settings.themeLight' : 'settings.themeDark')}
+          name={$i18n.t(slot === 'light' ? 'common.light' : 'common.dark')}
           swatches={theme ? themeSwatches(theme.css) : DEFAULT_THEME_SWATCHES[slot]}
           radius={theme ? themeRadius(theme.css) : undefined}
           innerRadius={theme ? themeRadius(theme.css, 'radius-inner') : undefined}

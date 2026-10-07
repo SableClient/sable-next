@@ -116,10 +116,10 @@ test('badges unread direct chats', async () => {
   });
   await tick();
 
-  expect(within(tab('nav.direct')).getByText('3').closest('.unread-badge')).toHaveClass(
+  expect(within(tab('common.directMessages')).getByText('3').closest('.unread-badge')).toHaveClass(
     'unread-badge-count'
   );
-  expect(tab('nav.direct')).toHaveAccessibleDescription('nav.unreadMentions:3');
+  expect(tab('common.directMessages')).toHaveAccessibleDescription('nav.unreadMentions:3');
 });
 
 test('badges the unspaced section', async () => {
@@ -170,12 +170,12 @@ test('search leaves the rail when the preference is off', async () => {
   renderRail({ spaces: [], mobile: true });
   await tick();
 
-  expect(tab('search.title')).toHaveAttribute('href', '/search');
+  expect(tab('common.searchMessages')).toHaveAttribute('href', '/search');
 
   setPreference('showSearch', false);
   await tick();
 
-  expect(screen.queryByRole('link', { name: 'search.title' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'common.searchMessages' })).not.toBeInTheDocument();
 });
 
 test('uses a dot for ordinary unread messages outside spaces', async () => {
@@ -300,8 +300,8 @@ test('marks a whole section read from the tab that badges it', async () => {
   });
   await tick();
 
-  await openMenu(tab('nav.direct'));
-  await user.click(screen.getByRole('menuitem', { name: 'nav.markSectionRead' }));
+  await openMenu(tab('common.directMessages'));
+  await user.click(screen.getByRole('menuitem', { name: 'common.markAsRead' }));
 
   expect(marked).toEqual(['direct']);
 });
@@ -319,7 +319,7 @@ test('marks the rooms outside spaces read from their tab', async () => {
   await tick();
 
   await openMenu(tab('nav.unspaced'));
-  await user.click(screen.getByRole('menuitem', { name: 'nav.markSectionRead' }));
+  await user.click(screen.getByRole('menuitem', { name: 'common.markAsRead' }));
 
   expect(marked).toEqual(['unspaced']);
 });
@@ -484,7 +484,7 @@ test('marks every space in a folder as read even when no badge is shown', async 
   await tick();
 
   await openMenu(screen.getByRole('button', { name: 'nav.folderExpand:Alpha, Beta' }));
-  await user.click(screen.getByRole('menuitem', { name: 'nav.markSectionRead' }));
+  await user.click(screen.getByRole('menuitem', { name: 'common.markAsRead' }));
 
   expect(marked).toEqual(['!a:example.org', '!b:example.org']);
 });
@@ -553,7 +553,7 @@ test('right-clicking a top-level space opens its options menu', async () => {
   await tick();
 
   const items = labels(await openMenu(tab('Alpha')));
-  expect(items).toContain('room.menuMarkRead');
+  expect(items).toContain('common.markAsRead');
   expect(items).not.toContain('settings.showUnreadCounts');
 });
 
@@ -594,7 +594,7 @@ test('long-pressing a top-level space opens its options menu', async () => {
   vi.useRealTimers();
 
   await vi.waitFor(() => {
-    expect(labels(screen.getAllByRole('menuitem'))).toContain('room.menuMarkRead');
+    expect(labels(screen.getAllByRole('menuitem'))).toContain('common.markAsRead');
   });
 });
 
@@ -615,7 +615,7 @@ test('opens the direct root on mobile even when it has a saved chat', async () =
   renderRail({ spaces: [], mobile: true });
   await tick();
 
-  expect(tab('nav.direct')).toHaveAttribute('href', '/direct');
+  expect(tab('common.directMessages')).toHaveAttribute('href', '/direct');
   expect(linkTo('/direct/!dm%3Aexample.org')).not.toBeInTheDocument();
 });
 
@@ -701,8 +701,8 @@ test('offers join by address from the add button', async () => {
 
   await vi.waitFor(() => {
     expect(labels(screen.getAllByRole('menuitem'))).toEqual([
-      'nav.createRoom',
-      'nav.createSpace',
+      'common.createRoom',
+      'common.createSpace',
       'nav.joinWithAddress',
       'nav.explore',
     ]);

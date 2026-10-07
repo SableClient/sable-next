@@ -40,8 +40,8 @@
     <Label for={`device-${deviceId}`}>{$i18n.t('settings.deviceName')}</Label>
     <TextInput id={`device-${deviceId}`} bind:value={displayName} autofocus required />
     <div class="form-actions">
-      <Button type="submit">{$i18n.t('settings.save')}</Button>
-      <Button variant="ghost" onclick={onCancel}>{$i18n.t('settings.cancel')}</Button>
+      <Button type="submit">{$i18n.t('common.save')}</Button>
+      <Button variant="ghost" onclick={onCancel}>{$i18n.t('common.cancel')}</Button>
     </div>
   {:else}
     <div class="row-copy">
@@ -63,7 +63,7 @@
         {$i18n.t('settings.removeDevice')}
       </Button>
       <Button variant="ghost" disabled={busy} onclick={onCancel}>
-        {$i18n.t('settings.cancel')}
+        {$i18n.t('common.cancel')}
       </Button>
     </div>
   {/if}

@@ -323,7 +323,7 @@
     {#if mode === 'custom'}
       <div class="toggle-row">
         <div>
-          <p class="toggle-label">{$i18n.t('room.createEncryptionLabel')}</p>
+          <p class="toggle-label">{$i18n.t('common.endtoendEncryption')}</p>
           <p class="hint">
             {!encryptable
               ? $i18n.t('room.createEncryptionUnavailable')
@@ -335,7 +335,7 @@
         <Switch
           checked={encryptable && encrypted}
           disabled={upgrading || !encryptable}
-          label={$i18n.t('room.createEncryptionLabel')}
+          label={$i18n.t('common.endtoendEncryption')}
           onCheckedChange={(next: boolean) => {
             encrypted = next;
           }}
@@ -370,11 +370,11 @@
             }}
           />
           <Button variant="secondary" disabled={upgrading} onclick={addCreator}>
-            {$i18n.t('room.createInviteAdd')}
+            {$i18n.t('common.add')}
           </Button>
         </div>
         {#if creatorInvalid}
-          <p class="error">{$i18n.t('room.createInviteInvalid')}</p>
+          <p class="error">{$i18n.t('common.aUserIdLooksLikeSomeoneserver')}</p>
         {/if}
         {#if creators.length > 0}
           <ul class="creators">
@@ -389,7 +389,7 @@
                     creators = creators.filter((entry) => entry !== creator);
                   }}
                 >
-                  {$i18n.t('room.upgradeCreatorRemove')}
+                  {$i18n.t('common.remove')}
                 </Button>
               </li>
             {/each}
@@ -416,7 +416,7 @@
           open = false;
         }}
       >
-        {$i18n.t('room.upgradeCancel')}
+        {$i18n.t('common.cancel')}
       </Button>
       <Button
         variant="danger"

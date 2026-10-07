@@ -326,7 +326,7 @@
             loading={avatarUploading}
             onclick={() => avatarInput?.click()}
           >
-            {$i18n.t('emotes.changeAvatar')}
+            {$i18n.t('common.changePicture')}
           </Button>
           <input
             bind:this={avatarInput}
@@ -546,7 +546,7 @@
     {/if}
     <div class="save-bar" class:pending={dirty}>
       {#if dirty}
-        <p class="save-status" role="status">{$i18n.t('emotes.unsaved')}</p>
+        <p class="save-status" role="status">{$i18n.t('common.youHaveUnsavedChanges')}</p>
       {/if}
       <Button
         size="small"
@@ -557,7 +557,7 @@
         }}
       >
         <ArrowCounterClockwiseIcon />
-        {$i18n.t('emotes.reset')}
+        {$i18n.t('common.reset')}
       </Button>
       <Button
         size="small"
@@ -602,7 +602,7 @@
             void saveAndLeave();
           }}
         >
-          {$i18n.t('emotes.leaveSave')}
+          {$i18n.t('common.save')}
         </Button>
       </DialogActions>
     </div>

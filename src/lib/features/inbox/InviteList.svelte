@@ -290,7 +290,7 @@
           {#if room.is_space}
             <StatusBadge label={$i18n.t('inbox.inviteSpace')} variant="secondary" />
           {:else if room.is_direct}
-            <StatusBadge label={$i18n.t('inbox.inviteDirect')} variant="secondary" />
+            <StatusBadge label={$i18n.t('common.directMessage')} variant="secondary" />
           {/if}
           {#if invite.group === 'strangers'}
             <StatusBadge label={$i18n.t('inbox.inviteNoSharedRooms')} variant="warning" />
@@ -348,14 +348,14 @@
         disabled={busy}
         onclick={() => {
           void answers.accept(room);
-        }}>{$i18n.t('room.inviteAccept')}</Button
+        }}>{$i18n.t('common.accept')}</Button
       >
       <Button
         variant="ghost"
         disabled={busy}
         onclick={() => {
           answers.decline(room);
-        }}>{$i18n.t('room.inviteDecline')}</Button
+        }}>{$i18n.t('common.decline')}</Button
       >
       <ActionMenu label={$i18n.t('inbox.inviteOptions', { room: name })}>
         {#snippet trigger({ props })}
@@ -373,7 +373,7 @@
             setDismissed(room.room_id, !showDismissed);
           }}
         >
-          {showDismissed ? $i18n.t('inbox.inviteRestore') : $i18n.t('inbox.inviteHide')}
+          {showDismissed ? $i18n.t('common.restore') : $i18n.t('inbox.inviteHide')}
         </ActionMenuItem>
       </ActionMenu>
     </div>

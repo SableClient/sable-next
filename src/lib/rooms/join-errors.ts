@@ -11,10 +11,10 @@ export function joinErrorMessage(cause: unknown): string {
       case 'rate_limited':
         return t('room.joinRateLimited');
       case 'unavailable':
-        return t('room.joinUnavailable');
+        return t('common.theHomeserverIsTemporarilyUnavailableTryAgain');
       default:
         break;
     }
   }
-  return t('room.joinFailed');
+  return t('common.theRoomCouldNotBeJoined');
 }

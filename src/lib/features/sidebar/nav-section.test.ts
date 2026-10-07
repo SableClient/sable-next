@@ -26,7 +26,7 @@ test('direct and unspaced each explain their own emptiness', () => {
 });
 
 test('every section carries a title key', () => {
-  expect(navSectionLabels('direct').title).toBe('nav.direct');
+  expect(navSectionLabels('direct').title).toBe('common.directMessages');
   expect(navSectionLabels('unspaced').title).toBe('nav.unspaced');
   expect(navSectionLabels('space').title).toBe('nav.space');
   expect(navSectionLabels('home').title).toBe('nav.home');

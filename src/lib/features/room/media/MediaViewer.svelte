@@ -719,7 +719,7 @@
             {/if}
             {#if canShare}
               <IconButton
-                label={$i18n.t('viewer.share')}
+                label={$i18n.t('common.share')}
                 size="medium"
                 variant="ghost"
                 onclick={(event) => {
@@ -800,14 +800,14 @@
                     }}
                   >
                     <ChatCenteredTextIcon />
-                    {$i18n.t('viewer.jumpToMessage')}
+                    {$i18n.t('common.jumpToMessage')}
                   </ActionMenuItem>
                 {/if}
               </ActionMenu>
             {/if}
             <IconButton
               class="close-button"
-              label={$i18n.t('viewer.close')}
+              label={$i18n.t('common.close')}
               size="medium"
               variant="ghost"
               onclick={onClose}><XIcon /></IconButton

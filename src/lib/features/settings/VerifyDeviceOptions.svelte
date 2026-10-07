@@ -67,7 +67,7 @@
       }}
     >
       <ArrowLeftIcon aria-hidden="true" />
-      {$i18n.t('settings.back')}
+      {$i18n.t('common.back')}
     </Button>
 
     <form
@@ -103,7 +103,7 @@
           loading={verification.recovering}
           disabled={!verification.recoveryKey.trim()}
         >
-          {$i18n.t('settings.verify')}
+          {$i18n.t('common.verify')}
         </Button>
       </div>
     </form>

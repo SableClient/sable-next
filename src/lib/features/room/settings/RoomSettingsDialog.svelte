@@ -111,7 +111,7 @@
     label={$i18n.t('room.settingsTitle')}
     description={$i18n.t('room.settingsDialogDescription')}
     closeLabel={$i18n.t('room.settingsClose')}
-    backLabel={$i18n.t('room.settingsBack')}
+    backLabel={$i18n.t('common.back')}
     {sectionLabel}
     {heading}
     {nav}

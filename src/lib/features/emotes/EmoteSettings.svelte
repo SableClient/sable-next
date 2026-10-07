@@ -176,7 +176,7 @@
           }}
         >
           <ArrowLeftIcon />
-          {$i18n.t('emotes.back')}
+          {$i18n.t('common.back')}
         </Button>
       </div>
       {#key viewing}
@@ -219,7 +219,7 @@
                   >
                     {roomsPacks.every(isChosen)
                       ? $i18n.t('emotes.unselectAll')
-                      : $i18n.t('emotes.selectAll')}
+                      : $i18n.t('common.selectAll')}
                   </Button>
                 </div>
               </div>

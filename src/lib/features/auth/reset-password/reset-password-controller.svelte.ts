@@ -32,7 +32,7 @@ export function passwordResetError(value: unknown): string {
           })
         : t('errors.tooManyAttempts');
     case 'unavailable':
-      return t('errors.temporarilyUnavailable');
+      return t('common.theHomeserverIsTemporarilyUnavailableTryAgain');
     case 'unknown_homeserver':
       return t('errors.homeserverNotFound');
     default:

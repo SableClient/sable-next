@@ -57,7 +57,7 @@
     <p>{$i18n.t(core.migrationFailed ? 'app.migrationFailed' : 'app.startFailed')}</p>
     {#if core.migrationError}<p>{core.migrationError}</p>{/if}
     <Button disabled={busy} onclick={() => void core.start()}>
-      {$i18n.t('app.tryAgain')}
+      {$i18n.t('common.tryAgain')}
     </Button>
     {#each core.accounts.filter((account) => !account.needs_reauth) as account (account.account_id)}
       <Button disabled={busy} onclick={() => void switchAccount(account.account_id)}>

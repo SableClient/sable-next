@@ -199,7 +199,7 @@
 
 <div class="section">
   {#if failed}
-    <Alert variant="critical" role="alert">{$i18n.t('room.emojisFailed')}</Alert>
+    <Alert variant="critical" role="alert">{$i18n.t('room.membersFailed')}</Alert>
   {/if}
 
   {#if viewingPack}
@@ -213,7 +213,7 @@
         }}
       >
         <ArrowLeftIcon />
-        {$i18n.t('emotes.back')}
+        {$i18n.t('common.back')}
       </Button>
     </div>
     {#key viewingPack.id}
@@ -337,7 +337,7 @@
   }}
   title={$i18n.t('room.emojisLegacyRemoveConfirm')}
   description={$i18n.t('room.emojisLegacyRemoveHint')}
-  confirmLabel={$i18n.t('room.remove')}
+  confirmLabel={$i18n.t('common.remove')}
   {busy}
   onConfirm={() => void removeLegacyCopies()}
 />
@@ -351,7 +351,7 @@
     name: packToRemove?.name ?? packToRemove?.id ?? '',
   })}
   description={$i18n.t('room.emojisDeletePackHint')}
-  confirmLabel={$i18n.t('room.remove')}
+  confirmLabel={$i18n.t('common.remove')}
   {busy}
   onConfirm={() => void confirmRemoval()}
 />

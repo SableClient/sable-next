@@ -60,7 +60,7 @@
   async function copy(text: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(text);
-      toasts.info($i18n.t('room.devCopied'));
+      toasts.info($i18n.t('common.copied'));
     } catch (error) {
       console.warn('[sable room] copy failed', error);
       toasts.error($i18n.t('errors.actionFailed'));
@@ -74,7 +74,7 @@
       <IconButton
         variant="subtle"
         size="small"
-        label={$i18n.t('room.devCopyRoomId')}
+        label={$i18n.t('room.menuCopyId')}
         onclick={() => void copy(room.room_id)}
       >
         <CopyIcon />

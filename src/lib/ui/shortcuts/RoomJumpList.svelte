@@ -73,8 +73,8 @@
     aria-controls={listboxId}
     aria-activedescendant={results.length > 0 ? optionId(active) : undefined}
     aria-autocomplete="list"
-    aria-label={$i18n.t('shortcuts.paletteLabel')}
-    placeholder={$i18n.t('shortcuts.palettePlaceholder')}
+    aria-label={$i18n.t('shortcuts.paletteTitle')}
+    placeholder={$i18n.t('common.searchRooms')}
     autocomplete="off"
   />
   <p class="hint">{$i18n.t('shortcuts.paletteHint')}</p>
@@ -85,7 +85,7 @@
     <ul
       id={listboxId}
       role="listbox"
-      aria-label={$i18n.t('shortcuts.paletteLabel')}
+      aria-label={$i18n.t('shortcuts.paletteTitle')}
       {@attach keepActiveInView}
     >
       {#each results as room, index (room.room_id)}

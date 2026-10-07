@@ -98,11 +98,11 @@
     <div class="recovery-keep">
       <Button onclick={() => void copy()}>
         <CopyIcon aria-hidden="true" />
-        {$i18n.t(kept === 'copied' ? 'setup.recoveryCopied' : 'setup.recoveryCopy')}
+        {$i18n.t(kept === 'copied' ? 'common.copied' : 'common.copy')}
       </Button>
       <Button onclick={() => void download()}>
         <DownloadSimpleIcon aria-hidden="true" />
-        {$i18n.t(kept === 'downloaded' ? 'setup.recoveryDownloaded' : 'setup.recoveryDownload')}
+        {$i18n.t(kept === 'downloaded' ? 'setup.recoveryDownloaded' : 'common.download')}
       </Button>
     </div>
 
@@ -111,7 +111,7 @@
       {$i18n.t('setup.recoveryWrittenDown')}
     </label>
   {:else}
-    <AuthField labelId="recovery-setup-title" label={$i18n.t('auth.setUpRecovery')}>
+    <AuthField labelId="recovery-setup-title" label={$i18n.t('common.setUpRecovery')}>
       <AuthInfoBox>{$i18n.t('auth.recoverySetupDescription')}</AuthInfoBox>
     </AuthField>
   {/if}

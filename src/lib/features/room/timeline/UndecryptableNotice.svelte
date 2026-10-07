@@ -71,7 +71,7 @@
         draggable="false"
         data-settings-link={SETTINGS_DEVICES_SECTION}
       >
-        {$i18n.t('timeline.utdRecoverAction')}
+        {$i18n.t('common.setUpRecovery')}
       </a>
     {/if}
   {/if}

@@ -84,7 +84,7 @@
 
     <div class="actions">
       <Button variant="ghost" size="small" onclick={clearDebugLogs}
-        >{$i18n.t('settings.developerLogsClear')}</Button
+        >{$i18n.t('common.clear')}</Button
       >
       <Button variant="secondary" size="small" onclick={() => void copy()}
         >{$i18n.t('settings.developerLogsCopy')}</Button

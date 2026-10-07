@@ -69,10 +69,10 @@
     {:else}
       <button type="button" class="reveal" disabled={loading} onclick={showMap}>
         <MapTrifoldIcon size={16} aria-hidden="true" />
-        {loading ? $i18n.t('timeline.locationMapLoading') : $i18n.t('timeline.locationShowMap')}
+        {loading ? $i18n.t('common.loadingMap') : $i18n.t('timeline.locationShowMap')}
       </button>
       {#if failed}
-        <p class="failed">{$i18n.t('timeline.locationMapFailed')}</p>
+        <p class="failed">{$i18n.t('common.theMapCouldNotBeLoaded')}</p>
       {/if}
     {/if}
   {/if}

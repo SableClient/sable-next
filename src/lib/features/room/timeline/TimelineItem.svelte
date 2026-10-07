@@ -963,7 +963,7 @@
                   onRetrySend?.(transactionId);
                 }}
               >
-                {$i18n.t('timeline.retrySend')}
+                {$i18n.t('common.retry')}
               </button>
               <button
                 type="button"
@@ -971,7 +971,7 @@
                   onCancelSend?.(transactionId);
                 }}
               >
-                {$i18n.t('timeline.cancelSend')}
+                {$i18n.t('common.delete')}
               </button>
             {/if}
             <span class="send-failure-reason">

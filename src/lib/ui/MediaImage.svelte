@@ -227,7 +227,7 @@
   );
   let retryLabel = $derived(
     retryWait === 0
-      ? $i18n.t('timeline.retryMedia')
+      ? $i18n.t('common.retry')
       : $i18n.t('timeline.retryMediaIn', { count: Math.ceil(retryWait / 1000) })
   );
   let unavailableLabel = $derived(

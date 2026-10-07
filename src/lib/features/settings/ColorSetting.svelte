@@ -161,7 +161,7 @@
       }}
     />
     <Button variant="ghost" size="small" disabled={!value} onclick={onReset}
-      >{$i18n.t('settings.resetButton')}</Button
+      >{$i18n.t('common.reset')}</Button
     >
   </div>
 </div>

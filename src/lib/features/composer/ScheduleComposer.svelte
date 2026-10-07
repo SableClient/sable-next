@@ -96,7 +96,7 @@
       {/each}
     </div>
 
-    <DateTimeField label={$i18n.t('composer.scheduleMoment')} bind:value={moment} />
+    <DateTimeField label={$i18n.t('common.dateAndTime')} bind:value={moment} />
 
     {#if moment !== '' && chosen === null}
       <Alert variant="critical" role="alert">{$i18n.t('composer.schedulePast')}</Alert>
@@ -104,7 +104,7 @@
 
     <DialogActions>
       <Button type="button" variant="ghost" onclick={cancel}>
-        {$i18n.t('composer.scheduleCancel')}
+        {$i18n.t('common.cancel')}
       </Button>
       <Button type="submit" disabled={unavailable || chosen === null}>
         {$i18n.t('composer.scheduleConfirm')}

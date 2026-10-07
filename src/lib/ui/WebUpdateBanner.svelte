@@ -48,7 +48,7 @@
 {#if registration && !dismissed}
   <Banner icon={ArrowClockwiseIcon} onClose={() => (dismissed = true)}>
     {#snippet title()}
-      {$i18n.t('settings.webUpdateBannerTitle')}
+      {$i18n.t('settings.updateBannerTitle')}
     {/snippet}
     {#snippet body()}
       {$i18n.t('settings.webUpdateBannerBody')}
@@ -58,7 +58,7 @@
         {$i18n.t('settings.updateBannerLater')}
       </Button>
       <Button variant="primary" size="small" onclick={refresh}>
-        {$i18n.t('settings.webUpdateBannerRefresh')}
+        {$i18n.t('common.refresh')}
       </Button>
     {/snippet}
   </Banner>

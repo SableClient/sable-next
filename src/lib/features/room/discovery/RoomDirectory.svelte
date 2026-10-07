@@ -100,7 +100,7 @@
       type="search"
       autocomplete="off"
       aria-label={$i18n.t('room.directorySearchLabel')}
-      placeholder={$i18n.t('room.directorySearchPlaceholder')}
+      placeholder={$i18n.t('common.searchRooms')}
     />
     <TextInput
       bind:value={server}
@@ -151,7 +151,7 @@
             <span class="room-name">
               {label(room)}
               {#if room.is_space}<span class="badge">{$i18n.t('nav.space')}</span>{/if}
-              {#if room.is_voice}<span class="badge">{$i18n.t('nav.voiceRoom')}</span>{/if}
+              {#if room.is_voice}<span class="badge">{$i18n.t('common.voiceRoom')}</span>{/if}
             </span>
             <span class="room-meta">
               <span class="members"
@@ -190,8 +190,8 @@
                   knocked.has(room.room_id)
                     ? 'room.lobbyKnockSent'
                     : action === 'knock'
-                      ? 'room.lobbyKnock'
-                      : 'room.lobbyJoin'
+                      ? 'common.askToJoin'
+                      : 'common.join'
                 )}
               </Button>
             {/if}
@@ -208,7 +208,7 @@
           void directory.loadMore();
         }}
       >
-        {$i18n.t('room.directoryMore')}
+        {$i18n.t('common.loadMore')}
       </Button>
     {/if}
   {:else if directory.loading}

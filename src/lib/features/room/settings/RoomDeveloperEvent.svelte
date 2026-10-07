@@ -76,7 +76,7 @@
     {#if outcome === 'json'}
       <Alert variant="critical" role="alert">{$i18n.t('room.devInvalidJson')}</Alert>
     {:else if outcome === 'failed'}
-      <Alert variant="critical" role="alert">{$i18n.t('room.devFailed')}</Alert>
+      <Alert variant="critical" role="alert">{$i18n.t('common.theStateEventWasRejected')}</Alert>
     {:else if outcome === 'sent'}
       <Alert variant="success" role="status">{$i18n.t('room.devSent')}</Alert>
     {/if}
