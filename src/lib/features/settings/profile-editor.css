@@ -47,6 +47,7 @@
 
 .profile-section .timezone-select {
   flex: 0 1 12rem;
+  min-width: min(8rem, 100%);
   width: auto;
 }
 
@@ -65,7 +66,7 @@
 .profile-section .timezone-row {
   align-items: center;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: var(--space-200);
 }
 
