@@ -459,7 +459,7 @@ impl Core {
     }
 
     async fn saved_account_client(
-        &self,
+        self: &Arc<Self>,
         account: &PersistedAccount,
     ) -> Result<matrix_sdk::Client, CommandErr> {
         let cached = self
@@ -481,10 +481,30 @@ impl Core {
         )
         .await
         .or_failed(self, "restore_build_client")?;
+        self.install_credential_writer(&client, &account.session.homeserver, &account.account_id)
+            .await;
         session::restore_credentials(&client, &account.session)
             .await
             .or_failed(self, "restore_session")?;
+        self.account_clients
+            .lock()
+            .await
+            .insert(account.account_id.clone(), client.clone());
         Ok(client)
+    }
+
+    async fn install_credential_writer(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        homeserver: &str,
+        account_id: &str,
+    ) {
+        let writer = self.next_credential_writer.fetch_add(1, Ordering::SeqCst);
+        self.credential_writers
+            .lock()
+            .await
+            .insert(account_id.to_owned(), writer);
+        self.install_session_callbacks(client, homeserver, account_id, writer);
     }
 
     async fn invalidate_account_client(&self, account_id: &str) {
@@ -504,7 +524,6 @@ impl Core {
         client: &matrix_sdk::Client,
         homeserver: &str,
         account_id: &str,
-        generation: u64,
     ) -> Result<(), CommandErr> {
         let _guard = self.session_store_lock.lock().await;
         let mut accounts = self.accounts.lock().await;
@@ -516,11 +535,8 @@ impl Core {
             .ok_or(CommandErr::NotLoggedIn)?;
         let mut clients = self.account_clients.lock().await;
         if !clients.contains_key(account_id) {
-            self.credential_writers
-                .lock()
-                .await
-                .insert(account_id.to_owned(), generation);
-            self.install_session_callbacks(client, homeserver, account_id, generation);
+            self.install_credential_writer(client, homeserver, account_id)
+                .await;
             clients.insert(account_id.to_owned(), client.clone());
         }
         drop(clients);
@@ -718,7 +734,7 @@ impl Core {
             return Err(CommandErr::Unavailable);
         }
 
-        self.prepare_account_client(&client, &homeserver, &account_id, generation)
+        self.prepare_account_client(&client, &homeserver, &account_id)
             .await?;
 
         // successfully. `take_session` also aborts its owned watcher tasks.
@@ -1632,7 +1648,7 @@ mod regression_tests {
             device_invalidated: false,
         });
         *core.accounts.lock().await = Some(registry);
-        core.prepare_account_client(&client, &server.server().uri(), "first", 1)
+        core.prepare_account_client(&client, &server.server().uri(), "first")
             .await
             .unwrap();
         *core.session.write().await = Some(Session {
@@ -1700,6 +1716,78 @@ mod regression_tests {
             stored["accounts"][0]["session"]["credentials"]["refresh_token"],
             "new-refresh"
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_refresh_during_an_abandoned_restore_is_saved() {
+        use crate::session::{AccountRegistry, Credentials, PersistedAccount, PersistedSession};
+        use wiremock::{
+            Mock,
+            matchers::{method, path_regex},
+        };
+
+        let server = MatrixMockServer::new().await;
+        server.mock_versions().ok().mount().await;
+        let base = std::env::temp_dir().join(format!(
+            "sable-restore-refresh-{}",
+            matrix_sdk::ruma::TransactionId::new()
+        ));
+        let base_id = base.to_str().unwrap().to_owned();
+        let (core, _events) = Core::new(base_id.clone(), Box::new(MemorySessionStore::default()));
+        let mut registry = AccountRegistry::empty();
+        let (account_id, store_id) = registry.allocate_account(&base_id);
+        registry.active_account_id = Some(account_id.clone());
+        registry.upsert(PersistedAccount {
+            account_id,
+            store_id: store_id.clone(),
+            session: PersistedSession {
+                oauth_issuer: None,
+                resolved_homeserver: None,
+                homeserver: server.server().uri(),
+                credentials: Credentials::Password(
+                    serde_json::from_value(serde_json::json!({
+                        "user_id": "@alice:example.org",
+                        "device_id": "DEVICE",
+                        "access_token": "old-access",
+                        "refresh_token": "old-refresh"
+                    }))
+                    .unwrap(),
+                ),
+            },
+            needs_reauth: false,
+            device_invalidated: false,
+        });
+        core.sessions
+            .save(serde_json::to_vec(&registry).unwrap())
+            .await
+            .unwrap();
+        let seeded = session::restore_client(&store_id, &registry.accounts[0].session, true)
+            .await
+            .unwrap();
+        session::restore_credentials(&seeded, &registry.accounts[0].session)
+            .await
+            .unwrap();
+        drop(seeded);
+
+        Mock::given(method("POST"))
+            .and(path_regex("/refresh$"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                serde_json::json!({"access_token": "new-access", "refresh_token": "new-refresh"}),
+            ))
+            .mount(server.server())
+            .await;
+        let account = core.accounts().await.unwrap().accounts.remove(0);
+        let client = core.saved_account_client(&account).await.unwrap();
+        client.refresh_access_token().await.unwrap();
+
+        let bytes = core.sessions.load().await.unwrap().unwrap();
+        let stored: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            stored["accounts"][0]["session"]["credentials"]["refresh_token"],
+            "new-refresh"
+        );
+        drop(client);
+        std::fs::remove_dir_all(&store_id).unwrap();
     }
 
     struct RejectSaves {

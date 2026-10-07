@@ -104,6 +104,7 @@ pub struct Core {
     #[cfg(not(target_family = "wasm"))]
     v1_migration: Mutex<Option<v1_migration::Import>>,
     credential_writers: Mutex<HashMap<String, u64>>,
+    next_credential_writer: AtomicU64,
     account_clients: Mutex<HashMap<String, matrix_sdk::Client>>,
     session_handlers: std::sync::Mutex<Vec<matrix_sdk::event_handler::EventHandlerDropGuard>>,
     probed_pinned_rooms: std::sync::Mutex<
@@ -287,6 +288,7 @@ impl Core {
             #[cfg(not(target_family = "wasm"))]
             v1_migration: Mutex::new(None),
             credential_writers: Mutex::new(HashMap::new()),
+            next_credential_writer: AtomicU64::new(1),
             account_clients: Mutex::new(HashMap::new()),
             session_handlers: std::sync::Mutex::new(Vec::new()),
             probed_pinned_rooms: std::sync::Mutex::new(HashMap::new()),
