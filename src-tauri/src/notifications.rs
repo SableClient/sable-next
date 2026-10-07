@@ -301,7 +301,7 @@ const fn shows_content(encrypted_room: bool, content: bool, encrypted_content: b
 }
 
 const fn alerts_silently(noisy: Option<bool>, sounds: bool) -> bool {
-    matches!(noisy, Some(false)) || !sounds
+    !sounds || (!cfg!(mobile) && matches!(noisy, Some(false)))
 }
 
 fn line(view: &NotificationView, content: bool) -> Line {
@@ -1272,10 +1272,10 @@ mod tests {
     }
 
     #[test]
-    fn only_a_soundless_rule_or_muted_sounds_silences_an_alert() {
+    fn only_a_soundless_rule_on_desktop_or_muted_sounds_silences_an_alert() {
         assert!(!alerts_silently(Some(true), true));
         assert!(!alerts_silently(None, true));
-        assert!(alerts_silently(Some(false), true));
+        assert_eq!(alerts_silently(Some(false), true), !cfg!(mobile));
         assert!(alerts_silently(Some(true), false));
     }
 
