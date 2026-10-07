@@ -1,6 +1,6 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
 
-import workletUrl from './screen-audio-worklet.js?url';
+import workletUrl from './screen-audio-worklet.js?url&no-inline';
 
 import type { ScreenAudioChoice } from './screen-audio';
 
