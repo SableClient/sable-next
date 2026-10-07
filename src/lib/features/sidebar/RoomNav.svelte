@@ -925,6 +925,7 @@
           {@const profile = peerProfiles.get(userId)}
           {@const voice =
             room.room_id === callRoomId ? callVoiceStates.get(rowKeys[index] ?? userId) : undefined}
+          {@const sharing = voice ? voice.screen : room.screen_sharers.includes(userId)}
           {@const displayName = numberedName(
             profile?.display_name ?? userId,
             rowKeys[index] ?? userId
@@ -954,23 +955,23 @@
               />
               {#if !collapsed}
                 <span>{displayName}</span>
-                {#if voice && (voice.muted || voice.deafened || voice.camera || voice.screen)}
+                {#if sharing || (voice && (voice.muted || voice.deafened || voice.camera))}
                   <span class="voice-badges">
-                    {#if voice.screen}
+                    {#if sharing}
                       <span class="voice-stream">{$i18n.t('call.live')}</span>
                     {/if}
-                    {#if voice.camera}
+                    {#if voice?.camera}
                       <span title={$i18n.t('call.cameraOnLabel')}>
                         <VideoCameraIcon aria-hidden="true" weight="fill" />
                         <span class="screen-reader-only">{$i18n.t('call.cameraOnLabel')}</span>
                       </span>
                     {/if}
-                    {#if voice.deafened}
+                    {#if voice?.deafened}
                       <span class="voice-off" title={$i18n.t('call.deafened')}>
                         <SpeakerSlashIcon aria-hidden="true" weight="fill" />
                         <span class="screen-reader-only">{$i18n.t('call.deafened')}</span>
                       </span>
-                    {:else if voice.muted}
+                    {:else if voice?.muted}
                       <span class="voice-off" title={$i18n.t('call.muted')}>
                         <MicrophoneSlashIcon aria-hidden="true" weight="fill" />
                         <span class="screen-reader-only">{$i18n.t('call.muted')}</span>

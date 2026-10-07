@@ -20,6 +20,7 @@
 
   interface Props {
     participants: readonly string[];
+    screenSharers?: readonly string[];
     members: readonly MemberView[];
     media: CallMedia;
     joining: boolean;
@@ -35,6 +36,7 @@
 
   let {
     participants,
+    screenSharers = [],
     members,
     media,
     joining,
@@ -214,6 +216,7 @@
             name={numberedName(person.name, otherKeys[index] ?? person.userId)}
             userId={person.userId}
             avatar={person.avatar}
+            live={screenSharers.includes(person.userId)}
           />
         {/each}
         {#if alone}

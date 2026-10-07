@@ -141,6 +141,7 @@ export class CallSession {
   #livekit = $state.raw<LivekitTransport | undefined>(undefined);
   #grant: CallGrant | undefined;
   #session: number | undefined;
+  #screenSharing = false;
   #lease: CallOwnerLease | undefined;
   #unsubscribe: (() => void) | undefined;
   #unsubscribeTransport: (() => void) | undefined;
@@ -318,6 +319,13 @@ export class CallSession {
       });
       this.#unsubscribeTransport = transport.subscribe((state) => {
         this.transport = state;
+        const sharing = state.connection === 'connected' && state.screenShareEnabled;
+        if (sharing !== this.#screenSharing && this.#session !== undefined) {
+          this.#screenSharing = sharing;
+          void this.#client.commands
+            .setCallScreenSharing(this.#session, sharing)
+            .catch(ignoreError);
+        }
         if (state.connection !== this.#transportConnection) {
           this.#transportConnection = state.connection;
           telemetry.event('call.transport.state', { 'call.connection': state.connection });
@@ -734,6 +742,7 @@ export class CallSession {
     this.#grant = undefined;
     this.listenOnly = false;
     this.#session = undefined;
+    this.#screenSharing = false;
     this.#buffer = [];
     this.#pendingKeys = [];
     this.#ownKeyPending = false;

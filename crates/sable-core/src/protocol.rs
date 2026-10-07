@@ -1370,6 +1370,10 @@ pub enum Command {
     LeaveCall {
         session: CallSessionId,
     },
+    SetCallScreenSharing {
+        session: CallSessionId,
+        active: bool,
+    },
     DeclineCall {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1486,6 +1490,7 @@ pub enum CommandOk {
     },
     CallSupport(CallSupportView),
     LeaveCall,
+    SetCallScreenSharing,
     DeclineCall,
     RoomPermissions(RoomPermissionsView),
     NotificationSettings(NotificationSettingsView),
@@ -2537,6 +2542,7 @@ pub struct CallMemberView {
     pub backend_id: Option<String>,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub joined_ts: u64,
+    pub screen_sharing: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -2640,6 +2646,8 @@ pub struct RoomSummary {
     /// many devices they joined with.
     #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
     pub call_participants: Vec<OwnedUserId>,
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub screen_sharers: Vec<OwnedUserId>,
     pub supports_knock: bool,
     pub supports_restricted: bool,
     pub supports_knock_restricted: bool,

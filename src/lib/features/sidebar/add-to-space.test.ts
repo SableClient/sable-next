@@ -25,6 +25,7 @@ function room(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSummary
     is_tombstoned: false,
     is_voice: false,
     call_participants: [],
+    screen_sharers: [],
     room_type: null,
     supports_knock: false,
     supports_restricted: false,

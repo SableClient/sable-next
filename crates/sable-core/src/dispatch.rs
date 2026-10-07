@@ -811,6 +811,9 @@ impl Core {
             } => self.call_support(room_id, livekit_service_url).await,
 
             Command::LeaveCall { session } => self.leave_call(session).await,
+            Command::SetCallScreenSharing { session, active } => {
+                self.set_call_screen_sharing(session, active).await
+            }
 
             Command::DeclineCall {
                 room_id,

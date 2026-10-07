@@ -25,6 +25,7 @@ fn member(mode: CallMode, created_ts: u64, foci: &[&str]) -> CallMember {
         joined_ts: created_ts,
         expires_at_ms: None,
         foci: foci.iter().map(ToString::to_string).collect(),
+        screen_sharing: false,
     }
 }
 
@@ -651,6 +652,38 @@ fn the_call_intent_rides_where_each_membership_format_reads_it() {
     let sticky = content(&room_id, &sticky, Some(crate::protocol::CallIntent::Audio));
     assert_eq!(sticky["application"]["m.call.intent"], "audio");
     assert!(sticky.get("m.call.intent").is_none());
+}
+
+#[test]
+fn a_screen_share_flag_is_top_level_and_leaves_the_membership_untouched() {
+    let room_id = owned_room_id!("!room:example.org");
+    for mode in [CallMode::Compatibility, CallMode::Matrix2] {
+        let mut own = member(mode, 7, &["https://sfu.example.org"]);
+        own.member_id = Some("member".to_owned());
+        let quiet = content(&room_id, &own, None);
+        assert!(quiet.get("org.sable.screen_sharing").is_none());
+
+        own.screen_sharing = true;
+        let sharing = content(&room_id, &own, None);
+        assert_eq!(sharing["org.sable.screen_sharing"], true);
+
+        let mut stripped = sharing.clone();
+        stripped
+            .as_object_mut()
+            .unwrap()
+            .remove("org.sable.screen_sharing");
+        assert_eq!(stripped, quiet);
+    }
+}
+
+#[test]
+fn a_republish_while_sharing_keeps_created_ts() {
+    let room_id = owned_room_id!("!room:example.org");
+    let mut own = member(CallMode::Compatibility, 4_000, &["https://sfu.example.org"]);
+    own.screen_sharing = true;
+    let body = super::content_at(&room_id, &own, None, 9_000);
+    assert_eq!(body["created_ts"], 4_000);
+    assert_eq!(body["org.sable.screen_sharing"], true);
 }
 
 async fn legacy_move_fixture(

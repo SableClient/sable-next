@@ -28,6 +28,7 @@ type Harness = {
   transport: CallTransport & { connected: CallTransportState[] };
   joinCall: ReturnType<typeof vi.fn>;
   leaveCall: ReturnType<typeof vi.fn>;
+  setCallScreenSharing: ReturnType<typeof vi.fn>;
 };
 
 function harness(
@@ -79,9 +80,10 @@ function harness(
     });
   });
   const leaveCall = vi.fn(() => Promise.resolve());
+  const setCallScreenSharing = vi.fn(() => Promise.resolve());
 
   const client = {
-    commands: { joinCall, leaveCall },
+    commands: { joinCall, leaveCall, setCallScreenSharing },
     subscribeEvents: (listener: (event: CoreEvent) => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -104,6 +106,7 @@ function harness(
     transport,
     joinCall,
     leaveCall,
+    setCallScreenSharing,
   };
 }
 
@@ -172,6 +175,22 @@ test('joining clears screen shares watched in an earlier call', async () => {
   await session.join('!room:example.org', { microphone: true, camera: false });
 
   expect(session.watchedScreenShareIds).toEqual([]);
+});
+
+test('the core is told when the local screen share starts and stops', async () => {
+  const { client, transport, emitTransportState, setCallScreenSharing } = harness();
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+
+  const connected = { ...idleTransportState(), connection: 'connected' as const };
+  emitTransportState({ ...connected, screenShareEnabled: true });
+  emitTransportState({ ...connected, screenShareEnabled: true });
+  emitTransportState({ ...connected, screenShareEnabled: false });
+
+  expect(setCallScreenSharing.mock.calls).toEqual([
+    [7, true],
+    [7, false],
+  ]);
 });
 
 test('a call tears down after a successful join reports disconnected', async () => {
@@ -385,6 +404,7 @@ test('a key for another session is ignored', async () => {
         identity: '@bob:example.org:X',
         backend_id: null,
         joined_ts: 0,
+        screen_sharing: false,
       },
     ],
   });
@@ -403,6 +423,7 @@ test('the call is timed from the earliest member still in it', async () => {
     identity: `@bob:example.org:${device}`,
     backend_id: null,
     joined_ts: joined,
+    screen_sharing: false,
   });
 
   emit({
@@ -925,6 +946,7 @@ test('two devices of one account keep their own voice state', () => {
     identity: `@me:x:${device}`,
     backend_id: null,
     joined_ts: 0,
+    screen_sharing: false,
   });
   const states = voiceStates(
     [member('BBBB'), member('AAAA')],

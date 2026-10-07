@@ -94,6 +94,7 @@ function makeRoom(overrides: Partial<RoomSummary>): RoomSummary {
     is_tombstoned: false,
     is_voice: false,
     call_participants: [],
+    screen_sharers: [],
     room_type: null,
     supports_knock: true,
     supports_restricted: true,
@@ -802,6 +803,36 @@ test('a live voice room lists its call members', async () => {
   expect(document.querySelectorAll('.call-participant-list .avatar-root')).toHaveLength(2);
   expect(core.userProfile).toHaveBeenCalledWith('@alice:example.org');
   expect(core.userProfile).toHaveBeenCalledWith('@bob:example.org');
+});
+
+test('a participant sharing their screen is tagged live to people outside the call', async () => {
+  observeImmediately();
+  core.userProfile.mockImplementation((userId: string) =>
+    Promise.resolve({
+      display_name: userId === '@bob:example.org' ? 'Bob' : 'Alice',
+      avatar_url: null,
+    })
+  );
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!voice:example.org',
+      name: 'Voice',
+      is_voice: true,
+      call_participants: ['@alice:example.org', '@bob:example.org'],
+      screen_sharers: ['@bob:example.org'],
+    }),
+  ];
+
+  await mountNav();
+  await vi.waitFor(() => {
+    expect(document.querySelectorAll('.call-participant-list li')).toHaveLength(2);
+  });
+
+  const tagged = document.querySelectorAll('.call-participant-list .voice-stream');
+  expect(tagged).toHaveLength(1);
+  await vi.waitFor(() => {
+    expect(tagged[0]?.closest('li')?.textContent).toContain('Bob');
+  });
 });
 
 test('a collapsed live voice room keeps participant avatars labelled', async () => {

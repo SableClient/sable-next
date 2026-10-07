@@ -34,7 +34,7 @@ struct PendingKey {
     received: u64,
 }
 
-struct State {
+pub(crate) struct State {
     own: CallMember,
     sticky: StickyMemberships,
     members: Vec<CallMember>,
@@ -164,6 +164,9 @@ fn content_at(
     };
     if let (Some(intent), Some(Value::Object(target))) = (intent, target) {
         target.insert("m.call.intent".to_owned(), json!(intent));
+    }
+    if let (true, Some(content)) = (own.screen_sharing, content.as_object_mut()) {
+        content.insert(membership::SCREEN_SHARING_FIELD.to_owned(), json!(true));
     }
     content
 }
@@ -299,6 +302,7 @@ async fn discover(
         joined_ts: now,
         expires_at_ms: None,
         foci: vec![service],
+        screen_sharing: false,
     };
     Ok(Discovered {
         own,
@@ -606,6 +610,7 @@ pub(super) async fn join(
         retract(core, &room, &own, delay).await;
         return Err(CommandErr::NotLoggedIn);
     }
+    let shared = state.clone();
     let updates = updates(
         core.clone(),
         generation,
@@ -624,6 +629,7 @@ pub(super) async fn join(
             postpone,
             _handlers: handlers,
             updates: Some(updates),
+            state: shared,
             sticky_member: own.member_id.filter(|_| mode == CallMode::Matrix2),
         },
     );
@@ -861,6 +867,26 @@ async fn follow_oldest_focus(
         },
     );
     moved
+}
+
+pub(super) async fn set_screen_sharing(
+    room: &Room,
+    state: &Mutex<State>,
+    active: bool,
+) -> Result<(), matrix_sdk::Error> {
+    let (own, intent) = {
+        let mut state = state.lock().await;
+        if state.own.screen_sharing == active {
+            return Ok(());
+        }
+        state.own.screen_sharing = active;
+        (state.own.clone(), state.intent)
+    };
+    if let Err(error) = publish_membership(room, &own, intent).await {
+        state.lock().await.own.screen_sharing = !active;
+        return Err(error);
+    }
+    Ok(())
 }
 
 async fn publish_update(

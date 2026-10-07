@@ -356,6 +356,7 @@ mod tests {
             joined_ts: created_ts,
             expires_at_ms: None,
             foci: Vec::new(),
+            screen_sharing: false,
         }
     }
 

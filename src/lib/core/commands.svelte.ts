@@ -643,6 +643,10 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'leave_call', session });
     },
 
+    async setCallScreenSharing(session: number, active: boolean): Promise<void> {
+      await transport().send({ type: 'set_call_screen_sharing', session, active });
+    },
+
     async declineCall(roomId: string, notificationEventId: string): Promise<void> {
       await transport().send({
         type: 'decline_call',

@@ -162,6 +162,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       is_tombstoned: false,
       is_voice: false,
       call_participants: [],
+      screen_sharers: [],
       room_type:
         workerMode === 'calendar'
           ? 'chat.commet.calendar'

@@ -13,6 +13,7 @@ use sha2::{Digest as _, Sha256};
 use crate::protocol::CallMode;
 
 pub(crate) const RTC_MEMBER_EVENT_TYPE: &str = "org.matrix.msc4143.rtc.member";
+pub(crate) const SCREEN_SHARING_FIELD: &str = "org.sable.screen_sharing";
 
 pub(crate) fn is_rtc_member_type(event_type: &str) -> bool {
     event_type == RTC_MEMBER_EVENT_TYPE || event_type == "m.rtc.member"
@@ -25,6 +26,7 @@ pub(crate) struct StickyMember {
     pub(crate) member_id: String,
     pub(crate) identity: String,
     pub(crate) foci: Vec<String>,
+    pub(crate) screen_sharing: bool,
 }
 
 #[derive(Default)]
@@ -55,6 +57,8 @@ struct StickyContent {
     member: Option<StickyMemberRef>,
     #[serde(default)]
     transports: StickyTransports,
+    #[serde(default, rename = "org.sable.screen_sharing")]
+    screen_sharing: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -112,6 +116,7 @@ pub(crate) fn sticky_member(raw: &str) -> Option<StickyMember> {
         member_id: member.id,
         identity,
         foci,
+        screen_sharing: event.content.screen_sharing,
     })
 }
 
@@ -131,6 +136,7 @@ pub(crate) struct CallMember {
     pub(crate) joined_ts: u64,
     pub(crate) expires_at_ms: Option<u64>,
     pub(crate) foci: Vec<String>,
+    pub(crate) screen_sharing: bool,
 }
 
 impl CallMember {
@@ -177,6 +183,11 @@ pub(crate) async fn active_members(room: &Room) -> Vec<CallMember> {
             .and_then(|content| content.get("membershipID"))
             .and_then(serde_json::Value::as_str)
             .map(str::to_owned);
+        let screen_sharing = value
+            .get("content")
+            .and_then(|content| content.get(SCREEN_SHARING_FIELD))
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
         alias_foci(&mut value, room.room_id().as_str());
         let Ok(event) = serde_json::from_value::<
             matrix_sdk::ruma::events::SyncStateEvent<CallMemberEventContent>,
@@ -229,6 +240,7 @@ pub(crate) async fn active_members(room: &Room) -> Vec<CallMember> {
                     .expires_ts(Some(origin_server_ts))
                     .map(|expires| expires.get().into()),
                 foci: livekit_urls(membership.foci_preferred()),
+                screen_sharing,
             });
         }
     }
@@ -369,6 +381,7 @@ impl StickyMemberships {
                     joined_ts: entry.joined_ts,
                     expires_at_ms: Some(entry.expires_at_ms),
                     foci: member.foci.clone(),
+                    screen_sharing: member.screen_sharing,
                 })
             })
             .collect()
@@ -430,6 +443,7 @@ mod tests {
             joined_ts: created_ts,
             expires_at_ms: None,
             foci: foci.iter().map(|url| (*url).to_owned()).collect(),
+            screen_sharing: false,
         }
     }
 
@@ -458,6 +472,29 @@ mod tests {
         assert_eq!(
             advertised_service_urls(&members),
             vec!["https://sfu.one".to_owned(), "https://sfu.two".to_owned()]
+        );
+    }
+
+    #[test]
+    fn test_a_sticky_member_reads_the_screen_share_flag() {
+        let raw = |extra: &str| {
+            format!(
+                r#"{{
+                    "sender":"@erwan:localhost",
+                    "content": {{
+                        "slot_id":"m.call#ROOM",
+                        "application":{{"type":"m.call"}},
+                        "member":{{"user_id":"@erwan:localhost","device_id":"LAPTOP","id":"member-1"}},
+                        "transports":{{"published":[]}}{extra}
+                    }}
+                }}"#
+            )
+        };
+        assert!(!sticky_member(&raw("")).unwrap().screen_sharing);
+        assert!(
+            sticky_member(&raw(r#","org.sable.screen_sharing":true"#))
+                .unwrap()
+                .screen_sharing
         );
     }
 

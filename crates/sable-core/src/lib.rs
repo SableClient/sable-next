@@ -174,6 +174,7 @@ struct CallSession {
     delay_id: Option<String>,
     postpone: Option<Task>,
     updates: Option<Task>,
+    state: Arc<tokio::sync::Mutex<calls::CallRuntimeState>>,
     sticky_member: Option<String>,
     _handlers: Vec<matrix_sdk::event_handler::EventHandlerDropGuard>,
 }

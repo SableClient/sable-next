@@ -45,6 +45,7 @@ function mountBothSharing(
         identity: 'me:AAAA',
         backend_id: null,
         joined_ts: 0,
+        screen_sharing: false,
       },
       {
         user_id: otherUserId,
@@ -52,6 +53,7 @@ function mountBothSharing(
         identity: 'me:BBBB',
         backend_id: null,
         joined_ts: 0,
+        screen_sharing: false,
       },
     ],
     transport: {

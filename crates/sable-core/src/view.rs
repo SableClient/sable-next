@@ -85,6 +85,7 @@ pub struct RoomInfo {
     pub avatar_url: Option<String>,
     pub children: Vec<SpaceChildEdge>,
     pub tags: Vec<RoomTag>,
+    pub screen_sharers: Vec<OwnedUserId>,
 }
 
 #[must_use]
@@ -137,6 +138,7 @@ pub fn room_summary<S: BuildHasher>(
         room_type: item.room_type().map(|kind| kind.to_string()),
         is_voice: item.is_call(),
         call_participants: item.active_room_call_participants(),
+        screen_sharers: info.map(|i| i.screen_sharers.clone()).unwrap_or_default(),
         supports_knock: info.is_some_and(|i| i.supports_knock),
         supports_restricted: info.is_some_and(|i| i.supports_restricted),
         supports_knock_restricted: info.is_some_and(|i| i.supports_knock_restricted),
@@ -361,6 +363,11 @@ async fn room_info(room: &Room) -> RoomInfo {
         avatar_url: room_avatar_url(room).await,
         children,
         tags: room_tags(room),
+        screen_sharers: if room.is_call() {
+            crate::calls::screen_sharers(room).await
+        } else {
+            Vec::new()
+        },
     }
 }
 

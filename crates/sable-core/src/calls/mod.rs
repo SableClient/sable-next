@@ -5,6 +5,7 @@ mod notify;
 
 pub(crate) use notify::is_call_event_type;
 mod runtime;
+pub(crate) use runtime::State as CallRuntimeState;
 mod sfu;
 pub(crate) mod sticky;
 
@@ -211,6 +212,25 @@ fn left_membership() -> CallMemberEventContent {
     CallMemberEventContent::new_empty(None)
 }
 
+pub(crate) async fn screen_sharers(room: &Room) -> Vec<OwnedUserId> {
+    let mut members = membership::active_members(room).await;
+    let now = keys::now_ms();
+    let mut sticky = membership::StickyMemberships::default();
+    for event in sticky::live_events(room) {
+        sticky.apply(&event, now);
+    }
+    members.extend(sticky.members(now));
+    members.retain(|member| member.screen_sharing);
+    members.sort_by_key(|member| member.joined_ts);
+    let mut users = Vec::new();
+    for member in members {
+        if !users.contains(&member.user_id) {
+            users.push(member.user_id);
+        }
+    }
+    users
+}
+
 fn member_views(members: &[CallMember]) -> Vec<CallMemberView> {
     members
         .iter()
@@ -220,6 +240,7 @@ fn member_views(members: &[CallMember]) -> Vec<CallMemberView> {
             identity: member.identity.clone(),
             backend_id: None,
             joined_ts: member.joined_ts,
+            screen_sharing: member.screen_sharing,
         })
         .collect()
 }
@@ -527,6 +548,23 @@ impl Core {
         }
     }
 
+    pub(crate) async fn set_call_screen_sharing(
+        &self,
+        session: CallSessionId,
+        active: bool,
+    ) -> Result<CommandOk, CommandErr> {
+        let (room_id, state) = {
+            let calls = self.call_sessions.lock().await;
+            let call = calls.get(&session).ok_or(CommandErr::UnknownCall)?;
+            (call.room_id.clone(), call.state.clone())
+        };
+        let room = self.room(&room_id).await?;
+        runtime::set_screen_sharing(&room, &state, active)
+            .await
+            .map_err(|error| self.room_error("set_call_screen_sharing", error))?;
+        Ok(CommandOk::SetCallScreenSharing)
+    }
+
     async fn fire_hangup(&self, delay_id: String) -> Result<CommandOk, CommandErr> {
         self.client()
             .await?
@@ -704,6 +742,7 @@ mod tests {
             joined_ts: 0,
             expires_at_ms: None,
             foci: Vec::new(),
+            screen_sharing: false,
         }]);
 
         assert_eq!(views[0].identity, "@erwan:localhost:LAPTOP");
