@@ -15,6 +15,7 @@
     supporterButtonText,
     supporterColor,
     type SupporterAppearance,
+    type SupporterVariant,
   } from './variants.js';
 
   type Props = Partial<SupporterAppearance> & {
@@ -49,19 +50,26 @@
     }
     return shortened;
   });
-  const palettes = {
+  const palettes: Record<SupporterVariant, [string, string]> = {
     gold: ['var(--supporter-gold)', 'var(--supporter-gold)'],
+    custom: ['var(--supporter-gold)', 'var(--supporter-gold)'],
     propeller: ['var(--supporter-yellow)', 'var(--supporter-red)'],
     ghost: ['var(--supporter-white)', 'var(--supporter-silver)'],
     evil: ['var(--supporter-red)', 'var(--supporter-evil)'],
     agender: ['var(--supporter-green)', 'var(--supporter-silver)'],
+    agendergradient: ['var(--supporter-green)', 'var(--supporter-silver)'],
     bisexual: ['var(--supporter-bisexual-pink)', 'var(--supporter-bisexual-blue)'],
+    bisexualgradient: ['var(--supporter-bisexual-pink)', 'var(--supporter-bisexual-blue)'],
     trans: ['var(--supporter-blue)', 'var(--supporter-pink)'],
     transgradient: ['var(--supporter-blue)', 'var(--supporter-pink)'],
     intersex: ['var(--supporter-yellow)', 'var(--supporter-purple)'],
+    intersexgradient: ['var(--supporter-yellow)', 'var(--supporter-purple)'],
     lesbian: ['var(--supporter-orange)', 'var(--supporter-bisexual-pink)'],
+    lesbiangradient: ['var(--supporter-orange)', 'var(--supporter-bisexual-pink)'],
     mlm: ['var(--supporter-teal)', 'var(--supporter-bisexual-blue)'],
+    mlmgradient: ['var(--supporter-teal)', 'var(--supporter-bisexual-blue)'],
     pride: ['var(--supporter-orange)', 'var(--supporter-purple)'],
+    pridegradient: ['var(--supporter-orange)', 'var(--supporter-purple)'],
     ceo: ['var(--supporter-gold)', 'var(--supporter-gold)'],
   };
   let customStyle = $derived.by(() => {
@@ -70,11 +78,15 @@
         ? [supporterColor(color), supporterColor(color)]
         : (palettes[variant] ?? palettes.gold);
     const ground = cardColor;
-    const button = customCardColors ? buttonColor : variant === 'pride' ? end : start;
+    const button = customCardColors
+      ? buttonColor
+      : variant === 'pride' || variant === 'pridegradient'
+        ? end
+        : start;
     const ink =
       customCardColors || variant === 'custom'
         ? supporterButtonText(button)
-        : variant === 'bisexual'
+        : variant === 'bisexual' || variant === 'bisexualgradient'
           ? 'var(--supporter-white)'
           : 'var(--supporter-card-bg)';
     const mix = customCardColors

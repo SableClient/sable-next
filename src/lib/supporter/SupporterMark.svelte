@@ -1,6 +1,12 @@
 <script lang="ts">
   import ceoArt from './ceo.png';
-  import { APP_ICON_STOPS, GHOST_SABLE_PATH, SABLE_EYE_PATH, SABLE_PATHS } from './icon-art.js';
+  import {
+    APP_ICON_STOPS,
+    CRISP_PRIDE_STOPS,
+    GHOST_SABLE_PATH,
+    SABLE_EYE_PATH,
+    SABLE_PATHS,
+  } from './icon-art.js';
   import {
     supporterButtonText,
     supporterColor,
@@ -8,6 +14,7 @@
     DEFAULT_SUPPORTER_BACKGROUND_COLOR,
     type SupporterAppearance,
   } from './variants.js';
+
   let {
     variant = 'gold',
     shape = 'circle',
@@ -17,17 +24,8 @@
   }: Partial<SupporterAppearance> = $props();
   const id = $props.id();
   let chosen = $derived(supporterVariant(variant));
-  const transStops = [
-    'var(--supporter-blue)',
-    'var(--supporter-pink)',
-    'var(--supporter-white)',
-    'var(--supporter-pink)',
-    'var(--supporter-blue)',
-  ].flatMap((color, index) => [
-    { color, offset: String(index / 5) },
-    { color, offset: String((index + 1) / 5) },
-  ]);
-  let stops = $derived(chosen === 'trans' ? transStops : APP_ICON_STOPS[chosen]);
+  let stops = $derived(CRISP_PRIDE_STOPS[chosen] ?? APP_ICON_STOPS[chosen]);
+  let isVertical = $derived(chosen in CRISP_PRIDE_STOPS && chosen !== 'intersex');
   let backing = $derived(
     customBackground
       ? supporterColor(backgroundColor, DEFAULT_SUPPORTER_BACKGROUND_COLOR)
@@ -47,18 +45,21 @@
   xmlns="http://www.w3.org/2000/svg"
 >
   <defs>
-    <linearGradient
-      {id}
-      x1="0"
-      y1="0"
-      x2={chosen === 'trans' ? '0' : '1'}
-      y2={chosen === 'trans' ? '1' : '0'}
-    >
-      {#each stops ?? [] as stop, index (index)}<stop
-          offset={stop.offset}
-          stop-color={stop.color}
-        />{/each}
-    </linearGradient>
+    {#if chosen === 'intersex'}
+      <radialGradient {id} cx="50%" cy="54%" r="38%">
+        {#each stops ?? [] as stop, index (index)}<stop
+            offset={stop.offset}
+            stop-color={stop.color}
+          />{/each}
+      </radialGradient>
+    {:else}
+      <linearGradient {id} x1="0" y1="0" x2={isVertical ? '0' : '1'} y2={isVertical ? '1' : '0'}>
+        {#each stops ?? [] as stop, index (index)}<stop
+            offset={stop.offset}
+            stop-color={stop.color}
+          />{/each}
+      </linearGradient>
+    {/if}
   </defs>
   {#if chosen === 'ceo'}
     <image href={ceoArt} width="512" height="512" />
