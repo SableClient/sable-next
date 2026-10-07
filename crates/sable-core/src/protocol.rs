@@ -238,6 +238,8 @@ pub enum Command {
         #[serde(default)]
         link_previews: Vec<UrlPreviewView>,
         #[serde(default)]
+        no_link_previews: bool,
+        #[serde(default)]
         image_source_packs: Vec<ImageSourcePackReferenceView>,
         #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Unknown>))]

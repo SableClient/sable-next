@@ -23,6 +23,8 @@
     | 'onCancelContext'
     | 'onEditPersona'
     | 'onToggleSilentReply'
+    | 'dismissedPreviews'
+    | 'onDismissPreview'
   > & {
     conversation: Conversation;
     onSend?: ComposerProps['onSend'];
@@ -54,4 +56,6 @@
   onCancelContext={conversation.clearContext}
   onEditPersona={conversation.setEditPersona}
   onToggleSilentReply={conversation.toggleSilentReply}
+  dismissedPreviews={conversation.dismissedPreviews}
+  onDismissPreview={conversation.dismissPreview}
 />

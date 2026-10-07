@@ -26,6 +26,8 @@
   import type { ConversationSendResult } from '#lib/features/room/conversation/conversation.svelte.js';
   import type { ReplyDirection } from '#lib/features/room/timeline/timeline-format.js';
   import DeleteMessageDialog from '#lib/features/room/messages/DeleteMessageDialog.svelte';
+  import { previewSources } from '#lib/features/room/media/link-preview-cache.js';
+  import { previewableLinks } from '#lib/features/room/media/link-preview.js';
   import { LongPress, SCHEDULE_PRESS_MS, touchContextMenu } from '#lib/ui/long-press.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { isPackChange, loadPacks } from '#lib/emoji/load-packs.js';
@@ -58,6 +60,7 @@
   import type { GifResult } from '#lib/features/gif/providers.js';
   import ComposerBoard from './ComposerBoard.svelte';
   import ComposerContextBanner from './ComposerContextBanner.svelte';
+  import ComposerLinkPreviews from './ComposerLinkPreviews.svelte';
   import ComposerError from './ComposerError.svelte';
   import ComposerDoor from './ComposerDoor.svelte';
   import PersonaPicker from './PersonaPicker.svelte';
@@ -174,6 +177,8 @@
     roomName?: string | null;
     readOnly?: boolean;
     encrypted?: boolean | null;
+    dismissedPreviews?: readonly string[];
+    onDismissPreview?: (url: string) => void;
     /** What the next send relates to: a message being replied to, or edited. */
     context?: ComposerContext | null;
     onCancelContext?: () => void;
@@ -203,6 +208,8 @@
     roomName = null,
     readOnly = false,
     encrypted = null,
+    dismissedPreviews = [],
+    onDismissPreview,
     context = null,
     onCancelContext,
     onEditPersona,
@@ -239,6 +246,8 @@
   let loadedMembersFor = $state<string | null>(null);
   let loadedEmotesFor = $state<string | null>(null);
   let typingTimeout: ReturnType<typeof setTimeout> | undefined;
+  let draftLinks = $state<string[]>([]);
+  let draftLinksTimeout: ReturnType<typeof setTimeout> | undefined;
   let draftTimeout: ReturnType<typeof setTimeout> | undefined;
   let seenRemoteDraft = 0;
   let boardOpen = $state(false);
@@ -497,6 +506,7 @@
       activeIndex = 0;
       if (change.docChanged) {
         updateTyping();
+        scheduleDraftLinks();
         scheduleLayout();
         schedulePersistDraft();
       }
@@ -607,6 +617,7 @@
   onDestroy(() => {
     sendPress.cancel();
     if (layoutFrame !== undefined) cancelAnimationFrame(layoutFrame);
+    if (draftLinksTimeout) clearTimeout(draftLinksTimeout);
     if (typingTimeout) clearTimeout(typingTimeout);
     clearTimeout(draftTimeout);
     stopTyping();
@@ -832,6 +843,21 @@
   function cancelContext(): void {
     onCancelContext?.();
     if (context?.kind === 'edit' || editingScheduled || !desktop) blurEditor();
+  }
+
+  let shownLinks = $derived.by(() => {
+    const sources = previewSources(encrypted);
+    if (!sources.server && !sources.client) return [];
+    return draftLinks.filter((url) => !dismissedPreviews.includes(url));
+  });
+
+  function scheduleDraftLinks(): void {
+    if (draftLinksTimeout) clearTimeout(draftLinksTimeout);
+    draftLinksTimeout = setTimeout(() => {
+      const doc = editor.doc();
+      const html = doc ? (richSend ? serializeComposer(doc) : serializePlain(doc)).formatted : null;
+      draftLinks = html ? previewableLinks(html) : [];
+    }, 300);
   }
 
   function updateTyping(): void {
@@ -1460,6 +1486,9 @@
               }}
             />
           {/key}
+        {/if}
+        {#if onDismissPreview && context?.kind !== 'edit' && shownLinks.length > 0}
+          <ComposerLinkPreviews urls={shownLinks} onDismiss={onDismissPreview} />
         {/if}
         {#if error}
           <ComposerError

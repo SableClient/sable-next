@@ -134,6 +134,7 @@ export type SendMessageOptions = {
   persona?: PerMessageProfileView | null;
   kind?: MessageKind;
   linkPreviews?: UrlPreviewView[];
+  noLinkPreviews?: boolean;
   imageSourcePacks?: ImageSourcePackReferenceView[];
   botCommand?: unknown;
   forumTitle?: string | null;
@@ -857,6 +858,7 @@ export function createCommands(transport: () => Transport) {
         silent_reply: options.silentReply ?? false,
         persona: $state.snapshot(options.persona ?? null),
         link_previews: $state.snapshot(options.linkPreviews ?? []),
+        no_link_previews: options.noLinkPreviews ?? false,
         image_source_packs: $state.snapshot(options.imageSourcePacks ?? []),
         bot_command: $state.snapshot(options.botCommand ?? null),
         forum_title: options.forumTitle ?? null,

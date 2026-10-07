@@ -483,6 +483,7 @@ impl Core {
                 silent_reply,
                 persona,
                 link_previews,
+                no_link_previews,
                 image_source_packs,
                 bot_command,
                 forum_title,
@@ -503,6 +504,7 @@ impl Core {
                     .with_reply(&room_id, content, reply, thread_root.clone(), "send_reply")
                     .await?;
 
+                let opt_out = no_link_previews.then(|| serde_json::json!([]));
                 let encrypted_images = self
                     .encrypted_preview_images(&room_id, &link_previews)
                     .await;
@@ -511,11 +513,13 @@ impl Core {
                     [
                         (
                             BUNDLED_LINK_PREVIEWS,
-                            bundled_link_previews(&link_previews, &encrypted_images, true),
+                            bundled_link_previews(&link_previews, &encrypted_images, true)
+                                .or_else(|| opt_out.clone()),
                         ),
                         (
                             LEGACY_BUNDLED_LINK_PREVIEWS,
-                            bundled_link_previews(&link_previews, &encrypted_images, false),
+                            bundled_link_previews(&link_previews, &encrypted_images, false)
+                                .or_else(|| opt_out.clone()),
                         ),
                         (
                             IMAGE_SOURCE_PACKS,

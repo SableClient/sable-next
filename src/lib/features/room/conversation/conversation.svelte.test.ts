@@ -42,6 +42,7 @@ function setup(
   const sendGif = vi.fn(() => Promise.resolve());
   const sendLocation = vi.fn(() => Promise.resolve());
   const toggleReaction = vi.fn(() => Promise.resolve());
+  const urlPreview = vi.fn(() => Promise.resolve(null));
   const core = {
     session: { user_id: userId },
     commands: {
@@ -52,6 +53,7 @@ function setup(
       sendGif,
       sendLocation,
       toggleReaction,
+      urlPreview,
     },
   } as unknown as CoreClient;
   const stub = {
@@ -77,6 +79,7 @@ function setup(
     sendGif,
     sendLocation,
     toggleReaction,
+    urlPreview,
     timeline,
     conversation: new Conversation({
       core,
@@ -882,4 +885,34 @@ test('editing steps forward to the next own message and leaves after the last', 
 
   conversation.editNext('$three:example.org');
   expect(conversation.context).toBeNull();
+});
+
+const LINKS = '<p><a href="https://a.example/">a</a> <a href="https://b.example/">b</a></p>';
+
+test('a dismissed link is not previewed and the dismissal is spent by the send', async () => {
+  setPreference('encryptedUrlPreviews', true);
+  const fixture = setup([], '@kris:example.org');
+  fixture.conversation.dismissPreview('https://a.example/');
+  await fixture.conversation.sendMessage(ROOM, 'a b', LINKS);
+
+  expect(fixture.urlPreview).toHaveBeenCalledTimes(1);
+  expect(fixture.urlPreview).toHaveBeenCalledWith('https://b.example/', null);
+  expect((fixture.sendMessage.mock.calls as unknown[][])[0]?.[2]).toMatchObject({
+    noLinkPreviews: false,
+  });
+  expect(fixture.conversation.dismissedPreviews).toEqual([]);
+});
+
+test('dismissing every link sends an explicit opt-out', async () => {
+  setPreference('encryptedUrlPreviews', true);
+  const fixture = setup([], '@kris:example.org');
+  fixture.conversation.dismissPreview('https://a.example/');
+  fixture.conversation.dismissPreview('https://b.example/');
+  await fixture.conversation.sendMessage(ROOM, 'a b', LINKS);
+
+  expect(fixture.urlPreview).not.toHaveBeenCalled();
+  expect((fixture.sendMessage.mock.calls as unknown[][])[0]?.[2]).toMatchObject({
+    linkPreviews: [],
+    noLinkPreviews: true,
+  });
 });

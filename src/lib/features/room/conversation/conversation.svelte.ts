@@ -66,6 +66,7 @@ export class Conversation {
   context = $state<ComposerContext | null>(null);
   scheduledRevision = $state(0);
   forumTitle = $state('');
+  dismissedPreviews = $state<string[]>([]);
 
   readonly #core: CoreClient;
   readonly #personas: PersonaStore;
@@ -102,15 +103,28 @@ export class Conversation {
     return this.#threadRoot;
   }
 
-  async #bundledLinkPreviews(html: string | null): Promise<UrlPreviewView[]> {
+  async #bundledLinkPreviews(
+    html: string | null,
+    dismissed: readonly string[]
+  ): Promise<{ previews: UrlPreviewView[]; suppressed: boolean }> {
     const sources = previewSources(this.#encrypted());
-    if (!sources.server && !sources.client) return [];
-    if (!html) return [];
+    if (!sources.server && !sources.client) return { previews: [], suppressed: false };
+    if (!html) return { previews: [], suppressed: false };
+    const links = previewableLinks(html);
+    const wanted = links.filter((url) => !dismissed.includes(url));
     const previews = await Promise.all(
-      previewableLinks(html).map((url) => resolveUrlPreview(this.#core.commands, url, sources))
+      wanted.map((url) => resolveUrlPreview(this.#core.commands, url, sources))
     );
-    return previews.filter((preview) => preview !== null);
+    return {
+      previews: previews.filter((preview) => preview !== null),
+      suppressed: links.length > 0 && wanted.length === 0,
+    };
   }
+
+  readonly dismissPreview = (url: string): void => {
+    if (!this.dismissedPreviews.includes(url))
+      this.dismissedPreviews = [...this.dismissedPreviews, url];
+  };
 
   readonly sendMessage = async (
     targetRoomId: string,
@@ -179,7 +193,12 @@ export class Conversation {
       untouched ? (outcome.formatted ?? formatted) : (outcome.formatted ?? null)
     );
     if (outgoing.body === '') return;
-    const linkPreviews = await this.#bundledLinkPreviews(outgoing.formatted);
+    const dismissed = this.dismissedPreviews;
+    this.dismissedPreviews = [];
+    const { previews: linkPreviews, suppressed } = await this.#bundledLinkPreviews(
+      outgoing.formatted,
+      dismissed
+    );
     await this.#core.commands.sendMessage(targetRoomId, outgoing.body, {
       inReplyTo: pending?.eventId ?? null,
       threadRoot: this.#threadRoot,
@@ -189,6 +208,7 @@ export class Conversation {
       kind: outcome.msgtype,
       persona: outgoing.persona,
       linkPreviews,
+      noLinkPreviews: suppressed,
       imageSourcePacks,
       forumTitle: this.#threadRoot === null && !pending?.eventId ? this.forumTitle : null,
     });

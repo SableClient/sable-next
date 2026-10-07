@@ -2516,6 +2516,8 @@
     "recordVideo": "Record video",
     "attachFile": "Attach file",
     "stagedFiles": "Files ready to send",
+    "linkPreviews": "Links that will be previewed",
+    "skipLinkPreview": "Don't preview {{url}}",
     "removeAttachment": "Remove {{name}}",
     "spoilerAttachment": "Mark {{name}} as a spoiler",
     "caption": "Caption",
