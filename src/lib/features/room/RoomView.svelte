@@ -1057,6 +1057,7 @@
             bind:this={composer}
             {conversation}
             roomId={resolvedRoomId}
+            roomMembers={memberLoader.members}
             onSchedule={conversation.schedule}
             canReact={roomSession.permissions?.can_react ?? true}
             {roomName}

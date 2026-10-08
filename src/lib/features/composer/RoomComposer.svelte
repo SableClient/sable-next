@@ -128,6 +128,7 @@
 
   interface Props {
     roomId: string;
+    roomMembers?: readonly MemberView[];
     onSend: (
       roomId: string,
       body: string,
@@ -195,6 +196,7 @@
 
   let {
     roomId,
+    roomMembers,
     onSend,
     onSendBotCommand,
     onSendAttachment,
@@ -303,7 +305,8 @@
   let activeIndex = $state(0);
   let previousContext: ComposerContext | null = null;
   let deleteEditTarget = $state.raw<ComposerContext | null>(null);
-  let members = $state.raw<MemberView[]>([]);
+  let loadedMembers = $state.raw<MemberView[]>([]);
+  let members = $derived(roomMembers?.length ? roomMembers : loadedMembers);
   let emotes = $state.raw<PackImageView[]>([]);
   let emotesFor: string | null = null;
   let botCommands = $state.raw<BotCommand[]>([]);
@@ -695,10 +698,10 @@
   }
 
   async function loadMembers(): Promise<void> {
-    if (loadedMembersFor === roomId) return;
+    if (roomMembers?.length || loadedMembersFor === roomId) return;
     loadedMembersFor = roomId;
     try {
-      members = await core.commands.roomMembers(roomId);
+      loadedMembers = await core.commands.roomMembers(roomId);
     } catch {
       loadedMembersFor = null;
     }

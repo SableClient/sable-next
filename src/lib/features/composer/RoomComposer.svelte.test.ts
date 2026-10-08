@@ -135,6 +135,7 @@ function core(): CoreClient {
 
 interface ComposerProps {
   roomId: string;
+  roomMembers?: readonly MemberView[];
   onSend?: (
     roomId: string,
     body: string,
@@ -2357,6 +2358,28 @@ test('a bot command change clears stale suggestions', async () => {
   await vi.waitFor(() => {
     expect(screen.queryByRole('option', { name: /\/warn/ })).toBeNull();
   });
+});
+
+test('mention suggestions use the members the room already loaded', async () => {
+  const client = core();
+  const roomMembers = vi.fn(() => new Promise<MemberView[]>(() => {}));
+  Object.assign(client.commands, { roomMembers });
+  draftText('@mem');
+  render(Harness, {
+    props: {
+      core: client,
+      composer: {
+        roomId: '!room:example.org',
+        roomMembers: members,
+        onSend: async () => {},
+        onSendAttachment: async () => {},
+        onTyping: async () => {},
+      },
+    },
+  });
+
+  expect(await screen.findByRole('option', { name: /Member One/ })).toBeTruthy();
+  expect(roomMembers).not.toHaveBeenCalled();
 });
 
 test('a pack change refreshes open emote suggestions', async () => {
