@@ -6,7 +6,7 @@ import type { RoomSummary } from '#src/generated/protocol';
 import { countNotifications, notifications } from '#lib/features/inbox/inbox.js';
 
 import { setQuiet } from './quiet-rooms.svelte.js';
-import { RoomList } from './room-list.svelte.js';
+import { RoomList, roomPathId } from './room-list.svelte.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -705,4 +705,20 @@ test('stopping drops pending warms and forgets what was warmed', () => {
   vi.advanceTimersByTime(100);
   expect(warmRooms).toHaveBeenCalledWith(['!a:example.org']);
   vi.useRealTimers();
+});
+
+test('a room path uses its alias only when the room is the first live owner of it', () => {
+  const room = (room_id: string, canonical_alias: string | null, is_tombstoned = false) =>
+    ({ room_id, canonical_alias, is_tombstoned }) as RoomSummary;
+  const old = room('!old:x', '#lounge:x', true);
+  const lounge = room('!lounge:x', '#lounge:x');
+  const copy = room('!copy:x', '#lounge:x');
+  const plain = room('!plain:x', null);
+  const rooms = [old, lounge, copy, plain];
+
+  expect(roomPathId(lounge, rooms)).toBe('#lounge:x');
+  expect(roomPathId(copy, rooms)).toBe('!copy:x');
+  expect(roomPathId(old, rooms)).toBe('!old:x');
+  expect(roomPathId(plain, rooms)).toBe('!plain:x');
+  expect(roomPathId(copy, [copy, lounge])).toBe('#lounge:x');
 });
