@@ -8742,8 +8742,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-sharekit"
 version = "0.4.0-rc.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "865a541921689b0a952bbd1fd28bb148148f70848bf47842929f7c394e0a1e6b"
+source = "git+https://github.com/Choochmeque/tauri-plugin-sharekit?rev=455a166070626bae1da4cf3c471d4d3a40d33d6d#455a166070626bae1da4cf3c471d4d3a40d33d6d"
 dependencies = [
  "log",
  "objc2",
@@ -8757,8 +8756,8 @@ dependencies = [
  "tauri-plugin",
  "thiserror 2.0.21",
  "tokio",
- "windows 0.61.3",
- "windows-collections 0.2.0",
+ "windows 0.62.2",
+ "windows-collections 0.3.2",
 ]
 
 [[package]]

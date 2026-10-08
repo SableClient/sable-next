@@ -635,7 +635,13 @@ test('edits an own image caption without dropping its media details', async () =
 
   await hover(document.querySelector('.message'));
   await tick();
-  await press(document.querySelector<HTMLButtonElement>('.message-actions button'));
+  const edit = screen.getByRole('button', { name: 'Edit message' });
+  const hitTest = vi.spyOn(document, 'elementFromPoint').mockReturnValue(edit);
+  try {
+    await press(edit);
+  } finally {
+    hitTest.mockRestore();
+  }
 
   expect(onEdit).toHaveBeenCalledWith('$item', 'caption', null, true);
 });

@@ -550,6 +550,19 @@ const RECEIVER_FORMATS = new Set([
   'spoiler_open',
 ]);
 
+const quoteRules = new MarkdownIt('commonmark').block.ruler;
+quoteRules.enableOnly('blockquote');
+const [parseBlockquote] = quoteRules.getRules('');
+tokenizer.block.ruler.at(
+  'blockquote',
+  (state, startLine, endLine, silent) => {
+    const start = state.bMarks[startLine] + state.tShift[startLine];
+    if (!/^>[ \t]/.test(state.src.slice(start, state.eMarks[startLine]))) return false;
+    return parseBlockquote(state, startLine, endLine, silent);
+  },
+  { alt: ['paragraph', 'reference', 'blockquote'] }
+);
+
 function receiverFormats(text: string): boolean {
   return tokenizer
     .parseInline(text, {})
@@ -683,35 +696,8 @@ const markdownParser = new MarkdownParser(
 
 const ATOM_PLACEHOLDER = '\uFFFC';
 
-// Require a space after '>' so emotes stay text
-function protectUnspacedBlockquotes(source: string): string {
-  let fence: { marker: '`' | '~'; length: number } | undefined;
-
-  return source
-    .split('\n')
-    .map((line) => {
-      if (fence) {
-        const closing = new RegExp(`^ {0,3}${fence.marker}{${fence.length},}[ \\t]*$`);
-        if (closing.test(line)) fence = undefined;
-        return line;
-      }
-
-      const opening = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1];
-      if (opening) {
-        fence = { marker: opening[0] as '`' | '~', length: opening.length };
-        return line;
-      }
-
-      if (/^ {4}/.test(line)) return line;
-      return line.replace(/^( {0,3})>(?=$|[^ \t])/, (_match, indent: string) => `${indent}\\>`);
-    })
-    .join('\n');
-}
-
 function parseMarkdown(source: string): ProseMirrorNode {
-  return markdownParser.parse(
-    protectUnspacedBlockquotes(source).replaceAll('¯\\_(ツ)_/¯', '¯\\\\\\_(ツ)\\_/¯')
-  );
+  return markdownParser.parse(source.replaceAll('¯\\_(ツ)_/¯', '¯\\\\\\_(ツ)\\_/¯'));
 }
 
 export function atomText(node: ProseMirrorNode): string {

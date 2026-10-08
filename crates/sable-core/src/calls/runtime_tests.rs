@@ -47,7 +47,12 @@ async fn discover_with_peers(
         .ok()
         .mount()
         .await;
-    let client = server.client_builder().no_server_versions().build().await;
+    let client = server
+        .client_builder()
+        .no_server_versions()
+        .on_builder(|builder| builder.disable_well_known_lookup(true))
+        .build()
+        .await;
     let room_id = owned_room_id!("!call:example.org");
     let now = super::keys::now_ms();
     let mut builder = JoinedRoomBuilder::new(&room_id);
@@ -700,7 +705,11 @@ async fn legacy_move_fixture(
     use wiremock::{Mock, ResponseTemplate};
 
     let server = MatrixMockServer::new().await;
-    let client = server.client_builder().build().await;
+    let client = server
+        .client_builder()
+        .on_builder(|builder| builder.disable_well_known_lookup(true))
+        .build()
+        .await;
     let room_id = owned_room_id!("!call:example.org");
     server.sync_joined_room(&client, &room_id).await;
     let room = client.get_room(&room_id).unwrap();

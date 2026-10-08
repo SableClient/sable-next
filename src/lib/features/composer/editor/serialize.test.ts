@@ -289,6 +289,23 @@ describe('source mode keeps markdown typed as text', () => {
     ['lines shaped like a table', [para([text('| a |'), hard_break.create(), text('| - |')])]],
     ['a heading that ends in a hash', [heading.create({ level: 2 }, text('a #'))]],
     ['a fence inside a code block', [code_block.create({ language: '' }, text('a\n```\nb'))]],
+    [
+      'a quote marker inside a list code block',
+      [bullet_list.create(null, list_item.create(null, code_block.create(null, text('>'))))],
+    ],
+    [
+      'a blank quote line between list blocks',
+      [
+        blockquote.create(
+          null,
+          bullet_list.create(null, [
+            list_item.create(null, [cells([text('&amp;')], [text('=')]), horizontal_rule.create()]),
+            list_item.create(null, code_block.create(null, text('-'))),
+          ])
+        ),
+        horizontal_rule.create(),
+      ],
+    ],
     ['an entity', [para(text('&amp; &#65;'))]],
     ['spoiler bars', [para(text('||s||'))]],
     ['an autolink', [para(text('<ab:c>'))]],
@@ -363,6 +380,13 @@ test('a quote survives both ways', () => {
   expect(message.body).toBe('> quoted');
   expect(message.formatted).toBe('<blockquote><p>quoted</p></blockquote>');
 });
+
+test.each(['>_<', '>word', '>', '* >_<', '> >_<'])(
+  'an unspaced quote marker stays text in %s',
+  (source) => {
+    expect(richFromPlain(textDoc(source)).textContent).toBe(source.replace(/^(?:\* |>[ \t])/, ''));
+  }
+);
 
 test('a line break ending a quote is not sent', () => {
   const message = serializeComposer(

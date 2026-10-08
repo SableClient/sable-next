@@ -285,7 +285,10 @@ mod tests {
     #[tokio::test]
     async fn a_gateway_request_retries_transient_connection_failures() {
         let attempts = Arc::new(AtomicUsize::new(0));
-        let client = matrix_sdk::reqwest::Client::new();
+        let client = matrix_sdk::reqwest::Client::builder()
+            .timeout(Duration::from_secs(1))
+            .build()
+            .unwrap();
         let result = retry_transient(
             || {
                 let attempt = attempts.fetch_add(1, Ordering::Relaxed);
