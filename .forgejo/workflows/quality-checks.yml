@@ -176,16 +176,28 @@ jobs:
           path: static/deepfilternet3
           key: deepfilternet3-${{ hashFiles('scripts/fetch-deepfilternet.mjs') }}
 
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
       - name: Restore Playwright browsers
         id: browsers
         uses: https://github.com/actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
       - name: Install Playwright browsers
         if: ${{ steps.browsers.outputs.cache-hit != 'true' }}
-        run: pnpm exec playwright install chromium webkit
+        env:
+          PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT: '120000'
+        run: |
+          for attempt in 1 2 3; do
+            pnpm exec playwright install chromium webkit && exit 0
+            echo "playwright install attempt $attempt failed"
+            sleep 15
+          done
+          exit 1
 
       # The shared libraries the browsers link against live outside the cache.
       - name: Install Playwright system libraries
