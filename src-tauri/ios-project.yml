@@ -113,6 +113,7 @@ targets:
         LSRequiresIPhoneOS: true
         UILaunchStoryboardName: LaunchScreen
         UIBackgroundModes: [audio, voip, remote-notification]
+        ITSAppUsesNonExemptEncryption: true
         NSMicrophoneUsageDescription: Sable uses your microphone for calls and videos.
         NSCameraUsageDescription: Sable uses your camera for video calls, photos and videos.
         NSLocationWhenInUseUsageDescription: Sable shares your location in a conversation when you ask it to.
