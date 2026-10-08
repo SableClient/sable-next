@@ -123,6 +123,17 @@ jobs:
           ipa="$(find src-tauri/gen/apple/build -type f -name '*.ipa' | head -n 1)"
           [ -n "$ipa" ] || { echo 'No iOS IPA found' >&2; exit 1; }
           echo "path=$ipa" >> "$GITHUB_OUTPUT"
+      - name: List IPA frameworks
+        env:
+          IPA_PATH: ${{ steps.ipa.outputs.path }}
+        run: |
+          dir="$(mktemp -d)"
+          unzip -q "$IPA_PATH" -d "$dir"
+          find "$dir"/Payload/*.app/Frameworks -maxdepth 2
+          find "$dir"/Payload/*.app/Frameworks -type f -perm -u+x -exec file {} \;
+          for framework in "$dir"/Payload/*.app/Frameworks/*.framework; do
+            codesign -dvv "$framework" 2>&1 | grep -E 'Identifier|Authority|not signed' || true
+          done
       - name: Upload to App Store Connect
         env:
           IPA_PATH: ${{ steps.ipa.outputs.path }}
