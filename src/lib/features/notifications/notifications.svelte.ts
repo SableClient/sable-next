@@ -184,13 +184,11 @@ export class NotificationCenter {
     const lines = appendLine(standing, line(view));
     this.conversations.set(view.room_id, lines);
 
-    const quiet = preferences.notifyOnce && standing.length > 0 && !view.mention;
     const allowed = soundsAllowed();
-    const chime = view.noisy !== false && preferences.notificationSounds && !quiet && allowed;
+    const chime = view.noisy !== false && preferences.notificationSounds && allowed;
     recordDebugLog('debug', 'notification', 'sound', chime ? 'chime' : 'silent', {
       noisy: view.noisy,
       sounds: preferences.notificationSounds,
-      quiet,
       allowed,
       mention: view.mention,
       direct: view.is_direct,

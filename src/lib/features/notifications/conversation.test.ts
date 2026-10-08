@@ -1,10 +1,12 @@
 import { expect, test } from 'vitest';
 
 import {
+  alertCooling,
   appendLine,
   hideLines,
   type ConversationLine,
   MAX_CONVERSATION_LINES,
+  NOTIFY_ONCE_WINDOW_MS,
   readLines,
   summarise,
 } from './conversation';
@@ -75,4 +77,12 @@ test('turning previews off scrubs the lines an earlier push stored', () => {
     { sender: null, body: 'New message from Ada', eventId: '$one' },
     { sender: null, body: 'New message', eventId: '$two' },
   ]);
+});
+
+test('a room that alerted stays quiet only for the notify-once window', () => {
+  expect(alertCooling(undefined, 1_000)).toBe(false);
+  expect(alertCooling(1_000, 1_000)).toBe(true);
+  expect(alertCooling(1_000, 1_000 + NOTIFY_ONCE_WINDOW_MS - 1)).toBe(true);
+  expect(alertCooling(1_000, 1_000 + NOTIFY_ONCE_WINDOW_MS)).toBe(false);
+  expect(alertCooling(5_000, 1_000)).toBe(false);
 });

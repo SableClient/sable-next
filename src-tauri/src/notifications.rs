@@ -4,7 +4,7 @@ use sable_core::protocol::{WebPushKeys, WebPusherView};
 use sable_core::ruma::{EventId, owned_room_id, owned_user_id};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_notifications::{NotificationMessage, NotificationsExt};
 
@@ -12,6 +12,7 @@ const MESSAGES_CHANNEL: &str = "messages.v2";
 const NOTIFICATION_GROUP: &str = "matrix_messages";
 const MESSAGE_ACTIONS: &str = "sable-message";
 const MAX_CONVERSATION_LINES: usize = 8;
+const NOTIFY_ONCE_WINDOW: Duration = Duration::from_mins(5);
 
 fn java_hash(text: &str) -> i32 {
     text.encode_utf16().fold(0i32, |hash, unit| {
@@ -40,6 +41,8 @@ struct Line {
 }
 
 static CONVERSATIONS: LazyLock<Mutex<HashMap<String, Vec<Line>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static ALERTED: LazyLock<Mutex<HashMap<String, Instant>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 static PUSH_REGISTRATION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -352,6 +355,26 @@ fn forget(user_id: &str, room_id: &str) {
     if let Ok(mut conversations) = CONVERSATIONS.lock() {
         conversations.remove(&conversation_key(user_id, room_id));
     }
+    if let Ok(mut alerted) = ALERTED.lock() {
+        alerted.remove(&conversation_key(user_id, room_id));
+    }
+}
+
+fn cooling(view: &NotificationView, now: Instant) -> bool {
+    if view.mention || view.noisy != Some(false) {
+        return false;
+    }
+    let Ok(mut alerted) = ALERTED.lock() else {
+        return false;
+    };
+    let key = conversation_key(view.user_id.as_str(), view.room_id.as_str());
+    let quiet = alerted
+        .get(&key)
+        .is_some_and(|at| now.saturating_duration_since(*at) < NOTIFY_ONCE_WINDOW);
+    if !quiet {
+        alerted.insert(key, now);
+    }
+    quiet
 }
 
 fn conversation_message(line: &Line, encrypted: bool) -> Option<NotificationMessage> {
@@ -435,7 +458,7 @@ pub async fn show<R: Runtime>(
     if let Some(icon) = linux_icon(app) {
         builder = builder.icon(icon);
     }
-    builder = builder.only_alert_once(core.notify_once() && !view.mention);
+    builder = builder.only_alert_once(core.notify_once() && cooling(view, Instant::now()));
     if alerts_silently(view.noisy, core.notification_sounds()) {
         builder = builder.silent();
     }
@@ -1097,9 +1120,9 @@ mod tests {
     use sable_core::protocol::NotificationView;
 
     use super::{
-        Line, MAX_CONVERSATION_LINES, MESSAGE_ACTIONS, Registration, alerts_silently, body,
-        collapsed, forget, java_hash, provider_for_server_delivery, pusher, remember,
-        room_notification_id, server_web_pusher, shows_content,
+        Line, MAX_CONVERSATION_LINES, MESSAGE_ACTIONS, NOTIFY_ONCE_WINDOW, Registration,
+        alerts_silently, body, collapsed, cooling, forget, java_hash, provider_for_server_delivery,
+        pusher, remember, room_notification_id, server_web_pusher, shows_content,
     };
 
     #[test]
@@ -1420,6 +1443,46 @@ mod tests {
             event_id: Some(event.parse().expect("an event id")),
             ..view.clone()
         }
+    }
+
+    #[test]
+    fn a_quiet_room_alerts_again_once_the_notify_once_window_has_passed() {
+        let quiet = NotificationView {
+            noisy: Some(false),
+            ..in_room("!cooling:example.org")
+        };
+        let start = std::time::Instant::now();
+
+        assert!(!cooling(&quiet, start));
+        assert!(cooling(&quiet, start + NOTIFY_ONCE_WINDOW / 2));
+        assert!(!cooling(&quiet, start + NOTIFY_ONCE_WINDOW));
+        assert!(cooling(
+            &quiet,
+            start + NOTIFY_ONCE_WINDOW + NOTIFY_ONCE_WINDOW / 2
+        ));
+        forget(quiet.user_id.as_str(), quiet.room_id.as_str());
+        assert!(!cooling(
+            &quiet,
+            start + NOTIFY_ONCE_WINDOW + NOTIFY_ONCE_WINDOW / 2
+        ));
+        forget(quiet.user_id.as_str(), quiet.room_id.as_str());
+    }
+
+    #[test]
+    fn a_ringing_rule_or_a_mention_is_never_quieted() {
+        let room = in_room("!loud:example.org");
+        let mention = NotificationView {
+            noisy: Some(false),
+            mention: true,
+            ..room.clone()
+        };
+        let start = std::time::Instant::now();
+
+        assert!(!cooling(&room, start));
+        assert!(!cooling(&room, start));
+        assert!(!cooling(&mention, start));
+        assert!(!cooling(&mention, start));
+        forget(room.user_id.as_str(), room.room_id.as_str());
     }
 
     #[test]

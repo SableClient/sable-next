@@ -8,6 +8,9 @@ final class NotificationService: UNNotificationServiceExtension {
     private var fallback: UNMutableNotificationContent?
     private var policyRoot: String?
     private var originalSound: UNNotificationSound?
+    private var noisy = false
+    private static let alertedAtKey = "sable_alerted_at"
+    private static let notifyOnceWindow: TimeInterval = 5 * 60
 
     override func didReceive(
         _ request: UNNotificationRequest,
@@ -28,6 +31,7 @@ final class NotificationService: UNNotificationServiceExtension {
         completion = contentHandler
         fallback = content
         originalSound = request.content.sound
+        noisy = false
         policyRoot = nil
         lock.unlock()
 
@@ -66,6 +70,11 @@ final class NotificationService: UNNotificationServiceExtension {
                 return
             }
             updated.body = body
+            if rendered["noisy"] as? Bool == true {
+                self?.lock.lock()
+                self?.noisy = true
+                self?.lock.unlock()
+            }
             if let user = rendered["user_id"] as? String, let room = rendered["room_id"] as? String {
                 updated.threadIdentifier = user + "\u{0}" + room
             }
@@ -131,10 +140,12 @@ final class NotificationService: UNNotificationServiceExtension {
                 delivered.filter { Self.messageIdentity($0.request.content.userInfo) == identity }
                     .map { $0.request.identifier }
             } ?? []
-            let standing = thread.map { thread in
-                delivered.contains { $0.request.content.threadIdentifier == thread }
-            } ?? false
-            self?.complete(content, duplicates: duplicates, standing: standing)
+            let alertedAt = thread.flatMap { thread in
+                delivered.filter { $0.request.content.threadIdentifier == thread }
+                    .compactMap { $0.request.content.userInfo[Self.alertedAtKey] as? TimeInterval }
+                    .max()
+            }
+            self?.complete(content, duplicates: duplicates, alertedAt: alertedAt)
         }
     }
 
@@ -152,22 +163,28 @@ final class NotificationService: UNNotificationServiceExtension {
     private func complete(
         _ content: UNNotificationContent,
         duplicates: [String] = [],
-        standing: Bool = false
+        alertedAt: TimeInterval? = nil
     ) {
         lock.lock()
         let handler = completion
         completion = nil
         let root = policyRoot
         let sound = originalSound
+        let noisy = self.noisy
         lock.unlock()
         guard let handler else { return }
         guard let updated = content.mutableCopy() as? UNMutableNotificationContent else {
             handler(content)
             return
         }
+        let now = Date().timeIntervalSince1970
+        let cooling = alertedAt.map { now >= $0 && now - $0 < Self.notifyOnceWindow } ?? false
         let quiet = !duplicates.isEmpty
-            || (standing && root?.withCString { sable_push_notify_once($0) } == true)
+            || (cooling && !noisy && root?.withCString { sable_push_notify_once($0) } == true)
         updated.sound = !quiet && root?.withCString { sable_push_sounds($0) } == true ? sound : nil
+        if let stamp = quiet ? alertedAt : Optional(now) {
+            updated.userInfo[Self.alertedAtKey] = stamp
+        }
         if !duplicates.isEmpty {
             UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: duplicates)
         }

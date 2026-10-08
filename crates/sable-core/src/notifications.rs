@@ -374,13 +374,16 @@ async fn decrypt_push_event(
 
     match &decrypted.kind {
         matrix_sdk::deserialized_responses::TimelineEventKind::Decrypted(clear) => {
-            return if decrypted
-                .push_actions()
-                .is_some_and(|actions| !notifies(actions))
-            {
+            let actions = decrypted.push_actions();
+            return if actions.is_some_and(|actions| !notifies(actions)) {
                 ColdPush::Discard
             } else {
-                ColdPush::Clear(clear.event.json().get().to_owned())
+                let noisy = actions.is_some_and(|actions| {
+                    actions
+                        .iter()
+                        .any(|action| action.sound().is_some() || action.is_highlight())
+                });
+                ColdPush::Clear(marked_noisy(clear.event.json().get(), noisy))
             };
         }
         matrix_sdk::deserialized_responses::TimelineEventKind::UnableToDecrypt {
@@ -417,7 +420,8 @@ async fn decrypt_push_event(
                 if clear.get_field::<String>("type").ok().flatten().as_deref()
                     != Some("m.room.encrypted") =>
             {
-                ColdPush::Clear(clear.json().get().to_owned())
+                let noisy = item.is_noisy == Some(true) || item.has_mention == Some(true);
+                ColdPush::Clear(marked_noisy(clear.json().get(), noisy))
             }
             _ => undecryptable,
         },
@@ -426,6 +430,19 @@ async fn decrypt_push_event(
         }
         Ok(NotificationStatus::EventNotFound) | Err(_) => undecryptable,
     }
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn marked_noisy(clear: &str, noisy: bool) -> String {
+    if !noisy {
+        return clear.to_owned();
+    }
+    let Ok(mut event) = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(clear)
+    else {
+        return clear.to_owned();
+    };
+    event.insert(NOISY_KEY.to_owned(), true.into());
+    serde_json::to_string(&event).unwrap_or_else(|_| clear.to_owned())
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -692,6 +709,7 @@ pub async fn remove_pusher(
 }
 
 const BACKFILL_GRACE_MS: u64 = 60_000;
+pub const NOISY_KEY: &str = "moe.sable.noisy";
 
 #[must_use]
 pub fn is_backfill(
@@ -1156,10 +1174,41 @@ mod tests {
         let ColdPush::Clear(clear) = fixture.decrypt("A", &message).await else {
             panic!("an all-messages room must still notify");
         };
-        assert_eq!(
-            serde_json::from_str::<serde_json::Value>(&clear).unwrap()["content"]["body"],
-            "hello"
-        );
+        let clear = serde_json::from_str::<serde_json::Value>(&clear).unwrap();
+        assert_eq!(clear["content"]["body"], "hello");
+        assert_eq!(clear.get(super::NOISY_KEY), None);
+        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_cold_push_whose_rule_rings_is_marked_noisy() {
+        use matrix_sdk::ruma::push::{Action, NewPushRule, NewSimplePushRule, Tweak};
+
+        let mut rules = Ruleset::server_default(user_id!("@alice:example.org"));
+        rules
+            .insert(
+                NewPushRule::Room(NewSimplePushRule::new(
+                    room_id!("!cold:example.org").to_owned(),
+                    vec![
+                        Action::Notify,
+                        Action::SetTweak(Tweak::Sound("default".into())),
+                    ],
+                )),
+                None,
+                None,
+            )
+            .unwrap();
+        let fixture = ColdFixture::new("noisy", cold_room_with_members(), Some(rules)).await;
+        let message = fixture
+            .push("m.room.message", json!({"msgtype":"m.text", "body":"ring"}))
+            .await;
+
+        let ColdPush::Clear(clear) = fixture.decrypt("A", &message).await else {
+            panic!("a ringing room must notify");
+        };
+        let clear = serde_json::from_str::<serde_json::Value>(&clear).unwrap();
+        assert_eq!(clear["content"]["body"], "ring");
+        assert_eq!(clear[super::NOISY_KEY], true);
         tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
     }
 

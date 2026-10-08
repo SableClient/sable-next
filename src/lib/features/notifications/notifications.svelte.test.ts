@@ -330,51 +330,12 @@ function message(eventId: string): NotificationView {
   return { ...invite(), event_id: eventId, body: 'Hello', noisy: true };
 }
 
-test('a second message in a room with a standing alert does not sound again', () => {
-  const notifications = center();
-
-  notifications.present(message('$one'));
-  expect(mocks.sound).toHaveBeenCalledTimes(1);
-
-  notifications.present(message('$two'));
-  expect(mocks.sound).toHaveBeenCalledTimes(1);
-
-  notifications.retireRead([room(0)]);
-  notifications.present(message('$three'));
-  expect(mocks.sound).toHaveBeenCalledTimes(2);
-});
-
-test('reading a room re-arms its sound while read alerts are left standing', () => {
-  preferences.clearNotificationsOnRead = false;
-  const notifications = center();
-
-  notifications.present(message('$one'));
-  notifications.readRoom('!room:example.org');
-  notifications.readRoom(null);
-  notifications.present(message('$two'));
-  expect(mocks.sound).toHaveBeenCalledTimes(2);
-
-  notifications.retireRead([room(0)]);
-  notifications.present(message('$three'));
-  expect(mocks.sound).toHaveBeenCalledTimes(3);
-  expect(mocks.retire).not.toHaveBeenCalled();
-});
-
-test('a mention sounds even in a room with a standing alert', () => {
-  const notifications = center();
-
-  notifications.present(message('$one'));
-  notifications.present({ ...message('$two'), mention: true });
-
-  expect(mocks.sound).toHaveBeenCalledTimes(2);
-});
-
-test('every message sounds while only notifying once is off', () => {
-  preferences.notifyOnce = false;
+test('a message whose rule rings sounds every time, alert standing or not', () => {
   const notifications = center();
 
   notifications.present(message('$one'));
   notifications.present(message('$two'));
+  notifications.present({ ...message('$three'), noisy: false });
 
   expect(mocks.sound).toHaveBeenCalledTimes(2);
 });

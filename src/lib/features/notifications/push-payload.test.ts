@@ -225,3 +225,17 @@ test('an encrypted push is silenced in a room that only wants mentions', () => {
   expect(silencedByRoomMode(encrypted, null)).toBe(false);
   expect(silencedByRoomMode(plain, 'mute')).toBe(true);
 });
+
+test('a push is noisy when its rule set a sound or a highlight', () => {
+  const push = (tweaks: object) =>
+    parsedPayload(
+      JSON.stringify({
+        notification: { room_id: '!room:example.org', devices: [{ pushkey: 'k', tweaks }] },
+      })
+    ).notification?.noisy;
+
+  expect(push({ sound: 'default' })).toBe(true);
+  expect(push({ highlight: true })).toBe(true);
+  expect(push({ highlight: false })).toBe(false);
+  expect(push({})).toBe(false);
+});

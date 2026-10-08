@@ -106,6 +106,18 @@ fn ring(event: &Value, notification: &Value) -> Option<Value> {
     Some(json!({"caller_name": caller, "expires_at": expires_at}))
 }
 
+fn rings(notification: &Value) -> bool {
+    notification
+        .get("devices")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|device| device.get("tweaks"))
+        .any(|tweaks| {
+            tweaks.get("sound").is_some() || tweaks.get("highlight") == Some(&json!(true))
+        })
+}
+
 async fn render(root: &Path, payload: &Value) -> Option<Value> {
     let settings = policy(root);
     if !settings.enabled {
@@ -167,7 +179,14 @@ async fn render(root: &Path, payload: &Value) -> Option<Value> {
     }) {
         return None;
     }
-    Some(json!({"body": body, "room_id": room_id, "user_id": user, "sounds": current.sounds}))
+    let noisy = event
+        .get(sable_core::notifications::NOISY_KEY)
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || rings(notification);
+    Some(
+        json!({"body": body, "room_id": room_id, "user_id": user, "sounds": current.sounds, "noisy": noisy}),
+    )
 }
 
 /// # Safety
@@ -295,6 +314,16 @@ mod tests {
         );
         assert!(ring(&event("m.rtc.notification", "notification"), &named).is_none());
         assert!(ring(&event("m.room.message", "ring"), &named).is_none());
+    }
+
+    #[test]
+    fn a_push_rings_when_its_rule_set_a_sound_or_a_highlight() {
+        let push = |tweaks: Value| json!({"devices":[{"pushkey":"k","tweaks":tweaks}]});
+
+        assert!(rings(&push(json!({"sound":"default"}))));
+        assert!(rings(&push(json!({"highlight":true}))));
+        assert!(!rings(&push(json!({"highlight":false}))));
+        assert!(!rings(&json!({"room_id":"!room:example.org"})));
     }
 
     #[test]

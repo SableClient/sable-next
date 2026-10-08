@@ -19,6 +19,7 @@ export type PushPayload = {
     counts?: { unread?: number };
     icon?: string;
     decrypted?: boolean;
+    noisy?: boolean;
   };
 };
 
@@ -47,6 +48,7 @@ export function parsePushPayload(raw: string | undefined): PushPayload | null {
     if (typeof notification === 'string') notification = JSON.parse(notification);
     if (!isRecord(notification)) return null;
     const recipients = new Set<string>();
+    let noisy = false;
     const addRecipient = (value: unknown) => {
       if (typeof value === 'string' && value.trim()) recipients.add(value.trim());
     };
@@ -54,7 +56,10 @@ export function parsePushPayload(raw: string | undefined): PushPayload | null {
     addRecipient(notification.user_id);
     if (Array.isArray(notification.devices)) {
       for (const device of notification.devices) {
-        if (!isRecord(device) || !isRecord(device.data)) continue;
+        if (!isRecord(device)) continue;
+        if (isRecord(device.tweaks))
+          noisy ||= 'sound' in device.tweaks || device.tweaks.highlight === true;
+        if (!isRecord(device.data)) continue;
         addRecipient(device.data.user_id);
         if (isRecord(device.data.default_payload))
           addRecipient(device.data.default_payload.user_id);
@@ -80,6 +85,7 @@ export function parsePushPayload(raw: string | undefined): PushPayload | null {
         type: text(notification.type),
         content: pushContent(notification.content),
         counts: { unread },
+        noisy,
       },
     };
   } catch {

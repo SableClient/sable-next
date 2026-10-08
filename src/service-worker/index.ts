@@ -8,6 +8,7 @@ import { resolve } from '$app/paths';
 
 import favicon from '#lib/assets/favicon.png';
 import {
+  alertCooling,
   appendLine,
   hideLines,
   readLines,
@@ -188,8 +189,14 @@ async function present(pushed: PushPayload | undefined): Promise<void> {
     return;
   }
 
-  const held = await conversation(showing.tag);
+  const { lines: held, alertedAt } = await conversation(showing.tag);
   const lines = appendLine(showContent ? held : hideLines(held), showing.line);
+  const now = Date.now();
+  const renotify =
+    !policy.notifyOnce ||
+    held.length === 0 ||
+    payload.notification?.noisy === true ||
+    !alertCooling(alertedAt, now);
 
   const options: NotificationOptions & {
     renotify?: boolean;
@@ -198,15 +205,16 @@ async function present(pushed: PushPayload | undefined): Promise<void> {
   } = {
     body: lines.length > 1 ? summarise(lines) : showing.body,
     tag: showing.tag,
-    renotify: !policy.notifyOnce || held.length === 0,
+    renotify,
     icon: payload.notification?.icon ?? favicon,
     badge: favicon,
-    timestamp: Date.now(),
+    timestamp: now,
     data: {
       roomId: showing.roomId,
       userId: payload.notification?.user_id,
       eventId: showing.eventId,
       lines,
+      alertedAt: renotify ? now : alertedAt,
     },
   };
   if (showing.ring) {
@@ -265,11 +273,17 @@ async function focused(): Promise<boolean> {
   return clients.some((client) => client.focused);
 }
 
-async function conversation(tag: string): Promise<ReturnType<typeof readLines>> {
-  if (!('getNotifications' in worker.registration)) return [];
+async function conversation(
+  tag: string
+): Promise<{ lines: ReturnType<typeof readLines>; alertedAt: number | undefined }> {
+  if (!('getNotifications' in worker.registration)) return { lines: [], alertedAt: undefined };
   const open = await worker.registration.getNotifications({ tag });
-  const previous = open.at(-1)?.data as { lines?: unknown } | undefined;
-  return readLines(previous?.lines);
+  const previous = open.at(-1)?.data as { lines?: unknown; alertedAt?: unknown } | undefined;
+  const alertedAt = previous?.alertedAt;
+  return {
+    lines: readLines(previous?.lines),
+    alertedAt: typeof alertedAt === 'number' ? alertedAt : undefined,
+  };
 }
 
 worker.addEventListener('notificationclick', (event) => {
