@@ -512,6 +512,11 @@ export class CoreClient {
     }
   }
 
+  cachedUserProfile(userId: string): ProfileView | null {
+    const cached = this.profileCache.get(userId);
+    return cached?.accountId === (this.session?.account_id ?? null) ? cached.profile : null;
+  }
+
   async userProfile(userId: string, urgent = false, signal?: AbortSignal): Promise<ProfileView> {
     const accountId = this.session?.account_id ?? null;
     const cached = this.profileCache.get(userId);

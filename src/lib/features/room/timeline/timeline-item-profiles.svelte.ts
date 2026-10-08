@@ -3,6 +3,7 @@ import type { ProfileView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 const RETRY_DELAYS_MS = [3000, 10_000, 30_000];
+const FIRST_LOOKUP_DELAY_MS = 300;
 
 class ProfileSlot {
   profile = $state<ProfileView | null>(null);
@@ -40,6 +41,22 @@ class ProfileSlot {
     const generation = ++this.#generation;
     const userId = this.#userId;
     if (userId === null || this.#preview) return;
+    if (attempt === 0) {
+      const cached = this.core.cachedUserProfile(userId);
+      if (cached !== null) {
+        this.profile = cached;
+        return;
+      }
+      this.#retry = setTimeout(() => {
+        this.#fetch(userId, generation, attempt);
+      }, FIRST_LOOKUP_DELAY_MS);
+      return;
+    }
+    this.#fetch(userId, generation, attempt);
+  }
+
+  #fetch(userId: string, generation: number, attempt: number): void {
+    this.#retry = null;
     const lookup = new AbortController();
     this.#lookup = lookup;
     void this.core.userProfile(userId, false, lookup.signal).then(

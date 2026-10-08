@@ -13,6 +13,7 @@ export function createCoreStub<T extends Record<string, unknown>>(overrides = {}
     userProfile: vi.fn<(...args: never[]) => Promise<unknown>>(() =>
       Promise.reject(new Error('profile unavailable'))
     ),
+    cachedUserProfile: vi.fn<(...args: never[]) => unknown>(() => null),
     refreshUserProfile: vi.fn<(...args: never[]) => Promise<unknown>>(() =>
       Promise.reject(new Error('profile unavailable'))
     ),

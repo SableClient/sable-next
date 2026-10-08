@@ -692,10 +692,9 @@ test('uses the sender profile name color in every message layout', async () => {
   render(TimelineItemHarness, {
     props: { core, item: { item: item(false), collapsed: false } },
   });
-  await tick();
-
-  const name = document.querySelector<HTMLElement>('.sender');
-  expect(name?.classList.contains('tinted')).toBe(true);
+  await vi.waitFor(() => {
+    expect(document.querySelector('.sender')?.classList.contains('tinted')).toBe(true);
+  });
   expect(
     document.querySelector<HTMLElement>('.message')?.style.getPropertyValue('--name-color-on-light')
   ).toBe('#2f5a1f');
@@ -744,10 +743,12 @@ test.each(['connected', 'compact', 'expanded'] as const)(
     render(TimelineItemHarness, {
       props: { core, item: { item: replyItem(), collapsed: false } },
     });
-    await tick();
-
+    await vi.waitFor(() => {
+      expect(
+        document.querySelector('.reply-preview .reply-name')?.classList.contains('tinted')
+      ).toBe(true);
+    });
     const name = document.querySelector<HTMLElement>('.reply-preview .reply-name');
-    expect(name?.classList.contains('tinted')).toBe(true);
     expect(name?.style.getPropertyValue('--name-color-on-light')).toBe('#2244aa');
     expect(name?.style.getPropertyValue('--name-color-on-dark')).toBe('#88aaff');
     expect(core.userProfile).toHaveBeenCalledWith(
