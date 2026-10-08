@@ -473,6 +473,45 @@ test('slots aggregation rows into the timeline by timestamp', () => {
   expect(mergeAggregations([sent, before], [before], whole)).toEqual([sent, before]);
 });
 
+test('date dividers keep aggregations in chronological order across history pages', () => {
+  const at = (day: number, hour: number) => new Date(2026, 9, day, hour).getTime();
+  const dateDivider = (day: number): TimelineItemView => {
+    const timestamp = at(day, 20);
+    return {
+      ...item({ kind: 'date_divider', timestamp }, `day-${day}`),
+      event_id: null,
+      timestamp,
+    };
+  };
+  const first = { ...message, id: 'first', event_id: '$first', timestamp: at(6, 10) };
+  const second = { ...message, id: 'second', event_id: '$second', timestamp: at(6, 20) };
+  const third = { ...message, id: 'third', event_id: '$third', timestamp: at(7, 20) };
+  const firstDay = dateDivider(6);
+  const secondDay = dateDivider(7);
+  const aggregations = [at(6, 12), at(6, 23), at(7, 0), at(7, 12)].map((timestamp, index) => ({
+    ...aggregation('m.reaction', `reaction-${index}`),
+    event_id: `$reaction-${index}`,
+    timestamp,
+  }));
+
+  expect(
+    mergeAggregations([firstDay, first, second, secondDay, third], aggregations, {
+      start: false,
+      end: true,
+    })
+  ).toEqual([
+    firstDay,
+    first,
+    aggregations[0],
+    second,
+    aggregations[1],
+    secondDay,
+    aggregations[2],
+    aggregations[3],
+    third,
+  ]);
+});
+
 test('drops aggregation rows outside the loaded range', () => {
   const at = (id: string, timestamp: number): TimelineItemView => ({
     ...item({ kind: 'hidden_event', event_type: 'm.reaction', content: null, redacts: null }, id),

@@ -172,7 +172,12 @@ export function mergeAggregations(
   const merged: TimelineItemView[] = [];
   let next = 0;
   for (const item of items) {
-    while (next < pending.length && pending[next].timestamp <= item.timestamp) {
+    const dateDivider = item.content.kind === 'date_divider';
+    const boundary = dateDivider ? new Date(item.timestamp).setHours(0, 0, 0, 0) : item.timestamp;
+    while (
+      next < pending.length &&
+      (dateDivider ? pending[next].timestamp < boundary : pending[next].timestamp <= boundary)
+    ) {
       merged.push(pending[next]);
       next += 1;
     }
