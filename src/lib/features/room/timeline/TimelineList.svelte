@@ -260,11 +260,13 @@
     return entries.find(({ value }) => holdsEvent(value, eventId));
   }
   let rows = $state.raw<readonly TimelineRow<RowValue>[]>([]);
-  let windowState = $state.raw<TimelineWindowState>({
+  let windowState = $state.raw<TimelineWindowState<RowValue>>({
     start: 0,
     end: 0,
     firstVisible: null,
     lastVisible: null,
+    lastFullyVisible: null,
+    rows: [],
     pinned: true,
     scrolling: false,
   });
@@ -317,15 +319,18 @@
   let readEventId = $derived.by(() => {
     if (!revealed || !viewport || unread.blocking || markingRead) return null;
     if (windowState.pinned) {
-      return latestEventId(timeline.items) ?? latestEventId(rows.map((row) => row.value.item));
+      return (
+        latestEventId(timeline.items) ??
+        latestEventId(windowState.rows.map((row) => row.value.item))
+      );
     }
-    const bottom = viewport.getBoundingClientRect().bottom;
-    let seen: string | null = null;
-    for (const row of viewport.querySelectorAll<HTMLElement>('.item[data-event-id]')) {
-      if (row.getBoundingClientRect().bottom > bottom) break;
-      seen = row.dataset.eventId ?? seen;
+    if (windowState.lastFullyVisible === null) return null;
+    for (let index = windowState.rows.length - 1; index >= 0; index -= 1) {
+      const row = windowState.rows[index];
+      if (row.index <= windowState.lastFullyVisible && row.value.item.event_id)
+        return row.value.item.event_id;
     }
-    return seen;
+    return null;
   });
   let unreadCount = $derived(unread.count(eventItems));
   let unreadInView = $derived.by(() => {
@@ -393,7 +398,7 @@
     isScrolling: () => windowState.scrolling,
     requestHistory,
   });
-  function windowChanged(state: TimelineWindowState): void {
+  function windowChanged(state: TimelineWindowState<RowValue>): void {
     const wasScrolling = windowState.scrolling;
     windowState = state;
     const node = viewport;

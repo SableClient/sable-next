@@ -2709,3 +2709,46 @@ test('empty newer pages can resume on a wheel gesture without needing scroll mov
   await runAnimationFrames();
   expect(document.querySelector('[data-item-id="newer"]')).not.toBeNull();
 });
+
+test.each(['scrolling', 'settled'])(
+  'read receipts use matching row snapshots while %s',
+  async (phase) => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    const roomTimeline = timeline();
+    roomTimeline.items = Array.from({ length: 12 }, (_, i) => item(String(i)));
+    const read = vi.fn().mockResolvedValue(undefined);
+    const { unmount } = render(TimelineListHarness, {
+      props: {
+        list: {
+          timeline: roomTimeline,
+          landingEventId: '$0',
+          onRequestHistory: () => Promise.resolve(true),
+          onRequestFuture: async () => {},
+          onRead: read,
+        },
+      },
+    });
+    const element = unreadViewport();
+    await tick();
+    await runAnimationFrames();
+    read.mockClear();
+
+    element.scrollTop = 360;
+    element.dispatchEvent(new WheelEvent('wheel', { deltaY: -50 }));
+    element.dispatchEvent(new Event('scroll'));
+    if (phase === 'scrolling') touch(element, 'touchstart', 0);
+    await tick();
+    await runAnimationFrames();
+
+    roomTimeline.items = roomTimeline.items.slice(1);
+    await tick();
+    await runAnimationFrames();
+    await vi.advanceTimersByTimeAsync(600);
+    await tick();
+    await runAnimationFrames();
+
+    expect(read).toHaveBeenCalledWith('$5', false);
+    expect(read).not.toHaveBeenCalledWith('$6', expect.anything());
+    unmount();
+  }
+);

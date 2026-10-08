@@ -1180,3 +1180,16 @@ test('a clustered photo dump does not shrink the scrollable extent', async () =>
   const error = Math.abs(viewport.scrollHeight - trueTotal) / trueTotal;
   expect(error).toBeLessThan(0.15);
 });
+
+test('the fully visible boundary excludes a partially visible last row', async () => {
+  const { window, viewport } = fixture();
+  await window.update(entries(60));
+  await window.jumpTo('20', 'start');
+  expect(window.state.firstVisible).toBe(20);
+  expect(window.state.lastFullyVisible).toBe(25);
+
+  viewport.scrollTop += 25;
+  viewport.dispatchEvent(new Event('scroll'));
+  expect(window.state.lastVisible).toBe(26);
+  expect(window.state.lastFullyVisible).toBe(25);
+});
