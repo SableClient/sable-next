@@ -123,6 +123,7 @@
   import { markRoomsRead } from '#lib/features/sidebar/nav-rooms.js';
   import { hasUnread } from '#lib/rooms/unread.js';
   import { roomAtOffset } from '#lib/features/sidebar/visible-rooms.svelte.js';
+  import { ALERT_MODULES, provideAlertProviders } from '#lib/features/sidebar/alerts.js';
 
   interface Props {
     children: Snippet;
@@ -147,6 +148,8 @@
   provideNotificationCenter(notifications);
   const callSession = new CallSession(core);
   provideCallSession(callSession);
+  const alertProviders = ALERT_MODULES.map((component) => component.priorityProvider());
+  provideAlertProviders(alertProviders);
   let systemCall = $state<{ callId: string; roomId: string } | null>(null);
   const incomingCalls = new IncomingCalls(core, ({ uuid, callId, roomId, hasVideo }) => {
     void goto(roomSectionPath(roomList.rooms, roomId));

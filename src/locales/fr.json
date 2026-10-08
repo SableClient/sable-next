@@ -1189,7 +1189,7 @@
     "autoUpdateCheck": "Rechercher automatiquement les mises à jour",
     "autoUpdateCheckHint": "Recherche une nouvelle version en arrière-plan et propose de l’installer. Rien n’est téléchargé sans votre accord.",
     "updateBannerTitle": "Mise à jour disponible",
-    "webUpdateBannerBody": "Une version plus récente de Sable est prête. Actualisez pour l’utiliser.",
+    "webUpdateAlertBody": "Une version plus récente de Sable est prête. Actualisez pour l’utiliser.",
     "updateBannerBody": "Sable {{version}} est prêt à être téléchargé.",
     "updateBannerProgress": "Téléchargement… {{percent}} %",
     "updateBannerStagedTitle": "Mise à jour installée",

@@ -178,10 +178,10 @@
   {#snippet profileTrigger({ props: tooltipProps }: { props: Record<string, unknown> })}
     <ActionMenu
       label={$i18n.t('nav.switchAccount')}
-      class="account-popover"
+      class="sidebar-popover"
       side={mode === 'compact' ? 'right' : 'top'}
       align={mode === 'compact' ? 'center' : 'start'}
-      sideOffset={8}
+      sideOffset={mode === 'compact' ? 20 : 24}
     >
       {#snippet trigger({ props })}
         <button
@@ -289,7 +289,7 @@
     position: relative;
   }
 
-  :global(.account-popover .profile-card:not([style*='--profile-hero']) .profile-card-identity) {
+  :global(.sidebar-popover .profile-card:not([style*='--profile-hero']) .profile-card-identity) {
     padding-bottom: var(--space-150);
   }
 

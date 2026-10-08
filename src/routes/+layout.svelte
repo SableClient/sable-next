@@ -10,16 +10,11 @@
   import '../styles.css';
   import { createCoreClient } from '#lib/core/client.svelte.js';
   import { provideCoreClient } from '#lib/core/context.js';
-  import BannerDock from '#lib/ui/BannerDock.svelte';
   import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
   import TitleBar from '#lib/ui/TitleBar.svelte';
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
   import SessionRestoreError from '#lib/ui/SessionRestoreError.svelte';
   import AccountLocked from '#lib/ui/AccountLocked.svelte';
-  import DesktopUpdateBanner from '#lib/ui/DesktopUpdateBanner.svelte';
-  import WebUpdateBanner from '#lib/ui/WebUpdateBanner.svelte';
-  import RecoveryIncompleteBanner from '#lib/ui/RecoveryIncompleteBanner.svelte';
-  import UnverifiedDeviceBanner from '#lib/ui/UnverifiedDeviceBanner.svelte';
   import favicon from '#lib/assets/favicon.png';
   import { trackKeyboardInset } from '#lib/platform/keyboard.js';
   import { trackInspectorShortcut } from '#lib/platform/devtools.js';
@@ -166,14 +161,6 @@
     <TitleBar kind={titlebar} />
   {/if}
   <CoreHealthBanner />
-  {#if !core.accountLocked}
-    <BannerDock>
-      <UnverifiedDeviceBanner />
-      <RecoveryIncompleteBanner />
-      <DesktopUpdateBanner />
-      <WebUpdateBanner />
-    </BannerDock>
-  {/if}
 
   <TooltipProvider>
     {#if core.accountLocked}

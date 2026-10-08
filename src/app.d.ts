@@ -19,7 +19,7 @@ declare global {
   }
 
   interface Window {
-    /** Injected by the desktop shell; false where a package manager owns updates. */
+    /** Injected by Tauri on desktop platforms. Set to false if updates are handled by a package manager. */
     __SABLE_AUTO_UPDATE__?: boolean;
   }
 

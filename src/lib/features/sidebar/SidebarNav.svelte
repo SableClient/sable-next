@@ -52,7 +52,7 @@
   }
 
   const MIN_ROOM_NAV_WIDTH = 50;
-  const COLLAPSED_ROOM_NAV_WIDTH = 190;
+  const COLLAPSED_ROOM_NAV_WIDTH = 230;
   const MAX_ROOM_NAV_WIDTH = 500;
   const ROOM_NAV_WIDTH_STEP = 80;
   const ROOM_NAV_STORAGE_KEY = 'sable-room-navigation-width';

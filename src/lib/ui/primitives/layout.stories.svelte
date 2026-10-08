@@ -33,7 +33,7 @@
         <Button variant="ghost" size="small">Later</Button>
       {/snippet}
     </Banner>
-    <Banner icon={ShieldWarningIcon} tone="warning" onClose={() => {}}>
+    <Banner icon={ShieldWarningIcon} tone="warning">
       {#snippet title()}
         <p>"Update available"</p>
       {/snippet}

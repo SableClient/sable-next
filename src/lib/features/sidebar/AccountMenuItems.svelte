@@ -148,7 +148,7 @@
 </ActionMenuItem>
 
 <style>
-  :global(.account-popover .menu-item .presence-dot) {
+  :global(.sidebar-popover .menu-item .presence-dot) {
     /* margin: (size of menu item icon - size of large presence dot) / 2 */
     margin: 0 calc((var(--size-x200) - var(--space-250)) / 2);
   }

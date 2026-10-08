@@ -19,6 +19,7 @@
   import AccountSwitcher from './AccountSwitcher.svelte';
   import '#lib/ui/primitives/nav-tab.css';
   import './sidebar-tools.css';
+  import AlertPopover from './AlertPopover.svelte';
 
   interface Props {
     mobile?: boolean;
@@ -43,12 +44,14 @@
     marked: hasMarkedUnread(roomList.rooms, roomList.badgeUnreadFor),
   });
 
+  let hasAlerts = $state(false);
+
   const mobileTools = [
     { href: '/rooms', icon: ChatsIcon, label: 'nav.messages' },
     { href: '/navigate', icon: ListMagnifyingGlassIcon, label: 'shortcuts.paletteTitle' },
     { href: '/inbox', icon: BellIcon, label: 'nav.inbox' },
   ] as const;
-  const mobileSlotCount = mobileTools.length + 1;
+  const mobileSlotCount = $derived(mobileTools.length + 1 + (hasAlerts ? 1 : 0));
   const ROOM_LIST_PATHS = ['/rooms', '/direct', '/space/'];
   const desktopTools = [
     { href: '/inbox', icon: BellIcon, label: 'nav.inbox' },
@@ -81,11 +84,17 @@
     return page.url.pathname.startsWith(href);
   }
 
-  let mobileSelectedIndex = $derived(
-    page.url.pathname === '/profile'
-      ? mobileTools.length
-      : mobileTools.findIndex((item) => isToolActive(item.href))
-  );
+  let mobileSelectedIndex = $derived.by(() => {
+    if (page.url.pathname === '/profile') {
+      return mobileTools.length;
+    }
+
+    if (page.url.pathname === '/alerts') {
+      return mobileTools.length + 1;
+    }
+
+    return mobileTools.findIndex((item) => isToolActive(item.href));
+  });
 </script>
 
 {#snippet roomSwitcher(toolClass: string, side: 'top' | 'right')}
@@ -137,9 +146,13 @@
     <div class="mobile-tool-slot">
       <AccountSwitcher mode="mobile" />
     </div>
+    <div class="mobile-tool-slot">
+      <AlertPopover mode="mobile" bind:hasAlerts />
+    </div>
   </nav>
 {:else if compact}
   <nav class="compact-tools" aria-label={$i18n.t('nav.quickTools')}>
+    <AlertPopover mode="compact" />
     {@render roomSwitcher('compact-tool nav-tab-side', 'right')}
     {#each desktopTools as item (item.href)}
       {@const toolActive = isToolActive(item.href)}
@@ -172,6 +185,7 @@
   <nav class="desktop-tools" aria-label={$i18n.t('nav.quickTools')}>
     <AccountSwitcher mode="desktop" />
     <div class="desktop-tool-actions">
+      <AlertPopover mode="desktop" />
       {@render roomSwitcher('desktop-tool nav-tab-bottom', 'top')}
       {#each desktopTools as item (item.href)}
         {@const toolActive = isToolActive(item.href)}
@@ -205,12 +219,6 @@
 <style>
   .quick-tool {
     position: relative;
-  }
-
-  .mobile-tool :global(.unread-badge) {
-    position: absolute;
-    right: 0.125rem;
-    top: 0.125rem;
   }
 
   .desktop-tools {
@@ -293,16 +301,6 @@
     min-width: 0;
     position: relative;
     z-index: 1;
-  }
-
-  .mobile-icon,
-  .tool-icon {
-    display: flex;
-  }
-
-  .mobile-icon :global(svg) {
-    height: var(--icon-size-large);
-    width: var(--icon-size-large);
   }
 
   @media (prefers-reduced-motion: no-preference) {

@@ -10,7 +10,7 @@
   text-decoration: none;
 }
 
-.account-popover {
+.sidebar-popover {
   --menu-min-width: min(20rem, calc(100vw - 2rem));
   --menu-max-height: calc(100dvh - 2rem);
 
@@ -19,7 +19,7 @@
   width: min(20rem, calc(100vw - 2rem));
 }
 
-.account-popover .account-profile-header {
+.sidebar-popover .account-profile-header {
   border: 0;
   border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
   margin: calc(-1 * var(--space-150)) calc(-1 * var(--space-150)) var(--space-100);
@@ -42,6 +42,15 @@
   width: var(--icon-size-small);
 }
 
+.mobile-icon, .tool-icon {
+    display: flex;
+  }
+
+.mobile-icon svg {
+  height: var(--icon-size-large);
+  width: var(--icon-size-large);
+}
+
 .compact-tool[aria-current='page'],
 .desktop-tool[aria-current='page'] {
   color: var(--surface-on-container);
@@ -62,6 +71,12 @@
   min-width: var(--control-height-large);
   padding: 0;
   width: var(--control-height-large);
+
+  .unread-badge {
+    position: absolute;
+    right: 0.125rem;
+    top: 0.125rem;
+  }
 }
 
 .quick-tool.mobile-tool:focus-visible {
