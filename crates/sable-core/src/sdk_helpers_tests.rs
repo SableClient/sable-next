@@ -273,6 +273,22 @@ async fn devices_without_uploaded_crypto_keys_remain_visible() {
 }
 
 #[tokio::test]
+async fn local_devices_never_ask_the_server() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/devices"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"devices": []})))
+        .expect(0)
+        .mount(server.server())
+        .await;
+    let devices = crate::verification::local_own_devices(&client).await;
+    let own = devices.iter().find(|device| device.is_own).unwrap();
+    assert_eq!(Some(own.device_id.as_ref()), client.device_id());
+    assert!(own.has_keys);
+}
+
+#[tokio::test]
 async fn image_pack_listing_fetches_complete_state_when_one_pack_is_cached() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

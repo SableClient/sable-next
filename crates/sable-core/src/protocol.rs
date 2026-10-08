@@ -2852,7 +2852,7 @@ pub struct EmojiView {
     pub description: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 // These are independent facts about one device, not a state machine.
 #[expect(

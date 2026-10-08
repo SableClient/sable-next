@@ -569,32 +569,52 @@ pub(crate) async fn own_devices(client: &matrix_sdk::Client) -> Vec<DeviceView> 
         Err(error) => {
             tracing::warn!(%error, "could not refresh devices; using the crypto store");
             encryption
-                .map(|devices| {
-                    devices
-                        .devices()
-                        .map(|device| DeviceView {
-                            is_own: Some(device.device_id()) == own_device_id,
-                            is_verified: device.is_verified(),
-                            cross_signed: device.is_cross_signed_by_owner(),
-                            has_keys: true,
-                            display_name: device.display_name().map(str::to_owned),
-                            device_id: device.device_id().to_owned(),
-                            last_seen_ts: None,
-                            last_seen_ip: None,
-                        })
-                        .collect()
-                })
+                .map(|devices| local_device_views(&devices, own_device_id))
                 .unwrap_or_default()
         }
     };
+    sort_devices(&mut views);
+    views
+}
 
+pub(crate) async fn local_own_devices(client: &matrix_sdk::Client) -> Vec<DeviceView> {
+    let Some(user_id) = client.user_id() else {
+        return Vec::new();
+    };
+    let Ok(devices) = client.encryption().get_user_devices(user_id).await else {
+        return Vec::new();
+    };
+    let mut views = local_device_views(&devices, client.device_id());
+    sort_devices(&mut views);
+    views
+}
+
+fn local_device_views(
+    devices: &matrix_sdk::encryption::identities::UserDevices,
+    own_device_id: Option<&matrix_sdk::ruma::DeviceId>,
+) -> Vec<DeviceView> {
+    devices
+        .devices()
+        .map(|device| DeviceView {
+            is_own: Some(device.device_id()) == own_device_id,
+            is_verified: device.is_verified(),
+            cross_signed: device.is_cross_signed_by_owner(),
+            has_keys: true,
+            display_name: device.display_name().map(str::to_owned),
+            device_id: device.device_id().to_owned(),
+            last_seen_ts: None,
+            last_seen_ip: None,
+        })
+        .collect()
+}
+
+fn sort_devices(views: &mut [DeviceView]) {
     views.sort_by(|a, b| {
         b.is_own
             .cmp(&a.is_own)
             .then(b.last_seen_ts.cmp(&a.last_seen_ts))
             .then(a.device_id.cmp(&b.device_id))
     });
-    views
 }
 
 pub(crate) async fn user_security(

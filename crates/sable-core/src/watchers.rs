@@ -357,27 +357,17 @@ impl Core {
         let watched = client.clone();
         self.track_session_task(
             spawn(async move {
-                let Ok(devices) = watched.encryption().devices_stream().await else {
+                let Ok(updates) = watched.encryption().devices_stream().await else {
                     return;
                 };
-                pin_mut!(devices);
-                while devices.next().await.is_some() {
-                    core.emit_devices(generation, &watched).await;
-                }
-            })
-            .abort_on_drop(),
-        );
-
-        let core = self.clone();
-        let watched = client.clone();
-        self.track_session_task(
-            spawn(async move {
-                let Ok(identities) = watched.encryption().user_identities_stream().await else {
-                    return;
-                };
-                pin_mut!(identities);
-                while identities.next().await.is_some() {
-                    core.emit_devices(generation, &watched).await;
+                pin_mut!(updates);
+                let mut known = crate::verification::local_own_devices(&watched).await;
+                while updates.next().await.is_some() {
+                    let devices = crate::verification::local_own_devices(&watched).await;
+                    if devices != known {
+                        known.clone_from(&devices);
+                        core.emit_if_current(generation, CoreEvent::DevicesChanged { devices });
+                    }
                 }
             })
             .abort_on_drop(),
