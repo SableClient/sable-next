@@ -240,13 +240,13 @@
     open = true;
   }
 
-  function pick(image: PackImageView, usage: ImageUsageView): void {
-    open = false;
+  function pick(image: PackImageView, usage: ImageUsageView, keepOpen: boolean): void {
+    if (!keepOpen) open = false;
     onPick(image, usage);
   }
 
-  function pickUnicode(emoji: string): void {
-    open = false;
+  function pickUnicode(emoji: string, keepOpen: boolean): void {
+    if (!keepOpen) open = false;
     onPickUnicode(emoji);
   }
 

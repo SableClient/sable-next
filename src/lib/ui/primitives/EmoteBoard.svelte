@@ -37,8 +37,8 @@
     stickers?: boolean;
     reactions?: boolean;
     gifs?: { config: GifsConfig; providerSetting: GifProviderSetting } | null;
-    onPick: (image: PackImageView, usage: ImageUsageView) => void;
-    onPickUnicode?: (emoji: string) => void;
+    onPick: (image: PackImageView, usage: ImageUsageView, keepOpen: boolean) => void;
+    onPickUnicode?: (emoji: string, keepOpen: boolean) => void;
     onPickGif?: (gif: GifResult) => void;
   }
 
@@ -410,13 +410,13 @@
     return 'image' in cell ? `:${cell.image.shortcode}:` : (shortcodeFor(cell.emoji) ?? cell.emoji);
   }
 
-  function pickCell(cell: Cell): void {
+  function pickCell(cell: Cell, keepOpen: boolean): void {
     if ('image' in cell) {
-      pick(cell.image);
+      pick(cell.image, keepOpen);
       return;
     }
     rememberReaction(cell.emoji);
-    onPickUnicode?.(cell.emoji);
+    onPickUnicode?.(cell.emoji, keepOpen);
   }
 
   function targetCell(key: string, from: number, last: number): number | null {
@@ -488,7 +488,7 @@
     const best = searchEmojis.at(0);
     if (best === undefined && !reactions) return;
     if (best !== undefined) rememberReaction(best);
-    onPickUnicode(best ?? text);
+    onPickUnicode(best ?? text, event.shiftKey);
   }
 
   function focusSearch(element: HTMLElement): void {
@@ -500,9 +500,9 @@
     return resizable ? trackBoardSize(element) : undefined;
   }
 
-  function pick(image: PackImageView): void {
+  function pick(image: PackImageView, keepOpen: boolean): void {
     rememberEmote(image.shortcode, tab === 'sticker' ? 'sticker' : 'emoticon');
-    onPick(image, tab as ImageUsageView);
+    onPick(image, tab as ImageUsageView, keepOpen);
   }
 
   function handleResizeStart(event: PointerEvent) {
@@ -662,8 +662,8 @@
                       <button
                         type="button"
                         class="free-text"
-                        onclick={() => {
-                          onPickUnicode?.(text);
+                        onclick={(event) => {
+                          onPickUnicode?.(text, event.shiftKey);
                         }}
                       >
                         {$i18n.t('composer.reactWithText', { text })}
@@ -706,8 +706,8 @@
                               data-cell={index}
                               tabindex={tabStop(row.section, index, column) ? 0 : -1}
                               aria-label={label}
-                              onclick={() => {
-                                pickCell(cell);
+                              onclick={(event) => {
+                                pickCell(cell, event.shiftKey);
                               }}
                               {@attach focusWhenPending(row.section, index)}
                             >
@@ -740,8 +740,8 @@
                               {...props}
                               type="button"
                               aria-label={imageLabel}
-                              onclick={() => {
-                                pick(image);
+                              onclick={(event) => {
+                                pick(image, event.shiftKey);
                               }}
                               onpointerenter={() => {
                                 if (row.pack) preview = { image, pack: row.pack };

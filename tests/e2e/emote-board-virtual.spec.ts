@@ -217,3 +217,17 @@ test('sticker rows keep every cell whole on one line', async ({ page }) => {
     expect(bottom, `row ${String(index)}`).toBeLessThanOrEqual(top);
   }
 });
+
+test('shift-click inserts an emote and keeps the board open', async ({ page }) => {
+  const board = page.locator('.composer-board');
+  const inserted = page.locator('.ProseMirror img');
+
+  await page.getByRole('button', { name: ':alpha0:', exact: true }).click({ modifiers: ['Shift'] });
+  await page.getByRole('button', { name: ':alpha1:', exact: true }).click({ modifiers: ['Shift'] });
+  await expect(inserted).toHaveCount(2);
+  await expect(board).toBeVisible();
+
+  await page.getByRole('button', { name: ':alpha2:', exact: true }).click();
+  await expect(inserted).toHaveCount(3);
+  await expect(board).toBeHidden();
+});

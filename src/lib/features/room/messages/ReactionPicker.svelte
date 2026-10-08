@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Popover } from 'bits-ui';
   import type { Snippet } from 'svelte';
-  import type { PackImageView } from '#src/generated/protocol';
+  import type { ImageUsageView, PackImageView } from '#src/generated/protocol';
 
   import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
@@ -13,7 +13,7 @@
     roomId?: string;
     triggerClass?: string;
     anchor?: HTMLElement | CursorAnchor | null;
-    onPick: (key: string, sourcePack?: PackImageView['source_pack']) => void;
+    onPick: (key: string, sourcePack?: PackImageView['source_pack'], keepOpen?: boolean) => void;
     onOpenChange?: (open: boolean) => void;
     children?: Snippet;
   }
@@ -44,14 +44,24 @@
     onOpenChange?.(next);
   }
 
-  function pick(key: string, sourcePack: PackImageView['source_pack'] = null): void {
-    open = false;
-    onOpenChange?.(false);
-    onPick(key, sourcePack);
+  function pick(
+    key: string,
+    sourcePack: PackImageView['source_pack'] = null,
+    keepOpen = false
+  ): void {
+    if (!keepOpen) {
+      open = false;
+      onOpenChange?.(false);
+    }
+    onPick(key, sourcePack, keepOpen);
   }
 
-  function pickImage(image: PackImageView): void {
-    pick(image.url, image.source_pack);
+  function pickImage(image: PackImageView, _usage: ImageUsageView, keepOpen: boolean): void {
+    pick(image.url, image.source_pack, keepOpen);
+  }
+
+  function pickUnicode(emoji: string, keepOpen: boolean): void {
+    pick(emoji, null, keepOpen);
   }
 </script>
 
@@ -78,7 +88,7 @@
           stickers={false}
           reactions
           onPick={pickImage}
-          onPickUnicode={pick}
+          onPickUnicode={pickUnicode}
         />
       {/key}
     </Popover.Content>

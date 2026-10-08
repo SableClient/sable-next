@@ -23,9 +23,13 @@
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let sheet = $derived(!appLayout.matches);
 
-  function pick(key: string, sourcePack: PackImageView['source_pack'] = null): void {
+  function pick(
+    key: string,
+    sourcePack: PackImageView['source_pack'] = null,
+    keepOpen = false
+  ): void {
     rememberReaction(key);
-    open = false;
+    if (!keepOpen) open = false;
     onPick(key, sourcePack);
   }
 </script>
@@ -42,10 +46,12 @@
       unicode
       stickers={false}
       reactions
-      onPick={(image: PackImageView) => {
-        pick(image.url, image.source_pack);
+      onPick={(image: PackImageView, _usage, keepOpen) => {
+        pick(image.url, image.source_pack, keepOpen);
       }}
-      onPickUnicode={pick}
+      onPickUnicode={(emoji, keepOpen) => {
+        pick(emoji, null, keepOpen);
+      }}
     />
   </BottomSheet>
 {:else}
