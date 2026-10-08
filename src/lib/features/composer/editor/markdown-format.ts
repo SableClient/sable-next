@@ -63,7 +63,8 @@ function atLineStart(state: EditorState, position: number): boolean {
 
 function wrap(marker: string): Command {
   return (state, dispatch) => {
-    const { from, to } = state.selection;
+    const { $from, $to } = state.selection;
+    const { from, to } = TextSelection.between($from, $to);
     const size = state.doc.content.size;
     const text = (start: number, end: number): string =>
       state.doc.textBetween(Math.max(0, start), Math.min(size, end));

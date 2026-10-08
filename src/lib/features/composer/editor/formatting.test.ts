@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
 
 import { inputRules, undoInputRule } from 'prosemirror-inputrules';
-import { EditorState, Selection, TextSelection } from 'prosemirror-state';
+import { AllSelection, EditorState, Selection, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { afterEach, describe, expect, test } from 'vitest';
 
 import { activeMarks, formatCommands, formattingInputRules } from './formatting';
+import { markdownFormatCommands } from './markdown-format';
 import { composerSchema } from './schema';
 import { serializeComposer } from './serialize';
 
@@ -566,6 +567,22 @@ describe('toolbar block insertion', () => {
     expect(details?.type.name).toBe('details');
     expect(details?.firstChild?.type.name).toBe('summary');
     expect(details?.child(1).type.name).toBe('paragraph');
+  });
+});
+
+describe('markdown wrap on a select-all', () => {
+  test('wraps the text inside the paragraph and keeps the selection', () => {
+    open();
+    type('hello');
+    const editor = view;
+    if (!editor) throw new Error('no editor');
+    editor.dispatch(editor.state.tr.setSelection(new AllSelection(editor.state.doc)));
+    const strike = markdownFormatCommands.strike;
+    expect(strike?.(editor.state, editor.dispatch)).toBe(true);
+
+    expect(editor.state.doc.childCount).toBe(1);
+    expect(editor.state.doc.textContent).toBe('~~hello~~');
+    expect(editor.state.selection.empty).toBe(false);
   });
 });
 
