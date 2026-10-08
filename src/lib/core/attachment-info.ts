@@ -76,7 +76,9 @@ export async function readAudioTags(file: Blob): Promise<AudioMetadataView | nul
 async function coverBlurhash(data: Uint8Array, format: string): Promise<string | null> {
   if (typeof createImageBitmap !== 'function') return null;
   try {
-    const bitmap = await createImageBitmap(new Blob([data.slice()], { type: format }));
+    const bitmap = await createImageBitmap(new Blob([data.slice()], { type: format }), {
+      imageOrientation: 'from-image',
+    });
     try {
       return encodeBlurhash(bitmap);
     } finally {

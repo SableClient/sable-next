@@ -11,7 +11,7 @@ export async function readImageInfo(file: File): Promise<PackImageInfoView | nul
   if (typeof createImageBitmap !== 'function') return base;
 
   try {
-    const bitmap = await createImageBitmap(file);
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     const info = { ...base, width: bitmap.width, height: bitmap.height };
     bitmap.close();
     return info;

@@ -101,6 +101,75 @@ describe('stripBytes', () => {
     expect(new DataView(out.buffer).getUint32(4, true)).toBe(out.length - 8);
   });
 
+  it('keeps only the orientation of a rotated PNG', () => {
+    const tiff = [
+      ...hex('4d 4d 00 2a 00 00 00 08 00 01 01 12 00 03 00 00 00 01 00 06 00 00'),
+      0,
+      0,
+      0,
+      0,
+    ];
+    const png = new Uint8Array([
+      ...hex('89 50 4e 47 0d 0a 1a 0a'),
+      ...pngChunk('eXIf', [...tiff, ...ascii('GPS-SECRET')]),
+      ...pngChunk('IEND', []),
+    ]);
+    const out = strip(png);
+    const text = String.fromCharCode(...out);
+    expect(text).toContain('eXIf');
+    expect(text).not.toContain('GPS-SECRET');
+    expect(out[out.indexOf(0x12) + 8]).toBe(6);
+  });
+
+  it('keeps only the orientation of a rotated WebP and flags it', () => {
+    const tiff = [
+      ...hex('49 49 2a 00 08 00 00 00 01 00 12 01 03 00 01 00 00 00 06 00 00 00'),
+      0,
+      0,
+      0,
+      0,
+    ];
+    const body = [
+      ...ascii('WEBP'),
+      ...ascii('VP8X'),
+      10,
+      0,
+      0,
+      0,
+      0x0c,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      ...ascii('VP8 '),
+      4,
+      0,
+      0,
+      0,
+      9,
+      9,
+      9,
+      9,
+      ...ascii('EXIF'),
+      tiff.length,
+      0,
+      0,
+      0,
+      ...tiff,
+    ];
+    const webp = new Uint8Array([...ascii('RIFF'), body.length, 0, 0, 0, ...body]);
+    const out = strip(webp);
+    expect(String.fromCharCode(...out)).toContain('EXIF');
+    expect(out[20]).toBe(0x08);
+    expect(out[out.indexOf(0x12) + 8]).toBe(6);
+    expect(new DataView(out.buffer).getUint32(4, true)).toBe(out.length - 8);
+  });
+
   it('zeroes the Exif and XMP items of a HEIC in place', () => {
     const box = (type: string, ...body: number[][]) => {
       const content = body.flat();

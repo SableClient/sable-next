@@ -93,7 +93,7 @@ function measure(key: string, type: string, blob: Blob): Promise<void> | null {
   if (!worthDecoding || aspectRatios.has(key) || typeof createImageBitmap !== 'function') {
     return null;
   }
-  return createImageBitmap(blob)
+  return createImageBitmap(blob, { imageOrientation: 'from-image' })
     .then((bitmap) => {
       if (bitmap.width > 0 && bitmap.height > 0) {
         aspectRatios.set(key, bitmap.width / bitmap.height);

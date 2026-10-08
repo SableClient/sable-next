@@ -86,7 +86,7 @@ export class MediaViewerActions {
 
   async #pngBlob(blob: Blob): Promise<Blob> {
     if (blob.type === 'image/png') return blob;
-    const bitmap = await createImageBitmap(blob);
+    const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' });
     const canvas = document.createElement('canvas');
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;

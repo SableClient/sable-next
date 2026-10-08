@@ -148,21 +148,46 @@ function stripJpeg(bytes: Bytes, scope: Scope): Bytes | null {
   return null;
 }
 
+function orientationTiff(orientation: number): Uint8Array {
+  const tiff = new Uint8Array(26);
+  const view = new DataView(tiff.buffer);
+  tiff.set([0x4d, 0x4d], 0);
+  view.setUint16(2, 0x2a);
+  view.setUint32(4, 8);
+  view.setUint16(8, 1);
+  view.setUint16(10, ORIENTATION_TAG);
+  view.setUint16(12, 3);
+  view.setUint32(14, 1);
+  view.setUint16(18, orientation);
+  return tiff;
+}
+
 function orientationSegment(orientation: number): Uint8Array {
   const segment = new Uint8Array(36);
   const view = new DataView(segment.buffer);
   view.setUint16(0, 0xffe1);
   view.setUint16(2, 34);
   segment.set([0x45, 0x78, 0x69, 0x66], 4);
-  segment.set([0x4d, 0x4d], 10);
-  view.setUint16(12, 0x2a);
-  view.setUint32(14, 8);
-  view.setUint16(18, 1);
-  view.setUint16(20, ORIENTATION_TAG);
-  view.setUint16(22, 3);
-  view.setUint32(24, 1);
-  view.setUint16(28, orientation);
+  segment.set(orientationTiff(orientation), 10);
   return segment;
+}
+
+function pngOrientationChunk(orientation: number): Uint8Array {
+  const chunk = new Uint8Array(38);
+  const view = new DataView(chunk.buffer);
+  view.setUint32(0, 26);
+  chunk.set([0x65, 0x58, 0x49, 0x66], 4);
+  chunk.set(orientationTiff(orientation), 8);
+  view.setUint32(34, crc32(chunk.subarray(4, 34)));
+  return chunk;
+}
+
+function webpOrientationChunk(orientation: number): Uint8Array {
+  const chunk = new Uint8Array(34);
+  chunk.set([0x45, 0x58, 0x49, 0x46], 0);
+  new DataView(chunk.buffer).setUint32(4, 26, true);
+  chunk.set(orientationTiff(orientation), 8);
+  return chunk;
 }
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
@@ -188,6 +213,10 @@ function stripPng(bytes: Bytes, scope: Scope): Bytes | null {
     const chunk = bytes.slice(position, end);
     if (scope === 'all') {
       if (!PNG_TEXT_CHUNKS.has(type)) parts.push(chunk);
+      else if (type === 'eXIf') {
+        const orientation = exifOrientation(chunk.subarray(8, chunk.length - 4));
+        if (orientation > 1) parts.push(pngOrientationChunk(orientation));
+      }
     } else if (type === 'eXIf') {
       clearGps(chunk.subarray(8, chunk.length - 4));
       viewOf(chunk).setUint32(chunk.length - 4, crc32(chunk.subarray(4, chunk.length - 4)));
@@ -203,6 +232,7 @@ function stripPng(bytes: Bytes, scope: Scope): Bytes | null {
 function stripWebp(bytes: Bytes, scope: Scope): Bytes | null {
   const parts: Uint8Array[] = [bytes.subarray(0, 12)];
   const view = viewOf(bytes);
+  let vp8x: Uint8Array | null = null;
   let position = 12;
   while (position + 8 <= bytes.length) {
     const size = view.getUint32(position + 4, true);
@@ -210,11 +240,20 @@ function stripWebp(bytes: Bytes, scope: Scope): Bytes | null {
     if (end > bytes.length) return null;
     const type = ascii(bytes, position, 4);
     const chunk = bytes.slice(position, end);
+    const prefix = type === 'EXIF' && ascii(chunk, 8, 6) === 'Exif\0\0' ? 6 : 0;
     if (scope === 'all') {
       if (!WEBP_METADATA_CHUNKS.has(type)) parts.push(chunk);
-      if (type === 'VP8X') chunk[8] &= ~0x0c;
+      if (type === 'VP8X') {
+        chunk[8] &= ~0x0c;
+        vp8x = chunk;
+      }
+      const orientation =
+        type === 'EXIF' ? exifOrientation(chunk.subarray(8 + prefix, 8 + size)) : 1;
+      if (orientation > 1) {
+        parts.push(webpOrientationChunk(orientation));
+        if (vp8x) vp8x[8] |= 0x08;
+      }
     } else if (type === 'EXIF') {
-      const prefix = ascii(chunk, 8, 6) === 'Exif\0\0' ? 6 : 0;
       clearGps(chunk.subarray(8 + prefix, 8 + size));
       parts.push(chunk);
     } else if (type !== 'XMP ' || !mentionsLocation(chunk)) {
