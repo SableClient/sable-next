@@ -233,6 +233,9 @@ export function createWebTransport(): Transport {
         for (const line of data.logs) {
           const level = wasmLogLevel(line);
           recordDebugLog(level, level === 'error' ? 'error' : 'general', 'wasm', line.trim());
+          if (line.includes('session tokens:')) {
+            Sentry.addBreadcrumb({ category: 'core.session', level: 'info', message: line.trim() });
+          }
           if (level === 'error') {
             reportCoreError(line, () => {
               for (const listener of storageFailureListeners) listener();

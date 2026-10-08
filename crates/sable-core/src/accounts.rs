@@ -392,10 +392,13 @@ impl Core {
     ) -> Result<(), CommandErr> {
         let _guard = self.session_store_lock.lock().await;
         if self.credential_writers.lock().await.get(account_id) != Some(&generation) {
+            tracing::info!("session tokens: save skipped, another client writes this account");
             return Ok(());
         }
         self.save_current_credentials(client, homeserver, account_id)
-            .await
+            .await?;
+        tracing::info!(refresh = %refresh_tag(client), "session tokens: save finished");
+        Ok(())
     }
 
     #[cfg(not(target_family = "wasm"))]
@@ -486,6 +489,7 @@ impl Core {
         session::restore_credentials(&client, &account.session)
             .await
             .or_failed(self, "restore_session")?;
+        tracing::info!(refresh = %refresh_tag(&client), "session tokens: restored");
         self.account_clients
             .lock()
             .await
@@ -1004,6 +1008,7 @@ impl Core {
     ) -> bool {
         let matrix_sdk::SessionChange::UnknownToken(data) = change else {
             if self.session_generation.load(Ordering::SeqCst) == generation {
+                tracing::info!("session tokens: refreshed");
                 self.emit(CoreEvent::SessionTokensRefreshed);
             }
             return false;
@@ -1061,6 +1066,22 @@ impl Core {
         }));
         true
     }
+}
+
+fn refresh_tag(client: &matrix_sdk::Client) -> String {
+    use std::hash::{DefaultHasher, Hash as _, Hasher as _};
+
+    client
+        .session_tokens()
+        .and_then(|tokens| tokens.refresh_token)
+        .map_or_else(
+            || "none".to_owned(),
+            |token| {
+                let mut hasher = DefaultHasher::new();
+                token.hash(&mut hasher);
+                format!("{:016x}", hasher.finish())
+            },
+        )
 }
 
 fn oauth_device_delete_url(
