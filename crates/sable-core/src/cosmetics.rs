@@ -174,6 +174,7 @@ pub(crate) fn resolve(room: &Layer, space: Option<&Layer>) -> Vec<SenderCosmetic
 #[derive(Debug, Default)]
 pub(crate) struct CosmeticsCache {
     layers: HashMap<OwnedRoomId, (Layer, u64)>,
+    checked: HashMap<(OwnedRoomId, OwnedUserId), (Option<String>, Option<String>)>,
     tick: u64,
 }
 
@@ -208,7 +209,7 @@ impl CosmeticsCache {
     }
 
     fn outdated_member(
-        &self,
+        &mut self,
         room_id: &RoomId,
         user_id: &UserId,
         content: &Value,
@@ -219,10 +220,12 @@ impl CosmeticsCache {
         if replaced.as_ref() == Some(&current) {
             return Vec::new();
         }
-        self.layers
+        let outdated: Vec<OwnedRoomId> = self
+            .layers
             .iter()
             .filter(|(id, (layer, _))| {
                 *id != room_id
+                    && self.checked.get(&((*id).clone(), user_id.to_owned())) != Some(&current)
                     && layer.users.get(user_id).is_some_and(|entry| {
                         let shown = (entry.display_name.clone(), entry.avatar_url.clone());
                         shown != current
@@ -230,7 +233,12 @@ impl CosmeticsCache {
                     })
             })
             .map(|(id, _)| id.clone())
-            .collect()
+            .collect();
+        for id in &outdated {
+            self.checked
+                .insert((id.clone(), user_id.to_owned()), current.clone());
+        }
+        outdated
     }
 
     fn apply(
@@ -1016,6 +1024,50 @@ mod tests {
             .cosmetics_for(&client, &room, Some(space_id.to_owned()))
             .await;
         assert!(found.users.is_empty(), "{:?}", found.users);
+    }
+
+    #[tokio::test]
+    async fn a_resent_member_state_re_reads_a_differing_layer_once() {
+        let server = MatrixMockServer::new().await;
+        let room_id = room_id!("!room:example.org");
+        let space_id = room_id!("!space:example.org");
+        let client = joined(&server, &[room_id, space_id]).await;
+        let (core, _events) = Core::new("cosmetics", Box::new(MemorySessionStore::default()));
+        core.watch_cosmetics(&client, 1);
+        let member = json!({ "membership": "join", "displayname": "Alice" });
+        let space = json!({ "membership": "join", "displayname": "Space Alice" });
+        serve_state(
+            &server,
+            room_id,
+            json!([state(MEMBER_EVENT, ALICE, &member)]),
+            1,
+        )
+        .await;
+        serve_state(
+            &server,
+            space_id,
+            json!([state(MEMBER_EVENT, ALICE, &space)]),
+            1,
+        )
+        .await;
+        serve_member(&server, space_id, &space, 1).await;
+        let room = client.get_room(room_id).unwrap();
+        core.cosmetics_for(&client, &room, Some(space_id.to_owned()))
+            .await;
+
+        for _ in 0..3 {
+            server
+                .sync_room(
+                    &client,
+                    JoinedRoomBuilder::new(room_id).add_state_event(
+                        Raw::new(&state(MEMBER_EVENT, ALICE, &member))
+                            .unwrap()
+                            .cast_unchecked(),
+                    ),
+                )
+                .await;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     }
 
     #[tokio::test]
