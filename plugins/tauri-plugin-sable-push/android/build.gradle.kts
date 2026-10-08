@@ -5,12 +5,15 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val fossBuild = providers.environmentVariable("SABLE_FOSS").orNull == "1"
+
 android {
     namespace = "moe.sable.push"
     compileSdk = 36
 
     defaultConfig {
         minSdk = 24
+        missingDimensionStrategy("push", if (fossBuild) "foss" else "gms")
     }
 
     buildTypes {
@@ -37,6 +40,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.work:work-runtime:2.11.2")
     implementation(project(":tauri-android"))
+    implementation(project(":tauri-plugin-notifications"))
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk-android:1.14.11")
     testImplementation("io.mockk:mockk-agent:1.14.11")

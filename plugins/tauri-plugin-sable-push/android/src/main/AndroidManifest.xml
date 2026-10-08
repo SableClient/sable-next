@@ -1,1 +1,7 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <meta-data
+            android:name="app.tauri.notification.PUSH_DELEGATE"
+            android:value="moe.sable.push.SablePushDelegate" />
+    </application>
+</manifest>
