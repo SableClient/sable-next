@@ -98,6 +98,7 @@
   } from './editor/serialize';
   import { isServerScheduleUnsupported, ScheduledOriginalKept, sendFailure } from './send-failure';
   import { SendQueue } from './send-queue';
+  import { jpegFromHeic } from './heic-to-jpeg';
   import { stripMetadata } from './strip-metadata';
   import {
     ADMIN_PREFIX,
@@ -938,15 +939,11 @@
           unsent.every((item) => !item.spoiler);
 
         if (gallery) {
-          await onSendGallery(
-            roomId,
-            await Promise.all(unsent.map((item) => stripMetadata(item.file, item.metadata))),
-            {
-              caption: message.body || null,
-              formattedCaption: message.formatted,
-              mentions: message.mentions,
-            }
-          );
+          await onSendGallery(roomId, await Promise.all(unsent.map(outgoing)), {
+            caption: message.body || null,
+            formattedCaption: message.formatted,
+            mentions: message.mentions,
+          });
           unsent = [];
           return;
         }
@@ -955,7 +952,7 @@
           const [next, ...rest] = unsent;
           await onSendAttachment(
             roomId,
-            await stripMetadata(next.file, next.metadata),
+            await outgoing(next),
             captioned
               ? {
                   caption: message.body,
@@ -1024,7 +1021,7 @@
         delayIds.push(
           await core.commands.scheduleAttachment(
             roomId,
-            await stripMetadata(attachment.file, attachment.metadata),
+            await outgoing(attachment),
             dueTs,
             attachment.spoiler
           )
@@ -1131,6 +1128,10 @@
 
     editor.insert(emoticonNode(image));
     updateTyping();
+  }
+
+  async function outgoing(item: StagedFile): Promise<File> {
+    return stripMetadata(await jpegFromHeic(item.file), item.metadata);
   }
 
   async function stage(files: File[]): Promise<void> {
