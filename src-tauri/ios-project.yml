@@ -190,7 +190,6 @@ targets:
         embed: true
       - package: Sentry
         product: Sentry
-        embed: false
       - framework: {{ lib-output-file-name }}
         embed: false
       {{~#each ios-libraries}}
@@ -256,8 +255,14 @@ targets:
         discoveredDependencyFile: {{this.discovered-dependency-file}}{{/if}}
       {{~/each~}}
     {{~/if~}}
-    {{~#if ios-post-build-scripts}}
     postBuildScripts:
+      - script: |
+          framework="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH/Sentry.framework"
+          if [ -f "$framework/Sentry" ] && file "$framework/Sentry" | grep -q 'ar archive'; then
+            rm -rf "$framework"
+          fi
+        name: Remove the static Sentry framework
+        basedOnDependencyAnalysis: false
       {{~#each ios-post-build-scripts}}{{#if this.path}}
       - path {{this.path}}{{/if}}{{#if this.script}}
       - script: {{this.script}}{{/if}}{{#if this.name}}
@@ -275,5 +280,4 @@ targets:
         runOnlyWhenInstalling: {{this.run-only-when-installing}}{{/if}}{{#if this.based-on-dependency-analysis}}
         basedOnDependencyAnalysis: {{this.based-on-dependency-analysis}}{{/if}}{{#if this.discovered-dependency-file}}
         discoveredDependencyFile: {{this.discovered-dependency-file}}{{/if}}
-      {{~/each~}}
-    {{~/if}}
+      {{~/each}}
