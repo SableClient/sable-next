@@ -1,6 +1,7 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
-  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ResponsivePopover from '#lib/ui/primitives/ResponsivePopover.svelte';
+  import { mergeProps } from 'bits-ui';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import { resolve } from '$app/paths';
@@ -82,18 +83,20 @@
     </a>
   {:else}
     {#snippet profileTrigger({ props: tooltipProps }: { props: Record<string, unknown> })}
-      <ActionMenu
+      <ResponsivePopover
         label={$i18n.t('nav.alerts')}
+        closeLabel={$i18n.t('common.close')}
         side={mode === 'compact' ? 'right' : 'top'}
         align="center"
-        class="sidebar-popover alert-popover {mode === 'compact' ? '' : 'social-distancing'}"
+        class="sidebar-popover alert-popover menu-surface {mode === 'compact'
+          ? ''
+          : 'social-distancing'}"
         sideOffset={mode === 'compact' ? 20 : 24}
         bind:open={popoverOpen}
       >
         {#snippet trigger({ props })}
           <button
-            {...tooltipProps}
-            {...props}
+            {...mergeProps(tooltipProps, props)}
             type="button"
             class="quick-tool priority-{mainPriority} nav-tab nav-tab-outlined selection-layer {mode ===
             'compact'
@@ -112,7 +115,7 @@
           </button>
         {/snippet}
         <AlertList />
-      </ActionMenu>
+      </ResponsivePopover>
     {/snippet}
     <Tooltip
       label={$i18n.t('nav.alerts')}
