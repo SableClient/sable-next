@@ -190,6 +190,7 @@ targets:
         embed: true
       - package: Sentry
         product: Sentry
+        embed: false
       - framework: {{ lib-output-file-name }}
         embed: false
       {{~#each ios-libraries}}
