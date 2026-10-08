@@ -100,6 +100,7 @@ impl crate::Core {
 }
 
 const RECENT_STATE_MS: u64 = 30_000;
+const RECENT_MEMBERS_MS: u64 = 60_000;
 
 pub(crate) type RoomStateSnapshot = Arc<Vec<Raw<AnyStateEvent>>>;
 
@@ -107,6 +108,7 @@ pub(crate) type RoomStateSnapshot = Arc<Vec<Raw<AnyStateEvent>>>;
 pub(crate) struct RecentState {
     rooms: HashMap<OwnedRoomId, (u64, RoomStateSnapshot)>,
     fetches: HashMap<OwnedRoomId, Arc<tokio::sync::Mutex<()>>>,
+    members: HashMap<OwnedRoomId, u64>,
 }
 
 impl crate::Core {
@@ -165,6 +167,22 @@ impl crate::Core {
             }
         });
         self.track_session_handler(client, handle);
+    }
+
+    pub(crate) fn members_recently_loaded(&self, room_id: &RoomId) -> bool {
+        self.recent_state()
+            .members
+            .get(room_id)
+            .is_some_and(|loaded| now_ms().saturating_sub(*loaded) < RECENT_MEMBERS_MS)
+    }
+
+    pub(crate) fn note_members_loaded(&self, room_id: &RoomId) {
+        let now = now_ms();
+        let mut recent = self.recent_state();
+        recent
+            .members
+            .retain(|_, loaded| now.saturating_sub(*loaded) < RECENT_MEMBERS_MS);
+        recent.members.insert(room_id.to_owned(), now);
     }
 
     fn recent_state(&self) -> std::sync::MutexGuard<'_, RecentState> {

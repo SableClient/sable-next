@@ -558,6 +558,36 @@ async fn a_synced_state_event_drops_the_room_state_snapshot() {
 }
 
 #[tokio::test]
+async fn a_limited_sync_right_after_a_member_load_does_not_refetch_members() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!members:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    Mock::given(method("GET"))
+        .and(path(format!("/_matrix/client/v3/rooms/{room_id}/members")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "chunk": [] })))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    server.mock_room_state_encryption().plain().mount().await;
+
+    let core = core_for(&server, client.clone()).await;
+    let members = || Command::RoomMembers {
+        room_id: room_id.to_owned(),
+        memberships: Vec::new(),
+    };
+    core.dispatch(members()).await.unwrap();
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).set_timeline_limited(),
+        )
+        .await;
+    assert!(!client.get_room(room_id).unwrap().are_members_synced());
+    core.dispatch(members()).await.unwrap();
+}
+
+#[tokio::test]
 async fn missing_room_state_is_remembered_until_it_is_written() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

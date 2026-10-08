@@ -844,10 +844,14 @@ impl Core {
                 memberships,
             } => {
                 let room = self.room(&room_id).await?;
-                let members = room
-                    .members(membership_filter(&memberships))
-                    .await
-                    .or_failed(self, "room_members")?;
+                let filter = membership_filter(&memberships);
+                let members = if self.members_recently_loaded(&room_id) {
+                    room.members_no_sync(filter).await
+                } else {
+                    room.members(filter).await
+                }
+                .or_failed(self, "room_members")?;
+                self.note_members_loaded(&room_id);
                 let power_levels = if room.power_levels().await.is_err() {
                     let content = self
                         .room_state_event_content(
