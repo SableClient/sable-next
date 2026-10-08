@@ -754,7 +754,7 @@
         toggleOptionsMenu(event.currentTarget, room, parentSpaceId);
       }}
     >
-      <DotsThreeVerticalIcon weight={open ? 'fill' : 'regular'} />
+      <DotsThreeVerticalIcon />
     </button>
   {/snippet}
 

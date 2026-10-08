@@ -254,7 +254,7 @@
     class="room-options-trigger selection-open"
     aria-label={$i18n.t('room.menuLabel')}
   >
-    <DotsThreeVerticalIcon weight={open ? 'fill' : 'regular'} />
+    <DotsThreeVerticalIcon />
   </button>
 {/snippet}
 
