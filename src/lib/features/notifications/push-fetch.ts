@@ -55,7 +55,18 @@ export async function completePushPayload(
   if (notification === undefined || roomId === undefined || eventId === undefined) return payload;
 
   const room = `rooms/${encodeURIComponent(roomId)}`;
-  const event = await get(fetcher, `${room}/event/${encodeURIComponent(eventId)}`);
+  const fetched = await request(fetcher, `${room}/event/${encodeURIComponent(eventId)}`);
+  if (fetched.status === 403) {
+    return {
+      notification: {
+        ...notification,
+        type: 'm.room.member',
+        content: { membership: 'invite' },
+        room_name: (await fetcher.roomName(roomId)) ?? undefined,
+      },
+    };
+  }
+  const event = fetched.body;
   if (!isRecord(event) || typeof event.type !== 'string') return payload;
   const sender = text(event.sender);
 
@@ -100,6 +111,13 @@ export async function completePushPayload(
 }
 
 async function get(fetcher: PushFetcher, path: string): Promise<unknown> {
+  return (await request(fetcher, path)).body;
+}
+
+async function request(
+  fetcher: PushFetcher,
+  path: string
+): Promise<{ status: number | null; body: unknown }> {
   try {
     const response = await fetcher.fetch(
       `${fetcher.session.homeserver.replace(/\/$/, '')}/_matrix/client/v3/${path}`,
@@ -108,9 +126,9 @@ async function get(fetcher: PushFetcher, path: string): Promise<unknown> {
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       }
     );
-    return response.ok ? await response.json() : null;
+    return { status: response.status, body: response.ok ? await response.json() : null };
   } catch {
-    return null;
+    return { status: null, body: null };
   }
 }
 

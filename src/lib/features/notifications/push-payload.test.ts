@@ -60,6 +60,7 @@ test('an event_id_only push names the room from what the app cached', () => {
     roomId: '!room:example.org',
     eventId: '$event',
     ring: false,
+    invite: false,
   });
 });
 

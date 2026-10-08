@@ -126,6 +126,7 @@ export type PushAlert = {
   roomId: string;
   eventId: string | null;
   ring: boolean;
+  invite: boolean;
 };
 
 const RING_EVENT_TYPES = new Set(['m.rtc.notification', 'org.matrix.msc4075.rtc.notification']);
@@ -171,6 +172,7 @@ export function alert(
     roomId,
     eventId: notification.event_id ?? null,
     ring: rings(notification),
+    invite: invites(notification),
   };
 }
 

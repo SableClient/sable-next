@@ -213,6 +213,7 @@ async function present(pushed: PushPayload | undefined): Promise<void> {
       roomId: showing.roomId,
       userId: payload.notification?.user_id,
       eventId: showing.eventId,
+      invite: showing.invite,
       lines,
       alertedAt: renotify ? now : alertedAt,
     },
@@ -223,6 +224,12 @@ async function present(pushed: PushPayload | undefined): Promise<void> {
       { action: 'decline', title: 'Decline' },
     ];
     options.requireInteraction = true;
+  }
+  if (showing.invite) {
+    options.actions = [
+      { action: 'accept', title: 'Accept' },
+      { action: 'decline', title: 'Decline' },
+    ];
   }
 
   await worker.registration.showNotification(showing.title, options);
@@ -289,7 +296,7 @@ async function conversation(
 worker.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data as
-    | { roomId?: string; userId?: string; eventId?: string | null }
+    | { roomId?: string; userId?: string; eventId?: string | null; invite?: boolean }
     | undefined;
   if (event.action === 'answer' || event.action === 'decline') {
     event.waitUntil(
@@ -298,6 +305,16 @@ worker.addEventListener('notificationclick', (event) => {
         callAction(event.action, data?.roomId, data?.userId, data?.eventId ?? null)
       )
     );
+    return;
+  }
+  if (event.action === 'accept' || event.action === 'decline') {
+    event.waitUntil(
+      watchWorkerOperation('invite-action', inviteAction(event.action, data?.roomId, data?.userId))
+    );
+    return;
+  }
+  if (data?.invite === true) {
+    event.waitUntil(watchWorkerOperation('notificationclick', openInvites(data.userId)));
     return;
   }
   event.waitUntil(
@@ -325,6 +342,33 @@ async function callAction(
   if (outcome === 'answer') {
     await worker.clients.openWindow(notificationPermalink(roomId, eventId ?? undefined, userId));
   }
+}
+
+async function inviteAction(
+  outcome: 'accept' | 'decline',
+  roomId: string | undefined,
+  userId: string | undefined
+): Promise<void> {
+  if (roomId === undefined || userId === undefined) return;
+  const clients = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  const client = clients.at(0);
+  if (client) {
+    client.postMessage({ type: 'sable:invite-action', outcome, roomId, userId });
+    if (outcome === 'accept') await client.focus();
+    return;
+  }
+  await worker.clients.openWindow(resolve('/(app)/inbox'));
+}
+
+async function openInvites(userId: string | undefined): Promise<void> {
+  const clients = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  const client = clients.at(0);
+  if (client) {
+    client.postMessage({ type: 'sable:open-invites', userId });
+    await client.focus();
+    return;
+  }
+  await worker.clients.openWindow(resolve('/(app)/inbox'));
 }
 
 async function open(

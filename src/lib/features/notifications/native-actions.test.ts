@@ -11,7 +11,11 @@ import type {
   NativeNotificationTarget,
 } from '#lib/platform/native-notifications.js';
 
-import { openNativeNotification, performNotificationAction } from './native-actions';
+import {
+  inviteNotificationAction,
+  openNativeNotification,
+  performNotificationAction,
+} from './native-actions';
 
 type Replier = Parameters<typeof performNotificationAction>[0];
 
@@ -99,4 +103,18 @@ test('opening an inactive account notification switches before navigating', asyn
   expect(switchAccount).toHaveBeenCalledWith('account-other');
   expect(open).toHaveBeenCalledWith('!room:example.org', '$event:example.org');
   expect(switchAccount).toHaveBeenCalledBefore(open);
+});
+
+test('the invite buttons map to an answer and nothing else does', () => {
+  const action = (actionId: string): NativeNotificationAction => ({
+    userId: '@me:example.org',
+    roomId: '!room:example.org',
+    eventId: null,
+    actionId,
+    text: null,
+  });
+  expect(inviteNotificationAction(action('sable-invite-accept'))).toBe('accept');
+  expect(inviteNotificationAction(action('sable-invite-decline'))).toBe('decline');
+  expect(inviteNotificationAction(action('sable-reply'))).toBeNull();
+  expect(inviteNotificationAction(action('sable-call-answer'))).toBeNull();
 });

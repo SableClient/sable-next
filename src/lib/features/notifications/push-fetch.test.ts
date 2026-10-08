@@ -133,6 +133,19 @@ test('an encrypted event no tab could read stays encrypted, and a silenced one i
   expect(await completePushPayload(bare, fetcher(responses, { kind: 'discard' }))).toBeNull();
 });
 
+test('an event the server will not show is an invitation to a room not yet joined', async () => {
+  const forbidden = fetcher({}, null, 'Design crew');
+  forbidden.fetch.mockResolvedValue(new Response(null, { status: 403 }));
+
+  const completed = await completePushPayload(bare, forbidden);
+
+  expect(completed?.notification).toMatchObject({
+    type: 'm.room.member',
+    content: { membership: 'invite' },
+    room_name: 'Design crew',
+  });
+});
+
 test('a failed fetch leaves the payload as it arrived', async () => {
   expect(await completePushPayload(bare, fetcher({}))).toBe(bare);
 });
