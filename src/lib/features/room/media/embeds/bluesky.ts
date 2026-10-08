@@ -1,4 +1,5 @@
-const VIDEO_HOSTS = new Set(['bsky.app', 'witchsky.app', 'blacksky.community', 'reddwarf.app']);
+const APPVIEWS = new Set(['bsky.app', 'witchsky.app', 'blacksky.community', 'reddwarf.app']);
+
 export type AtprotoRecord = {
   repo: string;
   collection?: 'app.bsky.feed.post';
@@ -17,8 +18,8 @@ export type BlueskyProfileDetails = {
   cid: string;
   value: {
     $type: 'app.bsky.actor.profile';
-    avatar: ApImage;
-    banner: ApImage;
+    avatar: ApBlob;
+    banner: ApBlob;
     displayName: string;
     description: string;
     createdAt: string;
@@ -31,11 +32,11 @@ export type BlueskyPostDetails = {
   value: {
     text: string;
     createdAt: string;
-    embed?: ImageEmbed;
+    embed?: ApEmbed;
   };
 };
 
-export type ApImage = {
+export type ApBlob = {
   $type: 'blob';
   size: number;
   ref: ApLink;
@@ -47,18 +48,49 @@ export type ApLink = {
   $link: string;
 };
 
+export type RecordWithMediaEmbed = {
+  $type: 'app.bsky.embed.recordWithMedia';
+  record: RecordEmbed;
+  media: ImageEmbed | VideoEmbed;
+};
+
+export type RecordEmbed = {
+  $type: 'app.bsky.embed.record';
+  record: { cid: string; uri: string };
+};
+
+export type VideoEmbed = {
+  $type: 'app.bsky.embed.video';
+  presentation?: 'default' | 'gif';
+  alt?: string;
+  aspectRatio: { width: number; height: number };
+  video: ApBlob;
+};
+
 export type ImageEmbed = {
   $type: 'app.bsky.embed.images';
   images: [
     {
       alt: string;
-      image: ApImage;
+      image: ApBlob;
       aspectRatio: { width: number; height: number };
     },
   ];
 };
+
+export type ApEmbed = ImageEmbed | VideoEmbed | RecordEmbed | RecordWithMediaEmbed;
+
+export function parseAtUri(uri: string): AtprotoRecord | null {
+  const [_a, _b, did, _collection, record] = uri.split('/');
+
+  return {
+    repo: did,
+    collection: 'app.bsky.feed.post',
+    key: record,
+  };
+}
 function recordId(url: URL): AtprotoRecord | null {
-  if (!VIDEO_HOSTS.has(url.hostname)) return null;
+  if (!APPVIEWS.has(url.hostname)) return null;
   const paths = url.pathname.split('/');
 
   if (paths[1] === 'profile' && paths[3] === 'post')
@@ -127,6 +159,7 @@ export function parseBlueskyLink(href: string): AtprotoRecord | null {
     due to the fact we are kind of forced to talk to random servers (PDSes, ~~DID:WEB stuff~~ nvm see 1D)
     we could face ipgrabbers. the likelihood of this is small in practice but it's still worth thinking about.
 */
+// TODO: cache all of this please
 export async function fetchPostDetails(
   pds: string,
   did: string,
@@ -139,18 +172,28 @@ export async function fetchPostDetails(
   const response = await fetch(url);
   if (!response.ok) return null;
   const body = (await response.json()) as BlueskyPostDetails;
-  console.info(body);
 
-  if (body.value.embed) {
-    for (const [idx, image] of body.value.embed.images.entries()) {
-      const blob = await fetchBlob(image.image.ref.$link, did, pds);
-      if (blob) body.value.embed.images[idx].image['moe.sable.blob'] = blob;
-    }
-  }
+  if (body.value.embed) await hydrateBlobs(body.value.embed, did, pds);
 
   return body;
 }
 
+// badly named? fetches full blobs.
+// TODO: make this get partials (especially for video!!) and figure out streaming
+async function hydrateBlobs(embed: ApEmbed, did: string, pds: string) {
+  if (embed.$type === 'app.bsky.embed.images') {
+    for (const [idx, image] of embed.images.entries()) {
+      const blob = await fetchBlob(image.image.ref.$link, did, pds);
+      if (blob) embed.images[idx].image['moe.sable.blob'] = blob;
+    }
+  } else if (embed.$type === 'app.bsky.embed.video') {
+    console.info(embed);
+    const blob = await fetchBlob(embed.video.ref.$link, did, pds);
+    if (blob) embed.video['moe.sable.blob'] = blob;
+  } else if (embed.$type === 'app.bsky.embed.recordWithMedia') {
+    await hydrateBlobs(embed.media, did, pds);
+  }
+}
 export async function fetchProfile(
   pds: string,
   did: string
@@ -180,17 +223,33 @@ export async function fetchBlob(cid: string, did: string, pds: string): Promise<
 
 export async function getPostRelationCount(
   did: string,
-  record: string,
-  collection: string
-): Promise<number | null> {
+  record: string
+): Promise<{ reposts: number; likes: number; comments: number } | null> {
   const url = new URL(
-    `https://constellation.microcosm.blue/links/distinct-dids?target=${encodeURIComponent(`at://${did}/app.bsky.feed.post/${record}`)}&collection=${collection}&path=.subject.uri`
+    `https://constellation.microcosm.blue/links/all?target=${encodeURIComponent(`at://${did}/app.bsky.feed.post/${record}`)}`
   );
   const response = await fetch(url);
   if (!response.ok) return null;
-  const body = (await response.json()) as { total: number };
+  const body = (await response.json()) as {
+    links: {
+      'app.bsky.feed.repost'?: {
+        '.subject.uri'?: { records: number; distinct_dids: number };
+      };
+      'app.bsky.feed.like'?: {
+        '.subject.uri'?: { records: number; distinct_dids: number };
+      };
+      'app.bsky.feed.post'?: {
+        '.reply.root.uri'?: { records: number; distinct_dids: number };
+        '.reply.parent.uri'?: { records: number; distinct_dids: number };
+      };
+    };
+  };
 
-  return body.total;
+  return {
+    reposts: body.links['app.bsky.feed.repost']?.['.subject.uri']?.distinct_dids ?? 0,
+    likes: body.links['app.bsky.feed.like']?.['.subject.uri']?.distinct_dids ?? 0,
+    comments: body.links['app.bsky.feed.post']?.['.reply.root.uri']?.records ?? 0,
+  };
 }
 
 export async function resolveMiniDoc(repo: string): Promise<MiniDoc | null> {
