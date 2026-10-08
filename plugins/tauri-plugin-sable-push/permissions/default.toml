@@ -1,0 +1,8 @@
+"$schema" = "schemas/schema.json"
+[default]
+description = "Reads and clears the push history and diagnostics."
+permissions = [
+  "allow-push-history",
+  "allow-clear-push-history",
+  "allow-take-push-diagnostics",
+]

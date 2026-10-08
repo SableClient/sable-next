@@ -14,9 +14,7 @@ const NEEDS_KEY_QUIETLY: &str = "needs-key-quietly";
 
 #[unsafe(no_mangle)]
 #[expect(unsafe_code, reason = "JNI entry point")]
-pub extern "system" fn Java_app_tauri_notification_PushPayloadDecryptor_nativeDecryptPush<
-    'frame,
->(
+pub extern "system" fn Java_moe_sable_push_PushPayloadDecryptor_nativeDecryptPush<'frame>(
     unowned_env: EnvUnowned<'frame>,
     _class: JClass<'frame>,
     store_dir: JString<'frame>,
@@ -38,9 +36,7 @@ pub extern "system" fn Java_app_tauri_notification_PushPayloadDecryptor_nativeDe
 
 #[unsafe(no_mangle)]
 #[expect(unsafe_code, reason = "JNI entry point")]
-pub extern "system" fn Java_app_tauri_notification_PushPayloadDecryptor_nativeDecryptPushLocally<
-    'frame,
->(
+pub extern "system" fn Java_moe_sable_push_PushPayloadDecryptor_nativeDecryptPushLocally<'frame>(
     unowned_env: EnvUnowned<'frame>,
     _class: JClass<'frame>,
     store_dir: JString<'frame>,
@@ -113,7 +109,7 @@ fn block_on<T>(live: bool, future: impl Future<Output = T>) -> Option<T> {
 
 #[unsafe(no_mangle)]
 #[expect(unsafe_code, reason = "JNI entry point")]
-pub extern "system" fn Java_app_tauri_notification_PushPayloadDecryptor_nativeFetchPush<'frame>(
+pub extern "system" fn Java_moe_sable_push_PushPayloadDecryptor_nativeFetchPush<'frame>(
     mut unowned_env: EnvUnowned<'frame>,
     _class: JClass<'frame>,
     store_dir: JString<'frame>,
@@ -172,9 +168,7 @@ fn encode(result: ColdPush) -> String {
 
 #[unsafe(no_mangle)]
 #[expect(unsafe_code, reason = "JNI entry point")]
-pub extern "system" fn Java_app_tauri_notification_PushPayloadDecryptor_nativeMaintainPush<
-    'frame,
->(
+pub extern "system" fn Java_moe_sable_push_PushPayloadDecryptor_nativeMaintainPush<'frame>(
     mut unowned_env: EnvUnowned<'frame>,
     _class: JClass<'frame>,
     store_dir: JString<'frame>,

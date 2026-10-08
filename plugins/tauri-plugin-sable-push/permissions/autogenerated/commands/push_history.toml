@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-push-history"
+description = "Enables the push_history command without any pre-configured scope."
+commands.allow = ["push_history"]
+
+[[permission]]
+identifier = "deny-push-history"
+description = "Denies the push_history command without any pre-configured scope."
+commands.deny = ["push_history"]

@@ -83,7 +83,7 @@ export async function takeNativePushDiagnostics(): Promise<NativePushDiagnostics
       counts?: Record<string, number>;
       lastOutcome?: string;
       lastAt?: number;
-    }>('plugin:notifications|take_push_diagnostics');
+    }>('plugin:sable-push|take_push_diagnostics');
     return {
       counts: taken.counts ?? {},
       lastOutcome: taken.lastOutcome ?? null,
@@ -97,7 +97,7 @@ export async function takeNativePushDiagnostics(): Promise<NativePushDiagnostics
 export async function nativePushHistory(): Promise<unknown[] | null> {
   if (!isTauri()) return null;
   try {
-    const taken = await invoke<{ entries?: unknown[] }>('plugin:notifications|push_history');
+    const taken = await invoke<{ entries?: unknown[] }>('plugin:sable-push|push_history');
     return taken.entries ?? [];
   } catch {
     return null;
@@ -106,7 +106,7 @@ export async function nativePushHistory(): Promise<unknown[] | null> {
 
 export async function clearNativePushHistory(): Promise<void> {
   if (!isTauri()) return;
-  await invoke('plugin:notifications|clear_push_history');
+  await invoke('plugin:sable-push|clear_push_history');
 }
 
 export interface NativePushTransport {

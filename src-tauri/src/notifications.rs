@@ -2,16 +2,27 @@ use sable_core::protocol::{CommandErr, NotificationView};
 #[cfg(any(mobile, test))]
 use sable_core::protocol::{WebPushKeys, WebPusherView};
 use sable_core::ruma::{EventId, owned_room_id, owned_user_id};
+#[cfg(not(target_os = "android"))]
 use std::collections::HashMap;
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::Arc;
+#[cfg(not(target_os = "android"))]
+use std::sync::{LazyLock, Mutex};
+#[cfg(not(target_os = "android"))]
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Runtime};
-use tauri_plugin_notifications::{NotificationMessage, NotificationsExt};
+#[cfg(not(target_os = "android"))]
+use tauri_plugin_notifications::NotificationMessage;
+use tauri_plugin_notifications::NotificationsExt;
 
+#[cfg(not(target_os = "android"))]
 const MESSAGES_CHANNEL: &str = "messages.v2";
+#[cfg(not(target_os = "android"))]
 const NOTIFICATION_GROUP: &str = "matrix_messages";
+#[cfg(not(target_os = "android"))]
 const MESSAGE_ACTIONS: &str = "sable-message";
+#[cfg(not(target_os = "android"))]
 const MAX_CONVERSATION_LINES: usize = 8;
+#[cfg(not(target_os = "android"))]
 const NOTIFY_ONCE_WINDOW: Duration = Duration::from_mins(5);
 
 fn java_hash(text: &str) -> i32 {
@@ -27,10 +38,12 @@ pub fn room_notification_id(user_id: &str, room_id: &str) -> i32 {
     if hash == i32::MIN { 0 } else { hash.abs() }
 }
 
+#[cfg(not(target_os = "android"))]
 fn conversation_key(user_id: &str, room_id: &str) -> String {
     format!("{user_id}\0{room_id}")
 }
 
+#[cfg(not(target_os = "android"))]
 #[derive(Clone)]
 struct Line {
     sender_name: String,
@@ -40,8 +53,10 @@ struct Line {
     event_id: Option<String>,
 }
 
+#[cfg(not(target_os = "android"))]
 static CONVERSATIONS: LazyLock<Mutex<HashMap<String, Vec<Line>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+#[cfg(not(target_os = "android"))]
 static ALERTED: LazyLock<Mutex<HashMap<String, Instant>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -283,6 +298,7 @@ async fn rotate_pusher(
     Ok(())
 }
 
+#[cfg(not(target_os = "android"))]
 fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -291,6 +307,7 @@ fn now_ms() -> i64 {
         .unwrap_or_default()
 }
 
+#[cfg(not(target_os = "android"))]
 fn group_key(view: &NotificationView) -> String {
     if cfg!(any(target_os = "ios", target_os = "macos")) {
         conversation_key(view.user_id.as_str(), view.room_id.as_str())
@@ -299,14 +316,17 @@ fn group_key(view: &NotificationView) -> String {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 const fn shows_content(encrypted_room: bool, content: bool, encrypted_content: bool) -> bool {
     content && (!encrypted_room || encrypted_content)
 }
 
+#[cfg(not(target_os = "android"))]
 const fn alerts_silently(noisy: Option<bool>, sounds: bool) -> bool {
     !sounds || (!cfg!(mobile) && matches!(noisy, Some(false)))
 }
 
+#[cfg(not(target_os = "android"))]
 fn line(view: &NotificationView, content: bool) -> Line {
     Line {
         sender_name: view
@@ -324,6 +344,7 @@ fn line(view: &NotificationView, content: bool) -> Line {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 fn remember(view: &NotificationView, content: bool) -> Option<Vec<Line>> {
     let fresh = line(view, content);
     let Ok(mut conversations) = CONVERSATIONS.lock() else {
@@ -351,6 +372,7 @@ fn remember(view: &NotificationView, content: bool) -> Option<Vec<Line>> {
     Some(lines.clone())
 }
 
+#[cfg(not(target_os = "android"))]
 fn forget(user_id: &str, room_id: &str) {
     if let Ok(mut conversations) = CONVERSATIONS.lock() {
         conversations.remove(&conversation_key(user_id, room_id));
@@ -360,6 +382,7 @@ fn forget(user_id: &str, room_id: &str) {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 fn cooling(view: &NotificationView, now: Instant) -> bool {
     if view.mention || view.noisy != Some(false) {
         return false;
@@ -377,6 +400,7 @@ fn cooling(view: &NotificationView, now: Instant) -> bool {
     quiet
 }
 
+#[cfg(not(target_os = "android"))]
 fn conversation_message(line: &Line, encrypted: bool) -> Option<NotificationMessage> {
     serde_json::from_value(serde_json::json!({
         "body": line.body,
@@ -389,6 +413,7 @@ fn conversation_message(line: &Line, encrypted: bool) -> Option<NotificationMess
     .ok()
 }
 
+#[cfg(not(target_os = "android"))]
 fn collapsed(lines: &[Line]) -> String {
     lines
         .iter()
@@ -397,6 +422,7 @@ fn collapsed(lines: &[Line]) -> String {
         .join("\n")
 }
 
+#[cfg(not(target_os = "android"))]
 fn body(view: &NotificationView, content: bool) -> String {
     let sender = view
         .sender_name
@@ -419,7 +445,41 @@ pub async fn show<R: Runtime>(
     if !core.notifications_enabled() {
         return;
     }
+    #[cfg(target_os = "android")]
+    post_android(app, view).await;
+    #[cfg(not(target_os = "android"))]
+    show_generic(app, core, view).await;
+}
 
+#[cfg(target_os = "android")]
+async fn post_android<R: Runtime>(app: &AppHandle<R>, view: &NotificationView) {
+    use tauri_plugin_sable_push::SablePushExt;
+    let post = tauri_plugin_sable_push::Post {
+        user_id: view.user_id.to_string(),
+        room_id: view.room_id.to_string(),
+        event_id: view.event_id.as_ref().map(ToString::to_string),
+        room_name: view.room_name.clone(),
+        sender_name: Some(
+            view.sender_name
+                .clone()
+                .unwrap_or_else(|| view.sender.to_string()),
+        ),
+        body: view.body.clone(),
+        encrypted: view.encrypted,
+        direct: view.is_direct,
+        noisy: view.noisy.unwrap_or(false) || view.mention,
+    };
+    if let Err(error) = app.sable_push().post(&post).await {
+        log::warn!("could not show a notification: {error}");
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+async fn show_generic<R: Runtime>(
+    app: &AppHandle<R>,
+    core: &sable_core::Core,
+    view: &NotificationView,
+) {
     let content = shows_content(
         view.encrypted,
         core.notification_content(),
@@ -504,20 +564,6 @@ fn grant(
     }
 }
 
-#[cfg(target_os = "android")]
-pub async fn ensure_channel<R: Runtime>(app: &AppHandle<R>) {
-    let channel = tauri_plugin_notifications::Channel::builder(MESSAGES_CHANNEL, "Messages")
-        .description("Matrix message notifications")
-        .importance(tauri_plugin_notifications::Importance::High)
-        .visibility(tauri_plugin_notifications::Visibility::Private)
-        .vibration(true)
-        .build();
-
-    if let Err(error) = app.notifications().create_channel(channel).await {
-        log::warn!("could not create the message notification channel: {error}");
-    }
-}
-
 #[cfg(target_os = "linux")]
 fn linux_icon<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
     use tauri::Manager;
@@ -575,29 +621,14 @@ pub fn register_actions<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-#[cfg_attr(
-    desktop,
-    expect(clippy::unused_async, reason = "mirrors the mobile signature")
-)]
-pub async fn allow_encrypted_content<R: Runtime>(app: &AppHandle<R>, allowed: bool) {
-    #[cfg(mobile)]
-    let result = app
-        .notifications()
-        .set_encrypted_content_allowed(allowed)
-        .await;
-    #[cfg(desktop)]
-    let result = app.notifications().set_encrypted_content_allowed(allowed);
-    if let Err(error) = result {
-        log::debug!("could not set the encrypted content policy: {error}");
-    }
-}
-
 pub async fn dismiss<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_id: &str) {
+    #[cfg(not(target_os = "android"))]
     forget(user_id, room_id);
     remove_posted(app, vec![room_notification_id(user_id, room_id)]).await;
 }
 
 pub async fn dismiss_read<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_ids: &[String]) {
+    #[cfg(not(target_os = "android"))]
     for room_id in room_ids {
         forget(user_id, room_id);
     }
@@ -606,12 +637,29 @@ pub async fn dismiss_read<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_id
         .map(|room_id| room_notification_id(user_id, room_id))
         .collect();
     #[cfg(target_os = "android")]
-    let ids = shown_among(app, ids).await;
+    {
+        use tauri_plugin_sable_push::SablePushExt;
+        if !ids.is_empty()
+            && let Err(error) = app.sable_push().dismiss_shown(&ids).await
+        {
+            log::debug!("could not dismiss the read notifications: {error}");
+        }
+    }
+    #[cfg(not(target_os = "android"))]
     if !ids.is_empty() {
         remove_posted(app, ids).await;
     }
 }
 
+#[cfg(target_os = "android")]
+async fn remove_posted<R: Runtime>(app: &AppHandle<R>, ids: Vec<i32>) {
+    use tauri_plugin_sable_push::SablePushExt;
+    if let Err(error) = app.sable_push().dismiss(&ids).await {
+        log::debug!("could not dismiss a notification: {error}");
+    }
+}
+
+#[cfg(not(target_os = "android"))]
 #[cfg_attr(
     desktop,
     expect(clippy::unused_async, reason = "the mobile backend awaits the plugin")
@@ -624,24 +672,6 @@ async fn remove_posted<R: Runtime>(app: &AppHandle<R>, ids: Vec<i32>) {
 
     if let Err(error) = dismissed {
         log::debug!("could not dismiss a notification: {error}");
-    }
-}
-
-#[cfg(target_os = "android")]
-async fn shown_among<R: Runtime>(app: &AppHandle<R>, mut ids: Vec<i32>) -> Vec<i32> {
-    match app.notifications().active().await {
-        Ok(active) => {
-            let shown: std::collections::HashSet<i32> = active
-                .iter()
-                .map(tauri_plugin_notifications::ActiveNotification::id)
-                .collect();
-            ids.retain(|id| shown.contains(id));
-            ids
-        }
-        Err(error) => {
-            log::debug!("could not list the posted notifications: {error}");
-            Vec::new()
-        }
     }
 }
 
@@ -892,6 +922,7 @@ pub async fn register_push<R: Runtime>(
         return Err(PushRegistrationError::NoSession);
     };
     let identity = (user_id, device_id);
+    #[cfg(target_os = "android")]
     declare_push_accounts(app, &config, &identity).await;
 
     // MSC4174 makes the homeserver the push gateway. Query before creating the
@@ -968,21 +999,23 @@ pub async fn register_push<R: Runtime>(
     Ok(())
 }
 
-#[cfg(mobile)]
+#[cfg(target_os = "android")]
 async fn declare_push_accounts<R: Runtime>(
     app: &AppHandle<R>,
     config: &PushConfig,
     identity: &(String, String),
 ) {
-    let accounts = config
+    use tauri_plugin_sable_push::{Account, SablePushExt};
+    let accounts: Vec<Account> = config
         .accounts
         .iter()
         .map(|account| (account.user_id.clone(), account.device_id.clone()))
         .chain(std::iter::once(identity.clone()))
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
+        .map(|(user_id, device_id)| Account { user_id, device_id })
         .collect();
-    if let Err(error) = app.notifications().set_push_accounts(accounts).await {
+    if let Err(error) = app.sable_push().set_accounts(&accounts).await {
         log::warn!("could not declare the signed-in accounts: {error}");
     }
 }
@@ -1089,6 +1122,17 @@ pub async fn unregister_push<R: Runtime>(app: &AppHandle<R>) -> Result<(), Comma
         .unregister_for_push_notifications()
         .await
         .map_err(|_| CommandErr::Unavailable)?;
+    #[cfg(target_os = "android")]
+    {
+        use tauri_plugin_sable_push::SablePushExt;
+        let push = app.sable_push();
+        if let Err(error) = push.set_accounts(&[]).await {
+            log::debug!("could not clear the signed-in accounts: {error}");
+        }
+        if let Err(error) = push.dismiss_all().await {
+            log::debug!("could not dismiss the notifications: {error}");
+        }
+    }
     let root = push_store(app)?;
     let mut pushers = registered_pushers(&root)?;
     while let Some(pusher) = pushers.first() {
