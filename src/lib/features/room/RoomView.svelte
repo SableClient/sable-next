@@ -363,6 +363,20 @@
   );
 
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
+  let composerRoomId = $state<string | null>(null);
+  $effect(() => {
+    const id = resolvedRoomId;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const frame = requestAnimationFrame(() => {
+      timer = setTimeout(() => {
+        composerRoomId = id;
+      });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
+  });
   let resolvedPermalink = $derived(
     permalinkTarget?.roomId === resolvedRoomId && permalinkTarget.eventId === eventId
       ? permalinkTarget
@@ -1030,27 +1044,31 @@
       />
     {:else}
       {#key resolvedRoomId}
-        <ScheduledMessages
-          roomId={resolvedRoomId}
-          revision={conversation.scheduledRevision}
-          editing={conversation.context?.kind === 'schedule' ? conversation.context.eventId : null}
-          onEdit={conversation.editScheduled}
-        />
-        <ConversationComposer
-          bind:this={composer}
-          {conversation}
-          roomId={resolvedRoomId}
-          onSchedule={conversation.schedule}
-          canReact={roomSession.permissions?.can_react ?? true}
-          {roomName}
-          readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
-          encrypted={resolvedRoom?.encrypted ?? null}
-          onDeleteEdited={conversation.redact}
-          onEditLast={conversation.editLast}
-          onEditNext={conversation.editNext}
-          onReplyStep={(direction) =>
-            conversation.moveReply(timelineList?.stepReply(direction) ?? null)}
-        />
+        {#if composerRoomId === resolvedRoomId}
+          <ScheduledMessages
+            roomId={resolvedRoomId}
+            revision={conversation.scheduledRevision}
+            editing={conversation.context?.kind === 'schedule'
+              ? conversation.context.eventId
+              : null}
+            onEdit={conversation.editScheduled}
+          />
+          <ConversationComposer
+            bind:this={composer}
+            {conversation}
+            roomId={resolvedRoomId}
+            onSchedule={conversation.schedule}
+            canReact={roomSession.permissions?.can_react ?? true}
+            {roomName}
+            readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
+            encrypted={resolvedRoom?.encrypted ?? null}
+            onDeleteEdited={conversation.redact}
+            onEditLast={conversation.editLast}
+            onEditNext={conversation.editNext}
+            onReplyStep={(direction) =>
+              conversation.moveReply(timelineList?.stepReply(direction) ?? null)}
+          />
+        {/if}
       {/key}
     {/if}
   </div>
