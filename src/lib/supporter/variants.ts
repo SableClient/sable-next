@@ -6,6 +6,7 @@ import { inkFor, WHITE } from '#lib/ui/primitives/readable-color.js';
 export const SUPPORTER_VARIANTS = [
   'gold',
   'custom',
+  'paw',
   'propeller',
   'ghost',
   'evil',
@@ -28,6 +29,10 @@ export const SUPPORTER_VARIANTS = [
   'ceo',
 ] as const;
 export type SupporterVariant = (typeof SUPPORTER_VARIANTS)[number];
+export function supportsSupporterColors(variant: SupporterVariant): boolean {
+  return variant === 'custom' || variant === 'paw';
+}
+
 export const SUPPORTER_SHAPES = ['none', 'circle', 'heart', 'square'] as const;
 export type SupporterShape = (typeof SUPPORTER_SHAPES)[number];
 export const MAX_SUPPORTER_GRADIENT_COLORS = 5;

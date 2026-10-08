@@ -1459,7 +1459,7 @@
     "badgeHint": "Any amount earns a badge, even $1, and a one-time donation keeps it for good.",
     "badgeDonorHint": "Thanks for making Sable possible.",
     "chooseBadge": "Choose your donor badge",
-    "chooseBadgeHint": "Pick a Sable to display on your profile.",
+    "chooseBadgeHint": "Pick a badge to display on your profile.",
     "backgroundShape": "Badge background shape",
     "customBackground": "Custom badge background",
     "backgroundColor": "Badge background color",
@@ -1470,9 +1470,11 @@
       "square": "Rounded square"
     },
     "customColor": "Badge color",
-    "customColorHint": "Choose any color for your Sable badge.",
+    "customColorHint": "Choose any color for your badge.",
+    "customizableColors": "Custom colors",
+    "customizeBadge": "Customize {{badge}}",
     "customGradient": "Custom gradient",
-    "customGradientHint": "Blend up to 5 colors for your Sable badge.",
+    "customGradientHint": "Blend up to 5 colors for your badge.",
     "gradientAngle": "Gradient angle",
     "addColor": "Add color",
     "colorIndex": "Color {{index}}",
@@ -1484,7 +1486,10 @@
       "gold": "Gold",
       "ghost": "Ghosable",
       "evil": "Sablevil",
-      "custom": "Custom color or gradient"
+      "custom": "Custom Sable"
+    },
+    "designs": {
+      "paw": "Pawable"
     },
     "badgeSaveFailed": "Could not save your badge. Try again."
   },

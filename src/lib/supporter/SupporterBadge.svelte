@@ -15,6 +15,7 @@
     supporterAppearance,
     supporterButtonText,
     supporterColor,
+    supportsSupporterColors,
     type SupporterAppearance,
     type SupporterVariant,
   } from './variants.js';
@@ -55,6 +56,7 @@
   const palettes: Record<SupporterVariant, [string, string]> = {
     gold: ['var(--supporter-gold)', 'var(--supporter-gold)'],
     custom: ['var(--supporter-gold)', 'var(--supporter-gold)'],
+    paw: ['var(--supporter-purple)', 'var(--supporter-purple)'],
     propeller: ['var(--supporter-yellow)', 'var(--supporter-red)'],
     ghost: ['var(--supporter-white)', 'var(--supporter-silver)'],
     evil: ['var(--supporter-red)', 'var(--supporter-evil)'],
@@ -77,12 +79,11 @@
     ceo: ['var(--supporter-gold)', 'var(--supporter-gold)'],
   };
   let customStyle = $derived.by(() => {
-    const [start, end] =
-      variant === 'custom'
-        ? isSupporterColors(colors)
-          ? [supporterColor(colors[0]), supporterColor(colors.at(-1))]
-          : [supporterColor(color), supporterColor(color)]
-        : (palettes[variant] ?? palettes.gold);
+    const [start, end] = supportsSupporterColors(variant)
+      ? isSupporterColors(colors)
+        ? [supporterColor(colors[0]), supporterColor(colors.at(-1))]
+        : [supporterColor(color), supporterColor(color)]
+      : (palettes[variant] ?? palettes.gold);
     const ground = cardColor;
     const button = customCardColors
       ? buttonColor
@@ -90,7 +91,7 @@
         ? end
         : start;
     const ink =
-      customCardColors || variant === 'custom'
+      customCardColors || supportsSupporterColors(variant)
         ? supporterButtonText(button)
         : variant === 'bisexual' || variant === 'bisexualgradient'
           ? 'var(--supporter-white)'
@@ -99,7 +100,7 @@
       ? ink === 'var(--supporter-white)'
         ? 'var(--supporter-black)'
         : 'var(--supporter-white)'
-      : variant === 'custom' && ink !== 'var(--supporter-white)'
+      : supportsSupporterColors(variant) && ink !== 'var(--supporter-white)'
         ? 'var(--supporter-white)'
         : 'var(--supporter-card-bg)';
     return `

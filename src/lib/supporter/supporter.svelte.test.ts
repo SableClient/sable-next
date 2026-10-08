@@ -104,7 +104,7 @@ describe('start', () => {
   });
 });
 
-test.each(['pride', 'ceo'] as const)(
+test.each(['pride', 'ceo', 'paw'] as const)(
   'loads %s customization independently of the signed award',
   async (variant) => {
     const { stub, core } = makeCore([VALID]);

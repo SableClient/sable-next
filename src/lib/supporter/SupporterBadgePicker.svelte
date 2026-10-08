@@ -23,7 +23,9 @@
     supporterAppearance,
     supporterColor,
     supporterGradientAngle,
+    supportsSupporterColors,
     type SupporterAppearance,
+    type SupporterVariant,
   } from './variants.js';
 
   let {
@@ -39,7 +41,6 @@
   } = $props();
   const name = $props.id();
   const defaults = supporterAppearance();
-  const iconVariants = SUPPORTER_VARIANTS.filter((variant) => variant !== 'custom');
   const colorLabels = {
     color: 'customColor',
     backgroundColor: 'backgroundColor',
@@ -56,6 +57,16 @@
   let liveAngle = $state<number | null>(null);
   let displayAngle = $derived(liveAngle ?? draft.gradientAngle ?? DEFAULT_GRADIENT_ANGLE);
   let isGradient = $derived(isSupporterColors(draft.colors));
+
+  function badgeLabel(variant: SupporterVariant): string {
+    if (variant === 'gold' || variant === 'custom' || variant === 'ghost' || variant === 'evil') {
+      return $i18n.t(`supporter.colors.${variant}`);
+    }
+    if (variant === 'paw') {
+      return $i18n.t(`supporter.designs.${variant}`);
+    }
+    return $i18n.t(`settings.appIcons.${variant}`);
+  }
 
   async function update(patch: Partial<SupporterAppearance>): Promise<void> {
     draft = { ...draft, ...patch };
@@ -153,40 +164,33 @@
   <legend>{$i18n.t('supporter.chooseBadge')}</legend>
   <p>{$i18n.t('supporter.chooseBadgeHint')}</p>
   <div class="badge-options">
-    {#each iconVariants as variant (variant)}
+    {#each SUPPORTER_VARIANTS as variant (variant)}
       <label class="badge-option" class:selected={draft.variant === variant}>
         <input
           type="radio"
           {name}
           value={variant}
+          aria-labelledby={`${name}-${variant}-label`}
+          aria-describedby={supportsSupporterColors(variant)
+            ? `${name}-${variant}-colors`
+            : undefined}
           checked={draft.variant === variant}
           onchange={() => void update({ variant })}
         />
         <span class="badge-option-mark"><SupporterMark {...draft} {variant} /></span>
-        <span
-          >{variant === 'gold' || variant === 'ghost' || variant === 'evil'
-            ? $i18n.t(`supporter.colors.${variant}`)
-            : $i18n.t(`settings.appIcons.${variant}`)}</span
-        >
+        <span id={`${name}-${variant}-label`}>{badgeLabel(variant)}</span>
+        {#if supportsSupporterColors(variant)}
+          <small class="badge-option-customizable" id={`${name}-${variant}-colors`}
+            >{$i18n.t('supporter.customizableColors')}</small
+          >
+        {/if}
       </label>
     {/each}
   </div>
-  <div class="custom-badge">
-    <label class="custom-choice">
-      <input
-        type="radio"
-        {name}
-        value="custom"
-        checked={draft.variant === 'custom'}
-        onchange={() => void update({ variant: 'custom' })}
-      />
-      <span class="custom-copy"
-        ><strong>{$i18n.t('supporter.colors.custom')}</strong><small
-          >{$i18n.t('supporter.customColorHint')}</small
-        ></span
-      >
-    </label>
-    {#if draft.variant === 'custom'}
+  {#if supportsSupporterColors(draft.variant)}
+    <div class="custom-badge">
+      <h3>{$i18n.t('supporter.customizeBadge', { badge: badgeLabel(draft.variant) })}</h3>
+      <p>{$i18n.t('supporter.customColorHint')}</p>
       <div class="custom-gradient-toggle">
         <div class="badge-background">
           <span class="custom-copy"
@@ -273,8 +277,8 @@
           />
         </div>
       {/if}
-    {/if}
-  </div>
+    </div>
+  {/if}
   <fieldset class="shape-picker">
     <legend>{$i18n.t('supporter.backgroundShape')}</legend>
     <div class="shape-options badge-options">
@@ -365,6 +369,17 @@
     margin-top: var(--space-300);
   }
 
+  .custom-badge h3 {
+    font-size: var(--font-size-subheading);
+    font-weight: var(--font-weight-600);
+    margin: 0 0 var(--space-100);
+  }
+
+  .badge-option-customizable {
+    color: var(--sec-main);
+    font-size: var(--font-size-small);
+  }
+
   .gradient-stop-row {
     align-items: center;
     display: flex;
@@ -391,19 +406,6 @@
 
   .gradient-angle-value {
     color: var(--sec-main);
-  }
-
-  .custom-choice {
-    align-items: center;
-    cursor: pointer;
-    display: flex;
-    gap: var(--space-300);
-  }
-
-  .custom-choice input {
-    accent-color: var(--primary-main);
-    flex-shrink: 0;
-    margin: 0;
   }
 
   .custom-copy {

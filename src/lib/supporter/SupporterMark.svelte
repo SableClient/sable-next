@@ -6,6 +6,7 @@
     GHOST_SABLE_PATH,
     SABLE_EYE_PATH,
     SABLE_PATHS,
+    PAW_PATH,
   } from './icon-art.js';
   import {
     isSupporterColors,
@@ -13,6 +14,7 @@
     supporterColor,
     supporterGradientAngle,
     supporterVariant,
+    supportsSupporterColors,
     DEFAULT_SUPPORTER_BACKGROUND_COLOR,
     type SupporterAppearance,
   } from './variants.js';
@@ -28,8 +30,9 @@
   }: Partial<SupporterAppearance> = $props();
   const id = $props.id();
   let chosen = $derived(supporterVariant(variant));
+  let customizable = $derived(supportsSupporterColors(chosen));
   let customStops = $derived.by(() => {
-    if (chosen !== 'custom' || !isSupporterColors(colors)) return null;
+    if (!customizable || !isSupporterColors(colors)) return null;
     const count = colors.length;
     return colors.map((col, index) => ({
       color: supporterColor(col),
@@ -52,8 +55,8 @@
   let backing = $derived(
     customBackground
       ? supporterColor(backgroundColor, DEFAULT_SUPPORTER_BACKGROUND_COLOR)
-      : chosen === 'custom' &&
-          supporterButtonText(colors?.[0] ?? color) === 'var(--supporter-white)'
+      : customizable &&
+          supporterButtonText(customStops ? colors?.[0] : color) === 'var(--supporter-white)'
         ? 'var(--supporter-white)'
         : 'var(--supporter-card-bg)'
   );
@@ -62,7 +65,7 @@
 <svg
   class="supporter-mark"
   data-variant={chosen}
-  style:color={chosen === 'custom' && !customStops ? supporterColor(color) : undefined}
+  style:color={customizable && !customStops ? supporterColor(color) : undefined}
   viewBox="0 0 512 512"
   fill="none"
   aria-hidden="true"
@@ -111,11 +114,15 @@
           ? 'translate(26 26) scale(.9)'
           : undefined}
     >
-      <path
-        fill={stops ? 'url(#' + id + ')' : 'currentColor'}
-        d={chosen === 'ghost' ? GHOST_SABLE_PATH : SABLE_PATHS[0]}
-      />
-      <path fill={backing} opacity="0.45" d={SABLE_PATHS[1]} />
+      {#if chosen === 'paw'}
+        <path fill={stops ? 'url(#' + id + ')' : 'currentColor'} d={PAW_PATH} />
+      {:else}
+        <path
+          fill={stops ? 'url(#' + id + ')' : 'currentColor'}
+          d={chosen === 'ghost' ? GHOST_SABLE_PATH : SABLE_PATHS[0]}
+        />
+        <path fill={backing} opacity="0.45" d={SABLE_PATHS[1]} />
+      {/if}
       {#if chosen === 'propeller'}
         <path fill="var(--supporter-red)" d="M125 174C146 81 277 69 324 150L225 174Z" />
         <path fill="var(--supporter-yellow)" d="M125 174C138 107 175 87 222 96L237 171Z" />
