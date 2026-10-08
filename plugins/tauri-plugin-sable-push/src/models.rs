@@ -4,6 +4,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "mirrors the notification view's flags"
+)]
 pub struct Post {
     pub user_id: String,
     pub room_id: String,
@@ -14,6 +18,7 @@ pub struct Post {
     pub encrypted: bool,
     pub direct: bool,
     pub noisy: bool,
+    pub invite: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

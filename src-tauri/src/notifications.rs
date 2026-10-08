@@ -468,6 +468,7 @@ async fn post_android<R: Runtime>(app: &AppHandle<R>, view: &NotificationView) {
         encrypted: view.encrypted,
         direct: view.is_direct,
         noisy: view.noisy.unwrap_or(false) || view.mention,
+        invite: view.event_id.is_none(),
     };
     if let Err(error) = app.sable_push().post(&post).await {
         log::warn!("could not show a notification: {error}");

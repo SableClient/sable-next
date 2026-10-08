@@ -23,6 +23,7 @@ class PostArgs {
     var encrypted: Boolean = false
     var direct: Boolean = false
     var noisy: Boolean = false
+    var invite: Boolean = false
 }
 
 @InvokeArg
@@ -57,19 +58,20 @@ class SablePushPlugin(private val activity: Activity) : Plugin(activity) {
     @Command
     fun post(invoke: Invoke) {
         val args = invoke.parseArgs(PostArgs::class.java)
-        PushNotifier.show(
-            activity,
-            JSONObject()
-                .put("user_id", args.userId)
-                .put("room_id", args.roomId)
-                .put("event_id", args.eventId.orEmpty())
-                .put("room_name", args.roomName)
-                .put("sender_display_name", args.senderName.orEmpty())
-                .put("content", JSONObject().put("body", args.body))
-                .put("moe.sable.encrypted", args.encrypted)
-                .put("moe.sable.direct", args.direct)
-                .put("moe.sable.noisy", args.noisy),
-        )
+        val notification = JSONObject()
+            .put("user_id", args.userId)
+            .put("room_id", args.roomId)
+            .put("event_id", args.eventId.orEmpty())
+            .put("room_name", args.roomName)
+            .put("sender_display_name", args.senderName.orEmpty())
+            .put("content", JSONObject().put("body", args.body))
+            .put("moe.sable.encrypted", args.encrypted)
+            .put("moe.sable.direct", args.direct)
+            .put("moe.sable.noisy", args.noisy)
+        if (args.invite) {
+            notification.put("type", "m.room.member").put("content", JSONObject().put("membership", "invite"))
+        }
+        PushNotifier.show(activity, notification)
         invoke.resolve()
     }
 

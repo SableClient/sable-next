@@ -327,6 +327,19 @@ class PushNotifierTest {
     }
 
     @Test
+    fun show_aWarmInvitationHasAcceptAndDecline() {
+        val invite = warmNotification("!invite:example.org", "", "").put("type", "m.room.member")
+            .put("content", JSONObject().put("membership", "invite"))
+        PushNotifier.show(context, invite)
+        val posted = notificationManager.activeNotifications.single().notification
+        assertEquals("invites", posted.channelId)
+        assertEquals(
+            listOf(PushActions.ACCEPT_INVITE, PushActions.DECLINE_INVITE),
+            posted.actions.map { shadowOf(it.actionIntent).savedIntent.getStringExtra(NotificationIntents.ACTION) },
+        )
+    }
+
+    @Test
     fun show_keepsTheCanonicalIdSoAPushAndTheAppShareOneAlert() {
         PushNotifier.showFromPush(context, pushPayload("!same:example.org", "\$one", "first"))
         PushNotifier.show(context, warmNotification("!same:example.org", "\$two", "second"))
