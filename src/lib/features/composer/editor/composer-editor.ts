@@ -549,6 +549,38 @@ const outdentCode: Command = (state, dispatch) => {
   return true;
 };
 
+function stepIntoBlankLine(direction: -1 | 1): Command {
+  return (state, dispatch, view) => {
+    const { $from, empty } = state.selection;
+    const { hard_break: hardBreak } = composerSchema.nodes;
+    if (!empty || !view || $from.parent.type !== composerSchema.nodes.paragraph) return false;
+    const pos = $from.pos;
+    let target: number;
+    if (direction < 0) {
+      const start = softLineStart($from);
+      if (start === $from.start()) return false;
+      const breakAt = start - 1;
+      const above = state.doc.resolve(breakAt);
+      if (breakAt !== $from.start() && above.nodeBefore?.type !== hardBreak) return false;
+      if (pos !== start && view.coordsAtPos(pos).top !== view.coordsAtPos(start).top) return false;
+      target = breakAt;
+    } else {
+      let breakAt = -1;
+      $from.parent.forEach((child, offset) => {
+        const at = $from.start() + offset;
+        if (breakAt < 0 && at >= pos && child.type === hardBreak) breakAt = at;
+      });
+      if (breakAt < 0 || state.doc.nodeAt(breakAt + 1)?.type !== hardBreak) return false;
+      if (pos !== breakAt && view.coordsAtPos(pos).top !== view.coordsAtPos(breakAt, -1).top) {
+        return false;
+      }
+      target = breakAt + 1;
+    }
+    dispatch?.(state.tr.setSelection(TextSelection.create(state.doc, target)).scrollIntoView());
+    return true;
+  };
+}
+
 function leaveCodeBlock(direction: -1 | 1): Command {
   return (state, dispatch, view) => {
     const { $from, empty } = state.selection;
@@ -748,10 +780,12 @@ export class ComposerEditor {
         ArrowUp: (state, dispatch, view) =>
           this.options.onNavigate('ArrowUp') ||
           leaveCodeBlock(-1)(state, dispatch, view) ||
+          stepIntoBlankLine(-1)(state, dispatch, view) ||
           moveToDocumentEdge('up')(state, dispatch, view),
         ArrowDown: (state, dispatch, view) =>
           this.options.onNavigate('ArrowDown') ||
           leaveCodeBlock(1)(state, dispatch, view) ||
+          stepIntoBlankLine(1)(state, dispatch, view) ||
           moveToDocumentEdge('down')(state, dispatch, view),
         'Shift-ArrowUp': chainCommands(escapeCodeBlock(-1), enterCodeBlock(-1)),
         'Shift-ArrowDown': chainCommands(escapeCodeBlock(1), enterCodeBlock(1)),

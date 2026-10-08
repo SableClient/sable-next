@@ -192,4 +192,62 @@ for (const mobile of [false, true]) {
       await expect(app.composer).toBeEmpty();
     }
   });
+
+  test(`${prefix}vertical arrows stop on every blank line`, async ({
+    page,
+    app,
+    installRoomCore,
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('sable-preferences', JSON.stringify({ richTextComposer: true }));
+    });
+    await installRoomCore('ready');
+    await app.openRoom('!room:example.test');
+    const coarse = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+    const newline = coarse ? 'Enter' : 'Shift+Enter';
+
+    await app.composer.click();
+    for (const key of [
+      '1',
+      newline,
+      newline,
+      '2',
+      newline,
+      '3',
+      newline,
+      '4',
+      newline,
+      newline,
+      '5',
+    ]) {
+      if (key === newline) await page.keyboard.press(key);
+      else await page.keyboard.type(key);
+    }
+    const marked = async () => {
+      await page.keyboard.type('X');
+      const text = await app.composer
+        .locator('p')
+        .evaluate((p) =>
+          [...p.childNodes]
+            .map((node) =>
+              node.nodeName === 'BR' &&
+              !(node as Element).classList.contains('ProseMirror-trailingBreak')
+                ? '|'
+                : (node.textContent ?? '')
+            )
+            .join('')
+        );
+      await page.keyboard.press('Backspace');
+      return text;
+    };
+    const up: string[] = [];
+    for (let step = 0; step < 6; step += 1) {
+      await page.keyboard.press('ArrowUp');
+      up.push(await marked());
+    }
+    expect(up[0]).toBe('1||2|3|4|X|5');
+    expect(up[4]).toBe('1|X|2|3|4||5');
+    for (let step = 0; step < 5; step += 1) await page.keyboard.press('ArrowDown');
+    expect(await marked()).toBe('1||2|3|4|X|5');
+  });
 }
