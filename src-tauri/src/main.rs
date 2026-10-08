@@ -178,7 +178,7 @@ fn is_cef_subprocess() -> bool {
 
 #[cfg(all(feature = "cef", target_os = "linux"))]
 fn is_crash_reporter() -> bool {
-    std::env::var_os("_CRASH_REPORTER_SERVER").is_some()
+    sentry::integrations::minidump::MinidumpIntegration::new().is_crash_reporter_process()
 }
 
 #[cfg(all(feature = "cef", target_os = "linux"))]
