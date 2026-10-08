@@ -2910,6 +2910,11 @@ impl Core {
         self.track_session_task(
             spawn(async move {
                 while changes.next().await.is_some() {
+                    let mut ignored = core.ignored_senders().await;
+                    ignored.sort();
+                    if persist::ignored_unchanged(&client, &ignored).await {
+                        continue;
+                    }
                     *core.search_index.lock().await = MessageIndex::new();
                     core.search_crawl.lock().await.reset();
                     core.server_search.lock().await.reset();
@@ -2928,6 +2933,7 @@ impl Core {
                             let _ = persist::forget(&client, &room_id).await;
                         }
                     }
+                    persist::save_ignored(&client, &ignored).await;
                 }
             })
             .abort_on_drop(),

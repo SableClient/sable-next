@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
+use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, OwnedUserId};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
@@ -28,6 +28,10 @@ fn chunk_key(room_id: &OwnedRoomId, chunk: ChunkId) -> Vec<u8> {
 
 fn rooms_key() -> Vec<u8> {
     b"sable.search.rooms".to_vec()
+}
+
+fn ignored_key() -> Vec<u8> {
+    b"sable.search.ignored".to_vec()
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -440,6 +444,20 @@ pub(super) async fn listed_rooms(client: &matrix_sdk::Client) -> Vec<OwnedRoomId
     }
 }
 
+pub(super) async fn ignored_unchanged(
+    client: &matrix_sdk::Client,
+    ignored: &[OwnedUserId],
+) -> bool {
+    matches!(
+        read::<Vec<OwnedUserId>>(client, &ignored_key()).await,
+        Read::Found(stored) if stored == ignored
+    )
+}
+
+pub(super) async fn save_ignored(client: &matrix_sdk::Client, ignored: &[OwnedUserId]) {
+    let _ = write(client, &ignored_key(), &ignored.to_vec()).await;
+}
+
 #[must_use]
 pub(super) async fn list_room(client: &matrix_sdk::Client, room_id: &OwnedRoomId) -> bool {
     let mut rooms = match read::<Vec<OwnedRoomId>>(client, &rooms_key()).await {
@@ -610,6 +628,7 @@ pub(crate) async fn reset_state_cache(path: &std::path::Path) -> Result<(), Stor
             .map_err(StoreError::backend)?;
     }
     let _ = copy_value(&source, &target, &crawl_key()).await?;
+    let _ = copy_value(&source, &target, &ignored_key()).await?;
     target.close().await.map_err(StoreError::backend)?;
     source.close().await.map_err(StoreError::backend)?;
 
