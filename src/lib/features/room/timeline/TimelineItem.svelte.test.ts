@@ -60,6 +60,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
 });
 
 import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
 
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
 import { senderColor } from './timeline-format';
@@ -1642,5 +1643,37 @@ test('preserves cleared room names and avatars', async () => {
     '@alice:example.org'
   );
   expect(document.querySelector('.reply-name')).toHaveTextContent('@bob:example.org');
+  expect(document.querySelector('.message-avatar .media-image')).toBeNull();
+});
+
+test('reopening a room does not replace the current sender with cached members', async () => {
+  const loader = new RoomMemberLoader();
+  const oldMember = {
+    user_id: '@alice:example.org',
+    display_name: 'Old Alice',
+    avatar_url: 'mxc://example.org/cached-avatar',
+    power_level: 0,
+    membership: 'join' as const,
+    member_ts: null,
+    kicked: false,
+    service: false,
+  };
+  await loader.load('!room:example.org', () => Promise.resolve([oldMember]));
+  loader.reset();
+  const request = Promise.withResolvers<typeof loader.members>();
+  const loading = loader.load('!room:example.org', () => request.promise);
+  const message = { ...item(false), sender_name: 'New Alice', sender_avatar: null };
+  const props = { core, item: { item: message, collapsed: false, members: loader.members } };
+  const row = render(TimelineItemHarness, props);
+  await tick();
+
+  expect(document.querySelector('header .sender-identity-name')).toHaveTextContent('New Alice');
+  expect(document.querySelector('.message-avatar .media-image')).toBeNull();
+
+  request.resolve([{ ...oldMember, display_name: 'New Alice', avatar_url: null }]);
+  await loading;
+  await row.rerender({ ...props, item: { ...props.item, members: loader.members } });
+
+  expect(document.querySelector('header .sender-identity-name')).toHaveTextContent('New Alice');
   expect(document.querySelector('.message-avatar .media-image')).toBeNull();
 });

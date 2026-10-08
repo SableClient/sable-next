@@ -80,7 +80,7 @@ test('a pending member load cannot block or replace the next room', async () => 
   expect(loader.loading).toBe(false);
 });
 
-test('a revisited room paints its cached members before the refetch lands', async () => {
+test('a revisited room waits for its current members', async () => {
   const loader = new RoomMemberLoader();
   const refetch = deferred<MemberView[]>();
   let calls = 0;
@@ -94,64 +94,23 @@ test('a revisited room paints its cached members before the refetch lands', asyn
   expect(loader.members).toEqual([]);
 
   const revisit = loader.load('!room:example.org', fetchMembers);
-  // Cached, so names are on screen without waiting for the request.
-  expect(loader.members.map((entry) => entry.display_name)).toEqual(['Alice']);
-  expect(loader.loading).toBe(false);
+  expect(loader.members).toEqual([]);
+  expect(loader.loading).toBe(true);
 
   refetch.resolve([member('@a:b', 'Alice Renamed')]);
   await revisit;
 
-  // No core event reports a membership change, so the refetch still replaces them.
   expect(loader.members.map((entry) => entry.display_name)).toEqual(['Alice Renamed']);
+  expect(loader.loading).toBe(false);
   expect(calls).toBe(2);
 });
 
-test('the member cache is bounded', async () => {
+test('a power level change patches the loaded members', async () => {
   const loader = new RoomMemberLoader();
-  let calls = 0;
-  const fetchMembers = (roomId: string) => {
-    calls += 1;
-    return Promise.resolve([member(`@u:${roomId}`)]);
-  };
-
-  for (let index = 0; index < 12; index += 1) {
-    loader.reset();
-    await loader.load(`!room-${String(index)}:example.org`, fetchMembers);
-  }
-  expect(calls).toBe(12);
-
-  // The earliest rooms were evicted, so nothing is painted before the fetch.
-  loader.reset();
-  const evicted = loader.load('!room-0:example.org', fetchMembers);
-  expect(loader.loading).toBe(true);
-  await evicted;
-
-  // A recent one is still cached, so it paints at once.
-  loader.reset();
-  const kept = loader.load('!room-11:example.org', fetchMembers);
-  expect(loader.loading).toBe(false);
-  await kept;
-});
-
-test('a power level change patches the loaded members and the cache', async () => {
-  const loader = new RoomMemberLoader();
-  const refetch = deferred<MemberView[]>();
-  let calls = 0;
-  const fetchMembers = () => {
-    calls += 1;
-    return calls === 1 ? Promise.resolve([member('@a:b'), member('@c:d')]) : refetch.promise;
-  };
-
-  await loader.load('!room:example.org', fetchMembers);
+  await loader.load('!room:example.org', () => Promise.resolve([member('@a:b'), member('@c:d')]));
   loader.setPowerLevel('!other:example.org', '@a:b', 50);
   expect(loader.members.map((entry) => entry.power_level)).toEqual([0, 0]);
 
   loader.setPowerLevel('!room:example.org', '@a:b', 50);
   expect(loader.members.map((entry) => entry.power_level)).toEqual([50, 0]);
-
-  loader.reset();
-  const revisit = loader.load('!room:example.org', fetchMembers);
-  expect(loader.members.map((entry) => entry.power_level)).toEqual([50, 0]);
-  refetch.resolve([member('@a:b'), member('@c:d')]);
-  await revisit;
 });
