@@ -7,9 +7,12 @@ import init, {
   setPanicHandler,
 } from '#src/generated/wasm/sable_wasm.js';
 import { clearSession, loadSession, saveSession } from '#lib/platform/session-storage.js';
+import { installFirefoxFetchLimit } from './adaptive-fetch';
 import { createCoreWorkerBoundary } from './core-worker-boundary';
 
 declare const self: SharedWorkerGlobalScope;
+
+installFirefoxFetchLimit(self);
 
 const core = init().then(() => {
   // Before the constructor, so a panic while opening the session store still
