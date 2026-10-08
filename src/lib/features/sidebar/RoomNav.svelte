@@ -1372,19 +1372,17 @@
     z-index: 1;
   }
 
-  .room-banner-resize:hover,
   .room-banner-resize.dragging,
   .room-banner-resize:focus-visible {
     background: var(--primary-main);
-  }
-
-  .room-banner-resize:hover {
-    transition-delay: var(--motion-normal);
-  }
-
-  .room-banner-resize.dragging,
-  .room-banner-resize:focus-visible {
     transition: none;
+  }
+
+  @media (hover: hover) {
+    .room-banner-resize:hover {
+      background: var(--primary-main);
+      transition-delay: var(--motion-normal);
+    }
   }
 
   .room-banner-resize:focus-visible {
