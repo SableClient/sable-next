@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -73,6 +74,13 @@
     void roomId;
     void revision;
     void refreshCount();
+  });
+
+  $effect(() => {
+    const target = roomId;
+    if (!open || !target) return;
+
+    untrack(() => void load());
   });
 
   async function refreshCount(): Promise<void> {
@@ -210,8 +218,7 @@
   preventScroll={false}
   trigger={triggerHidden ? undefined : pinTrigger}
   onOpenChange={(next) => {
-    if (next) void load();
-    else void refreshCount();
+    if (!next) void refreshCount();
   }}
 >
   <IconContext values={{ 'aria-hidden': 'true' }}>
