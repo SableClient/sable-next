@@ -84,7 +84,13 @@ function toFile(url: unknown, width: unknown, height: unknown, size: unknown): G
 
 function pickFullRes(candidates: (GifFile | undefined)[]): GifFile | undefined {
   const available = candidates.filter((file): file is GifFile => file !== undefined);
-  return available.find((file) => !file.size || file.size <= sizeLimit) ?? available.at(-1);
+  return (
+    available.find((file) => !file.size || file.size <= sizeLimit) ??
+    available.reduce<GifFile | undefined>(
+      (smallest, file) => (smallest && (smallest.size ?? 0) <= (file.size ?? 0) ? smallest : file),
+      undefined
+    )
+  );
 }
 
 function toResult(
@@ -121,7 +127,7 @@ function parseKlipy(payload: unknown): GifResult[] {
   return results.filter(isRecord).map((result) => {
     const formats = isRecord(result.file) ? result.file : {};
     const preview = klipyFormat(formats.xs) ?? klipyFormat(formats.sm) ?? klipyFormat(formats.md);
-    const fullRes = pickFullRes([klipyFormat(formats.hd), klipyFormat(formats.md), preview]);
+    const fullRes = pickFullRes([klipyFormat(formats.hd), klipyFormat(formats.md)]) ?? preview;
     const id =
       typeof result.id === 'string' || typeof result.id === 'number' ? String(result.id) : '';
 
@@ -143,11 +149,8 @@ function parseTenor(payload: unknown): GifResult[] {
   return results.filter(isRecord).map((result) => {
     const formats = isRecord(result.media_formats) ? result.media_formats : {};
     const preview = tenorFormat(formats, 'tinygif') ?? tenorFormat(formats, 'nanogif');
-    const fullRes = pickFullRes([
-      tenorFormat(formats, 'gif'),
-      tenorFormat(formats, 'mediumgif'),
-      preview,
-    ]);
+    const fullRes =
+      pickFullRes([tenorFormat(formats, 'gif'), tenorFormat(formats, 'mediumgif')]) ?? preview;
     const title =
       (typeof result.content_description === 'string' ? result.content_description : '') ||
       (typeof result.title === 'string' ? result.title : '');

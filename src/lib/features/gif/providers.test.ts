@@ -65,6 +65,52 @@ test('tenor reports the largest rendition that fits, and the small one as previe
   ]);
 });
 
+test('tenor sends the smaller full rendition rather than the preview when neither fits', () => {
+  const [result] = gifProviders.tenor.parse({
+    results: [
+      {
+        id: 'abc',
+        media_formats: {
+          gif: { url: 'https://media.tenor.com/abc/full.gif', dims: [498, 280], size: 6_196_294 },
+          mediumgif: {
+            url: 'https://media.tenor.com/abc/medium.gif',
+            dims: [498, 280],
+            size: 10_423_719,
+          },
+          tinygif: { url: 'https://media.tenor.com/abc/tiny.gif', dims: [220, 124], size: 650_875 },
+        },
+      },
+    ],
+  });
+
+  expect(result.mediaUrl).toBe('https://media.tenor.com/abc/full.gif');
+  expect(result.width).toBe(498);
+  expect(result.previewUrl).toBe('https://media.tenor.com/abc/tiny.gif');
+});
+
+test('klipy sends the smaller full rendition rather than the preview when neither fits', () => {
+  const file = (name: string, width: number, size: number) => ({
+    gif: { url: `https://static.klipy.com/ii/${name}.gif`, width, height: width, size },
+  });
+  const [result] = gifProviders.klipy.parse({
+    data: {
+      data: [
+        {
+          id: 1,
+          file: {
+            hd: file('hd', 498, 9_000_000),
+            md: file('md', 320, 4_000_000),
+            xs: file('xs', 90, 200_000),
+          },
+        },
+      ],
+    },
+  });
+
+  expect(result.mediaUrl).toBe('https://static.klipy.com/ii/md.gif');
+  expect(result.previewUrl).toBe('https://static.klipy.com/ii/xs.gif');
+});
+
 test('a payload in the wrong shape yields no results rather than throwing', () => {
   for (const provider of Object.values(gifProviders)) {
     expect(provider.parse(null)).toEqual([]);
