@@ -19,7 +19,7 @@
     trackBoardSize,
   } from '#lib/ui/primitives/board-size.svelte.js';
   import { on } from 'svelte/events';
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
 
   import { emojiGroups, searchReactionEmoji, shortcodeFor } from '#lib/emoji/emoji.js';
   import { readRecentReactions, rememberReaction } from '#lib/emoji/recents.svelte.js';
@@ -372,6 +372,7 @@
   }
 
   function measureImageRow(list: HTMLElement): () => void {
+    const measuredTab = tab;
     const update = (size?: ResizeObserverSize): void => {
       const cell = list.firstElementChild;
       if (!(cell instanceof HTMLElement)) return;
@@ -384,9 +385,10 @@
       const width = bounds.width;
       const gap = Number.parseFloat(style.columnGap) || 0;
       const row = bounds.height + (Number.parseFloat(style.marginBottom) || 0);
-      const last = imageMeasure;
-      if (last?.tab === tab && last.width === width && last.gap === gap && last.row === row) return;
-      imageMeasure = { tab, width, gap, row };
+      const last = untrack(() => imageMeasure);
+      if (last?.tab === measuredTab && last.width === width && last.gap === gap && last.row === row)
+        return;
+      imageMeasure = { tab: measuredTab, width, gap, row };
     };
     update();
     if (typeof ResizeObserver === 'undefined') return () => {};
