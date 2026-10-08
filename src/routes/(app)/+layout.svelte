@@ -12,6 +12,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { findRoomByPathId, provideRoomList, RoomList } from '#lib/rooms/room-list.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
+  import { rememberLastRoom } from '#lib/rooms/last-room.js';
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { Bookmarks, provideBookmarks } from '#lib/rooms/bookmarks.svelte.js';
@@ -787,6 +788,15 @@
   });
 
   const NOTIFIED_ROOM_WAIT_MS = 10_000;
+
+  $effect(() => {
+    const accountId = core.session?.account_id;
+    if (core.status !== 'ready' || !accountId || !roomList.settled) return;
+    const room = roomList.byId(openRoomId);
+    if (room?.state === 'joined' && !room.is_space && !room.is_tombstoned) {
+      rememberLastRoom(accountId, room.room_id);
+    }
+  });
 
   async function openNotification(roomId: string, eventId: string | null): Promise<void> {
     await tick();

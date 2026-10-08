@@ -204,6 +204,7 @@ export interface Preferences {
   searchUnmeteredOnly: boolean;
   serverSearch: boolean;
   showHome: boolean;
+  restoreLastRoom: boolean;
   showSearch: boolean;
   showUnreadCounts: boolean;
   badgeCountDMsOnly: boolean;
@@ -478,6 +479,7 @@ const DEFAULTS: Preferences = {
   searchUnmeteredOnly: true,
   serverSearch: true,
   showHome: false,
+  restoreLastRoom: true,
   showSearch: false,
   showUnreadCounts: false,
   badgeCountDMsOnly: true,

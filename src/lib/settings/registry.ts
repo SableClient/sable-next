@@ -527,6 +527,14 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'restoreLastRoom',
+        section: 'sidebar',
+        icon: ClockIcon,
+        name: 'settings.restoreLastRoom',
+        description: 'settings.restoreLastRoomHint',
+        type: 'boolean',
+      },
+      {
         key: 'showUnreadCounts',
         section: 'unread-badges',
         icon: ChatTextIcon,

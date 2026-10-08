@@ -94,7 +94,7 @@ interface StashedShare {
   files: File[];
 }
 
-const shareAction = `${resolve('/').replace(/\/$/, '')}/share`;
+const shareAction = `${resolve('/(app)').replace(/\/$/, '')}/share`;
 const shares = new Map<string, StashedShare>();
 
 worker.addEventListener('fetch', (event) => {
@@ -117,7 +117,7 @@ async function stashShare(event: FetchEvent): Promise<Response> {
   shares.set(id, { text, files });
   event.waitUntil(watchWorkerOperation('share-hold', holdShare(id)));
 
-  return Response.redirect(resolve('/'), 303);
+  return Response.redirect(resolve('/(app)'), 303);
 }
 
 async function holdShare(id: string): Promise<void> {
@@ -389,7 +389,7 @@ async function open(
   }
 
   await worker.clients.openWindow(
-    roomId === undefined ? resolve('/') : notificationPermalink(roomId, eventId, userId)
+    roomId === undefined ? resolve('/(app)') : notificationPermalink(roomId, eventId, userId)
   );
 }
 

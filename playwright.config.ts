@@ -46,7 +46,8 @@ export default defineConfig({
       // deliberately small so it catches compatibility regressions cheaply.
       name: 'webkit',
       dependencies: ['setup'],
-      testMatch: /(?:^|\/)(?:app-shell|login|navigation|window-activity|thread-links)\.spec\.ts$/,
+      testMatch:
+        /(?:^|\/)(?:app-shell|login|navigation|window-activity|thread-links|last-room)\.spec\.ts$/,
       use: devices['Desktop Safari'],
     },
     {

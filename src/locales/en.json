@@ -1945,6 +1945,8 @@
     "showRoomBanners": "Room banners above the list",
     "subspaceHierarchyLimit": "Subspace nesting depth",
     "showHome": "All rooms in the sidebar",
+    "restoreLastRoom": "Restore last viewed room",
+    "restoreLastRoomHint": "Open the last room you viewed when starting Sable.",
     "showSearch": "Show search in the sidebar",
     "showUnreadCounts": "Show counts on quiet rooms",
     "badgeCountDMsOnly": "Show counts on quiet direct messages",
