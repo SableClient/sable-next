@@ -330,6 +330,8 @@
   }
 
   :global(.media.media-frame-video) {
+    contain: inline-size;
+    contain-intrinsic-inline-size: var(--timeline-media-max);
     max-height: var(--timeline-media-max);
     width: min(
       var(--timeline-media-fill),

@@ -743,6 +743,30 @@ test('a portrait video is bounded like a portrait picture on mobile', async ({
   expect(box.sideways).toBe(0);
 });
 
+test('a video with read receipts keeps its box on mobile', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('delayed_media');
+  await page.setViewportSize(NARROW);
+  await app.openRooms();
+  await app.openRoomFromList('General');
+  await timeline.expectRevealed();
+  await core.setTimelineItemById(await core.subscription(), 'general-19', {
+    ...portraitVideo(),
+    read_by: ['@bob:example.test'],
+  });
+  await expect(page.locator('.timeline-viewport .receipt-tail')).toHaveCount(1);
+
+  const box = await mediaBox(page, '.media-frame');
+  expect(box.width).toBeGreaterThan(MEDIA_MIN_PX);
+  expect(box.width / box.height).toBeCloseTo(600 / 900, 2);
+  expect(box.sideways).toBe(0);
+});
+
 // `estimateRowSize` reserves one box for both kinds.
 test('a video takes the same box as the picture it shares dimensions with', async ({
   page,
