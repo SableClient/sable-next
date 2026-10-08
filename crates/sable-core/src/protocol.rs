@@ -2538,7 +2538,7 @@ pub struct SearchFilter {
     pub state_events: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct CallMemberView {
     #[cfg_attr(feature = "typegen", specta(type = String))]

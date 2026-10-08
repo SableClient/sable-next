@@ -17,7 +17,8 @@ use super::keys::{self, KeyDistributor, Rolled};
 use super::membership::{self, CallMember, StickyMemberships};
 use super::{HANGUP_DELAY, USE_KEY_DELAY, sfu, sticky};
 use crate::protocol::{
-    CallBackendView, CallIntent, CallMode, CallSessionId, CommandErr, CommandOk, CoreEvent,
+    CallBackendView, CallIntent, CallMemberView, CallMode, CallSessionId, CommandErr, CommandOk,
+    CoreEvent,
 };
 use crate::{CallSession, Core};
 
@@ -38,6 +39,7 @@ pub(crate) struct State {
     own: CallMember,
     sticky: StickyMemberships,
     members: Vec<CallMember>,
+    emitted_members: Option<Vec<CallMemberView>>,
     backends: BTreeMap<String, CallBackendView>,
     pending_keys: Vec<PendingKey>,
     distributor: Option<Arc<Mutex<KeyDistributor>>>,
@@ -75,6 +77,7 @@ impl State {
             members,
             sticky,
             distributor,
+            emitted_members: None,
             backends: BTreeMap::new(),
             pending_keys: Vec::new(),
             revision: 0,
@@ -903,13 +906,16 @@ async fn publish_update(
             view.backend_id = member_service(member, &state.members)
                 .map(|service| backend_id(&room.room_id().to_owned(), service));
         }
-        core.emit_if_current(
-            generation,
-            CoreEvent::CallMembers {
-                session,
-                members: views,
-            },
-        );
+        if state.emitted_members.as_ref() != Some(&views) {
+            state.emitted_members = Some(views.clone());
+            core.emit_if_current(
+                generation,
+                CoreEvent::CallMembers {
+                    session,
+                    members: views,
+                },
+            );
+        }
         let publisher_id = backend_id(
             &room.room_id().to_owned(),
             state.own.foci.first().map_or("", String::as_str),

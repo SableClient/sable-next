@@ -419,6 +419,7 @@ async fn an_element_call_peers_key_is_emitted_on_the_oldest_members_focus() {
         own: member(CallMode::Compatibility, now, &["https://sfu.example.org"]),
         sticky: super::StickyMemberships::default(),
         members,
+        emitted_members: None,
         backends: BTreeMap::new(),
         pending_keys: vec![super::PendingKey {
             sender: owned_user_id!("@genchu:federated.nexus"),
@@ -490,14 +491,19 @@ async fn an_element_call_focus_without_an_alias_still_counts() {
 async fn refresh_fixture(
     created_ts: u64,
     observed: bool,
-) -> (Arc<Core>, matrix_sdk::Room, Mutex<State>) {
+) -> (
+    Arc<Core>,
+    tokio::sync::mpsc::UnboundedReceiver<crate::protocol::CoreEvent>,
+    matrix_sdk::Room,
+    Mutex<State>,
+) {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = owned_room_id!("!call:example.org");
     server.sync_joined_room(&client, &room_id).await;
     let room = client.get_room(&room_id).unwrap();
     let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
-    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    let (core, events) = Core::new("test", Box::new(MemorySessionStore::default()));
     *core.session.write().await = Some(Session {
         account_id: "test".to_owned(),
         client,
@@ -544,11 +550,13 @@ async fn refresh_fixture(
     );
     (
         core,
+        events,
         room,
         Mutex::new(State {
             own,
             sticky: super::StickyMemberships::default(),
             members: Vec::new(),
+            emitted_members: None,
             backends,
             pending_keys: Vec::new(),
             distributor: None,
@@ -564,19 +572,33 @@ async fn refresh_fixture(
 
 #[tokio::test]
 async fn refresh_stops_when_an_observed_membership_disappears() {
-    let (core, room, state) = refresh_fixture(super::keys::now_ms(), true).await;
+    let (core, _events, room, state) = refresh_fixture(super::keys::now_ms(), true).await;
     assert!(!refresh(&core, 0, CallSessionId(1), &room, &state).await);
 }
 
 #[tokio::test]
 async fn refresh_allows_a_recent_unobserved_membership() {
-    let (core, room, state) = refresh_fixture(super::keys::now_ms(), false).await;
+    let (core, _events, room, state) = refresh_fixture(super::keys::now_ms(), false).await;
     assert!(refresh(&core, 0, CallSessionId(1), &room, &state).await);
 }
 
 #[tokio::test]
+async fn an_unchanged_roster_is_emitted_once() {
+    let (core, mut events, room, state) = refresh_fixture(super::keys::now_ms(), false).await;
+    assert!(refresh(&core, 1, CallSessionId(1), &room, &state).await);
+    assert!(refresh(&core, 1, CallSessionId(1), &room, &state).await);
+    let mut rosters = 0;
+    while let Ok(event) = events.try_recv() {
+        if matches!(event, crate::protocol::CoreEvent::CallMembers { .. }) {
+            rosters += 1;
+        }
+    }
+    assert_eq!(rosters, 1);
+}
+
+#[tokio::test]
 async fn refresh_stops_when_an_unobserved_membership_is_old() {
-    let (core, room, state) =
+    let (core, _events, room, state) =
         refresh_fixture(super::keys::now_ms().saturating_sub(30_001), false).await;
     assert!(!refresh(&core, 0, CallSessionId(1), &room, &state).await);
 }
