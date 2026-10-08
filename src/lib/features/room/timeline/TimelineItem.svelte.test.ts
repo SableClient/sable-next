@@ -1603,3 +1603,44 @@ test('shows the live member name over the one captured on the item', async () =>
   expect(document.body.textContent).toContain('New Alice');
   expect(document.body.textContent).not.toContain('Old Alice');
 });
+
+test('preserves cleared room names and avatars', async () => {
+  core.userProfile.mockResolvedValue({
+    display_name: 'Old Alice',
+    pronouns: [{ summary: 'they/them', language: null }],
+  });
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: {
+        item: {
+          ...replyItem(),
+          sender_name: 'Old Alice',
+          sender_avatar: 'mxc://example.org/old-avatar',
+        },
+        collapsed: false,
+        members: ['@alice:example.org', '@bob:example.org'].map((user_id) => ({
+          user_id,
+          display_name: null,
+          avatar_url: null,
+          power_level: 0,
+          membership: 'join' as const,
+          member_ts: null,
+          kicked: false,
+          service: false,
+        })),
+      },
+    },
+  });
+  await vi.waitFor(() => {
+    expect(document.querySelector('header .sender-identity-pronoun')).toHaveTextContent(
+      'they/them'
+    );
+  });
+
+  expect(document.querySelector('header .sender-identity-name')).toHaveTextContent(
+    '@alice:example.org'
+  );
+  expect(document.querySelector('.reply-name')).toHaveTextContent('@bob:example.org');
+  expect(document.querySelector('.message-avatar .media-image')).toBeNull();
+});

@@ -151,6 +151,51 @@ test('keeps the clicked room member identity when the global profile loads', asy
   expect(document.querySelector('.profile-card-bio strong')?.textContent).toBe('Global bio');
 });
 
+test.each(['New Alice', null])(
+  'keeps room identity when a stale profile loads (%s)',
+  async (display_name) => {
+    const member: MemberView = {
+      user_id: emptyProfile.user_id,
+      display_name,
+      avatar_url: null,
+      power_level: 0,
+      membership: 'join',
+      member_ts: null,
+      kicked: false,
+      service: false,
+    };
+    const request = Promise.withResolvers<ProfileView>();
+    core.userProfile.mockReturnValueOnce(request.promise);
+    render(MemberIdentityRow, { userId: member.user_id, members: [member] });
+    const props = { userId: member.user_id, roomId: '!room:example.org', member, profile: null };
+    const card = render(MentionProfileCard, props);
+    await tick();
+
+    const name = display_name ?? member.user_id;
+    expect(document.querySelector('.profile-card-name')).toHaveTextContent(name);
+    expect(document.querySelector('.member-name')).toHaveTextContent(name);
+    expect(document.querySelector('.avatar-root .media-image')).toBeNull();
+
+    const stale = {
+      ...emptyProfile,
+      display_name: 'Old Alice',
+      avatar_url: 'mxc://example.org/old-avatar',
+      bio: '<strong>Global bio</strong>',
+      pronouns: [{ summary: 'they/them', language: null }],
+    };
+    request.resolve(stale);
+    await card.rerender({ ...props, profile: stale });
+    await vi.waitFor(() => {
+      expect(document.querySelector('.member-identity-row')).toHaveTextContent('they/them');
+    });
+
+    expect(document.querySelector('.profile-card-name')).toHaveTextContent(name);
+    expect(document.querySelector('.member-name')).toHaveTextContent(name);
+    expect(document.querySelector('.avatar-root .media-image')).toBeNull();
+    expect(document.querySelector('.profile-card-bio strong')).toHaveTextContent('Global bio');
+  }
+);
+
 test('uses the room role name, emoji and colour when the profile has no name colour', async () => {
   render(MentionProfileCard, {
     props: {

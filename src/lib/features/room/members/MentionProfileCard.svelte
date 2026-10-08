@@ -165,8 +165,8 @@
   });
 
   let ownIdentity = $derived({
-    name: roomMember?.display_name ?? currentProfile?.display_name ?? null,
-    avatar: roomMember?.avatar_url ?? currentProfile?.avatar_url ?? null,
+    name: roomMember ? roomMember.display_name : (currentProfile?.display_name ?? null),
+    avatar: roomMember ? roomMember.avatar_url : (currentProfile?.avatar_url ?? null),
   });
   let shownIdentity = $derived(roomCosmetics?.identity(userId, ownIdentity) ?? ownIdentity);
   let realName = $derived(shownIdentity.name ?? userId);

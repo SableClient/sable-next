@@ -176,15 +176,15 @@
   let senderTimezone = $derived(profile?.timezone ?? null);
   let senderMember = $derived(findMember(members, item.sender));
   let roomIdentity = $derived({
-    name: senderMember?.display_name ?? item.sender_name ?? null,
-    avatar: senderMember?.avatar_url ?? item.sender_avatar ?? null,
+    name: senderMember ? senderMember.display_name : item.sender_name,
+    avatar: senderMember ? senderMember.avatar_url : item.sender_avatar,
   });
   let spaceIdentity = $derived(roomCosmetics?.identity(item.sender, roomIdentity) ?? roomIdentity);
   let accountName = $derived(
     profileOverrides.name(
       item.sender ?? '',
       spaceIdentity.name ??
-        profile?.display_name ??
+        (senderMember ? null : profile?.display_name) ??
         item.sender ??
         $i18n.t('timeline.unknownSender')
     )
@@ -216,11 +216,9 @@
       : []
   );
   let replyIdentity = $derived.by(() => {
+    const member = findMember(members, item.in_reply_to?.sender);
     const own = {
-      name:
-        findMember(members, item.in_reply_to?.sender)?.display_name ??
-        item.in_reply_to?.sender_name ??
-        null,
+      name: member ? member.display_name : (item.in_reply_to?.sender_name ?? null),
       avatar: null,
     };
     return roomCosmetics?.identity(item.in_reply_to?.sender, own) ?? own;

@@ -44,15 +44,11 @@
   const roomCosmetics = useRoomCosmetics();
   let profile = $state<ProfileView | null>(null);
   let member = $derived(findMember(members, userId));
-  let shown = $derived(
-    roomCosmetics?.identity(userId, {
-      name: member?.display_name ?? profile?.display_name ?? null,
-      avatar: member?.avatar_url ?? profile?.avatar_url ?? null,
-    }) ?? {
-      name: member?.display_name ?? profile?.display_name ?? null,
-      avatar: member?.avatar_url ?? profile?.avatar_url ?? null,
-    }
-  );
+  let ownIdentity = $derived({
+    name: member ? member.display_name : (profile?.display_name ?? null),
+    avatar: member ? member.avatar_url : (profile?.avatar_url ?? null),
+  });
+  let shown = $derived(roomCosmetics?.identity(userId, ownIdentity) ?? ownIdentity);
   let displayName = $derived(profileOverrides.name(userId, shown.name ?? userId));
   let avatarUrl = $derived(profileOverrides.avatar(userId, shown.avatar));
   let cosmetics = $derived(roomCosmetics?.for(userId) ?? null);
