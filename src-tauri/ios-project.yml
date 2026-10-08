@@ -49,6 +49,7 @@ targets:
       path: SableNotificationService/Info.plist
       properties:
         SableAppGroup: group.{{app.identifier}}
+        CFBundleDisplayName: Sable
         CFBundleShortVersionString: {{apple.bundle-version-short}}
         CFBundleVersion: "{{apple.bundle-version}}"
         NSExtension:
