@@ -1,4 +1,6 @@
 {
+	admin off
+
 	servers {
 		protocols h1 h2c
 	}
