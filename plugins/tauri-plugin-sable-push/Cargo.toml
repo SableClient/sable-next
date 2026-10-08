@@ -1,0 +1,19 @@
+[package]
+name = "tauri-plugin-sable-push"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Android push rendering for Sable: decrypts a push, decides how it alerts and posts it."
+links = "tauri-plugin-sable-push"
+
+[dependencies]
+tauri = { version = "2", default-features = false }
+serde = { workspace = true }
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[lints]
+workspace = true

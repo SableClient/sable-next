@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/*", "src-tauri"]
+members = ["crates/*", "plugins/*", "src-tauri"]
 exclude = ["vendor/tauri-plugin-edge-to-edge"]
 # sable-wasm only compiles for wasm32 - its session store holds JS functions,
 # which are not Send. Build it with `-p sable-wasm --target wasm32-unknown-unknown`.
