@@ -125,3 +125,67 @@ test('reaching the latest message unblocks receipts even when the marker lookup 
   unread.reachLatest();
   expect(unread.blocking).toBe(false);
 });
+
+test('keeps the first background message as the unread target', async () => {
+  const unread = new TimelineUnread();
+  const items = [message('read')];
+  await unread.initialize(items, false);
+  unread.trackBackground(items, true);
+  items.push(message('own', true), message('first'), message('later'));
+  unread.trackBackground(items, false);
+  expect(unread.firstEventId).toBe('$first');
+  expect(unread.readEventId).toBe('$read');
+  expect(unread.count(items)).toBe(2);
+  expect(unread.background).toBe(true);
+  expect(unread.blocking).toBe(true);
+
+  items.push(message('latest'));
+  unread.trackBackground(items, false);
+  unread.trackBackground(items, true);
+  expect(unread.firstEventId).toBe('$first');
+  expect(unread.blocking).toBe(true);
+  unread.observe('$first');
+  expect(unread.background).toBe(false);
+  expect(unread.blocking).toBe(false);
+});
+
+test('ignores history, own messages and foreground arrivals', async () => {
+  const unread = new TimelineUnread();
+  await unread.initialize([message('read')], false);
+  unread.trackBackground([message('read')], true);
+  unread.trackBackground([message('history'), message('read')], false);
+  unread.trackBackground([message('read'), message('own', true)], false);
+  unread.trackBackground([message('read'), message('own', true), message('latest')], true);
+  expect(unread.active).toBe(false);
+  expect(unread.background).toBe(false);
+});
+
+test('preserves an existing unread target in the background', async () => {
+  const unread = new TimelineUnread();
+  const items = [marker(), message('first'), message('read')];
+  await unread.initialize(items, true);
+  unread.observe('$first');
+  unread.trackBackground(items, true);
+  items.push(message('missed'));
+  unread.trackBackground(items, false);
+  expect(unread.firstEventId).toBe('$first');
+  expect(unread.background).toBe(true);
+  expect(unread.blocking).toBe(true);
+});
+
+test('starts a new unread target after reading the first batch', async () => {
+  const unread = new TimelineUnread();
+  const items = [message('read')];
+  await unread.initialize(items, false);
+  unread.trackBackground(items, true);
+  items.push(message('first'));
+  unread.trackBackground(items, false);
+  unread.reachLatest();
+  unread.dismiss();
+  expect(unread.background).toBe(false);
+  items.push(message('second'));
+  unread.trackBackground(items, false);
+  expect(unread.firstEventId).toBe('$second');
+  expect(unread.readEventId).toBe('$first');
+  expect(unread.blocking).toBe(true);
+});
