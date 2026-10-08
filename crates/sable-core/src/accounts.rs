@@ -681,6 +681,10 @@ impl Core {
             .clear();
         self.subscriptions.lock().await.clear();
         self.room_subscriptions.lock().await.clear();
+        self.warm_rooms
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
         self.timelines.lock().await.clear();
         self.thread_timelines.lock().await.clear();
         self.account_data_types.lock().await.clear();
@@ -701,6 +705,12 @@ impl Core {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) =
             cosmetics::CosmeticsCache::default();
+        *self.probed_state() = crate::probed_state::ProbedState::default();
+        *self
+            .recent_state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            crate::probed_state::RecentState::default();
         *self.search_index.lock().await = search::MessageIndex::new();
         self.search_crawl.lock().await.reset();
         self.server_search.lock().await.reset();
@@ -777,6 +787,7 @@ impl Core {
         self.watch_calendars(&client, generation);
         self.watch_widget_feed(&client, generation);
         self.watch_room_widgets(&client, generation);
+        self.watch_room_state(&client);
         self.watch_cosmetics(&client, generation);
         self.watch_profile_changes(&client, generation);
         self.track_session_handler(&client, crate::rooms::repair_unreadable_tombstones(&client));

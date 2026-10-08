@@ -20,6 +20,7 @@ use crate::view;
 use crate::{Core, Subscription, SubscriptionKind, Task};
 
 const ROOM_LIST_PAGE_SIZE: usize = 200;
+pub(crate) const MAX_WARM_ROOMS: usize = 32;
 
 const fn pages_for(total: u32) -> usize {
     (total as usize).div_ceil(ROOM_LIST_PAGE_SIZE)
@@ -169,6 +170,9 @@ impl Core {
         tracing::info!(%room_id, "subscribe_timeline: waiting for room_subscriptions");
         let mut subscribed = self.room_subscriptions.lock().await;
         tracing::info!(%room_id, "subscribe_timeline: holding room_subscriptions");
+        if live {
+            self.remember_warm(room_id.clone());
+        }
         self.subscriptions.lock().await.insert(
             subscription,
             Subscription {
@@ -341,6 +345,36 @@ impl Core {
         (items, Some(task))
     }
 
+    pub(crate) async fn warm_rooms(
+        &self,
+        room_ids: Vec<OwnedRoomId>,
+    ) -> Result<CommandOk, CommandErr> {
+        let client = self.client().await?;
+        let mut subscribed = self.room_subscriptions.lock().await;
+        for room_id in room_ids {
+            if client
+                .get_room(&room_id)
+                .is_some_and(|room| room.state() == matrix_sdk::RoomState::Joined)
+            {
+                self.remember_warm(room_id);
+            }
+        }
+        self.sync_timeline_rooms_locked(&mut subscribed).await?;
+        Ok(CommandOk::WarmRooms)
+    }
+
+    fn remember_warm(&self, room_id: OwnedRoomId) {
+        let mut warm = self
+            .warm_rooms
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        warm.retain(|warmed| *warmed != room_id);
+        warm.push_back(room_id);
+        while warm.len() > MAX_WARM_ROOMS {
+            warm.pop_front();
+        }
+    }
+
     pub(crate) async fn sync_timeline_rooms_locked(
         &self,
         subscribed: &mut std::collections::BTreeSet<OwnedRoomId>,
@@ -353,6 +387,13 @@ impl Core {
                 | SubscriptionKind::FocusedTimeline(room_id) => Some(room_id.clone()),
                 SubscriptionKind::Other => None,
             })
+            .chain(
+                self.warm_rooms
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .iter()
+                    .cloned(),
+            )
             .collect::<std::collections::BTreeSet<_>>();
         drop(subscriptions);
         if room_ids == *subscribed {

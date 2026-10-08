@@ -635,14 +635,9 @@ impl Core {
 
         let cached = self.pack_cache.lock().await.room(room.room_id());
         if network_fallback {
-            match client
-                .send(get_state_events::v3::Request::new(
-                    room.room_id().to_owned(),
-                ))
-                .await
-            {
-                Ok(response) => {
-                    let state = RoomPackState::from_server(&response.room_state);
+            match self.room_state_snapshot(client, room.room_id()).await {
+                Ok(snapshot) => {
+                    let state = RoomPackState::from_server(&snapshot);
                     self.pack_cache
                         .lock()
                         .await
@@ -650,7 +645,7 @@ impl Core {
                     return Ok((state, true));
                 }
                 Err(error) if stored.packs.is_empty() && cached.is_none() => {
-                    return Err(error.into());
+                    return Err(error);
                 }
                 Err(error) => {
                     tracing::warn!(room = %room.room_id(), %error, "using cached image packs after state refresh failed");
@@ -1357,6 +1352,11 @@ mod server_tests {
             .expect("cached");
         assert_eq!(cached.packs.len(), 1);
 
+        *core
+            .recent_state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            crate::probed_state::RecentState::default();
         let _state = Mock::given(method("GET"))
             .and(path_regex(ROOM_STATE_PATH))
             .respond_with(ResponseTemplate::new(500))

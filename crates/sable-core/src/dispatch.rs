@@ -47,6 +47,7 @@ use matrix_sdk_ui::timeline::{
 };
 
 use crate::ResultExt;
+use crate::probed_state::Probed;
 use crate::protocol::{
     Command, CommandErr, CommandOk, CoreEvent, CreateJoinRuleView, CreateRoomKind,
     HomeserverSoftwareView, ImageSourcePackReferenceView, ImageSourcePackView, MembershipView,
@@ -428,6 +429,8 @@ impl Core {
 
                 Ok(CommandOk::Unsubscribe)
             }
+
+            Command::WarmRooms { room_ids } => self.warm_rooms(room_ids).await,
 
             Command::Paginate {
                 subscription,
@@ -2543,6 +2546,7 @@ impl Core {
                     .lock()
                     .await
                     .forget_room(&room_id, &event_type);
+                self.forget_room_state(&room_id, &event_type);
                 if self.note_cosmetic_state(&room_id, &event_type, &state_key, &content) {
                     self.emit(CoreEvent::RoomCosmeticsChanged { room_id });
                 }
@@ -3544,10 +3548,18 @@ impl Core {
         if !events.is_empty() {
             return Ok(events);
         }
+        let probed = self.probed_state().events(room_id, event_type);
+        if let Some(events) = probed {
+            return Ok(events);
+        }
 
-        let events = room_state_events_from_server(&client, &room, event_type)
+        let snapshot = self
+            .room_state_snapshot(&client, room.room_id())
             .await
             .map_err(|error| self.room_error("room_state_events", error))?;
+        let state = room_state_by_type(&snapshot);
+        let events = state.get(event_type).cloned().unwrap_or_default();
+        self.probed_state().remember_full(room_id, state);
 
         Ok(events)
     }
@@ -3574,58 +3586,62 @@ impl Core {
             field.ok().flatten()
         });
 
-        let content = match content {
-            Some(content) => Some(content),
-            None => match client
-                .send(get_state_event_for_key::v3::Request::new(
-                    room_id,
-                    event_type.into(),
-                    state_key,
-                ))
-                .await
-            {
-                Ok(response) => state_event_content(response.event_or_content.get()),
-                Err(error) if error.client_api_error_kind() == Some(&ErrorKind::NotFound) => None,
-                Err(error) => {
-                    return Err(self.room_error("room_state_event", error.into()));
-                }
-            },
+        if content.is_some() {
+            return Ok(content);
+        }
+        let probed = self
+            .probed_state()
+            .content(&room_id, &event_type, &state_key);
+        match probed {
+            Probed::Present(content) => return Ok(Some(content)),
+            Probed::Absent => return Ok(None),
+            Probed::Unknown => {}
+        }
+
+        let content = match client
+            .send(get_state_event_for_key::v3::Request::new(
+                room_id.clone(),
+                event_type.clone().into(),
+                state_key.clone(),
+            ))
+            .await
+        {
+            Ok(response) => state_event_content(response.event_or_content.get()),
+            Err(error) if error.client_api_error_kind() == Some(&ErrorKind::NotFound) => None,
+            Err(error) => {
+                return Err(self.room_error("room_state_event", error.into()));
+            }
         };
+        self.probed_state()
+            .remember_content(&room_id, &event_type, &state_key, content.clone());
 
         Ok(content)
     }
 }
 
-async fn room_state_events_from_server(
-    client: &matrix_sdk::Client,
-    room: &matrix_sdk::Room,
-    event_type: &str,
-) -> Result<Vec<RoomStateEventView>, matrix_sdk::Error> {
-    let response = client
-        .send(get_state_events::v3::Request::new(
-            room.room_id().to_owned(),
-        ))
-        .await?;
-
-    Ok(response
-        .room_state
-        .iter()
-        .filter(|raw| {
-            raw.get_field::<String>("type")
-                .ok()
-                .flatten()
-                .is_some_and(|found| found == event_type)
-        })
-        .filter_map(|raw| {
-            Some(RoomStateEventView {
-                state_key: raw.get_field::<String>("state_key").ok().flatten()?,
-                content: raw
-                    .get_field::<serde_json::Value>("content")
-                    .ok()
-                    .flatten()?,
-            })
-        })
-        .collect())
+fn room_state_by_type(
+    events: &[Raw<matrix_sdk::ruma::events::AnyStateEvent>],
+) -> HashMap<String, Vec<RoomStateEventView>> {
+    let mut state: HashMap<String, Vec<RoomStateEventView>> = HashMap::new();
+    for raw in events {
+        let Some(event_type) = raw.get_field::<String>("type").ok().flatten() else {
+            continue;
+        };
+        if event_type == "m.room.member" {
+            continue;
+        }
+        let (Some(state_key), Some(content)) = (
+            raw.get_field::<String>("state_key").ok().flatten(),
+            raw.get_field::<serde_json::Value>("content").ok().flatten(),
+        ) else {
+            continue;
+        };
+        state
+            .entry(event_type)
+            .or_default()
+            .push(RoomStateEventView { state_key, content });
+    }
+    state
 }
 
 #[cfg(test)]

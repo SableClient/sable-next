@@ -184,6 +184,7 @@ impl Core {
         )
         .await
         .map_err(|error| self.room_error("calendar_id", error))?;
+        self.forget_room_state(room.room_id(), CALENDARS);
         Ok(created.response.event_id.to_string())
     }
 }

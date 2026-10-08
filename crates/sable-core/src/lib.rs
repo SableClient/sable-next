@@ -30,6 +30,7 @@ mod personas;
 pub mod polls;
 mod presence;
 mod preview;
+mod probed_state;
 pub mod profiles;
 pub mod protocol;
 pub mod push_check;
@@ -121,6 +122,8 @@ pub struct Core {
     >,
     cosmetics: std::sync::Mutex<cosmetics::CosmeticsCache>,
     cosmetics_fetches: std::sync::Mutex<HashMap<matrix_sdk::ruma::OwnedRoomId, Arc<Mutex<()>>>>,
+    probed_state: std::sync::Mutex<probed_state::ProbedState>,
+    recent_state: std::sync::Mutex<probed_state::RecentState>,
     media_health: std::sync::Mutex<media_health::MediaHealth>,
     media_downloads: tokio::sync::Semaphore,
     key_backup_downloads: tokio::sync::Semaphore,
@@ -138,6 +141,7 @@ pub struct Core {
     session_tasks: std::sync::Mutex<Vec<Task>>,
     subscriptions: Mutex<HashMap<SubscriptionId, Subscription>>,
     room_subscriptions: Mutex<std::collections::BTreeSet<OwnedRoomId>>,
+    warm_rooms: std::sync::Mutex<std::collections::VecDeque<OwnedRoomId>>,
     account_data_lock: Mutex<()>,
     inbox_lock: Mutex<()>,
     account_data_types: Mutex<std::collections::BTreeSet<String>>,
@@ -295,6 +299,8 @@ impl Core {
             pinned_caches: std::sync::Mutex::new(HashMap::new()),
             cosmetics: std::sync::Mutex::new(cosmetics::CosmeticsCache::default()),
             cosmetics_fetches: std::sync::Mutex::new(HashMap::new()),
+            probed_state: std::sync::Mutex::new(probed_state::ProbedState::default()),
+            recent_state: std::sync::Mutex::new(probed_state::RecentState::default()),
             media_health: std::sync::Mutex::new(media_health::MediaHealth::default()),
             media_downloads: tokio::sync::Semaphore::new(media::MAX_MEDIA_DOWNLOADS),
             notification_routes: Mutex::new(HashMap::new()),
@@ -310,6 +316,7 @@ impl Core {
             session_tasks: std::sync::Mutex::new(Vec::new()),
             subscriptions: Mutex::new(HashMap::new()),
             room_subscriptions: Mutex::new(std::collections::BTreeSet::new()),
+            warm_rooms: std::sync::Mutex::new(std::collections::VecDeque::new()),
             account_data_lock: Mutex::new(()),
             inbox_lock: Mutex::new(()),
             account_data_types: Mutex::new(std::collections::BTreeSet::new()),

@@ -32,6 +32,8 @@ type RoomListDiffs = Extract<CoreEvent, { type: 'room_list_diff' }>['diffs'];
 type RoomNotificationModes = { room: NotificationModeView | null; fallback: NotificationModeView };
 const NOTIFICATION_MODE_BATCH = 200;
 const SNAPSHOT_WRITE_DELAY_MS = 1_000;
+const WARM_ROOM_LIMIT = 32;
+const WARM_BATCH_MS = 100;
 
 /** Only use an alias when it resolves locally to this room. */
 export function roomPathId(room: RoomSummary, rooms: readonly RoomSummary[]): string {
@@ -105,6 +107,9 @@ export class RoomList {
   private readonly listedWaiters = new Set<{ roomId: string; resolve: () => void }>();
   private presentationActive = true;
   private live = $state(false);
+  private warmed: string[] = [];
+  private pendingWarm: string[] = [];
+  private warmTimer: ReturnType<typeof setTimeout> | undefined;
 
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt wholesale, never mutated
   private readonly roomsById = $derived(new Map(this.rooms.map((room) => [room.room_id, room])));
@@ -138,6 +143,19 @@ export class RoomList {
   labelFor(roomId: string): string {
     const room = this.byId(roomId);
     return room ? roomLabel(room) : roomId;
+  }
+
+  warm(roomId: string): void {
+    if (this.warmed.includes(roomId)) return;
+    this.warmed.push(roomId);
+    if (this.warmed.length > WARM_ROOM_LIMIT) this.warmed.shift();
+    this.pendingWarm.push(roomId);
+    this.warmTimer ??= setTimeout(() => {
+      this.warmTimer = undefined;
+      const roomIds = this.pendingWarm;
+      this.pendingWarm = [];
+      this.core.commands.warmRooms(roomIds).catch(() => {});
+    }, WARM_BATCH_MS);
   }
 
   setPresentationActive(active: boolean): void {
@@ -207,6 +225,10 @@ export class RoomList {
     });
     this.live = false;
     this.snapshotAccountId = null;
+    clearTimeout(this.warmTimer);
+    this.warmTimer = undefined;
+    this.warmed = [];
+    this.pendingWarm = [];
     this.rooms = [];
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     this.typingUsers = new Map();

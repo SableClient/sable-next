@@ -441,6 +441,10 @@ export function createCommands(transport: () => Transport) {
       return response;
     },
 
+    async warmRooms(roomIds: string[]): Promise<void> {
+      await transport().send({ type: 'warm_rooms', room_ids: roomIds });
+    },
+
     async roomSummary(roomId: string): Promise<RoomSummary> {
       const response = await transport().send({ type: 'room_summary', room_id: roomId });
       return response.room;

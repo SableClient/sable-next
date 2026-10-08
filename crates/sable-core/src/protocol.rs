@@ -156,6 +156,10 @@ pub enum Command {
     Unsubscribe {
         subscription: SubscriptionId,
     },
+    WarmRooms {
+        #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+        room_ids: Vec<OwnedRoomId>,
+    },
 
     Paginate {
         subscription: SubscriptionId,
@@ -1467,6 +1471,7 @@ pub enum CommandOk {
         aggregations: Vec<TimelineItemView>,
     },
     Unsubscribe,
+    WarmRooms,
 
     Paginate {
         direction: PaginationDirection,

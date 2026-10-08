@@ -100,6 +100,8 @@
   } from './space-tree.js';
 
   const MAX_VOICE_FACES = 3;
+  const roomRows = new WeakMap<RoomSummary, RoomNavRow>();
+  const WARM_DWELL_MS = 300;
   let contextRoom = $state<RoomSummary | null>(null);
   let contextParentSpaceId = $state<string | null>(null);
   let contextAnchor = $state.raw<CursorAnchor | null>(null);
@@ -349,11 +351,14 @@
   let favourites = $derived.by<RoomNavRow[]>(() => {
     if (!groupFavourites) return [];
     const rows = pathname.startsWith('/space') ? treeRows(spaceTree) : listedRooms;
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local to this derivation
+    const seen = new Set<string>();
     return rows
-      .filter(
-        (row, index) =>
-          isFavourite(row) && rows.findIndex((other) => other.roomId === row.roomId) === index
-      )
+      .filter((row) => {
+        if (!isFavourite(row) || seen.has(row.roomId)) return false;
+        seen.add(row.roomId);
+        return true;
+      })
       .map((row) => ({ ...row, depth: 0, key: row.roomId }))
       .sort(byRecency);
   });
@@ -437,7 +442,17 @@
   }
 
   function roomRow(room: RoomSummary): RoomNavRow {
-    return { room, roomId: room.room_id, depth: 0, kind: 'room', key: room.room_id };
+    const cached = roomRows.get(room);
+    if (cached) return cached;
+    const row: RoomNavRow = {
+      room,
+      roomId: room.room_id,
+      depth: 0,
+      kind: 'room',
+      key: room.room_id,
+    };
+    roomRows.set(room, row);
+    return row;
   }
 
   function byRecency(left: RoomNavRow, right: RoomNavRow): number {
@@ -765,6 +780,13 @@
                 requestPeerProfile(peerId);
               })
             : undefined}
+          {@attach whenVisible(
+            () => {
+              roomList.warm(item.roomId);
+            },
+            '0px',
+            WARM_DWELL_MS
+          )}
         >
           {#if (room?.is_direct ?? false) || showsRoomAvatar(iconMode, collapsed, Boolean(avatarUrl))}
             <span class="room-avatar">

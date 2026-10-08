@@ -61,3 +61,37 @@ test('falls back to loading immediately where the observer is unavailable', () =
 
   expect(onVisible).toHaveBeenCalledOnce();
 });
+
+test('a dwell fires only for a node that stays visible', () => {
+  vi.useFakeTimers();
+  const instances = stubObserver();
+  const onVisible = vi.fn();
+  const visible = [{ isIntersecting: true }] as IntersectionObserverEntry[];
+  const hidden = [{ isIntersecting: false }] as IntersectionObserverEntry[];
+
+  whenVisible(onVisible, '0px', 300)({} as HTMLElement);
+  instances[0].callback(visible, {} as never);
+  vi.advanceTimersByTime(200);
+  instances[0].callback(hidden, {} as never);
+  vi.advanceTimersByTime(500);
+  expect(onVisible).not.toHaveBeenCalled();
+
+  instances[0].callback(visible, {} as never);
+  vi.advanceTimersByTime(300);
+  expect(onVisible).toHaveBeenCalledOnce();
+  vi.useRealTimers();
+});
+
+test('a dwell does not fire after the attachment is torn down', () => {
+  vi.useFakeTimers();
+  const instances = stubObserver();
+  const onVisible = vi.fn();
+
+  const teardown = whenVisible(onVisible, '0px', 300)({} as HTMLElement);
+  instances[0].callback([{ isIntersecting: true }] as IntersectionObserverEntry[], {} as never);
+  if (typeof teardown === 'function') teardown();
+  vi.advanceTimersByTime(300);
+
+  expect(onVisible).not.toHaveBeenCalled();
+  vi.useRealTimers();
+});

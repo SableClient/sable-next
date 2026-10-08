@@ -2,7 +2,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
 use matrix_sdk::executor::spawn;
-use matrix_sdk::ruma::api::client::state::{get_state_event_for_key, get_state_events};
+use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
 use matrix_sdk::ruma::events::{AnySyncStateEvent, StateEventType};
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId, RoomId, UserId};
@@ -370,16 +370,10 @@ impl Core {
             return layer;
         }
 
-        match client
-            .send(get_state_events::v3::Request::new(
-                room.room_id().to_owned(),
-            ))
-            .await
-        {
-            Ok(response) => {
+        match self.room_state_snapshot(client, room.room_id()).await {
+            Ok(snapshot) => {
                 let layer = Layer::from_events(
-                    response
-                        .room_state
+                    snapshot
                         .iter()
                         .filter_map(|raw| raw.deserialize_as_unchecked::<StateFields<'_>>().ok()),
                 );

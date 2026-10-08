@@ -397,6 +397,299 @@ async fn custom_room_state_reads_from_the_server_when_not_in_the_store() {
     ));
 }
 
+#[expect(clippy::unwrap_used, reason = "test code")]
+async fn core_for(server: &MatrixMockServer, client: matrix_sdk::Client) -> Arc<Core> {
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+    core
+}
+
+#[expect(clippy::unwrap_used, clippy::panic, reason = "test code")]
+async fn read_state(
+    core: &Arc<Core>,
+    room_id: &matrix_sdk::ruma::RoomId,
+    event_type: &str,
+) -> Option<serde_json::Value> {
+    match core
+        .dispatch(Command::RoomStateEvent {
+            room_id: room_id.to_owned(),
+            event_type: event_type.to_owned(),
+            state_key: String::new(),
+        })
+        .await
+        .unwrap()
+    {
+        CommandOk::RoomStateEvent { content } => content,
+        other => panic!("unexpected response {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn reopening_a_room_reuses_the_state_it_probed() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!probe:example.org");
+    server.sync_joined_room(&client, room_id).await;
+
+    Mock::given(method("GET"))
+        .and(path(format!("/_matrix/client/v3/rooms/{room_id}/state")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([{
+            "type": "moe.sable.room.abbreviations",
+            "state_key": "",
+            "sender": "@alice:example.org",
+            "event_id": "$abbr",
+            "origin_server_ts": 1,
+            "content": { "terms": { "HS": "homeserver" } }
+        }])))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"/state/[^/]+/$"))
+        .respond_with(ResponseTemplate::new(404).set_body_json(json!({
+            "errcode": "M_NOT_FOUND",
+            "error": "not found"
+        })))
+        .mount(server.server())
+        .await;
+
+    let core = core_for(&server, client).await;
+    for _ in 0..2 {
+        let response = core
+            .dispatch(Command::RoomOpen {
+                room_id: room_id.to_owned(),
+            })
+            .await
+            .unwrap();
+        assert!(matches!(response, CommandOk::RoomOpen(_)));
+    }
+
+    assert_eq!(
+        read_state(&core, room_id, "moe.sable.room.abbreviations").await,
+        Some(json!({ "terms": { "HS": "homeserver" } }))
+    );
+    assert_eq!(
+        read_state(&core, room_id, "moe.sable.room.member_list").await,
+        None
+    );
+
+    let per_key = server
+        .server()
+        .received_requests()
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|request| {
+            request
+                .url
+                .path()
+                .ends_with("/in.cinny.room.power_level_tags/")
+        })
+        .count();
+    assert!(per_key <= 1, "power level tags fetched {per_key} times");
+}
+
+#[tokio::test]
+async fn opening_a_room_and_its_cosmetics_fetch_its_state_once() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!shared:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    Mock::given(method("GET"))
+        .and(path(format!("/_matrix/client/v3/rooms/{room_id}/state")))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!([]))
+                .set_delay(Duration::from_millis(50)),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+
+    let core = core_for(&server, client).await;
+    let (open, cosmetics) = tokio::join!(
+        core.dispatch(Command::RoomOpen {
+            room_id: room_id.to_owned(),
+        }),
+        core.dispatch(Command::RoomCosmetics {
+            room_id: room_id.to_owned(),
+            space_id: None,
+        })
+    );
+    open.unwrap();
+    cosmetics.unwrap();
+}
+
+#[tokio::test]
+async fn a_synced_state_event_drops_the_room_state_snapshot() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!snapshot:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    Mock::given(method("GET"))
+        .and(path(format!("/_matrix/client/v3/rooms/{room_id}/state")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([])))
+        .expect(2)
+        .mount(server.server())
+        .await;
+
+    let core = core_for(&server, client.clone()).await;
+    core.watch_room_state(&client);
+    core.room_state_snapshot(&client, room_id).await.unwrap();
+    core.room_state_snapshot(&client, room_id).await.unwrap();
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_state_event(
+                EventFactory::new()
+                    .sender(user_id!("@alice:example.org"))
+                    .room_topic("changed"),
+            ),
+        )
+        .await;
+    core.room_state_snapshot(&client, room_id).await.unwrap();
+}
+
+#[tokio::test]
+async fn missing_room_state_is_remembered_until_it_is_written() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!missing:example.org");
+    let event_type = "moe.sable.room.member_list";
+    server.sync_joined_room(&client, room_id).await;
+
+    Mock::given(method("GET"))
+        .and(path(format!(
+            "/_matrix/client/v3/rooms/{room_id}/state/{event_type}/"
+        )))
+        .respond_with(ResponseTemplate::new(404).set_body_json(json!({
+            "errcode": "M_NOT_FOUND",
+            "error": "not found"
+        })))
+        .expect(2)
+        .mount(server.server())
+        .await;
+    server
+        .mock_room_send_state()
+        .ok(event_id!("$written"))
+        .mount()
+        .await;
+
+    let core = core_for(&server, client).await;
+    assert_eq!(read_state(&core, room_id, event_type).await, None);
+    assert_eq!(read_state(&core, room_id, event_type).await, None);
+
+    core.dispatch(Command::SendStateEvent {
+        room_id: room_id.to_owned(),
+        event_type: event_type.to_owned(),
+        state_key: String::new(),
+        content: json!({ "hidden": true }),
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(read_state(&core, room_id, event_type).await, None);
+}
+
+#[tokio::test]
+async fn warmed_rooms_join_the_subscription_set_up_to_a_cap() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let open_room_id = room_id!("!open:example.org");
+    server.sync_joined_room(&client, open_room_id).await;
+    server.mock_room_state_encryption().plain().mount().await;
+    let warm_ids = (0..=super::subscriptions::MAX_WARM_ROOMS)
+        .map(|index| {
+            matrix_sdk::ruma::OwnedRoomId::try_from(format!("!warm{index}:example.org")).unwrap()
+        })
+        .collect::<Vec<_>>();
+    for room_id in &warm_ids {
+        server.sync_joined_room(&client, room_id).await;
+    }
+
+    let core = core_for(&server, client).await;
+    core.dispatch(Command::SubscribeTimeline {
+        room_id: open_room_id.to_owned(),
+        focus: TimelineFocusView::Live,
+        hidden_events: false,
+    })
+    .await
+    .unwrap();
+    core.dispatch(Command::WarmRooms {
+        room_ids: vec![room_id!("!unknown:example.org").to_owned()],
+    })
+    .await
+    .unwrap();
+    for room_id in &warm_ids {
+        core.dispatch(Command::WarmRooms {
+            room_ids: vec![room_id.clone()],
+        })
+        .await
+        .unwrap();
+    }
+
+    let subscribed = core.room_subscriptions.lock().await.clone();
+    assert!(subscribed.contains(open_room_id));
+    assert!(!subscribed.contains(room_id!("!unknown:example.org")));
+    assert!(!subscribed.contains(&warm_ids[0]));
+    assert!(
+        warm_ids[1..]
+            .iter()
+            .all(|room_id| subscribed.contains(room_id))
+    );
+    assert_eq!(subscribed.len(), super::subscriptions::MAX_WARM_ROOMS + 1);
+}
+
+#[tokio::test]
+async fn an_opened_room_stays_subscribed_after_another_room_opens() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let first_room_id = room_id!("!first-open:example.org");
+    let second_room_id = room_id!("!second-open:example.org");
+    server.sync_joined_room(&client, first_room_id).await;
+    server.sync_joined_room(&client, second_room_id).await;
+    server.mock_room_state_encryption().plain().mount().await;
+
+    let core = core_for(&server, client).await;
+    let CommandOk::SubscribeTimeline {
+        subscription: first,
+        ..
+    } = core
+        .dispatch(Command::SubscribeTimeline {
+            room_id: first_room_id.to_owned(),
+            focus: TimelineFocusView::Live,
+            hidden_events: false,
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("wrong response");
+    };
+    core.dispatch(Command::Unsubscribe {
+        subscription: first,
+    })
+    .await
+    .unwrap();
+    core.dispatch(Command::SubscribeTimeline {
+        room_id: second_room_id.to_owned(),
+        focus: TimelineFocusView::Live,
+        hidden_events: false,
+    })
+    .await
+    .unwrap();
+
+    let subscribed = core.room_subscriptions.lock().await.clone();
+    assert!(subscribed.contains(first_room_id));
+    assert!(subscribed.contains(second_room_id));
+}
+
 #[tokio::test]
 async fn timeline_subscriptions_remain_active_until_each_is_unsubscribed() {
     let server = MatrixMockServer::new().await;

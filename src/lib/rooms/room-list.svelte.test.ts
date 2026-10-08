@@ -671,3 +671,38 @@ test('badge defaults quiet group rooms while push stays all', async () => {
 
   roomList.stop();
 });
+
+test('warms each visible room once, batched into one command', () => {
+  vi.useFakeTimers();
+  const warmRooms = vi.fn(() => Promise.resolve());
+  const roomList = new RoomList({ commands: { warmRooms } } as unknown as CoreClient);
+
+  roomList.warm('!a:example.org');
+  roomList.warm('!b:example.org');
+  roomList.warm('!a:example.org');
+  vi.advanceTimersByTime(100);
+  roomList.warm('!b:example.org');
+  vi.advanceTimersByTime(100);
+
+  expect(warmRooms).toHaveBeenCalledTimes(1);
+  expect(warmRooms).toHaveBeenCalledWith(['!a:example.org', '!b:example.org']);
+  vi.useRealTimers();
+});
+
+test('stopping drops pending warms and forgets what was warmed', () => {
+  vi.useFakeTimers();
+  const warmRooms = vi.fn(() => Promise.resolve());
+  const roomList = new RoomList({
+    commands: { warmRooms, unsubscribe: vi.fn(() => Promise.resolve()) },
+  } as unknown as CoreClient);
+
+  roomList.warm('!a:example.org');
+  roomList.stop();
+  vi.advanceTimersByTime(100);
+  expect(warmRooms).not.toHaveBeenCalled();
+
+  roomList.warm('!a:example.org');
+  vi.advanceTimersByTime(100);
+  expect(warmRooms).toHaveBeenCalledWith(['!a:example.org']);
+  vi.useRealTimers();
+});
