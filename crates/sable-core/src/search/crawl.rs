@@ -3,9 +3,15 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
+use matrix_sdk::deserialized_responses::{
+    TimelineEvent, UnableToDecryptInfo, UnableToDecryptReason,
+};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
-use matrix_sdk::room::MessagesOptions;
+use matrix_sdk::ruma::api::Direction;
+use matrix_sdk::ruma::api::client::message::get_message_events;
 use matrix_sdk::ruma::api::error::{ErrorKind, RetryAfter};
+use matrix_sdk::ruma::events::AnyTimelineEvent;
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, OwnedRoomId, RoomId, UInt};
 use matrix_sdk::{EncryptionState, Room, RoomState};
 use tracing::warn;
@@ -100,6 +106,7 @@ pub(crate) struct CrawlProgress {
     tokens: HashMap<OwnedRoomId, Option<String>>,
     probed: HashSet<OwnedRoomId>,
     blind: HashMap<OwnedRoomId, usize>,
+    lost_sessions: HashSet<(OwnedRoomId, String)>,
     stalled: HashMap<OwnedRoomId, u32>,
     discarded: HashSet<OwnedRoomId>,
     awaiting: HashMap<OwnedRoomId, u64>,
@@ -656,6 +663,55 @@ impl Core {
         }
     }
 
+    async fn crawl_page(
+        &self,
+        room: &Room,
+        request: get_message_events::v3::Request,
+    ) -> matrix_sdk::Result<CrawlPage> {
+        let response = room.client().send(request).await?;
+        let mut chunk = Vec::with_capacity(response.chunk.len());
+        for event in response.chunk {
+            chunk.push(self.crawl_event(room, event).await);
+        }
+        Ok(CrawlPage {
+            chunk,
+            end: response.end,
+        })
+    }
+
+    async fn crawl_event(&self, room: &Room, event: Raw<AnyTimelineEvent>) -> TimelineEvent {
+        let Some(session_id) = megolm_session(&event) else {
+            return TimelineEvent::from_plaintext(event.cast());
+        };
+        let session = (room.room_id().to_owned(), session_id);
+        if self
+            .search_crawl
+            .lock()
+            .await
+            .lost_sessions
+            .contains(&session)
+        {
+            return TimelineEvent::from_utd(
+                event.cast(),
+                UnableToDecryptInfo {
+                    session_id: Some(session.1),
+                    reason: UnableToDecryptReason::MissingMegolmSession {
+                        withheld_code: None,
+                    },
+                },
+            );
+        }
+        match room.decrypt_event(event.cast_ref_unchecked(), None).await {
+            Ok(decrypted) => {
+                if decrypted.kind.is_utd() {
+                    self.search_crawl.lock().await.lost_sessions.insert(session);
+                }
+                decrypted
+            }
+            Err(_) => TimelineEvent::from_plaintext(event.cast()),
+        }
+    }
+
     pub(super) async fn crawl_once(
         &self,
         client: &matrix_sdk::Client,
@@ -673,11 +729,17 @@ impl Core {
             )
         };
 
-        let mut options = MessagesOptions::backward().from(from.as_deref());
-        options.limit = UInt::from(batch);
-        options.filter.not_types = vec!["m.reaction".to_owned()];
+        let mut request =
+            get_message_events::v3::Request::new(room_id.clone(), Direction::Backward);
+        request.from = from;
+        request.limit = UInt::from(batch);
+        request.filter.not_types = vec!["m.reaction".to_owned()];
         let requested = now_ms();
-        let Some(messages) = self.search_network.run(room.messages(options)).await else {
+        let Some(messages) = self
+            .search_network
+            .run(self.crawl_page(&room, request))
+            .await
+        else {
             return Ok(CrawlOutcome::Paused);
         };
         let messages = messages?;
@@ -797,6 +859,24 @@ impl CrawlBatch {
 fn crawls_first(room: &Room) -> bool {
     !matches!(room.encryption_state(), EncryptionState::NotEncrypted)
         || room.direct_targets_length() > 0
+}
+
+struct CrawlPage {
+    chunk: Vec<TimelineEvent>,
+    end: Option<String>,
+}
+
+fn megolm_session(event: &Raw<AnyTimelineEvent>) -> Option<String> {
+    if event.get_field::<String>("type").ok().flatten().as_deref() != Some("m.room.encrypted") {
+        return None;
+    }
+    event
+        .get_field::<serde_json::Value>("content")
+        .ok()
+        .flatten()?
+        .get("session_id")?
+        .as_str()
+        .map(ToOwned::to_owned)
 }
 
 #[cfg(test)]
@@ -936,6 +1016,71 @@ mod tests {
         assert_eq!(metrics.average_request_ms, metrics.last_request_ms);
         assert_eq!(metrics.rooms_joined, 1);
         assert_eq!(metrics.event_budget, MAX_CRAWLED_EVENTS);
+    }
+
+    fn encrypted(
+        event_id: &str,
+        session_id: &str,
+    ) -> matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnyTimelineEvent> {
+        matrix_sdk::ruma::serde::Raw::new(&serde_json::json!({
+            "type": "m.room.encrypted",
+            "event_id": event_id,
+            "room_id": room(),
+            "sender": "@bridge:localhost",
+            "origin_server_ts": super::now_ms(),
+            "content": {
+                "algorithm": "m.megolm.v1.aes-sha2",
+                "ciphertext": "AwgAEhAA",
+                "device_id": "BRIDGE",
+                "sender_key": "DeHIg4gwhClxzFYcmNntPNF9YtsdZbmMy8+3kzCMXHA",
+                "session_id": session_id
+            }
+        }))
+        .expect("event")
+        .cast_unchecked()
+    }
+
+    #[async_test]
+    async fn test_a_session_that_failed_once_is_not_decrypted_again() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room();
+        server.sync_joined_room(&client, &room_id).await;
+        server
+            .mock_room_messages()
+            .ok(RoomMessagesResponseTemplate::default()
+                .events(vec![encrypted("$a", "lost"), encrypted("$b", "lost")])
+                .end_token("older"))
+            .mock_once()
+            .mount()
+            .await;
+        server
+            .mock_room_messages()
+            .ok(RoomMessagesResponseTemplate::default()
+                .events(vec![encrypted("$c", "lost")])
+                .end_token("oldest"))
+            .mock_once()
+            .mount()
+            .await;
+        let (core, _events) = crate::Core::new(
+            "crawl-lost-sessions",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+
+        for _ in 0..2 {
+            let Ok(CrawlOutcome::Batch(batch)) = core.crawl_once(&client, &room_id).await else {
+                panic!("the batch should land");
+            };
+            assert!(!batch.readable);
+        }
+
+        assert!(
+            core.search_crawl
+                .lock()
+                .await
+                .lost_sessions
+                .contains(&(room_id, "lost".to_owned()))
+        );
     }
 
     #[test]
