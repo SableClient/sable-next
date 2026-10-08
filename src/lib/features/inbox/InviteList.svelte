@@ -21,6 +21,7 @@
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { DisplayNames } from './display-names.svelte';
   import InboxSectionHeader from './InboxSectionHeader.svelte';
@@ -276,14 +277,14 @@
         <p class="name">
           <span class="name-text">{name}</span>
           {#if room.encrypted}
-            <span
-              class="lock"
-              role="img"
-              aria-label={$i18n.t('inbox.inviteEncrypted')}
-              title={$i18n.t('inbox.inviteEncrypted')}
-            >
-              <LockSimpleIcon aria-hidden="true" />
-            </span>
+            {@const encryptedLabel = $i18n.t('inbox.inviteEncrypted')}
+            <Tooltip label={encryptedLabel}>
+              {#snippet trigger({ props })}
+                <span {...props} class="lock" role="img" aria-label={encryptedLabel}>
+                  <LockSimpleIcon aria-hidden="true" />
+                </span>
+              {/snippet}
+            </Tooltip>
           {/if}
         </p>
         <p class="meta">

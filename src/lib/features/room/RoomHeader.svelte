@@ -12,6 +12,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { participantKeys } from '#lib/features/call/participant-keys.js';
 
@@ -96,28 +97,32 @@
       {/if}
     </div>
     {#if isVoice || inVoice.length > 0}
-      <span
-        class="voice-chip"
-        class:live={inVoice.length > 0}
-        role="img"
-        title={voiceLabel}
-        aria-label={voiceLabel}
-      >
-        <SpeakerHighIcon />
-        {#if inVoice.length > 0}
-          <span class="voice-faces">
-            {#each inVoice.slice(0, MAX_FACES) as participant, index (inVoiceKeys[index])}
-              <Avatar
-                class="voice-face"
-                src={participant.avatar}
-                name={participant.name}
-                id={participant.userId}
-              />
-            {/each}
+      <Tooltip label={voiceLabel}>
+        {#snippet trigger({ props })}
+          <span
+            {...props}
+            class="voice-chip"
+            class:live={inVoice.length > 0}
+            role="img"
+            aria-label={voiceLabel}
+          >
+            <SpeakerHighIcon />
+            {#if inVoice.length > 0}
+              <span class="voice-faces">
+                {#each inVoice.slice(0, MAX_FACES) as participant, index (inVoiceKeys[index])}
+                  <Avatar
+                    class="voice-face"
+                    src={participant.avatar}
+                    name={participant.name}
+                    id={participant.userId}
+                  />
+                {/each}
+              </span>
+              <span class="voice-count">{inVoice.length}</span>
+            {/if}
           </span>
-          <span class="voice-count">{inVoice.length}</span>
-        {/if}
-      </span>
+        {/snippet}
+      </Tooltip>
     {/if}
   {/snippet}
 

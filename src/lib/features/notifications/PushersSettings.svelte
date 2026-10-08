@@ -15,6 +15,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { currentPushKey, SERVER_PUSHER_KIND, WEBPUSH_APP_ID } from './web-push';
   import '#lib/ui/primitives/settings-row.css';
@@ -244,76 +245,94 @@
                   <StatusBadge variant="neutral" label="Sable" />
                 {/if}
                 {#if pusher.activated !== null}
-                  <span
-                    title={pusher.activated ? undefined : $i18n.t('settings.pushersPendingHint')}
+                  {@const activationLabel = $i18n.t(
+                    pusher.activated ? 'settings.pushersActive' : 'settings.pushersPending'
+                  )}
+                  <Tooltip
+                    label={$i18n.t('settings.pushersPendingHint')}
+                    disabled={pusher.activated}
                   >
-                    <StatusBadge
-                      variant={pusher.activated ? 'success' : 'warning'}
-                      label={$i18n.t(
-                        pusher.activated ? 'settings.pushersActive' : 'settings.pushersPending'
-                      )}
-                    />
-                  </span>
+                    {#snippet trigger({ props })}
+                      <span {...props}>
+                        <StatusBadge
+                          variant={pusher.activated ? 'success' : 'warning'}
+                          label={activationLabel}
+                        />
+                      </span>
+                    {/snippet}
+                  </Tooltip>
                 {/if}
               </div>
               <div class="pusher-meta">
                 <span class="pusher-kind">{kindLabel(pusher.kind)}</span>
-                <button
-                  class="pusher-value"
-                  type="button"
-                  title={pusher.app_id}
-                  aria-label={$i18n.t('settings.pushersCopyAppId')}
-                  onclick={() => void copyValue(`app\u0000${key}`, pusher.app_id)}
-                >
-                  {#if copied === `app\u0000${key}`}
-                    {$i18n.t('common.copied')}
-                  {:else}
-                    <code>{pusher.app_id}</code>
-                  {/if}
-                </button>
-                <button
-                  class="pusher-value pusher-key"
-                  type="button"
-                  title={pusher.pushkey}
-                  aria-label={$i18n.t('settings.pushersCopyKey')}
-                  onclick={() => void copyValue(`key\u0000${key}`, pusher.pushkey)}
-                >
-                  {#if copied === `key\u0000${key}`}
-                    {$i18n.t('common.copied')}
-                  {:else}
-                    <code>{pusher.pushkey}</code>
-                  {/if}
-                </button>
+                <Tooltip label={pusher.app_id} multiline>
+                  {#snippet trigger({ props })}
+                    <button
+                      {...props}
+                      class="pusher-value"
+                      type="button"
+                      aria-label={$i18n.t('settings.pushersCopyAppId')}
+                      onclick={() => void copyValue(`app\u0000${key}`, pusher.app_id)}
+                    >
+                      {#if copied === `app\u0000${key}`}
+                        {$i18n.t('common.copied')}
+                      {:else}
+                        <code>{pusher.app_id}</code>
+                      {/if}
+                    </button>
+                  {/snippet}
+                </Tooltip>
+                <Tooltip label={pusher.pushkey} multiline>
+                  {#snippet trigger({ props })}
+                    <button
+                      {...props}
+                      class="pusher-value pusher-key"
+                      type="button"
+                      aria-label={$i18n.t('settings.pushersCopyKey')}
+                      onclick={() => void copyValue(`key\u0000${key}`, pusher.pushkey)}
+                    >
+                      {#if copied === `key\u0000${key}`}
+                        {$i18n.t('common.copied')}
+                      {:else}
+                        <code>{pusher.pushkey}</code>
+                      {/if}
+                    </button>
+                  {/snippet}
+                </Tooltip>
               </div>
               {#if gateway !== null}
-                <button
-                  class="pusher-gateway"
-                  type="button"
-                  title={gateway}
-                  aria-label={$i18n.t(
-                    copied === `gateway\u0000${key}`
-                      ? 'common.copied'
-                      : 'settings.pushersCopyProvider'
-                  )}
-                  onclick={() => void copyValue(`gateway\u0000${key}`, gateway)}
-                >
-                  <LinkSimpleIcon class="pusher-gateway-link" aria-hidden="true" />
-                  <span class="pusher-gateway-copy">
-                    <span class="pusher-gateway-label">
-                      {$i18n.t(
+                <Tooltip label={gateway} multiline>
+                  {#snippet trigger({ props })}
+                    <button
+                      {...props}
+                      class="pusher-gateway"
+                      type="button"
+                      aria-label={$i18n.t(
                         copied === `gateway\u0000${key}`
                           ? 'common.copied'
-                          : 'settings.pushersProvider'
+                          : 'settings.pushersCopyProvider'
                       )}
-                    </span>
-                    <code>{gateway}</code>
-                  </span>
-                  {#if copied === `gateway\u0000${key}`}
-                    <CheckIcon class="pusher-gateway-action" weight="bold" aria-hidden="true" />
-                  {:else}
-                    <CopyIcon class="pusher-gateway-action" aria-hidden="true" />
-                  {/if}
-                </button>
+                      onclick={() => void copyValue(`gateway\u0000${key}`, gateway)}
+                    >
+                      <LinkSimpleIcon class="pusher-gateway-link" aria-hidden="true" />
+                      <span class="pusher-gateway-copy">
+                        <span class="pusher-gateway-label">
+                          {$i18n.t(
+                            copied === `gateway\u0000${key}`
+                              ? 'common.copied'
+                              : 'settings.pushersProvider'
+                          )}
+                        </span>
+                        <code>{gateway}</code>
+                      </span>
+                      {#if copied === `gateway\u0000${key}`}
+                        <CheckIcon class="pusher-gateway-action" weight="bold" aria-hidden="true" />
+                      {:else}
+                        <CopyIcon class="pusher-gateway-action" aria-hidden="true" />
+                      {/if}
+                    </button>
+                  {/snippet}
+                </Tooltip>
               {/if}
             </div>
             {#if confirming !== key}

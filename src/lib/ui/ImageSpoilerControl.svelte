@@ -1,6 +1,7 @@
 <script lang="ts">
   import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
   import { i18n } from '#lib/i18n.js';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   interface Props {
     hidden: boolean;
@@ -22,32 +23,36 @@
   }
 </script>
 
-<button
-  type="button"
-  class="media-image-spoiler"
-  class:hidden
-  aria-label={label}
-  aria-describedby={hidden ? reasonId : undefined}
-  title={hidden && reason ? `${reason} — ${label}` : label}
-  onclick={(event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    ontoggle();
-  }}
-  onpointerdown={stopPress}
-  onpointermove={stopPress}
-  onpointerup={stopPress}
->
-  <span class="media-image-spoiler-chip">
-    <EyeSlashIcon aria-hidden="true" />
-    {#if hidden}
-      <span class="media-image-spoiler-copy">
-        <span id={reasonId}>{reason || $i18n.t('composer.spoiler')}</span>
-        <span class="media-image-spoiler-hint">{$i18n.t('timeline.revealImageUnnamed')}</span>
+<Tooltip label={hidden && reason ? `${reason} — ${label}` : label} multiline={hidden && !!reason}>
+  {#snippet trigger({ props })}
+    <button
+      {...props}
+      type="button"
+      class="media-image-spoiler"
+      class:hidden
+      aria-label={label}
+      aria-describedby={hidden ? reasonId : undefined}
+      onclick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        ontoggle();
+      }}
+      onpointerdown={stopPress}
+      onpointermove={stopPress}
+      onpointerup={stopPress}
+    >
+      <span class="media-image-spoiler-chip">
+        <EyeSlashIcon aria-hidden="true" />
+        {#if hidden}
+          <span class="media-image-spoiler-copy">
+            <span id={reasonId}>{reason || $i18n.t('composer.spoiler')}</span>
+            <span class="media-image-spoiler-hint">{$i18n.t('timeline.revealImageUnnamed')}</span>
+          </span>
+        {/if}
       </span>
-    {/if}
-  </span>
-</button>
+    </button>
+  {/snippet}
+</Tooltip>
 
 <style>
   .media-image-spoiler {

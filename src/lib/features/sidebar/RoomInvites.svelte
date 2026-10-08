@@ -11,6 +11,7 @@
   import { InviteActions } from '#lib/rooms/invites.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   interface Props {
     invites: readonly RoomSummary[];
@@ -41,11 +42,18 @@
             {name}
           />
           <span class="invite-text">
-            <span class="invite-name" title={name}>{name}</span>
+            <Tooltip label={name}>
+              {#snippet trigger({ props })}
+                <span {...props} class="invite-name">{name}</span>
+              {/snippet}
+            </Tooltip>
             {#if from}
-              <span class="invite-from" title={from}>
-                {$i18n.t('inbox.invitedBy', { name: senderName(from) })}
-              </span>
+              {@const invitedBy = $i18n.t('inbox.invitedBy', { name: senderName(from) })}
+              <Tooltip label={from}>
+                {#snippet trigger({ props })}
+                  <span {...props} class="invite-from">{invitedBy}</span>
+                {/snippet}
+              </Tooltip>
             {/if}
           </span>
           <div class="invite-actions">

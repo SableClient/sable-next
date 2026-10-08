@@ -23,6 +23,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import TimelineItem from '#lib/features/room/timeline/TimelineItem.svelte';
   import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
   import ColorSetting from './ColorSetting.svelte';
@@ -370,14 +371,29 @@
           {#snippet pronouns()}
             <div class="caption-field">
               <label class="caption" for="space-pronouns">{$i18n.t('settings.pronouns')}</label>
-              <TextInput
-                id="space-pronouns"
-                class="inline-edit hero-pronouns"
-                bind:value={draft.pronouns}
-                disabled={loading || !canSetPronouns}
-                placeholder={$i18n.t('room.cosmeticsPronounsPlaceholder')}
-                title={canSetPronouns ? undefined : $i18n.t('room.cosmeticsNotAllowed')}
-              />
+              {#if canSetPronouns}
+                <TextInput
+                  id="space-pronouns"
+                  class="inline-edit hero-pronouns"
+                  bind:value={draft.pronouns}
+                  disabled={loading}
+                  placeholder={$i18n.t('room.cosmeticsPronounsPlaceholder')}
+                />
+              {:else}
+                <Tooltip label={$i18n.t('room.cosmeticsNotAllowed')}>
+                  {#snippet trigger({ props })}
+                    <span {...props} class="pronouns-tooltip-trigger">
+                      <TextInput
+                        id="space-pronouns"
+                        class="inline-edit hero-pronouns"
+                        bind:value={draft.pronouns}
+                        disabled
+                        placeholder={$i18n.t('room.cosmeticsPronounsPlaceholder')}
+                      />
+                    </span>
+                  {/snippet}
+                </Tooltip>
+              {/if}
             </div>
           {/snippet}
           {#snippet actions()}
@@ -456,6 +472,11 @@
 {/if}
 
 <style>
+  .pronouns-tooltip-trigger {
+    display: block;
+    width: 100%;
+  }
+
   .preview-panel {
     display: flex;
     flex-direction: column;

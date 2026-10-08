@@ -4,6 +4,7 @@
 
   import { i18n } from '#lib/i18n.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { favoriteGifs, isFavorite, recentGifs, toggleFavorite } from './favorites.svelte';
   import { GifSearch } from './gif-search.svelte';
@@ -54,25 +55,29 @@
     {#each gifs as gif (gif.mediaUrl)}
       {@const kept = isFavorite(favorites, gif)}
       <li>
-        <button
-          type="button"
-          class="gif-cell"
-          title={gif.title}
-          aria-label={gif.title}
-          onclick={() => {
-            onPick(gif);
-          }}
-        >
-          <img
-            src={gif.previewUrl}
-            alt=""
-            width="4"
-            height="3"
-            loading="lazy"
-            decoding="async"
-            referrerpolicy="no-referrer"
-          />
-        </button>
+        <Tooltip label={gif.title} disabled={!gif.title}>
+          {#snippet trigger({ props })}
+            <button
+              {...props}
+              type="button"
+              class="gif-cell"
+              aria-label={gif.title}
+              onclick={() => {
+                onPick(gif);
+              }}
+            >
+              <img
+                src={gif.previewUrl}
+                alt=""
+                width="4"
+                height="3"
+                loading="lazy"
+                decoding="async"
+                referrerpolicy="no-referrer"
+              />
+            </button>
+          {/snippet}
+        </Tooltip>
         <button
           type="button"
           class="gif-star choice"

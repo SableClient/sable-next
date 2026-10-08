@@ -22,6 +22,7 @@
   import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import CallControls from './CallControls.svelte';
   import CallPlayback from './CallPlayback.svelte';
@@ -257,24 +258,40 @@
       {/if}
       <span>{statusLabel}</span>
       {#if session.startedAt !== null && !failed}
-        <span class="meta" title={$i18n.t('call.duration')}>
-          <TimerIcon aria-hidden="true" weight="bold" />
-          <span class="screen-reader-only">{$i18n.t('call.duration')}</span>
-          {formatClockDuration(Math.max(0, Math.floor((now - session.startedAt) / 1000)))}
-        </span>
+        {@const startedAt = session.startedAt}
+        {@const durationLabel = $i18n.t('call.duration')}
+        <Tooltip label={durationLabel}>
+          {#snippet trigger({ props })}
+            <span {...props} class="meta">
+              <TimerIcon aria-hidden="true" weight="bold" />
+              <span class="screen-reader-only">{durationLabel}</span>
+              {formatClockDuration(Math.max(0, Math.floor((now - startedAt) / 1000)))}
+            </span>
+          {/snippet}
+        </Tooltip>
       {/if}
       {#if ready && others > 0}
-        <span class="meta" title={$i18n.t('call.others', { count: others })}>
-          <UsersIcon aria-hidden="true" weight="bold" />
-          {others}
-          <span class="screen-reader-only">{$i18n.t('call.others', { count: others })}</span>
-        </span>
+        {@const othersLabel = $i18n.t('call.others', { count: others })}
+        <Tooltip label={othersLabel}>
+          {#snippet trigger({ props })}
+            <span {...props} class="meta">
+              <UsersIcon aria-hidden="true" weight="bold" />
+              {others}
+              <span class="screen-reader-only">{othersLabel}</span>
+            </span>
+          {/snippet}
+        </Tooltip>
       {/if}
       {#if session.encryptsMedia && !failed}
-        <span class="encrypted" title={$i18n.t('call.encrypted')}>
-          <LockIcon aria-hidden="true" weight="bold" />
-          <span class="screen-reader-only">{$i18n.t('call.encrypted')}</span>
-        </span>
+        {@const encryptedLabel = $i18n.t('call.encrypted')}
+        <Tooltip label={encryptedLabel}>
+          {#snippet trigger({ props })}
+            <span {...props} class="encrypted">
+              <LockIcon aria-hidden="true" weight="bold" />
+              <span class="screen-reader-only">{encryptedLabel}</span>
+            </span>
+          {/snippet}
+        </Tooltip>
       {/if}
     </p>
     <div class="top-actions">

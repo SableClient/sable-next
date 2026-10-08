@@ -19,6 +19,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Slider from '#lib/ui/primitives/Slider.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { cameraVisible, type CallTileSource } from './call-layout';
   import type {
@@ -210,7 +211,11 @@
   {:else if screen}
     <div class="share-placeholder">
       <MonitorIcon aria-hidden="true" />
-      <p class="name" title={label}>{label}</p>
+      <Tooltip {label}>
+        {#snippet trigger({ props })}
+          <p {...props} class="name">{label}</p>
+        {/snippet}
+      </Tooltip>
       {#if onWatchScreen}
         <Button
           variant="primary"
@@ -298,22 +303,37 @@
       {#if screen}
         <MonitorIcon aria-hidden="true" weight="fill" />
       {:else if muted}
-        <span class="muted" title={$i18n.t('call.muted')}>
-          <MicrophoneSlashIcon aria-hidden="true" weight="fill" />
-          <span class="screen-reader-only">{$i18n.t('call.muted')}</span>
-        </span>
+        {@const mutedLabel = $i18n.t('call.muted')}
+        <Tooltip label={mutedLabel}>
+          {#snippet trigger({ props })}
+            <span {...props} class="muted">
+              <MicrophoneSlashIcon aria-hidden="true" weight="fill" />
+              <span class="screen-reader-only">{mutedLabel}</span>
+            </span>
+          {/snippet}
+        </Tooltip>
       {/if}
       <span class="name">{label}</span>
       {#if quality === 'poor'}
-        <span class="quality" title={$i18n.t('call.connectionPoor')}>
-          <CellSignalLowIcon aria-hidden="true" weight="fill" />
-          <span class="screen-reader-only">{$i18n.t('call.connectionPoor')}</span>
-        </span>
+        {@const qualityLabel = $i18n.t('call.connectionPoor')}
+        <Tooltip label={qualityLabel}>
+          {#snippet trigger({ props })}
+            <span {...props} class="quality">
+              <CellSignalLowIcon aria-hidden="true" weight="fill" />
+              <span class="screen-reader-only">{qualityLabel}</span>
+            </span>
+          {/snippet}
+        </Tooltip>
       {:else if quality === 'lost'}
-        <span class="quality lost" title={$i18n.t('call.connectionLost')}>
-          <CellSignalSlashIcon aria-hidden="true" weight="fill" />
-          <span class="screen-reader-only">{$i18n.t('call.connectionLost')}</span>
-        </span>
+        {@const qualityLabel = $i18n.t('call.connectionLost')}
+        <Tooltip label={qualityLabel}>
+          {#snippet trigger({ props })}
+            <span {...props} class="quality lost">
+              <CellSignalSlashIcon aria-hidden="true" weight="fill" />
+              <span class="screen-reader-only">{qualityLabel}</span>
+            </span>
+          {/snippet}
+        </Tooltip>
       {/if}
     </div>
   {/if}

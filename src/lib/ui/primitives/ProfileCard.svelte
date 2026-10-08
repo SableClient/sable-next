@@ -8,6 +8,7 @@
   import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import Avatar from './Avatar.svelte';
   import PresenceDot from './PresenceDot.svelte';
@@ -256,19 +257,23 @@
         {#if pronouns}{@render pronouns()}{/if}
         {#if headerAction}{@render headerAction()}{/if}
       </div>
-      <button
-        class="profile-card-user-id"
-        type="button"
-        title={$i18n.t(copied ? 'common.copied' : 'common.copy')}
-        onclick={() => void copyUserId()}
-      >
-        {userId}
-        {#if copied}
-          <CheckIcon size="1em" aria-hidden="true" />
-        {:else}
-          <CopySimpleIcon size="1em" aria-hidden="true" />
-        {/if}
-      </button>
+      <Tooltip label={$i18n.t(copied ? 'common.copied' : 'common.copy')}>
+        {#snippet trigger({ props })}
+          <button
+            {...props}
+            class="profile-card-user-id"
+            type="button"
+            onclick={() => void copyUserId()}
+          >
+            {userId}
+            {#if copied}
+              <CheckIcon size="1em" aria-hidden="true" />
+            {:else}
+              <CopySimpleIcon size="1em" aria-hidden="true" />
+            {/if}
+          </button>
+        {/snippet}
+      </Tooltip>
       {#if meta}
         <div class="profile-card-meta">{@render meta()}</div>
       {/if}

@@ -10,6 +10,7 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import {
@@ -46,10 +47,14 @@
   <ul class="replaced-collapsed" aria-label={$i18n.t('room.replacedTitle')}>
     {#each replaced as room (room.room_id)}
       {@const name = room.name ?? room.room_id}
-      <li title={name} aria-label={name}>
-        <a href={roomSectionPath(roomList.rooms, room.room_id)} draggable="false">
-          <Avatar class="replaced-icon" id={room.room_id} src={room.avatar_url} {name} />
-        </a>
+      <li aria-label={name}>
+        <Tooltip label={name}>
+          {#snippet trigger({ props })}
+            <a {...props} href={roomSectionPath(roomList.rooms, room.room_id)} draggable="false">
+              <Avatar class="replaced-icon" id={room.room_id} src={room.avatar_url} {name} />
+            </a>
+          {/snippet}
+        </Tooltip>
       </li>
     {/each}
   </ul>
@@ -70,7 +75,11 @@
             draggable="false"
           >
             <Avatar class="replaced-icon" id={room.room_id} src={room.avatar_url} {name} />
-            <span class="replaced-name" title={name}>{name}</span>
+            <Tooltip label={name}>
+              {#snippet trigger({ props })}
+                <span {...props} class="replaced-name">{name}</span>
+              {/snippet}
+            </Tooltip>
           </a>
           <IconButton
             variant="ghost"

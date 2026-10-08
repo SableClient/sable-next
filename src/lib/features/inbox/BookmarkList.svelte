@@ -17,6 +17,7 @@
   import InboxFeedRow from './InboxFeedRow.svelte';
   import MessagePreview from '#lib/features/room/messages/MessagePreview.svelte';
   import InboxSectionHeader from './InboxSectionHeader.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   let { standalone = false }: { standalone?: boolean } = $props();
   const bookmarks = useBookmarks();
@@ -101,15 +102,20 @@
       {#each visible as bookmark (bookmark.bookmark_id)}
         {@const name = roomName(bookmark.room_id, bookmark.room_name)}
         {@const from = bookmark.sender ? names.name(bookmark.sender) : null}
+        {@const timestampLabel = formatMessageTimestamp(bookmark.bookmarked_ts)}
         <InboxFeedRow roomId={bookmark.room_id} eventId={bookmark.event_id} {name}>
           <span class="head">
             <span class="name">{name}</span>
-            <time
-              class="when"
-              datetime={new Date(bookmark.bookmarked_ts).toISOString()}
-              title={formatMessageTimestamp(bookmark.bookmarked_ts)}
-              >{formatCompactTimestamp(bookmark.bookmarked_ts)}</time
-            >
+            <Tooltip label={timestampLabel}>
+              {#snippet trigger({ props })}
+                <time
+                  {...props}
+                  class="when"
+                  datetime={new Date(bookmark.bookmarked_ts).toISOString()}
+                  >{formatCompactTimestamp(bookmark.bookmarked_ts)}</time
+                >
+              {/snippet}
+            </Tooltip>
           </span>
           {#snippet message()}
             <MessagePreview roomId={bookmark.room_id} eventId={bookmark.event_id}>

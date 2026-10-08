@@ -177,13 +177,16 @@
       <span class="live-dot" class:idle={alone}></span>
       {#if roomName}<span class="room">{roomName}</span>{/if}
       {#if !alone}
-        <span class="meta" title={$i18n.t('call.lobbyInCall', { count: others.length })}>
-          <UsersIcon aria-hidden="true" weight="bold" />
-          {others.length}
-          <span class="screen-reader-only">
-            {$i18n.t('call.lobbyInCall', { count: others.length })}
-          </span>
-        </span>
+        {@const lobbyLabel = $i18n.t('call.lobbyInCall', { count: others.length })}
+        <Tooltip label={lobbyLabel}>
+          {#snippet trigger({ props })}
+            <span {...props} class="meta">
+              <UsersIcon aria-hidden="true" weight="bold" />
+              {others.length}
+              <span class="screen-reader-only">{lobbyLabel}</span>
+            </span>
+          {/snippet}
+        </Tooltip>
       {/if}
     </p>
   </header>

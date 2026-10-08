@@ -27,6 +27,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { isEditableTarget } from '#lib/ui/shortcuts/binding.js';
 
@@ -1165,22 +1166,27 @@
   </div>
 
   {#if revealed && visibleItems.length > 0 && (live ? jumpToLatestVisible : onJumpToLive !== undefined)}
+    {@const jumpLabel = $i18n.t('timeline.jumpToLatest')}
     <div
       class="jump-to-latest-motion"
       in:fly={{ y: 4, duration: motionMs(200), easing: cubicOut }}
       out:fade={{ duration: motionMs(MOTION_MS.quick) }}
     >
-      <IconButton
-        type="button"
-        class="jump-to-latest"
-        variant="secondary"
-        size="medium"
-        label={$i18n.t('timeline.jumpToLatest')}
-        title={$i18n.t('timeline.jumpToLatest')}
-        onclick={jumpToLatest}
-      >
-        <ArrowDownIcon />
-      </IconButton>
+      <Tooltip label={jumpLabel}>
+        {#snippet trigger({ props })}
+          <IconButton
+            {...props}
+            type="button"
+            class="jump-to-latest"
+            variant="secondary"
+            size="medium"
+            label={jumpLabel}
+            onclick={jumpToLatest}
+          >
+            <ArrowDownIcon />
+          </IconButton>
+        {/snippet}
+      </Tooltip>
     </div>
   {/if}
 

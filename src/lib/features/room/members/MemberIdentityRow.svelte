@@ -12,6 +12,7 @@
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { findMember, senderDisplayColors } from './members.js';
   import SenderName from './SenderName.svelte';
@@ -111,13 +112,16 @@
       />
       {@render secondary?.()}
       {#if userStatus}
-        <span
-          class="member-identity-status"
-          title={[userStatus.emoji, userStatus.text].filter(Boolean).join(' ')}
-        >
-          {#if userStatus.emoji}<span class="member-identity-status-emoji">{userStatus.emoji}</span
-            >{/if}{userStatus.text}
-        </span>
+        {@const statusLabel = [userStatus.emoji, userStatus.text].filter(Boolean).join(' ')}
+        <Tooltip label={statusLabel}>
+          {#snippet trigger({ props })}
+            <span {...props} class="member-identity-status">
+              {#if userStatus.emoji}<span class="member-identity-status-emoji"
+                  >{userStatus.emoji}</span
+                >{/if}{userStatus.text}
+            </span>
+          {/snippet}
+        </Tooltip>
       {/if}
     </span>
     {#if trailing}

@@ -559,10 +559,14 @@
 {/snippet}
 
 {#snippet messageTime()}
-  <time
-    datetime={new Date(item.timestamp).toISOString()}
-    title={formatFullTimestamp(item.timestamp)}>{formatMessageTimestamp(item.timestamp)}</time
-  >
+  {@const fullTimestamp = formatFullTimestamp(item.timestamp)}
+  <Tooltip label={fullTimestamp}>
+    {#snippet trigger({ props })}
+      <time {...props} datetime={new Date(item.timestamp).toISOString()}>
+        {formatMessageTimestamp(item.timestamp)}
+      </time>
+    {/snippet}
+  </Tooltip>
 {/snippet}
 
 {#if placeholder}
@@ -657,11 +661,15 @@
       <MessageActions {roomId} onEdit={actions.onEdit} />
     {/if}
     {#if layout === 'compact'}
+      {@const fullTimestamp = formatFullTimestamp(item.timestamp)}
       <div class="compact-gutter">
-        <time
-          datetime={new Date(item.timestamp).toISOString()}
-          title={formatFullTimestamp(item.timestamp)}>{formatTime(item.timestamp)}</time
-        >
+        <Tooltip label={fullTimestamp}>
+          {#snippet trigger({ props })}
+            <time {...props} datetime={new Date(item.timestamp).toISOString()}>
+              {formatTime(item.timestamp)}
+            </time>
+          {/snippet}
+        </Tooltip>
         {#if !collapsed}
           <SenderName
             displayName={senderName}
@@ -959,7 +967,11 @@
         {/if}
         {#if stalled}
           <p class="send-failure">
-            <span title={stalled.error}>{$i18n.t('timeline.sendFailed')}</span>
+            <Tooltip label={stalled.error} multiline>
+              {#snippet trigger({ props })}
+                <span {...props}>{$i18n.t('timeline.sendFailed')}</span>
+              {/snippet}
+            </Tooltip>
             {#if item.transaction_id && blocked?.kind === 'identity_changed'}
               {@const transactionId = item.transaction_id}
               {@const userIds = blocked.user_ids}

@@ -7,6 +7,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
@@ -99,6 +100,7 @@
         <ul>
           {#each roots as root (root.id)}
             {@const rootId = root.event_id ?? root.id}
+            {@const threadOpenLabel = $i18n.t('timeline.threadOpen')}
             <li>
               <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
               <div
@@ -111,28 +113,34 @@
                   {#snippet fallback()}{/snippet}
                 </MessagePreview>
               </div>
-              <button
-                type="button"
-                class="thread-summary"
-                class:no-summary={!root.thread_summary}
-                aria-label={root.thread_summary ? undefined : $i18n.t('timeline.threadOpen')}
-                title={root.thread_summary ? undefined : $i18n.t('timeline.threadOpen')}
-                onclick={() => {
-                  onOpenThread(rootId);
-                }}
-              >
-                <ThreadIcon size={14} aria-hidden="true" />
-                {#if root.thread_summary}
-                  <span class="thread-count">
-                    {$i18n.t('timeline.threadReplies', { count: root.thread_summary.num_replies })}
-                  </span>
-                {/if}
-                {#if root.thread_summary?.latest_body}
-                  <span class="thread-latest"
-                    >{stripReplyFallback(root.thread_summary.latest_body, null)}</span
+              <Tooltip label={threadOpenLabel} disabled={!!root.thread_summary}>
+                {#snippet trigger({ props })}
+                  <button
+                    {...props}
+                    type="button"
+                    class="thread-summary"
+                    class:no-summary={!root.thread_summary}
+                    aria-label={root.thread_summary ? undefined : threadOpenLabel}
+                    onclick={() => {
+                      onOpenThread(rootId);
+                    }}
                   >
-                {/if}
-              </button>
+                    <ThreadIcon size={14} aria-hidden="true" />
+                    {#if root.thread_summary}
+                      <span class="thread-count">
+                        {$i18n.t('timeline.threadReplies', {
+                          count: root.thread_summary.num_replies,
+                        })}
+                      </span>
+                    {/if}
+                    {#if root.thread_summary?.latest_body}
+                      <span class="thread-latest"
+                        >{stripReplyFallback(root.thread_summary.latest_body, null)}</span
+                      >
+                    {/if}
+                  </button>
+                {/snippet}
+              </Tooltip>
             </li>
           {/each}
         </ul>

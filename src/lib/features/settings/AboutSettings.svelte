@@ -19,6 +19,7 @@
   import { supporter } from '#lib/supporter/supporter.svelte.js';
   import SableBrandMark from '#lib/ui/SableBrandMark.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
@@ -127,19 +128,23 @@
     <div>
       <div class="product-name">
         <h1>Sable</h1>
-        <button
-          class="version-copy-button"
-          type="button"
-          title={$i18n.t(versionCopied ? 'common.copied' : 'common.copy')}
-          onclick={() => void copyVersion()}
-        >
-          {version}
-          {#if versionCopied}
-            <CheckIcon size="1em" aria-hidden="true" />
-          {:else}
-            <CopySimpleIcon size="1em" aria-hidden="true" />
-          {/if}
-        </button>
+        <Tooltip label={$i18n.t(versionCopied ? 'common.copied' : 'common.copy')}>
+          {#snippet trigger({ props })}
+            <button
+              {...props}
+              class="version-copy-button"
+              type="button"
+              onclick={() => void copyVersion()}
+            >
+              {version}
+              {#if versionCopied}
+                <CheckIcon size="1em" aria-hidden="true" />
+              {:else}
+                <CopySimpleIcon size="1em" aria-hidden="true" />
+              {/if}
+            </button>
+          {/snippet}
+        </Tooltip>
       </div>
       <p>{$i18n.t('settings.aboutTagline')}</p>
       <div class="product-actions">

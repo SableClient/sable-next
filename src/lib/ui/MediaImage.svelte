@@ -21,6 +21,7 @@
   } from '#lib/ui/media-url.js';
   import { animationsPaused, stillFrame } from '#lib/ui/still-frame.js';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import ImageBrokenIcon from 'phosphor-svelte/lib/ImageBrokenIcon';
   import ImageSpoilerControl from './ImageSpoilerControl.svelte';
@@ -464,6 +465,40 @@
   }
 </script>
 
+{#snippet gifImageElement(props: Record<string, unknown>)}
+  <img
+    {...props}
+    bind:this={gifImage}
+    class={['media-image-content', 'gif-preview-source', { ready: showCanvas }]}
+    src={url}
+    alt={showCanvas ? '' : alt}
+    {width}
+    {height}
+    aria-hidden={showCanvas ? 'true' : undefined}
+    onload={freezeFrame}
+    onerror={brokenImage}
+  />
+{/snippet}
+
+{#snippet renderImageElement(props: Record<string, unknown>)}
+  <img
+    {...props}
+    bind:this={imageElement}
+    class={['media-image-content', { tinted }]}
+    style:background-color={plate ?? undefined}
+    src={heldUrl}
+    {alt}
+    {width}
+    {height}
+    decoding="async"
+    onload={imageShown}
+    onerror={brokenImage}
+    {@attach (node) => {
+      if (node instanceof HTMLImageElement && node.complete) loadedUrl = url;
+    }}
+  />
+{/snippet}
+
 {#snippet content()}
   {#if blurhashPixels && !showUnavailable}
     <canvas
@@ -482,39 +517,25 @@
       class={['media-image-content', 'gif-preview', { ready: showCanvas }]}>{alt}</canvas
     >
     {#if !steppedGif || !gifPreviewReady}
-      <img
-        bind:this={gifImage}
-        class={['media-image-content', 'gif-preview-source', { ready: showCanvas }]}
-        src={url}
-        alt={showCanvas ? '' : alt}
-        {title}
-        {width}
-        {height}
-        aria-hidden={showCanvas ? 'true' : undefined}
-        onload={freezeFrame}
-        onerror={brokenImage}
-      />
+      {#if title}
+        <Tooltip label={title} multiline>
+          {#snippet trigger({ props })}{@render gifImageElement(props)}{/snippet}
+        </Tooltip>
+      {:else}
+        {@render gifImageElement({})}
+      {/if}
     {/if}
     {#if heldGif}
       <span class="play-gif" aria-hidden="true"><PlayIcon /></span>
     {/if}
   {:else if url}
-    <img
-      bind:this={imageElement}
-      class={['media-image-content', { tinted }]}
-      style:background-color={plate ?? undefined}
-      src={heldUrl}
-      {alt}
-      {title}
-      {width}
-      {height}
-      decoding="async"
-      onload={imageShown}
-      onerror={brokenImage}
-      {@attach (node) => {
-        if (node instanceof HTMLImageElement && node.complete) loadedUrl = url;
-      }}
-    />
+    {#if title}
+      <Tooltip label={title} multiline>
+        {#snippet trigger({ props })}{@render renderImageElement(props)}{/snippet}
+      </Tooltip>
+    {:else}
+      {@render renderImageElement({})}
+    {/if}
     {#if tinted}
       <span class="media-image-tint" style:--media-tint="url({url})" aria-hidden="true"></span>
     {/if}

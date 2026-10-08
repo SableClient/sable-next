@@ -9,6 +9,7 @@
   import { currentLocale, i18n } from '#lib/i18n.js';
   import { motionMs, MOTION_MS } from '#lib/ui/motion.js';
   import ResponsiveDialog from '#lib/ui/primitives/ResponsiveDialog.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { memberGroupSegments, memberGroupSummary } from '../members/member-groups';
   import MemberUserList from '../members/MemberUserList.svelte';
@@ -55,19 +56,23 @@
 {/snippet}
 
 <p class="member-group">
-  <button
-    class="state-icon expand-events"
-    type="button"
-    aria-label={toggleLabel}
-    title={toggleLabel}
-    aria-expanded={expanded}
-    aria-controls={eventsId}
-    onclick={() => {
-      expanded = !expanded;
-    }}
-  >
-    <CaretDownIcon aria-hidden="true" />
-  </button>
+  <Tooltip label={toggleLabel}>
+    {#snippet trigger({ props })}
+      <button
+        {...props}
+        class="state-icon expand-events"
+        type="button"
+        aria-label={toggleLabel}
+        aria-expanded={expanded}
+        aria-controls={eventsId}
+        onclick={() => {
+          expanded = !expanded;
+        }}
+      >
+        <CaretDownIcon aria-hidden="true" />
+      </button>
+    {/snippet}
+  </Tooltip>
   <span
     >{#each tokens as token, index (index)}{#if token.kind === 'text'}{token.text}{:else if token.kind === 'user'}{#if onSenderProfile}<StateEventSubjectName
             userId={token.userId}

@@ -33,6 +33,7 @@
   import { PanelWidth, remFromPixels } from '#lib/ui/panel-width.svelte.js';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { groupByMonth } from './attachment-groups';
   import { RoomAttachmentsPager } from './room-attachments-pager.svelte';
@@ -427,21 +428,25 @@
       <span class="link-text">
         {#each content.urls.slice(0, LINKS_PER_ROW) as url (url)}
           {@const parts = splitUrl(url)}
-          <a
-            class="link"
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={url}
-            onclick={(event) => {
-              followLink(event, url);
-            }}
-          >
-            <span class="link-host">{parts.host}</span>
-            {#if parts.rest}
-              <span class="link-rest">{parts.rest}</span>
-            {/if}
-          </a>
+          <Tooltip label={url} multiline>
+            {#snippet trigger({ props })}
+              <a
+                {...props}
+                class="link"
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onclick={(event) => {
+                  followLink(event, url);
+                }}
+              >
+                <span class="link-host">{parts.host}</span>
+                {#if parts.rest}
+                  <span class="link-rest">{parts.rest}</span>
+                {/if}
+              </a>
+            {/snippet}
+          </Tooltip>
         {/each}
         {#if content.urls.length > LINKS_PER_ROW}
           <span class="link-more">

@@ -2,6 +2,7 @@
   import { i18n } from '#lib/i18n.js';
   import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
   import WaveformIcon from 'phosphor-svelte/lib/WaveformIcon';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import CallControls from './CallControls.svelte';
   import type { CallSession } from './call-session.svelte.js';
@@ -43,26 +44,35 @@
   class:reconnecting
   aria-label={$i18n.t('call.title')}
 >
-  <button
-    class="call-room"
-    type="button"
-    aria-label={collapsed ? `${statusLabel}, ${roomName}` : undefined}
-    title={collapsed ? roomName : undefined}
-    onclick={onReturn}
-  >
-    <WaveformIcon weight="bold" />
-    {#if !collapsed}
-      <span class="status">{statusLabel}</span>
-      <span class="room">{roomName}</span>
-    {/if}
-    {#if count > 0}
-      <span class="count" title={$i18n.t('call.participants', { count })}>
-        <UsersIcon aria-hidden="true" weight="bold" />
-        {count}
-        <span class="screen-reader-only">{$i18n.t('call.participants', { count })}</span>
-      </span>
-    {/if}
-  </button>
+  <Tooltip label={roomName} disabled={!collapsed}>
+    {#snippet trigger({ props })}
+      <button
+        {...props}
+        class="call-room"
+        type="button"
+        aria-label={collapsed ? `${statusLabel}, ${roomName}` : undefined}
+        onclick={onReturn}
+      >
+        <WaveformIcon weight="bold" />
+        {#if !collapsed}
+          <span class="status">{statusLabel}</span>
+          <span class="room">{roomName}</span>
+        {/if}
+        {#if count > 0}
+          {@const countLabel = $i18n.t('call.participants', { count })}
+          <Tooltip label={countLabel}>
+            {#snippet trigger({ props: countProps })}
+              <span {...countProps} class="count">
+                <UsersIcon aria-hidden="true" weight="bold" />
+                {count}
+                <span class="screen-reader-only">{countLabel}</span>
+              </span>
+            {/snippet}
+          </Tooltip>
+        {/if}
+      </button>
+    {/snippet}
+  </Tooltip>
   <span class="screen-reader-only" role="status">{statusLabel}</span>
   <CallControls
     compact

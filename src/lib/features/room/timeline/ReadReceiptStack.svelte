@@ -7,6 +7,7 @@
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import { MOTION_MS, motionMs, shouldReduceMotion } from '#lib/ui/motion.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { memberAvatar, memberName } from '../members/members.js';
   import ReadReceiptFace from './ReadReceiptFace.svelte';
@@ -97,7 +98,6 @@
       aria-label={$i18n.t('timeline.seenByNames', { names })}
       aria-haspopup="dialog"
       aria-expanded={expanded}
-      title={names}
       onclick={(event) => onOpen(event.currentTarget)}
     >
       <span class="faces">
@@ -117,18 +117,22 @@
     >
       {@render faceRow(true)}
       {#if overflow > 0}
-        <button
-          class={['t-avatar', 'overflow', 'selection-open']}
-          type="button"
-          aria-label={$i18n.t('timeline.seenByNames', { names: overflowNames })}
-          aria-haspopup="dialog"
-          aria-expanded={expanded}
-          title={overflowNames}
-          onmouseenter={() => setShifts(faces.length)}
-          onclick={(event) => onOpen(event.currentTarget)}
-        >
-          +{overflow}
-        </button>
+        <Tooltip label={overflowNames} multiline>
+          {#snippet trigger({ props })}
+            <button
+              {...props}
+              class={['t-avatar', 'overflow', 'selection-open']}
+              type="button"
+              aria-label={$i18n.t('timeline.seenByNames', { names: overflowNames })}
+              aria-haspopup="dialog"
+              aria-expanded={expanded}
+              onmouseenter={() => setShifts(faces.length)}
+              onclick={(event) => onOpen(event.currentTarget)}
+            >
+              +{overflow}
+            </button>
+          {/snippet}
+        </Tooltip>
       {/if}
     </div>
   {/if}

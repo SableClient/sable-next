@@ -10,6 +10,7 @@
   import VirtualList from 'svelte-tiny-virtual-list';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { emojiGroupIcons, type BoardTab } from '#lib/ui/primitives/emote-board.js';
   import ClockCounterClockwiseIcon from 'phosphor-svelte/lib/ClockCounterClockwiseIcon';
   import {
@@ -693,60 +694,70 @@
                       {#each row.cells as cell, column (column)}
                         {@const index = row.start + column}
                         {@const source = 'image' in cell ? cell.image.url : cell.emoji}
-                        <button
-                          type="button"
-                          role="gridcell"
-                          data-cell={index}
-                          tabindex={tabStop(row.section, index, column) ? 0 : -1}
-                          title={cellLabel(cell)}
-                          aria-label={cellLabel(cell)}
-                          onclick={() => {
-                            pickCell(cell);
-                          }}
-                          {@attach focusWhenPending(row.section, index)}
-                        >
-                          {#if source.startsWith('mxc://')}
-                            <MediaImage
-                              class="unicode-image"
-                              {source}
-                              alt=""
-                              width={64}
-                              height={64}
-                              original
-                            />
-                          {:else}
-                            <span class="unicode-text">{source}</span>
-                          {/if}
-                        </button>
+                        {@const label = cellLabel(cell)}
+                        <Tooltip {label}>
+                          {#snippet trigger({ props })}
+                            <button
+                              {...props}
+                              type="button"
+                              role="gridcell"
+                              data-cell={index}
+                              tabindex={tabStop(row.section, index, column) ? 0 : -1}
+                              aria-label={label}
+                              onclick={() => {
+                                pickCell(cell);
+                              }}
+                              {@attach focusWhenPending(row.section, index)}
+                            >
+                              {#if source.startsWith('mxc://')}
+                                <MediaImage
+                                  class="unicode-image"
+                                  {source}
+                                  alt=""
+                                  width={64}
+                                  height={64}
+                                  original
+                                />
+                              {:else}
+                                <span class="unicode-text">{source}</span>
+                              {/if}
+                            </button>
+                          {/snippet}
+                        </Tooltip>
                       {/each}
                     </div>
                   </div>
                 {:else}
                   <ul {@attach measureImageRow}>
                     {#each row.images as image, column (column)}
+                      {@const imageLabel = `:${image.shortcode}:`}
                       <li>
-                        <button
-                          type="button"
-                          title=":{image.shortcode}:"
-                          aria-label=":{image.shortcode}:"
-                          onclick={() => {
-                            pick(image);
-                          }}
-                          onpointerenter={() => {
-                            if (row.pack) preview = { image, pack: row.pack };
-                          }}
-                          onfocus={() => {
-                            if (row.pack) preview = { image, pack: row.pack };
-                          }}
-                        >
-                          <MediaImage
-                            source={image.url}
-                            alt={image.body ?? image.shortcode}
-                            width={cellSize}
-                            height={cellSize}
-                            original
-                          />
-                        </button>
+                        <Tooltip label={imageLabel}>
+                          {#snippet trigger({ props })}
+                            <button
+                              {...props}
+                              type="button"
+                              aria-label={imageLabel}
+                              onclick={() => {
+                                pick(image);
+                              }}
+                              onpointerenter={() => {
+                                if (row.pack) preview = { image, pack: row.pack };
+                              }}
+                              onfocus={() => {
+                                if (row.pack) preview = { image, pack: row.pack };
+                              }}
+                            >
+                              <MediaImage
+                                source={image.url}
+                                alt={image.body ?? image.shortcode}
+                                width={cellSize}
+                                height={cellSize}
+                                original
+                              />
+                            </button>
+                          {/snippet}
+                        </Tooltip>
                       </li>
                     {/each}
                   </ul>
@@ -759,58 +770,72 @@
 
       <nav class="rail" class:hidden={searching} aria-label={$i18n.t('composer.packs')}>
         {#if frequentCells.length > 0}
-          <button
-            type="button"
-            class="rail-pack rail-glyph"
-            title={$i18n.t('timeline.frequentlyUsed')}
-            aria-label={$i18n.t('timeline.frequentlyUsed')}
-            onclick={() => {
-              jumpTo('emoji-recent');
-            }}
-          >
-            <ClockCounterClockwiseIcon />
-          </button>
+          {@const frequentLabel = $i18n.t('timeline.frequentlyUsed')}
+          <Tooltip label={frequentLabel}>
+            {#snippet trigger({ props })}
+              <button
+                {...props}
+                type="button"
+                class="rail-pack rail-glyph"
+                aria-label={frequentLabel}
+                onclick={() => {
+                  jumpTo('emoji-recent');
+                }}
+              >
+                <ClockCounterClockwiseIcon />
+              </button>
+            {/snippet}
+          </Tooltip>
         {/if}
         {#each ['account', 'global', 'room', 'space'] as const as origin (origin)}
           {@const group = sections.filter((section) => section.pack.origin === origin)}
           {#if group.length > 0}
             <hr class="rail-divider" />
             {#each group as section (sectionId(section.pack))}
-              <button
-                type="button"
-                class="rail-pack"
-                title={packName(section.pack)}
-                aria-label={packName(section.pack)}
-                onclick={() => {
-                  jumpTo(sectionId(section.pack));
-                }}
-              >
-                <MediaImage
-                  class="rail-emote"
-                  source={section.pack.avatar_url ?? section.images[0].url}
-                  alt={packName(section.pack)}
-                  width={24}
-                  height={24}
-                  original
-                />
-              </button>
+              {@const packLabel = packName(section.pack)}
+              <Tooltip label={packLabel}>
+                {#snippet trigger({ props })}
+                  <button
+                    {...props}
+                    type="button"
+                    class="rail-pack"
+                    aria-label={packLabel}
+                    onclick={() => {
+                      jumpTo(sectionId(section.pack));
+                    }}
+                  >
+                    <MediaImage
+                      class="rail-emote"
+                      source={section.pack.avatar_url ?? section.images[0].url}
+                      alt={packLabel}
+                      width={24}
+                      height={24}
+                      original
+                    />
+                  </button>
+                {/snippet}
+              </Tooltip>
             {/each}
           {/if}
         {/each}
         {#if groupSections.length > 0}
           <hr class="rail-divider" />
           {#each groupSections as section (section.id)}
-            <button
-              type="button"
-              class="rail-pack rail-glyph"
-              title={section.label}
-              aria-label={section.label}
-              onclick={() => {
-                jumpTo(`emoji-${section.id}`);
-              }}
-            >
-              <section.icon />
-            </button>
+            <Tooltip label={section.label}>
+              {#snippet trigger({ props })}
+                <button
+                  {...props}
+                  type="button"
+                  class="rail-pack rail-glyph"
+                  aria-label={section.label}
+                  onclick={() => {
+                    jumpTo(`emoji-${section.id}`);
+                  }}
+                >
+                  <section.icon />
+                </button>
+              {/snippet}
+            </Tooltip>
           {/each}
         {/if}
       </nav>

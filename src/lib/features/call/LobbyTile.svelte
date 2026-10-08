@@ -3,6 +3,7 @@
   import MicrophoneSlashIcon from 'phosphor-svelte/lib/MicrophoneSlashIcon';
 
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   interface Props {
     name: string;
@@ -52,10 +53,15 @@
   {/if}
   <span class="tag">
     {#if muted}
-      <span class="muted" title={$i18n.t('call.muted')}>
-        <MicrophoneSlashIcon aria-hidden="true" weight="fill" />
-        <span class="screen-reader-only">{$i18n.t('call.muted')}</span>
-      </span>
+      {@const mutedLabel = $i18n.t('call.muted')}
+      <Tooltip label={mutedLabel}>
+        {#snippet trigger({ props })}
+          <span {...props} class="muted">
+            <MicrophoneSlashIcon aria-hidden="true" weight="fill" />
+            <span class="screen-reader-only">{mutedLabel}</span>
+          </span>
+        {/snippet}
+      </Tooltip>
     {/if}
     {#if live}<span class="live">{$i18n.t('call.live')}</span>{/if}
     <span class="name">{name}</span>

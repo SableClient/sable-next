@@ -1,5 +1,6 @@
 <script lang="ts">
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   interface Props {
     loading?: boolean;
@@ -27,15 +28,19 @@
       {loadingMessage}
     </div>
   {:else if message}
-    <p
-      class="auth-status-message auth-status-{tone}"
-      class:multiline
-      {id}
-      role={tone === 'error' ? 'alert' : 'status'}
-      title={message}
-    >
-      {message}
-    </p>
+    <Tooltip label={message} {multiline}>
+      {#snippet trigger({ props })}
+        <p
+          {...props}
+          class="auth-status-message auth-status-{tone}"
+          class:multiline
+          {id}
+          role={tone === 'error' ? 'alert' : 'status'}
+        >
+          {message}
+        </p>
+      {/snippet}
+    </Tooltip>
   {/if}
 </div>
 

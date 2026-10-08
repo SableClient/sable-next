@@ -3,6 +3,7 @@
   import type { Snippet } from 'svelte';
 
   import { safeSwatch } from '#lib/settings/theme-file.js';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   interface Props {
     name: string;
@@ -38,42 +39,46 @@
 </script>
 
 <div class="tile" class:selected class:has-trailing={trailing !== undefined}>
-  <button
-    type="button"
-    class="tile-hit"
-    {role}
-    aria-checked={role === 'radio' ? selected : undefined}
-    aria-keyshortcuts={keyshortcuts}
-    {tabindex}
-    title={name}
-    onclick={onselect}
-  >
-    <span
-      class="preview"
-      aria-hidden="true"
-      style:--tile-bg={colors[0]}
-      style:--tile-surface={colors[1]}
-      style:--tile-accent={colors[2]}
-      style:--tile-ink={colors[3]}
-      style:--tile-radius={radius}
-      style:--tile-radius-inner={innerRadius}
-    >
-      <span class="preview-side">
-        <span class="preview-dot"></span>
-        <span class="preview-dot"></span>
-        <span class="preview-dot"></span>
-      </span>
-      <span class="preview-main">
-        <span class="preview-line wide"></span>
-        <span class="preview-bubble"></span>
-        <span class="preview-line"></span>
-        <span class="preview-button"></span>
-      </span>
-      {#if selected}<span class="tile-check"><CheckIcon weight="bold" /></span>{/if}
-    </span>
-    <span class="tile-name">{name}</span>
-    {#if detail}<span class="tile-detail">{detail}</span>{/if}
-  </button>
+  <Tooltip label={name}>
+    {#snippet trigger({ props })}
+      <button
+        {...props}
+        type="button"
+        class="tile-hit"
+        {role}
+        aria-checked={role === 'radio' ? selected : undefined}
+        aria-keyshortcuts={keyshortcuts}
+        {tabindex}
+        onclick={onselect}
+      >
+        <span
+          class="preview"
+          aria-hidden="true"
+          style:--tile-bg={colors[0]}
+          style:--tile-surface={colors[1]}
+          style:--tile-accent={colors[2]}
+          style:--tile-ink={colors[3]}
+          style:--tile-radius={radius}
+          style:--tile-radius-inner={innerRadius}
+        >
+          <span class="preview-side">
+            <span class="preview-dot"></span>
+            <span class="preview-dot"></span>
+            <span class="preview-dot"></span>
+          </span>
+          <span class="preview-main">
+            <span class="preview-line wide"></span>
+            <span class="preview-bubble"></span>
+            <span class="preview-line"></span>
+            <span class="preview-button"></span>
+          </span>
+          {#if selected}<span class="tile-check"><CheckIcon weight="bold" /></span>{/if}
+        </span>
+        <span class="tile-name">{name}</span>
+        {#if detail}<span class="tile-detail">{detail}</span>{/if}
+      </button>
+    {/snippet}
+  </Tooltip>
   {#if trailing}<div class="tile-trailing">
       <div class="tile-trailing-row">{@render trailing()}</div>
     </div>{/if}

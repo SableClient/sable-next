@@ -1,5 +1,6 @@
 <script lang="ts">
   import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import type { Snippet } from 'svelte';
 
   interface Props {
@@ -60,9 +61,13 @@
     tabindex={active || !reachable ? -1 : 0}
   ></button>
   {#if !active && !reachable && unavailableLabel}
-    <span class="unavailable-cue" role="img" title={unavailableLabel} aria-label={unavailableLabel}>
-      <LockSimpleIcon aria-hidden="true" />
-    </span>
+    <Tooltip label={unavailableLabel}>
+      {#snippet trigger({ props })}
+        <span {...props} class="unavailable-cue" role="img" aria-label={unavailableLabel}>
+          <LockSimpleIcon aria-hidden="true" />
+        </span>
+      {/snippet}
+    </Tooltip>
   {/if}
   <div class="card-content" inert={!active}>
     {@render children()}

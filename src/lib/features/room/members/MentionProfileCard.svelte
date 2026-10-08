@@ -57,6 +57,7 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import Pill from '#lib/ui/primitives/Pill.svelte';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
@@ -670,20 +671,24 @@
       aria-label={messageLabel}
       disabled={sending}
     />
-    <IconButton
-      label={hasDraft ? $i18n.t('timeline.sendMessage') : $i18n.t('timeline.openChat')}
-      title={hasDraft ? undefined : $i18n.t('timeline.openChat')}
-      variant={hasDraft ? 'primary' : 'secondary'}
-      size="small"
-      type="submit"
-      disabled={sending}
-    >
-      {#if hasDraft}
-        <PaperPlaneRightIcon />
-      {:else}
-        <ChatCircleIcon />
-      {/if}
-    </IconButton>
+    <Tooltip label={$i18n.t('timeline.openChat')} disabled={hasDraft}>
+      {#snippet trigger({ props })}
+        <IconButton
+          {...props}
+          label={hasDraft ? $i18n.t('timeline.sendMessage') : $i18n.t('timeline.openChat')}
+          variant={hasDraft ? 'primary' : 'secondary'}
+          size="small"
+          type="submit"
+          disabled={sending}
+        >
+          {#if hasDraft}
+            <PaperPlaneRightIcon />
+          {:else}
+            <ChatCircleIcon />
+          {/if}
+        </IconButton>
+      {/snippet}
+    </Tooltip>
   </form>
   {#if sendFailed}
     <p class="profile-composer-error" role="status">

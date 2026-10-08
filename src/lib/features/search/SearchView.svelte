@@ -17,6 +17,7 @@
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import { whenVisible } from '#lib/ui/when-visible.js';
@@ -740,6 +741,7 @@
                   room: roomList.labelFor(hit.room_id),
                   time: formatFullTimestamp(hit.origin_server_ts),
                 })}
+                {@const fullTimestamp = formatFullTimestamp(hit.origin_server_ts)}
                 <li class="hit">
                   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                   <div
@@ -799,19 +801,21 @@
                                       )
                                     : []}
                                 />
-                                <button
-                                  class="hit-time-action"
-                                  type="button"
-                                  aria-label={openLabel}
-                                  onclick={() => void openHit(hit)}
-                                >
-                                  <time
-                                    datetime={new Date(hit.origin_server_ts).toISOString()}
-                                    title={formatFullTimestamp(hit.origin_server_ts)}
-                                  >
-                                    {formatMessageTimestamp(hit.origin_server_ts)}
-                                  </time>
-                                </button>
+                                <Tooltip label={fullTimestamp}>
+                                  {#snippet trigger({ props })}
+                                    <button
+                                      {...props}
+                                      class="hit-time-action"
+                                      type="button"
+                                      aria-label={openLabel}
+                                      onclick={() => void openHit(hit)}
+                                    >
+                                      <time datetime={new Date(hit.origin_server_ts).toISOString()}>
+                                        {formatMessageTimestamp(hit.origin_server_ts)}
+                                      </time>
+                                    </button>
+                                  {/snippet}
+                                </Tooltip>
                               </span>
                               <span class="hit-body">
                                 {#if snippet.clippedStart}…{/if}

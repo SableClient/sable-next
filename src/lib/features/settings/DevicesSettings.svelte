@@ -31,6 +31,7 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import '#lib/ui/primitives/settings-row.css';
   import ResetIdentityDialog from './ResetIdentityDialog.svelte';
   import VerifyDeviceDialog from './VerifyDeviceDialog.svelte';
@@ -536,7 +537,11 @@
                           ? $i18n.t('settings.verified')
                           : $i18n.t('settings.notVerified')}
                     />
-                    <code title={device.device_id}>{device.device_id}</code>
+                    <Tooltip label={device.device_id} multiline>
+                      {#snippet trigger({ props })}
+                        <code {...props}>{device.device_id}</code>
+                      {/snippet}
+                    </Tooltip>
                   </div>
                   {#if device.last_seen_ts !== null}
                     <span class="device-seen">

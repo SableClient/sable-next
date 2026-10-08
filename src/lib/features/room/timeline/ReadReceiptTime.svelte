@@ -1,5 +1,6 @@
 <script lang="ts">
   import { formatFullTimestamp, formatMessageTimestamp } from '#lib/ui/date-time.js';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   let { timestamp }: { timestamp?: number } = $props();
   let available = $derived(
@@ -8,9 +9,14 @@
 </script>
 
 {#if available && timestamp !== undefined}
-  <time datetime={new Date(timestamp).toISOString()} title={formatFullTimestamp(timestamp)}>
-    {formatMessageTimestamp(timestamp)}
-  </time>
+  {@const fullTimestamp = formatFullTimestamp(timestamp)}
+  <Tooltip label={fullTimestamp}>
+    {#snippet trigger({ props })}
+      <time {...props} datetime={new Date(timestamp).toISOString()}>
+        {formatMessageTimestamp(timestamp)}
+      </time>
+    {/snippet}
+  </Tooltip>
 {/if}
 
 <style>

@@ -33,6 +33,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import XIcon from 'phosphor-svelte/lib/XIcon';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
@@ -665,9 +666,13 @@
         <header class="toolbar" class:chrome-hidden={chromeHidden}>
           <div class="heading">
             <strong>{item.sender}</strong>
-            <span title={visibleLabel}
-              >{$i18n.t('viewer.position', { index: index + 1, total: items.length })} · {visibleLabel}</span
-            >
+            <Tooltip label={visibleLabel}>
+              {#snippet trigger({ props })}
+                <span {...props}
+                  >{$i18n.t('viewer.position', { index: index + 1, total: items.length })} · {visibleLabel}</span
+                >
+              {/snippet}
+            </Tooltip>
           </div>
           <div class="actions">
             {#if isImage || isPdf}
@@ -702,12 +707,14 @@
                     />%
                   </span>
                 {:else}
-                  <button
-                    class="zoom-level"
-                    type="button"
-                    title={$i18n.t('viewer.setZoom')}
-                    onclick={beginZoomEdit}>{Math.round(zoom * 100)}%</button
-                  >
+                  {@const zoomLabel = $i18n.t('viewer.setZoom')}
+                  <Tooltip label={zoomLabel}>
+                    {#snippet trigger({ props })}
+                      <button {...props} class="zoom-level" type="button" onclick={beginZoomEdit}
+                        >{Math.round(zoom * 100)}%</button
+                      >
+                    {/snippet}
+                  </Tooltip>
                 {/if}
                 <IconButton
                   label={$i18n.t('viewer.zoomIn')}

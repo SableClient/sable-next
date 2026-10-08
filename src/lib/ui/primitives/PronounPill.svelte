@@ -7,6 +7,7 @@
     visiblePronouns,
   } from '#lib/personas/pronouns.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import type { ClassValue, HTMLAttributes } from 'svelte/elements';
   import type { PronounView } from '#src/generated/protocol';
 
@@ -36,11 +37,16 @@
       >
     {/each}
     {#if splitPronouns.overflow.length > 0}
-      <span class={['pronoun-pill', pillClass]} title={formatPronouns(splitPronouns.overflow)}>
-        {$i18n.t('timeline.morePronouns', {
-          count: splitPronouns.overflow.length,
-        })}
-      </span>
+      {@const overflowLabel = formatPronouns(splitPronouns.overflow)}
+      <Tooltip label={overflowLabel}>
+        {#snippet trigger({ props })}
+          <span {...props} class={['pronoun-pill', pillClass]}>
+            {$i18n.t('timeline.morePronouns', {
+              count: splitPronouns.overflow.length,
+            })}
+          </span>
+        {/snippet}
+      </Tooltip>
     {/if}
   </span>
 {/if}

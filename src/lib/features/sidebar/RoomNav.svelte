@@ -812,12 +812,17 @@
               {#if room?.is_direct && room.topic}
                 <span class="room-topic">{room.topic}</span>
               {:else if peerStatus}
-                <span
-                  class="room-topic"
-                  title={[peerStatus.emoji, peerStatus.text].filter(Boolean).join(' ')}
-                  >{#if peerStatus.emoji}<span class="room-status-emoji">{peerStatus.emoji}</span
-                    >{/if}{peerStatus.text}</span
-                >
+                {@const peerStatusLabel = [peerStatus.emoji, peerStatus.text]
+                  .filter(Boolean)
+                  .join(' ')}
+                <Tooltip label={peerStatusLabel}>
+                  {#snippet trigger({ props })}
+                    <span {...props} class="room-topic">
+                      {#if peerStatus.emoji}<span class="room-status-emoji">{peerStatus.emoji}</span
+                        >{/if}{peerStatus.text}
+                    </span>
+                  {/snippet}
+                </Tooltip>
               {:else if room?.room_type === CALENDAR_ROOM_TYPE && preferences.showSpaceEvents}
                 <CalendarRowEvent roomId={room.room_id} />
               {/if}
@@ -961,21 +966,36 @@
                       <span class="voice-stream">{$i18n.t('call.live')}</span>
                     {/if}
                     {#if voice?.camera}
-                      <span title={$i18n.t('call.cameraOnLabel')}>
-                        <VideoCameraIcon aria-hidden="true" weight="fill" />
-                        <span class="screen-reader-only">{$i18n.t('call.cameraOnLabel')}</span>
-                      </span>
+                      {@const cameraLabel = $i18n.t('call.cameraOnLabel')}
+                      <Tooltip label={cameraLabel}>
+                        {#snippet trigger({ props })}
+                          <span {...props}>
+                            <VideoCameraIcon aria-hidden="true" weight="fill" />
+                            <span class="screen-reader-only">{cameraLabel}</span>
+                          </span>
+                        {/snippet}
+                      </Tooltip>
                     {/if}
                     {#if voice?.deafened}
-                      <span class="voice-off" title={$i18n.t('call.deafened')}>
-                        <SpeakerSlashIcon aria-hidden="true" weight="fill" />
-                        <span class="screen-reader-only">{$i18n.t('call.deafened')}</span>
-                      </span>
+                      {@const deafenLabel = $i18n.t('call.deafened')}
+                      <Tooltip label={deafenLabel}>
+                        {#snippet trigger({ props })}
+                          <span {...props} class="voice-off">
+                            <SpeakerSlashIcon aria-hidden="true" weight="fill" />
+                            <span class="screen-reader-only">{deafenLabel}</span>
+                          </span>
+                        {/snippet}
+                      </Tooltip>
                     {:else if voice?.muted}
-                      <span class="voice-off" title={$i18n.t('call.muted')}>
-                        <MicrophoneSlashIcon aria-hidden="true" weight="fill" />
-                        <span class="screen-reader-only">{$i18n.t('call.muted')}</span>
-                      </span>
+                      {@const muteLabel = $i18n.t('call.muted')}
+                      <Tooltip label={muteLabel}>
+                        {#snippet trigger({ props })}
+                          <span {...props} class="voice-off">
+                            <MicrophoneSlashIcon aria-hidden="true" weight="fill" />
+                            <span class="screen-reader-only">{muteLabel}</span>
+                          </span>
+                        {/snippet}
+                      </Tooltip>
                     {/if}
                   </span>
                 {/if}
