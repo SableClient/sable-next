@@ -24,7 +24,7 @@
     relationOf,
     type TimelineEventIndex,
   } from './timeline-event-index';
-  import { formatDate } from '#lib/ui/date-time.js';
+  import { formatDate, formatFullTimestamp, formatMessageTimestamp } from '#lib/ui/date-time.js';
   import UndecryptableNotice from './UndecryptableNotice.svelte';
 
   const MAX_PIN_PREVIEWS = 4;
@@ -138,10 +138,21 @@
   <span class="state-icon" aria-hidden="true"><StateIcon /></span>
 {/snippet}
 
+{#snippet stateTime()}
+  <Tooltip label={formatFullTimestamp(item.timestamp)}>
+    {#snippet trigger({ props })}
+      <time {...props} class="state-time" datetime={new Date(item.timestamp).toISOString()}>
+        {formatMessageTimestamp(item.timestamp)}
+      </time>
+    {/snippet}
+  </Tooltip>
+{/snippet}
+
 {#if item.content.kind === 'membership' || item.content.kind === 'profile_change' || (item.content.kind === 'state_event' && item.content.change !== null)}
   <p class="state">
     {@render stateGutter()}
     <StateEventText {item} {members} {onSenderProfile} />
+    {@render stateTime()}
   </p>
   {#if pins.length > 0}
     <div class="state-detail">
@@ -162,6 +173,7 @@
   <p class="state">
     {@render stateGutter()}
     <StateEventText {item} {members} {onSenderProfile} />
+    {@render stateTime()}
   </p>
   {#if item.content.content !== null}
     <div class="state-detail">
@@ -171,11 +183,12 @@
 {:else if item.content.kind === 'redacted' || redactedReaction}
   <p class="state redacted">
     {@render stateGutter()}
-    <span class="redacted-label">
+    <span class="redacted-label state-text">
       {item.content.kind === 'redacted' && item.content.reason
         ? $i18n.t('timeline.redactedWithReason', { reason: item.content.reason })
         : $i18n.t('timeline.redacted')}
     </span>
+    {@render stateTime()}
   </p>
 {:else if hiddenTarget !== null}
   {#if targetAbove}{@render targetDetail(hiddenTarget)}{/if}
@@ -187,6 +200,7 @@
       {onSenderProfile}
       reaction={customReaction ? reactionImageContent : undefined}
     />
+    {@render stateTime()}
   </p>
   {#if !targetAbove}{@render targetDetail(hiddenTarget)}{/if}
 {:else if item.content.kind === 'hidden_event'}
@@ -206,6 +220,7 @@
         </Collapsible.Root>
       {/if}
     </div>
+    {@render stateTime()}
   </div>
 {:else if item.content.kind === 'unable_to_decrypt'}
   <UndecryptableNotice
@@ -220,11 +235,15 @@
   <p class="state">
     {@render stateGutter()}
     <StateEventText {item} {members} {onSenderProfile} />
+    {@render stateTime()}
   </p>
 {:else if item.content.kind === 'unsupported'}
   <p class="state">
     {@render stateGutter()}
-    {$i18n.t('timeline.unsupported', { description: item.content.description })}
+    <span class="state-text"
+      >{$i18n.t('timeline.unsupported', { description: item.content.description })}</span
+    >
+    {@render stateTime()}
   </p>
 {:else if item.content.kind === 'date_divider'}
   <p class="date-divider"><span>{formatDate(item.content.timestamp)}</span></p>
@@ -263,8 +282,13 @@
     font-size: var(--font-size-body);
     gap: var(--timeline-row-gap);
     line-height: var(--line-height-body);
-    opacity: var(--opacity-p300);
     padding: 0;
+  }
+
+  .state-icon,
+  .state :global(.state-event-text),
+  .state-text {
+    opacity: var(--opacity-p300);
   }
 
   .state-icon {
@@ -279,6 +303,20 @@
   .state-icon :global(svg) {
     height: var(--icon-size-small);
     width: var(--icon-size-small);
+  }
+
+  .state-time {
+    color: var(--surface-var-on-container);
+    flex-shrink: 0;
+    font-size: var(--font-size-small);
+    margin-inline-start: auto;
+    white-space: nowrap;
+  }
+
+  .state :global(.state-event-text),
+  .state-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .state-detail {

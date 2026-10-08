@@ -1219,12 +1219,6 @@
     padding-block: 0;
   }
 
-  .message.event-row :global(.message-actions) {
-    bottom: auto;
-    top: 50%;
-    translate: 0 -50%;
-  }
-
   .event-reactions {
     display: flex;
     gap: var(--timeline-row-gap);

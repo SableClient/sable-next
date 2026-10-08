@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { render, screen } from '@testing-library/svelte';
+import { screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 
@@ -18,10 +18,11 @@ test('a redacted reaction renders as removed instead of as a generic hidden even
     id: '$reaction',
     sender: '@alice:example.org',
     sender_name: 'Alice',
+    timestamp: 0,
     content: { kind: 'hidden_event', event_type: 'm.reaction', content: {}, redacts: null },
   } as TimelineItemView;
 
-  const container = render(TimelineNotice, { item, unreadCount: 0 }).container;
+  const container = renderWithTooltips(TimelineNotice, { item, unreadCount: 0 }).container;
 
   expect(container.querySelector('.state.redacted')).not.toBeNull();
   expect(container.querySelector('.debug-event')).toBeNull();
@@ -41,6 +42,7 @@ test.each([
       id: '$reaction',
       sender: '@alice:example.org',
       sender_name: 'Alice',
+      timestamp: 0,
       content: {
         kind: 'hidden_event',
         event_type: 'm.reaction',
