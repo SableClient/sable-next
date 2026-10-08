@@ -44,6 +44,7 @@
     markRoomsRead,
     spacesDescendantRooms,
   } from './nav-rooms.js';
+  import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
 
   interface Props {
     mobile?: boolean;
@@ -248,6 +249,7 @@
 <aside class="sidebar">
   {#if mobile}
     <nav class="mobile-navigation" aria-label={$i18n.t('nav.primary')}>
+      <CoreHealthBanner />
       <div class="navigation-main">
         <NavigationRail
           {pathname}

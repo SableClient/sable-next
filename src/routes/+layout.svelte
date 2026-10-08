@@ -12,7 +12,6 @@
   import { provideCoreClient } from '#lib/core/context.js';
   import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
   import TitleBar from '#lib/ui/TitleBar.svelte';
-  import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
   import SessionRestoreError from '#lib/ui/SessionRestoreError.svelte';
   import AccountLocked from '#lib/ui/AccountLocked.svelte';
   import favicon from '#lib/assets/favicon.png';
@@ -160,7 +159,6 @@
   {#if titlebar}
     <TitleBar kind={titlebar} />
   {/if}
-  <CoreHealthBanner />
 
   <TooltipProvider>
     {#if core.accountLocked}

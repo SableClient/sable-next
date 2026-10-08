@@ -18,6 +18,7 @@
   import { BREAKPOINTS } from './breakpoints';
   import { createMediaQuery } from './media-query.svelte';
   import { backToRoomList, goToPage, isRoomSwitch } from '#lib/features/room/room-navigation.js';
+  import CoreHealthBanner from './CoreHealthBanner.svelte';
 
   interface Props {
     children: Snippet;
@@ -298,6 +299,7 @@
       class:with-back-bar={showMobileBackBar}
       inert={panelsOpen && !appLayout.matches}
     >
+      <CoreHealthBanner />
       {#if showMobileBackBar}
         <PanelHeader class="mobile-back-bar" title={pageTitle}>
           {#snippet prefix()}
