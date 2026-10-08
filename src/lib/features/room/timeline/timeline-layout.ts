@@ -3,6 +3,7 @@ import type { MessageSpacing } from '#lib/settings/preferences.svelte.js';
 
 export const TIMELINE_LAYOUT = {
   historyPrefetchItems: 25,
+  openingFillPageItems: 100,
   initialFillSettleTimeout: 3_000,
   initialFillPollInterval: 25,
   historyRequestMinInterval: 300,

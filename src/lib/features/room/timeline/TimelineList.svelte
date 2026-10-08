@@ -81,7 +81,7 @@
     landingEventId?: string | null;
     replyEventId?: string | null;
     onLanded?: () => void;
-    onRequestHistory: () => Promise<boolean>;
+    onRequestHistory: (count?: number) => Promise<boolean>;
     onRequestFuture: () => Promise<void>;
     onRetryLoad?: () => Promise<void>;
     threadRootId?: string | null;
@@ -292,7 +292,7 @@
   let menuOpen = $state(false);
   const pagination = new TimelinePagination(
     () => timeline,
-    () => onRequestHistory()
+    (count) => onRequestHistory(count)
   );
   const future = new TimelineFuture(
     () => timeline,
@@ -387,8 +387,14 @@
   function fillsViewport(engine: TimelineWindow<RowValue>, node: HTMLElement): boolean {
     return engine.contentHeight >= node.clientHeight || node.scrollHeight > node.clientHeight;
   }
-  function requestHistory(): Promise<boolean> {
-    return pagination.requestHistory();
+  function requestHistory(count?: number): Promise<boolean> {
+    return pagination.requestHistory(count);
+  }
+  let fillRequested = false;
+  function requestFill(): Promise<boolean> {
+    const count = fillRequested ? TIMELINE_LAYOUT.openingFillPageItems : undefined;
+    fillRequested = true;
+    return requestHistory(count);
   }
   const historyController = new TimelineHistoryController({
     getBackwardPagination: () => timeline.backwardPagination,
@@ -571,7 +577,7 @@
           if (timeline.backwardPagination === 'loading') break;
         } else {
           if (!pagination.canRefill()) break;
-          pagination.exhausted = await requestHistory();
+          pagination.exhausted = await requestFill();
           await awaitPagination();
           await engine.update(entries);
           await new Promise(requestAnimationFrame);
@@ -619,7 +625,7 @@
     if (count > 0 && !(node && windowState.start === 0 && !fillsViewport(engine, node))) return;
     if (!pagination.canRefill()) return;
     refillPending = true;
-    void requestHistory()
+    void requestFill()
       .then((end) => {
         pagination.exhausted = end;
       })

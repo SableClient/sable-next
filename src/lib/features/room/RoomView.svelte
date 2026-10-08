@@ -764,8 +764,8 @@
     void afterOverlayPops().then(() => goto(target, { reset: false }));
   }
 
-  function requestHistory(): Promise<boolean> {
-    return timeline.paginateBackward(25);
+  function requestHistory(count = 25): Promise<boolean> {
+    return timeline.paginateBackward(count);
   }
 
   async function requestFuture(): Promise<void> {

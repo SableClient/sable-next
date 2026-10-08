@@ -458,6 +458,34 @@ test('fills past several filtered pages until the opening viewport has enough me
   expect(history).toHaveBeenCalledTimes(5);
 });
 
+test('the opening fill asks for larger pages after the first one', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('latest')];
+  const history = vi.fn((_count?: number) => {
+    if (history.mock.calls.length === 3) {
+      roomTimeline.items = [item('older'), ...roomTimeline.items];
+    }
+    return Promise.resolve(false);
+  });
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+  await runAnimationFrames();
+
+  expect(history.mock.calls.map(([count]) => count)).toEqual([undefined, 100, 100]);
+});
+
 test('a reset that leaves one message refills the viewport on its own', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));

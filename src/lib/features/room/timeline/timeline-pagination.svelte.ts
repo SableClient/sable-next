@@ -13,7 +13,7 @@ export class TimelinePagination {
 
   constructor(
     private readonly timeline: () => RoomTimeline,
-    private readonly request: () => Promise<boolean>
+    private readonly request: (count?: number) => Promise<boolean>
   ) {}
 
   observeItems(): void {
@@ -33,10 +33,10 @@ export class TimelinePagination {
     return true;
   }
 
-  requestHistory(): Promise<boolean> {
+  requestHistory(count?: number): Promise<boolean> {
     if (this.#task) return this.#task;
     this.pending = true;
-    this.#task = this.request().finally(() => {
+    this.#task = this.request(count).finally(() => {
       this.pending = false;
       this.#task = null;
     });
