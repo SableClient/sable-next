@@ -113,12 +113,12 @@ windows = { version = "0.62.2", features = [
 ] }
 
 [target."cfg(target_os = \"linux\")".dependencies]
-gtk = "0.18"
+gtk = "0.19"
 webkit2gtk = { version = "2.0", features = ["v2_34"], optional = true }
 tauri-runtime-cef = { version = "0.1.0", git = "https://github.com/SableClient/tauri-runtime-cef", rev = "8b2e630815452da137ac898aee149a8e7663dc61", optional = true }
 # The CEF runtime currently uses the beta.2 drag event API. Keep Cargo from
 # selecting beta.3, which removed its paths and DragMoved payloads.
-winit = { version = "=0.31.0-beta.2", optional = true }
+winit = { version = "=0.31.0-beta.3", optional = true }
 cef = { version = "=151.8.1", optional = true }
 sha2 = { version = "0.11", optional = true }
 # Auto-download stays off: fetching a codec build would make Sable the one
@@ -130,7 +130,7 @@ tikv-jemallocator = { version = "0.7.0", optional = true }
 libloading = "0.9"
 # Ubuntu 22.04's PipeWire headers predate pipewire-rs 0.10's generated bindings.
 # Keep the capture client on the compatible 0.9 series used by the release runner.
-pipewire = "0.9.2"
+pipewire = "0.10.0"
 sable-hdr = { path = "../crates/sable-hdr", version = "0.1.0" }
 zbus = "5"
 
