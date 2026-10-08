@@ -1243,8 +1243,9 @@ test('caps the pills at three and counts the rest', async () => {
     const pills = document.querySelectorAll('header .sender-identity-pronoun');
     expect(pills).toHaveLength(4);
     expect(pills[3].textContent).toBe('+1');
-    expect(pills[3].getAttribute('title')).toBe('it/its (en)');
   });
+  await userEvent.hover(document.querySelectorAll('header .sender-identity-pronoun')[3]);
+  expect(await screen.findByText('it/its (en)')).toBeInTheDocument();
 });
 
 test('a touch long press opens the sheet without also opening the context menu', async () => {
@@ -1527,7 +1528,7 @@ test('a message whose embeds were removed renders none, bundled or found', async
   setPreference('urlPreviews', false);
 });
 
-test('compact layout shows the time alone and keeps the full date in the title (#514)', async () => {
+test('compact layout shows the time alone and keeps the full date in its tooltip (#514)', async () => {
   const lastWeek = { ...item(false), timestamp: Date.now() - 7 * 24 * 60 * 60 * 1000 };
   render(TimelineItemHarness, {
     props: { core, item: { item: lastWeek, collapsed: false, layout: 'compact' } },
@@ -1536,7 +1537,13 @@ test('compact layout shows the time alone and keeps the full date in the title (
 
   const time = document.querySelector('.compact-gutter time');
   expect(time).toHaveTextContent(/^\d{1,2}:\d{2}/);
-  expect(time?.getAttribute('title')).toContain(String(new Date(lastWeek.timestamp).getFullYear()));
+  if (!time) throw new Error('compact layout has no time');
+  await userEvent.hover(time);
+  await vi.waitFor(() => {
+    expect(document.querySelector('[data-tooltip-content]')).toHaveTextContent(
+      String(new Date(lastWeek.timestamp).getFullYear())
+    );
+  });
 });
 
 test('quotes a reply to a membership event as its timeline text', async () => {

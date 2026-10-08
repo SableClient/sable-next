@@ -14,6 +14,7 @@ function setup(change: MembershipChangeView): HTMLElement {
     id: change,
     sender: '@alice:example.org',
     sender_name: 'Alice',
+    timestamp: 1_700_000_000_000,
     content: {
       kind: 'membership',
       user_id: '@bob:example.org',

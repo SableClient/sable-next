@@ -510,7 +510,7 @@ test('a sticker has an emote tooltip that stays hidden with the sticker', async 
   await userEvent.click(screen.getByRole('button', { name: 'Hide Cat sticker' }));
   expect(document.querySelector('.spoilerable-media')).toHaveClass('spoilered');
   await userEvent.hover(screen.getByRole('group', { name: 'Cat sticker' }));
-  expect(document.querySelector('.tooltip')).not.toBeInTheDocument();
+  expect(document.querySelector('.tooltip .emote-card-image')).not.toBeInTheDocument();
   expect(onOpenMedia).not.toHaveBeenCalled();
 });
 

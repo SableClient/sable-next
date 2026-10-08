@@ -126,7 +126,8 @@ test('offers the whole status on hover, since the row truncates it', async () =>
   });
   await mountRow({ showStatus: true });
 
-  expect(await screen.findByText(text)).toHaveAttribute('title', `\u{1F680} ${text}`);
+  await userEvent.setup().hover(await screen.findByText(text));
+  expect(await screen.findByText(`\u{1F680} ${text}`)).toBeInTheDocument();
 });
 
 test('renders a medium presence marker', async () => {
