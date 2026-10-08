@@ -145,6 +145,15 @@
     display: none;
   }
 
+  /* stylelint-disable-next-line selector-class-pattern */
+  .editor :global(img.ProseMirror-separator) {
+    /* stylelint-disable-next-line declaration-no-important */
+    display: inline-block !important;
+    height: 1lh;
+    vertical-align: bottom;
+    width: 0;
+  }
+
   .editor :global(pre[data-language])::before {
     color: var(--surface-var-on-container);
     content: attr(data-language);
