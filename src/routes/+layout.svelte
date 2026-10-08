@@ -43,6 +43,7 @@
     resolveTheme,
   } from '#lib/settings/theme.js';
   import { shouldReduceMotion } from '#lib/ui/motion.js';
+  import { ALERT_MODULES, provideAlertProviders } from '#lib/features/sidebar/alerts.js';
 
   interface Props {
     children: Snippet;
@@ -51,6 +52,8 @@
   let { children }: Props = $props();
   const core = createCoreClient();
   provideCoreClient(core);
+  const alertProviders = ALERT_MODULES.map((component) => component.priorityProvider());
+  provideAlertProviders(alertProviders);
   let systemPrefersDark = $state(false);
   let titlebar = $state<TitleBarKind | null>(null);
 

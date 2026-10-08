@@ -72,7 +72,7 @@
       aria-current={isCurrentPage ? 'page' : undefined}
       draggable="false"
     >
-      <span class="mobile-icon"><Icon /></span>
+      <span class="mobile-icon"><Icon weight={isCurrentPage ? 'fill' : 'regular'} /></span>
       {#if pendingAlerts > 1}
         <UnreadBadge
           class="priority-{mainPriority}"
@@ -104,7 +104,7 @@
               : 'desktop-tool nav-tab-bottom'}"
             aria-label={$i18n.t('nav.alerts')}
           >
-            <Icon />
+            <Icon weight={popoverOpen ? 'fill' : 'regular'} />
             {#if pendingAlerts > 1}
               <UnreadBadge
                 class="priority-{mainPriority}"
