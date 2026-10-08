@@ -1,5 +1,6 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
+  import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import SableBrandMark from '#lib/ui/SableBrandMark.svelte';
   import { ALERT_MODULES, useAlertProviders } from './alerts.js';
 
@@ -12,10 +13,10 @@
     <h3>{$i18n.t('nav.alerts')}</h3>
   </div>
   <div class="banners">
-    {#each ALERT_MODULES as module, index (module.default)}
-      {#if alertProviders[index].priority !== null}
-        <module.default {...alertProviders[index]} />
-      {/if}
+    {#each ALERT_MODULES.filter((_, index) => alertProviders[index].priority !== null) as module, index (module.default)}
+      <module.default {...alertProviders[index]} />
+    {:else}
+      <EmptyState title={$i18n.t('nav.noAlerts')} />
     {/each}
   </div>
 </div>

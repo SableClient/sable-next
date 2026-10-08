@@ -147,7 +147,8 @@
     "folderExpand": "Folder {{name}}",
     "listOptions": "List options",
     "displayOptions": "Sidebar display options",
-    "alerts": "Alerts"
+    "alerts": "Alerts",
+    "noAlerts": "No alerts"
   },
   "inbox": {
     "invitesTab": "Invites",
