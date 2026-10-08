@@ -498,6 +498,24 @@ body {
   height: 100%;
 }
 
+.remove-blur {
+  display: none;
+}
+
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) {
+    .remove-blur {
+      background: var(--surface-container);
+      background-clip: text;
+      display: block;
+      height: 11px;
+      inset: 0 0 auto;
+      pointer-events: none;
+      position: fixed;
+    }
+  }
+}
+
 input,
 textarea,
 [contenteditable],
