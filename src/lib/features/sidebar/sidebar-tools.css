@@ -42,9 +42,10 @@
   width: var(--icon-size-small);
 }
 
-.mobile-icon, .tool-icon {
-    display: flex;
-  }
+.mobile-icon,
+.tool-icon {
+  display: flex;
+}
 
 .mobile-icon svg {
   height: var(--icon-size-large);
