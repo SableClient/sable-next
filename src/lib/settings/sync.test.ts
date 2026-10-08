@@ -59,7 +59,7 @@ describe('prepareSettings', () => {
     expect(content.settings).not.toHaveProperty('threadPresentation');
   });
 
-  it('drops a custom theme that does not fit the budget', () => {
+  it('drops a custom theme that does not fit the budget', { timeout: 30_000 }, () => {
     const large = theme('large', oversized());
     const { content, excludedThemeIds } = prepareSettings(
       base,

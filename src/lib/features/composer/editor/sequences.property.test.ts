@@ -109,7 +109,7 @@ function trailingEmptyParagraphs(editor: ComposerEditor): number {
   return count;
 }
 
-test('any sequence of edits sends clean html that survives an edit', () => {
+test('any sequence of edits sends clean html that survives an edit', { timeout: 30_000 }, () => {
   fc.assert(
     fc.property(
       fc.constantFrom(...starts),

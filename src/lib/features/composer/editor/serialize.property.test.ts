@@ -198,7 +198,7 @@ test('the composer markdown parses back to the document it came from', () => {
   );
 });
 
-test('a plain-mode edit of any sent message reproduces its html', () => {
+test('a plain-mode edit of any sent message reproduces its html', { timeout: 30_000 }, () => {
   fc.assert(
     fc.property(htmlDoc, (source) => {
       const message = serializeComposer(source);

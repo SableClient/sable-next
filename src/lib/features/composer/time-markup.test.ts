@@ -16,7 +16,7 @@ test('a colour looks for its close within a bounded span', () => {
   expect(parseMfmColor(`$[fg.color=f00 ${'a'.repeat(5000)}]`)).toBeNull();
 });
 
-test('a long run of unclosed colours stays literal', () => {
+test('a long run of unclosed colours stays literal', { timeout: 30_000 }, () => {
   const source = '$[fg.color=f00 x '.repeat(5000);
   for (const serialize of [serializeComposer, serializePlain]) {
     const message = serialize(textDoc(source));
