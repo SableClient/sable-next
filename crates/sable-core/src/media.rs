@@ -130,13 +130,13 @@ impl Core {
         let media = media_label(&source);
         let origin = media_origin(&source);
         let mut probe = None;
-        if let Some((server, _)) = &origin {
+        if let Some((server, media_id)) = &origin {
             let now = now_ms();
             let admission = self
                 .media_health
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .admit(server, now);
+                .admit(server, media_id, now);
             match admission {
                 Admission::Refused { retry_after_ms } => {
                     return Err(CommandErr::MediaServerUnavailable { retry_after_ms });
@@ -161,7 +161,7 @@ impl Core {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             match &result {
-                Ok(_) => health.succeeded(server),
+                Ok(_) => health.succeeded(server, media_id),
                 Err(error) if blames_media_server(error) => {
                     health.failed(server, media_id, now_ms());
                 }
