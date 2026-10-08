@@ -132,7 +132,9 @@ jobs:
           find "$dir"/Payload/*.app/Frameworks -maxdepth 2
           find "$dir"/Payload/*.app/Frameworks -type f -perm -u+x -exec file {} \;
           for framework in "$dir"/Payload/*.app/Frameworks/*.framework; do
-            codesign -dvv "$framework" 2>&1 | grep -E 'Identifier|Authority|not signed' || true
+            echo "== $framework"
+            codesign --verify --strict --verbose=4 "$framework" 2>&1 || true
+            codesign -dvvv "$framework" 2>&1 | grep -E 'Identifier|Format|CodeDirectory|flags|Signature|Authority|Sealed|Info.plist|TeamIdentifier' || true
           done
       - name: Upload to App Store Connect
         env:
