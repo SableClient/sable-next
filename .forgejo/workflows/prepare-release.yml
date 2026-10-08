@@ -6,6 +6,9 @@ on:
 
 permissions: {}
 
+env:
+  MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
+
 concurrency:
   group: prepare-release
   cancel-in-progress: true
