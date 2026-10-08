@@ -53,6 +53,7 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
+  import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
 
   import BotCommandForm from './BotCommandForm.svelte';
   import ComposerAttachments from './ComposerAttachments.svelte';
@@ -1131,7 +1132,14 @@
   }
 
   async function outgoing(item: StagedFile): Promise<File> {
-    return stripMetadata(await jpegFromHeic(item.file), item.metadata);
+    const file = await jpegFromHeic(item.file);
+    const upright = await uprightJpeg(file);
+    return stripMetadata(
+      upright === file
+        ? file
+        : new File([upright], file.name, { type: upright.type, lastModified: file.lastModified }),
+      item.metadata
+    );
   }
 
   async function stage(files: File[]): Promise<void> {

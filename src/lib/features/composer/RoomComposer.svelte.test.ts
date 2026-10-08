@@ -338,9 +338,10 @@ test('stages any selected attachment, not only images, and sends it on submit', 
   expect(attachment).not.toHaveBeenCalled();
 
   submit();
-  await tick();
 
-  expect(attachment).toHaveBeenCalledWith('!room:example.org', file, { spoiler: false });
+  await vi.waitFor(() => {
+    expect(attachment).toHaveBeenCalledWith('!room:example.org', file, { spoiler: false });
+  });
 });
 
 test('sends multiple staged files as one gallery', async () => {
