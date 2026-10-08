@@ -916,6 +916,7 @@
     "unsupported": "Unsupported event: {{description}}",
     "newMessages_one": "{{count, number}} new message",
     "newMessages_other": "{{count, number}} new messages",
+    "newMessagesUnknown": "New messages",
     "callInvite": "{{user}} sent a call invitation",
     "verificationRequest": "{{user}} requested verification",
     "malformedEvent": "Could not read event: {{type}}",

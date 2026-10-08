@@ -1047,7 +1047,7 @@
         <span
           >{unreadCount > 0
             ? $i18n.t('timeline.unreadCount', { count: unreadCount })
-            : $i18n.t('timeline.newMessages')}</span
+            : $i18n.t('timeline.newMessagesUnknown')}</span
         >
         <span class="unread-action">{$i18n.t('timeline.jumpToUnread')}</span>
       </Button>
