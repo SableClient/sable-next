@@ -1,3 +1,13 @@
+<script module lang="ts">
+  import { hasContext, setContext } from 'svelte';
+
+  const PROVIDED = Symbol('tooltip-provider');
+
+  export function tooltipProvided(): boolean {
+    return hasContext(PROVIDED);
+  }
+</script>
+
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { Tooltip as BitsTooltip } from 'bits-ui';
@@ -7,6 +17,8 @@
   }
 
   let { children }: Props = $props();
+
+  setContext(PROVIDED, true);
 </script>
 
 <BitsTooltip.Provider

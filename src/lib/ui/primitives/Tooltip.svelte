@@ -3,6 +3,7 @@
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
 
+  import TooltipProvider, { tooltipProvided } from './TooltipProvider.svelte';
   import './tooltip.css';
 
   export type TooltipVariant = 'icon' | 'inline';
@@ -38,6 +39,8 @@
     content,
     children,
   }: Props = $props();
+
+  const provided = tooltipProvided();
 </script>
 
 {#snippet defaultTrigger({ props }: { props: Record<string, unknown> })}
@@ -51,22 +54,30 @@
   </button>
 {/snippet}
 
-<BitsTooltip.Root {open} {disabled}>
-  {#if customAnchor === undefined}
-    <BitsTooltip.Trigger child={trigger ?? defaultTrigger} />
-  {/if}
-  <BitsTooltip.Portal>
-    <BitsTooltip.Content
-      class={multiline ? 'tooltip tooltip-multiline' : 'tooltip'}
-      {side}
-      {align}
-      sideOffset={8}
-      {customAnchor}
-    >
-      {#if content}{@render content()}{:else}{label}{/if}
-    </BitsTooltip.Content>
-  </BitsTooltip.Portal>
-</BitsTooltip.Root>
+{#snippet tooltip()}
+  <BitsTooltip.Root {open} {disabled}>
+    {#if customAnchor === undefined}
+      <BitsTooltip.Trigger child={trigger ?? defaultTrigger} />
+    {/if}
+    <BitsTooltip.Portal>
+      <BitsTooltip.Content
+        class={multiline ? 'tooltip tooltip-multiline' : 'tooltip'}
+        {side}
+        {align}
+        sideOffset={8}
+        {customAnchor}
+      >
+        {#if content}{@render content()}{:else}{label}{/if}
+      </BitsTooltip.Content>
+    </BitsTooltip.Portal>
+  </BitsTooltip.Root>
+{/snippet}
+
+{#if provided}
+  {@render tooltip()}
+{:else}
+  <TooltipProvider>{@render tooltip()}</TooltipProvider>
+{/if}
 
 <style>
   .tooltip-trigger {
