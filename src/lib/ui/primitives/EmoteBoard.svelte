@@ -379,9 +379,11 @@
       // Measure the row width after space is reserved for the scrollbar.
       const measured = size?.inlineSize ?? Number.parseFloat(style.width);
       if (Number.isFinite(measured)) gridWidth = measured;
-      const width = cell.offsetWidth;
+      const bounds = cell.getBoundingClientRect();
+      // Match fractional cell sizes to flex wrapping.
+      const width = bounds.width;
       const gap = Number.parseFloat(style.columnGap) || 0;
-      const row = cell.offsetHeight + (Number.parseFloat(style.marginBottom) || 0);
+      const row = bounds.height + (Number.parseFloat(style.marginBottom) || 0);
       const last = imageMeasure;
       if (last?.tab === tab && last.width === width && last.gap === gap && last.row === row) return;
       imageMeasure = { tab, width, gap, row };
