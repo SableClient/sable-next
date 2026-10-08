@@ -1299,6 +1299,8 @@
   }
 
   .message.highlighted {
+    --message-highlight-duration: 6s;
+
     border-radius: var(--radius);
   }
 
@@ -1361,20 +1363,31 @@
 
   @media (prefers-reduced-motion: no-preference) {
     :global(html:not([data-reduced-motion='on'])) .message.highlighted {
-      animation: jump 6s var(--motion-easing-standard);
+      animation: jump var(--message-highlight-duration) var(--motion-easing-standard);
+    }
+  }
+
+  @keyframes jump-reduced {
+    0% {
+      background-color: var(--primary-container);
+      color: var(--primary-on-container);
+    }
+
+    33%,
+    100% {
+      background-color: transparent;
+      color: inherit;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .message.highlighted {
-      background-color: var(--primary-container);
-      color: var(--primary-on-container);
+      animation: jump-reduced var(--message-highlight-duration) steps(1, end);
     }
   }
 
   :global(html[data-reduced-motion='on']) .message.highlighted {
-    background-color: var(--primary-container);
-    color: var(--primary-on-container);
+    animation: jump-reduced var(--message-highlight-duration) steps(1, end);
   }
 
   @media (width >= 48rem) and (any-hover: hover) and (any-pointer: fine) {
