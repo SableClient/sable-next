@@ -56,7 +56,7 @@ export async function completePushPayload(
 
   const room = `rooms/${encodeURIComponent(roomId)}`;
   const fetched = await request(fetcher, `${room}/event/${encodeURIComponent(eventId)}`);
-  if (fetched.status === 403) {
+  if (fetched.status === 403 || fetched.status === 404) {
     return {
       notification: {
         ...notification,

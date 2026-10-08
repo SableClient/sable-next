@@ -101,6 +101,25 @@ test('an invitation says so rather than reading as a message', () => {
   expect(alert(invite, 'Design crew', true)?.body).toBe('Ada invited you');
 });
 
+test('an invitation whose gateway sends no content still reads as one', () => {
+  const invite = parsedPayload(
+    JSON.stringify({
+      notification: {
+        room_id: '!room:example.org',
+        event_id: '$invite',
+        type: 'm.room.member',
+        membership: 'invite',
+        sender_display_name: 'Ada',
+        user_id: '@me:example.org',
+      },
+    })
+  );
+
+  const shown = alert(invite, 'Design crew', true);
+  expect(shown?.body).toBe('Ada invited you');
+  expect(shown?.invite).toBe(true);
+});
+
 test('a ring reads as a call and asks to be answered', () => {
   const ring = payload({
     room_id: '!room:example.org',
