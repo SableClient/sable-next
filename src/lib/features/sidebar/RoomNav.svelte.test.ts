@@ -1020,3 +1020,58 @@ test('a room whose parent space we are not in offers to join it', async () => {
     expect(joinRoom).toHaveBeenCalledWith('!parent:example.org', ['example.org']);
   });
 });
+
+test('a row options button opens the shared room menu and closes it again', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!first:example.org', name: 'First' }),
+    makeRoom({ room_id: '!second:example.org', name: 'Second' }),
+  ];
+  await mountNav();
+
+  const triggers = screen.getAllByRole('button', { name: 'room.menuLabel' });
+  expect(triggers).toHaveLength(2);
+  expect(screen.queryByRole('menu')).toBeNull();
+
+  const [, second] = triggers;
+  await user.click(second);
+
+  const menu = await screen.findByRole('menu');
+  expect(second).toHaveAttribute('aria-expanded', 'true');
+  await vi.waitFor(() => {
+    expect(core.roomPermissions).toHaveBeenCalledWith('!second:example.org');
+  });
+  expect(within(menu).getByRole('menuitem', { name: /room\.menuSettings/ })).toBeInTheDocument();
+
+  await user.click(second);
+
+  await vi.waitFor(() => {
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+  expect(second).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('closing the rooms section hides read rows without unmounting them', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!read:example.org', name: 'Read', latest_event: latestAt(2) }),
+    makeRoom({
+      room_id: '!unread:example.org',
+      name: 'Unread',
+      unread: 3,
+      latest_event: latestAt(1),
+    }),
+  ];
+  await mountNav();
+  const readRow = row('Read');
+  const heading = screen.getByRole('button', { name: 'nav.rooms' });
+
+  await user.click(heading);
+
+  expect(heading).toHaveAttribute('aria-expanded', 'false');
+  expect(readRow.closest('.room-row-wrap')).toHaveClass('closed-row');
+  expect(row('Unread').closest('.room-row-wrap')).not.toHaveClass('closed-row');
+
+  await user.click(heading);
+
+  expect(row('Read')).toBe(readRow);
+  expect(readRow.closest('.room-row-wrap')).not.toHaveClass('closed-row');
+});
