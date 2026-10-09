@@ -1245,6 +1245,7 @@
   .timeline-content {
     --timeline-foot-height: var(--size-x300);
     --timeline-indicator-size: var(--target-hit);
+    --timeline-scrollbar-size: 0.5rem;
 
     display: flex;
     flex: 1;
@@ -1335,8 +1336,8 @@
   }
 
   .viewport::-webkit-scrollbar {
-    height: 0.5rem;
-    width: 0.5rem;
+    height: var(--timeline-scrollbar-size);
+    width: var(--timeline-scrollbar-size);
   }
 
   .viewport::-webkit-scrollbar-thumb {
@@ -1428,7 +1429,7 @@
     gap: var(--space-200);
     height: var(--timeline-foot-height);
     inset-block-end: 0;
-    inset-inline: 0;
+    inset-inline: 0 var(--timeline-scrollbar-size);
     justify-content: space-between;
     padding: 0 var(--page-gutter);
     position: absolute;
