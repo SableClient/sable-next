@@ -1441,9 +1441,11 @@
   }
 
   .jump-to-latest-motion {
-    inset-inline-end: var(--page-gutter);
+    inset-inline: 0;
     bottom: calc(var(--timeline-foot-height) + var(--space-200));
+    margin-inline: auto;
     position: absolute;
+    width: fit-content;
     z-index: 4;
   }
 
