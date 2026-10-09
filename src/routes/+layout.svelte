@@ -33,6 +33,7 @@
     activeCustomThemeCss,
     activeTweakCss,
     hydrateCatalogThemes,
+    updateCatalogThemes,
     themePreview,
   } from '#lib/settings/custom-themes.svelte.js';
   import {
@@ -63,9 +64,12 @@
       systemPrefersDark = media.matches;
     };
     updateSystemTheme();
-    void hydrateCatalogThemes();
+    void hydrateCatalogThemes().then(updateCatalogThemes);
     const stopListening = on(media, 'change', updateSystemTheme);
     const stopHydrating = on(window, 'online', () => void hydrateCatalogThemes());
+    const stopUpdating = on(document, 'visibilitychange', () => {
+      if (document.visibilityState === 'visible') void updateCatalogThemes();
+    });
 
     if (isTauri()) {
       document.documentElement.dataset.tauriOs = osType();
@@ -84,6 +88,7 @@
     return () => {
       stopListening();
       stopHydrating();
+      stopUpdating();
       stopTrackingKeyboard();
       stopGuardingClicks();
       stopInspectorShortcut();

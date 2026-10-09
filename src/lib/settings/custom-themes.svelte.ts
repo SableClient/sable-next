@@ -199,3 +199,53 @@ async function fillCatalogThemes(): Promise<void> {
   customThemes.tweaks = fill(customThemes.tweaks);
   persist();
 }
+
+const CATALOG_UPDATE_INTERVAL_MS = 6 * 60 * 60_000;
+let lastCatalogUpdate = 0;
+let updating: Promise<void> | null = null;
+
+export function updateCatalogThemes(): Promise<void> {
+  if (updating || Date.now() - lastCatalogUpdate < CATALOG_UPDATE_INTERVAL_MS) {
+    return updating ?? Promise.resolve();
+  }
+  updating = refreshCatalogThemes().finally(() => {
+    updating = null;
+  });
+  return updating;
+}
+
+async function refreshCatalogThemes(): Promise<void> {
+  const installed = [...customThemes.themes, ...customThemes.tweaks].filter(
+    (entry) => entry.css !== '' && entry.source !== undefined && isCatalogReference(entry)
+  );
+  if (installed.length === 0) return;
+
+  const fetched: Record<string, string> = {};
+  await Promise.all(
+    installed.map(async (entry) => {
+      try {
+        fetched[entry.id] = await fetchCatalogFile(entry.source ?? '', true);
+      } catch (error) {
+        console.debug('[sable themes] catalog theme not updated', entry.name, error);
+      }
+    })
+  );
+  if (Object.keys(fetched).length > 0) lastCatalogUpdate = Date.now();
+
+  const refresh = <T extends { id: string; css: string }>(entries: T[]): T[] =>
+    entries.map((entry) => {
+      const css = fetched[entry.id] as string | undefined;
+      return css !== undefined && css !== '' && css !== entry.css ? { ...entry, css } : entry;
+    });
+  const themes = refresh(customThemes.themes);
+  const tweaks = refresh(customThemes.tweaks);
+  if (
+    themes.every((theme, index) => theme === customThemes.themes[index]) &&
+    tweaks.every((tweak, index) => tweak === customThemes.tweaks[index])
+  ) {
+    return;
+  }
+  customThemes.themes = themes;
+  customThemes.tweaks = tweaks;
+  persist();
+}

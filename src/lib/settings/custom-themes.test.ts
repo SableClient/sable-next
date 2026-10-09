@@ -10,6 +10,7 @@ import {
   removeCustomTheme,
   removeCustomTweak,
   replaceCustomThemes,
+  updateCatalogThemes,
 } from './custom-themes.svelte.js';
 
 afterEach(() => {
@@ -93,4 +94,69 @@ test('a failed catalog fetch is retried by the next hydration', async () => {
 
   await hydrateCatalogThemes();
   expect(customThemes.themes[0]?.css).toBe('/* @sable-theme */');
+});
+
+test('an installed catalog theme is refreshed from the catalog and persisted', async () => {
+  const fetchMock = vi.fn(() => Promise.resolve(new Response('/* @sable-theme new */')));
+  vi.stubGlobal('fetch', fetchMock);
+  replaceCustomThemes({
+    themes: [
+      {
+        id: 'night',
+        name: 'Night',
+        kind: 'dark',
+        css: '/* @sable-theme old */',
+        source: CATALOG_THEME,
+      },
+    ],
+    tweaks: [],
+    lightThemeId: null,
+    darkThemeId: 'night',
+    enabledTweakIds: [],
+  });
+
+  await updateCatalogThemes();
+
+  expect(fetchMock).toHaveBeenCalledWith(
+    CATALOG_THEME,
+    expect.objectContaining({ cache: 'no-cache' })
+  );
+  expect(customThemes.themes[0]?.css).toBe('/* @sable-theme new */');
+  expect(localStorage.getItem('sable-custom-themes')).toContain('new');
+
+  await updateCatalogThemes();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test('a failed refresh keeps the installed css and is retried at once', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(Date.now() + 7 * 60 * 60_000);
+  const fetchMock = vi
+    .fn<() => Promise<Response>>()
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce(new Response('/* @sable-theme new */'));
+  vi.stubGlobal('fetch', fetchMock);
+  vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+  replaceCustomThemes({
+    themes: [],
+    tweaks: [
+      { id: 'round', name: 'Round', css: '/* tweak old */', source: CATALOG_THEME },
+      { id: 'mine', name: 'Mine', css: '/* local */' },
+    ],
+    lightThemeId: null,
+    darkThemeId: null,
+    enabledTweakIds: [],
+  });
+
+  try {
+    await updateCatalogThemes();
+    expect(customThemes.tweaks[0]?.css).toBe('/* tweak old */');
+
+    await updateCatalogThemes();
+    expect(customThemes.tweaks[0]?.css).toBe('/* @sable-theme new */');
+    expect(customThemes.tweaks[1]?.css).toBe('/* local */');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
 });

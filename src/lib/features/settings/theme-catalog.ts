@@ -62,10 +62,14 @@ function rows(value: unknown): CatalogRow[] {
   });
 }
 
-export async function fetchCatalogFile(url: string): Promise<string> {
+export async function fetchCatalogFile(url: string, fresh = false): Promise<string> {
   const safe = catalogFileUrl(url);
   if (safe === null) throw new Error('catalog file outside the catalog');
-  const response = await fetch(safe, { credentials: 'omit', referrerPolicy: 'no-referrer', cache });
+  const response = await fetch(safe, {
+    credentials: 'omit',
+    referrerPolicy: 'no-referrer',
+    cache: fresh ? 'no-cache' : cache,
+  });
   if (!response.ok) throw new Error(`catalog file answered ${String(response.status)}`);
   const css = await response.text();
   if (css.length > MAX_THEME_FILE_BYTES) throw new Error('catalog file too large');
