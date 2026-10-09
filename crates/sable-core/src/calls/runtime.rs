@@ -32,7 +32,6 @@ struct PendingKey {
     sender: OwnedUserId,
     device: OwnedDeviceId,
     content: keys::ToDeviceCallEncryptionKeysEventContent,
-    received: u64,
 }
 
 pub(crate) struct State {
@@ -1018,15 +1017,8 @@ fn emit_pending(
                     own: false,
                 },
             );
-        } else if keys::now_ms().saturating_sub(pending.received) < 30_000 {
-            state.pending_keys.push(pending);
         } else {
-            tracing::warn!(
-                sender = %pending.sender,
-                device = %pending.device,
-                known_member = member.is_some(),
-                "dropping a call media key whose member never resolved"
-            );
+            state.pending_keys.push(pending);
         }
     }
 }
@@ -1079,13 +1071,17 @@ fn watch_keys(
                 }
                 let mut state = state.lock().await;
                 if state.pending_keys.len() >= 256 {
-                    state.pending_keys.remove(0);
+                    let dropped = state.pending_keys.remove(0);
+                    tracing::warn!(
+                        sender = %dropped.sender,
+                        device = %dropped.device,
+                        "dropping a call media key whose member never resolved"
+                    );
                 }
                 state.pending_keys.push(PendingKey {
                     sender: event.sender,
                     device,
                     content: event.content,
-                    received: keys::now_ms(),
                 });
                 emit_pending(&core, generation, session, &room_id, &mut state);
             }

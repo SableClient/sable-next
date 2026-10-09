@@ -309,7 +309,6 @@ async fn pending_key_with_a_custom_membership_id_is_emitted() {
             session: super::keys::SessionRef::default(),
             sent_ts: 1,
         },
-        received: super::keys::now_ms(),
     };
     let mut state = State::new(
         member(CallMode::Compatibility, 1, &[]),
@@ -425,7 +424,6 @@ async fn an_element_call_peers_key_is_emitted_on_the_oldest_members_focus() {
             sender: owned_user_id!("@genchu:federated.nexus"),
             device: owned_device_id!("spDmuPm52O"),
             content,
-            received: now,
         }],
         distributor: None,
         own_observed: false,
@@ -445,6 +443,45 @@ async fn an_element_call_peers_key_is_emitted_on_the_oldest_members_focus() {
             if identity == "@genchu:federated.nexus:spDmuPm52O" && id == expected
     ));
     assert!(state.pending_keys.is_empty());
+}
+
+#[tokio::test]
+async fn a_key_whose_member_has_not_resolved_waits_for_the_roster() {
+    use serde_json::json;
+
+    let (core, mut events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    let room_id = owned_room_id!("!call:example.org");
+    let content: super::keys::ToDeviceCallEncryptionKeysEventContent =
+        serde_json::from_value(json!({
+            "keys": {"index": 1, "key": "ag8zYq5ohmf0xrnZrzJ2Bw=="},
+            "room_id": room_id,
+            "member": {"claimed_device_id": "DEVICE"},
+            "session": {"call_id": "", "application": "m.call", "scope": "m.room"},
+            "sent_ts": 1
+        }))
+        .unwrap();
+    let mut state = State::new(
+        member(CallMode::Compatibility, 1, &[]),
+        Vec::new(),
+        super::StickyMemberships::default(),
+        &room_id,
+        false,
+        None,
+        false,
+    );
+    state.pending_keys = vec![super::PendingKey {
+        sender: owned_user_id!("@user:example.org"),
+        device: owned_device_id!("DEVICE"),
+        content,
+    }];
+
+    super::emit_pending(&core, 1, CallSessionId(1), &room_id, &mut state);
+
+    assert_eq!(state.pending_keys.len(), 1);
+    assert_eq!(
+        events.try_recv().unwrap_err(),
+        tokio::sync::mpsc::error::TryRecvError::Empty
+    );
 }
 
 #[tokio::test]
