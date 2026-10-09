@@ -851,7 +851,9 @@ impl Core {
                     room.members(filter).await
                 }
                 .or_failed(self, "room_members")?;
-                self.note_members_loaded(&room_id);
+                if room.are_members_synced() {
+                    self.note_members_loaded(&room_id);
+                }
                 let power_levels = if room.power_levels().await.is_err() {
                     let content = self
                         .room_state_event_content(
