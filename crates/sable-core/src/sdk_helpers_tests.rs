@@ -354,11 +354,11 @@ async fn healthy_space_summary_does_not_fetch_missing_tombstone_state() {
         .await;
     let item = RoomListItem::from(client.get_room(room_id).unwrap());
     let mut cache = HashMap::new();
-    crate::view::enrich_room_fields(
-        &VectorDiff::Set {
+    crate::view::enrich_room_batch(
+        &[VectorDiff::Set {
             index: 0,
             value: item.clone(),
-        },
+        }],
         &mut cache,
     )
     .await;

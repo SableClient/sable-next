@@ -29,7 +29,7 @@ use matrix_sdk::ruma::room::{
 };
 use matrix_sdk::ruma::{
     EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedTransactionId,
-    OwnedUserId, TransactionId, UserId,
+    OwnedUserId, RoomId, TransactionId, UserId,
 };
 use matrix_sdk::ruma::{Int, UInt};
 use matrix_sdk::send_queue::{LocalEcho, LocalEchoContent, RoomSendQueueUpdate};
@@ -290,28 +290,25 @@ fn local_preview(local: &LocalLatestEventValue) -> Option<String> {
 }
 
 /// Resolve current room fields for every emitted item, including reordered rooms.
-pub async fn enrich_room_fields<S: BuildHasher>(
-    diff: &eyeball_im::VectorDiff<RoomListItem>,
+pub async fn enrich_room_batch<S: BuildHasher>(
+    diffs: &[eyeball_im::VectorDiff<RoomListItem>],
     room_cache: &mut HashMap<OwnedRoomId, RoomInfo, S>,
 ) {
-    use eyeball_im::VectorDiff as In;
-
-    let items: Vec<&RoomListItem> = match diff {
-        In::Append { values } | In::Reset { values } => values.iter().collect(),
-        In::PushFront { value }
-        | In::PushBack { value }
-        | In::Insert { value, .. }
-        | In::Set { value, .. } => vec![value],
-        _ => Vec::new(),
-    };
-
-    let lookups = items
+    let lookups = latest_items(diffs)
         .into_iter()
         .map(|item| async move { (item.room_id().to_owned(), room_info(item).await) });
 
     for (room_id, info) in futures_util::future::join_all(lookups).await {
         room_cache.insert(room_id, info);
     }
+}
+
+fn latest_items(diffs: &[eyeball_im::VectorDiff<RoomListItem>]) -> Vec<&RoomListItem> {
+    let mut latest: HashMap<&RoomId, &RoomListItem> = HashMap::new();
+    for item in diffs.iter().flat_map(diff_values) {
+        latest.insert(item.room_id(), item);
+    }
+    latest.into_values().collect()
 }
 
 pub async fn listless_room_summary(room: Room, every_encrypted: bool) -> RoomSummary {
@@ -2316,13 +2313,13 @@ fn diff_values<T>(diff: &eyeball_im::VectorDiff<T>) -> Vec<&T> {
 /// Computed lazily: until something awaits `display_name()` every unnamed room
 /// crosses the wire as `null`.
 pub async fn prime_display_names(diffs: &[eyeball_im::VectorDiff<RoomListItem>]) {
-    for diff in diffs {
-        for item in diff_values(diff) {
-            if item.cached_display_name().is_none() {
-                let _ = item.display_name().await;
-            }
-        }
-    }
+    let missing = latest_items(diffs)
+        .into_iter()
+        .filter(|item| item.cached_display_name().is_none())
+        .map(|item| async move {
+            let _ = item.display_name().await;
+        });
+    futures_util::future::join_all(missing).await;
 }
 
 pub(crate) fn search_hit_view(hit: crate::search::Hit) -> SearchHitView {

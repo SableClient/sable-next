@@ -3071,11 +3071,11 @@ async fn invited_direct_room_summary_is_direct() {
         let item =
             matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
         let mut cache = std::collections::HashMap::new();
-        super::view::enrich_room_fields(
-            &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
+        super::view::enrich_room_batch(
+            &[matrix_sdk_ui::eyeball_im::VectorDiff::Set {
                 index: 0,
                 value: item.clone(),
-            },
+            }],
             &mut cache,
         )
         .await;
@@ -3116,11 +3116,11 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
     let item =
         matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
     let mut cache = std::collections::HashMap::new();
-    super::view::enrich_room_fields(
-        &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
+    super::view::enrich_room_batch(
+        &[matrix_sdk_ui::eyeball_im::VectorDiff::Set {
             index: 0,
             value: item.clone(),
-        },
+        }],
         &mut cache,
     )
     .await;
@@ -3150,11 +3150,11 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
         ),
     ] {
         server.sync_room(&client, update).await;
-        super::view::enrich_room_fields(
-            &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
+        super::view::enrich_room_batch(
+            &[matrix_sdk_ui::eyeball_im::VectorDiff::Set {
                 index: 0,
                 value: item.clone(),
-            },
+            }],
             &mut cache,
         )
         .await;
@@ -3176,11 +3176,11 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
             );
         })
         .await;
-    super::view::enrich_room_fields(
-        &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
+    super::view::enrich_room_batch(
+        &[matrix_sdk_ui::eyeball_im::VectorDiff::Set {
             index: 0,
             value: item.clone(),
-        },
+        }],
         &mut cache,
     )
     .await;
@@ -3206,11 +3206,11 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
     let item =
         matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
     let mut cache = std::collections::HashMap::new();
-    super::view::enrich_room_fields(
-        &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
+    super::view::enrich_room_batch(
+        &[matrix_sdk_ui::eyeball_im::VectorDiff::Set {
             index: 0,
             value: item.clone(),
-        },
+        }],
         &mut cache,
     )
     .await;
@@ -3240,10 +3240,10 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
         .await;
     let item =
         matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
-    super::view::enrich_room_fields(
-        &matrix_sdk_ui::eyeball_im::VectorDiff::PushFront {
+    super::view::enrich_room_batch(
+        &[matrix_sdk_ui::eyeball_im::VectorDiff::PushFront {
             value: item.clone(),
-        },
+        }],
         &mut cache,
     )
     .await;
@@ -3335,11 +3335,11 @@ async fn sliding_sync_room_summary_prefers_avatar_state_over_the_avatar_property
 
         let item = matrix_sdk_ui::room_list_service::RoomListItem::from(room);
         let mut cache = std::collections::HashMap::new();
-        super::view::enrich_room_fields(
-            &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
+        super::view::enrich_room_batch(
+            &[matrix_sdk_ui::eyeball_im::VectorDiff::Set {
                 index: 0,
                 value: item.clone(),
-            },
+            }],
             &mut cache,
         )
         .await;

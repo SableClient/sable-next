@@ -93,9 +93,7 @@ impl Core {
                 }
 
                 view::prime_display_names(&diffs).await;
-                for diff in &diffs {
-                    view::enrich_room_fields(diff, &mut room_cache).await;
-                }
+                view::enrich_room_batch(&diffs, &mut room_cache).await;
                 let every_encrypted = core.every_encrypted_event_pushed().await;
                 core.emit(CoreEvent::RoomListDiff {
                     subscription,
