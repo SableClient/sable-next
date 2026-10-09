@@ -3049,7 +3049,7 @@
     "pickerOffSpace": "No profile in this space",
     "pickerOffGlobal": "No profile",
     "scopeSpace": "This space",
-    "scopeAccount": "Everywhere",
+    "scopeAccount": "Global",
     "scopeLatchRoom": "Room",
     "scopeLatchAccount": "Global",
     "sendingAs": "Sending as {{name}}"
