@@ -1,5 +1,7 @@
 import type { MemberView } from '#src/generated/protocol';
 
+export const MEMBER_RETRY_DELAYS_MS = [2000, 5000, 15_000];
+
 export class RoomMemberLoader {
   members = $state.raw<MemberView[]>([]);
   loading = $state(false);
@@ -26,10 +28,22 @@ export class RoomMemberLoader {
     this.loading = true;
 
     try {
-      const members = await fetchMembers(roomId);
-      if (generation === this.generation) this.members = members;
-    } catch (error) {
-      console.debug('[sable room] members unavailable', error);
+      for (let attempt = 0; ; attempt += 1) {
+        const last = attempt >= MEMBER_RETRY_DELAYS_MS.length;
+        try {
+          const members = await fetchMembers(roomId);
+          if (generation !== this.generation) return;
+          if (members.length > 0 || last) {
+            this.members = members;
+            return;
+          }
+        } catch (error) {
+          console.debug('[sable room] members unavailable', error);
+          if (last) return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, MEMBER_RETRY_DELAYS_MS[attempt]));
+        if (generation !== this.generation) return;
+      }
     } finally {
       if (generation === this.generation) this.loading = false;
     }

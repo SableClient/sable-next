@@ -1,8 +1,8 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import type { MemberView } from '#src/generated/protocol';
 
-import { RoomMemberLoader } from './room-members.svelte';
+import { MEMBER_RETRY_DELAYS_MS, RoomMemberLoader } from './room-members.svelte';
 
 function member(userId: string, displayName: string | null = null): MemberView {
   return {
@@ -25,37 +25,75 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-test('a failed load settles without rejecting and is not retried', async () => {
-  const loader = new RoomMemberLoader();
-  let calls = 0;
-  const fetchMembers = () => {
-    calls += 1;
-    return Promise.reject(new Error('failed'));
-  };
+test('a failed or empty load retries on a backoff, then settles', async () => {
+  vi.useFakeTimers();
+  try {
+    const loader = new RoomMemberLoader();
+    let calls = 0;
+    const fetchMembers = () => {
+      calls += 1;
+      if (calls === 1) return Promise.reject(new Error('failed'));
+      return Promise.resolve(calls === 2 ? [] : [member('@a:b')]);
+    };
 
-  await expect(loader.load('!room:example.org', fetchMembers)).resolves.toBeUndefined();
-  await loader.load('!room:example.org', fetchMembers);
-  await loader.load('!room:example.org', fetchMembers);
+    const load = loader.load('!room:example.org', fetchMembers);
+    await vi.runAllTimersAsync();
+    await expect(load).resolves.toBeUndefined();
 
-  expect(calls).toBe(1);
-  expect(loader.loading).toBe(false);
-  expect(loader.members).toEqual([]);
+    expect(calls).toBe(3);
+    expect(loader.loading).toBe(false);
+    expect(loader.members.map((entry) => entry.user_id)).toEqual(['@a:b']);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
-test('resetting clears the failure so the room can be loaded again', async () => {
-  const loader = new RoomMemberLoader();
-  let calls = 0;
-  const fetchMembers = () => {
-    calls += 1;
-    return calls === 1 ? Promise.reject(new Error('failed')) : Promise.resolve([member('@a:b')]);
-  };
+test('a load that keeps failing gives up after the last retry', async () => {
+  vi.useFakeTimers();
+  try {
+    const loader = new RoomMemberLoader();
+    let calls = 0;
+    const fetchMembers = () => {
+      calls += 1;
+      return Promise.reject(new Error('failed'));
+    };
 
-  await loader.load('!room:example.org', fetchMembers);
-  loader.reset();
-  await loader.load('!room:example.org', fetchMembers);
+    const load = loader.load('!room:example.org', fetchMembers);
+    await vi.runAllTimersAsync();
+    await load;
+    await loader.load('!room:example.org', fetchMembers);
 
-  expect(calls).toBe(2);
-  expect(loader.members.map((entry) => entry.user_id)).toEqual(['@a:b']);
+    expect(calls).toBe(MEMBER_RETRY_DELAYS_MS.length + 1);
+    expect(loader.loading).toBe(false);
+    expect(loader.members).toEqual([]);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test('resetting stops the retries and lets the room load again', async () => {
+  vi.useFakeTimers();
+  try {
+    const loader = new RoomMemberLoader();
+    let calls = 0;
+    const fetchMembers = () => {
+      calls += 1;
+      return calls === 1 ? Promise.reject(new Error('failed')) : Promise.resolve([member('@a:b')]);
+    };
+
+    const first = loader.load('!room:example.org', fetchMembers);
+    await vi.advanceTimersByTimeAsync(0);
+    loader.reset();
+    await vi.runAllTimersAsync();
+    await first;
+    expect(calls).toBe(1);
+
+    await loader.load('!room:example.org', fetchMembers);
+    expect(calls).toBe(2);
+    expect(loader.members.map((entry) => entry.user_id)).toEqual(['@a:b']);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test('a pending member load cannot block or replace the next room', async () => {
