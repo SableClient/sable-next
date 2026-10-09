@@ -3,6 +3,8 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { pushOverride } from '#lib/features/notifications/push-config.js';
+  import { logoutWithPush } from '#lib/features/notifications/web-push.js';
   import { SignOutGuard } from '#lib/features/sidebar/sign-out-guard.svelte.js';
   import SignOutWarningDialog from '#lib/features/sidebar/SignOutWarningDialog.svelte';
   import Button from './primitives/Button.svelte';
@@ -27,7 +29,7 @@
 
   async function logout(): Promise<void> {
     try {
-      await core.logout();
+      await logoutWithPush(core, pushOverride());
       await goto(resolve(core.session ? '/(app)/rooms' : '/(auth)/login'));
     } catch {
       failed = true;
