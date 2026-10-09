@@ -1,6 +1,6 @@
 <script lang="ts">
   import { useCoreClient } from '#lib/core/context.js';
-  import { i18n } from '#lib/i18n.js';
+  import { currentLocale, i18n } from '#lib/i18n.js';
   import { parseJsonObject } from '#lib/json-object.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
@@ -22,7 +22,16 @@
   let sent = $state(false);
   let error = $state<'json' | 'failed' | null>(null);
 
-  let rooms = $derived(roomList.rooms.filter((room) => room.state === 'joined'));
+  let rooms = $derived(
+    roomList.rooms
+      .filter((room) => room.state === 'joined')
+      .map((room) => ({
+        value: room.room_id,
+        label: room.name ?? room.room_id,
+        labelClass: 'literal-label',
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, currentLocale()))
+  );
   let canSend = $derived(roomId !== '' && eventType.trim() !== '' && !sending);
 
   async function send(event: SubmitEvent): Promise<void> {
@@ -58,10 +67,7 @@
     <Select
       id="state-event-room"
       bind:value={roomId}
-      items={[
-        { value: '', label: '' },
-        ...rooms.map((room) => ({ value: room.room_id, label: room.name ?? room.room_id })),
-      ]}
+      items={[{ value: '', label: '' }, ...rooms]}
     />
   </FormField>
 
