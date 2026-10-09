@@ -1617,10 +1617,12 @@
     }
 
     .composer-dock {
+      --composer-band: calc(var(--sidebar-footer-height) - 2 * var(--space-300));
+
       box-sizing: border-box;
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: flex-end;
       margin-block-start: calc(-1 * var(--space-300));
       min-height: var(--sidebar-footer-height);
       padding-block: var(--space-300);

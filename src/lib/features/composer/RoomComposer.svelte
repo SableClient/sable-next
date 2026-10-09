@@ -1471,7 +1471,7 @@
   </Portal>
 {/if}
 
-<div class="composer-stack">
+<div class="composer-stack" class:short={composerShort && !readOnly}>
   {#if readOnly}
     <div class="composer-shell">
       <div class="composer">

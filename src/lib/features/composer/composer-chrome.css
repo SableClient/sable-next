@@ -7,6 +7,12 @@
   width: calc(100% - var(--composer-gutter) - var(--composer-gutter));
 }
 
+.composer-stack.short {
+  --composer-line: calc(var(--target) + 2 * var(--space-100) + 2 * var(--border-width));
+
+  margin-block-end: calc((var(--composer-band, var(--composer-line)) - var(--composer-line)) / 2);
+}
+
 @media (pointer: coarse) {
   .composer-stack {
     --target: var(--control-height-400);
