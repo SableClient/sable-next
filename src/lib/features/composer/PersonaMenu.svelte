@@ -7,11 +7,15 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
+  import ListIcon from 'phosphor-svelte/lib/ListBulletsIcon';
+  import GridIcon from 'phosphor-svelte/lib/SquaresFourIcon';
 
   import type { PersonaSelectionView, PersonaView } from '#src/generated/protocol';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 
   import { i18n } from '#lib/i18n.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { nameColorOnDark, nameColorOnLight } from '#lib/ui/primitives/readable-color.js';
 
@@ -39,7 +43,7 @@
     onDisable,
   }: Props = $props();
   let query = $state('');
-  let grid = $derived(!query);
+  let grid = $derived(preferences.personaGrid && !query);
   let filteredPersonas = $derived(
     personas.filter((persona) => {
       const needle = query.trim().toLocaleLowerCase();
@@ -179,14 +183,33 @@
     {/each}
   </ul>
 
-  <TextInput
-    class="persona-search"
-    bind:value={query}
-    type="search"
-    autocomplete="off"
-    placeholder={$i18n.t('personas.search')}
-    aria-label={$i18n.t('personas.search')}
-  />
+  <div class="persona-toolbar">
+    <TextInput
+      class="persona-search"
+      bind:value={query}
+      type="search"
+      autocomplete="off"
+      placeholder={$i18n.t('personas.search')}
+      aria-label={$i18n.t('personas.search')}
+    />
+
+    {#if !query}
+      <Tooltip label={grid ? $i18n.t('personas.listView') : $i18n.t('personas.gridView')}>
+        {#snippet trigger({ props })}
+          <IconButton
+            {...props}
+            size="small"
+            label={grid ? $i18n.t('personas.listView') : $i18n.t('personas.gridView')}
+            onclick={() => {
+              setPreference('personaGrid', !preferences.personaGrid);
+            }}
+          >
+            {#if preferences.personaGrid}<ListIcon />{:else}<GridIcon />{/if}
+          </IconButton>
+        {/snippet}
+      </Tooltip>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -210,6 +233,17 @@
     flex: 1;
     font: inherit;
     padding: var(--space-200);
+  }
+
+  .persona-toolbar {
+    display: flex;
+    gap: var(--space-200);
+  }
+
+  .persona-toolbar :global(> button) {
+    flex: 0 0 auto;
+
+    --button-height: var(--control-height-400);
   }
 
   .persona-options {

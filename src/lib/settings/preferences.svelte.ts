@@ -260,6 +260,7 @@ export interface Preferences {
   personaProxying: boolean;
   personaLatching: LatchScope;
   personaFallback: boolean;
+  personaGrid: boolean;
 
   sendTypingNotifications: boolean;
   sendReadReceipts: boolean;
@@ -536,6 +537,7 @@ const DEFAULTS: Preferences = {
   personaProxying: false,
   personaLatching: 'off',
   personaFallback: true,
+  personaGrid: true,
 
   sendTypingNotifications: true,
   sendReadReceipts: true,

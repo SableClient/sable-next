@@ -2988,6 +2988,8 @@
   "personas": {
     "title": "Per-Message Profiles",
     "search": "Search profiles",
+    "gridView": "Grid view",
+    "listView": "List view",
     "picker": "Show profile picker in the composer",
     "proxying": "Shorthand triggers",
     "proxyingHint": "The profile trigger wraps a message, for example k:hello.",
