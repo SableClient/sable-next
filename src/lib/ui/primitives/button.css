@@ -32,6 +32,12 @@
   border-width: 0;
 }
 
+@media (pointer: coarse) {
+  .btn:not(.icon-button) {
+    --button-height: var(--control-height-large);
+  }
+}
+
 .btn > svg {
   flex: 0 0 auto;
   height: var(--button-icon-size);

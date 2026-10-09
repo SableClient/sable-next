@@ -463,11 +463,15 @@
   function toggleSpoiler(): void {
     spoilerHidden = !spoilerHidden;
   }
+
+  function withoutTabindex(props: Record<string, unknown>): Record<string, unknown> {
+    return Object.fromEntries(Object.entries(props).filter(([key]) => key !== 'tabindex'));
+  }
 </script>
 
 {#snippet gifImageElement(props: Record<string, unknown>)}
   <img
-    {...props}
+    {...withoutTabindex(props)}
     bind:this={gifImage}
     class={['media-image-content', 'gif-preview-source', { ready: showCanvas }]}
     src={url}
@@ -482,7 +486,7 @@
 
 {#snippet renderImageElement(props: Record<string, unknown>)}
   <img
-    {...props}
+    {...withoutTabindex(props)}
     bind:this={imageElement}
     class={['media-image-content', { tinted }]}
     style:background-color={plate ?? undefined}

@@ -1961,7 +1961,7 @@
     .message-main:has(> .receipt-tail)
     > :global(*):nth-last-child(2) {
     margin-inline-end: max(
-      0,
+      calc(var(--space-100) * 0),
       calc(var(--receipt-reserve) + var(--space-200) - var(--avatar-size-small) - var(--space-250))
     );
   }
