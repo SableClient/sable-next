@@ -22,6 +22,14 @@
 
 .menu-surface.message-menu {
   --menu-max-height: var(--bits-floating-available-height, 100dvh);
+
+  max-width: 16rem;
+}
+
+.menu-surface.message-menu .menu-item > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @keyframes menu-in {
