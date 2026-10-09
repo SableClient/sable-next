@@ -230,6 +230,17 @@ test('clear empties the document and setText refills it', () => {
   expect(editor.isEmpty()).toBe(true);
 });
 
+test('setLines keeps a blank line as a line the caret can reach', () => {
+  const editor = open();
+  editor.setLines('1\n\n2\r\n3');
+
+  const doc = editor.doc();
+  if (!doc) throw new Error('no document');
+  expect(doc.childCount).toBe(1);
+  expect(doc.firstChild?.childCount).toBe(6);
+  expect(serializeComposer(doc).body).toBe('1\n\n2\n3');
+});
+
 describe('document replacement', () => {
   test.each(['one', 'one\ntwo'])('places the selection at the end of %j', (text) => {
     const editor = open();

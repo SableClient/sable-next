@@ -656,7 +656,7 @@
       if (prefilledFor === null && !editor.isEmpty()) preEdit = editor.doc();
       prefilledFor = context.eventId;
       const formatted = formattedForEditing(context.html);
-      if (formatted === null) editor.setText(context.body);
+      if (formatted === null) editor.setLines(context.body);
       else if (richText) editor.setHtml(formatted);
       else editor.setDoc(plainEditDoc(context.body, formatted));
       prefilledDoc = editor.doc();

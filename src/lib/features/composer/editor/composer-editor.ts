@@ -1193,6 +1193,10 @@ export class ComposerEditor {
     this.setDoc(composerSchema.node('doc', null, paragraph.create(null, content)));
   }
 
+  setLines(text: string): void {
+    this.setSource(text.replaceAll(/\r\n?/g, '\n'));
+  }
+
   setText(text: string): void {
     this.setDoc(textDoc(text));
   }
