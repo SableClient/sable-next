@@ -100,10 +100,28 @@
       cancelled = true;
     };
   });
+
+  const blobUrls = new WeakMap<Blob, string>();
+  const createdUrls: string[] = [];
+
+  function blobUrl(blob: Blob | undefined): string | undefined {
+    if (!blob) return undefined;
+    let url = blobUrls.get(blob);
+    if (url === undefined) {
+      url = URL.createObjectURL(blob);
+      blobUrls.set(blob, url);
+      createdUrls.push(url);
+    }
+    return url;
+  }
+
+  $effect(() => () => {
+    for (const url of createdUrls) URL.revokeObjectURL(url);
+  });
 </script>
 
 {#snippet embedVideo(embed: VideoEmbed)}
-  {@const src = embed.video['moe.sable.blob'] && URL.createObjectURL(embed.video['moe.sable.blob'])}
+  {@const src = blobUrl(embed.video['moe.sable.blob'])}
 
   {#if embed.presentation === 'default'}
     <video
@@ -132,8 +150,7 @@
   {#if embed.images.length === 1}
     {@const image = embed.images[0]}
 
-    {@const src =
-      image.image['moe.sable.blob'] && URL.createObjectURL(image.image['moe.sable.blob'])}
+    {@const src = blobUrl(image.image['moe.sable.blob'])}
 
     <img
       class="embed-solo-image"
@@ -145,8 +162,7 @@
   {:else}
     <div class="embed-images">
       {#each embed.images as image (image.image.ref.$link)}
-        {@const src =
-          image.image['moe.sable.blob'] && URL.createObjectURL(image.image['moe.sable.blob'])}
+        {@const src = blobUrl(image.image['moe.sable.blob'])}
 
         {#if src}
           <!-- TODO: it would be hard because these aren't MediaImages but being able to click them to open in full view would be awesome -->
@@ -165,9 +181,7 @@
 {#snippet embedQuote()}
   <div class="embed-quote-record">
     {#if quoteProfile && quote}
-      {@const src =
-        quoteProfile.value.avatar['moe.sable.blob'] &&
-        URL.createObjectURL(quoteProfile.value.avatar['moe.sable.blob'])}
+      {@const src = blobUrl(quoteProfile.value.avatar['moe.sable.blob'])}
 
       <span class="bsky-author">
         <img class="author-avatar" {src} alt="avatar" height="24" width="24" />
@@ -210,9 +224,7 @@
     <a class="bsky-header" href={url} target="_blank" rel="noopener noreferrer">
       <span class="bsky-site">BlueSky</span>
       {#if profile}
-        {@const src =
-          profile.value.avatar['moe.sable.blob'] &&
-          URL.createObjectURL(profile.value.avatar['moe.sable.blob'])}
+        {@const src = blobUrl(profile.value.avatar['moe.sable.blob'])}
 
         <span class="bsky-author">
           <img class="author-avatar" {src} alt="avatar" height="24" width="24" />
