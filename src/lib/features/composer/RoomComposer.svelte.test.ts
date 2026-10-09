@@ -1808,6 +1808,28 @@ function pressInEditor(init: KeyboardEventInit): void {
   void fireEvent.keyDown(editor, init);
 }
 
+test('typing hides the pointer over the composer and a real mouse move shows it again', async () => {
+  setup({ roomId: '!room:example.org' });
+  await tick();
+  const stack = document.querySelector('.composer-stack');
+
+  pressInEditor({ key: 'ArrowLeft' });
+  await tick();
+  expect(stack).not.toHaveClass('pointer-hidden');
+
+  pressInEditor({ key: 'a' });
+  await tick();
+  expect(stack).toHaveClass('pointer-hidden');
+
+  window.dispatchEvent(new MouseEvent('mousemove', { movementX: 0, movementY: 0 }));
+  await tick();
+  expect(stack).toHaveClass('pointer-hidden');
+
+  window.dispatchEvent(new MouseEvent('mousemove', { movementX: 3, movementY: 0 }));
+  await tick();
+  expect(stack).not.toHaveClass('pointer-hidden');
+});
+
 test('the expand button makes the editor taller and keeps focus in it', async () => {
   setup({ roomId: '!room:example.org' });
   await tick();

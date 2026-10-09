@@ -291,6 +291,7 @@
   let afterEl = $state<HTMLElement>();
   let measurerEl = $state<HTMLElement>();
   let multiline = $state(false);
+  let pointerHidden = $state(false);
   const shortLayout = $derived(composerShort && !multiline);
   let layoutFrame: number | undefined;
   let empty = $state(true);
@@ -1464,6 +1465,9 @@
 
 <svelte:window
   onkeydown={handleKeydown}
+  onmousemove={(event) => {
+    if (pointerHidden && (event.movementX !== 0 || event.movementY !== 0)) pointerHidden = false;
+  }}
   ondragstart={markInPageDrag}
   ondragover={handleDragover}
   ondragleave={handleDragleave}
@@ -1482,7 +1486,11 @@
   </Portal>
 {/if}
 
-<div class="composer-stack" class:short={shortLayout && !readOnly}>
+<div
+  class="composer-stack"
+  class:short={shortLayout && !readOnly}
+  class:pointer-hidden={pointerHidden}
+>
   {#if readOnly}
     <div class="composer-shell">
       <div class="composer">
@@ -1561,6 +1569,7 @@
           onkeydown={(event) => {
             stepReply(event);
             stepEdit(event);
+            if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) pointerHidden = true;
           }}
           onsubmit={(event) => {
             event.preventDefault();
