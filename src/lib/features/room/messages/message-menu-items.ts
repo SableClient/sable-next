@@ -40,7 +40,7 @@ export type MessageActions = {
   onCopyText?: () => void;
   copyTextLabel?: string;
   onCopyLink?: () => void;
-  copyLinkLabel?: string;
+  onCopyHref?: () => void;
   onPin?: () => void;
   onBookmark?: () => void;
   onForward?: () => void;
@@ -107,10 +107,18 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       run: actions.onCopyText,
     });
   }
+  if (actions.onCopyHref) {
+    rows.push({
+      key: 'href',
+      label: 'timeline.copyLink',
+      icon: LinkIcon,
+      run: actions.onCopyHref,
+    });
+  }
   if (actions.onCopyLink) {
     rows.push({
       key: 'link',
-      label: actions.copyLinkLabel ?? 'timeline.copyMessageLink',
+      label: 'timeline.copyMessageLink',
       icon: LinkIcon,
       run: actions.onCopyLink,
     });

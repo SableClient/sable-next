@@ -24,6 +24,15 @@ test('message permalinks are labelled separately from body links', () => {
   expect(rows.find((row) => row.key === 'link')?.label).toBe('timeline.copyMessageLink');
 });
 
+test('a link under the cursor adds a row beside the message permalink', () => {
+  const rows = messageMenuRows({ onCopyHref: () => {}, onCopyLink: () => {} });
+
+  expect(rows.map((row) => [row.key, row.label])).toEqual([
+    ['href', 'timeline.copyLink'],
+    ['link', 'timeline.copyMessageLink'],
+  ]);
+});
+
 test('version history sits with the other inspection rows', () => {
   const rows = messageMenuRows({
     onReadReceipts: () => {},

@@ -490,8 +490,7 @@
     const selected = selectedText();
     openMessageMenu.open(item.id, { x: event.clientX, y: event.clientY }, () => ({
       ...withSelectedText(actions, selected),
-      onCopyLink: link ? () => void navigator.clipboard.writeText(link) : actions.onCopyLink,
-      copyLinkLabel: link ? 'timeline.copyLink' : undefined,
+      onCopyHref: link ? () => void navigator.clipboard.writeText(link) : undefined,
     }));
   }
 
