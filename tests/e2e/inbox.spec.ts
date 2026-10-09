@@ -1,4 +1,7 @@
 import { expect, test, GUEST_DISPLAY_NAME, SIGNED_OUT } from './fixtures/test';
+import { registerUser } from './fixtures/continuwuity';
+import { LOGIN_PASSWORD } from './fixtures/loginAccount';
+import { MatrixAdmin } from './fixtures/matrix';
 import { COLD_BOOT_TIMEOUT } from './pages/AppShell';
 
 test.beforeEach(async ({ page }) => {
@@ -30,12 +33,22 @@ test('lists rooms that named us, and opens one', async ({ page, app, admin, gues
 test('filters notifications, and says so when nothing matches', async ({
   page,
   app,
+  homeserver,
   admin,
   guest,
 }) => {
   const roomName = `Filtered ${String(Date.now())}`;
-  const roomId = await guest.createRoom({ name: roomName, invite: [admin.userId] });
+  const third = await registerUser(
+    homeserver.baseUrl,
+    `third-${String(Date.now())}`,
+    LOGIN_PASSWORD
+  );
+  const roomId = await guest.createRoom({
+    name: roomName,
+    invite: [admin.userId, third.userId],
+  });
   await admin.join(roomId);
+  await new MatrixAdmin(homeserver.baseUrl, third.accessToken, third.userId).join(roomId);
   await guest.sendMessage(roomId, `${admin.userId}: over here`, {
     'm.mentions': { user_ids: [admin.userId] },
   });

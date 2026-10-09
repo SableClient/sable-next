@@ -28,11 +28,11 @@ test('typing filters settings by their name across categories', async ({ page })
 });
 
 test('typing matches on the translated description, not just the name', async ({ page }) => {
-  await searchField(page).fill('only the room and sender');
+  await searchField(page).fill('lock screen');
 
   const results = resultsList(page).getByRole('listitem');
   await expect(results).toHaveCount(1);
-  await expect(results.filter({ hasText: 'Show message content' })).toBeVisible();
+  await expect(results.filter({ hasText: 'Show message text' })).toBeVisible();
   await expect(results.filter({ hasText: 'In Notifications' })).toBeVisible();
 });
 
@@ -57,15 +57,12 @@ test('a query matching nothing says so', async ({ page }) => {
 test('activating a result lands in the right category and highlights the setting', async ({
   page,
 }) => {
-  await searchField(page).fill('clear notifications');
+  await searchField(page).fill('clear alerts');
 
-  await resultsList(page)
-    .getByRole('link')
-    .filter({ hasText: 'Clear notifications when read' })
-    .click();
+  await resultsList(page).getByRole('link').filter({ hasText: 'Clear alerts when read' }).click();
 
   await expect(page).toHaveURL(/\/settings\/notifications\?focus=clear-notifications-on-read/);
-  await expect(page.getByRole('switch', { name: 'Clear notifications when read' })).toBeVisible();
+  await expect(page.getByRole('switch', { name: 'Clear alerts when read' })).toBeVisible();
   await expect(page.locator('[data-settings-focus="clear-notifications-on-read"]')).toHaveClass(
     /highlighted/
   );

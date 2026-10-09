@@ -20,7 +20,7 @@ function anyGroup(page: Page, name: string) {
 }
 
 function hit(page: Page, text: RegExp) {
-  return page.locator('.hit').filter({ has: page.locator('.formatted-body', { hasText: text }) });
+  return page.locator('.hit').filter({ has: page.locator('.hit-message', { hasText: text }) });
 }
 
 function marked(page: Page): Promise<string[]> {
@@ -98,7 +98,7 @@ test('a query returns hits grouped by room and opens the message it lands on', a
   await expect(anyGroup(page, 'General')).toBeVisible(INDEXED);
   await expect(anyGroup(page, 'Random')).toBeVisible(INDEXED);
 
-  await results.first().locator('.formatted-body').click();
+  await results.first().locator('.hit-message').click();
   await expect.poll(() => new URL(page.url()).searchParams.get('event')).toMatch(/^\$/);
 });
 

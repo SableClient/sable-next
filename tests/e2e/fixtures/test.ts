@@ -90,7 +90,6 @@ function deepRoomBodies(count = DEEP_ROOM_MESSAGES): string[] {
 }
 
 type Fixtures = {
-  keepUnverifiedBanner: boolean;
   app: AppShell;
   auth: AuthFlow;
   timeline: RoomTimeline;
@@ -160,25 +159,13 @@ async function saveSignedInState(
 const RESIZE_OBSERVER_NOTICE = /^ResizeObserver loop /;
 
 export const test = base.extend<Fixtures, WorkerFixtures>({
-  keepUnverifiedBanner: [false, { option: true }],
-  page: async ({ page, keepUnverifiedBanner }, use) => {
+  page: async ({ page }, use) => {
     const errors: Error[] = [];
     const onError = (error: Error) => {
       if (RESIZE_OBSERVER_NOTICE.test(error.message)) return;
       errors.push(error);
     };
     page.on('pageerror', onError);
-    if (!keepUnverifiedBanner) {
-      await page.addLocatorHandler(
-        page.getByRole('status').filter({ hasText: /not verified/ }),
-        (banner) =>
-          banner
-            .getByRole('button', { name: 'Close' })
-            .click({ timeout: 2000 })
-            .catch(() => undefined),
-        { noWaitAfter: true }
-      );
-    }
     try {
       await use(page);
     } finally {

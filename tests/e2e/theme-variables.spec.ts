@@ -89,11 +89,19 @@ for (const theme of ['light', 'dark'] as const) {
       input.removeAttribute('aria-invalid');
     });
     const mode = page.getByLabel('Light or dark', { exact: true });
-    await expect(mode).toHaveCSS('background-color', 'rgb(16, 16, 32)');
-    await expect(mode).toHaveCSS('color', 'rgb(221, 221, 221)');
+    const switcherTint = await page.evaluate(() => {
+      const probe = document.createElement('div');
+      probe.style.background = 'color-mix(in oklab, rgb(238, 238, 238) 12%, transparent)';
+      document.body.append(probe);
+      const tint = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return tint;
+    });
+    await expect(mode).toHaveCSS('background-color', switcherTint);
+    await expect(mode).toHaveCSS('color', 'rgb(238, 238, 238)');
     await expect
       .soft(page.locator('.settings-section-content').first())
-      .toHaveCSS('color', 'rgb(255, 255, 255)');
+      .toHaveCSS('color', 'rgb(238, 238, 238)');
     await expect
       .soft(page.locator('.dialog-content-settings'))
       .toHaveCSS('box-shadow', 'rgb(18, 52, 86) 0px 4px 26px -6px');

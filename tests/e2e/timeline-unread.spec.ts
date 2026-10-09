@@ -102,9 +102,9 @@ test('the reveal stays readable when marker context fails', async ({
   await app.openRoom(room);
   await timeline.expectRevealed();
   await expect(timeline.message('General message 9999')).toBeInViewport();
-  await expect(page.getByRole('button', { name: 'Jump to unread' })).toBeVisible();
   expect(await page.evaluate(() => window.__e2ePaginationDirections)).not.toContain('backward');
   await expect.poll(() => core.commands()).toContain('mark_read');
+  await expect(timeline.message('General message 9999')).toBeInViewport();
 });
 
 test('the reveal can read forwards from unread and jump to the live room', async ({

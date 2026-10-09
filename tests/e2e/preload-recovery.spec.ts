@@ -14,7 +14,7 @@ test('does not preload a route on hover, but still handles its error when clicke
     const link = document.createElement('a');
     link.href = '/register';
     link.textContent = 'Preload target';
-    document.querySelector('body > div')?.append(link);
+    document.body.append(link);
   });
   const target = page.getByRole('link', { name: 'Preload target' });
   await page.route('**/_app/immutable/nodes/**', (route) => {

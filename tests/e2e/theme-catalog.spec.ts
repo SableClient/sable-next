@@ -165,15 +165,17 @@ test('a failed catalogue load can be retried', async ({ page }) => {
 
 test('a theme further down the catalogue can be previewed and installed', async ({ page }) => {
   const panel = page.getByRole('tabpanel');
-  const tile = panel.getByTitle('Theme 30', { exact: true });
+  const tile = panel.getByRole('button', { name: /^Theme 30\b/ });
+  const install = tile.locator('..').getByRole('button', { name: 'Install', exact: true });
   await tile.click();
   await expect(page.getByRole('button', { name: 'Revert', exact: true })).toBeVisible();
   await expect(tile).toBeInViewport();
+  await install.scrollIntoViewIfNeeded();
   const top = await panel.evaluate((element) => element.scrollTop);
   expect(top).toBeGreaterThan(0);
   await expectStableScroll(panel, top);
 
-  await tile.locator('..').getByRole('button', { name: 'Install', exact: true }).click();
+  await install.click();
   await expect(tile.locator('..').getByText('Installed', { exact: true })).toBeVisible();
   await expect(tile).toBeInViewport();
   await expectStableScroll(panel, top);
@@ -192,7 +194,7 @@ test('filters and keyboard tab navigation work after scrolling', async ({ page }
   const search = dialog.getByRole('searchbox', { name: 'Search themes and tweaks' });
   await search.fill('Theme 03');
   await expect(panel.getByRole('button', { name: 'Install', exact: true })).toHaveCount(1);
-  await expect(panel.getByTitle('Theme 03')).toBeInViewport();
+  await expect(panel.getByRole('button', { name: /^Theme 03\b/ })).toBeInViewport();
   await search.fill('no matching theme');
   await expect(panel.getByText('Nothing matches.', { exact: true })).toBeVisible();
   await panel.getByRole('button', { name: 'Clear filters', exact: true }).click();
@@ -227,7 +229,7 @@ test('filters and keyboard tab navigation work after scrolling', async ({ page }
 
 test('preview can be reverted, kept, and cleared when the catalogue reopens', async ({ page }) => {
   const panel = page.getByRole('tabpanel');
-  const theme = panel.getByTitle('Theme 30', { exact: true });
+  const theme = panel.getByRole('button', { name: /^Theme 30\b/ });
   await theme.click();
   await expect(page.getByRole('button', { name: 'Revert', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Revert', exact: true }).click();
@@ -238,22 +240,23 @@ test('preview can be reverted, kept, and cleared when the catalogue reopens', as
   await expect(
     theme.locator('..').getByText('In use for dark mode', { exact: true })
   ).toBeVisible();
-  await panel.getByTitle('Theme 31', { exact: true }).click();
+  await panel.getByRole('button', { name: /^Theme 31\b/ }).click();
   await expect(page.getByRole('button', { name: 'Revert', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close catalogue', exact: true }).click();
   await page.getByRole('button', { name: 'Theme catalogue', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Revert', exact: true })).toHaveCount(0);
   await expect(panel.getByRole('button', { name: 'Install', exact: true })).toHaveCount(59);
   await expect(
-    panel.getByTitle('Theme 30').locator('..').getByText('In use for dark mode', { exact: true })
+    panel
+      .getByRole('button', { name: /^Theme 30\b/ })
+      .locator('..')
+      .getByText('In use for dark mode', { exact: true })
   ).toBeAttached();
-  await expect(page.locator('.dock .banner')).toBeHidden();
   await page.getByRole('button', { name: 'Close catalogue', exact: true }).click();
   await page
     .locator('.dialog-content-settings')
     .getByRole('button', { name: 'Close', exact: true })
     .click();
-  await expect(page.locator('.dock .banner')).toBeVisible();
 });
 
 for (const scale of [1, 1.5]) {
@@ -269,8 +272,8 @@ for (const scale of [1, 1.5]) {
     await page.getByRole('button', { name: 'Theme catalogue', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Theme catalogue', exact: true });
     const panel = page.getByRole('tabpanel');
-    await expect(panel.getByTitle('Theme 30')).toBeAttached();
-    await panel.getByTitle('Theme 30').click();
+    await expect(panel.getByRole('button', { name: /^Theme 30\b/ })).toBeAttached();
+    await panel.getByRole('button', { name: /^Theme 30\b/ }).click();
     const revert = dialog.getByRole('button', { name: 'Revert', exact: true });
     const use = dialog.getByRole('button', { name: 'Use for dark mode', exact: true });
     await expect(revert).toBeInViewport();

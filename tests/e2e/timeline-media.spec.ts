@@ -315,6 +315,12 @@ for (const mobile of [false, true]) {
     installRoomCore,
   }, testInfo) => {
     await installRoomCore('ready');
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'sable-preferences',
+        JSON.stringify({ urlPreviews: true, encryptedUrlPreviews: true })
+      );
+    });
     await page.setViewportSize(mobile ? NARROW : { width: 1280, height: 900 });
     await app.openRooms();
     await app.openRoomFromList('General');
@@ -829,6 +835,12 @@ test('square article previews use thumbnails while landscape previews stay large
   timeline,
   installRoomCore,
 }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'sable-preferences',
+      JSON.stringify({ urlPreviews: true, encryptedUrlPreviews: true })
+    );
+  });
   await installRoomCore('ready');
   await app.openRoom('!room:example.test');
   await timeline.expectRevealed();

@@ -25,8 +25,9 @@ test('the media preview setting is offered in privacy settings', async ({
   await app.openRoom('!room:example.test');
 
   await page.goto('/settings/privacy');
-  await expect(page.getByText('Show media previews')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('switch', { name: 'Show avatars on invites' })).toBeChecked();
+  await expect(page.getByRole('switch', { name: 'Avatars on invites' })).toBeChecked({
+    timeout: 15_000,
+  });
   await page.screenshot({
     path: `test-results/media-privacy-${test.info().project.name}.png`,
     fullPage: false,

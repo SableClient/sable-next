@@ -175,13 +175,13 @@ test('mobile: a dropdown opens as a sheet of choices', async ({ page, installRoo
   await installRoomCore('ready');
   await page.goto('/settings/appearance');
 
-  await page.getByRole('button', { name: 'Message spacing' }).click();
-  const sheet = page.getByRole('dialog', { name: 'Message spacing' });
-  const choice = sheet.getByRole('radio', { name: 'Roomy' });
+  await page.getByRole('button', { name: 'Room icons' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Room icons' });
+  const choice = sheet.getByRole('radio', { name: 'Never' });
   await choice.click();
 
   await expect(sheet).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Message spacing' })).toContainText('Roomy');
+  await expect(page.getByRole('button', { name: 'Room icons' })).toContainText('Never');
 });
 
 test('mobile: log out is the last row of the section list', async ({ page, installRoomCore }) => {
@@ -197,7 +197,7 @@ test('mobile: log out is the last row of the section list', async ({ page, insta
   expect(row.y).toBeGreaterThan(about.y);
 });
 
-const THEME_FILES = 'https://raw.githubusercontent.com/SableClient/themes/main/';
+const THEME_FILES = 'https://git.sable.moe/SableClient/themes/raw/branch/main/';
 const DRACULA = `/*
 @sable-theme
 name: Dracula
@@ -209,7 +209,7 @@ kind: dark
 async function routeCatalogue(page: Page, requested: string[] = []): Promise<void> {
   await page.route('https://**/*', (route) => {
     const url = route.request().url();
-    if (!url.startsWith('https://raw.githubusercontent.com/')) return route.continue();
+    if (!url.startsWith('https://git.sable.moe/')) return route.continue();
     requested.push(url);
     if (url.endsWith('catalog.json')) {
       return route.fulfill({
@@ -223,7 +223,7 @@ async function routeCatalogue(page: Page, requested: string[] = []): Promise<voi
             {
               basename: 'outside',
               previewUrl: null,
-              fullUrl: 'https://raw.githubusercontent.com/else/where/x.sable.css',
+              fullUrl: 'https://git.sable.moe/else/where/x.sable.css',
             },
           ],
           tweaks: [

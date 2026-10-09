@@ -24,7 +24,7 @@ test('frequently used keeps custom emotes and text reactions inside their cells'
   const recents = page.locator('[data-section="recent"] [role="gridcell"]');
   await expect(recents.first()).toBeVisible();
 
-  await expect(recents.nth(0).locator('.unicode-image')).toHaveCount(1);
+  await expect(recents.nth(0).locator('.unicode-text')).toHaveText('this is a long text reaction');
   const overflowing = await recents.evaluateAll(
     (cells) => cells.filter((cell) => cell.scrollWidth > cell.clientWidth + 1).length
   );

@@ -190,7 +190,7 @@ test('arrow keys move focus through unicode rows that are not mounted yet', asyn
 
 test('unicode search results replace the groups', async ({ page }) => {
   await page.getByRole('searchbox').fill('fire');
-  await expect(page.getByRole('button', { name: /fire/i }).first()).toBeVisible();
+  await expect(page.getByRole('gridcell', { name: /fire/i }).first()).toBeVisible();
   await expect(page.locator('[data-section="people"]')).toHaveCount(0);
   await expect(page.locator('[data-section="search"] [data-cell]').first()).toBeVisible();
 });
@@ -220,7 +220,7 @@ test('sticker rows keep every cell whole on one line', async ({ page }) => {
 
 test('shift-click inserts an emote and keeps the board open', async ({ page }) => {
   const board = page.locator('.composer-board');
-  const inserted = page.locator('.ProseMirror img');
+  const inserted = page.locator('.ProseMirror img:not(.ProseMirror-separator)');
 
   await page.getByRole('button', { name: ':alpha0:', exact: true }).click({ modifiers: ['Shift'] });
   await page.getByRole('button', { name: ':alpha1:', exact: true }).click({ modifiers: ['Shift'] });

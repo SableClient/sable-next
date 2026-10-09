@@ -41,7 +41,7 @@ for (const size of [{}, { pageZoom: 1.5, textScale: 1.5 }]) {
     for (const section of SECTIONS) {
       await page.goto(`/settings/${section}`);
       await expect(page.locator('.settings-scroll')).toBeVisible({ timeout: 30_000 });
-      await page.waitForTimeout(500);
+      await page.evaluate(() => document.fonts.ready);
       const found = await page.evaluate(() => {
         const width = document.documentElement.clientWidth;
         const outside = (node: Element) => node.getBoundingClientRect().right > width + 1;

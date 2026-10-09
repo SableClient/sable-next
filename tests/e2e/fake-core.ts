@@ -1045,7 +1045,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           {
             user_id: '@alice:example.test',
             display_name: 'Alice',
-            avatar_url: null,
+            avatar_url:
+              (window as { __e2eProfilePatch?: Partial<ProfileView> }).__e2eProfilePatch
+                ?.avatar_url ?? null,
             power_level: 100,
             membership: 'join',
             member_ts: null,

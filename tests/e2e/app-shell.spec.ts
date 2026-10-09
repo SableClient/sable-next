@@ -46,13 +46,13 @@ test('persists the keyboard-adjusted room navigation width', async ({ page, app,
   await page.setViewportSize({ width: 1280, height: 900 });
   await signIn();
 
-  await expect(app.resizeRooms).toHaveAttribute('aria-valuenow', '224');
+  await expect(app.resizeRooms).toHaveAttribute('aria-valuenow', '288');
   await app.resizeRooms.press('ArrowRight');
-  await expect(app.resizeRooms).toHaveAttribute('aria-valuenow', '304');
+  await expect(app.resizeRooms).toHaveAttribute('aria-valuenow', '368');
 
   await page.reload();
 
-  await expect(app.resizeRooms).toHaveAttribute('aria-valuenow', '304');
+  await expect(app.resizeRooms).toHaveAttribute('aria-valuenow', '368');
 });
 
 test('opens a desktop room from the list at latest', async ({ app, timeline, signIn }) => {

@@ -29,7 +29,7 @@ test('offers recovery when the core cannot restore the session', async ({
   await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(/\/login\?addAccount=1$/);
-  await expect(page.getByRole('heading', { name: 'Welcome to Sable' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Add account' })).toBeVisible();
 });
 
 test('redirects signed-out protected routes to login', async ({ page }) => {

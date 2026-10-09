@@ -105,7 +105,7 @@ test.describe('mobile reactions', () => {
     await reaction.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true });
     await expect(actions).toHaveCount(0);
 
-    const backdrop = page.locator('.dialog-backdrop-verification');
+    const backdrop = page.locator('.dialog-backdrop');
     await backdrop.dispatchEvent('pointerdown', {
       pointerType: 'touch',
       isPrimary: true,
