@@ -116,7 +116,7 @@ windows = { version = "0.62.2", features = [
 [target."cfg(target_os = \"linux\")".dependencies]
 gtk = "0.18"
 webkit2gtk = { version = "2.0", features = ["v2_34"], optional = true }
-tauri-runtime-cef = { version = "0.1.0", git = "https://github.com/SableClient/tauri-runtime-cef", rev = "8b2e630815452da137ac898aee149a8e7663dc61", optional = true }
+tauri-runtime-cef = { version = "0.1.0", git = "https://github.com/SableClient/tauri-runtime-cef", rev = "47b0dad3689859797c12b59740a9cba998190f30", optional = true }
 # The CEF runtime currently uses the beta.2 drag event API. Keep Cargo from
 # selecting beta.3, which removed its paths and DragMoved payloads.
 winit = { version = "=0.31.0-beta.2", optional = true }
