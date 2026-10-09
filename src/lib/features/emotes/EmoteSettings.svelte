@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
 
   import type { ImagePackView } from '#src/generated/protocol';
@@ -51,6 +52,8 @@
   let failed = $state(false);
   let viewing = $state<string | null>(null);
   let alive = true;
+  let root = $state<HTMLElement | null>(null);
+  let listScroll = 0;
 
   let roomPacks = $derived(packs.filter((pack) => pack.origin === 'room' && pack.room_id !== null));
   let chosen = $derived(selectedAddresses(selection));
@@ -61,6 +64,26 @@
 
   function address(pack: ImagePackView): PackAddress {
     return { roomId: pack.room_id ?? '', stateKey: pack.id };
+  }
+
+  function scroller(): HTMLElement | null {
+    const found = root?.closest('.settings-scroll');
+    return found instanceof HTMLElement ? found : null;
+  }
+
+  async function view(pack: ImagePackView): Promise<void> {
+    listScroll = scroller()?.scrollTop ?? 0;
+    viewing = packAddressKey(address(pack));
+    await tick();
+    const target = scroller();
+    if (target) target.scrollTop = 0;
+  }
+
+  async function backToList(): Promise<void> {
+    viewing = null;
+    await tick();
+    const target = scroller();
+    if (target) target.scrollTop = listScroll;
   }
 
   function isChosen(pack: ImagePackView): boolean {
@@ -162,7 +185,7 @@
 </script>
 
 <AppPageShell title={$i18n.t('settings.emotes')} density="compact" class="emote-settings-page">
-  <div class="emote-settings">
+  <div class="emote-settings" bind:this={root}>
     {#if failed}
       <Alert variant="critical" role="alert">{$i18n.t('emotes.saveFailed')}</Alert>
     {/if}
@@ -172,7 +195,7 @@
         <Button
           size="small"
           onclick={() => {
-            viewing = null;
+            void backToList();
           }}
         >
           <ArrowLeftIcon />
@@ -241,7 +264,7 @@
                     <Button
                       size="small"
                       onclick={() => {
-                        viewing = packAddressKey(address(pack));
+                        void view(pack);
                       }}
                     >
                       {$i18n.t('emotes.view')}
@@ -276,7 +299,12 @@
   }
 
   .viewer-header {
+    background: var(--surface-container);
     display: flex;
+    inset-block-start: 0;
+    padding-block: var(--space-200);
+    position: sticky;
+    z-index: 1;
   }
 
   .room-group {
