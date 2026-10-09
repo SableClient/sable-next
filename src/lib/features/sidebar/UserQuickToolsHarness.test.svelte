@@ -1,17 +1,18 @@
 <script lang="ts">
   import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
   import { provideAlertProviders } from './alerts';
-  import SidebarNav from './SidebarNav.svelte';
+  import UserQuickTools from './UserQuickTools.svelte';
 
   interface Props {
     mobile?: boolean;
+    compact?: boolean;
   }
 
-  let { mobile }: Props = $props();
+  let { mobile, compact }: Props = $props();
 
   provideAlertProviders([]);
 </script>
 
 <TooltipProvider>
-  <SidebarNav {mobile} />
+  <UserQuickTools {mobile} {compact} />
 </TooltipProvider>

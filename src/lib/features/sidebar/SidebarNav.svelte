@@ -44,6 +44,7 @@
     markRoomsRead,
     spacesDescendantRooms,
   } from './nav-rooms.js';
+  import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
 
   interface Props {
     mobile?: boolean;
@@ -52,7 +53,7 @@
   }
 
   const MIN_ROOM_NAV_WIDTH = 50;
-  const COLLAPSED_ROOM_NAV_WIDTH = 190;
+  const COLLAPSED_ROOM_NAV_WIDTH = 230;
   const MAX_ROOM_NAV_WIDTH = 500;
   const ROOM_NAV_WIDTH_STEP = 80;
   const ROOM_NAV_STORAGE_KEY = 'sable-room-navigation-width';
@@ -253,6 +254,7 @@
 <aside class="sidebar">
   {#if mobile}
     <nav class="mobile-navigation" aria-label={$i18n.t('nav.primary')}>
+      <CoreHealthBanner />
       <div class="navigation-main">
         <NavigationRail
           {pathname}

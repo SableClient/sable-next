@@ -53,7 +53,9 @@
   <div class="banner" class:crash={notice.kind === 'crash'} role="alert">
     <p class="message">{notice.text}</p>
     {#if notice.kind === 'crash'}
-      <Button size="small" variant="danger" onclick={reload}>{$i18n.t('common.reload')}</Button>
+      <Button class="reload-button" size="small" variant="danger" onclick={reload}
+        >{$i18n.t('common.reload')}</Button
+      >
     {/if}
   </div>
 {/if}
@@ -62,7 +64,7 @@
   .banner {
     align-items: center;
     background: var(--warn-container);
-    border-block-end: var(--border-width) solid var(--warn-container-line);
+    border-block-start: var(--border-width) solid var(--warn-container-line);
     color: var(--warn-on-container);
     display: flex;
     gap: var(--space-300);
@@ -71,7 +73,6 @@
     justify-content: center;
     padding: calc(var(--space-300) + var(--safe-top)) calc(var(--space-400) + var(--safe-right))
       var(--space-300) calc(var(--space-400) + var(--safe-left));
-    position: fixed;
     z-index: var(--layer-notify);
   }
 
@@ -85,7 +86,8 @@
     margin: 0;
   }
 
-  :global(.btn) {
+  :global(.reload-button) {
+    background-color: var(--crit-container-active);
     flex: none;
   }
 </style>

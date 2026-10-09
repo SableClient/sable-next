@@ -19,7 +19,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async (importOriginal) => ({
 
 import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
 import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
-import UserQuickTools from './UserQuickTools.svelte';
+import UserQuickToolsHarness from './UserQuickToolsHarness.test.svelte';
 
 beforeEach(() => {
   visit('/rooms');
@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 function setup(props: { mobile?: boolean; compact?: boolean } = { mobile: true }): void {
-  render(UserQuickTools, props, { wrapper: TooltipProvider });
+  render(UserQuickToolsHarness, props, { wrapper: TooltipProvider });
 }
 
 test('the mobile bar links navigation and inbox as pages, not overlays', async () => {
@@ -50,8 +50,10 @@ test('the mobile bar keeps a slot per tool', () => {
   setup();
 
   const bar = screen.getByRole('navigation', { name: 'nav.quickTools' });
+  // the fifth tool (alerts) is hidden by default, so slot count is 4
+  // but there are 5 tool elements
   expect(bar.style.getPropertyValue('--mobile-slot-count')).toBe('4');
-  expect(bar.querySelectorAll('.mobile-tool-slot')).toHaveLength(4);
+  expect(bar.querySelectorAll('.mobile-tool-slot')).toHaveLength(5);
 });
 
 test.each([{ compact: false }, { compact: true }])(
@@ -82,7 +84,7 @@ test('the mobile bar marks the profile tab as selected on the profile page', () 
 });
 
 test('the collapsed sidebar leaves message search to the rail', () => {
-  setup({ compact: true });
+  setup({ compact: true, mobile: false });
 
   expect(screen.getByRole('navigation', { name: 'nav.quickTools' })).toHaveClass('compact-tools');
   expect(screen.queryByRole('link', { name: 'nav.search' })).not.toBeInTheDocument();

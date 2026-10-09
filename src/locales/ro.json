@@ -1208,7 +1208,7 @@
     "autoUpdateCheck": "Verifică pentru actualizări automat",
     "autoUpdateCheckHint": "Verifică pentru actualizări în fundal și oferă să o instaleze. Nimic nu este descărcat până când nu accepți. Prin natura ei, asta va întreba un alt server și poate reduce securitatea.",
     "updateBannerTitle": "Există o nouă versiune",
-    "webUpdateBannerBody": "O nouă versiune este accesibilă. Reîncarcă pagina pentru a o folosi.",
+    "webUpdateAlertBody": "O nouă versiune este accesibilă. Reîncarcă pagina pentru a o folosi.",
     "updateBannerBody": "Sable {{version}} poate fi descărcat.",
     "updateBannerProgress": "Se descarcă… {{percent}}%",
     "updateBannerStagedTitle": "Update instalat",

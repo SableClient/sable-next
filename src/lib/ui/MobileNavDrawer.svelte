@@ -18,6 +18,7 @@
   import { BREAKPOINTS } from './breakpoints';
   import { createMediaQuery } from './media-query.svelte';
   import { backToRoomList, goToPage, isRoomSwitch } from '#lib/features/room/room-navigation.js';
+  import CoreHealthBanner from './CoreHealthBanner.svelte';
 
   interface Props {
     children: Snippet;
@@ -42,7 +43,7 @@
       so room-list hydration cannot flash the sidebar over a room. */
   const LIST_INDEX_PATHS = new Set(['/home', '/rooms', '/direct']);
   const BLANK_INDEX_PATHS = new Set(['/home', '/rooms']);
-  const MOBILE_QUICK_TOOLS_PATHS = new Set(['/navigate', '/inbox', '/profile']);
+  const MOBILE_QUICK_TOOLS_PATHS = new Set(['/navigate', '/inbox', '/profile', '/alerts']);
   let pathname = $derived(page.url.pathname);
   let settledPath = $state(page.url.pathname);
   let routeChanging = $derived(pathname !== settledPath && page.params.roomId === undefined);
@@ -298,6 +299,7 @@
       class:with-back-bar={showMobileBackBar}
       inert={panelsOpen && !appLayout.matches}
     >
+      <CoreHealthBanner />
       {#if showMobileBackBar}
         <PanelHeader class="mobile-back-bar" title={pageTitle}>
           {#snippet prefix()}
