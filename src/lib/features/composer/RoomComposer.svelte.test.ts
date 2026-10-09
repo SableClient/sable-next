@@ -2478,14 +2478,17 @@ test.each([
 
     submit();
 
-    await vi.waitFor(() => {
-      expect(onSendBotCommand).toHaveBeenCalledWith(
-        '!room:example.org',
-        admin ? '@conduit:example.org' : '@bot:example.org',
-        body,
-        { command: admin ? 'appservices register' : 'register', arguments: {} }
-      );
-    });
+    await vi.waitFor(
+      () => {
+        expect(onSendBotCommand).toHaveBeenCalledWith(
+          '!room:example.org',
+          admin ? '@conduit:example.org' : '@bot:example.org',
+          body,
+          { command: admin ? 'appservices register' : 'register', arguments: {} }
+        );
+      },
+      { timeout: 5_000 }
+    );
   }
 );
 

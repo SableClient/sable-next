@@ -83,7 +83,7 @@ export function bitrateWindow(
 }
 
 export function averageBitrate(window: readonly VideoStatsSample[]): number | undefined {
-  const first = window[0];
+  const first = window.at(0);
   const last = window.at(-1);
   if (!first || !last || last.timestamp <= first.timestamp) return undefined;
   return ((last.bytes - first.bytes) * 8 * 1000) / (last.timestamp - first.timestamp);
