@@ -94,7 +94,7 @@
         >
         {#if disabled}<CheckIcon />{/if}
       {:else if kind === 'offGlobal'}
-        <Avatar initials="?" size="small" />
+        <Avatar size="small"><ProhibitIcon /></Avatar>
         <span class="persona-option-name">{$i18n.t('personas.pickerOffGlobal')}</span>
         {#if !selected && !disabled}<CheckIcon />{/if}
       {:else}
@@ -137,10 +137,8 @@
                 name={persona.display_name}
                 size="medium"
               />
-            {:else if kind === 'disable'}
+            {:else if kind === 'disable' || kind === 'offGlobal'}
               <Avatar id={null} size="medium" name={label}><ProhibitIcon /></Avatar>
-            {:else if kind === 'offGlobal'}
-              <Avatar id={null} initials="?" size="medium" name={label} />
             {:else}
               <Avatar id={null} initials="?" size="medium" name={label} />
             {/if}
