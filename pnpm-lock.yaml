@@ -222,7 +222,7 @@ importers:
         version: 2.0.5
       deepfilternet3-noise-filter:
         specifier: 1.3.0
-        version: 1.3.0(livekit-client@2.22.3(@types/dom-mediacapture-record@1.0.22))
+        version: 1.3.0(livekit-client@2.22.4(@types/dom-mediacapture-record@1.0.22))
       diff:
         specifier: 9.0.0
         version: 9.0.0
@@ -257,8 +257,8 @@ importers:
         specifier: 1.9.4
         version: 1.9.4
       livekit-client:
-        specifier: 2.22.3
-        version: 2.22.3(@types/dom-mediacapture-record@1.0.22)
+        specifier: 2.22.4
+        version: 2.22.4(@types/dom-mediacapture-record@1.0.22)
       markdown-it:
         specifier: ^15.0.0
         version: 15.0.2
@@ -1258,8 +1258,8 @@ packages:
   '@livekit/mutex@1.1.1':
     resolution: {integrity: sha512-EsshAucklmpuUAfkABPxJNhzj9v2sG7JuzFDL4ML1oJQSV14sqrpTYnsaOudMAw9yOaW53NU3QQTlUQoRs4czw==}
 
-  '@livekit/protocol@1.50.4':
-    resolution: {integrity: sha512-L1uggNQAqyY21smQY8AllyOYbcv9Me9TaxwuLytL1R8ck9nbYPmQLNwEDi3pOFGAMa5F8I2nUi2Jc59W5awxlA==}
+  '@livekit/protocol@1.52.1':
+    resolution: {integrity: sha512-X8DxKlNbzk6Lh+v630+mjdFHSotdAFwIyzxSRSUql2DbTxCnlpa7JsvFGc6Na3mXiex2OFh0iiQtWwOBP0rIYA==}
 
   '@mdx-js/react@3.1.1':
     resolution: {integrity: sha512-f++rKLQgUVYDAtECQ6fn/is15GkEH9+nZPM3MS0RcxVqoTfawHvDlSCH7JbMhAM6uJ32v3eXLvLmLvjGu7PTQw==}
@@ -4043,8 +4043,8 @@ packages:
   linkify-it@6.1.0:
     resolution: {integrity: sha512-wJ/TwpSDTLepCrQoYWYIExIKg5Zchex2Nn5yk2mFnB+6PtdkHtyLx742md9csRjjOnGkKIS/RrbY7l8D6gT9Vw==}
 
-  livekit-client@2.22.3:
-    resolution: {integrity: sha512-jw9zBKXY5Gtr5MZ7vEON3QhMNccuDvYHck1PFSyG1aaateQPqgKZFBMgZkFZaXHIf9RV4MDW5xpTK2b/+qbwOg==}
+  livekit-client@2.22.4:
+    resolution: {integrity: sha512-UJ5K8gqP8uIO+tjhGeF+s6SzgLfxZKPxQjSqzzkF298QNYMnhYmXGQRMMh3GnsfaeswnsHHMSogMeb7SocH2zw==}
     peerDependencies:
       '@types/dom-mediacapture-record': ^1
 
@@ -5929,7 +5929,7 @@ snapshots:
 
   '@livekit/mutex@1.1.1': {}
 
-  '@livekit/protocol@1.50.4':
+  '@livekit/protocol@1.52.1':
     dependencies:
       '@bufbuild/protobuf': 1.10.1
 
@@ -7553,9 +7553,9 @@ snapshots:
 
   deep-is@0.1.4: {}
 
-  deepfilternet3-noise-filter@1.3.0(livekit-client@2.22.3(@types/dom-mediacapture-record@1.0.22)):
+  deepfilternet3-noise-filter@1.3.0(livekit-client@2.22.4(@types/dom-mediacapture-record@1.0.22)):
     dependencies:
-      livekit-client: 2.22.3(@types/dom-mediacapture-record@1.0.22)
+      livekit-client: 2.22.4(@types/dom-mediacapture-record@1.0.22)
 
   deepmerge@4.3.1: {}
 
@@ -8246,10 +8246,10 @@ snapshots:
     dependencies:
       uc.micro: 3.0.0
 
-  livekit-client@2.22.3(@types/dom-mediacapture-record@1.0.22):
+  livekit-client@2.22.4(@types/dom-mediacapture-record@1.0.22):
     dependencies:
       '@livekit/mutex': 1.1.1
-      '@livekit/protocol': 1.50.4
+      '@livekit/protocol': 1.52.1
       '@types/dom-mediacapture-record': 1.0.22
       events: 3.3.0
       jose: 6.2.12

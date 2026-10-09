@@ -67,7 +67,7 @@
     "jsqr": "1.4.0",
     "katex": "0.18.9",
     "leaflet": "1.9.4",
-    "livekit-client": "2.22.3",
+    "livekit-client": "2.22.4",
     "markdown-it": "^15.0.0",
     "matrix-widget-api": "^1.19.0",
     "mdast-util-gfm-strikethrough": "^2.0.0",
