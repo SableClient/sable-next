@@ -19,6 +19,7 @@
   import { stripReplyFallback } from '../members/members.js';
   import MessagePreview from '../messages/MessagePreview.svelte';
   import { opensFrom } from '../messages/message-preview';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     roomId: string;
@@ -95,7 +96,7 @@
       {/snippet}
     </PanelHeader>
 
-    <div class="thread-list-body">
+    <div class="thread-list-body" {@attach scrollHint}>
       {#if roots.length > 0}
         <ul>
           {#each roots as root (root.id)}

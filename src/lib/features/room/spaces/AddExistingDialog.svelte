@@ -13,6 +13,7 @@
   import '#lib/ui/primitives/menu.css';
 
   import { addableChildren, type AddExistingKind } from './add-existing';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     open?: boolean;
@@ -71,7 +72,7 @@
           : $i18n.t('common.noRoomsMatchThatSearch')}
       </p>
     {:else}
-      <ul class="candidates">
+      <ul class="candidates" {@attach scrollHint}>
         {#each candidates as room (room.room_id)}
           {@const checked = selected.includes(room.room_id)}
           <li>

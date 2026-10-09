@@ -42,6 +42,7 @@
   import { galleryItemId } from './media-items.js';
   import { memberName } from '../members/members';
   import { formatDate } from '#lib/ui/date-time.js';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     roomId: string;
@@ -538,6 +539,7 @@
       id="attachments-panel"
       aria-labelledby={`attachments-tab-${kind}`}
       aria-busy={loading}
+      {@attach scrollHint}
     >
       {#if items.length > 0}
         {#each groups as group (group.key)}

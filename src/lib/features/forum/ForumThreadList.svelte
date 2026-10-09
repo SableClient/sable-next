@@ -5,6 +5,7 @@
 
   import type { ForumThread } from './forum-threads';
   import ForumThreadItem from './ForumThreadItem.svelte';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   const MAX_PINNED = 3;
 
@@ -49,7 +50,7 @@
   let otherThreads = $derived(threads.filter((thread) => !pinnedIds.has(thread.id)));
 </script>
 
-<div class="forum-thread-list">
+<div class="forum-thread-list" {@attach scrollHint}>
   {#if threads.length === 0 && !loading}
     <p class="forum-thread-list-empty">{$i18n.t('forum.empty')}</p>
   {:else if threads.length > 0}

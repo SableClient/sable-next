@@ -1,4 +1,5 @@
 <script module lang="ts">
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
   const remembered = { mode: 'agenda' as 'agenda' | 'month', monthStart: null as number | null };
 </script>
 
@@ -438,7 +439,7 @@
   </PanelHeader>
   <RoomBannerStrip {roomId} />
 
-  <div class="calendar-content">
+  <div class="calendar-content" {@attach scrollHint}>
     <div class="calendar-range">
       <div class="calendar-segment" role="group" aria-label={$i18n.t('calendar.view')}>
         <Button

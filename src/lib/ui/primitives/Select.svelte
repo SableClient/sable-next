@@ -12,6 +12,7 @@
   import Switcher, { settingsChoices } from './Switcher.svelte';
   import './form-control.css';
   import './menu.css';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   type Item = {
     value: string;
@@ -147,7 +148,12 @@
       <CaretDownIcon class="select-caret" aria-hidden="true" />
     </BitsSelect.Trigger>
     <BitsSelect.Portal>
-      <BitsSelect.Content sideOffset={4} class="menu-surface select-content" {...overlayLayer()}>
+      <BitsSelect.Content
+        sideOffset={4}
+        class="menu-surface select-content"
+        {...overlayLayer()}
+        {@attach scrollHint}
+      >
         <BitsSelect.Viewport>
           {#each items as item (item.value)}
             <BitsSelect.Item

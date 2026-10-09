@@ -19,6 +19,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   type Kind = ScreenAudioChoice['kind'];
 
@@ -159,7 +160,7 @@
         {:else if apps.length === 0}
           {#if !failed}<p class="state">{$i18n.t('call.screenAudioEmpty')}</p>{/if}
         {:else}
-          <ul>
+          <ul {@attach scrollHint}>
             {#each apps as app (app)}
               <li>
                 <label>

@@ -7,6 +7,7 @@
   import { i18n } from '#lib/i18n.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import ResponsiveDialog from '#lib/ui/primitives/ResponsiveDialog.svelte';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     open?: boolean;
@@ -25,7 +26,7 @@
 
 {#snippet content(desktop: boolean)}
   <h2>{$i18n.t('timeline.reproxyMessage')}</h2>
-  <ul class="reproxy-options" class:dialog={desktop}>
+  <ul class="reproxy-options" class:dialog={desktop} {@attach scrollHint}>
     <li>
       <button
         type="button"

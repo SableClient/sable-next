@@ -15,6 +15,7 @@
   } from '#lib/observability/debug-log.svelte.js';
   import { exportDiagnosticsBundle } from '#lib/observability/export-diagnostics.js';
   import '#lib/ui/primitives/settings-row.css';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   const categories: DebugLogCategory[] = [
     'sync',
@@ -97,7 +98,7 @@
     {#if filtered.length === 0}
       <p class="empty">{$i18n.t('settings.developerLogsEmpty')}</p>
     {:else}
-      <div class="entries" aria-live="polite">
+      <div class="entries" aria-live="polite" {@attach scrollHint}>
         {#each filtered.slice(-200).reverse() as entry (entry.id)}
           <details class={`entry level-${entry.level}`}>
             <summary>

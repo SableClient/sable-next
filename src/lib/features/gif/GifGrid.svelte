@@ -14,6 +14,7 @@
     type GifResult,
     type GifsConfig,
   } from './providers';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     config: GifsConfig;
@@ -98,7 +99,7 @@
   </ul>
 {/snippet}
 
-<div class="gif-grid">
+<div class="gif-grid" {@attach scrollHint}>
   {#if search.loading}
     <div class="gif-note"><Spinner label={$i18n.t('a11y.loading')} /></div>
   {:else if search.failed}

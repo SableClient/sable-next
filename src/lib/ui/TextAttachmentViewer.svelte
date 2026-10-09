@@ -8,6 +8,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   const MAX_HIGHLIGHT_CHARS = 100_000;
   const PREVIEW_LINES = 12;
@@ -142,7 +143,7 @@
         {copied ? $i18n.t('common.copied') : $i18n.t('timeline.copyAll')}
       </Button>
     </header>
-    <div class="text-viewer-scroll">
+    <div class="text-viewer-scroll" {@attach scrollHint}>
       <pre class="text-viewer-body"><code {@attach paint(html)}>{text ?? ''}</code></pre>
     </div>
   </div>

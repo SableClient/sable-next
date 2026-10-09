@@ -7,6 +7,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import '#lib/ui/primitives/menu.css';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     open: boolean;
@@ -63,7 +64,7 @@
   {#if targets.length === 0}
     <p class="empty">{$i18n.t('room.addToSpaceEmpty')}</p>
   {:else}
-    <ul class="targets">
+    <ul class="targets" {@attach scrollHint}>
       {#each targets as space (space.room_id)}
         <li>
           <label class="menu-item target">

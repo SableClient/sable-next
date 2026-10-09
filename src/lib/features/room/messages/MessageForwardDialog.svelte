@@ -8,6 +8,7 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import '#lib/ui/primitives/menu.css';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     open?: boolean;
@@ -63,7 +64,7 @@
     {#if targets.length === 0}
       <p class="empty">{$i18n.t('common.noRoomsMatchThatSearch')}</p>
     {:else}
-      <ul class="targets">
+      <ul class="targets" {@attach scrollHint}>
         {#each targets as room (room.room_id)}
           {@const checked = selected.includes(room.room_id)}
           <li>

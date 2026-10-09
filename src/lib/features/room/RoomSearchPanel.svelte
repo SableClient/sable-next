@@ -10,6 +10,7 @@
   import { PanelWidth, remFromPixels } from '#lib/ui/panel-width.svelte.js';
 
   import SearchView from '../search/SearchView.svelte';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     query: string;
@@ -48,7 +49,7 @@
       </PanelHeaderButton>
     {/snippet}
   </PanelHeader>
-  <div class="room-search-body">
+  <div class="room-search-body" {@attach scrollHint}>
     <SearchView panel initialQuery={query} />
   </div>
 </aside>

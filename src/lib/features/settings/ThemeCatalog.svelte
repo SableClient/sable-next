@@ -27,6 +27,7 @@
     type CatalogEntry,
     type CatalogFilter,
   } from './theme-catalog';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     open?: boolean;
@@ -250,6 +251,7 @@
           role="tabpanel"
           id="catalog-panel-theme"
           aria-labelledby="catalog-tab-theme"
+          {@attach scrollHint}
         >
           <Alert variant="warning"><p>{$i18n.t('settings.themeCatalogTrust')}</p></Alert>
           {#if shownThemes.length > 0}

@@ -36,6 +36,7 @@
   } from './member-listing';
   import { powerTag } from './power-tags';
   import type { PowerLevelTagMap } from '../settings/power-level-tags';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     members: readonly MemberView[];
@@ -248,7 +249,7 @@
     <p class="status">{$i18n.t('timeline.loadingMembers')}</p>
   {:else}
     {#if groups.length > 0}
-      <div class="member-groups">
+      <div class="member-groups" {@attach scrollHint}>
         {#each shown as group (group.key)}
           {@const tag =
             group.level === null

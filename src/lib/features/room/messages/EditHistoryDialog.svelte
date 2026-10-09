@@ -12,6 +12,7 @@
   import FormattedBody from './FormattedBody.svelte';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import { formatMessageTimestamp } from '#lib/ui/date-time.js';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     open?: boolean;
@@ -42,7 +43,7 @@
 {#snippet content(desktop: boolean)}
   <div class="edit-history" class:sheet={!desktop}>
     <h2>{$i18n.t('timeline.editHistoryTitle')}</h2>
-    <ol class="edit-history-versions">
+    <ol class="edit-history-versions" {@attach scrollHint}>
       {#each versions as version, index (version.event_id)}
         <li class="edit-history-version">
           <div class="edit-history-meta">

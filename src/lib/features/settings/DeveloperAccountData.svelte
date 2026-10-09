@@ -9,6 +9,7 @@
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import '#lib/ui/primitives/settings-row.css';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   const core = useCoreClient();
   let types = $state<string[]>([]);
@@ -103,7 +104,7 @@
     {#if types.length === 0}
       <p class="empty">{$i18n.t('settings.developerAccountDataEmpty')}</p>
     {:else}
-      <ul class="event-list">
+      <ul class="event-list" {@attach scrollHint}>
         {#each [...types].sort() as type (type)}
           <li>
             <Button

@@ -15,6 +15,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import FormattedBody from '../messages/FormattedBody.svelte';
   import { topicHtml } from '../topic-html';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     roomId: string;
@@ -150,7 +151,9 @@
       {$i18n.t('join.members', { count: preview.num_joined_members })}
     </p>
     {#if preview.topic}
-      <div class="join-topic"><FormattedBody html={topicHtml(preview.topic)} /></div>
+      <div class="join-topic" {@attach scrollHint}>
+        <FormattedBody html={topicHtml(preview.topic)} />
+      </div>
     {/if}
     {#if failedAction}
       <p role="alert">

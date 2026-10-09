@@ -81,6 +81,7 @@
   import SpaceLobbySection from './SpaceLobbySection.svelte';
   import { SpaceHierarchyLoader } from './space-hierarchy-loader.svelte';
   import { JoinQueue } from './join-queue.svelte';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     space: RoomSummary | null;
@@ -880,7 +881,7 @@
 <DialogFrame bind:open={topicOpen} variant="verification" label={$i18n.t('room.lobbyTopicTitle')}>
   <div class="topic-dialog">
     <h2>{space?.name ?? $i18n.t('nav.space')}</h2>
-    <div class="topic-full">
+    <div class="topic-full" {@attach scrollHint}>
       <FormattedBody html={topicHtml(space?.topic ?? '')} onMatrixLink={openTopicLink} />
     </div>
     <DialogActions>

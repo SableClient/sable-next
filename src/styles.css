@@ -800,3 +800,31 @@ a:not([class]):hover {
     opacity: 0.55;
   }
 }
+
+[data-scroll-more] {
+  --scroll-fade-top: 0px;
+  --scroll-fade-bottom: 0px;
+
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black var(--scroll-fade-top),
+    black calc(100% - var(--scroll-fade-bottom)),
+    transparent
+  );
+  scroll-padding-block: var(--space-500);
+}
+
+@media (forced-colors: active) {
+  [data-scroll-more] {
+    mask-image: none;
+  }
+}
+
+[data-scroll-more~='top'] {
+  --scroll-fade-top: var(--space-500);
+}
+
+[data-scroll-more~='bottom'] {
+  --scroll-fade-bottom: var(--space-500);
+}

@@ -61,6 +61,7 @@
     providePinnedEvents,
   } from '#lib/features/room/timeline/pinned-events.svelte.js';
   import TimelineItem from '#lib/features/room/timeline/TimelineItem.svelte';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     profile: ProfileView;
@@ -721,7 +722,7 @@
             >
           </p>
           {#if draft.extra.length}
-            <div class="extra-list">
+            <div class="extra-list" {@attach scrollHint}>
               {#each draft.extra as field (field.key)}
                 <Button
                   variant={editKey?.original === field.key ? 'primary' : 'ghost'}

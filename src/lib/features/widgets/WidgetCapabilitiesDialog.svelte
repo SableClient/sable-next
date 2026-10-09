@@ -5,6 +5,7 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
   import { capabilityLabel, isSensitiveCapability } from './capabilities.js';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     open?: boolean;
@@ -41,7 +42,7 @@
     <h2>{$i18n.t('widgets.capabilitiesTitle', { name: widgetName })}</h2>
     <p class="explain">{$i18n.t('widgets.capabilitiesExplain')}</p>
 
-    <ul>
+    <ul {@attach scrollHint}>
       {#each requested as capability (capability)}
         {@const sensitive = isSensitiveCapability(capability)}
         <li class:sensitive>

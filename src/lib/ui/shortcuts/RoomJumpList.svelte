@@ -17,6 +17,7 @@
     parseJumpQuery,
     roomDisplayName,
   } from './room-jump.js';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     onSelect: (room: RoomSummary) => void;
@@ -87,6 +88,7 @@
       role="listbox"
       aria-label={$i18n.t('shortcuts.paletteTitle')}
       {@attach keepActiveInView}
+      {@attach scrollHint}
     >
       {#each results as room, index (room.room_id)}
         {@const name = roomDisplayName(room)}

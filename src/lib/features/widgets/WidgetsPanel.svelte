@@ -19,6 +19,7 @@
   import IntegrationManagerDialog from './IntegrationManagerDialog.svelte';
   import WidgetCapabilitiesDialog from './WidgetCapabilitiesDialog.svelte';
   import WidgetFrame from './WidgetFrame.svelte';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     roomId: string;
@@ -177,7 +178,7 @@
       </div>
     {/key}
   {:else}
-    <div class="widgets-list">
+    <div class="widgets-list" {@attach scrollHint}>
       {#if widgets.length === 0}
         <p class="widgets-empty">{$i18n.t('widgets.empty')}</p>
       {/if}

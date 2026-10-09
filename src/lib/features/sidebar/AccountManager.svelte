@@ -38,6 +38,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { AccountDirectory } from './account-directory.svelte.js';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   const core = useCoreClient();
   const accountProfiles = new AccountDirectory(core);
@@ -193,7 +194,7 @@
   >
 {/snippet}
 
-<main class="account-manager" aria-label={$i18n.t('nav.profile')}>
+<main class="account-manager" aria-label={$i18n.t('nav.profile')} {@attach scrollHint}>
   <div class="account-profile">
     <ProfileCard
       variant="sheet"

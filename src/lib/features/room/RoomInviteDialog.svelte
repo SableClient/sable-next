@@ -12,6 +12,7 @@
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import '#lib/ui/primitives/menu.css';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     open: boolean;
@@ -161,7 +162,7 @@
       </FormField>
 
       {#if directory.length > 0}
-        <ul class="suggestions">
+        <ul class="suggestions" {@attach scrollHint}>
           {#each directory as entry (entry.user_id)}
             <li>
               <button

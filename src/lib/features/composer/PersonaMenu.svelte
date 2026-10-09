@@ -1,4 +1,5 @@
 <script lang="ts" module>
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
   export type PersonaScope = 'room' | 'space' | 'account';
 </script>
 
@@ -163,7 +164,7 @@
     {/each}
   </div>
 
-  <ul class="persona-options" class:grid>
+  <ul class="persona-options" class:grid {@attach scrollHint}>
     {#if scope === 'account'}
       {@render (grid ? gridItem : listItem)(null, 'offGlobal')}
     {/if}

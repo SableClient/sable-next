@@ -11,6 +11,7 @@
   import BottomSheet from './BottomSheet.svelte';
   import { setActionMenuSurface } from './action-menu.js';
   import './menu.css';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     open?: boolean;
@@ -89,6 +90,7 @@
         {align}
         {sideOffset}
         {preventScroll}
+        {@attach scrollHint}
       >
         {@render children()}
       </DropdownMenu.Content>

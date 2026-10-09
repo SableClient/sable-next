@@ -4,6 +4,7 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormActions from '#lib/ui/primitives/FormActions.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     open?: boolean;
@@ -26,7 +27,7 @@
 
 <DialogFrame bind:open variant="verification" label={$i18n.t('timeline.sourceTitle')}>
   <h2>{$i18n.t('timeline.sourceTitle')}</h2>
-  <pre class="source">{source}</pre>
+  <pre class="source" {@attach scrollHint}>{source}</pre>
   <FormActions>
     <Button variant="secondary" onclick={copy}>
       {copied ? $i18n.t('common.copied') : $i18n.t('common.copy')}

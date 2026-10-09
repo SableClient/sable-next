@@ -22,6 +22,7 @@
     nameColorOnLight,
     profilePalette,
   } from './readable-color.js';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     displayName: string;
@@ -290,6 +291,7 @@
             role="region"
             aria-labelledby={nameField ? undefined : nameId}
             tabindex="0"
+            {@attach scrollHint}
           >
             {@render children()}
           </div>

@@ -6,6 +6,7 @@
   import TextInput from './TextInput.svelte';
   import './menu.css';
   import type { HTMLInputAttributes } from 'svelte/elements';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   /** Free text is a valid value, so the input always shows `value` itself.
       `label` is the list's display and filter text and must not diverge from it. */
@@ -115,7 +116,7 @@
       {#snippet child({ wrapperProps, props, open })}
         {#if open && filteredItems.length > 0}
           <div {...wrapperProps} {...overlayLayer()} class="combobox-positioner">
-            <div {...props} class="menu-surface combobox-menu">
+            <div {...props} class="menu-surface combobox-menu" {@attach scrollHint}>
               {#each filteredItems as item (item.value)}
                 <BitsCombobox.Item value={item.value} label={item.label} disabled={item.disabled}>
                   {#snippet child({ props })}

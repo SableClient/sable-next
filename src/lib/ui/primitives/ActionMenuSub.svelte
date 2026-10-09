@@ -8,6 +8,7 @@
 
   import BottomSheet from './BottomSheet.svelte';
   import { setActionMenuSurface, useActionMenuSurface } from './action-menu.js';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     label: string;
@@ -62,6 +63,7 @@
         class={['menu-surface', surfaceClass]}
         {...overlayLayer()}
         sideOffset={4}
+        {@attach scrollHint}
       >
         {@render children()}
       </DropdownMenu.SubContent>

@@ -12,6 +12,7 @@
   import { USER_EMOTES_EVENT_TYPE } from './pack-address.js';
   import { normalizeShortcode } from './pack-content.js';
   import { mergedPackContent, uploadCandidates, type EmoteCandidate } from './steal-emotes.js';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     open?: boolean;
@@ -69,7 +70,7 @@
       <Alert variant="critical" role="alert">{$i18n.t('emotes.stealFailed')}</Alert>
     {/if}
 
-    <ul class="candidates">
+    <ul class="candidates" {@attach scrollHint}>
       {#each candidates as candidate (candidate.source)}
         <li>
           <MediaImage source={candidate.source} alt="" width={32} height={32} original />
