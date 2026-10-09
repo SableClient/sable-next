@@ -790,6 +790,25 @@ async fn a_bridge_bot_still_counts_for_one_to_one_push_rules() {
 }
 
 #[tokio::test]
+async fn a_pending_invite_does_not_make_a_room_one_to_one() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!invite:example.org");
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_joined_room(JoinedRoomBuilder::new(room_id).set_room_summary(
+                serde_json::json!({ "m.joined_member_count": 1, "m.invited_member_count": 1 }),
+            ));
+        })
+        .await;
+    let room = client.get_room(room_id).unwrap();
+
+    assert_eq!(room.active_members_count(), 2);
+    assert!(!notifications::uses_direct_push_rules(&room));
+}
+
+#[tokio::test]
 async fn resetting_a_bridged_dm_to_default_does_not_create_a_room_push_rule() {
     use std::collections::BTreeSet;
 
