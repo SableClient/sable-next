@@ -302,6 +302,7 @@ export interface Preferences {
   ringForGroupCalls: boolean;
   alwaysShowCallButton: boolean;
   callScreenPreview: boolean;
+  forceLegacyCalls: boolean;
   incomingCallSound: boolean;
   outgoingRingback: boolean;
   callRingtoneVolume: CallRingtoneVolume;
@@ -579,6 +580,7 @@ const DEFAULTS: Preferences = {
   ringForGroupCalls: false,
   alwaysShowCallButton: false,
   callScreenPreview: true,
+  forceLegacyCalls: false,
   incomingCallSound: true,
   outgoingRingback: true,
   callRingtoneVolume: 'normal',

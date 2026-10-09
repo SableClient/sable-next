@@ -1564,6 +1564,7 @@
       "ringing": "Ringing",
       "callButton": "Call button",
       "callScreens": "Screen sharing",
+      "callCompat": "Compatibility",
       "messageSearch": "Message search"
     },
     "account": "Account",
@@ -2127,6 +2128,7 @@
     "ringForGroupCalls": "Show call screen for groups and voice channels",
     "alwaysShowCallButton": "Show call button in rooms with more than 10 members",
     "callScreenPreview": "Show a shared screen outside the call",
+    "forceLegacyCalls": "Always join calls in legacy mode",
     "incomingCallSound": "In-app incoming call sound",
     "outgoingRingback": "Play a ringing tone while calling",
     "callRingtoneVolume": "Ringtone volume",

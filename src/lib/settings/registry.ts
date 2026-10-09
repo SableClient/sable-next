@@ -1481,6 +1481,7 @@ export const settingsCategories: SettingsCategory[] = [
       { id: 'ringing', name: 'settings.groups.ringing' },
       { id: 'call-button', name: 'settings.groups.callButton' },
       { id: 'call-screens', name: 'settings.groups.callScreens' },
+      { id: 'call-compat', name: 'settings.groups.callCompat' },
     ],
     items: [
       {
@@ -1641,6 +1642,13 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'call-screens',
         icon: MonitorIcon,
         name: 'settings.callScreenPreview',
+        type: 'boolean',
+      },
+      {
+        key: 'forceLegacyCalls',
+        section: 'call-compat',
+        icon: PhoneIcon,
+        name: 'settings.forceLegacyCalls',
         type: 'boolean',
       },
     ],

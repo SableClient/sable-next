@@ -27,7 +27,7 @@ import { commandErrorCode } from './command-error';
 import { CallTelemetry } from './call-telemetry';
 import { cameraVisible, screenShareVisible, type CallPin } from './call-layout';
 import { participantKeys } from './participant-keys';
-import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 import { DEVICE_PREFERENCE } from './devices';
 import type { CallBackendGrant, CallRemoteVideoOverlay, CallVideoOverlay } from './call-transport';
 
@@ -263,7 +263,7 @@ export class CallSession {
         this.#client.commands.joinCall(
           roomId,
           serviceUrl,
-          hasNativeCalls() ? 'legacy' : null,
+          hasNativeCalls() || preferences.forceLegacyCalls ? 'legacy' : null,
           media.camera ? 'video' : 'audio'
         )
       );
