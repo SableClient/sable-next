@@ -190,12 +190,7 @@ impl Core {
                 let mut alerted_events = std::collections::HashSet::new();
                 while let Some((notification, room)) = pending.recv().await {
                     let Notification { event, actions } = notification;
-                    let every_encrypted = match core.push_rules().await {
-                        Ok(rules) => {
-                            crate::push_rules::pushes_every_encrypted_event(&rules.snapshot().await)
-                        }
-                        Err(_) => notifications::every_encrypted_event_pushed(&client).await,
-                    };
+                    let every_encrypted = core.every_encrypted_event_pushed().await;
                     if let RawAnySyncOrStrippedTimelineEvent::Sync(raw) = &event
                         && !(every_encrypted && notifications::raw_is_encrypted(raw))
                     {

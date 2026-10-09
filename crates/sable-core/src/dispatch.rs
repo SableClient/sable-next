@@ -1271,10 +1271,11 @@ impl Core {
 
             Command::ReplacedRooms => {
                 let client = self.client().await?;
+                let every_encrypted = self.every_encrypted_event_pushed().await;
                 let mut rooms = Vec::new();
                 for room in client.joined_rooms() {
                     if room.is_tombstoned() {
-                        rooms.push(view::listless_room_summary(room).await);
+                        rooms.push(view::listless_room_summary(room, every_encrypted).await);
                     }
                 }
                 Ok(CommandOk::ReplacedRooms { rooms })
@@ -1324,7 +1325,11 @@ impl Core {
             Command::RoomSummary { room_id } => {
                 let room = self.room(&room_id).await?;
                 Ok(CommandOk::RoomSummary {
-                    room: view::listless_room_summary(room).await,
+                    room: view::listless_room_summary(
+                        room,
+                        self.every_encrypted_event_pushed().await,
+                    )
+                    .await,
                 })
             }
 

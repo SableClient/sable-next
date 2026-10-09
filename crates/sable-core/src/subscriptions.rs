@@ -96,10 +96,7 @@ impl Core {
                 for diff in &diffs {
                     view::enrich_room_fields(diff, &mut room_cache).await;
                 }
-                let every_encrypted = match core.client().await {
-                    Ok(client) => crate::notifications::every_encrypted_event_pushed(&client).await,
-                    Err(_) => false,
-                };
+                let every_encrypted = core.every_encrypted_event_pushed().await;
                 core.emit(CoreEvent::RoomListDiff {
                     subscription,
                     diffs: diffs

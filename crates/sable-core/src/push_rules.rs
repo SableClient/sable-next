@@ -72,6 +72,10 @@ impl PushRules {
         self.rules.read().await.clone()
     }
 
+    pub async fn pushes_every_encrypted_event(&self) -> bool {
+        pushes_every_encrypted_event(&*self.rules.read().await)
+    }
+
     #[must_use]
     pub fn subscribe(&self) -> broadcast::Receiver<()> {
         self.changes.subscribe()

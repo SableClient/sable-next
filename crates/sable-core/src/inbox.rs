@@ -487,7 +487,7 @@ impl Core {
             .await
             .or_failed(self, "inbox_memberships")?;
         let stored = load(&client).await?;
-        let every_encrypted = notifications::every_encrypted_event_pushed(&client).await;
+        let every_encrypted = self.every_encrypted_event_pushed().await;
         let candidates = backfill_candidates(&client, &stored, include_read).await?;
         drop(stored);
 

@@ -659,6 +659,13 @@ impl Core {
         Ok(rules)
     }
 
+    pub(crate) async fn every_encrypted_event_pushed(&self) -> bool {
+        match self.push_rules().await {
+            Ok(rules) => rules.pushes_every_encrypted_event().await,
+            Err(_) => false,
+        }
+    }
+
     pub(crate) async fn sync_service(
         &self,
     ) -> Result<Arc<matrix_sdk_ui::sync_service::SyncService>, CommandErr> {

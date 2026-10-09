@@ -314,8 +314,7 @@ pub async fn enrich_room_fields<S: BuildHasher>(
     }
 }
 
-pub async fn listless_room_summary(room: Room) -> RoomSummary {
-    let every_encrypted = crate::notifications::every_encrypted_event_pushed(&room.client()).await;
+pub async fn listless_room_summary(room: Room, every_encrypted: bool) -> RoomSummary {
     let item = RoomListItem::from(room);
     let cache = HashMap::from([(item.room_id().to_owned(), room_info(&item).await)]);
     room_summary(&item, &cache, every_encrypted)
