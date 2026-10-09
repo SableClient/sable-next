@@ -504,7 +504,7 @@ impl Core {
         }
     }
 
-    pub(crate) async fn end_all_calls(&self) {
+    pub async fn end_all_calls(&self) {
         let calls: Vec<CallSession> = self
             .call_sessions
             .lock()

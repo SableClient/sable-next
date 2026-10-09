@@ -96,7 +96,7 @@ struct SinkState {
 }
 
 impl EventSink {
-    fn replace(&self, channel: Channel<Vec<CoreEvent>>) {
+    fn replace(&self, channel: Channel<Vec<CoreEvent>>) -> bool {
         let mut state = self
             .0
             .lock()
@@ -106,7 +106,7 @@ impl EventSink {
             let tail = pending.split_off(pending.len().min(EVENT_BATCH_LIMIT));
             let _ = channel.send(std::mem::replace(&mut pending, tail));
         }
-        state.channel = Some(channel);
+        state.channel.replace(channel).is_some()
     }
 
     fn send(&self, events: Vec<CoreEvent>) {
@@ -323,7 +323,10 @@ async fn upload_media_base64(
     reason = "tauri extracts command state by value"
 )]
 fn subscribe_events(state: State<'_, AppState>, channel: Channel<Vec<CoreEvent>>) {
-    state.event_sink.replace(channel);
+    if state.event_sink.replace(channel) {
+        let core = state.core.clone();
+        tauri::async_runtime::spawn(async move { core.end_all_calls().await });
+    }
 }
 
 #[tauri::command]
@@ -1035,8 +1038,8 @@ mod tests {
         });
 
         let sink = EventSink::default();
-        sink.replace(first);
-        sink.replace(second);
+        assert!(!sink.replace(first));
+        assert!(sink.replace(second));
         sink.send(vec![CoreEvent::SessionEnded {
             reason: "test".to_owned(),
         }]);
