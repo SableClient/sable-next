@@ -5,6 +5,11 @@
   import { ALERT_MODULES, useAlertProviders } from './alerts.js';
 
   const alertProviders = useAlertProviders();
+  const activeAlerts = $derived(
+    ALERT_MODULES.map((module, index) => ({ module, provider: alertProviders[index] })).filter(
+      ({ provider }) => provider.priority !== null
+    )
+  );
 </script>
 
 <div class="alert-list">
@@ -13,8 +18,8 @@
     <h3>{$i18n.t('nav.alerts')}</h3>
   </div>
   <div class="banners">
-    {#each ALERT_MODULES.filter((_, index) => alertProviders[index].priority !== null) as module, index (module.default)}
-      <module.default {...alertProviders[index]} />
+    {#each activeAlerts as { module, provider } (module.default)}
+      <module.default {...provider} />
     {:else}
       <EmptyState title={$i18n.t('nav.noAlerts')} />
     {/each}
