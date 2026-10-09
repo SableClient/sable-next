@@ -79,8 +79,8 @@ export function issuePlatformOption(nativePlatform: string | undefined): string 
   return nativePlatform === undefined ? 'Web' : (ISSUE_PLATFORMS[nativePlatform] ?? '');
 }
 
-export async function issueBuildInfo(): Promise<{ build: string; platform: string }> {
-  if (!isTauri()) return { build: 'web', platform: issuePlatformOption(undefined) };
+export async function issuePlatform(): Promise<string> {
+  if (!isTauri()) return issuePlatformOption(undefined);
   const { platform } = await import('@tauri-apps/plugin-os');
-  return { build: 'app', platform: issuePlatformOption(platform()) };
+  return issuePlatformOption(platform());
 }

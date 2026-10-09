@@ -3,9 +3,13 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { forgeIssueUrl, openForgeIssueUrl } from '#lib/features/bug-report/forge.js';
+  import {
+    forgeIssueUrl,
+    issueEnvironment,
+    openForgeIssueUrl,
+  } from '#lib/features/bug-report/forge.js';
   import { i18n } from '#lib/i18n.js';
-  import { issueBuildInfo } from '#lib/platform/diagnostics.js';
+  import { describePlatform, issuePlatform } from '#lib/platform/diagnostics.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
 
@@ -22,13 +26,11 @@
   async function reportOnForge(): Promise<void> {
     const error = page.error;
     if (!error) return;
-    const { build, platform } = await issueBuildInfo();
+    const [platforms, os] = await Promise.all([issuePlatform(), describePlatform()]);
     const url = forgeIssueUrl('bug', `Crash: ${error.message}`, {
       description: error.message,
-      platforms: platform,
-      info: [`build: ${build}`, `version: v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`].join(
-        '\n'
-      ),
+      platforms,
+      info: issueEnvironment(os),
       context: [details.trim(), '```', error.stack ?? error.message, '```']
         .filter(Boolean)
         .join('\n'),

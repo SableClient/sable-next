@@ -5,12 +5,13 @@
     type ForgeIssue,
     type ReportType,
     forgeIssueUrl,
+    issueEnvironment,
     openForgeIssueUrl,
     searchForgeIssues,
   } from '#lib/features/bug-report/forge.js';
   import { i18n } from '#lib/i18n.js';
   import { debugLog, exportDebugLogs } from '#lib/observability/debug-log.svelte.js';
-  import { describePlatform } from '#lib/platform/diagnostics.js';
+  import { describePlatform, issuePlatform } from '#lib/platform/diagnostics.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
@@ -28,6 +29,7 @@
 
   let { onDone }: Props = $props();
   let platform = $state('unknown');
+  let platformOption = $state('');
   let type = $state<ReportType>('bug');
   let title = $state('');
   let description = $state('');
@@ -73,6 +75,7 @@
 
   onMount(() => {
     void describePlatform().then((value) => (platform = value));
+    void issuePlatform().then((value) => (platformOption = value));
   });
 
   onDestroy(() => {
@@ -84,10 +87,12 @@
     const fields: Record<string, string> =
       type === 'bug'
         ? {
-            description,
+            description: [description.trim(), expectedBehavior.trim()]
+              .filter(Boolean)
+              .join('\n\nExpected:\n'),
             reproduction,
-            'expected-behavior': expectedBehavior,
-            info: `- OS: ${platform}\n- Browser: ${userAgent}\n- Sable: ${version}`,
+            platforms: platformOption,
+            info: issueEnvironment(platform),
             context,
           }
         : { problem, solution, alternatives, context };

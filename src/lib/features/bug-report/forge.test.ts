@@ -2,7 +2,7 @@
 
 import { expect, test, vi } from 'vitest';
 
-import { forgeIssueUrl, openForgeIssueUrl, searchForgeIssues } from './forge.js';
+import { forgeIssueUrl, issueEnvironment, openForgeIssueUrl, searchForgeIssues } from './forge.js';
 
 const { openExternalUrl, opensExternalUrls } = vi.hoisted(() => ({
   openExternalUrl: vi.fn<(url: string) => Promise<void>>(),
@@ -57,4 +57,11 @@ test('the shell opens the issue, and the browser takes over when it refuses', as
   expect(open).toHaveBeenCalledOnce();
 
   vi.unstubAllGlobals();
+});
+
+test('names the OS, browser and Sable version for the environment field', () => {
+  const info = issueEnvironment('linux 6.9 (x86_64)').split('\n');
+  expect(info[0]).toBe('- OS: linux 6.9 (x86_64)');
+  expect(info[1]).toBe(`- Browser: ${navigator.userAgent}`);
+  expect(info[2]).toMatch(/^- Sable: v/);
 });
