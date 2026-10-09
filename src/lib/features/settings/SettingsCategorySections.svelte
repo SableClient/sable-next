@@ -21,9 +21,10 @@
 
   interface Props {
     category: SettingsCategory;
+    onRangeDraft?: (key: string, value: number | null) => void;
   }
 
-  let { category }: Props = $props();
+  let { category, onRangeDraft }: Props = $props();
 
   const items = $derived(
     category.items.filter((setting) => setting.supported?.() !== false && setting.panel !== true)
@@ -114,9 +115,11 @@
               label={$i18n.t(setting.name)}
               value={preferences[key]}
               oninput={(value) => {
-                if (!setting.applyOnCommit) setPreference(key, value);
+                if (setting.applyOnCommit) onRangeDraft?.(key, value);
+                else setPreference(key, value);
               }}
               oncommit={(value) => {
+                onRangeDraft?.(key, null);
                 if (setting.applyOnCommit) setPreference(key, value);
                 setting.onChange?.(value);
               }}

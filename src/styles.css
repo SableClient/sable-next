@@ -428,19 +428,7 @@ html {
   --font-family: 'Nunito Variable', var(--font-family-emoji), sans-serif;
   --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, monospace;
 
-  /* Typography scale */
-  --font-size-x-small: calc(0.75rem * var(--text-scale));
-  --font-size-small: calc(0.75rem * var(--text-scale));
-  --font-size-label: calc(0.875rem * var(--text-scale));
-  --font-size-body: calc(0.9375rem * var(--text-scale));
-  --font-size-subheading: calc(1rem * var(--text-scale));
-  --font-size-heading: calc(1.125rem * var(--text-scale));
-  --font-size-display: calc(2rem * var(--text-scale));
-  --font-size-emoji-display: calc(2.1875rem * var(--text-scale));
-  --font-size-editor: calc(1rem * var(--text-scale));
-
   /* Line heights */
-  --line-height-small: calc(1.25rem * var(--text-scale));
   --line-height-body: 1.5;
   --line-height-heading: 1.2;
 
@@ -469,6 +457,21 @@ html {
   --edge-inset-top: 0px;
   --edge-inset-bottom: 0px;
   --sheet-inset-bottom: 0px;
+}
+
+:root,
+.text-scale-scope {
+  /* Typography scale */
+  --font-size-x-small: calc(0.75rem * var(--text-scale));
+  --font-size-small: calc(0.75rem * var(--text-scale));
+  --font-size-label: calc(0.875rem * var(--text-scale));
+  --font-size-body: calc(0.9375rem * var(--text-scale));
+  --font-size-subheading: calc(1rem * var(--text-scale));
+  --font-size-heading: calc(1.125rem * var(--text-scale));
+  --font-size-display: calc(2rem * var(--text-scale));
+  --font-size-emoji-display: calc(2.1875rem * var(--text-scale));
+  --font-size-editor: calc(1rem * var(--text-scale));
+  --line-height-small: calc(1.25rem * var(--text-scale));
 }
 
 :root,
