@@ -529,6 +529,15 @@ pub(crate) fn sync_status(state: SyncState) -> SyncStatus {
     }
 }
 
+pub(crate) const OFFLINE_RECHECK: std::time::Duration = std::time::Duration::from_secs(10);
+
+pub(crate) async fn server_reachable(client: &matrix_sdk::Client) -> bool {
+    matches!(
+        matrix_sdk::timeout::timeout(client.fetch_server_versions(None), OFFLINE_RECHECK).await,
+        Ok(Ok(_))
+    )
+}
+
 pub(crate) async fn retry_backoff(failures: u32) {
     matrix_sdk::sleep::sleep(std::time::Duration::from_secs(
         2u64.saturating_pow(failures.min(5)),

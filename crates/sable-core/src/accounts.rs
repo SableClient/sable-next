@@ -17,7 +17,7 @@ use crate::cosmetics;
 use crate::image_packs;
 use crate::search;
 use crate::session;
-use crate::watchers::sync_status;
+use crate::watchers::{OFFLINE_RECHECK, server_reachable, sync_status};
 
 pub(crate) struct SessionGeneration<'core> {
     value: u64,
@@ -850,7 +850,24 @@ impl Core {
         self.track_session_task(
             spawn(async move {
                 let mut failures = 0u32;
-                while let Some(state) = states.next().await {
+                loop {
+                    let next = if matches!(states.get(), SyncState::Offline) {
+                        matrix_sdk::timeout::timeout(states.next(), OFFLINE_RECHECK).await
+                    } else {
+                        Ok(states.next().await)
+                    };
+                    let Ok(next) = next else {
+                        if server_reachable(&support_client).await
+                            && !core.account_locked.load(Ordering::SeqCst)
+                            && !core.sync_suspended.load(Ordering::SeqCst)
+                        {
+                            restarted.start().await;
+                        }
+                        continue;
+                    };
+                    let Some(state) = next else {
+                        break;
+                    };
                     if core.account_locked.load(Ordering::SeqCst)
                         || core.sync_suspended.load(Ordering::SeqCst)
                     {
