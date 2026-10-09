@@ -603,6 +603,10 @@ export class CoreClient {
     return this.userProfile(userId, true);
   }
 
+  forgetProfileFailure(userId: string): void {
+    this.profileFailures.delete(userId);
+  }
+
   private invalidateProfile(userId: string): void {
     this.profileCache.delete(userId);
     this.profileFailures.delete(userId);

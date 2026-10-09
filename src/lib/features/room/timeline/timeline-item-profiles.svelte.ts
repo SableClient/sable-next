@@ -52,6 +52,7 @@ class ProfileSlot {
       }, FIRST_LOOKUP_DELAY_MS);
       return;
     }
+    this.core.forgetProfileFailure(userId);
     this.#fetch(userId, generation, attempt);
   }
 

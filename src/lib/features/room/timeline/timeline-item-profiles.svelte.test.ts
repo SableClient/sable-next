@@ -10,9 +10,11 @@ const profile = (display_name: string) => ({ display_name }) as ProfileView;
 function setup(cached: ProfileView | null = null) {
   let notify: (userId: string) => void = () => {};
   const userProfile = vi.fn<(userId: string) => Promise<ProfileView>>();
+  const forgetProfileFailure = vi.fn<(userId: string) => void>();
   const core = {
     userProfile,
     cachedUserProfile: () => cached,
+    forgetProfileFailure,
     onProfileChanged: (listener: (userId: string) => void) => {
       notify = listener;
       return () => {};
@@ -21,6 +23,7 @@ function setup(cached: ProfileView | null = null) {
   return {
     profiles: new TimelineItemProfiles(core),
     userProfile,
+    forgetProfileFailure,
     notify: (id: string) => {
       notify(id);
     },
@@ -34,13 +37,15 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-test('a failed lookup is retried', async () => {
-  const { profiles, userProfile } = setup();
+test('a failed lookup is retried past the remembered failure', async () => {
+  const { profiles, userProfile, forgetProfileFailure } = setup();
   userProfile.mockRejectedValueOnce(new Error('limited')).mockResolvedValueOnce(profile('a'));
   profiles.sync('@a:x', null, false);
   await vi.advanceTimersByTimeAsync(300);
   expect(profiles.sender).toBeNull();
+  expect(forgetProfileFailure).not.toHaveBeenCalled();
   await vi.advanceTimersByTimeAsync(3000);
+  expect(forgetProfileFailure).toHaveBeenCalledWith('@a:x');
   expect(profiles.sender).toEqual(profile('a'));
   profiles.dispose();
 });
