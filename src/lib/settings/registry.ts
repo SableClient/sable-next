@@ -1,6 +1,7 @@
 import type { Component } from 'svelte';
 import i18next from 'i18next';
 import ArrowsOutLineVerticalIcon from 'phosphor-svelte/lib/ArrowsOutLineVerticalIcon';
+import ArrowLineDownIcon from 'phosphor-svelte/lib/ArrowLineDownIcon';
 import AtIcon from 'phosphor-svelte/lib/AtIcon';
 import BellIcon from 'phosphor-svelte/lib/BellIcon';
 import BellSimpleIcon from 'phosphor-svelte/lib/BellSimpleIcon';
@@ -820,6 +821,14 @@ export const settingsCategories: SettingsCategory[] = [
           },
           literal: true,
         })),
+      },
+      {
+        key: 'openRoomsAtUnread',
+        section: 'messages',
+        icon: ArrowLineDownIcon,
+        name: 'settings.openRoomsAtUnread',
+        description: 'settings.openRoomsAtUnreadHint',
+        type: 'boolean',
       },
       {
         key: 'timelineEmoteSize',

@@ -70,6 +70,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  setPreference('openRoomsAtUnread', true);
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -2093,6 +2094,39 @@ test('the read marker waits for the latest message or for the reader to leave', 
 
   unmount();
   expect(fullyRead).toHaveBeenCalledExactlyOnceWith('!room:example.org', eventId);
+});
+
+test('with open-at-unread off the room opens at the latest message and keeps receipts back', async () => {
+  setPreference('openRoomsAtUnread', false);
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('read'), ...Array.from({ length: 12 }, (_, i) => item(`new-${i}`))];
+  const read = vi.fn((_eventId: string, _fullyRead: boolean) => Promise.resolve());
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        roomId: '!room:example.org',
+        hasUnread: true,
+        onLoadReadMarker: () => Promise.resolve('$read'),
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: read,
+      },
+    },
+  });
+  unreadViewport();
+  const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
+  await tick();
+  await runAnimationFrames();
+  await new Promise((resolve) => setTimeout(resolve, 550));
+
+  expect(read.mock.calls.every(([eventId]) => eventId === '$read')).toBe(true);
+  expect(jumps).not.toHaveBeenCalledWith(
+    expect.stringContaining('new-0'),
+    'start',
+    expect.anything(),
+    expect.anything()
+  );
 });
 
 function unreadViewport(): HTMLDivElement {

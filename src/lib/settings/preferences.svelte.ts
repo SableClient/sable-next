@@ -222,6 +222,7 @@ export interface Preferences {
   hideProfileChanges: boolean;
   hideMemberInReadOnly: boolean;
   showTombstoneEvents: boolean;
+  openRoomsAtUnread: boolean;
   hideReadReceipts: boolean;
   readReceiptPlacement: ReadReceiptPlacement;
   replyPreviewStyle: ReplyPreviewStyle;
@@ -497,6 +498,7 @@ const DEFAULTS: Preferences = {
   hideProfileChanges: true,
   hideMemberInReadOnly: true,
   showTombstoneEvents: true,
+  openRoomsAtUnread: true,
   hideReadReceipts: false,
   readReceiptPlacement: 'message',
   replyPreviewStyle: 'connected',

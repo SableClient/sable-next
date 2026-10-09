@@ -569,7 +569,12 @@
     const openAtUnread = untrack(() => {
       if (openedRoomId === activeRoomId) return false;
       openedRoomId = activeRoomId;
-      return eventId === null && notifiedEventId === null && roomHasUnread;
+      return (
+        eventId === null &&
+        notifiedEventId === null &&
+        roomHasUnread &&
+        preferences.openRoomsAtUnread
+      );
     });
     // Read outside `untrack`: the toggle only takes effect by re-subscribing.
     const hiddenEvents = preferences.showHiddenEvents;

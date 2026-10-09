@@ -350,9 +350,17 @@
     unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
     if (!active || !revealed || !focused) return;
     if (unreadInView) unread.observe(unread.firstEventId);
-    else if (live && windowState.pinned && opened && !jumpingUnread && !unread.background)
+    else if (
+      live &&
+      windowState.pinned &&
+      opened &&
+      !jumpingUnread &&
+      !unread.background &&
+      !holdAtLatest
+    )
       unread.reachLatest();
   });
+  let holdAtLatest = $state(untrack(() => !preferences.openRoomsAtUnread));
   let hadUnread = untrack(() => hasUnread);
   $effect(() => {
     if (hadUnread && !hasUnread && unread.initialized) untrack(() => unread.dismiss());
@@ -428,7 +436,9 @@
   function readerScrolled(delta: number): void {
     historyController.clearUserScrollPending();
     if (!revealed) return;
-    if (delta > 0 && windowState.pinned && windowActivity.active) unread.reachLatest();
+    if (delta < 0) holdAtLatest = false;
+    if (delta > 0 && windowState.pinned && windowActivity.active && !holdAtLatest)
+      unread.reachLatest();
     historyController.observeScroll(delta < 0, nearLatest);
     if (
       timeline.mode.kind !== 'live' &&
@@ -593,7 +603,13 @@
       if (landing && !disposed && engine.state.pinned) {
         if (notified) markLanded(landingEventId);
         await engine.jumpTo(landing.key, landing === unreadEntry ? 'start' : 'center');
-      } else if (!notified && unread.active && unread.firstEventId !== null && !disposed) {
+      } else if (
+        !notified &&
+        !holdAtLatest &&
+        unread.active &&
+        unread.firstEventId !== null &&
+        !disposed
+      ) {
         await jumpToUnread();
       }
     } catch {
@@ -799,6 +815,7 @@
     unreadNavigation?.abort();
     unreadNavigation = navigation;
     jumpingUnread = true;
+    holdAtLatest = false;
     unreadError = null;
     let mode = timeline.mode;
     const current = () => !disposed && !navigation.signal.aborted && timeline.mode === mode;
