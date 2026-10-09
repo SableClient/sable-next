@@ -341,12 +341,7 @@ impl Core {
             }
             MediaSource::Plain(_) => content,
         };
-        client
-            .media_store()
-            .lock()
-            .await?
-            .add_media_content(&request, content.clone(), IgnoreMediaRetentionPolicy::No)
-            .await?;
+        store_media(client, &request, &content).await?;
         Ok(content)
     }
 
@@ -738,13 +733,24 @@ async fn fetch_sdk_media(
     request: &MediaRequestParameters,
 ) -> matrix_sdk::Result<Vec<u8>> {
     let content = client.media().get_media_content(request, false).await?;
-    client
-        .media_store()
-        .lock()
-        .await?
-        .add_media_content(request, content.clone(), IgnoreMediaRetentionPolicy::No)
-        .await?;
+    store_media(client, request, &content).await?;
     Ok(content)
+}
+
+async fn store_media(
+    client: &MatrixClient,
+    request: &MediaRequestParameters,
+    content: &[u8],
+) -> matrix_sdk::Result<()> {
+    let store = client.media_store().lock().await?;
+    let size = u64::try_from(content.len()).unwrap_or(u64::MAX);
+    if store.media_retention_policy().exceeds_max_file_size(size) {
+        return Ok(());
+    }
+    store
+        .add_media_content(request, content.to_vec(), IgnoreMediaRetentionPolicy::No)
+        .await?;
+    Ok(())
 }
 
 async fn cached_media(
