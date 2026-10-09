@@ -69,6 +69,9 @@ describe('scrubMatrixIds', () => {
   it('replaces user IDs, room IDs and aliases', () => {
     expect(scrubMatrixIds('@alice:example.com')).toBe('@[USER_ID]');
     expect(scrubMatrixIds('!roomid:example.com')).toBe('![ROOM_ID]');
+    expect(scrubMatrixIds('joined !dIz4NfOB_FDBH4ktZeSqqTfPEcBwm4KnNTnJptVRDko now')).toBe(
+      'joined ![ROOM_ID] now'
+    );
     expect(scrubMatrixIds('#general:example.com')).toBe('#[ROOM_ALIAS]');
   });
 
@@ -154,6 +157,9 @@ describe('scrubMatrixUrl', () => {
     expect(scrubMatrixUrl('/rooms/!roomid%3Aexample.com')).toBe('/rooms/![ROOM_ID]');
     expect(scrubMatrixUrl('/rooms/#general:example.com')).toBe('/rooms/[ROOM_ALIAS]');
     expect(scrubMatrixUrl('/home/!roomid:example.com')).toBe('/home/![ROOM_ID]');
+    expect(scrubMatrixUrl('/home/!dIz4NfOB_FDBH4ktZeSqqTfPEcBwm4KnNTnJptVRDko')).toBe(
+      '/home/![ROOM_ID]'
+    );
     expect(scrubMatrixUrl('/home/!roomid%3Aexample.com')).toBe('/home/![ROOM_ID]');
     expect(scrubMatrixUrl('/direct/@alice:example.com')).toBe('/direct/@[USER_ID]');
     expect(scrubMatrixUrl('/home/#general:example.com')).toBe('/home/[ROOM_ALIAS]');
