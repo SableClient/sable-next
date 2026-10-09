@@ -1699,6 +1699,18 @@ describe('arrow keys at the edge of the document', () => {
     expect(pressSurface('ArrowLeft').defaultPrevented).toBe(false);
   });
 
+  test('right at the very end leaves inline code', () => {
+    const editor = open();
+    editor.setText('ab');
+    const editorView = view(editor);
+    editorView.dispatch(editorView.state.tr.addMark(1, 3, composerSchema.marks.code.create()));
+    caretAt(editor, 'end');
+
+    expect(pressSurface('ArrowRight').defaultPrevented).toBe(true);
+    editorView.dispatch(editorView.state.tr.insertText('c'));
+    expect(editorView.state.doc.nodeAt(3)?.marks).toEqual([]);
+  });
+
   test('left and right in the middle of the text are left to the browser', () => {
     const editor = open();
     editor.setText('abc');

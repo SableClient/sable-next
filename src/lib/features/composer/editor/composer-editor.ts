@@ -492,6 +492,12 @@ function documentEdgeGuard(): Plugin {
           event.preventDefault();
           if (!event.shiftKey && !selection.eq(edge)) {
             view.dispatch(view.state.tr.setSelection(edge));
+          } else if (
+            !left &&
+            selection.empty &&
+            (view.state.storedMarks ?? selection.$from.marks()).length > 0
+          ) {
+            view.dispatch(view.state.tr.setStoredMarks([]));
           }
           return true;
         },
