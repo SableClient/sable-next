@@ -30,6 +30,7 @@
     avatarUrl?: string | null;
     avatarLabel?: string;
     onAvatarClick?: (source: string, displayName: string) => void;
+    onAvatarEdit?: () => void;
     color: string;
     /** The owner's own choice, so only this one tints the card. `color` also
         covers the id-derived fallback. */
@@ -64,6 +65,7 @@
     avatarUrl = null,
     avatarLabel,
     onAvatarClick,
+    onAvatarEdit,
     color,
     pronouns,
     nameField,
@@ -106,9 +108,10 @@
       ink === BLACK ? (nameColorLight ?? nameColorDark) : (nameColorDark ?? nameColorLight);
     return palette && own ? nameColorOn(own, palette.ground) : null;
   });
-  let canOpenAvatar = $derived(Boolean(avatarUrl && onAvatarClick));
+  let canOpenAvatar = $derived(Boolean(onAvatarEdit ?? (avatarUrl && onAvatarClick)));
   function openAvatar(): void {
-    if (avatarUrl) onAvatarClick?.(avatarUrl, displayName);
+    if (onAvatarEdit) onAvatarEdit();
+    else if (avatarUrl) onAvatarClick?.(avatarUrl, displayName);
   }
   function openBanner(): void {
     if (banner) onAvatarClick?.(banner, displayName);
@@ -132,6 +135,9 @@
 </script>
 
 <section
+  ondragstart={(event) => {
+    event.preventDefault();
+  }}
   aria-labelledby={nameField ? undefined : nameId}
   class={[
     'profile-card',

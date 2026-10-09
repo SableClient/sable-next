@@ -119,6 +119,7 @@
 
   let draft = $state(untrack(() => read(profile)));
   let base = $state.raw(untrack(() => read(profile)));
+  let avatarInput = $state<HTMLInputElement | null>(null);
   let avatarFile = $state<File | null>(null);
   let avatarPreview = $state<string | null>(null);
   let uploadingBanner = $state(false);
@@ -495,6 +496,8 @@
           displayName={draft.name.trim() || userId}
           avatarUrl={avatarPreview ?? (draft.avatarRemoved ? null : profile.avatar_url)}
           bannerUrl={draft.banner}
+          avatarLabel={$i18n.t(hasAvatar ? 'common.changeAvatar' : 'settings.uploadAvatar')}
+          onAvatarEdit={() => avatarInput?.click()}
           color={draft.hero || senderColor(userId)}
           heroColor={draft.hero || null}
           heroBrightness={draft.hero ? draft.brightness : null}
@@ -566,6 +569,7 @@
           {#snippet actions()}
             <label class="file-button btn btn-secondary btn-small">
               <input
+                bind:this={avatarInput}
                 type="file"
                 accept="image/*"
                 onchange={(event: Event & { currentTarget: HTMLInputElement }) => {

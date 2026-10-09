@@ -93,3 +93,24 @@ test('offers a profile scope beside the tabs', () => {
   expect(screen.getByLabelText('Profile for')).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: 'Preview' })).toBeInTheDocument();
 });
+
+test('the avatar picture opens the avatar file picker', async () => {
+  const user = userEvent.setup();
+  mount();
+
+  const input = document.querySelector<HTMLInputElement>('.file-button input[type="file"]');
+  const open = vi.spyOn(input as HTMLInputElement, 'click');
+  await user.click(screen.getByRole('button', { name: 'Upload avatar' }));
+
+  expect(open).toHaveBeenCalledOnce();
+});
+
+test('a drag that starts on the card is cancelled so it cannot drop into a field', () => {
+  mount();
+
+  const cover = document.querySelector('.profile-card-cover') as HTMLElement;
+  const event = new Event('dragstart', { bubbles: true, cancelable: true });
+  cover.dispatchEvent(event);
+
+  expect(event.defaultPrevented).toBe(true);
+});
