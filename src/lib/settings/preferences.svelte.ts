@@ -342,6 +342,7 @@ export interface Preferences {
   profileChangePropagation: ProfilePropagationView;
 
   developerTools: boolean;
+  callStatsOverlay: boolean;
   showHiddenEvents: boolean;
   hiddenEventEdits: boolean;
   hiddenEventReactions: boolean;
@@ -616,6 +617,7 @@ const DEFAULTS: Preferences = {
   profileChangePropagation: 'unchanged',
 
   developerTools: false,
+  callStatsOverlay: false,
   showHiddenEvents: false,
   hiddenEventEdits: true,
   hiddenEventReactions: true,

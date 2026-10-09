@@ -1711,6 +1711,14 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'callStatsOverlay',
+        section: 'developer-options',
+        icon: MonitorIcon,
+        name: 'settings.callStatsOverlay',
+        type: 'boolean',
+        gatedBy: 'developerTools',
+      },
+      {
         key: 'showHiddenEvents',
         section: 'developer-options',
         icon: BugIcon,

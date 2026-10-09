@@ -20,8 +20,10 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Slider from '#lib/ui/primitives/Slider.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
 
   import { cameraVisible, type CallTileSource } from './call-layout';
+  import CallStatsOverlay from './CallStatsOverlay.svelte';
   import type {
     CallParticipant,
     CallRemoteVideoOverlay,
@@ -336,6 +338,15 @@
         </Tooltip>
       {/if}
     </div>
+  {/if}
+
+  {#if screen && videoOn && room && videoTrackId !== undefined && preferences.developerTools && preferences.callStatsOverlay}
+    <CallStatsOverlay
+      {room}
+      identity={participant.identity}
+      local={participant.local === true}
+      trackId={videoTrackId}
+    />
   {/if}
 
   {#if volumeOpen && adjustable}
