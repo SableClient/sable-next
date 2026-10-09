@@ -190,7 +190,6 @@
 
   let openRoomId = $derived(findRoomByPathId(roomList.rooms, page.params.roomId)?.room_id ?? null);
   let incoming = $derived(incomingCalls.calls.at(0) ?? null);
-  let incomingProfile = $state.raw<{ name: string; avatar: string | null } | null>(null);
   let loadingAnimal = $derived(preferences.loadingAnimal || null);
 
   $effect(() => {
@@ -209,30 +208,6 @@
     };
   });
 
-  $effect(() => {
-    const sender = incoming?.sender;
-    if (!sender) {
-      incomingProfile = null;
-      return;
-    }
-
-    let cancelled = false;
-    incomingProfile = { name: incoming?.senderName ?? sender, avatar: null };
-    void core
-      .userProfile(sender)
-      .then((profile) => {
-        if (cancelled) return;
-        incomingProfile = {
-          name: profile.display_name ?? sender,
-          avatar: profile.avatar_url,
-        };
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  });
   let incomingRoom = $derived(incoming ? roomList.byId(incoming.roomId) : undefined);
 
   $effect(() => {
@@ -1025,8 +1000,6 @@
     {/if}
     <IncomingCallDialog
       call={incoming}
-      senderName={incomingProfile?.name ?? incoming?.sender ?? ''}
-      senderAvatar={incomingProfile?.avatar ?? null}
       roomName={incomingRoom?.name ?? incoming?.roomName ?? incoming?.roomId ?? ''}
       onAccept={acceptIncoming}
       onDecline={(call: IncomingCall) => void incomingCalls.decline(call)}

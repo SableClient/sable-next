@@ -1,5 +1,7 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { isRecord } from '#lib/guards.js';
   import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
   import PhoneDisconnectIcon from 'phosphor-svelte/lib/PhoneDisconnectIcon';
   import VideoCameraIcon from 'phosphor-svelte/lib/VideoCameraIcon';
@@ -14,14 +16,38 @@
 
   interface Props {
     call: IncomingCall | null;
-    senderName: string;
-    senderAvatar: string | null;
     roomName: string;
     onAccept: (call: IncomingCall) => void;
     onDecline: (call: IncomingCall) => void;
   }
 
-  let { call, senderName, senderAvatar, roomName, onAccept, onDecline }: Props = $props();
+  let { call, roomName, onAccept, onDecline }: Props = $props();
+
+  const core = useCoreClient();
+  let profile = $state.raw<{ name: string; avatar: string | null } | null>(null);
+  let senderName = $derived(profile?.name ?? call?.senderName ?? call?.sender ?? '');
+  let senderAvatar = $derived(profile?.avatar ?? null);
+
+  $effect(() => {
+    const incoming = call;
+    profile = null;
+    if (!incoming) return;
+
+    let current = true;
+    void core.commands.roomStateEvent(incoming.roomId, 'm.room.member', incoming.sender).then(
+      (content) => {
+        if (!current || !isRecord(content)) return;
+        profile = {
+          name: typeof content.displayname === 'string' ? content.displayname : incoming.sender,
+          avatar: typeof content.avatar_url === 'string' ? content.avatar_url : null,
+        };
+      },
+      () => undefined
+    );
+    return () => {
+      current = false;
+    };
+  });
 
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let open = $derived(call !== null);
