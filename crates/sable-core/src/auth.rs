@@ -165,28 +165,25 @@ impl Core {
         let user_id = matrix.meta.user_id.clone();
         self.validate_reauthentication(reauth.as_ref(), &client)
             .await?;
-        let generation = self.claim_session_generation().await;
-        self.persist(
-            &account_id,
-            &account_store_id,
-            &PersistedSession {
-                oauth_issuer: None,
-                resolved_homeserver: Some(endpoint),
-                homeserver: homeserver.clone(),
-                credentials: Credentials::Password(matrix),
-            },
-            reauth.as_ref(),
-        )
-        .await?;
-        self.retire_replaced_store(reauth.as_ref(), &account_store_id)
-            .await;
+        let _activation = self
+            .finish_sign_in(
+                client,
+                account_id.clone(),
+                &account_store_id,
+                PersistedSession {
+                    oauth_issuer: None,
+                    resolved_homeserver: Some(endpoint),
+                    homeserver: homeserver.clone(),
+                    credentials: Credentials::Password(matrix),
+                },
+                reauth.as_ref(),
+            )
+            .await?;
         tracing::info!(
             operation = "password_login",
             homeserver,
             "session persisted; starting sync"
         );
-        self.start_session(client, homeserver, account_id.clone(), generation.value())
-            .await?;
         self.pending_login.lock().await.take();
         self.pending_registration.lock().await.take();
 
@@ -420,22 +417,20 @@ impl Core {
         let user_id = full.user.meta.user_id.clone();
         self.validate_reauthentication(reauth.as_ref(), &client)
             .await?;
-        let generation = self.claim_session_generation().await;
-        self.persist(
-            &account_id,
-            &account_store_id,
-            &PersistedSession {
-                oauth_issuer: None,
-                resolved_homeserver: Some(client.homeserver()),
-                homeserver: homeserver.clone(),
-                credentials: Credentials::oauth(full),
-            },
-            reauth.as_ref(),
-        )
-        .await?;
-        self.retire_replaced_store(reauth.as_ref(), &account_store_id)
-            .await;
-        self.start_session(client, homeserver, account_id.clone(), generation.value())
+        let endpoint = client.homeserver();
+        let _activation = self
+            .finish_sign_in(
+                client,
+                account_id.clone(),
+                &account_store_id,
+                PersistedSession {
+                    oauth_issuer: None,
+                    resolved_homeserver: Some(endpoint),
+                    homeserver,
+                    credentials: Credentials::oauth(full),
+                },
+                reauth.as_ref(),
+            )
             .await?;
         self.pending_login.lock().await.take();
         self.pending_registration.lock().await.take();
@@ -564,22 +559,19 @@ impl Core {
 
         self.validate_reauthentication(reauth.as_ref(), &client)
             .await?;
-        let generation = self.claim_session_generation().await;
-        self.persist(
-            &account_id,
-            &account_store_id,
-            &PersistedSession {
-                resolved_homeserver: Some(endpoint),
-                homeserver: homeserver.clone(),
-                credentials: Credentials::Password(matrix),
-                oauth_issuer: None,
-            },
-            reauth.as_ref(),
-        )
-        .await?;
-        self.retire_replaced_store(reauth.as_ref(), &account_store_id)
-            .await;
-        self.start_session(client, homeserver, account_id.clone(), generation.value())
+        let _activation = self
+            .finish_sign_in(
+                client,
+                account_id.clone(),
+                &account_store_id,
+                PersistedSession {
+                    oauth_issuer: None,
+                    resolved_homeserver: Some(endpoint),
+                    homeserver,
+                    credentials: Credentials::Password(matrix),
+                },
+                reauth.as_ref(),
+            )
             .await?;
         self.pending_login.lock().await.take();
         self.pending_registration.lock().await.take();

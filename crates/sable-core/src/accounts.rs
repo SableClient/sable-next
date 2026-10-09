@@ -721,6 +721,23 @@ impl Core {
         session.take()
     }
 
+    pub(crate) async fn finish_sign_in(
+        self: &Arc<Self>,
+        client: matrix_sdk::Client,
+        account_id: String,
+        store_id: &str,
+        persisted: PersistedSession,
+        reauth: Option<&PersistedAccount>,
+    ) -> Result<SessionGeneration<'_>, CommandErr> {
+        let generation = self.claim_session_generation().await;
+        self.persist(&account_id, store_id, &persisted, reauth)
+            .await?;
+        self.retire_replaced_store(reauth, store_id).await;
+        self.start_session(client, persisted.homeserver, account_id, generation.value())
+            .await?;
+        Ok(generation)
+    }
+
     #[expect(
         clippy::too_many_lines,
         reason = "one sequential flow kept in a single function"

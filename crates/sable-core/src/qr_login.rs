@@ -274,21 +274,20 @@ impl Core {
             .full_session()
             .ok_or_else(|| self.failed("qr_login", "no session after the QR login"))?;
         let user_id = full.user.meta.user_id.to_string();
-        let generation = self.claim_session_generation().await;
-        self.persist(
-            &account_id,
+        let endpoint = client.homeserver();
+        self.finish_sign_in(
+            client,
+            account_id,
             &store_id,
-            &PersistedSession {
+            PersistedSession {
                 oauth_issuer: None,
-                resolved_homeserver: Some(client.homeserver()),
-                homeserver: homeserver.clone(),
+                resolved_homeserver: Some(endpoint),
+                homeserver,
                 credentials: Credentials::oauth(full),
             },
             None,
         )
         .await?;
-        self.start_session(client, homeserver, account_id, generation.value())
-            .await?;
         Ok(user_id)
     }
 
