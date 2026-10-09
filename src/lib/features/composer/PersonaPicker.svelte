@@ -159,6 +159,7 @@
         {...overlayLayer()}
         side="top"
         align="start"
+        sideOffset={10}
         collisionPadding={12}
       >
         <PersonaMenu
