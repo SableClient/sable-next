@@ -183,6 +183,19 @@ test('sends external links to a new tab instead of the handler', async () => {
   expect(onMatrixLink).not.toHaveBeenCalled();
 });
 
+test('a link in a message body is not draggable', async () => {
+  render(FormattedBodyHarness, {
+    props: {
+      html: '<a href="https://example.org/">Link</a> <a href="https://matrix.to/#/@alice:example.org">Alice</a>',
+      entries: [],
+    },
+  });
+  await tick();
+
+  for (const anchor of screen.getAllByRole('link'))
+    expect(anchor).toHaveAttribute('draggable', 'false');
+});
+
 // The colour is named rather than hex so check-theme-tokens does not read it as
 // an undeclared literal.
 test('applies Matrix colours and keeps spoilers hidden until asked', async () => {
