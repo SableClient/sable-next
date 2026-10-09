@@ -31,7 +31,7 @@ test('a redacted reaction renders as removed instead of as a generic hidden even
 test.each([
   [{ shortcode: ':sable-circular:' }, ':sable-circular:', true],
   [{ 'com.beeper.reaction.shortcode': 'sable-circular' }, ':sable-circular:', false],
-  [{}, 'Custom emote', false],
+  [{}, 'custom emote', false],
 ] satisfies [Record<string, string>, string, boolean][])(
   'a custom reaction state event renders its image in the sentence (%j)',
   async (metadata, label, profile) => {

@@ -34,14 +34,14 @@ test('recognises Matrix media reaction keys', () => {
 });
 
 test('uses the known custom emote shortcode instead of its media URI', () => {
-  expect(reactionEmoteLabel('mxc://example.org/neocat', imagePacks, 'Custom emote')).toBe(
+  expect(reactionEmoteLabel('mxc://example.org/neocat', imagePacks, 'custom emote')).toBe(
     ':neocat:'
   );
 });
 
 test('does not expose an unknown custom emote media URI', () => {
-  expect(reactionEmoteLabel('mxc://remote.example/unknown', imagePacks, 'Custom emote')).toBe(
-    'Custom emote'
+  expect(reactionEmoteLabel('mxc://remote.example/unknown', imagePacks, 'custom emote')).toBe(
+    'custom emote'
   );
 });
 
@@ -60,7 +60,7 @@ test('retries a room pack read after a transient failure', async () => {
 test('prefers the shortcode the reaction was sent with over the local pack name', () => {
   const sent = new Map([['mxc://example.org/neocat', 'partycat']]);
 
-  expect(reactionEmoteLabel('mxc://example.org/neocat', imagePacks, 'Custom emote', sent)).toBe(
+  expect(reactionEmoteLabel('mxc://example.org/neocat', imagePacks, 'custom emote', sent)).toBe(
     ':partycat:'
   );
   expect(reactionShortcode('mxc://example.org/neocat', imagePacks, sent)).toBe(':partycat:');
@@ -69,7 +69,7 @@ test('prefers the shortcode the reaction was sent with over the local pack name'
 test('names an image from another pack by the shortcode it was sent with', () => {
   const sent = new Map([['mxc://remote.example/parrot', 'partyparrot']]);
 
-  expect(reactionEmoteLabel('mxc://remote.example/parrot', imagePacks, 'Custom emote', sent)).toBe(
+  expect(reactionEmoteLabel('mxc://remote.example/parrot', imagePacks, 'custom emote', sent)).toBe(
     ':partyparrot:'
   );
 });
