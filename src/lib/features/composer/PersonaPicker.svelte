@@ -38,9 +38,20 @@
 
   let desktop = $derived(appLayout.matches);
   let open = $state(false);
-  let scope = $state<PersonaScope>('account');
-
   let spaces = $derived(personaSpaces(roomList.rooms, roomId, page.params.spaceId));
+  let hasSpace = $derived(spaces.target !== null);
+
+  function getScopeToOpen() {
+    if (personas.associationFor(roomId) !== undefined) {
+      return 'room';
+    } else if (hasSpace && spaces?.target && personas.associationFor(spaces.target) !== undefined) {
+      return 'space';
+    } else {
+      return 'account';
+    }
+  }
+
+  let scope = $state<PersonaScope>(getScopeToOpen());
   let scopeTarget = $derived(scope === 'room' ? roomId : scope === 'space' ? spaces.target : null);
   let selected = $derived(personas.selectionFor(scopeTarget));
   let disabled = $derived(scopeTarget !== null && personas.disabledIn(scopeTarget));
@@ -67,7 +78,7 @@
   function handleOpenChange(next: boolean): void {
     open = next;
     if (next) {
-      scope = 'account';
+      scope = getScopeToOpen();
       void personas.load();
     }
   }
@@ -175,7 +186,7 @@
           {selected}
           {disabled}
           {scope}
-          hasSpace={spaces.target !== null}
+          {hasSpace}
           onScope={setScope}
           onChoose={choose}
           onDisable={disable}
@@ -216,7 +227,7 @@
       {selected}
       {disabled}
       {scope}
-      hasSpace={spaces.target !== null}
+      {hasSpace}
       onScope={setScope}
       onChoose={choose}
       onDisable={disable}
