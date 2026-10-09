@@ -6,7 +6,7 @@ use matrix_sdk::ruma::{OwnedServerName, ServerName};
 const DISTINCT_FAILURES_TO_OPEN: usize = 3;
 const FAILURE_WINDOW_MS: u64 = 10 * 60 * 1000;
 const INITIAL_BACKOFF_MS: u64 = 60 * 1000;
-const MAX_BACKOFF_MS: u64 = 30 * 60 * 1000;
+const MAX_BACKOFF_MS: u64 = 5 * 60 * 1000;
 const PROBE_WAIT_MS: u64 = 5 * 1000;
 const MEDIA_FAILURES_TO_REFUSE: u32 = 3;
 const PERSISTENT_MEDIA_FAILURE_MS: u64 = 10 * 1000;

@@ -128,7 +128,11 @@ impl Core {
             Some(permit)
         };
         let media = media_label(&source);
-        let origin = media_origin(&source);
+        let origin = media_origin(&source).filter(|(server, _)| {
+            client
+                .user_id()
+                .is_none_or(|user| user.server_name() != server)
+        });
         let mut probe = None;
         if let Some((server, media_id)) = &origin {
             let now = now_ms();
