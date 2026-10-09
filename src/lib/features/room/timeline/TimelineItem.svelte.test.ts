@@ -955,6 +955,24 @@ test('opens message actions on right click', async () => {
   expect(menuLabels()).toContain('Copy link to message');
 });
 
+test('picking a quick reaction from the context menu closes it', async () => {
+  const onToggleReaction = vi.fn();
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: { item: item(false), collapsed: false, onReply: vi.fn(), onToggleReaction },
+    },
+  });
+  await tick();
+
+  await openMenu(document.querySelector('article.message'));
+  await tick();
+  await press(document.querySelector('[data-context-menu-content] .quick-reaction'));
+
+  expect(onToggleReaction).toHaveBeenCalledOnce();
+  expect(document.querySelectorAll('[data-context-menu-content]')).toHaveLength(0);
+});
+
 test('copies a message link when it is right-clicked', async () => {
   const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
   const linked = item(false);
@@ -1307,32 +1325,6 @@ test('a touch context menu the row never saw pressed opens the sheet', async () 
   expect(native.defaultPrevented).toBe(true);
   expect(document.querySelectorAll('[data-context-menu-content]')).toHaveLength(0);
   expect(document.querySelector('[data-dialog-content]')).not.toBeNull();
-});
-
-test('picking a quick reaction from the context menu closes it', async () => {
-  const onReact = vi.fn();
-  render(TimelineItemHarness, {
-    props: {
-      core,
-      item: { item: item(false), collapsed: false, onReply: vi.fn(), onToggleReaction: onReact },
-    },
-  });
-  await tick();
-
-  document
-    .querySelector('article.message')
-    ?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-  await tick();
-  const reaction = document.querySelector<HTMLButtonElement>(
-    '[data-context-menu-content] .quick-reaction'
-  );
-  if (!reaction) throw new Error('the context menu showed no quick reaction');
-
-  reaction.click();
-  await tick();
-
-  expect(onReact).toHaveBeenCalledOnce();
-  expect(document.querySelectorAll('[data-context-menu-content]')).toHaveLength(0);
 });
 
 test('a deleted message keeps its sender, its time and its menu', async () => {
