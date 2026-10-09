@@ -9,9 +9,12 @@ use serde_json::Value;
 
 use crate::protocol::RoomStateEventView;
 
+const MAX_PROBED_ROOMS: usize = 32;
+
 #[derive(Default)]
 pub(crate) struct ProbedState {
     rooms: HashMap<OwnedRoomId, ProbedRoom>,
+    tick: u64,
 }
 
 pub(crate) enum Probed {
@@ -24,6 +27,7 @@ pub(crate) enum Probed {
 struct ProbedRoom {
     full: Option<HashMap<String, Vec<RoomStateEventView>>>,
     keys: HashMap<(String, String), Option<Value>>,
+    written: u64,
 }
 
 impl ProbedState {
@@ -63,7 +67,7 @@ impl ProbedState {
         room_id: &RoomId,
         events: HashMap<String, Vec<RoomStateEventView>>,
     ) {
-        let room = self.rooms.entry(room_id.to_owned()).or_default();
+        let room = self.room_mut(room_id);
         room.full = Some(events);
         room.keys.clear();
     }
@@ -75,11 +79,26 @@ impl ProbedState {
         state_key: &str,
         content: Option<Value>,
     ) {
-        self.rooms
-            .entry(room_id.to_owned())
-            .or_default()
+        self.room_mut(room_id)
             .keys
             .insert((event_type.to_owned(), state_key.to_owned()), content);
+    }
+
+    fn room_mut(&mut self, room_id: &RoomId) -> &mut ProbedRoom {
+        self.tick += 1;
+        if !self.rooms.contains_key(room_id) && self.rooms.len() >= MAX_PROBED_ROOMS {
+            let oldest = self
+                .rooms
+                .iter()
+                .min_by_key(|(_, room)| room.written)
+                .map(|(room_id, _)| room_id.clone());
+            if let Some(oldest) = oldest {
+                self.rooms.remove(&oldest);
+            }
+        }
+        let room = self.rooms.entry(room_id.to_owned()).or_default();
+        room.written = self.tick;
+        room
     }
 
     pub(crate) fn forget(&mut self, room_id: &RoomId, event_type: &str) {
@@ -198,4 +217,37 @@ fn now_ms() -> u64 {
         .map_or(0, |elapsed| {
             u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX)
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use matrix_sdk::ruma::RoomId;
+
+    use super::{MAX_PROBED_ROOMS, Probed, ProbedState};
+
+    #[test]
+    fn the_least_recently_written_room_is_dropped_past_the_cap() {
+        let mut state = ProbedState::default();
+        let ids: Vec<_> = (0..=MAX_PROBED_ROOMS)
+            .map(|index| RoomId::parse(format!("!r{index}:example.org")).unwrap())
+            .collect();
+        for room_id in &ids[..MAX_PROBED_ROOMS] {
+            state.remember_content(room_id, "m.room.topic", "", None);
+        }
+        state.remember_content(&ids[0], "m.room.name", "", None);
+        state.remember_content(&ids[MAX_PROBED_ROOMS], "m.room.topic", "", None);
+
+        assert!(matches!(
+            state.content(&ids[0], "m.room.topic", ""),
+            Probed::Absent
+        ));
+        assert!(matches!(
+            state.content(&ids[1], "m.room.topic", ""),
+            Probed::Unknown
+        ));
+        assert!(matches!(
+            state.content(&ids[MAX_PROBED_ROOMS], "m.room.topic", ""),
+            Probed::Absent
+        ));
+    }
 }
