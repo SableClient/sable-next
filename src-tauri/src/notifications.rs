@@ -243,6 +243,7 @@ async fn rotate_pusher(
 ) -> Result<(), CommandErr> {
     use sable_core::protocol::{PusherView, WebPushKeys};
     let client = pusher_client(root, pusher).await?;
+    let registration = &rotated_registration(&pusher.app_id, registration);
     let pushkey = if let Some(gateway) = &pusher.gateway {
         let key = registration
             .p256dh
@@ -724,6 +725,19 @@ struct Registration {
 }
 
 #[cfg(any(mobile, test))]
+const DIRECT_PUSH_APP_ID: &str = "moe.sable.up";
+
+#[cfg(any(target_os = "android", test))]
+fn rotated_registration(app_id: &str, registration: &Registration) -> Registration {
+    let keyed = app_id != DIRECT_PUSH_APP_ID;
+    Registration {
+        token: registration.token.clone(),
+        p256dh: registration.p256dh.clone().filter(|_| keyed),
+        auth: registration.auth.clone().filter(|_| keyed),
+    }
+}
+
+#[cfg(any(mobile, test))]
 fn pusher(
     registration: Registration,
     native_app_id: Option<&str>,
@@ -740,7 +754,7 @@ fn pusher(
             }),
         )),
         (None, None) if is_unified_push_endpoint(&registration.token) => {
-            Some(("moe.sable.up".to_owned(), registration.token, None))
+            Some((DIRECT_PUSH_APP_ID.to_owned(), registration.token, None))
         }
         (None, None) if !registration.token.is_empty() && !registration.token.contains("://") => {
             Some((native_app_id?.to_owned(), registration.token, None))
@@ -813,8 +827,9 @@ async fn distributor_gateway(
     core: &Arc<sable_core::Core>,
     registration: &Registration,
     config: &PushConfig,
+    server_vapid: Option<&str>,
 ) -> Option<String> {
-    if !is_direct_unified_push(registration, config) {
+    if !asks_distributor_for_gateway(config, registration, server_vapid) {
         return None;
     }
     discover_gateway(core, &registration.token).await
@@ -844,6 +859,26 @@ fn is_direct_unified_push(registration: &Registration, config: &PushConfig) -> b
 }
 
 #[cfg(any(mobile, test))]
+fn asks_distributor_for_gateway(
+    config: &PushConfig,
+    registration: &Registration,
+    server_vapid: Option<&str>,
+) -> bool {
+    server_vapid.is_none()
+        && (prefers_distributor_gateway(config, registration)
+            || is_direct_unified_push(registration, config))
+}
+
+#[cfg(any(mobile, test))]
+fn without_keys(registration: Registration) -> Registration {
+    Registration {
+        token: registration.token,
+        p256dh: None,
+        auth: None,
+    }
+}
+
+#[cfg(any(mobile, test))]
 fn gateway_from_response(
     response: Result<sable_core::protocol::CommandOk, CommandErr>,
 ) -> Option<String> {
@@ -862,7 +897,7 @@ async fn register_with_distributor<R: Runtime>(
     core: &Arc<sable_core::Core>,
     config: &PushConfig,
     server_vapid: Option<&str>,
-) -> Result<Registration, PushRegistrationError> {
+) -> Result<(Registration, Option<String>), PushRegistrationError> {
     let provider = provider_for_server_delivery(server_vapid, config.provider.as_deref());
     let register = |vapid: Option<String>| async {
         let registered = app
@@ -891,18 +926,10 @@ async fn register_with_distributor<R: Runtime>(
         server_vapid.map_or_else(|| config.vapid_key.clone(), str::to_owned),
     ))
     .await?;
-    let hosts_gateway = if server_vapid.is_some() {
-        prefers_distributor_gateway(config, &registration)
-            && discover_gateway(core, &registration.token).await.is_some()
-    } else {
-        distributor_gateway(core, &registration, config)
-            .await
-            .is_some()
+    let Some(gateway) = distributor_gateway(core, &registration, config, server_vapid).await else {
+        return Ok((registration, None));
     };
-    if hosts_gateway {
-        return register(None).await;
-    }
-    Ok(registration)
+    Ok((without_keys(register(None).await?), Some(gateway)))
 }
 
 /// # Errors
@@ -934,7 +961,7 @@ pub async fn register_push<R: Runtime>(
         server_vapid_from_response(Box::pin(core.dispatch(Command::WebPusherSupport)).await)
             .map_err(|_| PushRegistrationError::Capabilities)?
     };
-    let registration =
+    let (registration, distributor_gateway) =
         register_with_distributor(app, core, &config, server_vapid.as_deref()).await?;
     if server_vapid.is_some()
         && let Some(pusher) =
@@ -950,7 +977,7 @@ pub async fn register_push<R: Runtime>(
         .await;
     }
 
-    let gateway_url = match distributor_gateway(core, &registration, &config).await {
+    let gateway_url = match distributor_gateway {
         Some(gateway) => gateway,
         None => registration_gateway(&registration, &config)
             .ok_or_else(|| {
@@ -1207,7 +1234,7 @@ mod tests {
     }
 
     #[test]
-    fn only_a_chosen_unifiedpush_distributor_displaces_msc4174_for_its_gateway() {
+    fn only_a_chosen_unifiedpush_distributor_offers_its_gateway() {
         let mut config: super::PushConfig = serde_json::from_value(serde_json::json!({
             "gateway_url": "https://sygnal.example/_matrix/push/v1/notify",
             "vapid_key": "key", "web_app_id": "web", "event_id_only": true,
@@ -1227,6 +1254,62 @@ mod tests {
         config.provider = Some("unifiedpush".to_owned());
         config.gateway_override = true;
         assert!(!super::prefers_distributor_gateway(&config, &registration));
+    }
+
+    #[test]
+    fn a_chosen_distributor_with_web_push_keys_still_offers_its_gateway() {
+        let mut config: super::PushConfig = serde_json::from_value(serde_json::json!({
+            "gateway_url": "https://sygnal.example/_matrix/push/v1/notify",
+            "vapid_key": "key", "web_app_id": "web", "event_id_only": true,
+            "provider": "unifiedpush",
+        }))
+        .expect("push config");
+        let registration = Registration {
+            token: "https://ntfy.example/upTopic?up=1".to_owned(),
+            p256dh: Some("key".to_owned()),
+            auth: Some("auth".to_owned()),
+        };
+        assert!(super::asks_distributor_for_gateway(
+            &config,
+            &registration,
+            None
+        ));
+        assert!(!super::asks_distributor_for_gateway(
+            &config,
+            &registration,
+            Some("server-key")
+        ));
+        config.provider = Some("embedded".to_owned());
+        assert!(!super::asks_distributor_for_gateway(
+            &config,
+            &registration,
+            None
+        ));
+
+        let (app_id, pushkey, web_push) = pusher(
+            super::without_keys(registration),
+            Some("native"),
+            Some("web"),
+        )
+        .expect("a direct pusher");
+        assert_eq!(app_id, super::DIRECT_PUSH_APP_ID);
+        assert_eq!(pushkey, "https://ntfy.example/upTopic?up=1");
+        assert!(web_push.is_none());
+    }
+
+    #[test]
+    fn a_rotated_direct_pusher_stays_keyed_on_its_endpoint() {
+        let registration = Registration {
+            token: "https://ntfy.example/upNew?up=1".to_owned(),
+            p256dh: Some("key".to_owned()),
+            auth: Some("auth".to_owned()),
+        };
+        let direct = super::rotated_registration(super::DIRECT_PUSH_APP_ID, &registration);
+        assert_eq!(direct.token, registration.token);
+        assert!(direct.p256dh.is_none() && direct.auth.is_none());
+        let keyed = super::rotated_registration("web", &registration);
+        assert_eq!(keyed.p256dh.as_deref(), Some("key"));
+        assert_eq!(keyed.auth.as_deref(), Some("auth"));
     }
 
     #[test]
