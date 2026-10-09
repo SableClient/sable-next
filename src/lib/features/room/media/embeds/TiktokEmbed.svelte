@@ -7,7 +7,13 @@
 
   import LinkPreviewCard from '../LinkPreviewCard.svelte';
 
-  import { parseTiktokLink, tiktokPlayerUrl } from './tiktok';
+  import {
+    isTiktokShortLink,
+    parseTiktokLink,
+    resolveTiktokShortLink,
+    tiktokPlayerUrl,
+    type TiktokPost,
+  } from './tiktok';
 
   interface Props {
     url: string;
@@ -16,13 +22,27 @@
   }
 
   let { url, encrypted, bundled = null }: Props = $props();
-  let post = $derived(parseTiktokLink(url));
+  let direct = $derived(parseTiktokLink(url));
+  let short = $derived(direct === null && isTiktokShortLink(url));
+  let resolved = $state<TiktokPost | null | undefined>(undefined);
+  let post = $derived(direct ?? resolved ?? null);
   let playing = $state(false);
   let title = $derived(post?.author ?? 'TikTok');
 
   $effect(() => {
-    void url;
+    const target = url;
+    const shortLink = short;
     playing = false;
+    resolved = undefined;
+    if (!shortLink) return;
+
+    let cancelled = false;
+    void resolveTiktokShortLink(target).then((result) => {
+      if (!cancelled) resolved = result;
+    });
+    return () => {
+      cancelled = true;
+    };
   });
 </script>
 
@@ -52,7 +72,7 @@
       {/if}
     </div>
   </div>
-{:else}
+{:else if !short || resolved === null}
   <LinkPreviewCard {url} {encrypted} {bundled} />
 {/if}
 

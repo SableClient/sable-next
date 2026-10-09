@@ -49,6 +49,7 @@ describe('findEmbed', () => {
     expect(findEmbed(post, false)).toBeNull();
     preferences.tiktokEmbeds = true;
     expect(findEmbed(post, false)).toBe(TiktokEmbed);
+    expect(findEmbed('https://vm.tiktok.com/ZN8BdN8wW/', false)).toBe(TiktokEmbed);
   });
 
   it('embeds an Instagram post only when its own switch is on', () => {
