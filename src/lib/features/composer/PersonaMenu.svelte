@@ -191,6 +191,11 @@
       autocomplete="off"
       placeholder={$i18n.t('personas.search')}
       aria-label={$i18n.t('personas.search')}
+      onkeyup={(event) => {
+        if (event.key === 'Enter' && query && filteredPersonas && filteredPersonas.length !== 0) {
+          onChoose(filteredPersonas[0]);
+        }
+      }}
     />
 
     {#if !query}
