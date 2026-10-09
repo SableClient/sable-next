@@ -5,7 +5,12 @@ import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { CoreEvent, TimelineItemView, UrlPreviewView } from '#src/generated/protocol';
+import type {
+  CoreEvent,
+  ProfileView,
+  TimelineItemView,
+  UrlPreviewView,
+} from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -61,6 +66,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
 
 import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
+import { RoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
 
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
 import { senderColor } from './timeline-format';
@@ -1677,3 +1683,105 @@ test('reopening a room does not replace the current sender with cached members',
   expect(document.querySelector('header .sender-identity-name')).toHaveTextContent('New Alice');
   expect(document.querySelector('.message-avatar .media-image')).toBeNull();
 });
+
+test.each([
+  { name: 'Room Alice', avatar: 'mxc://example.org/room-identity' },
+  { name: null, avatar: null },
+])(
+  'room profiles stay consistent with receipts after profile loading ($name)',
+  async ({ name, avatar }) => {
+    const request = Promise.withResolvers<ProfileView>();
+    core.userProfile.mockReturnValue(request.promise);
+    const userId = '@alice:example.org';
+    const expectedName = name ?? userId;
+    const cosmeticsCore = {
+      commands: {
+        roomCosmetics: vi.fn().mockResolvedValue({
+          space_id: '!space:example.org',
+          users: [
+            {
+              user_id: userId,
+              color_on_light: null,
+              color_on_dark: null,
+              pronouns: [],
+              space_display_name: 'Other Alice',
+              space_avatar_url: 'mxc://example.org/other-identity',
+            },
+          ],
+        }),
+      },
+      subscribeEvents: () => () => {},
+      userProfile: () => request.promise,
+    };
+    const cosmetics = new RoomCosmetics(cosmeticsCore);
+    await cosmetics.load('!room:example.org', '!space:example.org');
+    render(TimelineItemHarness, {
+      core,
+      cosmetics,
+      memberUserId: userId,
+      item: {
+        item: {
+          ...item(false),
+          sender_name: name,
+          sender_avatar: avatar,
+          read_by: [userId],
+        },
+        collapsed: false,
+        members: [
+          {
+            user_id: userId,
+            display_name: name,
+            avatar_url: avatar,
+            power_level: 0,
+            membership: 'join',
+            member_ts: null,
+            kicked: false,
+            service: false,
+          },
+        ],
+      },
+    });
+    await tick();
+    expect(document.querySelector('header .sender-identity-name')).toHaveTextContent(expectedName);
+    expect(document.querySelector('.member-name')).toHaveTextContent(expectedName);
+    expect(
+      within(screen.getByRole('group', { name: 'Seen by' })).getByRole('button', {
+        name: expectedName,
+      })
+    ).toBeInTheDocument();
+
+    request.resolve({
+      user_id: userId,
+      display_name: name,
+      avatar_url: avatar,
+      bio: null,
+      hero_color: null,
+      hero_brightness: null,
+      banner_url: null,
+      status: null,
+      pronouns: [{ summary: 'they/them', language: null }],
+      timezone: null,
+      name_color_light: null,
+      name_color_dark: null,
+      animal: null,
+      extra: [],
+      supporter_awards: null,
+      legacy_fields: [],
+    });
+    await vi.waitFor(() => {
+      expect(document.querySelector('header .sender-identity-pronoun')).toHaveTextContent(
+        'they/them'
+      );
+      expect(document.querySelector('.member-identity-row')).toHaveTextContent('they/them');
+    });
+    expect(document.querySelector('header .sender-identity-name')).toHaveTextContent(expectedName);
+    expect(document.querySelector('.member-name')).toHaveTextContent(expectedName);
+    expect(
+      within(screen.getByRole('group', { name: 'Seen by' })).getByRole('button', {
+        name: expectedName,
+      })
+    ).toBeInTheDocument();
+    if (avatar) expect(core.fetchMedia).toHaveBeenCalledWith(avatar, 96, 96);
+    expect(core.fetchMedia).not.toHaveBeenCalledWith('mxc://example.org/other-identity', 96, 96);
+  }
+);

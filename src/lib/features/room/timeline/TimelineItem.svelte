@@ -179,11 +179,10 @@
     name: senderMember ? senderMember.display_name : item.sender_name,
     avatar: senderMember ? senderMember.avatar_url : item.sender_avatar,
   });
-  let spaceIdentity = $derived(roomCosmetics?.identity(item.sender, roomIdentity) ?? roomIdentity);
   let accountName = $derived(
     profileOverrides.name(
       item.sender ?? '',
-      spaceIdentity.name ??
+      roomIdentity.name ??
         (senderMember ? null : profile?.display_name) ??
         item.sender ??
         $i18n.t('timeline.unknownSender')
@@ -200,7 +199,7 @@
   let senderAvatar = $derived(
     persona?.avatar_url === ''
       ? null
-      : (persona?.avatar_url ?? profileOverrides.avatar(item.sender ?? '', spaceIdentity.avatar))
+      : (persona?.avatar_url ?? profileOverrides.avatar(item.sender ?? '', roomIdentity.avatar))
   );
   let personaTint = $derived(personaWithColor(persona));
   let pronouns = $derived(
@@ -215,19 +214,15 @@
         )
       : []
   );
-  let replyIdentity = $derived.by(() => {
+  let replyRoomName = $derived.by(() => {
     const member = findMember(members, item.in_reply_to?.sender);
-    const own = {
-      name: member ? member.display_name : (item.in_reply_to?.sender_name ?? null),
-      avatar: null,
-    };
-    return roomCosmetics?.identity(item.in_reply_to?.sender, own) ?? own;
+    return member ? member.display_name : (item.in_reply_to?.sender_name ?? null);
   });
   let replyNameBase = $derived(
     replyPersona?.display_name ??
       profileOverrides.name(
         item.in_reply_to?.sender ?? '',
-        replyIdentity.name ?? item.in_reply_to?.sender ?? $i18n.t('timeline.unknownSender')
+        replyRoomName ?? item.in_reply_to?.sender ?? $i18n.t('timeline.unknownSender')
       )
   );
   let replyIsPinged = $derived(item.in_reply_to?.sender_mentioned ?? false);

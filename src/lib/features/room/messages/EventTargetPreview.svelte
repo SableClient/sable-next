@@ -55,9 +55,7 @@
   let preview = $derived(loaded ? previewOf(loaded, $i18n.t) : fetched);
   let name = $derived.by(() => {
     if (!preview?.sender) return $i18n.t('timeline.unknownSender');
-    const own = (loaded?.sender_name ?? null) || memberName(members, preview.sender);
-    const shown = roomCosmetics?.identity(preview.sender, { name: own, avatar: null });
-    return shown?.name ?? own;
+    return (loaded?.sender_name ?? null) || memberName(members, preview.sender);
   });
 
   let persona = $derived(loaded?.per_message_profile ?? null);

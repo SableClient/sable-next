@@ -168,9 +168,8 @@
     name: roomMember ? roomMember.display_name : (currentProfile?.display_name ?? null),
     avatar: roomMember ? roomMember.avatar_url : (currentProfile?.avatar_url ?? null),
   });
-  let shownIdentity = $derived(roomCosmetics?.identity(userId, ownIdentity) ?? ownIdentity);
-  let realName = $derived(shownIdentity.name ?? userId);
-  let realAvatar = $derived(shownIdentity.avatar);
+  let realName = $derived(ownIdentity.name ?? userId);
+  let realAvatar = $derived(ownIdentity.avatar);
   let displayName = $derived(profileOverrides.name(userId, realName));
   let avatarUrl = $derived(profileOverrides.avatar(userId, realAvatar));
   let overrideColors = $derived(profileOverrides.colors(userId));

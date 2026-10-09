@@ -2,6 +2,7 @@
   import { untrack, type ComponentProps } from 'svelte';
 
   import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
+  import { provideRoomCosmetics, type RoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
 
   import {
     Bookmarks,
@@ -19,6 +20,7 @@
   import { MessageDialogs, provideMessageDialogs } from '../messages/message-dialogs.svelte.js';
   import TimelineItem from './TimelineItem.svelte';
   import { provideSenderRoles, type SenderRole } from '../members/sender-roles.js';
+  import MemberIdentityRow from '../members/MemberIdentityRow.svelte';
 
   interface Props {
     core: PinnedEventCommands & BookmarkCommands;
@@ -26,9 +28,14 @@
     readers?: readonly string[];
     showItem?: boolean;
     roles?: Record<string, SenderRole>;
+    cosmetics?: RoomCosmetics;
+    memberUserId?: string;
   }
 
-  let { core, item, readers, showItem = true, roles }: Props = $props();
+  let { core, item, readers, showItem = true, roles, cosmetics, memberUserId }: Props = $props();
+
+  const roomCosmetics = untrack(() => cosmetics);
+  if (roomCosmetics) provideRoomCosmetics(roomCosmetics);
 
   const senderRoles = untrack(() => roles);
   if (senderRoles) provideSenderRoles((userId) => senderRoles[userId] ?? null);
@@ -45,6 +52,9 @@
 <TooltipProvider>
   {#if showItem}
     <TimelineItem {...item} />
+  {/if}
+  {#if memberUserId}
+    <MemberIdentityRow userId={memberUserId} members={item.members ?? []} />
   {/if}
   <MessageContextMenu menu={messageMenu} />
   <MessageDialogHost
