@@ -53,8 +53,7 @@
       return;
     }
     const eventId = pendingEventId;
-    if (!eventId || readingEventId !== null) return;
-    // Queued receipts were already visible, even if the tab is now hidden.
+    if (!active || !eventId || readingEventId !== null) return;
     if (
       readReceiptEventId(timeline.items, {
         visibleEventId: eventId,
@@ -70,7 +69,6 @@
   }
 
   $effect(() => {
-    if (!active) flush();
     if (historical || !enabled) {
       pendingEventId = null;
       clearTimeout(coalesceTimer);
@@ -82,9 +80,10 @@
       documentVisible: active,
       lastReadEventId: pendingEventId ?? readingEventId ?? lastReadEventId,
     });
-    if (!eventId || eventId === readingEventId) return;
-    pendingEventId = eventId;
-    if (coalesceTimer === undefined) coalesceTimer = setTimeout(flush, COALESCE_MS);
+    if (eventId && eventId !== readingEventId) pendingEventId = eventId;
+    if (active && pendingEventId && coalesceTimer === undefined) {
+      coalesceTimer = setTimeout(flush, COALESCE_MS);
+    }
   });
 
   onDestroy(() => {
