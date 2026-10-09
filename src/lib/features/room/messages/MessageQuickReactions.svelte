@@ -132,5 +132,6 @@
   .quick-line {
     background: var(--surface-container-line);
     block-size: var(--border-width);
+    margin: var(--space-100) 0;
   }
 </style>
