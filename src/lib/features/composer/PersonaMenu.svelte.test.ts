@@ -78,7 +78,7 @@ test('offers the space tab only when the room is in a space', () => {
     'aria-selected',
     'true'
   );
-  expect(screen.getByRole('button', { name: 'personas.pickerNone' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'personas.pickerSyncAccount' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'personas.pickerOffSpace' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'personas.pickerOff' })).toBeNull();
 });
@@ -97,5 +97,7 @@ test('a space that is off marks its off option and not the default', () => {
 
   const off = screen.getByRole('button', { name: 'personas.pickerOffSpace' });
   expect(off).toHaveClass('selected');
-  expect(screen.getByRole('button', { name: 'personas.pickerNone' })).not.toHaveClass('selected');
+  expect(screen.getByRole('button', { name: 'personas.pickerSyncAccount' })).not.toHaveClass(
+    'selected'
+  );
 });

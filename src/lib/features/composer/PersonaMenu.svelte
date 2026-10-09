@@ -7,8 +7,12 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
+  import SyncIcon from 'phosphor-svelte/lib/ArrowsClockwiseIcon';
   import ListIcon from 'phosphor-svelte/lib/ListBulletsIcon';
   import GridIcon from 'phosphor-svelte/lib/SquaresFourIcon';
+  import RoomIcon from 'phosphor-svelte/lib/HashStraightIcon';
+  import SpaceIcon from 'phosphor-svelte/lib/HouseIcon';
+  import GlobalIcon from 'phosphor-svelte/lib/GlobeSimpleIcon';
 
   import type { PersonaSelectionView, PersonaView } from '#src/generated/protocol';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
@@ -58,9 +62,9 @@
   let scopes = $derived(
     (
       [
-        { id: 'room', label: 'common.thisRoom' },
-        { id: 'space', label: 'personas.scopeSpace' },
-        { id: 'account', label: 'personas.scopeAccount' },
+        { id: 'room', label: 'common.thisRoom', icon: RoomIcon },
+        { id: 'space', label: 'personas.scopeSpace', icon: SpaceIcon },
+        { id: 'account', label: 'personas.scopeAccount', icon: GlobalIcon },
       ] as const
     ).filter((tab) => hasSpace || tab.id !== 'space')
   );
@@ -98,8 +102,12 @@
         <span class="persona-option-name">{$i18n.t('personas.pickerOffGlobal')}</span>
         {#if !selected && !disabled}<CheckIcon />{/if}
       {:else}
-        <Avatar initials="?" size="small" />
-        <span class="persona-option-name">{$i18n.t('personas.pickerNone')}</span>
+        <Avatar size="small"><SyncIcon /></Avatar>
+        <span class="persona-option-name"
+          >{$i18n.t(
+            scope === 'room' && hasSpace ? 'personas.pickerSyncSpace' : 'personas.pickerSyncAccount'
+          )}</span
+        >
         {#if !selected && !disabled}<CheckIcon />{/if}
       {/if}
     </button>
@@ -111,7 +119,13 @@
     ? persona.display_name
     : kind === 'disable'
       ? $i18n.t(scope === 'room' ? 'personas.pickerOff' : 'personas.pickerOffSpace')
-      : $i18n.t(scope === 'account' ? 'personas.pickerOffGlobal' : 'personas.pickerNone')}
+      : $i18n.t(
+          scope === 'account'
+            ? 'personas.pickerOffGlobal'
+            : scope === 'room' && hasSpace
+              ? 'personas.pickerSyncSpace'
+              : 'personas.pickerSyncAccount'
+        )}
 
   <li>
     <button
@@ -140,7 +154,7 @@
             {:else if kind === 'disable' || kind === 'offGlobal'}
               <Avatar id={null} size="medium" name={label}><ProhibitIcon /></Avatar>
             {:else}
-              <Avatar id={null} initials="?" size="medium" name={label} />
+              <Avatar id={null} size="medium" name={label}><SyncIcon /></Avatar>
             {/if}
           </div>
         {/snippet}
@@ -161,6 +175,7 @@
           onScope(tab.id);
         }}
       >
+        <tab.icon />
         {$i18n.t(tab.label)}
       </button>
     {/each}
@@ -228,13 +243,18 @@
   }
 
   .persona-scope {
+    align-items: center;
     background: none;
     border: var(--border-width) solid transparent;
     border-radius: var(--radius);
     color: var(--surface-var-on-container);
     cursor: pointer;
+    display: flex;
     flex: 1;
+    flex-flow: column nowrap;
     font: inherit;
+    font-size: var(--font-size-small);
+    justify-content: center;
     padding: var(--space-200);
   }
 
