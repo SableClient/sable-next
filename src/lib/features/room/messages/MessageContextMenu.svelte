@@ -46,7 +46,10 @@
             <MessageQuickReactions
               count={4}
               loadImagePacks={actions.loadImagePacks}
-              onReact={react}
+              onReact={(emoji) => {
+                react(emoji);
+                menu.close();
+              }}
               roomId={actions.roomId}
             />
           {/if}

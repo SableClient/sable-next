@@ -1309,6 +1309,32 @@ test('a touch context menu the row never saw pressed opens the sheet', async () 
   expect(document.querySelector('[data-dialog-content]')).not.toBeNull();
 });
 
+test('picking a quick reaction from the context menu closes it', async () => {
+  const onReact = vi.fn();
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: { item: item(false), collapsed: false, onReply: vi.fn(), onToggleReaction: onReact },
+    },
+  });
+  await tick();
+
+  document
+    .querySelector('article.message')
+    ?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await tick();
+  const reaction = document.querySelector<HTMLButtonElement>(
+    '[data-context-menu-content] .quick-reaction'
+  );
+  if (!reaction) throw new Error('the context menu showed no quick reaction');
+
+  reaction.click();
+  await tick();
+
+  expect(onReact).toHaveBeenCalledOnce();
+  expect(document.querySelectorAll('[data-context-menu-content]')).toHaveLength(0);
+});
+
 test('a deleted message keeps its sender, its time and its menu', async () => {
   render(TimelineItemHarness, {
     props: {
