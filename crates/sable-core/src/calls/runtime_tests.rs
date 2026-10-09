@@ -309,6 +309,8 @@ async fn pending_key_with_a_custom_membership_id_is_emitted() {
             session: super::keys::SessionRef::default(),
             sent_ts: 1,
         },
+        received: super::keys::now_ms(),
+        reported: false,
     };
     let mut state = State::new(
         member(CallMode::Compatibility, 1, &[]),
@@ -424,6 +426,8 @@ async fn an_element_call_peers_key_is_emitted_on_the_oldest_members_focus() {
             sender: owned_user_id!("@genchu:federated.nexus"),
             device: owned_device_id!("spDmuPm52O"),
             content,
+            received: now,
+            reported: false,
         }],
         distributor: None,
         own_observed: false,
@@ -473,11 +477,18 @@ async fn a_key_whose_member_has_not_resolved_waits_for_the_roster() {
         sender: owned_user_id!("@user:example.org"),
         device: owned_device_id!("DEVICE"),
         content,
+        received: super::keys::now_ms() - super::UNRESOLVED_KEY_REPORT_MS,
+        reported: false,
     }];
 
     super::emit_pending(&core, 1, CallSessionId(1), &room_id, &mut state);
 
     assert_eq!(state.pending_keys.len(), 1);
+    assert!(state.pending_keys[0].reported);
+    assert_eq!(
+        super::unresolved_reason(&state.pending_keys[0], &state.members),
+        "no membership for the sending device"
+    );
     assert_eq!(
         events.try_recv().unwrap_err(),
         tokio::sync::mpsc::error::TryRecvError::Empty

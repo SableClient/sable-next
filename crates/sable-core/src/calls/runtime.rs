@@ -23,6 +23,7 @@ use crate::protocol::{
 use crate::{CallSession, Core};
 
 const UPDATE_INTERVAL: Duration = Duration::from_secs(5);
+const UNRESOLVED_KEY_REPORT_MS: u64 = 30_000;
 const RENEW_INTERVAL_MS: u64 = 600_000;
 const STICKY_RENEW_INTERVAL_MS: u64 = 3_300_000;
 const SLOT_CHECK_INTERVAL_MS: u64 = 30_000;
@@ -32,6 +33,8 @@ struct PendingKey {
     sender: OwnedUserId,
     device: OwnedDeviceId,
     content: keys::ToDeviceCallEncryptionKeysEventContent,
+    received: u64,
+    reported: bool,
 }
 
 pub(crate) struct State {
@@ -1006,6 +1009,10 @@ fn emit_pending(
         if let Some(member) = member
             && let Some(service) = member_service(member, &state.members)
         {
+            let waited = keys::now_ms().saturating_sub(pending.received);
+            if pending.reported {
+                tracing::warn!("a call media key resolved after {waited}ms");
+            }
             core.emit_if_current(
                 generation,
                 CoreEvent::CallEncryptionKey {
@@ -1018,9 +1025,39 @@ fn emit_pending(
                 },
             );
         } else {
+            let mut pending = pending;
+            if !pending.reported
+                && keys::now_ms().saturating_sub(pending.received) >= UNRESOLVED_KEY_REPORT_MS
+            {
+                pending.reported = true;
+                tracing::warn!(
+                    "a call media key is still unresolved after {UNRESOLVED_KEY_REPORT_MS}ms: {}",
+                    unresolved_reason(&pending, &state.members)
+                );
+            }
             state.pending_keys.push(pending);
         }
     }
+}
+
+fn unresolved_reason(pending: &PendingKey, members: &[CallMember]) -> &'static str {
+    let mut devices = members
+        .iter()
+        .filter(|member| member.user_id == pending.sender && member.device_id == pending.device)
+        .peekable();
+    if devices.peek().is_none() {
+        return "no membership for the sending device";
+    }
+    let Some(member) = devices.find(|member| {
+        member.mode != CallMode::Matrix2
+            || (member.member_id.is_some() && member.member_id == pending.content.member.id)
+    }) else {
+        return "the member id does not match the sticky membership";
+    };
+    if member_service(member, members).is_none() {
+        return "the member has no focus";
+    }
+    "unknown"
 }
 
 fn watch_keys(
@@ -1082,6 +1119,8 @@ fn watch_keys(
                     sender: event.sender,
                     device,
                     content: event.content,
+                    received: keys::now_ms(),
+                    reported: false,
                 });
                 emit_pending(&core, generation, session, &room_id, &mut state);
             }
