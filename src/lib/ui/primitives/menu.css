@@ -6,8 +6,16 @@
   --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
   --menu-item-hover: var(--surface-container-hover);
   --menu-item-active: var(--surface-container-active);
+  --menu-scroll-shade: color-mix(in srgb, var(--surface-on-container) 22%, transparent);
 
-  background: var(--surface-container);
+  background:
+    linear-gradient(var(--surface-container) 30%, transparent) top / 100% 1.5rem no-repeat local,
+    linear-gradient(transparent, var(--surface-container) 70%) bottom / 100% 1.5rem no-repeat local,
+    radial-gradient(farthest-side at 50% 0, var(--menu-scroll-shade), transparent) top / 100% 0.5rem
+      no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, var(--menu-scroll-shade), transparent) bottom / 100%
+      0.5rem no-repeat scroll,
+    var(--surface-container);
   border: var(--border-width) solid var(--surface-container-line);
   border-radius: var(--radius-outer);
   box-shadow: var(--shadow-e200);
