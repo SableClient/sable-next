@@ -9,6 +9,7 @@
   import { messageMenuRows } from './message-menu-items';
   import type { OpenMessageMenu } from './message-menu-open.svelte.js';
   import MessageQuickReactions from './MessageQuickReactions.svelte';
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   let { menu }: { menu: OpenMessageMenu } = $props();
 
@@ -37,6 +38,7 @@
         collisionPadding={8}
         customAnchor={anchor}
         preventScroll={false}
+        {@attach scrollHint}
       >
         <IconContext values={{ 'aria-hidden': 'true' }}>
           {#if actions.onReact}

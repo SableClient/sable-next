@@ -20,6 +20,10 @@
   transform-origin: var(--bits-floating-transform-origin, top);
 }
 
+.menu-surface.message-menu {
+  --menu-max-height: var(--bits-floating-available-height, 100dvh);
+}
+
 @keyframes menu-in {
   from {
     opacity: 0;
