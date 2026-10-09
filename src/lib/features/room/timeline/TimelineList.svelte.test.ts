@@ -14,6 +14,7 @@ import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { TIMELINE_LAYOUT } from './timeline-layout';
 import { MAX_EMPTY_REFILLS } from './timeline-pagination.svelte.js';
 
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('#lib/core/context.js');
 vi.mock('#lib/platform/overlay-back.svelte.js', () => ({
   holdOverlayBack: () => {},
@@ -29,10 +30,12 @@ vi.mock('../messages/event-items.svelte.js', () => ({
 
 import TimelineListHarness from './TimelineListHarness.test.svelte';
 import { core } from '#lib/core/__mocks__/context.js';
+import { page, resetPage } from '#lib/test-support/app-state.js';
 
 let animationFrames: FrameRequestCallback[];
 
 beforeEach(() => {
+  resetPage();
   // happy-dom ships no Web Animations API, and the skeleton fades out through it.
   Element.prototype.animate = () =>
     ({
@@ -2814,3 +2817,33 @@ test.each(['scrolling', 'settled'])(
     unmount();
   }
 );
+
+async function readsWhileSettings(open: boolean): Promise<ReturnType<typeof vi.fn>> {
+  if (open) page.state.settings = { section: 'account' };
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('latest')];
+  const read = vi.fn((_eventId: string, _fullyRead: boolean) => Promise.resolve());
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(false),
+        onRequestFuture: async () => {},
+        onRead: read,
+      },
+    },
+  });
+  viewport();
+  await tick();
+  await runAnimationFrames();
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  return read;
+}
+
+test('a room with no settings over it is read', async () => {
+  expect(await readsWhileSettings(false)).toHaveBeenCalled();
+});
+
+test('a room covered by the settings dialog is not read', async () => {
+  expect(await readsWhileSettings(true)).not.toHaveBeenCalled();
+});

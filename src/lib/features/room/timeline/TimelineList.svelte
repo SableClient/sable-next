@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import { onDestroy, tick, untrack, type Snippet } from 'svelte';
   import { on } from 'svelte/events';
   import { fade, fly } from 'svelte/transition';
@@ -196,6 +197,7 @@
   let switchingToUnread = false;
   let resumeTask: Promise<void> | null = null;
   let resumeFailed = $state(false);
+  let reading = $derived(active && page.state.settings === undefined);
   const readRoomId = untrack(() => roomId);
   let readUpTo: string | null = null;
   let fullyReadAt: string | null = null;
@@ -348,7 +350,7 @@
     const focused = windowActivity.active;
     if (opened && live) untrack(() => unread.trackBackground(eventItems, focused));
     unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
-    if (!active || !revealed || !focused) return;
+    if (!reading || !revealed || !focused) return;
     if (unreadInView) unread.observe(unread.firstEventId);
     else if (
       live &&
@@ -1013,7 +1015,7 @@
 <TimelineReadReceipt
   {timeline}
   visibleEventId={readEventId}
-  enabled={active && !unread.blocking && !markingRead && !timeline.resumingLive}
+  enabled={reading && !unread.blocking && !markingRead && !timeline.resumingLive}
   atLatest={windowState.pinned && timeline.forwardPagination === 'end'}
   onRead={markRead}
 />
