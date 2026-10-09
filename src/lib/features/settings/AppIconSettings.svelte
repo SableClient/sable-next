@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { invoke, isTauri } from '@tauri-apps/api/core';
-  import { type as osType } from '@tauri-apps/plugin-os';
   import { i18n } from '#lib/i18n.js';
+  import { loadAppIcons, setAppIcon } from '#lib/platform/app-icon.js';
+  import { isAndroid } from '#lib/platform/os.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
@@ -39,21 +39,14 @@
   let android = $state(false);
 
   onMount(() => {
-    if (!isTauri() || !['android', 'ios'].includes(osType())) return;
-    android = osType() === 'android';
+    android = isAndroid();
     let cancelled = false;
-    void Promise.all([
-      invoke<string[]>('plugin:app-icon|get_available_icons'),
-      invoke<string | null>('plugin:app-icon|get_current_icon'),
-    ])
-      .then(([available, current]) => {
-        if (cancelled) return;
-        icons = available;
-        selected = current && available.includes(current) ? current : 'primary';
-      })
-      .catch(() => {
-        // Hide the picker if the plugin is unavailable.
-      });
+    void loadAppIcons().then((loaded) => {
+      if (cancelled || !loaded) return;
+      icons = loaded.available;
+      selected =
+        loaded.current && loaded.available.includes(loaded.current) ? loaded.current : 'primary';
+    });
     return () => {
       cancelled = true;
     };
@@ -64,9 +57,7 @@
     changing = true;
     failed = false;
     try {
-      await invoke('plugin:app-icon|set_icon', {
-        request: { icon: icon === 'primary' ? null : icon },
-      });
+      await setAppIcon(icon === 'primary' ? null : icon);
       selected = icon;
     } catch {
       failed = true;
