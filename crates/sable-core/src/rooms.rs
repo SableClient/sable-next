@@ -32,6 +32,9 @@ pub(crate) fn repair_unreadable_tombstones(
     client: &Client,
 ) -> matrix_sdk::event_handler::EventHandlerHandle {
     client.add_event_handler(|raw: Raw<AnySyncTimelineEvent>, room: Room| async move {
+        if raw.get_field::<&str>("type").ok().flatten() != Some("m.room.tombstone") {
+            return;
+        }
         let Ok(mut event) = raw.deserialize_as_unchecked::<serde_json::Value>() else {
             return;
         };
