@@ -115,9 +115,11 @@
     >
       <div class="settings-title settings-nav-header">
         <Dialog.Title class="settings-heading">{@render heading()}</Dialog.Title>
-        <IconButton variant="ghost" size="small" label={closeLabel} onclick={onClose}
-          ><XIcon /></IconButton
-        >
+        {#if !pages.desktop || !pages.openSection}
+          <IconButton variant="ghost" size="small" label={closeLabel} onclick={onClose}
+            ><XIcon /></IconButton
+          >
+        {/if}
       </div>
       {@render nav({
         desktop: pages.desktop,
@@ -156,6 +158,12 @@
               {activeLabel}
             {/if}
           </Dialog.Title>
+          <IconButton variant="ghost" size="small" label={closeLabel} onclick={onClose}
+            ><XIcon /></IconButton
+          >
+        </div>
+      {:else}
+        <div class="close-bar">
           <IconButton variant="ghost" size="small" label={closeLabel} onclick={onClose}
             ><XIcon /></IconButton
           >
@@ -238,6 +246,13 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
+  }
+
+  .close-bar {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    padding: var(--space-200) var(--space-300) 0;
   }
 
   .section-bar {
