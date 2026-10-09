@@ -9,7 +9,6 @@ export interface AccountIdentity {
 
 export class AccountDirectory {
   #core: CoreClient;
-  #accountId: string | null = null;
   #identities = new SvelteMap<string, AccountIdentity>();
   // Nothing renders from this; it only stops a second request in flight.
   // eslint-disable-next-line svelte/prefer-svelte-reactivity
@@ -20,36 +19,29 @@ export class AccountDirectory {
   }
 
   identity(userId: string): AccountIdentity {
-    const accountId = this.#core.session?.account_id ?? null;
-    if (accountId !== this.#accountId) {
-      // Profiles are fetched through the active session; start over on switch.
-      this.#accountId = accountId;
-      this.#identities.clear();
-      this.#requested.clear();
-    }
-
-    const known = this.#identities.get(userId);
+    const key = `${this.#core.session?.account_id ?? ''}\n${userId}`;
+    const known = this.#identities.get(key);
     if (known) return known;
 
-    this.#request(userId);
+    this.#request(key, userId);
     return { displayName: userId, avatarUrl: null };
   }
 
-  #request(userId: string): void {
-    if (this.#requested.has(userId)) return;
-    this.#requested.add(userId);
+  #request(key: string, userId: string): void {
+    if (this.#requested.has(key)) return;
+    this.#requested.add(key);
 
     void this.#core
       .userProfile(userId)
       .then((profile) => {
-        this.#identities.set(userId, {
+        this.#identities.set(key, {
           displayName: profile.display_name ?? userId,
           avatarUrl: profile.avatar_url,
         });
       })
       .catch(() => {
         // Let a later render retry; the core throttles repeat failures.
-        this.#requested.delete(userId);
+        this.#requested.delete(key);
       });
   }
 }
