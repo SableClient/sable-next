@@ -68,6 +68,16 @@ test('re-sending an unchanged edit does not escape the body again', () => {
   expect(second.body).toBe(typed);
 });
 
+test('a typed backslash before punctuation is sent once and survives every round trip', () => {
+  const typed = '\\>.<';
+  const rich = docOf(para(composerSchema.text(typed)));
+
+  expect(serializeComposer(rich).body).toBe(typed);
+  expect(serializeComposer(textDoc(serializeComposer(rich).body)).body).toBe(typed);
+  expect(serializePlain(textDoc(typed)).body).toBe(typed);
+  expect(plainTextOf(richFromPlain(textDoc(composerMarkdown(rich))))).toBe(typed);
+});
+
 test.each(['one\ntwo', 'one\n\ntwo', 'a\nb\n\nc'])(
   'reloading the body %j for an edit sends the same body back',
   (body) => {
