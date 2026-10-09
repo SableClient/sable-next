@@ -161,6 +161,14 @@
         align="start"
         sideOffset={10}
         collisionPadding={12}
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          const searchInput = document.getElementById('persona-search');
+          if (searchInput instanceof HTMLInputElement) {
+            searchInput.focus();
+            searchInput.select();
+          }
+        }}
       >
         <PersonaMenu
           personas={sortedPersonas}

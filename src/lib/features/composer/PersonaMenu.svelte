@@ -185,7 +185,7 @@
 
   <div class="persona-toolbar">
     <TextInput
-      class="persona-search"
+      id="persona-search"
       bind:value={query}
       type="search"
       autocomplete="off"
@@ -272,7 +272,7 @@
     }
   }
 
-  :global(.persona-search) {
+  :global(#persona-search) {
     --form-control-container: var(--surface-container);
     --form-control-container-line: var(--surface-container-line);
     --form-control-color: var(--surface-on-container);
