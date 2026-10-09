@@ -3269,6 +3269,7 @@
     "resetOne": "Reset to default",
     "resetAll": "Reset every shortcut",
     "categoryCall": "Calls",
+    "categoryComposer": "Composer",
     "toggleMute": "Mute or unmute your microphone in a call",
     "toggleDeafen": "Deafen or undeafen in a call",
     "toggleCamera": "Turn your camera on or off in a call",

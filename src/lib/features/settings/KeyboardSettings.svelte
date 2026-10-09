@@ -32,6 +32,7 @@
     { id: 'general', labelKey: 'shortcuts.categoryGeneral' },
     { id: 'room', labelKey: 'shortcuts.categoryRoom' },
     { id: 'call', labelKey: 'shortcuts.categoryCall' },
+    { id: 'composer', labelKey: 'shortcuts.categoryComposer' },
   ];
 
   let capturing = $state<ShortcutId | null>(null);

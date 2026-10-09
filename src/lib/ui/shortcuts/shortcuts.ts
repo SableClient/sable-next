@@ -22,12 +22,29 @@ export type ShortcutId =
   | 'call.toggleDeafen'
   | 'call.toggleCamera'
   | 'call.toggleScreenShare'
-  | 'call.hangUp';
+  | 'call.hangUp'
+  | 'composer.strong'
+  | 'composer.em'
+  | 'composer.underline'
+  | 'composer.strike'
+  | 'composer.code'
+  | 'composer.sub'
+  | 'composer.sup'
+  | 'composer.spoiler'
+  | 'composer.bullet_list'
+  | 'composer.ordered_list'
+  | 'composer.blockquote'
+  | 'composer.heading1'
+  | 'composer.heading2'
+  | 'composer.heading3'
+  | 'composer.code_block'
+  | 'composer.link'
+  | 'composer.toggleSource';
 
 export interface ShortcutDefinition {
   id: ShortcutId;
   labelKey: string;
-  category: 'general' | 'navigation' | 'room' | 'call';
+  category: 'general' | 'navigation' | 'room' | 'call' | 'composer';
   binding: string;
   allowInEditable?: boolean;
 }
@@ -171,16 +188,137 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     category: 'call',
     binding: 'mod+shift+h',
   },
+  {
+    id: 'composer.strong',
+    labelKey: 'composer.bold',
+    category: 'composer',
+    binding: 'mod+b',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.em',
+    labelKey: 'composer.italic',
+    category: 'composer',
+    binding: 'mod+i',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.underline',
+    labelKey: 'composer.underline',
+    category: 'composer',
+    binding: 'mod+u',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.strike',
+    labelKey: 'composer.strike',
+    category: 'composer',
+    binding: 'mod+shift+x',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.code',
+    labelKey: 'composer.code',
+    category: 'composer',
+    binding: 'mod+e',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.sub',
+    labelKey: 'composer.subscript',
+    category: 'composer',
+    binding: 'mod+,',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.sup',
+    labelKey: 'composer.superscript',
+    category: 'composer',
+    binding: 'mod+.',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.spoiler',
+    labelKey: 'composer.spoiler',
+    category: 'composer',
+    binding: 'mod+h',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.bullet_list',
+    labelKey: 'composer.bulletList',
+    category: 'composer',
+    binding: 'mod+shift+8',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.ordered_list',
+    labelKey: 'composer.orderedList',
+    category: 'composer',
+    binding: 'mod+shift+9',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.blockquote',
+    labelKey: 'composer.quote',
+    category: 'composer',
+    binding: 'mod+shift+.',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.heading1',
+    labelKey: 'composer.heading1',
+    category: 'composer',
+    binding: 'mod+1',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.heading2',
+    labelKey: 'composer.heading2',
+    category: 'composer',
+    binding: 'mod+2',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.heading3',
+    labelKey: 'composer.heading3',
+    category: 'composer',
+    binding: 'mod+3',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.code_block',
+    labelKey: 'composer.codeBlock',
+    category: 'composer',
+    binding: 'mod+;',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.link',
+    labelKey: 'composer.link',
+    category: 'composer',
+    binding: 'mod+shift+k',
+    allowInEditable: true,
+  },
+  {
+    id: 'composer.toggleSource',
+    labelKey: 'composer.markdownSource',
+    category: 'composer',
+    binding: 'mod+shift+m',
+    allowInEditable: true,
+  },
 ] as const;
 
-const GLOBAL_SCOPE = 'global';
+export function shortcutScope(shortcut: Pick<ShortcutDefinition, 'category'>): string {
+  return shortcut.category === 'composer' ? 'composer' : 'global';
+}
 
 export function shortcutsConflicts(isMac: boolean): ReturnType<typeof findShortcutConflicts> {
   return findShortcutConflicts(
     SHORTCUTS.map((shortcut) => ({
       id: shortcut.id,
       binding: shortcut.binding,
-      scope: GLOBAL_SCOPE,
+      scope: shortcutScope(shortcut),
     })),
     isMac
   );

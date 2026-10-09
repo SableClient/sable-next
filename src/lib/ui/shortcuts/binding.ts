@@ -162,6 +162,34 @@ export function formatBinding(binding: string, isMac: boolean): string {
   return parts.join('+');
 }
 
+const PROSEMIRROR_KEY_NAMES: Record<string, string> = {
+  ' ': 'Space',
+  arrowup: 'ArrowUp',
+  arrowdown: 'ArrowDown',
+  arrowleft: 'ArrowLeft',
+  arrowright: 'ArrowRight',
+  escape: 'Escape',
+};
+
+export function toProseMirrorKey(binding: string): string {
+  const parsed = parseBinding(binding);
+  const parts: string[] = [];
+
+  if (parsed.mod) parts.push('Mod');
+  if (parsed.ctrl) parts.push('Ctrl');
+  if (parsed.meta) parts.push('Meta');
+  if (parsed.alt) parts.push('Alt');
+  if (parsed.shift) parts.push('Shift');
+  parts.push(
+    PROSEMIRROR_KEY_NAMES[parsed.key] ??
+      (parsed.key.length === 1
+        ? parsed.key
+        : parsed.key.charAt(0).toUpperCase() + parsed.key.slice(1))
+  );
+
+  return parts.join('-');
+}
+
 const MODIFIER_KEYS = new Set(['control', 'meta', 'alt', 'shift', 'os', 'altgraph']);
 
 export function bindingFromEvent(event: KeyboardEventLike, isMac: boolean): string | null {

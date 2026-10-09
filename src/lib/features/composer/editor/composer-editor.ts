@@ -10,7 +10,7 @@ import { dropCursor } from 'prosemirror-dropcursor';
 import { gapCursor } from 'prosemirror-gapcursor';
 import { history, redo, undo } from 'prosemirror-history';
 import { inputRules, undoInputRule } from 'prosemirror-inputrules';
-import { keymap } from 'prosemirror-keymap';
+import { keydownHandler, keymap } from 'prosemirror-keymap';
 import { Slice, type Node as ProseMirrorNode, type ResolvedPos } from 'prosemirror-model';
 import {
   Plugin,
@@ -33,6 +33,9 @@ import type { PackImageView } from '#src/generated/protocol';
 
 import { enterInsertsNewline } from '#lib/settings/enter-key.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
+import { toProseMirrorKey } from '#lib/ui/shortcuts/binding.js';
+import { bindingFor } from '#lib/ui/shortcuts/bindings.svelte.js';
+import type { ShortcutId } from '#lib/ui/shortcuts/shortcuts.js';
 import type { AutocompleteQuery } from '../autocomplete';
 import { filesFrom } from '../composer-files';
 import { compositionInputRules } from './composition-rules';
@@ -44,6 +47,7 @@ import {
   formatCommands,
   formattingInputRules,
   formattingKeymap,
+  formattingShortcuts,
   insideListItem,
   joinListItemBackward,
   sinkListEntry,
@@ -74,6 +78,21 @@ import {
   textSlice,
 } from './serialize';
 import { shortcodeInputRule } from './shortcodes';
+
+function shortcutKeymap(commands: Partial<Record<ShortcutId, Command>>): Plugin {
+  return new Plugin({
+    props: {
+      handleKeyDown(view, event) {
+        const map: Record<string, Command> = {};
+        for (const [id, command] of Object.entries(commands)) {
+          const binding = bindingFor(id);
+          if (binding) map[toProseMirrorKey(binding)] = command;
+        }
+        return keydownHandler(map)(view, event);
+      },
+    },
+  });
+}
 
 const androidBackspaceKeyEvent = (): KeyboardEvent =>
   new KeyboardEvent('keydown', {
@@ -751,17 +770,22 @@ export class ComposerEditor {
         ],
       }),
       compositionInputRules(),
-      ...(rich
-        ? [
-            keymap(formattingKeymap),
-            keymap({
-              'Mod-Shift-k': () => {
+      ...(rich ? [keymap(formattingKeymap)] : []),
+      shortcutKeymap({
+        ...(rich
+          ? {
+              ...formattingShortcuts,
+              'composer.link': () => {
                 this.options.onLinkRequest();
                 return true;
               },
-            }),
-          ]
-        : []),
+            }
+          : {}),
+        'composer.toggleSource': () => {
+          this.options.onSourceToggle(this.toggleSource());
+          return true;
+        },
+      }),
       gapCursor(),
       dropCursor(),
       trailingParagraph(),
@@ -797,10 +821,6 @@ export class ComposerEditor {
         Enter: this.enter,
         'Shift-Enter': this.shiftEnter,
         'Mod-Enter': () => this.submit(),
-        'Mod-Shift-m': () => {
-          this.options.onSourceToggle(this.toggleSource());
-          return true;
-        },
       }),
       keymap(baseKeymap),
     ];

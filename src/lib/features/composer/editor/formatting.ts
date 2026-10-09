@@ -20,6 +20,8 @@ import {
 import { canJoin, findWrapping } from 'prosemirror-transform';
 import { wrapIn } from 'prosemirror-commands';
 
+import type { ShortcutId } from '#lib/ui/shortcuts/shortcuts.js';
+
 import { composerSchema } from './schema';
 import { atomText, markdownSlice } from './serialize';
 
@@ -462,22 +464,25 @@ const orderedListCommand = toggleList(nodes.ordered_list);
 const blockquoteCommand = toggleWrap(nodes.blockquote);
 
 export const formattingKeymap: Record<string, Command> = {
-  'Mod-b': toggleMark(marks.strong),
-  'Mod-i': toggleMark(marks.em),
-  'Mod-u': toggleMark(marks.underline),
-  'Mod-Shift-x': toggleMark(marks.strike),
-  'Mod-e': toggleMark(marks.code),
-  'Mod-,': toggleMark(marks.sub),
-  'Mod-.': toggleMark(marks.sup),
-  'Mod-h': toggleMark(marks.spoiler),
-  'Mod-Shift-8': bulletListCommand,
-  'Mod-Shift-9': orderedListCommand,
-  'Mod-Shift-.': blockquoteCommand,
-  'Mod-1': headingCommand(1),
-  'Mod-2': headingCommand(2),
-  'Mod-3': headingCommand(3),
-  'Mod-;': codeBlockCommand,
   'Shift-Tab': liftListEntry,
+};
+
+export const formattingShortcuts: Partial<Record<ShortcutId, Command>> = {
+  'composer.strong': toggleMark(marks.strong),
+  'composer.em': toggleMark(marks.em),
+  'composer.underline': toggleMark(marks.underline),
+  'composer.strike': toggleMark(marks.strike),
+  'composer.code': toggleMark(marks.code),
+  'composer.sub': toggleMark(marks.sub),
+  'composer.sup': toggleMark(marks.sup),
+  'composer.spoiler': toggleMark(marks.spoiler),
+  'composer.bullet_list': bulletListCommand,
+  'composer.ordered_list': orderedListCommand,
+  'composer.blockquote': blockquoteCommand,
+  'composer.heading1': headingCommand(1),
+  'composer.heading2': headingCommand(2),
+  'composer.heading3': headingCommand(3),
+  'composer.code_block': codeBlockCommand,
 };
 
 export const splitListEntry = splitListItem(nodes.list_item);

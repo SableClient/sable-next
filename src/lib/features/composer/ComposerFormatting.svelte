@@ -26,6 +26,9 @@
   import type { Component } from 'svelte';
 
   import { i18n } from '#lib/i18n.js';
+  import { formatBinding } from '#lib/ui/shortcuts/binding.js';
+  import { bindingFor } from '#lib/ui/shortcuts/bindings.svelte.js';
+  import { isMacPlatform } from '#lib/ui/shortcuts/global-shortcuts.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
@@ -82,6 +85,11 @@
   let secondary = $derived(available.filter((button) => !primaryActions.includes(button.action)));
   let visible = $derived([...primary, ...secondary]);
 
+  function withShortcut(label: string, id: string): string {
+    const binding = bindingFor(id);
+    return binding ? `${label} (${formatBinding(binding, isMacPlatform())})` : label;
+  }
+
   function scrollSideways(event: WheelEvent & { currentTarget: HTMLDivElement }): void {
     const bar = event.currentTarget;
     if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
@@ -98,7 +106,7 @@
   onwheel={scrollSideways}
 >
   {#each visible as button (button.action)}
-    <Tooltip label={$i18n.t(button.label)}>
+    <Tooltip label={withShortcut($i18n.t(button.label), `composer.${button.action}`)}>
       {#snippet trigger({ props })}
         <IconButton
           {...mergeProps(props, {
@@ -132,7 +140,7 @@
     onPick={(value) => onColor('bg', value)}
   />
   {#if source || !markdown}
-    <Tooltip label={$i18n.t('composer.markdownSource')}>
+    <Tooltip label={withShortcut($i18n.t('composer.markdownSource'), 'composer.toggleSource')}>
       {#snippet trigger({ props })}
         <IconButton
           {...mergeProps(props, { onclick: onToggleSource })}

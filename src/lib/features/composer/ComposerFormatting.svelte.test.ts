@@ -44,7 +44,9 @@ test('a formatting button names itself on hover', async () => {
     pointerType: 'mouse',
   });
 
-  expect(await screen.findByText('composer.bold', { selector: '.tooltip' })).toBeInTheDocument();
+  expect(
+    await screen.findByText('composer.bold (Ctrl+B)', { selector: '.tooltip' })
+  ).toBeInTheDocument();
 });
 
 test('a formatting button still formats with its tooltip attached', async () => {
