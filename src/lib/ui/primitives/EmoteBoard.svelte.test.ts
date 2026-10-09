@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 
-import { render } from '@testing-library/svelte';
+import { fireEvent, render } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
 vi.mock('#lib/emoji/load-packs.js', () => ({
@@ -19,13 +19,13 @@ vi.mock('#lib/emoji/load-packs.js', () => ({
           declared_name: 'Pack',
           declared_avatar_url: null,
           attribution: null,
-          usage: ['emoticon'],
+          usage: ['emoticon', 'sticker'],
           images: [
             {
               shortcode: 'wave',
               url: 'mxc://example.org/wave',
               body: null,
-              usage: ['emoticon'],
+              usage: ['emoticon', 'sticker'],
               info: null,
               source_pack: null,
             },
@@ -40,11 +40,21 @@ vi.mock('#lib/emoji/load-packs.js', () => ({
 }));
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { rememberEmote } from '#lib/emoji/recent-packs.svelte.js';
 
 import EmoteBoard from './EmoteBoard.svelte';
 
+beforeEach(() => {
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400);
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 48, 48)
+  );
+});
+
 afterEach(() => {
   core.fetchMedia.mockReset();
+  vi.restoreAllMocks();
 });
 
 test('requests pack images unthumbnailed so animated emotes animate', async () => {
@@ -61,4 +71,42 @@ test('requests pack images unthumbnailed so animated emotes animate', async () =
   for (const [, width, height] of requests) {
     expect([width, height]).toEqual([0, 0]);
   }
+});
+
+test('previews a search result on hover', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  const { findByRole, container } = render(EmoteBoard, {
+    props: { roomId: '!room:example.org', query: 'wav', onPick: vi.fn() },
+  });
+
+  const button = await findByRole('button', { name: ':wave:' });
+  await fireEvent.pointerEnter(button);
+
+  expect(container.querySelector('.preview code')?.textContent).toBe(':wave:');
+});
+
+test('previews a recent sticker on hover', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  rememberEmote('wave', 'sticker');
+  const { findAllByRole, container } = render(EmoteBoard, {
+    props: { roomId: '!room:example.org', tab: 'sticker', onPick: vi.fn() },
+  });
+
+  const [button] = await findAllByRole('button', { name: ':wave:' });
+  await fireEvent.pointerEnter(button);
+
+  expect(container.querySelector('.preview code')?.textContent).toBe(':wave:');
+});
+
+test('previews a recent emote on focus', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  rememberEmote('wave', 'emoticon');
+  const { findAllByRole, container } = render(EmoteBoard, {
+    props: { roomId: '!room:example.org', unicode: true, onPick: vi.fn() },
+  });
+
+  const [cell] = await findAllByRole('gridcell', { name: ':wave:' });
+  await fireEvent.focus(cell);
+
+  expect(container.querySelector('.preview code')?.textContent).toBe(':wave:');
 });

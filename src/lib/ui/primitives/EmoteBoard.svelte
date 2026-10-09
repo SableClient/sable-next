@@ -173,6 +173,10 @@
       .filter((section) => section.images.length > 0);
   });
 
+  let packOf = $derived(
+    new Map(sections.flatMap((section) => section.images.map((image) => [image, section.pack])))
+  );
+
   let searching = $derived(query.trim() !== '');
   /** Search is by emote, so matches arrive as one flat list across packs. */
   let matchedImages = $derived(
@@ -502,6 +506,11 @@
     return resizable ? trackBoardSize(element) : undefined;
   }
 
+  function showPreview(image: PackImageView, pack: ImagePackView | null): void {
+    const owner = pack ?? packOf.get(image);
+    if (owner) preview = { image, pack: owner };
+  }
+
   function pick(image: PackImageView, keepOpen: boolean): void {
     rememberEmote(image.shortcode, tab === 'sticker' ? 'sticker' : 'emoticon');
     onPick(image, tab as ImageUsageView, keepOpen);
@@ -711,6 +720,12 @@
                               onclick={(event) => {
                                 pickCell(cell, event.shiftKey);
                               }}
+                              onpointerenter={() => {
+                                if ('image' in cell) showPreview(cell.image, null);
+                              }}
+                              onfocus={() => {
+                                if ('image' in cell) showPreview(cell.image, null);
+                              }}
                               {@attach focusWhenPending(row.section, index)}
                             >
                               {#if source.startsWith('mxc://')}
@@ -746,10 +761,10 @@
                                 pick(image, event.shiftKey);
                               }}
                               onpointerenter={() => {
-                                if (row.pack) preview = { image, pack: row.pack };
+                                showPreview(image, row.pack);
                               }}
                               onfocus={() => {
-                                if (row.pack) preview = { image, pack: row.pack };
+                                showPreview(image, row.pack);
                               }}
                             >
                               <MediaImage
