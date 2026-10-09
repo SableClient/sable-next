@@ -15,12 +15,26 @@
 
   let details = $state('');
   let detailsSent = $state(false);
+  let copied = $state(false);
 
   let crash = $derived(page.error?.stack !== undefined || page.error?.eventId !== undefined);
   let eventId = $derived(page.error?.eventId);
 
   function reloadApp(): void {
     void goto(resolve('/(app)/rooms'));
+  }
+
+  async function copyError(): Promise<void> {
+    const error = page.error;
+    if (!error) return;
+    const stack = error.stack ?? '';
+    const text = stack.includes(error.message) ? stack : [error.message, stack].join('\n\n');
+    try {
+      await navigator.clipboard.writeText(text.trim());
+      copied = true;
+    } catch (failure) {
+      console.debug('[sable] clipboard unavailable', failure);
+    }
   }
 
   async function reportOnForge(): Promise<void> {
@@ -82,6 +96,9 @@
       {/if}
 
       <Button size="medium" onclick={reportOnForge}>{$i18n.t('errors.reportIssue')}</Button>
+      <Button size="medium" onclick={copyError}>
+        {copied ? $i18n.t('common.copied') : $i18n.t('common.copy')}
+      </Button>
 
       {#if page.error?.stack}
         <details class="stack">
