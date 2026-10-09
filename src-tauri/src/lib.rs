@@ -35,8 +35,6 @@ mod portal_theme;
 pub mod proxy;
 #[cfg(target_os = "linux")]
 pub mod screen_audio;
-#[cfg(mobile)]
-use tauri_plugin_notifications::NotificationsExt;
 mod sentry;
 mod share_inbox;
 #[cfg(target_os = "windows")]
@@ -380,17 +378,27 @@ async fn set_notification_encrypted_content(
     sounds: bool,
     notify_once: bool,
 ) -> Result<(), CommandErr> {
-    #[cfg(mobile)]
-    app.notifications()
-        .set_push_policy(enabled, content, allowed, sounds, notify_once)
-        .await
-        .map_err(|_| CommandErr::Unavailable)?;
-    #[cfg(not(mobile))]
-    let _ = (content, enabled, sounds, notify_once);
+    #[cfg(target_os = "android")]
+    {
+        use tauri_plugin_sable_push::SablePushExt;
+        app.sable_push()
+            .set_policy(tauri_plugin_sable_push::Policy {
+                enabled,
+                content,
+                encrypted_content: allowed,
+                sounds,
+                notify_once,
+            })
+            .await
+            .map_err(|_| CommandErr::Unavailable)?;
+    }
     #[cfg(target_os = "ios")]
     ios::write_push_policy(enabled, content, allowed, sounds, notify_once)
         .map_err(|_| CommandErr::Unavailable)?;
-    notifications::allow_encrypted_content(&app, allowed).await;
+    #[cfg(not(target_os = "android"))]
+    let _ = &app;
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let _ = (allowed, content, enabled, sounds, notify_once);
     Ok(())
 }
 
@@ -489,11 +497,6 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     spawn_event_pump(app.handle().clone(), pushing, events, event_sink);
     #[cfg(desktop)]
     notifications::register_actions(app.handle());
-    #[cfg(target_os = "android")]
-    {
-        let handle = app.handle().clone();
-        tauri::async_runtime::spawn(async move { notifications::ensure_channel(&handle).await });
-    }
     #[cfg(desktop)]
     app.manage(tray::DesktopWindowStore::default());
 
@@ -824,6 +827,9 @@ fn with_platform_plugins(builder: tauri::Builder<BrowserEngine>) -> tauri::Build
         .plugin(tauri_plugin_app_icon::init())
         .plugin(tauri_plugin_edge_to_edge::init())
         .plugin(tauri_plugin_livekit_mobile::init());
+
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(tauri_plugin_sable_push::init());
 
     #[cfg(all(any(target_os = "android", target_os = "ios"), feature = "geolocation"))]
     let builder = builder.plugin(tauri_plugin_geolocation::init());

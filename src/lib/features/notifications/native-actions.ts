@@ -8,12 +8,22 @@ const REPLY_ACTION = 'sable-reply';
 const MARK_READ_ACTION = 'sable-mark-read';
 const ANSWER_CALL_ACTION = 'sable-call-answer';
 const DECLINE_CALL_ACTION = 'sable-call-decline';
+const ACCEPT_INVITE_ACTION = 'sable-invite-accept';
+const DECLINE_INVITE_ACTION = 'sable-invite-decline';
 
 export function callNotificationAction(
   action: NativeNotificationAction
 ): 'answer' | 'decline' | null {
   if (action.actionId === ANSWER_CALL_ACTION) return 'answer';
   if (action.actionId === DECLINE_CALL_ACTION) return 'decline';
+  return null;
+}
+
+export function inviteNotificationAction(
+  action: NativeNotificationAction
+): 'accept' | 'decline' | null {
+  if (action.actionId === ACCEPT_INVITE_ACTION) return 'accept';
+  if (action.actionId === DECLINE_INVITE_ACTION) return 'decline';
   return null;
 }
 

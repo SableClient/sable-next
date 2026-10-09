@@ -698,7 +698,11 @@
       jumpToEvent(link.eventId);
       return;
     }
-    void afterOverlayPops().then(() => goto(target));
+    void afterOverlayPops().then(() =>
+      goto(target, {
+        replace: phone && new URL(target, page.url.href).pathname === page.url.pathname,
+      })
+    );
   }
 
   function handleProfileLink(link: MatrixLink, anchor: HTMLAnchorElement): void {
@@ -747,7 +751,6 @@
     void goto(roomUrl(null), { replace: true });
   }
 
-  // A history entry, so back is a way out of the anchor.
   function jumpToEvent(eventId: string): void {
     if (eventId === page.url.searchParams.get('event')) {
       if (!timelineList?.jumpToEvent(eventId)) {
@@ -761,7 +764,7 @@
       return;
     }
     const target = roomUrl(eventId);
-    void afterOverlayPops().then(() => goto(target, { reset: false }));
+    void afterOverlayPops().then(() => goto(target, { replace: phone, reset: false }));
   }
 
   function requestHistory(count = 25): Promise<boolean> {

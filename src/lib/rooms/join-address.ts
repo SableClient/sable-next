@@ -2,7 +2,7 @@ import { parseMatrixLink } from './matrix-link';
 
 export type JoinAddress = { address: string; via: string[] };
 
-const idOrAlias = /^[!#][^:\s?]+:[^\s?]+$/;
+const idOrAlias = /^(?:#[^:\s?]+:[^\s?]+|![^:\s?]+(?::[^\s?]+)?)$/;
 
 /**
  * matrix.to carries `?via=` inside the fragment, where neither `URL.searchParams`

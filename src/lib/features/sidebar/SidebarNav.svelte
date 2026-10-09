@@ -62,13 +62,18 @@
   const core = useCoreClient();
   const roomList = useRoomList();
   const call = useCallSession();
-  let pathname = $state(page.url.pathname);
+  let pathname = $state(page.url.pathname === '/create-room' ? '/rooms' : page.url.pathname);
   let spaceId = $state(page.params.spaceId);
   let roomId = $state(page.params.roomId);
 
   afterNavigate(() => {
     roomId = page.params.roomId;
-    if (page.url.pathname === '/inbox' || page.url.pathname === '/search') return;
+    if (
+      page.url.pathname === '/inbox' ||
+      page.url.pathname === '/search' ||
+      page.url.pathname === '/create-room'
+    )
+      return;
     pathname = page.url.pathname;
     spaceId = page.params.spaceId;
   });

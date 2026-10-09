@@ -15,6 +15,7 @@ export type PushPayload = {
     room_name?: string;
     sender_display_name?: string;
     type?: string;
+    membership?: string;
     content?: PushContent;
     counts?: { unread?: number };
     icon?: string;
@@ -83,6 +84,7 @@ export function parsePushPayload(raw: string | undefined): PushPayload | null {
         room_name: text(notification.room_name),
         sender_display_name: text(notification.sender_display_name),
         type: text(notification.type),
+        membership: text(notification.membership),
         content: pushContent(notification.content),
         counts: { unread },
         noisy,
@@ -126,6 +128,7 @@ export type PushAlert = {
   roomId: string;
   eventId: string | null;
   ring: boolean;
+  invite: boolean;
 };
 
 const RING_EVENT_TYPES = new Set(['m.rtc.notification', 'org.matrix.msc4075.rtc.notification']);
@@ -171,6 +174,7 @@ export function alert(
     roomId,
     eventId: notification.event_id ?? null,
     ring: rings(notification),
+    invite: invites(notification),
   };
 }
 
@@ -194,7 +198,10 @@ function line(
 }
 
 function invites(notification: NonNullable<PushPayload['notification']>): boolean {
-  return notification.type === 'm.room.member' && notification.content?.membership === 'invite';
+  return (
+    notification.type === 'm.room.member' &&
+    (notification.membership ?? notification.content?.membership) === 'invite'
+  );
 }
 
 function body(

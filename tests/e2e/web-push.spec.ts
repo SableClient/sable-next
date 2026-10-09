@@ -22,6 +22,20 @@ async function shownNotifications(page: Page): Promise<string[]> {
   });
 }
 
+async function shownActions(page: Page): Promise<string[][]> {
+  return page.evaluate(async () => {
+    const ready = await navigator.serviceWorker.ready;
+    const notifications = await ready.getNotifications();
+    return notifications.map((notification) => {
+      const titles = (notification as Notification & { actions: { title: string }[] }).actions.map(
+        (action) => action.title
+      );
+      notification.close();
+      return titles;
+    });
+  });
+}
+
 test('a push shows a notification naming the room the app cached', async ({
   page,
   app,
@@ -76,5 +90,62 @@ test('a push shows a notification naming the room the app cached', async ({
   await expect
     .poll(deliver, { timeout: 60_000 })
     .toEqual([`${roomName}|New message|${admin.userId} ${roomId}`]);
+  await away.close();
+});
+
+test('a push for an invitation reads as an invitation with accept and decline', async ({
+  page,
+  app,
+  context,
+  admin,
+  guest,
+}) => {
+  await context.grantPermissions(['notifications']);
+
+  const roomName = `Invited ${String(Date.now())}`;
+  const roomId = await guest.createRoom({ name: roomName, invite: [admin.userId] });
+
+  await app.openRooms();
+
+  const session = await context.newCDPSession(page);
+  const activated = new Promise<string>((resolve) => {
+    session.on('ServiceWorker.workerVersionUpdated', (event) => {
+      const running = event.versions.find((version) => version.status === 'activated');
+      if (running) resolve(running.registrationId);
+    });
+  });
+  await session.send('ServiceWorker.enable');
+  const registrationId = await activated;
+
+  const payload = JSON.stringify({
+    notification: {
+      room_id: roomId,
+      event_id: '$an-invite',
+      user_id: admin.userId,
+      type: 'm.room.member',
+      membership: 'invite',
+      sender_display_name: 'Ada',
+      counts: { unread: 1 },
+    },
+  });
+
+  const away = await context.newPage();
+  await away.bringToFront();
+
+  const deliver = async (): Promise<string[]> => {
+    await session.send('ServiceWorker.deliverPushMessage', {
+      origin: 'http://127.0.0.1',
+      registrationId,
+      data: payload,
+    });
+    const bodies = await page.evaluate(async () => {
+      const ready = await navigator.serviceWorker.ready;
+      return (await ready.getNotifications()).map((notification) => notification.body);
+    });
+    return bodies;
+  };
+
+  await expect.poll(deliver, { timeout: 60_000 }).toEqual([expect.stringMatching(/invited you/i)]);
+  expect(await shownActions(page)).toEqual([['Accept', 'Decline']]);
   await away.close();
 });

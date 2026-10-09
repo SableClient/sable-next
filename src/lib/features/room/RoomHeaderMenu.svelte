@@ -92,7 +92,7 @@
       class="room-menu-button selection-open"
       label={$i18n.t('common.moreOptions')}
     >
-      <DotsThreeVerticalIcon weight={open ? 'fill' : 'regular'} />
+      <DotsThreeVerticalIcon />
     </PanelHeaderButton>
   {/snippet}
 

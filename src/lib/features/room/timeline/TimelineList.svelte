@@ -345,10 +345,13 @@
     );
   });
   $effect(() => {
+    const focused = windowActivity.active;
+    if (opened && live) untrack(() => unread.trackBackground(eventItems, focused));
     unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
-    if (!active || !revealed || document.visibilityState !== 'visible') return;
+    if (!active || !revealed || !focused) return;
     if (unreadInView) unread.observe(unread.firstEventId);
-    else if (live && windowState.pinned && opened && !jumpingUnread) unread.reachLatest();
+    else if (live && windowState.pinned && opened && !jumpingUnread && !unread.background)
+      unread.reachLatest();
   });
   let hadUnread = untrack(() => hasUnread);
   $effect(() => {
@@ -425,6 +428,7 @@
   function readerScrolled(delta: number): void {
     historyController.clearUserScrollPending();
     if (!revealed) return;
+    if (delta > 0 && windowState.pinned && windowActivity.active) unread.reachLatest();
     historyController.observeScroll(delta < 0, nearLatest);
     if (
       timeline.mode.kind !== 'live' &&
@@ -922,6 +926,7 @@
       onJumpToLive?.();
       return;
     }
+    unread.reachLatest();
     void controller?.jumpTo(null, 'start', !shouldReduceMotion());
   }
   function onEscape(event: KeyboardEvent): void {
@@ -1047,7 +1052,7 @@
         <span
           >{unreadCount > 0
             ? $i18n.t('timeline.unreadCount', { count: unreadCount })
-            : $i18n.t('timeline.newMessages')}</span
+            : $i18n.t('timeline.newMessagesUnknown')}</span
         >
         <span class="unread-action">{$i18n.t('timeline.jumpToUnread')}</span>
       </Button>

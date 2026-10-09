@@ -100,6 +100,72 @@ test('background messages stay unread until focus returns', async ({ page }) => 
   expect(errors).toEqual([]);
 });
 
+for (const background of ['blur', 'hidden'] as const) {
+  test(`keeps a jump to missed messages after ${background}`, async ({ page }) => {
+    const timeline = new RoomTimeline(page);
+    const core = new FakeCoreDriver(page);
+    await page.goto(`/rooms/${encodeURIComponent('!room:example.test')}`);
+    await timeline.expectRevealed({ timeout: 30_000 });
+    await expect(timeline.message('General message 19')).toBeInViewport();
+    await expect.poll(() => page.evaluate(() => window.__e2eCommands)).toContain('mark_read');
+
+    await page.evaluate((background) => {
+      if (background === 'blur') {
+        window.__e2eWindowFocused = false;
+        window.dispatchEvent(new Event('blur'));
+      } else {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }
+    }, background);
+    await page.waitForTimeout(650);
+    const receipts = await page.evaluate(
+      () => window.__e2eCommands.filter((type) => type === 'mark_read').length
+    );
+    await core.emitTimelineDiff(await core.subscription(), [
+      { op: 'push_back', value: timelineItem('missed-0', 'Missed message 0') },
+    ]);
+    await expect(timeline.message('Missed message 0')).toBeInViewport();
+    await core.emitTimelineDiff(
+      await core.subscription(),
+      Array.from({ length: 29 }, (_, index) => ({
+        op: 'push_back' as const,
+        value: timelineItem(`missed-${index + 1}`, `Missed message ${index + 1}`),
+      }))
+    );
+    await expect(timeline.message('Missed message 29')).toBeInViewport();
+    await expect(timeline.message('Missed message 0')).not.toBeInViewport();
+    const jump = page.getByRole('button', { name: 'Jump to unread' });
+    await expect(jump).toBeVisible();
+    await expect(jump).toContainText('30 new messages');
+
+    await page.evaluate((background) => {
+      if (background === 'blur') {
+        window.__e2eWindowFocused = true;
+        window.dispatchEvent(new Event('focus'));
+      } else {
+        Reflect.deleteProperty(document, 'visibilityState');
+        document.dispatchEvent(new Event('visibilitychange'));
+      }
+    }, background);
+    await page.waitForTimeout(650);
+    await expect(jump).toBeVisible();
+    expect(
+      await page.evaluate(() => window.__e2eCommands.filter((type) => type === 'mark_read').length)
+    ).toBe(receipts);
+
+    await jump.click();
+    await expect(timeline.message('Missed message 0')).toBeInViewport();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__e2eCommands.filter((type) => type === 'mark_read').length)
+      )
+      .toBeGreaterThan(receipts);
+    await timeline.scrollToBottomAndNotify();
+    await expect(page.getByRole('button', { name: 'Jump to unread' })).toHaveCount(0);
+  });
+}
+
 for (const choice of [
   { name: 'manual offline status', presence: 'offline', sendPresence: true, expected: 'offline' },
   {

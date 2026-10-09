@@ -12,6 +12,7 @@
     "android-fs:allow-write-file",
     "android-fs:allow-set-public-file-pending",
     "android-fs:allow-scan-public-file",
-    "android-fs:allow-remove-file"
+    "android-fs:allow-remove-file",
+    "sable-push:default"
   ]
 }

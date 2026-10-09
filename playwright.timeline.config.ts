@@ -48,6 +48,7 @@ export default defineConfig({
     'voice-room-chat.spec.ts',
     'calendar-room-menu.spec.ts',
     'room-icon-badge.spec.ts',
+    'room-options-trigger.spec.ts',
     'space-search-navigation.spec.ts',
     'space-timeline-navigation.spec.ts',
     'verification-qr.spec.ts',

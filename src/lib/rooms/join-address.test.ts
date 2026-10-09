@@ -13,6 +13,16 @@ test('a bare alias or room id needs no via servers', () => {
   });
 });
 
+test('a v12 room id has no server part', () => {
+  const id = '!dIz4NfOB_FDBH4ktZeSqqTfPEcBwm4KnNTnJptVRDko';
+  expect(parseJoinAddress(id)).toEqual({ address: id, via: [] });
+  expect(parseJoinAddress(`https://matrix.to/#/${id}?via=one.org`)).toEqual({
+    address: id,
+    via: ['one.org'],
+  });
+  expect(parseJoinAddress('#alias')).toBeNull();
+});
+
 test('a matrix.to link keeps its via servers out of the room id', () => {
   expect(parseJoinAddress('https://matrix.to/#/!abc:example.org?via=one.org&via=two.org')).toEqual({
     address: '!abc:example.org',

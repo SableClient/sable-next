@@ -102,6 +102,21 @@ test.each([
   expect(screen.getByRole('link', { name: expected })).toHaveAttribute('data-matrix-link', 'user');
 });
 
+test('keeps the author text on a user mention when asked to', async () => {
+  render(FormattedBody, {
+    props: {
+      html: '<a href="https://matrix.to/#/@ezera:example.org">@ezera \u2192</a>',
+      keepMentionText: true,
+    },
+  });
+  await tick();
+
+  expect(screen.getByRole('link', { name: '@ezera \u2192' })).toHaveAttribute(
+    'data-matrix-link',
+    'user'
+  );
+});
+
 test('turns a room permalink whose label is its href into a room mention', async () => {
   const url = 'https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe';
   render(FormattedBody, {

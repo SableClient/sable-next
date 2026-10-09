@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test, GUEST_DISPLAY_NAME } from './fixtures/test';
 
 type Raised = { title: string; body: string; tag: string };
@@ -72,8 +73,8 @@ for (const opened of [false, true]) {
       await app.openRoom(roomId);
       await expect(app.composer).toBeVisible();
     }
-    await setSwitch(page, 'System notifications', true);
-    await setSwitch(page, 'Show message content', true);
+    await setSwitch(page, en.settings.systemNotifications, true);
+    await setSwitch(page, en.settings.notificationContent, true);
     await app.openRooms();
     await page.reload();
     await expect(app.primaryNavigation).toBeVisible();
@@ -107,7 +108,7 @@ test('stays quiet until the switch is on', async ({ page, app, admin, guest }) =
   await admin.join(roomId);
   await admin.sendMessage(roomId, 'Channel opened');
 
-  await setSwitch(page, 'System notifications', false);
+  await setSwitch(page, en.settings.systemNotifications, false);
   await app.openRooms();
   await app.openRoom(roomId);
   await expect(app.composer).toBeVisible();

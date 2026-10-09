@@ -133,9 +133,34 @@ test('an encrypted event no tab could read stays encrypted, and a silenced one i
   expect(await completePushPayload(bare, fetcher(responses, { kind: 'discard' }))).toBeNull();
 });
 
-test('a failed fetch leaves the payload as it arrived', async () => {
-  expect(await completePushPayload(bare, fetcher({}))).toBe(bare);
-});
+test.each([403, 404])(
+  'an event the server answers %i for is an invitation to a room not yet joined',
+  async (status) => {
+    const forbidden = fetcher({}, null, 'Design crew');
+    forbidden.fetch.mockResolvedValue(new Response(null, { status }));
+
+    const completed = await completePushPayload(bare, forbidden);
+
+    expect(completed?.notification).toMatchObject({
+      type: 'm.room.member',
+      content: { membership: 'invite' },
+      room_name: 'Design crew',
+    });
+  }
+);
+
+test.each([500, 'offline'])(
+  'a fetch that fails with %s leaves the payload as it arrived',
+  async (failure) => {
+    const failing = fetcher({});
+    if (typeof failure === 'number') {
+      failing.fetch.mockResolvedValue(new Response(null, { status: failure }));
+    } else {
+      failing.fetch.mockRejectedValue(new Error(failure));
+    }
+    expect(await completePushPayload(bare, failing)).toBe(bare);
+  }
+);
 
 test('a tab answer is only trusted in the shape the core sends', () => {
   expect(readPushFetch({ kind: 'discard' })).toEqual({ kind: 'discard' });

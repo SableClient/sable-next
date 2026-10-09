@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-take-push-diagnostics"
+description = "Enables the take_push_diagnostics command without any pre-configured scope."
+commands.allow = ["take_push_diagnostics"]
+
+[[permission]]
+identifier = "deny-take-push-diagnostics"
+description = "Denies the take_push_diagnostics command without any pre-configured scope."
+commands.deny = ["take_push_diagnostics"]

@@ -36,9 +36,25 @@ const WARM_ROOM_LIMIT = 32;
 const WARM_BATCH_MS = 100;
 
 /** Only use an alias when it resolves locally to this room. */
+const aliasOwners = new WeakMap<readonly RoomSummary[], Map<string, string>>();
+
+function aliasOwner(rooms: readonly RoomSummary[], alias: string): string | undefined {
+  let owners = aliasOwners.get(rooms);
+  if (owners === undefined) {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a lookup index for one immutable rooms array
+    owners = new Map();
+    for (const room of rooms) {
+      const owned = room.canonical_alias;
+      if (!room.is_tombstoned && owned && !owners.has(owned)) owners.set(owned, room.room_id);
+    }
+    aliasOwners.set(rooms, owners);
+  }
+  return owners.get(alias);
+}
+
 export function roomPathId(room: RoomSummary, rooms: readonly RoomSummary[]): string {
   const alias = room.canonical_alias;
-  if (!room.is_tombstoned && alias && findRoomByPathId(rooms, alias)?.room_id === room.room_id) {
+  if (!room.is_tombstoned && alias && aliasOwner(rooms, alias) === room.room_id) {
     return alias;
   }
   return room.room_id;

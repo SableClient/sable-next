@@ -99,6 +99,70 @@ function railOrder(names: readonly string[]): (string | null)[] {
     .filter((name) => name !== null && names.includes(name));
 }
 
+test.each([
+  ['/rooms', {}, '/create-room', ['Unspaced']],
+  ['/direct', {}, '/create-room', ['Alice']],
+  ['/create-room', {}, '/create-room', ['Unspaced']],
+  ['/home', {}, '/create-room', ['Child', 'Unspaced', 'Alice']],
+  [
+    '/space/!space%3Aexample.org/lobby',
+    { spaceId: '!space:example.org' },
+    '/create-room',
+    ['Child'],
+  ],
+  [
+    '/space/!space%3Aexample.org/lobby',
+    { spaceId: '!space:example.org' },
+    '/space/!space%3Aexample.org/create-room',
+    ['Child'],
+  ],
+])(
+  'keeps the room list from %s while creating a room (%#)',
+  async (path, params, target, names) => {
+    const child = { ...space('!child:example.org', 'Child'), is_space: false };
+    const parent = {
+      ...space(),
+      space_children: [
+        { room_id: child.room_id, via: [], order: null, origin_server_ts: 1, suggested: false },
+      ],
+    };
+    const rooms = [
+      parent,
+      child,
+      { ...space('!unspaced:example.org', 'Unspaced'), is_space: false },
+      { ...space('!dm:example.org', 'Alice'), is_space: false, is_direct: true },
+    ];
+    const client = {
+      subscribeEvents: () => () => {},
+      commands: {
+        subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms }),
+        roomNotificationModes: () => Promise.resolve([]),
+        unsubscribe: () => Promise.resolve(),
+      },
+    } as unknown as CoreClient;
+    await startRoomList(client);
+    visit(path, params);
+    render(SidebarNav);
+    await tick();
+
+    const roomNames = () =>
+      Array.from(document.querySelectorAll('.room-row .room-name'), (node) => node.textContent);
+    expect(roomNames()).toEqual(names);
+
+    visit(target, target.startsWith('/space/') ? params : {});
+    navigated();
+    await tick();
+
+    expect(roomNames()).toEqual(names);
+
+    visit('/rooms');
+    navigated();
+    await tick();
+
+    expect(roomNames()).toEqual(['Unspaced']);
+  }
+);
+
 test('adds an incoming unread DM to the navbar and removes it when read', async () => {
   const room: RoomSummary = {
     ...space('!dm:example.org', 'Alice'),

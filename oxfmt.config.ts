@@ -14,6 +14,7 @@ export default {
     '.svelte-kit',
     'target',
     'vendor',
+    'plugins/tauri-plugin-sable-push/permissions',
     'src/generated',
     'src-tauri/icons',
     // Handlebars behind a .yml extension; oxfmt parses it as YAML and fails.

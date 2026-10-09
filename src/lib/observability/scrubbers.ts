@@ -30,6 +30,7 @@ export function scrubMatrixIds(value: string): string {
     )
     .replace(/@[^\s:@]+:[^\s,'"(){}[\]]+/g, '@[USER_ID]')
     .replace(/![^\s:]+:[^\s,'"(){}[\]]+/g, '![ROOM_ID]')
+    .replace(/![A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g, '![ROOM_ID]')
     .replace(/#[^\s:@]+:[^\s,'"(){}[\]]+/g, '#[ROOM_ALIAS]')
     .replace(/\$[A-Za-z0-9_+/-]{10,}/g, '$[EVENT_ID]');
 }
@@ -111,6 +112,7 @@ export function scrubMatrixUrl(url: string): string {
       // Browsers decode %21 and %40 for display but often leave %3A encoded,
       // so both the literal colon and the encoding have to match.
       .replace(/\/![^/?#\s:%]+(?:%3A|:)[^/?#\s]*/gi, '/![ROOM_ID]')
+      .replace(/\/![A-Za-z0-9_-]{43}(?=[/?#\s]|$)/g, '/![ROOM_ID]')
       .replace(/\/@[^/?#\s:%]+(?:%3A|:)[^/?#\s]*/gi, '/@[USER_ID]')
       .replace(/\/#[^/?#\s:%]+(?:%3A|:)[^/?#\s]*/gi, '/[ROOM_ALIAS]')
       .replace(/\/%40[^/?#\s]*/gi, '/[USER_ID]')

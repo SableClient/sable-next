@@ -12,6 +12,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { findRoomByPathId, provideRoomList, RoomList } from '#lib/rooms/room-list.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
+  import { rememberLastRoom } from '#lib/rooms/last-room.js';
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { Bookmarks, provideBookmarks } from '#lib/rooms/bookmarks.svelte.js';
@@ -22,6 +23,7 @@
   } from '#lib/features/room/messages/message-scope.svelte.js';
   import { contextSearchPath } from '#lib/features/room/room-navigation.js';
   import { MESSAGE_SEARCH_FIELD_ID } from '#lib/features/search/message-search.svelte.js';
+  import { InviteActions } from '#lib/rooms/invites.svelte.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
   import { endSystemCall, fulfillSystemAnswer } from '#lib/platform/calls.js';
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
@@ -83,7 +85,9 @@
   import { watchVoipToken } from '#lib/platform/calls.js';
   import {
     callNotificationAction,
+    inviteNotificationAction,
     openNativeNotification,
+    selectNotificationAccount,
     performNotificationAction,
   } from '#lib/features/notifications/native-actions.js';
   import {
@@ -241,6 +245,22 @@
     void callSession.join(call.roomId, { microphone: true, camera: call.hasVideo });
     await afterOverlayPops();
     await goto(roomSectionPath(roomList.rooms, call.roomId));
+  }
+
+  async function answerInvite(
+    userId: string,
+    roomId: string,
+    outcome: 'accept' | 'decline'
+  ): Promise<void> {
+    if (!(await selectNotificationAccount(core, userId))) return;
+    await tick();
+    await roomList.start();
+    await roomList.whenListed(roomId, NOTIFIED_ROOM_WAIT_MS);
+    const invite = roomList.rooms.find((room) => room.room_id === roomId);
+    if (invite?.state !== 'invited') return;
+    const answers = new InviteActions(core);
+    if (outcome === 'accept') await answers.accept(invite);
+    else answers.decline(invite);
   }
 
   function answerFromNotification(
@@ -619,9 +639,29 @@
             roomId?: string;
             userId?: string;
             eventId?: string | null;
-            outcome?: 'answer' | 'decline';
+            outcome?: 'answer' | 'decline' | 'accept';
           }
         | undefined;
+      if (message?.type === 'sable:open-invites') {
+        void selectNotificationAccount(core, message.userId ?? '')
+          .then(() => goto(resolve('/(app)/inbox')))
+          .catch((error: unknown) => {
+            console.debug('[sable notifications] invites not opened', error);
+          });
+        return;
+      }
+      if (
+        message?.type === 'sable:invite-action' &&
+        message.roomId !== undefined &&
+        message.userId !== undefined &&
+        (message.outcome === 'accept' || message.outcome === 'decline')
+      ) {
+        const { roomId, userId, outcome } = message;
+        void answerInvite(userId, roomId, outcome).catch((error: unknown) => {
+          console.debug('[sable notifications] invite not answered', error);
+        });
+        return;
+      }
       if (
         message?.type === 'sable:call-action' &&
         message.roomId !== undefined &&
@@ -749,10 +789,23 @@
 
   const NOTIFIED_ROOM_WAIT_MS = 10_000;
 
+  $effect(() => {
+    const accountId = core.session?.account_id;
+    if (core.status !== 'ready' || !accountId || !roomList.settled) return;
+    const room = roomList.byId(openRoomId);
+    if (room?.state === 'joined' && !room.is_space && !room.is_tombstoned) {
+      rememberLastRoom(accountId, room.room_id);
+    }
+  });
+
   async function openNotification(roomId: string, eventId: string | null): Promise<void> {
     await tick();
     await roomList.start();
     await roomList.whenListed(roomId, NOTIFIED_ROOM_WAIT_MS);
+    if (roomList.rooms.find((room) => room.room_id === roomId)?.state === 'invited') {
+      await goto(resolve('/(app)/inbox'));
+      return;
+    }
     await goto(roomSectionPath(roomList.rooms, roomId), {
       state: eventId === null ? {} : { notified: eventId },
     });
@@ -783,6 +836,13 @@
 
     void Promise.all([
       watchNativeNotificationActions((action) => {
+        const invite = inviteNotificationAction(action);
+        if (invite !== null) {
+          void answerInvite(action.userId, action.roomId, invite).catch((error: unknown) => {
+            console.debug('[sable notifications] invite not answered', error);
+          });
+          return;
+        }
         const call = callNotificationAction(action);
         if (call !== null) {
           void openNativeNotification(core, action, (roomId, eventId) => {

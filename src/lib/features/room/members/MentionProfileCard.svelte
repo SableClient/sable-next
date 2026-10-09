@@ -631,6 +631,7 @@
     <FormattedBody
       html={currentProfile.bio}
       senderTimezone={currentProfile.timezone}
+      keepMentionText
       {onMatrixLink}
     />
   {/if}

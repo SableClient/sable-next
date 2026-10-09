@@ -12,8 +12,9 @@ export async function collectSymbols(root) {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name.endsWith('.dSYM')) symbols.push(path);
-        else if (
+        if (entry.name.endsWith('.dSYM')) {
+          if (!entry.name.endsWith('.framework.dSYM')) symbols.push(path);
+        } else if (
           !ignored.has(entry.name) &&
           !(entry.name === 'build' && basename(directory) === 'release')
         )

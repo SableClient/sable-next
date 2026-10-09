@@ -18,6 +18,7 @@ test('finds app symbols and excludes dependencies and bundles', async () => {
       'release/bundle/app',
       'debug/app',
       'build/archive/Sable.app.dSYM/Contents/Resources/DWARF/Sable',
+      'build/archive/Sentry.framework.dSYM/Contents/Resources/DWARF/Sentry',
     ];
     for (const file of files) {
       await mkdir(join(root, file, '..'), { recursive: true });

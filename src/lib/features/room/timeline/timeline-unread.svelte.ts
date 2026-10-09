@@ -1,16 +1,18 @@
 import type { TimelineItemView } from '#src/generated/protocol';
-import { isUnreadMessage, unreadCountAfter } from './timeline-format';
+import { isUnreadMessage, latestEventId, unreadCountAfter } from './timeline-format';
 
 export class TimelineUnread {
   initialized = $state(false);
   loading = $state(false);
   active = $state(false);
   reached = $state(false);
+  background = $state(false);
   firstEventId = $state<string | null>(null);
   failed = $state(false);
   #readEventId: string | null = null;
   #disposed = false;
   #task: Promise<void> | null = null;
+  #lastEventId: string | null | undefined;
 
   get readEventId(): string | null {
     return this.#readEventId;
@@ -85,19 +87,41 @@ export class TimelineUnread {
     return index < 0 ? 0 : unreadCountAfter(items, index - 1);
   }
 
+  trackBackground(items: readonly TimelineItemView[], focused: boolean): void {
+    const previous = this.#lastEventId;
+    this.#lastEventId = latestEventId(items);
+    if (focused || previous === undefined || previous === this.#lastEventId) return;
+    const index = previous === null ? -1 : items.findIndex((item) => item.event_id === previous);
+    if (previous !== null && index < 0) return;
+    const first = items.slice(index + 1).find(isUnreadMessage);
+    if (!first) return;
+    if (!this.active) {
+      this.#readEventId = previous;
+      this.firstEventId = first.event_id;
+    }
+    this.active = true;
+    this.reached = false;
+    this.background = true;
+  }
+
   observe(firstVisible: string | null): void {
     if (this.active && firstVisible === this.firstEventId && firstVisible !== null) {
       this.reached = true;
+      this.background = false;
     }
   }
 
   reachLatest(): void {
-    if (this.active) this.reached = true;
+    if (this.active) {
+      this.reached = true;
+      this.background = false;
+    }
   }
 
   dismiss(): void {
     this.active = false;
     this.reached = true;
+    this.background = false;
   }
 
   clear(): void {

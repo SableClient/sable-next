@@ -2552,7 +2552,26 @@ impl Core {
                     .forget_room(&room_id, &event_type);
                 self.forget_room_state(&room_id, &event_type);
                 if self.note_cosmetic_state(&room_id, &event_type, &state_key, &content) {
-                    self.emit(CoreEvent::RoomCosmeticsChanged { room_id });
+                    self.emit(CoreEvent::RoomCosmeticsChanged {
+                        room_id: room_id.clone(),
+                    });
+                }
+                if event_type == "m.room.member"
+                    && content.get("membership").and_then(|value| value.as_str()) == Some("join")
+                    && let Ok(user_id) = state_key.as_str().try_into()
+                {
+                    self.emit(CoreEvent::ProfileChanged {
+                        room_id,
+                        user_id,
+                        display_name: content
+                            .get("displayname")
+                            .and_then(|value| value.as_str())
+                            .map(ToOwned::to_owned),
+                        avatar_url: content
+                            .get("avatar_url")
+                            .and_then(|value| value.as_str())
+                            .map(ToOwned::to_owned),
+                    });
                 }
 
                 Ok(CommandOk::SendStateEvent {

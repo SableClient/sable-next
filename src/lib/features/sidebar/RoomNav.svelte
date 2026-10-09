@@ -104,8 +104,13 @@
   const WARM_DWELL_MS = 300;
   let contextRoom = $state<RoomSummary | null>(null);
   let contextParentSpaceId = $state<string | null>(null);
-  let contextAnchor = $state.raw<CursorAnchor | null>(null);
+  let contextAnchor = $state.raw<HTMLElement | CursorAnchor | null>(null);
   let contextOpen = $state(false);
+  let optionsRoomId = $derived(
+    contextOpen && contextAnchor !== null && 'focus' in contextAnchor
+      ? (contextRoom?.room_id ?? null)
+      : null
+  );
 
   function openContextMenu(
     event: MouseEvent,
@@ -117,6 +122,21 @@
     contextRoom = room;
     contextParentSpaceId = parentSpaceId;
     contextAnchor = cursorAnchor(event);
+    contextOpen = true;
+  }
+
+  function toggleOptionsMenu(
+    trigger: HTMLElement,
+    room: RoomSummary,
+    parentSpaceId: string | null
+  ): void {
+    if (optionsRoomId === room.room_id && contextAnchor === trigger) {
+      contextOpen = false;
+      return;
+    }
+    contextRoom = room;
+    contextParentSpaceId = parentSpaceId;
+    contextAnchor = trigger;
     contextOpen = true;
   }
 
@@ -407,16 +427,6 @@
       keep: stillShownRow,
     })
   );
-  let visibleFavourites = $derived(favouritesClosed ? stillShown(favourites) : favourites);
-  let visibleRooms = $derived<RoomNavItem[]>([
-    ...(roomsClosed ? stillShown(rooms) : rooms),
-    ...visibleSubspaces,
-  ]);
-
-  function stillShown(rows: RoomNavRow[]): RoomNavRow[] {
-    return rows.filter(stillShownRow);
-  }
-
   function stillShownRow(item: RoomNavRow): boolean {
     const room = item.room;
     if (room === undefined) return false;
@@ -731,7 +741,24 @@
     {/if}
   {/snippet}
 
-  {#snippet navRoom(item: RoomNavRow)}
+  {#snippet optionsButton(room: RoomSummary, parentSpaceId: string | null)}
+    {@const open = optionsRoomId === room.room_id}
+    <button
+      type="button"
+      class="room-options-trigger selection-open"
+      aria-label={$i18n.t('room.menuLabel')}
+      aria-haspopup="menu"
+      aria-expanded={open}
+      data-state={open ? 'open' : 'closed'}
+      onclick={(event) => {
+        toggleOptionsMenu(event.currentTarget, room, parentSpaceId);
+      }}
+    >
+      <DotsThreeVerticalIcon />
+    </button>
+  {/snippet}
+
+  {#snippet navRoom(item: RoomNavRow, sectionClosed: boolean)}
     {@const room = item.room}
     {@const name = room ? roomLabel(room) : item.roomId}
     {@const avatarUrl = room ? roomAvatarUrl(room) : null}
@@ -753,7 +780,8 @@
     {@const peerId = room?.is_direct ? dmPeerId(room) : null}
     {@const peerPresence = peerId ? presenceStore.peek(peerId) : null}
     {@const peerStatus = peerId ? resolveUserStatus(peerProfiles.get(peerId), peerPresence) : null}
-    <div class="room-row-wrap">
+    {@const closed = sectionClosed && !(room !== undefined && (active || hasUnread(counts)))}
+    <div class="room-row-wrap" class:closed-row={closed}>
       {@render threadLines(item.threads)}
       {#snippet roomTrigger({ props }: { props: Record<string, unknown> })}
         <a
@@ -789,24 +817,39 @@
           )}
         >
           {#if (room?.is_direct ?? false) || showsRoomAvatar(iconMode, collapsed, Boolean(avatarUrl))}
+            {#snippet glyph()}
+              <RoomIcon
+                isCalendar={room?.room_type === CALENDAR_ROOM_TYPE}
+                isForum={room?.room_type === FORUM_ROOM_TYPE}
+                isSpace={room?.is_space ?? false}
+                isVoice={room?.is_voice ?? false}
+                joinRule={room?.join_rule ?? null}
+                weight={active ? 'fill' : 'regular'}
+              />
+            {/snippet}
             <span class="room-avatar">
-              <Avatar
-                class={['room-avatar-icon', { glyph: !avatarUrl, voice: room?.is_voice }]}
-                id={avatarUrl ? item.roomId : null}
-                src={avatarUrl}
-                size="small"
-                uniform
-                recolor={!room?.is_direct}
-              >
-                <RoomIcon
-                  isCalendar={room?.room_type === CALENDAR_ROOM_TYPE}
-                  isForum={room?.room_type === FORUM_ROOM_TYPE}
-                  isSpace={room?.is_space ?? false}
-                  isVoice={room?.is_voice ?? false}
-                  joinRule={room?.join_rule ?? null}
-                  weight={active ? 'fill' : 'regular'}
-                />
-              </Avatar>
+              {#if avatarUrl}
+                <Avatar
+                  class={['room-avatar-icon', { voice: room?.is_voice }]}
+                  id={item.roomId}
+                  src={avatarUrl}
+                  size="small"
+                  uniform
+                  recolor={!room?.is_direct}
+                >
+                  {@render glyph()}
+                </Avatar>
+              {:else}
+                <div
+                  class={[
+                    'avatar-root avatar-small room-avatar-icon glyph',
+                    { voice: room?.is_voice },
+                  ]}
+                  aria-hidden="true"
+                >
+                  <span class="avatar-fallback">{@render glyph()}</span>
+                </div>
+              {/if}
               {#if peerPresence && peerPresence.presence !== 'offline'}
                 <PresenceDot
                   presence={peerPresence.presence}
@@ -931,12 +974,7 @@
                 <ChatCircleIcon weight={active && voiceChat.open ? 'fill' : 'regular'} />
               </button>
             {/if}
-            <RoomOptionsMenu
-              {room}
-              parentSpaceId={item.parentSpaceId ?? null}
-              onSettings={openSettings}
-              onLeave={openLeave}
-            />
+            {@render optionsButton(room, item.parentSpaceId ?? null)}
           </span>
         {/if}
       {/if}
@@ -945,6 +983,7 @@
       {@const rowKeys = participantKeys(room.call_participants)}
       <ul
         class:collapsed
+        class:closed-row={closed}
         class="call-participant-list"
         aria-label={$i18n.t('nav.voiceLive', { count: live })}
       >
@@ -1084,12 +1123,7 @@
       {:else}
         {@render linkTrigger({ props: {} })}
         <span class="room-options-slot">
-          <RoomOptionsMenu
-            {room}
-            onSettings={openSettings}
-            onLeave={openLeave}
-            onLobby={openLobby}
-          />
+          {@render optionsButton(room, null)}
         </span>
       {/if}
     </div>
@@ -1189,8 +1223,8 @@
         </button>
       {/if}
       <div id={favouritesListId} class="room-list favourites" class:collapsed>
-        {#each visibleFavourites as item (item.key)}
-          {@render navRoom(item)}
+        {#each favourites as item (item.key)}
+          {@render navRoom(item, favouritesClosed)}
         {/each}
       </div>
     {/if}
@@ -1222,7 +1256,10 @@
         {/if}
       {:else}
         <div class="room-list" class:collapsed>
-          {#each visibleRooms as item (item.key)}
+          {#each rooms as item (item.key)}
+            {@render navRoom(item, roomsClosed)}
+          {/each}
+          {#each visibleSubspaces as item (item.key)}
             {#if item.kind === 'category'}
               {@const name = roomLabel(item.room)}
               {@const isClosed = closedCategories.has(item.key)}
@@ -1260,19 +1297,14 @@
                 {:else}
                   {@render categoryTrigger({ props: {} })}
                   <span class="room-options-slot">
-                    <RoomOptionsMenu
-                      room={item.room}
-                      onSettings={openSettings}
-                      onLeave={openLeave}
-                      onLobby={openLobby}
-                    />
+                    {@render optionsButton(item.room, null)}
                   </span>
                 {/if}
               </div>
             {:else if item.kind === 'link'}
               {@render navLink(item)}
             {:else if isRoom(item)}
-              {@render navRoom(item)}
+              {@render navRoom(item, false)}
             {/if}
           {/each}
         </div>
@@ -1320,17 +1352,20 @@
 />
 
 {#if contextRoom}
-  <RoomOptionsMenu
-    room={contextRoom}
-    parentSpaceId={contextParentSpaceId}
-    anchor={contextAnchor}
-    align="start"
-    side="right"
-    bind:open={contextOpen}
-    onSettings={openSettings}
-    onLeave={openLeave}
-    onLobby={openLobby}
-  />
+  {@const fromTrigger = contextAnchor !== null && 'focus' in contextAnchor}
+  {#key contextRoom.room_id}
+    <RoomOptionsMenu
+      room={contextRoom}
+      parentSpaceId={contextParentSpaceId}
+      anchor={contextAnchor}
+      align={fromTrigger ? 'end' : 'start'}
+      side={fromTrigger ? 'bottom' : 'right'}
+      bind:open={contextOpen}
+      onSettings={openSettings}
+      onLeave={openLeave}
+      onLobby={openLobby}
+    />
+  {/key}
 {/if}
 
 <style>
@@ -1707,6 +1742,11 @@
     background: var(--bg-container-hover);
   }
 
+  .room-row-wrap.closed-row,
+  .call-participant-list.closed-row {
+    display: none;
+  }
+
   .room-list > .room-row-wrap:not(:focus-within, :has(.room-category)) {
     contain-intrinsic-size: auto 2.25rem;
     content-visibility: auto;
@@ -1722,7 +1762,7 @@
 
   /* A subspace heading opens a group, so it needs air above it to read as a
      break rather than as one more row. */
-  .room-row-wrap:has(.room-category):not(:first-child) {
+  .room-list > :where(:not(.closed-row)) ~ .room-row-wrap:has(.room-category) {
     margin-top: var(--space-300);
   }
 
@@ -1744,7 +1784,10 @@
     top: 0;
   }
 
-  .room-row-wrap:has(.room-category):not(:first-child) :is(.thread-line, .thread-elbow) {
+  .room-list
+    > :where(:not(.closed-row))
+    ~ .room-row-wrap:has(.room-category)
+    :is(.thread-line, .thread-elbow) {
     top: calc(-1 * var(--space-300));
   }
 

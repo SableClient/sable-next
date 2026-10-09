@@ -189,7 +189,7 @@ targets:
       - target: SableNotificationService
         embed: true
       - package: Sentry
-        product: Sentry
+        product: Sentry-Dynamic
       - framework: {{ lib-output-file-name }}
         embed: false
       {{~#each ios-libraries}}

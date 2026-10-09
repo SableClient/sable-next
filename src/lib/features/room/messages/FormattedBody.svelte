@@ -45,10 +45,11 @@
   interface Props {
     html: string;
     senderTimezone?: string | null;
+    keepMentionText?: boolean;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
   }
 
-  let { html, senderTimezone = null, onMatrixLink }: Props = $props();
+  let { html, senderTimezone = null, keepMentionText = false, onMatrixLink }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
   const abbreviations = hasRoomAbbreviations() ? useRoomAbbreviations() : null;
@@ -341,7 +342,7 @@
       void html;
       for (const anchor of node.querySelectorAll<HTMLAnchorElement>('a[data-matrix-link="user"]')) {
         const link = parseMatrixLink(anchor.href);
-        if (link?.kind === 'user') {
+        if (link?.kind === 'user' && !keepMentionText) {
           anchor.textContent = mentionLabel(link.userId, memberNames);
         }
       }
