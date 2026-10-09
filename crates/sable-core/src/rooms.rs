@@ -32,7 +32,7 @@ pub(crate) fn repair_unreadable_tombstones(
     client: &Client,
 ) -> matrix_sdk::event_handler::EventHandlerHandle {
     client.add_event_handler(|raw: Raw<AnySyncTimelineEvent>, room: Room| async move {
-        if raw.get_field::<&str>("type").ok().flatten() != Some("m.room.tombstone") {
+        if raw.get_field::<String>("type").ok().flatten().as_deref() != Some("m.room.tombstone") {
             return;
         }
         let Ok(mut event) = raw.deserialize_as_unchecked::<serde_json::Value>() else {
@@ -72,20 +72,21 @@ pub(crate) fn repair_unreadable_tombstones(
 }
 
 pub(crate) async fn reconcile_memberships(client: &Client) -> Result<(), matrix_sdk::Error> {
-    let joined = client
+    let joined: std::collections::HashSet<_> = client
         .send(joined_rooms::v3::Request::new())
         .await?
-        .joined_rooms;
+        .joined_rooms
+        .into_iter()
+        .collect();
 
     for room in client.rooms() {
-        let mark: fn(&mut RoomInfo) =
-            match (room.state(), joined.iter().any(|id| id == room.room_id())) {
-                (RoomState::Joined, false) => RoomInfo::mark_as_left,
-                (RoomState::Left | RoomState::Invited | RoomState::Knocked, true) => {
-                    RoomInfo::mark_as_joined
-                }
-                _ => continue,
-            };
+        let mark: fn(&mut RoomInfo) = match (room.state(), joined.contains(room.room_id())) {
+            (RoomState::Joined, false) => RoomInfo::mark_as_left,
+            (RoomState::Left | RoomState::Invited | RoomState::Knocked, true) => {
+                RoomInfo::mark_as_joined
+            }
+            _ => continue,
+        };
         room.update_and_save_room_info(|mut info| {
             mark(&mut info);
             (info, RoomInfoNotableUpdateReasons::MEMBERSHIP)
