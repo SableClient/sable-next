@@ -83,6 +83,7 @@
     unstageFile,
     type StagedFile,
   } from './composer-files';
+  import { isMultiline } from './composer-multiline';
   import { shouldFocusComposer } from './type-to-focus';
   import ComposerEditorView from './editor/ComposerEditor.svelte';
   import { ComposerEditor } from './editor/composer-editor';
@@ -289,6 +290,8 @@
   let beforeEl = $state<HTMLElement>();
   let afterEl = $state<HTMLElement>();
   let measurerEl = $state<HTMLElement>();
+  let multiline = $state(false);
+  const shortLayout = $derived(composerShort && !multiline);
   let layoutFrame: number | undefined;
   let empty = $state(true);
   let showPlaceholder = $state(true);
@@ -548,6 +551,14 @@
   function updateLayout(): void {
     const editable = editor.editable();
     if (!rowEl || !measurerEl || !editable) return;
+    multiline = isMultiline({
+      text: editor.text(),
+      row: rowEl,
+      before: beforeEl,
+      after: afterEl,
+      editable,
+      measurer: measurerEl,
+    });
   }
 
   function scheduleLayout(): void {
@@ -1471,7 +1482,7 @@
   </Portal>
 {/if}
 
-<div class="composer-stack" class:short={composerShort && !readOnly}>
+<div class="composer-stack" class:short={shortLayout && !readOnly}>
   {#if readOnly}
     <div class="composer-shell">
       <div class="composer">
@@ -1542,7 +1553,7 @@
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <form
           class="composer-row"
-          class:short={composerShort}
+          class:short={shortLayout}
           class:formatting-open={formattingOpen}
           hidden={activeBotCommand !== null}
           bind:this={rowEl}

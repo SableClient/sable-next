@@ -126,16 +126,26 @@ async function measure(composer: Locator) {
   });
 }
 
-for (const richTextComposer of [false, true]) {
-  test(`composer keeps controls below the text in ${richTextComposer ? 'rich' : 'plain'} mode`, async ({
+for (const [richTextComposer, composerForm] of [
+  [false, 'tall'],
+  [true, 'tall'],
+  [true, 'short'],
+] as const) {
+  test(`composer keeps controls below the text in ${richTextComposer ? 'rich' : 'plain'} ${composerForm} mode`, async ({
     page,
     app,
     installRoomCore,
     isMobile,
   }) => {
-    await page.addInitScript((rich) => {
-      localStorage.setItem('sable-preferences', JSON.stringify({ richTextComposer: rich }));
-    }, richTextComposer);
+    await page.addInitScript(
+      ([rich, form]) => {
+        localStorage.setItem(
+          'sable-preferences',
+          JSON.stringify({ richTextComposer: rich, composerForm: form })
+        );
+      },
+      [richTextComposer, composerForm] as const
+    );
     if (!isMobile) await page.setViewportSize({ width: 1900, height: 900 });
     await installRoomCore('ready');
     await app.openRoom('!room:example.test');
