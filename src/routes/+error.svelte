@@ -5,6 +5,7 @@
   import { page } from '$app/state';
   import { forgeIssueUrl, openForgeIssueUrl } from '#lib/features/bug-report/forge.js';
   import { i18n } from '#lib/i18n.js';
+  import { issueBuildInfo } from '#lib/platform/diagnostics.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
 
@@ -18,13 +19,19 @@
     void goto(resolve('/(app)/rooms'));
   }
 
-  function reportOnForge(): void {
+  async function reportOnForge(): Promise<void> {
     const error = page.error;
     if (!error) return;
+    const { build, platform } = await issueBuildInfo();
     const url = forgeIssueUrl('bug', `Crash: ${error.message}`, {
       description: error.message,
-      context: details.trim(),
-      info: ['```', error.stack ?? error.message, '```'].join('\n'),
+      platforms: platform,
+      info: [`build: ${build}`, `version: v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`].join(
+        '\n'
+      ),
+      context: [details.trim(), '```', error.stack ?? error.message, '```']
+        .filter(Boolean)
+        .join('\n'),
     });
     void openForgeIssueUrl(url);
   }

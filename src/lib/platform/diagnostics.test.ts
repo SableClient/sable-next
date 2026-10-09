@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { webPlatformLabel } from './diagnostics.js';
+import { issuePlatformOption, webPlatformLabel } from './diagnostics.js';
 
 const MAC_FIREFOX =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:142.0) Gecko/20100101 Firefox/142.0';
@@ -22,5 +22,21 @@ describe('webPlatformLabel', () => {
 
   it('falls back on an unrecognised user agent', () => {
     expect(webPlatformLabel('Mozilla/5.0 (Unknown)', undefined)).toBe('unknown');
+  });
+});
+
+describe('issuePlatformOption', () => {
+  it('names the web build Web', () => {
+    expect(issuePlatformOption(undefined)).toBe('Web');
+  });
+
+  it('maps native platforms onto the issue template options', () => {
+    expect(issuePlatformOption('linux')).toBe('Linux');
+    expect(issuePlatformOption('macos')).toBe('macOS');
+    expect(issuePlatformOption('ios')).toBe('iOS');
+  });
+
+  it('leaves an unknown native platform unset', () => {
+    expect(issuePlatformOption('freebsd')).toBe('');
   });
 });

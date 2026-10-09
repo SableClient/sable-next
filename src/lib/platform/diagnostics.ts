@@ -66,3 +66,21 @@ export async function describePlatform(): Promise<string> {
   }
   return webPlatformLabel(navigator.userAgent, await webArchitecture());
 }
+
+const ISSUE_PLATFORMS: Record<string, string> = {
+  linux: 'Linux',
+  windows: 'Windows',
+  macos: 'macOS',
+  ios: 'iOS',
+  android: 'Android',
+};
+
+export function issuePlatformOption(nativePlatform: string | undefined): string {
+  return nativePlatform === undefined ? 'Web' : (ISSUE_PLATFORMS[nativePlatform] ?? '');
+}
+
+export async function issueBuildInfo(): Promise<{ build: string; platform: string }> {
+  if (!isTauri()) return { build: 'web', platform: issuePlatformOption(undefined) };
+  const { platform } = await import('@tauri-apps/plugin-os');
+  return { build: 'app', platform: issuePlatformOption(platform()) };
+}
