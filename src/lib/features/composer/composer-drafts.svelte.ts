@@ -10,12 +10,26 @@ export interface ComposerDraft {
 }
 
 const MAX_SYNCED_DRAFTS = 50;
+const MAX_OFFERED_PER_ROOM = 8;
+
+const fingerprints = new WeakMap<object, string>();
+
+function docFingerprint(doc: unknown): string {
+  if (typeof doc !== 'object' || doc === null) return fingerprint(doc);
+  let cached = fingerprints.get(doc);
+  if (cached === undefined) {
+    cached = fingerprint(doc);
+    fingerprints.set(doc, cached);
+  }
+  return cached;
+}
 
 interface DraftState {
   drafts: Map<string, ComposerDraft>;
   synced: Map<string, string>;
   adopted: Map<string, number>;
-  discarded: Map<string, string>;
+  discarded: Map<string, string[]>;
+  offered: Map<string, string[]>;
   replies: Map<string, ComposerContext>;
 }
 
@@ -30,6 +44,7 @@ function stateFor(accountId: string): DraftState {
       synced: new Map(),
       adopted: new Map(),
       discarded: new Map(),
+      offered: new Map(),
       replies: new Map(),
     };
     accounts.set(accountId, state);
@@ -60,10 +75,14 @@ export function injectDraft(roomId: string, draft: ComposerDraft, accountId = ''
 }
 
 export function clearDraft(roomId: string, accountId = ''): void {
-  const { drafts, discarded } = stateFor(accountId);
+  const { drafts, discarded, offered, synced } = stateFor(accountId);
   const doc = drafts.get(roomId)?.doc;
   if (!drafts.delete(roomId)) return;
-  if (doc !== null && doc !== undefined) discarded.set(roomId, fingerprint(doc));
+  const stale = [...(offered.get(roomId) ?? []), synced.get(roomId)].filter(
+    (value) => value !== undefined
+  );
+  if (doc !== null && doc !== undefined) stale.push(docFingerprint(doc));
+  if (stale.length > 0) discarded.set(roomId, stale);
   revision.value += 1;
 }
 
@@ -90,9 +109,15 @@ export function remoteRevision(roomId: string, accountId = ''): number {
 export function draftDocuments(accountId = ''): Record<string, unknown> {
   void revision.value;
 
-  const entries = [...stateFor(accountId).drafts.entries()]
+  const { drafts, offered } = stateFor(accountId);
+  const entries = [...drafts.entries()]
     .filter(([, draft]) => draft.doc !== null && draft.doc !== undefined)
     .slice(-MAX_SYNCED_DRAFTS);
+  for (const [roomId, draft] of entries) {
+    const current = docFingerprint(draft.doc);
+    const seen = (offered.get(roomId) ?? []).filter((value) => value !== current);
+    offered.set(roomId, [...seen, current].slice(-MAX_OFFERED_PER_ROOM));
+  }
   return Object.fromEntries(entries.map(([roomId, draft]) => [roomId, draft.doc]));
 }
 
@@ -103,14 +128,14 @@ export function adoptDraftDocuments(documents: Record<string, unknown>, accountI
   for (const roomId of [...Object.keys(documents), ...dropped]) {
     const existing = drafts.get(roomId);
     const held = existing?.doc ?? null;
-    const local = held === null ? null : fingerprint(held);
+    const local = held === null ? null : docFingerprint(held);
     const doc = documents[roomId] ?? null;
-    const next = doc === null ? null : fingerprint(doc);
+    const next = doc === null ? null : docFingerprint(doc);
     const untouched = local === null || local === synced.get(roomId);
 
     if (next === null) synced.delete(roomId);
     else synced.set(roomId, next);
-    if (next !== discarded.get(roomId)) discarded.delete(roomId);
+    if (next === null || !discarded.get(roomId)?.includes(next)) discarded.delete(roomId);
     if (!untouched || local === next || discarded.has(roomId)) continue;
 
     if (doc === null && (existing?.staged.length ?? 0) === 0) drafts.delete(roomId);

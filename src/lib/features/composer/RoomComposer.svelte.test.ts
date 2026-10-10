@@ -168,6 +168,7 @@ interface ComposerProps {
   ) => Promise<void>;
   canReact?: boolean;
   context?: ComposerContext;
+  restoredContext?: ComposerContext;
   onCancelContext?: () => void;
   onDeleteEdited?: (eventId: string, reason: string | null) => void;
   onReplyStep?: (direction: 'older' | 'newer') => void;
@@ -775,6 +776,21 @@ test('replying to the same event restores focus to the editor', async () => {
   await vi.waitFor(() => {
     expect(document.activeElement).toBe(editor);
   });
+});
+
+test('a restored reply does not take focus', async () => {
+  const restored: ComposerContext = {
+    kind: 'reply',
+    eventId: '$one:example.org',
+    sender: 'Alice',
+    body: 'Hello',
+  };
+  setup({ roomId: '!room:example.org', context: restored, restoredContext: restored });
+  await tick();
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+
+  const editor = document.querySelector('[role="combobox"]');
+  expect(document.activeElement).not.toBe(editor);
 });
 
 test('finishing an edit keeps focus in the editor', async () => {

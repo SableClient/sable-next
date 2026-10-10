@@ -20,6 +20,7 @@
     | 'onTyping'
     | 'onQuickReact'
     | 'context'
+    | 'restoredContext'
     | 'onCancelContext'
     | 'onEditPersona'
     | 'onToggleSilentReply'
@@ -53,6 +54,7 @@
   onTyping={conversation.setTyping}
   onQuickReact={conversation.quickReact}
   context={conversation.context}
+  restoredContext={conversation.restored}
   onCancelContext={conversation.clearContext}
   onEditPersona={conversation.setEditPersona}
   onToggleSilentReply={conversation.toggleSilentReply}

@@ -65,6 +65,7 @@ function failed(action: string): (error: unknown) => void {
 
 export class Conversation {
   #context = $state<ComposerContext | null>(null);
+  readonly restored: ComposerContext | null;
   scheduledRevision = $state(0);
   forumTitle = $state('');
   dismissedPreviews = $state<string[]>([]);
@@ -98,7 +99,8 @@ export class Conversation {
     this.#encrypted = encrypted ?? (() => null);
     this.#threadRoot = threadRoot;
     this.#beforeSend = beforeSend;
-    this.#context = readReply(this.#replyKey(), this.#accountId()) ?? null;
+    this.restored = readReply(this.#replyKey(), this.#accountId()) ?? null;
+    this.#context = this.restored;
   }
 
   get context(): ComposerContext | null {

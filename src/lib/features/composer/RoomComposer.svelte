@@ -185,6 +185,7 @@
     onDismissPreview?: (url: string) => void;
     /** What the next send relates to: a message being replied to, or edited. */
     context?: ComposerContext | null;
+    restoredContext?: ComposerContext | null;
     onCancelContext?: () => void;
     onEditPersona?: (persona: PersonaView | null) => void;
     onToggleSilentReply?: () => void;
@@ -216,6 +217,7 @@
     dismissedPreviews = [],
     onDismissPreview,
     context = null,
+    restoredContext = null,
     onCancelContext,
     onEditPersona,
     onToggleSilentReply,
@@ -307,7 +309,7 @@
   let query = $state.raw<AutocompleteQuery | null>(null);
   let dismissedAt = $state<number | null>(null);
   let activeIndex = $state(0);
-  let previousContext: ComposerContext | null = null;
+  let previousContext: ComposerContext | null = untrack(() => restoredContext);
   let deleteEditTarget = $state.raw<ComposerContext | null>(null);
   let loadedMembers = $state.raw<MemberView[]>([]);
   let members = $derived(roomMembers?.length ? roomMembers : loadedMembers);

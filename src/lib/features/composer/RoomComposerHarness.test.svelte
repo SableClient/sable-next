@@ -20,7 +20,7 @@
   }
 
   let { core, rooms, composer, registerReply, registerContext, registerRoom }: Props = $props();
-  let context = $state<ComposerContext | null>(
+  let context = $state.raw<ComposerContext | null>(
     untrack(() => composer.context as ComposerContext | null)
   );
 
