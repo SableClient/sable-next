@@ -3,6 +3,7 @@ name: Cloudflare Infra
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     paths:
       - 'infra/**'
@@ -11,6 +12,11 @@ on:
       - '.forgejo/actions/prepare-tofu/**'
       - '.forgejo/actions/setup/**'
   workflow_dispatch:
+    inputs:
+      git_tag:
+        description: 'Git tag to deploy to production (e.g. v1.2.3). Empty = deploy current HEAD as the development build.'
+        required: false
+        type: string
 
 permissions: {}
 
@@ -26,18 +32,34 @@ env:
   TF_HTTP_USERNAME: ${{ secrets.TF_HTTP_USERNAME }}
   TF_HTTP_PASSWORD: ${{ secrets.TF_HTTP_PASSWORD }}
   TF_VAR_workers_message: ${{ github.event_name == 'pull_request' && github.event.pull_request.title || github.ref_name }}
-  TF_HTTP_ADDRESS: ${{ secrets.TF_HTTP_ADDRESS }}
-  TF_HTTP_LOCK_ADDRESS: ${{ secrets.TF_HTTP_LOCK_ADDRESS }}
-  TF_HTTP_UNLOCK_ADDRESS: ${{ secrets.TF_HTTP_UNLOCK_ADDRESS }}
   TF_HTTP_LOCK_METHOD: 'POST'
   TF_HTTP_UNLOCK_METHOD: 'DELETE'
   TF_HTTP_RETRY_WAIT_MIN: '5'
-  TF_VAR_custom_domain: ${{ secrets.TF_VAR_CUSTOM_DOMAIN }}
-  TF_VAR_worker_name: ${{ secrets.TF_VAR_WORKER_NAME }}
 
 jobs:
+  detect:
+    name: Detect target
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      production: ${{ steps.target.outputs.production }}
+    steps:
+      - name: Detect target
+        id: target
+        env:
+          REF: ${{ github.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_GIT_TAG: ${{ inputs.git_tag }}
+        run: |
+          if [[ "${REF}" == refs/tags/v* ]] || [[ "${EVENT_NAME}" == "workflow_dispatch" && -n "${INPUT_GIT_TAG}" ]]; then
+            echo "production=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "production=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build web assets
+    needs: detect
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -45,8 +67,7 @@ jobs:
     env:
       # Absent on forks, which builds an app with error reporting switched off.
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-      VITE_SENTRY_ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
-      VITE_APP_VERSION: ${{ github.sha }}
+      VITE_SENTRY_ENVIRONMENT: ${{ needs.detect.outputs.production == 'true' && 'production' || github.event_name == 'pull_request' && 'preview' || 'development' }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
       SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
@@ -55,6 +76,10 @@ jobs:
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.git_tag || '' }}
+
+      - name: Resolve app version
+        run: echo "VITE_APP_VERSION=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Set up app and build
         uses: ./.forgejo/actions/setup
@@ -63,7 +88,9 @@ jobs:
 
       - name: Carry over the previous build's assets
         if: ${{ github.event_name != 'pull_request' }}
-        run: node scripts/ci/retain-previous-web-assets.mjs https://next.sable.moe dist
+        env:
+          SITE_URL: ${{ needs.detect.outputs.production == 'true' && 'https://app.sable.moe' || 'https://next.sable.moe' }}
+        run: node scripts/ci/retain-previous-web-assets.mjs "$SITE_URL" dist
 
       - name: Upload Cloudflare assets
         uses: https://code.forgejo.org/forgejo/upload-artifact@cb8afe72b42edc798abfb8fcb556cf660d894245 # v5
@@ -75,18 +102,25 @@ jobs:
 
   plan:
     name: Cloudflare plan
-    needs: build
+    needs: [detect, build]
     # Forks cannot read the Cloudflare credentials a plan needs.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
+    env:
+      TF_HTTP_ADDRESS: ${{ needs.detect.outputs.production == 'true' && secrets.TF_HTTP_ADDRESS_PRODUCTION || secrets.TF_HTTP_ADDRESS }}
+      TF_HTTP_LOCK_ADDRESS: ${{ needs.detect.outputs.production == 'true' && secrets.TF_HTTP_LOCK_ADDRESS_PRODUCTION || secrets.TF_HTTP_LOCK_ADDRESS }}
+      TF_HTTP_UNLOCK_ADDRESS: ${{ needs.detect.outputs.production == 'true' && secrets.TF_HTTP_UNLOCK_ADDRESS_PRODUCTION || secrets.TF_HTTP_UNLOCK_ADDRESS }}
+      TF_VAR_custom_domain: ${{ needs.detect.outputs.production == 'true' && secrets.TF_VAR_CUSTOM_DOMAIN_PRODUCTION || secrets.TF_VAR_CUSTOM_DOMAIN }}
+      TF_VAR_worker_name: ${{ needs.detect.outputs.production == 'true' && secrets.TF_VAR_WORKER_NAME_PRODUCTION || secrets.TF_VAR_WORKER_NAME }}
     steps:
       - name: Check out repository
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.git_tag || '' }}
 
       - name: Download Cloudflare assets
         uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
@@ -105,9 +139,11 @@ jobs:
 
       - name: Publish plan summary
         if: ${{ !cancelled() }}
+        env:
+          TARGET: ${{ needs.detect.outputs.production == 'true' && 'production' || 'development' }}
         run: |
           {
-            echo '## OpenTofu plan (development)'
+            echo "## OpenTofu plan (${TARGET})"
             echo
             echo '```terraform'
             cat "$RUNNER_TEMP/plan.txt"
@@ -116,20 +152,27 @@ jobs:
 
   apply:
     name: Cloudflare apply
-    needs: plan
+    needs: [detect, plan]
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
+    env:
+      TF_HTTP_ADDRESS: ${{ needs.detect.outputs.production == 'true' && secrets.TF_HTTP_ADDRESS_PRODUCTION || secrets.TF_HTTP_ADDRESS }}
+      TF_HTTP_LOCK_ADDRESS: ${{ needs.detect.outputs.production == 'true' && secrets.TF_HTTP_LOCK_ADDRESS_PRODUCTION || secrets.TF_HTTP_LOCK_ADDRESS }}
+      TF_HTTP_UNLOCK_ADDRESS: ${{ needs.detect.outputs.production == 'true' && secrets.TF_HTTP_UNLOCK_ADDRESS_PRODUCTION || secrets.TF_HTTP_UNLOCK_ADDRESS }}
+      TF_VAR_custom_domain: ${{ needs.detect.outputs.production == 'true' && secrets.TF_VAR_CUSTOM_DOMAIN_PRODUCTION || secrets.TF_VAR_CUSTOM_DOMAIN }}
+      TF_VAR_worker_name: ${{ needs.detect.outputs.production == 'true' && secrets.TF_VAR_WORKER_NAME_PRODUCTION || secrets.TF_VAR_WORKER_NAME }}
     concurrency:
-      group: cloudflare-infra-development
+      group: cloudflare-infra-${{ needs.detect.outputs.production == 'true' && 'production' || 'development' }}
       cancel-in-progress: false
     steps:
       - name: Check out repository
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.git_tag || '' }}
 
       - name: Download Cloudflare assets
         uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7

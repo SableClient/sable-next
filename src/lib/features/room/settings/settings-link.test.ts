@@ -87,9 +87,9 @@ test('a focus id that is not a setting is kept for the heading it may name', () 
 test.each([
   [APP, APP],
   ['http://localhost:3000', 'http://localhost:3000'],
-  ['tauri://localhost', 'https://next.sable.moe'],
-  ['http://tauri.localhost', 'https://next.sable.moe'],
-  ['https://tauri.localhost', 'https://next.sable.moe'],
+  ['tauri://localhost', 'https://app.sable.moe'],
+  ['http://tauri.localhost', 'https://app.sable.moe'],
+  ['https://tauri.localhost', 'https://app.sable.moe'],
 ])('builds a shareable settings link from %s', (origin, linkOrigin) => {
   const href = buildSettingsLink(origin, 'timeline', 'hide-read-receipts');
   expect(href).toBe(

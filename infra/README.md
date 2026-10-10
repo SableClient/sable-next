@@ -1,11 +1,11 @@
 # Infrastructure
 
 `infra/web` manages the Cloudflare Worker, immutable Worker versions, the live
-development deployment, and the `next.sable.moe` custom domain.
+deployment, and the custom domain. Two deployments share this configuration:
+development on `next.sable.moe` from pushes to `main`, and production on
+`app.sable.moe` from `v*` tags.
 
-The workflow is intentionally separate from `SableClient/sable`'s state:
-`sable-next-development` must be a distinct OpenTofu state from any Sable web
-deployment.
+Each deployment has its own OpenTofu state.
 
 Prerequisites:
 
@@ -23,23 +23,27 @@ Required repository secrets:
 - `TF_HTTP_USERNAME`
 - `TF_HTTP_PASSWORD`
 
-Required variables in the `development` GitHub Environment:
+Per-deployment secrets. Development uses the plain names, production the same
+names with a `_PRODUCTION` suffix:
 
-- `TF_HTTP_ADDRESS`
-- `TF_HTTP_LOCK_ADDRESS`
-- `TF_HTTP_UNLOCK_ADDRESS`
-- `TF_VAR_CUSTOM_DOMAIN` = `next.sable.moe`
-- `TF_VAR_WORKER_NAME` = `sable-next`
+- `TF_HTTP_ADDRESS`, `TF_HTTP_LOCK_ADDRESS`, `TF_HTTP_UNLOCK_ADDRESS`
+- `TF_VAR_CUSTOM_DOMAIN`
+- `TF_VAR_WORKER_NAME`
 
-The three HTTP addresses must point to the separate `sable-next-development`
-state. The workflows map these values to the environment variable names used by
-OpenTofu and Cloudflare.
+Development is `next.sable.moe` on the `sable-next` Worker. Production is
+`app.sable.moe` on the `sable` Worker. The HTTP addresses of each deployment must
+point to its own state. The workflow maps these values to the environment
+variable names used by OpenTofu and Cloudflare.
+
+A custom domain can be attached to only one Worker. Before the first production
+apply, import the existing `app.sable.moe` Worker and custom domain into the
+production state, and stop the old deployment from applying to it.
 
 Cloudflare API token permissions:
 
 - `Account > Workers Scripts > Edit`
 - Scope the token to the account that owns the Worker.
-- Scope the token to the zone serving `next.sable.moe`.
+- Scope the token to the zone serving `next.sable.moe` and `app.sable.moe`.
 - No Pages or DNS edit permission is required; Cloudflare creates the DNS record
   when the custom domain is attached.
 
@@ -71,7 +75,8 @@ tofu -chdir=infra/web apply -var-file="../terraform.tfvars"
 The workflow is `.forgejo/workflows/cloudflare-web.yml`. It builds the web
 assets once per push or pull request, reuses that artifact for frontend checks,
 Playwright, desktop packaging, and Cloudflare operations, plans infrastructure
-changes, applies the development state on pushes to `main`, and uploads
+changes, applies the development state on pushes to `main`, applies the
+production state on `v*` tags or a manual dispatch with `git_tag`, and uploads
 same-repository PR preview versions using Cloudflare Worker preview aliases.
 
 The Worker is configured with `single-page-application` not-found handling so

@@ -83,7 +83,7 @@ export function buildSettingsLink(origin: string, section: string, focus?: strin
   const app = new URL(origin);
   const desktopApp =
     app.hostname === 'tauri.localhost' || (app.protocol === 'tauri:' && app.host === 'localhost');
-  const url = new URL(`/settings/${section}`, desktopApp ? 'https://next.sable.moe' : origin);
+  const url = new URL(`/settings/${section}`, desktopApp ? 'https://app.sable.moe' : origin);
   if (focus !== undefined) url.searchParams.set('focus', focus);
   url.searchParams.set(SETTINGS_LINK_ACTION_PARAM, SETTINGS_LINK_ACTION);
   return url.toString();
