@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Sable v2",
-  "version": "1.22.9",
+  "version": "1.22.10",
   "identifier": "moe.sable.next",
   "build": {
     "frontendDist": "../dist",
@@ -38,7 +38,9 @@
         "base-uri": "'self'",
         "form-action": "'self'"
       },
-      "dangerousDisableAssetCspModification": ["style-src"]
+      "dangerousDisableAssetCspModification": [
+        "style-src"
+      ]
     }
   },
   "bundle": {
@@ -111,18 +113,30 @@
               "inputButtonTitle": "Send",
               "inputPlaceholder": "Message"
             },
-            { "id": "sable-mark-read", "title": "Mark as read", "foreground": false }
+            {
+              "id": "sable-mark-read",
+              "title": "Mark as read",
+              "foreground": false
+            }
           ]
         }
       ]
     },
     "deep-link": {
       "desktop": {
-        "schemes": ["moe.sable.app", "moe.sable.next", "sable"]
+        "schemes": [
+          "moe.sable.app",
+          "moe.sable.next",
+          "sable"
+        ]
       },
       "mobile": [
         {
-          "scheme": ["moe.sable.app", "moe.sable.next", "sable"],
+          "scheme": [
+            "moe.sable.app",
+            "moe.sable.next",
+            "sable"
+          ],
           "appLink": false
         }
       ]
