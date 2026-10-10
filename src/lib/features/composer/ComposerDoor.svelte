@@ -242,12 +242,13 @@
     padding: 0 var(--space-300) var(--space-300);
   }
 
-  :global(.door-action) {
+  :global(.btn.door-action) {
     background: transparent;
     border-color: transparent;
     border-radius: var(--radius);
     color: inherit;
     gap: var(--space-300);
+    justify-content: flex-start;
     min-height: 3rem;
     padding: 0 var(--space-300);
     text-align: left;

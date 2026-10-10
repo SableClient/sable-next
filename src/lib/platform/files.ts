@@ -272,19 +272,28 @@ export function withResolvedMime(file: File): File {
 }
 
 /** `null` when the caller should fall back to `<input type="file">`. */
-export async function pickFiles(accept: string): Promise<File[] | null> {
+export async function pickFiles(
+  accept: string,
+  onFailure?: (error: unknown) => void
+): Promise<File[] | null> {
   if (!(await picksNatively())) return null;
 
   try {
     const { type } = await import('@tauri-apps/plugin-os');
-    return await (type() === 'android' ? pickAndroidFiles(accept) : pickIosFiles(accept));
+    return await (type() === 'android'
+      ? pickAndroidFiles(accept, onFailure)
+      : pickIosFiles(accept, onFailure));
   } catch (error) {
     console.debug('[sable files] native pick failed', error);
-    return null;
+    onFailure?.(error);
+    return [];
   }
 }
 
-async function pickAndroidFiles(accept: string): Promise<File[]> {
+async function pickAndroidFiles(
+  accept: string,
+  onFailure?: (error: unknown) => void
+): Promise<File[]> {
   const AndroidFs = await import('tauri-plugin-android-fs-api');
   const documents = accept === '*' || accept === '*/*';
   const selected = await AndroidFs.showOpenFilePicker({
@@ -312,6 +321,7 @@ async function pickAndroidFiles(accept: string): Promise<File[]> {
           });
         } catch (error) {
           console.debug('[sable files] Android file read failed', uri.uri, error);
+          onFailure?.(error);
           return null;
         }
       })
@@ -319,7 +329,7 @@ async function pickAndroidFiles(accept: string): Promise<File[]> {
   return files.filter((file): file is File => file !== null);
 }
 
-async function pickIosFiles(accept: string): Promise<File[]> {
+async function pickIosFiles(accept: string, onFailure?: (error: unknown) => void): Promise<File[]> {
   const [{ open }, { readFile, remove }] = await Promise.all([
     import('@tauri-apps/plugin-dialog'),
     import('@tauri-apps/plugin-fs'),
@@ -341,6 +351,7 @@ async function pickIosFiles(accept: string): Promise<File[]> {
         return new File([bytes], name, { type: mimeFromName(name) });
       } catch (error) {
         console.debug('[sable files] iOS file read failed', path, error);
+        onFailure?.(error);
         return null;
       } finally {
         await remove(path).catch((error: unknown) => {

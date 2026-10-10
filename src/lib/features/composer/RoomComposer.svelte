@@ -1188,18 +1188,28 @@
     }
   }
 
-  function pick(accept: string): void {
-    void (async () => {
-      const picked = await pickFiles(accept);
-      if (picked !== null) {
-        await stage(picked);
-        return;
-      }
+  let picking = false;
 
-      if (!fileInput) return;
-      fileInput.accept = accept;
-      fileInput.removeAttribute('capture');
-      fileInput.click();
+  function pick(accept: string): void {
+    if (picking) return;
+    picking = true;
+    void (async () => {
+      try {
+        const picked = await pickFiles(accept, () => {
+          error = $i18n.t('composer.pickFailed');
+        });
+        if (picked !== null) {
+          await stage(picked);
+          return;
+        }
+
+        if (!fileInput) return;
+        fileInput.accept = accept;
+        fileInput.removeAttribute('capture');
+        fileInput.click();
+      } finally {
+        picking = false;
+      }
     })();
   }
 

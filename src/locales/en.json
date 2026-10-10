@@ -2646,6 +2646,7 @@
     "unmuteReply": "Send reply notification",
     "readOnly": "You do not have permission to post in this room",
     "tooLarge": "{{name}} is bigger than the {{limit}} limit",
+    "pickFailed": "Could not add that file. Try again.",
     "location": "Location",
     "locationTitle": "Share a location",
     "locationExplain": "Sent as coordinates. The map is only drawn when a reader asks for it, so nothing reaches a tile provider on its own.",
