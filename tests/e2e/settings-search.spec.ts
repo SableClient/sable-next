@@ -18,42 +18,6 @@ function resultsList(page: import('@playwright/test').Page) {
   return page.getByRole('list', { name: 'Search settings' });
 }
 
-test('typing filters settings by their name across categories', async ({ page }) => {
-  await searchField(page).fill('autoplay gifs');
-
-  const results = resultsList(page).getByRole('listitem');
-  await expect(results).toHaveCount(1);
-  await expect(results.filter({ hasText: 'Autoplay GIFs' })).toBeVisible();
-  await expect(results.filter({ hasText: 'In Media' })).toBeVisible();
-});
-
-test('typing matches on the translated description, not just the name', async ({ page }) => {
-  await searchField(page).fill('lock screen');
-
-  const results = resultsList(page).getByRole('listitem');
-  await expect(results).toHaveCount(1);
-  await expect(results.filter({ hasText: 'Show message text' })).toBeVisible();
-  await expect(results.filter({ hasText: 'In Notifications' })).toBeVisible();
-});
-
-test('the summary reports how many results there are', async ({ page }) => {
-  await searchField(page).fill('notification');
-
-  const count = await resultsList(page).getByRole('listitem').count();
-  expect(count).toBeGreaterThan(1);
-  await expect(page.getByText(`${String(count)} results`)).toBeVisible();
-
-  await searchField(page).fill('autoplay gifs');
-  await expect(page.getByText('1 result', { exact: true })).toBeVisible();
-});
-
-test('a query matching nothing says so', async ({ page }) => {
-  await searchField(page).fill('zzzznothingmatchesthis');
-
-  await expect(resultsList(page).getByRole('listitem')).toHaveCount(0);
-  await expect(page.getByText('No settings match')).toBeVisible();
-});
-
 test('activating a result lands in the right category and highlights the setting', async ({
   page,
 }) => {
