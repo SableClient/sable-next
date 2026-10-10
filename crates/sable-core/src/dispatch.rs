@@ -233,6 +233,27 @@ pub(crate) fn state_event_content(raw: &str) -> Option<serde_json::Value> {
     }
 }
 
+async fn confirmed_member_join(
+    room: &matrix_sdk::Room,
+    user_id: &matrix_sdk::ruma::UserId,
+) -> bool {
+    let response = room
+        .client()
+        .send(get_state_event_for_key::v3::Request::new(
+            room.room_id().to_owned(),
+            matrix_sdk::ruma::events::StateEventType::RoomMember,
+            user_id.to_string(),
+        ))
+        .await;
+    match response {
+        Ok(response) => state_event_content(response.event_or_content.get())
+            .and_then(|content| content.get("membership")?.as_str().map(|m| m == "join"))
+            .unwrap_or(true),
+        Err(error) if error.client_api_error_kind() == Some(&ErrorKind::NotFound) => false,
+        Err(_) => true,
+    }
+}
+
 impl Core {
     /// Splitting this by command family needs a second match with an
     /// unreachable arm, which `clippy::panic = "deny"` rules out.
@@ -926,15 +947,19 @@ impl Core {
                     .iter()
                     .any(|ignored| ignored == user_id.as_str());
                 // One store read per joined room, sent together because awaiting
-                // them in turn is hundreds of IndexedDB round trips.
+                // them in turn is hundreds of IndexedDB round trips. Sliding sync
+                // does not deliver a leave for a member who sent nothing in the
+                // window, so a room the store still lists is confirmed with the
+                // server before it is shown.
                 let target = &user_id;
                 let lookups = client.joined_rooms().into_iter().map(|room| async move {
-                    let joined = room
+                    let stored = room
                         .get_member_no_sync(target)
                         .await
                         .ok()
                         .flatten()
                         .is_some_and(|member| member.membership() == &MembershipState::Join);
+                    let joined = stored && confirmed_member_join(&room, target).await;
                     joined.then(|| MutualRoomView {
                         name: room
                             .cached_display_name()
