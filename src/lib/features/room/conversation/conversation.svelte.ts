@@ -16,6 +16,7 @@ import { t } from '#lib/i18n.js';
 import type { CoreClient, OutgoingMentions } from '#lib/core/client.svelte.js';
 import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
 import type { BotCommandInvocation } from '#lib/features/composer/bot-commands.js';
+import { readReply, writeReply } from '#lib/features/composer/composer-drafts.svelte.js';
 import type { ComposerContext, ScheduledTarget } from '#lib/features/composer/composer-context.js';
 import { dequeue, enqueue } from '#lib/features/composer/scheduled-queue.svelte.js';
 import {
@@ -63,7 +64,7 @@ function failed(action: string): (error: unknown) => void {
 }
 
 export class Conversation {
-  context = $state<ComposerContext | null>(null);
+  #context = $state<ComposerContext | null>(null);
   scheduledRevision = $state(0);
   forumTitle = $state('');
   dismissedPreviews = $state<string[]>([]);
@@ -97,6 +98,24 @@ export class Conversation {
     this.#encrypted = encrypted ?? (() => null);
     this.#threadRoot = threadRoot;
     this.#beforeSend = beforeSend;
+    this.#context = readReply(this.#replyKey(), this.#accountId()) ?? null;
+  }
+
+  get context(): ComposerContext | null {
+    return this.#context;
+  }
+
+  set context(value: ComposerContext | null) {
+    this.#context = value;
+    writeReply(this.#replyKey(), value?.kind === 'reply' ? value : null, this.#accountId());
+  }
+
+  #replyKey(): string {
+    return this.#threadRoot === null ? this.#roomId() : `${this.#roomId()}/${this.#threadRoot}`;
+  }
+
+  #accountId(): string {
+    return this.#core.session?.account_id ?? '';
   }
 
   get threadRoot(): string | null {

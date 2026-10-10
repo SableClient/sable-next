@@ -8,6 +8,7 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
 import type { ReplyFallback, RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
+import { clearDrafts } from '#lib/features/composer/composer-drafts.svelte.js';
 import { adoptQueue, scheduledQueue } from '#lib/features/composer/scheduled-queue.svelte.js';
 import { ScheduledOriginalKept } from '#lib/features/composer/send-failure.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
@@ -224,6 +225,34 @@ test('a reply notifies the author it answers', async () => {
     'sure',
     expect.objectContaining({ inReplyTo: '$one:example.org', silentReply: false })
   );
+});
+
+test('a reply survives leaving the room and coming back', () => {
+  const items = [item('$one:example.org', '@ana:example.org')];
+  const first = setup(items, '@kris:example.org');
+  first.conversation.reply('$one:example.org');
+
+  const returned = setup(items, '@kris:example.org');
+  expect(returned.conversation.context?.eventId).toBe('$one:example.org');
+
+  returned.conversation.clearContext();
+  expect(setup(items, '@kris:example.org').conversation.context).toBeNull();
+});
+
+test('a thread keeps its own pending reply', () => {
+  const items = [item('$one:example.org', '@ana:example.org')];
+  setup(items, '@kris:example.org').conversation.reply('$one:example.org');
+
+  expect(setup(items, '@kris:example.org', {}, undefined, '$root').conversation.context).toBeNull();
+});
+
+test('a sent reply is not restored', async () => {
+  const items = [item('$one:example.org', '@ana:example.org')];
+  const { conversation } = setup(items, '@kris:example.org');
+  conversation.reply('$one:example.org');
+  await conversation.sendMessage(ROOM, 'sure');
+
+  expect(setup(items, '@kris:example.org').conversation.context).toBeNull();
 });
 
 test('muting the reply stops the mention', async () => {
@@ -637,6 +666,7 @@ function scheduling() {
 afterEach(() => {
   vi.restoreAllMocks();
   adoptQueue([]);
+  clearDrafts();
   setPreference('scheduleInEncryptedRooms', true);
   setPreference('personaProxying', false);
 });

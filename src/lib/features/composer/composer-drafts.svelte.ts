@@ -1,5 +1,6 @@
 import { fingerprint } from '#lib/settings/fingerprint.js';
 
+import type { ComposerContext } from './composer-context';
 import type { StagedFile } from './composer-files';
 
 export interface ComposerDraft {
@@ -15,6 +16,7 @@ interface DraftState {
   synced: Map<string, string>;
   adopted: Map<string, number>;
   discarded: Map<string, string>;
+  replies: Map<string, ComposerContext>;
 }
 
 // eslint-disable-next-line svelte/prefer-svelte-reactivity -- changes publish through revision
@@ -23,7 +25,13 @@ const accounts = new Map<string, DraftState>();
 function stateFor(accountId: string): DraftState {
   let state = accounts.get(accountId);
   if (!state) {
-    state = { drafts: new Map(), synced: new Map(), adopted: new Map(), discarded: new Map() };
+    state = {
+      drafts: new Map(),
+      synced: new Map(),
+      adopted: new Map(),
+      discarded: new Map(),
+      replies: new Map(),
+    };
     accounts.set(accountId, state);
   }
   return state;
@@ -57,6 +65,16 @@ export function clearDraft(roomId: string, accountId = ''): void {
   if (!drafts.delete(roomId)) return;
   if (doc !== null && doc !== undefined) discarded.set(roomId, fingerprint(doc));
   revision.value += 1;
+}
+
+export function readReply(key: string, accountId = ''): ComposerContext | undefined {
+  return stateFor(accountId).replies.get(key);
+}
+
+export function writeReply(key: string, reply: ComposerContext | null, accountId = ''): void {
+  const { replies } = stateFor(accountId);
+  if (reply === null) replies.delete(key);
+  else replies.set(key, reply);
 }
 
 export function clearDrafts(): void {
