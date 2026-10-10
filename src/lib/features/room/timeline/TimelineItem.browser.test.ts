@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { commands, page } from 'vitest/browser';
+import { commands, page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 
 import type { ProfileView, TimelineItemView } from '#src/generated/protocol';
@@ -161,4 +161,79 @@ test('a mobile connected reply aligns its preview text with the sender name', as
   const nameTop = range.getBoundingClientRect().top;
   range.selectNodeContents(body);
   expect(Math.abs(nameTop - range.getBoundingClientRect().top)).toBeLessThanOrEqual(1);
+});
+
+async function parkPointer(): Promise<void> {
+  const spot = document.createElement('div');
+  Object.assign(spot.style, {
+    position: 'fixed',
+    right: '0',
+    bottom: '0',
+    width: '8px',
+    height: '8px',
+  });
+  document.body.append(spot);
+  await userEvent.hover(spot);
+  spot.remove();
+}
+
+async function widePng(): Promise<Uint8Array<ArrayBuffer>> {
+  const canvas = new OffscreenCanvas(600, 40);
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('No canvas context');
+  context.fillStyle = '#3366cc';
+  context.fillRect(0, 0, 600, 40);
+  const blob = await canvas.convertToBlob({ type: 'image/png' });
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+function layers(root: Element): number[][] {
+  const frame = root.getBoundingClientRect();
+  return [...root.querySelectorAll('.media-image')].map((layer) => {
+    const box = layer.getBoundingClientRect();
+    return [
+      box.left - frame.left,
+      box.top - frame.top,
+      box.width - frame.width,
+      box.height - frame.height,
+    ].map(Math.round);
+  });
+}
+
+test('an avatar picture fills its frame exactly, however wide the image', async () => {
+  await parkPointer();
+  Object.assign(core, { fetchMedia: vi.fn(widePng) });
+  await mountItem({
+    ...message('wide', '@alice:example.test', 'Alice'),
+    sender_avatar: 'mxc://example.test/wide-avatar',
+  });
+
+  await expect.poll(() => document.querySelector('.avatar-root img')).not.toBeNull();
+  const frame = document.querySelector('.avatar-root:has(img)');
+  if (!frame) throw new Error('the avatar frame is not rendered');
+  expect(layers(frame)).toEqual([[0, 0, 0, 0]]);
+});
+
+test('the hover animation stacks over the still picture inside the frame', async () => {
+  await parkPointer();
+  Object.assign(core, { fetchMedia: vi.fn(widePng) });
+  await mountItem({
+    ...message('hover', '@hover:example.test', 'Hover'),
+    sender_avatar: 'mxc://example.test/wide-avatar',
+  });
+
+  await expect.poll(() => document.querySelector('.avatar-root img')).not.toBeNull();
+  const frame = document.querySelector<HTMLElement>('.avatar-root:has(img)');
+  const row = document.querySelector<HTMLElement>('.message');
+  if (!frame || !row) throw new Error('the row is not rendered');
+  const width = frame.getBoundingClientRect().width;
+
+  await userEvent.hover(row);
+  await expect.poll(() => frame.querySelectorAll('.media-image').length).toBe(2);
+
+  expect(frame.getBoundingClientRect().width).toBe(width);
+  expect(layers(frame)).toEqual([
+    [0, 0, 0, 0],
+    [0, 0, 0, 0],
+  ]);
 });
