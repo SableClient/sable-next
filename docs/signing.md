@@ -33,12 +33,12 @@ storeFile=<absolute path to upload-keystore.jks>
 
 ```bash
 # TAURI_SIGNING_PRIVATE_KEY_PASSWORD may be empty
-pnpm tauri signer generate -w ~/.tauri/sable-next.key
+pnpm tauri signer generate -w ~/.tauri/sable.key
 ```
 
-- `TAURI_SIGNING_PRIVATE_KEY`: contents of `~/.tauri/sable-next.key`
+- `TAURI_SIGNING_PRIVATE_KEY`: contents of `~/.tauri/sable.key`
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: the chosen password
-- `~/.tauri/sable-next.key.pub` goes in `plugins.updater.pubkey` in
+- `~/.tauri/sable.key.pub` goes in `plugins.updater.pubkey` in
   `src-tauri/tauri.conf.json`
 
 Losing the private key prevents publishing updates to installed apps.

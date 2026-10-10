@@ -12,7 +12,7 @@ if (!version || !tag || !outputPath) {
 const repository = 'SableClient/sable-next';
 const server = 'https://git.sable.moe';
 const isNightly = tag.startsWith('nightly-');
-const apkName = `sable-next-${version}-android-universal.apk`;
+const apkName = `sable-${version}-android-universal.apk`;
 const apkUrl = `${server}/${repository}/releases/download/${tag}/${apkName}`;
 
 // Obtainium fills in every other setting from its own defaults on import.

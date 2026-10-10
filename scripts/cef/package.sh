@@ -73,9 +73,9 @@ fi
 cp -a "$WORK/stage/share/." "$PKGROOT/usr/share/"
 
 PKGROOT="$PKGROOT" PKG_ARCH="$NFPM_ARCH" PKG_VERSION="$DEB_VERSION" PKG_RELEASE=1 \
-  nfpm pkg -f nfpm.yaml -p deb -t "$OUT/deb/sable-next-${VERSION}-linux-${ARCH}.deb"
+  nfpm pkg -f nfpm.yaml -p deb -t "$OUT/deb/sable-${VERSION}-linux-${ARCH}.deb"
 PKGROOT="$PKGROOT" PKG_ARCH="$NFPM_ARCH" PKG_VERSION="$RPM_VERSION" PKG_RELEASE="$RPM_RELEASE" \
-  nfpm pkg -f nfpm.yaml -p rpm -t "$OUT/rpm/sable-next-${VERSION}-linux-${ARCH}.rpm"
+  nfpm pkg -f nfpm.yaml -p rpm -t "$OUT/rpm/sable-${VERSION}-linux-${ARCH}.rpm"
 
 # The Flatpak takes this as extra-data; apply_extra unpacks this layout.
 TARROOT="$WORK/tarball"
@@ -84,7 +84,7 @@ cp -f "$BIN_PATH" "$TARROOT/sable-next"
 strip --strip-debug "$TARROOT/sable-next"
 chmod 755 "$TARROOT/sable-next"
 cp -a "$WORK/stage/runtime" "$WORK/stage/share" "$TARROOT/"
-tar -C "$TARROOT" -czf "$OUT/sable-next-${VERSION}-linux-${ARCH}.tar.gz" \
+tar -C "$TARROOT" -czf "$OUT/sable-${VERSION}-linux-${ARCH}.tar.gz" \
   sable-next runtime share
 
 APPDIR="$WORK/SableNext.AppDir"
@@ -125,6 +125,6 @@ EOF
 chmod 755 "$APPDIR/AppRun"
 
 APPIMAGE_EXTRACT_AND_RUN=1 "$APPIMAGETOOL" "$APPDIR" \
-  "$OUT/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage"
+  "$OUT/appimage/sable-${VERSION}-linux-${ARCH}.AppImage"
 
 echo "packages in $OUT"

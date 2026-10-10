@@ -201,15 +201,15 @@ jobs:
                   *.dmg) suffix='.dmg' ;;
                   *) continue ;;
                 esac
-                target="$(dirname "$path")/sable-next-${VERSION}-${ASSET_PLATFORM}${suffix}"
+                target="$(dirname "$path")/sable-${VERSION}-${ASSET_PLATFORM}${suffix}"
                 [ "$path" = "$target" ] || mv "$path" "$target"
               done
-          find "$BUNDLE_PATH" -type f -name 'sable-next-*' > bundles
+          find "$BUNDLE_PATH" -type f -name 'sable-*' > bundles
           test -s bundles || { echo "No desktop bundles found in $BUNDLE_PATH" >&2; exit 1; }
       - name: Attest desktop bundles
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: ${{ matrix.bundle-path }}/*/sable-next-*
+          subject-path: ${{ matrix.bundle-path }}/*/sable-*
       - name: Attach desktop bundles to release
         shell: bash
         run: |
@@ -291,7 +291,7 @@ jobs:
           node scripts/ci/upload-sentry-symbols.mjs --ios
           ipa="$(find src-tauri/gen/apple/build -type f -name '*.ipa' | head -n 1)"
           [ -n "$ipa" ] || { echo 'No iOS IPA found' >&2; exit 1; }
-          target="$(dirname "$ipa")/sable-next-${VERSION}-ios-arm64.ipa"
+          target="$(dirname "$ipa")/sable-${VERSION}-ios-arm64.ipa"
           [ "$ipa" = "$target" ] || mv "$ipa" "$target"
 
           unzip -p "$target" 'Payload/*.app/Info.plist' > Info.plist
@@ -392,33 +392,33 @@ jobs:
           node scripts/ci/upload-sentry-symbols.mjs target/release
       - name: Check the CEF packages carry what they should
         run: |
-          deb="target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb"
+          deb="target/release/bundle/deb/sable-${VERSION}-linux-${ARCH}.deb"
           dpkg-deb --contents "$deb" | grep -q 'etc/apparmor.d/sable-next$'
           dpkg-deb --ctrl-tarfile "$deb" | tar -t | grep -qx './postinst'
           dpkg-deb --ctrl-tarfile "$deb" | tar -t | grep -qx './prerm'
           dpkg-deb --contents "$deb" | grep -q 'opt/sable-next/CEF-LICENSE.txt$'
       - name: Check stable packages replace v1
         if: ${{ needs.setup-release.outputs.nightly != 'true' }}
-        run: test "$(dpkg-deb --field "target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb" Package)" = sable
+        run: test "$(dpkg-deb --field "target/release/bundle/deb/sable-${VERSION}-linux-${ARCH}.deb" Package)" = sable
       - name: Sign the AppImage for the updater
         if: ${{ env.TAURI_SIGNING_PRIVATE_KEY != '' }}
-        run: pnpm tauri signer sign "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage"
+        run: pnpm tauri signer sign "target/release/bundle/appimage/sable-${VERSION}-linux-${ARCH}.AppImage"
       - name: Attest Linux bundles
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
-            target/release/bundle/deb/sable-next-*.deb
-            target/release/bundle/rpm/sable-next-*.rpm
-            target/release/bundle/sable-next-*.tar.gz
-            target/release/bundle/appimage/sable-next-*.AppImage
+            target/release/bundle/deb/sable-*.deb
+            target/release/bundle/rpm/sable-*.rpm
+            target/release/bundle/sable-*.tar.gz
+            target/release/bundle/appimage/sable-*.AppImage
       - name: Attach Linux bundles to release
         run: |
           bundles=()
-          for bundle in "target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb" \
-                        "target/release/bundle/rpm/sable-next-${VERSION}-linux-${ARCH}.rpm" \
-                        "target/release/bundle/sable-next-${VERSION}-linux-${ARCH}.tar.gz" \
-                        "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage" \
-                        "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage.sig"; do
+          for bundle in "target/release/bundle/deb/sable-${VERSION}-linux-${ARCH}.deb" \
+                        "target/release/bundle/rpm/sable-${VERSION}-linux-${ARCH}.rpm" \
+                        "target/release/bundle/sable-${VERSION}-linux-${ARCH}.tar.gz" \
+                        "target/release/bundle/appimage/sable-${VERSION}-linux-${ARCH}.AppImage" \
+                        "target/release/bundle/appimage/sable-${VERSION}-linux-${ARCH}.AppImage.sig"; do
             [ -e "$bundle" ] && bundles+=("$bundle")
           done
           node scripts/ci/forgejo-release.mjs upload "${bundles[@]}"
@@ -454,7 +454,7 @@ jobs:
         id: tarball
         shell: bash
         run: |
-          tarball="sable-next-${VERSION}-linux-${ARCH}.tar.gz"
+          tarball="sable-${VERSION}-linux-${ARCH}.tar.gz"
           if ! node scripts/ci/forgejo-release.mjs wait-assets \
                  --names "$tarball" --attempts 140 --interval 30; then
             echo "::warning::$tarball never appeared; skipping the $ARCH Flatpak."
@@ -554,7 +554,7 @@ jobs:
             fi
           done
           for arch in x86_64 aarch64; do
-            url="$FORGEJO_URL/$FORGEJO_REPOSITORY/releases/download/$TAG/sable-next-$VERSION-linux-$arch.tar.gz"
+            url="$FORGEJO_URL/$FORGEJO_REPOSITORY/releases/download/$TAG/sable-$VERSION-linux-$arch.tar.gz"
             for attempt in $(seq 20); do
               if curl -fsSL -r 0-0 -o /dev/null "$url"; then
                 unset url
@@ -678,7 +678,7 @@ jobs:
         run: |
           jq -n \
             --arg version "$VERSION" \
-            --arg name "sable-next-${VERSION}-ios-arm64.ipa" \
+            --arg name "sable-${VERSION}-ios-arm64.ipa" \
             --arg size "$IPA_SIZE" \
             --arg ipa_version "$IPA_VERSION" \
             --arg build "$IPA_BUILD" \

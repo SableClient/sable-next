@@ -70,7 +70,7 @@ modules:
     sources:
       - type: extra-data
         filename: sable-next.tar.gz
-        url: https://git.sable.moe/SableClient/sable-next/releases/download/v@VERSION@/sable-next-@VERSION@-linux-x86_64.tar.gz
+        url: https://git.sable.moe/SableClient/sable-next/releases/download/v@VERSION@/sable-@VERSION@-linux-x86_64.tar.gz
         sha256: '@SHA256_X86_64@'
         size: @SIZE_X86_64@
         only-arches: [x86_64]
@@ -78,11 +78,11 @@ modules:
           type: json
           url: https://git.sable.moe/api/v1/repos/SableClient/sable-next/releases/latest
           version-query: .tag_name | sub("^v"; "")
-          url-query: .assets[] | select(.name == "sable-next-" + $version + "-linux-x86_64.tar.gz") | .browser_download_url
+          url-query: .assets[] | select(.name == "sable-" + $version + "-linux-x86_64.tar.gz") | .browser_download_url
           is-main-source: true
       - type: extra-data
         filename: sable-next.tar.gz
-        url: https://git.sable.moe/SableClient/sable-next/releases/download/v@VERSION@/sable-next-@VERSION@-linux-aarch64.tar.gz
+        url: https://git.sable.moe/SableClient/sable-next/releases/download/v@VERSION@/sable-@VERSION@-linux-aarch64.tar.gz
         sha256: '@SHA256_AARCH64@'
         size: @SIZE_AARCH64@
         only-arches: [aarch64]
@@ -90,7 +90,7 @@ modules:
           type: json
           url: https://git.sable.moe/api/v1/repos/SableClient/sable-next/releases/latest
           version-query: .tag_name | sub("^v"; "")
-          url-query: .assets[] | select(.name == "sable-next-" + $version + "-linux-aarch64.tar.gz") | .browser_download_url
+          url-query: .assets[] | select(.name == "sable-" + $version + "-linux-aarch64.tar.gz") | .browser_download_url
       - type: script
         dest-filename: apply_extra
         commands:

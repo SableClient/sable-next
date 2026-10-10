@@ -31,7 +31,7 @@ provides=('sable')
 conflicts=('sable' 'sable-bin')
 options=('!strip' '!debug')
 install=${pkgname}.install
-source_x86_64=("${pkgname}-${pkgver}-x86_64.deb::${url}/releases/download/nightly-${_relver}/sable-next-${_relver}-linux-x86_64.deb")
+source_x86_64=("${pkgname}-${pkgver}-x86_64.deb::${url}/releases/download/nightly-${_relver}/sable-${_relver}-linux-x86_64.deb")
 sha256sums_x86_64=('cd7655580610260e6ea360096a6c3189e5831d280f5bc44187fc5b09205b8afe')
 
 package() {

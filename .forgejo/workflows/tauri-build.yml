@@ -105,8 +105,8 @@ jobs:
       # bundles in step with the desktop and mobile ones.
       - name: Attach web bundle to release
         run: |
-          tar --create --gzip --file "sable-next-${VERSION}-web.tar.gz" --directory dist .
-          node scripts/ci/forgejo-release.mjs upload "sable-next-${VERSION}-web.tar.gz"
+          tar --create --gzip --file "sable-${VERSION}-web.tar.gz" --directory dist .
+          node scripts/ci/forgejo-release.mjs upload "sable-${VERSION}-web.tar.gz"
       - name: Upload web assets
         uses: https://code.forgejo.org/forgejo/upload-artifact@cb8afe72b42edc798abfb8fcb556cf660d894245 # v5
         with:
@@ -262,7 +262,7 @@ jobs:
           node scripts/ci/upload-sentry-symbols.mjs target/release
       - name: Check the CEF packages carry what they should
         run: |
-          deb="target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb"
+          deb="target/release/bundle/deb/sable-${VERSION}-linux-${ARCH}.deb"
           contents=$(dpkg-deb --contents "$deb")
           ctrl=$(dpkg-deb --ctrl-tarfile "$deb" | tar -t)
           grep -q 'etc/apparmor.d/sable-next$' <<<"$contents"
@@ -271,18 +271,18 @@ jobs:
           grep -q 'opt/sable-next/CEF-LICENSE.txt$' <<<"$contents"
       - name: Check stable packages replace v1
         if: ${{ needs.setup-release.outputs.nightly != 'true' }}
-        run: test "$(dpkg-deb --field "target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb" Package)" = sable
+        run: test "$(dpkg-deb --field "target/release/bundle/deb/sable-${VERSION}-linux-${ARCH}.deb" Package)" = sable
       - name: Sign the AppImage for the updater
         if: ${{ env.TAURI_SIGNING_PRIVATE_KEY != '' }}
-        run: pnpm tauri signer sign "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage"
+        run: pnpm tauri signer sign "target/release/bundle/appimage/sable-${VERSION}-linux-${ARCH}.AppImage"
       - name: Attach Linux bundles to release
         run: |
           bundles=()
-          for bundle in "target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb" \
-                        "target/release/bundle/rpm/sable-next-${VERSION}-linux-${ARCH}.rpm" \
-                        "target/release/bundle/sable-next-${VERSION}-linux-${ARCH}.tar.gz" \
-                        "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage" \
-                        "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage.sig"; do
+          for bundle in "target/release/bundle/deb/sable-${VERSION}-linux-${ARCH}.deb" \
+                        "target/release/bundle/rpm/sable-${VERSION}-linux-${ARCH}.rpm" \
+                        "target/release/bundle/sable-${VERSION}-linux-${ARCH}.tar.gz" \
+                        "target/release/bundle/appimage/sable-${VERSION}-linux-${ARCH}.AppImage" \
+                        "target/release/bundle/appimage/sable-${VERSION}-linux-${ARCH}.AppImage.sig"; do
             [ -e "$bundle" ] && bundles+=("$bundle")
           done
           node scripts/ci/forgejo-release.mjs upload "${bundles[@]}"
@@ -408,7 +408,7 @@ jobs:
             dir="src-tauri/gen/android/app/build/outputs/apk/$flavor/release"
             apk="$(find "$dir" -name '*.apk' -type f | head -n 1)"
             [ -n "$apk" ] || { echo "FOSS $abi APK not found" >&2; exit 1; }
-            mv "$apk" "$dir/sable-next-${VERSION}-android-${abi}-foss.apk"
+            mv "$apk" "$dir/sable-${VERSION}-android-${abi}-foss.apk"
           done
       - name: Build Android bundles
         run: |
@@ -422,12 +422,12 @@ jobs:
           aab="$(find "$out/bundle/universalRelease" -name '*.aab' -type f | head -n 1)"
           [ -n "$apk" ] || { echo 'APK not found' >&2; exit 1; }
           [ -n "$aab" ] || { echo 'AAB not found' >&2; exit 1; }
-          mv "$apk" "$(dirname "$apk")/sable-next-${VERSION}-android-universal.apk"
-          mv "$aab" "$(dirname "$aab")/sable-next-${VERSION}-android-universal.aab"
+          mv "$apk" "$(dirname "$apk")/sable-${VERSION}-android-universal.apk"
+          mv "$aab" "$(dirname "$aab")/sable-${VERSION}-android-universal.aab"
       - name: Verify the APK is signed
         if: ${{ env.ANDROID_KEY_BASE64 != '' }}
         run: |
-          apk="src-tauri/gen/android/app/build/outputs/apk/universal/release/sable-next-${VERSION}-android-universal.apk"
+          apk="src-tauri/gen/android/app/build/outputs/apk/universal/release/sable-${VERSION}-android-universal.apk"
           sdk="$(mise exec -- printenv ANDROID_HOME)"
           apksigner="$(find "$sdk/build-tools" -name apksigner -type f | sort | tail -n 1)"
           [ -n "$apksigner" ] || { echo 'apksigner not found' >&2; exit 1; }
@@ -435,7 +435,7 @@ jobs:
       - name: Attach Android bundles to release
         run: |
           mapfile -d '' bundles < <(find src-tauri/gen/android/app/build/outputs -type f \
-            -name 'sable-next-*' \( -name '*.apk' -o -name '*.aab' \) -print0)
+            -name 'sable-*' \( -name '*.apk' -o -name '*.aab' \) -print0)
           [ "${#bundles[@]}" -gt 0 ] || { echo 'No Android bundles found' >&2; exit 1; }
           node scripts/ci/forgejo-release.mjs upload "${bundles[@]}"
   github-bundles:
@@ -673,7 +673,7 @@ jobs:
         run: |
           mkdir debs
           node scripts/ci/forgejo-release.mjs download \
-            --pattern "sable-next-${VERSION}-linux-x86_64.deb" --dir debs
+            --pattern "sable-${VERSION}-linux-x86_64.deb" --dir debs
           ls debs | grep -q . || { echo 'The x86_64 deb is not on the release' >&2; exit 1; }
       - name: Push to the AUR
         env:
@@ -692,7 +692,7 @@ jobs:
             pkgver="$VERSION"
             relver=-
           fi
-          sha="$(sha256sum "debs/sable-next-${VERSION}-linux-x86_64.deb" | awk '{print $1}')"
+          sha="$(sha256sum "debs/sable-${VERSION}-linux-x86_64.deb" | awk '{print $1}')"
 
           mkdir -p ~/.ssh
           printf '%s\n' "$AUR_KEY" > ~/.ssh/aur_key
@@ -735,7 +735,7 @@ jobs:
         run: |
           mkdir dmg
           node scripts/ci/forgejo-release.mjs download \
-            --pattern "sable-next-${VERSION}-macos-universal.dmg" --dir dmg
+            --pattern "sable-${VERSION}-macos-universal.dmg" --dir dmg
           ls dmg | grep -q . || { echo 'The DMG is not on the release' >&2; exit 1; }
       - name: Push the cask to the tap
         env:
@@ -745,7 +745,7 @@ jobs:
             echo '::notice::HOMEBREW_TAP_TOKEN is not set; skipping the Homebrew publish.'
             exit 0
           fi
-          sha="$(sha256sum "dmg/sable-next-${VERSION}-macos-universal.dmg" | awk '{print $1}')"
+          sha="$(sha256sum "dmg/sable-${VERSION}-macos-universal.dmg" | awk '{print $1}')"
           git clone --depth 1 \
             "https://x-access-token:${HOMEBREW_TAP_TOKEN}@git.sable.moe/SableClient/homebrew-sable.git" tap
 
@@ -786,7 +786,7 @@ jobs:
         run: |
           mkdir tarballs
           node scripts/ci/forgejo-release.mjs download \
-            --pattern "sable-next-${VERSION}-linux-*.tar.gz" --dir tarballs
+            --pattern "sable-${VERSION}-linux-*.tar.gz" --dir tarballs
       - name: Open the Flathub PR
         env:
           FLATHUB_TOKEN: ${{ secrets.FLATHUB_TOKEN }}
@@ -802,7 +802,7 @@ jobs:
           fi
 
           arch_args() {
-            local file="tarballs/sable-next-${VERSION}-linux-$1.tar.gz"
+            local file="tarballs/sable-${VERSION}-linux-$1.tar.gz"
             if [ -e "$file" ]; then
               echo "$(sha256sum "$file" | awk '{print $1}'):$(stat -c %s "$file")"
             else
