@@ -39,11 +39,10 @@
     if (!root || options.length !== items.length) return;
 
     const measure = () => {
-      const rootLeft = root.getBoundingClientRect().left;
-      optionBounds = options.map((option) => {
-        const bounds = option.getBoundingClientRect();
-        return { left: bounds.left - rootLeft, width: bounds.width };
-      });
+      optionBounds = options.map((option) => ({
+        left: option.offsetLeft,
+        width: option.offsetWidth,
+      }));
     };
 
     measure();
