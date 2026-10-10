@@ -375,12 +375,7 @@ impl Core {
             .map(|token| token.trim().to_owned())
             .filter(|token| !token.is_empty());
 
-        let auth = registration_token.as_ref().map(|token| {
-            AuthData::RegistrationToken(
-                matrix_sdk::ruma::api::client::uiaa::RegistrationToken::new(token.clone()),
-            )
-        });
-        let request = registration_request(&username, &password, auth);
+        let request = registration_request(&username, &password, None);
 
         match client.matrix_auth().register(request).await {
             Ok(_) => self
@@ -992,6 +987,16 @@ mod tests {
             serde_json::to_value(AuthData::fallback_acknowledgement("session-1".to_owned()))?;
         assert_eq!(fallback["session"], "session-1");
         assert!(fallback.get("type").is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn a_token_stage_without_a_session_serializes_a_null_session() -> Result<(), serde_json::Error>
+    {
+        let token =
+            matrix_sdk::ruma::api::client::uiaa::RegistrationToken::new("invite-123".to_owned());
+        let value = serde_json::to_value(AuthData::RegistrationToken(token))?;
+        assert_eq!(value.get("session"), Some(&serde_json::Value::Null));
         Ok(())
     }
 
