@@ -1036,9 +1036,10 @@ pub fn timeline_item(
 }
 
 fn annotatable_reactions(event: &EventTimelineItem) -> Vec<ReactionGroup> {
-    if event
-        .original_json()
-        .is_none_or(crate::reactions::can_annotate)
+    if !event.content().is_redacted()
+        && event
+            .original_json()
+            .is_none_or(crate::reactions::can_annotate)
     {
         reactions(event.reactions())
     } else {

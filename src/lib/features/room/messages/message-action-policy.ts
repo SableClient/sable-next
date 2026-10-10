@@ -101,6 +101,7 @@ export function messageActionPolicy({
   const canAnnotate =
     !isRecord(relation) ||
     (relation.rel_type !== 'm.annotation' && relation.rel_type !== 'm.replace');
+  const redacted = item.content.kind === 'redacted';
 
   return {
     eventId,
@@ -113,8 +114,8 @@ export function messageActionPolicy({
     pinned,
     bookmarked,
     stealCount,
-    react: canToggleReaction && canAnnotate,
-    viewReactions: canAnnotate && item.reactions.length > 0,
+    react: canToggleReaction && canAnnotate && !redacted,
+    viewReactions: canAnnotate && !redacted && item.reactions.length > 0,
     readReceipts: true,
     markUnread: canMarkUnread && eventId !== '',
     reply: canReply,

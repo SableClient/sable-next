@@ -63,3 +63,17 @@ test('an edit diffs against the edit before it', () => {
   expect(index.editBefore(second)).toBe(first);
   expect(index.editBefore(first)).toBeNull();
 });
+
+test('a redaction reason is found by the event it redacted', () => {
+  const index = new TimelineEventIndex(
+    [],
+    [
+      hidden('$x', 'm.room.redaction', { reason: 'spam' }, 0, '$old'),
+      hidden('$y', 'm.room.redaction', { reason: '  ' }, 0, '$blank'),
+    ]
+  );
+
+  expect(index.redactionReason('$old')).toBe('spam');
+  expect(index.redactionReason('$blank')).toBeNull();
+  expect(index.redactionReason('$other')).toBeNull();
+});

@@ -33,6 +33,7 @@
   interface Props {
     item: TimelineItemView;
     canRedactOthers: boolean;
+    redactionReason?: string | null;
     encrypted?: boolean | null;
     senderTimezone?: string | null;
     members?: readonly MemberView[];
@@ -46,6 +47,7 @@
   let {
     item,
     canRedactOthers,
+    redactionReason = null,
     encrypted = null,
     senderTimezone = null,
     members = [],
@@ -102,11 +104,10 @@
     <p class="body">{item.content.caption}</p>
   {/if}
 {:else if item.content.kind === 'redacted'}
+  {@const reason = item.content.reason ?? redactionReason}
   <p class="redacted">
     <TrashIcon size={14} aria-hidden="true" />
-    {item.content.reason
-      ? $i18n.t('timeline.redactedWithReason', { reason: item.content.reason })
-      : $i18n.t('timeline.redacted')}
+    {reason ? $i18n.t('timeline.redactedWithReason', { reason }) : $i18n.t('timeline.redacted')}
   </p>
 {:else if item.content.kind === 'sticker'}
   {@const sticker = item.content}

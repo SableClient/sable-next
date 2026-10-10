@@ -127,6 +127,16 @@ test.each(['m.annotation', 'm.replace'])('cannot react to a %s event', (relType)
   expect(actions.viewReactions).toBe(false);
 });
 
+test('cannot react to a redacted message', () => {
+  const actions = policy({
+    content: { kind: 'redacted', reason: null },
+    reactions: [{ key: '👍', senders: ['@alice:example.org'] }],
+  });
+
+  expect(actions.react).toBe(false);
+  expect(actions.viewReactions).toBe(false);
+});
+
 test.each(['m.thread', 'm.reference', null])('can react to a %s relation', (relType) => {
   const actions = policy({
     content: {

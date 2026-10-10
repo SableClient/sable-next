@@ -25,6 +25,14 @@ pub(crate) fn can_annotate<T>(event: &Raw<T>) -> bool {
     )
 }
 
+fn is_redacted<T>(event: &Raw<T>) -> bool {
+    event
+        .get_field::<serde_json::Value>("unsigned")
+        .ok()
+        .flatten()
+        .is_some_and(|unsigned| unsigned.get("redacted_because").is_some())
+}
+
 impl Core {
     pub(crate) async fn ensure_reaction_target(
         &self,
@@ -37,7 +45,7 @@ impl Core {
             .load_or_fetch_event(event_id, None)
             .await
             .or_failed(self, "reaction_target")?;
-        if can_annotate(event.raw()) {
+        if can_annotate(event.raw()) && !is_redacted(event.raw()) {
             Ok(())
         } else {
             Err(CommandErr::Unsupported)
@@ -429,5 +437,92 @@ mod tests {
 
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].shortcode, "parrot");
+    }
+    #[tokio::test]
+    #[cfg(not(target_family = "wasm"))]
+    async fn a_redacted_message_shows_no_reactions() {
+        use matrix_sdk::{
+            ruma::{event_id, room_id},
+            test_utils::mocks::MatrixMockServer,
+        };
+        use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
+        use matrix_sdk_ui::timeline::RoomExt as _;
+
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        server.mock_room_state_encryption().plain().mount().await;
+        let room_id = room_id!("!redacted:example.org");
+        let me = client.user_id().unwrap().to_owned();
+        let factory = EventFactory::new().room(room_id).sender(*ALICE);
+        let target = event_id!("$target");
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(factory.text_msg("hi").event_id(target))
+                    .add_timeline_event(
+                        factory.redaction(target).event_id(event_id!("$redaction")),
+                    ),
+            )
+            .await;
+        let timeline = room.timeline().await.unwrap();
+        let reactions = |items: Vec<std::sync::Arc<matrix_sdk_ui::timeline::TimelineItem>>| {
+            items
+                .iter()
+                .find(|item| item.as_event().and_then(|e| e.event_id()) == Some(target))
+                .map(|item| item.as_event().unwrap().reactions().len())
+        };
+        let item_id = timeline
+            .items()
+            .await
+            .iter()
+            .find_map(|item| item.as_event().filter(|e| e.event_id() == Some(target)))
+            .unwrap()
+            .identifier();
+
+        server
+            .mock_room_send()
+            .ok(event_id!("$reaction"))
+            .mock_once()
+            .mount()
+            .await;
+        timeline.toggle_reaction(&item_id, "👍").await.unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).add_timeline_event(
+                    EventFactory::new()
+                        .room(room_id)
+                        .sender(&me)
+                        .reaction(target, "👍")
+                        .event_id(event_id!("$reaction")),
+                ),
+            )
+            .await;
+        assert_eq!(
+            reactions(timeline.items().await.iter().cloned().collect()),
+            Some(1)
+        );
+
+        let views = timeline
+            .items()
+            .await
+            .iter()
+            .map(|item| {
+                crate::view::timeline_item(
+                    item,
+                    client.user_id(),
+                    &std::collections::BTreeSet::new(),
+                    &crate::view::Highlights::default(),
+                    &crate::view::LocalContent::default(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let view = views
+            .iter()
+            .find(|item| item.event_id.as_deref() == Some(target))
+            .unwrap();
+        assert!(view.reactions.is_empty());
     }
 }

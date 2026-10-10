@@ -44,6 +44,7 @@ export class TimelineEventIndex {
   readonly #aggregations: readonly TimelineItemView[];
   #byId: Map<string, TimelineItemView> | null = null;
   #edits: Map<string, TimelineItemView[]> | null = null;
+  #reasons: Map<string, string> | null = null;
 
   constructor(items: readonly TimelineItemView[], aggregations: readonly TimelineItemView[]) {
     this.#items = items;
@@ -58,6 +59,20 @@ export class TimelineEventIndex {
       }
     }
     return this.#byId.get(eventId) ?? null;
+  }
+
+  redactionReason(eventId: string): string | null {
+    if (this.#reasons === null) {
+      this.#reasons = new Map();
+      for (const item of this.#aggregations) {
+        const target = redactionTarget(item);
+        if (!target || item.content.kind !== 'hidden_event' || !isRecord(item.content.content))
+          continue;
+        const reason = item.content.content.reason;
+        if (typeof reason === 'string' && reason.trim() !== '') this.#reasons.set(target, reason);
+      }
+    }
+    return this.#reasons.get(eventId) ?? null;
   }
 
   editBefore(edit: TimelineItemView): TimelineItemView | null {
