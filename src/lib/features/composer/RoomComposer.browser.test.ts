@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -14,7 +14,12 @@ function literal(text: string): string {
   return text.replaceAll('{', '{{').replaceAll('[', '[[');
 }
 
-afterEach(() => {
+afterEach(async () => {
+  await page.viewport(414, 800);
+  setPreference('composerForm', 'tall');
+  setPreference('formattingToolbar', false);
+  setPreference('composerGifButton', true);
+  setPreference('composerStickerButton', true);
   setPreference('richTextComposer', true);
   setPreference('enterForNewline', 'adaptive');
 });
@@ -35,9 +40,12 @@ function client(): CoreClient {
 
 let rooms = 0;
 
-async function mount(richText: boolean) {
+async function mount(richText: boolean, preferences: Partial<Record<string, unknown>> = {}) {
   rooms += 1;
   setPreference('richTextComposer', richText);
+  for (const [key, value] of Object.entries(preferences)) {
+    setPreference(key as Parameters<typeof setPreference>[0], value as never);
+  }
   const sent: { body: string; formatted: string | null }[] = [];
   const screen = await render(Harness, {
     core: client(),
@@ -227,3 +235,142 @@ test('vertical arrows stop on every blank line', async () => {
 });
 
 vi.setConfig({ testTimeout: 30_000 });
+
+function boxOf(selector: string): DOMRect {
+  const node = document.querySelector(selector);
+  if (!node) throw new Error(`${selector} is not rendered`);
+  return node.getBoundingClientRect();
+}
+
+test('formatting uses the footer space', async () => {
+  await page.viewport(1920, 1080);
+  const { screen, composer } = await mount(true);
+  await userEvent.click(composer);
+  await userEvent.keyboard('draft words');
+  await userEvent.keyboard('{Control>}a{/Control}');
+  const before = boxOf('.composer');
+
+  await userEvent.click(screen.getByRole('button', { name: 'Formatting', exact: true }));
+  const formatting = boxOf('.formatting');
+  const controls = boxOf('.composer-after');
+  const field = boxOf('.composer-field');
+  const after = boxOf('.composer');
+
+  expect(formatting.y).toBeGreaterThanOrEqual(field.y + field.height);
+  expect(Math.abs(formatting.y - controls.y)).toBeLessThanOrEqual(1);
+  expect(after.height).toBe(before.height);
+
+  await userEvent.click(screen.getByRole('button', { name: 'Bold', exact: true }));
+  await expect
+    .poll(() => document.querySelector('.ProseMirror strong')?.textContent)
+    .toBe('draft words');
+  await expect.element(composer).toHaveFocus();
+
+  await userEvent.click(screen.getByRole('button', { name: 'Underline', exact: true }));
+  await expect
+    .poll(() => document.querySelector('.ProseMirror u')?.textContent)
+    .toBe('draft words');
+  await expect.element(composer).toHaveFocus();
+  const composerBox = boxOf('.composer');
+  expect(formatting.x).toBeGreaterThanOrEqual(composerBox.x);
+  expect(formatting.x + formatting.width).toBeLessThanOrEqual(composerBox.x + composerBox.width);
+
+  await userEvent.click(screen.getByRole('button', { name: 'Formatting', exact: true }));
+  await expect.poll(() => document.querySelector('.formatting')).toBeNull();
+});
+
+for (const width of [320, 520]) {
+  test(`formatting scrolls in a narrow ${String(width)}px composer`, async () => {
+    await page.viewport(width, 812);
+    const { screen } = await mount(true, {
+      composerGifButton: false,
+      composerStickerButton: false,
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Formatting', exact: true }));
+    await expect.poll(() => document.querySelector('.formatting')).not.toBeNull();
+    const rail = document.querySelector<HTMLElement>('.formatting');
+    if (!rail) throw new Error('the formatting rail is not rendered');
+    const strip = rail.getBoundingClientRect();
+    const field = boxOf('.composer-field');
+    const plus = boxOf('.composer-before');
+    const actions = boxOf('.composer-after');
+    expect(strip.y).toBeGreaterThanOrEqual(field.y + field.height);
+    if (width < 400) {
+      expect(strip.y + strip.height).toBeLessThanOrEqual(actions.y);
+    } else {
+      expect(strip.x).toBeGreaterThanOrEqual(plus.x + plus.width);
+      expect(strip.x + strip.width).toBeLessThanOrEqual(actions.x);
+      expect(Math.abs(strip.y - actions.y)).toBeLessThanOrEqual(1);
+    }
+    expect(rail.scrollWidth > rail.clientWidth).toBe(true);
+    rail.dispatchEvent(new WheelEvent('wheel', { deltaY: 200, bubbles: true, cancelable: true }));
+    expect(rail.scrollLeft).toBeGreaterThan(0);
+    const highlight = screen.getByRole('button', { name: 'Highlight colour', exact: true });
+    highlight.element().focus();
+    await expect.element(highlight).toBeInViewport();
+  });
+}
+
+async function measure(editable: HTMLElement) {
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        resolve();
+      });
+    });
+  });
+  const row = editable.closest('.composer-row');
+  const before = row?.querySelector('.composer-before');
+  const after = row?.querySelector('.composer-after');
+  if (!row || !before || !after) throw new Error('Missing composer layout');
+  const walker = document.createTreeWalker(editable, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  const lines = new Set<number>();
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    range.selectNodeContents(node);
+    for (const rect of range.getClientRects()) {
+      if (rect.width > 0) lines.add(Math.round(rect.top));
+    }
+  }
+  return {
+    lines: lines.size,
+    editorBottom: editable.getBoundingClientRect().bottom,
+    controlsTop: Math.min(before.getBoundingClientRect().top, after.getBoundingClientRect().top),
+  };
+}
+
+for (const [richText, form] of [
+  [false, 'tall'],
+  [true, 'tall'],
+  [true, 'short'],
+] as const) {
+  test(`composer keeps controls below the text in ${richText ? 'rich' : 'plain'} ${form} mode`, async () => {
+    await page.viewport(1900, 900);
+    const { composer, editor } = await mount(richText, { composerForm: form });
+    await document.fonts.ready;
+    const row = document.querySelector<HTMLElement>('.composer-row');
+    if (!row) throw new Error('Missing composer');
+    row.style.width = '800px';
+
+    const text =
+      "yo why'd you close my #617? is there an unpublished solution or did you not like my repro steps? it's a real issue i had to use my phone to sync the theme to the";
+    const start = 125;
+    await userEvent.click(composer);
+    await userEvent.keyboard(literal(text.slice(0, start)));
+    let wrapped = false;
+    for (const char of text.slice(start)) {
+      await userEvent.keyboard(literal(char));
+      const layout = await measure(editor());
+      expect(layout.controlsTop).toBeGreaterThanOrEqual(layout.editorBottom);
+      wrapped ||= layout.lines > 1;
+    }
+    expect(wrapped).toBe(true);
+
+    for (let index = start; index < text.length; index += 1) {
+      await userEvent.keyboard('{Backspace}');
+      const layout = await measure(editor());
+      expect(layout.controlsTop).toBeGreaterThanOrEqual(layout.editorBottom);
+    }
+  });
+}
