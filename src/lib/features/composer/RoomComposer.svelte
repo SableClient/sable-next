@@ -294,7 +294,7 @@
   let measurerEl = $state<HTMLElement>();
   let multiline = $state(false);
   let pointerHidden = $state(false);
-  const shortLayout = $derived(composerShort && !multiline);
+  const shortLayout = $derived(composerShort && (!multiline || preferences.alwaysInlineEditor));
   let layoutFrame: number | undefined;
   let empty = $state(true);
   let showPlaceholder = $state(true);
@@ -1490,7 +1490,7 @@
 
 <div
   class="composer-stack"
-  class:short={shortLayout && !readOnly}
+  class:short={composerShort && !readOnly}
   class:pointer-hidden={pointerHidden}
 >
   {#if readOnly}

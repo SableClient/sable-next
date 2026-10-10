@@ -1070,6 +1070,14 @@ export const settingsCategories: SettingsCategory[] = [
         ],
       },
       {
+        key: 'alwaysInlineEditor',
+        section: 'form',
+        icon: PencilSimpleIcon,
+        name: 'settings.alwaysInlineEditor',
+        description: 'settings.alwaysInlineEditorHint',
+        type: 'boolean',
+      },
+      {
         key: 'enterForNewline',
         section: 'writing',
         icon: KeyReturnIcon,

@@ -241,6 +241,7 @@ export interface Preferences {
   pronounPillLength: PronounPillLength;
 
   composerForm: ComposerForm;
+  alwaysInlineEditor: boolean;
   enterForNewline: EnterKey;
   mentionInReplies: boolean;
   formattingToolbar: boolean;
@@ -519,6 +520,7 @@ const DEFAULTS: Preferences = {
   pronounPillLength: 'all',
 
   composerForm: 'tall',
+  alwaysInlineEditor: false,
   enterForNewline: 'adaptive',
   mentionInReplies: true,
   formattingToolbar: false,

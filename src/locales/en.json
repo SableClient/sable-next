@@ -2019,6 +2019,8 @@
     "composerFormTall": "Tall",
     "composerFormAdaptive": "Auto",
     "composerFormShort": "Short",
+    "alwaysInlineEditor": "Always inline editor",
+    "alwaysInlineEditorHint": "Keep the last line of text inline with the composer buttons.",
     "composerSeparator": "Separator",
     "composerGifButton": "GIF button",
     "composerStickerButton": "Sticker button",
