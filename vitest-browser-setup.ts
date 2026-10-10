@@ -1,3 +1,4 @@
+import './src/styles.css';
 import { afterEach } from 'vitest';
 
 import { resetNavigation } from '#lib/test-support/app-navigation.js';

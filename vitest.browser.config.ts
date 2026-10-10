@@ -17,6 +17,11 @@ export default mergeConfig(
         headless: true,
         provider: playwright(),
         instances: [{ browser: 'chromium' }],
+        commands: {
+          emulateColorScheme: async (context, scheme: 'light' | 'dark') => {
+            await context.page.emulateMedia({ colorScheme: scheme });
+          },
+        },
       },
     },
   })
