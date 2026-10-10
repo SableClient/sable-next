@@ -98,6 +98,7 @@
     canPin?: boolean;
     encrypted?: boolean | null;
     selected?: boolean;
+    editing?: boolean;
     layout?: TimelineLayout;
     preview?: boolean;
     loadPreviewProfile?: boolean;
@@ -132,7 +133,7 @@
     currentUserId = null,
     onToggleReaction,
     onReply,
-    onCancelReply,
+    onCancelContext,
     onOpenThread,
     onEdit,
     onDelete,
@@ -143,6 +144,7 @@
     canPin = true,
     encrypted = null,
     selected = false,
+    editing = false,
     layout = 'modern',
     preview = false,
     loadPreviewProfile = false,
@@ -313,8 +315,8 @@
   const swipe = new MessageSwipe({
     enabled: () => actionable && actions.onReply !== undefined,
     canEdit: () => actionable && actions.onEdit !== undefined,
-    onReply: () => (selected ? onCancelReply?.() : actions.onReply?.()),
-    onEdit: () => actions.onEdit?.(),
+    onReply: () => (selected ? onCancelContext?.() : actions.onReply?.()),
+    onEdit: () => (editing ? onCancelContext?.() : actions.onEdit?.()),
   });
   let senderRole = $derived(item.sender ? (senderRoles?.(item.sender) ?? null) : null);
   let senderColors = $derived(
@@ -872,7 +874,11 @@
             style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}
             {@attach inlineReceipts ? receiptReserve : undefined}
           >
-            <MessageBody {item} {canRedactOthers} />
+            <MessageBody
+              {item}
+              {canRedactOthers}
+              redactionReason={item.event_id ? events?.redactionReason(item.event_id) : null}
+            />
             {#if inlineReceipts}
               <span class="receipt-space" aria-hidden="true"></span>
               {@render receiptSlot()}

@@ -1826,7 +1826,7 @@ test.each([
   }
 );
 
-async function swipeLeft(message: Element): Promise<void> {
+async function swipeLeft(message: Element, distance = 400): Promise<void> {
   const touch = (type: string, x: number) => {
     const event = new Event(type, { bubbles: true, cancelable: true });
     Object.defineProperty(event, 'touches', {
@@ -1835,16 +1835,16 @@ async function swipeLeft(message: Element): Promise<void> {
     message.dispatchEvent(event);
   };
   touch('touchstart', 0);
-  touch('touchmove', -400);
+  touch('touchmove', -distance);
   touch('touchend', 0);
   await tick();
 }
 
 test('a swipe on a message that is not the reply target replies to it', async () => {
   const onReply = vi.fn();
-  const onCancelReply = vi.fn();
+  const onCancelContext = vi.fn();
   render(TimelineItemHarness, {
-    props: { core, item: { item: item(false), collapsed: false, onReply, onCancelReply } },
+    props: { core, item: { item: item(false), collapsed: false, onReply, onCancelContext } },
   });
   await tick();
   const message = document.querySelector('.message');
@@ -1853,16 +1853,16 @@ test('a swipe on a message that is not the reply target replies to it', async ()
   await swipeLeft(message);
 
   expect(onReply).toHaveBeenCalledOnce();
-  expect(onCancelReply).not.toHaveBeenCalled();
+  expect(onCancelContext).not.toHaveBeenCalled();
 });
 
 test('a swipe on the message being replied to cancels the reply', async () => {
   const onReply = vi.fn();
-  const onCancelReply = vi.fn();
+  const onCancelContext = vi.fn();
   render(TimelineItemHarness, {
     props: {
       core,
-      item: { item: item(false), collapsed: false, selected: true, onReply, onCancelReply },
+      item: { item: item(false), collapsed: false, selected: true, onReply, onCancelContext },
     },
   });
   await tick();
@@ -1871,6 +1871,49 @@ test('a swipe on the message being replied to cancels the reply', async () => {
 
   await swipeLeft(message);
 
-  expect(onCancelReply).toHaveBeenCalledOnce();
+  expect(onCancelContext).toHaveBeenCalledOnce();
   expect(onReply).not.toHaveBeenCalled();
+});
+
+test('a long swipe on the message being edited cancels the edit', async () => {
+  const onEdit = vi.fn();
+  const onCancelContext = vi.fn();
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: {
+        item: { ...item(false), is_own: true },
+        collapsed: false,
+        editing: true,
+        onReply: vi.fn(),
+        onEdit,
+        onCancelContext,
+      },
+    },
+  });
+  await tick();
+  const message = document.querySelector('.message');
+  if (!message) throw new Error('message was not rendered');
+
+  await swipeLeft(message, 3000);
+
+  expect(onCancelContext).toHaveBeenCalledOnce();
+  expect(onEdit).not.toHaveBeenCalled();
+});
+
+test('a long swipe on a message that is not being edited edits it', async () => {
+  const onEdit = vi.fn();
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: { item: { ...item(false), is_own: true }, collapsed: false, onReply: vi.fn(), onEdit },
+    },
+  });
+  await tick();
+  const message = document.querySelector('.message');
+  if (!message) throw new Error('message was not rendered');
+
+  await swipeLeft(message, 3000);
+
+  expect(onEdit).toHaveBeenCalledOnce();
 });

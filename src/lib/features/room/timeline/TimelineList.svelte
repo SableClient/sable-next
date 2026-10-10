@@ -81,6 +81,7 @@
     focusEventId?: string | null;
     landingEventId?: string | null;
     replyEventId?: string | null;
+    editEventId?: string | null;
     onLanded?: () => void;
     onRequestHistory: (count?: number) => Promise<boolean>;
     onRequestFuture: () => Promise<void>;
@@ -130,6 +131,7 @@
     focusEventId = null,
     landingEventId = null,
     replyEventId = null,
+    editEventId = null,
     onLanded,
     onRequestHistory,
     onRequestFuture,
@@ -152,7 +154,7 @@
     currentUserId,
     onToggleReaction,
     onReply,
-    onCancelReply,
+    onCancelContext,
     onOpenThread,
     onEdit,
     onDelete,
@@ -981,6 +983,7 @@
       item.event_id !== replayingEventId &&
       item.event_id === (focusEventId ?? landedEventId)}
     selected={replyEventId !== null && item.event_id === replyEventId}
+    editing={editEventId !== null && item.event_id === editEventId}
     {onMatrixLink}
     {onCopyLink}
     {onMarkUnread}
@@ -991,7 +994,7 @@
     {currentUserId}
     {onToggleReaction}
     {onReply}
-    {onCancelReply}
+    {onCancelContext}
     {onOpenThread}
     {onEdit}
     {onDelete}

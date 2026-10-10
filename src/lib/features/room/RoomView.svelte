@@ -971,6 +971,7 @@
     <TimelineList
       bind:this={timelineList}
       replyEventId={conversation.context?.kind === 'reply' ? conversation.context.eventId : null}
+      editEventId={conversation.context?.kind === 'edit' ? conversation.context.eventId : null}
       {timeline}
       active={panels.threadRootId === null || threadInPanel}
       focusEventId={timelineEventId}
@@ -997,7 +998,7 @@
         : conversation.toggleReaction}
       onDelete={conversation.redact}
       onReply={roomSession.permissions?.can_post === false ? undefined : conversation.reply}
-      onCancelReply={conversation.clearContext}
+      onCancelContext={conversation.clearContext}
       onOpenThread={openThread}
       onEdit={roomSession.permissions?.can_post === false ? undefined : conversation.edit}
       roomId={resolvedRoomId}

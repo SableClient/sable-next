@@ -241,6 +241,7 @@
   <TimelineList
     bind:this={timelineList}
     replyEventId={conversation.context?.kind === 'reply' ? conversation.context.eventId : null}
+    editEventId={conversation.context?.kind === 'edit' ? conversation.context.eventId : null}
     {timeline}
     {focusEventId}
     threadRootId={rootEventId}
@@ -260,7 +261,7 @@
     onRequestFuture={requestFuture}
     onRead={markRead}
     onReply={readOnly ? undefined : conversation.reply}
-    onCancelReply={conversation.clearContext}
+    onCancelContext={conversation.clearContext}
     onEdit={readOnly ? undefined : conversation.edit}
     onDelete={conversation.redact}
     onToggleReaction={canReact ? conversation.toggleReaction : undefined}
