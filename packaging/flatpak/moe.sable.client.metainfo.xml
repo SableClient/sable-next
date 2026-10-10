@@ -49,6 +49,9 @@
   <launchable type="desktop-id">moe.sable.client.desktop</launchable>
 
   <releases>
+    <release version="2.0.0" date="2026-10-10">
+      <url type="details">https://git.sable.moe/SableClient/sable-next/releases/tag/v2.0.0</url>
+    </release>
     <release version="1.22.9" date="2026-09-26">
       <url type="details">https://github.com/SableClient/Sable/releases/tag/v1.22.9</url>
     </release>
