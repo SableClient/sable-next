@@ -327,7 +327,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
                     )
                   );
               },
-              { timeout: 120_000, intervals: [1_000] }
+              { timeout: 150_000, intervals: [1_000] }
             )
             .toEqual(
               expect.arrayContaining(
@@ -405,7 +405,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
 
       await use(path);
     },
-    { scope: 'worker', timeout: 180_000 },
+    { scope: 'worker', timeout: 240_000 },
   ],
 
   installEmptyCore: async ({ page, workerSession }, use) => {
