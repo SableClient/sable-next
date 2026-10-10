@@ -5,6 +5,7 @@ import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { afterEach, expect, test, vi } from 'vitest';
 
+import { autolinks } from './autolinks';
 import { compositionInputRules } from './composition-rules';
 import { formattingInputRules } from './formatting';
 import { composerSchema } from './schema';
@@ -29,7 +30,7 @@ function open(): EditorView {
   view = new EditorView(host, {
     state: EditorState.create({
       schema: composerSchema,
-      plugins: [inputRules({ rules: formattingInputRules }), compositionInputRules()],
+      plugins: [inputRules({ rules: formattingInputRules }), autolinks(), compositionInputRules()],
     }),
   });
   return view;

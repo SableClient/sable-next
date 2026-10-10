@@ -38,11 +38,11 @@ import { bindingFor } from '#lib/ui/shortcuts/bindings.svelte.js';
 import type { ShortcutId } from '#lib/ui/shortcuts/shortcuts.js';
 import type { AutocompleteQuery } from '../autocomplete';
 import { filesFrom } from '../composer-files';
+import { autolinks } from './autolinks';
 import { compositionInputRules } from './composition-rules';
 import {
   activeColors,
   activeMarks,
-  autolinkAtCursor,
   colorCommand,
   formatCommands,
   formattingInputRules,
@@ -122,8 +122,9 @@ function handleAndroidDeleteBackward(view: EditorView): void {
 }
 
 const insertHardBreak: Command = (state, dispatch) => {
-  const tr = autolinkAtCursor(state) ?? state.tr;
-  dispatch?.(tr.replaceSelectionWith(composerSchema.nodes.hard_break.create()).scrollIntoView());
+  dispatch?.(
+    state.tr.replaceSelectionWith(composerSchema.nodes.hard_break.create()).scrollIntoView()
+  );
   return true;
 };
 
@@ -776,7 +777,7 @@ export class ComposerEditor {
         ],
       }),
       compositionInputRules(),
-      ...(rich ? [keymap(formattingKeymap)] : []),
+      ...(rich ? [autolinks(), keymap(formattingKeymap)] : []),
       shortcutKeymap({
         ...(rich
           ? {

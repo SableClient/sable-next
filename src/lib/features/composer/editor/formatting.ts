@@ -156,12 +156,6 @@ function inlineMarkdownRule(): InputRule {
   });
 }
 
-const URL_PATTERN =
-  /(?:^|[\p{White_Space}(])((?:https?:\/\/|www\.)[^\p{White_Space}\uFFFC<>()]*[^\p{White_Space}\uFFFC<>().,;:!?'"])[.,;:!?'"]*([\p{White_Space})\uFFFC])$/u;
-
-const URL_AT_CURSOR =
-  /(?:^|[\p{White_Space}(])((?:https?:\/\/|www\.)[^\p{White_Space}<>()]*[^\p{White_Space}<>().,;:!?'"])[.,;:!?'"]*$/u;
-
 const LINE_BREAK = '\uFFFC';
 
 type LineHandler = (
@@ -258,44 +252,7 @@ export const formattingInputRules: readonly InputRule[] = [
     (match) => ({ order: Number(match[1]) }),
     (match, node) => node.childCount + (node.attrs.order as number) === Number(match[1])
   ),
-  autolinkRule(),
 ];
-
-function autolinkRule(): InputRule {
-  return new InputRule(
-    URL_PATTERN,
-    (state, match, start, end) => {
-      const text = match[1];
-      const from = start + match[0].indexOf(text);
-      const to = from + text.length;
-      if (from < 0 || state.doc.rangeHasMark(from, to, marks.link)) return null;
-
-      const href = text.startsWith('www.') ? `https://${text}` : text;
-      const tr = state.tr
-        .addMark(from, to, marks.link.create({ href }))
-        .removeStoredMark(marks.link);
-
-      return end - start === match[0].length ? tr : tr.insertText(match[2], end);
-    },
-    { inCodeMark: false }
-  );
-}
-
-export function autolinkAtCursor(state: EditorState): Transaction | null {
-  if (!state.selection.empty) return null;
-  const { $from } = state.selection;
-  const text = $from.parent.textBetween(0, $from.parentOffset, '', '');
-  const match = URL_AT_CURSOR.exec(text);
-  const url = match?.[1];
-  if (!match || !url) return null;
-
-  const from = $from.start() + match.index + match[0].indexOf(url);
-  const to = from + url.length;
-  if (state.doc.rangeHasMark(from, to, marks.link)) return null;
-
-  const href = url.startsWith('www.') ? `https://${url}` : url;
-  return state.tr.addMark(from, to, marks.link.create({ href })).removeStoredMark(marks.link);
-}
 
 function isInside(state: EditorState, type: NodeType): boolean {
   const { $from } = state.selection;

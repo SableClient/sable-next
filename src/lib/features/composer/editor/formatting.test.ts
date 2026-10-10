@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 
+import { history, undo } from 'prosemirror-history';
 import { inputRules, undoInputRule } from 'prosemirror-inputrules';
 import { AllSelection, EditorState, Selection, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { afterEach, describe, expect, test } from 'vitest';
 
+import { autolinks } from './autolinks';
 import { activeMarks, formatCommands, formattingInputRules } from './formatting';
 import { markdownFormatCommands } from './markdown-format';
 import { composerSchema } from './schema';
@@ -36,7 +38,7 @@ function open(): EditorView {
   view = new EditorView(host, {
     state: EditorState.create({
       schema: composerSchema,
-      plugins: [inputRules({ rules: formattingInputRules })],
+      plugins: [history(), inputRules({ rules: formattingInputRules }), autolinks()],
     }),
   });
   return view;
@@ -666,6 +668,109 @@ describe('autolink edge cases', () => {
 
     expect(view?.state.doc.textContent).toBe(`go to https://a.b/c${tail} now`);
     expect(marksOn('https://a.b/c')).toEqual(['link']);
+  });
+});
+
+function links(): string[] {
+  const found: string[] = [];
+  view?.state.doc.descendants((node) => {
+    for (const mark of node.marks)
+      if (mark.type.name === 'link') found.push(`${node.text}=${mark.attrs.href}`);
+  });
+  return found;
+}
+
+function deleteBack(count: number): void {
+  const editor = view;
+  if (!editor) throw new Error('no editor');
+  const { from } = editor.state.selection;
+  editor.dispatch(editor.state.tr.delete(from - count, from));
+}
+
+describe('autolinks', () => {
+  test('an address typed past a linked prefix is linked whole', () => {
+    open();
+    type('https://github ');
+    deleteBack(1);
+    type('.com/shibco/ableton-linux');
+
+    expect(links()).toEqual([
+      'https://github.com/shibco/ableton-linux=https://github.com/shibco/ableton-linux',
+    ]);
+  });
+
+  test('an address is linked as it grows, with no delimiter typed', () => {
+    open();
+    type('go to https://a.b/c');
+
+    expect(links()).toEqual(['https://a.b/c=https://a.b/c']);
+  });
+
+  test('deleting into an address shortens its link', () => {
+    open();
+    type('https://a.b/c ');
+    deleteBack(3);
+
+    expect(links()).toEqual(['https://a.b=https://a.b']);
+  });
+
+  test('an address that stops being one loses its link', () => {
+    open();
+    type('https://a ');
+    deleteBack(10);
+    type('a ');
+
+    expect(links()).toEqual([]);
+  });
+
+  test('a bare host is linked with a scheme it can be opened with', () => {
+    open();
+    type('www.example.org');
+
+    expect(links()).toEqual(['www.example.org=https://www.example.org']);
+  });
+
+  test('trailing punctuation stays out of the link', () => {
+    open();
+    type('see https://a.b/c.');
+
+    expect(links()).toEqual(['https://a.b/c=https://a.b/c']);
+  });
+
+  test('a link made by hand is left alone while its text is edited', () => {
+    const editor = open();
+    editor.dispatch(
+      editor.state.tr
+        .insertText('docs')
+        .addMark(1, 5, composerSchema.marks.link.create({ href: 'https://example.org' }))
+    );
+    editor.dispatch(editor.state.tr.setSelection(Selection.atEnd(editor.state.doc)));
+    type('.com');
+
+    expect(links()).toEqual(['docs=https://example.org']);
+  });
+
+  test('removing the link from an address does not bring it back', () => {
+    const editor = open();
+    type('https://a.b ');
+    editor.dispatch(editor.state.tr.removeMark(1, 12, composerSchema.marks.link));
+
+    expect(links()).toEqual([]);
+  });
+
+  test('code is not linked', () => {
+    open();
+    type('`https://a.b` ');
+
+    expect(links()).toEqual([]);
+  });
+
+  test('the link is not an undo step of its own', () => {
+    const editor = open();
+    type('https://a.b');
+    undo(editor.state, editor.dispatch);
+
+    expect(editor.state.doc.textContent).toBe('');
   });
 });
 
