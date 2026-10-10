@@ -41,3 +41,11 @@ test('a size setting takes a typed percentage and clamps it', async () => {
   await expect.element(field).toHaveValue(150);
   await expect.poll(storedTextScale).toBe(1.5);
 });
+
+test('the media preview setting is offered in privacy settings', async () => {
+  const category = settingsCategories.find((entry) => entry.id === 'privacy');
+  if (!category) throw new Error('the privacy category is missing');
+  const screen = await render(SettingsCategorySections, { category });
+
+  await expect.element(screen.getByRole('switch', { name: 'Avatars on invites' })).toBeChecked();
+});
