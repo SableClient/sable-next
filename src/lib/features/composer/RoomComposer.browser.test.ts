@@ -4,6 +4,7 @@ import { render } from 'vitest-browser-svelte';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { CoreError } from '#src/transport';
 
 import en from '../../../locales/en.json' with { type: 'json' };
 import Harness from './RoomComposerHarness.test.svelte';
@@ -493,4 +494,27 @@ test('code pasted from an editor keeps its lines and indentation in plain mode',
     );
 
   await expect.poll(() => editor().innerText).toBe('```\nfn main() {\n    let x = 1;\n}');
+});
+
+test('a failed send keeps the draft and retries from inside the composer', async () => {
+  let fail = true;
+  const onSend = vi.fn((_roomId: string, _body: string, _formatted: string | null) =>
+    fail ? Promise.reject(new CoreError({ code: 'unavailable' })) : Promise.resolve()
+  );
+  const { screen, composer, editor } = await mount(true, {}, { onSend });
+
+  await userEvent.click(composer);
+  await userEvent.keyboard('still here');
+  await userEvent.keyboard('{Enter}');
+
+  const alert = screen.getByRole('alert');
+  await expect.poll(() => alert.element().textContent).toContain(en.composer.sendUnavailable);
+  expect(editor().textContent).toBe('still here');
+
+  fail = false;
+  await userEvent.click(alert.getByRole('button', { name: 'Retry' }));
+
+  await expect.poll(() => screen.getByRole('alert').elements()).toHaveLength(0);
+  await expect.poll(() => editor().textContent).toBe('');
+  expect(onSend).toHaveBeenCalledTimes(2);
 });
