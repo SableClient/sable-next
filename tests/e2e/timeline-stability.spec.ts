@@ -386,63 +386,6 @@ test('anchor identity and position come from the same rendered row', async ({ pa
   }
 });
 
-test('the gesture sampler catches a scrollTo jump and return', async ({ page }) => {
-  await page.setContent(PROBE_HTML);
-  const viewport = page.locator('#probe');
-  await viewport.evaluate((node) => {
-    node.scrollTop = 400;
-  });
-  await viewport.evaluate(instrumentSelfWrites);
-  const sampling = await startGestureSample(viewport, { frames: 20, quietFrames: 6 });
-  await viewport.evaluate(async (node) => {
-    node.scrollTo(0, 500);
-    await new Promise(requestAnimationFrame);
-    await new Promise(requestAnimationFrame);
-    node.scrollTo({ top: 400 });
-  });
-  const result = await sampling.finish();
-  expect(result.readerMovement).toBeCloseTo(0, 3);
-  expect(result.frameError).toBeCloseTo(100, 3);
-});
-
-test('the gesture sampler flags smooth programmatic scrolling', async ({ page }) => {
-  await page.setContent(PROBE_HTML);
-  const viewport = page.locator('#probe');
-  await viewport.evaluate((node) => {
-    node.scrollTop = 400;
-  });
-  await viewport.evaluate(instrumentSelfWrites);
-  const sampling = await startGestureSample(viewport, { frames: 20, quietFrames: 6 });
-  await viewport.evaluate((node) => {
-    node.scrollTo({ top: 500, behavior: 'smooth' });
-  });
-  expect((await sampling.finish()).unexpectedScrolls).toEqual(['scrollTo']);
-});
-
-test('the gesture sampler distinguishes a canvas resize clamp from reader movement', async ({
-  page,
-}) => {
-  await page.setContent(
-    '<div id="probe" style="height:200px;overflow:auto"><div class="items" style="height:800px;position:relative"><div class="item" data-event-id="reader" style="position:absolute;top:600px;height:40px">Reader</div></div></div>'
-  );
-  const viewport = page.locator('#probe');
-  await viewport.evaluate((node) => {
-    node.scrollTop = 600;
-  });
-  await viewport.evaluate(instrumentSelfWrites);
-  const sampling = await startGestureSample(viewport, { frames: 20, quietFrames: 6 });
-  await viewport.evaluate((node) => {
-    const canvas = node.querySelector<HTMLElement>('.items');
-    const row = node.querySelector<HTMLElement>('.item');
-    if (!canvas || !row) throw new Error('missing probe content');
-    canvas.style.height = '700px';
-    row.style.top = '500px';
-  });
-  const result = await sampling.finish();
-  expect(result.readerMovement).toBe(0);
-  expect(result.frameError).toBe(0);
-});
-
 test('the anchor sampler reports a row that disappears', async ({ page, timeline }) => {
   await page.setContent(
     '<div class="timeline-viewport"><div class="viewport"><div class="item" data-item-id="probe">Reader</div></div></div>'
@@ -453,26 +396,6 @@ test('the anchor sampler reports a row that disappears', async ({ page, timeline
     });
   });
   expect(positions).toContain(Number.POSITIVE_INFINITY);
-});
-
-test('the gesture sampler keeps sampling between input events', async ({ page }) => {
-  await page.setContent(PROBE_HTML);
-  const viewport = page.locator('#probe');
-  await viewport.evaluate((node) => {
-    node.scrollTop = 400;
-  });
-  await viewport.evaluate(instrumentSelfWrites);
-  const sampling = await startGestureSample(viewport, { frames: 60, quietFrames: 2 });
-  await viewport.evaluate(async (node) => {
-    const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
-    if (!descriptor?.set) throw new Error('missing native scrollTop setter');
-    descriptor.set.call(node, 500);
-    for (let frame = 0; frame < 6; frame += 1) await new Promise(requestAnimationFrame);
-    descriptor.set.call(node, 600);
-  });
-  const result = await sampling.finish();
-  expect(result.readerMovement).toBeCloseTo(200, 3);
-  expect(result.frameError).toBeCloseTo(0, 3);
 });
 
 test('latest stays at the bottom on every frame as message heights settle', async ({

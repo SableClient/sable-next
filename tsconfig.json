@@ -17,7 +17,12 @@
     "src/**/*.svelte",
     "src/**/*.ts"
   ],
-  "exclude": ["src/service-worker", "src/**/*.browser.test.ts", "vitest-browser-setup.ts"],
+  "exclude": [
+    "src/service-worker",
+    "src/**/*.browser.test.ts",
+    "tests/e2e/fixtures/*.browser.test.ts",
+    "vitest-browser-setup.ts"
+  ],
   "compilerOptions": {
     "rewriteRelativeImportExtensions": true,
     "sourceMap": true,

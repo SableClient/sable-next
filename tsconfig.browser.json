@@ -5,6 +5,8 @@
     ".svelte-kit/non-ambient.d.ts",
     "src/app.d.ts",
     "src/**/*.browser.test.ts",
+    "tests/e2e/fixtures/*.browser.test.ts",
+    "tests/e2e/fixtures/timeline-probe.ts",
     "vitest-browser-setup.ts",
     "vitest.browser.config.ts"
   ],

@@ -10,7 +10,7 @@ export default mergeConfig(
     optimizeDeps: { include: ['katex'] },
     test: {
       name: 'browser',
-      include: ['src/**/*.browser.test.ts'],
+      include: ['src/**/*.browser.test.ts', 'tests/e2e/fixtures/*.browser.test.ts'],
       setupFiles: ['./vitest-browser-setup.ts'],
       browser: {
         enabled: true,
