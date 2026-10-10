@@ -1,5 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { commands, page, userEvent } from 'vitest/browser';
+
+import en from '../../../../locales/en.json' with { type: 'json' };
 import { render } from 'vitest-browser-svelte';
 
 import type { ProfileView, TimelineItemView } from '#src/generated/protocol';
@@ -34,6 +36,7 @@ declare module 'vitest/browser' {
 }
 
 afterEach(async () => {
+  document.body.removeAttribute('style');
   await commands.emulateColorScheme('light');
   await page.viewport(414, 800);
   setPreference('replyPreviewStyle', 'connected');
@@ -105,13 +108,17 @@ function replyToAlice(id: string, sender: string, senderName: string): TimelineI
   };
 }
 
-function mountItem(item: TimelineItemView, layout: 'modern' | 'compact' = 'modern') {
+function mountItem(
+  item: TimelineItemView,
+  layout: 'modern' | 'compact' = 'modern',
+  extra: Record<string, unknown> = {}
+) {
   core.userProfile.mockImplementation((userId: string) =>
     Promise.resolve(userId === profile.user_id ? profile : { ...profile, user_id: userId })
   );
   return render(TimelineItemHarness, {
     core,
-    item: { item, collapsed: false, layout },
+    item: { item, collapsed: false, layout, ...extra },
   });
 }
 
@@ -236,4 +243,59 @@ test('the hover animation stacks over the still picture inside the frame', async
     [0, 0, 0, 0],
     [0, 0, 0, 0],
   ]);
+});
+
+test('right-clicking the same message again reopens the menu at the pointer', async () => {
+  await page.viewport(900, 600);
+  const screen = await mountItem(message('menu-2', '@alice:example.test', 'Alice'));
+  const row = document.querySelector<HTMLElement>('article.message');
+  if (!row) throw new Error('the message row is not rendered');
+  const box = row.getBoundingClientRect();
+  const menu = () => document.querySelectorAll('.message-menu');
+  const menuLeft = () => document.querySelector('.message-menu')?.getBoundingClientRect().x ?? 0;
+
+  await userEvent.click(screen.getByRole('article').first(), {
+    button: 'right',
+    position: { x: 20, y: box.height / 2 },
+  });
+  await expect.poll(() => menu().length).toBe(1);
+  const first = menuLeft();
+
+  await userEvent.click(screen.getByRole('article').first(), {
+    button: 'right',
+    position: { x: box.width - 20, y: box.height / 2 },
+  });
+  await expect.poll(menuLeft).toBeGreaterThan(first + 100);
+  expect(menu()).toHaveLength(1);
+});
+
+test('a hover action still fires when the row loses hover and focus mid-press', async () => {
+  await page.viewport(1280, 700);
+  document.body.style.paddingTop = '120px';
+  const onReply = vi.fn();
+  const screen = await mountItem(message('menu-2', '@alice:example.test', 'Alice'), 'modern', {
+    onReply,
+  });
+  const row = document.querySelector<HTMLElement>('article.message');
+  if (!row) throw new Error('the message row is not rendered');
+  await userEvent.hover(row);
+  const reply = screen.getByRole('button', { name: en.timeline.reply, exact: true });
+  const button = reply.element() as HTMLElement;
+  await userEvent.hover(button);
+  button.dispatchEvent(
+    new PointerEvent('pointerdown', {
+      bubbles: true,
+      pointerType: 'mouse',
+      isPrimary: true,
+      buttons: 1,
+    })
+  );
+  button.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+  row.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse', buttons: 1 }));
+  button.dispatchEvent(
+    new PointerEvent('pointerup', { bubbles: true, pointerType: 'mouse', isPrimary: true })
+  );
+  button.click();
+
+  await expect.poll(() => onReply.mock.calls.length).toBe(1);
 });
