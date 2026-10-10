@@ -16,7 +16,9 @@ test.beforeEach(async ({ page, app, installRoomCore }) => {
   await page.getByRole('button', { name: "Open Alice's profile" }).last().click();
 });
 
-test('the message action opens the direct chat and closes the card', async ({ page }) => {
+test('a hovered status leaves the message action clickable', async ({ page }) => {
+  await page.locator('.profile-card-user-id').focus();
+  await page.locator('.profile-card-status').hover();
   await page.getByRole('button', { name: 'Message', exact: true }).click();
   await expect(page.locator('.profile-card')).toBeHidden();
 });
