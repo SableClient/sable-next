@@ -242,14 +242,15 @@ test('the reveal jumps from an unloaded notification marker without adding a per
   timeline,
   installRoomCore,
 }) => {
+  await page.addInitScript(() => {
+    document.hasFocus = () => false;
+  });
   await installRoomCore('unread_history');
   await page.goto(
     `/to/${encodeURIComponent(room)}?notified=${encodeURIComponent('$general-9999:example.test')}`
   );
   await timeline.expectRevealed();
-  await expect(async () => {
-    await page.getByRole('button', { name: 'Jump to unread' }).click({ timeout: 3_000 });
-    await expect(timeline.message('General message 5')).toBeInViewport({ timeout: 3_000 });
-  }).toPass({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Jump to unread' }).click();
+  await expect(timeline.message('General message 5')).toBeInViewport();
   expect(new URL(page.url()).searchParams.has('event')).toBe(false);
 });
