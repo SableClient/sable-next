@@ -7,11 +7,19 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
+  import SyncIcon from 'phosphor-svelte/lib/ArrowsClockwiseIcon';
+  import ListIcon from 'phosphor-svelte/lib/ListBulletsIcon';
+  import GridIcon from 'phosphor-svelte/lib/SquaresFourIcon';
+  import RoomIcon from 'phosphor-svelte/lib/HashStraightIcon';
+  import SpaceIcon from 'phosphor-svelte/lib/HouseIcon';
+  import GlobalIcon from 'phosphor-svelte/lib/GlobeSimpleIcon';
 
   import type { PersonaSelectionView, PersonaView } from '#src/generated/protocol';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 
   import { i18n } from '#lib/i18n.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { nameColorOnDark, nameColorOnLight } from '#lib/ui/primitives/readable-color.js';
 
@@ -39,7 +47,7 @@
     onDisable,
   }: Props = $props();
   let query = $state('');
-  let grid = $derived(!query);
+  let grid = $derived(preferences.personaGrid && !query);
   let filteredPersonas = $derived(
     personas.filter((persona) => {
       const needle = query.trim().toLocaleLowerCase();
@@ -54,9 +62,9 @@
   let scopes = $derived(
     (
       [
-        { id: 'room', label: 'common.thisRoom' },
-        { id: 'space', label: 'personas.scopeSpace' },
-        { id: 'account', label: 'personas.scopeAccount' },
+        { id: 'room', label: 'common.thisRoom', icon: RoomIcon },
+        { id: 'space', label: 'personas.scopeSpace', icon: SpaceIcon },
+        { id: 'account', label: 'personas.scopeAccount', icon: GlobalIcon },
       ] as const
     ).filter((tab) => hasSpace || tab.id !== 'space')
   );
@@ -90,12 +98,16 @@
         >
         {#if disabled}<CheckIcon />{/if}
       {:else if kind === 'offGlobal'}
-        <Avatar initials="?" size="small" />
+        <Avatar size="small"><ProhibitIcon /></Avatar>
         <span class="persona-option-name">{$i18n.t('personas.pickerOffGlobal')}</span>
         {#if !selected && !disabled}<CheckIcon />{/if}
       {:else}
-        <Avatar initials="?" size="small" />
-        <span class="persona-option-name">{$i18n.t('personas.pickerNone')}</span>
+        <Avatar size="small"><SyncIcon /></Avatar>
+        <span class="persona-option-name"
+          >{$i18n.t(
+            scope === 'room' && hasSpace ? 'personas.pickerSyncSpace' : 'personas.pickerSyncAccount'
+          )}</span
+        >
         {#if !selected && !disabled}<CheckIcon />{/if}
       {/if}
     </button>
@@ -107,7 +119,13 @@
     ? persona.display_name
     : kind === 'disable'
       ? $i18n.t(scope === 'room' ? 'personas.pickerOff' : 'personas.pickerOffSpace')
-      : $i18n.t(scope === 'account' ? 'personas.pickerOffGlobal' : 'personas.pickerNone')}
+      : $i18n.t(
+          scope === 'account'
+            ? 'personas.pickerOffGlobal'
+            : scope === 'room' && hasSpace
+              ? 'personas.pickerSyncSpace'
+              : 'personas.pickerSyncAccount'
+        )}
 
   <li>
     <button
@@ -133,12 +151,10 @@
                 name={persona.display_name}
                 size="medium"
               />
-            {:else if kind === 'disable'}
+            {:else if kind === 'disable' || kind === 'offGlobal'}
               <Avatar id={null} size="medium" name={label}><ProhibitIcon /></Avatar>
-            {:else if kind === 'offGlobal'}
-              <Avatar id={null} initials="?" size="medium" name={label} />
             {:else}
-              <Avatar id={null} initials="?" size="medium" name={label} />
+              <Avatar id={null} size="medium" name={label}><SyncIcon /></Avatar>
             {/if}
           </div>
         {/snippet}
@@ -159,6 +175,7 @@
           onScope(tab.id);
         }}
       >
+        <tab.icon />
         {$i18n.t(tab.label)}
       </button>
     {/each}
@@ -179,14 +196,38 @@
     {/each}
   </ul>
 
-  <TextInput
-    class="persona-search"
-    bind:value={query}
-    type="search"
-    autocomplete="off"
-    placeholder={$i18n.t('personas.search')}
-    aria-label={$i18n.t('personas.search')}
-  />
+  <div class="persona-toolbar">
+    <TextInput
+      id="persona-search"
+      bind:value={query}
+      type="search"
+      autocomplete="off"
+      placeholder={$i18n.t('personas.search')}
+      aria-label={$i18n.t('personas.search')}
+      onkeyup={(event) => {
+        if (event.key === 'Enter' && query && filteredPersonas && filteredPersonas.length !== 0) {
+          onChoose(filteredPersonas[0]);
+        }
+      }}
+    />
+
+    {#if !query}
+      <Tooltip label={grid ? $i18n.t('personas.listView') : $i18n.t('personas.gridView')}>
+        {#snippet trigger({ props })}
+          <IconButton
+            {...props}
+            size="small"
+            label={grid ? $i18n.t('personas.listView') : $i18n.t('personas.gridView')}
+            onclick={() => {
+              setPreference('personaGrid', !preferences.personaGrid);
+            }}
+          >
+            {#if preferences.personaGrid}<ListIcon />{:else}<GridIcon />{/if}
+          </IconButton>
+        {/snippet}
+      </Tooltip>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -202,14 +243,30 @@
   }
 
   .persona-scope {
+    align-items: center;
     background: none;
     border: var(--border-width) solid transparent;
     border-radius: var(--radius);
     color: var(--surface-var-on-container);
     cursor: pointer;
+    display: flex;
     flex: 1;
+    flex-flow: column nowrap;
     font: inherit;
+    font-size: var(--font-size-small);
+    justify-content: center;
     padding: var(--space-200);
+  }
+
+  .persona-toolbar {
+    display: flex;
+    gap: var(--space-200);
+  }
+
+  .persona-toolbar :global(> button) {
+    flex: 0 0 auto;
+
+    --button-height: var(--control-height-400);
   }
 
   .persona-options {
@@ -238,7 +295,7 @@
     }
   }
 
-  :global(.persona-search) {
+  :global(#persona-search) {
     --form-control-container: var(--surface-container);
     --form-control-container-line: var(--surface-container-line);
     --form-control-color: var(--surface-on-container);
