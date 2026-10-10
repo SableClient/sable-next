@@ -69,6 +69,7 @@ src-tauri/gen/apple/*
 
 # Playwright visual regression
 /test-results
+/.vitest
 /playwright-report
 /blob-report
 /tests/e2e/.auth

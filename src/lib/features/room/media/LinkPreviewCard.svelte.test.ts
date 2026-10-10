@@ -461,5 +461,5 @@ test('the theme colour becomes the card accent and a summary card is compact', a
 
   const card = container.querySelector('.link-preview');
   expect(card).toHaveClass('accented', 'compact');
-  expect(card).toHaveStyle({ '--link-preview-accent': '#ff4500' });
+  expect((card as HTMLElement).style.getPropertyValue('--link-preview-accent')).toBe('#ff4500');
 });

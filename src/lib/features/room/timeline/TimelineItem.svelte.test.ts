@@ -1562,7 +1562,7 @@ test('compact layout shows the time alone and keeps the full date in its tooltip
   await tick();
 
   const time = document.querySelector('.compact-gutter time');
-  expect(time).toHaveTextContent(/^\d{1,2}:\d{2}/);
+  expect(time?.textContent).toMatch(/^\d{1,2}:\d{2}/);
   if (!time) throw new Error('compact layout has no time');
   await userEvent.hover(time);
   await vi.waitFor(() => {

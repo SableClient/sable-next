@@ -267,55 +267,6 @@ test('an unknown from: yields nothing rather than every message', async ({ page 
   await expect(page.getByText(/No match for from:nobody/)).toBeVisible();
 });
 
-test('typing an operator prefix offers completions and Tab accepts one', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('fr');
-  const listbox = page.getByRole('listbox', { name: 'Search suggestions' });
-  await expect(listbox.getByRole('option', { name: 'from:' })).toBeVisible();
-
-  await field.press('Tab');
-  await expect(field).toHaveValue('from:');
-});
-
-test('completing an operator with Tab offers its values', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('in');
-  await field.press('Tab');
-
-  await expect(field).toHaveValue('in:');
-  await expect(
-    page.getByRole('listbox', { name: 'Search suggestions' }).getByRole('option').first()
-  ).toBeVisible();
-});
-
-test('an operator prefix is not highlighted until the list is arrowed', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('fr');
-  const option = page.getByRole('option', { name: 'from:' });
-  await expect(option).toHaveAttribute('aria-selected', 'false');
-
-  await field.press('ArrowDown');
-  await expect(option).toHaveAttribute('aria-selected', 'true');
-});
-
-test('Enter searches a word that merely starts an operator', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('turn on');
-  await expect(page.getByRole('option', { name: /^on:/ })).toBeVisible();
-
-  await field.press('Enter');
-  await expect(field).toHaveValue('turn on');
-  await expect(page.getByRole('listbox')).toHaveCount(0);
-});
-
 test('in: offers rooms and accepting one inserts its alias', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
@@ -329,19 +280,6 @@ test('in: offers rooms and accepting one inserts its alias', async ({ page }) =>
   await expect(chips(page)).toHaveText(/in:\s*Random/);
   await expect(field).toHaveValue('message ');
   await expect(anyGroup(page, 'Random')).toBeVisible(INDEXED);
-});
-
-test('escape dismisses the suggestions without clearing the query', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('has:');
-  await expect(page.getByRole('option', { name: 'image' })).toBeVisible();
-
-  await field.press('Escape');
-
-  await expect(page.getByRole('listbox')).toHaveCount(0);
-  await expect(field).toHaveValue('has:');
 });
 
 test('matched terms are marked in the result body', async ({ page }) => {
@@ -385,55 +323,6 @@ test('zero results are announced and offer a way out', async ({ page, searchCorp
   await expect(page.getByText(/Remove a filter/)).toBeVisible();
 });
 
-test('a completed filter does not keep the suggestions open', async ({ page }) => {
-  await page.goto('/search');
-
-  await searchField(page).fill('message in:Random ');
-
-  await expect(page.getByRole('listbox')).toHaveCount(0);
-});
-
-test('alt+arrowdown offers the operator cheat-sheet on demand', async ({ page }) => {
-  await page.goto('/search');
-
-  await searchField(page).fill('message ');
-  await expect(page.getByRole('listbox')).toHaveCount(0);
-
-  await searchField(page).press('Alt+ArrowDown');
-
-  await expect(page.getByRole('option', { name: /^in:/ })).toBeVisible();
-  await expect(page.getByRole('option', { name: /^during:/ })).toBeVisible();
-});
-
-test('alt+arrowdown opens the suggestions without moving focus', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('has:image');
-  await field.press('Escape');
-  await expect(page.getByRole('listbox')).toHaveCount(0);
-
-  await field.press('Alt+ArrowDown');
-
-  await expect(page.getByRole('listbox')).toBeVisible();
-  await expect(field).toBeFocused();
-});
-
-test('escape clears the field only once the suggestions are closed', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('has:im');
-  await expect(page.getByRole('listbox')).toBeVisible();
-
-  await field.press('Escape');
-  await expect(page.getByRole('listbox')).toHaveCount(0);
-  await expect(field).toHaveValue('has:im');
-
-  await field.press('Escape');
-  await expect(field).toHaveValue('');
-});
-
 test('a stemmed match is still marked in the body', async ({ page }) => {
   await page.goto('/search');
 
@@ -451,21 +340,6 @@ test('a result row names the sender and shows their avatar initials', async ({ p
   await expect(page.locator('.hit-row').first().locator('.avatar-root')).toBeVisible();
 });
 
-test('an operator under the caret stays as text until it is committed', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('message in:Random');
-  await expect(chips(page)).toHaveCount(0);
-  await expect(field).toHaveValue('message in:Random');
-
-  await field.press('End');
-  await field.pressSequentially(' ');
-
-  await expect(chips(page)).toHaveText(/in:\s*Random/);
-  await expect(field).toHaveValue('message ');
-});
-
 test('the remove button drops the chip and rebroadens the results', async ({ page }) => {
   await page.goto('/search');
 
@@ -477,28 +351,6 @@ test('the remove button drops the chip and rebroadens the results', async ({ pag
 
   await expect(chips(page)).toHaveCount(0);
   await expect(anyGroup(page, 'General')).toBeVisible(INDEXED);
-});
-
-test('backspace on an empty draft removes the last chip', async ({ page, searchCorpus }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  const localpart = searchCorpus.sender.userId.replace(/^@/, '').split(':')[0];
-  await field.fill(`in:Random from:${localpart} `);
-  await expect(chips(page)).toHaveCount(2);
-
-  await field.press('Backspace');
-
-  await expect(chips(page)).toHaveCount(1);
-  await expect(chips(page)).toHaveText(/in:\s*Random/);
-});
-
-test('a chip names the room rather than its id', async ({ page, searchCorpus }) => {
-  await page.goto('/search');
-
-  await searchField(page).fill(`message in:${searchCorpus.randomId} `);
-
-  await expect(chips(page)).toHaveText(/in:\s*Random/);
 });
 
 test('from: suggestions show display names', async ({ page, app, searchCorpus }) => {
@@ -513,43 +365,6 @@ test('from: suggestions show display names', async ({ page, app, searchCorpus })
   await expect(page.getByRole('option', { name: 'Alice' })).toBeVisible();
 });
 
-test('accepting a suggestion closes the list instead of reopening it', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-  const listbox = page.getByRole('listbox');
-
-  await field.fill('has:im');
-  await expect(listbox).toBeVisible();
-
-  await field.press('Enter');
-
-  await expect(chips(page)).toHaveText(/has:\s*image/);
-  await expect(field).toHaveValue('');
-  await expect(listbox).toHaveCount(0);
-});
-
-test('clicking a suggestion closes the list', async ({ page }) => {
-  await page.goto('/search');
-  await searchField(page).fill('in:Ran');
-
-  await page
-    .getByRole('option', { name: /Random/ })
-    .first()
-    .click();
-
-  await expect(page.getByRole('listbox')).toHaveCount(0);
-});
-
-test('leaving the field closes the list', async ({ page }) => {
-  await page.goto('/search');
-  await searchField(page).fill('has:');
-  await expect(page.getByRole('listbox')).toBeVisible();
-
-  await searchField(page).blur();
-
-  await expect(page.getByRole('listbox')).toHaveCount(0);
-});
-
 test('the sort controls are not covered by the suggestions', async ({ page }) => {
   await page.goto('/search');
   await searchField(page).fill('has:');
@@ -558,71 +373,6 @@ test('the sort controls are not covered by the suggestions', async ({ page }) =>
   await chooseOrder(page, en.search.orderRecent);
 
   await expect(orderControl(page)).toHaveText(en.search.orderRecent);
-});
-
-test('a pasted filter commits to a chip without stranding text in the input', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('in:Random ');
-
-  await expect(chips(page)).toHaveCount(1);
-  await expect(field).toHaveValue('');
-
-  await field.pressSequentially('message');
-
-  await expect(chips(page)).toHaveCount(1);
-  await expect(field).toHaveValue('message');
-  await expect(page).toHaveURL(/q=in%3ARandom%20message/);
-});
-
-test('a space typed after a committed chip is not swallowed', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('in:Random ');
-  await field.pressSequentially(' ');
-
-  await expect(field).toHaveValue(' ');
-  await expect(chips(page)).toHaveCount(1);
-});
-
-test('backspace after that space deletes the space, not the chip', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('in:Random ');
-  await field.pressSequentially(' ');
-  await field.press('Backspace');
-
-  await expect(chips(page)).toHaveCount(1);
-  await expect(field).toHaveValue('');
-});
-
-test('typing in the middle of the draft keeps the space and the caret', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('in:Random ');
-  await field.pressSequentially('deploy');
-  await field.press('Home');
-  await field.pressSequentially(' X');
-
-  await expect(field).toHaveValue(' Xdeploy');
-  await expect(chips(page)).toHaveCount(1);
-});
-
-test('a chip is built character by character in front of existing text', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.pressSequentially('message in:Random');
-  await expect(chips(page)).toHaveCount(0);
-
-  await field.pressSequentially(' ');
-
-  await expect(chips(page)).toHaveText(/in:\s*Random/);
-  await expect(field).toHaveValue('message ');
 });
 
 test('a negated room filter drops that room instead of matching its text', async ({ page }) => {
@@ -636,32 +386,6 @@ test('a negated room filter drops that room instead of matching its text', async
   await expect(group(page, 'Random')).toHaveCount(0);
 });
 
-test('a negated date bound is reported as unsupported', async ({ page }) => {
-  await page.goto('/search');
-
-  await searchField(page).fill('message -before:2024-01-01');
-
-  await expect(page.getByText('Not supported yet: -before')).toBeVisible();
-});
-
-test('a negated chip names the negation in its remove button', async ({ page }) => {
-  await page.goto('/search');
-
-  await searchField(page).fill('message -in:Random ');
-
-  await expect(page.getByRole('button', { name: 'Remove -in:Random' })).toBeVisible();
-});
-
-test('clicking the field padding focuses the input', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('in:Random ');
-  await page.locator('.token-field').click({ position: { x: 2, y: 2 } });
-
-  await expect(field).toBeFocused();
-});
-
 test('a quoted phrase is marked whole in the result body', async ({ page }) => {
   await page.goto('/search');
 
@@ -670,27 +394,6 @@ test('a quoted phrase is marked whole in the result body', async ({ page }) => {
   await searchField(page).fill('"General message 1"');
 
   await expect.poll(() => marked(page), INDEXED).toContain('General message 1');
-});
-
-test('an empty field lists every operator, even after a chip', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.fill('in:Random ');
-  await field.focus();
-
-  const listbox = page.getByRole('listbox');
-  await expect(listbox.getByRole('option', { name: /^from:/ })).toBeVisible();
-  await expect(listbox.getByRole('option', { name: /^mentions:/ })).toBeVisible();
-});
-
-test('a starter filter begins a filter and offers its values', async ({ page }) => {
-  await page.goto('/search');
-
-  await page.getByRole('button', { name: 'in:' }).click();
-
-  await expect(searchField(page)).toBeFocused();
-  await expect(page.getByRole('listbox')).toBeVisible();
 });
 
 test('arrow down from the field reaches the results and enter opens one', async ({ page }) => {

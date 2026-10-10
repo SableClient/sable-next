@@ -19,7 +19,7 @@
     "prepare": "svelte-kit sync || echo ''; node scripts/install-git-hooks.mjs",
     "check:theme": "node scripts/check-theme-tokens.mjs",
     "check:locales": "node scripts/check-locale-keys.mjs",
-    "check": "svelte-kit sync && node scripts/check-theme-tokens.mjs && node scripts/check-timeline-scroll.mjs && node scripts/check-overlay-layers.mjs && node scripts/check-date-inputs.mjs && node scripts/check-locale-keys.mjs && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc -p src/service-worker/tsconfig.json",
+    "check": "svelte-kit sync && node scripts/check-theme-tokens.mjs && node scripts/check-timeline-scroll.mjs && node scripts/check-overlay-layers.mjs && node scripts/check-date-inputs.mjs && node scripts/check-locale-keys.mjs && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc -p src/service-worker/tsconfig.json && tsc -p tsconfig.browser.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings --watch",
     "lint": "oxlint && oxlint --type-aware --ignore-pattern \"**/*.js\" --ignore-pattern \"**/*.mjs\" --ignore-pattern \"**/*.cjs\" && eslint . --cache --cache-strategy content --max-warnings 0",
     "lint:fix": "oxlint --fix && oxlint --type-aware --ignore-pattern '**/*.js' --ignore-pattern '**/*.mjs' --ignore-pattern '**/*.cjs' && eslint . --cache --cache-strategy content --fix",
@@ -115,6 +115,7 @@
     "@testing-library/user-event": "^14.6.7",
     "@types/leaflet": "^1.9.22",
     "@types/mdast": "^4.0.4",
+    "@vitest/browser-playwright": "^5.0.3",
     "@vitest/coverage-v8": "^5.0.0",
     "eslint": "^10.10.0",
     "eslint-plugin-oxlint": "^1.85.0",
@@ -140,6 +141,7 @@
     "typescript-eslint": "^8.70.1",
     "vite": "^8.3.1",
     "vitest": "^5.0.0",
+    "vitest-browser-svelte": "^3.1.0",
     "wrangler": "^4.140.0"
   },
   "devEngines": {

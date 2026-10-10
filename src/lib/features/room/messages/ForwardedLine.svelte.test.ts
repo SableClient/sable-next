@@ -56,5 +56,5 @@ test('a private forward names no origin', () => {
 
   expect(screen.queryByRole('link')).not.toBeInTheDocument();
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
-  expect(container).toHaveTextContent(/^Forwarded$/);
+  expect(container.textContent.trim()).toMatch(/^Forwarded$/);
 });

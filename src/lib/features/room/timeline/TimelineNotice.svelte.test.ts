@@ -65,9 +65,11 @@ test.each([
     });
     const image = await screen.findByAltText(label);
 
-    expect(image.closest('.state-event-text')).toHaveTextContent(/^Alice reacted with\s*$/);
+    expect(image.closest('.state-event-text')?.textContent).toMatch(/^Alice reacted with\s*$/);
     await userEvent.hover(image);
-    await vi.waitFor(() => expect(document.querySelector('.tooltip')).toHaveTextContent(label));
+    await vi.waitFor(() => {
+      expect(document.querySelector('.tooltip')).toHaveTextContent(label);
+    });
     expect(document.querySelector('.tooltip .emote-card-image img')).toBeInTheDocument();
     await userEvent.unhover(image);
     expect(document.querySelector('.tooltip')).not.toBeInTheDocument();

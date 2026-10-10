@@ -684,7 +684,7 @@ test('a bare event link names the room and quotes the message, with an icon', as
 
   const anchor = link();
   await vi.waitFor(() => {
-    expect(anchor).toHaveTextContent(/^#Design: ship it x+…$/);
+    expect(anchor.textContent).toMatch(/^#Design: ship it x+…$/);
   });
   expect(anchor.textContent).toHaveLength('#Design: '.length + 72);
   expect(anchor.querySelector('.link-chip-icon svg')).toBeInTheDocument();

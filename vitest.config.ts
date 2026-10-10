@@ -26,9 +26,11 @@ export default mergeConfig(
           extends: true,
           test: {
             name: 'node',
+            setupFiles: ['./vitest-setup.ts'],
             environment: 'node',
             include: ['src/**/*.test.ts'],
             exclude: [
+              'src/**/*.browser.test.ts',
               'src/lib/features/composer/VoiceRecorder.svelte.test.ts',
               'src/lib/features/composer/voice-recorder-encoder.test.ts',
               'src/lib/features/room/timeline/TimelineReadReceipt.svelte.test.ts',
@@ -55,6 +57,7 @@ export default mergeConfig(
           extends: true,
           test: {
             name: 'happy-dom',
+            setupFiles: ['./vitest-setup.ts'],
             environment: 'happy-dom',
             include: [
               'src/lib/features/composer/VoiceRecorder.svelte.test.ts',
@@ -79,8 +82,8 @@ export default mergeConfig(
             ],
           },
         },
+        './vitest.browser.config.ts',
       ],
-      setupFiles: ['./vitest-setup.ts'],
       coverage: {
         provider: 'v8',
         reporter: ['text', 'html', 'lcov'],

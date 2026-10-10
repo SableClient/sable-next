@@ -85,7 +85,7 @@ test('keeps the remembered apps on screen when the list cannot be read', async (
   platform.listScreenAudioApps.mockRejectedValue(new Error('no pipewire'));
   open();
 
-  expect(await screen.findByRole('alert')).toHaveTextContent(/Refresh to try again/);
+  expect((await screen.findByRole('alert')).textContent).toMatch(/Refresh to try again/);
   expect(screen.getByRole('checkbox', { name: /mpv/ })).toBeChecked();
 });
 

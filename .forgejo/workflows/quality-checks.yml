@@ -125,7 +125,7 @@ jobs:
 
       - name: Run Vitest with coverage thresholds
         if: ${{ !cancelled() }}
-        run: pnpm test:coverage
+        run: pnpm test:coverage --project node --project happy-dom
 
       - name: Test web assets validation
         if: ${{ !cancelled() }}
@@ -222,6 +222,9 @@ jobs:
             echo "gateway=$gateway"
             echo "TESTCONTAINERS_HOST_OVERRIDE=$gateway" >>"$GITHUB_ENV"
           fi
+
+      - name: Run browser component tests
+        run: pnpm exec vitest run --project browser
 
       - name: Run Playwright tests
         if: ${{ github.event_name == 'pull_request' }}
