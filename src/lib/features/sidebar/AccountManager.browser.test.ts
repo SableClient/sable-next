@@ -16,6 +16,7 @@ vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { goto } from '#lib/test-support/app-navigation.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 import AccountManager from './AccountManager.svelte';
@@ -59,11 +60,25 @@ async function mount(initial: ProfileView, options: { saveFails?: () => boolean 
       {
         account_id: 'a1',
         user_id: '@alice:example.test',
-        homeserver: 'example.test',
-        status: 'ok',
+        device_id: 'D1',
+        homeserver: 'https://example.test',
+        needs_reauth: false,
+      },
+      {
+        account_id: 'second-account',
+        user_id: '@second:example.test',
+        device_id: 'D2',
+        homeserver: 'https://example.test',
+        needs_reauth: false,
       },
     ],
-    userProfile: vi.fn().mockResolvedValue(initial),
+    userProfile: vi.fn((userId: string) =>
+      Promise.resolve(
+        userId === '@second:example.test'
+          ? profileWith({ user_id: userId, display_name: 'Second' })
+          : initial
+      )
+    ),
     setProfileField,
     switchAccount: vi.fn().mockResolvedValue(undefined),
     removeAccount: vi.fn().mockResolvedValue(undefined),
@@ -204,3 +219,87 @@ for (const sendPresence of [false, true]) {
     expect(setProfileField).toHaveBeenCalledWith('m.status', null);
   });
 }
+
+test('mobile: the account page omits the profile biography', async () => {
+  await page.viewport(412, 915);
+  const { screen } = await mount(profileWith({ bio: '<p>My profile biography.</p>' }));
+
+  await expect
+    .element(screen.getByRole('button', { name: 'Edit profile', exact: true }))
+    .toBeVisible();
+  expect(screen.getByRole('heading', { name: 'Biography' }).elements()).toHaveLength(0);
+  expect(screen.getByText('My profile biography.', { exact: true }).elements()).toHaveLength(0);
+});
+
+test('mobile: tapping an account identity switches to that account', async () => {
+  await page.viewport(412, 915);
+  const { screen } = await mount(profileWith({}));
+  await expect.element(screen.getByRole('button', { pressed: true })).toBeDisabled();
+
+  await userEvent.click(screen.getByText('Second', { exact: true }));
+
+  await expect.poll(() => core.switchAccount).toHaveBeenCalledWith('second-account');
+  await expect.poll(() => goto.mock.calls.length).toBeGreaterThan(0);
+});
+
+test('mobile: account options do not select the account', async () => {
+  await page.viewport(412, 915);
+  const { screen } = await mount(profileWith({}));
+  await userEvent.click(
+    screen.getByRole('button', { name: 'More options: @second:example.test', exact: true })
+  );
+  await expect.element(screen.getByRole('menuitem', { name: 'Remove account' })).toBeVisible();
+  expect(core.switchAccount).not.toHaveBeenCalled();
+
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Remove account' }));
+  const confirmation = screen.getByRole('dialog', { name: 'Remove this account?' });
+  await expect.element(confirmation.getByText('Second', { exact: true })).toBeVisible();
+  await expect
+    .element(confirmation.getByText('@second:example.test', { exact: true }))
+    .toBeVisible();
+  await userEvent.click(confirmation.getByRole('button', { name: 'Cancel', exact: true }));
+  await expect.poll(() => screen.getByRole('dialog').elements().length).toBe(0);
+});
+
+test('mobile: switching shows progress and a failed switch can be retried', async () => {
+  await page.viewport(412, 915);
+  const { screen } = await mount(profileWith({}));
+  let failing = true;
+  const switchAccount = vi.fn(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        setTimeout(
+          () => {
+            if (failing) reject(new Error('no'));
+            else resolve();
+          },
+          failing ? 300 : 0
+        );
+      })
+  );
+  Object.assign(core, { switchAccount });
+  const account = screen.getByRole('button', {
+    name: 'Switch account: Second, @second:example.test',
+    exact: true,
+  });
+  await expect.element(account).toBeVisible();
+
+  await userEvent.click(account);
+  await expect.element(account).toHaveAttribute('aria-busy', 'true');
+  await expect.element(account.getByText('Switching…', { exact: true })).toBeVisible();
+  await expect.element(account).toBeDisabled();
+  await expect
+
+    .poll(() => document.querySelector('.account-list [role="alert"]')?.textContent.trim())
+    .toBe('Could not switch accounts. Try again.');
+  await expect.element(account).toBeEnabled();
+  await expect.element(account).toHaveAttribute('aria-busy', 'false');
+  await expect
+    .element(screen.getByRole('button', { pressed: true }))
+    .toHaveAccessibleName('Active account: Alice, @alice:example.test');
+
+  failing = false;
+  await userEvent.click(account);
+  await expect.poll(() => switchAccount.mock.calls.length).toBe(2);
+  await expect.poll(() => goto.mock.calls.length).toBeGreaterThan(0);
+});
