@@ -65,3 +65,15 @@ test('a query matching nothing says so', async () => {
   await expect.element(screen.getByText(/No settings match/)).toBeVisible();
   expect(document.querySelectorAll('[aria-label="Search settings"] li')).toHaveLength(0);
 });
+
+test('mobile: log out is the last row of the section list', async () => {
+  const { screen } = await mount();
+  await page.viewport(412, 915);
+  const nav = screen.getByRole('navigation', { name: 'Settings sections' });
+  const logout = nav.getByRole('button', { name: 'Log out' });
+  logout.element().scrollIntoView();
+  const about = nav.getByRole('link', { name: 'About' }).element().getBoundingClientRect();
+  const row = logout.element().getBoundingClientRect();
+
+  expect(row.y).toBeGreaterThan(about.y);
+});

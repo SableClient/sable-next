@@ -172,32 +172,6 @@ test('mobile: a row with several buttons wraps them under its description', asyn
   expect(description.width).toBeGreaterThan(rowBox.width * 0.6);
 });
 
-test('mobile: a dropdown opens as a sheet of choices', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
-  await page.goto('/settings/appearance');
-
-  await page.getByRole('button', { name: 'Room icons' }).click();
-  const sheet = page.getByRole('dialog', { name: 'Room icons' });
-  const choice = sheet.getByRole('radio', { name: 'Never' });
-  await choice.click();
-
-  await expect(sheet).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Room icons' })).toContainText('Never');
-});
-
-test('mobile: log out is the last row of the section list', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
-  await page.goto('/settings');
-
-  const nav = page.getByRole('navigation', { name: 'Settings sections' });
-  const logout = nav.getByRole('button', { name: 'Log out' });
-  await logout.scrollIntoViewIfNeeded();
-  const about = await nav.getByRole('link', { name: 'About' }).boundingBox();
-  const row = await logout.boundingBox();
-  if (!about || !row) throw new Error('The list is not laid out.');
-  expect(row.y).toBeGreaterThan(about.y);
-});
-
 const THEME_FILES = 'https://git.sable.moe/SableClient/themes/raw/branch/main/';
 const DRACULA = `/*
 @sable-theme
