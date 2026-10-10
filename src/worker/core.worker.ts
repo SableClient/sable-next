@@ -9,9 +9,11 @@ import init, {
 import { clearSession, loadSession, saveSession } from '#lib/platform/session-storage.js';
 import { installFirefoxFetchLimit } from './adaptive-fetch';
 import { createCoreWorkerBoundary } from './core-worker-boundary';
+import { installUploadDeadline } from './upload-deadline';
 
 declare const self: SharedWorkerGlobalScope;
 
+installUploadDeadline(self);
 installFirefoxFetchLimit(self);
 
 const core = init().then(() => {
