@@ -518,3 +518,80 @@ test('a failed send keeps the draft and retries from inside the composer', async
   await expect.poll(() => editor().textContent).toBe('');
   expect(onSend).toHaveBeenCalledTimes(2);
 });
+
+const SCHEDULE_PRESS_MS = 800;
+
+async function scheduleHarness() {
+  const onSchedule = vi.fn(() => Promise.resolve());
+  const mounted = await mount(true, {}, { onSchedule });
+  const send = () => {
+    const node = document.querySelector<HTMLElement>('.composer-send');
+    if (!node) throw new Error('the send button is not rendered');
+    return node;
+  };
+  const dialog = () => mounted.screen.getByText('Schedule this message', { exact: true });
+  return { ...mounted, onSchedule, send, dialog };
+}
+
+test('touch taps and mouse clicks send without scheduling', async () => {
+  const { composer, sent, send, dialog, editor } = await scheduleHarness();
+
+  for (let index = 0; index < 3; index += 1) {
+    await userEvent.click(composer);
+    await userEvent.keyboard(`Message ${String(index)}`);
+    await userEvent.click(send());
+    await expect.poll(() => editor().textContent).toBe('');
+    expect(dialog().elements()).toHaveLength(0);
+  }
+  expect(sent).toHaveLength(3);
+});
+
+test('an untyped touch contextmenu cannot bypass the schedule delay', async () => {
+  const { composer, send, dialog, editor } = await scheduleHarness();
+  await userEvent.click(composer);
+  await userEvent.keyboard('Later');
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+  try {
+    send().dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true })
+    );
+    await vi.advanceTimersByTimeAsync(100);
+    send().dispatchEvent(
+      new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch', isPrimary: true })
+    );
+    await vi.advanceTimersByTimeAsync(500);
+    send().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    send().dispatchEvent(
+      new PointerEvent('contextmenu', { bubbles: true, cancelable: true, pointerType: '' })
+    );
+    await vi.advanceTimersByTimeAsync(SCHEDULE_PRESS_MS);
+  } finally {
+    vi.useRealTimers();
+  }
+
+  expect(dialog().elements()).toHaveLength(0);
+  expect(editor().textContent).toBe('Later');
+});
+
+test('a touch hold schedules only after the full delay and swallows its click', async () => {
+  const { composer, sent, send, dialog } = await scheduleHarness();
+  await userEvent.click(composer);
+  await userEvent.keyboard('Later');
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+  try {
+    send().dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true })
+    );
+    await vi.advanceTimersByTimeAsync(SCHEDULE_PRESS_MS - 1);
+    expect(dialog().elements()).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(1);
+  } finally {
+    vi.useRealTimers();
+  }
+  await expect.element(dialog()).toBeVisible();
+  send().dispatchEvent(
+    new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch', isPrimary: true })
+  );
+  send().dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  expect(sent).toHaveLength(0);
+});

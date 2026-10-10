@@ -1,6 +1,5 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { timelineItem } from './fixtures/timeline-items';
-import type { ImagePackView } from '#src/generated/protocol';
 import { quietFor, NEGATIVE_SETTLE_MS } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT });
@@ -81,55 +80,4 @@ test('the context menu opens the reaction board as a popover, not a sheet', asyn
   if (!board) throw new Error('the reaction popover has no box');
   expect(Math.abs(board.x + board.width - point.x)).toBeLessThan(48);
   expect(Math.abs(board.y + board.height - point.y)).toBeLessThan(48);
-});
-
-test('search shows matching emotes from different packs with the same shortcode', async ({
-  app,
-  page,
-  timeline,
-  core,
-  installRoomCore,
-}) => {
-  const packs: ImagePackView[] = ['one', 'two'].map((id) => ({
-    id,
-    origin: 'room',
-    room_id: '!room:example.test',
-    name: id,
-    avatar_url: null,
-    declared_name: null,
-    declared_avatar_url: null,
-    stable_event: false,
-    legacy_event: false,
-    attribution: null,
-    usage: ['emoticon'],
-    images: [
-      {
-        shortcode: 'duplicate',
-        url: `mxc://example.test/${id}`,
-        body: null,
-        usage: ['emoticon'],
-        info: null,
-        source_pack: null,
-      },
-    ],
-  }));
-  await page.addInitScript((imagePacks) => {
-    (window as unknown as { __e2eImagePacks: ImagePackView[] }).__e2eImagePacks = imagePacks;
-  }, packs);
-  await installRoomCore('ready');
-  await app.openRoom('!room:example.test');
-  const subscription = await core.subscription();
-  await core.emitTimelineDiff(subscription, [
-    { op: 'reset', values: [timelineItem('react-duplicates', 'React to me')] },
-  ]);
-
-  const row = timeline.itemById('react-duplicates').locator('article.message');
-  await expect(row).toBeVisible();
-  await row.click({ button: 'right' });
-  await page.getByRole('menuitem', { name: 'Add reaction' }).click();
-
-  const picker = page.locator('.reaction-picker');
-  await expect(picker).toBeVisible();
-  await picker.getByRole('searchbox').fill('duplicate');
-  await expect(picker.getByRole('button', { name: ':duplicate:' })).toHaveCount(2);
 });

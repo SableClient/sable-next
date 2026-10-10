@@ -38,6 +38,8 @@ const packs: ImagePackView[] = packIds.map((id, packIndex) => ({
   })),
 }));
 
+let activePacks: ImagePackView[] = packs;
+
 vi.mock('#lib/emoji/load-packs.js', () => ({
   isPackChange: () => false,
   loadPacks: (
@@ -45,7 +47,7 @@ vi.mock('#lib/emoji/load-packs.js', () => ({
     _roomId: string,
     apply: (loaded: ImagePackView[]) => void
   ): Promise<boolean> => {
-    apply(packs);
+    apply(activePacks);
     return Promise.resolve(true);
   },
 }));
@@ -55,6 +57,7 @@ import { core } from '#lib/core/__mocks__/context.js';
 import EmoteBoard from './EmoteBoard.svelte';
 
 afterEach(async () => {
+  activePacks = packs;
   await page.viewport(414, 800);
 });
 
@@ -159,4 +162,36 @@ test('sticker rows keep every cell whole on one line', async () => {
     const top = Math.min(...(rows[index] ?? []).map((cell) => cell.top));
     expect(bottom, `row ${String(index)}`).toBeLessThanOrEqual(top);
   }
+});
+
+test('search shows matching emotes from different packs with the same shortcode', async () => {
+  activePacks = ['one', 'two'].map((id) => ({
+    id,
+    origin: 'room',
+    room_id: '!room:example.test',
+    name: id,
+    avatar_url: null,
+    declared_name: null,
+    declared_avatar_url: null,
+    stable_event: false,
+    legacy_event: false,
+    attribution: null,
+    usage: ['emoticon'],
+    images: [
+      {
+        shortcode: 'duplicate',
+        url: `mxc://example.test/${id}`,
+        body: null,
+        usage: ['emoticon'],
+        info: null,
+        source_pack: null,
+      },
+    ],
+  }));
+  const { screen } = await mountBoard();
+  await userEvent.fill(screen.getByRole('searchbox').element(), 'duplicate');
+
+  await expect
+    .poll(() => screen.getByRole('button', { name: ':duplicate:' }).elements().length)
+    .toBe(2);
 });
