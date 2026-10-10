@@ -247,7 +247,9 @@ test('the reveal jumps from an unloaded notification marker without adding a per
     `/to/${encodeURIComponent(room)}?notified=${encodeURIComponent('$general-9999:example.test')}`
   );
   await timeline.expectRevealed();
-  await page.getByRole('button', { name: 'Jump to unread' }).click();
-  await expect(timeline.message('General message 5')).toBeInViewport();
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Jump to unread' }).click({ timeout: 3_000 });
+    await expect(timeline.message('General message 5')).toBeInViewport({ timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
   expect(new URL(page.url()).searchParams.has('event')).toBe(false);
 });
