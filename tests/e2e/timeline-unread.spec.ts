@@ -189,6 +189,33 @@ test('the reveal resumes live at forward end without moving the reader or losing
   await expect(timeline.message('New live message')).toBeAttached();
 });
 
+test('a notification context stays put at forward end until the reader jumps to latest', async ({
+  page,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('unread_catchup');
+  await page.goto(
+    `/to/${encodeURIComponent(room)}?notified=${encodeURIComponent('$general-12:example.test')}`
+  );
+  await timeline.expectRevealed();
+  await expect(page.locator('.message.highlighted')).toContainText('General message 12');
+  const subscriptions = await core.subscribeCount();
+  await expect
+    .poll(async () => {
+      await timeline.wheelDown(2_000);
+      return timeline.message('General message 79').count();
+    })
+    .toBeGreaterThan(0);
+  await quietFor(page, RECEIPT_COALESCE_MS);
+  expect(await core.subscribeCount()).toBe(subscriptions);
+
+  await page.getByRole('button', { name: 'Jump to latest' }).click();
+  await expect.poll(() => core.subscribeCount()).toBe(subscriptions + 1);
+  await expect(timeline.message('Arrived during handoff')).toBeInViewport();
+});
+
 test('the reveal keeps the row the reader scrolled to during the live handoff', async ({
   app,
   page,

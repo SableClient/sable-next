@@ -686,9 +686,11 @@
     if (nearLatest && !windowState.pinned) void controller.jumpTo(null, 'start');
   }
   let handledFocus: string | null = null;
+  let heldContext = $state<string | null>(null);
   $effect(() => {
     if (
       timeline.mode.kind !== 'unread' ||
+      timeline.mode.eventId === heldContext ||
       timeline.forwardPagination !== 'end' ||
       timeline.loading ||
       timeline.resumingLive ||
@@ -757,7 +759,8 @@
   });
   async function landOnUnloaded(
     engine: TimelineWindow<RowValue>,
-    target: string
+    target: string,
+    root = false
   ): Promise<boolean> {
     if (!onRequestUnread) return false;
     switchingToUnread = true;
@@ -771,9 +774,12 @@
     if (disposed) return true;
     await tick();
     await engine.update(entries);
-    const entry = entryFor(target);
-    if (!entry) return false;
-    markLanded(target);
+    const threadRoot = entryFor(target)?.value.item.thread_root ?? null;
+    const landing = threadRoot ?? target;
+    const entry = entryFor(landing);
+    if (!entry) return threadRoot !== null && !root && landOnUnloaded(engine, threadRoot, true);
+    if (timeline.mode.kind === 'unread') heldContext = timeline.mode.eventId;
+    markLanded(landing);
     await engine.jumpTo(entry.key, 'center');
     return true;
   }

@@ -928,6 +928,75 @@ test('a notification whose event is not loaded opens its context and lands on it
   expect(read).not.toHaveBeenCalled();
 });
 
+test('a notification context stays put at its forward end until the reader jumps to latest', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [readMarker('marker'), item('latest')];
+  const resume = vi.fn(() => {
+    roomTimeline.mode = { kind: 'live' };
+    return Promise.resolve();
+  });
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        landingEventId: '$elsewhere',
+        onRequestUnread: (eventId: string) => {
+          roomTimeline.mode = { kind: 'unread', eventId };
+          roomTimeline.forwardPagination = 'end';
+          roomTimeline.items = [item('before'), item('elsewhere'), item('after')];
+          return Promise.resolve();
+        },
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: () => Promise.resolve(),
+        onRead: () => Promise.resolve(),
+        onResumeLive: resume,
+        onJumpToLive: () => {},
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+  expect(document.querySelector('.message.highlighted')?.textContent).toContain('elsewhere');
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(resume).not.toHaveBeenCalled();
+
+  await userEvent.click(screen.getByRole('button', { name: 'Jump to latest' }));
+  expect(resume).toHaveBeenCalledTimes(1);
+});
+
+test('a notification for an unloaded thread reply lands on its root', async () => {
+  const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
+  const roomTimeline = timeline();
+  roomTimeline.items = [readMarker('marker'), item('latest')];
+  const requestUnread = vi.fn((eventId: string) => {
+    roomTimeline.mode = { kind: 'unread', eventId };
+    roomTimeline.items = [item('root'), { ...item('reply'), thread_root: '$root' }, item('after')];
+    return Promise.resolve();
+  });
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        landingEventId: '$reply',
+        onRequestUnread: requestUnread,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: () => Promise.resolve(),
+        onRead: () => Promise.resolve(),
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  expect(requestUnread).toHaveBeenCalledTimes(1);
+  expect(jumps).toHaveBeenCalledWith(expect.stringContaining('root'), 'center');
+  expect(document.querySelector('.message.highlighted')?.textContent).toContain('root');
+});
+
 test('does not eagerly paginate a scrollable initial timeline', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
