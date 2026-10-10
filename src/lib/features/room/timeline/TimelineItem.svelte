@@ -550,6 +550,21 @@
   {/if}
 {/snippet}
 
+{#snippet cancelUpload()}
+  {#if item.transaction_id}
+    {@const transactionId = item.transaction_id}
+    <button
+      type="button"
+      class="transfer-cancel"
+      onclick={() => {
+        onCancelSend?.(transactionId);
+      }}
+    >
+      {$i18n.t('common.cancel')}
+    </button>
+  {/if}
+{/snippet}
+
 {#snippet messageTime()}
   {@const fullTimestamp = formatFullTimestamp(item.timestamp)}
   <Tooltip label={fullTimestamp}>
@@ -938,10 +953,12 @@
                 {$i18n.t('timeline.uploadingItem', { current: uploadItem, count: galleryCount })}
               </span>
             {/if}
+            {@render cancelUpload()}
           </div>
         {:else if uploading}
           <div class="transfer">
             <progress class="upload" aria-label={$i18n.t('timeline.uploading')}></progress>
+            {@render cancelUpload()}
           </div>
         {:else if saving.percent !== null}
           <div class="transfer">
@@ -1667,6 +1684,31 @@
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+  }
+
+  .transfer-cancel {
+    background: none;
+    border: 0;
+    color: var(--surface-var-on-container);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--font-size-small);
+    padding: 0;
+    position: relative;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  .transfer-cancel::after {
+    content: '';
+    inset: -0.5rem -0.25rem;
+    position: absolute;
+  }
+
+  .transfer-cancel:focus-visible {
+    border-radius: var(--radii-200);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: 0.15rem;
   }
 
   .reply-preview {

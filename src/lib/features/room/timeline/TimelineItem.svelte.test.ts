@@ -15,6 +15,7 @@ import type {
 vi.mock('#lib/core/context.js');
 
 import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
+import { guardTouchClicks } from '#lib/ui/trailing-click.js';
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
 
 const core = Object.assign(baseCore, {
@@ -1456,6 +1457,27 @@ test('shows an indeterminate upload bar until the core reports progress', async 
   const bar = document.querySelector<HTMLProgressElement>('progress.upload');
   expect(bar).not.toBeNull();
   expect(bar?.hasAttribute('value')).toBe(false);
+});
+
+test('cancels an upload that is still sending', async () => {
+  const onCancelSend = vi.fn();
+  const upload: TimelineItemView = {
+    ...imageItem(),
+    event_id: null,
+    transaction_id: 'txn-upload',
+    is_own: true,
+    send_state: { status: 'sending', progress: { index: 0, current: 10, total: 100 } },
+  };
+  render(TimelineItemHarness, {
+    props: { core, item: { item: upload, collapsed: false, onCancelSend } },
+  });
+  await tick();
+  const unguard = guardTouchClicks();
+
+  await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+  unguard();
+  expect(onCancelSend).toHaveBeenCalledWith('txn-upload');
 });
 
 test('fills one bar across a gallery and names the item uploading', async () => {
