@@ -1938,7 +1938,10 @@
 
   .message:not(.layout-bubble.own.align-own)
     .message-main:has(> .receipt-tail)
-    > :global(.reactions):nth-last-child(2) {
+    > :global(.reactions):nth-last-child(2),
+  .message:not(.layout-bubble)
+    .message-main:has(> .receipt-tail)
+    > :nth-last-child(2):has(:global(.media-frame-audio, .poll, .location)) {
     flex-basis: calc(100% - var(--receipt-reserve) - var(--space-200));
     max-width: calc(100% - var(--receipt-reserve) - var(--space-200));
   }
