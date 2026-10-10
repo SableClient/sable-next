@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { expect, test, SIGNED_OUT } from './fixtures/test';
+import { quietFor, NEGATIVE_SETTLE_MS } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT, hasTouch: true, viewport: { width: 412, height: 915 } });
 
@@ -33,7 +34,7 @@ test('mobile: the room menu hands the settings dialog its back entry', async ({
   await app.openRoom('!room:example.test');
 
   const settings = await openSettings(page);
-  await page.waitForTimeout(1_000);
+  await quietFor(page, NEGATIVE_SETTLE_MS);
   await expect(settings).toBeVisible();
 });
 

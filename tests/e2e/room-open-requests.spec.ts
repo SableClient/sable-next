@@ -1,5 +1,6 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import type { HomeserverProxy } from './fixtures/proxy';
+import { quietFor, NEGATIVE_SETTLE_MS } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -73,7 +74,7 @@ test('reopening a room does not fetch its members again', async ({
   await expect(page.locator('.timeline-viewport').getByText('Second room message')).toBeVisible();
   await app.openRoomFromList(first);
   await expect(page.locator('.timeline-viewport').getByText('First room message')).toBeVisible();
-  await page.waitForTimeout(1_000);
+  await quietFor(page, NEGATIVE_SETTLE_MS * 2);
 
   expect(requests(homeserverProxy, firstId, 'members')).toBe(fetched);
 });

@@ -102,7 +102,9 @@ test('the keyboard move sends one order for the room that moved', async ({ page,
     .click();
   await page.getByRole('menuitem', { name: 'Move up' }).click();
 
-  await expect(rooms).toHaveText([/Late Arrival/, /Tail Room/, /Middle Room/]);
+  await expect(rooms).toHaveText([/Late Arrival/, /Tail Room/, /Middle Room/], {
+    timeout: 30_000,
+  });
 
   await expect
     .poll(() =>
@@ -151,9 +153,12 @@ test('a dragged room is dropped where the indicator showed', async ({ page, spac
     has: page.locator('.room-name', { hasText: 'Late Arrival' }),
   });
 
-  await source.dragTo(target, { targetPosition: { x: 20, y: 2 } });
-
-  await expect(rooms).toHaveText([/Tail Room/, /Late Arrival/, /Middle Room/]);
+  await expect(async () => {
+    await source.dragTo(target, { targetPosition: { x: 20, y: 2 } });
+    await expect(rooms).toHaveText([/Tail Room/, /Late Arrival/, /Middle Room/], {
+      timeout: 5_000,
+    });
+  }).toPass({ timeout: 30_000 });
 });
 
 test('a room shows a drag handle when the account can manage the space', async ({

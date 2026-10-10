@@ -109,6 +109,19 @@ export default defineConfig([
     },
   },
   {
+    files: ['tests/e2e/**/*.ts'],
+    ignores: ['tests/e2e/fixtures/settle.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          property: 'waitForTimeout',
+          message: 'Wait on a condition, or name the window in fixtures/settle.ts.',
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.{js,mjs,cjs}'],
     extends: [tseslint.configs.disableTypeChecked],
   },

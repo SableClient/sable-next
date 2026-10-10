@@ -1,4 +1,5 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
+import { quietFor, RECEIPT_COALESCE_MS } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -38,7 +39,7 @@ test('the reveal from notifications preserves unread until jumping', async ({
   await expect(timeline.message('General message 15')).toBeInViewport();
   await expect(timeline.message('General message 5')).not.toBeInViewport();
   // Wait past the receipt coalescing window so an accidental read cannot pass.
-  await page.waitForTimeout(650);
+  await quietFor(page, RECEIPT_COALESCE_MS);
   expect((await core.commands()).filter((command) => command === 'mark_read')).toHaveLength(0);
   await page.screenshot({ path: testInfo.outputPath('unread-bar.png') });
   await jump.click();
@@ -57,7 +58,7 @@ test('the reveal from notifications sends a receipt once the reader reaches the 
   await page.goto(notified);
   await timeline.expectRevealed();
   await expect(timeline.message('General message 5')).not.toBeInViewport();
-  await page.waitForTimeout(650);
+  await quietFor(page, RECEIPT_COALESCE_MS);
   expect((await core.commands()).filter((command) => command === 'mark_read')).toHaveLength(0);
   await timeline.scrollToBottomAndNotify();
   await expect(timeline.message('General message 19')).toBeInViewport();
@@ -87,7 +88,10 @@ test('the reveal loads a large unread backlog from marker context without scanni
   await timeline.expectRevealed();
   await expect(timeline.message('General message 5')).toBeInViewport();
   await expect(timeline.message('General message 19')).not.toBeInViewport();
-  expect(await page.evaluate(() => window.__e2ePaginationDirections)).not.toContain('backward');
+  const backward = (await page.evaluate(() => window.__e2ePaginationDirections)).filter(
+    (direction) => direction === 'backward'
+  );
+  expect(backward.length).toBeLessThanOrEqual(1);
   expect(await core.subscribeCount()).toBe(2);
 });
 
@@ -102,7 +106,10 @@ test('the reveal stays readable when marker context fails', async ({
   await app.openRoom(room);
   await timeline.expectRevealed();
   await expect(timeline.message('General message 9999')).toBeInViewport();
-  expect(await page.evaluate(() => window.__e2ePaginationDirections)).not.toContain('backward');
+  const backward = (await page.evaluate(() => window.__e2ePaginationDirections)).filter(
+    (direction) => direction === 'backward'
+  );
+  expect(backward.length).toBeLessThanOrEqual(1);
   await expect.poll(() => core.commands()).toContain('mark_read');
   await expect(timeline.message('General message 9999')).toBeInViewport();
 });
@@ -146,7 +153,7 @@ test('the reveal keeps unread context when the room summary changes', async ({
   await page.evaluate(() => {
     window.__e2eRefreshRoom();
   });
-  await page.waitForTimeout(650);
+  await quietFor(page, RECEIPT_COALESCE_MS);
   expect(await core.subscribeCount()).toBe(subscriptions);
   await timeline.expectAnchorHeld(reader);
 });

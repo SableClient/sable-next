@@ -1,6 +1,7 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { timelineItem } from './fixtures/timeline-items';
 import type { ImagePackView } from '#src/generated/protocol';
+import { quietFor, NEGATIVE_SETTLE_MS } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -39,7 +40,7 @@ test.describe('touch', () => {
 
     const reactions = page.getByRole('dialog', { name: 'Add reaction' });
     await expect(reactions).toBeVisible();
-    await page.waitForTimeout(1_000);
+    await quietFor(page, NEGATIVE_SETTLE_MS);
     await expect(reactions).toBeVisible();
 
     await page.goBack();

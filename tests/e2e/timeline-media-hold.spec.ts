@@ -1,6 +1,7 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { historyItems, timelineItem } from './fixtures/timeline-items';
 import type { TimelineItemView } from '#src/generated/protocol';
+import { nextFrames } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -66,7 +67,7 @@ test('a voice message keeps its player when a message arrives past the media url
     { op: 'push_back', value: timelineItem('arrival', 'A new message') },
   ]);
   await expect(timeline.itemById('arrival')).toBeAttached();
-  await page.waitForTimeout(500);
+  await nextFrames(page, 30);
 
   expect(await audio.evaluate((node) => (node as HTMLAudioElement & { held?: boolean }).held)).toBe(
     true

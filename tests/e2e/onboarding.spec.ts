@@ -1,5 +1,6 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { FakeCoreDriver } from './pages/FakeCoreDriver';
+import { nextFrames } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -258,7 +259,7 @@ test('touch: a swipe past device confirmation does not move', async ({
   });
 
   expect(moved).toBe(0);
-  await page.waitForTimeout(400);
+  await nextFrames(page, 24);
   await expect(page).toHaveURL(/\/setup\/device$/);
 });
 

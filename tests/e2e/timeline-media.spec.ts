@@ -5,6 +5,7 @@ import type { Page } from '@playwright/test';
 
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { timelineItem } from './fixtures/timeline-items';
+import { quietFor, NEGATIVE_SETTLE_MS } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT, hasTouch: true });
 
@@ -819,7 +820,7 @@ test('a picture that will not decode falls back to the original once, then stops
   expect(fetches.at(-1)).toBe('fetch_media 0x0');
   expect(fetches.filter((fetch) => fetch === 'fetch_media 0x0')).toHaveLength(1);
 
-  await page.waitForTimeout(3_000);
+  await quietFor(page, NEGATIVE_SETTLE_MS * 6);
   expect(await core.mediaFetches()).toEqual(fetches);
   await expect(media.locator('img')).toHaveCount(0);
 

@@ -6,6 +6,7 @@ import { installFakeCore } from './fake-core';
 import { timelineItem } from './fixtures/timeline-items';
 import { FakeCoreDriver } from './pages/FakeCoreDriver';
 import { RoomTimeline } from './pages/RoomTimeline';
+import { quietFor, RECEIPT_COALESCE_MS } from './fixtures/settle';
 
 declare global {
   interface Window {
@@ -68,7 +69,7 @@ test('background messages stay unread until focus returns', async ({ page }) => 
     .toEqual({ type: 'set_presence', presence: 'unavailable', status_message: null });
 
   // Wait for receipts queued before blur.
-  await page.waitForTimeout(650);
+  await quietFor(page, RECEIPT_COALESCE_MS);
   const receipts = await page.evaluate(
     () => window.__e2eCommands.filter((type) => type === 'mark_read').length
   );
@@ -76,7 +77,7 @@ test('background messages stay unread until focus returns', async ({ page }) => 
     { op: 'push_back', value: timelineItem('background-message', 'Arrived in the background') },
   ]);
   await expect(timeline.message('Arrived in the background')).toBeInViewport();
-  await page.waitForTimeout(650);
+  await quietFor(page, RECEIPT_COALESCE_MS);
   expect(await page.evaluate(() => document.visibilityState)).toBe('visible');
   expect(
     await page.evaluate(() => window.__e2eCommands.filter((type) => type === 'mark_read').length)
@@ -118,7 +119,7 @@ for (const background of ['blur', 'hidden'] as const) {
         document.dispatchEvent(new Event('visibilitychange'));
       }
     }, background);
-    await page.waitForTimeout(650);
+    await quietFor(page, RECEIPT_COALESCE_MS);
     const receipts = await page.evaluate(
       () => window.__e2eCommands.filter((type) => type === 'mark_read').length
     );
@@ -148,7 +149,7 @@ for (const background of ['blur', 'hidden'] as const) {
         document.dispatchEvent(new Event('visibilitychange'));
       }
     }, background);
-    await page.waitForTimeout(650);
+    await quietFor(page, RECEIPT_COALESCE_MS);
     await expect(jump).toBeVisible();
     expect(
       await page.evaluate(() => window.__e2eCommands.filter((type) => type === 'mark_read').length)

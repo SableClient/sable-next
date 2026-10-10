@@ -3,6 +3,7 @@ import en from '../../src/locales/en.json' with { type: 'json' };
 
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { timelineItem } from './fixtures/timeline-items';
+import { nextFrames } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -112,7 +113,7 @@ test.describe('mobile reactions', () => {
       clientX: 195,
       clientY: 200,
     });
-    await page.waitForTimeout(50);
+    await nextFrames(page, 3);
     await backdrop.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true });
     await backdrop.dispatchEvent('click', { clientX: 195, clientY: 200 });
     await expect(details).toHaveCount(0);

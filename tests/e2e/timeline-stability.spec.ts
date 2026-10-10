@@ -7,6 +7,7 @@ import {
 } from './fixtures/timeline-probe';
 import type { FakeCoreDriver } from './pages/FakeCoreDriver';
 import type { RoomTimeline } from './pages/RoomTimeline';
+import { nextFrames } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -1069,7 +1070,7 @@ test.describe('touch', () => {
         preventFling: false,
         gestureSourceType: 'touch',
       });
-      await page.waitForTimeout(500);
+      await nextFrames(page, 30);
       expect(await viewport.evaluate((node) => node.scrollTop)).toBeLessThan(888);
     }
   });
@@ -1124,9 +1125,9 @@ test.describe('touch', () => {
                 type: 'touchMove',
                 touchPoints: [{ x, y: startY + step * STEP }],
               });
-              await page.waitForTimeout(16);
+              await nextFrames(page, 1);
             }
-            await page.waitForTimeout(120);
+            await nextFrames(page, 8);
             await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
           }
 
@@ -1180,7 +1181,7 @@ test.describe('mobile', () => {
     await core.emitTimelineDiff(await core.subscription(), [
       { op: 'push_front', value: timelineItem('ios-older', 'Older iOS history') },
     ]);
-    await page.waitForTimeout(250);
+    await nextFrames(page, 15);
     expect(await page.evaluate(() => window.__e2eSelfWriteCount)).toBe(0);
     await timeline.expectAnchorHeld(anchor, { tolerance: 2 });
     const subscription = await core.subscription();

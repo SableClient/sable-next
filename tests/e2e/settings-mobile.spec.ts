@@ -1,13 +1,14 @@
 import type { Page } from '@playwright/test';
 
 import { expect, test, SIGNED_OUT } from './fixtures/test';
+import { quietFor, LONG_PRESS_HOLD_MS } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT, hasTouch: true, viewport: { width: 412, height: 915 } });
 
 async function holdAt(page: Page, x: number, y: number): Promise<void> {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-  await page.waitForTimeout(800);
+  await quietFor(page, LONG_PRESS_HOLD_MS);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
 
@@ -26,7 +27,7 @@ async function swipeRight(
     });
   await touch('touchStart', fromX);
   for (let x = fromX + 12; x <= toX; x += 12) {
-    if (stepMs > 0) await page.waitForTimeout(stepMs);
+    if (stepMs > 0) await quietFor(page, stepMs);
     await touch('touchMove', x);
   }
   await touch('touchEnd', toX);

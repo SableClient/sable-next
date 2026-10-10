@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { nextFrames } from '../fixtures/settle';
 
 export class RoomTimeline {
   readonly container: Locator;
@@ -283,7 +284,7 @@ export class RoomTimeline {
           `timeline rendered no fully visible anchor with stable bounds (skip ${String(skip)})`
         );
       }
-      await this.page.waitForTimeout(50);
+      await nextFrames(this.page, 3);
     }
   }
 

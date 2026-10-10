@@ -1,6 +1,7 @@
 import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { TIMELINE_ROOM_NAME } from './fixtures/continuwuity';
+import { nextFrames } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -24,7 +25,7 @@ test('the background crawl makes history searchable without opening the room', a
       async () => {
         await field.fill('');
         await field.fill(`"${DEEP_MESSAGE}"`);
-        await page.waitForTimeout(500);
+        await nextFrames(page, 30);
         return hit.count();
       },
       { timeout: 150_000, intervals: [2_000] }

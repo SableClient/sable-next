@@ -1,4 +1,5 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
+import { nextFrames } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -21,7 +22,7 @@ test('the row options button toggles the shared menu and returns focus', async (
 
   await trigger.click();
   await expect(page.getByRole('menu')).toHaveCount(0);
-  await page.waitForTimeout(300);
+  await nextFrames(page, 20);
   await expect(page.getByRole('menu')).toHaveCount(0);
 
   await trigger.focus();
