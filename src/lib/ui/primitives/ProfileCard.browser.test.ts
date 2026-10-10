@@ -155,3 +155,20 @@ test('an expanded status stays inside the card and above its controls', async ()
   await userEvent.keyboard('{End}');
   await expect.poll(() => status.element().scrollTop).toBeGreaterThan(0);
 });
+
+test('a long status can be scrolled to its end', async () => {
+  await statusCard();
+  const status = document.querySelector<HTMLElement>('.profile-card-status-text');
+  if (!status) throw new Error('the status text is not rendered');
+  expect(status.scrollHeight).toBeGreaterThan(status.clientHeight);
+
+  await userEvent.hover(status);
+  await userEvent.wheel(status, { delta: { x: 0, y: 1000 } });
+  await expect.poll(() => status.scrollTop).toBeGreaterThan(0);
+
+  status.focus();
+  await userEvent.keyboard('{Control>}{End}{/Control}');
+  await expect
+    .poll(() => status.scrollHeight - status.clientHeight - status.scrollTop)
+    .toBeLessThanOrEqual(1);
+});
