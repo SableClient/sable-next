@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import { onDestroy } from 'svelte';
 
   import DeleteMessageDialog from '#lib/features/room/messages/DeleteMessageDialog.svelte';
@@ -60,8 +61,7 @@
     onReact: onReact ? (key: string) => onReact(thread.eventId, key) : undefined,
     onOpenThread: () => onOpen(thread.eventId),
     onEdit: thread.editable && onEdit ? () => onEdit(thread) : undefined,
-    onCopyText:
-      thread.preview === '' ? undefined : () => void navigator.clipboard.writeText(thread.preview),
+    onCopyText: thread.preview === '' ? undefined : () => void copyText(thread.preview),
     onCopyLink: () => onCopyLink(thread.eventId),
     onPin: onPin ? () => onPin(thread.eventId) : undefined,
     pinned,

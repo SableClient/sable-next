@@ -1,8 +1,10 @@
 <script lang="ts">
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
+  import { on } from 'svelte/events';
 
   import { i18n } from '#lib/i18n.js';
+  import { copyText } from '#lib/platform/clipboard.js';
   import { longPress } from '#lib/ui/long-press.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { settingsAnchors } from './settings-anchors.js';
@@ -20,7 +22,7 @@
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   async function copy(build: (anchor: string) => string): Promise<void> {
-    await navigator.clipboard.writeText(build(anchor));
+    await copyText(build(anchor));
     copied = true;
     clearTimeout(timer);
     timer = setTimeout(() => {
@@ -35,10 +37,25 @@
       return longPress({
         enabled: (event) => !(event.target instanceof Element && event.target.closest(CONTROLS)),
         onPress: () => {
-          copy(build).then(
-            () => toasts.info($i18n.t('settings.linkCopied')),
-            () => toasts.error($i18n.t('errors.copyFailed'))
-          );
+          const done = () => toasts.info($i18n.t('settings.linkCopied'));
+          const offer = () =>
+            toasts.undoable($i18n.t('errors.copyFailed'), {
+              label: $i18n.t('settings.copyLink'),
+              onUndo: () => {
+                copy(build).then(done, () => toasts.error($i18n.t('errors.copyFailed')));
+              },
+            });
+          copy(build).then(done, () => {
+            const off = on(
+              window,
+              'touchend',
+              () => {
+                off();
+                void copy(build).then(done, offer);
+              },
+              { capture: true }
+            );
+          });
         },
       })(host);
     };

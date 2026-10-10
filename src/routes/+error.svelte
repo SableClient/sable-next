@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import * as Sentry from '@sentry/sveltekit';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -30,7 +31,7 @@
     const stack = error.stack ?? '';
     const text = stack.includes(error.message) ? stack : [error.message, stack].join('\n\n');
     try {
-      await navigator.clipboard.writeText(text.trim());
+      await copyText(text.trim());
       copied = true;
     } catch (failure) {
       console.debug('[sable] clipboard unavailable', failure);

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
 
@@ -49,7 +50,7 @@
 
   let versionCopied = $state(false);
   async function copyVersion(): Promise<void> {
-    await navigator.clipboard.writeText(version);
+    await copyText(version);
     versionCopied = true;
     setTimeout(() => {
       versionCopied = false;

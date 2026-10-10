@@ -9,6 +9,7 @@
     "deep-link:default",
     "os:allow-platform",
     "os:allow-os-type",
+    "clipboard-manager:allow-write-text",
     "notifications:default",
     "sentry:default"
   ]

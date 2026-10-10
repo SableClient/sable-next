@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import { onDestroy, type Snippet } from 'svelte';
   import { on } from 'svelte/events';
 
@@ -403,7 +404,7 @@
     if (!text) return base;
     return {
       ...base,
-      onCopyText: () => void navigator.clipboard.writeText(text),
+      onCopyText: () => void copyText(text),
       copyTextLabel: 'timeline.copySelection',
     };
   }
@@ -493,7 +494,7 @@
     const selected = selectedText();
     openMessageMenu.open(item.id, { x: event.clientX, y: event.clientY }, () => ({
       ...withSelectedText(actions, selected),
-      onCopyHref: link ? () => void navigator.clipboard.writeText(link) : undefined,
+      onCopyHref: link ? () => void copyText(link) : undefined,
     }));
   }
 

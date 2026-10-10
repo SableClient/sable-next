@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -14,7 +15,7 @@
     try {
       const token = await core.commands.accessToken();
       if (!token) throw new Error('No access token');
-      await navigator.clipboard.writeText(token);
+      await copyText(token);
       copied = true;
       error = false;
       setTimeout(() => {

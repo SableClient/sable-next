@@ -1,3 +1,4 @@
+import { copyText } from '#lib/platform/clipboard.js';
 import { t } from '#lib/i18n.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { CoreError } from '#src/transport';
@@ -14,7 +15,7 @@ export class MemberProfileActions {
 
   async copy(text: string): Promise<void> {
     try {
-      await navigator.clipboard.writeText(text);
+      await copyText(text);
     } catch (error) {
       console.debug('[sable profile] clipboard unavailable', error);
     }

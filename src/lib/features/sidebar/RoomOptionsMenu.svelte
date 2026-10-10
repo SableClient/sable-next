@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import { goto } from '$app/navigation';
   import type { RoomSummary, RoomTag } from '#src/generated/protocol';
   import ArrowLineUpIcon from 'phosphor-svelte/lib/ArrowLineUpIcon';
@@ -239,7 +240,7 @@
 
   async function copyId(): Promise<void> {
     try {
-      await navigator.clipboard.writeText(room.room_id);
+      await copyText(room.room_id);
     } catch (error) {
       console.debug('[sable room] copy id failed', error);
       toasts.error($i18n.t('errors.copyFailed'));

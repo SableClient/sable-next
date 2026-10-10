@@ -1,3 +1,4 @@
+import { copyText } from '#lib/platform/clipboard.js';
 import { resolve } from '$app/paths';
 
 import type { RoomSummary } from '#src/generated/protocol';
@@ -111,9 +112,7 @@ export async function copyRoomLink(
 ): Promise<boolean> {
   try {
     const via = room.canonical_alias ? [] : await core.commands.roomViaServers(room.room_id);
-    await navigator.clipboard.writeText(
-      matrixToUrl(room.canonical_alias ?? room.room_id, via, eventId)
-    );
+    await copyText(matrixToUrl(room.canonical_alias ?? room.room_id, via, eventId));
     return true;
   } catch (error) {
     console.debug('[sable room] copy link failed', error);

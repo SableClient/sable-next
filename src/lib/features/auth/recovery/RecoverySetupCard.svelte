@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
   import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
 
@@ -44,7 +45,7 @@
   async function copy(): Promise<void> {
     error = null;
     try {
-      await navigator.clipboard.writeText(recoveryKey);
+      await copyText(recoveryKey);
       kept = 'copied';
     } catch {
       error = t('setup.recoveryCopyFailed');

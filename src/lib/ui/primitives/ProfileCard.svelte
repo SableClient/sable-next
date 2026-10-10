@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
   import type { PresenceView } from '#src/generated/protocol';
@@ -120,7 +121,7 @@
   const nameId = $props.id();
   let copied = $state(false);
   async function copyUserId(): Promise<void> {
-    await navigator.clipboard.writeText(userId);
+    await copyText(userId);
     copied = true;
     setTimeout(() => {
       copied = false;

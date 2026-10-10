@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
 
@@ -97,7 +98,7 @@
   async function copy(): Promise<void> {
     if (text === null) return;
     try {
-      await navigator.clipboard.writeText(text);
+      await copyText(text);
       copied = true;
     } catch (error) {
       console.debug('[sable media] clipboard unavailable', error);

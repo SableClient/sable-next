@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import { formatTime } from '#lib/ui/date-time.js';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -45,7 +46,7 @@
   }
 
   async function copy(entries = filtered): Promise<void> {
-    await navigator.clipboard.writeText(exportDebugLogs(entries));
+    await copyText(exportDebugLogs(entries));
   }
 </script>
 

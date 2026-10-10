@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import type {
     RoomPermissionsView,
     RoomPowerLevelsView,
@@ -51,7 +52,7 @@
   async function copy(): Promise<void> {
     failed = false;
     try {
-      await navigator.clipboard.writeText(data);
+      await copyText(data);
       copied = true;
     } catch {
       failed = true;

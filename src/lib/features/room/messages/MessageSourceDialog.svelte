@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
@@ -16,7 +17,7 @@
 
   async function copy(): Promise<void> {
     try {
-      await navigator.clipboard.writeText(source);
+      await copyText(source);
       copied = true;
     } catch (error) {
       console.debug('[sable timeline] clipboard unavailable', error);

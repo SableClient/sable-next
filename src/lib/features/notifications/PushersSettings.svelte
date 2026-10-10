@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
@@ -109,7 +110,7 @@
   }
 
   async function copyValue(id: string, value: string): Promise<void> {
-    await navigator.clipboard.writeText(value);
+    await copyText(value);
     copied = id;
     setTimeout(() => {
       if (copied === id) copied = null;

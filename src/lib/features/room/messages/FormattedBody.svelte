@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import { mount, unmount, untrack, type Component } from 'svelte';
   import { on } from 'svelte/events';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
@@ -512,8 +513,7 @@
 
     if (button.dataset.codeCopy === undefined) return false;
     const label = button;
-    void navigator.clipboard
-      .writeText(block.textContent)
+    void copyText(block.textContent)
       .then(() => {
         label.textContent = $i18n.t('common.copied');
         setTimeout(() => {

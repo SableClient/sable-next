@@ -42,6 +42,9 @@ tauri-plugin-deep-link = "2"
 tauri-plugin-fs = "2.5.1"
 tauri-plugin-dialog = "2.7.2"
 tauri-plugin-os = "2.3.2"
+# WKWebView rejects `navigator.clipboard.writeText` outside a touch or click
+# handler, which a long press never is.
+tauri-plugin-clipboard-manager = "2.4.1"
 # Push stays off here: the feature pulls in Firebase and APNs, which belong to
 # the mobile builds, not the desktop one.
 # The published crate hands back a bare token; the fork takes a VAPID key and

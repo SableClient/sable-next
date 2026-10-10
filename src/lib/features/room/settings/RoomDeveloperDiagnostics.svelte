@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '#lib/platform/clipboard.js';
   import type { RoomSummary } from '#src/generated/protocol';
   import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
 
@@ -59,7 +60,7 @@
 
   async function copy(text: string): Promise<void> {
     try {
-      await navigator.clipboard.writeText(text);
+      await copyText(text);
       toasts.info($i18n.t('common.copied'));
     } catch (error) {
       console.warn('[sable room] copy failed', error);

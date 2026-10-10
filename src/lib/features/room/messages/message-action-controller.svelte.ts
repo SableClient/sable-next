@@ -1,3 +1,4 @@
+import { copyText as writeClipboard } from '#lib/platform/clipboard.js';
 import type { TimelineItemView, ImageSourcePackView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
@@ -198,7 +199,7 @@ export class MessageActionExecutor {
     }
 
     async function copyText(): Promise<void> {
-      if (item.content.kind === 'message') await navigator.clipboard.writeText(item.content.body);
+      if (item.content.kind === 'message') await writeClipboard(item.content.body);
     }
     return {
       loadImagePacks: (targetRoomId: string) => core.commands.imagePacks(targetRoomId),
