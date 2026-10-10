@@ -85,7 +85,21 @@ async function mountItem(
       document.querySelector(`[data-item-id="${view.id}"] .read-receipt-stack`)
     ).not.toBeNull();
   });
+  await settled(view.id);
   return screen;
+}
+
+async function settled(itemId: string): Promise<void> {
+  const height = () =>
+    document.querySelector(`[data-item-id="${itemId}"] .message`)?.getBoundingClientRect().height;
+  let previous = Number.NaN;
+  let steady = 0;
+  while (steady < 5) {
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const current = height();
+    steady = current === previous ? steady + 1 : 0;
+    previous = current ?? Number.NaN;
+  }
 }
 
 interface RowBox {
