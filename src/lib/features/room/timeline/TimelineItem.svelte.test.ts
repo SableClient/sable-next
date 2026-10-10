@@ -1825,3 +1825,52 @@ test.each([
     expect(core.fetchMedia).not.toHaveBeenCalledWith('mxc://example.org/other-identity', 96, 96);
   }
 );
+
+async function swipeLeft(message: Element): Promise<void> {
+  const touch = (type: string, x: number) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'touches', {
+      value: type === 'touchend' ? [] : [{ clientX: x, clientY: 0 }],
+    });
+    message.dispatchEvent(event);
+  };
+  touch('touchstart', 0);
+  touch('touchmove', -400);
+  touch('touchend', 0);
+  await tick();
+}
+
+test('a swipe on a message that is not the reply target replies to it', async () => {
+  const onReply = vi.fn();
+  const onCancelReply = vi.fn();
+  render(TimelineItemHarness, {
+    props: { core, item: { item: item(false), collapsed: false, onReply, onCancelReply } },
+  });
+  await tick();
+  const message = document.querySelector('.message');
+  if (!message) throw new Error('message was not rendered');
+
+  await swipeLeft(message);
+
+  expect(onReply).toHaveBeenCalledOnce();
+  expect(onCancelReply).not.toHaveBeenCalled();
+});
+
+test('a swipe on the message being replied to cancels the reply', async () => {
+  const onReply = vi.fn();
+  const onCancelReply = vi.fn();
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: { item: item(false), collapsed: false, selected: true, onReply, onCancelReply },
+    },
+  });
+  await tick();
+  const message = document.querySelector('.message');
+  if (!message) throw new Error('message was not rendered');
+
+  await swipeLeft(message);
+
+  expect(onCancelReply).toHaveBeenCalledOnce();
+  expect(onReply).not.toHaveBeenCalled();
+});

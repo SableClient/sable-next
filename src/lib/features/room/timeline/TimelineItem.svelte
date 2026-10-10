@@ -132,6 +132,7 @@
     currentUserId = null,
     onToggleReaction,
     onReply,
+    onCancelReply,
     onOpenThread,
     onEdit,
     onDelete,
@@ -312,7 +313,7 @@
   const swipe = new MessageSwipe({
     enabled: () => actionable && actions.onReply !== undefined,
     canEdit: () => actionable && actions.onEdit !== undefined,
-    onReply: () => actions.onReply?.(),
+    onReply: () => (selected ? onCancelReply?.() : actions.onReply?.()),
     onEdit: () => actions.onEdit?.(),
   });
   let senderRole = $derived(item.sender ? (senderRoles?.(item.sender) ?? null) : null);

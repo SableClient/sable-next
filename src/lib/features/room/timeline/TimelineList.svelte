@@ -152,6 +152,7 @@
     currentUserId,
     onToggleReaction,
     onReply,
+    onCancelReply,
     onOpenThread,
     onEdit,
     onDelete,
@@ -990,6 +991,7 @@
     {currentUserId}
     {onToggleReaction}
     {onReply}
+    {onCancelReply}
     {onOpenThread}
     {onEdit}
     {onDelete}

@@ -260,6 +260,7 @@
     onRequestFuture={requestFuture}
     onRead={markRead}
     onReply={readOnly ? undefined : conversation.reply}
+    onCancelReply={conversation.clearContext}
     onEdit={readOnly ? undefined : conversation.edit}
     onDelete={conversation.redact}
     onToggleReaction={canReact ? conversation.toggleReaction : undefined}
