@@ -48,7 +48,8 @@ export default defineConfig({
     {
       name: 'deepfilternet-assets',
       buildStart: async () => {
-        if (!process.env.VITEST) await fetchDeepFilterNet();
+        if (!process.env.VITEST && !process.env.SABLE_SKIP_DEEPFILTERNET)
+          await fetchDeepFilterNet();
       },
     },
     sentrySvelteKit({

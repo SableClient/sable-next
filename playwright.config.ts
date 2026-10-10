@@ -8,7 +8,7 @@ const SCRIPTED_TIMELINE_SPECS =
 
 const build = process.env.SABLE_E2E_PREBUILT
   ? ''
-  : 'SABLE_WASM_OUTPUT=src/generated/wasm-e2e pnpm run build && ';
+  : 'SABLE_SKIP_DEEPFILTERNET=1 SABLE_WASM_OUTPUT=src/generated/wasm-e2e pnpm run build && ';
 
 export default defineConfig({
   testDir: 'tests/e2e',
