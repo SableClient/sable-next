@@ -104,7 +104,7 @@
     }
 
     try {
-      audioContext = new AudioContext();
+      audioContext = new AudioContext({ latencyHint: 'playback', sampleRate: 48_000 });
       const source = audioContext.createMediaStreamSource(stream);
       analyser = audioContext.createAnalyser();
       analyser.fftSize = 1024;
