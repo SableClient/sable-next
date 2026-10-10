@@ -263,3 +263,36 @@ test('own trailing reactions clear a wide receipt stack', async () => {
     expect(badge.x - (reactions.x + reactions.width)).toBeGreaterThanOrEqual(0);
   });
 });
+
+test('a receipt never takes a line of its own or covers text when the last line is full', async () => {
+  await page.viewport(1280, 720);
+  for (const unit of ['word ', 'adsf']) {
+    for (let length = 60; length <= 140; length += 1) {
+      const body = unit.repeat(40).slice(0, length).trim();
+      const screen = await mountItem(item('general-18', body, { read_by: ['@bob:example.test'] }));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const row = document.querySelector('[data-item-id="general-18"] .message');
+      const text = row?.querySelector('.formatted-body');
+      const badge = row?.querySelector('.read-receipt-stack');
+      if (!text || !badge) throw new Error('missing body or badge');
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const lines = [...range.getClientRects()].filter((rect) => rect.width > 0);
+      const badgeBox = badge.getBoundingClientRect();
+      const last = lines.at(-1);
+      const label = `${unit.trim()} x ${String(length)}`;
+      expect(last ? badgeBox.top - last.bottom : Number.POSITIVE_INFINITY, label).toBeLessThan(0);
+      expect(
+        lines.some(
+          (rect) =>
+            rect.right > badgeBox.left + 0.5 &&
+            rect.left < badgeBox.right - 0.5 &&
+            rect.bottom > badgeBox.top + 0.5 &&
+            rect.top < badgeBox.bottom - 0.5
+        ),
+        label
+      ).toBe(false);
+      await screen.unmount();
+    }
+  }
+}, 120_000);

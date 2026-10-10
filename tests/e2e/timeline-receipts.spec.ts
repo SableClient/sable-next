@@ -126,57 +126,6 @@ test('own bubble receipts reach the same edge as everyone else’s on mobile', a
   expect(edges.own).toBe(edges.other);
 });
 
-test('a receipt never takes a line of its own or covers text when the last line is full', async ({
-  page,
-  app,
-  timeline,
-  core,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
-  await app.openRooms();
-  await app.openRoomFromList('General');
-  await timeline.expectRevealed();
-  const subscription = await core.subscription();
-  const row = page.locator('[data-item-id="general-18"] .message');
-
-  for (const unit of ['word ', 'adsf']) {
-    for (let length = 60; length <= 140; length += 1) {
-      const body = unit.repeat(40).slice(0, length).trim();
-      await core.setTimelineItemById(subscription, 'general-18', {
-        ...timelineItem('general-18', body),
-        read_by: ['@bob:example.test'],
-      });
-      await expect(row.locator('.formatted-body')).toHaveText(body);
-      await expect(row.locator('.receipt-slot')).toHaveCount(1);
-      await heightSettled(row);
-      const box = await row.evaluate((node) => {
-        const text = node.querySelector('.formatted-body');
-        const badge = node.querySelector('.read-receipt-stack');
-        if (!text || !badge) throw new Error('missing body or badge');
-        const range = document.createRange();
-        range.selectNodeContents(text);
-        const lines = [...range.getClientRects()].filter((rect) => rect.width > 0);
-        const badgeBox = badge.getBoundingClientRect();
-        const last = lines.at(-1);
-        return {
-          below: last ? badgeBox.top - last.bottom : Number.POSITIVE_INFINITY,
-          overlap: lines.some(
-            (rect) =>
-              rect.right > badgeBox.left + 0.5 &&
-              rect.left < badgeBox.right - 0.5 &&
-              rect.bottom > badgeBox.top + 0.5 &&
-              rect.top < badgeBox.bottom - 0.5
-          ),
-        };
-      });
-      const label = `${unit.trim()} × ${String(length)}`;
-      expect(box.below, label).toBeLessThan(0);
-      expect(box.overlap, label).toBe(false);
-    }
-  }
-});
-
 test('receipts beside text, reactions, an embed or an image add no row of their own', async ({
   page,
   app,
