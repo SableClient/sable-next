@@ -567,6 +567,21 @@ test('/rainbow colours every visible character and escapes the text', async () =
   expect(outcome.formatted?.match(/data-mx-color/g)).toHaveLength(3);
 });
 
+test('/rainbow keeps a custom emote from the formatted body', async () => {
+  const emote = '<img data-mx-emoticon src="mxc://x/y" alt=":cat:">';
+  const outcome = await runSlash('/rainbow hi :cat:', {
+    ...context(fakeCommands()),
+    formatted: `/rainbow hi ${emote}`,
+  });
+
+  expect(outcome.kind).toBe('message');
+  if (outcome.kind !== 'message') return;
+  expect(outcome.formatted).toContain('data-mx-emoticon');
+  expect(outcome.formatted).toContain('src="mxc://x/y"');
+  expect(outcome.formatted).not.toContain(':cat:</span>');
+  expect(outcome.formatted?.match(/data-mx-color/g)).toHaveLength(2);
+});
+
 test('/rainbowme is an emote', async () => {
   const outcome = await runSlash('/rainbowme waves', context(fakeCommands()));
 

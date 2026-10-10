@@ -7,7 +7,7 @@ import { currentFix } from '#lib/platform/geolocation.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { coordinate, geoUriFor } from './composer-location.js';
-import { escapeHtml, rainbowHtml } from './rainbow.js';
+import { escapeHtml, rainbowFormatted, rainbowHtml } from './rainbow.js';
 
 export type SlashCommandApi = Pick<
   CoreCommands,
@@ -731,16 +731,22 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   },
   {
     name: 'rainbow',
-    run: (args) => {
+    run: (args, { formatted }) => {
       const text = args.trim();
-      return text === '' ? usageError('rainbow') : message(text, 'text', rainbowHtml(text));
+      if (text === '') return usageError('rainbow');
+
+      const html = withoutPrefix('rainbow', formatted);
+      return message(text, 'text', html === null ? rainbowHtml(text) : rainbowFormatted(html));
     },
   },
   {
     name: 'rainbowme',
-    run: (args) => {
+    run: (args, { formatted }) => {
       const text = args.trim();
-      return text === '' ? usageError('rainbowme') : message(text, 'emote', rainbowHtml(text));
+      if (text === '') return usageError('rainbowme');
+
+      const html = withoutPrefix('rainbowme', formatted);
+      return message(text, 'emote', html === null ? rainbowHtml(text) : rainbowFormatted(html));
     },
   },
   {
