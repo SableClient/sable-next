@@ -347,7 +347,7 @@ test('clicking the field padding focuses the input', async () => {
   field.element().blur();
   const padding = document.querySelector<HTMLElement>('.token-field');
   if (!padding) throw new Error('the token field is not rendered');
-  await page.elementLocator(padding).click({ position: { x: 2, y: 2 }, force: true });
+  await page.elementLocator(padding).click({ position: { x: 2, y: 2 } });
 
   await expect.element(field).toHaveFocus();
 });

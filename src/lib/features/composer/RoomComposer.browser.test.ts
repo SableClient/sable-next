@@ -15,6 +15,7 @@ function literal(text: string): string {
 }
 
 afterEach(async () => {
+  document.body.removeAttribute('style');
   await page.viewport(414, 800);
   setPreference('composerForm', 'tall');
   setPreference('formattingToolbar', false);
@@ -40,7 +41,11 @@ function client(): CoreClient {
 
 let rooms = 0;
 
-async function mount(richText: boolean, preferences: Partial<Record<string, unknown>> = {}) {
+async function mount(
+  richText: boolean,
+  preferences: Partial<Record<string, unknown>> = {},
+  extra: Record<string, unknown> = {}
+) {
   rooms += 1;
   setPreference('richTextComposer', richText);
   for (const [key, value] of Object.entries(preferences)) {
@@ -58,6 +63,7 @@ async function mount(richText: boolean, preferences: Partial<Record<string, unkn
       },
       onSendAttachment: () => Promise.resolve(),
       onTyping: () => Promise.resolve(),
+      ...extra,
     },
   });
   const composer = screen.getByRole('combobox', { name: en.timeline.messagePlaceholder });
@@ -374,3 +380,117 @@ for (const [richText, form] of [
     }
   });
 }
+
+async function colourSelection(
+  screen: Awaited<ReturnType<typeof mount>>['screen'],
+  composer: Awaited<ReturnType<typeof mount>>['composer'],
+  editor: () => HTMLElement
+) {
+  await userEvent.click(screen.getByRole('button', { name: 'Formatting', exact: true }));
+  await userEvent.click(composer);
+  await userEvent.keyboard('red words');
+  await userEvent.keyboard('{Control>}a{/Control}');
+  await userEvent.click(screen.getByRole('button', { name: 'Text colour' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Red', exact: true }));
+  await expect.poll(() => editor().textContent).toBe('$[fg.color=e5484d red words]');
+}
+
+test('the text colour picker colours the selection', async () => {
+  const { screen, composer, editor } = await mount(false);
+  await colourSelection(screen, composer, editor);
+
+  await userEvent.click(screen.getByRole('button', { name: 'Highlight colour' }));
+  await userEvent.fill(screen.getByRole('textbox', { name: 'Hex colour' }).element(), '#12a594');
+  await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
+  await expect
+    .poll(() => editor().textContent)
+    .toBe('$[fg.color=e5484d $[bg.color=12a594 red words]]');
+});
+
+test('the text colour picker opens as a sheet on a phone', async () => {
+  await page.viewport(375, 812);
+  const { screen, composer, editor } = await mount(false);
+  await colourSelection(screen, composer, editor);
+});
+
+test('quick reaction autocomplete selects with Enter or Tab', async () => {
+  const onQuickReact = vi.fn(() => Promise.resolve());
+  const { screen, composer, sent, editor } = await mount(
+    true,
+    {},
+    { onQuickReact, canReact: true }
+  );
+
+  for (const key of ['{Enter}', '{Tab}']) {
+    await userEvent.click(composer);
+    await userEvent.keyboard('+:joy');
+    await expect.element(screen.getByRole('option', { name: ':joy:', exact: true })).toBeVisible();
+    await userEvent.keyboard(key);
+    await expect.poll(() => editor().textContent).toBe('');
+    expect(screen.getByRole('listbox').elements()).toHaveLength(0);
+  }
+  await expect.poll(() => onQuickReact.mock.calls.length).toBe(2);
+  expect(sent).toHaveLength(0);
+});
+
+test('quick reaction autocomplete selects by pointer', async () => {
+  Object.assign(document.body.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
+    minHeight: '100vh',
+  });
+  const onQuickReact = vi.fn(() => Promise.resolve());
+  const { screen, composer, sent, editor } = await mount(
+    true,
+    {},
+    { onQuickReact, canReact: true }
+  );
+  await userEvent.click(composer);
+  await userEvent.keyboard('+:joy');
+  await userEvent.click(screen.getByRole('option', { name: ':joy:', exact: true }));
+
+  await expect.poll(() => editor().textContent).toBe('');
+  await expect.poll(() => onQuickReact.mock.calls.length).toBe(1);
+  expect(sent).toHaveLength(0);
+});
+
+test('the arrow keys move a visible highlight through emote suggestions', async () => {
+  const { screen, composer, editor } = await mount(true);
+  await userEvent.click(composer);
+  await userEvent.keyboard(':sm');
+  const options = screen.getByRole('option');
+  await expect.poll(() => options.elements().length).toBeGreaterThan(1);
+
+  await userEvent.keyboard('{ArrowDown}');
+  const second = options.nth(1);
+  await expect.element(second).toHaveAttribute('aria-selected', 'true');
+  const node = second.element();
+  const row = getComputedStyle(node).backgroundColor;
+  const panel = getComputedStyle(node.closest('.autocomplete') ?? node).backgroundColor;
+  expect(row).not.toBe(panel);
+
+  const picked = node.querySelector('.unicode-emoji')?.textContent ?? '';
+  await userEvent.keyboard('{Enter}');
+  await expect.poll(() => editor().textContent).toContain(picked);
+});
+
+test('code pasted from an editor keeps its lines and indentation in plain mode', async () => {
+  const { composer, editor } = await mount(false);
+  await userEvent.click(composer);
+  await userEvent.keyboard('```');
+  await userEvent.keyboard(NEWLINE);
+  const data = new DataTransfer();
+  data.setData('text/plain', 'fn main() {\n    let x = 1;\n}');
+  data.setData(
+    'text/html',
+    '<div><div><span>fn main() {</span></div><div><span>    let x = 1;</span></div><div><span>}</span></div></div>'
+  );
+  composer
+    .element()
+    .dispatchEvent(
+      new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true })
+    );
+
+  await expect.poll(() => editor().innerText).toBe('```\nfn main() {\n    let x = 1;\n}');
+});

@@ -15,7 +15,7 @@ export default mergeConfig(
       browser: {
         enabled: true,
         headless: true,
-        provider: playwright(),
+        provider: playwright({ contextOptions: { reducedMotion: 'reduce' } }),
         instances: [{ browser: 'chromium' }],
         commands: {
           emulateColorScheme: async (context, scheme: 'light' | 'dark') => {
