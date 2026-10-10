@@ -1,9 +1,11 @@
 import { readdir, access } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { SentryCli } from '@sentry/cli';
+
+const binaries = ['app', 'sable'];
 
 export async function collectSymbols(root) {
   const symbols = [];
@@ -21,7 +23,12 @@ export async function collectSymbols(root) {
           await visit(path);
       } else if (
         entry.isFile() &&
-        ['app', 'app.exe', 'app.pdb', 'libapp_lib.so'].includes(entry.name)
+        [
+          ...binaries,
+          ...binaries.map((name) => `${name}.exe`),
+          ...binaries.map((name) => `${name}.pdb`),
+          'libapp_lib.so',
+        ].includes(entry.name)
       ) {
         symbols.push(path);
       }
@@ -79,16 +86,16 @@ async function main() {
       throw new Error(`Missing iOS app dSYM: ${root}`);
     }
     if (process.platform === 'darwin') {
-      for (const binary of files.filter((path) => basename(path) === 'app')) {
+      for (const binary of files.filter((path) => binaries.includes(basename(path)))) {
         execFileSync('dsymutil', [binary, '-o', `${binary}.dSYM`], { stdio: 'inherit' });
       }
     }
     for (const file of files) {
       let debugFile = file;
       if (file.endsWith('.exe')) {
-        debugFile = join(dirname(file), 'app.pdb');
+        debugFile = file.replace(/\.exe$/, '.pdb');
         await access(debugFile);
-      } else if (process.platform === 'darwin' && basename(file) === 'app') {
+      } else if (process.platform === 'darwin' && binaries.includes(basename(file))) {
         debugFile = `${file}.dSYM`;
       }
       const fileIds = await debugIds(debugFile);
