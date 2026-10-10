@@ -840,3 +840,57 @@ jobs:
               "body": f"Bumps the release tarballs to {version}.",
           }))
           PY
+  distribute-playstore:
+    name: Publish to Google Play
+    needs: [setup-release, android]
+    if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+    steps:
+      - name: Check out repository
+        if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Download the AAB
+        if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        run: |
+          mkdir aab
+          node scripts/ci/forgejo-release.mjs download \
+            --pattern "sable-${VERSION}-android-universal.aab" --dir aab
+          ls aab | grep -q . || { echo 'The universal AAB is not on the release' >&2; exit 1; }
+      - name: Prepare the release notes
+        if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        id: notes
+        run: |
+          IFS=. read -r major minor patch <<<"$VERSION"
+          code=$(( (major * 1000000 + minor * 1000 + patch) * 10 + 2 ))
+          changelog="fastlane/metadata/android/en-US/changelogs/${code}.txt"
+          if [ -f "$changelog" ]; then
+            mkdir whatsnew
+            cp "$changelog" whatsnew/whatsnew-en-US
+            echo 'dir=whatsnew' >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No changelog at ${changelog}; publishing without release notes."
+            echo 'dir=' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload to Google Play
+        if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        uses: https://github.com/r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ env.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: moe.sable.client
+          releaseFiles: aab/sable-${{ needs.setup-release.outputs.version }}-android-universal.aab
+          tracks: internal
+          status: completed
+          whatsNewDirectory: ${{ steps.notes.outputs.dir }}
+      - name: Report the skipped publish
+        if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON == '' }}
+        run: echo '::notice::PLAY_SERVICE_ACCOUNT_JSON is not set; skipping the Google Play publish.'
