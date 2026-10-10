@@ -38,8 +38,13 @@ export function groupNotifications(items: readonly InboxItemView[]): Notificatio
   }));
 }
 
-export function parseInboxTab(value: string | null): InboxTab {
-  return value === 'invites' || value === 'requests' ? value : 'notifications';
+export function parseInboxTab(
+  value: string | null,
+  fallback: InboxTab = 'notifications'
+): InboxTab {
+  return value === 'notifications' || value === 'invites' || value === 'requests'
+    ? value
+    : fallback;
 }
 
 export function parseFilter(value: string | null): NotificationFilter {

@@ -34,6 +34,7 @@ const room = {
 Object.assign(core, {
   inboxNotifications: vi.fn(() => Promise.resolve({ items: [], hasMore: false })),
   backfillInbox: vi.fn(() => Promise.resolve({ hasMore: false })),
+  inviteTriage: vi.fn(() => Promise.resolve([])),
   roomPermissions: vi.fn(() =>
     Promise.resolve({
       can_invite: true,
@@ -95,4 +96,20 @@ test('keeps the notification filter while navigating tabs with the keyboard', as
     replace: true,
     reset: false,
   });
+});
+
+test('shows the pending invite count on the invites tab', () => {
+  roomList.rooms = [
+    room,
+    { ...room, room_id: '!a:example.org', state: 'invited' },
+    { ...room, room_id: '!b:example.org', state: 'invited' },
+  ];
+  render(InboxView);
+  expect(screen.getByRole('tab', { name: /Invites/ })).toHaveTextContent('2');
+});
+
+test('lands on the invites tab when only invites are waiting', () => {
+  roomList.rooms = [room, { ...room, room_id: '!a:example.org', state: 'invited' }];
+  render(InboxView);
+  expect(screen.getByRole('tab', { name: /Invites/ })).toHaveAttribute('aria-selected', 'true');
 });
