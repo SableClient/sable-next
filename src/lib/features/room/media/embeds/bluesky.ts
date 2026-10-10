@@ -182,7 +182,7 @@ export async function fetchPostDetails(
 // TODO: make this get partials (especially for video!!) and figure out streaming
 async function hydrateBlobs(embed: ApEmbed, did: string, pds: string) {
   if (embed.$type === 'app.bsky.embed.images') {
-    for (const [idx, image] of embed.images.entries()) {
+    for (const [idx, image] of ((embed as Partial<ImageEmbed>).images ?? []).entries()) {
       const blob = await fetchBlob(image.image.ref.$link, did, pds);
       if (blob) embed.images[idx].image['moe.sable.blob'] = blob;
     }

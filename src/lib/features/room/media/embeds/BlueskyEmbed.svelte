@@ -208,7 +208,7 @@
       - app.bsky.embed.gallery (see https://github.com/snarfed/bridgy-fed/issues/2504)
       - app.bsky.embed.external (link to a gif site eg klipy (oh no))
     -->
-  {#if e.$type === 'app.bsky.embed.images'}
+  {#if e.$type === 'app.bsky.embed.images' && e.images}
     {@render embedImage(e)}
   {:else if e.$type === 'app.bsky.embed.video'}
     {@render embedVideo(e)}
