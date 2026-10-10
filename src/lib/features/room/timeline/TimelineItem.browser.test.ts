@@ -347,3 +347,20 @@ for (const [name, width] of [
     expect(gallery.y).toBeGreaterThanOrEqual(label.y + label.height);
   });
 }
+
+test('an edited message keeps its marker on the body line', async () => {
+  await page.viewport(1280, 900);
+  const plain = message('marker-plain', '@alice:example.test', 'Alice');
+  const edited = message('marker-edited', '@alice:example.test', 'Alice');
+  if (edited.content.kind !== 'message') throw new Error('expected a message');
+  edited.content = { ...edited.content, edited: true };
+  await mountItem(plain);
+  await mountItem(edited);
+
+  const heights = [...document.querySelectorAll('article.message')].map(
+    (row) => row.getBoundingClientRect().height
+  );
+  expect(heights).toHaveLength(2);
+  expect(heights[1]).toBeCloseTo(heights[0] ?? 0, 0);
+  expect(document.querySelectorAll('.edited, [class*="edited"]').length).toBeGreaterThan(0);
+});

@@ -92,33 +92,3 @@ test('an image without dimensions takes the file shape without losing the newest
   expect(loaded.width / loaded.height).toBeCloseTo(1000 / 400, 1);
   await timeline.expectAtLatest(last);
 });
-
-test('an edited message keeps its marker on the body line', async ({
-  page,
-  app,
-  timeline,
-  admin,
-}) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
-
-  const roomId = await admin.createRoom({ name: `Edit marker ${String(Date.now())}` });
-  await admin.sendMessage(roomId, 'Marker header owner');
-  await admin.sendMessage(roomId, 'Marker plain');
-  const editable = await admin.sendMessage(roomId, 'Marker before edit');
-  await admin.sendMessage(roomId, 'Marker trailing');
-
-  await app.openRoom(roomId);
-  await timeline.expectRevealed();
-  await expect(timeline.message('Marker trailing')).toBeVisible({ timeout: 20_000 });
-
-  await admin.editMessage(roomId, editable, 'Marker edited');
-  await expect(timeline.container.getByText('Marker edited')).toBeVisible({ timeout: 20_000 });
-
-  const plainRow = timeline.container.locator('.item').filter({ hasText: 'Marker plain' });
-  const editedRow = timeline.container.locator('.item').filter({ hasText: 'Marker edited' });
-  const plainBox = await plainRow.boundingBox();
-  const editedBox = await editedRow.boundingBox();
-  if (!plainBox || !editedBox) throw new Error('missing marker row bounds');
-
-  expect(editedBox.height).toBeCloseTo(plainBox.height, 0);
-});
