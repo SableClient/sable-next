@@ -129,6 +129,8 @@
   let composer = $state<ConversationComposer>();
   let timelineList = $state<TimelineList>();
   let receiptsOpen = $state(false);
+  let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId) ?? room);
+  let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
   const conversation = new Conversation({
     core,
     personas,
@@ -346,7 +348,6 @@
     void activeTimeline.stop(timelineOwner);
   });
 
-  let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId) ?? room);
   let callParticipants = $derived(resolvedRoom?.call_participants ?? []);
   let callable = $derived(
     !call.active &&
@@ -362,7 +363,6 @@
         memberLoader.members.length <= 10)
   );
 
-  let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
   let composerRoomId = $state<string | null>(null);
   $effect(() => {
     const id = resolvedRoomId;
