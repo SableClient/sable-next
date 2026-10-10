@@ -40,6 +40,7 @@ OUT="$STAGE/bundle"
 WORK="$STAGE/cef-pkg"
 
 BIN_PATH="$STAGE/app"
+[ -x "$STAGE/sable" ] && BIN_PATH="$STAGE/sable"
 [ -x "$BIN_PATH" ] || { echo "no binary at $BIN_PATH; run 'pnpm tauri:cef build' first" >&2; exit 1; }
 
 if command -v appimagetool.AppImage >/dev/null 2>&1; then
