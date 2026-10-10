@@ -112,6 +112,7 @@ for (const surface of ['room', 'forum'] as const) {
       await actions.getByRole(actionRole, { name: en.timeline.editMessage, exact: true }).click();
       await expect(editor).toHaveText('My earlier reply');
       await editor.fill('Edited thread reply');
+      await expect(editor).toHaveText('Edited thread reply');
       await editor.press('Enter');
       await expect.poll(commands).toContainEqual(
         expect.objectContaining({
