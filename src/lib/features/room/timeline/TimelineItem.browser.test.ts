@@ -299,3 +299,51 @@ test('a hover action still fires when the row loses hover and focus mid-press', 
 
   await expect.poll(() => onReply.mock.calls.length).toBe(1);
 });
+
+function galleryItem(id: string, items: { filename: string; width: number; height: number }[]) {
+  return {
+    ...message(id, '@alice:example.test', 'Alice'),
+    content: {
+      kind: 'gallery',
+      body: '',
+      html: '',
+      items: items.map(({ filename, width, height }) => ({
+        kind: 'image',
+        filename,
+        caption: null,
+        source: JSON.stringify({ Plain: 'mxc://example.test/history-image' }),
+        mime: 'image/png',
+        width,
+        height,
+        size: null,
+        blurhash: null,
+        thumbnail: null,
+        spoiler: null,
+      })),
+    },
+  } as TimelineItemView;
+}
+
+for (const [name, width] of [
+  ['desktop', 1280],
+  ['mobile', 390],
+] as const) {
+  test(`a forwarded gallery keeps its label above the media on ${name}`, async () => {
+    await page.viewport(width, 900);
+    Object.assign(core, { fetchMedia: vi.fn(widePng) });
+    await mountItem({
+      ...galleryItem('forwarded', [
+        { filename: 'one', width: 800, height: 600 },
+        { filename: 'two', width: 800, height: 600 },
+      ]),
+      forwarded: { room_id: '!random:example.test', event_id: '$original', timestamp: null },
+      read_by: ['@bob:example.test'],
+    });
+
+    await expect.poll(() => document.querySelector('.gallery img')).not.toBeNull();
+    const label = document.querySelector('.forwarded')?.getBoundingClientRect();
+    const gallery = document.querySelector('.gallery')?.getBoundingClientRect();
+    if (!label || !gallery) throw new Error('forwarded gallery missing');
+    expect(gallery.y).toBeGreaterThanOrEqual(label.y + label.height);
+  });
+}
