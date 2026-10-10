@@ -23,19 +23,7 @@ jobs:
           persist-credentials: true
           token: ${{ secrets.RELEASE_TOKEN }}
 
-      - name: Set up mise
-        uses: https://github.com/jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
-        with:
-          version: '2026.9.17'
-          github_token: ''
-          cache: true
-          env: false
-          install: false
-
-      - name: Trust project mise configuration
-        run: mise settings set trusted_config_paths "$GITHUB_WORKSPACE"
-
       - name: Create release
-        run: mise run knope -- release --verbose
+        run: node scripts/ci/forgejo-release-pr.mjs release
         env:
-          GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          FORGEJO_TOKEN: ${{ secrets.RELEASE_TOKEN }}

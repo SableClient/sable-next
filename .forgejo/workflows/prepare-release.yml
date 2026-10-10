@@ -49,4 +49,4 @@ jobs:
       - name: Prepare release
         run: mise run knope -- prepare-release --verbose
         env:
-          GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          FORGEJO_TOKEN: ${{ secrets.RELEASE_TOKEN }}

@@ -58,25 +58,8 @@ type = "Command"
 command = "git push --force --set-upstream origin release"
 
 [[workflows.steps]]
-type = "CreatePullRequest"
-base = "main"
-
-[workflows.steps.title]
-template = "chore: prepare release $version"
-
-[workflows.steps.body]
-template = """
-> [!IMPORTANT]
-> Merging this PR will create a new release.
-
-$changelog"""
-
-[[workflows]]
-name = "release"
-help_text = "Create a Forgejo release"
-
-[[workflows.steps]]
-type = "Release"
+type = "Command"
+command = "node scripts/ci/forgejo-release-pr.mjs pr"
 
 [[workflows]]
 name = "document-change"
