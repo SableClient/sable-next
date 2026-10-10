@@ -2,6 +2,7 @@ import type { Component } from 'svelte';
 
 import { hasNativeCalls } from '#lib/platform/calls.js';
 import { usesPushGateway } from '#lib/platform/notifications.js';
+import { supportsTouch } from '#lib/platform/os.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
 
@@ -52,7 +53,7 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: ComposerButtons, section: 'composer-buttons' },
   ],
   timeline: [
-    { component: DoubleTapReaction, section: 'messages' },
+    { component: DoubleTapReaction, section: 'messages', when: supportsTouch },
     {
       component: DeveloperSearchMetrics,
       section: 'developer-search-metrics',
