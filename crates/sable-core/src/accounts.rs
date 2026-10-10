@@ -801,6 +801,7 @@ impl Core {
 
         self.watch_session_changes(session_changes, generation);
         self.watch_encryption(&client, generation);
+        self.watch_account_data_key_sharing(&client, generation);
         self.watch_devices(&client, generation);
         self.watch_notifications(&client, generation).await;
         self.watch_notification_settings(generation);

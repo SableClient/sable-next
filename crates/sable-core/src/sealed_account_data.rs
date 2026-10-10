@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use aes::Aes256;
 use aes::cipher::{KeyIvInit, StreamCipher};
 use base64::Engine as _;
@@ -5,7 +7,16 @@ use base64::alphabet::STANDARD;
 use base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
 use hkdf::Hkdf;
 use hmac::{Hmac, KeyInit as _, Mac as _};
+use matrix_sdk::deserialized_responses::EncryptionInfo;
+use matrix_sdk::encryption::VerificationState;
+use matrix_sdk::encryption::identities::Device;
 use matrix_sdk::encryption::secret_storage::{SecretStorageError, SecretStore};
+use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::ruma::UserId;
+use matrix_sdk::ruma::events::StaticEventContent;
+use matrix_sdk::ruma::events::macros::EventContent;
+use matrix_sdk::ruma::serde::Raw;
+use matrix_sdk_base::crypto::CollectStrategy;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 
@@ -42,7 +53,7 @@ struct Envelope {
 pub(crate) struct AccountDataKey([u8; KEY_SIZE]);
 
 impl AccountDataKey {
-    fn generate() -> Result<Self, getrandom::Error> {
+    pub(crate) fn generate() -> Result<Self, getrandom::Error> {
         let mut key = [0u8; KEY_SIZE];
         getrandom::fill(&mut key)?;
         Ok(Self(key))
@@ -150,7 +161,7 @@ pub(crate) async fn cached_key(client: &matrix_sdk::Client) -> Option<AccountDat
     }
 }
 
-async fn cache_key(client: &matrix_sdk::Client, key: &AccountDataKey) {
+pub(crate) async fn cache_key(client: &matrix_sdk::Client, key: &AccountDataKey) {
     if let Err(error) = client
         .state_store()
         .set_custom_value_no_read(CACHE_KEY, key.0.to_vec())
@@ -278,6 +289,182 @@ impl Core {
         self.emit(CoreEvent::EncryptionStatus {
             status: crate::verification::encryption_status(client).await,
         });
+    }
+
+    pub(crate) fn watch_account_data_key_sharing(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        generation: u64,
+    ) {
+        let handle = client.add_event_handler(
+            |event: ToDeviceAccountDataKeyRequestEvent,
+             encryption: Option<EncryptionInfo>,
+             client: matrix_sdk::Client| async move {
+                let Some(device) = verified_own_sender(&client, &event.sender, encryption).await
+                else {
+                    return;
+                };
+                let Some(key) = cached_key(&client).await else {
+                    return;
+                };
+                let content = ToDeviceAccountDataKeySendEventContent {
+                    key: key.to_base64(),
+                };
+                send_to(&client, &[device], &content).await;
+            },
+        );
+        self.track_session_handler(client, handle);
+
+        let core = self.clone();
+        let handle = client.add_event_handler(
+            move |event: ToDeviceAccountDataKeySendEvent,
+                  encryption: Option<EncryptionInfo>,
+                  client: matrix_sdk::Client| {
+                let core = core.clone();
+                async move {
+                    if verified_own_sender(&client, &event.sender, encryption)
+                        .await
+                        .is_none()
+                        || cached_key(&client).await.is_some()
+                    {
+                        return;
+                    }
+                    let Some(key) = AccountDataKey::from_base64(&event.content.key) else {
+                        tracing::warn!("ignoring an account data key that is not 32 bytes");
+                        return;
+                    };
+                    cache_key(&client, &key).await;
+                    core.emit_if_current(
+                        generation,
+                        CoreEvent::AccountDataChanged {
+                            event_type: ADK_SECRET.to_owned(),
+                        },
+                    );
+                    core.emit_if_current(
+                        generation,
+                        CoreEvent::EncryptionStatus {
+                            status: crate::verification::encryption_status(&client).await,
+                        },
+                    );
+                }
+            },
+        );
+        self.track_session_handler(client, handle);
+
+        let mut verification = client.encryption().verification_state();
+        let watched = client.clone();
+        self.track_session_task(
+            spawn(async move {
+                loop {
+                    if verification.get() == VerificationState::Verified {
+                        request_account_data_key(&watched).await;
+                    }
+                    if verification.next().await.is_none() {
+                        return;
+                    }
+                }
+            })
+            .abort_on_drop(),
+        );
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
+#[ruma_event(type = "moe.sable.account_data_key.request", kind = ToDevice)]
+pub(crate) struct ToDeviceAccountDataKeyRequestEventContent {}
+
+#[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
+#[ruma_event(type = "moe.sable.account_data_key.send", kind = ToDevice)]
+pub(crate) struct ToDeviceAccountDataKeySendEventContent {
+    key: String,
+}
+
+pub(crate) async fn request_account_data_key(client: &matrix_sdk::Client) {
+    if cached_key(client).await.is_some() {
+        return;
+    }
+    let (Some(user_id), Some(device_id)) = (client.user_id(), client.device_id()) else {
+        return;
+    };
+    let devices = match client.encryption().get_user_devices(user_id).await {
+        Ok(devices) => devices,
+        Err(error) => {
+            tracing::warn!("listing our devices for the account data key failed: {error}");
+            return;
+        }
+    };
+    let targets: Vec<Device> = devices
+        .devices()
+        .filter(|device| device.device_id() != device_id && device.is_verified())
+        .collect();
+    if targets.is_empty() {
+        return;
+    }
+    send_to(
+        client,
+        &targets,
+        &ToDeviceAccountDataKeyRequestEventContent {},
+    )
+    .await;
+}
+
+async fn verified_own_sender(
+    client: &matrix_sdk::Client,
+    sender: &UserId,
+    encryption: Option<EncryptionInfo>,
+) -> Option<Device> {
+    let encryption = encryption?;
+    let device_id = encryption.sender_device?;
+    if client.user_id() != Some(sender)
+        || encryption.sender != sender
+        || client.device_id() == Some(&*device_id)
+    {
+        return None;
+    }
+    let lookup = client.encryption();
+    let mut device = lookup.get_device(sender, &device_id).await.ok().flatten();
+    if !device.as_ref().is_some_and(Device::is_verified) {
+        if let Err(error) = lookup.request_user_identity(sender).await {
+            tracing::warn!("refreshing our devices for the account data key failed: {error}");
+        }
+        device = lookup.get_device(sender, &device_id).await.ok().flatten();
+    }
+    let device = device.filter(Device::is_verified);
+    if device.is_none() {
+        tracing::warn!(%device_id, "ignoring an account data key message from an unverified device");
+    }
+    device
+}
+
+async fn send_to<C: StaticEventContent + Serialize>(
+    client: &matrix_sdk::Client,
+    devices: &[Device],
+    content: &C,
+) {
+    let event_type = C::TYPE;
+    let Ok(raw) = Raw::new(content) else {
+        return;
+    };
+    match client
+        .encryption()
+        .encrypt_and_send_raw_to_device(
+            devices.iter().collect(),
+            event_type,
+            raw.cast_unchecked(),
+            CollectStrategy::AllDevices,
+        )
+        .await
+    {
+        Ok(failures) if failures.is_empty() => {}
+        Ok(failures) => tracing::warn!(
+            count = failures.len(),
+            event_type,
+            "some devices did not receive the account data key message"
+        ),
+        Err(error) => tracing::warn!(
+            event_type,
+            "sending the account data key message failed: {error}"
+        ),
     }
 }
 

@@ -332,3 +332,56 @@ async fn a_self_verification_completes_with_a_qr_code() {
         ));
     }
 }
+
+#[tokio::test]
+async fn the_account_data_key_is_shared_only_with_a_verified_own_device() {
+    use std::sync::atomic::Ordering;
+
+    use matrix_sdk_base::crypto::LocalTrust;
+    use serde_json::json;
+
+    use crate::sealed_account_data::{
+        AccountDataKey, cache_key, cached_key, request_account_data_key,
+    };
+
+    for trusted in [false, true] {
+        let server = MatrixMockServer::new().await;
+        let (mut old, mut new, queue) = two_devices(&server, true).await;
+        let user_id = old.client.user_id().unwrap().to_owned();
+        let _traffic = server
+            .capture_put_to_device_traffic(&user_id, queue.clone())
+            .await;
+
+        let key = AccountDataKey::generate().unwrap();
+        cache_key(&old.client, &key).await;
+        for (device, other, trusts) in [(&old, &new, trusted), (&new, &old, true)] {
+            if trusts {
+                device
+                    .client
+                    .encryption()
+                    .get_device(&user_id, other.client.device_id().unwrap())
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .set_local_trust(LocalTrust::Verified)
+                    .await
+                    .unwrap();
+            }
+            let generation = device.core.session_generation.load(Ordering::SeqCst);
+            device
+                .core
+                .watch_account_data_key_sharing(&device.client, generation);
+        }
+
+        request_account_data_key(&new.client).await;
+        deliver(&server, &queue, &mut [&mut old, &mut new]).await;
+
+        let shared = cached_key(&new.client).await;
+        assert_eq!(shared.is_some(), trusted);
+        if let Some(shared) = shared {
+            let content = json!({ "v": 1 });
+            let sealed = key.seal("moe.sable.next.drafts", &content).unwrap();
+            assert_eq!(shared.open("moe.sable.next.drafts", &sealed), Some(content));
+        }
+    }
+}
