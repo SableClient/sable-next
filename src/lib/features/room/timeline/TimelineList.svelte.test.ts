@@ -890,6 +890,44 @@ test('a notification whose event is not loaded falls back to the unread marker',
   expect(jumps).toHaveBeenCalledWith(expect.stringContaining('marker'), 'start');
 });
 
+test('a notification whose event is not loaded opens its context and lands on it', async () => {
+  const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
+  const landed = vi.fn();
+  const read = vi.fn().mockResolvedValue(undefined);
+  const roomTimeline = timeline();
+  roomTimeline.items = [readMarker('marker'), item('latest')];
+  const requestUnread = vi.fn((eventId: string) => {
+    roomTimeline.mode = { kind: 'unread', eventId };
+    roomTimeline.items = [item('before'), item('elsewhere'), item('after')];
+    return Promise.resolve();
+  });
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        landingEventId: '$elsewhere',
+        onLanded: landed,
+        onRequestUnread: requestUnread,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: () => Promise.resolve(),
+        onRead: read,
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  expect(requestUnread).toHaveBeenCalledWith('$elsewhere');
+  expect(jumps).not.toHaveBeenCalledWith(expect.stringContaining('marker'), 'start');
+  expect(jumps).toHaveBeenCalledWith(expect.stringContaining('elsewhere'), 'center');
+  expect(landed).toHaveBeenCalledTimes(1);
+  expect(document.querySelector('.message.highlighted')?.textContent).toContain('elsewhere');
+  await new Promise((resolve) => setTimeout(resolve, 550));
+  expect(read).not.toHaveBeenCalled();
+});
+
 test('does not eagerly paginate a scrollable initial timeline', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));

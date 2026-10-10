@@ -71,7 +71,7 @@ test('a notification opens the room live on its event', async ({
   await expect(page.locator('.message.highlighted')).toHaveCount(0);
 });
 
-test('a notification whose event is not loaded opens at the first unread', async ({
+test('a notification whose event cannot be found opens at the first unread', async ({
   page,
   timeline,
   installRoomCore,

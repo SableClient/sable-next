@@ -237,6 +237,24 @@ test('the reveal switches to live before sending from unread context', async ({
   expect(commands.lastIndexOf('subscribe_timeline')).toBeLessThan(commands.indexOf('send_message'));
 });
 
+test('a notification for an unloaded event opens its context without marking the room read', async ({
+  page,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('unread_history');
+  await page.goto(
+    `/to/${encodeURIComponent(room)}?notified=${encodeURIComponent('$general-12:example.test')}`
+  );
+  await timeline.expectRevealed();
+  await expect(page.locator('.message.highlighted')).toContainText('General message 12');
+  await expect(timeline.message('General message 12')).toBeInViewport();
+  expect(new URL(page.url()).searchParams.has('event')).toBe(false);
+  await quietFor(page, RECEIPT_COALESCE_MS);
+  expect((await core.commands()).filter((command) => command === 'mark_read')).toHaveLength(0);
+});
+
 test('the reveal jumps from an unloaded notification marker without adding a permalink', async ({
   page,
   timeline,

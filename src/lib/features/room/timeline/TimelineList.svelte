@@ -564,9 +564,11 @@
       eventItems,
       timeline.readMarkerEventId
     );
+    const landingPending = landingEventId !== null && onRequestUnread !== undefined;
     if (
       !entries.some(({ value }) => value.item.content.kind === 'read_marker') &&
-      !entryFor(landingEventId)
+      !entryFor(landingEventId) &&
+      !landingPending
     ) {
       revealed = true;
     }
@@ -583,7 +585,7 @@
     }
     const landingEntry = () => entryFor(landingEventId);
     const unreadEntry = entries.find(({ value }) => value.item.content.kind === 'read_marker');
-    if (!unreadEntry && !landingEntry()) revealed = true;
+    if (!unreadEntry && !landingEntry() && !landingPending) revealed = true;
     filling = true;
     try {
       while (!disposed && engine.state.pinned && timeline.backwardPagination !== 'end') {
@@ -604,18 +606,21 @@
         }
       }
       const notified = landingEntry();
-      const landing = notified ?? unreadEntry;
+      const landing = notified ?? (landingPending ? undefined : unreadEntry);
       if (landing && !disposed && engine.state.pinned) {
         if (notified) markLanded(landingEventId);
         await engine.jumpTo(landing.key, landing === unreadEntry ? 'start' : 'center');
-      } else if (
-        !notified &&
-        !holdAtLatest &&
-        unread.active &&
-        unread.firstEventId !== null &&
-        !disposed
-      ) {
-        await jumpToUnread();
+      } else if (!notified && !disposed) {
+        const landed = landingPending && (await landOnUnloaded(engine, landingEventId));
+        if (
+          !landed &&
+          !holdAtLatest &&
+          unread.active &&
+          unread.firstEventId !== null &&
+          !disposed
+        ) {
+          await jumpToUnread();
+        }
       }
     } catch {
       pagination.exhausted = false;
@@ -750,6 +755,28 @@
     handledFocus = target;
     void focus.position(engine, target, entry.key, !shouldReduceMotion());
   });
+  async function landOnUnloaded(
+    engine: TimelineWindow<RowValue>,
+    target: string
+  ): Promise<boolean> {
+    if (!onRequestUnread) return false;
+    switchingToUnread = true;
+    try {
+      await onRequestUnread(target);
+    } catch {
+      return false;
+    } finally {
+      switchingToUnread = false;
+    }
+    if (disposed) return true;
+    await tick();
+    await engine.update(entries);
+    const entry = entryFor(target);
+    if (!entry) return false;
+    markLanded(target);
+    await engine.jumpTo(entry.key, 'center');
+    return true;
+  }
   let handledLanding: string | null = null;
   let landedEventId = $state<string | null>(null);
   function markLanded(eventId: string | null): void {
@@ -770,7 +797,7 @@
       return;
     }
     if (!engine || !revealed || target === handledLanding) return;
-    if (focusEventId !== null || timeline.mode.kind !== 'live') {
+    if (focusEventId !== null || timeline.mode.kind === 'focused') {
       untrack(abandonLanding);
       return;
     }
