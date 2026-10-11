@@ -268,6 +268,7 @@ export interface Preferences {
 
   personaPicker: boolean;
   personaPickerSortOrder: PersonaPickerSortOrder;
+  personaPickerLeftSide: boolean;
   personaProxying: boolean;
   personaLatching: LatchScope;
   personaFallback: boolean;
@@ -555,6 +556,7 @@ const DEFAULTS: Preferences = {
 
   personaPicker: true,
   personaPickerSortOrder: 'recent',
+  personaPickerLeftSide: false,
   personaProxying: false,
   personaLatching: 'off',
   personaFallback: true,

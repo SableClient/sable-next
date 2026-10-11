@@ -1741,6 +1741,14 @@ export const settingsCategories: SettingsCategory[] = [
         gatedBy: 'personaPicker',
       },
       {
+        key: 'personaPickerLeftSide',
+        section: 'persona-sending',
+        icon: PushPinIcon,
+        name: 'personas.pickerLeftSide',
+        type: 'boolean',
+        gatedBy: 'personaPicker',
+      },
+      {
         key: 'personaProxying',
         section: 'persona-sending',
         icon: ChatTextIcon,

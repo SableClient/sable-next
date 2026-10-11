@@ -114,8 +114,33 @@
             event.preventDefault();
           }}
         >
+          {#snippet personaButton(onReorder: () => void)}
+            <Tooltip label={$i18n.t('settings.composerButtonOrderDragHintNone')}>
+              {#snippet trigger({ props })}
+                <IconButton
+                  {...props}
+                  variant="ghost"
+                  size="small"
+                  class="composer-format selection-open"
+                  aria-keyshortcuts="ArrowLeft ArrowRight"
+                  onclick={onReorder}
+                  label={$i18n.t('personas.picker')}
+                >
+                  <UserSwitchIcon />
+                </IconButton>
+              {/snippet}
+            </Tooltip>
+          {/snippet}
           <div class="composer-before">
-            <ComposerDoor {desktop} disabled onPick={() => {}} />
+            <ComposerDoor
+              {desktop}
+              disabled
+              onPick={() => {}}
+              extras={{
+                ...(preferences.personaPicker &&
+                  preferences.personaPickerLeftSide && { persona: personaButton }),
+              }}
+            />
           </div>
           <div class="composer-field">
             <ComposerEditorView {editor} {showPlaceholder} {placeholder} />
@@ -139,23 +164,6 @@
               />
             </div>
           {/if}
-          {#snippet personaButton(onReorder: () => void)}
-            <Tooltip label={$i18n.t('settings.composerButtonOrderDragHintNone')}>
-              {#snippet trigger({ props })}
-                <IconButton
-                  {...props}
-                  variant="ghost"
-                  size="small"
-                  class="composer-format selection-open"
-                  aria-keyshortcuts="ArrowLeft ArrowRight"
-                  onclick={onReorder}
-                  label={$i18n.t('personas.picker')}
-                >
-                  <UserSwitchIcon />
-                </IconButton>
-              {/snippet}
-            </Tooltip>
-          {/snippet}
           {#snippet formatButton(onReorder: () => void)}
             <Tooltip label={$i18n.t('settings.composerButtonOrderDragHintNone')}>
               {#snippet trigger({ props })}
@@ -185,7 +193,8 @@
               onPick={() => {}}
               onPickUnicode={() => {}}
               extras={{
-                ...(preferences.personaPicker && { persona: personaButton }),
+                ...(preferences.personaPicker &&
+                  !preferences.personaPickerLeftSide && { persona: personaButton }),
                 ...(preferences.composerFormatButton && { format: formatButton }),
               }}
             />

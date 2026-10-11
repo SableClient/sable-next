@@ -1609,6 +1609,15 @@
               }}
             />
           {:else}
+            {#snippet personaButton()}
+              <PersonaPicker
+                {roomId}
+                onBeforeOpen={!desktop ? blurEditor : undefined}
+                edit={context?.kind === 'edit' && onEditPersona
+                  ? { current: context.persona ?? null, onChoose: onEditPersona }
+                  : undefined}
+              />
+            {/snippet}
             <div class="composer-before" bind:this={beforeEl}>
               <ComposerDoor
                 {desktop}
@@ -1631,6 +1640,10 @@
                   : undefined}
                 onVoice={canVoice && !showVoice ? startRecording : undefined}
                 onBeforeOpen={!desktop ? blurEditor : undefined}
+                extras={{
+                  ...(showPersonaPicker &&
+                    preferences.personaPickerLeftSide && { persona: personaButton }),
+                }}
               />
             </div>
             <input
@@ -1685,15 +1698,6 @@
                 />
               </div>
             {/if}
-            {#snippet personaButton()}
-              <PersonaPicker
-                {roomId}
-                onBeforeOpen={!desktop ? blurEditor : undefined}
-                edit={context?.kind === 'edit' && onEditPersona
-                  ? { current: context.persona ?? null, onChoose: onEditPersona }
-                  : undefined}
-              />
-            {/snippet}
             {#snippet formatButton()}
               <Tooltip label={$i18n.t('composer.formatting')}>
                 {#snippet trigger({ props })}
@@ -1727,7 +1731,8 @@
                 onPickGif={onSendGif ? pickGifFromBoard : undefined}
                 onBeforeOpen={!desktop ? blurEditor : undefined}
                 extras={{
-                  ...(showPersonaPicker && { persona: personaButton }),
+                  ...(showPersonaPicker &&
+                    !preferences.personaPickerLeftSide && { persona: personaButton }),
                   ...(preferences.composerFormatButton && { format: formatButton }),
                 }}
               />

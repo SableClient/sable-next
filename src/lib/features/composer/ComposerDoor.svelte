@@ -16,6 +16,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import type { Snippet } from 'svelte';
 
   interface Props {
     desktop: boolean;
@@ -27,6 +28,7 @@
     onSchedule?: () => void;
     onVoice?: () => void;
     onBeforeOpen?: () => void;
+    extras?: Partial<Record<'persona', Snippet<[onReorder: () => void]>>>;
   }
 
   let {
@@ -39,6 +41,7 @@
     onSchedule,
     onVoice,
     onBeforeOpen,
+    extras = undefined,
   }: Props = $props();
   let open = $state(false);
 
@@ -46,6 +49,11 @@
   const any = '*';
 </script>
 
+{#if extras}
+  {#each Object.entries(extras) as [_id, extra]}
+    {@render extra(() => {})}
+  {/each}
+{/if}
 {#if desktop}
   <DropdownMenu.Root>
     <Tooltip label={$i18n.t('composer.insert')}>

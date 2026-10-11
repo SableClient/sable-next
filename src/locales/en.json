@@ -3094,6 +3094,7 @@
     "scopeLatchRoom": "Room",
     "scopeLatchAccount": "Global",
     "sendingAs": "Sending as {{name}}",
+    "pickerLeftSide": "Pin picker to left side of composer",
     "pickerSortOrder": "Profile picker sort order",
     "sortNameRecentlyUsed": "Recently used"
   },
