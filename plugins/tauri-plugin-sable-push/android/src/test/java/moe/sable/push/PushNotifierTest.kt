@@ -327,6 +327,17 @@ class PushNotifierTest {
     }
 
     @Test
+    fun show_aLineWithoutADisplayNameIsNeverTheReader() {
+        val named = warmNotification("!room:example.org", "\$one", "hi")
+        named.remove("sender_display_name")
+        PushNotifier.show(context, named.put("sender", "@bob:example.org"))
+        PushNotifier.show(context, warmNotification("!room:example.org", "\$two", "yo").apply { remove("sender_display_name") })
+        val style = androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
+            notificationManager.activeNotifications.single().notification)!!
+        assertEquals(listOf("@bob:example.org", "Someone"), style.messages.map { it.person?.name?.toString() })
+    }
+
+    @Test
     fun show_aWarmInvitationHasAcceptAndDecline() {
         val invite = warmNotification("!invite:example.org", "", "").put("type", "m.room.member")
             .put("content", JSONObject().put("membership", "invite"))

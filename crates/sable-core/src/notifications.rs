@@ -3,7 +3,9 @@ use matrix_sdk::Client;
 #[cfg(not(target_family = "wasm"))]
 use matrix_sdk::ruma::OwnedEventId;
 use matrix_sdk::ruma::api::client::push::{PusherIds, PusherInit, PusherKind};
+use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
 use matrix_sdk::ruma::events::AnySyncTimelineEvent;
+use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::TimelineEventType;
 #[cfg(not(target_family = "wasm"))]
 use matrix_sdk::ruma::events::room::encrypted::OriginalSyncRoomEncryptedEvent;
@@ -505,15 +507,39 @@ pub async fn fetch_push_event(
         return PushFetchView::Unavailable;
     };
     match notifications.get_notification(room_id, event_id).await {
-        Ok(NotificationStatus::Event(item)) => push_event_view(*item)
-            .map_or(PushFetchView::Unavailable, |event| PushFetchView::Event {
-                event,
-            }),
+        Ok(NotificationStatus::Event(item)) => {
+            let Some(mut event) = push_event_view(*item) else {
+                return PushFetchView::Unavailable;
+            };
+            if event.sender_display_name.is_none() {
+                event.sender_display_name = Some(sender_name(client, room_id, &event.sender).await);
+            }
+            PushFetchView::Event { event }
+        }
         Ok(NotificationStatus::EventFilteredOut | NotificationStatus::EventRedacted) => {
             PushFetchView::Discard
         }
         Ok(NotificationStatus::EventNotFound) | Err(_) => PushFetchView::Unavailable,
     }
+}
+
+async fn sender_name(client: &Client, room_id: &RoomId, sender: &str) -> String {
+    let request = get_state_event_for_key::v3::Request::new(
+        room_id.to_owned(),
+        StateEventType::RoomMember,
+        sender.to_owned(),
+    );
+    let fetched = client.send(request).await.ok().and_then(|response| {
+        serde_json::from_str::<serde_json::Value>(response.event_or_content.get()).ok()
+    });
+    fetched
+        .as_ref()
+        .map(|value| value.get("content").unwrap_or(value))
+        .and_then(|content| content.get("displayname")?.as_str())
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .unwrap_or(sender)
+        .to_owned()
 }
 
 fn push_event_view(item: NotificationItem) -> Option<PushEventView> {

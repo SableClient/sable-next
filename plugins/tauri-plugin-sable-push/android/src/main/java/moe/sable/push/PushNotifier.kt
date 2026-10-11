@@ -226,6 +226,7 @@ object PushNotifier {
         return event.optJSONObject("content")?.optString("notification_type") == "ring"
     }
 
+    private const val UNKNOWN_SENDER = "Someone"
     private const val GENERATION_KEY = "sable.push.generation"
     private const val ALERTED_AT_KEY = "sable.push.alerted-at"
     private const val EVENT_KEY = ConversationHistory.EVENT_KEY
@@ -249,6 +250,7 @@ object PushNotifier {
         val roomId = notification.optString("room_id")
         val eventId = notification.optString("event_id")
         val sender = notification.optString("sender_display_name")
+            .ifEmpty { notification.optString("sender") }
         val isInvite = notification.optString("type") == "m.room.member" &&
             notification.optJSONObject("content")?.optString("membership") == "invite"
         val roomName = notification.optString("room_name")
@@ -323,7 +325,7 @@ object PushNotifier {
             val incoming = NotificationCompat.MessagingStyle.Message(
                 if (!state.showContent) "New message" else text.orEmpty(),
                 if (index >= 0) messages[index].timestamp else System.currentTimeMillis(),
-                sender.takeIf { it.isNotEmpty() }?.let { Person.Builder().setName(it).build() }
+                Person.Builder().setName(sender.ifEmpty { UNKNOWN_SENDER }).build()
             ).also {
                 it.extras.putString(EVENT_KEY, eventId)
                 it.extras.putString(GENERATION_KEY, generation)
