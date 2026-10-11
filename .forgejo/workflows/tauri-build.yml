@@ -829,7 +829,14 @@ jobs:
           fi
           git checkout -b "update-${VERSION}"
           git commit -m "Update Sable to ${VERSION}"
-          git push origin "update-${VERSION}"
+          git push --force origin "update-${VERSION}"
+          open=$(curl -fsS -H "Authorization: Bearer ${FLATHUB_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/flathub/moe.sable.client/pulls?state=open&head=flathub:update-${VERSION}" \
+            | python3 -c 'import json, sys; print(len(json.load(sys.stdin)))')
+          if [ "$open" != 0 ]; then
+            echo "The Flathub PR for ${VERSION} is already open; its branch was updated."
+            exit 0
+          fi
           VERSION="$VERSION" python3 - <<'PY' | curl -fsS -X POST \
             -H "Authorization: Bearer ${FLATHUB_TOKEN}" -H 'Accept: application/vnd.github+json' \
             -d @- https://api.github.com/repos/flathub/moe.sable.client/pulls
