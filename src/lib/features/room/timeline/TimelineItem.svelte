@@ -1635,7 +1635,10 @@
 
   /* `m.notice` is usually a bot, and reads as an aside. */
   .notice {
-    color: var(--surface-var-on-container);
+    color: light-dark(
+      color-mix(var(--surface-var-on-container), var(--primary-main) 70%),
+      var(--surface-var-on-container)
+    );
   }
 
   .send-failure {
