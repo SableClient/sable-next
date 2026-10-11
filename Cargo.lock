@@ -1058,9 +1058,9 @@ dependencies = [
 
 [[package]]
 name = "cef"
-version = "151.8.1+151.3.24"
+version = "152.3.0+152.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d4fbc354286b45619122580b769f6cff53ed19565fe10359253ae4c235495db"
+checksum = "785012b485c1a2685876b1f924722a047309900b88f15fc3581869caabdce3d8"
 dependencies = [
  "anyhow",
  "cargo_metadata 0.23.1",
@@ -1078,11 +1078,12 @@ dependencies = [
 
 [[package]]
 name = "cef-dll-sys"
-version = "151.8.1+151.3.24"
+version = "152.3.0+152.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d073a3cd9fb40877a1ae38560cf5df2bb4601e02198880b61ef5476a8e28c35e"
+checksum = "ced5c6a0f46744561b50e283f9134c21bdd95a2e991695b0fc7399ad79765bbd"
 dependencies = [
  "anyhow",
+ "cc",
  "cmake",
  "download-cef",
  "serde_json",
@@ -2180,9 +2181,9 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
 name = "download-cef"
-version = "2.3.2"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c169adf067a787e1f1c58ed62906a557de85388bee4b54fb878b722ff606b113"
+checksum = "05ee509499d14dc47da5f824e4bb1bd558ceb259adc5475956265d48787a80da"
 dependencies = [
  "bzip2",
  "clap",
@@ -8995,7 +8996,7 @@ dependencies = [
 [[package]]
 name = "tauri-runtime-cef"
 version = "0.1.0"
-source = "git+https://github.com/SableClient/tauri-runtime-cef?rev=47b0dad3689859797c12b59740a9cba998190f30#47b0dad3689859797c12b59740a9cba998190f30"
+source = "git+https://github.com/SableClient/tauri-runtime-cef?rev=99d6dd5fac4e8f3a7b865f9eea54178916111f3d#99d6dd5fac4e8f3a7b865f9eea54178916111f3d"
 dependencies = [
  "base64 0.22.1",
  "cef",
