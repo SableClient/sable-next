@@ -1,4 +1,7 @@
-use std::sync::{Arc, atomic::Ordering};
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 use std::time::Duration;
 
 use base64::Engine;
@@ -238,6 +241,7 @@ impl Core {
 
             let changes = request.changes();
             let mut changes = futures_util::stream::iter([request.state()]).chain(changes);
+            let current_sas = Arc::new(AtomicUsize::new(0));
 
             while let Some(state) = changes.next().await {
                 match state {
@@ -286,8 +290,14 @@ impl Core {
 
                     VerificationRequestState::Transitioned { verification, .. } => {
                         if let Some(sas) = verification.sas() {
-                            core.watch_sas(user_id.clone(), flow_id.clone(), sas);
-                            break;
+                            let generation = current_sas.fetch_add(1, Ordering::SeqCst) + 1;
+                            core.watch_sas(
+                                user_id.clone(),
+                                flow_id.clone(),
+                                sas,
+                                current_sas.clone(),
+                                generation,
+                            );
                         }
                     }
 
@@ -297,7 +307,9 @@ impl Core {
                             view,
                             VerificationView::Done | VerificationView::Cancelled { .. }
                         );
-                        core.emit_verification(&user_id, &flow_id, view);
+                        if current_sas.load(Ordering::SeqCst) == 0 {
+                            core.emit_verification(&user_id, &flow_id, view);
+                        }
 
                         if done {
                             break;
@@ -310,19 +322,27 @@ impl Core {
         self.track_session_task(task);
     }
 
-    fn watch_sas(self: &Arc<Self>, user_id: OwnedUserId, flow_id: String, sas: SasVerification) {
+    fn watch_sas(
+        self: &Arc<Self>,
+        user_id: OwnedUserId,
+        flow_id: String,
+        sas: SasVerification,
+        current_sas: Arc<AtomicUsize>,
+        generation: usize,
+    ) {
         let core = self.clone();
         let task = spawn(async move {
             let mut changes = sas.changes();
             core.emit_verification(&user_id, &flow_id, sas_view(&sas, &sas.state()));
 
-            if !sas.we_started()
-                && let Err(error) = sas.accept().await
-            {
+            if let Err(error) = sas.accept().await {
                 core.failed("verification_accept_sas", error);
             }
 
             while let Some(state) = changes.next().await {
+                if current_sas.load(Ordering::SeqCst) != generation {
+                    break;
+                }
                 let view = sas_view(&sas, &state);
                 let done = matches!(
                     view,
