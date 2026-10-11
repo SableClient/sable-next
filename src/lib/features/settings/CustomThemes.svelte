@@ -528,6 +528,8 @@
   @media (width < 36rem) {
     .tiles {
       gap: var(--space-300);
+      max-block-size: none;
+      overflow-y: visible;
     }
   }
 
