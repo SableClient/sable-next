@@ -98,7 +98,7 @@ describe('start', () => {
     supporter.start(core);
 
     await vi.waitFor(() => {
-      expect(supporter.status).toBe('failed');
+      expect(supporter.status).toBe('error');
     });
     expect(stub.setProfileField).not.toHaveBeenCalled();
   });
@@ -197,10 +197,28 @@ describe('verify', () => {
     expect(stub.setProfileField).not.toHaveBeenCalled();
   });
 
-  test('fails when the service refuses to start', async () => {
-    vi.mocked(startVerification).mockRejectedValue(new Error('401'));
+  test.each([new Error('401'), new Error('502'), new TypeError('Failed to fetch')])(
+    'reports a startup error without blaming the contribution: %s',
+    async (error) => {
+      vi.mocked(startVerification).mockRejectedValue(error);
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { stub, core } = makeCore(null);
+      supporter.start(core);
+      await vi.waitFor(() => {
+        expect(stub.userProfile).toHaveBeenCalled();
+      });
+
+      await supporter.verify();
+
+      expect(supporter.status).toBe('error');
+      expect(openExternalAuthUrl).not.toHaveBeenCalled();
+    }
+  );
+
+  test('reports an error when the homeserver cannot issue an OpenID token', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { stub, core } = makeCore(null);
+    stub.requestOpenIdToken.mockRejectedValueOnce(new Error('offline'));
     supporter.start(core);
     await vi.waitFor(() => {
       expect(stub.userProfile).toHaveBeenCalled();
@@ -208,7 +226,8 @@ describe('verify', () => {
 
     await supporter.verify();
 
-    expect(supporter.status).toBe('failed');
+    expect(supporter.status).toBe('error');
+    expect(startVerification).not.toHaveBeenCalled();
     expect(openExternalAuthUrl).not.toHaveBeenCalled();
   });
 
@@ -225,7 +244,7 @@ describe('verify', () => {
     await vi.advanceTimersByTimeAsync(20_000);
     await done;
 
-    expect(supporter.status).toBe('failed');
+    expect(supporter.status).toBe('error');
   });
 
   test('ignores an award it already holds', async () => {
@@ -297,7 +316,7 @@ describe('claim', () => {
 
     await supporter.claim();
 
-    expect(supporter.status).toBe('failed');
+    expect(supporter.status).toBe('error');
   });
 });
 

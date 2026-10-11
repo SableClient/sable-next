@@ -19,7 +19,14 @@ const POLL_TIMEOUT_MS = 10 * 60 * 1000;
 const STEP_TIMEOUT_MS = 15_000;
 const REFRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-export type SupporterStatus = 'idle' | 'waiting' | 'refreshing' | 'checking' | 'none' | 'failed';
+export type SupporterStatus =
+  | 'idle'
+  | 'waiting'
+  | 'refreshing'
+  | 'checking'
+  | 'none'
+  | 'failed'
+  | 'error';
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
@@ -130,7 +137,7 @@ class Supporter {
       this.status = aborted() ? 'idle' : 'failed';
     } catch (error) {
       console.warn('[sable supporter] verification failed', error);
-      if (generation === this.generation) this.status = 'failed';
+      if (generation === this.generation) this.status = 'error';
     }
   }
 
@@ -146,7 +153,7 @@ class Supporter {
       this.status = (await this.adopt(core, config, userId, awards)) ? 'idle' : 'none';
     } catch (error) {
       console.warn('[sable supporter] award lookup failed', error);
-      this.status = 'failed';
+      this.status = 'error';
     }
   }
 
@@ -165,7 +172,7 @@ class Supporter {
       this.status = 'idle';
     } catch (error) {
       console.warn('[sable supporter] refresh failed', error);
-      this.status = 'failed';
+      this.status = 'error';
     }
   }
 

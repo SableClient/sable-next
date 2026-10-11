@@ -64,9 +64,20 @@ test('shows the active badge and lets it be removed', async () => {
   expect(remove).toHaveBeenCalledOnce();
 });
 
-test('says so when verification failed', () => {
+test('reports an incomplete verification without claiming there was no contribution', () => {
   supporter.status = 'failed';
   render(SupporterSettings);
 
-  expect(screen.getByRole('alert')).toHaveTextContent('Could not verify');
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'Verification did not finish. Complete approval on Open Collective, then check for your badge.'
+  );
+});
+
+test('reports a verification error without blaming the Open Collective account', () => {
+  supporter.status = 'error';
+  render(SupporterSettings);
+
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'Badge verification could not be completed. Please try again later.'
+  );
 });

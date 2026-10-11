@@ -75,7 +75,9 @@
       <li class="settings-form status" aria-live="polite">{$i18n.t('settings.supporterNone')}</li>
     {/if}
     {#if supporter.status === 'failed'}
-      <li class="settings-form error" role="alert">{$i18n.t('settings.supporterFailed')}</li>
+      <li class="settings-form error" role="alert">{$i18n.t('settings.supporterTimedOut')}</li>
+    {:else if supporter.status === 'error'}
+      <li class="settings-form error" role="alert">{$i18n.t('settings.supporterError')}</li>
     {/if}
   </ul>
   {#if badge}
