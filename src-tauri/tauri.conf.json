@@ -68,7 +68,8 @@
         "sidebarImage": "icons/installer/nsis-sidebar.bmp",
         "installerIcon": "icons/icon.ico",
         "uninstallerIcon": "icons/icon.ico",
-        "startMenuFolder": "Sable"
+        "startMenuFolder": "Sable",
+        "installerHooks": "windows/hooks.nsh"
       },
       "wix": {
         "bannerPath": "icons/installer/wix-banner.bmp",
@@ -120,7 +121,10 @@
             }
           ]
         }
-      ]
+      ],
+      "windows": {
+        "registerUnpackagedActivator": true
+      }
     },
     "deep-link": {
       "desktop": {
