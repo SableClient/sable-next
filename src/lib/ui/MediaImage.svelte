@@ -109,6 +109,8 @@
   let blurhashCanvas = $state<HTMLCanvasElement>();
   let loadedUrl = $state<string | null>(null);
   let imageElement = $state<HTMLImageElement>();
+  let renderedWidth = $state(0);
+  let renderedHeight = $state(0);
   let sidewaysSource = $state<string | null>(null);
   let undecodableThumbnail = $state<string | null>(null);
   let eventRatio = $derived.by(() => {
@@ -180,7 +182,8 @@
     pixelatedImage(
       preferences.pixelatedImages,
       intrinsicWidth ?? naturalImage?.naturalWidth,
-      intrinsicHeight ?? naturalImage?.naturalHeight
+      intrinsicHeight ?? naturalImage?.naturalHeight,
+      { width: renderedWidth, height: renderedHeight }
     )
   );
   let gifPreviewReady = $derived(url !== null && previewUrl === url);
@@ -488,6 +491,8 @@
   <img
     {...withoutTabindex(props)}
     bind:this={imageElement}
+    bind:clientWidth={renderedWidth}
+    bind:clientHeight={renderedHeight}
     class={['media-image-content', { tinted }]}
     style:background-color={plate ?? undefined}
     src={heldUrl}

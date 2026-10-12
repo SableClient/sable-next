@@ -182,7 +182,10 @@
     if (image.dataset.mxEmoticon === undefined || !image.complete) return;
     image.classList.toggle(
       'pixelated',
-      pixelatedImage(preferences.pixelatedImages, image.naturalWidth, image.naturalHeight)
+      pixelatedImage(preferences.pixelatedImages, image.naturalWidth, image.naturalHeight, {
+        width: image.clientWidth,
+        height: image.clientHeight,
+      })
     );
   }
 
