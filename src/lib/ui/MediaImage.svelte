@@ -49,7 +49,7 @@
     class?: string;
     style?: string;
     onclick?: () => void;
-    onloaded?: () => void;
+    onloaded?: (url: string | null) => void;
     onfailed?: () => void;
     retryable?: boolean;
     uniform?: boolean;
@@ -238,7 +238,7 @@
   );
 
   $effect(() => {
-    if (painted) onloaded?.();
+    if (painted) onloaded?.(url);
   });
 
   $effect(() => {

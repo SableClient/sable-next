@@ -8,9 +8,8 @@
   import { on } from 'svelte/events';
   import type { ClassValue } from 'svelte/elements';
 
-  import { useCoreClient } from '#lib/core/context.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
-  import { cachedMediaUrl, isAnimatedImage } from '#lib/ui/media-url.js';
+  import { isAnimatedImage } from '#lib/ui/media-url.js';
 
   import { identityColor } from './identity-color.js';
   import { toInitials } from './initials.js';
@@ -61,10 +60,8 @@
   let tint = $derived(paintedSrc === src ? undefined : plate);
   let hovered = $state(false);
   let animatedSrc = $state<string | null>(null);
-  const core = useCoreClient();
 
-  async function checkAnimated(source: string): Promise<void> {
-    const url = cachedMediaUrl(core, source, 0, 0);
+  async function checkAnimated(source: string, url: string | null): Promise<void> {
     if (!url) return;
     const head = await (await fetch(url)).blob().then((blob) => blob.slice(0, 65536).arrayBuffer());
     if (isAnimatedImage(new Uint8Array(head))) animatedSrc = source;
@@ -119,7 +116,7 @@
         width={96}
         height={96}
         original
-        onloaded={() => void checkAnimated(src).catch(() => {})}
+        onloaded={(url) => void checkAnimated(src, url).catch(() => {})}
       />
     {/if}
   {:else if src}
