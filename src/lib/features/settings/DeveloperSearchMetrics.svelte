@@ -2,7 +2,7 @@
   import type { SearchCrawlPhase, SearchMetricsView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { formatByteSize } from '#lib/ui/byte-size.js';
+  import { formatBinarySize } from '#lib/ui/byte-size.js';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import '#lib/ui/primitives/settings-row.css';
@@ -69,8 +69,8 @@
 
   function bytes(value: number, total: number): string {
     return $i18n.t('settings.developerSearchBytes', {
-      value: formatByteSize(value),
-      total: formatByteSize(total),
+      value: formatBinarySize(value),
+      total: formatBinarySize(total),
     });
   }
 

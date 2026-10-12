@@ -13,3 +13,19 @@ export function formatByteSize(bytes: number): string {
 
   return `${value.toFixed(value < 10 ? 1 : 0)} ${UNITS[unitIndex]}`;
 }
+
+const BINARY_UNITS = ['B', 'KiB', 'MiB', 'GiB', 'TiB'] as const;
+
+export function formatBinarySize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return '';
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < BINARY_UNITS.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${BINARY_UNITS[unitIndex]}`;
+}

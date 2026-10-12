@@ -738,7 +738,7 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'select',
         options: SEARCH_INDEX_LIMITS.map((limit) => ({
           value: limit,
-          label: Number(limit) >= 1024 ? `${String(Number(limit) / 1024)} GB` : `${limit} MB`,
+          label: Number(limit) >= 1024 ? `${String(Number(limit) / 1024)} GiB` : `${limit} MiB`,
           literal: true,
         })),
       },
@@ -1805,6 +1805,14 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'developer-options',
         icon: MonitorIcon,
         name: 'settings.callStatsOverlay',
+        type: 'boolean',
+        gatedBy: 'developerTools',
+      },
+      {
+        key: 'callDebugOverlay',
+        section: 'developer-options',
+        icon: PhoneIcon,
+        name: 'settings.callDebugOverlay',
         type: 'boolean',
         gatedBy: 'developerTools',
       },
