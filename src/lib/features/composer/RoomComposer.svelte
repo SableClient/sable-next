@@ -594,6 +594,7 @@
   const queue = new SendQueue();
 
   let activeDraftAccount = '';
+  let draftRoomId = '';
 
   function persistDraft(key: string): void {
     const doc = preEdit ?? (editor.isEmpty() ? undefined : editor.doc());
@@ -618,8 +619,20 @@
     draftTimeout = undefined;
     if (previous !== null) untrack(() => persistDraft(previous));
     if (activeDraftAccount !== accountId) preEdit = undefined;
+    if (previous !== null) {
+      preEdit = undefined;
+      prefilledFor = null;
+      prefilledDoc = undefined;
+      error = null;
+      if (typingTimeout) {
+        clearTimeout(typingTimeout);
+        typingTimeout = undefined;
+        onTyping(draftRoomId, false).catch(() => {});
+      }
+    }
     activeDraftKey = key;
     activeDraftAccount = accountId;
+    draftRoomId = roomId;
 
     untrack(() => {
       seenRemoteDraft = remoteRevision(key, core.session?.account_id ?? '');
@@ -634,6 +647,7 @@
         nextStagedId = 0;
         editor.clear();
       }
+      if (previous !== null) editor.clearHistory();
     });
   });
 

@@ -363,13 +363,13 @@
         memberLoader.members.length <= 10)
   );
 
-  let composerRoomId = $state<string | null>(null);
+  let composerMounted = $state(false);
   $effect(() => {
-    const id = resolvedRoomId;
+    if (composerMounted) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const frame = requestAnimationFrame(() => {
       timer = setTimeout(() => {
-        composerRoomId = id;
+        composerMounted = true;
       });
     });
     return () => {
@@ -488,6 +488,7 @@
   $effect(() => {
     void resolvedRoomId;
     memberLoader.reset();
+    untrack(() => conversation.followRoom());
     conversation.forgetRequestedDetails();
     receiptsOpen = false;
     panels.reset();
@@ -1053,34 +1054,30 @@
         onJoin={() => void joinTombstoneSuccessor()}
       />
     {:else}
-      {#key resolvedRoomId}
-        {#if composerRoomId === resolvedRoomId}
-          <ScheduledMessages
-            roomId={resolvedRoomId}
-            revision={conversation.scheduledRevision}
-            editing={conversation.context?.kind === 'schedule'
-              ? conversation.context.eventId
-              : null}
-            onEdit={conversation.editScheduled}
-          />
-          <ConversationComposer
-            bind:this={composer}
-            {conversation}
-            roomId={resolvedRoomId}
-            roomMembers={memberLoader.members}
-            onSchedule={conversation.schedule}
-            canReact={roomSession.permissions?.can_react ?? true}
-            {roomName}
-            readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
-            encrypted={resolvedRoom?.encrypted ?? null}
-            onDeleteEdited={conversation.redact}
-            onEditLast={conversation.editLast}
-            onEditNext={conversation.editNext}
-            onReplyStep={(direction) =>
-              conversation.moveReply(timelineList?.stepReply(direction) ?? null)}
-          />
-        {/if}
-      {/key}
+      {#if composerMounted}
+        <ScheduledMessages
+          roomId={resolvedRoomId}
+          revision={conversation.scheduledRevision}
+          editing={conversation.context?.kind === 'schedule' ? conversation.context.eventId : null}
+          onEdit={conversation.editScheduled}
+        />
+        <ConversationComposer
+          bind:this={composer}
+          {conversation}
+          roomId={resolvedRoomId}
+          roomMembers={memberLoader.members}
+          onSchedule={conversation.schedule}
+          canReact={roomSession.permissions?.can_react ?? true}
+          {roomName}
+          readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
+          encrypted={resolvedRoom?.encrypted ?? null}
+          onDeleteEdited={conversation.redact}
+          onEditLast={conversation.editLast}
+          onEditNext={conversation.editNext}
+          onReplyStep={(direction) =>
+            conversation.moveReply(timelineList?.stepReply(direction) ?? null)}
+        />
+      {/if}
     {/if}
   </div>
 {/snippet}

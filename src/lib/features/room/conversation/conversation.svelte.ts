@@ -107,6 +107,12 @@ export class Conversation {
     return this.#context;
   }
 
+  followRoom(): void {
+    this.#context = readReply(this.#replyKey(), this.#accountId()) ?? null;
+    this.forumTitle = '';
+    this.dismissedPreviews = [];
+  }
+
   set context(value: ComposerContext | null) {
     this.#context = value;
     writeReply(this.#replyKey(), value?.kind === 'reply' ? value : null, this.#accountId());
