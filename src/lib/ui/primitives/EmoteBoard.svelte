@@ -194,7 +194,10 @@
     if (query.trim() !== '') return [];
     const all = sections.flatMap((section) => section.images);
     return recent
-      .map((shortcode) => all.find((image) => image.shortcode === shortcode))
+      .map(
+        (key) =>
+          all.find((image) => image.url === key) ?? all.find((image) => image.shortcode === key)
+      )
       .filter((image): image is PackImageView => image !== undefined)
       .slice(0, 16);
   });
@@ -512,7 +515,7 @@
   }
 
   function pick(image: PackImageView, keepOpen: boolean): void {
-    rememberEmote(image.shortcode, tab === 'sticker' ? 'sticker' : 'emoticon');
+    rememberEmote(image.url, tab === 'sticker' ? 'sticker' : 'emoticon');
     onPick(image, tab as ImageUsageView, keepOpen);
   }
 
