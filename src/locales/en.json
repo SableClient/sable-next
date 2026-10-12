@@ -179,6 +179,7 @@
     "noPreview": "Message",
     "mention": "Mentions you",
     "markRead": "Mark {{room}} as read",
+    "markAllRead": "Mark all as read",
     "invitedBy": "Invited by {{name}}",
     "inviteEncrypted": "Encrypted",
     "inviteSpace": "Space",

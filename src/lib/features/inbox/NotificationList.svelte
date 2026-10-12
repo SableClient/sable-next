@@ -11,6 +11,7 @@
   import { i18n } from '#lib/i18n.js';
   import {
     backfillSignal,
+    countNotifications,
     focusRowAt,
     groupNotifications,
     senderName,
@@ -26,7 +27,7 @@
   import { splitVia } from '#lib/rooms/join-address.js';
   import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import InboxSectionHeader from './InboxSectionHeader.svelte';
-  import { markRoomUnread } from '#lib/features/sidebar/nav-rooms.js';
+  import { markRoomUnread, markRoomsRead } from '#lib/features/sidebar/nav-rooms.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -97,6 +98,14 @@
   );
 
   let groups = $derived(groupNotifications(rows).slice(0, size));
+
+  let unreadRooms = $derived(
+    roomList.rooms.filter((room) => countNotifications([room], roomList.badgeUnreadFor) > 0)
+  );
+
+  function markAllRead(): void {
+    markRoomsRead(unreadRooms, core.commands, readReceiptIsPrivate());
+  }
 
   function openMessage(roomId: string, eventId: string): void {
     void afterOverlayPops().then(() => goto(roomSectionPath(roomList.rooms, roomId, eventId)));
@@ -195,6 +204,11 @@
           {$i18n.t(filterLabels[value])}
         </Button>
       {/each}
+      {#if !compact && unreadRooms.length > 0}
+        <Button variant="ghost" size="small" class="filter choice" onclick={markAllRead}>
+          {$i18n.t('inbox.markAllRead')}
+        </Button>
+      {/if}
       {#if !compact}
         <Button
           variant="ghost"
