@@ -283,5 +283,16 @@
     .keyword-input-row {
       flex-direction: row;
     }
+
+    .keyword-input-row :global(.text-input) {
+      flex: 1;
+      min-width: 0;
+      width: auto;
+    }
+
+    .keyword-input-row :global(.btn) {
+      flex: none;
+      white-space: nowrap;
+    }
   }
 </style>
