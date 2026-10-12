@@ -1801,6 +1801,19 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'coreLogLevel',
+        section: 'developer-options',
+        icon: CodeIcon,
+        name: 'settings.coreLogLevel',
+        description: 'settings.coreLogLevelHint',
+        type: 'select',
+        gatedBy: 'developerTools',
+        options: [
+          { value: 'default', label: 'settings.coreLogLevelDefault' },
+          { value: 'debug', label: 'settings.coreLogLevelDebug' },
+        ],
+      },
+      {
         key: 'callStatsOverlay',
         section: 'developer-options',
         icon: MonitorIcon,

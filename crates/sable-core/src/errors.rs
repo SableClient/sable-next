@@ -234,7 +234,8 @@ impl Core {
                 tracing::warn!(
                     context,
                     category = "network",
-                    "homeserver request failed: {error}"
+                    "homeserver request failed: {}",
+                    error_chain(&error)
                 );
                 CommandErr::Unavailable
             }
@@ -263,6 +264,17 @@ impl Core {
     }
 }
 
+fn error_chain(error: &dyn std::error::Error) -> String {
+    let mut text = error.to_string();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        text.push_str(": ");
+        text.push_str(&cause.to_string());
+        source = cause.source();
+    }
+    text
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -272,6 +284,8 @@ mod tests {
     };
 
     use matrix_sdk::ruma::api::error::RetryAfter;
+
+    use super::error_chain;
 
     use crate::Core;
     use crate::protocol::CommandErr;
@@ -337,5 +351,32 @@ mod tests {
         assert!((58_000..=60_000).contains(&ms), "{ms}");
         let past = web_time::SystemTime::now() - Duration::from_secs(60);
         assert_eq!(retry_delay_ms(&RetryAfter::DateTime(past)), Some(0));
+    }
+
+    #[derive(Debug)]
+    struct Outer(io::Error);
+
+    impl std::fmt::Display for Outer {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("error sending request")
+        }
+    }
+
+    impl std::error::Error for Outer {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            Some(&self.0)
+        }
+    }
+
+    #[test]
+    fn the_error_chain_names_every_cause() {
+        let error = Outer(io::Error::other(
+            "NetworkError when attempting to fetch resource.",
+        ));
+
+        assert_eq!(
+            error_chain(&error),
+            "error sending request: NetworkError when attempting to fetch resource."
+        );
     }
 }

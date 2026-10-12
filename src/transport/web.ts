@@ -59,6 +59,19 @@ interface PrewarmedWorker {
 
 let prewarmed: PrewarmedWorker | null = null;
 
+function storedLogFilter(): string | null {
+  try {
+    const stored = JSON.parse(localStorage.getItem('sable-preferences') ?? '{}') as {
+      coreLogLevel?: unknown;
+      developerTools?: unknown;
+    };
+    if (stored.developerTools !== true || stored.coreLogLevel !== 'debug') return null;
+    return 'debug,matrix_sdk::latest_events::latest_event::builder=off,matrix_sdk_base::room::display_name=off';
+  } catch {
+    return null;
+  }
+}
+
 function openWorker(): SharedWorker {
   const workerUrl = new URL(coreWorkerUrl, self.location.href);
   // Shared workers outlive tabs, so changing their URL prevents an old glue
@@ -72,7 +85,7 @@ function openWorker(): SharedWorker {
     (navigator as Navigator & { standalone?: boolean }).standalone === true;
   const iosPwa = /iPhone|iPad|iPod/.test(navigator.userAgent) && standalone;
   if (iosPwa) workerUrl.searchParams.set('event-cache', 'memory');
-  const logFilter = new URLSearchParams(self.location.search).get('log');
+  const logFilter = new URLSearchParams(self.location.search).get('log') ?? storedLogFilter();
   if (logFilter) workerUrl.searchParams.set('log', logFilter);
 
   return new SharedWorker(workerUrl, {

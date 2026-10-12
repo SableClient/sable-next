@@ -22,6 +22,7 @@ impl Core {
             .await
             .or_failed(self, "export_room_keys")?;
 
+        tracing::info!("room keys exported");
         Ok(CommandOk::ExportRoomKeys { export })
     }
 
@@ -44,6 +45,11 @@ impl Core {
             .await
             .map_err(|error| self.room_key_import_error(error))?;
 
+        tracing::info!(
+            imported = result.imported_count,
+            total = result.total_count,
+            "room keys imported"
+        );
         Ok(CommandOk::ImportRoomKeys {
             imported: result.imported_count as u64,
             total: result.total_count as u64,
@@ -64,6 +70,7 @@ impl Core {
         let export = matrix_sdk_base::crypto::encrypt_room_key_export(&keys, passphrase, 500_000)
             .or_failed(self, "export_room_keys")?;
 
+        tracing::info!("room keys exported");
         Ok(CommandOk::ExportRoomKeys { export })
     }
 
@@ -85,6 +92,11 @@ impl Core {
             .await
             .or_failed(self, "import_room_keys")?;
 
+        tracing::info!(
+            imported = result.imported_count,
+            total = result.total_count,
+            "room keys imported"
+        );
         Ok(CommandOk::ImportRoomKeys {
             imported: result.imported_count as u64,
             total: result.total_count as u64,

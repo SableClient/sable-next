@@ -33,6 +33,7 @@ export const SEARCH_INDEX_LIMITS: readonly SearchIndexLimit[] = [
   '2048',
   '4096',
 ];
+export const CORE_LOG_LEVELS = ['default', 'debug'] as const;
 export const SEARCH_CRAWL_PAUSES = ['1', '2', '3', '5', '10', '30'] as const;
 export const SEARCH_TRICKLE_PAUSES = ['5', '10', '30', '60'] as const;
 export const SEARCH_FLUSH_INTERVALS = ['20', '60', '120', '300'] as const;
@@ -203,6 +204,7 @@ export interface Preferences {
   roomBannerHeight: number;
   subspaceHierarchyLimit: SubspaceDepth;
   searchIndexLimit: SearchIndexLimit;
+  coreLogLevel: (typeof CORE_LOG_LEVELS)[number];
   searchCrawlPause: (typeof SEARCH_CRAWL_PAUSES)[number];
   searchTricklePause: (typeof SEARCH_TRICKLE_PAUSES)[number];
   searchFlushInterval: (typeof SEARCH_FLUSH_INTERVALS)[number];
@@ -409,6 +411,7 @@ const ENUMS = {
   showRoomIcon: ['always', 'sometimes', 'collapsed', 'never'],
   subspaceHierarchyLimit: SUBSPACE_DEPTHS,
   searchIndexLimit: SEARCH_INDEX_LIMITS,
+  coreLogLevel: CORE_LOG_LEVELS,
   searchCrawlPause: SEARCH_CRAWL_PAUSES,
   searchTricklePause: SEARCH_TRICKLE_PAUSES,
   searchFlushInterval: SEARCH_FLUSH_INTERVALS,
@@ -492,6 +495,7 @@ const DEFAULTS: Preferences = {
   roomBannerHeight: 190,
   subspaceHierarchyLimit: '3',
   searchIndexLimit: '512',
+  coreLogLevel: 'default',
   searchCrawlPause: '3',
   searchTricklePause: '10',
   searchFlushInterval: '60',

@@ -85,18 +85,24 @@ impl PushRules {
     ///
     /// When the server rejects a write.
     pub async fn apply(&self, writes: Vec<RuleWrite>) -> Result<(), CoreError> {
+        let planned = writes.len();
         let mut result = Ok(());
-        let mut applied = false;
+        let mut applied = 0_usize;
         for write in writes {
             if let Err(error) = self.send(&write).await {
                 result = Err(error);
                 break;
             }
             write.apply_to(&mut *self.rules.write().await);
-            applied = true;
+            applied += 1;
         }
-        if applied {
+        if applied > 0 {
             let _ = self.changes.send(());
+        }
+        match &result {
+            Ok(()) if planned > 0 => tracing::info!(planned, "push rule changes applied"),
+            Ok(()) => {}
+            Err(error) => tracing::warn!(planned, applied, %error, "push rule changes failed"),
         }
         result
     }

@@ -19,6 +19,7 @@ export const NON_SYNCABLE_KEYS = new Set<keyof Preferences>([
   'textScale',
   'roomBannerHeight',
   'searchIndexLimit',
+  'coreLogLevel',
   'searchUnmeteredOnly',
   'audioInputDevice',
   'audioOutputDevice',

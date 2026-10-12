@@ -557,6 +557,17 @@ impl Core {
         if added > 0 {
             self.emit(CoreEvent::InboxChanged);
         }
+        if added > 0 || failure.is_some() {
+            tracing::info!(
+                added,
+                pages,
+                has_more,
+                failed = failure.is_some(),
+                "inbox backfill finished"
+            );
+        } else {
+            tracing::debug!(pages, has_more, "inbox backfill found nothing new");
+        }
         if let Some(error) = failure {
             return Err(error);
         }

@@ -1,5 +1,9 @@
 use std::collections::HashMap;
+use std::fmt::{self, Write as _};
 use std::sync::{Arc, atomic::Ordering};
+use std::time::Duration;
+
+use web_time::Instant;
 
 use matrix_sdk::RoomMemberships;
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
@@ -254,6 +258,64 @@ async fn confirmed_member_join(
     }
 }
 
+const SLOW_COMMAND: Duration = Duration::from_secs(2);
+
+struct VariantName {
+    name: String,
+    done: bool,
+}
+
+impl fmt::Write for VariantName {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        for character in text.chars() {
+            if self.done || !(character.is_alphanumeric() || character == '_') {
+                self.done = true;
+                return Err(fmt::Error);
+            }
+            self.name.push(character);
+        }
+        Ok(())
+    }
+}
+
+/// Derived `Debug` writes the variant's name first, so stopping at the first
+/// non-identifier character keeps every argument out of the log and never
+/// formats it.
+fn command_name(command: &Command) -> String {
+    let mut sink = VariantName {
+        name: String::new(),
+        done: false,
+    };
+    let _ = write!(sink, "{command:?}");
+    sink.name
+}
+
+impl Core {
+    /// Logs the command name, never its arguments.
+    ///
+    /// # Errors
+    ///
+    /// Returns a protocol error when the command is invalid, the user is not
+    /// authenticated, or the Matrix operation fails.
+    pub async fn dispatch(self: &Arc<Self>, command: Command) -> Result<CommandOk, CommandErr> {
+        let name = command_name(&command);
+        let started = Instant::now();
+        let result = Box::pin(self.run_command(command)).await;
+        let elapsed = started.elapsed();
+        let elapsed_ms = u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX);
+        match &result {
+            Ok(_) if elapsed >= SLOW_COMMAND => {
+                tracing::info!(command = name, elapsed_ms, "slow command finished");
+            }
+            Ok(_) => tracing::debug!(command = name, elapsed_ms, "command finished"),
+            Err(error) => {
+                tracing::debug!(command = name, elapsed_ms, ?error, "command failed");
+            }
+        }
+        result
+    }
+}
+
 impl Core {
     /// Splitting this by command family needs a second match with an
     /// unreachable arm, which `clippy::panic = "deny"` rules out.
@@ -266,7 +328,7 @@ impl Core {
         clippy::too_many_lines,
         reason = "one sequential flow kept in a single function"
     )]
-    pub async fn dispatch(self: &Arc<Self>, command: Command) -> Result<CommandOk, CommandErr> {
+    async fn run_command(self: &Arc<Self>, command: Command) -> Result<CommandOk, CommandErr> {
         match command {
             Command::DiscoverHomeserver { server_name } => {
                 let client = session::discovery_client(&server_name)
@@ -4235,5 +4297,21 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(error, super::CommandErr::Unavailable));
+    }
+}
+
+#[cfg(test)]
+mod command_name_tests {
+    use super::command_name;
+    use crate::protocol::Command;
+
+    #[test]
+    fn a_command_is_named_without_its_arguments() {
+        let command = Command::LoginFlows {
+            homeserver: "secret.example.org".to_owned(),
+        };
+
+        assert_eq!(command_name(&command), "LoginFlows");
+        assert_eq!(command_name(&Command::Restore), "Restore");
     }
 }
