@@ -47,9 +47,11 @@ function open(onSubmit: () => void): ComposerEditor {
   return editor;
 }
 
-function pressEnter(shiftKey: boolean): void {
+function pressEnter(shiftKey: boolean, heldShift = shiftKey): void {
   const surface = document.querySelector<HTMLElement>('[contenteditable]');
   if (!surface) throw new Error('editor surface not found');
+  if (heldShift)
+    surface.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', bubbles: true }));
   const event = new KeyboardEvent('keydown', { key: 'Enter', shiftKey, bubbles: true });
   Object.defineProperty(event, 'keyCode', { value: 13 });
   surface.dispatchEvent(event);
@@ -76,3 +78,16 @@ test.each([
     expect(editor.doc()?.firstChild?.toString()).toBe(doc);
   }
 );
+
+test('on iOS the auto-capitalise shift is not a Shift press', () => {
+  vi.useFakeTimers();
+  preferences.enterForNewline = 'newline';
+  const submit = vi.fn();
+  const editor = open(submit);
+  editor.setText('hi');
+
+  pressEnter(true, false);
+
+  expect(submit).not.toHaveBeenCalled();
+  expect(editor.doc()?.firstChild?.toString()).toBe('paragraph("hi", hard_break)');
+});

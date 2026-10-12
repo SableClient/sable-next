@@ -694,6 +694,7 @@ export class ComposerEditor {
   private pillSpace: number | null = null;
   private androidDelete: { pos: number; at: number } | null = null;
   private iosEnter: { shift: boolean; handled: boolean } | null = null;
+  private shiftHeld = false;
   private keyboardReset: HTMLTextAreaElement | undefined;
   private keyboardResetFrame: number | undefined;
 
@@ -918,9 +919,14 @@ export class ComposerEditor {
                 if (this.options.onNavigate('Escape')) event.preventDefault();
                 return true;
               }
+              if (event.key === 'Shift') this.shiftHeld = true;
               if (event.key === 'Enter' && hasIosKeyboardContextQuirk()) {
-                this.iosEnter = { shift: event.shiftKey, handled: false };
+                this.iosEnter = { shift: event.shiftKey && this.shiftHeld, handled: false };
               }
+              return false;
+            },
+            keyup: (_view, event) => {
+              if (event.key === 'Shift') this.shiftHeld = false;
               return false;
             },
             beforeinput: (view, event) => {
