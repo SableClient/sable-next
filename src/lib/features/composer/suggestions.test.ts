@@ -63,6 +63,25 @@ test('a member matches on display name or localpart, never on the homeserver', (
   ]);
 });
 
+test('a nickname is matched and listed, and the real name is what gets inserted', () => {
+  const members = [member('@rob:example.org', 'Rob'), member('@ann:example.org', 'Ann')];
+  const nicknames = new Map([['@rob:example.org', 'Bobby']]);
+
+  const [match] = suggestionsFor(
+    mentionQuery('bob'),
+    members,
+    [],
+    [],
+    undefined,
+    null,
+    null,
+    [],
+    (userId, fallback) => nicknames.get(userId) ?? fallback
+  );
+
+  expect(match).toMatchObject({ id: '@rob:example.org', label: '@Bobby', insert: '@Rob' });
+});
+
 test('prefix matches come before contained ones, then alphabetical', () => {
   const members = [
     member('@c:example.org', 'Zoe Anders'),

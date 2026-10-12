@@ -34,6 +34,7 @@
   import { listenNativeFileDrop } from '#lib/platform/file-drop.js';
   import { capturesFromCamera, pickFiles } from '#lib/platform/files.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
+  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { enterInsertsNewline } from '#lib/settings/enter-key.svelte.js';
   import {
@@ -434,7 +435,8 @@
       advertisedAdminCommands.length > 0
         ? adminCommandTree(advertisedAdminCommands)
         : adminCommands,
-      slashBotCommands
+      slashBotCommands,
+      (userId, fallback) => profileOverrides.name(userId, fallback)
     )
   );
 
@@ -1283,7 +1285,7 @@
       if (suggestion.id === ROOM_MENTION) return composerSchema.nodes.room_ping.create();
       return composerSchema.nodes.mention.create({
         userId: suggestion.id,
-        name: suggestion.label,
+        name: suggestion.insert,
       });
     }
 

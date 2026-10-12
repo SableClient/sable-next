@@ -34,41 +34,49 @@ function roomMention(needle: string, translate: Translate): Suggestion[] {
   ];
 }
 
-function memberSuggestions(needle: string, members: readonly MemberView[]): Suggestion[] {
+export type DisplayName = (userId: string, fallback: string) => string;
+
+const atName = (name: string): string => (name.startsWith('@') ? name : `@${name}`);
+
+function memberSuggestions(
+  needle: string,
+  members: readonly MemberView[],
+  displayName: DisplayName
+): Suggestion[] {
   return members
-    .map((member) => ({
-      member,
-      name: member.display_name ?? member.user_id,
-      localpart: localpartOf(member.user_id),
+    .map((member) => {
+      const name = member.display_name ?? member.user_id;
+      return {
+        member,
+        name,
+        shown: displayName(member.user_id, name),
+        localpart: localpartOf(member.user_id),
+      };
+    })
+    .map((entry) => ({
+      ...entry,
+      keys: [entry.shown, entry.name, entry.localpart].map((key) => key.toLowerCase()),
     }))
-    .filter(
-      ({ name, localpart }) =>
-        name.toLowerCase().includes(needle) || localpart.toLowerCase().includes(needle)
-    )
+    .filter(({ keys }) => keys.some((key) => key.includes(needle)))
     .sort((left, right) => {
       const byPrefix = rank(
-        left.name.toLowerCase().startsWith(needle) ||
-          left.localpart.toLowerCase().startsWith(needle),
-        right.name.toLowerCase().startsWith(needle) ||
-          right.localpart.toLowerCase().startsWith(needle)
+        left.keys.some((key) => key.startsWith(needle)),
+        right.keys.some((key) => key.startsWith(needle))
       );
       return (
         byPrefix ||
         byUsage(left.member.user_id, right.member.user_id) ||
-        left.name.localeCompare(right.name)
+        left.shown.localeCompare(right.shown)
       );
     })
     .slice(0, limit)
-    .map(({ member, name }) => {
-      const label = name.startsWith('@') ? name : `@${name}`;
-      return {
-        id: member.user_id,
-        insert: label,
-        label,
-        detail: member.user_id,
-        avatarUrl: member.avatar_url,
-      };
-    });
+    .map(({ member, name, shown }) => ({
+      id: member.user_id,
+      insert: atName(name),
+      label: atName(shown),
+      detail: member.user_id,
+      avatarUrl: member.avatar_url,
+    }));
 }
 
 function emoteSuggestions(needle: string, emotes: readonly PackImageView[]): Suggestion[] {
@@ -236,7 +244,8 @@ export function suggestionsFor(
   translate: Translate = t,
   admin: AdminScope = null,
   adminCommands: readonly AdminCommand[] | null = null,
-  botCommands: readonly BotCommand[] = []
+  botCommands: readonly BotCommand[] = [],
+  displayName: DisplayName = (_userId, fallback) => fallback
 ): Suggestion[] {
   if (!query) return [];
   if (query.sigil === '!') return adminSuggestions(query.query, admin, adminCommands);
@@ -244,7 +253,10 @@ export function suggestionsFor(
 
   if (query.sigil === '/') return commandSuggestions(needle, translate, botCommands);
   if (query.sigil === '@') {
-    return [...roomMention(needle, translate), ...memberSuggestions(needle, members)].slice(
+    return [
+      ...roomMention(needle, translate),
+      ...memberSuggestions(needle, members, displayName),
+    ].slice(
       0,
       limit
     );
