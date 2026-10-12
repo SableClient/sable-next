@@ -333,10 +333,18 @@
     void setUnreadBadge(notifyingTotal);
   });
 
+  let answeredCallRoom = $state<string | null>(null);
+
+  $effect(() => {
+    if (callSession.lifecycle !== 'active') answeredCallRoom = null;
+    else if (callSession.transport.participants.length > 0) answeredCallRoom = callSession.roomId;
+  });
+
   $effect(() => {
     if (!preferences.outgoingRingback) return;
     if (callSession.lifecycle !== 'active') return;
     if (callSession.transport.participants.length > 0) return;
+    if (answeredCallRoom === callSession.roomId) return;
     if (!roomList.byId(callSession.roomId)?.is_direct) return;
 
     const ringback = startRingback(ringtoneVolume(preferences.callRingtoneVolume));
