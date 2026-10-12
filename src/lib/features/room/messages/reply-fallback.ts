@@ -1,26 +1,27 @@
-import { isRecord } from '#lib/guards.js';
-import type { ReplyFallback } from '#lib/rooms/timeline.svelte.js';
+import type { ReplyFallbackView, ReplyView } from '#src/generated/protocol';
 
-import { reactionKey, type Translate } from '../timeline/state-event-text';
+import type { Translate } from '../timeline/state-event-text';
 
-export function replyFallbackFromSource(source: string, t: Translate): ReplyFallback | null {
-  let event: unknown;
-  try {
-    event = JSON.parse(source);
-  } catch {
-    return null;
+export function fallbackText(
+  body: string | null,
+  fallback: ReplyFallbackView | null,
+  t: Translate
+): string {
+  if (body !== null) return body;
+  switch (fallback?.kind) {
+    case 'redacted':
+      return t('timeline.redacted');
+    case 'reaction':
+      return t('timeline.replyToReaction', { key: fallback.key });
+    case 'redaction':
+      return t('timeline.replyToRedaction');
+    case 'event':
+      return t('timeline.replyToEvent', { type: fallback.event_type });
+    case undefined:
+      return '';
   }
-  if (!isRecord(event) || typeof event.type !== 'string') return null;
+}
 
-  const sender = typeof event.sender === 'string' ? event.sender : null;
-  if (isRecord(event.unsigned) && isRecord(event.unsigned.redacted_because)) {
-    return { sender, body: t('timeline.redacted') };
-  }
-  const key = event.type === 'm.reaction' ? reactionKey(event.content) : null;
-  if (key) return { sender, body: t('timeline.replyToReaction', { key }) };
-  if (event.type === 'm.room.redaction') return { sender, body: t('timeline.replyToRedaction') };
-  if (isRecord(event.content) && typeof event.content.body === 'string' && event.content.body) {
-    return { sender, body: event.content.body };
-  }
-  return { sender, body: t('timeline.replyToEvent', { type: event.type }) };
+export function replyText(reply: ReplyView | null, t: Translate): string {
+  return reply === null ? '' : fallbackText(reply.body, reply.fallback, t);
 }

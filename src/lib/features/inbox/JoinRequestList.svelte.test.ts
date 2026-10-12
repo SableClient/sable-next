@@ -20,7 +20,7 @@ const core = Object.assign(baseCore, {
   roomMembers: vi.fn<(roomId: string) => Promise<MemberView[]>>(),
   roomPermissions: vi.fn<(roomId: string) => Promise<RoomPermissionsView>>(),
   inviteUser: vi.fn<() => Promise<void>>(),
-  sendStateEvent: vi.fn<() => Promise<string>>(),
+  denyKnock: vi.fn<(roomId: string, userId: string) => Promise<void>>(),
 });
 const roomList = new RoomList(core as unknown as CoreClient);
 const room = {
@@ -50,7 +50,7 @@ beforeEach(() => {
   core.roomPermissions.mockReset().mockResolvedValue(permissions);
   core.roomMembers.mockReset().mockResolvedValue([alice]);
   core.inviteUser.mockReset().mockResolvedValue(undefined);
-  core.sendStateEvent.mockReset().mockResolvedValue('$denied:example.org');
+  core.denyKnock.mockReset().mockResolvedValue(undefined);
   roomList.rooms = [room];
 });
 
@@ -70,14 +70,7 @@ test('approves room requests and denies space requests', async () => {
   });
   await user.click(within(spaceRow).getByRole('button', { name: 'Deny' }));
   await vi.waitFor(() => {
-    expect(core.sendStateEvent).toHaveBeenCalledWith(
-      space.room_id,
-      'm.room.member',
-      alice.user_id,
-      {
-        membership: 'leave',
-      }
-    );
+    expect(core.denyKnock).toHaveBeenCalledWith(space.room_id, alice.user_id);
     expect(screen.getByText('No pending join requests.')).toBeInTheDocument();
   });
 });

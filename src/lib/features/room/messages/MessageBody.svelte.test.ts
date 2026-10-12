@@ -26,6 +26,7 @@ import { setPreference } from '#lib/settings/preferences.svelte.js';
 import MessageBody from './MessageBody.svelte';
 import MessageBodyMediaHarness from './MessageBodyMediaHarness.test.svelte';
 import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 afterEach(() => {
   setPreference('captionPosition', 'below');
@@ -33,7 +34,7 @@ afterEach(() => {
 });
 
 function item(content: TimelineItemContentView): TimelineItemView {
-  return {
+  return withRowFields({
     id: 'item',
     event_id: '$item',
     transaction_id: null,
@@ -56,7 +57,7 @@ function item(content: TimelineItemContentView): TimelineItemView {
     mention: 'none',
     forwarded: null,
     forum_title: null,
-  };
+  });
 }
 
 function attachment(kind: 'image' | 'video' | 'audio' | 'file'): TimelineItemContentView {

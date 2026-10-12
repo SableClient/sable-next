@@ -6,6 +6,7 @@ import { expect, test, vi } from 'vitest';
 
 import type {
   MemberView,
+  PowerLevelTagView,
   RoomPermissionsView,
   RoomSummary,
   UserDirectoryEntryView,
@@ -23,6 +24,9 @@ const core = Object.assign(baseCore, {
   setUserPowerLevel: vi.fn<() => Promise<void>>(),
   inviteUser: vi.fn<(roomId: string, userId: string) => Promise<void>>(),
   sendStateEvent: vi.fn<() => Promise<string>>(),
+  powerLevelTags: vi.fn<() => Promise<Record<string, PowerLevelTagView>>>(() =>
+    Promise.resolve({})
+  ),
   searchUserDirectory:
     vi.fn<() => Promise<{ limited: boolean; results: UserDirectoryEntryView[] }>>(),
 });
@@ -87,7 +91,7 @@ test('offers approval and denial for join requests', async () => {
 test.each(['Approve', 'Deny'])('answers a join request with %s', async (action) => {
   core.roomMembers.mockResolvedValue([{ ...alice, membership: 'knock' }]);
   core.inviteUser.mockResolvedValue(undefined);
-  core.sendStateEvent.mockResolvedValue('$denied:example.org');
+  core.kickUser.mockResolvedValue(undefined);
   render(RoomMembersSettings, { room, permissions: { ...permissions, can_invite: true } });
   const user = userEvent.setup();
   await user.click(screen.getByRole('radio', { name: 'Requests' }));
@@ -97,15 +101,7 @@ test.each(['Approve', 'Deny'])('answers a join request with %s', async (action) 
   await vi.waitFor(() => {
     if (action === 'Approve')
       expect(core.inviteUser).toHaveBeenCalledWith(room.room_id, alice.user_id);
-    else
-      expect(core.sendStateEvent).toHaveBeenCalledWith(
-        room.room_id,
-        'm.room.member',
-        alice.user_id,
-        {
-          membership: 'leave',
-        }
-      );
+    else expect(core.kickUser).toHaveBeenCalledWith(room.room_id, alice.user_id, null);
     expect(screen.queryByText('Alice')).not.toBeInTheDocument();
   });
 });
@@ -226,9 +222,7 @@ test('offers the roles created in the room alongside the default ones', async ()
   const bob: MemberView = { ...alice, user_id: '@bob:example.org', display_name: 'Bob' };
   core.roomMembers.mockResolvedValue([alice, bob]);
   core.setUserPowerLevel.mockResolvedValue(undefined);
-  Object.assign(core, {
-    roomStateEvent: vi.fn(() => Promise.resolve({ '75': { name: 'Helper' } })),
-  });
+  core.powerLevelTags.mockResolvedValue({ '75': { name: 'Helper', color: null, icon: null } });
   const user = await renderMembers({ ...permissions, can_change_power_levels: true });
 
   const [, bobRole] = screen.getAllByRole('button', { name: 'Change role' });

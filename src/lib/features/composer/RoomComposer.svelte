@@ -118,7 +118,6 @@
     buildInvocation,
     draftsFromText,
     matchBotCommand,
-    parseBotCommands,
     type ArgumentDrafts,
     type BotCommand,
     type BotCommandInvocation,
@@ -769,7 +768,7 @@
     loadedBotCommandsFor = target;
     if (botCommandsFor !== target) botCommands = [];
     try {
-      const commands = parseBotCommands(await core.commands.botCommands(target));
+      const commands = await core.commands.botCommands(target);
       if (roomId !== target) return;
       botCommandsFor = target;
       botCommands = commands;
@@ -834,7 +833,7 @@
 
     editor.clear();
     if (matched.command.parameters.length === 0 && matched.args !== '') {
-      const body = `${typed.prefix}${matched.command.command}${matched.rawArgs}`;
+      const body = `${typed.prefix}${matched.command.command}${matched.raw_args}`;
       if (
         !(await sendBotCommand(matched.command, body, {
           command: matched.command.command,
@@ -847,7 +846,7 @@
     }
     const drafts = draftsFromText(matched.command, matched.args);
     const result = buildInvocation(matched.command, drafts, typed.prefix);
-    if (result.ok) {
+    if (result.kind === 'built') {
       if (!(await sendBotCommand(matched.command, result.body, result.invocation))) {
         if (doc && roomId === targetRoomId && editor.isEmpty()) editor.setDoc(doc);
       }

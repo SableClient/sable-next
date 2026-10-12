@@ -1,92 +1,23 @@
+import type { PowerLevelTagView } from '#src/generated/protocol';
+
+import type { PowerLevelTags } from '#lib/core/commands.svelte.js';
+
 export const POWER_LEVEL_TAGS_EVENT_TYPE = 'in.cinny.room.power_level_tags';
 
 export const MIN_POWER_LEVEL = Number.MIN_SAFE_INTEGER;
 export const MAX_POWER_LEVEL = Number.MAX_SAFE_INTEGER;
 export const FOUNDER_POWER_LEVEL = MAX_POWER_LEVEL + 1;
 
-const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+export type PowerLevelTag = PowerLevelTagView;
 
-export interface PowerLevelTag {
-  readonly name: string;
-  readonly color: string | null;
-  /** A Unicode emoji or Matrix media URI stored in the legacy tag contract. */
-  readonly icon: string | null;
-}
-
-export type PowerLevelTagMap = Readonly<Record<number, PowerLevelTag>>;
+export type PowerLevelTagMap = PowerLevelTags;
 
 export type PowerLevelInputResult =
   | { valid: true; level: number }
   | { valid: false; reason: 'not-a-number' | 'out-of-range' | 'exceeds-own' };
 
-function parseTag(value: unknown): PowerLevelTag | null {
-  if (typeof value !== 'object' || value === null) return null;
-  const name = (value as Record<string, unknown>).name;
-  if (typeof name !== 'string' || name.trim() === '') return null;
-  const color = (value as Record<string, unknown>).color;
-  const rawIcon = (value as Record<string, unknown>).icon;
-  const iconKey =
-    typeof rawIcon === 'object' && rawIcon !== null
-      ? (rawIcon as Record<string, unknown>).key
-      : null;
-  const icon = typeof iconKey === 'string' ? iconKey.trim() || null : null;
-  return {
-    name,
-    color: typeof color === 'string' && HEX_COLOR.test(color) ? color : null,
-    icon,
-  };
-}
-
-export function parsePowerLevelTags(content: unknown): PowerLevelTagMap {
-  if (typeof content !== 'object' || content === null) return {};
-
-  const tags: Record<number, PowerLevelTag> = {};
-  for (const [key, value] of Object.entries(content as Record<string, unknown>)) {
-    if (!/^-?\d+$/.test(key)) continue;
-    const level = Number(key);
-    if (!isValidPowerLevel(level) && key !== String(FOUNDER_POWER_LEVEL)) continue;
-    const tag = parseTag(value);
-    if (tag) tags[level] = tag;
-  }
-  return tags;
-}
-
 export function tagForLevel(tags: PowerLevelTagMap, level: number): PowerLevelTag | null {
-  return tags[level] ?? null;
-}
-
-export function withPowerLevelTag(
-  rawContent: unknown,
-  level: number,
-  tag: PowerLevelTag | null
-): Record<string, unknown> {
-  const base = typeof rawContent === 'object' && rawContent !== null ? rawContent : {};
-  const next: Record<string, unknown> = { ...(base as Record<string, unknown>) };
-  const key = String(level);
-
-  if (tag === null) {
-    const { [key]: _removed, ...rest } = next;
-    return rest;
-  }
-
-  const existing = next[key];
-  const existingFields = typeof existing === 'object' && existing !== null ? existing : {};
-  next[key] = {
-    ...existingFields,
-    name: tag.name,
-    color: tag.color ?? undefined,
-    icon: tag.icon ? { key: tag.icon } : undefined,
-  };
-  return next;
-}
-
-export function withPowerLevelTagsFrom(
-  rawContent: unknown,
-  rawSource: unknown
-): Record<string, unknown> {
-  const base = typeof rawContent === 'object' && rawContent !== null ? rawContent : {};
-  const source = typeof rawSource === 'object' && rawSource !== null ? rawSource : {};
-  return { ...(base as Record<string, unknown>), ...(source as Record<string, unknown>) };
+  return Object.hasOwn(tags, level) ? tags[level] : null;
 }
 
 export function isValidPowerLevel(value: number): boolean {

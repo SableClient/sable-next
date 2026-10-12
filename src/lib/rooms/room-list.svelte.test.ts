@@ -7,6 +7,7 @@ import { countNotifications, notifications } from '#lib/features/inbox/inbox.js'
 
 import { setQuiet } from './quiet-rooms.svelte.js';
 import { RoomList, roomPathId } from './room-list.svelte.js';
+import { withCounts } from './summary-fixtures.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -27,129 +28,50 @@ function stubLocalStorage(): Map<string, string> {
   return stored;
 }
 
-test('resolves notification modes for the whole list in one command', async () => {
-  const roomNotificationModes = vi.fn((roomIds: readonly string[]) =>
-    Promise.resolve(
-      roomIds.map((room_id) => ({
-        room_id,
-        room: room_id.startsWith('!room-1') ? ('mute' as const) : null,
-        default: 'all' as const,
-      }))
-    )
-  );
-  const rooms = Array.from({ length: 20 }, (_, index) => ({
-    room_id: `!room-${String(index)}:example.org`,
-  })) as RoomSummary[];
+test("reads a room's mode off its summary", async () => {
+  const rooms = [
+    withCounts({
+      room_id: '!muted:example.org',
+      notification: { room: 'mute', default: 'all' },
+    } as RoomSummary),
+    withCounts({ room_id: '!plain:example.org', is_direct: false } as RoomSummary),
+  ];
   const core = {
-    subscribeEvents: vi.fn(() => {
-      return () => {};
-    }),
+    subscribeEvents: vi.fn(() => () => {}),
     commands: {
       subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms })),
-      roomNotificationModes,
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
   const roomList = new RoomList(core);
 
   await roomList.start();
-  await vi.waitFor(() => {
-    expect(
-      rooms.filter((entry) => roomList.notificationMode(entry.room_id) === 'mute')
-    ).toHaveLength(11);
-  });
 
-  expect(roomNotificationModes).toHaveBeenCalledTimes(1);
-  expect(roomNotificationModes.mock.calls[0]?.[0]).toHaveLength(20);
-  expect(roomList.notificationMode('!room-0:example.org')).toBe('all');
-  expect(roomList.notificationMode('!room-1:example.org')).toBe('mute');
-  roomList.stop();
-});
-
-test('a room override set here shows before the push rules echo back', async () => {
-  const rooms = [{ room_id: '!room:example.org' }] as RoomSummary[];
-  const core = {
-    subscribeEvents: vi.fn(() => {
-      return () => {};
-    }),
-    commands: {
-      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms })),
-      roomNotificationModes: vi.fn(() =>
-        Promise.resolve([{ room_id: '!room:example.org', room: null, default: 'all' as const }])
-      ),
-      unsubscribe: vi.fn(() => Promise.resolve()),
-    },
-  } as unknown as CoreClient;
-  const roomList = new RoomList(core);
-
-  await roomList.start();
-  await vi.waitFor(() => {
-    expect(roomList.notificationMode('!room:example.org')).toBe('all');
-  });
-
-  roomList.setNotificationOverride('!room:example.org', 'mentions');
-  expect(roomList.notificationOverride('!room:example.org')).toBe('mentions');
-  expect(roomList.notificationMode('!room:example.org')).toBe('mentions');
-
-  roomList.setNotificationOverride('!room:example.org', null);
-  expect(roomList.notificationMode('!room:example.org')).toBe('all');
-  roomList.stop();
-});
-
-test('a stale notification-mode refresh cannot overwrite a room override', async () => {
-  const room = { room_id: '!room:example.org' } as RoomSummary;
-  const eventListeners: ((event: unknown) => void)[] = [];
-  let resolveRefresh: (
-    value: { room_id: string; room: 'mentions'; default: 'all' }[]
-  ) => void = () => {};
-  let loads = 0;
-  const roomNotificationModes = vi.fn((roomIds: readonly string[]) => {
-    loads += 1;
-    if (loads === 1)
-      return Promise.resolve(
-        roomIds.map((room_id) => ({ room_id, room: 'mentions' as const, default: 'all' as const }))
-      );
-
-    return new Promise((resolve) => {
-      resolveRefresh = resolve;
-    });
-  });
-  const core = {
-    subscribeEvents: vi.fn((listener: (event: unknown) => void) => {
-      eventListeners.push(listener);
-      return () => {};
-    }),
-    commands: {
-      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
-      roomNotificationModes,
-      unsubscribe: vi.fn(() => Promise.resolve()),
-    },
-  } as unknown as CoreClient;
-  const roomList = new RoomList(core);
-
-  await roomList.start();
-  await vi.waitFor(() => {
-    expect(roomList.notificationOverride(room.room_id)).toBe('mentions');
-  });
-
-  eventListeners[1]?.({ type: 'notification_settings_changed' });
-  await vi.waitFor(() => {
-    expect(roomNotificationModes).toHaveBeenCalledTimes(2);
-  });
-
-  roomList.setNotificationOverride(room.room_id, 'all');
-  resolveRefresh([{ room_id: room.room_id, room: 'mentions', default: 'all' }]);
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(roomList.notificationOverride(room.room_id)).toBe('all');
+  expect(roomList.notificationOverride('!muted:example.org')).toBe('mute');
+  expect(roomList.notificationMode('!muted:example.org')).toBe('mute');
+  expect(roomList.notificationOverride('!plain:example.org')).toBeNull();
+  expect(roomList.notificationMode('!plain:example.org')).toBe('mentions');
+  expect(roomList.notificationMode('!missing:example.org')).toBeNull();
   roomList.stop();
 });
 
 test('inbox counts follow badge defaults, and a mute silences it at once', async () => {
-  const rooms = [
-    { room_id: '!loud', state: 'joined', unread: 2, notifying: 2, highlight: 0 },
-    { room_id: '!quiet', state: 'joined', unread: 3, notifying: 0, highlight: 0 },
-  ] as RoomSummary[];
-  let loudMode = 'all' as 'all' | 'mute';
+  const loud = withCounts({
+    room_id: '!loud',
+    state: 'joined',
+    unread: 2,
+    notifying: 2,
+    highlight: 0,
+    notification: { room: 'all', default: 'all' },
+  } as RoomSummary);
+  const quiet = withCounts({
+    room_id: '!quiet',
+    state: 'joined',
+    unread: 3,
+    notifying: 0,
+    highlight: 0,
+    notification: { room: null, default: 'all' },
+  } as RoomSummary);
   const listeners: ((event: unknown) => void)[] = [];
   const core = {
     subscribeEvents: (listener: (event: unknown) => void) => {
@@ -157,33 +79,26 @@ test('inbox counts follow badge defaults, and a mute silences it at once', async
       return () => {};
     },
     commands: {
-      subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms }),
-      roomNotificationModes: () =>
-        Promise.resolve(
-          rooms.map((room) => ({
-            room_id: room.room_id,
-            room: room.room_id === '!loud' ? loudMode : null,
-            default: 'all',
-          }))
-        ),
+      subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [loud, quiet] }),
       unsubscribe: async () => {},
     },
   } as unknown as CoreClient;
   const roomList = new RoomList(core);
   await roomList.start();
-  await vi.waitFor(() => {
-    expect(roomList.notificationMode('!loud')).toBe('all');
-  });
   expect(countNotifications(roomList.rooms, roomList.badgeUnreadFor)).toBe(2);
   expect(
     notifications(roomList.rooms, 'all', roomList.badgeUnreadFor).map((room) => room.room_id)
   ).toEqual(['!loud', '!quiet']);
 
-  loudMode = 'mute';
-  for (const listener of listeners) listener({ type: 'notification_settings_changed' });
-  await vi.waitFor(() => {
-    expect(countNotifications(roomList.rooms, roomList.badgeUnreadFor)).toBe(0);
-  });
+  const muted = withCounts({ ...loud, notification: { room: 'mute', default: 'all' } });
+  for (const listener of listeners) {
+    listener({
+      type: 'room_list_diff',
+      subscription: 1,
+      diffs: [{ op: 'set', index: 0, value: muted }],
+    });
+  }
+  expect(countNotifications(roomList.rooms, roomList.badgeUnreadFor)).toBe(0);
   roomList.stop();
 });
 
@@ -201,7 +116,6 @@ test('clears a room avatar when a room-list diff supplies null', async () => {
     }),
     commands: {
       subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
-      roomNotificationModes: vi.fn(() => Promise.resolve([])),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
@@ -228,7 +142,6 @@ test('holds the typing user ids so a room opened later reads them', async () => 
     }),
     commands: {
       subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
-      roomNotificationModes: vi.fn(() => Promise.resolve([])),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
@@ -251,7 +164,14 @@ test('holds the typing user ids so a room opened later reads them', async () => 
 });
 
 test('paints the persisted room list before the subscription answers', async () => {
-  const room = { room_id: '!persisted:example.org', name: 'Persisted' } as RoomSummary;
+  const room = withCounts({
+    room_id: '!persisted:example.org',
+    name: 'Persisted',
+    unread: 0,
+    notifying: 0,
+    highlight: 0,
+    marked_unread: false,
+  } as RoomSummary);
   stubLocalStorage().set('sable.room-list.acct', JSON.stringify([room]));
   let resolveSubscription: (value: {
     subscription: number;
@@ -267,7 +187,6 @@ test('paints the persisted room list before the subscription answers', async () 
             resolveSubscription = resolve;
           })
       ),
-      roomNotificationModes: vi.fn(() => Promise.resolve([])),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
@@ -283,62 +202,33 @@ test('paints the persisted room list before the subscription answers', async () 
   roomList.stop();
 });
 
-test('does not show cached unread counts before a room notification mode resolves', async () => {
-  const stored = stubLocalStorage();
-  const muted = {
-    room_id: '!muted:example.org',
-    unread: 4,
-    highlight: 0,
-    marked_unread: false,
-  } as RoomSummary;
-  stored.set('sable.room-list.acct', JSON.stringify([muted]));
-  let resolveModes: (value: { room_id: string; room: 'mute'; default: 'all' }[]) => void = () => {};
+test('a snapshot from a build before resolved counts paints nothing', () => {
+  stubLocalStorage().set(
+    'sable.room-list.acct',
+    JSON.stringify([{ room_id: '!old:example.org', unread: 4 }])
+  );
   const core = {
     session: { account_id: 'acct' },
     subscribeEvents: vi.fn(() => () => {}),
     commands: {
-      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [muted] })),
-      roomNotificationModes: vi.fn(
-        () =>
-          new Promise<{ room_id: string; room: 'mute'; default: 'all' }[]>((resolve) => {
-            resolveModes = resolve;
-          })
-      ),
+      subscribeRoomList: vi.fn(() => new Promise(() => {})),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
   const roomList = new RoomList(core);
 
-  await roomList.start();
-  expect(roomList.unreadFor(muted)).toEqual({
-    unread: 0,
-    highlight: 0,
-    marked: false,
-    notifying: 0,
-  });
-  expect(roomList.notificationsFor(muted)).toEqual({ unread: 0, highlight: 0, marked: false });
-
-  resolveModes([{ room_id: muted.room_id, room: 'mute', default: 'all' }]);
-  await vi.waitFor(() => {
-    expect(roomList.notificationMode(muted.room_id)).toBe('mute');
-  });
-  expect(roomList.unreadFor(muted)).toEqual({
-    unread: 0,
-    highlight: 0,
-    marked: false,
-    notifying: 0,
-  });
+  void roomList.start();
+  expect(roomList.rooms).toEqual([]);
   roomList.stop();
 });
 
-test('is not settled on a painted snapshot or while notification modes load', async () => {
-  const room = { room_id: '!room:example.org' } as RoomSummary;
+test('is not settled on a painted snapshot', async () => {
+  const room = withCounts({ room_id: '!room:example.org' } as RoomSummary);
   stubLocalStorage().set('sable.room-list.acct', JSON.stringify([room]));
   let resolveSubscription: (value: {
     subscription: number;
     rooms: RoomSummary[];
   }) => void = () => {};
-  let resolveModes: (value: never[]) => void = () => {};
   const core = {
     session: { account_id: 'acct' },
     subscribeEvents: vi.fn(() => () => {}),
@@ -347,12 +237,6 @@ test('is not settled on a painted snapshot or while notification modes load', as
         () =>
           new Promise<{ subscription: number; rooms: RoomSummary[] }>((resolve) => {
             resolveSubscription = resolve;
-          })
-      ),
-      roomNotificationModes: vi.fn(
-        () =>
-          new Promise<never[]>((resolve) => {
-            resolveModes = resolve;
           })
       ),
       unsubscribe: vi.fn(() => Promise.resolve()),
@@ -365,18 +249,13 @@ test('is not settled on a painted snapshot or while notification modes load', as
 
   resolveSubscription({ subscription: 1, rooms: [room] });
   await started;
-  expect(roomList.settled).toBe(false);
-
-  resolveModes([]);
-  await vi.waitFor(() => {
-    expect(roomList.settled).toBe(true);
-  });
+  expect(roomList.settled).toBe(true);
   roomList.stop();
 });
 
 test('a diff after an empty first answer replaces the painted snapshot rather than joining it', async () => {
-  const first = { room_id: '!first:example.org' } as RoomSummary;
-  const second = { room_id: '!second:example.org' } as RoomSummary;
+  const first = withCounts({ room_id: '!first:example.org' } as RoomSummary);
+  const second = withCounts({ room_id: '!second:example.org' } as RoomSummary);
   stubLocalStorage().set('sable.room-list.acct', JSON.stringify([first, second]));
   const eventListeners: ((event: unknown) => void)[] = [];
   const core = {
@@ -387,7 +266,6 @@ test('a diff after an empty first answer replaces the painted snapshot rather th
     }),
     commands: {
       subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [] })),
-      roomNotificationModes: vi.fn(() => Promise.resolve([])),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
@@ -417,7 +295,6 @@ test('waits for a room to be listed, and gives up after the timeout', async () =
     }),
     commands: {
       subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [listed] })),
-      roomNotificationModes: vi.fn(() => Promise.resolve([])),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
@@ -459,7 +336,6 @@ test('persists the live room list for the next launch', async () => {
     subscribeEvents: vi.fn(() => () => {}),
     commands: {
       subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
-      roomNotificationModes: vi.fn(() => Promise.resolve([])),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
@@ -483,7 +359,6 @@ test('defers room-list snapshot writes until presentation resumes', async () => 
     subscribeEvents: vi.fn(() => () => {}),
     commands: {
       subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
-      roomNotificationModes: vi.fn(() => Promise.resolve([])),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
@@ -499,58 +374,6 @@ test('defers room-list snapshot writes until presentation resumes', async () => 
 
   roomList.stop();
   vi.useRealTimers();
-});
-
-test('a muted room that drops out of a reset and returns stays muted', async () => {
-  const muted = {
-    room_id: '!muted:example.org',
-    unread: 4,
-    highlight: 0,
-    marked_unread: false,
-  } as RoomSummary;
-  const eventListeners: ((event: unknown) => void)[] = [];
-  let reloads = 0;
-  const roomNotificationModes = vi.fn(async (roomIds: readonly string[]) => {
-    reloads += 1;
-    if (reloads > 1) await new Promise(() => {});
-    return roomIds.map((room_id) => ({ room_id, room: 'mute' as const, default: 'all' as const }));
-  });
-  const core = {
-    subscribeEvents: vi.fn((listener: (event: unknown) => void) => {
-      eventListeners.push(listener);
-      return () => {};
-    }),
-    commands: {
-      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [muted] })),
-      roomNotificationModes,
-      unsubscribe: vi.fn(() => Promise.resolve()),
-    },
-  } as unknown as CoreClient;
-  const roomList = new RoomList(core);
-
-  await roomList.start();
-  await vi.waitFor(() => {
-    expect(roomList.notificationMode(muted.room_id)).toBe('mute');
-  });
-
-  const reset = (rooms: RoomSummary[]): void => {
-    eventListeners[0]?.({
-      type: 'room_list_diff',
-      subscription: 1,
-      diffs: [{ op: 'reset', values: rooms }],
-    });
-  };
-  reset([]);
-  reset([muted]);
-
-  expect(roomList.notificationMode(muted.room_id)).toBe('mute');
-  expect(roomList.unreadFor(muted)).toEqual({
-    unread: 0,
-    highlight: 0,
-    marked: false,
-    notifying: 0,
-  });
-  roomList.stop();
 });
 
 test('looks rooms up by id and labels them by name, then alias, then id', () => {
@@ -574,30 +397,25 @@ test('looks rooms up by id and labels them by name, then alias, then id', () => 
 });
 
 test('a hidden room keeps its unread state and badges only its mentions', async () => {
-  const quiet = {
+  const quiet = withCounts({
     room_id: '!quiet:example.org',
     unread: 4,
     notifying: 4,
     highlight: 1,
     marked_unread: false,
     space_children: [],
-  } as unknown as RoomSummary;
+    notification: { room: null, default: 'all' },
+  } as unknown as RoomSummary);
   const core = {
     subscribeEvents: vi.fn(() => () => {}),
     commands: {
       subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [quiet] })),
-      roomNotificationModes: vi.fn(() =>
-        Promise.resolve([{ room_id: quiet.room_id, room: null, default: 'all' as const }])
-      ),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
   const roomList = new RoomList(core);
 
   await roomList.start();
-  await vi.waitFor(() => {
-    expect(roomList.notificationMode(quiet.room_id)).toBe('all');
-  });
   setQuiet(quiet.room_id, true);
 
   expect(roomList.unreadFor(quiet)).toEqual({
@@ -618,7 +436,7 @@ test('a hidden room keeps its unread state and badges only its mentions', async 
 });
 
 test('badge defaults quiet group rooms while push stays all', async () => {
-  const group = {
+  const group = withCounts({
     room_id: '!group:example.org',
     is_direct: false,
     unread: 5,
@@ -626,8 +444,9 @@ test('badge defaults quiet group rooms while push stays all', async () => {
     highlight: 0,
     marked_unread: false,
     space_children: [],
-  } as unknown as RoomSummary;
-  const dm = {
+    notification: { room: null, default: 'all' },
+  } as unknown as RoomSummary);
+  const dm = withCounts({
     room_id: '!dm:example.org',
     is_direct: true,
     unread: 3,
@@ -635,26 +454,18 @@ test('badge defaults quiet group rooms while push stays all', async () => {
     highlight: 0,
     marked_unread: false,
     space_children: [],
-  } as unknown as RoomSummary;
+    notification: { room: null, default: 'all' },
+  } as unknown as RoomSummary);
   const core = {
     subscribeEvents: vi.fn(() => () => {}),
     commands: {
       subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [group, dm] })),
-      roomNotificationModes: vi.fn(() =>
-        Promise.resolve([
-          { room_id: group.room_id, room: null, default: 'all' as const },
-          { room_id: dm.room_id, room: null, default: 'all' as const },
-        ])
-      ),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
   const roomList = new RoomList(core);
 
   await roomList.start();
-  await vi.waitFor(() => {
-    expect(roomList.notificationMode(group.room_id)).toBe('all');
-  });
 
   expect(roomList.badgeUnreadFor(group)).toEqual({
     unread: 5,

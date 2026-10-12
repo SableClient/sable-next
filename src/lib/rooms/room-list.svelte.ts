@@ -1,5 +1,4 @@
 import { createContext, untrack } from 'svelte';
-import { SvelteMap } from 'svelte/reactivity';
 
 import type {
   CoreEvent,
@@ -20,7 +19,6 @@ import { quietRoomIds } from './spaces.js';
 import {
   applyBadgeMode,
   badgeModeFor,
-  type NotificationModeResolver,
   quietUnread,
   roomNotifications,
   type RoomUnread,
@@ -29,8 +27,6 @@ import {
 
 type RoomListDiffs = Extract<CoreEvent, { type: 'room_list_diff' }>['diffs'];
 
-type RoomNotificationModes = { room: NotificationModeView | null; fallback: NotificationModeView };
-const NOTIFICATION_MODE_BATCH = 200;
 const SNAPSHOT_WRITE_DELAY_MS = 1_000;
 const WARM_ROOM_LIMIT = 32;
 const WARM_BATCH_MS = 100;
@@ -103,19 +99,9 @@ export class RoomList {
 
   private subscription: SubscriptionId | null = null;
   private unsubscribeEvents: (() => void) | null = null;
-  private unsubscribeNotificationSettings: (() => void) | null = null;
   private unsubscribeTyping: (() => void) | null = null;
   private startPromise: Promise<void> | null = null;
   private generation = 0;
-  /* eslint-disable svelte/prefer-svelte-reactivity -- rows read the published snapshot, not these */
-  private readonly notificationModes = new Map<string, RoomNotificationModes>();
-  private readonly notificationModeVersions = new Map<string, number>();
-  private readonly loadingNotificationModes = new Set<string>();
-  /* eslint-enable svelte/prefer-svelte-reactivity */
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
-  private publishedModes = $state.raw<ReadonlyMap<string, RoomNotificationModes>>(new Map());
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
-  private publishedLoadingModes = $state.raw<ReadonlySet<string>>(new Set());
   private snapshotAccountId: string | null = null;
   private snapshotWriteTimer: ReturnType<typeof setTimeout> | undefined;
   private snapshotDirty = false;
@@ -134,7 +120,7 @@ export class RoomList {
   constructor(private readonly core: CoreClient) {}
 
   get settled(): boolean {
-    return this.live && this.publishedLoadingModes.size === 0;
+    return this.live;
   }
 
   byId(roomId: string | null | undefined): RoomSummary | undefined {
@@ -184,37 +170,29 @@ export class RoomList {
   }
 
   notificationOverride(roomId: string): NotificationModeView | null {
-    return this.publishedModes.get(roomId)?.room ?? null;
+    return this.byId(roomId)?.notification.room ?? null;
   }
 
   notificationMode(roomId: string): NotificationModeView | null {
-    const mode = this.publishedModes.get(roomId);
-    return mode?.room ?? mode?.fallback ?? null;
+    const notification = this.byId(roomId)?.notification;
+    return notification ? (notification.room ?? notification.default) : null;
   }
 
-  readonly notificationModeOf: NotificationModeResolver = (roomId) => this.notificationMode(roomId);
-
-  readonly unreadFor: RoomUnread = (room) =>
-    this.notificationModeIsLoading(room.room_id)
-      ? { unread: 0, highlight: 0, marked: room.marked_unread, notifying: 0 }
-      : roomUnread(room, this.notificationMode(room.room_id));
+  readonly unreadFor: RoomUnread = roomUnread;
 
   readonly badgeUnreadFor: RoomUnread = (room) => {
-    const counts = this.unreadFor(room);
+    const counts = roomUnread(room);
     if (this.quietRoomIds.has(room.room_id)) return quietUnread(counts);
     return applyBadgeMode(
       counts,
-      badgeModeFor(room, this.notificationOverride(room.room_id), {
+      badgeModeFor(room, room.notification.room, {
         direct: preferences.badgeDefaultDirect,
         group: preferences.badgeDefaultGroup,
       })
     );
   };
 
-  readonly notificationsFor: RoomUnread = (room) =>
-    this.notificationModeIsLoading(room.room_id)
-      ? { unread: 0, highlight: 0, marked: room.marked_unread }
-      : roomNotifications(room, this.notificationMode(room.room_id));
+  readonly notificationsFor: RoomUnread = roomNotifications;
 
   async start(): Promise<void> {
     if (this.subscription !== null) return;
@@ -248,17 +226,8 @@ export class RoomList {
     this.rooms = [];
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     this.typingUsers = new Map();
-    this.notificationModes.clear();
-    this.notificationModeVersions.clear();
-    this.loadingNotificationModes.clear();
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
-    this.publishedModes = new Map();
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
-    this.publishedLoadingModes = new Set();
     this.unsubscribeEvents?.();
     this.unsubscribeEvents = null;
-    this.unsubscribeNotificationSettings?.();
-    this.unsubscribeNotificationSettings = null;
     this.unsubscribeTyping?.();
     this.unsubscribeTyping = null;
 
@@ -296,10 +265,6 @@ export class RoomList {
     const rooms = buffered.activate(response.subscription, response.rooms);
     if (rooms.length > 0 || !this.snapshotPainted()) this.setRooms(rooms);
     this.unsubscribeEvents = buffered.stop;
-    this.unsubscribeNotificationSettings = this.core.subscribeEvents((event) => {
-      if (event.type === 'notification_settings_changed')
-        void this.loadNotificationModes(this.rooms);
-    });
     this.unsubscribeTyping = this.core.subscribeEvents((event) => {
       if (event.type !== 'typing') return;
 
@@ -357,80 +322,6 @@ export class RoomList {
       if (rooms.some((room) => room.room_id === waiter.roomId)) waiter.resolve();
     }
     this.scheduleSnapshotWrite();
-    void this.loadNotificationModes(
-      rooms.filter((room) => !this.notificationModes.has(room.room_id))
-    );
-  }
-
-  private async loadNotificationModes(rooms: readonly RoomSummary[]): Promise<void> {
-    const generation = this.generation;
-    const pending = rooms.filter((room) => !this.loadingNotificationModes.has(room.room_id));
-    const requestedVersions = new SvelteMap(
-      pending.map((room) => [room.room_id, this.notificationModeVersions.get(room.room_id) ?? 0])
-    );
-    for (const room of pending) this.loadingNotificationModes.add(room.room_id);
-    this.publishLoadingModes();
-    const modes: { roomId: string; mode: RoomNotificationModes }[] = [];
-    for (let index = 0; index < pending.length; index += NOTIFICATION_MODE_BATCH) {
-      const batch = pending
-        .slice(index, index + NOTIFICATION_MODE_BATCH)
-        .map((room) => room.room_id);
-      try {
-        for (const entry of await this.core.commands.roomNotificationModes(batch)) {
-          modes.push({
-            roomId: entry.room_id,
-            mode: { room: entry.room, fallback: entry.default },
-          });
-        }
-      } catch (error) {
-        console.debug('[sable rooms] notification modes unavailable', error);
-      }
-    }
-    for (const room of pending) this.loadingNotificationModes.delete(room.room_id);
-    this.publishLoadingModes();
-    if (generation !== this.generation) return;
-
-    let changed = false;
-    for (const { roomId, mode } of modes) {
-      if ((this.notificationModeVersions.get(roomId) ?? 0) !== requestedVersions.get(roomId))
-        continue;
-
-      const previous = this.notificationModes.get(roomId);
-      if (previous?.room === mode.room && previous.fallback === mode.fallback) continue;
-
-      this.notificationModes.set(roomId, mode);
-      changed = true;
-    }
-    if (!changed) return;
-
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
-    this.publishedModes = new Map(this.notificationModes);
-  }
-
-  setNotificationOverride(roomId: string, room: NotificationModeView | null): void {
-    const previous = this.notificationModes.get(roomId);
-    if (!previous || previous.room === room) return;
-    this.notificationModeVersions.set(roomId, (this.notificationModeVersions.get(roomId) ?? 0) + 1);
-    this.notificationModes.set(roomId, { ...previous, room });
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
-    this.publishedModes = new Map(this.notificationModes);
-  }
-
-  private publishLoadingModes(): void {
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
-    const firstRead = new Set<string>();
-    for (const roomId of this.loadingNotificationModes) {
-      if (!this.notificationModes.has(roomId)) firstRead.add(roomId);
-    }
-    const published = this.publishedLoadingModes;
-    if (firstRead.size === published.size && [...firstRead].every((id) => published.has(id)))
-      return;
-
-    this.publishedLoadingModes = firstRead;
-  }
-
-  private notificationModeIsLoading(roomId: string): boolean {
-    return this.publishedLoadingModes.has(roomId) && !this.publishedModes.has(roomId);
   }
 }
 

@@ -1,5 +1,9 @@
 <script lang="ts">
-  import type { RoomPowerLevelsView, RoomSummary } from '#src/generated/protocol';
+  import type {
+    HistoryVisibilityView,
+    RoomPowerLevelsView,
+    RoomSummary,
+  } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -10,8 +14,12 @@
   import { canSendState } from './permission-groups';
 
   const EVENT_TYPE = 'm.room.history_visibility';
-  const VISIBILITIES = ['shared', 'invited', 'joined', 'world_readable'] as const;
-  type Visibility = (typeof VISIBILITIES)[number];
+  const VISIBILITIES: readonly HistoryVisibilityView[] = [
+    'shared',
+    'invited',
+    'joined',
+    'world_readable',
+  ];
 
   interface Props {
     room: RoomSummary | null;
@@ -22,7 +30,7 @@
   let { room, levels, ownPowerLevel }: Props = $props();
   const core = useCoreClient();
 
-  let visibility = $state<Visibility>('shared');
+  let visibility = $state<HistoryVisibilityView>('shared');
   let saving = $state(false);
   let run = 0;
 
@@ -38,22 +46,15 @@
 
     const current = ++run;
     void core.commands
-      .roomStateEvent(target, EVENT_TYPE)
-      .then((content) => {
-        if (current !== run) return;
-        visibility = read(content);
+      .historyVisibility(target)
+      .then((next) => {
+        if (current === run) visibility = next;
       })
       .catch((error: unknown) => {
         console.debug('[sable room] history visibility unavailable', error);
         toasts.error($i18n.t('errors.actionFailed'));
       });
   });
-
-  function read(content: unknown): Visibility {
-    if (typeof content !== 'object' || content === null) return 'shared';
-    const value = (content as { history_visibility?: unknown }).history_visibility;
-    return VISIBILITIES.find((entry) => entry === value) ?? 'shared';
-  }
 
   async function select(next: string): Promise<void> {
     const target = roomId;
@@ -64,7 +65,7 @@
     visibility = chosen;
     saving = true;
     try {
-      await core.commands.sendStateEvent(target, EVENT_TYPE, '', { history_visibility: chosen });
+      await core.commands.setHistoryVisibility(target, chosen);
     } catch (error) {
       console.warn('[sable room] history visibility change failed', error);
       visibility = previous;

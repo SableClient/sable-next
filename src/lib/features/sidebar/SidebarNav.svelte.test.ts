@@ -40,6 +40,7 @@ core.roomPermissions.mockResolvedValue({ can_manage_children: false });
 import SidebarNav from './SidebarNavHarness.test.svelte';
 import { RoomList } from '#lib/rooms/room-list.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 beforeEach(() => {
   visit('/rooms');
@@ -51,7 +52,7 @@ afterEach(() => {
 });
 
 function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
-  return {
+  return withCounts({
     room_id: roomId,
     canonical_alias: null,
     name,
@@ -78,7 +79,7 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
     highlight: 0,
     marked_unread: false,
     latest_event: null,
-  };
+  });
 }
 
 async function startRoomList(core: CoreClient): Promise<RoomList> {
@@ -136,7 +137,6 @@ test.each([
       subscribeEvents: () => () => {},
       commands: {
         subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms }),
-        roomNotificationModes: () => Promise.resolve([]),
         unsubscribe: () => Promise.resolve(),
       },
     } as unknown as CoreClient;
@@ -190,7 +190,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
 
   expect(screen.queryByRole('link', { name: 'Alice' })).not.toBeInTheDocument();
 
-  const incoming = {
+  const incoming = withCounts({
     ...room,
     unread: 1,
     notifying: 1,
@@ -201,7 +201,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
       sending: false,
       event_id: '$message',
     },
-  };
+  });
   for (const listener of listeners)
     listener({
       type: 'room_list_diff',
@@ -232,7 +232,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
     listener({
       type: 'room_list_diff',
       subscription: 1,
-      diffs: [{ op: 'set', index: 0, value: { ...incoming, unread: 0 } }],
+      diffs: [{ op: 'set', index: 0, value: withCounts({ ...incoming, unread: 0 }) }],
     });
   await tick();
 
@@ -252,7 +252,6 @@ test('keeps the rail order when a room-list reset reorders spaces', async () => 
     },
     commands: {
       subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [alpha, beta] }),
-      roomNotificationModes: () => Promise.resolve([]),
       unsubscribe: () => Promise.resolve(),
     },
   } as unknown as CoreClient;
@@ -286,7 +285,6 @@ test('a subspace pinned in the stored layout joins the rail beside its parent', 
     subscribeEvents: () => () => {},
     commands: {
       subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [parent, child] }),
-      roomNotificationModes: () => Promise.resolve([]),
       unsubscribe: () => Promise.resolve(),
     },
   } as unknown as CoreClient;
@@ -304,28 +302,22 @@ test('a subspace pinned in the stored layout joins the rail beside its parent', 
 });
 
 test('a muted direct chat marked unread by hand still reaches the navbar', async () => {
-  const room: RoomSummary = {
+  const room: RoomSummary = withCounts({
     ...space('!muted:example.org', 'Bo'),
     is_space: false,
     is_direct: true,
     direct_targets: ['@bo:example.org'],
     marked_unread: true,
-  };
+    notification: { room: 'mute', default: 'all' },
+  });
   const core = {
     subscribeEvents: () => () => {},
     commands: {
       subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
-      roomNotificationModes: (roomIds: readonly string[]) =>
-        Promise.resolve(
-          roomIds.map((room_id) => ({ room_id, room: 'mute' as const, default: 'all' as const }))
-        ),
       unsubscribe: () => Promise.resolve(),
     },
   } as unknown as CoreClient;
-  const roomList = await startRoomList(core);
-  await vi.waitFor(() => {
-    expect(roomList.notificationMode(room.room_id)).toBe('mute');
-  });
+  await startRoomList(core);
 
   render(SidebarNav, { mobile: true });
   await tick();
@@ -337,26 +329,20 @@ test('a muted direct chat marked unread by hand still reaches the navbar', async
 });
 
 test('a muted room marked unread by hand still marks its section as unread', async () => {
-  const room: RoomSummary = {
+  const room: RoomSummary = withCounts({
     ...space('!muted-room:example.org', 'Ops'),
     is_space: false,
     marked_unread: true,
-  };
+    notification: { room: 'mute', default: 'all' },
+  });
   const core = {
     subscribeEvents: () => () => {},
     commands: {
       subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
-      roomNotificationModes: (roomIds: readonly string[]) =>
-        Promise.resolve(
-          roomIds.map((room_id) => ({ room_id, room: 'mute' as const, default: 'all' as const }))
-        ),
       unsubscribe: () => Promise.resolve(),
     },
   } as unknown as CoreClient;
-  const roomList = await startRoomList(core);
-  await vi.waitFor(() => {
-    expect(roomList.notificationMode(room.room_id)).toBe('mute');
-  });
+  await startRoomList(core);
 
   render(SidebarNav, { mobile: true });
   await tick();
@@ -370,27 +356,21 @@ test('a section totals its notifying rooms in green', async () => {
   onTestFinished(() => {
     setPreference('showUnreadCounts', false);
   });
-  const room: RoomSummary = {
+  const room: RoomSummary = withCounts({
     ...space('!loud:example.org', 'Loud'),
     is_space: false,
     unread: 4,
     notifying: 4,
-  };
+    notification: { room: 'all', default: 'all' },
+  });
   const core = {
     subscribeEvents: () => () => {},
     commands: {
       subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
-      roomNotificationModes: (roomIds: readonly string[]) =>
-        Promise.resolve(
-          roomIds.map((room_id) => ({ room_id, room: 'all' as const, default: 'all' as const }))
-        ),
       unsubscribe: () => Promise.resolve(),
     },
   } as unknown as CoreClient;
-  const roomList = await startRoomList(core);
-  await vi.waitFor(() => {
-    expect(roomList.notificationMode(room.room_id)).toBe('all');
-  });
+  await startRoomList(core);
 
   render(SidebarNav, { mobile: true });
   await tick();

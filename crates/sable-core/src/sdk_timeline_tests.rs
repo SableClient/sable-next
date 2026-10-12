@@ -606,7 +606,7 @@ async fn missing_room_state_is_remembered_until_it_is_written() {
             "errcode": "M_NOT_FOUND",
             "error": "not found"
         })))
-        .expect(2)
+        .expect(1)
         .mount(server.server())
         .await;
     server
@@ -628,7 +628,239 @@ async fn missing_room_state_is_remembered_until_it_is_written() {
     .await
     .unwrap();
 
-    assert_eq!(read_state(&core, room_id, event_type).await, None);
+    assert_eq!(
+        read_state(&core, room_id, event_type).await,
+        Some(json!({ "hidden": true }))
+    );
+}
+
+#[tokio::test]
+async fn a_refused_pin_puts_back_the_marker_it_advanced() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!pins:example.org");
+    let seen = vec![event_id!("$a").to_owned()];
+    let marker = json!({
+        "type": "moe.sable.app.pins_read_marker",
+        "content": {
+            "hash": crate::pin_marker::pins_hash(&seen),
+            "count": 1,
+            "last_seen_id": "$a",
+        },
+    });
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(
+                    EventFactory::new()
+                        .room(room_id)
+                        .sender(*ALICE)
+                        .room_pinned_events(seen.clone()),
+                )
+                .add_account_data(
+                    matrix_sdk::ruma::serde::Raw::new(&marker)
+                        .unwrap()
+                        .cast_unchecked(),
+                ),
+        )
+        .await;
+    let advanced = json!({
+        "hash": crate::pin_marker::pins_hash(&[
+            event_id!("$a").to_owned(),
+            event_id!("$b").to_owned(),
+        ]),
+        "count": 2,
+        "last_seen_id": "$b",
+    });
+    for body in [advanced, marker["content"].clone()] {
+        Mock::given(method("PUT"))
+            .and(path_regex("/account_data/moe.sable.app.pins_read_marker$"))
+            .and(wiremock::matchers::body_json(body))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+    }
+    server
+        .mock_set_room_pinned_events()
+        .unauthorized()
+        .mount()
+        .await;
+
+    let core = core_for(&server, client).await;
+    let refused = core
+        .dispatch(Command::SetPinned {
+            room_id: room_id.to_owned(),
+            event_id: event_id!("$b").to_owned(),
+            pinned: true,
+        })
+        .await;
+    assert!(refused.err().is_some());
+}
+
+#[expect(clippy::unwrap_used, reason = "test code")]
+fn clear_override(user_id: &str) -> Command {
+    Command::SetProfileOverride {
+        user_id: user_id.try_into().unwrap(),
+        display_name: crate::protocol::FieldEdit::Clear,
+        avatar: crate::protocol::AvatarEditView::Clear,
+        color: crate::protocol::FieldEdit::Clear,
+    }
+}
+
+#[tokio::test]
+async fn a_stable_profile_override_is_written_back_plain() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    Mock::given(method("GET"))
+        .and(path_regex("/account_data/m.profile_overrides$"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "@s:example.org": { "displayname": "Mum" } })),
+        )
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(
+            "/account_data/org.matrix.msc4529.profile_overrides$",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(0)
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex("/account_data/m.profile_overrides$"))
+        .and(wiremock::matchers::body_json(json!({})))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+
+    let core = core_for(&server, client).await;
+    let CommandOk::SetProfileOverride(view) = core
+        .dispatch(clear_override("@s:example.org"))
+        .await
+        .unwrap()
+    else {
+        panic!("unexpected response");
+    };
+    assert!(view.overrides.is_empty());
+}
+
+#[tokio::test]
+async fn a_locked_profile_override_document_refuses_a_write() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    Mock::given(method("GET"))
+        .and(path_regex("/account_data/m.profile_overrides$"))
+        .respond_with(ResponseTemplate::new(404).set_body_json(json!({
+            "errcode": "M_NOT_FOUND",
+            "error": "not found"
+        })))
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(
+            "/account_data/org.matrix.msc4529.profile_overrides$",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "encrypted": { "iv": "iv", "ciphertext": "sealed", "mac": "mac" }
+        })))
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex("/account_data/"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(0)
+        .mount(server.server())
+        .await;
+
+    let core = core_for(&server, client).await;
+    assert!(matches!(
+        core.dispatch(clear_override("@s:example.org")).await,
+        Err(crate::protocol::CommandErr::DocumentLocked)
+    ));
+}
+
+#[tokio::test]
+async fn a_legacy_pack_is_copied_verbatim_to_the_stable_type() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!packs:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    let legacy = json!({ "pack": { "display_name": "Neo", "x.custom": 1 }, "images": {} });
+    Mock::given(method("GET"))
+        .and(path(format!(
+            "/_matrix/client/v3/rooms/{room_id}/state/im.ponies.room_emotes/stickers"
+        )))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&legacy))
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path(format!(
+            "/_matrix/client/v3/rooms/{room_id}/state/m.room.image_pack/stickers"
+        )))
+        .and(wiremock::matchers::body_json(&legacy))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "event_id": "$copy" })))
+        .expect(1)
+        .mount(server.server())
+        .await;
+
+    let core = core_for(&server, client).await;
+    core.dispatch(Command::ConvertLegacyImagePacks {
+        room_id: room_id.to_owned(),
+        state_keys: vec!["stickers".to_owned()],
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn a_written_state_event_is_read_back_until_sync_delivers_it() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!written:example.org");
+    let event_type = "m.room.topic";
+    server.sync_joined_room(&client, room_id).await;
+    server
+        .mock_room_send_state()
+        .ok(event_id!("$topic"))
+        .mount()
+        .await;
+
+    let core = core_for(&server, client.clone()).await;
+    core.watch_room_state(&client);
+    core.dispatch(Command::SendStateEvent {
+        room_id: room_id.to_owned(),
+        event_type: event_type.to_owned(),
+        state_key: String::new(),
+        content: json!({ "topic": "ours" }),
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        read_state(&core, room_id, event_type).await,
+        Some(json!({ "topic": "ours" }))
+    );
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_state_event(
+                EventFactory::new()
+                    .room(room_id)
+                    .sender(*ALICE)
+                    .room_topic("theirs"),
+            ),
+        )
+        .await;
+    assert_eq!(
+        read_state(&core, room_id, event_type)
+            .await
+            .and_then(|content| content.get("topic").cloned()),
+        Some(json!("theirs"))
+    );
 }
 
 #[tokio::test]
@@ -1445,7 +1677,11 @@ async fn a_room_read_elsewhere_reports_the_server_unread_count() {
         .await;
 
     let item = matrix_sdk_ui::room_list_service::RoomListItem::from(room);
-    let summary = super::view::room_summary(&item, &std::collections::HashMap::new(), false);
+    let summary = super::view::room_summary(
+        &item,
+        &std::collections::HashMap::new(),
+        &matrix_sdk::ruma::push::Ruleset::new(),
+    );
 
     assert_eq!(item.num_unread_messages(), 2);
     assert_eq!(summary.unread, 0);
@@ -2065,6 +2301,38 @@ async fn live_location_beacons_reach_the_view_as_updated_coordinates() {
             .iter()
             .any(|view| view.event_id.as_deref() == Some(event_id!("$position")))
     );
+}
+
+#[tokio::test]
+async fn an_emoji_only_message_is_sized_as_jumbo() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!jumbo:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.text_msg("👍🎉").event_id(event_id!("$emoji")))
+                .add_timeline_event(factory.text_msg("nice 👍").event_id(event_id!("$words"))),
+        )
+        .await;
+
+    let sizes: Vec<_> = contents(
+        &timeline_views(&client, &room, false)
+            .await
+            .expect("a timeline for a joined room"),
+    )
+    .into_iter()
+    .filter_map(|content| match content {
+        crate::protocol::TimelineItemContentView::Message { jumbo, .. } => Some(jumbo),
+        _ => None,
+    })
+    .collect();
+
+    assert_eq!(sizes, [Some(2), None]);
 }
 
 #[tokio::test]
@@ -3082,7 +3350,8 @@ async fn invited_direct_room_summary_is_direct() {
             &mut cache,
         )
         .await;
-        let summary = super::view::room_summary(&item, &cache, false);
+        let summary =
+            super::view::room_summary(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new());
 
         assert!(summary.direct_targets.is_empty());
         assert_eq!(summary.is_direct, expected);
@@ -3127,7 +3396,7 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
         &mut cache,
     )
     .await;
-    let summary = super::view::room_summary(&item, &cache, false);
+    let summary = super::view::room_summary(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new());
     assert!(summary.is_direct);
     assert_eq!(summary.avatar_url.as_deref(), Some(avatar.as_str()));
 
@@ -3162,7 +3431,7 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
         )
         .await;
         assert_eq!(
-            super::view::room_summary(&item, &cache, false)
+            super::view::room_summary(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new())
                 .avatar_url
                 .as_deref(),
             expected
@@ -3187,7 +3456,7 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
         &mut cache,
     )
     .await;
-    let summary = super::view::room_summary(&item, &cache, false);
+    let summary = super::view::room_summary(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new());
     assert!(!summary.is_direct);
     assert_eq!(summary.avatar_url, None);
 }
@@ -3218,7 +3487,7 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
     )
     .await;
     assert_eq!(
-        super::view::room_summary(&item, &cache, false)
+        super::view::room_summary(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new())
             .avatar_url
             .as_deref(),
         Some(avatar.as_str())
@@ -3251,7 +3520,7 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
     )
     .await;
 
-    let summary = super::view::room_summary(&item, &cache, false);
+    let summary = super::view::room_summary(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new());
     assert!(!summary.is_direct);
     assert_eq!(summary.avatar_url, None);
 }
@@ -3347,7 +3616,7 @@ async fn sliding_sync_room_summary_prefers_avatar_state_over_the_avatar_property
         )
         .await;
         assert_eq!(
-            super::view::room_summary(&item, &cache, false)
+            super::view::room_summary(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new())
                 .avatar_url
                 .as_deref(),
             expected_avatar,

@@ -1567,7 +1567,7 @@ mod regression_tests {
                 .await
                 .search(
                     "archaeology",
-                    &crate::protocol::SearchFilter::default(),
+                    &crate::search::IndexFilter::default(),
                     crate::protocol::SearchOrder::Rank,
                     10,
                     0

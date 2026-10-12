@@ -11,11 +11,12 @@
 
   import { readEventSource } from './event-source-cache';
   import { memberName, senderDisplayColors } from '../members/members.js';
-  import { replyFallbackFromSource } from './reply-fallback';
+  import { eventPreview, reactionKey } from '#lib/model/model.js';
+  import { fallbackText } from './reply-fallback';
   import { replyPreviewBody } from './reply-preview';
   import { hasSenderRoles, useSenderRoles } from '../members/sender-roles';
   import SenderName from '../members/SenderName.svelte';
-  import { reactionKey, stateEventText, type Translate } from '../timeline/state-event-text';
+  import { stateEventText, type Translate } from '../timeline/state-event-text';
   import type { TimelineEventIndex } from '../timeline/timeline-event-index';
 
   interface Props {
@@ -111,7 +112,11 @@
     const read = (room: string, id: string) => core.commands.eventSource(room, id);
     void readEventSource(read, roomId, target).then((event) => {
       if (!current || event === null) return;
-      fetched = replyFallbackFromSource(JSON.stringify(event), $i18n.t);
+      const preview = eventPreview(event);
+      fetched = preview && {
+        sender: preview.sender,
+        body: fallbackText(preview.body, preview.fallback, $i18n.t),
+      };
     });
     return () => {
       current = false;

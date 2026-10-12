@@ -1,4 +1,4 @@
-import type { PushPayload } from './push-payload';
+import type { PushNotification } from './push-payload';
 
 export interface PushHistoryEntry {
   at: number;
@@ -11,14 +11,13 @@ export interface PushHistoryEntry {
 export const PUSH_HISTORY_LIMIT = 200;
 export const DIAGNOSTIC_EVENT_PREFIX = '$sable-diagnostic-';
 
-export function isDiagnosticPush(payload: PushPayload): boolean {
-  return payload.notification?.event_id?.startsWith(DIAGNOSTIC_EVENT_PREFIX) ?? false;
+export function isDiagnosticPush(notification: PushNotification): boolean {
+  return notification.event_id?.startsWith(DIAGNOSTIC_EVENT_PREFIX) ?? false;
 }
 
 export function pushTrace(
-  payload: PushPayload | undefined
+  notification: PushNotification | undefined
 ): Pick<PushHistoryEntry, 'userId' | 'roomId' | 'eventId'> {
-  const notification = payload?.notification;
   return {
     ...(notification?.user_id ? { userId: notification.user_id } : {}),
     ...(notification?.room_id ? { roomId: notification.room_id } : {}),

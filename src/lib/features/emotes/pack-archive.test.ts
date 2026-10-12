@@ -14,7 +14,7 @@ function draft(overrides: Partial<PackDraft> = {}): PackDraft {
   return {
     ...emptyDraft(),
     name: 'Blobs',
-    avatarUrl: 'mxc://a/av',
+    avatar_url: 'mxc://a/av',
     attribution: 'CC BY 4.0',
     images: [
       {

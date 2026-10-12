@@ -6,7 +6,7 @@ import type { TimelineItemView } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
-import type { ReplyFallback, RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
 import { clearDrafts } from '#lib/features/composer/composer-drafts.svelte.js';
 import { adoptQueue, scheduledQueue } from '#lib/features/composer/scheduled-queue.svelte.js';
@@ -15,18 +15,19 @@ import { setPreference } from '#lib/settings/preferences.svelte.js';
 import * as runtime from '#lib/config/runtime-config.js';
 
 import { Conversation } from './conversation.svelte';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 const ROOM = '!room:example.org';
 
 function item(eventId: string, sender: string): TimelineItemView {
-  return {
+  return withRowFields({
     id: eventId,
     event_id: eventId,
     sender,
     sender_name: 'Ana',
     reactions: [],
     content: { kind: 'message', body: 'Hello', html: '<p>Hello</p>' },
-  } as unknown as TimelineItemView;
+  } as unknown as TimelineItemView);
 }
 
 function setup(
@@ -105,9 +106,15 @@ test('quick reactions resume live before choosing the latest message', async () 
   expect(fixture.toggleReaction).not.toHaveBeenCalled();
   fixture.timeline.items = [
     item('$latest', '@ana:example.org'),
-    { ...item('$state', '@ana:example.org'), content: { kind: 'state_event' } } as TimelineItemView,
+    withRowFields({
+      ...item('$state', '@ana:example.org'),
+      content: { kind: 'state_event' },
+    } as TimelineItemView),
     { ...item('$pending', '@kris:example.org'), event_id: null },
-    { ...item('$redacted', '@ana:example.org'), content: { kind: 'redacted', reason: null } },
+    withRowFields({
+      ...item('$redacted', '@ana:example.org'),
+      content: { kind: 'redacted', reason: null },
+    }),
   ];
   live.resolve(undefined);
   await reacting;
@@ -124,10 +131,10 @@ test('quick reactions do nothing in an empty room', async () => {
 test.each(['message', 'image', 'sticker', 'unable_to_decrypt'] as const)(
   'quick reactions target the latest %s',
   async (kind) => {
-    const latest = {
+    const latest = withRowFields({
       ...item('$latest', '@ana:example.org'),
       content: { kind },
-    } as TimelineItemView;
+    } as TimelineItemView);
     const fixture = setup([item('$old', '@ana:example.org'), latest], '@kris:example.org');
     await fixture.conversation.quickReact(ROOM, '😂');
     expect(fixture.toggleReaction).toHaveBeenCalledWith(ROOM, '$latest', '😂', null, null, 7);
@@ -373,10 +380,10 @@ test.each([
 );
 
 test('a reply to a persona message names the persona', () => {
-  const target = {
+  const target = withRowFields({
     ...item('$one:example.org', '@ana:example.org'),
     per_message_profile: { display_name: 'Ghost' },
-  } as unknown as TimelineItemView;
+  } as unknown as TimelineItemView);
   const { conversation } = setup([target], '@kris:example.org');
 
   conversation.reply('$one:example.org');
@@ -384,7 +391,7 @@ test('a reply to a persona message names the persona', () => {
 });
 
 test('a visible reaction aggregation can be replied to', () => {
-  const reaction = {
+  const reaction = withRowFields({
     ...item('$reaction:example.org', '@ana:example.org'),
     content: {
       kind: 'hidden_event',
@@ -392,7 +399,7 @@ test('a visible reaction aggregation can be replied to', () => {
       content: { 'm.relates_to': { event_id: '$message:example.org', key: '🎉' } },
       redacts: null,
     },
-  } as TimelineItemView;
+  });
   const { conversation, timeline } = setup([], '@kris:example.org');
   timeline.aggregations = [reaction];
 
@@ -415,6 +422,7 @@ test('a reply keeps the target formatting for its composer preview', () => {
     emote: false,
     notice: false,
     edited: false,
+    jumbo: null,
   };
   const { conversation } = setup([target], '@kris:example.org');
 
@@ -435,6 +443,7 @@ test('a reply context uses rendered preview text', () => {
     emote: false,
     notice: false,
     edited: false,
+    jumbo: null,
   };
   const { conversation } = setup([target], '@kris:example.org');
   conversation.reply('$one:example.org');
@@ -490,7 +499,7 @@ test('editing a pending message uses its transaction ID', async () => {
 });
 
 test('keeps an edited message kind and persona when returning to live drops its row', async () => {
-  const original = {
+  const original = withRowFields({
     ...item('$original', '@kris:example.org'),
     content: {
       kind: 'message',
@@ -499,9 +508,10 @@ test('keeps an edited message kind and persona when returning to live drops its 
       emote: true,
       notice: false,
       edited: false,
+      jumbo: null,
     },
     per_message_profile: { display_name: 'Ghost', avatar_url: null },
-  } as TimelineItemView;
+  } as TimelineItemView);
   const fixture = setup([original], '@kris:example.org', {}, () => {
     fixture.timeline.items = [];
     return Promise.resolve();
@@ -778,75 +788,26 @@ test('saving an edited queued message replaces its queue entry', async () => {
   expect(conversation.context).toBeNull();
 });
 
-test('a reply the SDK cannot embed takes its preview from the event source', async () => {
-  const reply = {
+test('a reply the SDK has not filled asks the core for its details once', async () => {
+  const reply = withRowFields({
     ...item('$reply:example.org', '@kris:example.org'),
-    in_reply_to: { event_id: '$reaction:example.org', sender: null, body: null },
-  } as unknown as TimelineItemView;
-  const provideReplyFallback = vi.fn<(eventId: string, fallback: ReplyFallback) => void>();
-  const eventSource = vi.fn(() =>
-    Promise.resolve(
-      JSON.stringify({
-        type: 'm.reaction',
-        sender: '@ana:example.org',
-        content: { 'm.relates_to': { key: '🎉' } },
-      })
-    )
-  );
-  const core = {
-    session: { user_id: '@kris:example.org' },
-    commands: {
-      fetchEventDetails: vi.fn(() => Promise.reject(new Error('unsupported'))),
-      eventSource,
+    in_reply_to: { event_id: '$reaction:example.org', sender: null, body: null, fallback: null },
+  } as unknown as TimelineItemView);
+  const filled = withRowFields({
+    ...item('$filled:example.org', '@kris:example.org'),
+    in_reply_to: {
+      event_id: '$gone:example.org',
+      sender: null,
+      body: null,
+      fallback: { kind: 'redacted' },
     },
-  } as unknown as CoreClient;
-  const timeline = { items: [reply], provideReplyFallback } as unknown as RoomTimeline;
-  const conversation = new Conversation({
-    core,
-    personas: {} as PersonaStore,
-    timeline,
-    roomId: () => ROOM,
-  });
-
-  conversation.fetchMissingReplyDetails();
-  await vi.waitFor(() => {
-    expect(provideReplyFallback).toHaveBeenCalled();
-  });
-
-  expect(eventSource).toHaveBeenCalledWith(ROOM, '$reaction:example.org');
-  const [eventId, fallback] = provideReplyFallback.mock.calls[0];
-  expect(eventId).toBe('$reaction:example.org');
-  expect(fallback.sender).toBe('@ana:example.org');
-  expect(fallback.body).toContain('🎉');
-});
-
-test.each([
-  ['m.room.name', 'Sent a m.room.name event', undefined],
-  ['m.room.member', 'Sent a m.room.member event', undefined],
-  [
-    'm.room.message',
-    'Message deleted',
-    { redacted_because: { type: 'm.room.redaction', content: {} } },
-  ],
-  [
-    'm.room.encrypted',
-    'Message deleted',
-    { redacted_because: { type: 'm.room.redaction', content: {} } },
-  ],
-])('uses event source for missing %s reply details', async (type, body, unsigned) => {
-  const reply = {
-    ...item('$reply:example.org', '@kris:example.org'),
-    in_reply_to: { event_id: '$state:example.org', sender: null, body: null },
-  } as unknown as TimelineItemView;
-  const provideReplyFallback = vi.fn<(eventId: string, fallback: ReplyFallback) => void>();
-  const eventSource = vi.fn(() =>
-    Promise.resolve(JSON.stringify({ type, sender: '@ana:example.org', content: {}, unsigned }))
-  );
+  } as unknown as TimelineItemView);
+  const fetchEventDetails = vi.fn(() => Promise.reject(new Error('unsupported')));
   const core = {
     session: { user_id: '@kris:example.org' },
-    commands: { fetchEventDetails: vi.fn(() => Promise.resolve()), eventSource },
+    commands: { fetchEventDetails },
   } as unknown as CoreClient;
-  const timeline = { items: [reply], provideReplyFallback } as unknown as RoomTimeline;
+  const timeline = { items: [reply, filled] } as unknown as RoomTimeline;
   const conversation = new Conversation({
     core,
     personas: {} as PersonaStore,
@@ -855,13 +816,11 @@ test.each([
   });
 
   conversation.fetchMissingReplyDetails();
+  conversation.fetchMissingReplyDetails();
   await vi.waitFor(() => {
-    expect(provideReplyFallback).toHaveBeenCalledWith('$state:example.org', {
-      sender: '@ana:example.org',
-      body,
-    });
+    expect(fetchEventDetails).toHaveBeenCalledOnce();
   });
-  expect(eventSource).toHaveBeenCalledWith(ROOM, '$state:example.org');
+  expect(fetchEventDetails).toHaveBeenCalledWith(ROOM, '$reply:example.org', null);
 });
 
 test('editing steps back to the own message before the one being edited', () => {
@@ -887,7 +846,7 @@ test('editing steps back to the own message before the one being edited', () => 
 
 test('editing the last own message includes an image caption', () => {
   const me = '@kris:example.org';
-  const image = {
+  const image = withRowFields({
     ...item('$image:example.org', me),
     content: {
       kind: 'image',
@@ -895,7 +854,7 @@ test('editing the last own message includes an image caption', () => {
       caption: 'A photo',
       html: '<strong>A photo</strong>',
     },
-  } as unknown as TimelineItemView;
+  } as unknown as TimelineItemView);
   const { conversation } = setup([image], me);
 
   conversation.editLast();

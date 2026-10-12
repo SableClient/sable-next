@@ -5,28 +5,27 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { DISMISSED_INVITES_EVENT, dismissedInvites } from './dismissed-invites.svelte';
 
-function fakeCore(stored: unknown) {
+function fakeCore(stored: string[]) {
   const listeners = new Set<(event: CoreEvent) => void>();
-  const accountData = vi.fn(() => Promise.resolve(stored));
-  const setAccountData = vi.fn((_type: string, content: unknown) => {
-    stored = content;
-    return Promise.resolve();
+  const dismissedInvitesCommand = vi.fn(() => Promise.resolve(stored));
+  const setInviteDismissed = vi.fn((roomId: string, dismissed: boolean) => {
+    stored = dismissed ? [...stored, roomId] : stored.filter((entry) => entry !== roomId);
+    return Promise.resolve(stored);
   });
   const core = {
     subscribeEvents: (listener: (event: CoreEvent) => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    commands: { accountData, setAccountData },
+    commands: { dismissedInvites: dismissedInvitesCommand, setInviteDismissed },
   } as unknown as CoreClient;
   return {
     core,
-    accountData,
-    setAccountData,
+    setInviteDismissed,
     emit: (event: CoreEvent) => {
       for (const listener of listeners) listener(event);
     },
-    setStored: (next: unknown) => {
+    setStored: (next: string[]) => {
       stored = next;
     },
   };
@@ -36,15 +35,14 @@ afterEach(() => {
   dismissedInvites.stop();
 });
 
-test('reads the list v1 writes and follows remote changes', async () => {
-  const fake = fakeCore({ roomIds: ['!a:example.org'] });
+test('reads the dismissed rooms and follows remote changes', async () => {
+  const fake = fakeCore(['!a:example.org']);
   dismissedInvites.start(fake.core);
   await vi.waitFor(() => {
     expect(dismissedInvites.has('!a:example.org')).toBe(true);
   });
-  expect(fake.accountData).toHaveBeenCalledWith(DISMISSED_INVITES_EVENT);
 
-  fake.setStored({ roomIds: ['!b:example.org'] });
+  fake.setStored(['!b:example.org']);
   fake.emit({ type: 'account_data_changed', event_type: DISMISSED_INVITES_EVENT });
   await vi.waitFor(() => {
     expect(dismissedInvites.has('!b:example.org')).toBe(true);
@@ -52,23 +50,22 @@ test('reads the list v1 writes and follows remote changes', async () => {
   expect(dismissedInvites.has('!a:example.org')).toBe(false);
 });
 
-test('dismissing and restoring write the whole list back', async () => {
-  const fake = fakeCore(null);
+test('dismissing and restoring go through the core one room at a time', async () => {
+  const fake = fakeCore([]);
   dismissedInvites.start(fake.core);
 
   await dismissedInvites.dismiss('!a:example.org');
-  expect(fake.setAccountData).toHaveBeenLastCalledWith(DISMISSED_INVITES_EVENT, {
-    roomIds: ['!a:example.org'],
-  });
+  expect(fake.setInviteDismissed).toHaveBeenLastCalledWith('!a:example.org', true);
+  expect(dismissedInvites.has('!a:example.org')).toBe(true);
 
   await dismissedInvites.restore('!a:example.org');
-  expect(fake.setAccountData).toHaveBeenLastCalledWith(DISMISSED_INVITES_EVENT, { roomIds: [] });
+  expect(fake.setInviteDismissed).toHaveBeenLastCalledWith('!a:example.org', false);
   expect(dismissedInvites.has('!a:example.org')).toBe(false);
 });
 
 test('a failed write puts the previous list back', async () => {
-  const fake = fakeCore(null);
-  fake.setAccountData.mockRejectedValueOnce(new Error('offline'));
+  const fake = fakeCore([]);
+  fake.setInviteDismissed.mockRejectedValueOnce(new Error('offline'));
   dismissedInvites.start(fake.core);
 
   await expect(dismissedInvites.dismiss('!a:example.org')).rejects.toThrow('offline');

@@ -77,7 +77,7 @@ const core = Object.assign(baseCore, {
       ],
     })
   ),
-  sendRawEvent: vi.fn(() => Promise.resolve()),
+  answerCalendarEvent: vi.fn(() => Promise.resolve()),
   roomMembers: vi.fn(() =>
     Promise.resolve([
       { user_id: '@alice:x', display_name: 'Alice' },
@@ -166,11 +166,11 @@ test('answers and counts each occurrence of a recurring event on its own', async
   expect(first.queryByRole('definition')).not.toBeInTheDocument();
 
   await user.click(first.getByRole('button', { name: /^Going/ }));
-  expect(core.sendRawEvent).toHaveBeenCalledWith('!cal:x', 'moe.sable.calendar.rsvp', {
+  expect(core.answerCalendarEvent).toHaveBeenCalledWith('!cal:x', {
+    calendarEventId: '$weekly',
     uid: 'weekly',
     recurrenceId: local(soon),
     status: 'accepted',
-    'm.relates_to': { rel_type: 'm.reference', event_id: '$weekly' },
   });
 });
 

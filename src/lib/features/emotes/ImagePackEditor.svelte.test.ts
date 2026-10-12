@@ -19,7 +19,7 @@ import { core } from '#lib/core/__mocks__/context.js';
 Object.assign(core, { uploadMedia: mocks.uploadMedia });
 
 import ImagePackEditor from './ImagePackEditor.svelte';
-import { packEventContent, type PackDraft } from './pack-content.js';
+import type { PackDraft } from './pack-content.js';
 import { beforeNavigate } from '#lib/test-support/app-navigation.js';
 import { leaveUnlessUnsaved } from '#lib/ui/unsaved-guard.js';
 
@@ -102,11 +102,8 @@ test('an image uploaded to a sticker-only pack follows the pack usage', async ()
     ['party', ['sticker']],
   ]);
 
-  const content = packEventContent(draft);
-  expect(content.pack).toMatchObject({ usage: ['sticker'] });
-  const images = content.images as Record<string, Record<string, unknown>>;
-  expect(images.party.usage).toBeUndefined();
-  expect(images.party.url).toBe('mxc://example.org/party');
+  expect(draft.usage).toEqual(['sticker']);
+  expect(draft.images[1].url).toBe('mxc://example.org/party');
   expect(mocks.uploadMedia).toHaveBeenCalledWith('image/png', expect.any(Uint8Array));
 });
 
@@ -127,8 +124,7 @@ test('a mixed pack keeps uploaded images serving both tabs', async () => {
   await pickImage();
   const draft = await appliedDraft(applied);
 
-  const images = packEventContent(draft).images as Record<string, Record<string, unknown>>;
-  expect(images.party.usage).toBeUndefined();
+  expect(draft.images.at(-1)?.usage).toEqual(draft.usage);
 });
 
 test('a new pack picture is saved as soon as it uploads', async () => {
@@ -152,7 +148,7 @@ test('a new pack picture is saved as soon as it uploads', async () => {
     expect(applied).toHaveLength(1);
   });
 
-  expect(applied[0].avatarUrl).toBe('mxc://example.org/icon');
+  expect(applied[0].avatar_url).toBe('mxc://example.org/icon');
   expect(applied[0].images.map((image) => image.shortcode)).toEqual(['wave']);
   expect(button('Apply changes')).toBeDisabled();
 });
@@ -243,14 +239,10 @@ test('an upload never writes the room avatar or name into the pack', async () =>
   });
 
   await pickImage();
-  const content = packEventContent(await appliedDraft(applied));
+  const draft = await appliedDraft(applied);
 
-  expect(content.pack).toEqual({
-    display_name: undefined,
-    avatar_url: undefined,
-    attribution: undefined,
-    usage: ['sticker'],
-  });
+  expect(draft.name).toBe('');
+  expect(draft.avatar_url).toBeNull();
 });
 
 test('an attribution keeps its line breaks', async () => {

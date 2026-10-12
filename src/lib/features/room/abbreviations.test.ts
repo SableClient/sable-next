@@ -16,7 +16,7 @@ import type { AbbreviationEntry } from './settings/abbreviations';
 function mark(html: string, entries: [string, string][]): string {
   return markEntries(
     html,
-    entries.map(([term, definition]) => ({ term, definition }))
+    entries.map(([term, definition]) => ({ term, definition, cased: false }))
   );
 }
 
@@ -58,7 +58,7 @@ test('a cased term and a case-insensitive term can share the same letters', () =
   expect(
     markEntries('<p>DO do</p>', [
       { term: 'DO', definition: 'Digital Ocean', cased: true },
-      { term: 'do', definition: 'to do' },
+      { term: 'do', definition: 'to do', cased: false },
     ])
   ).toBe(
     '<p><abbr data-abbr-definition="Digital Ocean" tabindex="0">DO</abbr> <abbr data-abbr-definition="to do" tabindex="0">do</abbr></p>'
@@ -68,7 +68,7 @@ test('a cased term and a case-insensitive term can share the same letters', () =
 test('a cased term and an uncased term with the same lowercased letters both match', () => {
   expect(
     markEntries('<p>DO do</p>', [
-      { term: 'DO', definition: 'to do' },
+      { term: 'DO', definition: 'to do', cased: false },
       { term: 'do', definition: 'to do, cased', cased: true },
     ])
   ).toBe(
@@ -77,7 +77,7 @@ test('a cased term and an uncased term with the same lowercased letters both mat
 });
 
 test('an uncased term still matches any casing', () => {
-  expect(markEntries('<p>DO</p>', [{ term: 'do', definition: 'to do' }])).toBe(
+  expect(markEntries('<p>DO</p>', [{ term: 'do', definition: 'to do', cased: false }])).toBe(
     '<p><abbr data-abbr-definition="to do" tabindex="0">DO</abbr></p>'
   );
 });

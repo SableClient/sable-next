@@ -62,7 +62,7 @@ export class NotificationCenter {
       if (validation !== null) {
         if (message.nativeActivation) return;
         void core.commands
-          .ackWebPusher(validation.appId, validation.ackToken)
+          .ackWebPusher(validation.app_id, validation.ack_token)
           .catch(() => undefined);
         return;
       }
@@ -206,21 +206,21 @@ export class NotificationCenter {
   }
 
   private retirePush(raw: string): void {
-    const notification = parsePushPayload(raw)?.notification;
-    if (notification?.room_id === undefined) return;
+    const notification = parsePushPayload(raw);
+    if (!notification || notification.room_id === null) return;
     const roomId = notification.room_id;
     const userId = notification.user_id;
-    if (userId !== undefined && userId !== this.client?.session?.user_id) {
-      if (notification.counts?.unread === 0) {
+    if (userId !== null && userId !== this.client?.session?.user_id) {
+      if (notification.unread === 0) {
         void retireRoomAlerts(userId, roomId).catch(() => undefined);
       }
       return;
     }
-    if (notification.counts?.unread === 0 || this.reading === roomId) {
+    if (notification.unread === 0 || this.reading === roomId) {
       this.retire(roomId);
       return;
     }
-    if (notification.event_id === undefined) return;
+    if (notification.event_id === null) return;
 
     const room = this.rooms.find((item) => item.room_id === roomId);
     if (room !== undefined && this.readThrough(room, notification.event_id)) this.settle(roomId);

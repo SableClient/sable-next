@@ -1,6 +1,7 @@
 #![recursion_limit = "512"]
 
 mod account_data;
+mod account_documents;
 mod account_lock;
 mod accounts;
 mod attachments;
@@ -12,6 +13,7 @@ mod calls;
 mod cosmetics;
 mod dispatch;
 mod errors;
+mod gestures;
 pub use errors::CoreError;
 pub(crate) use errors::ResultExt;
 pub mod image_packs;
@@ -20,17 +22,22 @@ mod invites;
 pub mod matrix_html;
 mod media;
 mod media_health;
+mod member_look;
 pub use media::GalleryAttachment;
 mod key_backup;
 mod messages;
 pub mod notifications;
 mod outgoing;
+mod pack_edits;
 mod password_reset;
 mod personas;
+mod pin_marker;
 pub mod polls;
+mod power_levels;
 mod presence;
 mod preview;
 mod probed_state;
+mod profile_overrides;
 pub mod profiles;
 pub mod protocol;
 pub mod push_check;
@@ -39,6 +46,9 @@ mod qr_login;
 mod reactions;
 mod registration;
 mod room_keys;
+mod room_list_rows;
+mod room_settings;
+mod room_widgets;
 mod rooms;
 mod scheduled;
 mod sealed_account_data;
@@ -50,6 +60,7 @@ pub mod store;
 mod store_disposal;
 mod subscriptions;
 mod sync_support;
+mod timeline_overlay;
 mod timelines;
 pub mod tls;
 #[cfg(not(target_family = "wasm"))]
@@ -228,6 +239,7 @@ enum PendingLogin {
 struct Subscription {
     tasks: Vec<Task>,
     timeline: Option<Arc<Timeline>>,
+    overlay: Option<Arc<std::sync::Mutex<timeline_overlay::TimelineOverlay>>>,
     thread_root: Option<OwnedEventId>,
     kind: SubscriptionKind,
 }

@@ -19,6 +19,9 @@ vi.mock('#lib/settings/preferences.svelte.js', () => ({
 vi.mock('#src/transport', () => ({
   CoreError: class CoreError extends Error {},
 }));
+vi.mock('#lib/model/model.js', () => ({
+  loadModel: vi.fn(() => Promise.resolve()),
+}));
 
 afterEach(() => {
   preferences.errorReporting = false;
@@ -113,4 +116,16 @@ test('scrubs custom grouping and captured console arguments', async () => {
   const sent = options.beforeSend?.(event, {});
   expect(JSON.stringify(sent)).not.toContain('secret');
   expect(JSON.stringify(sent)).not.toContain('!private:example.org');
+});
+
+test('a model that fails to load is reported without stopping the app from starting', async () => {
+  const failure = new Error('Load failed');
+  const { loadModel } = await import('#lib/model/model.js');
+  vi.mocked(loadModel).mockRejectedValueOnce(failure);
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+  const { init } = await import('./hooks.client.js');
+
+  await expect(init()).resolves.toBeUndefined();
+  expect(Sentry.captureException).toHaveBeenCalledWith(failure);
 });

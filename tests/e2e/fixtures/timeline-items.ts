@@ -2,8 +2,12 @@
 // reads content.html, so a body-only override renders the previous text.
 import type { TimelineItemView } from '#src/generated/protocol';
 
+import { withRowFields } from '../../../src/lib/features/room/timeline/row-fixtures';
+
+export { withRowFields };
+
 export function timelineItem(id: string, body: string): TimelineItemView {
-  return {
+  return withRowFields({
     id,
     event_id: `$${id}:example.test`,
     transaction_id: null,
@@ -12,7 +16,15 @@ export function timelineItem(id: string, body: string): TimelineItemView {
     sender_name: 'Alice',
     sender_avatar: null,
     timestamp: 1_700_000_000_000,
-    content: { kind: 'message', body, html: body, emote: false, notice: false, edited: false },
+    content: {
+      kind: 'message',
+      body,
+      html: body,
+      emote: false,
+      notice: false,
+      edited: false,
+      jumbo: null,
+    },
     in_reply_to: null,
     thread_root: null,
     thread_summary: null,
@@ -26,17 +38,17 @@ export function timelineItem(id: string, body: string): TimelineItemView {
     mention: 'none',
     forwarded: null,
     forum_title: null,
-  };
+  });
 }
 
 export function readMarkerItem(id: string): TimelineItemView {
-  return {
+  return withRowFields({
     ...timelineItem(id, ''),
     event_id: null,
     sender: null,
     sender_name: null,
     content: { kind: 'read_marker' },
-  };
+  });
 }
 
 export function timelineMessage(

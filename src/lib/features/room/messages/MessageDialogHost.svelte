@@ -157,6 +157,7 @@
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     });
     onReply(version.event_id, { of: item.event_id, body, html: version.html });
   }

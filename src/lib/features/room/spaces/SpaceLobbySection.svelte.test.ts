@@ -6,12 +6,12 @@ import { expect, test, vi } from 'vitest';
 
 import type { RoomJoinRuleView } from '#src/generated/protocol';
 
-import type { HierarchyRoomView, HierarchySection } from './space-hierarchy';
+import { buildHierarchySections, type HierarchyRoomView } from './space-hierarchy';
 import SpaceLobbySection from './SpaceLobbySection.svelte';
 
-function subspace(joinRule: RoomJoinRuleView): HierarchyRoomView {
+function space(roomId: string, joinRule: RoomJoinRuleView, children: string[]): HierarchyRoomView {
   return {
-    room_id: '!sub:example.org',
+    room_id: roomId,
     canonical_alias: null,
     name: 'Sub',
     topic: null,
@@ -22,7 +22,13 @@ function subspace(joinRule: RoomJoinRuleView): HierarchyRoomView {
     join_rule: joinRule,
     allowed_room_ids: [],
     guest_can_join: false,
-    children: [],
+    children: children.map((child) => ({
+      room_id: child,
+      via: [],
+      order: null,
+      origin_server_ts: 0,
+      suggested: false,
+    })),
   };
 }
 
@@ -32,25 +38,19 @@ function mount(
   rights: { canManage?: boolean; canManageOwner?: boolean } = {}
 ) {
   const onJoin = vi.fn();
-  const section: HierarchySection = {
-    space: subspace(joinRule),
-    suggested: false,
-    depth: 1,
-    key: '!sub:example.org',
-    rooms: [],
-    parentId: '!sub:example.org',
-    ownerId: '!root:example.org',
-    siblings: [],
-    loaded: true,
-    failed: false,
-    pending: 0,
-  };
+  const [section] = buildHierarchySections(
+    [
+      space('!root:example.org', 'public', ['!sub:example.org']),
+      space('!sub:example.org', joinRule, []),
+    ],
+    '!root:example.org',
+    { joined: joinedIds, keepEmpty: ['!sub:example.org'] }
+  );
   const noop = vi.fn();
   render(SpaceLobbySection, {
     section,
     closed: true,
     joinedIds: new Set(joinedIds),
-    invitedIds: new Set<string>(),
     joining: new Set<string>(),
     knocked: new Set<string>(),
     joinErrors: new Map<string, string>(),
@@ -91,7 +91,8 @@ test('a subspace members of its parent can join offers a join', async () => {
   expect(onJoin).toHaveBeenCalledWith(
     expect.objectContaining({ room_id: '!sub:example.org' }),
     [],
-    '!root:example.org'
+    '!root:example.org',
+    'join'
   );
 });
 

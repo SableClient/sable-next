@@ -112,7 +112,7 @@ test('a catalog command is written back as the text continuwuity parses', () => 
   if (!reset) throw new Error('users reset-password is missing from the catalog');
 
   const result = buildInvocation(reset, draftsFromText(reset, '--logout bob'), '!admin ');
-  expect(result.ok && result.body).toBe('!admin users reset-password --logout bob');
+  expect(result.kind === 'built' && result.body).toBe('!admin users reset-password --logout bob');
 });
 
 test('until the catalog loads only the prefix completes', async () => {

@@ -4,6 +4,7 @@ use crate::errors::CoreError;
 use base64::Engine as _;
 use matrix_sdk::Client;
 use matrix_sdk::event_handler::EventHandlerDropGuard;
+use matrix_sdk::ruma::RoomId;
 use matrix_sdk::ruma::api::client::push::{
     delete_pushrule, set_pushrule, set_pushrule_actions, set_pushrule_enabled,
 };
@@ -15,13 +16,12 @@ use matrix_sdk::ruma::push::{
     PredefinedOverrideRuleId, PredefinedUnderrideRuleId, PushCondition, RuleKind, Ruleset,
     SoundTweakValue, Tweak,
 };
-use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 use tokio::sync::{RwLock, broadcast};
 
 use crate::protocol::{
     DefaultNotificationModesView, EventNotificationView, EventNotificationsView,
     KeywordNotificationView, MentionNotificationModeView, MentionNotificationsView,
-    MentionRuleView, NotificationModeView, NotificationSettingsView, RoomNotificationModeView,
+    MentionRuleView, NotificationModeView, NotificationSettingsView,
 };
 
 pub struct PushRules {
@@ -387,21 +387,6 @@ pub fn room_settings(rules: &Ruleset, room_id: &RoomId, direct: bool) -> Notific
         room: room_mode(rules, room_id),
         default: default_mode(rules, direct),
     }
-}
-
-#[must_use]
-pub fn room_modes(
-    rules: &Ruleset,
-    rooms: impl IntoIterator<Item = (OwnedRoomId, bool)>,
-) -> Vec<RoomNotificationModeView> {
-    rooms
-        .into_iter()
-        .map(|(room_id, direct)| RoomNotificationModeView {
-            room: room_mode(rules, &room_id),
-            default: default_mode(rules, direct),
-            room_id,
-        })
-        .collect()
 }
 
 #[must_use]
@@ -1019,9 +1004,7 @@ mod tests {
             plan_room_mode(&rules, room, true, Some(NotificationModeView::All)),
         );
         let settings = super::room_settings(&chosen, room, false);
-        let modes = super::room_modes(&chosen, [(room.to_owned(), false)]);
         assert_eq!(settings.room, Some(NotificationModeView::All));
-        assert_eq!(modes[0].room, Some(NotificationModeView::All));
     }
 
     #[test]

@@ -3,15 +3,15 @@ import { expect, test } from 'vitest';
 import { parseMatrixLink } from './matrix-link';
 
 test.each([
-  ['matrix:u/alice:example.org', { kind: 'user', userId: '@alice:example.org' }],
+  ['matrix:u/alice:example.org', { kind: 'user', user_id: '@alice:example.org' }],
   [
     'matrix:roomid/room:example.org/e/event',
-    { kind: 'event', roomId: '!room:example.org', eventId: '$event' },
+    { kind: 'event', room_id: '!room:example.org', event_id: '$event' },
   ],
-  ['https://matrix.to/#/#lobby:example.org', { kind: 'room', roomId: '#lobby:example.org' }],
+  ['https://matrix.to/#/#lobby:example.org', { kind: 'room', room_id: '#lobby:example.org' }],
   [
     'https://matrix.to/#/!room:example.org/$event',
-    { kind: 'event', roomId: '!room:example.org', eventId: '$event' },
+    { kind: 'event', room_id: '!room:example.org', event_id: '$event' },
   ],
 ])('parses %s', (href, expected) => {
   expect(parseMatrixLink(href)).toEqual(expected);
@@ -22,15 +22,15 @@ test.each([
 test.each([
   [
     'https://matrix.to/#/!somewhere:example.org?via=elsewhere.ca',
-    { kind: 'room', roomId: '!somewhere:example.org' },
+    { kind: 'room', room_id: '!somewhere:example.org' },
   ],
   [
     'https://matrix.to/#/!somewhere:example.org/$event:example.org?via=elsewhere.ca',
-    { kind: 'event', roomId: '!somewhere:example.org', eventId: '$event:example.org' },
+    { kind: 'event', room_id: '!somewhere:example.org', event_id: '$event:example.org' },
   ],
   [
     'matrix:roomid/somewhere:example.org/e/event?via=elsewhere.ca',
-    { kind: 'event', roomId: '!somewhere:example.org', eventId: '$event' },
+    { kind: 'event', room_id: '!somewhere:example.org', event_id: '$event' },
   ],
 ])('keeps via out of the ids in %s', (href, expected) => {
   expect(parseMatrixLink(href)).toEqual(expected);
@@ -41,7 +41,7 @@ test('parses the shared Sable room permalink', () => {
     parseMatrixLink(
       'https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe'
     )
-  ).toEqual({ kind: 'room', roomId: '!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI' });
+  ).toEqual({ kind: 'room', room_id: '!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI' });
 });
 
 test('does not treat arbitrary URLs as Matrix links', () => {

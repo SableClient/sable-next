@@ -19,6 +19,8 @@ const cargoArgs = [
   '--locked',
   '--package',
   'sable-wasm',
+  '--package',
+  'sable-model-wasm',
   '--target',
   'wasm32-unknown-unknown',
   '--profile',
@@ -26,6 +28,7 @@ const cargoArgs = [
 ];
 
 const MAX_RELEASE_WASM_BYTES = 19 * 1024 * 1024;
+const MAX_RELEASE_MODEL_BYTES = 650 * 1024;
 
 function run(command, args, env) {
   const result = spawnSync(command, args, { stdio: 'inherit', env: env ?? process.env });
@@ -112,7 +115,8 @@ if (!version || cli.status !== 0 || cli.stdout.trim() !== `wasm-bindgen ${versio
 
 run('cargo', cargoArgs, release ? releaseEnvironment() : undefined);
 
-const wasm = `${targetDirectory()}/wasm32-unknown-unknown/${profile}/sable_wasm.wasm`;
+const built = `${targetDirectory()}/wasm32-unknown-unknown/${profile}`;
+const wasm = `${built}/sable_wasm.wasm`;
 const output = process.env.SABLE_WASM_OUTPUT ?? 'src/generated/wasm';
 const bindgenArgs = ['--target', 'web', '--out-dir', output, '--out-name', 'sable_wasm'];
 const unlockOutput = lockOutput(output);
@@ -159,6 +163,29 @@ try {
     `${output}/sable_wasm_version.js`,
     `export default '${createHash('sha256').update(generated).digest('hex')}';\n`
   );
+
+  const modelArgs = ['--target', 'web', '--out-dir', output, '--out-name', 'sable_model'];
+  if (release) modelArgs.push('--remove-name-section', '--remove-producers-section');
+  else modelArgs.push('--debug');
+  modelArgs.push(`${built}/sable_model_wasm.wasm`);
+  run('wasm-bindgen', modelArgs);
+
+  if (release) {
+    const optimized = `${output}/sable_model_bg.optimized.wasm`;
+
+    run('wasm-opt', ['-Oz', `${output}/sable_model_bg.wasm`, '--output', optimized]);
+    rmSync(`${output}/sable_model_bg.wasm`);
+    renameSync(optimized, `${output}/sable_model_bg.wasm`);
+  }
+
+  const model = readFileSync(`${output}/sable_model_bg.wasm`);
+  await WebAssembly.compile(model);
+
+  if (release && model.byteLength > MAX_RELEASE_MODEL_BYTES) {
+    throw new Error(
+      `the release model wasm is ${model.byteLength} bytes, over the ${MAX_RELEASE_MODEL_BYTES} budget`
+    );
+  }
 } finally {
   unlockOutput();
 }

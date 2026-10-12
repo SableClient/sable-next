@@ -8,10 +8,12 @@ use matrix_sdk::ruma::events::AnySyncTimelineEvent;
 use matrix_sdk::ruma::room::RoomType;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, UInt};
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
 use crate::Core;
-use crate::protocol::{CalendarEntryView, CalendarRsvpView, CalendarView, CommandErr, CoreEvent};
+use crate::protocol::{
+    CalendarEntryView, CalendarRsvpView, CalendarView, CommandErr, CoreEvent, RsvpStatusView,
+};
 
 pub(crate) const CALENDAR_ROOM_TYPE: &str = "chat.commet.calendar";
 pub(crate) const RSVP_EVENT: &str = "moe.sable.calendar.rsvp";
@@ -39,6 +41,28 @@ impl RoomCalendar {
             rsvps: self.rsvps.iter().map(|(_, rsvp)| rsvp.clone()).collect(),
         }
     }
+}
+
+pub(crate) struct CalendarAnswer {
+    pub(crate) calendar_event_id: OwnedEventId,
+    pub(crate) uid: String,
+    pub(crate) recurrence_id: Option<String>,
+    pub(crate) status: RsvpStatusView,
+}
+
+/// One answer per occurrence, related to the event that carries the entry.
+fn rsvp_content(answer: &CalendarAnswer) -> Value {
+    let mut content = Map::new();
+    content.insert("uid".to_owned(), json!(answer.uid));
+    content.insert("status".to_owned(), json!(answer.status));
+    content.insert(
+        "m.relates_to".to_owned(),
+        json!({ "rel_type": "m.reference", "event_id": answer.calendar_event_id }),
+    );
+    if let Some(recurrence_id) = &answer.recurrence_id {
+        content.insert("recurrenceId".to_owned(), json!(recurrence_id));
+    }
+    Value::Object(content)
 }
 
 impl Core {
@@ -153,6 +177,19 @@ impl Core {
                 .await
                 .map_err(|error| self.room_error("save_calendar_event", error.into()))?;
         }
+        Ok(())
+    }
+
+    pub(crate) async fn answer_calendar_event(
+        &self,
+        room_id: &OwnedRoomId,
+        answer: &CalendarAnswer,
+    ) -> Result<(), CommandErr> {
+        self.room(room_id)
+            .await?
+            .send_raw(RSVP_EVENT, rsvp_content(answer))
+            .await
+            .map_err(|error| self.room_error("answer_calendar_event", error))?;
         Ok(())
     }
 

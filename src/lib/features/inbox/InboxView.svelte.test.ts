@@ -18,10 +18,11 @@ import { core } from '#lib/core/__mocks__/context.js';
 import { RoomList } from '#lib/rooms/room-list.svelte.js';
 import { goto } from '#lib/test-support/app-navigation.js';
 import { visit } from '#lib/test-support/app-state.js';
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
 import InboxView from './InboxView.svelte';
 
 const roomList = new RoomList(core as unknown as CoreClient);
-const room = {
+const room = withCounts({
   room_id: '!room:example.org',
   name: 'Room',
   state: 'joined',
@@ -29,7 +30,8 @@ const room = {
   unread: 0,
   notifying: 0,
   highlight: 0,
-} as RoomSummary;
+  marked_unread: false,
+} as RoomSummary);
 
 Object.assign(core, {
   inboxNotifications: vi.fn(() => Promise.resolve({ items: [], hasMore: false })),
@@ -115,7 +117,16 @@ test('lands on the invites tab when only invites are waiting', () => {
 });
 
 test('a room behind the badge with nothing in the feed still gets a row', async () => {
-  roomList.rooms = [{ ...room, is_direct: true, direct_targets: [], unread: 2, notifying: 2 }];
+  roomList.rooms = [
+    withCounts({
+      ...room,
+      is_direct: true,
+      direct_targets: [],
+      unread: 2,
+      notifying: 2,
+      notification: { room: null, default: 'all' },
+    }),
+  ];
   render(InboxView);
   const user = userEvent.setup();
 

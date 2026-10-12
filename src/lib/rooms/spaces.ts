@@ -1,12 +1,6 @@
 import type { RoomSummary } from '#src/generated/protocol';
 
-import {
-  type NotificationModeResolver,
-  quietUnread,
-  type RoomUnread,
-  roomUnread,
-  UNRESOLVED_MODE,
-} from './unread.js';
+import { quietUnread, type RoomUnread, roomUnread } from './unread.js';
 
 export type UnreadCount = {
   unread: number;
@@ -18,11 +12,10 @@ export type UnreadCount = {
 export function spaceUnreadCounts(
   spaces: readonly RoomSummary[],
   rooms: readonly RoomSummary[],
-  mode: NotificationModeResolver = UNRESOLVED_MODE,
   quiet: ReadonlySet<string> = new Set()
 ): Map<string, UnreadCount> {
   return spaceUnreadTotals(spaces, rooms, (room) => {
-    const loud = roomUnread(room, mode(room.room_id));
+    const loud = roomUnread(room);
     return quiet.has(room.room_id) ? quietUnread(loud) : loud;
   });
 }

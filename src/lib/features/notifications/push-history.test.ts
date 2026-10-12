@@ -7,6 +7,7 @@ import {
   pushTrace,
   readPushHistory,
 } from './push-history';
+import { pushNotification } from './push-fixtures';
 
 test('the history keeps only the newest entries', () => {
   let history = readPushHistory(undefined);
@@ -37,14 +38,14 @@ test('what a store hands back is validated entry by entry', () => {
 
 test('a diagnostic push is recognised by its event id', () => {
   expect(
-    isDiagnosticPush({ notification: { event_id: '$sable-diagnostic-1', room_id: '!r:x' } })
+    isDiagnosticPush(pushNotification({ event_id: '$sable-diagnostic-1', room_id: '!r:x' }))
   ).toBe(true);
-  expect(isDiagnosticPush({ notification: { event_id: '$real', room_id: '!r:x' } })).toBe(false);
-  expect(isDiagnosticPush({})).toBe(false);
+  expect(isDiagnosticPush(pushNotification({ event_id: '$real', room_id: '!r:x' }))).toBe(false);
+  expect(isDiagnosticPush(pushNotification({}))).toBe(false);
 });
 
 test('a trace names only what the push carried', () => {
-  expect(pushTrace({ notification: { room_id: '!r:x', event_id: '$e' } })).toEqual({
+  expect(pushTrace(pushNotification({ room_id: '!r:x', event_id: '$e' }))).toEqual({
     roomId: '!r:x',
     eventId: '$e',
   });

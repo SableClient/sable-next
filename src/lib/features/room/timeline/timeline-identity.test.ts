@@ -3,9 +3,10 @@ import { describe, expect, test } from 'vitest';
 import type { TimelineItemView } from '#src/generated/protocol';
 
 import { TimelineIdentityTracker } from './timeline-identity';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 function item(id: string, options: Partial<TimelineItemView> = {}): TimelineItemView {
-  return {
+  return withRowFields({
     id,
     event_id: `$${id}`,
     transaction_id: null,
@@ -14,7 +15,15 @@ function item(id: string, options: Partial<TimelineItemView> = {}): TimelineItem
     sender_name: 'Alice',
     sender_avatar: null,
     timestamp: 0,
-    content: { kind: 'message', body: id, html: id, emote: false, notice: false, edited: false },
+    content: {
+      kind: 'message',
+      body: id,
+      html: id,
+      emote: false,
+      notice: false,
+      edited: false,
+      jumbo: null,
+    },
     in_reply_to: null,
     thread_root: null,
     thread_summary: null,
@@ -29,7 +38,7 @@ function item(id: string, options: Partial<TimelineItemView> = {}): TimelineItem
     mention: options.mention ?? 'none',
     forwarded: options.forwarded ?? null,
     forum_title: options.forum_title ?? null,
-  };
+  });
 }
 
 describe('TimelineIdentityTracker', () => {

@@ -178,7 +178,9 @@ test('a hidden video still waits for reveal before fetching', async () => {
   await tick();
   expect(core.fetchMedia).not.toHaveBeenCalled();
   await user.click(screen.getByRole('button', { name: /Ending/ }));
-  await vi.waitFor(() => expect(document.querySelector('video')).toBeInTheDocument());
+  await vi.waitFor(() => {
+    expect(document.querySelector('video')).toBeInTheDocument();
+  });
 });
 
 test('renders an audio attachment with a player', async () => {

@@ -8,9 +8,7 @@ import { imageMime } from '#lib/ui/media-url.js';
 import { extensionFor } from './pack-archive.js';
 import type { PackTransferCore } from './pack-transfer.js';
 import {
-  imageContent,
   normalizeShortcode,
-  readPackUsage,
   shortcodeWithoutExtension,
   uniqueShortcode,
   type PackImageDraft,
@@ -106,7 +104,7 @@ export async function downloadCandidates(
   for (const pick of picks) {
     const bytes = await core.commands.fetchMedia(pick.source, 0, 0, true);
     const mime = pick.mime ?? imageMime(bytes) ?? null;
-    const shortcode = uniqueShortcode(pick.shortcode, (candidate) => used.has(candidate));
+    const shortcode = uniqueShortcode(pick.shortcode, used);
     used.add(shortcode);
     files.push({ name: `${shortcode}.${extensionFor(mime)}`, bytes, mime });
   }
@@ -121,23 +119,4 @@ export async function downloadCandidates(
     `sable-emotes-${String(Date.now())}.zip`,
     'application/zip'
   );
-}
-
-export function mergedPackContent(
-  current: unknown,
-  additions: PackImageDraft[]
-): Record<string, unknown> {
-  const pack: Record<string, unknown> =
-    typeof current === 'object' && current !== null ? { ...current } : {};
-  const held = pack.images;
-  const images: Record<string, unknown> =
-    typeof held === 'object' && held !== null ? { ...held } : {};
-
-  const packUsage = readPackUsage(pack.pack);
-  for (const image of additions) {
-    const shortcode = uniqueShortcode(image.shortcode, (candidate) => candidate in images);
-    images[shortcode] = imageContent(image, packUsage);
-  }
-
-  return { ...pack, images };
 }

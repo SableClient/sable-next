@@ -15,6 +15,9 @@ const MAX_PROBED_ROOMS: usize = 32;
 pub(crate) struct ProbedState {
     rooms: HashMap<OwnedRoomId, ProbedRoom>,
     tick: u64,
+    /// Our own writes, until their sync echo lands or `RECENT_STATE_MS` has
+    /// passed: state nobody syncs never echoes, and a probe re-reads the server.
+    written: HashMap<(OwnedRoomId, String, String), (u64, Value)>,
 }
 
 pub(crate) enum Probed {
@@ -101,6 +104,51 @@ impl ProbedState {
         room
     }
 
+    pub(crate) fn written(
+        &self,
+        room_id: &RoomId,
+        event_type: &str,
+        state_key: &str,
+        now: u64,
+    ) -> Option<Value> {
+        self.written
+            .get(&(
+                room_id.to_owned(),
+                event_type.to_owned(),
+                state_key.to_owned(),
+            ))
+            .filter(|(at, _)| now.saturating_sub(*at) < RECENT_STATE_MS)
+            .map(|(_, content)| content.clone())
+    }
+
+    pub(crate) fn remember_written(
+        &mut self,
+        room_id: &RoomId,
+        event_type: &str,
+        state_key: &str,
+        content: Value,
+        now: u64,
+    ) {
+        self.written
+            .retain(|_, (at, _)| now.saturating_sub(*at) < RECENT_STATE_MS);
+        self.written.insert(
+            (
+                room_id.to_owned(),
+                event_type.to_owned(),
+                state_key.to_owned(),
+            ),
+            (now, content),
+        );
+    }
+
+    pub(crate) fn settle_written(&mut self, room_id: &RoomId, event_type: &str, state_key: &str) {
+        self.written.remove(&(
+            room_id.to_owned(),
+            event_type.to_owned(),
+            state_key.to_owned(),
+        ));
+    }
+
     pub(crate) fn forget(&mut self, room_id: &RoomId, event_type: &str) {
         if let Some(room) = self.rooms.get_mut(room_id) {
             room.full = None;
@@ -181,6 +229,14 @@ impl crate::Core {
                 async move {
                     if let Some(event_type) = raw.get_field::<String>("type").ok().flatten() {
                         core.forget_room_state(room.room_id(), &event_type);
+                        if let Some(state_key) = raw.get_field::<String>("state_key").ok().flatten()
+                        {
+                            core.probed_state().settle_written(
+                                room.room_id(),
+                                &event_type,
+                                &state_key,
+                            );
+                        }
                     }
                 }
             }
@@ -211,7 +267,7 @@ impl crate::Core {
     }
 }
 
-fn now_ms() -> u64 {
+pub(crate) fn now_ms() -> u64 {
     web_time::SystemTime::now()
         .duration_since(web_time::UNIX_EPOCH)
         .map_or(0, |elapsed| {
@@ -223,7 +279,34 @@ fn now_ms() -> u64 {
 mod tests {
     use matrix_sdk::ruma::RoomId;
 
-    use super::{MAX_PROBED_ROOMS, Probed, ProbedState};
+    use serde_json::json;
+
+    use super::{MAX_PROBED_ROOMS, Probed, ProbedState, RECENT_STATE_MS};
+
+    #[test]
+    fn a_write_shadows_the_store_only_until_it_could_have_echoed() {
+        let mut state = ProbedState::default();
+        let room_id = RoomId::parse("!room:example.org").unwrap();
+        state.remember_written(&room_id, "m.room.topic", "", json!({"topic": "new"}), 1_000);
+
+        assert_eq!(
+            state.written(&room_id, "m.room.topic", "", 1_000 + RECENT_STATE_MS - 1),
+            Some(json!({"topic": "new"}))
+        );
+        assert_eq!(
+            state.written(&room_id, "m.room.topic", "", 1_000 + RECENT_STATE_MS),
+            None
+        );
+
+        state.remember_written(
+            &room_id,
+            "m.room.name",
+            "",
+            json!({"name": "later"}),
+            1_000 + RECENT_STATE_MS,
+        );
+        assert_eq!(state.written.len(), 1);
+    }
 
     #[test]
     fn the_least_recently_written_room_is_dropped_past_the_cap() {

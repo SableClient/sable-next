@@ -73,10 +73,7 @@
     actionFailed = false;
     try {
       if (approve) await core.commands.inviteUser(room.room_id, member.user_id);
-      else
-        await core.commands.sendStateEvent(room.room_id, 'm.room.member', member.user_id, {
-          membership: 'leave',
-        });
+      else await core.commands.denyKnock(room.room_id, member.user_id);
       answered.add(key(request));
     } catch (error) {
       console.warn('[sable inbox] answering join request failed', error);

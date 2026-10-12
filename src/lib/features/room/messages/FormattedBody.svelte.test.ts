@@ -71,7 +71,7 @@ test('opens Matrix links through the room-level handler', async () => {
   await user.click(link());
 
   expect(onMatrixLink).toHaveBeenCalledWith(
-    { kind: 'event', roomId: '!room:example.org', eventId: '$event' },
+    { kind: 'event', room_id: '!room:example.org', event_id: '$event' },
     expect.any(HTMLAnchorElement)
   );
   expect(onDocumentClick).not.toHaveBeenCalled();
@@ -557,7 +557,7 @@ test('shows a room abbreviation definition in a tooltip on hover', async () => {
   render(FormattedBodyHarness, {
     props: {
       html: '<p>a foss build</p>',
-      entries: [{ term: 'FOSS', definition: 'Free and open source software' }],
+      entries: [{ term: 'FOSS', definition: 'Free and open source software', cased: false }],
     },
   });
   await tick();

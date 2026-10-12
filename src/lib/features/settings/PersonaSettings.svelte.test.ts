@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   removeAll: vi.fn<() => Promise<void>>(),
   list: [] as PersonaView[],
   accountData: vi.fn<(eventType: string) => Promise<unknown>>(),
+  checkPersonaBackup: vi.fn<(backup: string) => Promise<void>>(),
+  restorePersonaBackup: vi.fn<(backup: string) => Promise<void>>(),
   setAccountData: vi.fn<(eventType: string, content: unknown) => Promise<void>>(),
 }));
 
@@ -31,6 +33,8 @@ Object.assign(core, {
   uploadMedia: mocks.uploadMedia,
   accountData: mocks.accountData,
   setAccountData: mocks.setAccountData,
+  checkPersonaBackup: mocks.checkPersonaBackup,
+  restorePersonaBackup: mocks.restorePersonaBackup,
 });
 vi.mock('#lib/personas/personas.svelte.js', () => ({
   usePersonaStore: () => ({ personas: mocks.list, loading: false, error: null, ...mocks }),
@@ -129,13 +133,14 @@ test('reports an export file that holds no members', async () => {
 
 test('restores a backup only after confirmation', async () => {
   mocks.load.mockResolvedValue();
-  mocks.setAccountData.mockResolvedValue();
-  const catalog = { profiles: [{ id: 'kris' }] };
+  mocks.checkPersonaBackup.mockResolvedValue();
+  mocks.restorePersonaBackup.mockResolvedValue();
+  const backup = JSON.stringify({ catalog: true });
   render(PersonaSettings);
-  await choose(1, JSON.stringify({ 'fi.mau.msc4461.per_message_profiles.v3': catalog }));
+  await choose(1, backup);
 
   const dialog = await screen.findByRole('dialog');
-  expect(mocks.setAccountData).not.toHaveBeenCalled();
+  expect(mocks.restorePersonaBackup).not.toHaveBeenCalled();
 
   const [confirm] = within(dialog)
     .getAllByRole('button')
@@ -144,20 +149,18 @@ test('restores a backup only after confirmation', async () => {
   await vi.waitFor(() => {
     expect(mocks.load).toHaveBeenCalledWith(true);
   });
-  expect(mocks.setAccountData).toHaveBeenCalledWith(
-    'fi.mau.msc4461.per_message_profiles.v3',
-    catalog
-  );
+  expect(mocks.restorePersonaBackup).toHaveBeenCalledWith(backup);
 });
 
-test('rejects a backup without the v3 catalog', async () => {
+test('a file the core refuses is reported before anything is asked', async () => {
   mocks.load.mockResolvedValue();
+  mocks.checkPersonaBackup.mockRejectedValueOnce(new Error('invalid_backup'));
   render(PersonaSettings);
-  await choose(1, JSON.stringify({ 'fi.mau.msc4461.per_message_profiles.v2': { profiles: [] } }));
+  await choose(1, '{}');
 
   expect(await screen.findByText(/not a per-message profile backup/)).toBeInTheDocument();
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  expect(mocks.setAccountData).not.toHaveBeenCalled();
+  expect(mocks.restorePersonaBackup).not.toHaveBeenCalled();
 });
 
 test('deletes every profile only after confirmation', async () => {

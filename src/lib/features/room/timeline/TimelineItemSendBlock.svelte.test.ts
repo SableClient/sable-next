@@ -35,9 +35,10 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
 });
 
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 function failed(blocked: NonNullable<TimelineItemView['send_state']>): TimelineItemView {
-  return {
+  return withRowFields({
     id: 'item',
     event_id: null,
     transaction_id: 'txn',
@@ -53,6 +54,7 @@ function failed(blocked: NonNullable<TimelineItemView['send_state']>): TimelineI
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -67,7 +69,7 @@ function failed(blocked: NonNullable<TimelineItemView['send_state']>): TimelineI
     mention: 'none',
     forwarded: null,
     forum_title: null,
-  };
+  });
 }
 
 test('a send blocked by a changed identity explains why and can go out anyway', async () => {

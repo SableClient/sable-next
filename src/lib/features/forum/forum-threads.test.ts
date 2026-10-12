@@ -3,9 +3,10 @@ import { expect, test } from 'vitest';
 import type { TimelineItemView } from '#src/generated/protocol';
 
 import { collectForumThreads } from './forum-threads';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 function item(overrides: Partial<TimelineItemView> & { id: string }): TimelineItemView {
-  return {
+  return withRowFields({
     event_id: `$${overrides.id}`,
     transaction_id: null,
     send_state: null,
@@ -20,6 +21,7 @@ function item(overrides: Partial<TimelineItemView> & { id: string }): TimelineIt
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -35,7 +37,7 @@ function item(overrides: Partial<TimelineItemView> & { id: string }): TimelineIt
     forwarded: null,
     forum_title: null,
     ...overrides,
-  };
+  });
 }
 
 test('collects an item with a thread summary as a root', () => {
@@ -74,6 +76,7 @@ test('ignores a thread reply, a plain reply and a state change', () => {
       sender_mentioned: false,
       sender_name: null,
       body: null,
+      fallback: null,
     },
   });
   const joined = item({
@@ -176,6 +179,7 @@ test('keeps the root details needed for its own forum actions', () => {
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
   });
 

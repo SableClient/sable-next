@@ -42,12 +42,7 @@
   import '#lib/ui/primitives/settings-row.css';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
-  import {
-    FOUNDER_POWER_LEVEL,
-    parsePowerLevelTags,
-    POWER_LEVEL_TAGS_EVENT_TYPE,
-    type PowerLevelTagMap,
-  } from './power-level-tags';
+  import { FOUNDER_POWER_LEVEL, type PowerLevelTagMap } from './power-level-tags';
 
   interface Props {
     room: RoomSummary | null;
@@ -132,9 +127,9 @@
     if (!target) return;
     let current = true;
     void core.commands
-      .roomStateEvent(target, POWER_LEVEL_TAGS_EVENT_TYPE)
-      .then((content) => {
-        if (current) powerTags = parsePowerLevelTags(content);
+      .powerLevelTags(target)
+      .then((tags) => {
+        if (current) powerTags = tags;
       })
       .catch(() => {
         if (current) powerTags = {};
@@ -472,10 +467,7 @@
                       if (target)
                         void act(
                           member.user_id,
-                          () =>
-                            core.commands.sendStateEvent(target, 'm.room.member', member.user_id, {
-                              membership: 'leave',
-                            }),
+                          () => core.commands.kickUser(target, member.user_id, null),
                           (entry) => ({ ...entry, membership: 'leave' })
                         );
                     }}

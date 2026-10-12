@@ -1,5 +1,5 @@
 import type { Suggestion } from '../composer/autocomplete';
-import { SEARCH_OPERATORS, type SearchOperator } from './search-query';
+import { searchOperators, type SearchOperator } from './search-query';
 
 export interface SuggestionRoom {
   id: string;
@@ -94,14 +94,14 @@ export function suggestionsFor(
 
   if (!partial.hasColon) {
     if (partial.operator === '' && !includeOperatorList) return [];
-    return SEARCH_OPERATORS.filter((operator) => operator.startsWith(partial.operator)).map(
-      (operator) => ({
+    return searchOperators()
+      .filter((operator) => operator.startsWith(partial.operator))
+      .map((operator) => ({
         id: `operator:${operator}`,
         label: `${operator}:`,
         detail: OPERATOR_HINTS[operator],
         insert: `${partial.negated}${operator}:`,
-      })
-    );
+      }));
   }
 
   const operator = partial.operator as SearchOperator;

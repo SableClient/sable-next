@@ -12,15 +12,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { invalidatePacks } from '#lib/emoji/load-packs.js';
   import ImagePackEditor from '#lib/features/emotes/ImagePackEditor.svelte';
-  import {
-    ROOM_EMOTES_EVENT_TYPE,
-    ROOM_IMAGE_PACK_EVENT_TYPE,
-  } from '#lib/features/emotes/pack-address.js';
-  import {
-    packEventContent,
-    uniqueShortcode,
-    normalizeShortcode,
-  } from '#lib/features/emotes/pack-content.js';
+  import { ROOM_IMAGE_PACK_EVENT_TYPE } from '#lib/features/emotes/pack-address.js';
   import type { PackDraft } from '#lib/features/emotes/pack-content.js';
   import { i18n } from '#lib/i18n.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
@@ -90,39 +82,21 @@
     }
   }
 
-  async function writePack(stateKey: string, content: unknown): Promise<void> {
-    const target = roomId;
-    if (!target) return;
-
-    await core.commands.sendStateEvent(target, ROOM_IMAGE_PACK_EVENT_TYPE, stateKey, content);
+  async function changed(): Promise<void> {
     invalidatePacks(core.commands);
     await load();
   }
 
-  async function clearLegacyPack(stateKey: string): Promise<void> {
-    const target = roomId;
-    if (!target) return;
-
-    const legacy = await core.commands
-      .roomStateEvent(target, ROOM_EMOTES_EVENT_TYPE, stateKey)
-      .catch(() => null);
-    if (typeof legacy !== 'object' || legacy === null || Object.keys(legacy).length === 0) return;
-    await core.commands.sendStateEvent(target, ROOM_EMOTES_EVENT_TYPE, stateKey, {});
-  }
-
   async function createPack(): Promise<void> {
+    const target = roomId;
     const name = newPackName.trim();
-    if (name === '' || busy) return;
-
-    const wanted = normalizeShortcode(name).toLocaleLowerCase() || 'pack';
-    const stateKey = uniqueShortcode(wanted, (candidate) =>
-      roomPacks.some((pack) => pack.id === candidate)
-    );
+    if (!target || name === '' || busy) return;
 
     busy = true;
     failed = false;
     try {
-      await writePack(stateKey, { pack: { display_name: name }, images: {} });
+      await core.commands.createRoomImagePack(target, name);
+      await changed();
       newPackName = '';
     } catch (error) {
       console.warn('[sable room] pack creation failed', error);
@@ -133,15 +107,14 @@
   }
 
   async function deletePack(pack: ImagePackView): Promise<void> {
-    if (busy) return;
+    const target = roomId;
+    if (!target || busy) return;
 
     busy = true;
     failed = false;
     try {
-      await clearLegacyPack(pack.id).catch((error: unknown) => {
-        console.warn('[sable room] legacy pack not cleared', error);
-      });
-      await writePack(pack.id, {});
+      await core.commands.deleteRoomImagePack(target, pack.id);
+      await changed();
       if (viewing === pack.id) viewing = null;
     } catch (error) {
       console.warn('[sable room] pack removal failed', error);
@@ -159,8 +132,8 @@
   }
 
   async function updateLegacy(
-    targets: ImagePackView[],
-    write: (target: string, stateKey: string) => Promise<void>
+    update: (target: string, stateKeys: string[]) => Promise<void>,
+    targets: ImagePackView[]
   ): Promise<void> {
     const target = roomId;
     if (!target || busy) return;
@@ -168,32 +141,34 @@
     busy = true;
     failed = false;
     try {
-      for (const pack of targets) await write(target, pack.id);
+      await update(
+        target,
+        targets.map((pack) => pack.id)
+      );
     } catch (error) {
       console.warn('[sable room] legacy packs not updated', error);
       failed = true;
     } finally {
-      invalidatePacks(core.commands);
-      await load();
+      await changed();
       busy = false;
     }
   }
 
   function convertLegacyPacks(): Promise<void> {
-    return updateLegacy(legacyOnly, async (target, stateKey) => {
-      const legacy = await core.commands.roomStateEvent(target, ROOM_EMOTES_EVENT_TYPE, stateKey);
-      if (typeof legacy !== 'object' || legacy === null || Object.keys(legacy).length === 0) return;
-      await core.commands.sendStateEvent(target, ROOM_IMAGE_PACK_EVENT_TYPE, stateKey, legacy);
-    });
+    return updateLegacy(core.commands.convertLegacyImagePacks, legacyOnly);
   }
 
   async function removeLegacyCopies(): Promise<void> {
-    await updateLegacy(legacyCopies, (_target, stateKey) => clearLegacyPack(stateKey));
+    await updateLegacy(core.commands.removeLegacyImagePacks, legacyCopies);
     confirmingLegacyRemoval = false;
   }
 
   async function applyDraft(pack: ImagePackView, draft: PackDraft): Promise<void> {
-    await writePack(pack.id, packEventContent(draft));
+    const target = roomId;
+    if (!target) return;
+
+    await core.commands.saveImagePack({ kind: 'room', room_id: target, state_key: pack.id }, draft);
+    await changed();
   }
 </script>
 

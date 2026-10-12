@@ -54,7 +54,9 @@ pub fn items(content: &SidebarSpacesEventContent) -> Vec<SidebarItemView> {
                 let Some(room_id) = fresh_room_id(&room_id, &mut seen_rooms) else {
                     continue;
                 };
-                items.push(SidebarItemView::Space { room_id });
+                items.push(SidebarItemView::Space {
+                    room_id: room_id.into(),
+                });
             }
             StoredItem::Unknown(_) => {}
             StoredItem::Folder { id, name, content } => {
@@ -62,9 +64,10 @@ pub fn items(content: &SidebarSpacesEventContent) -> Vec<SidebarItemView> {
                     continue;
                 }
 
-                let content: Vec<OwnedRoomId> = content
+                let content: Vec<String> = content
                     .iter()
                     .filter_map(|room_id| fresh_room_id(room_id, &mut seen_rooms))
+                    .map(Into::into)
                     .collect();
                 if content.is_empty() {
                     continue;
@@ -97,11 +100,11 @@ fn stored_items(items: &[SidebarItemView]) -> Vec<StoredItem> {
     items
         .iter()
         .map(|item| match item {
-            SidebarItemView::Space { room_id } => StoredItem::Space(room_id.to_string()),
+            SidebarItemView::Space { room_id } => StoredItem::Space(room_id.clone()),
             SidebarItemView::Folder { id, name, content } => StoredItem::Folder {
                 id: id.clone(),
                 name: name.clone(),
-                content: content.iter().map(ToString::to_string).collect(),
+                content: content.clone(),
             },
         })
         .collect()

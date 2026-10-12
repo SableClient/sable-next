@@ -1,5 +1,5 @@
 import { expect, SIGNED_OUT, test } from './fixtures/test';
-import { timelineItem } from './fixtures/timeline-items';
+import { timelineItem, withRowFields } from './fixtures/timeline-items';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -28,7 +28,7 @@ for (const name of [
       },
       {
         op: 'push_back',
-        value: {
+        value: withRowFields({
           ...timelineItem('long-name-ban', ''),
           content: {
             kind: 'membership',
@@ -37,7 +37,7 @@ for (const name of [
             change: 'kicked_and_banned',
             reason: 'Moderation reason',
           },
-        },
+        }),
       },
     ]);
 

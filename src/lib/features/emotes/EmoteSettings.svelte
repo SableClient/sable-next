@@ -24,20 +24,7 @@
   import { packDraft } from './pack-content.js';
   import { exportPacks } from './pack-transfer.js';
   import PersonalPackSettings from './PersonalPackSettings.svelte';
-  import {
-    EMOTE_ROOMS_EVENT_TYPE,
-    IMAGE_PACK_ROOMS_EVENT_TYPE,
-    packAddressEqual,
-    packAddressKey,
-    type PackAddress,
-  } from './pack-address.js';
-  import {
-    emoteRoomsEventContent,
-    readEmoteRooms,
-    selectedAddresses,
-    withSelection,
-    type EmoteRoomsContent,
-  } from './emote-rooms.js';
+  import { packAddressEqual, packAddressKey, type PackAddress } from './pack-address.js';
 
   import '#lib/ui/primitives/settings-row.css';
 
@@ -46,7 +33,7 @@
   const category = findCategory(SETTINGS_EMOTES_SECTION);
 
   let packs = $state.raw<ImagePackView[]>([]);
-  let selection = $state.raw<EmoteRoomsContent>({});
+  let chosen = $state.raw<PackAddress[]>([]);
   let loading = $state(true);
   let busy = $state(false);
   let failed = $state(false);
@@ -56,14 +43,13 @@
   let listScroll = 0;
 
   let roomPacks = $derived(packs.filter((pack) => pack.origin === 'room' && pack.room_id !== null));
-  let chosen = $derived(selectedAddresses(selection));
   let viewingPack = $derived(
     roomPacks.find((pack) => pack.room_id !== null && packAddressKey(address(pack)) === viewing) ??
       null
   );
 
   function address(pack: ImagePackView): PackAddress {
-    return { roomId: pack.room_id ?? '', stateKey: pack.id };
+    return { room_id: pack.room_id ?? '', state_key: pack.id };
   }
 
   function scroller(): HTMLElement | null {
@@ -111,15 +97,13 @@
 
   async function load(): Promise<void> {
     try {
-      const [loaded, stable, unstable] = await Promise.all([
+      const [loaded, subscribed] = await Promise.all([
         core.commands.allImagePacks(),
-        core.commands.accountData(IMAGE_PACK_ROOMS_EVENT_TYPE),
-        core.commands.accountData(EMOTE_ROOMS_EVENT_TYPE),
+        core.commands.packSubscriptions(),
       ]);
       if (!alive) return;
       packs = loaded;
-      const chosenStable = readEmoteRooms(stable);
-      selection = Object.keys(chosenStable).length > 0 ? chosenStable : readEmoteRooms(unstable);
+      chosen = subscribed;
     } catch (error) {
       console.warn('[sable emotes] the pack list could not be read', error);
       if (alive) failed = true;
@@ -127,17 +111,15 @@
   }
 
   async function toggle(pack: ImagePackView, wanted: boolean): Promise<void> {
-    const target = address(pack);
-    const next = wanted
-      ? withSelection(selection, [target], [])
-      : withSelection(selection, [], [target]);
+    const target = [address(pack)];
 
     busy = true;
     failed = false;
     try {
-      await core.commands.setAccountData(IMAGE_PACK_ROOMS_EVENT_TYPE, emoteRoomsEventContent(next));
+      chosen = wanted
+        ? await core.commands.setPackSubscriptions(target, [])
+        : await core.commands.setPackSubscriptions([], target);
       invalidatePacks(core.commands);
-      selection = next;
     } catch (error) {
       console.warn('[sable emotes] the pack selection could not be saved', error);
       failed = true;
@@ -164,16 +146,14 @@
   async function toggleRoom(roomId: string, roomsPacks: ImagePackView[]): Promise<void> {
     const all = roomsPacks.every(isChosen);
     const addresses = roomsPacks.map(address);
-    const next = all
-      ? withSelection(selection, [], addresses)
-      : withSelection(selection, addresses, []);
 
     busy = true;
     failed = false;
     try {
-      await core.commands.setAccountData(IMAGE_PACK_ROOMS_EVENT_TYPE, emoteRoomsEventContent(next));
+      chosen = all
+        ? await core.commands.setPackSubscriptions([], addresses)
+        : await core.commands.setPackSubscriptions(addresses, []);
       invalidatePacks(core.commands);
-      selection = next;
     } catch (error) {
       console.warn('[sable emotes] the pack selection could not be saved', error);
       failed = true;

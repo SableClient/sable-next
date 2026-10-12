@@ -26,7 +26,6 @@ import {
 } from '#lib/features/composer/send-failure.js';
 import { runSlash } from '#lib/features/composer/slash-commands.js';
 import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
-import { replyFallbackFromSource } from '#lib/features/room/messages/reply-fallback.js';
 import { replyPreviewBody, type ReplyVersion } from '#lib/features/room/messages/reply-preview.js';
 import { previewableLinks } from '#lib/features/room/media/link-preview.js';
 import { previewSources, resolveUrlPreview } from '#lib/features/room/media/link-preview-cache.js';
@@ -493,7 +492,7 @@ export class Conversation {
       const item = items[index];
       if (
         !item.event_id ||
-        (!isMessageRow(item.content) && item.content.kind !== 'unable_to_decrypt') ||
+        (!isMessageRow(item) && item.content.kind !== 'unable_to_decrypt') ||
         item.content.kind === 'redacted'
       )
         continue;
@@ -660,29 +659,16 @@ export class Conversation {
 
     for (const item of this.#timeline.items) {
       const reply = item.in_reply_to;
-      if (!reply || reply.body !== null) continue;
+      if (!reply || reply.body !== null || reply.fallback !== null) continue;
 
       const eventId = item.event_id;
       if (eventId === null || this.#requestedDetails.has(eventId)) continue;
 
       this.#requestedDetails.add(eventId);
-      const loadFallback = async (): Promise<void> => {
-        const source = await this.#core.commands.eventSource(roomId, reply.event_id);
-        const fallback = replyFallbackFromSource(source, t);
-        if (fallback) this.#timeline.provideReplyFallback(reply.event_id, fallback);
-      };
       void this.#core.commands
         .fetchEventDetails(roomId, eventId, this.#threadRoot)
-        .then(async () => {
-          const updated = this.#timeline.items.find((entry) => entry.event_id === eventId);
-          if (updated?.in_reply_to?.body === null) await loadFallback();
-        })
-        .catch(async (error: unknown) => {
-          console.debug('[sable room] reply details unavailable', error);
-          await loadFallback();
-        })
         .catch((error: unknown) => {
-          console.debug('[sable room] replied-to event unavailable', error);
+          console.debug('[sable room] reply details unavailable', error);
         });
     }
   };

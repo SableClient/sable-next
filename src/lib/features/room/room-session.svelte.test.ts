@@ -28,7 +28,7 @@ function opened(eventId: string): RoomOpenView {
       can_change_power_levels: false,
       can_manage_children: false,
     },
-    power_level_tags: null,
+    power_level_tags: {},
     widgets: [],
     pinned_event_ids: [eventId],
     predecessor: null,
@@ -53,8 +53,10 @@ function fixture() {
       })
     ),
     roomStateEvent: vi.fn((): Promise<unknown> => Promise.resolve(null)),
+    memberListThreshold: vi.fn((): Promise<number | null> => Promise.resolve(null)),
     roomStateEvents: vi.fn((): Promise<RoomStateEventView[]> => Promise.resolve([])),
-    sendStateEvent: vi.fn((..._args: unknown[]) => Promise.resolve('$created')),
+    addRoomWidget: vi.fn((..._args: unknown[]) => Promise.resolve('new')),
+    removeRoomWidget: vi.fn((..._args: unknown[]) => Promise.resolve()),
   };
   const pins = { set: vi.fn() };
   return { commands, pins, session: new RoomSession(commands, pins) };
@@ -69,7 +71,7 @@ test('opening a room loads the saved founder flair', async () => {
   commands.roomOpen.mockResolvedValueOnce({
     ...opened('$new'),
     power_level_tags: {
-      [FOUNDER_POWER_LEVEL]: { name: 'Founder', color: '#ff0000', icon: { key: '👑' } },
+      [String(FOUNDER_POWER_LEVEL)]: { name: 'Founder', color: '#ff0000', icon: '👑' },
     },
   });
 
@@ -127,26 +129,20 @@ test('widget removal cannot populate the next room with the previous room widget
     },
   ]);
   await removal;
-  expect(commands.sendStateEvent).toHaveBeenCalledWith(
-    '!old',
-    'im.vector.modular.widgets',
-    'widget',
-    {}
-  );
+  expect(commands.removeRoomWidget).toHaveBeenCalledWith('!old', 'widget');
   expect(session.widgets).toEqual([]);
 });
 
 test('tombstone completion and member settings are cancelled on room change', async () => {
   const { commands, session } = fixture();
   const tombstone = deferred<unknown>();
-  const listing = deferred<unknown>();
-  commands.roomStateEvent
-    .mockReturnValueOnce(listing.promise)
-    .mockReturnValueOnce(tombstone.promise);
+  const listing = deferred<number | null>();
+  commands.memberListThreshold.mockReturnValueOnce(listing.promise);
+  commands.roomStateEvent.mockReturnValueOnce(tombstone.promise);
   session.sync('!old', true, 0);
   session.sync('!new', false, 1);
   tombstone.resolve({ replacement_room: '!replacement', body: 'old' });
-  listing.resolve({});
+  listing.resolve(50);
   await settle();
   expect(session.tombstoneReplacementId).toBeNull();
   expect(session.tombstoneChecked).toBe(false);
@@ -155,22 +151,22 @@ test('tombstone completion and member settings are cancelled on room change', as
 
 test('a member list revision keeps the current setting until the new one lands', async () => {
   const { commands, session } = fixture();
-  commands.roomStateEvent.mockResolvedValueOnce({ always_listed_from: 50 });
+  commands.memberListThreshold.mockResolvedValueOnce(50);
   session.sync('!room', false, 0);
   await settle();
   expect(session.alwaysListedFrom).toBe(50);
 
-  const next = deferred<unknown>();
-  commands.roomStateEvent.mockReturnValueOnce(next.promise);
+  const next = deferred<number | null>();
+  commands.memberListThreshold.mockReturnValueOnce(next.promise);
   session.sync('!room', false, 1);
   expect(session.alwaysListedFrom).toBe(50);
 
-  next.resolve({ always_listed_from: 100 });
+  next.resolve(100);
   await settle();
   expect(session.alwaysListedFrom).toBe(100);
 });
 
-test('adding a widget writes an enriched widget state event and reloads the list', async () => {
+test('adding a widget goes through the core and reloads the list', async () => {
   const { commands, session } = fixture();
   commands.roomStateEvents.mockResolvedValueOnce([
     { state_key: 'new', content: { type: 'm.custom', url: 'https://example.org/widget' } },
@@ -178,20 +174,12 @@ test('adding a widget writes an enriched widget state event and reloads the list
   session.sync('!room', false, 0);
   await settle();
 
-  await session.details.addWidget('Doom', 'https://example.org/widget', '@erwan:example.org');
+  await session.details.addWidget('Doom', 'https://example.org/widget');
 
-  const [roomId, type, , content] = commands.sendStateEvent.mock.calls[0] as [
-    string,
-    string,
-    string,
-    { url: string; type: string; name: string; creatorUserId: string },
-  ];
-  expect([roomId, type]).toEqual(['!room', 'im.vector.modular.widgets']);
-  expect(content).toMatchObject({
-    type: 'm.custom',
-    name: 'Doom',
-    creatorUserId: '@erwan:example.org',
-  });
-  expect(content.url).toContain('https://example.org/widget?matrix_user_id=$matrix_user_id');
+  expect(commands.addRoomWidget).toHaveBeenCalledWith(
+    '!room',
+    'Doom',
+    'https://example.org/widget'
+  );
   expect(session.widgets).toHaveLength(1);
 });

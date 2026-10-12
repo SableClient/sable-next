@@ -40,8 +40,8 @@ use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
 use matrix_sdk::ruma::room::RoomType;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
-    MilliSecondsSinceUnixEpoch, OwnedMxcUri, OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt,
-    events::room::member::MembershipState,
+    MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedMxcUri, OwnedRoomId, RoomId, RoomOrAliasId,
+    ServerName, UInt, events::room::member::MembershipState,
 };
 use matrix_sdk::ruma::{
     RoomVersionId, api::client::discovery::get_capabilities::v3::RoomVersionStability,
@@ -51,6 +51,7 @@ use matrix_sdk_ui::timeline::{
 };
 
 use crate::ResultExt;
+use crate::power_levels;
 use crate::probed_state::Probed;
 use crate::protocol::{
     Command, CommandErr, CommandOk, CoreEvent, CreateJoinRuleView, CreateRoomKind,
@@ -61,7 +62,6 @@ use crate::protocol::{
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
-const POWER_LEVEL_TAGS_EVENT_TYPE: &str = "in.cinny.room.power_level_tags";
 const WIDGETS_EVENT_TYPE: &str = "im.vector.modular.widgets";
 
 use crate::media::mxc_uri;
@@ -565,6 +565,10 @@ impl Core {
                 })
             }
 
+            Command::MarkdownToContent { markdown, pills } => Ok(CommandOk::MarkdownToContent(
+                sable_model::markdown::markdown_to_content(&markdown, &pills),
+            )),
+
             Command::SendMessage {
                 room_id,
                 body,
@@ -870,22 +874,8 @@ impl Core {
                 event_id,
                 thread_root,
             } => {
-                let fetched = self
-                    .timeline_for(&room_id, thread_root.as_ref())
-                    .await?
-                    .fetch_details_for_event(&event_id)
-                    .await;
-                match fetched {
-                    Err(TimelineError::EventNotInTimeline(_)) => {
-                        tracing::debug!(
-                            context = "fetch_event_details",
-                            "the event left the timeline"
-                        );
-                        return Err(CommandErr::Unavailable);
-                    }
-                    other => other.or_failed(self, "fetch_event_details")?,
-                }
-
+                self.fetch_event_details(&room_id, &event_id, thread_root.as_ref())
+                    .await?;
                 Ok(CommandOk::FetchEventDetails)
             }
 
@@ -898,6 +888,7 @@ impl Core {
                 context,
                 older,
             } => {
+                let filter = crate::search::IndexFilter::try_from(filter)?;
                 let limit = (limit as usize).min(MAX_SEARCH_RESULTS);
                 let context = (context as usize).min(MAX_SEARCH_CONTEXT);
                 let (hits, older) = if let Some(cursor) = older {
@@ -1081,7 +1072,9 @@ impl Core {
                 event_id,
                 pinned,
             } => Ok(CommandOk::SetPinned {
-                event_ids: self.set_pinned(&room_id, event_id, pinned).await?,
+                event_ids: self
+                    .set_pinned_with_marker(&room_id, event_id, pinned)
+                    .await?,
             }),
 
             Command::RoomPowerLevels { room_id } => {
@@ -1383,11 +1376,11 @@ impl Core {
 
             Command::ReplacedRooms => {
                 let client = self.client().await?;
-                let every_encrypted = self.every_encrypted_event_pushed().await;
+                let rules = self.push_rules().await?.snapshot().await;
                 let mut rooms = Vec::new();
                 for room in client.joined_rooms() {
                     if room.is_tombstoned() {
-                        rooms.push(view::listless_room_summary(room, every_encrypted).await);
+                        rooms.push(view::listless_room_summary(room, &rules).await);
                     }
                 }
                 Ok(CommandOk::ReplacedRooms { rooms })
@@ -1402,7 +1395,7 @@ impl Core {
                     self.room_permissions(&room_id),
                     self.room_state_event_content(
                         room_id.clone(),
-                        POWER_LEVEL_TAGS_EVENT_TYPE.to_owned(),
+                        power_levels::TAGS_EVENT.to_owned(),
                         String::new(),
                     ),
                     self.room_state_events(&room_id, WIDGETS_EVENT_TYPE),
@@ -1418,10 +1411,14 @@ impl Core {
                     .and_then(|room| view::predecessor(&room));
                 Ok(CommandOk::RoomOpen(RoomOpenView {
                     permissions: permissions?,
-                    power_level_tags: power_level_tags.unwrap_or_else(|error| {
-                        tracing::warn!(?error, "power level tags unavailable");
-                        None
-                    }),
+                    power_level_tags: power_levels::parse_tags(
+                        power_level_tags
+                            .unwrap_or_else(|error| {
+                                tracing::warn!(?error, "power level tags unavailable");
+                                None
+                            })
+                            .as_ref(),
+                    ),
                     widgets: widgets.unwrap_or_else(|error| {
                         tracing::warn!(?error, "widgets unavailable");
                         Vec::new()
@@ -1439,7 +1436,7 @@ impl Core {
                 Ok(CommandOk::RoomSummary {
                     room: view::listless_room_summary(
                         room,
-                        self.every_encrypted_event_pushed().await,
+                        &self.push_rules().await?.snapshot().await,
                     )
                     .await,
                 })
@@ -1541,18 +1538,7 @@ impl Core {
                 event_type,
                 content,
             } => {
-                self.remember_account_data_type(event_type.as_str()).await;
-                self.put_global_account_data(
-                    event_type.as_str().into(),
-                    &content,
-                    "set_account_data",
-                )
-                .await?;
-                self.pack_cache
-                    .lock()
-                    .await
-                    .forget_account_data(&event_type);
-
+                self.set_account_data(&event_type, &content).await?;
                 Ok(CommandOk::SetAccountData)
             }
 
@@ -2369,20 +2355,6 @@ impl Core {
                 )))
             }
 
-            Command::RoomNotificationModes { room_ids } => {
-                let rules = self.push_rules().await?.snapshot().await;
-                let mut rooms = Vec::with_capacity(room_ids.len());
-                for room_id in room_ids {
-                    if let Ok(room) = self.room(&room_id).await {
-                        rooms.push((room_id, notifications::uses_direct_push_rules(&room)));
-                    }
-                }
-
-                Ok(CommandOk::RoomNotificationModes {
-                    modes: push_rules::room_modes(&rules, rooms),
-                })
-            }
-
             Command::DefaultNotificationModes => Ok(CommandOk::DefaultNotificationModes {
                 modes: push_rules::default_modes(&self.push_rules().await?.snapshot().await),
             }),
@@ -2661,44 +2633,325 @@ impl Core {
                 event_type,
                 state_key,
                 content,
-            } => {
-                let response = self
-                    .room(&room_id)
-                    .await?
-                    .send_state_event_raw(&event_type, &state_key, &content)
-                    .await
-                    .map_err(|error| self.room_error("send_state_event", error))?;
-                self.pack_cache
-                    .lock()
-                    .await
-                    .forget_room(&room_id, &event_type);
-                self.forget_room_state(&room_id, &event_type);
-                if self.note_cosmetic_state(&room_id, &event_type, &state_key, &content) {
-                    self.emit(CoreEvent::RoomCosmeticsChanged {
-                        room_id: room_id.clone(),
-                    });
-                }
-                if event_type == "m.room.member"
-                    && content.get("membership").and_then(|value| value.as_str()) == Some("join")
-                    && let Ok(user_id) = state_key.as_str().try_into()
-                {
-                    self.emit(CoreEvent::ProfileChanged {
-                        room_id,
-                        user_id,
-                        display_name: content
-                            .get("displayname")
-                            .and_then(|value| value.as_str())
-                            .map(ToOwned::to_owned),
-                        avatar_url: content
-                            .get("avatar_url")
-                            .and_then(|value| value.as_str())
-                            .map(ToOwned::to_owned),
-                    });
-                }
+            } => Ok(CommandOk::SendStateEvent {
+                event_id: self
+                    .send_state(room_id, &event_type, &state_key, &content)
+                    .await?,
+            }),
 
-                Ok(CommandOk::SendStateEvent {
-                    event_id: response.event_id,
+            Command::HistoryVisibility { room_id } => Ok(CommandOk::HistoryVisibility {
+                visibility: self.history_visibility(&room_id).await?,
+            }),
+
+            Command::SetHistoryVisibility {
+                room_id,
+                visibility,
+            } => {
+                self.set_history_visibility(room_id, visibility).await?;
+                Ok(CommandOk::SetHistoryVisibility)
+            }
+
+            Command::EnableEncryption { room_id } => {
+                self.enable_encryption(room_id).await?;
+                Ok(CommandOk::EnableEncryption)
+            }
+
+            Command::CanonicalAlias { room_id } => {
+                let (alias, alt_aliases) = self.canonical_alias(&room_id).await?;
+                Ok(CommandOk::CanonicalAlias { alias, alt_aliases })
+            }
+
+            Command::SetCanonicalAlias {
+                room_id,
+                alias,
+                alt_aliases,
+            } => {
+                let (alias, alt_aliases) = self
+                    .set_canonical_alias(room_id, alias.as_deref(), &alt_aliases)
+                    .await?;
+                Ok(CommandOk::SetCanonicalAlias { alias, alt_aliases })
+            }
+
+            Command::RoomBanner { room_id } => Ok(CommandOk::RoomBanner {
+                url: self.room_banner(&room_id).await?,
+            }),
+
+            Command::SetRoomBanner { room_id, url } => {
+                self.set_room_banner(room_id, url.as_deref()).await?;
+                Ok(CommandOk::SetRoomBanner)
+            }
+
+            Command::MemberListThreshold { room_id } => Ok(CommandOk::MemberListThreshold {
+                always_listed_from: self.member_list_threshold(&room_id).await?,
+            }),
+
+            Command::SetMemberListThreshold {
+                room_id,
+                always_listed_from,
+            } => {
+                self.set_member_list_threshold(room_id, always_listed_from)
+                    .await?;
+                Ok(CommandOk::SetMemberListThreshold)
+            }
+
+            Command::MediaPreviewConfig { room_id } => Ok(CommandOk::MediaPreviewConfig {
+                config: self.media_preview_settings(room_id.as_ref()).await?,
+            }),
+
+            Command::SetMediaPreviewConfig { config } => Ok(CommandOk::SetMediaPreviewConfig {
+                config: self.set_media_preview_settings(config).await?,
+            }),
+
+            Command::SendGesture {
+                room_id,
+                gesture,
+                target,
+            } => {
+                self.send_gesture(&room_id, gesture, target.as_ref())
+                    .await?;
+                Ok(CommandOk::SendGesture)
+            }
+
+            Command::AnswerCalendarEvent {
+                room_id,
+                calendar_event_id,
+                uid,
+                recurrence_id,
+                status,
+            } => {
+                let answer = crate::calendar::CalendarAnswer {
+                    calendar_event_id,
+                    uid,
+                    recurrence_id,
+                    status,
+                };
+                self.answer_calendar_event(&room_id, &answer).await?;
+                Ok(CommandOk::AnswerCalendarEvent)
+            }
+
+            Command::AddRoomWidget { room_id, name, url } => Ok(CommandOk::AddRoomWidget {
+                widget_id: self.add_room_widget(room_id, &name, &url).await?,
+            }),
+
+            Command::RemoveRoomWidget { room_id, widget_id } => {
+                self.remove_room_widget(room_id, &widget_id).await?;
+                Ok(CommandOk::RemoveRoomWidget)
+            }
+
+            Command::UpdateServerAcl {
+                room_id,
+                allow,
+                deny,
+                remove_allow,
+                remove_deny,
+            } => {
+                let edit = crate::room_settings::AclEdit {
+                    allow,
+                    deny,
+                    remove_allow,
+                    remove_deny,
+                };
+                self.update_server_acl(room_id, &edit).await?;
+                Ok(CommandOk::UpdateServerAcl)
+            }
+
+            Command::PinReadState { room_id } => Ok(CommandOk::PinReadState(
+                self.pin_read_state(&room_id).await?,
+            )),
+
+            Command::MarkPinsSeen {
+                room_id,
+                pinned_ids,
+            } => Ok(CommandOk::MarkPinsSeen(
+                self.mark_pins_seen(&room_id, pinned_ids).await?,
+            )),
+
+            Command::PersonaBackup => Ok(CommandOk::PersonaBackup {
+                backup: self.persona_backup().await?,
+            }),
+
+            Command::CheckPersonaBackup { backup } => {
+                Self::check_persona_backup(&backup)?;
+                Ok(CommandOk::CheckPersonaBackup)
+            }
+
+            Command::RestorePersonaBackup { backup } => {
+                self.restore_persona_backup(&backup).await?;
+                Ok(CommandOk::RestorePersonaBackup)
+            }
+
+            Command::ProfileOverrides => {
+                Ok(CommandOk::ProfileOverrides(self.profile_overrides().await?))
+            }
+
+            Command::SetProfileOverride {
+                user_id,
+                display_name,
+                avatar,
+                color,
+            } => {
+                let edit = crate::profile_overrides::OverrideEdit {
+                    display_name,
+                    avatar,
+                    color,
+                };
+                Ok(CommandOk::SetProfileOverride(
+                    self.set_profile_override(&user_id, &edit).await?,
+                ))
+            }
+
+            Command::DismissedInvites => Ok(CommandOk::DismissedInvites {
+                room_ids: self.dismissed_invites().await?,
+            }),
+
+            Command::SetInviteDismissed { room_id, dismissed } => {
+                Ok(CommandOk::SetInviteDismissed {
+                    room_ids: self.set_invite_dismissed(room_id, dismissed).await?,
                 })
+            }
+
+            Command::SaveImagePack { target, draft } => {
+                self.save_image_pack(target, &draft).await?;
+                Ok(CommandOk::SaveImagePack)
+            }
+
+            Command::CreateRoomImagePack { room_id, name } => Ok(CommandOk::CreateRoomImagePack {
+                state_key: self.create_room_image_pack(room_id, &name).await?,
+            }),
+
+            Command::DeleteRoomImagePack { room_id, state_key } => {
+                self.delete_room_image_pack(room_id, &state_key).await?;
+                Ok(CommandOk::DeleteRoomImagePack)
+            }
+
+            Command::ConvertLegacyImagePacks {
+                room_id,
+                state_keys,
+            } => {
+                self.convert_legacy_image_packs(&room_id, &state_keys)
+                    .await?;
+                Ok(CommandOk::ConvertLegacyImagePacks)
+            }
+
+            Command::RemoveLegacyImagePacks {
+                room_id,
+                state_keys,
+            } => {
+                self.remove_legacy_image_packs(&room_id, &state_keys)
+                    .await?;
+                Ok(CommandOk::RemoveLegacyImagePacks)
+            }
+
+            Command::AddAccountPackImages { images } => {
+                self.add_account_pack_images(&images).await?;
+                Ok(CommandOk::AddAccountPackImages)
+            }
+
+            Command::PackSubscriptions => Ok(CommandOk::PackSubscriptions {
+                subscriptions: self.pack_subscriptions().await?,
+            }),
+
+            Command::SetPackSubscriptions { added, removed } => {
+                Ok(CommandOk::SetPackSubscriptions {
+                    subscriptions: self.set_pack_subscriptions(&added, &removed).await?,
+                })
+            }
+
+            Command::RoomAbbreviations { room_id } => Ok(CommandOk::RoomAbbreviations {
+                entries: self.room_abbreviations(&room_id).await?,
+            }),
+
+            Command::SetRoomAbbreviations { room_id, entries } => {
+                self.set_room_abbreviations(room_id, &entries).await?;
+                Ok(CommandOk::SetRoomAbbreviations)
+            }
+
+            Command::SetTombstone {
+                room_id,
+                replacement_room,
+                body,
+            } => {
+                self.set_tombstone(room_id, &replacement_room, &body)
+                    .await?;
+                Ok(CommandOk::SetTombstone)
+            }
+
+            Command::SetPowerLevel {
+                room_id,
+                levels,
+                location,
+                level,
+            } => Ok(CommandOk::SetPowerLevel(
+                self.set_power_level(room_id, levels, &location, level)
+                    .await?,
+            )),
+
+            Command::SyncPowerLevelsFromSpace {
+                room_id,
+                space_id,
+                levels,
+            } => {
+                let (levels, tags) = self
+                    .sync_power_levels_from_space(room_id, space_id, levels)
+                    .await?;
+                Ok(CommandOk::SyncPowerLevelsFromSpace { levels, tags })
+            }
+
+            Command::SyncChildPowerLevels {
+                space_id,
+                child_ids,
+            } => {
+                let result = self.sync_child_power_levels(space_id, &child_ids).await?;
+                Ok(CommandOk::SyncChildPowerLevels {
+                    updated: result.updated,
+                    skipped: result.skipped,
+                })
+            }
+
+            Command::PowerLevelTags { room_id } => Ok(CommandOk::PowerLevelTags {
+                tags: self.power_level_tags(&room_id).await?,
+            }),
+
+            Command::SetPowerLevelTag {
+                room_id,
+                level,
+                tag,
+            } => Ok(CommandOk::SetPowerLevelTag {
+                tags: self
+                    .set_power_level_tag(room_id, level, tag.as_ref())
+                    .await?,
+            }),
+
+            Command::MemberLook { room_id } => {
+                Ok(CommandOk::MemberLook(self.member_look(room_id).await?))
+            }
+
+            Command::SetMemberLook {
+                room_id,
+                in_parent_space,
+                display_name,
+                avatar_url,
+                color_on_light,
+                color_on_dark,
+            } => {
+                let edit = crate::member_look::LookEdit {
+                    display_name,
+                    avatar_url,
+                    color_on_light,
+                    color_on_dark,
+                };
+                self.set_member_look(room_id, in_parent_space, edit).await?;
+                Ok(CommandOk::SetMemberLook)
+            }
+
+            Command::SetPronouns {
+                room_id,
+                in_parent_space,
+                pronouns,
+            } => {
+                self.set_pronouns(room_id, in_parent_space, &pronouns)
+                    .await?;
+                Ok(CommandOk::SetPronouns)
             }
 
             Command::SetRoomName { room_id, name } => {
@@ -2768,6 +3021,17 @@ impl Core {
                     .map_err(|error| self.room_error("kick_user", error))?;
 
                 Ok(CommandOk::KickUser)
+            }
+
+            Command::DenyKnock { room_id, user_id } => {
+                self.send_state(
+                    room_id,
+                    "m.room.member",
+                    user_id.as_str(),
+                    &serde_json::json!({ "membership": "leave" }),
+                )
+                .await?;
+                Ok(CommandOk::DenyKnock)
             }
 
             Command::BanUser {
@@ -3186,6 +3450,12 @@ impl Core {
             }),
 
             Command::SetSpaceSidebar { items } => {
+                if sable_model::sidebar::layout_space_ids(&items)
+                    .iter()
+                    .any(|room_id| RoomId::parse(room_id).is_err())
+                {
+                    return Err(CommandErr::UnknownRoom);
+                }
                 self.set_space_sidebar(&items).await?;
 
                 Ok(CommandOk::SetSpaceSidebar)
@@ -3639,6 +3909,76 @@ impl Core {
         images
     }
 
+    /// Every global account data write goes through here so the pack cache
+    /// never serves what we just replaced.
+    pub(crate) async fn set_account_data(
+        &self,
+        event_type: &str,
+        content: &serde_json::Value,
+    ) -> Result<(), CommandErr> {
+        self.remember_account_data_type(event_type).await;
+        self.put_global_account_data(event_type.into(), content, "set_account_data")
+            .await?;
+        self.pack_cache.lock().await.forget_account_data(event_type);
+        Ok(())
+    }
+
+    /// Every state write goes through here so the caches that read state back
+    /// are invalidated and the cosmetic and profile listeners hear about it.
+    pub(crate) async fn send_state(
+        &self,
+        room_id: OwnedRoomId,
+        event_type: &str,
+        state_key: &str,
+        content: &serde_json::Value,
+    ) -> Result<OwnedEventId, CommandErr> {
+        let response = self
+            .room(&room_id)
+            .await?
+            .send_state_event_raw(event_type, state_key, content)
+            .await
+            .map_err(|error| self.room_error("send_state_event", error))?;
+        self.pack_cache
+            .lock()
+            .await
+            .forget_room(&room_id, event_type);
+        self.forget_room_state(&room_id, event_type);
+        self.probed_state().remember_written(
+            &room_id,
+            event_type,
+            state_key,
+            content.clone(),
+            crate::probed_state::now_ms(),
+        );
+        if self.note_cosmetic_state(&room_id, event_type, state_key, content) {
+            self.emit(CoreEvent::RoomCosmeticsChanged {
+                room_id: room_id.clone(),
+            });
+        }
+        if event_type == "m.room.member"
+            && content.get("membership").and_then(|value| value.as_str()) == Some("join")
+            && let Ok(user_id) = matrix_sdk::ruma::OwnedUserId::try_from(state_key)
+        {
+            let text = |key| {
+                content
+                    .get(key)
+                    .and_then(|value| value.as_str())
+                    .map(ToOwned::to_owned)
+            };
+            let (display_name, avatar_url) = (text("displayname"), text("avatar_url"));
+            self.overlay_profile(&room_id, &user_id, display_name.clone(), avatar_url.clone())
+                .await;
+            self.emit(CoreEvent::ProfileChanged {
+                room_id,
+                user_id,
+                display_name,
+                avatar_url,
+            });
+        }
+
+        Ok(response.event_id)
+    }
+
     async fn room_permissions(
         &self,
         room_id: &OwnedRoomId,
@@ -3656,7 +3996,7 @@ impl Core {
         Ok(view::room_permissions(&power_levels, &user_id))
     }
 
-    async fn room_state_events(
+    pub(crate) async fn room_state_events(
         &self,
         room_id: &OwnedRoomId,
         event_type: &str,
@@ -3713,6 +4053,15 @@ impl Core {
         event_type: String,
         state_key: String,
     ) -> Result<Option<serde_json::Value>, CommandErr> {
+        let written = self.probed_state().written(
+            &room_id,
+            &event_type,
+            &state_key,
+            crate::probed_state::now_ms(),
+        );
+        if written.is_some() {
+            return Ok(written);
+        }
         let client = self.client().await?;
         let room = self.room(&room_id).await?;
         let event = room

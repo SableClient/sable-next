@@ -1,94 +1,30 @@
 import type {
-  RoomJoinRuleView,
+  HierarchyRoomView,
+  HierarchySection,
   RoomSummary,
   SpaceChildEdge,
-  SpaceHierarchyRoomView,
 } from '#src/generated/protocol';
 
-export type HierarchyRoomView = Omit<SpaceHierarchyRoomView, 'num_joined_members'> & {
-  num_joined_members: number | null;
-};
+import * as model from '#lib/model/model.js';
 
-export type HierarchyRoom = {
-  room: HierarchyRoomView;
-  suggested: boolean;
-  via: string[];
-  key: string;
-};
-
-export type HierarchySection = {
-  space: HierarchyRoomView | null;
-  suggested: boolean;
-  depth: number;
-  key: string;
-  rooms: HierarchyRoom[];
-  parentId: string;
-  ownerId: string | null;
-  siblings: SpaceChildEdge[];
-  loaded: boolean;
-  failed: boolean;
-  pending: number;
-};
+export type {
+  HierarchyRoom,
+  HierarchyRoomView,
+  HierarchySection,
+  JoinCandidate,
+  LobbyAction,
+} from '#src/generated/protocol';
+export {
+  buildHierarchySections,
+  joinCandidates,
+  lobbyAction,
+  mergeHierarchyRooms,
+} from '#lib/model/model.js';
 
 export type LobbyDragItem = { parentId: string; roomId: string | null };
 
 export function sameLobbyItem(left: LobbyDragItem, right: LobbyDragItem): boolean {
   return left.parentId === right.parentId && left.roomId === right.roomId;
-}
-
-export function lobbyAction(
-  joinRule: RoomJoinRuleView,
-  invited: boolean,
-  inParent = true
-): 'join' | 'knock' | null {
-  if (invited || joinRule === 'public') return 'join';
-  if (joinRule === 'restricted') return inParent ? 'join' : null;
-  if (joinRule === 'knock_restricted') return inParent ? 'join' : 'knock';
-  if (joinRule === 'knock') return 'knock';
-  return null;
-}
-
-export function inAllowList(
-  room: Pick<HierarchyRoomView, 'allowed_room_ids'>,
-  joinedIds: ReadonlySet<string>,
-  parentId: string
-): boolean {
-  return room.allowed_room_ids.length > 0
-    ? room.allowed_room_ids.some((id) => joinedIds.has(id))
-    : joinedIds.has(parentId);
-}
-
-export type JoinCandidate = {
-  room: HierarchyRoomView;
-  via: string[];
-  parentId: string;
-};
-
-export function joinCandidates(
-  sections: readonly HierarchySection[],
-  joinedIds: ReadonlySet<string>,
-  invitedIds: ReadonlySet<string>
-): JoinCandidate[] {
-  const seen = new Set<string>();
-  const candidates: JoinCandidate[] = [];
-  const consider = (room: HierarchyRoomView, via: string[], parentId: string): void => {
-    if (seen.has(room.room_id) || joinedIds.has(room.room_id)) return;
-    seen.add(room.room_id);
-    const action = lobbyAction(
-      room.join_rule,
-      invitedIds.has(room.room_id),
-      inAllowList(room, joinedIds, parentId)
-    );
-    if (action === 'join') candidates.push({ room, via, parentId });
-  };
-
-  for (const section of sections) {
-    if (section.space !== null && section.ownerId !== null) {
-      consider(section.space, [], section.ownerId);
-    }
-    for (const entry of section.rooms) consider(entry.room, entry.via, section.parentId);
-  }
-  return candidates;
 }
 
 export function localHierarchyRooms(
@@ -131,114 +67,6 @@ export function localHierarchyRooms(
   return views;
 }
 
-export function mergeHierarchyRooms(
-  local: readonly HierarchyRoomView[],
-  fetched: readonly SpaceHierarchyRoomView[]
-): HierarchyRoomView[] {
-  const merged = new Map<string, HierarchyRoomView>();
-  for (const room of fetched) merged.set(room.room_id, room);
-
-  for (const room of local) {
-    const chunk = merged.get(room.room_id);
-    if (chunk === undefined) {
-      merged.set(room.room_id, room);
-      continue;
-    }
-
-    merged.set(room.room_id, {
-      ...room,
-      name: room.name ?? chunk.name,
-      topic: room.topic ?? chunk.topic,
-      avatar_url: room.avatar_url ?? chunk.avatar_url,
-      canonical_alias: room.canonical_alias ?? chunk.canonical_alias,
-      num_joined_members: chunk.num_joined_members,
-      guest_can_join: chunk.guest_can_join,
-      children: room.children.length > 0 ? room.children : chunk.children,
-    });
-  }
-
-  return [...merged.values()];
-}
-
-export function buildHierarchySections(
-  rooms: readonly HierarchyRoomView[],
-  rootId: string,
-  levels: { loaded?: ReadonlySet<string>; failed?: ReadonlySet<string> } = {},
-  keepEmpty: (spaceId: string) => boolean = () => false
-): HierarchySection[] {
-  const byId = new Map(rooms.map((room) => [room.room_id, room]));
-  const sections: HierarchySection[] = [];
-  const described = (spaceId: string): boolean =>
-    levels.loaded === undefined || levels.loaded.has(spaceId);
-  const refused = (spaceId: string): boolean => levels.failed?.has(spaceId) ?? false;
-
-  function walk(
-    spaceId: string,
-    space: HierarchyRoomView | null,
-    suggested: boolean,
-    depth: number,
-    ancestry: readonly string[]
-  ): void {
-    const current = byId.get(spaceId);
-    if (!current) return;
-
-    const ownRooms: HierarchyRoom[] = [];
-    const subspaces: { room: HierarchyRoomView; suggested: boolean }[] = [];
-    let pending = 0;
-
-    for (const edge of current.children) {
-      const child = byId.get(edge.room_id);
-      if (!child) {
-        pending += 1;
-        continue;
-      }
-
-      if (child.is_space) {
-        subspaces.push({ room: child, suggested: edge.suggested });
-        continue;
-      }
-      ownRooms.push({
-        room: child,
-        suggested: edge.suggested,
-        via: [...edge.via],
-        key: [...ancestry, child.room_id].join('/'),
-      });
-    }
-
-    if (
-      ownRooms.length > 0 ||
-      !described(spaceId) ||
-      refused(spaceId) ||
-      (space !== null && keepEmpty(spaceId))
-    ) {
-      sections.push({
-        space,
-        suggested,
-        depth,
-        key: ancestry.join('/'),
-        rooms: ownRooms,
-        parentId: spaceId,
-        ownerId: ancestry.at(-2) ?? null,
-        siblings: current.children,
-        loaded: described(spaceId),
-        failed: refused(spaceId),
-        pending,
-      });
-    }
-
-    for (const subspace of subspaces) {
-      if (ancestry.includes(subspace.room.room_id)) continue;
-      walk(subspace.room.room_id, subspace.room, subspace.suggested, depth + 1, [
-        ...ancestry,
-        subspace.room.room_id,
-      ]);
-    }
-  }
-
-  walk(rootId, null, false, 0, [rootId]);
-  return sections;
-}
-
 const MIN_PLACEHOLDER_ROWS = 3;
 const MAX_PLACEHOLDER_ROWS = 10;
 
@@ -261,6 +89,17 @@ export type ChildOrderOverride = {
   baseline: string;
 };
 
+export function applyChildOverrides(
+  rooms: readonly HierarchyRoomView[],
+  overrides: readonly ChildOrderOverride[]
+): HierarchyRoomView[] {
+  if (overrides.length === 0) return [...rooms];
+  return model.applyChildOverrides(
+    rooms,
+    overrides.map(({ parentId, children }) => ({ parent_id: parentId, children }))
+  );
+}
+
 export function edgeSignature(edges: readonly SpaceChildEdge[]): string {
   return edges.map((edge) => `${edge.room_id}:${edge.order ?? ''}`).join('|');
 }
@@ -270,19 +109,6 @@ export function childEdges(
   parentId: string
 ): readonly SpaceChildEdge[] {
   return rooms.find((room) => room.room_id === parentId)?.children ?? [];
-}
-
-export function applyChildOverrides(
-  rooms: readonly HierarchyRoomView[],
-  overrides: readonly ChildOrderOverride[]
-): HierarchyRoomView[] {
-  if (overrides.length === 0) return [...rooms];
-
-  const byParent = new Map(overrides.map((override) => [override.parentId, override.children]));
-  return rooms.map((room) => {
-    const children = byParent.get(room.room_id);
-    return children === undefined ? room : { ...room, children };
-  });
 }
 
 export type SuggestedOverride = {
@@ -296,19 +122,14 @@ export function applySuggestedOverrides(
   overrides: readonly SuggestedOverride[]
 ): HierarchyRoomView[] {
   if (overrides.length === 0) return [...rooms];
-
-  return rooms.map((room) => {
-    const own = overrides.filter((override) => override.parentId === room.room_id);
-    if (own.length === 0) return room;
-
-    return {
-      ...room,
-      children: room.children.map((edge) => {
-        const override = own.find((candidate) => candidate.roomId === edge.room_id);
-        return override === undefined ? edge : { ...edge, suggested: override.suggested };
-      }),
-    };
-  });
+  return model.applySuggestedOverrides(
+    rooms,
+    overrides.map(({ parentId, roomId, suggested }) => ({
+      parent_id: parentId,
+      room_id: roomId,
+      suggested,
+    }))
+  );
 }
 
 export function pendingSuggestedOverrides(

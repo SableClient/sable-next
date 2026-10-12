@@ -16,11 +16,11 @@ import {
 } from '#lib/features/notifications/conversation.js';
 import { notificationPermalink } from '#lib/features/notifications/notification-link.js';
 import {
-  alert,
   parsePushPayload,
-  type PushPayload,
+  pushAlert,
+  type PushNotification,
   silencedByRoomMode,
-  unreadCount,
+  type WebPushValidation,
   webPushValidation,
 } from '#lib/features/notifications/push-payload.js';
 import {
@@ -40,6 +40,7 @@ import {
   roomMode,
   roomName,
 } from '#lib/features/notifications/room-names.js';
+import { loadModel } from '#lib/model/model.js';
 import type { PushFetchView } from '#src/generated/protocol';
 import { reportWorkerError, watchWorkerOperation } from './telemetry.js';
 
@@ -54,31 +55,36 @@ worker.addEventListener('unhandledrejection', (event) => {
 
 worker.addEventListener('push', (event) => {
   const raw = event.data?.text();
+  event.waitUntil(
+    watchWorkerOperation(
+      'push',
+      loadModel().then(() => receive(raw))
+    )
+  );
+});
 
+async function receive(raw: string | undefined): Promise<void> {
   const validation = webPushValidation(raw);
   if (validation) {
-    event.waitUntil(
-      watchWorkerOperation(
-        'push-validation',
-        Promise.all([
-          record('WEBPUSH_VALIDATION'),
-          worker.clients.matchAll({ type: 'window', includeUncontrolled: true }),
-        ]).then(([, clients]) => {
-          for (const client of clients) {
-            client.postMessage({
-              type: 'sable:webpush-ack',
-              appId: validation.appId,
-              ackToken: validation.ackToken,
-            });
-          }
-        })
-      )
-    );
+    await watchWorkerOperation('push-validation', acknowledge(validation));
     return;
   }
+  await present(parsePushPayload(raw) ?? undefined);
+}
 
-  event.waitUntil(watchWorkerOperation('push', present(parsePushPayload(raw) ?? undefined)));
-});
+async function acknowledge(validation: WebPushValidation): Promise<void> {
+  const [, clients] = await Promise.all([
+    record('WEBPUSH_VALIDATION'),
+    worker.clients.matchAll({ type: 'window', includeUncontrolled: true }),
+  ]);
+  for (const client of clients) {
+    client.postMessage({
+      type: 'sable:webpush-ack',
+      appId: validation.app_id,
+      ackToken: validation.ack_token,
+    });
+  }
+}
 
 worker.addEventListener('message', (event) => {
   const message = event.data as { type?: unknown } | undefined;
@@ -147,7 +153,7 @@ function record(outcome: string, trace: Omit<PushHistoryEntry, 'at' | 'outcome'>
   return recordPush({ at: Date.now(), outcome, ...trace });
 }
 
-async function present(pushed: PushPayload | undefined): Promise<void> {
+async function present(pushed: PushNotification | undefined): Promise<void> {
   if (!pushed) {
     await record('INVALID_PAYLOAD');
     return;
@@ -158,9 +164,8 @@ async function present(pushed: PushPayload | undefined): Promise<void> {
     return;
   }
 
-  const count = unreadCount(pushed);
-  if (count !== null && 'setAppBadge' in navigator) {
-    await navigator.setAppBadge(count).catch(() => undefined);
+  if (pushed.unread !== null && 'setAppBadge' in navigator) {
+    await navigator.setAppBadge(pushed.unread).catch(() => undefined);
   }
 
   if (await focused()) {
@@ -173,17 +178,16 @@ async function present(pushed: PushPayload | undefined): Promise<void> {
     await record('DISCARDED', trace);
     return;
   }
-  if (fetched) await record(payload.notification?.type ? 'FETCHED' : 'FETCH_FAILED', trace);
-  if (silencedByRoomMode(payload, await roomMode(payload.notification?.room_id ?? ''))) {
+  if (fetched) await record(payload.type ? 'FETCHED' : 'FETCH_FAILED', trace);
+  if (silencedByRoomMode(payload, await roomMode(payload.room_id ?? ''))) {
     await record('ROOM_MODE_SILENCED', trace);
     return;
   }
 
   const policy = await pushContentPolicy();
-  const encrypted =
-    payload.notification?.type === 'm.room.encrypted' || payload.notification?.decrypted === true;
+  const encrypted = payload.type === 'm.room.encrypted' || payload.decrypted;
   const showContent = policy.content && (!encrypted || policy.encryptedContent);
-  const showing = alert(payload, await roomName(payload.notification?.room_id ?? ''), showContent);
+  const showing = pushAlert(payload, await roomName(payload.room_id ?? ''), showContent);
   if (!showing) {
     await record('BADGE_ONLY', trace);
     return;
@@ -193,10 +197,7 @@ async function present(pushed: PushPayload | undefined): Promise<void> {
   const lines = appendLine(showContent ? held : hideLines(held), showing.line);
   const now = Date.now();
   const renotify =
-    !policy.notifyOnce ||
-    held.length === 0 ||
-    payload.notification?.noisy === true ||
-    !alertCooling(alertedAt, now);
+    !policy.notifyOnce || held.length === 0 || payload.noisy || !alertCooling(alertedAt, now);
 
   const options: NotificationOptions & {
     renotify?: boolean;
@@ -206,13 +207,13 @@ async function present(pushed: PushPayload | undefined): Promise<void> {
     body: lines.length > 1 ? summarise(lines) : showing.body,
     tag: showing.tag,
     renotify,
-    icon: payload.notification?.icon ?? favicon,
+    icon: payload.icon ?? favicon,
     badge: favicon,
     timestamp: now,
     data: {
-      roomId: showing.roomId,
-      userId: payload.notification?.user_id,
-      eventId: showing.eventId,
+      roomId: showing.room_id,
+      userId: payload.user_id ?? undefined,
+      eventId: showing.event_id,
       invite: showing.invite,
       lines,
       alertedAt: renotify ? now : alertedAt,
@@ -236,11 +237,11 @@ async function present(pushed: PushPayload | undefined): Promise<void> {
   await record('POSTED', trace);
 }
 
-async function fetchEvent(payload: PushPayload): Promise<PushPayload | null> {
-  const session = await pushSession(payload.notification?.user_id);
+async function fetchEvent(payload: PushNotification): Promise<PushNotification | null> {
+  const session = await pushSession(payload.user_id ?? undefined);
   if (!session) return payload;
   return completePushPayload(
-    { notification: { ...payload.notification, user_id: session.userId } },
+    { ...payload, user_id: session.userId },
     {
       session,
       fetch: (input, init) => fetch(input, init),

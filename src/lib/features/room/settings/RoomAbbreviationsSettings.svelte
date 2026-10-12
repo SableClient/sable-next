@@ -26,7 +26,6 @@
   import {
     ABBREVIATIONS_EVENT_TYPE,
     abbreviationKey,
-    readAbbreviations,
     splitTerms,
     upsertAbbreviation,
     type AbbreviationEntry,
@@ -73,9 +72,9 @@
 
     const current = ++run;
     void core.commands
-      .roomStateEvent(target, ABBREVIATIONS_EVENT_TYPE)
-      .then((content) => {
-        if (current === run) entries = readAbbreviations(content);
+      .roomAbbreviations(target)
+      .then((next) => {
+        if (current === run) entries = next;
       })
       .catch((error: unknown) => {
         console.debug('[sable room] abbreviations unavailable', error);
@@ -99,9 +98,7 @@
       ids.map(async (spaceId) => {
         let list: AbbreviationEntry[] = [];
         try {
-          list = readAbbreviations(
-            await core.commands.roomStateEvent(spaceId, ABBREVIATIONS_EVENT_TYPE)
-          );
+          list = await core.commands.roomAbbreviations(spaceId);
         } catch (error) {
           console.debug('[sable room] inherited abbreviations unavailable', error);
         }
@@ -127,7 +124,7 @@
     busy = true;
     failed = false;
     try {
-      await core.commands.sendStateEvent(target, ABBREVIATIONS_EVENT_TYPE, '', { entries: next });
+      await core.commands.setRoomAbbreviations(target, next);
       entries = [...next];
       abbreviationsChanged();
       return true;
@@ -159,7 +156,7 @@
     const drafted = splitTerms(term).map((nextTerm) => ({
       term: nextTerm,
       definition: nextDefinition,
-      ...(cased ? { cased: true } : {}),
+      cased,
     }));
     const unique = drafted.filter(
       (entry, index) =>

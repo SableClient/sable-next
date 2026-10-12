@@ -1,10 +1,11 @@
 <script lang="ts">
+  import type { AvatarEditView, FieldEdit } from '#src/generated/protocol';
+
   import { useCoreClient } from '#lib/core/context.js';
   import ColorSetting from '#lib/features/settings/ColorSetting.svelte';
   import { i18n } from '#lib/i18n.js';
   import { downscaledAvatar, encryptAttachment } from '#lib/profile/encrypted-file.js';
-  import { NAME_COLOR_FIELD } from '#lib/profile/fields.js';
-  import { avatarSource, profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
+  import { profileOverrides, type OverrideEdit } from '#lib/profile/profile-overrides.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
@@ -26,8 +27,8 @@
 
   let name = $state('');
   let color = $state('');
-  let avatar = $state.raw<unknown>(undefined);
-  let avatarSrc = $derived(avatarSource(avatar) ?? undefined);
+  let avatar = $state.raw<AvatarEditView>({ kind: 'clear' });
+  let avatarSrc = $derived(avatarPreview(avatar));
   let locked = $derived(profileOverrides.protection === 'locked');
   let sealed = $derived(profileOverrides.protection === 'sealed' || profileOverrides.canSeal);
   let busy = $state(false);
@@ -37,11 +38,30 @@
     if (!open) return;
     const current = profileOverrides.of(userId);
     const colors = profileOverrides.colors(userId);
-    name = typeof current?.displayname === 'string' ? current.displayname : '';
+    name = current?.display_name.kind === 'set' ? current.display_name.value : '';
     color = colors?.light ?? colors?.dark ?? '';
-    avatar = avatarSource(current?.avatar_url) ? current?.avatar_url : undefined;
+    avatar = current?.avatar.kind === 'set' ? { kind: 'keep' } : { kind: 'clear' };
     failed = false;
   });
+
+  function avatarPreview(edit: AvatarEditView): string | undefined {
+    switch (edit.kind) {
+      case 'keep': {
+        const current = profileOverrides.of(userId)?.avatar;
+        return current?.kind === 'set' ? current.value : undefined;
+      }
+      case 'url':
+        return edit.url;
+      case 'encrypted':
+        return JSON.stringify(edit.file);
+      case 'clear':
+        return undefined;
+    }
+  }
+
+  function field(value: string): FieldEdit {
+    return value === '' ? { kind: 'clear' } : { kind: 'set', value };
+  }
 
   async function pickAvatar(file: File | undefined): Promise<void> {
     if (!file) return;
@@ -54,14 +74,20 @@
           new Uint8Array(await scaled.arrayBuffer())
         );
         avatar = {
-          ...encrypted,
-          url: await core.commands.uploadMedia('application/octet-stream', ciphertext),
+          kind: 'encrypted',
+          file: {
+            ...encrypted,
+            url: await core.commands.uploadMedia('application/octet-stream', ciphertext),
+          },
         };
       } else {
-        avatar = await core.commands.uploadMedia(
-          upright.type || 'image/*',
-          new Uint8Array(await upright.arrayBuffer())
-        );
+        avatar = {
+          kind: 'url',
+          url: await core.commands.uploadMedia(
+            upright.type || 'image/*',
+            new Uint8Array(await upright.arrayBuffer())
+          ),
+        };
       }
     } catch (error) {
       console.warn('[sable profile] override avatar upload failed', error);
@@ -71,11 +97,11 @@
     }
   }
 
-  async function save(fields: Record<string, unknown>): Promise<void> {
+  async function save(edit: OverrideEdit): Promise<void> {
     busy = true;
     failed = false;
     try {
-      await profileOverrides.set(userId, fields);
+      await profileOverrides.set(userId, edit);
       onOpenChange(false);
     } catch (error) {
       console.warn('[sable profile] override not saved', error);
@@ -86,15 +112,15 @@
   }
 
   function confirm(): void {
-    void save({
-      displayname: name.trim() || undefined,
-      avatar_url: avatar,
-      [NAME_COLOR_FIELD]: color ? { on_light: color, on_dark: color } : undefined,
-    });
+    void save({ display_name: field(name.trim()), avatar, color: field(color) });
   }
 
   function reset(): void {
-    void save({ displayname: undefined, avatar_url: undefined, [NAME_COLOR_FIELD]: undefined });
+    void save({
+      display_name: { kind: 'clear' },
+      avatar: { kind: 'clear' },
+      color: { kind: 'clear' },
+    });
   }
 </script>
 
@@ -129,8 +155,8 @@
       />
       {$i18n.t('common.chooseAPicture')}
     </label>
-    {#if avatar !== undefined}
-      <Button variant="ghost" size="small" onclick={() => (avatar = undefined)}>
+    {#if avatar.kind !== 'clear'}
+      <Button variant="ghost" size="small" onclick={() => (avatar = { kind: 'clear' })}>
         {$i18n.t('timeline.profileOverrideAvatarReset')}
       </Button>
     {/if}

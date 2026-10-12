@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import type { TimelineItemView } from '#src/generated/protocol';
 import { TimelineUnread } from './timeline-unread.svelte.js';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 function message(id: string, own = false): TimelineItemView {
   return { id, event_id: `$${id}`, is_own: own, content: { kind: 'message' } } as TimelineItemView;
@@ -34,7 +35,10 @@ test('landing below the unread boundary holds receipts until its first message i
 
 test('resolves an unloaded boundary after history arrives and skips hidden events', async () => {
   const unread = new TimelineUnread();
-  const hidden = { ...message('hidden'), content: { kind: 'membership' } } as TimelineItemView;
+  const hidden = withRowFields({
+    ...message('hidden'),
+    content: { kind: 'membership' },
+  } as TimelineItemView);
   const load = vi.fn().mockResolvedValue('$read');
   await unread.initialize([message('later')], true, load);
   unread.resolve([message('later')], false);
@@ -99,7 +103,10 @@ test('dismissing while a marker lookup is in flight cannot restore the unread st
 
 test('a fully-read event hidden by preferences still defines the unread boundary', async () => {
   const unread = new TimelineUnread();
-  const hiddenRead = { ...message('read'), content: { kind: 'membership' } } as TimelineItemView;
+  const hiddenRead = withRowFields({
+    ...message('read'),
+    content: { kind: 'membership' },
+  } as TimelineItemView);
   const raw = [message('old'), hiddenRead, message('first'), message('later')];
   const visible = [raw[0], raw[2], raw[3]];
   await unread.initialize(raw, true, () => Promise.resolve('$read'), visible);
@@ -111,7 +118,10 @@ test('a fully-read event hidden by preferences still defines the unread boundary
 test('redacting a hidden unread target advances the jump to its next visible message', async () => {
   const unread = new TimelineUnread();
   await unread.initialize([marker(), message('first'), message('next')], true);
-  const redacted = { ...message('first'), content: { kind: 'redacted' } } as TimelineItemView;
+  const redacted = withRowFields({
+    ...message('first'),
+    content: { kind: 'redacted' },
+  } as TimelineItemView);
   unread.resolve([marker(), redacted, message('next')], false, [marker(), message('next')]);
   expect(unread.firstEventId).toBe('$next');
   expect(unread.blocking).toBe(true);

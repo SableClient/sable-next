@@ -19,6 +19,7 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
 import TimelineReadReceipt from './TimelineReadReceipt.svelte';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 beforeEach(() => {
   native.onFocus = null;
@@ -31,7 +32,7 @@ afterEach(() => {
 });
 
 function item(): TimelineItemView {
-  return {
+  return withRowFields({
     id: 'latest',
     event_id: '$latest',
     transaction_id: null,
@@ -47,6 +48,7 @@ function item(): TimelineItemView {
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -61,7 +63,7 @@ function item(): TimelineItemView {
     mention: 'none',
     forwarded: null,
     forum_title: null,
-  };
+  });
 }
 
 function deferred<T>() {

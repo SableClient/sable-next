@@ -27,6 +27,7 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { NotificationCenter } from './notifications.svelte';
 import { preferences } from '#lib/settings/preferences.svelte.js';
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 beforeEach(() => {
   mocks.retire.mockClear();
@@ -47,14 +48,14 @@ afterEach(() => {
 });
 
 function room(unread: number): RoomSummary {
-  return {
+  return withCounts({
     room_id: '!room:example.org',
     state: 'joined',
     unread,
     notifying: unread,
     highlight: 0,
     marked_unread: false,
-  } as RoomSummary;
+  } as RoomSummary);
 }
 
 function center(): NotificationCenter {
@@ -185,7 +186,7 @@ test('an Android push for an unread message stands until the room is read', () =
   mocks.retire.mockClear();
 
   push('$new');
-  notifications.retireRead([{ ...readThrough('$new'), unread: 1, notifying: 1 }]);
+  notifications.retireRead([withCounts({ ...readThrough('$new'), unread: 1, notifying: 1 })]);
   expect(mocks.retire).not.toHaveBeenCalled();
 
   notifications.retireRead([readThrough('$new')]);

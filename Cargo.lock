@@ -7187,6 +7187,7 @@ dependencies = [
  "rusqlite",
  "rust-stemmers",
  "rustls",
+ "sable-model",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -7234,6 +7235,31 @@ dependencies = [
  "sysinfo",
  "tauri",
  "wasapi",
+]
+
+[[package]]
+name = "sable-model"
+version = "0.1.0"
+dependencies = [
+ "idna",
+ "pulldown-cmark",
+ "regex-lite",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-typescript",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "sable-model-wasm"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "sable-model",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
 ]
 
 [[package]]

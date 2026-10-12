@@ -1,12 +1,6 @@
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { isRecord } from '#lib/guards.js';
 
 export const DISMISSED_INVITES_EVENT = 'moe.sable.dismissed_invites';
-
-function readRoomIds(content: unknown): string[] {
-  if (!isRecord(content) || !Array.isArray(content.roomIds)) return [];
-  return content.roomIds.filter((roomId): roomId is string => typeof roomId === 'string');
-}
 
 class DismissedInvites {
   roomIds = $state.raw<ReadonlySet<string>>(new Set());
@@ -40,29 +34,36 @@ class DismissedInvites {
   }
 
   dismiss(roomId: string): Promise<void> {
-    return this.write(new Set([...this.roomIds, roomId]));
+    return this.write(roomId, true);
   }
 
   restore(roomId: string): Promise<void> {
-    return this.write(new Set([...this.roomIds].filter((entry) => entry !== roomId)));
+    return this.write(roomId, false);
   }
 
   private async pull(generation: number): Promise<void> {
     try {
-      const content = await this.core?.commands.accountData(DISMISSED_INVITES_EVENT);
-      if (generation === this.generation) this.roomIds = new Set(readRoomIds(content));
+      const core = this.core;
+      if (core === null) return;
+      const roomIds = await core.commands.dismissedInvites();
+      if (generation === this.generation) this.roomIds = new Set(roomIds);
     } catch (error) {
       console.debug('[sable room] dismissed invites unavailable', error);
     }
   }
 
-  private async write(next: ReadonlySet<string>): Promise<void> {
+  private async write(roomId: string, dismissed: boolean): Promise<void> {
     const core = this.core;
     if (core === null) return;
+    const generation = this.generation;
     const previous = this.roomIds;
+    const next = dismissed
+      ? new Set([...previous, roomId])
+      : new Set([...previous].filter((entry) => entry !== roomId));
     this.roomIds = next;
     try {
-      await core.commands.setAccountData(DISMISSED_INVITES_EVENT, { roomIds: [...next] });
+      const stored = await core.commands.setInviteDismissed(roomId, dismissed);
+      if (generation === this.generation) this.roomIds = new Set(stored);
     } catch (error) {
       if (this.roomIds === next) this.roomIds = previous;
       throw error;

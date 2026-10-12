@@ -72,7 +72,8 @@ import { RoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
 import { senderColor } from './timeline-format';
 import { FOUNDER_POWER_LEVEL, powerTag } from '../members/power-tags';
-import { parsePowerLevelTags, tagForLevel } from '../settings/power-level-tags';
+import { tagForLevel } from '../settings/power-level-tags';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 const user = userEvent.setup({ delay: null });
 
@@ -105,7 +106,7 @@ afterEach(() => {
 });
 
 function item(emote: boolean): TimelineItemView {
-  return {
+  return withRowFields({
     id: 'item',
     event_id: '$item',
     transaction_id: null,
@@ -114,7 +115,15 @@ function item(emote: boolean): TimelineItemView {
     sender_name: 'Alice',
     sender_avatar: null,
     timestamp: 0,
-    content: { kind: 'message', body: 'waves', html: 'waves', emote, notice: false, edited: false },
+    content: {
+      kind: 'message',
+      body: 'waves',
+      html: 'waves',
+      emote,
+      notice: false,
+      edited: false,
+      jumbo: null,
+    },
     in_reply_to: null,
     thread_root: null,
     thread_summary: null,
@@ -128,11 +137,11 @@ function item(emote: boolean): TimelineItemView {
     mention: 'none',
     forwarded: null,
     forum_title: null,
-  };
+  });
 }
 
 function imageItem(body = 'photo.png'): TimelineItemView {
-  return {
+  return withRowFields({
     ...item(false),
     content: {
       kind: 'image',
@@ -149,7 +158,7 @@ function imageItem(body = 'photo.png'): TimelineItemView {
       spoiler: null,
       animated: null,
     },
-  };
+  });
 }
 
 function replyItem(
@@ -166,6 +175,7 @@ function replyItem(
       sender_mentioned: isMentioned,
       sender_name: 'Bob',
       body,
+      fallback: null,
     },
   };
 }
@@ -318,9 +328,9 @@ test('shows the role name on hover only when the setting is on', async () => {
 
 test('displays saved founder flair on a message', async () => {
   core.userProfile.mockResolvedValue({ name_color_light: null, name_color_dark: null });
-  const tags = parsePowerLevelTags({
-    [FOUNDER_POWER_LEVEL]: { name: 'Founder', color: '#c04040', icon: { key: '👑' } },
-  });
+  const tags = {
+    [FOUNDER_POWER_LEVEL]: { name: 'Founder', color: '#c04040', icon: '👑' },
+  };
   render(TimelineItemHarness, {
     props: {
       core,
@@ -394,11 +404,11 @@ test('badges a message with its own readers, and only in that placement', async 
 });
 
 test('a deleted message keeps its receipts on the tombstone line', async () => {
-  const deleted = {
+  const deleted = withRowFields({
     ...item(false),
     content: { kind: 'redacted', reason: null } as const,
     read_by: ['@bob:example.org'],
-  };
+  });
   render(TimelineItemHarness, {
     props: { core, item: { item: deleted, collapsed: true, currentUserId: '@alice:example.org' } },
   });
@@ -631,11 +641,11 @@ test('with profile on name click, the sender name opens the profile instead', as
 test('edits an own image caption without dropping its media details', async () => {
   const onEdit = vi.fn();
   core.fetchMedia.mockResolvedValue(new Uint8Array());
-  const image = {
+  const image = withRowFields({
     ...imageItem(),
     is_own: true,
     content: { ...imageItem().content, caption: 'caption' },
-  };
+  });
   render(TimelineItemHarness, {
     props: { core, item: { item: image, collapsed: false, onEdit } },
   });
@@ -1333,7 +1343,7 @@ test('a deleted message keeps its sender, its time and its menu', async () => {
     props: {
       core,
       item: {
-        item: { ...item(false), content: { kind: 'redacted', reason: null } },
+        item: withRowFields({ ...item(false), content: { kind: 'redacted', reason: null } }),
         collapsed: false,
         roomId: '!room:example.org',
         onReply: () => undefined,
@@ -1356,7 +1366,7 @@ test('offers to add a message inline emote to your own pack', async () => {
   // The SDK sanitises `data-mx-emoticon` away before the core sees the message.
   const html =
     '<img src="mxc://sable.moe/As8m" alt=":neocat_amogus:" title=":neocat_amogus:" height="32"> ';
-  const emoteItem = {
+  const emoteItem = withRowFields({
     ...item(false),
     content: {
       kind: 'message' as const,
@@ -1365,8 +1375,9 @@ test('offers to add a message inline emote to your own pack', async () => {
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
-  };
+  });
   render(TimelineItemHarness, {
     props: { core, item: { item: emoteItem, collapsed: false, onReply: vi.fn() } },
   });
@@ -1380,9 +1391,9 @@ test('offers to add a message inline emote to your own pack', async () => {
   expect(menuLabels()).toContain('Add emote to my pack');
 });
 
-test('a message of only inline emotes reads at jumbo size', async () => {
+test('a message the core sized as jumbo reads at that size', async () => {
   const html = '<img alt="rotate" height="32" src="mxc://example.org/rotate" title="rotate"> ';
-  const emoteItem = {
+  const emoteItem = withRowFields({
     ...item(false),
     content: {
       kind: 'message' as const,
@@ -1391,8 +1402,9 @@ test('a message of only inline emotes reads at jumbo size', async () => {
       emote: false,
       notice: false,
       edited: false,
+      jumbo: 1,
     },
-  };
+  });
   render(TimelineItemHarness, {
     props: { core, item: { item: emoteItem, collapsed: false, onReply: vi.fn() } },
   });
@@ -1402,7 +1414,7 @@ test('a message of only inline emotes reads at jumbo size', async () => {
 });
 
 test('a membership row keeps its notice look and still carries the action layer', async () => {
-  const joined: TimelineItemView = {
+  const joined: TimelineItemView = withRowFields({
     ...item(false),
     content: {
       kind: 'membership',
@@ -1411,7 +1423,7 @@ test('a membership row keeps its notice look and still carries the action layer'
       display_name: 'Alice',
       reason: null,
     },
-  };
+  });
   render(TimelineItemHarness, {
     props: { core, item: { item: joined, collapsed: false, onReply: vi.fn() } },
   });
@@ -1428,11 +1440,11 @@ test('a membership row keeps its notice look and still carries the action layer'
 });
 
 test('a date divider stays a plain annotation with nothing to act on', async () => {
-  const divider: TimelineItemView = {
+  const divider: TimelineItemView = withRowFields({
     ...item(false),
     event_id: null,
     content: { kind: 'date_divider', timestamp: 0 },
-  };
+  });
   render(TimelineItemHarness, {
     props: { core, item: { item: divider, collapsed: false, onReply: vi.fn() } },
   });
@@ -1481,7 +1493,7 @@ test('cancels an upload that is still sending', async () => {
 });
 
 test('fills one bar across a gallery and names the item uploading', async () => {
-  const gallery: TimelineItemView = {
+  const gallery: TimelineItemView = withRowFields({
     ...item(false),
     event_id: null,
     is_own: true,
@@ -1499,7 +1511,7 @@ test('fills one bar across a gallery and names the item uploading', async () => 
         size: null,
       })),
     },
-  };
+  });
   render(TimelineItemHarness, {
     props: { core, item: { item: gallery, collapsed: false } },
   });
@@ -1511,7 +1523,7 @@ test('fills one bar across a gallery and names the item uploading', async () => 
 
 test('renders a link preview for every link in a message', async () => {
   setPreference('urlPreviews', true);
-  const message: TimelineItemView = {
+  const message: TimelineItemView = withRowFields({
     ...item(false),
     content: {
       kind: 'message',
@@ -1520,8 +1532,9 @@ test('renders a link preview for every link in a message', async () => {
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
-  };
+  });
   const instance = render(TimelineItemHarness, {
     props: { core, item: { item: message, collapsed: false, encrypted: false } },
   });
@@ -1538,7 +1551,7 @@ test('renders a link preview for every link in a message', async () => {
 
 test('a message whose embeds were removed renders none, bundled or found', async () => {
   setPreference('urlPreviews', true);
-  const message: TimelineItemView = {
+  const message: TimelineItemView = withRowFields({
     ...item(false),
     content: {
       kind: 'message',
@@ -1547,6 +1560,7 @@ test('a message whose embeds were removed renders none, bundled or found', async
       emote: false,
       notice: false,
       edited: true,
+      jumbo: null,
     },
     bundled_link_previews: [
       {
@@ -1565,7 +1579,7 @@ test('a message whose embeds were removed renders none, bundled or found', async
       },
     ],
     link_previews_removed: true,
-  };
+  });
   const instance = render(TimelineItemHarness, {
     props: { core, item: { item: message, collapsed: false, encrypted: false } },
   });
@@ -1595,7 +1609,7 @@ test('compact layout shows the time alone and keeps the full date in its tooltip
 });
 
 test('quotes a reply to a membership event as its timeline text', async () => {
-  const target: TimelineItemView = {
+  const target: TimelineItemView = withRowFields({
     ...item(false),
     id: 'member',
     event_id: '$original',
@@ -1606,7 +1620,7 @@ test('quotes a reply to a membership event as its timeline text', async () => {
       display_name: 'nex',
       reason: null,
     },
-  };
+  });
   const base = replyItem('');
   const reply: TimelineItemView = {
     ...base,

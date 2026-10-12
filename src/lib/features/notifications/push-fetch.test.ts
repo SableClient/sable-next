@@ -8,12 +8,10 @@ import {
   type PushFetcher,
   readPushFetch,
 } from './push-fetch';
-import type { PushPayload } from './push-payload';
+import { pushNotification } from './push-fixtures';
 
 const ROOM = '!room:example.org';
-const bare: PushPayload = {
-  notification: { room_id: ROOM, event_id: '$event', user_id: '@me:example.org', counts: {} },
-};
+const bare = pushNotification({ room_id: ROOM, event_id: '$event', user_id: '@me:example.org' });
 
 function fetcher(
   responses: Record<string, unknown>,
@@ -43,10 +41,8 @@ const base = `/_matrix/client/v3/rooms/${ROOM}`;
 
 test('only a push that names nothing but its event is fetched', () => {
   expect(namesOnlyItsEvent(bare)).toBe(true);
-  expect(
-    namesOnlyItsEvent({ notification: { ...bare.notification, type: 'm.room.message' } })
-  ).toBe(false);
-  expect(namesOnlyItsEvent({ notification: { room_id: ROOM, counts: {} } })).toBe(false);
+  expect(namesOnlyItsEvent({ ...bare, type: 'm.room.message' })).toBe(false);
+  expect(namesOnlyItsEvent(pushNotification({ room_id: ROOM }))).toBe(false);
 });
 
 test('a plaintext event is completed with its sender and room, with the token', async () => {
@@ -62,7 +58,7 @@ test('a plaintext event is completed with its sender and room, with the token', 
 
   const completed = await completePushPayload(bare, source);
 
-  expect(completed?.notification).toMatchObject({
+  expect(completed).toMatchObject({
     type: 'm.room.message',
     content: { body: 'hello' },
     sender_display_name: 'Alice',
@@ -78,12 +74,12 @@ test('a room with no name is titled after its sender, unless the app stored one'
     [`${base}/event/$event`]: { type: 'm.room.message', sender: '@alice:example.org', content: {} },
   };
 
-  expect((await completePushPayload(bare, fetcher(responses)))?.notification?.room_name).toBe(
+  expect((await completePushPayload(bare, fetcher(responses)))?.room_name).toBe(
     '@alice:example.org'
   );
-  expect(
-    (await completePushPayload(bare, fetcher(responses, null, 'Stored')))?.notification?.room_name
-  ).toBe('Stored');
+  expect((await completePushPayload(bare, fetcher(responses, null, 'Stored')))?.room_name).toBe(
+    'Stored'
+  );
 });
 
 test('an encrypted event takes what the open tab decrypted, and remembers it was encrypted', async () => {
@@ -111,7 +107,7 @@ test('an encrypted event takes what the open tab decrypted, and remembers it was
     )
   );
 
-  expect(completed?.notification).toMatchObject({
+  expect(completed).toMatchObject({
     type: 'm.room.message',
     content: { body: 'secret' },
     decrypted: true,
@@ -127,9 +123,7 @@ test('an encrypted event no tab could read stays encrypted, and a silenced one i
     },
   };
 
-  expect((await completePushPayload(bare, fetcher(responses)))?.notification?.type).toBe(
-    'm.room.encrypted'
-  );
+  expect((await completePushPayload(bare, fetcher(responses)))?.type).toBe('m.room.encrypted');
   expect(await completePushPayload(bare, fetcher(responses, { kind: 'discard' }))).toBeNull();
 });
 
@@ -141,7 +135,7 @@ test.each([403, 404])(
 
     const completed = await completePushPayload(bare, forbidden);
 
-    expect(completed?.notification).toMatchObject({
+    expect(completed).toMatchObject({
       type: 'm.room.member',
       content: { membership: 'invite' },
       room_name: 'Design crew',

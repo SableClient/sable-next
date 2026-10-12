@@ -6,6 +6,7 @@
   import type { MemberView, TimelineItemView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
+  import { reactionKey } from '#lib/model/model.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -17,7 +18,7 @@
   import StateContentDiff from '../messages/StateContentDiff.svelte';
   import StateEventText from './StateEventText.svelte';
   import { stateEventIcon } from './state-event-icon';
-  import { reactionKey, reactionSource } from './state-event-text';
+  import { reactionSource } from './state-event-text';
   import {
     isEditEvent,
     redactionTarget,

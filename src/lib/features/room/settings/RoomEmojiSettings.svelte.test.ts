@@ -57,30 +57,29 @@ test('a pack enabled for every room is still listed in its own room', async () =
   expect(screen.queryByText('room.emojisEmpty')).toBeNull();
 });
 
-test('a legacy-only pack is copied verbatim to the stable event type', async () => {
-  const legacy = { pack: { display_name: 'Neo', 'x.custom': 1 }, images: {} };
+test('converting a legacy-only pack asks the core to copy it', async () => {
   core.imagePacks.mockResolvedValue([pack({ stable_event: false, legacy_event: true })]);
-  core.roomStateEvent.mockResolvedValue(legacy);
-  const sendStateEvent = vi.fn<() => Promise<void>>(() => Promise.resolve());
-  Object.assign(core, { sendStateEvent });
+  const convertLegacyImagePacks = vi.fn<() => Promise<void>>(() => Promise.resolve());
+  Object.assign(core, { convertLegacyImagePacks });
   const room = { room_id: '!space:home.example' } as RoomSummary;
-  const levels = { events: {}, state_default: 50 } as unknown as RoomPowerLevelsView;
+  const levels: RoomPowerLevelsView = {
+    ban: 50,
+    kick: 50,
+    redact: 50,
+    invite: 0,
+    events_default: 0,
+    state_default: 50,
+    users_default: 0,
+    events: {},
+    users: {},
+    notifications_room: 50,
+  };
   const permissions = { own_power_level: 100 } as RoomPermissionsView;
   render(RoomEmojiSettings, { room, permissions, levels });
 
   await userEvent.click(await screen.findByRole('button', { name: 'room.emojisLegacyConvert:1' }));
 
   await vi.waitFor(() => {
-    expect(sendStateEvent).toHaveBeenCalledWith(
-      '!space:home.example',
-      'm.room.image_pack',
-      'stickers',
-      legacy
-    );
+    expect(convertLegacyImagePacks).toHaveBeenCalledWith('!space:home.example', ['stickers']);
   });
-  expect(core.roomStateEvent).toHaveBeenCalledWith(
-    '!space:home.example',
-    'im.ponies.room_emotes',
-    'stickers'
-  );
 });

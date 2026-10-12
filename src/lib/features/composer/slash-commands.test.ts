@@ -2,13 +2,21 @@
 
 import { expect, test, vi } from 'vitest';
 
-import type { MemberView, PersonaCatalogView, PersonaView } from '#src/generated/protocol';
+import { CoreError } from '#src/transport';
+
+import type {
+  FieldEdit,
+  MemberLookEdit,
+  MemberView,
+  PersonaCatalogView,
+  PersonaView,
+} from '#src/generated/protocol';
 
 import {
   descriptionKey,
   parseSlash,
   runSlash,
-  SLASH_COMMANDS,
+  slashCommandNames,
   SlashError,
   usageKey,
   type SlashContext,
@@ -36,10 +44,12 @@ function fakeCommands() {
     sendLocation: vi.fn(() => Promise.resolve()),
     sendRawEvent: vi.fn(() => Promise.resolve('$created')),
     roomStateEvent: vi.fn(() => Promise.resolve<unknown>({ membership: 'join' })),
-    roomStateEvents: vi.fn(() =>
-      Promise.resolve([{ state_key: '!space:example.org', content: {} }])
-    ),
     sendStateEvent: vi.fn((..._args: unknown[]) => Promise.resolve('$created')),
+    setMemberLook: vi.fn((..._args: unknown[]) => Promise.resolve()),
+    setPronouns: vi.fn((..._args: unknown[]) => Promise.resolve()),
+    updateServerAcl: vi.fn((..._args: unknown[]) => Promise.resolve()),
+    sendGesture: vi.fn((..._args: unknown[]) => Promise.resolve()),
+    addRoomWidget: vi.fn((..._args: unknown[]) => Promise.resolve('widget')),
     personas: vi.fn(() =>
       Promise.resolve({
         personas: [],
@@ -64,6 +74,18 @@ function fakeCommands() {
       ) => Promise<number>
     >(() => Promise.resolve(0)),
     roomMembers: vi.fn(() => Promise.resolve<MemberView[]>([])),
+  };
+}
+
+const KEEP = { kind: 'keep' } as const;
+
+function look(fields: Partial<MemberLookEdit>): MemberLookEdit {
+  return {
+    display_name: KEEP,
+    avatar_url: KEEP,
+    color_on_light: KEEP,
+    color_on_dark: KEEP,
+    ...fields,
   };
 }
 
@@ -99,7 +121,7 @@ test('a doubled slash escapes a message that starts with one', async () => {
 test('the command name is matched without regard to case', () => {
   const parsed = parseSlash('/ME waves');
 
-  expect(parsed).toMatchObject({ kind: 'command', args: 'waves' });
+  expect(parsed).toMatchObject({ kind: 'command', name: 'me' });
 });
 
 test('an unknown command is reported rather than sent', async () => {
@@ -164,37 +186,27 @@ test('/gif returns a picker action instead of sending text', async () => {
   });
 });
 
-test.each([
-  ['hug', 'im.fluffychat.cute_event', { cute_type: 'hug', body: '🤗' }],
-  ['cuddle', 'im.fluffychat.cute_event', { cute_type: 'cuddle', body: '😊' }],
-  ['wave', 'im.fluffychat.cute_event', { cute_type: 'wave', body: '👋' }],
-  ['poke', 'im.fluffychat.cute_event', { cute_type: 'poke', body: '🫵' }],
-] as const)('/%s sends a raw cute event', async (name, eventType, content) => {
+test.each(['hug', 'cuddle', 'wave', 'poke', 'headpat'] as const)(
+  '/%s sends its gesture at the mentioned user',
+  async (name) => {
+    const commands = fakeCommands();
+
+    await runSlash(`/${name} @someone:example.org`, context(commands));
+
+    expect(commands.sendGesture).toHaveBeenCalledWith(
+      '!room:example.org',
+      name,
+      '@someone:example.org'
+    );
+  }
+);
+
+test('a gesture without a target is sent at nobody in particular', async () => {
   const commands = fakeCommands();
 
-  await runSlash(`/${name} @someone:example.org`, context(commands));
+  await runSlash('/headpat', context(commands));
 
-  expect(commands.sendRawEvent).toHaveBeenCalledWith(
-    '!room:example.org',
-    'm.room.message',
-    expect.objectContaining({ ...content, 'm.mentions': { user_ids: ['@someone:example.org'] } })
-  );
-});
-
-test('/headpat sends a raw emote event', async () => {
-  const commands = fakeCommands();
-
-  await runSlash('/headpat @someone:example.org', context(commands));
-
-  expect(commands.sendRawEvent).toHaveBeenCalledWith(
-    '!room:example.org',
-    'm.room.message',
-    expect.objectContaining({
-      msgtype: 'm.emote',
-      body: 'pats @someone:example.org',
-      'fyi.cisnt.headpat': true,
-    })
-  );
+  expect(commands.sendGesture).toHaveBeenCalledWith('!room:example.org', 'headpat', null);
 });
 
 test('/rawmsg sends a raw message event', async () => {
@@ -384,18 +396,18 @@ test.each([
 test('every command has a description and a usage line', () => {
   const slash: Record<string, { description: string; usage: string }> = en.composer.slash;
 
-  for (const command of SLASH_COMMANDS) {
-    const entry = slash[command.name];
-    expect(entry, `no locale entry for /${command.name}`).toBeDefined();
-    expect(descriptionKey(command)).toBe(`composer.slash.${command.name}.description`);
-    expect(usageKey(command)).toBe(`composer.slash.${command.name}.usage`);
-    expect(entry.description.length, `/${command.name} description`).toBeGreaterThan(0);
-    expect(entry.usage.startsWith(`/${command.name}`), `/${command.name} usage`).toBe(true);
+  for (const name of slashCommandNames()) {
+    const entry = slash[name];
+    expect(entry, `no locale entry for /${name}`).toBeDefined();
+    expect(descriptionKey(name)).toBe(`composer.slash.${name}.description`);
+    expect(usageKey(name)).toBe(`composer.slash.${name}.usage`);
+    expect(entry.description.length, `/${name} description`).toBeGreaterThan(0);
+    expect(entry.usage.startsWith(`/${name}`), `/${name} usage`).toBe(true);
   }
 });
 
 test('no two commands claim the same name', () => {
-  const names = SLASH_COMMANDS.map((command) => command.name);
+  const names = slashCommandNames();
 
   expect(new Set(names).size).toBe(names.length);
 });
@@ -457,42 +469,38 @@ test('/discardsession discards the room key', async () => {
   });
 });
 
-test('/acl merges and removes server rules', async () => {
+test('/acl hands the flags to the core', async () => {
   const commands = fakeCommands();
-  commands.roomStateEvent.mockResolvedValueOnce({
-    allow: ['good.example'],
-    deny: ['bad.example'],
-    allow_ip_literals: false,
-  });
 
   await runSlash('/acl -a new.example -d worse.example -ra good.example', context(commands));
 
-  expect(commands.sendStateEvent).toHaveBeenCalledWith(
-    '!room:example.org',
-    'm.room.server_acl',
-    '',
-    { allow: ['new.example'], deny: ['bad.example', 'worse.example'], allow_ip_literals: false }
-  );
+  expect(commands.updateServerAcl).toHaveBeenCalledWith('!room:example.org', {
+    allow: ['new.example'],
+    deny: ['worse.example'],
+    removeAllow: ['good.example'],
+    removeDeny: [],
+  });
 });
 
-test('/addwidget sends a validated widget state event', async () => {
+test('/addwidget names the widget after the rest of the line', async () => {
   const commands = fakeCommands();
 
   await runSlash('/addwidget https://widget.example/app Room Widget', context(commands));
 
-  const [roomId, type, , content] = commands.sendStateEvent.mock.calls[0] as [
-    string,
-    string,
-    string,
-    { url: string; type: string; name: string; creatorUserId: string },
-  ];
-  expect([roomId, type]).toEqual(['!room:example.org', 'im.vector.modular.widgets']);
-  expect(content).toMatchObject({
-    type: 'm.custom',
-    name: 'Room Widget',
-    creatorUserId: '@me:example.org',
-  });
-  expect(content.url).toMatch(/^https:\/\/widget\.example\/app\?matrix_user_id=\$matrix_user_id&/);
+  expect(commands.addRoomWidget).toHaveBeenCalledWith(
+    '!room:example.org',
+    'Room Widget',
+    'https://widget.example/app'
+  );
+});
+
+test('/addwidget shows its usage for a url the core refuses', async () => {
+  const commands = fakeCommands();
+  commands.addRoomWidget.mockRejectedValueOnce(new CoreError({ code: 'invalid_url' }));
+
+  await expect(runSlash('/addwidget javascript:alert(1)', context(commands))).rejects.toMatchObject(
+    { key: 'composer.slash.addwidget.usage' }
+  );
 });
 
 test('/pmpproxy appends a persona trigger', async () => {
@@ -612,20 +620,15 @@ test.each(['/location 91 0', '/location 1', '/location 1 2 3', '/location a b'])
   }
 );
 
-test('/myroomnick merges into the existing member state', async () => {
+test('/myroomnick sets the room display name', async () => {
   const commands = fakeCommands();
-  commands.roomStateEvent.mockResolvedValueOnce({
-    membership: 'join',
-    avatar_url: 'mxc://example.org/keep',
-  });
 
   await runSlash('/myroomnick Marie', context(commands));
 
-  expect(commands.sendStateEvent).toHaveBeenCalledWith(
+  expect(commands.setMemberLook).toHaveBeenCalledWith(
     '!room:example.org',
-    'm.room.member',
-    '@me:example.org',
-    { membership: 'join', avatar_url: 'mxc://example.org/keep', displayname: 'Marie' }
+    look({ display_name: { kind: 'set', value: 'Marie' } }),
+    false
   );
 });
 
@@ -635,10 +638,14 @@ test('/myroomavatar insists on an mxc uri', async () => {
   await expect(
     runSlash('/myroomavatar https://example.org/pic.png', context(commands))
   ).rejects.toMatchObject({ key: 'composer.slash.myroomavatar.usage' });
-  expect(commands.sendStateEvent).not.toHaveBeenCalled();
+  expect(commands.setMemberLook).not.toHaveBeenCalled();
 
   await runSlash('/myroomavatar mxc://example.org/pic', context(commands));
-  expect(commands.sendStateEvent).toHaveBeenCalled();
+  expect(commands.setMemberLook).toHaveBeenCalledWith(
+    '!room:example.org',
+    look({ avatar_url: { kind: 'set', value: 'mxc://example.org/pic' } }),
+    false
+  );
 });
 
 test('a per-room profile command needs to know who we are', async () => {
@@ -723,111 +730,60 @@ test('/pronoun sets and resets your room pronouns', async () => {
   const commands = fakeCommands();
 
   await runSlash('/pronoun they/them', context(commands));
-
-  expect(commands.sendStateEvent).toHaveBeenCalledWith(
+  expect(commands.setPronouns).toHaveBeenCalledWith(
     '!room:example.org',
-    'moe.sable.room.cosmetics.pronouns',
-    '@me:example.org',
-    { pronouns: [{ summary: 'they/them' }] }
+    [{ language: null, summary: 'they/them' }],
+    false
   );
 
   await runSlash('/pronoun reset', context(commands));
-  expect(commands.sendStateEvent).toHaveBeenLastCalledWith(
+  expect(commands.setPronouns).toHaveBeenLastCalledWith('!room:example.org', [], false);
+});
+
+test('/pronoun understands a language-tagged list', async () => {
+  const commands = fakeCommands();
+
+  await runSlash('/pronoun en:they/them, de:sie/ihr', context(commands));
+
+  expect(commands.setPronouns).toHaveBeenCalledWith(
     '!room:example.org',
-    'moe.sable.room.cosmetics.pronouns',
-    '@me:example.org',
-    {}
+    [
+      { language: 'en', summary: 'they/them' },
+      { language: 'de', summary: 'sie/ihr' },
+    ],
+    false
   );
 });
 
-test('/colour writes the room colour into your own m.room.member', async () => {
+test('/spronoun targets the parent space', async () => {
   const commands = fakeCommands();
 
-  await runSlash('/color #ff00ff', context(commands));
+  await runSlash('/spronoun she/her', context(commands));
 
-  expect(commands.sendStateEvent).toHaveBeenNthCalledWith(
-    1,
+  expect(commands.setPronouns).toHaveBeenCalledWith(
     '!room:example.org',
-    'm.room.member',
-    '@me:example.org',
-    {
-      membership: 'join',
-      'eu.she-a.color': { on_dark: '#ff00ff', on_light: '#ff00ff' },
-    }
-  );
-  expect(commands.sendStateEvent).toHaveBeenLastCalledWith(
-    '!room:example.org',
-    'moe.sable.room.cosmetics.color',
-    '@me:example.org',
-    {}
+    [{ language: null, summary: 'she/her' }],
+    true
   );
 });
 
-test('/colour sets a single theme and preserves the rest of your member event', async () => {
+test.each<[string, FieldEdit | undefined, FieldEdit | undefined]>([
+  ['#FF00FF', { kind: 'set', value: '#ff00ff' }, { kind: 'set', value: '#ff00ff' }],
+  ['reset', { kind: 'clear' }, { kind: 'clear' }],
+  ['light #ff00ff', { kind: 'set', value: '#ff00ff' }, undefined],
+  ['dark reset', undefined, { kind: 'clear' }],
+])('/color %s edits the member colours', async (args, light, dark) => {
   const commands = fakeCommands();
-  commands.roomStateEvent.mockResolvedValueOnce({
-    membership: 'join',
-    displayname: 'Me',
-    'eu.she-a.color': { on_dark: '#001100' },
-  });
 
-  await runSlash('/color light #ff00ff', context(commands));
+  await runSlash(`/color ${args}`, context(commands));
 
-  expect(commands.sendStateEvent).toHaveBeenNthCalledWith(
-    1,
+  expect(commands.setMemberLook).toHaveBeenCalledWith(
     '!room:example.org',
-    'm.room.member',
-    '@me:example.org',
-    {
-      membership: 'join',
-      displayname: 'Me',
-      'eu.she-a.color': { on_dark: '#001100', on_light: '#ff00ff' },
-    }
-  );
-});
-
-test('/colour reset clears the member colour and the legacy event', async () => {
-  const commands = fakeCommands();
-  commands.roomStateEvent.mockResolvedValueOnce({
-    membership: 'join',
-    'eu.she-a.color': { on_dark: '#001100', on_light: '#002200' },
-  });
-
-  await runSlash('/color reset', context(commands));
-
-  expect(commands.sendStateEvent).toHaveBeenNthCalledWith(
-    1,
-    '!room:example.org',
-    'm.room.member',
-    '@me:example.org',
-    { membership: 'join' }
-  );
-  expect(commands.sendStateEvent).toHaveBeenLastCalledWith(
-    '!room:example.org',
-    'moe.sable.room.cosmetics.color',
-    '@me:example.org',
-    {}
-  );
-});
-
-test('/colour light reset drops only the light colour', async () => {
-  const commands = fakeCommands();
-  commands.roomStateEvent.mockResolvedValueOnce({
-    membership: 'join',
-    'eu.she-a.color': { on_dark: '#001100', on_light: '#002200' },
-  });
-
-  await runSlash('/color light reset', context(commands));
-
-  expect(commands.sendStateEvent).toHaveBeenNthCalledWith(
-    1,
-    '!room:example.org',
-    'm.room.member',
-    '@me:example.org',
-    {
-      membership: 'join',
-      'eu.she-a.color': { on_dark: '#001100' },
-    }
+    look({
+      ...(light && { color_on_light: light }),
+      ...(dark && { color_on_dark: dark }),
+    }),
+    false
   );
 });
 
@@ -840,52 +796,6 @@ test('/colour rejects anything that is not a hex colour', async () => {
   });
 });
 
-test('/pronoun understands a language-tagged list', async () => {
-  const commands = fakeCommands();
-
-  await runSlash('/pronoun en:they/them, de:sie/ihr', context(commands));
-
-  expect(commands.sendStateEvent).toHaveBeenCalledWith(
-    '!room:example.org',
-    'moe.sable.room.cosmetics.pronouns',
-    '@me:example.org',
-    {
-      pronouns: [
-        { language: 'en', summary: 'they/them' },
-        { language: 'de', summary: 'sie/ihr' },
-      ],
-    }
-  );
-});
-
-test('/spronoun sets your pronouns on the parent space', async () => {
-  const commands = fakeCommands();
-
-  await runSlash('/spronoun she/her', context(commands));
-
-  expect(commands.roomStateEvents).toHaveBeenCalledWith('!room:example.org', 'm.space.parent');
-  expect(commands.sendStateEvent).toHaveBeenCalledWith(
-    '!space:example.org',
-    'moe.sable.room.cosmetics.pronouns',
-    '@me:example.org',
-    { pronouns: [{ summary: 'she/her' }] }
-  );
-});
-
-test('/spronoun falls back to the room when it has no parent space', async () => {
-  const commands = fakeCommands();
-  commands.roomStateEvents.mockResolvedValueOnce([]);
-
-  await runSlash('/spronoun they/them', context(commands));
-
-  expect(commands.sendStateEvent).toHaveBeenCalledWith(
-    '!room:example.org',
-    'moe.sable.room.cosmetics.pronouns',
-    '@me:example.org',
-    { pronouns: [{ summary: 'they/them' }] }
-  );
-});
-
 test.each(['font', 'sfont'])('/%s is no longer supported', async (name) => {
   const commands = fakeCommands();
 
@@ -895,21 +805,18 @@ test.each(['font', 'sfont'])('/%s is no longer supported', async (name) => {
   expect(commands.sendStateEvent).not.toHaveBeenCalled();
 });
 
-test('/scolor writes the colour into your membership of the parent space', async () => {
+test('/scolor targets the parent space', async () => {
   const commands = fakeCommands();
 
   await runSlash('/scolor #ff00ff', context(commands));
 
-  expect(commands.roomStateEvent).toHaveBeenCalledWith(
-    '!space:example.org',
-    'm.room.member',
-    '@me:example.org'
-  );
-  expect(commands.sendStateEvent).toHaveBeenCalledWith(
-    '!space:example.org',
-    'm.room.member',
-    '@me:example.org',
-    expect.objectContaining({ membership: 'join' })
+  expect(commands.setMemberLook).toHaveBeenCalledWith(
+    '!room:example.org',
+    look({
+      color_on_light: { kind: 'set', value: '#ff00ff' },
+      color_on_dark: { kind: 'set', value: '#ff00ff' },
+    }),
+    true
   );
 });
 

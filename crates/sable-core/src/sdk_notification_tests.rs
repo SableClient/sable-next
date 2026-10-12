@@ -654,15 +654,10 @@ async fn an_encrypted_room_defaults_to_the_rule_its_decrypted_messages_hit() {
         .await;
     let direct = notifications::uses_direct_push_rules(&room);
     let result = crate::push_rules::room_settings(&rules, room_id, direct);
-    let modes = crate::push_rules::room_modes(&rules, [(room_id.to_owned(), direct)]);
 
     assert!(result.room.is_none());
     assert_eq!(
         serde_json::to_value(result.default).unwrap(),
-        json!("mentions")
-    );
-    assert_eq!(
-        serde_json::to_value(modes[0].default).unwrap(),
         json!("mentions")
     );
 }
@@ -877,18 +872,6 @@ async fn resetting_a_bridged_dm_to_default_does_not_create_a_room_push_rule() {
     };
     assert!(settings.room.is_none());
     assert_eq!(settings.default, NotificationModeView::Mentions);
-
-    let CommandOk::RoomNotificationModes { modes } = core
-        .dispatch(Command::RoomNotificationModes {
-            room_ids: vec![room_id.to_owned()],
-        })
-        .await
-        .unwrap()
-    else {
-        panic!("room notification modes");
-    };
-    assert!(modes[0].room.is_none());
-    assert_eq!(modes[0].default, NotificationModeView::Mentions);
 
     core.dispatch(Command::SetRoomNotificationMode {
         room_id: room_id.to_owned(),

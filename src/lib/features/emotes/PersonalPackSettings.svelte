@@ -6,8 +6,7 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import ImagePackEditor from './ImagePackEditor.svelte';
-  import { USER_EMOTES_EVENT_TYPE } from './pack-address.js';
-  import { packEventContent, type PackDraft } from './pack-content.js';
+  import type { PackDraft } from './pack-content.js';
 
   const core = useCoreClient();
 
@@ -36,7 +35,7 @@
   }
 
   async function apply(draft: PackDraft): Promise<void> {
-    await core.commands.setAccountData(USER_EMOTES_EVENT_TYPE, packEventContent(draft));
+    await core.commands.saveImagePack({ kind: 'account' }, draft);
     invalidatePacks(core.commands);
     await load();
   }

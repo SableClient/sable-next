@@ -9,9 +9,10 @@ import {
   roomDisplayName,
   unreadRoomsByPriority,
 } from './room-jump';
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 function room(overrides: Partial<RoomSummary> & { room_id: string }): RoomSummary {
-  return {
+  return withCounts({
     canonical_alias: null,
     name: null,
     topic: null,
@@ -38,7 +39,7 @@ function room(overrides: Partial<RoomSummary> & { room_id: string }): RoomSummar
     marked_unread: false,
     latest_event: null,
     ...overrides,
-  };
+  });
 }
 
 function latest(timestamp: number): RoomSummary['latest_event'] {

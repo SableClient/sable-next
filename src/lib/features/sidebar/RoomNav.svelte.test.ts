@@ -5,36 +5,21 @@ import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 
-import type {
-  NotificationModeView,
-  NotificationSettingsView,
-  RoomSummary,
-} from '#src/generated/protocol';
+import type { NotificationSettingsView, RoomSummary } from '#src/generated/protocol';
 
 import { roomNotifications, roomUnread } from '#lib/rooms/unread.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 const roomsFixture = vi.hoisted(() => {
-  const muteAware = {
-    notificationMode: (roomId: string): NotificationModeView =>
-      fixture.mutedRoomIds.has(roomId) ? 'mute' : 'all',
-  };
   const fixture = {
     rooms: [] as RoomSummary[],
-    mutedRoomIds: new Set<string>(),
     typingUsers: new Map<string, readonly string[]>(),
     byId: (roomId: string | null) => fixture.rooms.find((room) => room.room_id === roomId),
     notificationOverride: () => null,
-    unreadFor: (room: RoomSummary) => roomUnread(room, fixture.notificationMode(room.room_id)),
-    badgeUnreadFor: (room: RoomSummary) => roomUnread(room, fixture.notificationMode(room.room_id)),
+    unreadFor: (room: RoomSummary) => roomUnread(room),
+    badgeUnreadFor: (room: RoomSummary) => roomUnread(room),
     quietRoomIds: new Set<string>(),
-    notificationsFor: (room: RoomSummary) =>
-      roomNotifications(room, fixture.notificationMode(room.room_id)),
-    ...muteAware,
-    reset(): void {
-      fixture.mutedRoomIds = new Set();
-      Object.assign(fixture, muteAware);
-    },
+    notificationsFor: (room: RoomSummary) => roomNotifications(room),
   };
   return fixture;
 });
@@ -46,6 +31,7 @@ import { visit } from '#lib/test-support/app-state.js';
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
 const notificationSettings = vi.fn<(roomId: string) => Promise<NotificationSettingsView>>();
 Object.assign(core, { notificationSettings });
 vi.mock('$app/paths', () => ({
@@ -78,7 +64,7 @@ import RoomNavHarness from './RoomNavHarness.test.svelte';
 const realObserver = globalThis.IntersectionObserver;
 
 function makeRoom(overrides: Partial<RoomSummary>): RoomSummary {
-  return {
+  return withCounts({
     room_id: '!room:example.org',
     canonical_alias: null,
     name: null,
@@ -106,7 +92,7 @@ function makeRoom(overrides: Partial<RoomSummary>): RoomSummary {
     marked_unread: false,
     latest_event: null,
     ...overrides,
-  };
+  });
 }
 
 function latestAt(timestamp: number): RoomSummary['latest_event'] {
@@ -135,7 +121,6 @@ async function openMenu(name: string): Promise<void> {
 beforeEach(() => {
   visit('/home', {});
   roomsFixture.rooms = [];
-  roomsFixture.reset();
   presenceFixture.entry = null;
   core.userProfile.mockReset();
   core.userProfile.mockRejectedValue(new Error('no profile'));
@@ -581,8 +566,14 @@ test('direct page offers starting a chat and searching instead of creating or br
 });
 
 test('does not show a badge for a muted room', async () => {
-  roomsFixture.rooms = [makeRoom({ room_id: '!muted:example.org', name: 'Muted', unread: 3 })];
-  roomsFixture.mutedRoomIds = new Set(['!muted:example.org']);
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!muted:example.org',
+      name: 'Muted',
+      unread: 3,
+      notification: { room: 'mute', default: 'all' },
+    }),
+  ];
 
   await mountNav();
   expect(row('Muted').querySelector('.unread-badge')).not.toBeInTheDocument();
@@ -593,7 +584,6 @@ test('a mentions-only room keeps its unread marker and badges its mentions', asy
     makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', unread: 6 }),
     makeRoom({ room_id: '!pinged:example.org', name: 'Pinged', unread: 6, highlight: 2 }),
   ];
-  roomsFixture.notificationMode = () => 'mentions';
 
   await mountNav();
   expect(row('Quiet').querySelector('.unread-badge-dot')).toBeInTheDocument();
@@ -605,7 +595,6 @@ test('counts mentions in the badge, and quiet traffic only dots', async () => {
     makeRoom({ room_id: '!mention:example.org', name: 'Mentioned', unread: 9, highlight: 2 }),
     makeRoom({ room_id: '!plain:example.org', name: 'Plain', unread: 5 }),
   ];
-  roomsFixture.notificationMode = () => 'mentions';
 
   await mountNav();
   expect(within(row('Mentioned')).getByText('2')).toHaveClass('unread-badge-count');
@@ -654,23 +643,17 @@ test('a space list header shows the space banner above it', async () => {
     makeRoom({ room_id: '!space:example.org', name: 'Design', is_space: true }),
   ];
   visit('/space/!space:example.org', { spaceId: '!space:example.org' });
-  core.roomStateEvent.mockResolvedValue({
-    type: 'page.codeberg.everypizza.room.banner',
-    content: { url: 'mxc://example.org/banner' },
-  });
+  core.roomBanner.mockResolvedValue('mxc://example.org/banner');
 
   await mountNav();
   await tick();
   await tick();
 
-  expect(core.roomStateEvent).toHaveBeenCalledWith(
-    '!space:example.org',
-    'page.codeberg.everypizza.room.banner'
-  );
+  expect(core.roomBanner).toHaveBeenCalledWith('!space:example.org');
   expect(document.querySelector('.room-banner')).not.toBeNull();
   expect(document.querySelector('.room-nav-header')).toHaveClass('on-banner');
 
-  core.roomStateEvent.mockResolvedValue(null);
+  core.roomBanner.mockResolvedValue(null);
 });
 
 test('a space list header wears the space avatar when collapsed', async () => {
@@ -968,9 +951,14 @@ test('hovering a collapsed room row shows its full name in a tooltip', async () 
 
 test('a muted room marked unread by hand keeps its dot and no count', async () => {
   roomsFixture.rooms = [
-    makeRoom({ room_id: '!muted:example.org', name: 'Muted', unread: 9, marked_unread: true }),
+    makeRoom({
+      room_id: '!muted:example.org',
+      name: 'Muted',
+      unread: 9,
+      marked_unread: true,
+      notification: { room: 'mute', default: 'all' },
+    }),
   ];
-  roomsFixture.mutedRoomIds = new Set(['!muted:example.org']);
 
   await mountNav();
   expect(row('Muted').querySelector('.unread-badge-dot')).toBeInTheDocument();
@@ -986,8 +974,6 @@ test('a room set to all messages badges its unread messages in green', async () 
     makeRoom({ room_id: '!loud:example.org', name: 'Loud', unread: 6, notifying: 6 }),
     makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', unread: 6 }),
   ];
-  roomsFixture.notificationMode = (roomId: string) =>
-    roomId === '!loud:example.org' ? 'all' : 'mentions';
 
   await mountNav();
   expect(within(row('Loud')).getByText('6')).toHaveClass(

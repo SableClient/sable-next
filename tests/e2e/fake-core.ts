@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import type {
+  AbbreviationView,
   BookmarkView,
   Command,
   CommandOk,
@@ -146,7 +147,17 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       supporter_awards: null,
       legacy_fields: [],
     };
-    const room: RoomSummary = {
+    const summary = (raw: Omit<RoomSummary, 'notification' | 'counts'>): RoomSummary => ({
+      ...raw,
+      notification: { room: null, default: raw.is_direct ? 'all' : 'mentions' },
+      counts: {
+        unread: Math.max(raw.unread, raw.highlight),
+        notifying: Math.max(raw.notifying, raw.highlight),
+        highlight: raw.highlight,
+        marked: raw.marked_unread,
+      },
+    });
+    const room: RoomSummary = summary({
       room_id: '!room:example.test',
       canonical_alias: null,
       name: workerMode === 'room_name_overflow' ? 'Room name fits until hover' : 'General',
@@ -191,16 +202,16 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         sending: false,
         event_id: '$general-19:example.test',
       },
-    };
-    const secondRoom: RoomSummary = {
+    });
+    const secondRoom: RoomSummary = summary({
       ...room,
       room_id: '!second:example.test',
       name: 'Random',
       unread: 3,
       notifying: 3,
       highlight: 0,
-    };
-    const invitedRoom: RoomSummary = {
+    });
+    const invitedRoom: RoomSummary = summary({
       ...room,
       room_id: '!invited:example.test',
       name: 'Design crew',
@@ -216,8 +227,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         sending: false,
         event_id: null,
       },
-    };
-    const alphaSpace: RoomSummary = {
+    });
+    const alphaSpace: RoomSummary = summary({
       ...room,
       room_id: '!alpha:example.test',
       name: 'Alpha',
@@ -229,22 +240,26 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       notifying: 0,
       highlight: 0,
       latest_event: null,
-    };
-    const betaSpace: RoomSummary = { ...alphaSpace, room_id: '!beta:example.test', name: 'Beta' };
-    const gammaSpace: RoomSummary = {
+    });
+    const betaSpace: RoomSummary = summary({
+      ...alphaSpace,
+      room_id: '!beta:example.test',
+      name: 'Beta',
+    });
+    const gammaSpace: RoomSummary = summary({
       ...alphaSpace,
       room_id: '!gamma:example.test',
       name: 'Gamma',
-    };
-    const successorRoom: RoomSummary = {
+    });
+    const successorRoom: RoomSummary = summary({
       ...room,
       room_id: '!successor:example.test',
       name: 'Successor',
       unread: 0,
       notifying: 0,
       highlight: 0,
-    };
-    const tombstonedRoom: RoomSummary = {
+    });
+    const tombstonedRoom: RoomSummary = summary({
       ...room,
       room_id: '!tombstoned:example.test',
       name: 'Old Room',
@@ -252,8 +267,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       unread: 0,
       notifying: 0,
       highlight: 0,
-    };
-    const voiceRoom: RoomSummary = {
+    });
+    const voiceRoom: RoomSummary = summary({
       ...room,
       room_id: '!voice:example.test',
       name: 'Hangout',
@@ -262,7 +277,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       unread: 0,
       notifying: 0,
       highlight: 0,
-    };
+    });
     const joinedRooms: RoomSummary[] =
       workerMode === 'voice'
         ? [room, secondRoom, invitedRoom, voiceRoom]
@@ -370,7 +385,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     };
 
     const WIDGET_STATE_KEY = 'dashboard';
-    const abbreviations = new Map<string, { entries: unknown[] }>();
+    const abbreviations = new Map<string, AbbreviationView[]>();
     const roomWidgets = new Map<string, Record<string, unknown> | null>([
       [
         room.room_id,
@@ -412,6 +427,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           const index = offset + relativeIndex;
           return {
             id: `${roomName.toLowerCase()}-${String(index)}`,
+            row: 'message',
+            forwardable: true,
+            redactable: true,
+            visibility: 'always',
             event_id: `$${roomName.toLowerCase()}-${String(index)}:example.test`,
             transaction_id: null,
             send_state: null,
@@ -426,6 +445,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               emote: false,
               notice: false,
               edited: false,
+              jumbo: null,
             },
             in_reply_to: null,
             thread_root: null,
@@ -608,6 +628,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         sender_name: null,
         timestamp: 1_700_000_000_000,
         content: { kind: 'date_divider', timestamp: 1_700_000_000_000 },
+        row: 'annotation',
+        forwardable: false,
+        redactable: false,
+        visibility: 'always',
       };
       const readMarker: TimelineItemView = {
         ...first,
@@ -616,6 +640,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         sender: null,
         sender_name: null,
         content: { kind: 'read_marker' },
+        row: 'annotation',
+        forwardable: false,
+        redactable: false,
+        visibility: 'always',
       };
       switch (workerMode) {
         case 'empty_room':
@@ -632,6 +660,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               emote: false,
               notice: false,
               edited: false,
+              jumbo: null,
             },
           }));
         case 'delayed_pagination':
@@ -659,6 +688,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     });
 
     const paginationDiffs = (
@@ -677,6 +707,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             sender: null,
             sender_name: null,
             content: { kind: 'read_marker' },
+            row: 'annotation',
+            forwardable: false,
+            redactable: false,
+            visibility: 'always',
           };
           return [...items.slice(0, 5), marker, ...items.slice(5, 10)].map((value, index) => ({
             op: 'insert' as const,
@@ -880,6 +914,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           sender: null,
           sender_name: null,
           content: { kind: 'read_marker' },
+          row: 'annotation',
+          forwardable: false,
+          redactable: false,
+          visibility: 'always',
         };
         return {
           type: 'subscribe_timeline',
@@ -994,6 +1032,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                     ...items[4],
                     id: 'filtered-forward',
                     event_id: '$filtered-forward:example.test',
+                    row: 'event' as const,
+                    forwardable: false,
+                    redactable: true,
+                    visibility: 'profile_change' as const,
                     content: {
                       kind: 'profile_change' as const,
                       user_id: '@alice:example.test',
@@ -1118,20 +1160,16 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           can_manage_children: canPost,
         };
       },
+      markdown_to_content: (command) => ({
+        type: 'markdown_to_content',
+        body: command.markdown,
+        formatted_body: null,
+        mentions: { user_ids: [], room: false },
+      }),
       notification_settings: () => ({
         type: 'notification_settings',
         room: null,
         default: 'all',
-      }),
-      room_notification_modes: (command) => ({
-        type: 'room_notification_modes',
-        modes: command.room_ids.map((room_id) => ({
-          room_id,
-          room: null,
-          default: joinedRooms.find((joined) => joined.room_id === room_id)?.is_direct
-            ? 'all'
-            : 'mentions',
-        })),
       }),
       default_notification_modes: () => ({
         type: 'default_notification_modes',
@@ -1206,7 +1244,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         return {
           type: 'room_open',
           permissions: rest,
-          power_level_tags: null,
+          power_level_tags: {},
           widgets: widgets.events,
           pinned_event_ids: [],
           predecessor: null,
@@ -1229,6 +1267,43 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         users: { [session.user_id]: 100 },
         notifications_room: 50,
       }),
+      set_power_level: (command) => ({
+        type: 'set_power_level',
+        ban: 50,
+        kick: 50,
+        redact: 50,
+        invite: 0,
+        events_default: 0,
+        state_default: 50,
+        users_default: 0,
+        events: {},
+        users: { [session.user_id]: 100 },
+        notifications_room: 50,
+        ...command.levels,
+      }),
+      sync_power_levels_from_space: () => ({
+        type: 'sync_power_levels_from_space',
+        levels: {
+          ban: 50,
+          kick: 50,
+          redact: 50,
+          invite: 0,
+          events_default: 0,
+          state_default: 50,
+          users_default: 0,
+          events: {},
+          users: { [session.user_id]: 100 },
+          notifications_room: 50,
+        },
+        tags: {},
+      }),
+      sync_child_power_levels: (command) => ({
+        type: 'sync_child_power_levels',
+        updated: command.child_ids.length,
+        skipped: 0,
+      }),
+      power_level_tags: () => ({ type: 'power_level_tags', tags: {} }),
+      set_power_level_tag: () => ({ type: 'set_power_level_tag', tags: {} }),
       room_versions: () => ({
         type: 'room_versions',
         default: '10',
@@ -1250,7 +1325,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'room_state_event',
         content:
           command.event_type === 'moe.sable.room.abbreviations'
-            ? (abbreviations.get(command.room_id) ?? null)
+            ? { entries: abbreviations.get(command.room_id) ?? [] }
             : command.event_type === 'm.room.tombstone' &&
                 command.room_id === tombstonedRoom.room_id
               ? { replacement_room: successorRoom.room_id, body: null }
@@ -1695,10 +1770,96 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       send_state_event: (command) => {
         if (command.event_type === 'im.vector.modular.widgets')
           roomWidgets.set(command.room_id, null);
-        if (command.event_type === 'moe.sable.room.abbreviations')
-          abbreviations.set(command.room_id, command.content as { entries: unknown[] });
         return { type: 'send_state_event', event_id: `$state-${crypto.randomUUID()}` };
       },
+      media_preview_config: () => ({
+        type: 'media_preview_config',
+        config: { media_previews: null, invite_avatars: null },
+      }),
+      set_media_preview_config: (command) => ({
+        type: 'set_media_preview_config',
+        config: command.config,
+      }),
+      send_gesture: () => ({ type: 'send_gesture' }),
+      answer_calendar_event: () => ({ type: 'answer_calendar_event' }),
+      add_room_widget: () => ({ type: 'add_room_widget', widget_id: 'widget' }),
+      remove_room_widget: () => ({ type: 'remove_room_widget' }),
+      update_server_acl: () => ({ type: 'update_server_acl' }),
+      pin_read_state: () => ({
+        type: 'pin_read_state',
+        pinned_ids: [],
+        unread: 0,
+        fresh_ids: [],
+      }),
+      mark_pins_seen: (command) => ({
+        type: 'mark_pins_seen',
+        pinned_ids: command.pinned_ids,
+        unread: 0,
+        fresh_ids: [],
+      }),
+      persona_backup: () => ({ type: 'persona_backup', backup: '{}' }),
+      check_persona_backup: () => ({ type: 'check_persona_backup' }),
+      restore_persona_backup: () => ({ type: 'restore_persona_backup' }),
+      profile_overrides: () => ({
+        type: 'profile_overrides',
+        overrides: [],
+        protection: 'plain',
+        can_seal: false,
+      }),
+      set_profile_override: () => ({
+        type: 'set_profile_override',
+        overrides: [],
+        protection: 'plain',
+        can_seal: false,
+      }),
+      dismissed_invites: () => ({ type: 'dismissed_invites', room_ids: [] }),
+      set_invite_dismissed: (command) => ({
+        type: 'set_invite_dismissed',
+        room_ids: command.dismissed ? [command.room_id] : [],
+      }),
+      save_image_pack: () => ({ type: 'save_image_pack' }),
+      create_room_image_pack: () => ({ type: 'create_room_image_pack', state_key: 'pack' }),
+      delete_room_image_pack: () => ({ type: 'delete_room_image_pack' }),
+      convert_legacy_image_packs: () => ({ type: 'convert_legacy_image_packs' }),
+      remove_legacy_image_packs: () => ({ type: 'remove_legacy_image_packs' }),
+      add_account_pack_images: () => ({ type: 'add_account_pack_images' }),
+      pack_subscriptions: () => ({ type: 'pack_subscriptions', subscriptions: [] }),
+      set_pack_subscriptions: (command) => ({
+        type: 'set_pack_subscriptions',
+        subscriptions: command.added,
+      }),
+      history_visibility: () => ({ type: 'history_visibility', visibility: 'shared' }),
+      set_history_visibility: () => ({ type: 'set_history_visibility' }),
+      enable_encryption: () => ({ type: 'enable_encryption' }),
+      canonical_alias: () => ({ type: 'canonical_alias', alias: null, alt_aliases: [] }),
+      set_canonical_alias: (command) => ({
+        type: 'set_canonical_alias',
+        alias: command.alias,
+        alt_aliases: command.alt_aliases,
+      }),
+      room_banner: () => ({ type: 'room_banner', url: null }),
+      set_room_banner: () => ({ type: 'set_room_banner' }),
+      member_list_threshold: () => ({ type: 'member_list_threshold', always_listed_from: null }),
+      set_member_list_threshold: () => ({ type: 'set_member_list_threshold' }),
+      room_abbreviations: (command) => ({
+        type: 'room_abbreviations',
+        entries: abbreviations.get(command.room_id) ?? [],
+      }),
+      set_room_abbreviations: (command) => {
+        abbreviations.set(command.room_id, command.entries);
+        return { type: 'set_room_abbreviations' };
+      },
+      set_tombstone: () => ({ type: 'set_tombstone' }),
+      member_look: () => ({
+        type: 'member_look',
+        display_name: null,
+        avatar_url: null,
+        color_on_light: null,
+        color_on_dark: null,
+        pronouns: [],
+      }),
+      set_member_look: () => ({ type: 'set_member_look' }),
+      set_pronouns: () => ({ type: 'set_pronouns' }),
       send_raw_event: () => ({
         type: 'send_raw_event',
         event_id: `$message-${crypto.randomUUID()}`,
@@ -1881,7 +2042,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         activePort?.emit({
           type: 'room_list_diff',
           subscription: 1,
-          diffs: [{ op: 'set', index: 0, value: { ...room, unread: room.unread + 1 } }],
+          diffs: [{ op: 'set', index: 0, value: summary({ ...room, unread: room.unread + 1 }) }],
         }),
     });
 

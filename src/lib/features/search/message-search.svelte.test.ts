@@ -1,19 +1,14 @@
 import { flushSync } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import type { SearchHitView } from '#src/generated/protocol';
+import type { SearchDirectory, SearchHitView } from '#src/generated/protocol';
 
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { MessageSearch } from './message-search.svelte.js';
 
-const resolvers = {
-  roomId: (value: string) => value,
-  userId: (value: string) => value,
-  spaceRooms: () => undefined,
-  directRooms: () => undefined,
-};
+const directory: SearchDirectory = { rooms: [], people: [] };
 
 function hit(eventId: string): SearchHitView {
   return {
@@ -53,7 +48,7 @@ afterEach(() => {
 test('an empty query clears results without asking the core', async () => {
   const searchMessages = vi.fn().mockResolvedValue(page([hit('$a')]));
   const { core } = coreReturning(searchMessages);
-  const search = new MessageSearch(core, () => resolvers);
+  const search = new MessageSearch(core, () => directory);
 
   search.query = 'deploy';
   search.schedule();
@@ -72,7 +67,7 @@ test('an empty query clears results without asking the core', async () => {
 test('typing again before the debounce elapses searches once', async () => {
   const searchMessages = vi.fn().mockResolvedValue(page([hit('$a')]));
   const { core } = coreReturning(searchMessages);
-  const search = new MessageSearch(core, () => resolvers);
+  const search = new MessageSearch(core, () => directory);
 
   search.query = 'dep';
   search.schedule();
@@ -102,7 +97,7 @@ test('a slow response for an abandoned query never lands', async () => {
     )
     .mockResolvedValueOnce(page([hit('$fresh')]));
   const { core } = coreReturning(searchMessages);
-  const search = new MessageSearch(core, () => resolvers);
+  const search = new MessageSearch(core, () => directory);
 
   search.query = 'stale';
   search.schedule();
@@ -118,7 +113,7 @@ test('a slow response for an abandoned query never lands', async () => {
 test('a short page marks the results exhausted', async () => {
   const searchMessages = vi.fn().mockResolvedValue(page([hit('$a'), hit('$b')]));
   const { core } = coreReturning(searchMessages);
-  const search = new MessageSearch(core, () => resolvers);
+  const search = new MessageSearch(core, () => directory);
 
   search.query = 'deploy';
   search.schedule();
@@ -133,7 +128,7 @@ test('a short page marks the results exhausted', async () => {
 test('a page with repeated events keeps each event once', async () => {
   const searchMessages = vi.fn().mockResolvedValue(page([hit('$duplicate'), hit('$duplicate')]));
   const { core } = coreReturning(searchMessages);
-  const search = new MessageSearch(core, () => resolvers);
+  const search = new MessageSearch(core, () => directory);
 
   search.query = 'deploy';
   search.schedule();
@@ -149,7 +144,7 @@ test('a full page loads more and appends', async () => {
     .mockResolvedValueOnce(page(firstPage))
     .mockResolvedValueOnce(page([hit('$second')]));
   const { core } = coreReturning(searchMessages);
-  const search = new MessageSearch(core, () => resolvers);
+  const search = new MessageSearch(core, () => directory);
 
   search.query = 'deploy';
   search.schedule();
@@ -173,7 +168,7 @@ test('a short page with messages on disk continues into older pages', async () =
     .mockResolvedValueOnce(page([hit('$older')], '100:3:!room:example.org'))
     .mockResolvedValueOnce(page([hit('$oldest')]));
   const { core } = coreReturning(searchMessages);
-  const search = new MessageSearch(core, () => resolvers);
+  const search = new MessageSearch(core, () => directory);
 
   search.query = 'deploy';
   search.schedule();
@@ -200,7 +195,7 @@ test('an older page that finds nothing still counts as a page, so scrolling asks
     .mockResolvedValueOnce(page([hit('$recent')], ''))
     .mockResolvedValueOnce(page([], '100:3:!room:example.org'));
   const { core } = coreReturning(searchMessages);
-  const search = new MessageSearch(core, () => resolvers);
+  const search = new MessageSearch(core, () => directory);
 
   search.query = 'deploy';
   search.schedule();
@@ -217,7 +212,7 @@ test('an older page that finds nothing still counts as a page, so scrolling asks
 test('a failure reports itself and stops paging', async () => {
   const searchMessages = vi.fn().mockRejectedValue(new Error('core is gone'));
   const { core } = coreReturning(searchMessages);
-  const search = new MessageSearch(core, () => resolvers);
+  const search = new MessageSearch(core, () => directory);
 
   search.query = 'deploy';
   search.schedule();
@@ -232,7 +227,7 @@ test('a failure reports itself and stops paging', async () => {
 test('disposing drops a pending search', async () => {
   const searchMessages = vi.fn().mockResolvedValue(page([hit('$a')]));
   const { core } = coreReturning(searchMessages);
-  const search = new MessageSearch(core, () => resolvers);
+  const search = new MessageSearch(core, () => directory);
 
   search.query = 'deploy';
   search.schedule();
@@ -252,7 +247,7 @@ test('interleaved rooms produce distinct group keys', async () => {
     ])
   );
   const { core } = coreReturning(searchMessages);
-  const search = new MessageSearch(core, () => resolvers);
+  const search = new MessageSearch(core, () => directory);
 
   search.query = 'deploy';
   search.schedule();
@@ -280,7 +275,7 @@ test('a hit repeated across pages is kept once and the cursor still advances by 
     .mockResolvedValueOnce(page(secondPage))
     .mockResolvedValueOnce(page([]));
   const { core } = coreReturning(searchMessages);
-  const search = new MessageSearch(core, () => resolvers);
+  const search = new MessageSearch(core, () => directory);
 
   search.query = 'deploy';
   search.schedule();
@@ -301,7 +296,23 @@ test('a hit repeated across pages is kept once and the cursor still advances by 
 test('a space with no joined rooms finds nothing instead of searching everywhere', async () => {
   const searchMessages = vi.fn().mockResolvedValue(page([hit('$a')]));
   const { core } = coreReturning(searchMessages);
-  const search = new MessageSearch(core, () => ({ ...resolvers, spaceRooms: () => [] }));
+  const emptySpace: SearchDirectory = {
+    rooms: [
+      {
+        room_id: '!empty:example.org',
+        name: 'empty',
+        canonical_alias: null,
+        joined: true,
+        is_tombstoned: false,
+        is_space: true,
+        is_direct: false,
+        direct_targets: [],
+        space_children: [],
+      },
+    ],
+    people: [],
+  };
+  const search = new MessageSearch(core, () => emptySpace);
 
   search.query = 'space:empty deploy';
   search.schedule();

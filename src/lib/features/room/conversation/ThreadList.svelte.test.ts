@@ -48,6 +48,7 @@ vi.mock('../messages/message-scope.svelte.js', async () => {
 import { core } from '#lib/core/__mocks__/context.js';
 
 import ThreadList from './ThreadList.svelte';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 const listThreads = vi.fn();
 Object.assign(core, { listThreads });
@@ -57,7 +58,7 @@ afterEach(() => {
 });
 
 function root(id: string, body: string): TimelineItemView {
-  return {
+  return withRowFields({
     id,
     event_id: id,
     transaction_id: null,
@@ -66,7 +67,15 @@ function root(id: string, body: string): TimelineItemView {
     sender_name: 'Ana',
     sender_avatar: null,
     timestamp: 0,
-    content: { kind: 'message', body, html: body, emote: false, notice: false, edited: false },
+    content: {
+      kind: 'message',
+      body,
+      html: body,
+      emote: false,
+      notice: false,
+      edited: false,
+      jumbo: null,
+    },
     in_reply_to: null,
     thread_root: null,
     thread_summary: null,
@@ -80,7 +89,7 @@ function root(id: string, body: string): TimelineItemView {
     mention: 'none',
     forwarded: null,
     forum_title: null,
-  };
+  });
 }
 
 const rows = () => within(screen.getByRole('list')).getAllByRole('listitem');

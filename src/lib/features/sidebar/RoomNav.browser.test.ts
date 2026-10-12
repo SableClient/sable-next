@@ -4,6 +4,7 @@ import { render } from 'vitest-browser-svelte';
 
 import type { NotificationModeView, RoomSummary } from '#src/generated/protocol';
 
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
 import { roomNotifications, roomUnread } from '#lib/rooms/unread.js';
 
 const roomsFixture = vi.hoisted(() => {
@@ -16,9 +17,9 @@ const roomsFixture = vi.hoisted(() => {
     notificationMode: (): NotificationModeView => 'all',
     mutedRoomIds: new Set<string>(),
     quietRoomIds: new Set<string>(),
-    unreadFor: (room: RoomSummary) => roomUnread(room, 'all'),
-    badgeUnreadFor: (room: RoomSummary) => roomUnread(room, 'all'),
-    notificationsFor: (room: RoomSummary) => roomNotifications(room, 'all'),
+    unreadFor: (room: RoomSummary) => roomUnread(room),
+    badgeUnreadFor: (room: RoomSummary) => roomUnread(room),
+    notificationsFor: (room: RoomSummary) => roomNotifications(room),
   };
   return fixture;
 });
@@ -52,7 +53,7 @@ afterEach(async () => {
 });
 
 function room(overrides: Partial<RoomSummary>): RoomSummary {
-  return {
+  return withCounts({
     room_id: '!room:example.org',
     canonical_alias: null,
     name: null,
@@ -80,7 +81,7 @@ function room(overrides: Partial<RoomSummary>): RoomSummary {
     marked_unread: false,
     latest_event: { sender: null, body: 'hi', timestamp: 1, sending: false, event_id: null },
     ...overrides,
-  };
+  });
 }
 
 async function mountNav(props: { collapsed?: boolean; width?: number } = {}) {

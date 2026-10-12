@@ -105,7 +105,8 @@ async function putAll(entries: Iterable<readonly [string, string]>): Promise<voi
 
 export async function roomName(roomId: string): Promise<string | null> {
   try {
-    return (await transact<unknown>('readonly', (store) => store.get(roomId))) as string | null;
+    const stored = await transact<unknown>('readonly', (store) => store.get(roomId));
+    return typeof stored === 'string' ? stored : null;
   } catch {
     return null;
   }

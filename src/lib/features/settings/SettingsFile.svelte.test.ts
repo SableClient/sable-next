@@ -44,7 +44,7 @@ test('applies a settings file only after confirmation that names the gateway', a
   );
 
   const dialog = await screen.findByRole('dialog');
-  expect(dialog).toHaveAccessibleDescription(expect.stringContaining(gateway));
+  expect(dialog).toHaveAccessibleDescription(expect.stringContaining(gateway) as string);
   expect(preferences.dateFormat).toBe('dmy');
 
   await user.click(within(dialog).getByRole('button', { name: 'Import settings' }));

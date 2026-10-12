@@ -1,5 +1,5 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
-import { timelineItem } from './fixtures/timeline-items';
+import { timelineItem, withRowFields } from './fixtures/timeline-items';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -22,7 +22,7 @@ for (const scheme of ['light', 'dark'] as const) {
     await core.emitTimelineDiff(await core.subscription(), [
       {
         op: 'push_back',
-        value: {
+        value: withRowFields({
           ...timelineItem('pin-alice', ''),
           sender: '@e2e:example.test',
           sender_name: 'E2E User',
@@ -39,7 +39,7 @@ for (const scheme of ['light', 'dark'] as const) {
               total: 1,
             },
           },
-        },
+        }),
       },
     ]);
 

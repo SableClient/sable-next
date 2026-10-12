@@ -2,9 +2,10 @@ import { expect, test } from 'vitest';
 import type { TimelineItemView } from '#src/generated/protocol';
 
 import { messageActionPolicy } from './message-action-policy';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 function item(overrides: Partial<TimelineItemView> = {}): TimelineItemView {
-  return {
+  return withRowFields({
     id: 'item',
     event_id: '$item',
     transaction_id: null,
@@ -20,6 +21,7 @@ function item(overrides: Partial<TimelineItemView> = {}): TimelineItemView {
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -35,7 +37,7 @@ function item(overrides: Partial<TimelineItemView> = {}): TimelineItemView {
     forwarded: null,
     forum_title: null,
     ...overrides,
-  };
+  });
 }
 
 function policy(overrides: Partial<TimelineItemView> = {}, hasLinkPreviews = false) {
@@ -172,6 +174,7 @@ test('edited messages can still be annotated through their original event', () =
       emote: false,
       notice: false,
       edited: true,
+      jumbo: null,
     },
   });
 

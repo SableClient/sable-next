@@ -1,4 +1,14 @@
 use matrix_sdk::ruma::{OwnedDeviceId, OwnedEventId, OwnedRoomId, OwnedUserId};
+pub use sable_model::calendar::{CalendarRsvpView, RsvpStatusView};
+pub use sable_model::event_preview::ReplyFallbackView;
+pub use sable_model::markdown::{ComposerContent, ComposerMentions, ComposerPill};
+pub use sable_model::member_look::{FieldEdit, PronounView};
+pub use sable_model::notifications::NotificationModeView;
+pub use sable_model::power_levels::{PowerLevelAction, PowerLevelLocation, RoomPowerLevelsView};
+pub use sable_model::search_filter::{SearchAttachment, SearchFilter};
+pub use sable_model::sidebar::SidebarItemView;
+pub use sable_model::slash::{GestureView, MessageKind};
+pub use sable_model::spaces::{RoomJoinRuleView, SpaceChildEdge};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
@@ -180,10 +190,6 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
     },
-    RoomNotificationModes {
-        #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
-        room_ids: Vec<OwnedRoomId>,
-    },
     DefaultNotificationModes,
     MentionNotifications,
     EventNotifications,
@@ -214,6 +220,13 @@ pub enum Command {
     UserRelations {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         user_id: OwnedUserId,
+    },
+    /// A typed message as the web composer's plain mode sends it, each
+    /// `\u{FFFC}` in `markdown` standing for the next of `pills`.
+    MarkdownToContent {
+        markdown: String,
+        #[serde(default)]
+        pills: Vec<ComposerPill>,
     },
     SendMessage {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -1241,6 +1254,213 @@ pub enum Command {
         room_id: OwnedRoomId,
         rule: JoinRuleView,
     },
+    HistoryVisibility {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+    SetHistoryVisibility {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        visibility: HistoryVisibilityView,
+    },
+    /// Cannot be undone.
+    EnableEncryption {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+    CanonicalAlias {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+    SetCanonicalAlias {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        alias: Option<String>,
+        alt_aliases: Vec<String>,
+    },
+    RoomBanner {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+    SetRoomBanner {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        url: Option<String>,
+    },
+    /// The power level from which members are listed whatever their presence.
+    MemberListThreshold {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+    SetMemberListThreshold {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        always_listed_from: Option<i64>,
+    },
+    /// The room's own config when `room_id` is set, the account's otherwise.
+    MediaPreviewConfig {
+        #[serde(default)]
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        room_id: Option<OwnedRoomId>,
+    },
+    /// Merges into the account's config; a field left `None` is kept.
+    SetMediaPreviewConfig {
+        config: MediaPreviewConfigView,
+    },
+    SendGesture {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        gesture: GestureView,
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        target: Option<OwnedUserId>,
+    },
+    /// `recurrence_id` picks one occurrence of a repeating event.
+    AnswerCalendarEvent {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        calendar_event_id: OwnedEventId,
+        uid: String,
+        recurrence_id: Option<String>,
+        status: RsvpStatusView,
+    },
+    /// A custom widget whose URL is given the template variables hosts fill in.
+    AddRoomWidget {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        name: String,
+        url: String,
+    },
+    RemoveRoomWidget {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        widget_id: String,
+    },
+    /// Server globs to add to and remove from each list.
+    UpdateServerAcl {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        allow: Vec<String>,
+        deny: Vec<String>,
+        remove_allow: Vec<String>,
+        remove_deny: Vec<String>,
+    },
+    PinReadState {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+    /// Marks `pinned_ids`, the list the reader is looking at, as seen.
+    MarkPinsSeen {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+        pinned_ids: Vec<OwnedEventId>,
+    },
+    /// The persona catalog as a backup file's text.
+    PersonaBackup,
+    /// Refuses a file that is not a persona backup, without touching anything.
+    CheckPersonaBackup {
+        backup: String,
+    },
+    /// Replaces the persona catalog with the one in a backup file.
+    RestorePersonaBackup {
+        backup: String,
+    },
+    ProfileOverrides,
+    SetProfileOverride {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        user_id: OwnedUserId,
+        display_name: FieldEdit,
+        avatar: AvatarEditView,
+        color: FieldEdit,
+    },
+    DismissedInvites,
+    SetInviteDismissed {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        dismissed: bool,
+    },
+    SaveImagePack {
+        target: PackTargetView,
+        draft: PackDraftView,
+    },
+    /// The state key is derived from the name and kept unique in the room.
+    CreateRoomImagePack {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        name: String,
+    },
+    /// Clears the legacy copy too, or the pack would come back from it.
+    DeleteRoomImagePack {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        state_key: String,
+    },
+    ConvertLegacyImagePacks {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        state_keys: Vec<String>,
+    },
+    RemoveLegacyImagePacks {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        state_keys: Vec<String>,
+    },
+    /// Merges into the account pack, renaming a shortcode that is taken.
+    AddAccountPackImages {
+        images: Vec<PackImageDraftView>,
+    },
+    PackSubscriptions,
+    SetPackSubscriptions {
+        added: Vec<PackAddressView>,
+        removed: Vec<PackAddressView>,
+    },
+    RoomAbbreviations {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+    SetRoomAbbreviations {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        entries: Vec<AbbreviationView>,
+    },
+    /// Points readers of this room at `replacement_room` without upgrading it.
+    SetTombstone {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        replacement_room: OwnedRoomId,
+        body: String,
+    },
+    /// Our own member event and pronouns in one room or space.
+    MemberLook {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+    /// Writes our member event once; a colour change also clears the legacy
+    /// colour event other clients still read.
+    SetMemberLook {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[serde(default)]
+        in_parent_space: bool,
+        #[serde(default)]
+        display_name: FieldEdit,
+        #[serde(default)]
+        avatar_url: FieldEdit,
+        #[serde(default)]
+        color_on_light: FieldEdit,
+        #[serde(default)]
+        color_on_dark: FieldEdit,
+    },
+    SetPronouns {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[serde(default)]
+        in_parent_space: bool,
+        pronouns: Vec<PronounView>,
+    },
     /// Escape hatch for unmodelled state. `content` is validated only by the
     /// server, so prefer a typed command.
     SendStateEvent {
@@ -1250,6 +1470,44 @@ pub enum Command {
         state_key: String,
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
         content: serde_json::Value,
+    },
+    /// `levels` is what the reader is editing; the store lags our own writes.
+    SetPowerLevel {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[serde(default)]
+        levels: Option<RoomPowerLevelsView>,
+        location: PowerLevelLocation,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        level: i64,
+    },
+    /// Copies the space's moderation and settings levels, and its role names,
+    /// as far as our own level allows.
+    SyncPowerLevelsFromSpace {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        space_id: OwnedRoomId,
+        #[serde(default)]
+        levels: Option<RoomPowerLevelsView>,
+    },
+    SyncChildPowerLevels {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        space_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+        child_ids: Vec<OwnedRoomId>,
+    },
+    PowerLevelTags {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+    /// No tag removes the role at that level.
+    SetPowerLevelTag {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        level: i64,
+        tag: Option<PowerLevelTagView>,
     },
     /// Lowering our own cannot be undone. The level to raise it is gone.
     SetUserPowerLevel {
@@ -1266,6 +1524,14 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         user_id: OwnedUserId,
         reason: Option<String>,
+    },
+    /// Refuses a knock with a `leave` membership; homeservers refuse to kick
+    /// a user who only knocked.
+    DenyKnock {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        user_id: OwnedUserId,
     },
     /// Also removes them from the room.
     BanUser {
@@ -1518,9 +1784,6 @@ pub enum CommandOk {
     DeclineCall,
     RoomPermissions(RoomPermissionsView),
     NotificationSettings(NotificationSettingsView),
-    RoomNotificationModes {
-        modes: Vec<RoomNotificationModeView>,
-    },
     DefaultNotificationModes {
         modes: DefaultNotificationModesView,
     },
@@ -1584,6 +1847,7 @@ pub enum CommandOk {
     InviteTriage {
         invites: Vec<InviteTriageView>,
     },
+    MarkdownToContent(ComposerContent),
     /// The local echo arrives on the timeline diff stream.
     SendMessage,
     SendRawEvent {
@@ -1649,7 +1913,7 @@ pub enum CommandOk {
         events: Vec<RoomStateEventView>,
     },
     BotCommands {
-        commands: Vec<BotCommandDescriptionView>,
+        commands: Vec<sable_model::bot_commands::BotCommand>,
     },
     RoomHasSpaceParent {
         has_space_parent: bool,
@@ -1973,13 +2237,106 @@ pub enum CommandOk {
     SetRoomTopic,
     SetRoomAvatar,
     SetRoomJoinRule,
+    HistoryVisibility {
+        visibility: HistoryVisibilityView,
+    },
+    SetHistoryVisibility,
+    EnableEncryption,
+    CanonicalAlias {
+        alias: Option<String>,
+        alt_aliases: Vec<String>,
+    },
+    SetCanonicalAlias {
+        alias: Option<String>,
+        alt_aliases: Vec<String>,
+    },
+    RoomBanner {
+        url: Option<String>,
+    },
+    SetRoomBanner,
+    MemberListThreshold {
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        always_listed_from: Option<i64>,
+    },
+    SetMemberListThreshold,
+    MediaPreviewConfig {
+        config: MediaPreviewConfigView,
+    },
+    SetMediaPreviewConfig {
+        config: MediaPreviewConfigView,
+    },
+    SendGesture,
+    AnswerCalendarEvent,
+    AddRoomWidget {
+        widget_id: String,
+    },
+    RemoveRoomWidget,
+    UpdateServerAcl,
+    PinReadState(PinReadStateView),
+    MarkPinsSeen(PinReadStateView),
+    PersonaBackup {
+        backup: String,
+    },
+    CheckPersonaBackup,
+    RestorePersonaBackup,
+    ProfileOverrides(ProfileOverridesView),
+    SetProfileOverride(ProfileOverridesView),
+    DismissedInvites {
+        #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+        room_ids: Vec<OwnedRoomId>,
+    },
+    SetInviteDismissed {
+        #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+        room_ids: Vec<OwnedRoomId>,
+    },
+    SaveImagePack,
+    CreateRoomImagePack {
+        state_key: String,
+    },
+    DeleteRoomImagePack,
+    ConvertLegacyImagePacks,
+    RemoveLegacyImagePacks,
+    AddAccountPackImages,
+    PackSubscriptions {
+        subscriptions: Vec<PackAddressView>,
+    },
+    SetPackSubscriptions {
+        subscriptions: Vec<PackAddressView>,
+    },
+    RoomAbbreviations {
+        entries: Vec<AbbreviationView>,
+    },
+    SetRoomAbbreviations,
+    SetTombstone,
+    MemberLook(MemberLookView),
+    SetMemberLook,
+    SetPronouns,
     SendStateEvent {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         event_id: OwnedEventId,
     },
     SetUserPowerLevel,
+    SetPowerLevel(RoomPowerLevelsView),
+    SyncPowerLevelsFromSpace {
+        levels: RoomPowerLevelsView,
+        #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, PowerLevelTagView>))]
+        tags: PowerLevelTagsView,
+    },
+    SyncChildPowerLevels {
+        updated: u32,
+        skipped: u32,
+    },
+    PowerLevelTags {
+        #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, PowerLevelTagView>))]
+        tags: PowerLevelTagsView,
+    },
+    SetPowerLevelTag {
+        #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, PowerLevelTagView>))]
+        tags: PowerLevelTagsView,
+    },
 
     KickUser,
+    DenyKnock,
     BanUser,
     UnbanUser,
 
@@ -2036,6 +2393,19 @@ pub enum CommandErr {
     SlidingSyncUnsupported,
     AccountLocked,
     AccountSuspended,
+    /// MSC2545 allows `[a-zA-Z0-9-_]`, at most 100 bytes, each once per pack.
+    InvalidShortcode {
+        shortcode: String,
+    },
+    /// A file that is not a backup this app wrote.
+    InvalidBackup,
+    /// Not an `http` or `https` URL.
+    InvalidUrl,
+    /// A search filter naming something that is not a room or user id.
+    InvalidSearchFilter,
+    /// A sealed document this device cannot open, so writing it would erase
+    /// what the other devices stored.
+    DocumentLocked,
     /// Static: safe to hide UI.
     Unsupported,
     /// Retryable: keep UI.
@@ -2424,18 +2794,6 @@ pub enum SearchOrder {
     Oldest,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-#[serde(rename_all = "snake_case")]
-pub enum SearchAttachment {
-    Image,
-    Video,
-    Audio,
-    File,
-    Link,
-    Poll,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
@@ -2529,38 +2887,6 @@ pub struct SearchMetricsView {
     pub average_request_ms: Option<u64>,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub running_ms: Option<u64>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-#[serde(default)]
-pub struct SearchFilter {
-    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
-    pub rooms: Vec<OwnedRoomId>,
-    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
-    pub senders: Vec<OwnedUserId>,
-    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
-    pub mentions: Vec<OwnedUserId>,
-    pub has: Vec<SearchAttachment>,
-    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
-    pub not_rooms: Vec<OwnedRoomId>,
-    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
-    pub not_senders: Vec<OwnedUserId>,
-    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
-    pub not_mentions: Vec<OwnedUserId>,
-    pub not_has: Vec<SearchAttachment>,
-    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
-    pub after_ts: Option<u64>,
-    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
-    pub before_ts: Option<u64>,
-    pub phrases: Vec<String>,
-    pub exclude: Vec<String>,
-    pub pinned: Option<bool>,
-    pub in_thread: Option<bool>,
-    pub file_types: Vec<String>,
-    pub not_file_types: Vec<String>,
-    pub pattern: Option<String>,
-    pub state_events: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -2699,7 +3025,21 @@ pub struct RoomSummary {
     pub notifying: u32,
     pub highlight: u32,
     pub marked_unread: bool,
+    pub notification: NotificationSettingsView,
+    /// The counts above under the room's mode.
+    pub counts: RoomUnreadView,
     pub latest_event: Option<LatestEventView>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RoomUnreadView {
+    pub unread: u32,
+    /// What the push rules notified on, which is what the inbox counts.
+    pub notifying: u32,
+    pub highlight: u32,
+    /// Set by hand, so it survives a mute.
+    pub marked: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -2940,21 +3280,6 @@ pub enum JoinRuleView {
     KnockRestricted,
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-#[serde(rename_all = "snake_case")]
-pub enum RoomJoinRuleView {
-    Public,
-    Invite,
-    Knock,
-    /// Members of an allowed space may join.
-    Restricted,
-    KnockRestricted,
-    Private,
-    /// Not loaded, or a rule this client has no name for.
-    Unknown,
-}
-
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
@@ -3045,34 +3370,30 @@ pub struct SpaceParentView {
     pub via: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+/// How a timeline row is drawn: a message carries a sender, a hover menu and
+/// reactions; an event is a one-line notice; an annotation is a divider.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
-pub struct SpaceChildEdge {
-    #[cfg_attr(feature = "typegen", specta(type = String))]
-    pub room_id: OwnedRoomId,
-    pub via: Vec<String>,
-    /// `m.space.child.content.order`, unordered children sort last.
-    pub order: Option<String>,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub origin_server_ts: u64,
-    /// The parent marked this child as worth surfacing first.
-    pub suggested: bool,
+#[serde(rename_all = "snake_case")]
+pub enum TimelineRowKind {
+    Message,
+    Event,
+    Annotation,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+/// Which reader preference can hide a row; `always` rows are always shown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum SidebarItemView {
-    Space {
-        #[cfg_attr(feature = "typegen", specta(type = String))]
-        room_id: OwnedRoomId,
-    },
-    Folder {
-        id: String,
-        name: Option<String>,
-        #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
-        content: Vec<OwnedRoomId>,
-    },
+#[serde(rename_all = "snake_case")]
+pub enum TimelineVisibility {
+    Always,
+    Membership,
+    /// A membership event that changed nothing a reader would notice.
+    MembershipOther,
+    ProfileChange,
+    Tombstone,
+    /// Shown only with hidden events on.
+    Hidden,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -3080,6 +3401,13 @@ pub enum SidebarItemView {
 pub struct TimelineItemView {
     /// Not an event id. Stable across a local echo becoming remote.
     pub id: String,
+    pub row: TimelineRowKind,
+    /// Content another room can receive as it is.
+    pub forwardable: bool,
+    /// Whether the event can be redacted at all; the room's power levels
+    /// decide whether the reader may.
+    pub redactable: bool,
+    pub visibility: TimelineVisibility,
     /// Absent while the event is still a local echo.
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
     pub event_id: Option<OwnedEventId>,
@@ -3243,20 +3571,10 @@ pub struct RoomStateEventView {
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
-pub struct BotCommandDescriptionView {
-    pub sender: String,
-    pub sender_name: Option<String>,
-    pub sender_avatar: Option<String>,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
-    pub content: serde_json::Value,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct RoomOpenView {
     pub permissions: RoomPermissionsView,
-    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Unknown>))]
-    pub power_level_tags: Option<serde_json::Value>,
+    #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, PowerLevelTagView>))]
+    pub power_level_tags: PowerLevelTagsView,
     pub widgets: Vec<RoomStateEventView>,
     #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
     pub pinned_event_ids: Vec<OwnedEventId>,
@@ -3321,30 +3639,18 @@ pub struct RoomPermissionsView {
     pub can_manage_children: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+/// A role name for a power level, from `in.cinny.room.power_level_tags`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
-pub struct RoomPowerLevelsView {
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub ban: i64,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub kick: i64,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub redact: i64,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub invite: i64,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub events_default: i64,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub state_default: i64,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub users_default: i64,
-    #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, specta_typescript::Number<i64>>))]
-    pub events: std::collections::BTreeMap<String, i64>,
-    #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, specta_typescript::Number<i64>>))]
-    pub users: std::collections::BTreeMap<String, i64>,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub notifications_room: i64,
+pub struct PowerLevelTagView {
+    pub name: String,
+    pub color: Option<String>,
+    /// A Unicode emoji or an `mxc://` URI.
+    pub icon: Option<String>,
 }
+
+/// Keyed by the power level.
+pub type PowerLevelTagsView = std::collections::BTreeMap<i64, PowerLevelTagView>;
 
 #[derive(Debug, Clone, Copy, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
@@ -3398,16 +3704,6 @@ pub enum TimelineFocusView {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         root_event_id: OwnedEventId,
     },
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-#[serde(rename_all = "snake_case")]
-pub enum MessageKind {
-    #[default]
-    Text,
-    Emote,
-    Notice,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -3504,7 +3800,7 @@ pub struct PersonaCatalogView {
 
 /// The SDK loads the body lazily, so it is absent for an event we have never
 /// seen until `FetchEventDetails` fills it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct ReplyView {
     #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -3514,6 +3810,8 @@ pub struct ReplyView {
     pub sender_mentioned: bool,
     pub sender_name: Option<String>,
     pub body: Option<String>,
+    /// Set instead of `body` when the replied-to event has none to show.
+    pub fallback: Option<ReplyFallbackView>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -3637,6 +3935,10 @@ pub enum TimelineItemContentView {
         emote: bool,
         notice: bool,
         edited: bool,
+        /// Drawn larger, 1 to 4, when the message is nothing but emoji or
+        /// inline emotes.
+        #[cfg_attr(feature = "typegen", specta(optional))]
+        jumbo: Option<u8>,
     },
     Image {
         filename: String,
@@ -4103,15 +4405,6 @@ pub enum DiagnosticPushView {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-#[serde(rename_all = "snake_case")]
-pub enum NotificationModeView {
-    All,
-    Mentions,
-    Mute,
-}
-
 #[derive(Debug, Clone, Copy, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct DefaultNotificationModesView {
@@ -4177,19 +4470,10 @@ pub struct KeywordNotificationView {
     pub mode: MentionNotificationModeView,
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct NotificationSettingsView {
     /// The room's own rule. `null` means it follows `default`.
-    pub room: Option<NotificationModeView>,
-    pub default: NotificationModeView,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-pub struct RoomNotificationModeView {
-    #[cfg_attr(feature = "typegen", specta(type = String))]
-    pub room_id: OwnedRoomId,
     pub room: Option<NotificationModeView>,
     pub default: NotificationModeView,
 }
@@ -4343,7 +4627,7 @@ pub struct ImageSourcePackReferenceView {
     pub source: ImageSourcePackView,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(default)]
 pub struct PackImageInfoView {
@@ -4356,7 +4640,7 @@ pub struct PackImageInfoView {
     pub size: Option<u32>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
 pub enum ImageUsageView {
@@ -4446,18 +4730,6 @@ pub struct CalendarEntryView {
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
-pub struct CalendarRsvpView {
-    pub sender: String,
-    pub calendar_event_id: String,
-    pub uid: String,
-    pub recurrence_id: Option<String>,
-    pub status: String,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub timestamp: u64,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct CalendarView {
     pub entries: Vec<CalendarEntryView>,
     pub rsvps: Vec<CalendarRsvpView>,
@@ -4473,12 +4745,171 @@ pub struct AudioMetadataView {
     pub cover_art_blurhash: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct PinReadStateView {
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub pinned_ids: Vec<OwnedEventId>,
+    pub unread: u32,
+    /// Pins added since this account last looked.
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub fresh_ids: Vec<OwnedEventId>,
+}
+
+/// MSC4529 keeps three states apart: no override, an override that removes
+/// the value, and an override that replaces it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum OverrideTextView {
+    Unset,
+    Cleared,
+    Set { value: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum OverrideColorView {
+    Unset,
+    Cleared,
+    Set {
+        light: Option<String>,
+        dark: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct ProfileOverrideView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub user_id: OwnedUserId,
+    pub display_name: OverrideTextView,
+    /// An `mxc://` URI, or an encrypted file's JSON that `fetch_media` opens.
+    pub avatar: OverrideTextView,
+    pub color: OverrideColorView,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct ProfileOverridesView {
+    pub overrides: Vec<ProfileOverrideView>,
+    pub protection: SealStateView,
+    pub can_seal: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AvatarEditView {
+    Keep,
+    Clear,
+    Url {
+        url: String,
+    },
+    /// Encrypted in the webview with the account data key in hand.
+    Encrypted {
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+        file: serde_json::Value,
+    },
+}
+
+/// MSC4278. `None` means the event does not say.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct MediaPreviewConfigView {
+    pub media_previews: Option<MediaPreviewsView>,
+    pub invite_avatars: Option<InviteAvatarsView>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum MediaPreviewsView {
+    On,
+    /// Only in rooms that are not public.
+    Private,
+    Off,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum InviteAvatarsView {
+    On,
+    Off,
+}
+
+/// What the pack editor holds; the core turns it into MSC2545 content.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
-pub struct PronounView {
-    pub summary: String,
-    /// Absent when the writer did not tag the set with a language.
-    pub language: Option<String>,
+pub struct PackDraftView {
+    pub name: String,
+    pub avatar_url: Option<String>,
+    pub attribution: String,
+    pub usage: Vec<ImageUsageView>,
+    pub images: Vec<PackImageDraftView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct PackImageDraftView {
+    pub shortcode: String,
+    pub url: String,
+    pub body: Option<String>,
+    pub usage: Vec<ImageUsageView>,
+    pub info: Option<PackImageInfoView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PackTargetView {
+    Room {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        state_key: String,
+    },
+    /// `im.ponies.user_emotes`, the account's own pack.
+    Account,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct PackAddressView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub state_key: String,
+}
+
+/// A term the room explains on hover. An uncased term matches any casing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct AbbreviationView {
+    pub term: String,
+    pub definition: String,
+    #[serde(default)]
+    pub cased: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum HistoryVisibilityView {
+    Shared,
+    Invited,
+    Joined,
+    WorldReadable,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct MemberLookView {
+    pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub color_on_light: Option<String>,
+    pub color_on_dark: Option<String>,
+    pub pronouns: Vec<PronounView>,
 }
 
 #[derive(Debug, Clone, Serialize)]

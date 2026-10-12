@@ -65,6 +65,10 @@
   function placeholderItem(id: number): TimelineItemView {
     return {
       id: `placeholder-${String(id)}`,
+      row: 'message',
+      forwardable: true,
+      redactable: true,
+      visibility: 'always',
       event_id: null,
       transaction_id: null,
       send_state: null,
@@ -79,6 +83,7 @@
         emote: false,
         notice: false,
         edited: false,
+        jumbo: null,
       },
       in_reply_to: null,
       thread_root: null,

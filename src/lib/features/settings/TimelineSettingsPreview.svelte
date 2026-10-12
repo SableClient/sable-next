@@ -43,6 +43,10 @@
 
   const incoming = {
     id: 'timeline-preview-incoming',
+    row: 'message',
+    forwardable: true,
+    redactable: true,
+    visibility: 'always',
     event_id: '$timeline-preview-incoming',
     transaction_id: null,
     send_state: null,
@@ -57,6 +61,7 @@
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -92,6 +97,7 @@
       sender_mentioned: false,
       sender_name: 'Alex',
       body: 'See you at six?',
+      fallback: null,
     },
     is_own: true,
     read_by: [previewAlexId],

@@ -9,7 +9,6 @@ import {
   childEdges,
   edgeSignature,
   levelTargets,
-  inAllowList,
   joinCandidates,
   lobbyAction,
   lobbyPhase,
@@ -18,6 +17,7 @@ import {
   pendingSuggestedOverrides,
   placeholderRows,
 } from './space-hierarchy';
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 function edge(roomId: string, overrides: Partial<SpaceChildEdge> = {}): SpaceChildEdge {
   return {
@@ -71,15 +71,18 @@ test.each([
 );
 
 test('the allow list decides membership, and the parent stands in when it is unknown', () => {
-  const joined = new Set(['!other-space']);
+  const restricted = { join_rule: 'restricted' } as const;
+  const rooms = [
+    room('!root', { is_space: true, children: [edge('!a'), edge('!b'), edge('!c')] }),
+    room('!a', { ...restricted, allowed_room_ids: ['!other-space'] }),
+    room('!b', { ...restricted, allowed_room_ids: ['!elsewhere'] }),
+    room('!c', restricted),
+  ];
+  const actions = (joined: string[]) =>
+    buildHierarchySections(rooms, '!root', { joined })[0].rooms.map((entry) => entry.action);
 
-  expect(inAllowList(room('!a', { allowed_room_ids: ['!other-space'] }), joined, '!parent')).toBe(
-    true
-  );
-  expect(
-    inAllowList(room('!a', { allowed_room_ids: ['!elsewhere'] }), joined, '!other-space')
-  ).toBe(false);
-  expect(inAllowList(room('!a'), joined, '!other-space')).toBe(true);
+  expect(actions(['!other-space'])).toEqual(['join', null, null]);
+  expect(actions(['!root'])).toEqual([null, null, 'join']);
 });
 
 test('rooms follow the order of the parent edges, not the response order', () => {
@@ -114,7 +117,7 @@ test('each subspace becomes its own section after the root section', () => {
     [null, 0, ['!direct']],
     ['!sub', 1, ['!nested']],
   ]);
-  expect(sections.map((section) => section.ownerId)).toEqual([null, '!space']);
+  expect(sections.map((section) => section.owner_id)).toEqual([null, '!space']);
 });
 
 test('a subspace holding no rooms never becomes a lone heading', () => {
@@ -135,7 +138,7 @@ test('a manager still gets a heading for a subspace holding no rooms', () => {
     room('!empty', { is_space: true }),
   ];
 
-  const sections = buildHierarchySections(rooms, '!space', {}, () => true);
+  const sections = buildHierarchySections(rooms, '!space', { keepEmpty: ['!space', '!empty'] });
   expect(sections.map((section) => section.space?.room_id ?? null)).toEqual([null, '!empty']);
 });
 
@@ -228,7 +231,7 @@ test('a child on a later page does not drop its whole section', () => {
 });
 
 function summary(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSummary {
-  return {
+  return withCounts({
     room_id: roomId,
     canonical_alias: null,
     name: roomId,
@@ -256,7 +259,7 @@ function summary(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSumm
     marked_unread: false,
     latest_event: null,
     ...overrides,
-  };
+  });
 }
 
 test('the local tree is walked from this account own state', () => {
@@ -421,7 +424,7 @@ test('a suggestion override shows on the edge until the parent agrees', () => {
   const sections = buildHierarchySections(applySuggestedOverrides(rooms, overrides), '!root');
 
   expect(sections[0].rooms[0].suggested).toBe(true);
-  expect(sections[1]).toMatchObject({ ownerId: '!root', suggested: true });
+  expect(sections[1]).toMatchObject({ owner_id: '!root', suggested: true });
   expect(pendingSuggestedOverrides(rooms, overrides)).toEqual(overrides);
 
   const synced = [
@@ -438,11 +441,11 @@ test('joinCandidates lists unjoined rooms and subspaces and skips knock and join
     room('!k:x', { join_rule: 'knock' }),
     room('!b:x', { join_rule: 'restricted' }),
   ];
-  const sections = buildHierarchySections(rooms, '!root:x');
+  const candidates = (joined: string[]) =>
+    joinCandidates(buildHierarchySections(rooms, '!root:x', { joined }), joined).map(
+      (candidate) => candidate.room.room_id
+    );
 
-  const candidates = joinCandidates(sections, new Set(['!root:x']), new Set());
-  expect(candidates.map((candidate) => candidate.room.room_id)).toEqual(['!a:x', '!sub:x']);
-
-  const afterSub = joinCandidates(sections, new Set(['!root:x', '!sub:x', '!a:x']), new Set());
-  expect(afterSub.map((candidate) => candidate.room.room_id)).toEqual(['!b:x']);
+  expect(candidates(['!root:x'])).toEqual(['!a:x', '!sub:x']);
+  expect(candidates(['!root:x', '!sub:x', '!a:x'])).toEqual(['!b:x']);
 });

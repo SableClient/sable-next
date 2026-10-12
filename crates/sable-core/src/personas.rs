@@ -479,6 +479,15 @@ fn split_edit_marker(value: &str, edit: bool) -> (&str, &str) {
         .map_or(("", value), |rest| (EDIT_MARKER, rest))
 }
 
+fn catalog_from_backup(backup: &str) -> Option<Value> {
+    let parsed: Value = serde_json::from_str(backup).ok()?;
+    let catalog = parsed.get(CATALOG_V3)?;
+    catalog
+        .get("profiles")
+        .is_some_and(Value::is_array)
+        .then(|| catalog.clone())
+}
+
 impl Core {
     pub(crate) async fn edit_local_with_persona(
         &self,
@@ -611,6 +620,31 @@ impl Core {
 
         self.save_personas(&personas).await?;
         Ok(personas)
+    }
+
+    /// A backup file is the v3 catalog event wrapped under its own type.
+    pub(crate) async fn persona_backup(&self) -> Result<String, CommandErr> {
+        let content = self
+            .persona_account_data(GlobalAccountDataEventType::from(CATALOG_V3))
+            .await?;
+        serde_json::to_string_pretty(&json!({ CATALOG_V3: content }))
+            .or_failed(self, "persona_backup")
+    }
+
+    pub(crate) fn check_persona_backup(backup: &str) -> Result<(), CommandErr> {
+        catalog_from_backup(backup)
+            .map(drop)
+            .ok_or(CommandErr::InvalidBackup)
+    }
+
+    pub(crate) async fn restore_persona_backup(&self, backup: &str) -> Result<(), CommandErr> {
+        let catalog = catalog_from_backup(backup).ok_or(CommandErr::InvalidBackup)?;
+        self.put_global_account_data(
+            GlobalAccountDataEventType::from(CATALOG_V3),
+            &catalog,
+            "restore_persona_backup",
+        )
+        .await
     }
 
     async fn save_personas(&self, personas: &[PersonaView]) -> Result<(), CommandErr> {
@@ -837,6 +871,23 @@ fn ensure_empty_mentions(content: &mut Value) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_backup_must_carry_a_catalog_with_profiles() {
+        let catalog = serde_json::json!({ "profiles": [{ "id": "alt" }] });
+        let backup = serde_json::json!({ super::CATALOG_V3: catalog }).to_string();
+        assert_eq!(super::catalog_from_backup(&backup), Some(catalog));
+
+        for invalid in [
+            "not json".to_owned(),
+            serde_json::json!({ super::CATALOG_V3: {} }).to_string(),
+            serde_json::json!({ super::CATALOG_V3: null }).to_string(),
+            serde_json::json!({ super::CATALOG_V3: [] }).to_string(),
+            serde_json::json!({ "other": { "profiles": [] } }).to_string(),
+        ] {
+            assert_eq!(super::catalog_from_backup(&invalid), None, "{invalid}");
+        }
+    }
+
     use super::{
         RoomAssociation, ensure_empty_mentions, fallback_body, outgoing_with_fallback,
         persona_from_json, personas_from_catalog, profile_to_json, room_associations_from_json,

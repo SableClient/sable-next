@@ -1,4 +1,5 @@
 import { isRecord } from '#lib/guards.js';
+import { reactionKey } from '#lib/model/model.js';
 import type { StateChangeView, TimelineItemView } from '#src/generated/protocol';
 
 import { isCustomReaction } from '../messages/reaction-emote-label';
@@ -44,16 +45,6 @@ function stateChangeText(change: StateChangeView, user: string, t: Translate): s
 
 function text(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
-}
-
-export function reactionKey(content: unknown): string | null {
-  if (!isRecord(content)) return null;
-  const shortcode = text(content.shortcode) ?? text(content['com.beeper.reaction.shortcode']);
-  const name = shortcode
-    ?.trim()
-    .replace(/^:+|:+$/g, '')
-    .trim();
-  return name ? `:${name}:` : reactionSource(content);
 }
 
 export function reactionSource(content: unknown): string | null {

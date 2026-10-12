@@ -5,81 +5,7 @@ import {
   MAX_POWER_LEVEL,
   MIN_POWER_LEVEL,
   parsePowerLevelInput,
-  parsePowerLevelTags,
-  tagForLevel,
-  withPowerLevelTag,
-  withPowerLevelTagsFrom,
 } from './power-level-tags';
-
-test('a valid tag map is read with its name, colour and icon', () => {
-  const tags = parsePowerLevelTags({
-    '100': { name: 'Admin', color: '#0088ff', icon: { key: '✨' } },
-    '50': { name: 'Moderator' },
-  });
-
-  expect(tagForLevel(tags, 100)).toEqual({ name: 'Admin', color: '#0088ff', icon: '✨' });
-  expect(tagForLevel(tags, 50)).toEqual({ name: 'Moderator', color: null, icon: null });
-  expect(tagForLevel(tags, 0)).toBeNull();
-});
-
-test('hostile content does not crash and yields no tags', () => {
-  expect(parsePowerLevelTags(null)).toEqual({});
-  expect(parsePowerLevelTags(undefined)).toEqual({});
-  expect(parsePowerLevelTags('not an object')).toEqual({});
-  expect(parsePowerLevelTags([1, 2, 3])).toEqual({});
-  expect(parsePowerLevelTags({ '100': 'not an object' })).toEqual({});
-  expect(parsePowerLevelTags({ '100': { name: 42 } })).toEqual({});
-  expect(parsePowerLevelTags({ '100': { name: '  ' } })).toEqual({});
-  expect(parsePowerLevelTags({ notALevel: { name: 'Admin' } })).toEqual({});
-});
-
-test('an invalid colour falls back to no colour rather than an unvalidated string', () => {
-  const tags = parsePowerLevelTags({ '100': { name: 'Admin', color: 'javascript:alert(1)' } });
-  expect(tagForLevel(tags, 100)).toEqual({ name: 'Admin', color: null, icon: null });
-});
-
-test('writing a tag preserves other entries and unknown fields on the same entry', () => {
-  const content = {
-    '100': { name: 'Admin', color: '#0088ff', icon: { key: 'mxc://server/abc' } },
-    '50': { name: 'Moderator' },
-  };
-
-  const next = withPowerLevelTag(content, 100, {
-    name: 'Owner',
-    color: '#ff0000',
-    icon: '✨',
-  });
-
-  expect(next['100']).toEqual({
-    name: 'Owner',
-    color: '#ff0000',
-    icon: { key: '✨' },
-  });
-  expect(next['50']).toEqual({ name: 'Moderator' });
-});
-
-test('writing a tag with no colour clears a previously set colour', () => {
-  const content = { '100': { name: 'Admin', color: '#0088ff' } };
-  const next = withPowerLevelTag(content, 100, { name: 'Admin', color: null, icon: null });
-
-  expect(next['100']).toEqual({ name: 'Admin', color: undefined });
-});
-
-test('writing null removes the entry', () => {
-  const content = { '100': { name: 'Admin' }, '50': { name: 'Moderator' } };
-  const next = withPowerLevelTag(content, 100, null);
-
-  expect(next).toEqual({ '50': { name: 'Moderator' } });
-});
-
-test('writing against hostile raw content starts fresh rather than throwing', () => {
-  expect(withPowerLevelTag(null, 100, { name: 'Admin', color: null, icon: null })).toEqual({
-    '100': { name: 'Admin', color: undefined },
-  });
-  expect(withPowerLevelTag('nonsense', 100, { name: 'Admin', color: null, icon: null })).toEqual({
-    '100': { name: 'Admin', color: undefined },
-  });
-});
 
 test('a power level is only valid within the safe integer range', () => {
   expect(isValidPowerLevel(0)).toBe(true);
@@ -90,21 +16,7 @@ test('a power level is only valid within the safe integer range', () => {
   expect(isValidPowerLevel(1.5)).toBe(false);
 });
 
-test('tags reject levels outside the safe integer range except the founder key', () => {
-  expect(
-    parsePowerLevelTags({
-      [MIN_POWER_LEVEL]: { name: 'Minimum' },
-      [MAX_POWER_LEVEL]: { name: 'Maximum' },
-      '9007199254740992': { name: 'Founder' },
-      '9007199254740993': { name: 'Rounded to founder' },
-      '9007199254740994': { name: 'Too high' },
-      '-9007199254740992': { name: 'Too low' },
-    })
-  ).toEqual({
-    [MIN_POWER_LEVEL]: { name: 'Minimum', color: null, icon: null },
-    [MAX_POWER_LEVEL]: { name: 'Maximum', color: null, icon: null },
-    '9007199254740992': { name: 'Founder', color: null, icon: null },
-  });
+test('the founder level is out of range for input', () => {
   expect(parsePowerLevelInput('9007199254740992', MAX_POWER_LEVEL + 1)).toEqual({
     valid: false,
     reason: 'out-of-range',
@@ -118,18 +30,4 @@ test('parsing the numeric input rejects non-integers and levels above the accoun
   expect(parsePowerLevelInput('12.5', 100)).toEqual({ valid: false, reason: 'not-a-number' });
   expect(parsePowerLevelInput('', 100)).toEqual({ valid: false, reason: 'not-a-number' });
   expect(parsePowerLevelInput('101', 100)).toEqual({ valid: false, reason: 'exceeds-own' });
-});
-
-test('syncing tags takes the source role at each level and keeps the rest', () => {
-  const next = withPowerLevelTagsFrom(
-    { '100': { name: 'Owner' }, '20': { name: 'Helper', color: '#00ff00' } },
-    { '100': { name: 'Admin', color: '#0088ff' }, '50': { name: 'Moderator' } }
-  );
-
-  expect(parsePowerLevelTags(next)).toEqual({
-    100: { name: 'Admin', color: '#0088ff', icon: null },
-    50: { name: 'Moderator', color: null, icon: null },
-    20: { name: 'Helper', color: '#00ff00', icon: null },
-  });
-  expect(withPowerLevelTagsFrom(null, undefined)).toEqual({});
 });

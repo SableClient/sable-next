@@ -1,4 +1,3 @@
-import { MEMBER_LIST_EVENT_TYPE, readAlwaysListedFrom } from './settings/member-list.svelte.js';
 import { readTombstone } from './settings/room-upgrade.js';
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 import type {
@@ -8,13 +7,18 @@ import type {
   RoomStateEventView,
 } from '#src/generated/protocol';
 import { parseRoomWidget, type RoomWidget } from '#lib/features/widgets/widget-content.js';
-import { enrichWidgetUrl } from '#lib/features/widgets/widget-url.js';
-import { parsePowerLevelTags, type PowerLevelTagMap } from './settings/power-level-tags.js';
+import type { PowerLevelTagMap } from './settings/power-level-tags.js';
 import type { PinnedEvents } from './timeline/pinned-events.svelte.js';
 
 type RoomDetailCommands = Pick<
   CoreCommands,
-  'roomStateEvent' | 'roomOpen' | 'roomPowerLevels' | 'roomStateEvents' | 'sendStateEvent'
+  | 'memberListThreshold'
+  | 'roomStateEvent'
+  | 'roomOpen'
+  | 'roomPowerLevels'
+  | 'roomStateEvents'
+  | 'addRoomWidget'
+  | 'removeRoomWidget'
 >;
 
 function parseWidgets(events: readonly RoomStateEventView[]): RoomWidget[] {
@@ -52,7 +56,7 @@ export class RoomDetails {
         if (generation !== this.#generation) return;
         this.permissions = opened.permissions;
         this.predecessor = opened.predecessor;
-        this.powerTags = parsePowerLevelTags(opened.power_level_tags);
+        this.powerTags = opened.power_level_tags;
         this.widgets = parseWidgets(opened.widgets);
         this.pins.set(roomId, opened.pinned_event_ids);
       })
@@ -73,20 +77,13 @@ export class RoomDetails {
     };
   }
 
-  async addWidget(name: string, url: string, userId: string): Promise<void> {
-    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-    await this.commands.sendStateEvent(this.#roomId, 'im.vector.modular.widgets', id, {
-      type: 'm.custom',
-      url: enrichWidgetUrl(url),
-      name,
-      id,
-      creatorUserId: userId,
-    });
+  async addWidget(name: string, url: string): Promise<void> {
+    await this.commands.addRoomWidget(this.#roomId, name, url);
     await this.refreshWidgets();
   }
 
   async removeWidget(widgetId: string): Promise<void> {
-    await this.commands.sendStateEvent(this.#roomId, 'im.vector.modular.widgets', widgetId, {});
+    await this.commands.removeRoomWidget(this.#roomId, widgetId);
     await this.refreshWidgets();
   }
 
@@ -101,16 +98,16 @@ export class RoomMemberList {
   alwaysListedFrom = $state<number | null>(null);
   #roomId: string | null = null;
 
-  constructor(private readonly commands: Pick<RoomDetailCommands, 'roomStateEvent'>) {}
+  constructor(private readonly commands: Pick<RoomDetailCommands, 'memberListThreshold'>) {}
 
   start(roomId: string): () => void {
     if (roomId !== this.#roomId) this.alwaysListedFrom = null;
     this.#roomId = roomId;
     let current = true;
     void this.commands
-      .roomStateEvent(roomId, MEMBER_LIST_EVENT_TYPE)
-      .then((content) => {
-        if (current) this.alwaysListedFrom = readAlwaysListedFrom(content);
+      .memberListThreshold(roomId)
+      .then((level) => {
+        if (current) this.alwaysListedFrom = level;
       })
       .catch((error: unknown) => {
         console.debug('[sable room] member list settings unavailable', error);

@@ -23,7 +23,7 @@ use matrix_sdk::ruma::events::space::child::{
     HierarchySpaceChildEvent, SpaceChildEventContent, SpaceChildOrd,
 };
 use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventContentChange, StateEventType};
-use matrix_sdk::ruma::push::Action;
+use matrix_sdk::ruma::push::{Action, Ruleset};
 use matrix_sdk::ruma::room::{
     JoinRuleKind, JoinRuleSummary, RoomSummary as RumaRoomSummary, RoomType,
 };
@@ -52,6 +52,7 @@ use matrix_sdk::latest_events::{LatestEventValue, LocalLatestEventValue, RemoteL
 use matrix_sdk::ruma::events::{
     AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
 };
+use sable_model::jumbo;
 
 use crate::matrix_html::{
     display_html, has_profile_fallback_html, preview_body, strip_profile_fallback_body,
@@ -61,12 +62,13 @@ use crate::profiles::pronoun_sets;
 use crate::protocol::{
     AudioMetadataView, AvatarChangeView, DisplayNameChangeView, ForwardedView, GalleryItemView,
     LatestEventView, MemberView, MembershipChangeView, MembershipView, MentionView,
-    PerMessageProfileView, PollAnswerView, PollView, PredecessorRoomView, PublicRoomView,
-    ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView,
-    RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchContextView, SearchHitView,
-    SendBlockView, SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView,
-    ThreadSummaryView, TimelineItemContentView, TimelineItemView, UploadProgressView,
-    UrlPreviewView, UtdCauseView, VectorDiff,
+    NotificationModeView, NotificationSettingsView, PerMessageProfileView, PollAnswerView,
+    PollView, PredecessorRoomView, PublicRoomView, ReactionGroup, ReplyView, RoomJoinRuleView,
+    RoomPermissionsView, RoomPowerLevelsView, RoomPreviewView, RoomStateView, RoomSummary, RoomTag,
+    RoomUnreadView, SearchContextView, SearchHitView, SendBlockView, SendStateView, SpaceChildEdge,
+    SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView, TimelineItemContentView,
+    TimelineItemView, TimelineRowKind, TimelineVisibility, UploadProgressView, UrlPreviewView,
+    UtdCauseView, VectorDiff,
 };
 
 // Independent room capabilities.
@@ -92,15 +94,22 @@ pub struct RoomInfo {
 pub fn room_summary<S: BuildHasher>(
     item: &RoomListItem,
     room_cache: &HashMap<OwnedRoomId, RoomInfo, S>,
-    every_encrypted: bool,
+    rules: &Ruleset,
 ) -> RoomSummary {
     let info = room_cache.get(item.room_id());
     let latest_event = latest_event(item);
     let latest_event_id = latest_event
         .as_ref()
         .and_then(|event| event.event_id.as_deref());
+    let every_encrypted = crate::push_rules::pushes_every_encrypted_event(rules);
     let (unread, highlight) = unread_counts(item, latest_event_id, every_encrypted);
     let notifying = notifying_count(item, latest_event_id, every_encrypted);
+    let marked_unread = item.is_marked_unread();
+    let notification = crate::push_rules::room_settings(
+        rules,
+        item.room_id(),
+        crate::notifications::uses_direct_push_rules(item),
+    );
     RoomSummary {
         room_id: item.room_id().to_owned(),
         canonical_alias: info.and_then(|info| info.canonical_alias.clone()),
@@ -146,8 +155,48 @@ pub fn room_summary<S: BuildHasher>(
         unread,
         notifying,
         highlight,
-        marked_unread: item.is_marked_unread(),
+        marked_unread,
+        notification,
+        counts: room_counts(notification, unread, notifying, highlight, marked_unread),
         latest_event,
+    }
+}
+
+/// What a room's counts show under its mode: only `mute` clears them, and a
+/// mention always counts as unread and as notified.
+#[must_use]
+pub const fn room_counts(
+    notification: NotificationSettingsView,
+    unread: u32,
+    notifying: u32,
+    highlight: u32,
+    marked: bool,
+) -> RoomUnreadView {
+    let mode = match notification.room {
+        Some(mode) => mode,
+        None => notification.default,
+    };
+    if matches!(mode, NotificationModeView::Mute) {
+        return RoomUnreadView {
+            unread: 0,
+            notifying: 0,
+            highlight: 0,
+            marked,
+        };
+    }
+    RoomUnreadView {
+        unread: if unread > highlight {
+            unread
+        } else {
+            highlight
+        },
+        notifying: if notifying > highlight {
+            notifying
+        } else {
+            highlight
+        },
+        highlight,
+        marked,
     }
 }
 
@@ -311,10 +360,10 @@ fn latest_items(diffs: &[eyeball_im::VectorDiff<RoomListItem>]) -> Vec<&RoomList
     latest.into_values().collect()
 }
 
-pub async fn listless_room_summary(room: Room, every_encrypted: bool) -> RoomSummary {
+pub async fn listless_room_summary(room: Room, rules: &Ruleset) -> RoomSummary {
     let item = RoomListItem::from(room);
     let cache = HashMap::from([(item.room_id().to_owned(), room_info(&item).await)]);
-    room_summary(&item, &cache, every_encrypted)
+    room_summary(&item, &cache, rules)
 }
 
 #[must_use]
@@ -443,7 +492,7 @@ pub async fn restricted_parents(client: &Client, room: &Room) -> Vec<OwnedRoomId
         let lists_room = space_children(&space)
             .await
             .iter()
-            .any(|edge| edge.room_id == room.room_id() && !edge.via.is_empty());
+            .any(|edge| edge.room_id == room.room_id().as_str() && !edge.via.is_empty());
         if lists_room {
             parents.push(space.room_id().to_owned());
         }
@@ -463,7 +512,7 @@ pub async fn listing_spaces(
         let lists_room = space_children(&space)
             .await
             .iter()
-            .any(|edge| edge.room_id == room_id && !edge.via.is_empty());
+            .any(|edge| edge.room_id == room_id.as_str() && !edge.via.is_empty());
         if lists_room {
             spaces.push(space.room_id().to_owned());
         }
@@ -540,7 +589,7 @@ pub fn hierarchy_child_edges(
         .into_iter()
         .filter(|event| seen.insert(event.state_key.clone()))
         .map(|event| SpaceChildEdge {
-            room_id: event.state_key,
+            room_id: event.state_key.into(),
             via: event.content.via.iter().map(ToString::to_string).collect(),
             order: event.content.order.map(|order| order.to_string()),
             origin_server_ts: u64::from(event.origin_server_ts.get()),
@@ -671,7 +720,7 @@ async fn space_children(room: &Room) -> Vec<SpaceChildEdge> {
     events
         .into_iter()
         .map(|event| SpaceChildEdge {
-            room_id: event.state_key,
+            room_id: event.state_key.into(),
             via: event.content.via.iter().map(ToString::to_string).collect(),
             order: event.content.order.map(|order| order.to_string()),
             origin_server_ts: u64::from(event.origin_server_ts.get()),
@@ -802,6 +851,74 @@ impl LocalContent {
     }
 }
 
+impl TimelineItemContentView {
+    #[must_use]
+    pub const fn row_kind(&self) -> TimelineRowKind {
+        match self {
+            Self::Message { .. }
+            | Self::Image { .. }
+            | Self::Video { .. }
+            | Self::Audio { .. }
+            | Self::File { .. }
+            | Self::Sticker { .. }
+            | Self::Gallery { .. }
+            | Self::Location { .. }
+            | Self::LiveLocation { .. }
+            | Self::Poll { .. }
+            | Self::Redacted { .. } => TimelineRowKind::Message,
+            Self::DateDivider { .. } | Self::ReadMarker | Self::TimelineStart => {
+                TimelineRowKind::Annotation
+            }
+            Self::CallInvite
+            | Self::VerificationRequest
+            | Self::Malformed { .. }
+            | Self::UnableToDecrypt { .. }
+            | Self::Membership { .. }
+            | Self::ProfileChange { .. }
+            | Self::StateEvent { .. }
+            | Self::HiddenEvent { .. }
+            | Self::Unsupported { .. } => TimelineRowKind::Event,
+        }
+    }
+
+    #[must_use]
+    pub const fn forwardable(&self) -> bool {
+        matches!(
+            self,
+            Self::Message { .. }
+                | Self::Image { .. }
+                | Self::Video { .. }
+                | Self::Audio { .. }
+                | Self::File { .. }
+                | Self::Location { .. }
+                | Self::Gallery { .. }
+        )
+    }
+
+    #[must_use]
+    pub const fn visibility(&self) -> TimelineVisibility {
+        match self {
+            Self::Membership {
+                change: MembershipChangeView::Other,
+                ..
+            } => TimelineVisibility::MembershipOther,
+            Self::Membership { .. } => TimelineVisibility::Membership,
+            Self::ProfileChange { .. } => TimelineVisibility::ProfileChange,
+            Self::Redacted { .. } => TimelineVisibility::Tombstone,
+            Self::StateEvent { change: None, .. } | Self::HiddenEvent { .. } => {
+                TimelineVisibility::Hidden
+            }
+            _ => TimelineVisibility::Always,
+        }
+    }
+
+    #[must_use]
+    pub const fn redactable(&self) -> bool {
+        !matches!(self, Self::Redacted { .. })
+            && !matches!(self.row_kind(), TimelineRowKind::Annotation)
+    }
+}
+
 #[must_use]
 pub fn aggregation_item(
     event: &AnySyncTimelineEvent,
@@ -811,8 +928,17 @@ pub fn aggregation_item(
 ) -> TimelineItemView {
     let event_id = event.event_id().to_owned();
     let sender = event.sender().to_owned();
+    let content = TimelineItemContentView::HiddenEvent {
+        event_type: event.event_type().to_string(),
+        content,
+        redacts,
+    };
     TimelineItemView {
         id: event_id.to_string(),
+        row: content.row_kind(),
+        forwardable: content.forwardable(),
+        redactable: content.redactable(),
+        visibility: content.visibility(),
         event_id: Some(event_id),
         transaction_id: None,
         send_state: None,
@@ -820,11 +946,7 @@ pub fn aggregation_item(
         sender_name: None,
         sender_avatar: None,
         timestamp: event.origin_server_ts().0.into(),
-        content: TimelineItemContentView::HiddenEvent {
-            event_type: event.event_type().to_string(),
-            content,
-            redacts,
-        },
+        content,
         sender: Some(sender),
         in_reply_to: None,
         thread_root: None,
@@ -900,6 +1022,10 @@ pub async fn standalone_item(
 
     Some(TimelineItemView {
         id: event_id.to_string(),
+        row: view_content.row_kind(),
+        forwardable: view_content.forwardable(),
+        redactable: view_content.redactable(),
+        visibility: view_content.visibility(),
         event_id: Some(event_id),
         transaction_id: None,
         send_state: None,
@@ -964,9 +1090,14 @@ pub fn timeline_item(
             let link_previews_removed = link_previews_removed(raw.message());
             let forwarded = forwarded(event, &raw);
             let forum_title = forum_title(raw.message());
+            let content = content(event.content(), message_profile.as_ref(), &raw, own_user_id);
 
             TimelineItemView {
                 id,
+                row: content.row_kind(),
+                forwardable: content.forwardable(),
+                redactable: content.redactable(),
+                visibility: content.visibility(),
                 event_id: event.event_id().map(ToOwned::to_owned),
                 transaction_id: event.transaction_id().map(ToString::to_string),
                 send_state: event.send_state().map(send_state),
@@ -976,7 +1107,7 @@ pub fn timeline_item(
                     .and_then(|p: &Profile| p.avatar_url.as_ref())
                     .map(ToString::to_string),
                 timestamp: event.timestamp().0.into(),
-                content: content(event.content(), message_profile.as_ref(), &raw, own_user_id),
+                content,
                 in_reply_to: in_reply_to(event.content()),
                 thread_root: msg_like(event.content()).and_then(|msg| msg.thread_root.clone()),
                 thread_summary: thread_summary(event.content()),
@@ -1007,6 +1138,10 @@ pub fn timeline_item(
 
             TimelineItemView {
                 id,
+                row: content.row_kind(),
+                forwardable: content.forwardable(),
+                redactable: content.redactable(),
+                visibility: content.visibility(),
                 event_id: None,
                 transaction_id: None,
                 send_state: None,
@@ -1340,12 +1475,18 @@ fn text_message(
         )
     });
 
+    let html = display_html(&body, formatted.as_deref());
+    let emote = matches!(message.msgtype(), MessageType::Emote(_));
+    let jumbo = (!emote)
+        .then(|| jumbo::emoji_level(&body).or_else(|| jumbo::emoticon_level(&html)))
+        .flatten();
     TimelineItemContentView::Message {
-        html: display_html(&body, formatted.as_deref()),
+        html,
         body,
-        emote: matches!(message.msgtype(), MessageType::Emote(_)),
+        emote,
         notice: matches!(message.msgtype(), MessageType::Notice(_)),
         edited: message.is_edited(),
+        jumbo,
     }
 }
 
@@ -2098,6 +2239,13 @@ const fn msg_like(content: &TimelineItemContent) -> Option<&MsgLikeContent> {
     }
 }
 
+/// The event `content` replies to, while the SDK holds no body for it.
+pub(crate) fn reply_without_body(content: &TimelineItemContent) -> Option<OwnedEventId> {
+    in_reply_to(content)
+        .filter(|reply| reply.body.is_none())
+        .map(|reply| reply.event_id)
+}
+
 /// An unloaded event still yields its id.
 fn in_reply_to(content: &TimelineItemContent) -> Option<ReplyView> {
     let reply = msg_like(content)?.in_reply_to.as_ref()?;
@@ -2127,6 +2275,7 @@ fn in_reply_to(content: &TimelineItemContent) -> Option<ReplyView> {
             _ => None,
         }),
         body: embedded.and_then(|event| reply_preview_body(&event.content)),
+        fallback: None,
     })
 }
 
@@ -2255,6 +2404,39 @@ pub(crate) fn clamp_power_level(level: UserPowerLevel) -> i64 {
     match level {
         UserPowerLevel::Int(level) => i64::from(level),
         _ => i64::from(Int::MAX) + 1,
+    }
+}
+
+/// Keeps a copy of a list in step with the diffs sent for it.
+pub(crate) fn apply_diff<T: Clone>(items: &mut Vec<T>, diff: &VectorDiff<T>) {
+    match diff {
+        VectorDiff::Append { values } => items.extend(values.iter().cloned()),
+        VectorDiff::Clear => items.clear(),
+        VectorDiff::PushFront { value } => items.insert(0, value.clone()),
+        VectorDiff::PushBack { value } => items.push(value.clone()),
+        VectorDiff::PopFront => {
+            if !items.is_empty() {
+                items.remove(0);
+            }
+        }
+        VectorDiff::PopBack => {
+            items.pop();
+        }
+        VectorDiff::Insert { index, value } => {
+            items.insert((*index).min(items.len()), value.clone());
+        }
+        VectorDiff::Set { index, value } => {
+            if let Some(slot) = items.get_mut(*index) {
+                *slot = value.clone();
+            }
+        }
+        VectorDiff::Remove { index } => {
+            if *index < items.len() {
+                items.remove(*index);
+            }
+        }
+        VectorDiff::Truncate { length } => items.truncate(*length),
+        VectorDiff::Reset { values } => values.clone_into(items),
     }
 }
 
@@ -3095,5 +3277,95 @@ mod tests {
         assert!(!in_call(Some(&json!({ "memberships": [] }))));
         assert!(!in_call(Some(&json!({}))));
         assert!(!in_call(None));
+    }
+}
+
+#[cfg(test)]
+mod row_kind_tests {
+    use crate::protocol::{TimelineItemContentView, TimelineRowKind, TimelineVisibility};
+
+    #[test]
+    fn a_tombstone_is_a_message_row_that_cannot_be_redacted_again() {
+        let tombstone = TimelineItemContentView::Redacted { reason: None };
+        assert_eq!(tombstone.row_kind(), TimelineRowKind::Message);
+        assert!(!tombstone.redactable());
+        assert!(!tombstone.forwardable());
+    }
+
+    #[test]
+    fn dividers_are_annotations_and_notices_are_events() {
+        let divider = TimelineItemContentView::DateDivider { timestamp: 0 };
+        assert_eq!(divider.row_kind(), TimelineRowKind::Annotation);
+        assert!(!divider.redactable());
+        let unsupported = TimelineItemContentView::Unsupported {
+            description: String::new(),
+        };
+        assert_eq!(unsupported.row_kind(), TimelineRowKind::Event);
+        assert!(unsupported.redactable());
+    }
+
+    #[test]
+    fn visibility_names_the_preference_that_can_hide_a_row() {
+        let tombstone = TimelineItemContentView::Redacted { reason: None };
+        assert_eq!(tombstone.visibility(), TimelineVisibility::Tombstone);
+        let hidden = TimelineItemContentView::HiddenEvent {
+            event_type: "m.reaction".to_owned(),
+            content: None,
+            redacts: None,
+        };
+        assert_eq!(hidden.visibility(), TimelineVisibility::Hidden);
+        let divider = TimelineItemContentView::DateDivider { timestamp: 0 };
+        assert_eq!(divider.visibility(), TimelineVisibility::Always);
+    }
+}
+
+#[cfg(test)]
+mod room_counts_tests {
+    use super::room_counts;
+    use crate::protocol::{NotificationModeView, NotificationSettingsView};
+
+    const fn under(mode: NotificationModeView) -> NotificationSettingsView {
+        NotificationSettingsView {
+            room: Some(mode),
+            default: NotificationModeView::Mentions,
+        }
+    }
+
+    #[test]
+    fn the_agreed_badge_matrix() {
+        use NotificationModeView::{All, Mentions, Mute};
+        for (mode, (unread, notifying, highlight), shown) in [
+            (All, (6, 6, 0), (6, 6)),
+            (All, (9, 9, 2), (9, 9)),
+            (All, (6, 0, 0), (6, 0)),
+            (Mentions, (6, 0, 0), (6, 0)),
+            (Mentions, (9, 2, 2), (9, 2)),
+            (Mentions, (9, 1, 0), (9, 1)),
+            (All, (0, 0, 3), (3, 3)),
+            (Mute, (9, 9, 2), (0, 0)),
+        ] {
+            let counts = room_counts(under(mode), unread, notifying, highlight, false);
+            assert_eq!(
+                (counts.unread, counts.notifying),
+                shown,
+                "{mode:?} {unread} {notifying} {highlight}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_room_with_no_rule_of_its_own_follows_its_default() {
+        let muted_by_default = NotificationSettingsView {
+            room: None,
+            default: NotificationModeView::Mute,
+        };
+        assert_eq!(room_counts(muted_by_default, 4, 4, 1, false).unread, 0);
+    }
+
+    #[test]
+    fn a_manual_mark_survives_a_mute() {
+        let counts = room_counts(under(NotificationModeView::Mute), 0, 0, 0, true);
+        assert!(counts.marked);
+        assert_eq!(counts.highlight, 0);
     }
 }

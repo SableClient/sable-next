@@ -3,11 +3,12 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { RoomSummary } from '#src/generated/protocol';
 
 import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 import { copyRoomLink, matrixToUrl, permalinkTarget, roomSectionPath, viaFor } from './permalink';
 
 function room(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSummary {
-  return {
+  return withCounts({
     room_id: roomId,
     canonical_alias: null,
     name: roomId,
@@ -35,7 +36,7 @@ function room(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSummary
     marked_unread: false,
     latest_event: null,
     ...overrides,
-  };
+  });
 }
 
 function child(roomId: string) {
@@ -231,8 +232,8 @@ test('a link the app generates parses back to what it named', () => {
   const url = matrixToUrl('!somewhere:example.org', ['elsewhere.ca'], '$event');
   expect(parseMatrixLink(url)).toEqual({
     kind: 'event',
-    roomId: '!somewhere:example.org',
-    eventId: '$event',
+    room_id: '!somewhere:example.org',
+    event_id: '$event',
   });
 });
 

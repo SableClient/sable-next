@@ -25,6 +25,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
 import { core } from '#lib/core/__mocks__/context.js';
 
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 afterEach(async () => {
   await page.viewport(414, 800);
@@ -35,7 +36,7 @@ const TWO_READERS = ['@bob:example.test', '@carol:example.test'];
 const FOUR_READERS = [...TWO_READERS, '@dave:example.test', '@erin:example.test'];
 
 function item(id: string, body: string, patch: Partial<TimelineItemView> = {}): TimelineItemView {
-  return {
+  return withRowFields({
     id,
     event_id: `$${id}:example.test`,
     transaction_id: null,
@@ -51,6 +52,7 @@ function item(id: string, body: string, patch: Partial<TimelineItemView> = {}): 
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -66,7 +68,7 @@ function item(id: string, body: string, patch: Partial<TimelineItemView> = {}): 
     forwarded: null,
     forum_title: null,
     ...patch,
-  };
+  });
 }
 
 async function mountItem(

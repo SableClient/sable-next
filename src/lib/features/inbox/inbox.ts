@@ -74,12 +74,10 @@ function byRecency(left: RoomSummary, right: RoomSummary): number {
   return (right.latest_event?.timestamp ?? 0) - (left.latest_event?.timestamp ?? 0);
 }
 
-const defaultUnread: RoomUnread = (room) => roomUnread(room, null);
-
 export function notifications(
   rooms: readonly RoomSummary[],
   filter: NotificationFilter,
-  unreadFor: RoomUnread = defaultUnread
+  unreadFor: RoomUnread = roomUnread
 ): RoomSummary[] {
   return rooms
     .filter((room) => {
@@ -91,7 +89,7 @@ export function notifications(
 
 export function countNotifications(
   rooms: readonly RoomSummary[],
-  unreadFor: RoomUnread = defaultUnread
+  unreadFor: RoomUnread = roomUnread
 ): number {
   return rooms
     .filter((room) => room.state === 'joined' && !room.is_space)
@@ -111,7 +109,7 @@ export function unlistedNotifications(
 
 export function hasMarkedUnread(
   rooms: readonly RoomSummary[],
-  unreadFor: RoomUnread = defaultUnread
+  unreadFor: RoomUnread = roomUnread
 ): boolean {
   return rooms.some(
     (room) => room.state === 'joined' && !room.is_space && (unreadFor(room).marked ?? false)

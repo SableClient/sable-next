@@ -58,6 +58,7 @@ for (const source of ['reply', 'link']) {
                 sender_mentioned: false,
                 sender_name: 'Alice',
                 body: `Target ${id}`,
+                fallback: null,
               },
             })),
           ],

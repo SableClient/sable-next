@@ -3,18 +3,23 @@ use std::{collections::HashMap, sync::Arc};
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::event_cache::{PaginationStatus, RoomEventCacheUpdate};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
-use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId};
+use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId, RoomId, UserId};
 use matrix_sdk_base::event_cache::Event;
 use matrix_sdk_ui::eyeball_im::VectorDiff;
 use matrix_sdk_ui::room_list_service::RoomListLoadingState;
 use matrix_sdk_ui::room_list_service::filters::new_filter_non_left;
-use matrix_sdk_ui::timeline::{EventSendState, SendTarget, Timeline, TimelineItem};
+use matrix_sdk_ui::timeline::{
+    Error as TimelineError, EventSendState, SendTarget, Timeline, TimelineItem,
+};
+use tokio::sync::broadcast::error::RecvError;
 
 use crate::ResultExt;
+use crate::notifications;
 use crate::protocol::{
     CommandErr, CommandOk, CoreEvent, SubscriptionId, TimelineFocusView, TimelineItemView,
 };
-
+use crate::room_list_rows::RoomListRows;
+use crate::timeline_overlay::{ReplyFallback, TimelineOverlay};
 use crate::timelines::{aggregation_items, build_room_timeline, fill_sender_profiles};
 use crate::view;
 use crate::{Core, Subscription, SubscriptionKind, Task};
@@ -59,6 +64,8 @@ impl Core {
                 .clone()
         };
 
+        let client = self.client().await?;
+        let push_rules = self.push_rules().await?;
         let subscription = self.allocate_subscription();
         let core = self.clone();
 
@@ -77,35 +84,62 @@ impl Core {
 
             // Refreshed from each diff before constructing synchronous summaries.
             let mut room_cache: HashMap<OwnedRoomId, view::RoomInfo> = HashMap::new();
+            let mut rows = RoomListRows::default();
+            let mut rule_changes = push_rules.subscribe();
+            let mut rules = push_rules.snapshot().await;
 
             let mut stream = Box::pin(stream);
             let mut grown_to = 0;
-            while let Some(diffs) = stream.next().await {
-                if let RoomListLoadingState::Loaded {
-                    maximum_number_of_rooms: Some(total),
-                } = loading.get()
-                    && total > grown_to
-                {
-                    for _ in 0..pages_for(total) {
-                        controller.add_one_page();
-                    }
-                    grown_to = total;
-                }
+            loop {
+                let diffs = tokio::select! {
+                    diffs = stream.next() => {
+                        let Some(diffs) = diffs else { break };
+                        if let RoomListLoadingState::Loaded {
+                            maximum_number_of_rooms: Some(total),
+                        } = loading.get()
+                            && total > grown_to
+                        {
+                            for _ in 0..pages_for(total) {
+                                controller.add_one_page();
+                            }
+                            grown_to = total;
+                        }
 
-                view::prime_display_names(&diffs).await;
-                room_cache.clear();
-                view::enrich_room_batch(&diffs, &mut room_cache).await;
-                let every_encrypted = core.every_encrypted_event_pushed().await;
+                        view::prime_display_names(&diffs).await;
+                        room_cache.clear();
+                        view::enrich_room_batch(&diffs, &mut room_cache).await;
+                        let diffs: Vec<_> = diffs
+                            .into_iter()
+                            .map(|diff| {
+                                view::map_diff(diff, |item| {
+                                    view::room_summary(item, &room_cache, &rules)
+                                })
+                            })
+                            .collect();
+                        for diff in &diffs {
+                            rows.apply(diff);
+                        }
+                        diffs
+                    }
+                    changed = rule_changes.recv() => {
+                        if matches!(changed, Err(RecvError::Closed)) {
+                            break;
+                        }
+                        rules = push_rules.snapshot().await;
+                        let diffs = rows.renotify(&rules, |room_id| {
+                            client
+                                .get_room(room_id)
+                                .is_some_and(|room| notifications::uses_direct_push_rules(&room))
+                        });
+                        if diffs.is_empty() {
+                            continue;
+                        }
+                        diffs
+                    }
+                };
                 core.emit(CoreEvent::RoomListDiff {
                     subscription,
-                    diffs: diffs
-                        .into_iter()
-                        .map(|diff| {
-                            view::map_diff(diff, |item| {
-                                view::room_summary(item, &room_cache, every_encrypted)
-                            })
-                        })
-                        .collect(),
+                    diffs,
                 });
             }
         })
@@ -116,6 +150,7 @@ impl Core {
             Subscription {
                 tasks: vec![task],
                 timeline: None,
+                overlay: None,
                 thread_root: None,
                 kind: SubscriptionKind::Other,
             },
@@ -161,6 +196,7 @@ impl Core {
         };
         fill_sender_profiles(&room, &timeline);
         let relays = Arc::new(room.service_members().unwrap_or_default());
+        let overlay = Arc::new(std::sync::Mutex::new(TimelineOverlay::default()));
 
         // The SDK replaces its explicit-room set wholesale. Register before
         tracing::info!(%room_id, "subscribe_timeline: waiting for room_subscriptions");
@@ -174,6 +210,7 @@ impl Core {
             Subscription {
                 tasks: Vec::new(),
                 timeline: Some(timeline.clone()),
+                overlay: Some(overlay.clone()),
                 thread_root: match &focus {
                     TimelineFocusView::Thread { root_event_id } => Some(root_event_id.clone()),
                     TimelineFocusView::Live | TimelineFocusView::Event { .. } => None,
@@ -199,11 +236,32 @@ impl Core {
         let mut stream_content = view::LocalContent::new(&echoes);
         let pagination = timeline.live_back_pagination_status().await;
         let own_user_id = self.client().await?.user_id().map(ToOwned::to_owned);
+        let push = room.push_context().await.ok().flatten();
+        let highlights = view::Highlights::compute(push.as_ref(), items.iter()).await;
+        let items = items
+            .iter()
+            .map(|item| {
+                abort_rejected_redaction(&timeline, item);
+                view::timeline_item(
+                    item,
+                    own_user_id.as_deref(),
+                    &relays,
+                    &highlights,
+                    &local_content,
+                )
+            })
+            .collect();
+        // Seeded before the stream starts, so its diffs apply to this snapshot.
+        let items = overlay
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .reset(items);
         let core = self.clone();
         let stream_user_id = own_user_id.clone();
         let stream_relays = relays.clone();
         let stream_room = room.clone();
         let stream_timeline = timeline.clone();
+        let stream_overlay = overlay.clone();
         let task = spawn(async move {
             pin_mut!(stream);
             while let Some(diffs) = stream.next().await {
@@ -214,29 +272,33 @@ impl Core {
                 }
                 let push = stream_room.push_context().await.ok().flatten();
                 let highlights = view::Highlights::for_diffs(push.as_ref(), &diffs).await;
+                let diffs: Vec<_> = diffs
+                    .into_iter()
+                    .map(|diff| {
+                        view::map_diff(diff, |item| {
+                            if let Some(event) = item.as_event()
+                                && event.send_state().is_none()
+                                && let Some(transaction_id) = event.transaction_id()
+                            {
+                                stream_content.forget(transaction_id);
+                            }
+                            abort_rejected_redaction(&stream_timeline, item);
+                            view::timeline_item(
+                                item,
+                                stream_user_id.as_deref(),
+                                &stream_relays,
+                                &highlights,
+                                &stream_content,
+                            )
+                        })
+                    })
+                    .collect();
+                let mut overlay = stream_overlay
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
                 core.emit(CoreEvent::TimelineDiff {
                     subscription,
-                    diffs: diffs
-                        .into_iter()
-                        .map(|diff| {
-                            view::map_diff(diff, |item| {
-                                if let Some(event) = item.as_event()
-                                    && event.send_state().is_none()
-                                    && let Some(transaction_id) = event.transaction_id()
-                                {
-                                    stream_content.forget(transaction_id);
-                                }
-                                abort_rejected_redaction(&stream_timeline, item);
-                                view::timeline_item(
-                                    item,
-                                    stream_user_id.as_deref(),
-                                    &stream_relays,
-                                    &highlights,
-                                    &stream_content,
-                                )
-                            })
-                        })
-                        .collect(),
+                    diffs: diffs.into_iter().map(|diff| overlay.apply(diff)).collect(),
                 });
             }
         })
@@ -276,26 +338,106 @@ impl Core {
             self.emit(timeline_pagination_event(subscription, status));
         }
 
-        let push = room.push_context().await.ok().flatten();
-        let highlights = view::Highlights::compute(push.as_ref(), items.iter()).await;
-
         Ok(CommandOk::SubscribeTimeline {
             subscription,
             aggregations,
-            items: items
-                .iter()
-                .map(|item| {
-                    abort_rejected_redaction(&timeline, item);
-                    view::timeline_item(
-                        item,
-                        own_user_id.as_deref(),
-                        &relays,
-                        &highlights,
-                        &local_content,
-                    )
-                })
-                .collect(),
+            items,
         })
+    }
+
+    /// Lays a member's new profile over every open timeline of the room.
+    pub(crate) async fn overlay_profile(
+        &self,
+        room_id: &RoomId,
+        user_id: &UserId,
+        name: Option<String>,
+        avatar: Option<String>,
+    ) {
+        self.overlay_room(room_id, |overlay| {
+            overlay.set_profile(user_id.to_owned(), name.clone(), avatar.clone())
+        })
+        .await;
+    }
+
+    /// Fills in the replies to `replied` in every open timeline of the room.
+    pub(crate) async fn overlay_reply(
+        &self,
+        room_id: &RoomId,
+        replied: &EventId,
+        stand_in: &ReplyFallback,
+    ) {
+        self.overlay_room(room_id, |overlay| {
+            overlay.set_reply(replied.to_owned(), stand_in.clone())
+        })
+        .await;
+    }
+
+    async fn overlay_room(
+        &self,
+        room_id: &RoomId,
+        change: impl Fn(&mut TimelineOverlay) -> Vec<crate::protocol::VectorDiff<TimelineItemView>>,
+    ) {
+        let subscriptions = self.subscriptions.lock().await;
+        for (subscription, entry) in subscriptions.iter() {
+            let (SubscriptionKind::LiveTimeline(room) | SubscriptionKind::FocusedTimeline(room)) =
+                &entry.kind
+            else {
+                continue;
+            };
+            let Some(overlay) = entry.overlay.as_ref().filter(|_| room == room_id) else {
+                continue;
+            };
+            let mut overlay = overlay
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let diffs = change(&mut overlay);
+            if !diffs.is_empty() {
+                self.emit(CoreEvent::TimelineDiff {
+                    subscription: *subscription,
+                    diffs,
+                });
+            }
+        }
+    }
+
+    /// The SDK's details for a reply, or what the replied-to event's source
+    /// says when it has none.
+    pub(crate) async fn fetch_event_details(
+        &self,
+        room_id: &OwnedRoomId,
+        event_id: &OwnedEventId,
+        thread_root: Option<&OwnedEventId>,
+    ) -> Result<(), CommandErr> {
+        let timeline = self.timeline_for(room_id, thread_root).await?;
+        let fetched = timeline.fetch_details_for_event(event_id).await;
+        if let Err(TimelineError::EventNotInTimeline(_)) = fetched {
+            tracing::debug!(
+                context = "fetch_event_details",
+                "the event left the timeline"
+            );
+            return Err(CommandErr::Unavailable);
+        }
+        let unresolved = timeline
+            .item_by_event_id(event_id)
+            .await
+            .and_then(|item| view::reply_without_body(item.content()));
+        if let Some(replied) = unresolved {
+            match self.event_source(room_id, &replied).await {
+                Ok((source, _, _)) => {
+                    let stand_in = serde_json::from_str(&source)
+                        .ok()
+                        .and_then(|source| ReplyFallback::from_source(&source));
+                    if let Some(stand_in) = stand_in {
+                        self.overlay_reply(room_id, &replied, &stand_in).await;
+                    }
+                }
+                Err(error) => {
+                    tracing::debug!(?error, "replied-to event unavailable");
+                }
+            }
+        }
+        fetched.or_failed(self, "fetch_event_details")?;
+        Ok(())
     }
 
     async fn watch_aggregations(

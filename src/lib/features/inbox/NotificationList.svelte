@@ -136,12 +136,12 @@
   }
 
   function handleMatrixLink(roomId: string, link: MatrixLink, anchor: HTMLAnchorElement): void {
-    if (link.kind === 'user') openProfile(roomId, link.userId, anchor);
+    if (link.kind === 'user') openProfile(roomId, link.user_id, anchor);
     else {
       const path = roomSectionPath(
         roomList.rooms,
-        link.roomId,
-        link.kind === 'event' ? link.eventId : null,
+        link.room_id,
+        link.kind === 'event' ? link.event_id : null,
         splitVia(anchor.href).via
       );
       void afterOverlayPops().then(() => goto(path));

@@ -18,10 +18,18 @@ const core = Object.assign(baseCore, {
   createRoomAlias: vi.fn<() => Promise<void>>(() => Promise.resolve()),
 });
 
-const levels = {
+const levels: RoomPowerLevelsView = {
+  ban: 50,
+  kick: 50,
+  redact: 50,
+  invite: 0,
+  events_default: 0,
   state_default: 50,
+  users_default: 0,
   events: {},
-} as unknown as RoomPowerLevelsView;
+  users: {},
+  notifications_room: 50,
+};
 
 afterEach(() => {
   vi.clearAllMocks();

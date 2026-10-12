@@ -8,21 +8,9 @@ export function bannerChanged(): void {
   bannerChanges.version += 1;
 }
 
-export function bannerUrl(content: unknown): string | null {
-  if (typeof content !== 'object' || content === null) return null;
-
-  const value = content as { url?: unknown; content?: unknown };
-  const nested =
-    typeof value.content === 'object' && value.content !== null
-      ? (value.content as { url?: unknown })
-      : null;
-  const url = value.url ?? nested?.url;
-  return typeof url === 'string' && url.startsWith('mxc://') ? url : null;
-}
-
 export async function readRoomBanner(core: CoreClient, roomId: string): Promise<string | null> {
   try {
-    return bannerUrl(await core.commands.roomStateEvent(roomId, ROOM_BANNER_EVENT));
+    return await core.commands.roomBanner(roomId);
   } catch (error) {
     console.debug('[sable room] banner unavailable', error);
     return null;
@@ -34,6 +22,6 @@ export async function setRoomBanner(
   roomId: string,
   url: string | null
 ): Promise<void> {
-  await core.commands.sendStateEvent(roomId, ROOM_BANNER_EVENT, '', { url: url ?? '' });
+  await core.commands.setRoomBanner(roomId, url);
   bannerChanged();
 }

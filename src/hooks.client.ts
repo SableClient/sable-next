@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/sveltekit';
-import type { HandleClientError } from '@sveltejs/kit/hooks';
+import type { ClientInit, HandleClientError } from '@sveltejs/kit/hooks';
 
 import { tolerateUnknownListeners } from '#lib/platform/tauri-events.js';
 import { syncTelemetryConsent } from '#lib/platform/telemetry.js';
@@ -11,6 +11,7 @@ import { sanitizePayload, scrubMatrixIds, scrubMatrixUrl } from '#lib/observabil
 import { scrubSentryEvent } from '#lib/observability/sentry-event.js';
 import { untrackFetch } from '#lib/observability/untracked-fetch.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
+import { loadModel } from '#lib/model/model.js';
 import { CoreError } from '#src/transport';
 import { prewarmTransport } from './transport/create';
 
@@ -100,6 +101,15 @@ if (dsn && preferences.errorReporting) {
 }
 
 syncTelemetryConsent(preferences.errorReporting);
+
+export const init: ClientInit = async () => {
+  try {
+    await loadModel();
+  } catch (error) {
+    Sentry.captureException(error);
+    console.error('[sable] the model failed to load', error);
+  }
+};
 
 export const handleError: HandleClientError = (input) => {
   if (input.kind !== 'unknown') return;

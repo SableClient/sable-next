@@ -1697,6 +1697,7 @@ test('a reply target can be jumped to again after scrolling away', async ({
           sender_mentioned: false,
           sender_name: 'Bob',
           body: 'Mobile history 4',
+          fallback: null,
         },
       },
     },

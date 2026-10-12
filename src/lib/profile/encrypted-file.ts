@@ -1,5 +1,3 @@
-import { isRecord } from '#lib/guards.js';
-
 const AVATAR_EDGE = 256;
 const COUNTER_BITS = 64;
 
@@ -15,24 +13,6 @@ function base64(bytes: Uint8Array): string {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/=+$/, '');
-}
-
-export function parseEncryptedFile(value: unknown): EncryptedFile | null {
-  if (!isRecord(value)) return null;
-  const { url, v, iv, hashes, key } = value;
-  if (
-    typeof url !== 'string' ||
-    !url.startsWith('mxc://') ||
-    typeof v !== 'string' ||
-    typeof iv !== 'string' ||
-    !isRecord(hashes) ||
-    typeof hashes.sha256 !== 'string' ||
-    !isRecord(key) ||
-    typeof key.k !== 'string'
-  ) {
-    return null;
-  }
-  return { url, v, iv, hashes: hashes as Record<string, string>, key };
 }
 
 export async function encryptAttachment(

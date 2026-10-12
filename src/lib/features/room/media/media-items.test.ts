@@ -7,6 +7,10 @@ import { galleryEventId, galleryItemId, timelineMediaItems } from './media-items
 function gallery(items: Extract<TimelineItemView['content'], { kind: 'gallery' }>['items']) {
   return {
     id: 'item',
+    row: 'message',
+    forwardable: true,
+    redactable: true,
+    visibility: 'always',
     event_id: '$gallery',
     transaction_id: null,
     send_state: null,

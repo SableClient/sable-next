@@ -10,9 +10,10 @@ use matrix_sdk::ruma::events::{AnyMessageLikeEvent, AnyTimelineEvent};
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId, UInt};
 
+use super::IndexFilter;
 use super::{ContextLine, Hit, indexable_body};
 use crate::Core;
-use crate::protocol::{SearchFilter, SearchOrder};
+use crate::protocol::SearchOrder;
 
 const MAX_ROUND_TRIPS: usize = 8;
 
@@ -21,7 +22,7 @@ const MAX_PER_REQUEST: u64 = 100;
 pub(super) struct ServerQuery<'a> {
     pub(super) room_id: &'a OwnedRoomId,
     pub(super) query: &'a str,
-    pub(super) filter: &'a SearchFilter,
+    pub(super) filter: &'a IndexFilter,
     pub(super) order: SearchOrder,
     pub(super) limit: usize,
     pub(super) offset: usize,
@@ -40,7 +41,7 @@ impl ServerQuery<'_> {
     }
 }
 
-type Signature = (String, SearchFilter, SearchOrder, OwnedRoomId, usize);
+type Signature = (String, IndexFilter, SearchOrder, OwnedRoomId, usize);
 
 #[derive(Default)]
 pub(crate) struct ServerSearch {
@@ -83,7 +84,7 @@ impl ServerSearch {
 pub(super) async fn target(
     client: &matrix_sdk::Client,
     query: &str,
-    filter: &SearchFilter,
+    filter: &IndexFilter,
 ) -> Option<OwnedRoomId> {
     if query.trim().is_empty() {
         return None;
@@ -174,7 +175,7 @@ impl Core {
     }
 }
 
-const fn expressible(filter: &SearchFilter) -> bool {
+const fn expressible(filter: &IndexFilter) -> bool {
     filter.mentions.is_empty()
         && filter.not_mentions.is_empty()
         && filter.has.is_empty()
@@ -283,8 +284,9 @@ mod tests {
     use matrix_sdk::ruma::api::client::search::search_events::v3::SearchResult;
     use serde_json::json;
 
+    use super::super::IndexFilter;
     use super::{expressible, hit_from};
-    use crate::protocol::{SearchAttachment, SearchFilter};
+    use crate::protocol::SearchAttachment;
 
     #[test]
     fn test_an_edit_is_not_a_hit_of_its_own() {
@@ -342,16 +344,16 @@ mod tests {
         assert_eq!(ids(&hit.after), ["$after"]);
     }
 
-    fn scoped() -> SearchFilter {
-        SearchFilter {
+    fn scoped() -> IndexFilter {
+        IndexFilter {
             rooms: vec![room_id!("!plain:localhost").to_owned()],
-            ..SearchFilter::default()
+            ..IndexFilter::default()
         }
     }
 
     #[test]
     fn test_a_sender_scoped_query_survives_the_trip_to_the_homeserver() {
-        let filter = SearchFilter {
+        let filter = IndexFilter {
             senders: vec![user_id!("@erwan:localhost").to_owned()],
             ..scoped()
         };
@@ -361,7 +363,7 @@ mod tests {
 
     #[test]
     fn test_a_dated_query_stays_local_because_the_wire_cannot_carry_it() {
-        let filter = SearchFilter {
+        let filter = IndexFilter {
             before_ts: Some(1_700_000_000_000),
             ..scoped()
         };
@@ -371,7 +373,7 @@ mod tests {
 
     #[test]
     fn test_an_attachment_query_stays_local() {
-        let filter = SearchFilter {
+        let filter = IndexFilter {
             has: vec![SearchAttachment::Image],
             ..scoped()
         };
@@ -381,7 +383,7 @@ mod tests {
 
     #[test]
     fn test_a_phrase_query_stays_local() {
-        let filter = SearchFilter {
+        let filter = IndexFilter {
             phrases: vec!["exact wording".to_owned()],
             ..scoped()
         };

@@ -1,6 +1,11 @@
 <script lang="ts">
   import { CoreError } from '#src/transport';
-  import type { RoomPermissionsView, RoomSummary, SpaceChildEdge } from '#src/generated/protocol';
+  import type {
+    LobbyAction,
+    RoomPermissionsView,
+    RoomSummary,
+    SpaceChildEdge,
+  } from '#src/generated/protocol';
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import ListBulletsIcon from 'phosphor-svelte/lib/ListBulletsIcon';
@@ -49,9 +54,7 @@
     childEdges,
     edgeSignature,
     levelTargets,
-    inAllowList,
     joinCandidates,
-    lobbyAction,
     lobbyPhase,
     localHierarchyRooms,
     mergeHierarchyRooms,
@@ -123,8 +126,8 @@
     const { via } = splitVia(anchor.href);
     const target = roomSectionPath(
       roomList.rooms,
-      link.roomId,
-      link.kind === 'event' ? link.eventId : null,
+      link.room_id,
+      link.kind === 'event' ? link.event_id : null,
       via
     );
     void afterOverlayPops().then(() => goto(target));
@@ -154,17 +157,16 @@
   });
   let ordered = $derived(applyChildOverrides(base, overrides));
   let merged = $derived(applySuggestedOverrides(ordered, suggestedOverrides));
+  let manageable = $derived(merged.filter((room) => room.is_space && canManageIn(room.room_id)));
   let sections = $derived.by<HierarchySection[]>(() => {
     if (spaceId === null) return [];
-    return buildHierarchySections(
-      merged,
-      spaceId,
-      {
-        loaded: hierarchy.loadedLevels,
-        failed: hierarchy.failedLevels,
-      },
-      canManageIn
-    )
+    return buildHierarchySections(merged, spaceId, {
+      loaded: hierarchy.loadedLevels,
+      failed: hierarchy.failedLevels,
+      keepEmpty: manageable.map((room) => room.room_id),
+      joined: joinedIds,
+      invited: invitedIds,
+    })
       .map((section) => ({
         ...section,
         rooms: section.rooms.filter((entry) => !removed.has(entry.key)),
@@ -174,18 +176,16 @@
           section.rooms.length > 0 ||
           !section.loaded ||
           section.failed ||
-          (section.space !== null && canManageIn(section.parentId))
+          (section.space !== null && canManageIn(section.parent_id))
       );
   });
   let moveTargets = $derived(
-    merged
-      .filter((room) => room.is_space && canManageIn(room.room_id))
-      .map((room) => ({
-        id: room.room_id,
-        name: room.room_id === spaceId ? (space?.name ?? label(room)) : label(room),
-      }))
+    manageable.map((room) => ({
+      id: room.room_id,
+      name: room.room_id === spaceId ? (space?.name ?? label(room)) : label(room),
+    }))
   );
-  let candidates = $derived(joinCandidates(sections, joinedIds, invitedIds));
+  let candidates = $derived(joinCandidates(sections, joinedIds));
   let pinnedIds = $derived(new Set(layoutSpaceIds(spaceSidebar.items)));
   let phase = $derived(
     lobbyPhase(sections.length, spaceId === null || !hierarchy.loadedLevels.has(spaceId))
@@ -220,9 +220,9 @@
   $effect(() => {
     if (!joinAllOn) return;
     for (const section of sections) visibleLevels.add(section.key);
-    const targets = candidates.map(({ room, via, parentId }) => ({
+    const targets = candidates.map(({ room, via, parent_id: parentId }) => ({
       roomId: room.room_id,
-      run: () => trackedJoin(room, via, parentId),
+      run: () => trackedJoin(room, via, parentId, 'join'),
     }));
     untrack(() => {
       joinQueue.add(targets);
@@ -386,18 +386,14 @@
   async function attemptJoin(
     child: HierarchyRoomView,
     via: readonly string[],
-    parentId: string
+    parentId: string,
+    action: LobbyAction
   ): Promise<boolean> {
     const address = child.canonical_alias ?? child.room_id;
     let routing = viaFor(address, via);
     if (routing.length === 0 && child.canonical_alias === null) {
       routing = await core.commands.roomViaServers(parentId);
     }
-    const action = lobbyAction(
-      child.join_rule,
-      invitedIds.has(child.room_id),
-      inAllowList(child, joinedIds, parentId)
-    );
     if (action === 'knock') {
       await core.commands.knockRoom(address, routing);
       knocked.add(child.room_id);
@@ -418,12 +414,13 @@
   async function trackedJoin(
     child: HierarchyRoomView,
     via: readonly string[],
-    parentId: string
+    parentId: string,
+    action: LobbyAction
   ): Promise<boolean> {
     joining.add(child.room_id);
     joinErrors.delete(child.room_id);
     try {
-      return await attemptJoin(child, via, parentId);
+      return await attemptJoin(child, via, parentId, action);
     } finally {
       joining.delete(child.room_id);
     }
@@ -432,11 +429,12 @@
   async function join(
     child: HierarchyRoomView,
     via: readonly string[],
-    parentId: string
+    parentId: string,
+    action: LobbyAction
   ): Promise<void> {
     if (joining.has(child.room_id)) return;
     try {
-      await trackedJoin(child, via, parentId);
+      await trackedJoin(child, via, parentId, action);
     } catch (error) {
       console.warn('[sable lobby] join failed', error);
       joinErrors.set(child.room_id, joinErrorMessage(error));
@@ -457,10 +455,10 @@
   }
 
   async function removeSubspace(section: HierarchySection): Promise<void> {
-    if (section.ownerId === null) return;
+    if (section.owner_id === null) return;
 
     try {
-      await core.commands.removeFromSpace(section.ownerId, section.parentId);
+      await core.commands.removeFromSpace(section.owner_id, section.parent_id);
     } catch (error) {
       console.warn('[sable lobby] remove failed', error);
       hierarchy.fail();
@@ -478,7 +476,7 @@
     try {
       await core.commands.removeFromSpace(from, roomId);
       for (const section of sections) {
-        if (section.parentId !== from) continue;
+        if (section.parent_id !== from) continue;
         for (const entry of section.rooms) {
           if (entry.room.room_id === roomId) removed.add(entry.key);
         }
@@ -502,7 +500,7 @@
       return;
     }
     if (target.roomId === null || instruction === 'into') return;
-    const section = sections.find((candidate) => candidate.parentId === source.parentId);
+    const section = sections.find((candidate) => candidate.parent_id === source.parentId);
     if (section) reorder(section, source.roomId, target.roomId, instruction);
   }
 
@@ -563,24 +561,24 @@
     target: string,
     position: DropEdge
   ): void {
-    reorderIn(section.parentId, section.siblings, source, target, position);
+    reorderIn(section.parent_id, section.siblings, source, target, position);
   }
 
   function moveSubspace(section: HierarchySection, delta: number): void {
-    if (section.ownerId === null) return;
+    if (section.owner_id === null) return;
 
-    const edges = childEdges(merged, section.ownerId);
+    const edges = childEdges(merged, section.owner_id);
     const spaces = edges.filter(
       (edge) => merged.find((room) => room.room_id === edge.room_id)?.is_space
     );
-    const index = spaces.findIndex((edge) => edge.room_id === section.parentId);
+    const index = spaces.findIndex((edge) => edge.room_id === section.parent_id);
     const to = index + delta;
     if (index === -1 || to < 0 || to >= spaces.length) return;
 
     reorderIn(
-      section.ownerId,
+      section.owner_id,
       edges,
-      section.parentId,
+      section.parent_id,
       spaces[to].room_id,
       delta < 0 ? 'above' : 'below'
     );
@@ -825,20 +823,24 @@
         {section}
         closed={closed.has(section.key)}
         {joinedIds}
-        {invitedIds}
         {joining}
         knocked={knockedIds}
         {joinErrors}
-        canManage={canManageIn(section.parentId)}
-        canManageOwner={canManageIn(section.ownerId)}
+        canManage={canManageIn(section.parent_id)}
+        canManageOwner={canManageIn(section.owner_id)}
         {canLeaveParent}
         {canDropInto}
         {label}
         onToggle={toggle}
         onVisible={(key) => visibleLevels.add(key)}
         onOpen={open}
-        onJoin={(child: HierarchyRoomView, via: readonly string[], parentId: string) => {
-          void join(child, via, parentId);
+        onJoin={(
+          child: HierarchyRoomView,
+          via: readonly string[],
+          parentId: string,
+          action: LobbyAction
+        ) => {
+          void join(child, via, parentId, action);
         }}
         onCopyLink={(child: HierarchyRoomView) => {
           void copyRoomLink(core, child);
@@ -864,7 +866,7 @@
           void removeSubspace(section);
         }}
         onMoveTo={(section: HierarchySection, entry: HierarchyRoom, target: string) => {
-          void moveRoom(section.parentId, entry.room.room_id, target);
+          void moveRoom(section.parent_id, entry.room.room_id, target);
         }}
       />
     {/each}

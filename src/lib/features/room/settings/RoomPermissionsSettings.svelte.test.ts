@@ -5,10 +5,14 @@ import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type {
+  PowerLevelLocation,
+  PowerLevelTagView,
   RoomPermissionsView,
   RoomPowerLevelsView,
   RoomSummary,
 } from '#src/generated/protocol';
+
+type Tags = Record<string, PowerLevelTagView>;
 
 const { space, extraRooms } = vi.hoisted(() => ({
   extraRooms: [] as { room_id: string; state: string; space_children: [] }[],
@@ -36,12 +40,36 @@ import { core as baseCore } from '#lib/core/__mocks__/context.js';
 
 const core = Object.assign(baseCore, {
   roomPowerLevels: vi.fn<(roomId: string) => Promise<RoomPowerLevelsView>>(),
-  roomStateEvent: vi.fn<(roomId: string, eventType: string) => Promise<unknown>>(),
+  roomStateEvent: vi.fn<(roomId: string, eventType: string) => Promise<unknown>>(() =>
+    Promise.resolve(null)
+  ),
   roomPermissions: vi.fn<(roomId: string) => Promise<RoomPermissionsView>>(),
   sendStateEvent:
     vi.fn<
       (roomId: string, eventType: string, stateKey: string, content: unknown) => Promise<void>
     >(),
+  powerLevelTags: vi.fn<(roomId: string) => Promise<Tags>>(() => Promise.resolve({})),
+  setPowerLevelTag:
+    vi.fn<(roomId: string, level: number, tag: PowerLevelTagView | null) => Promise<Tags>>(),
+  setPowerLevel:
+    vi.fn<
+      (
+        roomId: string,
+        levels: RoomPowerLevelsView | null,
+        location: PowerLevelLocation,
+        level: number
+      ) => Promise<RoomPowerLevelsView>
+    >(),
+  syncPowerLevelsFromSpace:
+    vi.fn<
+      (
+        roomId: string,
+        spaceId: string,
+        levels: RoomPowerLevelsView | null
+      ) => Promise<{ levels: RoomPowerLevelsView; tags: Tags }>
+    >(),
+  syncChildPowerLevels:
+    vi.fn<(spaceId: string, childIds: string[]) => Promise<{ updated: number; skipped: number }>>(),
 });
 
 import RoomPermissionsSettings from './RoomPermissionsSettings.svelte';
@@ -71,24 +99,13 @@ afterEach(() => {
   extraRooms.length = 0;
 });
 
-test('syncing copies the parent space levels and roles into the room', async () => {
+test('syncing hands the space to the core and shows what it wrote', async () => {
   core.session = { user_id: '@admin:example.org' };
-  core.roomPowerLevels.mockImplementation((roomId) =>
-    Promise.resolve(
-      roomId === space.room_id
-        ? {
-            ...base,
-            ban: 75,
-            events_default: 100,
-            users: { '@admin:example.org': 100, '@mod:example.org': 50 },
-          }
-        : base
-    )
-  );
-  core.roomStateEvent.mockImplementation((roomId) =>
-    Promise.resolve(roomId === space.room_id ? { '50': { name: 'Moderator' } } : null)
-  );
-  core.sendStateEvent.mockResolvedValue(undefined);
+  core.roomPowerLevels.mockResolvedValue(base);
+  core.syncPowerLevelsFromSpace.mockResolvedValue({
+    levels: { ...base, ban: 75 },
+    tags: { '50': { name: 'Moderator', color: null, icon: null } },
+  });
 
   const user = userEvent.setup();
   render(RoomPermissionsSettings, { room, permissions });
@@ -98,33 +115,22 @@ test('syncing copies the parent space levels and roles into the room', async () 
   await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Sync' }));
 
   await vi.waitFor(() => {
-    expect(core.sendStateEvent).toHaveBeenCalledTimes(2);
+    expect(core.syncPowerLevelsFromSpace).toHaveBeenCalledWith(
+      '!room:example.org',
+      '!space:example.org',
+      base
+    );
   });
-  expect(core.sendStateEvent).toHaveBeenCalledWith(
-    '!room:example.org',
-    'm.room.power_levels',
-    '',
-    expect.objectContaining({
-      ban: 75,
-      events_default: 0,
-      users: { '@admin:example.org': 100, '@mod:example.org': 50 },
-    })
-  );
-  expect(core.sendStateEvent).toHaveBeenCalledWith(
-    '!room:example.org',
-    'in.cinny.room.power_level_tags',
-    '',
-    { '50': { name: 'Moderator' } }
-  );
+  expect(await screen.findByText('Moderator (50)')).toBeInTheDocument();
 });
 
 test('saves a role emoji with its name and colour', async () => {
   core.session = { user_id: '@admin:example.org' };
   core.roomPowerLevels.mockResolvedValue(base);
-  core.roomStateEvent.mockResolvedValue({
-    '50': { name: 'Sentinel', color: '#ff0000' },
+  core.powerLevelTags.mockResolvedValue({
+    '50': { name: 'Sentinel', color: '#ff0000', icon: null },
   });
-  core.sendStateEvent.mockResolvedValue(undefined);
+  core.setPowerLevelTag.mockResolvedValue({});
 
   const user = userEvent.setup();
   render(RoomPermissionsSettings, { room, permissions });
@@ -133,14 +139,11 @@ test('saves a role emoji with its name and colour', async () => {
   await user.type(screen.getByRole('textbox', { name: 'Icon' }), '🛡️{Enter}');
 
   await vi.waitFor(() => {
-    expect(core.sendStateEvent).toHaveBeenCalledWith(
-      '!room:example.org',
-      'in.cinny.room.power_level_tags',
-      '',
-      {
-        '50': { name: 'Sentinel', color: '#ff0000', icon: { key: '🛡️' } },
-      }
-    );
+    expect(core.setPowerLevelTag).toHaveBeenCalledWith('!room:example.org', 50, {
+      name: 'Sentinel',
+      color: '#ff0000',
+      icon: '🛡️',
+    });
   });
 });
 
@@ -153,7 +156,7 @@ test.each([
     ...base,
     events: tagsLevel === undefined ? {} : { 'in.cinny.room.power_level_tags': tagsLevel },
   });
-  core.roomStateEvent.mockResolvedValue({ '50': { name: 'Sentinel' } });
+  core.powerLevelTags.mockResolvedValue({ '50': { name: 'Sentinel', color: null, icon: null } });
 
   render(RoomPermissionsSettings, {
     room,
@@ -169,8 +172,9 @@ test.each([
 test('lets a founder add colour and an icon to the founder role', async () => {
   core.session = { user_id: '@admin:example.org' };
   core.roomPowerLevels.mockResolvedValue(base);
-  core.roomStateEvent.mockResolvedValue(null);
-  core.sendStateEvent.mockResolvedValue(undefined);
+  core.powerLevelTags.mockResolvedValue({});
+  const founderTag = { name: 'Founder', color: '#ff0000', icon: '👑' };
+  core.setPowerLevelTag.mockResolvedValue({ [FOUNDER_POWER_LEVEL]: founderTag });
 
   const user = userEvent.setup();
   render(RoomPermissionsSettings, {
@@ -184,13 +188,10 @@ test('lets a founder add colour and an icon to the founder role', async () => {
   await user.type(screen.getByRole('textbox', { name: 'Icon' }), '👑');
   await user.type(screen.getByRole('textbox', { name: 'Role colour' }), '#ff0000{Enter}');
 
-  expect(core.sendStateEvent).toHaveBeenCalledWith(
+  expect(core.setPowerLevelTag).toHaveBeenCalledWith(
     '!room:example.org',
-    'in.cinny.room.power_level_tags',
-    '',
-    {
-      [FOUNDER_POWER_LEVEL]: { name: 'Founder', color: '#ff0000', icon: { key: '👑' } },
-    }
+    FOUNDER_POWER_LEVEL,
+    founderTag
   );
 
   const row = founderRow.closest('li') ?? document.body;
@@ -204,7 +205,7 @@ test('lets a founder add colour and an icon to the founder role', async () => {
 test('uses tagged default roles in permission controls and opens their editor', async () => {
   core.session = { user_id: '@admin:example.org' };
   core.roomPowerLevels.mockResolvedValue(base);
-  core.roomStateEvent.mockResolvedValue({ '0': { name: 'Test' } });
+  core.powerLevelTags.mockResolvedValue({ '0': { name: 'Test', color: null, icon: null } });
 
   const user = userEvent.setup();
   render(RoomPermissionsSettings, { room, permissions });
@@ -233,7 +234,7 @@ test('uses tagged default roles in permission controls and opens their editor', 
 test('opens a role editor for a power level that no permission currently uses', async () => {
   core.session = { user_id: '@admin:example.org' };
   core.roomPowerLevels.mockResolvedValue(base);
-  core.roomStateEvent.mockResolvedValue({});
+  core.powerLevelTags.mockResolvedValue({});
 
   const user = userEvent.setup();
   render(RoomPermissionsSettings, { room, permissions });
@@ -247,13 +248,8 @@ test('opens a role editor for a power level that no permission currently uses', 
 test('a space applies its levels to the rooms below it that you can edit', async () => {
   core.session = { user_id: '@admin:example.org' };
   extraRooms.push({ room_id: '!room:example.org', state: 'joined', space_children: [] });
-  const spaceLevels = { ...base, invite: 50 };
-  core.roomPowerLevels.mockImplementation((roomId: string) =>
-    Promise.resolve(roomId === space.room_id ? spaceLevels : { ...base, users: {} })
-  );
-  core.roomPermissions.mockResolvedValue(permissions);
-  core.roomStateEvent.mockResolvedValue(null);
-  core.sendStateEvent.mockClear();
+  core.roomPowerLevels.mockResolvedValue(base);
+  core.syncChildPowerLevels.mockResolvedValue({ updated: 1, skipped: 0 });
 
   const user = userEvent.setup();
   render(RoomPermissionsSettings, { room: space as RoomSummary, permissions });
@@ -265,19 +261,18 @@ test('a space applies its levels to the rooms below it that you can edit', async
   );
 
   expect(await screen.findByText(/Updated 1 room, 0 skipped\./)).toBeInTheDocument();
-  expect(core.sendStateEvent).toHaveBeenCalledWith(
+  expect(core.syncChildPowerLevels).toHaveBeenCalledWith('!space:example.org', [
     '!room:example.org',
-    'm.room.power_levels',
-    '',
-    expect.objectContaining({ invite: 50 })
-  );
+  ]);
 });
 
 test('sets the level from which members stay listed whatever their presence (#497)', async () => {
   core.session = { user_id: '@admin:example.org' };
   core.roomPowerLevels.mockResolvedValue(base);
-  core.roomStateEvent.mockResolvedValue(null);
-  core.sendStateEvent.mockResolvedValue(undefined);
+  const setMemberListThreshold = vi
+    .fn<(roomId: string, level: number | null) => Promise<void>>()
+    .mockResolvedValue(undefined);
+  Object.assign(core, { setMemberListThreshold });
 
   const user = userEvent.setup();
   render(RoomPermissionsSettings, { room, permissions });
@@ -287,11 +282,6 @@ test('sets the level from which members stay listed whatever their presence (#49
   await user.click(select);
   await user.click(await screen.findByRole('option', { name: 'Moderator and above' }));
 
-  expect(core.sendStateEvent).toHaveBeenCalledWith(
-    '!room:example.org',
-    'moe.sable.room.member_list',
-    '',
-    { always_listed_from: 50 }
-  );
+  expect(setMemberListThreshold).toHaveBeenCalledWith('!room:example.org', 50);
   expect(select).toHaveTextContent('Moderator and above');
 });

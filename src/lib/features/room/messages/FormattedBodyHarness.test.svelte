@@ -14,7 +14,7 @@
 
   let { html, entries, senderTimezone = null, onMatrixLink }: Props = $props();
   const abbreviations = new RoomAbbreviations({
-    roomStateEvent: () => Promise.resolve({ entries }),
+    roomAbbreviations: () => Promise.resolve(entries),
   });
   provideRoomAbbreviations(abbreviations);
   void abbreviations.load('!room:example.org', []);

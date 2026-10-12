@@ -276,7 +276,7 @@ function isPlain(doc: ProseMirrorNode): boolean {
   return plain;
 }
 
-function mfmMarks(node: ProseMirrorNode, fg?: string, bg?: string): readonly Mark[] {
+function mfmMarks(node: ProseMirrorNode, fg: string | null, bg: string | null): readonly Mark[] {
   let marks = node.marks;
   if (fg) marks = composerSchema.marks.color.create({ value: fg }).addToSet(marks);
   if (bg) marks = composerSchema.marks.bg_color.create({ value: bg }).addToSet(marks);

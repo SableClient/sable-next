@@ -31,6 +31,7 @@ vi.mock('../messages/event-items.svelte.js', () => ({
 import TimelineListHarness from './TimelineListHarness.test.svelte';
 import { core } from '#lib/core/__mocks__/context.js';
 import { page, resetPage } from '#lib/test-support/app-state.js';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 let animationFrames: FrameRequestCallback[];
 
@@ -93,7 +94,7 @@ async function finishWheelGesture(element?: HTMLElement): Promise<void> {
 }
 
 function item(id: string): TimelineItemView {
-  return {
+  return withRowFields({
     id,
     event_id: `$${id}`,
     transaction_id: null,
@@ -102,7 +103,15 @@ function item(id: string): TimelineItemView {
     sender_name: 'Alice',
     sender_avatar: null,
     timestamp: 0,
-    content: { kind: 'message', body: id, html: id, emote: false, notice: false, edited: false },
+    content: {
+      kind: 'message',
+      body: id,
+      html: id,
+      emote: false,
+      notice: false,
+      edited: false,
+      jumbo: null,
+    },
     in_reply_to: null,
     thread_root: null,
     thread_summary: null,
@@ -116,15 +125,15 @@ function item(id: string): TimelineItemView {
     mention: 'none',
     forwarded: null,
     forum_title: null,
-  };
+  });
 }
 
 function readMarker(id: string): TimelineItemView {
-  return { ...item(id), event_id: null, content: { kind: 'read_marker' } };
+  return withRowFields({ ...item(id), event_id: null, content: { kind: 'read_marker' } });
 }
 
 function hiddenItem(id: string): TimelineItemView {
-  return {
+  return withRowFields({
     ...item(id),
     content: {
       kind: 'profile_change',
@@ -132,7 +141,7 @@ function hiddenItem(id: string): TimelineItemView {
       display_name: { old: 'Alice', new: id },
       avatar: null,
     },
-  };
+  });
 }
 
 async function runAnimationFrames(): Promise<void> {
@@ -172,16 +181,18 @@ test('expanding a member group exposes the original event source', async () => {
   const source = JSON.stringify({ event_id: '$first' });
   const eventSource = vi.fn(() => Promise.resolve({ source, encrypted: false, original: null }));
   Object.assign(core.commands, { eventSourceDetails: eventSource });
-  roomTimeline.items = ['first', 'last'].map((id): TimelineItemView => ({
-    ...item(id),
-    content: {
-      kind: 'membership',
-      change: 'joined',
-      user_id: '@alice:example.org',
-      display_name: 'Alice',
-      reason: null,
-    },
-  }));
+  roomTimeline.items = ['first', 'last'].map((id): TimelineItemView =>
+    withRowFields({
+      ...item(id),
+      content: {
+        kind: 'membership',
+        change: 'joined',
+        user_id: '@alice:example.org',
+        display_name: 'Alice',
+        reason: null,
+      },
+    })
+  );
   roomTimeline.backwardPagination = 'end';
   render(TimelineListHarness, {
     props: {
@@ -583,7 +594,7 @@ test('an empty room reports it once the start is reached', async () => {
 test("the timeline start renders the caller's notice in its row", async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [
-    { ...item('start'), event_id: null, content: { kind: 'timeline_start' } },
+    withRowFields({ ...item('start'), event_id: null, content: { kind: 'timeline_start' } }),
     item('first'),
   ];
   render(TimelineListHarness, {
@@ -613,7 +624,7 @@ test("the timeline start renders the caller's notice in its row", async () => {
 test('the timeline start keeps its separator without a notice', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [
-    { ...item('start'), event_id: null, content: { kind: 'timeline_start' } },
+    withRowFields({ ...item('start'), event_id: null, content: { kind: 'timeline_start' } }),
     item('first'),
   ];
   render(TimelineListHarness, {
@@ -2135,7 +2146,7 @@ test.each(['success', 'failure'] as const)(
 test('a reader at the latest message also reads the hidden events after it', async () => {
   setPreference('hideMembershipEvents', true);
   const roomTimeline = timeline();
-  const join: TimelineItemView = {
+  const join: TimelineItemView = withRowFields({
     ...item('join'),
     content: {
       kind: 'membership',
@@ -2144,7 +2155,7 @@ test('a reader at the latest message also reads the hidden events after it', asy
       display_name: 'Bob',
       reason: null,
     },
-  };
+  });
   roomTimeline.items = [
     ...Array.from({ length: 5 }, (_, index) => item(`old-${String(index)}`)),
     join,

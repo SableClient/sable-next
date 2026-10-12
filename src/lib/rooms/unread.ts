@@ -2,44 +2,19 @@ import type { NotificationModeView, RoomSummary } from '#src/generated/protocol'
 
 import type { UnreadCount } from './spaces.js';
 
-export type NotificationModeResolver = (roomId: string) => NotificationModeView | null;
-
-export const UNRESOLVED_MODE: NotificationModeResolver = () => null;
-
 export type RoomUnread = (room: RoomSummary) => UnreadCount;
 
 export const NO_UNREAD: UnreadCount = { unread: 0, highlight: 0, marked: false };
 
 export type BadgeNotificationMode = 'all' | 'mentions' | 'quiet';
 
-function counts(room: RoomSummary): UnreadCount {
-  return {
-    unread: room.unread || 0,
-    highlight: room.highlight || 0,
-    marked: room.marked_unread,
-  };
-}
+export const roomUnread: RoomUnread = (room) => room.counts;
 
-export function roomUnread(
-  room: RoomSummary,
-  mode: NotificationModeView | null = null
-): UnreadCount {
-  const { unread, highlight, marked } = counts(room);
-  const notifying = roomNotifications(room, mode).unread;
-
-  if (mode === 'mute') return { unread: 0, highlight: 0, marked, notifying };
-  return { unread: Math.max(unread, highlight), highlight, marked, notifying };
-}
-
-export function roomNotifications(
-  room: RoomSummary,
-  mode: NotificationModeView | null = null
-): UnreadCount {
-  const { highlight, marked } = counts(room);
-
-  if (mode === 'mute') return { unread: 0, highlight: 0, marked };
-  return { unread: Math.max(room.notifying || 0, highlight), highlight, marked };
-}
+export const roomNotifications: RoomUnread = ({ counts }) => ({
+  unread: counts.notifying,
+  highlight: counts.highlight,
+  marked: counts.marked,
+});
 
 export function quietUnread(count: UnreadCount): UnreadCount {
   return { ...count, unread: count.highlight, notifying: 0 };

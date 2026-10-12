@@ -1,12 +1,13 @@
 import fc from 'fast-check';
 import { expect, test } from 'vitest';
 
-import { parseSearchQuery, SEARCH_OPERATORS, type SearchToken } from './search-query';
+import { parseSearchQuery, searchOperators, type SearchToken } from './search-query';
 
-const operator = fc.constantFrom(...SEARCH_OPERATORS);
+const operators = searchOperators();
+const operator = fc.constantFrom(...operators);
 const bareWord = fc
   .stringMatching(/^[a-zA-Z0-9]{1,12}$/)
-  .filter((word) => !SEARCH_OPERATORS.some((name) => word.startsWith(name)));
+  .filter((word) => !operators.some((name) => word.startsWith(name)));
 
 const tokenSource = fc.record({
   operator,

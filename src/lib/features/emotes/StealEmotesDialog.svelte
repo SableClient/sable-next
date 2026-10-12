@@ -9,9 +9,8 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
-  import { USER_EMOTES_EVENT_TYPE } from './pack-address.js';
   import { normalizeShortcode } from './pack-content.js';
-  import { mergedPackContent, uploadCandidates, type EmoteCandidate } from './steal-emotes.js';
+  import { uploadCandidates, type EmoteCandidate } from './steal-emotes.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
@@ -40,9 +39,9 @@
     busy = true;
     failed = false;
     try {
-      const added = await uploadCandidates(core, $state.snapshot(picks));
-      const current = await core.commands.accountData(USER_EMOTES_EVENT_TYPE);
-      await core.commands.setAccountData(USER_EMOTES_EVENT_TYPE, mergedPackContent(current, added));
+      await core.commands.addAccountPackImages(
+        await uploadCandidates(core, $state.snapshot(picks))
+      );
       invalidatePacks(core.commands);
       names = {};
       open = false;

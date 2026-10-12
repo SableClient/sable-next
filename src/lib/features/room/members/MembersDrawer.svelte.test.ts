@@ -29,7 +29,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 import MembersDrawer from './MembersDrawer.svelte';
-import { FOUNDER_POWER_LEVEL, parsePowerLevelTags } from '../settings/power-level-tags';
+import { FOUNDER_POWER_LEVEL } from '../settings/power-level-tags';
 
 const observerBackup = globalThis.IntersectionObserver;
 
@@ -118,9 +118,7 @@ test.each([
           service: false,
         },
       ],
-      powerTags: parsePowerLevelTags({
-        [level]: { name, color: '#ff0000', icon: { key: icon } },
-      }),
+      powerTags: { [level]: { name, color: '#ff0000', icon } },
       onClose: vi.fn(),
       onMemberProfile: vi.fn(),
     },

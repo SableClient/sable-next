@@ -134,10 +134,10 @@ export function permalinkTarget(
   const { href, via } = splitVia(`https://matrix.to/#/${encodedFragment}`);
   const link = parseMatrixLink(href);
   if (link === null) return null;
-  if (link.kind === 'user') return { kind: 'user', userId: link.userId };
+  if (link.kind === 'user') return { kind: 'user', userId: link.user_id };
 
   return {
     kind: 'room',
-    path: roomSectionPath(rooms, link.roomId, link.kind === 'event' ? link.eventId : null, via),
+    path: roomSectionPath(rooms, link.room_id, link.kind === 'event' ? link.event_id : null, via),
   };
 }

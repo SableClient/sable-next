@@ -272,7 +272,7 @@
             anchor.dataset.matrixLink = link.kind;
             if (link.kind === 'user') continue;
             const bare = anchor.textContent.trim() === anchor.getAttribute('href')?.trim();
-            if (bare) anchor.textContent = link.roomId;
+            if (bare) anchor.textContent = link.room_id;
             const label = link.kind === 'event' ? withIcon(anchor, ChatCircleIcon) : anchor;
             if (bare) void resolveLinkLabel(link, anchor, label);
             continue;
@@ -348,7 +348,7 @@
       for (const anchor of node.querySelectorAll<HTMLAnchorElement>('a[data-matrix-link="user"]')) {
         const link = parseMatrixLink(anchor.href);
         if (link?.kind === 'user' && !keepMentionText) {
-          anchor.textContent = mentionLabel(link.userId, memberNames);
+          anchor.textContent = mentionLabel(link.user_id, memberNames);
         }
       }
       for (const chip of node.querySelectorAll<HTMLElement>('.time-chip')) {
@@ -395,18 +395,18 @@
     label: HTMLElement
   ) {
     const known = roomList.rooms.find(
-      (room) => room.room_id === link.roomId || room.canonical_alias === link.roomId
+      (room) => room.room_id === link.room_id || room.canonical_alias === link.room_id
     );
     const name =
       known?.name ??
-      (await core.commands.roomPreview(link.roomId, splitVia(anchor.href).via).then(
+      (await core.commands.roomPreview(link.room_id, splitVia(anchor.href).via).then(
         (preview) => preview.name,
         () => null
       ));
     const room = name ? (name.startsWith('#') ? name : `#${name}`) : null;
     const snippet =
       link.kind === 'event' && known
-        ? await core.commands.eventItems(known.room_id, [link.eventId]).then(
+        ? await core.commands.eventItems(known.room_id, [link.event_id]).then(
             ([item]) => (item ? replyPreviewBody(item.content).replace(/\s+/g, ' ').trim() : ''),
             () => ''
           )

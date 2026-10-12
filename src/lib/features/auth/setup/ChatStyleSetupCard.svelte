@@ -51,6 +51,10 @@
   } as const;
   const message: TimelineItemView = {
     id: 'setup-preview',
+    row: 'message',
+    forwardable: true,
+    redactable: true,
+    visibility: 'always',
     event_id: null,
     transaction_id: null,
     send_state: null,
@@ -65,6 +69,7 @@
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -92,6 +97,7 @@
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
     in_reply_to: {
       event_id: '$setup-preview',
@@ -99,6 +105,7 @@
       sender_mentioned: false,
       sender_name: 'Alex',
       body: 'See you at six?',
+      fallback: null,
     },
   };
 </script>

@@ -16,16 +16,16 @@ afterEach(() => {
 
 function item(overrides: Partial<CalendarItem>): CalendarItem {
   return {
-    eventId: '$raid',
+    event_id: '$raid',
     sender: '@ana:x',
     uid: 'raid',
     title: 'Raid',
     description: '',
     location: '',
-    allDay: false,
+    all_day: false,
     start: '2026-10-01T20:00:00',
-    timeZone: null,
-    durationMs: 2 * 3_600_000,
+    time_zone: null,
+    duration_ms: 2 * 3_600_000,
     recurrence: null,
     raw: {},
     ...overrides,
@@ -75,9 +75,9 @@ test('offers the until date of a repeating event and saves it', async () => {
         interval: 1,
         count: null,
         until: '2026-12-01T23:59:59',
-        byDay: [],
-        byMonthDay: [],
-        firstDayOfWeek: 1,
+        by_day: [],
+        by_month_day: [],
+        first_day_of_week: 1,
         modelled: true,
       },
     })
@@ -93,7 +93,7 @@ test('offers the until date of a repeating event and saves it', async () => {
 
 test('edits an all-day event as dates, with an inclusive last day', async () => {
   const onSave = await open(
-    item({ allDay: true, start: '2026-10-01T00:00:00', durationMs: 2 * 86_400_000 })
+    item({ all_day: true, start: '2026-10-01T00:00:00', duration_ms: 2 * 86_400_000 })
   );
   expect(document.querySelector('[data-segment="hour"]')).toBeNull();
 

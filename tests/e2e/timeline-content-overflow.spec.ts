@@ -1,6 +1,6 @@
 import type { TimelineItemView } from '#src/generated/protocol';
 import { expect, SIGNED_OUT, test } from './fixtures/test';
-import { timelineImage, timelineItem } from './fixtures/timeline-items';
+import { timelineImage, timelineItem, withRowFields } from './fixtures/timeline-items';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -8,7 +8,15 @@ const long = 'UnbrokenContent'.repeat(30);
 const source = JSON.stringify({ Plain: 'mxc://example.test/history-image' });
 const message = (html: string): TimelineItemView => ({
   ...timelineItem('general-19', long),
-  content: { kind: 'message', body: long, html, emote: false, notice: false, edited: false },
+  content: {
+    kind: 'message',
+    body: long,
+    html,
+    emote: false,
+    notice: false,
+    edited: false,
+    jumbo: null,
+  },
 });
 const alteredMessage = (flags: { emote?: boolean; notice?: boolean; edited?: boolean }) => {
   const item = message(`<p>${long}</p>`);
@@ -71,6 +79,7 @@ const cases: Record<string, TimelineItemView> = {
       sender_name: long,
       sender_mentioned: false,
       body: long,
+      fallback: null,
     },
   },
   image: timelineImage('general-19'),
@@ -281,7 +290,7 @@ for (const layout of ['modern', 'compact', 'bubble'] as const) {
           await test.step(`${label} (${own ? 'sent' : 'received'})`, async () => {
             const id = `overflow-${label.replaceAll(' ', '-')}-${String(own)}`;
             await core.setTimelineItemById(subscription, previousId, {
-              ...item,
+              ...withRowFields(item),
               id,
               sender: own ? '@e2e:example.test' : '@oversized:example.test',
               sender_name: long,

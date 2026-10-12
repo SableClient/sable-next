@@ -31,8 +31,10 @@ import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
 import InviteList from './InviteList.svelte';
 
 Object.assign(core, {
-  accountData: vi.fn(() => Promise.resolve(null)),
-  setAccountData: vi.fn(() => Promise.resolve()),
+  dismissedInvites: vi.fn(() => Promise.resolve([])),
+  setInviteDismissed: vi.fn((roomId: string, dismissed: boolean) =>
+    Promise.resolve(dismissed ? [roomId] : [])
+  ),
 });
 
 function invite(roomId: string, name: string): RoomSummary {

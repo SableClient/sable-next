@@ -1,17 +1,20 @@
-import type { MemberView, MessageKind } from '#src/generated/protocol';
+import type { MemberView, MessageKind, SlashInvocation } from '#src/generated/protocol';
+import { CoreError } from '#src/transport';
 
-import { enrichWidgetUrl } from '#lib/features/widgets/widget-url.js';
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
-import { parseJoinAddress } from '#lib/rooms/join-address.js';
+import { parseSlash } from '#lib/model/model.js';
 import { currentFix } from '#lib/platform/geolocation.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
-import { coordinate, geoUriFor } from './composer-location.js';
-import { escapeHtml, rainbowFormatted, rainbowHtml } from './rainbow.js';
+import { geoUriFor } from './composer-location.js';
+import { rainbowFormatted, rainbowHtml } from './rainbow.js';
+
+export { parseSlash, pronounSets, slashCommandNames } from '#lib/model/model.js';
 
 export type SlashCommandApi = Pick<
   CoreCommands,
   | 'accountData'
+  | 'addRoomWidget'
   | 'banUser'
   | 'bulkRedact'
   | 'createDm'
@@ -27,10 +30,12 @@ export type SlashCommandApi = Pick<
   | 'removePersona'
   | 'roomMembers'
   | 'roomStateEvent'
-  | 'roomStateEvents'
   | 'sendRawEvent'
   | 'savePersona'
+  | 'setMemberLook'
+  | 'setPronouns'
   | 'setAccountData'
+  | 'sendGesture'
   | 'sendLocation'
   | 'sendStateEvent'
   | 'setDirect'
@@ -40,6 +45,7 @@ export type SlashCommandApi = Pick<
   | 'setRoomTopic'
   | 'unbanUser'
   | 'unignoreUser'
+  | 'updateServerAcl'
 >;
 
 export type SlashContext = {
@@ -63,11 +69,6 @@ export type SlashOutcome =
   | { kind: 'done' }
   | { kind: 'error'; key: string; values?: Record<string, string> };
 
-export type SlashCommand = {
-  readonly name: string;
-  run(args: string, context: SlashContext): SlashOutcome | Promise<SlashOutcome>;
-};
-
 export type SlashResult = Exclude<SlashOutcome, { kind: 'error' }>;
 
 export class SlashError extends Error {
@@ -80,35 +81,24 @@ export class SlashError extends Error {
   }
 }
 
-export type ParsedSlash =
-  | { kind: 'command'; command: SlashCommand; args: string }
-  | { kind: 'literal'; body: string }
-  | { kind: 'unknown'; name: string }
-  | { kind: 'none' };
-
 function localeKey(name: string, part: 'description' | 'usage'): string {
   return `composer.slash.${name}.${part}`;
 }
 
-export function descriptionKey(command: SlashCommand): string {
-  return localeKey(command.name, 'description');
+export function descriptionKey(name: string): string {
+  return localeKey(name, 'description');
 }
 
-export function usageKey(command: SlashCommand): string {
-  return localeKey(command.name, 'usage');
+export function usageKey(name: string): string {
+  return localeKey(name, 'usage');
 }
 
-const USER_ID = /^@[^:\s]+:\S+$/;
+export const COSMETIC_EVENT_TYPES = {
+  color: 'moe.sable.room.cosmetics.color',
+  pronoun: 'moe.sable.room.cosmetics.pronouns',
+} as const;
+
 const MXC_URI = /^mxc:\/\/\S+$/;
-
-function words(args: string): string[] {
-  const trimmed = args.trim();
-  return trimmed === '' ? [] : trimmed.split(/\s+/);
-}
-
-function userIds(args: string): string[] {
-  return [...new Set(words(args).filter((word) => USER_ID.test(word)))];
-}
 
 function message(
   body: string,
@@ -118,90 +108,11 @@ function message(
   return { kind: 'message', body, msgtype, formatted };
 }
 
-const SLASH_PREFIX = /^\s*\/([a-z0-9]+)(\s+|$)/i;
-
-function withoutPrefix(name: string, formatted: string | null | undefined): string | null {
-  if (!formatted) return null;
-  const match = SLASH_PREFIX.exec(formatted);
-  return match && match[1].toLowerCase() === name ? formatted.slice(match[0].length) : null;
-}
-
-function verbatim(body: string, msgtype: MessageKind, formatted: string | null): SlashOutcome {
-  return { kind: 'message', body, msgtype, formatted, verbatim: true };
-}
-
 function usageError(name: string): SlashOutcome {
-  return { kind: 'error', key: localeKey(name, 'usage') };
+  return { kind: 'error', key: usageKey(name) };
 }
 
-function speech(name: string, msgtype: MessageKind): SlashCommand {
-  return {
-    name,
-    run: (args, { formatted }) => {
-      const text = args.trim();
-      return text === ''
-        ? usageError(name)
-        : verbatim(text, msgtype, withoutPrefix(name, formatted));
-    },
-  };
-}
-
-function decorated(name: string, suffix: string): SlashCommand {
-  return {
-    name,
-    run: (args, { formatted }) => {
-      const text = args.trim();
-      if (text === '') return message(suffix, 'text');
-
-      const html = withoutPrefix(name, formatted);
-      return verbatim(
-        `${text} ${suffix}`,
-        'text',
-        html === null ? null : `${html} ${escapeHtml(suffix)}`
-      );
-    },
-  };
-}
-
-function eachUser(
-  name: string,
-  act: (userId: string, context: SlashContext) => Promise<unknown>
-): SlashCommand {
-  return {
-    name,
-    run: async (args, context) => {
-      const targets = userIds(args);
-      if (targets.length === 0) return usageError(name);
-
-      for (const userId of targets) await act(userId, context);
-      return { kind: 'done' };
-    },
-  };
-}
-
-function splitTargetUser(args: string): { userId: string; reason: string | null } | null {
-  const [first, ...rest] = args.trim().split(/\s+/);
-  if (!USER_ID.test(first)) return null;
-
-  const reason = rest.join(' ').trim();
-  return { userId: first, reason: reason === '' ? null : reason };
-}
-
-const SERVER_WILDCARD = /^@\*:(\S+)$/;
-
-function isTargetToken(token: string): boolean {
-  return USER_ID.test(token) || SERVER_WILDCARD.test(token);
-}
-
-function targetTokens(args: string): { tokens: string[]; reason: string | null } | null {
-  const all = words(args);
-  let end = 0;
-  while (end < all.length && isTargetToken(all[end])) end += 1;
-  if (end === 0) return null;
-
-  const reason = all.slice(end).join(' ').trim();
-  return { tokens: all.slice(0, end), reason: reason === '' ? null : reason };
-}
+const DONE: SlashOutcome = { kind: 'done' };
 
 async function resolveTargets(
   tokens: readonly string[],
@@ -213,13 +124,12 @@ async function resolveTargets(
   let members: MemberView[] | null = null;
 
   for (const token of tokens) {
-    const wildcard = SERVER_WILDCARD.exec(token);
-    if (wildcard === null) {
+    if (!token.startsWith('@*:')) {
       userIds.add(token);
       continue;
     }
 
-    const server = wildcard[1];
+    const server = token.slice('@*:'.length);
     members ??= await commands.roomMembers(roomId);
     const matches = members
       .filter((member) => member.user_id.endsWith(`:${server}`))
@@ -233,240 +143,29 @@ async function resolveTargets(
   return { userIds: [...userIds] };
 }
 
-type ModerationVerb = Extract<keyof SlashCommandApi, 'banUser' | 'kickUser' | 'unbanUser'>;
+type ModerationVerb = Extract<keyof SlashCommandApi, 'banUser' | 'kickUser'>;
 
-function moderation(name: string, verb: ModerationVerb): SlashCommand {
-  return {
-    name,
-    run: async (args, { roomId, commands }) => {
-      const target = splitTargetUser(args);
-      if (target === null) return usageError(name);
-
-      await commands[verb](roomId, target.userId, target.reason);
-      return { kind: 'done' };
-    },
-  };
-}
-
-function moderationTargets(
+async function moderate(
   name: string,
+  invocation: { targets: string[]; reason: string | null },
   verb: ModerationVerb,
-  excludeBanned: boolean
-): SlashCommand {
-  return {
-    name,
-    run: async (args, { roomId, commands }) => {
-      const parsed = targetTokens(args);
-      if (parsed === null) return usageError(name);
+  excludeBanned: boolean,
+  { roomId, commands }: SlashContext
+): Promise<SlashOutcome> {
+  const resolved = await resolveTargets(invocation.targets, roomId, commands, excludeBanned);
+  if (!('userIds' in resolved)) return resolved;
+  if (resolved.userIds.length === 0) return usageError(name);
 
-      const resolved = await resolveTargets(parsed.tokens, roomId, commands, excludeBanned);
-      if (!('userIds' in resolved)) return resolved;
-      if (resolved.userIds.length === 0) return usageError(name);
-
-      for (const userId of resolved.userIds) await commands[verb](roomId, userId, parsed.reason);
-      return { kind: 'done' };
-    },
-  };
+  for (const userId of resolved.userIds) await commands[verb](roomId, userId, invocation.reason);
+  return DONE;
 }
 
-function memberProfile(
-  name: string,
-  patch: (text: string) => Record<string, string> | null
-): SlashCommand {
-  return {
-    name,
-    run: async (args, { roomId, userId, commands }) => {
-      const text = args.trim();
-      if (text === '' || userId === null) return usageError(name);
-
-      const fields = patch(text);
-      if (fields === null) return usageError(name);
-
-      const current = await commands.roomStateEvent(roomId, 'm.room.member', userId);
-      const existing = typeof current === 'object' && current !== null ? current : {};
-      await commands.sendStateEvent(roomId, 'm.room.member', userId, {
-        ...existing,
-        membership: 'join',
-        ...fields,
-      });
-      return { kind: 'done' };
-    },
-  };
-}
-
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
-const PRONOUN_ENTRY = /^([a-z]{2}):(.+)$/;
-
-function isReset(text: string): boolean {
-  return text === '' || text.toLowerCase() === 'reset' || text.toLowerCase() === 'clear';
-}
-
-// Unstable prefix for the `m.color_preference` field from MSC4522.
-export const MEMBER_COLOR_FIELD = 'eu.she-a.color';
-
-export type ColorUpdate =
-  | { kind: 'clear' }
-  | { kind: 'set'; colors: Record<string, string | undefined> };
-
-function colorUpdate(text: string): ColorUpdate | null {
-  const parts = words(text);
-  if (parts.length === 0 || parts.length > 2) return null;
-
-  const theme = parts.length === 2 ? parts[0].toLowerCase() : 'both';
-  if (theme !== 'both' && theme !== 'light' && theme !== 'dark') return null;
-
-  const value = (parts.length === 2 ? parts[1] : parts[0]).toLowerCase();
-  if (isReset(value)) {
-    if (theme === 'both') return { kind: 'clear' };
-    return theme === 'light'
-      ? { kind: 'set', colors: { on_light: undefined } }
-      : { kind: 'set', colors: { on_dark: undefined } };
-  }
-  if (!HEX_COLOR.test(value)) return null;
-
-  if (theme === 'both') return { kind: 'set', colors: { on_dark: value, on_light: value } };
-  return theme === 'light'
-    ? { kind: 'set', colors: { on_light: value } }
-    : { kind: 'set', colors: { on_dark: value } };
-}
-
-export function pronounContent(text: string): Record<string, unknown> | null {
-  if (isReset(text)) return {};
-  const pronouns = text.split(',').map((entry) => {
-    const trimmed = entry.trim();
-    const match = PRONOUN_ENTRY.exec(trimmed);
-    return match ? { language: match[1], summary: match[2].trim() } : { summary: trimmed };
-  });
-  return { pronouns };
-}
-
-export const COSMETIC_EVENT_TYPES = {
-  color: 'moe.sable.room.cosmetics.color',
-  pronoun: 'moe.sable.room.cosmetics.pronouns',
-} as const;
-
-type CosmeticScope = 'room' | 'space';
-
-async function cosmeticTarget(
-  scope: CosmeticScope,
-  roomId: string,
-  commands: SlashCommandApi
-): Promise<string> {
-  if (scope === 'room') return roomId;
-  const parents = await commands.roomStateEvents(roomId, 'm.space.parent');
-  return parents.at(0)?.state_key ?? roomId;
-}
-
-function ownCosmetic(
-  name: string,
-  eventType: string,
-  scope: CosmeticScope,
-  build: (text: string) => Record<string, unknown> | null
-): SlashCommand {
-  return {
-    name,
-    run: async (args, { roomId, userId, commands }) => {
-      if (userId === null) return usageError(name);
-
-      const content = build(args.trim());
-      if (content === null) return usageError(name);
-
-      const target = await cosmeticTarget(scope, roomId, commands);
-      await commands.sendStateEvent(target, eventType, userId, content);
-      return { kind: 'done' };
-    },
-  };
-}
-
-// The legacy vendor event write clears deprecated colours for other clients.
-export async function writeMemberColors(
-  commands: Pick<SlashCommandApi, 'roomStateEvent' | 'sendStateEvent'>,
-  roomId: string,
-  userId: string,
-  update: ColorUpdate
-): Promise<void> {
-  const existing = objectValue(await commands.roomStateEvent(roomId, 'm.room.member', userId));
-  // Omitting the colour field replaces it; spreading it back would keep the old value.
-  const source: Record<string, unknown> = { ...existing, membership: 'join' };
-  const { [MEMBER_COLOR_FIELD]: legacyColors, ...content } = source;
-
-  if (update.kind === 'set') {
-    const colors = { ...objectValue(legacyColors), ...update.colors };
-    if (Object.values(colors).some((color) => typeof color === 'string' && color !== '')) {
-      content[MEMBER_COLOR_FIELD] = colors;
-    }
-  }
-
-  await commands.sendStateEvent(roomId, 'm.room.member', userId, content);
-  await commands.sendStateEvent(roomId, COSMETIC_EVENT_TYPES.color, userId, {});
-}
-
-function ownColor(name: string, scope: CosmeticScope): SlashCommand {
-  return {
-    name,
-    run: async (args, { roomId: currentRoomId, userId, commands }) => {
-      if (userId === null) return usageError(name);
-
-      const update = colorUpdate(args.trim());
-      if (update === null) return usageError(name);
-
-      const roomId = await cosmeticTarget(scope, currentRoomId, commands);
-      await writeMemberColors(commands, roomId, userId, update);
-      return { kind: 'done' };
-    },
-  };
-}
-
-function setter(
-  name: string,
-  write: (text: string, context: SlashContext) => Promise<void>
-): SlashCommand {
-  return {
-    name,
-    run: async (args, context) => {
-      const text = args.trim();
-      if (text === '') return usageError(name);
-
-      await write(text, context);
-      return { kind: 'done' };
-    },
-  };
-}
-
-function address(
-  name: string,
-  visit: (
-    target: { address: string; via: string[] },
-    reason: string | null,
-    context: SlashContext
-  ) => Promise<unknown>
-): SlashCommand {
-  return {
-    name,
-    run: async (args, context) => {
-      const [first, ...rest] = args.trim().split(/\s+/);
-      const target = parseJoinAddress(first);
-      if (target === null) return usageError(name);
-
-      const reason = rest.join(' ').trim();
-      await visit(target, reason === '' ? null : reason, context);
-      return { kind: 'done' };
-    },
-  };
-}
-
-function flagValues(args: string): Map<string, string[]> {
-  const values = new Map<string, string[]>();
-  let flag: string | null = null;
-  for (const token of words(args)) {
-    if (token.startsWith('-') && token.length > 1) {
-      flag = token.slice(1);
-      values.set(flag, []);
-    } else if (flag !== null) {
-      values.get(flag)?.push(token);
-    }
-  }
-  return values;
+async function eachUser(
+  userIds: readonly string[],
+  act: (userId: string) => Promise<unknown>
+): Promise<SlashOutcome> {
+  for (const userId of userIds) await act(userId);
+  return DONE;
 }
 
 function objectValue(value: unknown): Record<string, unknown> {
@@ -475,510 +174,270 @@ function objectValue(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function developerOnly(context: SlashContext): SlashOutcome | null {
-  return context.developerTools === true
-    ? null
-    : { kind: 'error', key: 'composer.slashDeveloperOnly' };
+async function sendLocation(
+  name: string,
+  latitude: number,
+  longitude: number,
+  { roomId, commands }: SlashContext
+): Promise<SlashOutcome> {
+  const geoUri = geoUriFor(latitude, longitude);
+  if (geoUri === null) return usageError(name);
+
+  await commands.sendLocation(roomId, geoUri.slice('geo:'.length), geoUri);
+  return DONE;
 }
 
-function jsonObject(value: string): Record<string, unknown> | null {
+async function shareMyLocation(context: SlashContext): Promise<SlashOutcome> {
+  const result = await currentFix();
+  if (result.kind !== 'fix') return { kind: 'error', key: `composer.slashFix.${result.kind}` };
+
+  const geoUri = geoUriFor(result.fix.latitude, result.fix.longitude);
+  if (geoUri === null) return { kind: 'error', key: 'composer.slashFix.unavailable' };
+
+  await context.commands.sendLocation(context.roomId, geoUri.slice('geo:'.length), geoUri);
+  return DONE;
+}
+
+async function addWidget(
+  name: string,
+  widget: { url: string; name: string },
+  { roomId, userId, commands }: SlashContext
+): Promise<SlashOutcome> {
+  if (userId === null) return usageError(name);
   try {
-    const parsed: unknown = JSON.parse(value);
-    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
+    await commands.addRoomWidget(roomId, widget.name, widget.url);
+  } catch (error) {
+    if (error instanceof CoreError && error.detail.code === 'invalid_url') {
+      return usageError(name);
+    }
+    throw error;
   }
+  return DONE;
 }
 
-function rawEventArgs(
-  args: string
-): { eventType: string; content: Record<string, unknown>; stateKey: string | null } | null {
-  const trimmed = args.trim();
-  const stateFlag = trimmed.match(/\s+-s\s+(\S+)\s*$/);
-  const payload = stateFlag ? trimmed.slice(0, stateFlag.index).trimEnd() : trimmed;
-  const split = payload.search(/\s/);
-  if (split < 1) return null;
+async function addPersona(
+  name: string,
+  persona: { id: string; name: string | null; avatar: string | null },
+  { commands }: SlashContext
+): Promise<SlashOutcome> {
+  const { id } = persona;
+  const existing = (await commands.personas()).personas.find((entry) => entry.id === id);
+  const avatar = persona.avatar ?? existing?.avatar_url ?? null;
+  if (avatar !== null && !MXC_URI.test(avatar)) return usageError(name);
 
-  const content = jsonObject(payload.slice(split + 1).trim());
-  if (content === null) return null;
-
-  return {
-    eventType: payload.slice(0, split),
-    content,
-    stateKey: stateFlag?.[1] ?? null,
-  };
+  await commands.savePersona(
+    {
+      id,
+      display_name: persona.name ?? existing?.display_name ?? id,
+      avatar_url: avatar,
+      pronouns: existing?.pronouns ?? [],
+      color_on_light: existing?.color_on_light ?? null,
+      color_on_dark: existing?.color_on_dark ?? null,
+      triggers: existing?.triggers ?? [],
+      pluralkit: existing?.pluralkit ?? null,
+      last_used: existing?.last_used ?? null,
+    },
+    existing ? id : null
+  );
+  return DONE;
 }
 
-function deleteArgs(args: string): {
-  senderTokens: string[];
-  afterTs: number;
-  eventTypes: string[];
-  reason: string | null;
-} | null {
-  const match = args.match(/\s-(?=\w)/);
-  const targets = match ? args.slice(0, match.index).trim() : args.trim();
-  const flags = match ? flagValues(args.slice(match.index)) : new Map<string, string[]>();
-  const past = flags.get('past')?.[0];
-  const pastMatch = past?.match(/^(\d+(?:\.\d+)?)([dhms])$/);
-  if (!pastMatch) return null;
+async function addPersonaProxy(
+  name: string,
+  proxy: { id: string; prefix: string | null; suffix: string | null },
+  { commands }: SlashContext
+): Promise<SlashOutcome> {
+  const persona = (await commands.personas()).personas.find((entry) => entry.id === proxy.id);
+  if (persona === undefined) return usageError(name);
 
-  const value = Number(pastMatch[1]);
-  const units = { d: 24 * 60 * 60 * 1000, h: 60 * 60 * 1000, m: 60 * 1000, s: 1000 };
-  const afterTs = Date.now() - value * units[pastMatch[2] as keyof typeof units];
-  const senderTokens = words(targets).filter(isTargetToken);
-  if (senderTokens.length === 0 || !Number.isSafeInteger(afterTs)) return null;
-
-  return {
-    senderTokens,
-    afterTs,
-    eventTypes: flags.get('t') ?? [],
-    reason: flags.get('r')?.join(' ') || null,
-  };
+  await commands.savePersona(
+    {
+      ...persona,
+      triggers: [
+        ...persona.triggers,
+        { prefix: proxy.prefix, suffix: proxy.suffix, keep_trigger: false },
+      ],
+    },
+    proxy.id
+  );
+  return DONE;
 }
 
-function cute(name: string, cuteType: string, body: string): SlashCommand {
-  return {
-    name,
-    run: async (args, { roomId, commands }) => {
-      const target = args.trim();
-      if (target !== '' && !USER_ID.test(target)) return usageError(name);
+async function deleteAccountDataKey(
+  name: string,
+  { event_type: eventType, key }: { event_type: string; key: string },
+  { commands }: SlashContext
+): Promise<SlashOutcome> {
+  const content = objectValue(await commands.accountData(eventType));
+  if (!(key in content)) return usageError(name);
 
-      await commands.sendRawEvent(roomId, 'm.room.message', {
-        msgtype: 'im.fluffychat.cute_event',
-        'm.mentions': { user_ids: target === '' ? [] : [target] },
-        cute_type: cuteType,
+  const updated = { ...content };
+  Reflect.deleteProperty(updated, key);
+  await commands.setAccountData(eventType, updated);
+  return DONE;
+}
+
+async function bulkRedact(
+  name: string,
+  redaction: Extract<SlashInvocation, { command: 'bulk_redact' }>,
+  { roomId, commands }: SlashContext
+): Promise<SlashOutcome> {
+  const resolved = await resolveTargets(redaction.targets, roomId, commands, false);
+  if (!('userIds' in resolved)) return resolved;
+  if (resolved.userIds.length === 0) return usageError(name);
+
+  await commands.bulkRedact(
+    roomId,
+    resolved.userIds,
+    redaction.after_ts,
+    redaction.event_types,
+    redaction.reason
+  );
+  return DONE;
+}
+
+async function run(
+  name: string,
+  invocation: SlashInvocation,
+  context: SlashContext
+): Promise<SlashOutcome> {
+  const { roomId, userId, commands } = context;
+  switch (invocation.command) {
+    case 'bug_report':
+      return { kind: 'bugReport' };
+    case 'gif_search':
+      return { kind: 'gifSearch', query: invocation.query };
+    case 'gesture':
+      await commands.sendGesture(roomId, invocation.gesture, invocation.target);
+      return DONE;
+    case 'message': {
+      const { body, msgtype, formatted } = invocation;
+      return invocation.verbatim
+        ? { kind: 'message', body, msgtype, formatted, verbatim: true }
+        : message(body, msgtype, formatted);
+    }
+    case 'rainbow': {
+      const { body, msgtype, formatted } = invocation;
+      return message(
         body,
-      });
-      return { kind: 'done' };
-    },
-  };
-}
-
-function headpat(): SlashCommand {
-  return {
-    name: 'headpat',
-    run: async (args, { roomId, commands }) => {
-      const target = args.trim();
-      if (target !== '' && !USER_ID.test(target)) return usageError('headpat');
-
-      await commands.sendRawEvent(roomId, 'm.room.message', {
-        msgtype: 'm.emote',
-        'm.mentions': { user_ids: target === '' ? [] : [target] },
-        body: `pats ${target || 'you'}`,
-        'fyi.cisnt.headpat': true,
-      });
-      return { kind: 'done' };
-    },
-  };
-}
-
-export const SLASH_COMMANDS: readonly SlashCommand[] = [
-  {
-    name: 'bugreport',
-    run: (args) => (args.trim() === '' ? { kind: 'bugReport' } : usageError('bugreport')),
-  },
-  {
-    name: 'gif',
-    run: (args) => ({ kind: 'gifSearch', query: args.trim() }),
-  },
-  cute('hug', 'hug', '🤗'),
-  cute('cuddle', 'cuddle', '😊'),
-  cute('wave', 'wave', '👋'),
-  cute('poke', 'poke', '🫵'),
-  headpat(),
-  speech('me', 'emote'),
-  speech('notice', 'notice'),
-  decorated('shrug', '¯\\_(ツ)_/¯'),
-  decorated('tableflip', '(╯°□°）╯︵ ┻━┻'),
-  decorated('unflip', '┬─┬ ノ( ゜-゜ノ)'),
-  address('join', (target, _reason, { commands }) => commands.joinRoom(target.address, target.via)),
-  address('knock', (target, reason, { commands }) =>
-    commands.knockRoom(target.address, target.via, reason ?? undefined)
-  ),
-  {
-    name: 'leave',
-    run: async (args, { roomId, commands }) => {
-      if (args.trim() !== '') return usageError('leave');
-
+        msgtype,
+        formatted === null ? rainbowHtml(body) : rainbowFormatted(formatted)
+      );
+    }
+    case 'html':
+      return message(plainTextFrom(invocation.html), 'text', invocation.html);
+    case 'join':
+      await commands.joinRoom(invocation.address, invocation.via);
+      return DONE;
+    case 'knock':
+      await commands.knockRoom(invocation.address, invocation.via, invocation.reason ?? undefined);
+      return DONE;
+    case 'leave':
       await commands.leaveRoom(roomId);
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'invite',
-    run: async (args, { roomId, commands }) => {
-      const target = splitTargetUser(args);
-      if (target === null || target.reason !== null) return usageError('invite');
-
-      await commands.inviteUser(roomId, target.userId);
-      return { kind: 'done' };
-    },
-  },
-  moderationTargets('kick', 'kickUser', true),
-  moderationTargets('ban', 'banUser', false),
-  moderation('unban', 'unbanUser'),
-  setter('nick', (text, { commands }) =>
-    commands.setDisplayName(text, preferences.profileChangePropagation)
-  ),
-  ownColor('color', 'room'),
-  ownColor('scolor', 'space'),
-  ownCosmetic('pronoun', COSMETIC_EVENT_TYPES.pronoun, 'room', pronounContent),
-  ownCosmetic('spronoun', COSMETIC_EVENT_TYPES.pronoun, 'space', pronounContent),
-  setter('roomname', (text, { roomId, commands }) => commands.setRoomName(roomId, text)),
-  setter('topic', (text, { roomId, commands }) => commands.setRoomTopic(roomId, text)),
-  eachUser('disinvite', (userId, { roomId, commands }) => commands.kickUser(roomId, userId)),
-  eachUser('ignore', (userId, { commands }) => commands.ignoreUser(userId)),
-  eachUser('unignore', (userId, { commands }) => commands.unignoreUser(userId)),
-  eachUser('startdm', (userId, { commands }) => commands.createDm(userId)),
-  {
-    name: 'converttodm',
-    run: async (args, { roomId, commands }) => {
-      const targets = words(args);
-      if (targets.length > 1 || (targets.length === 1 && !USER_ID.test(targets[0]))) {
-        return usageError('converttodm');
-      }
-
-      await commands.setDirect(roomId, true, targets[0]);
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'converttoroom',
-    run: async (args, { roomId, commands }) => {
-      if (args.trim() !== '') return usageError('converttoroom');
-
+      return DONE;
+    case 'invite':
+      await commands.inviteUser(roomId, invocation.user_id);
+      return DONE;
+    case 'kick':
+      return moderate(name, invocation, 'kickUser', true, context);
+    case 'ban':
+      return moderate(name, invocation, 'banUser', false, context);
+    case 'unban':
+      await commands.unbanUser(roomId, invocation.user_id, invocation.reason);
+      return DONE;
+    case 'display_name':
+      await commands.setDisplayName(invocation.name, preferences.profileChangePropagation);
+      return DONE;
+    case 'member_look':
+      if (userId === null) return usageError(name);
+      await commands.setMemberLook(roomId, invocation.look, invocation.in_parent_space);
+      return DONE;
+    case 'pronouns':
+      if (userId === null) return usageError(name);
+      await commands.setPronouns(roomId, invocation.pronouns, invocation.in_parent_space);
+      return DONE;
+    case 'room_name':
+      await commands.setRoomName(roomId, invocation.name);
+      return DONE;
+    case 'topic':
+      await commands.setRoomTopic(roomId, invocation.topic);
+      return DONE;
+    case 'disinvite':
+      return eachUser(invocation.user_ids, (target) => commands.kickUser(roomId, target));
+    case 'ignore':
+      return eachUser(invocation.user_ids, (target) => commands.ignoreUser(target));
+    case 'unignore':
+      return eachUser(invocation.user_ids, (target) => commands.unignoreUser(target));
+    case 'start_dm':
+      return eachUser(invocation.user_ids, (target) => commands.createDm(target));
+    case 'convert_to_dm':
+      await commands.setDirect(roomId, true, invocation.user_id ?? undefined);
+      return DONE;
+    case 'convert_to_room':
       await commands.setDirect(roomId, false);
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'discardsession',
-    run: async (args, { roomId, commands }) => {
-      if (args.trim() !== '') return usageError('discardsession');
-
+      return DONE;
+    case 'discard_session':
       await commands.discardRoomKey(roomId);
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'acl',
-    run: async (args, { roomId, commands }) => {
-      const flags = flagValues(args);
-      const allow = flags.get('a') ?? [];
-      const deny = flags.get('d') ?? [];
-      const removeAllow = new Set(flags.get('ra') ?? []);
-      const removeDeny = new Set(flags.get('rd') ?? []);
-      if (
-        allow.length === 0 &&
-        deny.length === 0 &&
-        removeAllow.size === 0 &&
-        removeDeny.size === 0
-      ) {
-        return usageError('acl');
-      }
-
-      const current = objectValue(await commands.roomStateEvent(roomId, 'm.room.server_acl'));
-      const currentAllow = Array.isArray(current.allow)
-        ? current.allow.filter((entry): entry is string => typeof entry === 'string')
-        : [];
-      const currentDeny = Array.isArray(current.deny)
-        ? current.deny.filter((entry): entry is string => typeof entry === 'string')
-        : [];
-      const content = {
-        ...current,
-        allow: [...new Set([...currentAllow, ...allow])].filter((entry) => !removeAllow.has(entry)),
-        deny: [...new Set([...currentDeny, ...deny])].filter((entry) => !removeDeny.has(entry)),
-      };
-      await commands.sendStateEvent(roomId, 'm.room.server_acl', '', content);
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'addwidget',
-    run: async (args, { roomId, userId, commands }) => {
-      const parts = words(args);
-      if (parts.length === 0 || userId === null) return usageError('addwidget');
-      const [rawUrl, ...nameParts] = parts;
-
-      let url: URL;
-      try {
-        url = new URL(rawUrl);
-      } catch {
-        return usageError('addwidget');
-      }
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') return usageError('addwidget');
-
-      const name = nameParts.join(' ') || 'Widget';
-      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-      await commands.sendStateEvent(roomId, 'im.vector.modular.widgets', id, {
-        type: 'm.custom',
-        url: enrichWidgetUrl(url.toString()),
-        name,
-        id,
-        creatorUserId: userId,
+      return DONE;
+    case 'acl':
+      await commands.updateServerAcl(roomId, {
+        allow: invocation.allow,
+        deny: invocation.deny,
+        removeAllow: invocation.remove_allow,
+        removeDeny: invocation.remove_deny,
       });
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'html',
-    run: (args) => {
-      const html = args.trim();
-      return html === '' ? usageError('html') : message(plainTextFrom(html), 'text', html);
-    },
-  },
-  {
-    name: 'rainbow',
-    run: (args, { formatted }) => {
-      const text = args.trim();
-      if (text === '') return usageError('rainbow');
-
-      const html = withoutPrefix('rainbow', formatted);
-      return message(text, 'text', html === null ? rainbowHtml(text) : rainbowFormatted(html));
-    },
-  },
-  {
-    name: 'rainbowme',
-    run: (args, { formatted }) => {
-      const text = args.trim();
-      if (text === '') return usageError('rainbowme');
-
-      const html = withoutPrefix('rainbowme', formatted);
-      return message(text, 'emote', html === null ? rainbowHtml(text) : rainbowFormatted(html));
-    },
-  },
-  {
-    name: 'location',
-    run: async (args, { roomId, commands }) => {
-      const parts = words(args);
-      if (parts.length !== 2) return usageError('location');
-
-      const geoUri = geoUriFor(coordinate(parts[0]), coordinate(parts[1]));
-      if (geoUri === null) return usageError('location');
-
-      await commands.sendLocation(roomId, geoUri.slice('geo:'.length), geoUri);
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'sharemylocation',
-    run: async (args, { roomId, commands }) => {
-      if (args.trim() !== '') return usageError('sharemylocation');
-
-      const result = await currentFix();
-      if (result.kind !== 'fix') return { kind: 'error', key: `composer.slashFix.${result.kind}` };
-
-      const geoUri = geoUriFor(result.fix.latitude, result.fix.longitude);
-      if (geoUri === null) return { kind: 'error', key: 'composer.slashFix.unavailable' };
-
-      await commands.sendLocation(roomId, geoUri.slice('geo:'.length), geoUri);
-      return { kind: 'done' };
-    },
-  },
-  memberProfile('myroomnick', (text) => ({ displayname: text })),
-  memberProfile('myroomavatar', (text) => (MXC_URI.test(text) ? { avatar_url: text } : null)),
-  {
-    name: 'addpmp',
-    run: async (args, { commands }) => {
-      const parts = words(args);
-      const id = parts[0];
-      if (parts.length === 0 || id === 'index') return usageError('addpmp');
-
-      const fields = new Map<string, string>();
-      for (const pair of parts.slice(1)) {
-        const at = pair.indexOf('=');
-        if (at > 0) fields.set(pair.slice(0, at), pair.slice(at + 1));
-      }
-
-      const existing = (await commands.personas()).personas.find((entry) => entry.id === id);
-      const avatar = fields.get('avatar') ?? existing?.avatar_url ?? null;
-      if (avatar !== null && !MXC_URI.test(avatar)) return usageError('addpmp');
-
-      await commands.savePersona(
-        {
-          id,
-          display_name: fields.get('name') ?? existing?.display_name ?? id,
-          avatar_url: avatar,
-          pronouns: existing?.pronouns ?? [],
-          color_on_light: existing?.color_on_light ?? null,
-          color_on_dark: existing?.color_on_dark ?? null,
-          triggers: existing?.triggers ?? [],
-          pluralkit: existing?.pluralkit ?? null,
-          last_used: existing?.last_used ?? null,
-        },
-        existing ? id : null
-      );
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'delpmp',
-    run: async (args, { commands }) => {
-      const id = args.trim();
-      if (id === '' || id === 'index') return usageError('delpmp');
-
-      await commands.removePersona(id);
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'usepmp',
-    run: async (args, { roomId, commands }) => {
-      const parts = words(args);
-      if (parts.length === 0 || parts.length > 2) return usageError('usepmp');
-
-      const id = parts[0];
-      if (id === 'reset') {
-        await commands.setPersonaSelection(roomId, null);
-        return { kind: 'done' };
-      }
-      if (id === 'off') {
-        await commands.disableRoomPersonas(roomId);
-        return { kind: 'done' };
-      }
-
-      const validUntil = parts.length === 2 ? Number(parts[1]) : null;
-      if (validUntil !== null && !Number.isFinite(validUntil)) return usageError('usepmp');
-
-      await commands.setPersonaSelection(roomId, id, validUntil);
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'pmpproxy',
-    run: async (args, { commands }) => {
-      const parts = words(args);
-      if (parts.length !== 2) return usageError('pmpproxy');
-      const id = parts[0];
-      const proxy = parts[1];
-      const marker = proxy.indexOf('text');
-      if (marker < 0) return usageError('pmpproxy');
-
-      const persona = (await commands.personas()).personas.find((entry) => entry.id === id);
-      if (persona === undefined) return usageError('pmpproxy');
-
-      await commands.savePersona(
-        {
-          ...persona,
-          triggers: [
-            ...persona.triggers,
-            {
-              prefix: proxy.slice(0, marker) || null,
-              suffix: proxy.slice(marker + 'text'.length) || null,
-              keep_trigger: false,
-            },
-          ],
-        },
-        id
-      );
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'rawmsg',
-    run: async (args, context) => {
-      const denied = developerOnly(context);
-      if (denied) return denied;
-
-      const content = jsonObject(args.trim());
-      if (content === null) return usageError('rawmsg');
-
-      await context.commands.sendRawEvent(context.roomId, 'm.room.message', content);
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'raw',
-    run: async (args, context) => {
-      const denied = developerOnly(context);
-      if (denied) return denied;
-
-      const parsed = rawEventArgs(args);
-      if (parsed === null) return usageError('raw');
-
-      if (parsed.stateKey === null) {
-        await context.commands.sendRawEvent(context.roomId, parsed.eventType, parsed.content);
+      return DONE;
+    case 'add_widget':
+      return addWidget(name, invocation, context);
+    case 'location':
+      return sendLocation(name, invocation.latitude, invocation.longitude, context);
+    case 'share_my_location':
+      return shareMyLocation(context);
+    case 'add_persona':
+      return addPersona(name, invocation, context);
+    case 'remove_persona':
+      await commands.removePersona(invocation.id);
+      return DONE;
+    case 'use_persona':
+      await commands.setPersonaSelection(roomId, invocation.id, invocation.valid_until);
+      return DONE;
+    case 'reset_persona':
+      await commands.setPersonaSelection(roomId, null);
+      return DONE;
+    case 'disable_room_personas':
+      await commands.disableRoomPersonas(roomId);
+      return DONE;
+    case 'persona_proxy':
+      return addPersonaProxy(name, invocation, context);
+    case 'raw_message':
+      await commands.sendRawEvent(roomId, 'm.room.message', invocation.content);
+      return DONE;
+    case 'raw_event':
+      if (invocation.state_key === null) {
+        await commands.sendRawEvent(roomId, invocation.event_type, invocation.content);
       } else {
-        await context.commands.sendStateEvent(
-          context.roomId,
-          parsed.eventType,
-          parsed.stateKey,
-          parsed.content
+        await commands.sendStateEvent(
+          roomId,
+          invocation.event_type,
+          invocation.state_key,
+          invocation.content
         );
       }
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'rawacc',
-    run: async (args, context) => {
-      const denied = developerOnly(context);
-      if (denied) return denied;
-
-      const split = args.trim().search(/\s/);
-      if (split < 1) return usageError('rawacc');
-
-      const eventType = args.trim().slice(0, split);
-      const content = jsonObject(
-        args
-          .trim()
-          .slice(split + 1)
-          .trim()
-      );
-      if (content === null) return usageError('rawacc');
-
-      const existing = objectValue(await context.commands.accountData(eventType));
-      await context.commands.setAccountData(eventType, { ...existing, ...content });
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'delacc',
-    run: async (args, context) => {
-      const denied = developerOnly(context);
-      if (denied) return denied;
-
-      const parts = words(args);
-      if (parts.length !== 2) return usageError('delacc');
-
-      const [eventType, key] = parts;
-      const content = objectValue(await context.commands.accountData(eventType));
-      if (!(key in content)) return usageError('delacc');
-
-      const updated = { ...content };
-      Reflect.deleteProperty(updated, key);
-      await context.commands.setAccountData(eventType, updated);
-      return { kind: 'done' };
-    },
-  },
-  {
-    name: 'delete',
-    run: async (args, context) => {
-      const parsed = deleteArgs(args);
-      if (parsed === null) return usageError('delete');
-
-      const resolved = await resolveTargets(
-        parsed.senderTokens,
-        context.roomId,
-        context.commands,
-        false
-      );
-      if (!('userIds' in resolved)) return resolved;
-      if (resolved.userIds.length === 0) return usageError('delete');
-
-      await context.commands.bulkRedact(
-        context.roomId,
-        resolved.userIds,
-        parsed.afterTs,
-        parsed.eventTypes,
-        parsed.reason
-      );
-      return { kind: 'done' };
-    },
-  },
-];
+      return DONE;
+    case 'raw_account_data': {
+      const existing = objectValue(await commands.accountData(invocation.event_type));
+      await commands.setAccountData(invocation.event_type, {
+        ...existing,
+        ...invocation.content,
+      });
+      return DONE;
+    }
+    case 'delete_account_data_key':
+      return deleteAccountDataKey(name, invocation, context);
+    case 'bulk_redact':
+      return bulkRedact(name, invocation, context);
+  }
+}
 
 function textFrom(node: Node): string {
   let text = '';
@@ -1014,22 +473,8 @@ function plainTextFrom(html: string): string {
   return textFrom(new DOMParser().parseFromString(html, 'text/html').body).trim();
 }
 
-const byName = new Map(SLASH_COMMANDS.map((command) => [command.name, command]));
-
-export function parseSlash(body: string): ParsedSlash {
-  if (!body.startsWith('/')) return { kind: 'none' };
-  if (body.startsWith('//')) return { kind: 'literal', body: body.slice(1) };
-
-  const boundary = body.search(/\s/);
-  const name = (boundary === -1 ? body.slice(1) : body.slice(1, boundary)).toLowerCase();
-  const args = boundary === -1 ? '' : body.slice(boundary + 1);
-
-  const command = byName.get(name);
-  return command === undefined ? { kind: 'unknown', name } : { kind: 'command', command, args };
-}
-
 export async function runSlash(body: string, context: SlashContext): Promise<SlashResult> {
-  const parsed = parseSlash(body);
+  const parsed = parseSlash(body, context.formatted ?? null);
 
   switch (parsed.kind) {
     case 'none':
@@ -1038,8 +483,13 @@ export async function runSlash(body: string, context: SlashContext): Promise<Sla
       return { kind: 'message', body: parsed.body, msgtype: 'text', formatted: null };
     case 'unknown':
       throw new SlashError('composer.slashUnknown', { name: parsed.name });
+    case 'usage':
     case 'command': {
-      const outcome = await parsed.command.run(parsed.args, context);
+      if (parsed.developer_only && context.developerTools !== true) {
+        throw new SlashError('composer.slashDeveloperOnly');
+      }
+      if (parsed.kind === 'usage') throw new SlashError(usageKey(parsed.name));
+      const outcome = await run(parsed.name, parsed.invocation, context);
       if (outcome.kind === 'error') throw new SlashError(outcome.key, outcome.values);
       return outcome;
     }

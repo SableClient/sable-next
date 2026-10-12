@@ -290,7 +290,7 @@ test('a matrix.to link routes inside the app instead of opening a tab', async ()
 
   expect(await fireEvent.click(link)).toBe(false);
   expect(onMatrixLink).toHaveBeenCalledWith(
-    expect.objectContaining({ kind: 'event', eventId: '$target' }),
+    expect.objectContaining({ kind: 'event', event_id: '$target' }),
     expect.any(HTMLAnchorElement)
   );
 });

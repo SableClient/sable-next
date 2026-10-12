@@ -6,7 +6,7 @@ import { t } from '#lib/i18n.js';
 import { adminSuggestions, type AdminCommand, type AdminScope } from './admin-commands';
 import type { AutocompleteQuery, Suggestion } from './autocomplete';
 import { botCommandId, botCommandNames, type BotCommand } from './bot-commands';
-import { descriptionKey, SLASH_COMMANDS } from './slash-commands';
+import { descriptionKey, slashCommandNames } from './slash-commands';
 import { byUsage, usageOf } from './suggestion-usage';
 
 const limit = 8;
@@ -183,27 +183,27 @@ function roomSuggestions(needle: string, rooms: readonly RoomSummary[]): Suggest
     .slice(0, limit);
 }
 
-const builtIn = new Set(SLASH_COMMANDS.map((command) => command.name));
-
 function commandSuggestions(
   needle: string,
   translate: Translate,
   botCommands: readonly BotCommand[]
 ): Suggestion[] {
-  const local = SLASH_COMMANDS.map((command) => ({
-    name: command.name,
-    names: [command.name],
+  const names = slashCommandNames();
+  const builtIn = new Set(names);
+  const local = names.map((name) => ({
+    name,
+    names: [name],
     suggestion: {
-      id: command.name,
-      insert: `/${command.name}`,
-      label: `/${command.name}`,
-      detail: translate(descriptionKey(command)),
+      id: name,
+      insert: `/${name}`,
+      label: `/${name}`,
+      detail: translate(descriptionKey(name)),
     },
   }));
   const bots = botCommands
     .filter((command) => !builtIn.has(command.command.toLowerCase()))
     .map((command) => {
-      const bot = command.senderName ?? command.sender;
+      const bot = command.sender_name ?? command.sender;
       return {
         name: command.command.toLowerCase(),
         names: botCommandNames(command).map((name) => name.toLowerCase()),
@@ -212,7 +212,7 @@ function commandSuggestions(
           insert: `/${command.command}`,
           label: `/${command.command}`,
           detail: command.description ? `${bot} · ${command.description}` : bot,
-          avatarUrl: command.senderAvatar,
+          avatarUrl: command.sender_avatar,
         },
       };
     });
@@ -256,10 +256,7 @@ export function suggestionsFor(
     return [
       ...roomMention(needle, translate),
       ...memberSuggestions(needle, members, displayName),
-    ].slice(
-      0,
-      limit
-    );
+    ].slice(0, limit);
   }
   if (query.sigil === '#') return roomSuggestions(needle, rooms);
   return emoteSuggestions(needle, emotes);

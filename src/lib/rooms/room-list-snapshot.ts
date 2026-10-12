@@ -10,12 +10,19 @@ function storage(): Storage | null {
   }
 }
 
+/** A snapshot from a build before the core resolved counts paints nothing. */
+function isCurrentSummary(room: unknown): boolean {
+  return typeof room === 'object' && room !== null && 'counts' in room;
+}
+
 export function readRoomListSnapshot(accountId: string): RoomSummary[] | null {
   const raw = storage()?.getItem(KEY_PREFIX + accountId);
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as RoomSummary[]) : null;
+    return Array.isArray(parsed) && parsed.every(isCurrentSummary)
+      ? (parsed as RoomSummary[])
+      : null;
   } catch {
     return null;
   }

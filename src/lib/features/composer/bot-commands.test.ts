@@ -51,7 +51,7 @@ describe('parseBotCommand', () => {
     expect(parsed.command).toBe('ban');
     expect(parsed.aliases).toEqual(['b']);
     expect(parsed.description).toBe('Ban someone');
-    expect(parsed.senderName).toBe('Bot');
+    expect(parsed.sender_name).toBe('Bot');
     expect(parsed.parameters.map((parameter) => parameter.key)).toEqual([
       'target_room',
       'timeout_seconds',
@@ -122,7 +122,7 @@ describe('matchBotCommand', () => {
       ])
     ).toMatchObject({
       args: 'id: meowlnir',
-      rawArgs: '\n\nid: meowlnir',
+      raw_args: '\n\nid: meowlnir',
     });
   });
 });
@@ -137,7 +137,7 @@ describe('buildInvocation', () => {
     });
 
     expect(result).toEqual({
-      ok: true,
+      kind: 'built',
       invocation: {
         command: 'ban',
         arguments: {
@@ -157,7 +157,7 @@ describe('buildInvocation', () => {
       parameters: [{ key: 'username', schema: { schema_type: 'primitive', type: 'string' } }],
     });
     const result = buildInvocation(say, { username: 'bob' }, '!admin ');
-    expect(result.ok && result.body).toBe('!admin users create bob');
+    expect(result.kind === 'built' && result.body).toBe('!admin users create bob');
   });
 
   test('omits an unset optional boolean and reports what is missing or malformed', () => {
@@ -166,7 +166,7 @@ describe('buildInvocation', () => {
       timeout_seconds: 'soon',
     });
     expect(result).toEqual({
-      ok: false,
+      kind: 'invalid',
       errors: { target_room: 'required', timeout_seconds: 'invalid', target_users: 'required' },
     });
   });
@@ -188,7 +188,7 @@ describe('buildInvocation', () => {
       ],
     });
     const result = buildInvocation(mode, { mode: '42' });
-    expect(result.ok && result.invocation.arguments.mode).toBe(42);
+    expect(result.kind === 'built' && result.invocation.arguments.mode).toBe(42);
   });
 
   test('builds an event reference from a permalink', () => {
@@ -199,7 +199,7 @@ describe('buildInvocation', () => {
     const result = buildInvocation(quote, {
       event: 'https://matrix.to/#/!room:example.org/$event?via=example.org',
     });
-    expect(result.ok && result.invocation.arguments.event).toEqual({
+    expect(result.kind === 'built' && result.invocation.arguments.event).toEqual({
       type: 'event_id',
       id: '!room:example.org',
       event_id: '$event',

@@ -640,7 +640,7 @@
 
   async function addWidget(name: string, url: string): Promise<void> {
     try {
-      await roomSession.details.addWidget(name, url, core.session?.user_id ?? '');
+      await roomSession.details.addWidget(name, url);
     } catch (error) {
       console.warn('[sable room] add widget failed', error);
       toasts.error($i18n.t('errors.actionFailed'));
@@ -679,7 +679,7 @@
 
   function handleMatrixLink(link: MatrixLink, anchor: HTMLAnchorElement): void {
     if (link.kind === 'user') {
-      openProfile(link.userId, anchor);
+      openProfile(link.user_id, anchor);
       return;
     }
 
@@ -687,12 +687,12 @@
     const { via } = splitVia(anchor.href);
     const target = roomSectionPath(
       roomList.rooms,
-      link.roomId,
-      link.kind === 'event' ? link.eventId : null,
+      link.room_id,
+      link.kind === 'event' ? link.event_id : null,
       via
     );
     if (link.kind === 'event' && target === `${page.url.pathname}${page.url.search}`) {
-      jumpToEvent(link.eventId);
+      jumpToEvent(link.event_id);
       return;
     }
     void afterOverlayPops().then(() =>
@@ -704,7 +704,7 @@
 
   function handleProfileLink(link: MatrixLink, anchor: HTMLAnchorElement): void {
     if (link.kind === 'user' && memberProfile.anchor) {
-      openProfile(link.userId, memberProfile.anchor);
+      openProfile(link.user_id, memberProfile.anchor);
       return;
     }
     handleMatrixLink(link, anchor);

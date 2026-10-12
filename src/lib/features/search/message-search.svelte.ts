@@ -4,10 +4,10 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import {
   parseSearchQuery,
-  toSearchFilter,
+  resolveSearchQuery,
   type ParsedQuery,
-  type QueryResolvers,
   type ResolvedQuery,
+  type SearchDirectory,
   type SearchToken,
 } from './search-query';
 
@@ -41,23 +41,19 @@ export class MessageSearch {
   pages = $state(0);
 
   #core: CoreClient;
-  #resolvers: () => QueryResolvers;
   #debounce: ReturnType<typeof setTimeout> | undefined;
   #generation = 0;
   #served = 0;
   #olderCursor: string | null = null;
+  readonly resolved: ResolvedQuery;
 
-  constructor(core: CoreClient, resolvers: () => QueryResolvers) {
+  constructor(core: CoreClient, directory: () => SearchDirectory) {
     this.#core = core;
-    this.#resolvers = resolvers;
+    this.resolved = $derived(resolveSearchQuery(this.query, directory()));
   }
 
   get parsed(): ParsedQuery {
     return parseSearchQuery(this.query);
-  }
-
-  get resolved(): ResolvedQuery {
-    return toSearchFilter(this.parsed, this.#resolvers());
   }
 
   get unresolved(): SearchToken[] {
@@ -95,7 +91,7 @@ export class MessageSearch {
       return;
     }
 
-    if (this.unresolved.length > 0 || this.resolved.matchesNothing) {
+    if (this.unresolved.length > 0 || this.resolved.matches_nothing) {
       this.hits = [];
       this.searching = false;
       this.refining = false;

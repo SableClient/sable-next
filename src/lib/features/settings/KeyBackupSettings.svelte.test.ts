@@ -151,7 +151,9 @@ test('can retry a failed download', async () => {
   const button = await screen.findByRole('button', { name: 'Download keys' });
   await userEvent.click(button);
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not download keys');
-  await waitFor(() => expect(button).not.toBeDisabled());
+  await waitFor(() => {
+    expect(button).not.toBeDisabled();
+  });
   await userEvent.click(button);
   expect(core.downloadKeyBackup).toHaveBeenCalledTimes(2);
 });

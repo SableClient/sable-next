@@ -10,6 +10,7 @@ import type {
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';
 
+import { rowFields } from './row-fixtures';
 import { stateEventSubject, stateEventText, type Translate } from './state-event-text';
 import {
   canRedact,
@@ -17,9 +18,6 @@ import {
   cumulativeReadTimestamps,
   eventBefore,
   isCollapsed,
-  isMessageRow,
-  jumboEmojiLevel,
-  jumboEmoticonLevel,
   mergeAggregations,
   personaLookup,
   readReceiptEventId,
@@ -158,7 +156,7 @@ test('an aggregation is filtered by its own event type', () => {
 });
 
 function item(content: TimelineItemView['content'], id: string = content.kind): TimelineItemView {
-  return { id, content } as TimelineItemView;
+  return { id, content, ...rowFields(content) } as TimelineItemView;
 }
 
 const message = item({
@@ -168,6 +166,7 @@ const message = item({
   emote: false,
   notice: false,
   edited: false,
+  jumbo: null,
 });
 const divider = item({ kind: 'date_divider', timestamp: 0 });
 const readMarker = item({ kind: 'read_marker' });
@@ -335,11 +334,27 @@ test('keeps described room changes visible with other hidden events disabled', (
 
 test("keeps a persona message out of the account's collapsed run", () => {
   const account = item(
-    { kind: 'message', body: 'a', html: 'a', emote: false, notice: false, edited: false },
+    {
+      kind: 'message',
+      body: 'a',
+      html: 'a',
+      emote: false,
+      notice: false,
+      edited: false,
+      jumbo: null,
+    },
     'a'
   );
   const persona = item(
-    { kind: 'message', body: 'b', html: 'b', emote: false, notice: false, edited: false },
+    {
+      kind: 'message',
+      body: 'b',
+      html: 'b',
+      emote: false,
+      notice: false,
+      edited: false,
+      jumbo: null,
+    },
     'b'
   );
   const items = [
@@ -391,6 +406,7 @@ test('only a connected reply preview starts a new message group', () => {
       sender_mentioned: false,
       sender_name: 'Bob',
       body: 'Earlier message',
+      fallback: null,
     },
   } as TimelineItemView;
   const run = [first, reply];
@@ -547,48 +563,6 @@ test('a live location share counts as unread', () => {
   expect(unreadCountAfter([marker, share], 0)).toBe(1);
 });
 
-test('sizes emoji-only bodies by how many there are', () => {
-  expect(jumboEmojiLevel('👍')).toBe(1);
-  expect(jumboEmojiLevel('👍🎉')).toBe(2);
-  expect(jumboEmojiLevel('👍🎉🔥')).toBe(3);
-  expect(jumboEmojiLevel('👍🎉🔥😀😀')).toBe(4);
-});
-
-test('leaves ordinary text alone', () => {
-  expect(jumboEmojiLevel('nice 👍')).toBeNull();
-  expect(jumboEmojiLevel('')).toBeNull();
-  // Digits are Emoji_Component, so a bare number must not count as emoji.
-  expect(jumboEmojiLevel('123')).toBeNull();
-  expect(jumboEmojiLevel('👍👍👍👍👍👍👍👍👍')).toBeNull();
-});
-
-const emote = (name: string) =>
-  `<img alt="${name}" height="32" src="mxc://example.org/${name}" title="${name}">`;
-
-test('sizes a message made only of inline emotes, by how many there are', () => {
-  expect(
-    jumboEmoticonLevel('<img alt="rotate" height="32" src="mxc://a/rotate" title="rotate"> ')
-  ).toBe(1);
-  expect(jumboEmoticonLevel(`<p>${emote('rotate')}</p>`)).toBe(1);
-  expect(jumboEmoticonLevel(`${emote('rotate')}<br>${emote('spin')}`)).toBe(2);
-  expect(jumboEmoticonLevel(`${emote('a')} ${emote('b')}`)).toBe(2);
-  expect(jumboEmoticonLevel(`${emote('a')} ${emote('b')} ${emote('c')} ${emote('d')}`)).toBe(3);
-  expect(jumboEmoticonLevel('<img src="mxc://a/rotate" alt="a > b">')).toBe(1);
-  expect(jumboEmoticonLevel('<img src="mxc://a/rotate" alt=":rotate:">&nbsp;')).toBe(1);
-});
-
-test('leaves messages with words or real images at normal size', () => {
-  expect(jumboEmoticonLevel(`nice ${emote('rotate')}`)).toBeNull();
-  expect(jumboEmoticonLevel('')).toBeNull();
-  expect(jumboEmoticonLevel('<img src="https://example.org/photo.png" width="640">')).toBeNull();
-  expect(
-    jumboEmoticonLevel(`${emote('rotate')}<img src="https://example.org/photo.png">`)
-  ).toBeNull();
-  expect(jumboEmoticonLevel('<a href="https://example.org">link</a>')).toBeNull();
-  expect(jumboEmoticonLevel(`${emote('rotate')} and words`)).toBeNull();
-  expect(jumboEmoticonLevel(Array.from({ length: 9 }, () => emote('rotate')).join(' '))).toBeNull();
-});
-
 function stateChange(change: StateChangeView): TimelineItemView {
   return {
     ...item({
@@ -739,10 +713,6 @@ test('anything you sent is yours to redact, not only your text', () => {
   expect(canRedact(theirs(joined.content), true, true)).toBe(true);
   expect(canRedact(own(divider.content), true, true)).toBe(false);
   expect(canRedact(own({ kind: 'redacted', reason: null }), true, true)).toBe(false);
-});
-
-test('a tombstone is a message row, so it keeps the sender and the menu', () => {
-  expect(isMessageRow({ kind: 'redacted', reason: null })).toBe(true);
 });
 
 test('a room whose every event is redacted is not blank at the shipped default', () => {

@@ -5,7 +5,7 @@
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
   import IconContext from 'phosphor-svelte/lib/IconContext';
-  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
+  import type { MemberView, PinReadStateView, TimelineItemView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -16,14 +16,6 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
-  import {
-    isNewPin,
-    PIN_MARKER_EVENT_TYPE,
-    pinsHash,
-    readPinMarker,
-    unreadPinCount,
-    type PinReadMarker,
-  } from './timeline/pin-marker';
   import { useEventItems } from './messages/event-items.svelte.js';
   import { pinErrorMessage } from './timeline/pinned-events.svelte.js';
   import MessagePreview from './messages/MessagePreview.svelte';
@@ -68,8 +60,8 @@
   let entries = $state.raw<ReadonlyMap<string, TimelineItemView>>(new Map());
   let pending = $state.raw<ReadonlySet<string>>(new Set());
   let settled = $state.raw<ReadonlySet<string>>(new Set());
-  let marker = $state.raw<PinReadMarker | null>(null);
-  let currentHash = $state<string | null>(null);
+  let unreadCount = $state(0);
+  let freshIds = $state.raw<ReadonlySet<string>>(new Set());
   let run = 0;
   let sizeVersion = $state(0);
   let listHeight = $state(0);
@@ -81,7 +73,6 @@
     void sizeVersion;
     return (index: number) => heights.get(ordered[index]) ?? ESTIMATED_ROW;
   });
-  let unreadCount = $derived(unreadPinCount(pinnedIds, marker, currentHash));
   $effect(() => {
     onUnread?.(unreadCount);
   });
@@ -105,15 +96,10 @@
 
     const current = ++run;
     try {
-      const [ids, stored] = await Promise.all([
-        core.commands.pinnedEvents(target),
-        core.commands.roomAccountData(target, PIN_MARKER_EVENT_TYPE),
-      ]);
+      const state = await core.commands.pinReadState(target);
       if (current !== run) return;
 
-      pinnedIds = ids;
-      marker = readPinMarker(stored);
-      currentHash = await pinsHash(ids);
+      adopt(state);
     } catch (error) {
       console.debug('[sable room] pins unavailable', error);
     }
@@ -190,19 +176,17 @@
     };
   }
 
-  async function markSeen(target: string, ids: readonly string[]): Promise<void> {
-    const lastSeen = ids.at(-1);
-    if (lastSeen === undefined) return;
+  function adopt(state: PinReadStateView): void {
+    pinnedIds = state.pinned_ids;
+    unreadCount = state.unread;
+    freshIds = new Set(state.fresh_ids);
+  }
 
-    const next: PinReadMarker = {
-      hash: await pinsHash(ids),
-      count: ids.length,
-      last_seen_id: lastSeen,
-    };
-    marker = next;
-    currentHash = next.hash;
+  async function markSeen(target: string, ids: readonly string[]): Promise<void> {
+    if (ids.length === 0) return;
+    unreadCount = 0;
     try {
-      await core.commands.setRoomAccountData(target, PIN_MARKER_EVENT_TYPE, next);
+      adopt(await core.commands.markPinsSeen(target, ids));
     } catch (error) {
       console.debug('[sable room] pin marker not stored', error);
     }
@@ -292,11 +276,7 @@
           {#snippet item({ index, style })}
             {@const eventId = ordered[index]}
             <div {style} class="pin-row">
-              <div
-                class="pin-item"
-                class:fresh={isNewPin(pinnedIds, marker, eventId)}
-                {@attach measure(eventId)}
-              >
+              <div class="pin-item" class:fresh={freshIds.has(eventId)} {@attach measure(eventId)}>
                 {#if !settled.has(eventId)}
                   <p class="pin-status" role="status"><Spinner small /></p>
                 {:else}

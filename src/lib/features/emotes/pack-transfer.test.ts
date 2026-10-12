@@ -112,7 +112,7 @@ test('a pack survives a round trip onto a homeserver that never saw the original
 
   expect(imported.name).toBe('Blobs');
   expect(imported.attribution).toBe('CC BY 4.0');
-  expect(imported.avatarUrl).toMatch(/^mxc:\/\/new\.example\.org\//u);
+  expect(imported.avatar_url).toMatch(/^mxc:\/\/new\.example\.org\//u);
   expect(imported.images.map((image) => image.shortcode).toSorted()).toEqual([
     'blob_party',
     'blob_wave',

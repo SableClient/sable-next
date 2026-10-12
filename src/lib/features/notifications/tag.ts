@@ -1,3 +1,1 @@
-export function roomTag(userId: string | undefined, roomId: string): string {
-  return `${userId ?? ''} ${roomId}`;
-}
+export { roomTag } from '#lib/model/model.js';

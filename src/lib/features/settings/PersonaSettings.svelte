@@ -11,7 +11,7 @@
   import { pickFiles, saveBytes } from '#lib/platform/files.js';
   import { importPersonaAvatar } from '#lib/platform/persona-avatar.js';
   import { i18n } from '#lib/i18n.js';
-  import { backupFileName, backupJson, CATALOG_EVENT, parseBackup } from '#lib/personas/backup.js';
+  import { backupFileName } from '#lib/personas/backup.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import {
     fetchPluralkitMembers,
@@ -57,7 +57,7 @@
 
   let backingUp = $state(false);
   let backupInput = $state<HTMLInputElement>();
-  let restoreContent = $state.raw<Record<string, unknown> | null>(null);
+  let restoreContent = $state.raw<string | null>(null);
   let restoring = $state(false);
 
   $effect(() => {
@@ -191,8 +191,7 @@
     backingUp = true;
     error = null;
     try {
-      const content = await core.commands.accountData(CATALOG_EVENT);
-      const bytes = new TextEncoder().encode(backupJson(content));
+      const bytes = new TextEncoder().encode(await core.commands.personaBackup());
       if ((await saveBytes(bytes, backupFileName(), 'application/json')) === 'failed') {
         error = $i18n.t('personas.backupFailed');
       }
@@ -209,7 +208,9 @@
     if (!file) return;
     error = null;
     try {
-      restoreContent = parseBackup(await file.text());
+      const backup = await file.text();
+      await core.commands.checkPersonaBackup(backup);
+      restoreContent = backup;
     } catch (cause) {
       console.warn('[sable personas] the backup file could not be read', cause);
       error = $i18n.t('personas.restoreInvalid');
@@ -223,11 +224,11 @@
   }
 
   async function confirmRestore(): Promise<void> {
-    const content = restoreContent;
-    if (!content) return;
+    const backup = restoreContent;
+    if (backup === null) return;
     restoring = true;
     try {
-      await core.commands.setAccountData(CATALOG_EVENT, content);
+      await core.commands.restorePersonaBackup(backup);
       await personas.load(true);
     } catch (cause) {
       console.warn('[sable personas] the restore failed', cause);

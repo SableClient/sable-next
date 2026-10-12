@@ -1,5 +1,6 @@
 <script lang="ts">
   import type {
+    FieldEdit,
     PronounView,
     RoomPermissionsView,
     RoomPowerLevelsView,
@@ -7,12 +8,8 @@
   } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import {
-    COSMETIC_EVENT_TYPES,
-    MEMBER_COLOR_FIELD,
-    pronounContent,
-    writeMemberColors,
-  } from '#lib/features/composer/slash-commands.js';
+  import type { MemberLookEdit } from '#lib/core/commands.svelte.js';
+  import { COSMETIC_EVENT_TYPES, pronounSets } from '#lib/features/composer/slash-commands.js';
   import ColorSetting from '#lib/features/settings/ColorSetting.svelte';
   import { i18n } from '#lib/i18n.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -27,7 +24,7 @@
 
   import { senderDisplayColors } from '../members/members';
   import SenderName from '../members/SenderName.svelte';
-  import { canSendState, toEventContent } from './permission-groups';
+  import { canSendState } from './permission-groups';
 
   import '#lib/ui/primitives/settings-row.css';
 
@@ -134,54 +131,36 @@
     void load(target, self);
   });
 
-  function record(value: unknown): Record<string, unknown> {
-    return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
-  }
-
-  function text(value: unknown): string {
-    return typeof value === 'string' ? value : '';
-  }
-
   async function load(target: string, self: string): Promise<void> {
     const current = ++run;
     try {
-      const [member, pronounEvent, profile] = await Promise.all([
-        core.commands.roomStateEvent(target, 'm.room.member', self),
-        core.commands.roomStateEvent(target, COSMETIC_EVENT_TYPES.pronoun, self),
+      const [look, profile] = await Promise.all([
+        core.commands.memberLook(target),
         core.refreshUserProfile(self).catch(() => null),
       ]);
       if (current !== run) return;
-      const colors = record(record(member)['eu.she-a.color']);
-      colorOnLight = text(colors.on_light);
-      colorOnDark = text(colors.on_dark);
+      colorOnLight = look.color_on_light ?? '';
+      colorOnDark = look.color_on_dark ?? '';
       profileName = profile?.display_name ?? null;
       profileAvatar = profile?.avatar_url ?? null;
-      const memberAvatar = text(record(member).avatar_url);
-      avatar = memberAvatar === '' || memberAvatar === profileAvatar ? null : memberAvatar;
-      const memberName = text(record(member).displayname);
-      name = memberName === profileName ? '' : memberName;
+      avatar = look.avatar_url === profileAvatar ? null : look.avatar_url;
+      name = look.display_name === profileName ? '' : (look.display_name ?? '');
       savedName = name;
-      const sets = record(pronounEvent).pronouns;
-      pronouns = Array.isArray(sets)
-        ? sets
-            .map((set) => text(record(set).summary))
-            .filter((summary) => summary !== '')
-            .join(', ')
-        : '';
+      pronouns = look.pronouns.map((set) => set.summary).join(', ');
       savedPronouns = pronouns;
     } catch (error) {
       console.warn('[sable room] cosmetics unavailable', error);
     }
   }
 
-  async function save(key: string, write: (target: string, self: string) => Promise<void>) {
+  async function save(key: string, write: (target: string) => Promise<void>) {
     const target = roomId;
     const self = userId;
     if (!target || !self || saving !== null) return;
     saving = key;
     failed = false;
     try {
-      await write(target, self);
+      await write(target);
     } catch (error) {
       console.warn('[sable room] cosmetic not saved', error);
       failed = true;
@@ -191,35 +170,27 @@
   }
 
   function saveColor(theme: 'on_light' | 'on_dark', value: string | undefined): void {
-    void save(theme, (target, self) =>
-      writeMemberColors(core.commands, target, self, {
-        kind: 'set',
-        colors: { [theme]: value },
-      })
+    const edit = field(value);
+    void save(theme, (target) =>
+      core.commands.setMemberLook(
+        target,
+        theme === 'on_light' ? { color_on_light: edit } : { color_on_dark: edit }
+      )
     );
   }
 
-  async function writeMember(
-    target: string,
-    self: string,
-    fields: Partial<Record<string, string | null>>
-  ): Promise<void> {
-    const rest = Object.fromEntries(
-      Object.entries(
-        record(await core.commands.roomStateEvent(target, 'm.room.member', self))
-      ).filter(([key]) => !(key in fields))
-    );
-    await core.commands.sendStateEvent(target, 'm.room.member', self, {
-      ...rest,
-      membership: 'join',
-      ...Object.fromEntries(Object.entries(fields).filter(([, value]) => value)),
-    });
+  function field(value: string | null | undefined): FieldEdit {
+    return value ? { kind: 'set', value } : { kind: 'clear' };
+  }
+
+  function writeMember(target: string, look: MemberLookEdit): Promise<void> {
+    return core.commands.setMemberLook(target, look);
   }
 
   function saveName(): void {
-    void save('name', async (target, self) => {
+    void save('name', async (target) => {
       const next = name.trim() || profileName;
-      await writeMember(target, self, { displayname: next });
+      await writeMember(target, { display_name: field(next) });
       name = next === profileName ? '' : (next ?? '');
       savedName = name;
     });
@@ -229,18 +200,18 @@
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
     if (!file) return;
-    void save('avatar', async (target, self) => {
+    void save('avatar', async (target) => {
       const upright = await uprightJpeg(file);
       const bytes = new Uint8Array(await upright.arrayBuffer());
       const uri = await core.commands.uploadMedia(upright.type || 'image/*', bytes);
-      await writeMember(target, self, { avatar_url: uri });
+      await writeMember(target, { avatar_url: field(uri) });
       avatar = uri;
     });
   }
 
   function resetAvatar(): void {
-    void save('avatar', async (target, self) => {
-      await writeMember(target, self, { avatar_url: profileAvatar });
+    void save('avatar', async (target) => {
+      await writeMember(target, { avatar_url: field(profileAvatar) });
       avatar = null;
     });
   }
@@ -249,12 +220,12 @@
     const total = applyTargets.length;
     let progress = { done: 0, failed: 0, total };
     applied = progress;
-    void save('apply', async (_target, self) => {
+    void save('apply', async () => {
       for (const child of applyTargets) {
         try {
-          await writeMember(child, self, {
-            displayname: name.trim() || profileName,
-            avatar_url: avatar ?? profileAvatar,
+          await writeMember(child, {
+            display_name: field(name.trim() || profileName),
+            avatar_url: field(avatar ?? profileAvatar),
           });
         } catch (error) {
           console.warn('[sable room] look not applied to a room', error);
@@ -269,34 +240,29 @@
   }
 
   function savePronouns(): void {
-    void save('pronouns', async (target, self) => {
-      await core.commands.sendStateEvent(
-        target,
-        COSMETIC_EVENT_TYPES.pronoun,
-        self,
-        pronounContent(pronouns.trim() === '' ? 'reset' : pronouns) ?? {}
-      );
+    void save('pronouns', async (target) => {
+      await core.commands.setPronouns(target, pronounSets(pronouns));
       savedPronouns = pronouns;
     });
   }
 
   function resetLook(): void {
-    void save('reset', async (target, self) => {
-      await writeMember(target, self, {
-        displayname: profileName,
-        avatar_url: profileAvatar,
-        [MEMBER_COLOR_FIELD]: null,
+    void save('reset', async (target) => {
+      const colored = colorOnLight !== '' || colorOnDark !== '';
+      await writeMember(target, {
+        display_name: field(profileName),
+        avatar_url: field(profileAvatar),
+        ...(colored && { color_on_light: field(null), color_on_dark: field(null) }),
       });
       name = '';
       savedName = '';
       avatar = null;
-      if (colorOnLight || colorOnDark) {
-        await core.commands.sendStateEvent(target, COSMETIC_EVENT_TYPES.color, self, {});
+      if (colored) {
         colorOnLight = '';
         colorOnDark = '';
       }
       if (canSetPronouns && savedPronouns !== '') {
-        await core.commands.sendStateEvent(target, COSMETIC_EVENT_TYPES.pronoun, self, {});
+        await core.commands.setPronouns(target, []);
         pronouns = '';
         savedPronouns = '';
       }
@@ -306,13 +272,13 @@
   function allowMembers(eventType: string, allowed: boolean): void {
     const base = effectiveLevels;
     if (!base) return;
-    const next = {
-      ...base,
-      events: { ...base.events, [eventType]: allowed ? MEMBER_LEVEL : MODERATOR_LEVEL },
-    };
     void save(eventType, async (target) => {
-      await core.commands.sendStateEvent(target, 'm.room.power_levels', '', toEventContent(next));
-      currentLevels = next;
+      currentLevels = await core.commands.setPowerLevel(
+        target,
+        base,
+        { kind: 'state', event_type: eventType },
+        allowed ? MEMBER_LEVEL : MODERATOR_LEVEL
+      );
     });
   }
 </script>

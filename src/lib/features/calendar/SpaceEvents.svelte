@@ -81,7 +81,7 @@
       <span>{$i18n.t('common.today')}</span>
     </h3>
     <ul class="space-events-list">
-      {#each shown as { room, occurrence } (`${room.room_id}|${occurrence.item.eventId}|${String(occurrence.start)}`)}
+      {#each shown as { room, occurrence } (`${room.room_id}|${occurrence.item.event_id}|${String(occurrence.start)}`)}
         {@const href = resolve('/(app)/space/[spaceId]/[roomId]', {
           spaceId,
           roomId: roomPathParam(room, roomList.rooms),
@@ -89,7 +89,7 @@
         <li>
           <a class="space-event selection-layer" {href} onclick={() => onNavigate?.(href)}>
             <span class="space-event-time">
-              {occurrence.item.allDay ? $i18n.t('calendar.allDay') : formatTime(occurrence.start)}
+              {occurrence.item.all_day ? $i18n.t('calendar.allDay') : formatTime(occurrence.start)}
             </span>
             <span class="space-event-title">
               {occurrence.item.title || $i18n.t('calendar.untitled')}

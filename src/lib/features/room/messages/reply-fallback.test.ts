@@ -1,79 +1,33 @@
 import { expect, test } from 'vitest';
 
-import { replyFallbackFromSource } from './reply-fallback';
+import type { ReplyView } from '#src/generated/protocol';
+
+import { replyText } from './reply-fallback';
 
 const t = (key: string, values?: Record<string, unknown>) =>
   values ? `${key}:${JSON.stringify(values)}` : key;
 
-test('a reply to a reaction names the reaction', () => {
-  const source = JSON.stringify({
-    type: 'm.reaction',
-    sender: '@ana:example.org',
-    content: { 'm.relates_to': { rel_type: 'm.annotation', event_id: '$x', key: '👍' } },
-  });
+function reply(body: string | null, fallback: ReplyView['fallback']): ReplyView {
+  return {
+    event_id: '$x',
+    sender: null,
+    sender_mentioned: false,
+    sender_name: null,
+    body,
+    fallback,
+  };
+}
 
-  expect(replyFallbackFromSource(source, t)).toEqual({
-    sender: '@ana:example.org',
-    body: 'timeline.replyToReaction:{"key":"👍"}',
-  });
-});
-
-test('any other event falls back to its body, then its type', () => {
-  expect(
-    replyFallbackFromSource(
-      JSON.stringify({ type: 'org.example.note', sender: '@b:x', content: { body: 'hi' } }),
-      t
-    )?.body
-  ).toBe('hi');
-  expect(
-    replyFallbackFromSource(
-      JSON.stringify({ type: 'm.room.topic', sender: '@b:x', content: {} }),
-      t
-    )?.body
-  ).toBe('timeline.replyToEvent:{"type":"m.room.topic"}');
-});
-
-test.each(['m.room.message', 'm.room.encrypted', 'm.reaction', 'm.room.topic'])(
-  'redacted %s reply',
-  (type) => {
-    const source = JSON.stringify({
-      type,
-      sender: '@ana:example.org',
-      content: {},
-      unsigned: { redacted_because: { type: 'm.room.redaction', content: {} } },
-    });
-
-    expect(replyFallbackFromSource(source, t)).toEqual({
-      sender: '@ana:example.org',
-      body: 'timeline.redacted',
-    });
-  }
-);
-
-test('redaction overrides body', () => {
-  expect(
-    replyFallbackFromSource(
-      JSON.stringify({
-        type: 'm.room.message',
-        sender: '@ana:example.org',
-        content: { body: 'Old body' },
-        unsigned: { redacted_because: { type: 'm.room.redaction', content: {} } },
-      }),
-      t
-    )?.body
-  ).toBe('timeline.redacted');
-});
-
-test('reply to a redaction event', () => {
-  expect(
-    replyFallbackFromSource(
-      JSON.stringify({ type: 'm.room.redaction', sender: '@ana:example.org', content: {} }),
-      t
-    )?.body
-  ).toBe('timeline.replyToRedaction');
-});
-
-test('unreadable source gives nothing', () => {
-  expect(replyFallbackFromSource('not json', t)).toBeNull();
-  expect(replyFallbackFromSource('[]', t)).toBeNull();
+test('a reply quotes its body, or says what the replied-to event was', () => {
+  expect(replyText(reply('hi', null), t)).toBe('hi');
+  expect(replyText(reply(null, { kind: 'reaction', key: '👍' }), t)).toBe(
+    'timeline.replyToReaction:{"key":"👍"}'
+  );
+  expect(replyText(reply(null, { kind: 'event', event_type: 'm.room.topic' }), t)).toBe(
+    'timeline.replyToEvent:{"type":"m.room.topic"}'
+  );
+  expect(replyText(reply(null, { kind: 'redacted' }), t)).toBe('timeline.redacted');
+  expect(replyText(reply(null, { kind: 'redaction' }), t)).toBe('timeline.replyToRedaction');
+  expect(replyText(reply(null, null), t)).toBe('');
+  expect(replyText(null, t)).toBe('');
 });

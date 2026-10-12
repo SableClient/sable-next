@@ -175,6 +175,10 @@
 
   const previewMessage = $derived<TimelineItemView>({
     id: 'profile-message-preview',
+    row: 'message',
+    forwardable: true,
+    redactable: true,
+    visibility: 'always',
     event_id: null,
     transaction_id: null,
     send_state: null,
@@ -189,6 +193,7 @@
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
     in_reply_to: null,
     forum_title: null,

@@ -1,6 +1,8 @@
 import type {
+  AbbreviationView,
+  AvatarEditView,
   BookmarkView,
-  BotCommandDescriptionView,
+  BotCommand,
   CalendarView,
   CallIntent,
   CallCompatibilityView,
@@ -17,8 +19,11 @@ import type {
   EncryptionStatusView,
   EventNotificationsView,
   EventNotificationView,
+  FieldEdit,
+  GestureView,
   KeyBackupStatusView,
   KeyBackupDownloadView,
+  HistoryVisibilityView,
   HomeserverSoftwareView,
   IdentityResetStep,
   ImagePackView,
@@ -29,6 +34,8 @@ import type {
   InviteTriageView,
   JoinRuleView,
   KeywordNotificationView,
+  MediaPreviewConfigView,
+  MemberLookView,
   MembershipView,
   MemberView,
   MentionNotificationModeView,
@@ -38,12 +45,21 @@ import type {
   NotificationModeView,
   NotificationSettingsView,
   OpenIdTokenView,
+  PackAddressView,
+  PackDraftView,
+  PackImageDraftView,
+  PackTargetView,
   PackImageInfoView,
   PaginationDirection,
   PerMessageProfileView,
   PersonaCatalogView,
   PersonaView,
+  PinReadStateView,
+  PowerLevelLocation,
+  PowerLevelTagView,
   PresenceView,
+  PronounView,
+  ProfileOverridesView,
   ProfilePropagationView,
   PublicRoomView,
   PusherView,
@@ -56,7 +72,6 @@ import type {
   RoomAttachmentView,
   RoomCosmeticsView,
   SpaceParentView,
-  RoomNotificationModeView,
   RoomOpenView,
   RoomPermissionsView,
   RoomPowerLevelsView,
@@ -65,6 +80,7 @@ import type {
   RoomSummary,
   RoomTag,
   RoomVersionsView,
+  RsvpStatusView,
   RtcLivekitEndpoint,
   ScheduledMessageView,
   SealedAccountDataView,
@@ -157,6 +173,14 @@ export type SendAttachmentOptions = {
 };
 
 export type SendGalleryOptions = Omit<SendAttachmentOptions, 'persona' | 'spoiler'>;
+
+export type MemberLookEdit = Partial<
+  Record<'display_name' | 'avatar_url' | 'color_on_light' | 'color_on_dark', FieldEdit>
+>;
+
+const KEEP: FieldEdit = { kind: 'keep' };
+
+export type PowerLevelTags = Readonly<Record<string, PowerLevelTagView>>;
 
 export type EditMessageOptions = Omit<SendMessageOptions, 'inReplyTo' | 'silentReply'> & {
   mediaCaption?: boolean;
@@ -410,7 +434,7 @@ export function createCommands(transport: () => Transport) {
       return response.events;
     },
 
-    async botCommands(roomId: string): Promise<BotCommandDescriptionView[]> {
+    async botCommands(roomId: string): Promise<BotCommand[]> {
       const response = await transport().send({ type: 'bot_commands', room_id: roomId });
       return response.commands;
     },
@@ -698,6 +722,10 @@ export function createCommands(transport: () => Transport) {
         user_id: userId,
         reason,
       });
+    },
+
+    async denyKnock(roomId: string, userId: string): Promise<void> {
+      await transport().send({ type: 'deny_knock', room_id: roomId, user_id: userId });
     },
 
     async banUser(roomId: string, userId: string, reason: string | null = null): Promise<void> {
@@ -1747,14 +1775,6 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
-    async roomNotificationModes(roomIds: readonly string[]): Promise<RoomNotificationModeView[]> {
-      const response = await transport().send({
-        type: 'room_notification_modes',
-        room_ids: [...roomIds],
-      });
-      return response.modes;
-    },
-
     async notificationSettings(roomId: string): Promise<NotificationSettingsView> {
       const response = await transport().send({
         type: 'notification_settings',
@@ -2226,6 +2246,323 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
+    async historyVisibility(roomId: string): Promise<HistoryVisibilityView> {
+      const { visibility } = await transport().send({
+        type: 'history_visibility',
+        room_id: roomId,
+      });
+      return visibility;
+    },
+
+    async setHistoryVisibility(roomId: string, visibility: HistoryVisibilityView): Promise<void> {
+      await transport().send({ type: 'set_history_visibility', room_id: roomId, visibility });
+    },
+
+    async enableEncryption(roomId: string): Promise<void> {
+      await transport().send({ type: 'enable_encryption', room_id: roomId });
+    },
+
+    async canonicalAlias(
+      roomId: string
+    ): Promise<{ alias: string | null; alternatives: string[] }> {
+      const { alias, alt_aliases } = await transport().send({
+        type: 'canonical_alias',
+        room_id: roomId,
+      });
+      return { alias, alternatives: alt_aliases };
+    },
+
+    async setCanonicalAlias(
+      roomId: string,
+      alias: string | null,
+      alternatives: readonly string[]
+    ): Promise<{ alias: string | null; alternatives: string[] }> {
+      const response = await transport().send({
+        type: 'set_canonical_alias',
+        room_id: roomId,
+        alias,
+        alt_aliases: [...alternatives],
+      });
+      return { alias: response.alias, alternatives: response.alt_aliases };
+    },
+
+    async roomBanner(roomId: string): Promise<string | null> {
+      const { url } = await transport().send({ type: 'room_banner', room_id: roomId });
+      return url;
+    },
+
+    async setRoomBanner(roomId: string, url: string | null): Promise<void> {
+      await transport().send({ type: 'set_room_banner', room_id: roomId, url });
+    },
+
+    async memberListThreshold(roomId: string): Promise<number | null> {
+      const { always_listed_from } = await transport().send({
+        type: 'member_list_threshold',
+        room_id: roomId,
+      });
+      return always_listed_from;
+    },
+
+    async setMemberListThreshold(roomId: string, alwaysListedFrom: number | null): Promise<void> {
+      await transport().send({
+        type: 'set_member_list_threshold',
+        room_id: roomId,
+        always_listed_from: alwaysListedFrom,
+      });
+    },
+
+    async mediaPreviewConfig(roomId: string | null = null): Promise<MediaPreviewConfigView> {
+      const { config } = await transport().send({
+        type: 'media_preview_config',
+        room_id: roomId,
+      });
+      return config;
+    },
+
+    async setMediaPreviewConfig(config: MediaPreviewConfigView): Promise<MediaPreviewConfigView> {
+      const { config: merged } = await transport().send({
+        type: 'set_media_preview_config',
+        config,
+      });
+      return merged;
+    },
+
+    async sendGesture(roomId: string, gesture: GestureView, target: string | null): Promise<void> {
+      await transport().send({ type: 'send_gesture', room_id: roomId, gesture, target });
+    },
+
+    async answerCalendarEvent(
+      roomId: string,
+      answer: {
+        calendarEventId: string;
+        uid: string;
+        recurrenceId: string | null;
+        status: RsvpStatusView;
+      }
+    ): Promise<void> {
+      await transport().send({
+        type: 'answer_calendar_event',
+        room_id: roomId,
+        calendar_event_id: answer.calendarEventId,
+        uid: answer.uid,
+        recurrence_id: answer.recurrenceId,
+        status: answer.status,
+      });
+    },
+
+    async addRoomWidget(roomId: string, name: string, url: string): Promise<string> {
+      const { widget_id } = await transport().send({
+        type: 'add_room_widget',
+        room_id: roomId,
+        name,
+        url,
+      });
+      return widget_id;
+    },
+
+    async removeRoomWidget(roomId: string, widgetId: string): Promise<void> {
+      await transport().send({ type: 'remove_room_widget', room_id: roomId, widget_id: widgetId });
+    },
+
+    async updateServerAcl(
+      roomId: string,
+      edit: { allow: string[]; deny: string[]; removeAllow: string[]; removeDeny: string[] }
+    ): Promise<void> {
+      await transport().send({
+        type: 'update_server_acl',
+        room_id: roomId,
+        allow: edit.allow,
+        deny: edit.deny,
+        remove_allow: edit.removeAllow,
+        remove_deny: edit.removeDeny,
+      });
+    },
+
+    async pinReadState(roomId: string): Promise<PinReadStateView> {
+      const { pinned_ids, unread, fresh_ids } = await transport().send({
+        type: 'pin_read_state',
+        room_id: roomId,
+      });
+      return { pinned_ids, unread, fresh_ids };
+    },
+
+    async markPinsSeen(roomId: string, pinnedIds: readonly string[]): Promise<PinReadStateView> {
+      const { pinned_ids, unread, fresh_ids } = await transport().send({
+        type: 'mark_pins_seen',
+        room_id: roomId,
+        pinned_ids: [...pinnedIds],
+      });
+      return { pinned_ids, unread, fresh_ids };
+    },
+
+    async personaBackup(): Promise<string> {
+      const { backup } = await transport().send({ type: 'persona_backup' });
+      return backup;
+    },
+
+    async checkPersonaBackup(backup: string): Promise<void> {
+      await transport().send({ type: 'check_persona_backup', backup });
+    },
+
+    async restorePersonaBackup(backup: string): Promise<void> {
+      await transport().send({ type: 'restore_persona_backup', backup });
+    },
+
+    async profileOverrides(): Promise<ProfileOverridesView> {
+      const { overrides, protection, can_seal } = await transport().send({
+        type: 'profile_overrides',
+      });
+      return { overrides, protection, can_seal };
+    },
+
+    async setProfileOverride(
+      userId: string,
+      edit: { display_name: FieldEdit; avatar: AvatarEditView; color: FieldEdit }
+    ): Promise<ProfileOverridesView> {
+      const { overrides, protection, can_seal } = await transport().send({
+        type: 'set_profile_override',
+        user_id: userId,
+        ...$state.snapshot(edit),
+      });
+      return { overrides, protection, can_seal };
+    },
+
+    async dismissedInvites(): Promise<string[]> {
+      const { room_ids } = await transport().send({ type: 'dismissed_invites' });
+      return room_ids;
+    },
+
+    async setInviteDismissed(roomId: string, dismissed: boolean): Promise<string[]> {
+      const { room_ids } = await transport().send({
+        type: 'set_invite_dismissed',
+        room_id: roomId,
+        dismissed,
+      });
+      return room_ids;
+    },
+
+    async saveImagePack(target: PackTargetView, draft: PackDraftView): Promise<void> {
+      await transport().send({
+        type: 'save_image_pack',
+        target,
+        draft: $state.snapshot(draft),
+      });
+    },
+
+    async createRoomImagePack(roomId: string, name: string): Promise<string> {
+      const { state_key } = await transport().send({
+        type: 'create_room_image_pack',
+        room_id: roomId,
+        name,
+      });
+      return state_key;
+    },
+
+    async deleteRoomImagePack(roomId: string, stateKey: string): Promise<void> {
+      await transport().send({
+        type: 'delete_room_image_pack',
+        room_id: roomId,
+        state_key: stateKey,
+      });
+    },
+
+    async convertLegacyImagePacks(roomId: string, stateKeys: string[]): Promise<void> {
+      await transport().send({
+        type: 'convert_legacy_image_packs',
+        room_id: roomId,
+        state_keys: stateKeys,
+      });
+    },
+
+    async removeLegacyImagePacks(roomId: string, stateKeys: string[]): Promise<void> {
+      await transport().send({
+        type: 'remove_legacy_image_packs',
+        room_id: roomId,
+        state_keys: stateKeys,
+      });
+    },
+
+    async addAccountPackImages(images: PackImageDraftView[]): Promise<void> {
+      await transport().send({ type: 'add_account_pack_images', images });
+    },
+
+    async packSubscriptions(): Promise<PackAddressView[]> {
+      const { subscriptions } = await transport().send({ type: 'pack_subscriptions' });
+      return subscriptions;
+    },
+
+    async setPackSubscriptions(
+      added: PackAddressView[],
+      removed: PackAddressView[]
+    ): Promise<PackAddressView[]> {
+      const { subscriptions } = await transport().send({
+        type: 'set_pack_subscriptions',
+        added,
+        removed,
+      });
+      return subscriptions;
+    },
+
+    async roomAbbreviations(roomId: string): Promise<AbbreviationView[]> {
+      const { entries } = await transport().send({ type: 'room_abbreviations', room_id: roomId });
+      return entries;
+    },
+
+    async setRoomAbbreviations(
+      roomId: string,
+      entries: readonly AbbreviationView[]
+    ): Promise<void> {
+      await transport().send({
+        type: 'set_room_abbreviations',
+        room_id: roomId,
+        entries: $state.snapshot([...entries]),
+      });
+    },
+
+    async setTombstone(roomId: string, replacementRoom: string, body: string): Promise<void> {
+      await transport().send({
+        type: 'set_tombstone',
+        room_id: roomId,
+        replacement_room: replacementRoom,
+        body,
+      });
+    },
+
+    async memberLook(roomId: string): Promise<MemberLookView> {
+      const { display_name, avatar_url, color_on_light, color_on_dark, pronouns } =
+        await transport().send({ type: 'member_look', room_id: roomId });
+      return { display_name, avatar_url, color_on_light, color_on_dark, pronouns };
+    },
+
+    async setMemberLook(
+      roomId: string,
+      edit: MemberLookEdit,
+      inParentSpace = false
+    ): Promise<void> {
+      await transport().send({
+        type: 'set_member_look',
+        room_id: roomId,
+        in_parent_space: inParentSpace,
+        display_name: edit.display_name ?? KEEP,
+        avatar_url: edit.avatar_url ?? KEEP,
+        color_on_light: edit.color_on_light ?? KEEP,
+        color_on_dark: edit.color_on_dark ?? KEEP,
+      });
+    },
+
+    async setPronouns(
+      roomId: string,
+      pronouns: PronounView[],
+      inParentSpace = false
+    ): Promise<void> {
+      await transport().send({
+        type: 'set_pronouns',
+        room_id: roomId,
+        in_parent_space: inParentSpace,
+        pronouns,
+      });
+    },
+
     async sendStateEvent(
       roomId: string,
       eventType: string,
@@ -2240,6 +2577,67 @@ export function createCommands(transport: () => Transport) {
         content: $state.snapshot(content),
       });
       return event_id;
+    },
+
+    async setPowerLevel(
+      roomId: string,
+      levels: RoomPowerLevelsView | null,
+      location: PowerLevelLocation,
+      level: number
+    ): Promise<RoomPowerLevelsView> {
+      const response = await transport().send({
+        type: 'set_power_level',
+        room_id: roomId,
+        levels: $state.snapshot(levels),
+        location,
+        level,
+      });
+      return response;
+    },
+
+    async syncPowerLevelsFromSpace(
+      roomId: string,
+      spaceId: string,
+      levels: RoomPowerLevelsView | null
+    ): Promise<{ levels: RoomPowerLevelsView; tags: PowerLevelTags }> {
+      const { levels: next, tags } = await transport().send({
+        type: 'sync_power_levels_from_space',
+        room_id: roomId,
+        space_id: spaceId,
+        levels: $state.snapshot(levels),
+      });
+      return { levels: next, tags };
+    },
+
+    async syncChildPowerLevels(
+      spaceId: string,
+      childIds: string[]
+    ): Promise<{ updated: number; skipped: number }> {
+      const { updated, skipped } = await transport().send({
+        type: 'sync_child_power_levels',
+        space_id: spaceId,
+        child_ids: childIds,
+      });
+      return { updated, skipped };
+    },
+
+    async powerLevelTags(roomId: string): Promise<PowerLevelTags> {
+      const { tags } = await transport().send({ type: 'power_level_tags', room_id: roomId });
+      return tags;
+    },
+
+    async setPowerLevelTag(
+      roomId: string,
+      level: number,
+      tag: PowerLevelTagView | null
+    ): Promise<PowerLevelTags> {
+      const { tags } = await transport().send({
+        type: 'set_power_level_tag',
+        room_id: roomId,
+        level,
+        tag,
+      });
+      return tags;
     },
 
     async setUserPowerLevel(roomId: string, userId: string, powerLevel: number): Promise<void> {

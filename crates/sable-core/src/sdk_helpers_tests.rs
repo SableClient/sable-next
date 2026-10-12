@@ -104,6 +104,68 @@ async fn room_list_keeps_joined_rooms_redirected_to_a_joined_successor() {
 }
 
 #[tokio::test]
+async fn a_synced_room_rule_reaches_the_listed_room() {
+    use matrix_sdk::ruma::push::{NewPushRule, NewSimplePushRule, Ruleset};
+    use matrix_sdk_test::event_factory::EventFactory;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!chatty:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    let (core, mut events) = core_with_events(&server, client.clone()).await;
+    let CommandOk::SubscribeRoomList { subscription, .. } =
+        core.dispatch(Command::SubscribeRoomList).await.unwrap()
+    else {
+        panic!("wrong response")
+    };
+    let mut next_room = async || {
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                if let Some(CoreEvent::RoomListDiff {
+                    subscription: current,
+                    diffs,
+                }) = events.recv().await
+                    && current == subscription
+                    && let Some(room) = diffs.into_iter().find_map(|diff| match diff {
+                        crate::protocol::VectorDiff::Reset { values } => values.into_iter().next(),
+                        crate::protocol::VectorDiff::Set { value, .. } => Some(value),
+                        _ => None,
+                    })
+                {
+                    break room;
+                }
+            }
+        })
+        .await
+        .unwrap()
+    };
+    assert_eq!(next_room().await.notification.room, None);
+
+    let mut rules = Ruleset::server_default(client.user_id().unwrap());
+    rules
+        .insert(
+            NewPushRule::Room(NewSimplePushRule::new(room_id.to_owned(), vec![])),
+            None,
+            None,
+        )
+        .unwrap();
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_global_account_data(EventFactory::new().push_rules(rules));
+        })
+        .await;
+
+    assert_eq!(
+        next_room().await.notification.room,
+        Some(crate::protocol::NotificationModeView::Mentions)
+    );
+    core.dispatch(Command::Unsubscribe { subscription })
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn room_members_use_cached_or_fetched_power_levels() {
     use matrix_sdk::ruma::user_id;
     use matrix_sdk_test::event_factory::EventFactory;
@@ -362,7 +424,7 @@ async fn healthy_space_summary_does_not_fetch_missing_tombstone_state() {
         &mut cache,
     )
     .await;
-    let summary = crate::view::room_summary(&item, &cache, false);
+    let summary = crate::view::room_summary(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new());
     assert!(summary.is_space);
     assert!(!summary.is_tombstoned);
 }
@@ -2262,4 +2324,115 @@ async fn event_cached_reports_only_events_the_cache_holds() {
         };
         assert_eq!(cached, expected, "{event_id}");
     }
+}
+
+#[tokio::test]
+async fn markdown_to_content_needs_no_session() {
+    use crate::protocol::ComposerPill;
+
+    let (core, _events) = Core::new("markdown-test", Box::new(MemorySessionStore::default()));
+    let CommandOk::MarkdownToContent(content) = core
+        .dispatch(Command::MarkdownToContent {
+            markdown: "**hi** \u{FFFC}".to_owned(),
+            pills: vec![ComposerPill::Mention {
+                user_id: "@ana:example.org".to_owned(),
+                name: "Ana".to_owned(),
+                via: Vec::new(),
+            }],
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("wrong response")
+    };
+    assert_eq!(content.body, "**hi** Ana");
+    assert_eq!(
+        content.formatted_body.as_deref(),
+        Some("<strong>hi</strong> <a href=\"https://matrix.to/#/@ana:example.org\">Ana</a>")
+    );
+    assert_eq!(content.mentions.user_ids, ["@ana:example.org"]);
+}
+
+/// An account-data event the server stores, served back slowly enough that two
+/// unguarded read-modify-writes would both read the empty document.
+#[derive(Clone, Default)]
+struct StoredAccountData(Arc<std::sync::Mutex<Option<serde_json::Value>>>);
+
+impl wiremock::Respond for StoredAccountData {
+    fn respond(&self, request: &wiremock::Request) -> ResponseTemplate {
+        let mut stored = self
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if request.method == wiremock::http::Method::PUT {
+            *stored = request.body_json().ok();
+            return ResponseTemplate::new(200).set_body_json(json!({}));
+        }
+        let delay = std::time::Duration::from_millis(50);
+        stored.as_ref().map_or_else(
+            || {
+                ResponseTemplate::new(404)
+                    .set_body_json(json!({"errcode": "M_NOT_FOUND", "error": "absent"}))
+                    .set_delay(delay)
+            },
+            |content| {
+                ResponseTemplate::new(200)
+                    .set_body_json(content)
+                    .set_delay(delay)
+            },
+        )
+    }
+}
+
+#[tokio::test]
+async fn invites_dismissed_at_once_are_all_kept() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let stored = StoredAccountData::default();
+    Mock::given(path_regex(r"/account_data/moe\.sable\.dismissed_invites$"))
+        .respond_with(stored.clone())
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    let dismiss = |room_id: &'static str| {
+        core.dispatch(Command::SetInviteDismissed {
+            room_id: room_id.try_into().expect("a room id"),
+            dismissed: true,
+        })
+    };
+    let (first, second) = tokio::join!(
+        dismiss("!first:example.org"),
+        dismiss("!second:example.org")
+    );
+    assert!(first.is_ok() && second.is_ok());
+
+    let kept = stored
+        .0
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    assert_eq!(
+        kept,
+        Some(json!({"roomIds": ["!first:example.org", "!second:example.org"]}))
+    );
+}
+
+#[tokio::test]
+async fn a_sidebar_naming_something_that_is_not_a_room_is_refused() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let core = core(&server, client).await;
+
+    let refused = core
+        .dispatch(Command::SetSpaceSidebar {
+            items: vec![sable_model::sidebar::SidebarItemView::Folder {
+                id: "folder".to_owned(),
+                name: None,
+                content: vec!["not a room".to_owned()],
+            }],
+        })
+        .await;
+
+    assert!(matches!(refused, Err(CommandErr::UnknownRoom)));
 }

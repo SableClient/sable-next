@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import type { RoomSummary } from '#src/generated/protocol';
+import type { MemberLookView, RoomSummary } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
@@ -18,8 +18,21 @@ import { core as baseCore } from '#lib/core/__mocks__/context.js';
 import RoomCosmeticsSettings from './RoomCosmeticsSettings.svelte';
 
 const core = Object.assign(baseCore, {
-  sendStateEvent: vi.fn<(...args: never[]) => Promise<void>>(() => Promise.resolve()),
+  memberLook: vi.fn<(...args: never[]) => Promise<MemberLookView>>(() => Promise.resolve(look())),
+  setMemberLook: vi.fn<(...args: never[]) => Promise<void>>(() => Promise.resolve()),
+  setPronouns: vi.fn<(...args: never[]) => Promise<void>>(() => Promise.resolve()),
 });
+
+function look(overrides: Partial<MemberLookView> = {}): MemberLookView {
+  return {
+    display_name: null,
+    avatar_url: null,
+    color_on_light: null,
+    color_on_dark: null,
+    pronouns: [],
+    ...overrides,
+  };
+}
 
 const room = {
   room_id: '!room:example.org',
@@ -45,16 +58,8 @@ test('reset writes the live profile when the room profile only matches a stale o
     display_name: 'Live',
     avatar_url: 'mxc://example.org/live',
   });
-  core.roomStateEvent.mockImplementation((_room, type) =>
-    Promise.resolve(
-      type === 'm.room.member'
-        ? {
-            membership: 'join',
-            displayname: 'Stale',
-            avatar_url: 'mxc://example.org/stale',
-          }
-        : null
-    )
+  core.memberLook.mockResolvedValue(
+    look({ display_name: 'Stale', avatar_url: 'mxc://example.org/stale' })
   );
   const user = userEvent.setup();
   render(RoomCosmeticsSettings, { room, permissions: null, levels: null });
@@ -64,16 +69,10 @@ test('reset writes the live profile when the room profile only matches a stale o
   await user.click(reset);
 
   await vi.waitFor(() => {
-    expect(core.sendStateEvent).toHaveBeenCalledWith(
-      '!room:example.org',
-      'm.room.member',
-      '@me:example.org',
-      {
-        membership: 'join',
-        displayname: 'Live',
-        avatar_url: 'mxc://example.org/live',
-      }
-    );
+    expect(core.setMemberLook).toHaveBeenCalledWith('!room:example.org', {
+      display_name: { kind: 'set', value: 'Live' },
+      avatar_url: { kind: 'set', value: 'mxc://example.org/live' },
+    });
   });
 });
 
@@ -89,17 +88,12 @@ test('reset writes the member event once and drops the colours with it', async (
     display_name: 'Live',
     avatar_url: 'mxc://example.org/live',
   });
-  core.roomStateEvent.mockImplementation((_room, type) =>
-    Promise.resolve(
-      type === 'm.room.member'
-        ? {
-            membership: 'join',
-            displayname: 'Custom',
-            avatar_url: 'mxc://example.org/custom',
-            'eu.she-a.color': { on_light: '#112233' },
-          }
-        : null
-    )
+  core.memberLook.mockResolvedValue(
+    look({
+      display_name: 'Custom',
+      avatar_url: 'mxc://example.org/custom',
+      color_on_light: '#112233',
+    })
   );
   const user = userEvent.setup();
   render(RoomCosmeticsSettings, { room, permissions: null, levels: null });
@@ -107,22 +101,12 @@ test('reset writes the member event once and drops the colours with it', async (
   await user.click(await screen.findByRole('button', { name: 'common.reset' }));
 
   await vi.waitFor(() => {
-    expect(core.sendStateEvent).toHaveBeenCalledWith(
-      '!room:example.org',
-      'moe.sable.room.cosmetics.color',
-      '@me:example.org',
-      {}
-    );
+    expect(core.setMemberLook).toHaveBeenCalledTimes(1);
   });
-  const memberWrites = core.sendStateEvent.mock.calls.filter(
-    ([, type]) => (type as string) === 'm.room.member'
-  );
-  expect(memberWrites).toEqual([
-    [
-      '!room:example.org',
-      'm.room.member',
-      '@me:example.org',
-      { membership: 'join', displayname: 'Live', avatar_url: 'mxc://example.org/live' },
-    ],
-  ]);
+  expect(core.setMemberLook).toHaveBeenCalledWith('!room:example.org', {
+    display_name: { kind: 'set', value: 'Live' },
+    avatar_url: { kind: 'set', value: 'mxc://example.org/live' },
+    color_on_light: { kind: 'clear' },
+    color_on_dark: { kind: 'clear' },
+  });
 });

@@ -1,0 +1,20 @@
+[package]
+name = "sable-model-wasm"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+js-sys = { workspace = true }
+sable-model = { path = "../sable-model", version = "0.1.0" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+wasm-bindgen = { workspace = true }
+
+[lints]
+workspace = true

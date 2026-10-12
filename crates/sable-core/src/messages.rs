@@ -1374,6 +1374,7 @@ mod tests {
             crate::Subscription {
                 tasks: Vec::new(),
                 timeline: Some(timeline),
+                overlay: None,
                 thread_root: Some(root.to_owned()),
                 kind: crate::SubscriptionKind::FocusedTimeline(room_id.to_owned()),
             },
@@ -1434,6 +1435,7 @@ mod tests {
             crate::Subscription {
                 tasks: Vec::new(),
                 timeline: Some(timeline),
+                overlay: None,
                 thread_root: Some(root.to_owned()),
                 kind: crate::SubscriptionKind::FocusedTimeline(room_id.to_owned()),
             },

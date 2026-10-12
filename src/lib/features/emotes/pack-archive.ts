@@ -77,7 +77,7 @@ export function archivePack(
   return {
     pack: {
       display_name: draft.name === '' ? undefined : draft.name,
-      avatar_file: draft.avatarUrl === null ? undefined : entryFor(draft.avatarUrl),
+      avatar_file: draft.avatar_url === null ? undefined : entryFor(draft.avatar_url),
       attribution: draft.attribution === '' ? undefined : draft.attribution,
       usage: usageContent(draft.usage),
     },

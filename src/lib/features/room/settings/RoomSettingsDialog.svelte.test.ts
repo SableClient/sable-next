@@ -14,6 +14,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
 }));
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 const core = Object.assign(baseCore, {
   roomPowerLevels: vi.fn(),
@@ -35,7 +36,7 @@ vi.mock('#lib/ui/unsaved-guard.js', async (importOriginal) => ({
 
 import RoomSettingsDialog from './RoomSettingsDialog.svelte';
 
-const room: RoomSummary = {
+const room: RoomSummary = withCounts({
   room_id: '!room:example.org',
   canonical_alias: null,
   name: 'Restricted room',
@@ -62,7 +63,7 @@ const room: RoomSummary = {
   highlight: 0,
   marked_unread: false,
   latest_event: null,
-};
+});
 
 function permissions(canChangeJoinRule: boolean): RoomPermissionsView {
   return {

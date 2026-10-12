@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { parsePowerLevelTags, withPowerLevelTag } from '../settings/power-level-tags';
 import { FOUNDER_POWER_LEVEL, powerTag } from './power-tags';
 
 const t = (key: string, options?: Record<string, unknown>): string =>
@@ -18,12 +17,10 @@ describe('powerTag', () => {
     expect(powerTag(Number.MAX_SAFE_INTEGER + 1, t).name).toBe('timeline.powerTagFounder');
   });
 
-  it('applies saved founder flair after reading the room state', () => {
+  it('applies saved founder flair', () => {
     const flair = { name: 'Founder', color: '#ff0000', icon: '👑' };
-    const content = withPowerLevelTag({}, FOUNDER_POWER_LEVEL, flair);
-    const tags = parsePowerLevelTags(content);
 
-    expect(powerTag(FOUNDER_POWER_LEVEL, t, tags)).toEqual(flair);
+    expect(powerTag(FOUNDER_POWER_LEVEL, t, { [FOUNDER_POWER_LEVEL]: flair })).toEqual(flair);
   });
 
   it('does not name the highest 32-bit power level as founder', () => {

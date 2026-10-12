@@ -69,17 +69,17 @@
   $effect(() => {
     if (!open) return;
     untrack(() => {
-      const from = item ? localToEpoch(item.start, item.timeZone) : null;
+      const from = item ? localToEpoch(item.start, item.time_zone) : null;
       const day = initialDay === null ? null : new Date(initialDay);
       const fresh = day
         ? new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9).getTime()
         : Math.ceil(Date.now() / HOUR) * HOUR;
       const at = from ?? fresh;
-      const length = item ? item.durationMs : HOUR;
+      const length = item ? item.duration_ms : HOUR;
       title = item?.title ?? '';
       start = epochToLocal(at).slice(0, 16);
-      end = epochToLocal(at + (item?.allDay ? Math.max(0, length - DAY) : length)).slice(0, 16);
-      allDay = item?.allDay ?? false;
+      end = epochToLocal(at + (item?.all_day ? Math.max(0, length - DAY) : length)).slice(0, 16);
+      allDay = item?.all_day ?? false;
       frequency = item?.recurrence?.frequency ?? NEVER;
       until = item?.recurrence?.until?.slice(0, 10) ?? '';
       location = item?.location ?? '';

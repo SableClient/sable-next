@@ -1,21 +1,53 @@
 import { expect, test } from 'vitest';
 
-import { parseSearchQuery, toSearchFilter } from './search-query';
+import type { SearchDirectory, SearchRoom, SpaceChildEdge } from '#src/generated/protocol';
 
-const resolve = {
-  roomId: (value: string) => (value === 'dev' ? '!dev:example.org' : undefined),
-  userId: (value: string) => (value === 'erwan' ? '@erwan:example.org' : undefined),
-  spaceRooms: (value: string) =>
-    value === 'eng' ? ['!dev:example.org', '!ops:example.org'] : undefined,
-  directRooms: (value: string) => (value === 'erwan' ? ['!dm:example.org'] : undefined),
+import { parseSearchQuery, resolveSearchQuery } from './search-query';
+
+function edge(roomId: string): SpaceChildEdge {
+  return { room_id: roomId, via: [], order: null, origin_server_ts: 0, suggested: false };
+}
+
+function room(roomId: string, name: string, fields: Partial<SearchRoom> = {}): SearchRoom {
+  return {
+    room_id: roomId,
+    name,
+    canonical_alias: null,
+    joined: true,
+    is_tombstoned: false,
+    is_space: false,
+    is_direct: false,
+    direct_targets: [],
+    space_children: [],
+    ...fields,
+  };
+}
+
+const directory: SearchDirectory = {
+  rooms: [
+    room('!dev:example.org', 'dev'),
+    room('!ops:example.org', 'ops'),
+    room('!eng:example.org', 'eng', {
+      is_space: true,
+      space_children: [edge('!dev:example.org'), edge('!ops:example.org')],
+    }),
+    room('!new:example.org', 'new', { is_space: true }),
+    room('!dm:example.org', 'Erwan', { is_direct: true, direct_targets: ['@erwan:example.org'] }),
+  ],
+  people: [
+    { user_id: '@erwan:example.org', display_name: 'Erwan' },
+    { user_id: '@meow:example.org', display_name: 'Meow' },
+    { user_id: '@meowmeow:example.org', display_name: 'Meow Meow' },
+    { user_id: '@bark:example.org', display_name: 'Bark' },
+  ],
 };
 
 function filterFor(query: string) {
-  return toSearchFilter(parseSearchQuery(query), resolve).filter;
+  return resolveSearchQuery(query, directory).filter;
 }
 
 function resolveFor(query: string) {
-  return toSearchFilter(parseSearchQuery(query), resolve);
+  return resolveSearchQuery(query, directory);
 }
 
 test('plain words become the free text', () => {
@@ -215,15 +247,7 @@ test('an operator with no value is not a filter', () => {
 });
 
 test('a colon inside a matrix id survives', () => {
-  const withId = {
-    roomId: () => undefined,
-    userId: (value: string) => (value === '@erwan:example.org' ? value : undefined),
-    spaceRooms: () => undefined,
-    directRooms: () => undefined,
-  };
-  const { filter } = toSearchFilter(parseSearchQuery('from:@erwan:example.org'), withId);
-
-  expect(filter.senders).toEqual(['@erwan:example.org']);
+  expect(filterFor('from:@someone:example.org').senders).toEqual(['@someone:example.org']);
 });
 
 test('an operator value may be quoted so it can contain spaces', () => {
@@ -290,25 +314,15 @@ test('date bounds intersect whatever order they are written in', () => {
 });
 
 test('a space with no joined rooms matches nothing, and excluding it excludes nothing', () => {
-  const empty = { ...resolve, spaceRooms: () => [] };
-
-  expect(toSearchFilter(parseSearchQuery('space:new deploy'), empty).matchesNothing).toBe(true);
-  expect(toSearchFilter(parseSearchQuery('-space:new deploy'), empty).matchesNothing).toBe(false);
-  expect(resolveFor('space:eng deploy').matchesNothing).toBe(false);
+  expect(resolveFor('space:new deploy').matches_nothing).toBe(true);
+  expect(resolveFor('-space:new deploy').matches_nothing).toBe(false);
+  expect(resolveFor('space:eng deploy').matches_nothing).toBe(false);
 });
 
 test('in: a space searches the rooms inside it, like space:', () => {
-  const spaced = {
-    ...resolve,
-    roomId: (value: string) => (value === 'eng' ? '!eng:example.org' : resolve.roomId(value)),
-    spaceRooms: (value: string) =>
-      value === '!eng:example.org' ? ['!dev:example.org', '!ops:example.org'] : undefined,
-  };
-  const filter = (query: string) => toSearchFilter(parseSearchQuery(query), spaced).filter;
-
-  expect(filter('in:eng deploy').rooms).toEqual(['!dev:example.org', '!ops:example.org']);
-  expect(filter('-in:eng deploy').not_rooms).toEqual(['!dev:example.org', '!ops:example.org']);
-  expect(filter('in:dev deploy').rooms).toEqual(['!dev:example.org']);
+  expect(filterFor('in:eng deploy').rooms).toEqual(['!dev:example.org', '!ops:example.org']);
+  expect(filterFor('-in:eng deploy').not_rooms).toEqual(['!dev:example.org', '!ops:example.org']);
+  expect(filterFor('in:dev deploy').rooms).toEqual(['!dev:example.org']);
 });
 
 test('has: takes polls and file types, is: takes state events', () => {
@@ -321,16 +335,9 @@ test('has: takes polls and file types, is: takes state events', () => {
 });
 
 test('regex: sets a body pattern, and a /pattern/ picks every matching person', () => {
-  const people = {
-    ...resolve,
-    usersMatching: (pattern: RegExp) =>
-      ['@meow:example.org', '@meowmeow:example.org', '@bark:example.org'].filter((userId) =>
-        pattern.test(userId)
-      ),
-  };
-  const resolved = toSearchFilter(parseSearchQuery('regex:"me+ow" from:/^@meow/'), people);
+  const resolved = resolveFor('regex:"me+ow" from:/^@meow/');
 
   expect(resolved.filter.pattern).toBe('me+ow');
   expect(resolved.filter.senders).toEqual(['@meow:example.org', '@meowmeow:example.org']);
-  expect(toSearchFilter(parseSearchQuery('from:/nobody/'), people).unresolved).toHaveLength(1);
+  expect(resolveFor('from:/nobody/').unresolved).toHaveLength(1);
 });

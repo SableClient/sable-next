@@ -28,13 +28,12 @@
   import { MESSAGE_SEARCH_FIELD_ID, MessageSearch } from './message-search.svelte.js';
   import { clearRecentSearches, recentSearches, rememberSearch } from './recent-searches.svelte.js';
   import {
-    resolveDirectRooms,
     resolveRoomTarget,
-    resolveSpaceRooms,
     resolveSpaceTarget,
-    resolveUserTarget,
+    searchRooms,
+    suggestPersonTarget,
     suggestRoomTarget,
-    suggestUserTarget,
+    type SearchPerson,
     type TargetSuggestion,
   } from './resolve-targets';
   import { coverageMessage } from './coverage';
@@ -61,17 +60,12 @@
   const roomList = useRoomList();
   const senders = new SenderDirectory(core);
 
-  const search = new MessageSearch(core, () => ({
-    roomId: (value) => resolveRoomTarget(roomList.rooms, value),
-    userId: (value) => resolveUserTarget(knownSenders(), value),
-    usersMatching: (pattern) =>
-      knownSenders()
-        .filter((sender) => pattern.test(sender.userId) || pattern.test(sender.displayName))
-        .map((sender) => sender.userId),
-    spaceRooms: (value) => resolveSpaceRooms(roomList.rooms, value),
-    directRooms: (value) =>
-      resolveDirectRooms(roomList.rooms, resolveUserTarget(knownSenders(), value) ?? value),
-  }));
+  let rooms = $derived(searchRooms(roomList.rooms));
+  let people: SearchPerson[] = $derived(
+    knownSenders().map((sender) => ({ user_id: sender.userId, display_name: sender.displayName }))
+  );
+  let directory = $derived({ rooms, people });
+  const search = new MessageSearch(core, () => directory);
 
   const LOOKUP_DELAY_MS = 300;
   const PEOPLE_OPERATORS: readonly string[] = ['from', 'mentions', 'with'];
@@ -228,13 +222,13 @@
   function suggestionFor(token: SearchToken): TargetSuggestion | undefined {
     switch (token.operator) {
       case 'in':
-        return suggestRoomTarget(roomList.rooms, token.value);
+        return suggestRoomTarget(rooms, token.value);
       case 'space':
-        return suggestRoomTarget(roomList.rooms, token.value, true);
+        return suggestRoomTarget(rooms, token.value, true);
       case 'from':
       case 'mentions':
       case 'with':
-        return suggestUserTarget(knownSenders(), token.value);
+        return suggestPersonTarget(people, token.value);
       default:
         return undefined;
     }
@@ -280,11 +274,11 @@
 
   function chipLabel(chip: SearchToken): string {
     if (chip.operator === 'in') {
-      const roomId = resolveRoomTarget(roomList.rooms, chip.value);
+      const roomId = resolveRoomTarget(rooms, chip.value);
       return roomId === undefined ? chip.value : roomList.labelFor(roomId);
     }
     if (chip.operator === 'space') {
-      const spaceId = resolveSpaceTarget(roomList.rooms, chip.value);
+      const spaceId = resolveSpaceTarget(rooms, chip.value);
       return spaceId === undefined ? chip.value : roomList.labelFor(spaceId);
     }
     return chip.value;

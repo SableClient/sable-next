@@ -1,8 +1,6 @@
-export interface ConversationLine {
-  sender: string | null;
-  body: string;
-  eventId: string | null;
-}
+import type { ConversationLine } from '#src/generated/protocol';
+
+export type { ConversationLine } from '#src/generated/protocol';
 
 export const MAX_CONVERSATION_LINES = 5;
 

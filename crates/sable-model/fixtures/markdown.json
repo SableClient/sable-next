@@ -1,0 +1,876 @@
+[
+  {
+    "markdown": "just words",
+    "pills": [],
+    "body": "just words",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "two  spaces   inside",
+    "pills": [],
+    "body": "two  spaces   inside",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "  padded  ",
+    "pills": [],
+    "body": "padded",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "line one\nline two",
+    "pills": [],
+    "body": "line one\nline two",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "para one\n\npara two",
+    "pills": [],
+    "body": "para one\n\npara two",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "*em* and **strong** and ***both***",
+    "pills": [],
+    "body": "*em* and **strong** and ***both***",
+    "formatted_body": "<em>em</em> and <strong>strong</strong> and <strong><em>both</em></strong>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "_under_ and __strong__",
+    "pills": [],
+    "body": "_under_ and __strong__",
+    "formatted_body": "<em>under</em> and <strong>strong</strong>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "a*b*c and snake_case_name and 5 * 3 * 2",
+    "pills": [],
+    "body": "a*b*c and snake_case_name and 5 * 3 * 2",
+    "formatted_body": "a<em>b</em>c and snake_case_name and 5 * 3 * 2",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "~~gone~~ and ~one~",
+    "pills": [],
+    "body": "~~gone~~ and ~one~",
+    "formatted_body": "<del>gone</del> and ~one~",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "**unclosed and `code` span",
+    "pills": [],
+    "body": "**unclosed and `code` span",
+    "formatted_body": "**unclosed and <code>code</code> span",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "``code with ` tick``",
+    "pills": [],
+    "body": "``code with ` tick``",
+    "formatted_body": "<code>code with ` tick</code>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "\\*not em\\*",
+    "pills": [],
+    "body": "\\*not em\\*",
+    "formatted_body": "<span>*</span>not em<span>*</span>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "\\# not a heading",
+    "pills": [],
+    "body": "\\# not a heading",
+    "formatted_body": "# not a heading",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "C:\\path\\to",
+    "pills": [],
+    "body": "C:\\path\\to",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "\\>.<",
+    "pills": [],
+    "body": "\\>.<",
+    "formatted_body": "&gt;.&lt;",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "¯\\_(ツ)_/¯",
+    "pills": [],
+    "body": "¯\\_(ツ)_/¯",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "a \\| b",
+    "pills": [],
+    "body": "a \\| b",
+    "formatted_body": "a | b",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "# Title\n\ntext",
+    "pills": [],
+    "body": "# Title\n\ntext",
+    "formatted_body": "<h1>Title</h1><p>text</p>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "### three",
+    "pills": [],
+    "body": "### three",
+    "formatted_body": "<h3>three</h3>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "Setext\n===",
+    "pills": [],
+    "body": "Setext\n===",
+    "formatted_body": "<h1>Setext</h1>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "####### seven",
+    "pills": [],
+    "body": "####### seven",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "-# small print",
+    "pills": [],
+    "body": "-# small print",
+    "formatted_body": "<sub data-md=\"-#\">small print</sub>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "-# a\n-# b",
+    "pills": [],
+    "body": "-# a\n-# b",
+    "formatted_body": "<sub data-md=\"-#\">a</sub><sub data-md=\"-#\">b</sub>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "text\n-# under",
+    "pills": [],
+    "body": "text\n-# under",
+    "formatted_body": "<p>text</p><sub data-md=\"-#\">under</sub>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "> quoted",
+    "pills": [],
+    "body": "> quoted",
+    "formatted_body": "<blockquote><p>quoted</p></blockquote>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": ">no space",
+    "pills": [],
+    "body": ">no space",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "> a\n> b",
+    "pills": [],
+    "body": "> a\n> b",
+    "formatted_body": "<blockquote><p>a<br>b</p></blockquote>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "> # head in quote",
+    "pills": [],
+    "body": "> # head in quote",
+    "formatted_body": "<blockquote><h1>head in quote</h1></blockquote>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "> -# small in quote",
+    "pills": [],
+    "body": "> -# small in quote",
+    "formatted_body": "<blockquote><sub data-md=\"-#\">small in quote</sub></blockquote>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "- a\n- b",
+    "pills": [],
+    "body": "- a\n- b",
+    "formatted_body": "<ul><li>a</li><li>b</li></ul>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "1. one\n2. two",
+    "pills": [],
+    "body": "1. one\n2. two",
+    "formatted_body": "<ol><li>one</li><li>two</li></ol>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "3. three\n4. four",
+    "pills": [],
+    "body": "3. three\n4. four",
+    "formatted_body": "<ol start=\"3\"><li>three</li><li>four</li></ol>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "- a\n\n- b",
+    "pills": [],
+    "body": "- a\n\n- b",
+    "formatted_body": "<ul><li>a</li><li>b</li></ul>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "- a\n  - nested",
+    "pills": [],
+    "body": "- a\n  - nested",
+    "formatted_body": "<ul><li><p>a</p><ul><li>nested</li></ul></li></ul>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "1) paren",
+    "pills": [],
+    "body": "1) paren",
+    "formatted_body": "<ol><li>paren</li></ol>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "```\ncode\n```",
+    "pills": [],
+    "body": "```\ncode\n```",
+    "formatted_body": "<pre><code>code</code></pre>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "```rust\nfn main() {}\n```",
+    "pills": [],
+    "body": "```rust\nfn main() {}\n```",
+    "formatted_body": "<pre><code class=\"language-rust\">fn main() {}</code></pre>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "```> weird\nx\n```",
+    "pills": [],
+    "body": "```> weird\nx\n```",
+    "formatted_body": "<pre><code>x</code></pre>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "    indented",
+    "pills": [],
+    "body": "indented",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "```\n<b>&amp;\n```",
+    "pills": [],
+    "body": "```\n<b>&amp;\n```",
+    "formatted_body": "<pre><code>&lt;b&gt;&amp;amp;</code></pre>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "---",
+    "pills": [],
+    "body": "---",
+    "formatted_body": "<hr>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "a\n\n***\n\nb",
+    "pills": [],
+    "body": "a\n\n***\n\nb",
+    "formatted_body": "<p>a</p><hr><p>b</p>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "| a | b |\n| --- | --- |\n| 1 | 2 |",
+    "pills": [],
+    "body": "| a | b |\n| --- | --- |\n| 1 | 2 |",
+    "formatted_body": "<table><tbody><tr><th>a</th><th>b</th></tr><tr><td>1</td><td>2</td></tr></tbody></table>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "| a |\n| - |\n| x \\| y |",
+    "pills": [],
+    "body": "| a |\n| - |\n| x \\| y |",
+    "formatted_body": "<table><tbody><tr><th>a</th></tr><tr><td>x | y</td></tr></tbody></table>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "|h|\n|-|\n|**b**|",
+    "pills": [],
+    "body": "|h|\n|-|\n|**b**|",
+    "formatted_body": "<table><tbody><tr><th>h</th></tr><tr><td><strong>b</strong></td></tr></tbody></table>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "[text](https://example.org)",
+    "pills": [],
+    "body": "[text](https://example.org)",
+    "formatted_body": "<a href=\"https://example.org\">text</a>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "<https://example.org/path>",
+    "pills": [],
+    "body": "<https://example.org/path>",
+    "formatted_body": "<a href=\"https://example.org/path\">https://example.org/path</a>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "https://bare.example.org",
+    "pills": [],
+    "body": "https://bare.example.org",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "[t](javascript:alert(1))",
+    "pills": [],
+    "body": "[t](javascript:alert(1))",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "[x](https://example.org/ä b)",
+    "pills": [],
+    "body": "[x](https://example.org/ä b)",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "[x](<https://example.org/ä b>)",
+    "pills": [],
+    "body": "[x](<https://example.org/ä b>)",
+    "formatted_body": "<a href=\"https://example.org/%C3%A4%20b\">x</a>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "<user@example.org>",
+    "pills": [],
+    "body": "<user@example.org>",
+    "formatted_body": "<a href=\"mailto:user@example.org\">user@example.org</a>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "[room](https://matrix.to/#/#room:example.org)",
+    "pills": [],
+    "body": "[room](https://matrix.to/#/#room:example.org)",
+    "formatted_body": "<a href=\"https://matrix.to/#/#room:example.org\" data-org.matrix.msc4550.link=\"\">room</a>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "[https://matrix.to/#/#r:x.org](https://matrix.to/#/#r:x.org)",
+    "pills": [],
+    "body": "[https://matrix.to/#/#r:x.org](https://matrix.to/#/#r:x.org)",
+    "formatted_body": "<a href=\"https://matrix.to/#/#r:x.org\">https://matrix.to/#/#r:x.org</a>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "MSC1234 and msc42",
+    "pills": [],
+    "body": "MSC1234 and msc42",
+    "formatted_body": "<a href=\"https://github.com/matrix-org/matrix-spec-proposals/pull/1234\">MSC1234</a> and <a href=\"https://github.com/matrix-org/matrix-spec-proposals/pull/42\">msc42</a>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "see MSC4550's text",
+    "pills": [],
+    "body": "see MSC4550's text",
+    "formatted_body": "see <a href=\"https://github.com/matrix-org/matrix-spec-proposals/pull/4550\">MSC4550</a>'s text",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "`MSC1234`",
+    "pills": [],
+    "body": "`MSC1234`",
+    "formatted_body": "<code>MSC1234</code>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "![alt](mxc://example.org/abc)",
+    "pills": [],
+    "body": "![alt](mxc://example.org/abc)",
+    "formatted_body": "<img src=\"mxc://example.org/abc\" alt=\"alt\">",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "![a](https://example.org/i.png \"title\")",
+    "pills": [],
+    "body": "![a](https://example.org/i.png \"title\")",
+    "formatted_body": "<img src=\"https://example.org/i.png\" alt=\"a\" title=\"title\">",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "||secret||",
+    "pills": [],
+    "body": "||secret||",
+    "formatted_body": "<span data-mx-spoiler=\"\">secret</span>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "|| spaced ||",
+    "pills": [],
+    "body": "|| spaced ||",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "||a **b**||",
+    "pills": [],
+    "body": "||a **b**||",
+    "formatted_body": "<span data-mx-spoiler=\"\">a </span><strong><span data-mx-spoiler=\"\">b</span></strong>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "x ||y|| z",
+    "pills": [],
+    "body": "x ||y|| z",
+    "formatted_body": "x <span data-mx-spoiler=\"\">y</span> z",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "\\|\\|not\\|\\|",
+    "pills": [],
+    "body": "\\|\\|not\\|\\|",
+    "formatted_body": "<span>|</span><span>|</span>not<span>|</span><span>|</span>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "$[fg.color=f00 red]",
+    "pills": [],
+    "body": "$[fg.color=f00 red]",
+    "formatted_body": "<span data-mx-color=\"#ff0000\">red</span>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "$[bg.color=00ff00 green **bold**]",
+    "pills": [],
+    "body": "$[bg.color=00ff00 green **bold**]",
+    "formatted_body": "<span data-mx-bg-color=\"#00ff00\">green </span><strong><span data-mx-bg-color=\"#00ff00\">bold</span></strong>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "$[fg.color=red named]",
+    "pills": [],
+    "body": "$[fg.color=red named]",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "$[unixtime 1700000000]",
+    "pills": [],
+    "body": "$[unixtime 1700000000]",
+    "formatted_body": "<time datetime=\"2023-11-14T22:13:20Z\">Nov 14, 2023, 22:13 (UTC)</time>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "\\$[fg.color=f00 literal]",
+    "pills": [],
+    "body": "\\$[fg.color=f00 literal]",
+    "formatted_body": "<span>$</span>[fg.color=f00 literal]",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "`$[fg.color=f00 code]`",
+    "pills": [],
+    "body": "`$[fg.color=f00 code]`",
+    "formatted_body": "<code>$[fg.color=f00 code]</code>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "$[fg.color=f00 $[bg.color=000 nest]]",
+    "pills": [],
+    "body": "$[fg.color=f00 $[bg.color=000 nest]]",
+    "formatted_body": "<span data-mx-color=\"#ff0000\"><span data-mx-bg-color=\"#000000\">nest</span></span>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "\\*\\*bold?\\*\\*",
+    "pills": [],
+    "body": "\\*\\*bold?\\*\\*",
+    "formatted_body": "<span>*</span><span>*</span>bold?<span>*</span><span>*</span>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "a \\_b\\_ c",
+    "pills": [],
+    "body": "a \\_b\\_ c",
+    "formatted_body": "a <span>_</span>b<span>_</span> c",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "\\`tick\\`",
+    "pills": [],
+    "body": "\\`tick\\`",
+    "formatted_body": "<span>`</span>tick<span>`</span>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "*a* \\*b\\*",
+    "pills": [],
+    "body": "*a* \\*b\\*",
+    "formatted_body": "<em>a</em> <span>*</span>b<span>*</span>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "hi ￼!",
+    "pills": [
+      {
+        "kind": "mention",
+        "user_id": "@alice:example.org",
+        "name": "Alice",
+        "via": []
+      }
+    ],
+    "body": "hi Alice!",
+    "formatted_body": "hi <a href=\"https://matrix.to/#/@alice:example.org\">Alice</a>!",
+    "mentions": {
+      "user_ids": ["@alice:example.org"],
+      "room": false
+    }
+  },
+  {
+    "markdown": "￼",
+    "pills": [
+      {
+        "kind": "emote",
+        "shortcode": "blob",
+        "url": "mxc://example.org/blob",
+        "body": null
+      }
+    ],
+    "body": ":blob:",
+    "formatted_body": "<img data-mx-emoticon=\"\" src=\"mxc://example.org/blob\" alt=\":blob:\" title=\":blob:\" height=\"32\">",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "**￼** in ￼",
+    "pills": [
+      {
+        "kind": "mention",
+        "user_id": "@alice:example.org",
+        "name": "Alice",
+        "via": []
+      },
+      {
+        "kind": "mention",
+        "user_id": "!room:example.org",
+        "name": "Lounge",
+        "via": ["example.org", "other.org"]
+      }
+    ],
+    "body": "**Alice** in Lounge",
+    "formatted_body": "<a href=\"https://matrix.to/#/@alice:example.org\">Alice</a> in <a href=\"https://matrix.to/#/!room:example.org?via=example.org&amp;via=other.org\">Lounge</a>",
+    "mentions": {
+      "user_ids": ["@alice:example.org"],
+      "room": false
+    }
+  },
+  {
+    "markdown": "`￼`",
+    "pills": [
+      {
+        "kind": "emote",
+        "shortcode": "blob",
+        "url": "mxc://example.org/blob",
+        "body": null
+      }
+    ],
+    "body": "`:blob:`",
+    "formatted_body": "<img data-mx-emoticon=\"\" src=\"mxc://example.org/blob\" alt=\":blob:\" title=\":blob:\" height=\"32\">",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "@room please",
+    "pills": [],
+    "body": "@room please",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": true
+    }
+  },
+  {
+    "markdown": "`@room` too",
+    "pills": [],
+    "body": "`@room` too",
+    "formatted_body": "<code>@room</code> too",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "a@room no",
+    "pills": [],
+    "body": "a@room no",
+    "formatted_body": null,
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "**bold** and [link](https://x.org) and `code`",
+    "pills": [],
+    "body": "**bold** and [link](https://x.org) and `code`",
+    "formatted_body": "<strong>bold</strong> and <a href=\"https://x.org\">link</a> and <code>code</code>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  },
+  {
+    "markdown": "# Notes\n\n- one\n- two\n\n> said\n\n```js\nlet x = 1;\n```",
+    "pills": [],
+    "body": "# Notes\n\n- one\n- two\n\n> said\n\n```js\nlet x = 1;\n```",
+    "formatted_body": "<h1>Notes</h1><ul><li>one</li><li>two</li></ul><blockquote><p>said</p></blockquote><pre><code class=\"language-js\">let x = 1;</code></pre>",
+    "mentions": {
+      "user_ids": [],
+      "room": false
+    }
+  }
+]

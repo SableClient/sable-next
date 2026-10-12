@@ -38,7 +38,15 @@ test.each([
   ['fallback', '', 'fallback'],
 ])('a preview renders %s', (body, html, expected) => {
   expect(
-    replyPreviewBody({ kind: 'message', body, html, emote: false, notice: false, edited: false })
+    replyPreviewBody({
+      kind: 'message',
+      body,
+      html,
+      emote: false,
+      notice: false,
+      edited: false,
+      jumbo: null,
+    })
   ).toBe(expected);
 });
 
@@ -109,6 +117,7 @@ test('a spoiler stays hidden in the preview', () => {
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     })
   ).toBe('look [Spoiler] here & there');
   expect(

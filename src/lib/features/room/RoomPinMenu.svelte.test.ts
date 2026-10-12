@@ -17,16 +17,25 @@ vi.mock('#lib/personas/personas.svelte.js', () => ({
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
 import { timelineMediaItems } from './media/media-items.js';
 import RoomPinMenuHarness from './RoomPinMenuHarness.test.svelte';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 const core = Object.assign(baseCore, {
   pinnedEvents: vi.fn(() => Promise.resolve(['$image', '$second'])),
   eventItems: vi.fn(() => Promise.resolve([image, secondImage])),
-  roomAccountData: vi.fn((): Promise<unknown> => Promise.resolve(null)),
-  setRoomAccountData: vi.fn(() => Promise.resolve()),
+  pinReadState: vi.fn(() =>
+    Promise.resolve({ pinned_ids: ['$image', '$second'], unread: 2, fresh_ids: [] })
+  ),
+  markPinsSeen: vi.fn((_roomId: string, pinnedIds: string[]) =>
+    Promise.resolve({ pinned_ids: pinnedIds, unread: 0, fresh_ids: [] })
+  ),
   roomCosmetics: vi.fn(() => Promise.resolve({ users: [], space_id: null })),
 });
 
 const image = {
+  row: 'message',
+  forwardable: true,
+  redactable: true,
+  visibility: 'always',
   id: '$image',
   event_id: '$image',
   transaction_id: null,
@@ -65,12 +74,12 @@ const image = {
   forum_title: null,
 } satisfies TimelineItemView;
 
-const secondImage: TimelineItemView = {
+const secondImage = withRowFields({
   ...image,
   id: '$second',
   event_id: '$second',
   content: { ...image.content, filename: 'second.png', source: 'mxc://example.org/second' },
-};
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -127,7 +136,11 @@ test.each([
 });
 
 test('shows the total pin count on the button, even once the pins are read', async () => {
-  core.roomAccountData.mockResolvedValueOnce({ hash: 'x', count: 2, last_seen_id: '$second' });
+  core.pinReadState.mockResolvedValueOnce({
+    pinned_ids: ['$image', '$second'],
+    unread: 0,
+    fresh_ids: [],
+  });
   render(RoomPinMenuHarness, {
     menu: {
       roomId: '!room:example.org',

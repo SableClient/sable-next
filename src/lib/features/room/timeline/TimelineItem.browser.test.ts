@@ -28,6 +28,7 @@ import { core } from '#lib/core/__mocks__/context.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
@@ -62,7 +63,7 @@ const profile: ProfileView = {
 };
 
 function message(id: string, sender: string, senderName: string): TimelineItemView {
-  return {
+  return withRowFields({
     id,
     event_id: `$${id}:example.test`,
     transaction_id: null,
@@ -78,6 +79,7 @@ function message(id: string, sender: string, senderName: string): TimelineItemVi
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -92,7 +94,7 @@ function message(id: string, sender: string, senderName: string): TimelineItemVi
     mention: 'none',
     forwarded: null,
     forum_title: null,
-  };
+  });
 }
 
 function replyToAlice(id: string, sender: string, senderName: string): TimelineItemView {
@@ -104,6 +106,7 @@ function replyToAlice(id: string, sender: string, senderName: string): TimelineI
       sender_mentioned: false,
       sender_name: 'Alice',
       body: 'General message 1',
+      fallback: null,
     },
   };
 }
@@ -301,7 +304,7 @@ test('a hover action still fires when the row loses hover and focus mid-press', 
 });
 
 function galleryItem(id: string, items: { filename: string; width: number; height: number }[]) {
-  return {
+  return withRowFields({
     ...message(id, '@alice:example.test', 'Alice'),
     content: {
       kind: 'gallery',
@@ -321,7 +324,7 @@ function galleryItem(id: string, items: { filename: string; width: number; heigh
         spoiler: null,
       })),
     },
-  } as TimelineItemView;
+  }) as TimelineItemView;
 }
 
 for (const [name, width] of [

@@ -11,6 +11,7 @@ import { core } from '#lib/core/__mocks__/context.js';
 import type { TimelineItemView } from '#src/generated/protocol';
 
 import StateEventText from './StateEventText.svelte';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 afterEach(() => {
   core.userProfile.mockReset();
@@ -18,7 +19,7 @@ afterEach(() => {
 });
 
 function membership(change: 'left' | 'joined', userId: string, name: string): TimelineItemView {
-  return {
+  return withRowFields({
     id: 'state',
     event_id: '$state',
     transaction_id: null,
@@ -47,7 +48,7 @@ function membership(change: 'left' | 'joined', userId: string, name: string): Ti
       display_name: name,
       reason: null,
     },
-  };
+  });
 }
 
 test.each([

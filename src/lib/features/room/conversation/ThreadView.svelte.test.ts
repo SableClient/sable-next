@@ -19,6 +19,7 @@ vi.mock('../messages/event-items.svelte.js', () => ({
 import { core } from '#lib/core/__mocks__/context.js';
 
 import ThreadViewHarness from './ThreadViewHarness.test.svelte';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -26,7 +27,7 @@ afterEach(() => {
 });
 
 function image(eventId: string, filename: string): TimelineItemView {
-  return {
+  return withRowFields({
     id: eventId,
     event_id: eventId,
     transaction_id: null,
@@ -63,7 +64,7 @@ function image(eventId: string, filename: string): TimelineItemView {
     mention: 'none',
     forwarded: null,
     forum_title: null,
-  };
+  });
 }
 
 test('an image in a thread opens the viewer on that image', async () => {
@@ -95,6 +96,7 @@ test('the header keeps a spoiler-safe topic visible', async () => {
     emote: false,
     notice: false,
     edited: false,
+    jumbo: null,
   };
   vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (this: RoomTimeline) {
     this.items = [root];
@@ -146,6 +148,7 @@ test.each([false, true])(
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     };
     vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (
       this: RoomTimeline

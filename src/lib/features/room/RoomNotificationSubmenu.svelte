@@ -66,16 +66,11 @@
     if (quiet) setQuiet(roomId, true);
     else if (mode === 'mentions' && isQuiet(roomId)) setQuiet(roomId, false);
     mode = next;
-    void core.commands.setRoomNotificationMode(roomId, next).then(
-      () => {
-        roomList.setNotificationOverride(roomId, next);
-      },
-      (error: unknown) => {
-        console.warn('[sable room] notification mode failed', error);
-        toasts.error($i18n.t('errors.actionFailed'));
-        void read();
-      }
-    );
+    core.commands.setRoomNotificationMode(roomId, next).catch((error: unknown) => {
+      console.warn('[sable room] notification mode failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
+      void read();
+    });
   }
 </script>
 

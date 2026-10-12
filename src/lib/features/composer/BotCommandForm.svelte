@@ -155,7 +155,7 @@
       if (parameter.schema.schema_type === 'array') addEntry(parameter.key);
     }
     const result = buildInvocation(command, values, prefix);
-    if (!result.ok) {
+    if (result.kind === 'invalid') {
       errors = result.errors;
       const [first] = Object.keys(result.errors);
       event.currentTarget.querySelector<HTMLElement>(`#${CSS.escape(fieldId(first))}`)?.focus();
@@ -185,12 +185,12 @@
   <div class="bot-command-header">
     <Avatar
       size="small"
-      src={command.senderAvatar}
+      src={command.sender_avatar}
       id={command.sender}
-      name={command.senderName ?? command.sender}
+      name={command.sender_name ?? command.sender}
     />
     <span class="bot-command-name">{prefix}{command.command}</span>
-    <span class="bot-command-bot">{command.senderName ?? command.sender}</span>
+    <span class="bot-command-bot">{command.sender_name ?? command.sender}</span>
     {#if command.description}
       <span class="bot-command-description">{command.description}</span>
     {/if}

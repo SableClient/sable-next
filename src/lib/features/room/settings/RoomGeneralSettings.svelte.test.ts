@@ -18,6 +18,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 import RoomGeneralSettings from './RoomGeneralSettings.svelte';
 
@@ -29,7 +30,7 @@ const core = Object.assign(baseCore, {
   setRoomJoinRule: vi.fn<() => Promise<void>>(),
 });
 
-const room: RoomSummary = {
+const room: RoomSummary = withCounts({
   room_id: '!room:example.org',
   canonical_alias: null,
   name: 'Example room',
@@ -56,7 +57,7 @@ const room: RoomSummary = {
   highlight: 0,
   marked_unread: false,
   latest_event: null,
-};
+});
 
 const permissions: RoomPermissionsView = {
   own_power_level: 50,

@@ -11,7 +11,6 @@
   import { canSendState } from './permission-groups';
 
   const EVENT_TYPE = 'm.room.encryption';
-  const ALGORITHM = 'm.megolm.v1.aes-sha2';
 
   interface Props {
     room: RoomSummary | null;
@@ -37,7 +36,7 @@
     enabling = true;
     failed = false;
     try {
-      await core.commands.sendStateEvent(target, EVENT_TYPE, '', { algorithm: ALGORITHM });
+      await core.commands.enableEncryption(target);
       confirming = false;
     } catch (error) {
       console.warn('[sable room] enabling encryption failed', error);

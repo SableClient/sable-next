@@ -61,23 +61,16 @@
 
     const current = ++run;
     try {
-      const [local, canonicalContent] = await Promise.all([
+      const [local, published] = await Promise.all([
         core.commands.roomAliases(target).catch(() => [] as string[]),
-        core.commands.roomStateEvent(target, CANONICAL_EVENT_TYPE),
+        core.commands.canonicalAlias(target),
       ]);
       if (current !== run) return;
 
       aliases = local;
       selected = new Set([...selected].filter((alias) => local.includes(alias)));
-      const content = canonicalContent as { alias?: unknown; alt_aliases?: unknown } | null;
-      canonical = typeof content?.alias === 'string' ? content.alias : null;
-      alternatives = Array.isArray(content?.alt_aliases)
-        ? [
-            ...new Set(
-              content.alt_aliases.filter((entry): entry is string => typeof entry === 'string')
-            ),
-          ]
-        : [];
+      canonical = published.alias;
+      alternatives = published.alternatives;
     } catch (error) {
       console.debug('[sable room] addresses unavailable', error);
     }
@@ -110,13 +103,9 @@
     const target = roomId;
     if (!target) return;
 
-    const rest = [...new Set(alt)].filter((entry) => entry !== alias);
-    await core.commands.sendStateEvent(target, CANONICAL_EVENT_TYPE, '', {
-      ...(alias === null ? {} : { alias }),
-      ...(rest.length > 0 ? { alt_aliases: rest } : {}),
-    });
-    canonical = alias;
-    alternatives = rest;
+    const written = await core.commands.setCanonicalAlias(target, alias, alt);
+    canonical = written.alias;
+    alternatives = written.alternatives;
   }
 
   function add(): void {

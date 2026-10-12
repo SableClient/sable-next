@@ -406,7 +406,7 @@ impl Core {
                     {
                         return;
                     }
-                    core.emit_profile_changed(generation, &room, &event);
+                    core.emit_profile_changed(generation, &room, &event).await;
                 }
             }
         });
@@ -427,7 +427,7 @@ impl Core {
                         return;
                     };
                     if event.prev_content().is_none() {
-                        core.emit_profile_changed(generation, &room, &event);
+                        core.emit_profile_changed(generation, &room, &event).await;
                     }
                 }
             }
@@ -435,7 +435,7 @@ impl Core {
         self.track_session_handler(client, handle);
     }
 
-    fn emit_profile_changed(
+    async fn emit_profile_changed(
         &self,
         generation: u64,
         room: &matrix_sdk::Room,
@@ -444,16 +444,25 @@ impl Core {
         if event.content.membership != MembershipState::Join {
             return;
         }
-        let Ok(user_id) = event.state_key.as_str().try_into() else {
+        let Ok(user_id) = matrix_sdk::ruma::OwnedUserId::try_from(event.state_key.as_str()) else {
             return;
         };
+        let display_name = event.content.displayname.clone();
+        let avatar_url = event.content.avatar_url.as_ref().map(ToString::to_string);
+        self.overlay_profile(
+            room.room_id(),
+            &user_id,
+            display_name.clone(),
+            avatar_url.clone(),
+        )
+        .await;
         self.emit_if_current(
             generation,
             CoreEvent::ProfileChanged {
                 room_id: room.room_id().to_owned(),
                 user_id,
-                display_name: event.content.displayname.clone(),
-                avatar_url: event.content.avatar_url.as_ref().map(ToString::to_string),
+                display_name,
+                avatar_url,
             },
         );
     }

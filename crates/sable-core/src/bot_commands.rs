@@ -4,11 +4,12 @@ use std::sync::Arc;
 use matrix_sdk::ruma::api::client::state::get_state_events;
 use matrix_sdk::ruma::events::{AnyStateEvent, AnySyncStateEvent};
 use matrix_sdk::ruma::serde::Raw;
+use sable_model::bot_commands::{BotCommand, BotCommandDescription, parse_descriptions};
 use serde::Deserialize;
 use serde_json::Value;
 
 use crate::Core;
-use crate::protocol::{BotCommandDescriptionView, CoreEvent};
+use crate::protocol::CoreEvent;
 
 pub(crate) const COMMAND_DESCRIPTION_EVENT: &str = "org.matrix.msc4391.command_description";
 pub(crate) const COMMAND_FIELD: &str = "org.matrix.msc4391.command";
@@ -25,7 +26,8 @@ struct StateFields {
     content: Value,
 }
 
-pub(crate) fn descriptions(state: &[Raw<AnyStateEvent>]) -> Vec<BotCommandDescriptionView> {
+/// Only a joined member's descriptions count, and they carry its profile.
+pub(crate) fn descriptions(state: &[Raw<AnyStateEvent>]) -> Vec<BotCommand> {
     let events: Vec<StateFields> = state
         .iter()
         .filter_map(|raw| raw.deserialize_as_unchecked::<StateFields>().ok())
@@ -40,7 +42,7 @@ pub(crate) fn descriptions(state: &[Raw<AnyStateEvent>]) -> Vec<BotCommandDescri
         .filter_map(|event| Some((event.state_key.as_deref()?, &event.content)))
         .collect();
 
-    events
+    let described: Vec<BotCommandDescription> = events
         .iter()
         .filter(|event| event.event_type == COMMAND_DESCRIPTION_EVENT)
         .filter(|event| {
@@ -52,14 +54,15 @@ pub(crate) fn descriptions(state: &[Raw<AnyStateEvent>]) -> Vec<BotCommandDescri
         .filter_map(|event| {
             let member = joined.get(event.sender.as_str())?;
             let text = |field: &str| member.get(field).and_then(Value::as_str).map(str::to_owned);
-            Some(BotCommandDescriptionView {
+            Some(BotCommandDescription {
                 sender: event.sender.clone(),
                 sender_name: text("displayname"),
                 sender_avatar: text("avatar_url"),
                 content: event.content.clone(),
             })
         })
-        .collect()
+        .collect();
+    parse_descriptions(&described)
 }
 
 impl Core {
@@ -67,7 +70,7 @@ impl Core {
         &self,
         client: &matrix_sdk::Client,
         room: &matrix_sdk::Room,
-    ) -> Result<Vec<BotCommandDescriptionView>, matrix_sdk::Error> {
+    ) -> Result<Vec<BotCommand>, matrix_sdk::Error> {
         let response = client
             .send(get_state_events::v3::Request::new(
                 room.room_id().to_owned(),
@@ -176,7 +179,7 @@ mod tests {
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].sender, BOT);
         assert_eq!(found[0].sender_name.as_deref(), Some("Bot"));
-        assert_eq!(found[0].content, json!({ "command": "ban" }));
+        assert_eq!(found[0].command, "ban");
     }
 
     #[tokio::test]

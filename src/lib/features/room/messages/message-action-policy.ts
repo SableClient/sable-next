@@ -1,7 +1,7 @@
 import type { TimelineItemView } from '#src/generated/protocol';
 import { isRecord } from '#lib/guards.js';
 
-import { canForward, canRedact } from '../timeline/timeline-format';
+import { canRedact } from '../timeline/timeline-format';
 
 type DownloadableMedia = Extract<
   TimelineItemView['content'],
@@ -140,7 +140,7 @@ export function messageActionPolicy({
       item.link_previews_removed !== true,
     pin: canPin && hasRoomEvent,
     bookmark: hasRoomEvent,
-    forward: hasRoomEvent && canForward(item.content),
+    forward: hasRoomEvent && item.forwardable,
     download: media !== null,
     stealEmotes: stealCount > 0,
     editHistory: hasRoomEvent && item.content.kind === 'message' && item.content.edited,

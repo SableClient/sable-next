@@ -175,10 +175,7 @@
       roomVersion: target,
       predecessor: id,
     });
-    await core.commands.sendStateEvent(id, 'm.room.tombstone', '', {
-      body: messageDraft.trim() || defaultBody,
-      replacement_room: next,
-    });
+    await core.commands.setTombstone(id, next, messageDraft.trim() || defaultBody);
     return next;
   }
 
@@ -192,10 +189,7 @@
       let next: string;
       if (mode === 'redirect') {
         next = replacementId ?? '';
-        await core.commands.sendStateEvent(id, 'm.room.tombstone', '', {
-          body: messageDraft.trim() || defaultBody,
-          replacement_room: next,
-        });
+        await core.commands.setTombstone(id, next, messageDraft.trim() || defaultBody);
       } else if (mode === 'custom') {
         next = await replaceWithNewRoom(id);
       } else {

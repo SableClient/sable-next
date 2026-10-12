@@ -10,7 +10,6 @@ import { saveBytes } from '#lib/platform/files.js';
 import {
   downloadCandidates,
   emoteCandidates,
-  mergedPackContent,
   uploadCandidates,
   type EmoteCandidate,
 } from './steal-emotes';
@@ -126,57 +125,6 @@ test('a candidate is re-uploaded rather than aliased to the original media', asy
     mimetype: 'image/png',
     size: PNG.length,
   });
-});
-
-test('the merge keeps the images already in the pack and everything else in the event', () => {
-  const current = {
-    pack: { display_name: 'Mine' },
-    images: { wave: { url: 'mxc://mine/wave' } },
-  };
-  const next = mergedPackContent(current, [
-    {
-      shortcode: 'party',
-      url: 'mxc://mine/party',
-      body: null,
-      usage: ['sticker'],
-      info: null,
-    },
-  ]);
-
-  expect(next.pack).toEqual({ display_name: 'Mine' });
-  expect(next.images).toEqual({
-    wave: { url: 'mxc://mine/wave' },
-    party: { url: 'mxc://mine/party', body: undefined, usage: ['sticker'], info: undefined },
-  });
-});
-
-test('a stolen image that matches the pack usage carries no usage of its own', () => {
-  const next = mergedPackContent({ pack: { usage: ['sticker'] } }, [
-    { shortcode: 'party', url: 'mxc://mine/party', body: null, usage: ['sticker'], info: null },
-    { shortcode: 'wave', url: 'mxc://mine/wave', body: null, usage: ['emoticon'], info: null },
-  ]);
-  const images = next.images as Record<string, { usage?: string[] }>;
-
-  expect(images.party.usage).toBeUndefined();
-  expect(images.wave.usage).toEqual(['emoticon']);
-});
-
-test('a taken shortcode is suffixed rather than overwriting an emote you already have', () => {
-  const next = mergedPackContent({ images: { wave: { url: 'mxc://mine/old' } } }, [
-    { shortcode: 'wave', url: 'mxc://mine/new', body: null, usage: ['emoticon'], info: null },
-  ]);
-  const images = next.images as Record<string, { url: string } | undefined>;
-
-  expect(images.wave?.url).toBe('mxc://mine/old');
-  expect(images['wave-1']?.url).toBe('mxc://mine/new');
-});
-
-test('an empty account data event becomes a pack rather than throwing', () => {
-  const next = mergedPackContent(undefined, [
-    { shortcode: 'wave', url: 'mxc://mine/wave', body: null, usage: ['emoticon'], info: null },
-  ]);
-
-  expect(Object.keys(next.images as Record<string, unknown>)).toEqual(['wave']);
 });
 
 function candidate(overrides: Partial<EmoteCandidate> = {}): EmoteCandidate {

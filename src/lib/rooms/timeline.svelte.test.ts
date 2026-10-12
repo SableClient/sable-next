@@ -4,9 +4,10 @@ import type { CoreEvent, TimelineFocusView, TimelineItemView } from '#src/genera
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { RoomTimeline } from './timeline.svelte';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 function item(id: string): TimelineItemView {
-  return {
+  return withRowFields({
     id,
     event_id: `$${id}`,
     transaction_id: null,
@@ -15,7 +16,15 @@ function item(id: string): TimelineItemView {
     sender_name: 'Alice',
     sender_avatar: null,
     timestamp: 0,
-    content: { kind: 'message', body: id, html: id, emote: false, notice: false, edited: false },
+    content: {
+      kind: 'message',
+      body: id,
+      html: id,
+      emote: false,
+      notice: false,
+      edited: false,
+      jumbo: null,
+    },
     in_reply_to: null,
     thread_root: null,
     thread_summary: null,
@@ -29,7 +38,7 @@ function item(id: string): TimelineItemView {
     mention: 'none',
     forwarded: null,
     forum_title: null,
-  };
+  });
 }
 
 class FakeCore {
@@ -145,7 +154,7 @@ test('an updated aggregation replaces the previous version of the event', async 
   const core = new FakeCore();
   const timeline = new RoomTimeline(core as unknown as CoreClient);
   await timeline.start('!room:example.org');
-  const reaction = {
+  const reaction = withRowFields({
     ...item('reaction'),
     content: {
       kind: 'hidden_event',
@@ -153,7 +162,7 @@ test('an updated aggregation replaces the previous version of the event', async 
       content: { 'm.relates_to': { event_id: '$initial', key: '👍', rel_type: 'm.annotation' } },
       redacts: null,
     },
-  } as TimelineItemView;
+  }) as TimelineItemView;
   const redacted = {
     ...reaction,
     content: { kind: 'hidden_event', event_type: 'm.reaction', content: {}, redacts: null },
@@ -511,11 +520,11 @@ test.each(['marker', 'event'] as const)(
       subscription: 1,
       items: [
         boundary === 'marker'
-          ? {
+          ? withRowFields({
               ...item('marker'),
               event_id: null,
               content: { kind: 'read_marker' },
-            }
+            })
           : item('read'),
         item('first'),
       ],
@@ -1273,88 +1282,4 @@ test('a different thread in the same room resubscribes', async () => {
     { kind: 'thread', root_event_id: '$one' },
     { kind: 'thread', root_event_id: '$two' },
   ]);
-});
-
-test('a reply fallback fills the preview now and on every later diff', async () => {
-  const core = new FakeCore();
-  const timeline = new RoomTimeline(core as unknown as CoreClient);
-  await timeline.start('!room:example.org');
-  const reply = {
-    ...item('reply'),
-    in_reply_to: {
-      event_id: '$reaction',
-      sender: null,
-      sender_mentioned: false,
-      sender_name: null,
-      body: null,
-    },
-  };
-  core.emit({ type: 'timeline_diff', subscription: 1, diffs: [{ op: 'push_back', value: reply }] });
-
-  timeline.provideReplyFallback('$reaction', { sender: '@ana:example.org', body: 'Reacted' });
-  expect(timeline.items.at(-1)?.in_reply_to).toMatchObject({
-    sender: '@ana:example.org',
-    body: 'Reacted',
-  });
-
-  core.emit({
-    type: 'timeline_diff',
-    subscription: 1,
-    diffs: [{ op: 'set', index: 2, value: reply }],
-  });
-  expect(timeline.items.at(-1)?.in_reply_to?.body).toBe('Reacted');
-});
-
-test('a rename in the room relabels the loaded rows the SDK left on the old name', async () => {
-  const core = new FakeCore();
-  const timeline = new RoomTimeline(core as unknown as CoreClient);
-  await timeline.start('!room:example.org');
-  const reply: TimelineItemView = {
-    ...item('reply'),
-    sender: '@bob:example.org',
-    sender_name: 'Bob',
-    in_reply_to: {
-      event_id: '$initial',
-      sender: '@alice:example.org',
-      sender_mentioned: false,
-      sender_name: 'Alice',
-      body: 'initial',
-    },
-  };
-  core.emit({ type: 'timeline_diff', subscription: 1, diffs: [{ op: 'push_back', value: reply }] });
-  const bobRow = timeline.items.at(-1);
-
-  core.emit({
-    type: 'profile_changed',
-    room_id: '!room:example.org',
-    user_id: '@alice:example.org',
-    display_name: 'Alicia',
-    avatar_url: 'mxc://example.org/alicia',
-  });
-  core.emit({
-    type: 'profile_changed',
-    room_id: '!other:example.org',
-    user_id: '@bob:example.org',
-    display_name: 'Robert',
-    avatar_url: null,
-  });
-
-  expect(timeline.items[0]).toMatchObject({
-    sender_name: 'Alicia',
-    sender_avatar: 'mxc://example.org/alicia',
-  });
-  expect(timeline.items.at(-1)?.sender_name).toBe('Bob');
-  expect(timeline.items.at(-1)?.in_reply_to?.sender_name).toBe('Alicia');
-  expect(timeline.items.at(-1)).not.toBe(bobRow);
-
-  core.emit({
-    type: 'timeline_diff',
-    subscription: 1,
-    diffs: [{ op: 'push_back', value: item('late') }],
-  });
-  expect(timeline.items.at(-1)?.sender_name).toBe('Alicia');
-
-  await timeline.stop();
-  await timeline.start('!room:example.org');
-  expect(timeline.items[0]?.sender_name).toBe('Alice');
 });

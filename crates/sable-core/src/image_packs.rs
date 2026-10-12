@@ -344,7 +344,7 @@ impl Core {
         Ok((cached.flatten(), false))
     }
 
-    async fn subscribed_pack_rooms(
+    pub(crate) async fn subscribed_pack_rooms(
         &self,
         client: &matrix_sdk::Client,
         network: bool,

@@ -85,8 +85,8 @@
     transferFailed = null;
   }
 
-  function taken(candidate: string): boolean {
-    return current.images.some((image) => image.shortcode === candidate);
+  function taken(): string[] {
+    return current.images.map((image) => image.shortcode);
   }
 
   function toggleUsage(usage: ImageUsageView, on: boolean): void {
@@ -122,7 +122,7 @@
     const next =
       wanted === '' || wanted === target.shortcode
         ? target.shortcode
-        : uniqueShortcode(wanted, taken);
+        : uniqueShortcode(wanted, taken());
     if (next === target.shortcode && body === target.body) return;
 
     edit({
@@ -158,10 +158,10 @@
           files.length === 1 && requested !== ''
             ? requested
             : normalizeShortcode(shortcodeWithoutExtension(file.name));
-        const name = uniqueShortcode(
-          wanted,
-          (candidate) => taken(candidate) || added.some((image) => image.shortcode === candidate)
-        );
+        const name = uniqueShortcode(wanted, [
+          ...taken(),
+          ...added.map((image) => image.shortcode),
+        ]);
         added.push({
           shortcode: name,
           url,
@@ -192,8 +192,8 @@
       const upright = await uprightJpeg(file);
       const bytes = new Uint8Array(await upright.arrayBuffer());
       const avatarUrl = await core.commands.uploadMedia(upright.type || 'image/*', bytes);
-      await onApply?.({ ...$state.snapshot(saved), avatarUrl });
-      if (draft !== null) draft = { ...draft, avatarUrl };
+      await onApply?.({ ...$state.snapshot(saved), avatar_url: avatarUrl });
+      if (draft !== null) draft = { ...draft, avatar_url: avatarUrl };
     } catch (error) {
       console.warn('[sable emotes] the pack avatar could not be saved', error);
       failed = true;
@@ -236,10 +236,10 @@
       for (const image of imported.flatMap((pack) => pack.images)) {
         added.push({
           ...image,
-          shortcode: uniqueShortcode(
-            image.shortcode,
-            (candidate) => taken(candidate) || added.some((entry) => entry.shortcode === candidate)
-          ),
+          shortcode: uniqueShortcode(image.shortcode, [
+            ...taken(),
+            ...added.map((entry) => entry.shortcode),
+          ]),
         });
       }
 
@@ -247,7 +247,7 @@
       edit({
         ...current,
         name: current.name === '' ? (first?.name ?? '') : current.name,
-        avatarUrl: current.avatarUrl ?? first?.avatarUrl ?? null,
+        avatar_url: current.avatar_url ?? first?.avatar_url ?? null,
         attribution: current.attribution === '' ? (first?.attribution ?? '') : current.attribution,
         images: [...current.images, ...added],
       });
@@ -324,7 +324,7 @@
       <div class="meta">
         <MediaImage
           class="pack-avatar"
-          source={current.avatarUrl ?? pack?.avatar_url ?? current.images[0]?.url ?? ''}
+          source={current.avatar_url ?? pack?.avatar_url ?? current.images[0]?.url ?? ''}
           alt=""
           width={56}
           height={56}

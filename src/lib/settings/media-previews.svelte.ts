@@ -1,19 +1,19 @@
-import type { RoomJoinRuleView } from '#src/generated/protocol';
+import type {
+  MediaPreviewConfigView,
+  MediaPreviewsView,
+  RoomJoinRuleView,
+} from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { isRecord } from '#lib/guards.js';
-import { preferences, setPreference, type MediaAutoLoad } from './preferences.svelte.js';
+import { preferences, setPreference } from './preferences.svelte.js';
 
 export const MEDIA_PREVIEW_EVENT = 'm.media_preview_config';
 export const UNSTABLE_MEDIA_PREVIEW_EVENT = 'io.element.msc4278.media_preview_config';
 
-export type MediaPreviews = MediaAutoLoad;
+export type MediaPreviews = MediaPreviewsView;
 export type InviteAvatars = 'on' | 'off';
 
-export interface MediaPreviewConfig {
-  media_previews?: MediaPreviews;
-  invite_avatars?: InviteAvatars;
-}
+export type MediaPreviewConfig = Partial<MediaPreviewConfigView>;
 
 const PRIVATE_JOIN_RULES: readonly RoomJoinRuleView[] = [
   'invite',
@@ -21,19 +21,6 @@ const PRIVATE_JOIN_RULES: readonly RoomJoinRuleView[] = [
   'restricted',
   'knock_restricted',
 ];
-
-export function parseMediaPreviewConfig(content: unknown): MediaPreviewConfig {
-  if (!isRecord(content)) return {};
-  const config: MediaPreviewConfig = {};
-  if ('media_previews' in content) {
-    const value = content.media_previews;
-    config.media_previews = value === 'on' || value === 'private' ? value : 'off';
-  }
-  if ('invite_avatars' in content) {
-    config.invite_avatars = content.invite_avatars === 'on' ? 'on' : 'off';
-  }
-  return config;
-}
 
 export function previewsShown(level: MediaPreviews, joinRule: RoomJoinRuleView | null): boolean {
   if (level === 'on') return true;
@@ -84,10 +71,7 @@ class MediaPreviewSettings {
   async roomConfig(roomId: string): Promise<MediaPreviewConfig> {
     const core = this.core;
     if (core === null) return {};
-    const stable = await core.commands.roomAccountData(roomId, MEDIA_PREVIEW_EVENT);
-    const content =
-      stable ?? (await core.commands.roomAccountData(roomId, UNSTABLE_MEDIA_PREVIEW_EVENT));
-    return parseMediaPreviewConfig(content);
+    return core.commands.mediaPreviewConfig(roomId);
   }
 
   async set(next: MediaPreviewConfig): Promise<void> {
@@ -95,12 +79,17 @@ class MediaPreviewSettings {
     if (core === null) return;
     this.reads += 1;
     const previous = this.global;
-    const merged = { ...previous, ...next };
+    const merged: MediaPreviewConfig = {
+      media_previews: next.media_previews ?? previous.media_previews,
+      invite_avatars: next.invite_avatars ?? previous.invite_avatars,
+    };
     this.global = merged;
     try {
-      await core.commands.setAccountData(MEDIA_PREVIEW_EVENT, merged);
-      await core.commands.setAccountData(UNSTABLE_MEDIA_PREVIEW_EVENT, merged);
-      if (this.global === merged && next.media_previews !== undefined) {
+      await core.commands.setMediaPreviewConfig({
+        media_previews: next.media_previews ?? null,
+        invite_avatars: next.invite_avatars ?? null,
+      });
+      if (this.global === merged && next.media_previews) {
         setPreference('mediaAutoLoad', next.media_previews);
       }
     } catch (error) {
@@ -114,13 +103,10 @@ class MediaPreviewSettings {
     try {
       const core = this.core;
       if (core === null) return;
-      const stable = await core.commands.accountData(MEDIA_PREVIEW_EVENT);
-      const content = stable ?? (await core.commands.accountData(UNSTABLE_MEDIA_PREVIEW_EVENT));
+      const config = await core.commands.mediaPreviewConfig();
       if (generation === this.generation && read === this.reads) {
-        this.global = parseMediaPreviewConfig(content);
-        if (this.global.media_previews !== undefined) {
-          setPreference('mediaAutoLoad', this.global.media_previews);
-        }
+        this.global = config;
+        if (config.media_previews) setPreference('mediaAutoLoad', config.media_previews);
       }
     } catch (error) {
       console.debug('[sable settings] media preview settings unavailable', error);

@@ -41,6 +41,7 @@ import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 import NavigationRail from './NavigationRail.svelte';
 import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
 import { savedSpacePaths, spaceNavigationHref } from './space-paths.js';
 
 beforeEach(() => {
@@ -76,7 +77,7 @@ async function openMenu(target: Element): Promise<HTMLElement[]> {
 const labels = (items: HTMLElement[]) => items.map((item) => item.textContent.trim());
 
 function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
-  return {
+  return withCounts({
     room_id: roomId,
     canonical_alias: null,
     name,
@@ -103,7 +104,7 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
     highlight: 0,
     marked_unread: false,
     latest_event: null,
-  };
+  });
 }
 
 test('badges unread direct chats', async () => {
@@ -188,7 +189,7 @@ test('uses a dot for ordinary unread messages outside spaces', async () => {
 });
 
 test('shows unread direct rooms as individual avatars', async () => {
-  const directRoom = {
+  const directRoom = withCounts({
     room_id: '!dm:example.org',
     canonical_alias: null,
     name: 'Alice',
@@ -215,7 +216,7 @@ test('shows unread direct rooms as individual avatars', async () => {
     highlight: 0,
     marked_unread: false,
     latest_event: null,
-  } satisfies RoomSummary;
+  });
   renderRail({ spaces: [], directRooms: [directRoom], mobile: true });
   await tick();
 

@@ -2,21 +2,10 @@ import { expect, test, vi } from 'vitest';
 
 import { CoreError } from '#src/transport';
 
-import { pinsHash } from './pin-marker';
 import { pinErrorMessage, PinnedEvents, type PinnedEventCommands } from './pinned-events.svelte.js';
 
-function fakeCore(
-  pinnedEvents = vi.fn(() => Promise.resolve<string[]>([])),
-  setPinned = vi.fn(),
-  roomAccountData = vi.fn(() => Promise.resolve<unknown>(null)),
-  setRoomAccountData = vi.fn(() => Promise.resolve())
-) {
-  return {
-    pinnedEvents,
-    setPinned,
-    roomAccountData,
-    setRoomAccountData,
-  } as unknown as PinnedEventCommands;
+function fakeCore(pinnedEvents = vi.fn(() => Promise.resolve<string[]>([])), setPinned = vi.fn()) {
+  return { pinnedEvents, setPinned } as unknown as PinnedEventCommands;
 }
 
 test('one load answers for every event in the room', async () => {
@@ -116,69 +105,5 @@ test('a refused pin says so instead of asking to retry', () => {
   );
   expect(pinErrorMessage(new CoreError({ code: 'failed', log_id: 'e1' }))).toBe(
     'Could not complete that action. Try again.'
-  );
-});
-
-test('pinning with the marker at the end moves it onto the new pin', async () => {
-  const room = '!room:example.org';
-  const marker = { hash: await pinsHash(['$a']), count: 1, last_seen_id: '$a' };
-  const setRoomAccountData = vi.fn(() => Promise.resolve());
-  const pins = new PinnedEvents(
-    fakeCore(
-      vi.fn(() => Promise.resolve(['$a'])),
-      vi.fn(() => Promise.resolve(['$a', '$b'])),
-      vi.fn(() => Promise.resolve<unknown>(marker)),
-      setRoomAccountData
-    )
-  );
-
-  await pins.load(room);
-  await pins.toggle(room, '$b');
-
-  expect(setRoomAccountData).toHaveBeenCalledWith(room, 'moe.sable.app.pins_read_marker', {
-    hash: await pinsHash(['$a', '$b']),
-    count: 2,
-    last_seen_id: '$b',
-  });
-});
-
-test('pinning leaves the marker alone while earlier pins are unread', async () => {
-  const room = '!room:example.org';
-  const setRoomAccountData = vi.fn(() => Promise.resolve());
-  const pins = new PinnedEvents(
-    fakeCore(
-      vi.fn(() => Promise.resolve(['$a'])),
-      vi.fn(() => Promise.resolve(['$a', '$b'])),
-      vi.fn(() => Promise.resolve<unknown>(null)),
-      setRoomAccountData
-    )
-  );
-
-  await pins.load(room);
-  await pins.toggle(room, '$b');
-
-  expect(setRoomAccountData).not.toHaveBeenCalled();
-});
-
-test('a refused pin puts the previous marker back', async () => {
-  const room = '!room:example.org';
-  const marker = { hash: await pinsHash(['$a']), count: 1, last_seen_id: '$a' };
-  const setRoomAccountData = vi.fn(() => Promise.resolve());
-  const pins = new PinnedEvents(
-    fakeCore(
-      vi.fn(() => Promise.resolve(['$a'])),
-      vi.fn(() => Promise.reject(new Error('denied'))),
-      vi.fn(() => Promise.resolve<unknown>(marker)),
-      setRoomAccountData
-    )
-  );
-
-  await pins.load(room);
-  await expect(pins.toggle(room, '$b')).rejects.toThrow('denied');
-
-  expect(setRoomAccountData).toHaveBeenLastCalledWith(
-    room,
-    'moe.sable.app.pins_read_marker',
-    marker
   );
 });

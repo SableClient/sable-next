@@ -77,7 +77,9 @@ test.each([
   const onSend = vi.fn<(file: File) => void>();
   render(VoiceRecorder, { props: { onSend, onCancel: vi.fn() } });
   const send = screen.getByRole('button', { name: 'composer.voiceSend' });
-  await vi.waitFor(() => expect(send).toBeEnabled());
+  await vi.waitFor(() => {
+    expect(send).toBeEnabled();
+  });
   now += 1250;
   await fireEvent.click(send);
 

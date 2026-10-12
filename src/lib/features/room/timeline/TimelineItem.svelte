@@ -59,17 +59,13 @@
   import RoleTagIcon from '../members/RoleTagIcon.svelte';
   import { hasSenderRoles, useSenderRoles } from '../members/sender-roles.js';
   import { useRoomCosmetics, type SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
+  import { replyText } from '../messages/reply-fallback.js';
   import ForwardedLine from '../messages/ForwardedLine.svelte';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import { useMessageDialogs } from '../messages/message-dialogs.svelte.js';
   import '../members/sender-identity.css';
   import { formatFullTimestamp, formatMessageTimestamp, formatTime } from '#lib/ui/date-time.js';
-  import {
-    isAnnotation,
-    isMessageRow,
-    jumboEmojiLevel,
-    jumboEmoticonLevel,
-  } from './timeline-format';
+  import { isAnnotation, isMessageRow } from './timeline-format';
 
   import { MessageActionExecutor } from '../messages/message-action-controller.svelte.js';
   import { TimelineItemProfiles } from './timeline-item-profiles.svelte';
@@ -251,7 +247,7 @@
     ) {
       return stateEventText(target, $i18n.t);
     }
-    return stripReplyFallback(item.in_reply_to?.body ?? '', replyPersona);
+    return stripReplyFallback(replyText(item.in_reply_to, $i18n.t), replyPersona);
   });
   let replyCosmetics = $derived(
     replyPersona ? null : (roomCosmetics?.for(item.in_reply_to?.sender) ?? null)
@@ -269,11 +265,7 @@
   );
   let emote = $derived(item.content.kind === 'message' && item.content.emote);
   let notice = $derived(item.content.kind === 'message' && item.content.notice);
-  let jumbo = $derived(
-    item.content.kind === 'message' && !item.content.emote
-      ? (jumboEmojiLevel(item.content.body) ?? jumboEmoticonLevel(item.content.html))
-      : null
-  );
+  let jumbo = $derived(item.content.kind === 'message' ? (item.content.jumbo ?? null) : null);
   let stalled = $derived(item.send_state?.status === 'failed' ? item.send_state : null);
   let blocked = $derived(stalled?.blocked ?? null);
   let changedNames = $derived(
@@ -616,7 +608,7 @@
       {/if}
     </div>
   </article>
-{:else if isMessageRow(item.content)}
+{:else if isMessageRow(item)}
   <article
     bind:this={messageRow}
     class={[

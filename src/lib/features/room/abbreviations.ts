@@ -26,7 +26,7 @@ export function buildAbbreviationMap(
     const match: AbbreviationMatch = {
       term,
       definition: entry.definition,
-      cased: entry.cased === true,
+      cased: entry.cased,
     };
     const key = term.toLowerCase();
     const bucket = map.get(key);

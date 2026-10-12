@@ -4,7 +4,7 @@ import type { PushFetchView } from '#src/generated/protocol';
 
 import { isRecord } from '#lib/guards.js';
 
-import { pushContent, type PushPayload } from './push-payload';
+import { pushContent, type PushNotification } from './push-payload';
 import type { PushSession } from './room-names';
 
 const REQUEST_TIMEOUT_MS = 8000;
@@ -17,12 +17,9 @@ export interface PushFetcher {
   decrypt: (roomId: string, eventId: string) => Promise<PushFetchView | null>;
 }
 
-export function namesOnlyItsEvent(payload: PushPayload): boolean {
-  const notification = payload.notification;
+export function namesOnlyItsEvent(notification: PushNotification): boolean {
   return (
-    notification?.room_id !== undefined &&
-    notification.event_id !== undefined &&
-    notification.type === undefined
+    notification.room_id !== null && notification.event_id !== null && notification.type === null
   );
 }
 
@@ -46,28 +43,25 @@ export function readPushFetch(value: unknown): PushFetchView | null {
 }
 
 export async function completePushPayload(
-  payload: PushPayload,
+  notification: PushNotification,
   fetcher: PushFetcher
-): Promise<PushPayload | null> {
-  const notification = payload.notification;
-  const roomId = notification?.room_id;
-  const eventId = notification?.event_id;
-  if (notification === undefined || roomId === undefined || eventId === undefined) return payload;
+): Promise<PushNotification | null> {
+  const roomId = notification.room_id;
+  const eventId = notification.event_id;
+  if (roomId === null || eventId === null) return notification;
 
   const room = `rooms/${encodeURIComponent(roomId)}`;
   const fetched = await request(fetcher, `${room}/event/${encodeURIComponent(eventId)}`);
   if (fetched.status === 403 || fetched.status === 404) {
     return {
-      notification: {
-        ...notification,
-        type: 'm.room.member',
-        content: { membership: 'invite' },
-        room_name: (await fetcher.roomName(roomId)) ?? undefined,
-      },
+      ...notification,
+      type: 'm.room.member',
+      content: { body: null, membership: 'invite', notification_type: null },
+      room_name: await fetcher.roomName(roomId),
     };
   }
   const event = fetched.body;
-  if (!isRecord(event) || typeof event.type !== 'string') return payload;
+  if (!isRecord(event) || typeof event.type !== 'string') return notification;
   const sender = text(event.sender);
 
   const [member, storedName, stateName, roomAvatar] = await Promise.all([
@@ -83,13 +77,14 @@ export async function completePushPayload(
     text(isRecord(roomAvatar) ? roomAvatar.url : undefined) ??
     text(isRecord(member) ? member.avatar_url : undefined);
 
-  let completed: NonNullable<PushPayload['notification']> = {
+  let completed: PushNotification = {
     ...notification,
     type: event.type,
     content: pushContent(event.content),
-    sender_display_name: senderName,
-    room_name: storedName ?? text(isRecord(stateName) ? stateName.name : undefined) ?? senderName,
-    icon: avatar === undefined ? undefined : await thumbnail(fetcher, avatar),
+    sender_display_name: senderName ?? null,
+    room_name:
+      storedName ?? text(isRecord(stateName) ? stateName.name : undefined) ?? senderName ?? null,
+    icon: avatar === undefined ? null : ((await thumbnail(fetcher, avatar)) ?? null),
   };
 
   if (event.type === 'm.room.encrypted') {
@@ -100,14 +95,14 @@ export async function completePushPayload(
         ...completed,
         type: decrypted.event.type,
         content: pushContent(decrypted.event.content),
-        sender_display_name: decrypted.event.sender_display_name ?? senderName,
-        room_name: completed.room_name ?? text(decrypted.event.room_name),
+        sender_display_name: decrypted.event.sender_display_name ?? senderName ?? null,
+        room_name: completed.room_name ?? text(decrypted.event.room_name) ?? null,
         decrypted: true,
       };
     }
   }
 
-  return { notification: completed };
+  return completed;
 }
 
 async function get(fetcher: PushFetcher, path: string): Promise<unknown> {

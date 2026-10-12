@@ -292,7 +292,7 @@ pub(crate) async fn unjoined_space_parents(
         .collect()
 }
 
-async fn first_space_parent(
+pub(crate) async fn first_space_parent(
     client: &matrix_sdk::Client,
     room: &matrix_sdk::Room,
 ) -> Option<OwnedRoomId> {

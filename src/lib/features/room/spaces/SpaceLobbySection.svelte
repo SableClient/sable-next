@@ -32,16 +32,16 @@
     HierarchyRoom,
     HierarchyRoomView,
     HierarchySection,
+    LobbyAction,
     LobbyDragItem,
   } from './space-hierarchy';
-  import { inAllowList, lobbyAction, placeholderRows } from './space-hierarchy';
+  import { placeholderRows } from './space-hierarchy';
   import LobbyRoomPlaceholder from './LobbyRoomPlaceholder.svelte';
 
   interface Props {
     section: HierarchySection;
     closed: boolean;
     joinedIds: ReadonlySet<string>;
-    invitedIds: ReadonlySet<string>;
     joining: ReadonlySet<string>;
     knocked: ReadonlySet<string>;
     joinErrors: ReadonlyMap<string, string>;
@@ -53,7 +53,12 @@
     onToggle: (key: string) => void;
     onVisible: (key: string) => void;
     onOpen: (child: HierarchyRoomView) => void;
-    onJoin: (child: HierarchyRoomView, via: readonly string[], parentId: string) => void;
+    onJoin: (
+      child: HierarchyRoomView,
+      via: readonly string[],
+      parentId: string,
+      action: LobbyAction
+    ) => void;
     onCopyLink: (child: HierarchyRoomView) => void;
     onRemove: (section: HierarchySection, entry: HierarchyRoom) => void;
     dragList: DragList<LobbyDragItem>;
@@ -80,7 +85,6 @@
     section,
     closed,
     joinedIds,
-    invitedIds,
     joining,
     knocked,
     joinErrors,
@@ -110,7 +114,7 @@
     onRemoveSubspace,
     onMoveTo,
   }: Props = $props();
-  let otherTargets = $derived(moveTargets.filter((target) => target.id !== section.parentId));
+  let otherTargets = $derived(moveTargets.filter((target) => target.id !== section.parent_id));
   let pendingSubspaceRemoval = $state(false);
 
   let dragging = $state<string | null>(null);
@@ -119,9 +123,9 @@
 
   function dropTarget(roomId: string | null) {
     return dragList.dropTarget(
-      { parentId: section.parentId, roomId },
+      { parentId: section.parent_id, roomId },
       {
-        accepts: (source) => canDropInto(source, section.parentId),
+        accepts: (source) => canDropInto(source, section.parent_id),
         onState: (next) => {
           if (roomId === null) headerDrop = next !== null;
           else dropState = next;
@@ -181,15 +185,8 @@
     </Button>
     {#if section.space}
       {@const sectionSpace = section.space}
-      {@const ownerId = section.ownerId}
-      {@const spaceAction =
-        joinedSpace || ownerId === null
-          ? null
-          : lobbyAction(
-              sectionSpace.join_rule,
-              invitedIds.has(sectionSpace.room_id),
-              inAllowList(sectionSpace, joinedIds, ownerId)
-            )}
+      {@const ownerId = section.owner_id}
+      {@const spaceAction = joinedSpace || ownerId === null ? null : section.space_action}
       {#if spaceAction && ownerId !== null}
         <Button
           size="small"
@@ -197,7 +194,7 @@
           disabled={knocked.has(sectionSpace.room_id)}
           loading={joining.has(sectionSpace.room_id)}
           onclick={() => {
-            onJoin(sectionSpace, [], ownerId);
+            onJoin(sectionSpace, [], ownerId, spaceAction);
           }}
         >
           <PlusIcon size={14} />{$i18n.t(
@@ -270,8 +267,8 @@
               <UsersThreeIcon size={16} />{$i18n.t('nav.createSubspace')}
             </ActionMenuItem>
           {/if}
-          {#if canManageOwner && section.ownerId !== null}
-            {@const ownerId = section.ownerId}
+          {#if canManageOwner && section.owner_id !== null}
+            {@const ownerId = section.owner_id}
             <ActionMenuItem
               onSelect={() => {
                 onSetSuggested(ownerId, sectionSpace.room_id, !section.suggested);
@@ -315,11 +312,7 @@
         {#each section.rooms as entry (entry.key)}
           {@const child = entry.room}
           {@const joined = joinedIds.has(child.room_id)}
-          {@const action = lobbyAction(
-            child.join_rule,
-            invitedIds.has(child.room_id),
-            inAllowList(child, joinedIds, section.parentId)
-          )}
+          {@const action = entry.action}
           <li
             class="room"
             class:dragging={dragging === child.room_id}
@@ -329,7 +322,7 @@
               dropState.instruction === 'below'}
             {@attach canManage
               ? dragList.draggable(
-                  { parentId: section.parentId, roomId: child.room_id },
+                  { parentId: section.parent_id, roomId: child.room_id },
                   (next) => {
                     dragging = next?.roomId ?? null;
                   }
@@ -382,7 +375,7 @@
                   disabled={knocked.has(child.room_id)}
                   loading={joining.has(child.room_id)}
                   onclick={() => {
-                    onJoin(child, entry.via, section.parentId);
+                    onJoin(child, entry.via, section.parent_id, action);
                   }}
                 >
                   <PlusIcon size={14} />{$i18n.t(
@@ -416,7 +409,7 @@
                   {#if canManage}
                     <ActionMenuItem
                       onSelect={() => {
-                        onSetSuggested(section.parentId, child.room_id, !entry.suggested);
+                        onSetSuggested(section.parent_id, child.room_id, !entry.suggested);
                       }}
                     >
                       <StarFourIcon size={16} />{$i18n.t(
@@ -478,7 +471,7 @@
             variant="ghost"
             size="small"
             onclick={() => {
-              onRetry(section.parentId);
+              onRetry(section.parent_id);
             }}>{$i18n.t('common.retry')}</Button
           >
         </p>

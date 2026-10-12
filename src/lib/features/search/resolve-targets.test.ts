@@ -4,17 +4,18 @@ import type { RoomSummary, SpaceChildEdge } from '#src/generated/protocol';
 
 import {
   parentSpaceOf,
-  resolveDirectRooms,
   resolveRoomTarget,
-  resolveSpaceRooms,
   resolveSpaceTarget,
-  resolveUserTarget,
+  searchRooms,
+  suggestPersonTarget,
   suggestRoomTarget,
-  suggestUserTarget,
+  type SearchPerson,
 } from './resolve-targets';
+import { resolveSearchQuery } from './search-query';
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 function room(overrides: Partial<RoomSummary>): RoomSummary {
-  return {
+  return withCounts({
     room_id: '!id:example.org',
     canonical_alias: null,
     name: null,
@@ -42,10 +43,10 @@ function room(overrides: Partial<RoomSummary>): RoomSummary {
     marked_unread: false,
     latest_event: null,
     ...overrides,
-  };
+  });
 }
 
-const rooms = [
+const rooms = searchRooms([
   room({
     room_id: '!design:example.org',
     canonical_alias: '#design-crew:example.org',
@@ -57,7 +58,7 @@ const rooms = [
     name: 'General',
   }),
   room({ room_id: '!nameless:example.org' }),
-];
+]);
 
 test('a full alias resolves', () => {
   expect(resolveRoomTarget(rooms, '#general:example.org')).toBe('!general:example.org');
@@ -86,10 +87,15 @@ test('an unknown room resolves to nothing rather than the first room', () => {
   expect(resolveRoomTarget(rooms, '')).toBeUndefined();
 });
 
-const senders = [
-  { userId: '@ada:example.org', displayName: 'Ada Lovelace' },
-  { userId: '@erwan:other.example', displayName: 'Erwan' },
+const senders: SearchPerson[] = [
+  { user_id: '@ada:example.org', display_name: 'Ada Lovelace' },
+  { user_id: '@erwan:other.example', display_name: 'Erwan' },
 ];
+
+function resolveUserTarget(people: SearchPerson[], value: string): string | undefined {
+  const query = `from:"${value}"`;
+  return resolveSearchQuery(query, { rooms: [], people }).filter.senders[0];
+}
 
 test('a full user id is taken as given even when unseen', () => {
   expect(resolveUserTarget([], '@stranger:example.org')).toBe('@stranger:example.org');
@@ -138,21 +144,29 @@ const spaceRooms = [
   room({ room_id: '!unrelated:example.org', name: 'Unrelated' }),
 ];
 
+function spaceRoomsOf(value: string): string[] | undefined {
+  const resolved = resolveSearchQuery(`space:"${value}"`, {
+    rooms: searchRooms(spaceRooms),
+    people: [],
+  });
+  return resolved.unresolved.length > 0 ? undefined : resolved.filter.rooms;
+}
+
 test('a space alias or name resolves to the space room id', () => {
-  expect(resolveSpaceTarget(spaceRooms, 'eng')).toBe('!eng:example.org');
-  expect(resolveSpaceTarget(spaceRooms, 'Engineering')).toBe('!eng:example.org');
+  expect(resolveSpaceTarget(searchRooms(spaceRooms), 'eng')).toBe('!eng:example.org');
+  expect(resolveSpaceTarget(searchRooms(spaceRooms), 'Engineering')).toBe('!eng:example.org');
 });
 
 test('a non-space room is not resolved as a space', () => {
-  expect(resolveSpaceTarget(spaceRooms, 'Dev')).toBeUndefined();
+  expect(resolveSpaceTarget(searchRooms(spaceRooms), 'Dev')).toBeUndefined();
 });
 
 test('a space resolves to every non-space room in its subtree', () => {
-  expect(resolveSpaceRooms(spaceRooms, 'eng')).toEqual(['!dev:example.org', '!ops:example.org']);
+  expect(spaceRoomsOf('eng')).toEqual(['!dev:example.org', '!ops:example.org']);
 });
 
 test('an unknown space resolves to nothing', () => {
-  expect(resolveSpaceRooms(spaceRooms, 'nowhere')).toBeUndefined();
+  expect(spaceRoomsOf('nowhere')).toBeUndefined();
 });
 
 test('a room resolves to the space that lists it as a child', () => {
@@ -170,7 +184,7 @@ test('a room outside every joined space has no parent space', () => {
   ).toBeUndefined();
 });
 
-const directRooms = [
+const directRooms = searchRooms([
   room({
     room_id: '!dm-erwan:example.org',
     is_direct: true,
@@ -187,29 +201,34 @@ const directRooms = [
     direct_targets: ['@alice:example.org'],
   }),
   room({ room_id: '!public:example.org', direct_targets: [] }),
-];
+]);
+
+function resolveDirectRooms(value: string): string[] | undefined {
+  const { rooms } = resolveSearchQuery(`with:"${value}"`, {
+    rooms: directRooms,
+    people: [],
+  }).filter;
+  return rooms.length > 0 ? rooms : undefined;
+}
 
 test('with: resolves a person to every direct room they are in', () => {
-  expect(resolveDirectRooms(directRooms, '@erwan:example.org')).toEqual([
+  expect(resolveDirectRooms('@erwan:example.org')).toEqual([
     '!dm-erwan:example.org',
     '!group:example.org',
   ]);
-  expect(resolveDirectRooms(directRooms, 'alice')).toEqual([
-    '!group:example.org',
-    '!dm-alice:example.org',
-  ]);
+  expect(resolveDirectRooms('alice')).toEqual(['!group:example.org', '!dm-alice:example.org']);
 });
 
 test('with: someone you have no direct room with resolves to nothing', () => {
-  expect(resolveDirectRooms(directRooms, '@nobody:example.org')).toBeUndefined();
-  expect(resolveDirectRooms(directRooms, '')).toBeUndefined();
+  expect(resolveDirectRooms('@nobody:example.org')).toBeUndefined();
+  expect(resolveDirectRooms('')).toBeUndefined();
 });
 
 test('a partial room name suggests the room it would have matched', () => {
-  const rooms = [
+  const rooms = searchRooms([
     room({ room_id: '!a:x', name: 'General chat', canonical_alias: '#general:x' }),
     room({ room_id: '!s:x', name: 'General space', is_space: true }),
-  ];
+  ]);
 
   expect(suggestRoomTarget(rooms, 'gen')).toEqual({ label: 'General chat', value: '#general:x' });
   expect(suggestRoomTarget(rooms, '#gen', true)).toEqual({
@@ -221,33 +240,33 @@ test('a partial room name suggests the room it would have matched', () => {
 });
 
 test('a partial name or localpart suggests the person', () => {
-  const people = [{ userId: '@ada:x', displayName: 'Ada Lovelace' }];
+  const people = [{ user_id: '@ada:x', display_name: 'Ada Lovelace' }];
 
-  expect(suggestUserTarget(people, 'love')).toEqual({ label: 'Ada Lovelace', value: '@ada:x' });
-  expect(suggestUserTarget(people, '@ad')).toEqual({ label: 'Ada Lovelace', value: '@ada:x' });
-  expect(suggestUserTarget(people, 'bob')).toBeUndefined();
+  expect(suggestPersonTarget(people, 'love')).toEqual({ label: 'Ada Lovelace', value: '@ada:x' });
+  expect(suggestPersonTarget(people, '@ad')).toEqual({ label: 'Ada Lovelace', value: '@ada:x' });
+  expect(suggestPersonTarget(people, 'bob')).toBeUndefined();
 });
 
 test('a name shared by a space and its room resolves to the room that holds messages', () => {
-  const rooms = [
+  const rooms = searchRooms([
     room({ room_id: '!space:example.org', name: 'Sable Next', is_space: true }),
     room({ room_id: '!room:example.org', name: 'Sable Next' }),
-  ];
+  ]);
   expect(resolveRoomTarget(rooms, 'Sable Next')).toBe('!room:example.org');
 });
 
 test('a name shared with an upgraded predecessor resolves to the current room', () => {
-  const rooms = [
+  const rooms = searchRooms([
     room({ room_id: '!old:example.org', name: 'Sable Next', is_tombstoned: true }),
     room({ room_id: '!new:example.org', name: 'Sable Next' }),
-  ];
+  ]);
   expect(resolveRoomTarget(rooms, 'Sable Next')).toBe('!new:example.org');
 });
 
 test('a joined room wins over an invite with the same name', () => {
-  const rooms = [
+  const rooms = searchRooms([
     room({ room_id: '!invite:example.org', name: 'Sable Next', state: 'invited' }),
     room({ room_id: '!joined:example.org', name: 'Sable Next' }),
-  ];
+  ]);
   expect(resolveRoomTarget(rooms, 'Sable Next')).toBe('!joined:example.org');
 });

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import type {
-  BotCommandDescriptionView,
+  BotCommand,
   ImagePackView,
   ImageSourcePackView,
   MemberView,
@@ -23,7 +23,7 @@ import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { BotCommandInvocation } from './bot-commands';
+import { parseBotCommands, type BotCommandInvocation } from './bot-commands';
 import type { ComposerContext } from './composer-context';
 import { invalidatePacks } from '#lib/emoji/load-packs.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
@@ -97,7 +97,7 @@ const mediaConfig = vi.fn(() => Promise.resolve({ upload_size: 100 * 1024 * 1024
 
 const scheduleAttachment = vi.fn(() => Promise.resolve('delayed'));
 
-const botCommands: BotCommandDescriptionView[] = [
+const botCommands: BotCommand[] = parseBotCommands([
   {
     sender: '@bot:example.org',
     sender_name: 'Bot',
@@ -116,7 +116,7 @@ const botCommands: BotCommandDescriptionView[] = [
     sender_avatar: null,
     content: { command: 'register' },
   },
-];
+]);
 
 function core(): CoreClient {
   return {
@@ -2311,11 +2311,11 @@ test('a failed bot command does not restore into another room', async () => {
 });
 
 test('a bot command lookup does not clear a newer draft', async () => {
-  let resolveCommands: ((commands: BotCommandDescriptionView[]) => void) | undefined;
+  let resolveCommands: ((commands: BotCommand[]) => void) | undefined;
   const client = core();
   const lookup = vi.fn(
     () =>
-      new Promise<BotCommandDescriptionView[]>((resolve) => {
+      new Promise<BotCommand[]>((resolve) => {
         resolveCommands = resolve;
       })
   );

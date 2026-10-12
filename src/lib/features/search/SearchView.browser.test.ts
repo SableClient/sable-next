@@ -4,6 +4,8 @@ import { render } from 'vitest-browser-svelte';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
+
 import en from '../../../locales/en.json' with { type: 'json' };
 
 const core = vi.hoisted((): Record<string, unknown> => ({}));
@@ -25,7 +27,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
 import SearchView from './SearchView.svelte';
 
 function room(overrides: Partial<RoomSummary>): RoomSummary {
-  return {
+  return withCounts({
     room_id: '!id:example.org',
     canonical_alias: null,
     name: null,
@@ -53,7 +55,7 @@ function room(overrides: Partial<RoomSummary>): RoomSummary {
     marked_unread: false,
     latest_event: null,
     ...overrides,
-  };
+  });
 }
 
 const rooms = [

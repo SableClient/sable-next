@@ -48,7 +48,6 @@
     type CalendarItem,
     type Occurrence,
     type RsvpStatus,
-    RSVP_EVENT,
     agenda,
     buildEvent,
     monthGrid,
@@ -339,7 +338,7 @@
       Date.now(),
       timeZone
     );
-    await core.commands.saveCalendarEvent(resolvedRoomId, event, base?.eventId ?? null);
+    await core.commands.saveCalendarEvent(resolvedRoomId, event, base?.event_id ?? null);
     await load(resolvedRoomId);
   }
 
@@ -347,7 +346,7 @@
     if (deleting === null) return;
     deleteBusy = true;
     try {
-      await core.commands.redact(resolvedRoomId, deleting.eventId);
+      await core.commands.redact(resolvedRoomId, deleting.event_id);
       deleting = null;
       await load(resolvedRoomId);
     } catch (error) {
@@ -361,11 +360,11 @@
   async function answer(occurrence: Occurrence, status: RsvpStatus): Promise<void> {
     const item = occurrence.item;
     try {
-      await core.commands.sendRawEvent(resolvedRoomId, RSVP_EVENT, {
+      await core.commands.answerCalendarEvent(resolvedRoomId, {
+        calendarEventId: item.event_id,
         uid: item.uid,
-        ...(occurrence.recurrenceId === null ? {} : { recurrenceId: occurrence.recurrenceId }),
+        recurrenceId: occurrence.recurrenceId,
         status,
-        'm.relates_to': { rel_type: 'm.reference', event_id: item.eventId },
       });
       await load(resolvedRoomId);
     } catch (error) {
@@ -375,7 +374,7 @@
   }
 
   function timeRange(occurrence: Occurrence): string {
-    if (occurrence.item.allDay) {
+    if (occurrence.item.all_day) {
       const last = occurrence.end - 1;
       return new Date(occurrence.start).toDateString() === new Date(last).toDateString()
         ? $i18n.t('calendar.allDay')
@@ -528,9 +527,9 @@
                 onkeydown={(event) => onGridKey(event, day)}
               >
                 <span class="calendar-cell-number">{new Date(day).getDate()}</span>
-                {#each found.slice(0, CHIPS) as entry (`${entry.item.eventId}:${String(entry.start)}`)}
+                {#each found.slice(0, CHIPS) as entry (`${entry.item.event_id}:${String(entry.start)}`)}
                   <span class="calendar-chip" class:declined={mineOn(entry) === 'declined'}>
-                    {#if !entry.item.allDay}<span class="calendar-chip-time"
+                    {#if !entry.item.all_day}<span class="calendar-chip-time"
                         >{formatTime(entry.start)}</span
                       >{/if}
                     {entry.item.title || $i18n.t('calendar.untitled')}
@@ -538,7 +537,7 @@
                 {/each}
                 {#if found.length > 0}
                   <span class="calendar-dots" aria-hidden="true">
-                    {#each found.slice(0, DOTS) as entry (`${entry.item.eventId}:${String(entry.start)}`)}
+                    {#each found.slice(0, DOTS) as entry (`${entry.item.event_id}:${String(entry.start)}`)}
                       <span class="calendar-dot"></span>
                     {/each}
                   </span>
@@ -579,7 +578,7 @@
           <section class="calendar-day">
             <h2>{day.label}</h2>
             <ul>
-              {#each day.list as occurrence (`${occurrence.item.eventId}:${String(occurrence.start)}`)}
+              {#each day.list as occurrence (`${occurrence.item.event_id}:${String(occurrence.start)}`)}
                 {@const item = occurrence.item}
                 {@const tally = tallyRsvps(
                   view?.rsvps ?? [],

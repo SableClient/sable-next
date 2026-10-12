@@ -46,8 +46,8 @@ use self::persist::ChunkId;
 use crate::Core;
 use crate::attachments::{attachment_contents, fits, link_urls};
 use crate::protocol::{
-    RoomAttachmentContentView, RoomAttachmentKind, RoomAttachmentView, SearchAttachment,
-    SearchFilter, SearchOrder,
+    self, CommandErr, RoomAttachmentContentView, RoomAttachmentKind, RoomAttachmentView,
+    SearchAttachment, SearchOrder,
 };
 
 const BODY_FIELD_COUNT: usize = 1;
@@ -57,6 +57,62 @@ const DOCUMENTS_PER_RESTORE_YIELD: usize = 256;
 const INGEST_WAIT: Duration = Duration::from_millis(25);
 const INGEST_WAIT_ATTEMPTS: usize = 200;
 const RETIRED_KEYS_BEFORE_VACUUM: usize = 64;
+
+/// [`protocol::SearchFilter`] with its ids parsed.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct IndexFilter {
+    pub(crate) rooms: Vec<OwnedRoomId>,
+    pub(crate) senders: Vec<OwnedUserId>,
+    pub(crate) mentions: Vec<OwnedUserId>,
+    pub(crate) has: Vec<SearchAttachment>,
+    pub(crate) not_rooms: Vec<OwnedRoomId>,
+    pub(crate) not_senders: Vec<OwnedUserId>,
+    pub(crate) not_mentions: Vec<OwnedUserId>,
+    pub(crate) not_has: Vec<SearchAttachment>,
+    pub(crate) after_ts: Option<u64>,
+    pub(crate) before_ts: Option<u64>,
+    pub(crate) phrases: Vec<String>,
+    pub(crate) exclude: Vec<String>,
+    pub(crate) pinned: Option<bool>,
+    pub(crate) in_thread: Option<bool>,
+    pub(crate) file_types: Vec<String>,
+    pub(crate) not_file_types: Vec<String>,
+    pub(crate) pattern: Option<String>,
+    pub(crate) state_events: Option<bool>,
+}
+
+fn parsed_ids<T: TryFrom<String>>(ids: Vec<String>) -> Result<Vec<T>, CommandErr> {
+    ids.into_iter()
+        .map(|id| T::try_from(id).map_err(|_| CommandErr::InvalidSearchFilter))
+        .collect()
+}
+
+impl TryFrom<protocol::SearchFilter> for IndexFilter {
+    type Error = CommandErr;
+
+    fn try_from(filter: protocol::SearchFilter) -> Result<Self, CommandErr> {
+        Ok(Self {
+            rooms: parsed_ids(filter.rooms)?,
+            senders: parsed_ids(filter.senders)?,
+            mentions: parsed_ids(filter.mentions)?,
+            has: filter.has,
+            not_rooms: parsed_ids(filter.not_rooms)?,
+            not_senders: parsed_ids(filter.not_senders)?,
+            not_mentions: parsed_ids(filter.not_mentions)?,
+            not_has: filter.not_has,
+            after_ts: filter.after_ts,
+            before_ts: filter.before_ts,
+            phrases: filter.phrases,
+            exclude: filter.exclude,
+            pinned: filter.pinned,
+            in_thread: filter.in_thread,
+            file_types: filter.file_types,
+            not_file_types: filter.not_file_types,
+            pattern: filter.pattern,
+            state_events: filter.state_events,
+        })
+    }
+}
 
 const MEMORY_BUDGET: usize = 64 * 1024 * 1024;
 const DISK_BUDGET: usize = 512 * 1024 * 1024;
@@ -186,7 +242,7 @@ impl Document {
         })
     }
 
-    fn matches(&self, filter: &SearchFilter, terms: &FoldedTerms) -> bool {
+    fn matches(&self, filter: &IndexFilter, terms: &FoldedTerms) -> bool {
         if !filter.senders.is_empty() && !filter.senders.contains(&self.sender) {
             return false;
         }
@@ -322,7 +378,7 @@ impl BodyPattern {
 }
 
 impl FoldedTerms {
-    fn of(filter: &SearchFilter, pinned: HashSet<OwnedEventId>) -> Self {
+    fn of(filter: &IndexFilter, pinned: HashSet<OwnedEventId>) -> Self {
         Self {
             pinned,
             pattern: filter.pattern.as_deref().map(BodyPattern::of),
@@ -862,7 +918,7 @@ impl RoomIndex {
         &'index self,
         room_id: &'index OwnedRoomId,
         query: &str,
-        filter: &SearchFilter,
+        filter: &IndexFilter,
         terms: &FoldedTerms,
     ) -> Vec<Ranked<'index>> {
         if query.is_empty() {
@@ -1167,7 +1223,7 @@ impl MessageIndex {
     pub(crate) fn search(
         &self,
         query: &str,
-        filter: &SearchFilter,
+        filter: &IndexFilter,
         order: SearchOrder,
         limit: usize,
         offset: usize,
@@ -1178,7 +1234,7 @@ impl MessageIndex {
     pub(crate) fn search_pinned(
         &self,
         query: &str,
-        filter: &SearchFilter,
+        filter: &IndexFilter,
         pinned: HashSet<OwnedEventId>,
         order: SearchOrder,
         limit: usize,
@@ -1290,12 +1346,12 @@ impl MessageIndex {
         )
     }
 
-    fn in_scope(filter: &SearchFilter, room_id: &RoomId) -> bool {
+    fn in_scope(filter: &IndexFilter, room_id: &RoomId) -> bool {
         (filter.rooms.is_empty() || filter.rooms.iter().any(|wanted| wanted == room_id))
             && !filter.not_rooms.iter().any(|denied| denied == room_id)
     }
 
-    fn cold_queue(&self, filter: &SearchFilter) -> Vec<OlderCursor> {
+    fn cold_queue(&self, filter: &IndexFilter) -> Vec<OlderCursor> {
         let mut queue: Vec<OlderCursor> = self
             .rooms
             .iter()
@@ -1326,7 +1382,7 @@ impl MessageIndex {
         room_id: &OwnedRoomId,
         stored: &persist::StoredChunk,
         query: &str,
-        filter: &SearchFilter,
+        filter: &IndexFilter,
         terms: &FoldedTerms,
         window: ColdWindow,
     ) -> (Vec<Hit>, usize) {
@@ -2435,7 +2491,7 @@ impl Core {
     pub(crate) async fn search_messages(
         &self,
         query: &str,
-        filter: &SearchFilter,
+        filter: &IndexFilter,
         order: SearchOrder,
         limit: usize,
         offset: usize,
@@ -2481,7 +2537,7 @@ impl Core {
     pub(crate) async fn searches_locally(
         &self,
         query: &str,
-        filter: &SearchFilter,
+        filter: &IndexFilter,
         order: SearchOrder,
     ) -> bool {
         if order == SearchOrder::Oldest || !self.server_search_enabled.load(Ordering::Relaxed) {
@@ -2493,7 +2549,7 @@ impl Core {
         server::target(&client, query, filter).await.is_none()
     }
 
-    pub(crate) async fn older_start(&self, filter: &SearchFilter) -> Option<String> {
+    pub(crate) async fn older_start(&self, filter: &IndexFilter) -> Option<String> {
         let index = self.search_index.lock().await;
         (!index.cold_queue(filter).is_empty()).then(String::new)
     }
@@ -2501,7 +2557,7 @@ impl Core {
     pub(crate) async fn search_older(
         &self,
         query: &str,
-        filter: &SearchFilter,
+        filter: &IndexFilter,
         order: SearchOrder,
         limit: usize,
         cursor: &str,
@@ -2603,7 +2659,7 @@ impl Core {
         (hits, next)
     }
 
-    async fn pinned_in_scope(&self, filter: &SearchFilter) -> HashSet<OwnedEventId> {
+    async fn pinned_in_scope(&self, filter: &IndexFilter) -> HashSet<OwnedEventId> {
         let Ok(client) = self.client().await else {
             return HashSet::new();
         };
@@ -3073,9 +3129,9 @@ mod tests {
     ) -> Vec<super::Hit> {
         index.search(
             query,
-            &super::SearchFilter {
+            &super::IndexFilter {
                 rooms: vec![room_id.clone()],
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             },
             super::SearchOrder::Rank,
             limit,
@@ -3453,14 +3509,14 @@ mod tests {
             ));
         let mut hits = index.search(
             "pipeline",
-            &super::SearchFilter::default(),
+            &super::IndexFilter::default(),
             super::SearchOrder::Rank,
             10,
             0,
         );
         hits.extend(index.search(
             "finished",
-            &super::SearchFilter::default(),
+            &super::IndexFilter::default(),
             super::SearchOrder::Rank,
             10,
             0,
@@ -3484,7 +3540,7 @@ mod tests {
         assert_eq!(ids(&hits[1].after), ["$screenshot"]);
     }
 
-    fn found(index: &MessageIndex, query: &str, filter: &super::SearchFilter) -> Vec<String> {
+    fn found(index: &MessageIndex, query: &str, filter: &super::IndexFilter) -> Vec<String> {
         index
             .search(query, filter, super::SearchOrder::Rank, 20, 0)
             .into_iter()
@@ -3499,9 +3555,9 @@ mod tests {
         let hits = found(
             &index,
             "deploy",
-            &super::SearchFilter {
+            &super::IndexFilter {
                 senders: vec![matrix_sdk::ruma::user_id!("@alice:localhost").to_owned()],
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             },
         );
 
@@ -3516,9 +3572,9 @@ mod tests {
         let hits = found(
             &index,
             "deploy",
-            &super::SearchFilter {
+            &super::IndexFilter {
                 mentions: vec![matrix_sdk::ruma::user_id!("@erwan:localhost").to_owned()],
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             },
         );
 
@@ -3533,9 +3589,9 @@ mod tests {
             found(
                 &index,
                 "deploy",
-                &super::SearchFilter {
+                &super::IndexFilter {
                     has: vec![super::SearchAttachment::Image],
-                    ..super::SearchFilter::default()
+                    ..super::IndexFilter::default()
                 }
             ),
             vec!["$screenshot"]
@@ -3544,9 +3600,9 @@ mod tests {
             found(
                 &index,
                 "deploy",
-                &super::SearchFilter {
+                &super::IndexFilter {
                     has: vec![super::SearchAttachment::Link],
-                    ..super::SearchFilter::default()
+                    ..super::IndexFilter::default()
                 }
             ),
             vec!["$alice"]
@@ -3560,10 +3616,10 @@ mod tests {
         let hits = found(
             &index,
             "deploy",
-            &super::SearchFilter {
+            &super::IndexFilter {
                 after_ts: Some(2_000),
                 before_ts: Some(3_000),
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             },
         );
 
@@ -3579,9 +3635,9 @@ mod tests {
             found(
                 &index,
                 "deploy",
-                &super::SearchFilter {
+                &super::IndexFilter {
                     phrases: vec!["pipeline is broken".to_owned()],
-                    ..super::SearchFilter::default()
+                    ..super::IndexFilter::default()
                 }
             ),
             vec!["$erwan"]
@@ -3595,9 +3651,9 @@ mod tests {
         let hits = found(
             &index,
             "deploy",
-            &super::SearchFilter {
+            &super::IndexFilter {
                 exclude: vec!["screenshot".to_owned()],
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             },
         );
 
@@ -3611,7 +3667,7 @@ mod tests {
         let hits: Vec<String> = index
             .search(
                 "deploy",
-                &super::SearchFilter::default(),
+                &super::IndexFilter::default(),
                 super::SearchOrder::Recent,
                 20,
                 0,
@@ -3630,9 +3686,9 @@ mod tests {
         let hits = found(
             &index,
             "",
-            &super::SearchFilter {
+            &super::IndexFilter {
                 senders: vec![matrix_sdk::ruma::user_id!("@alice:localhost").to_owned()],
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             },
         );
 
@@ -3659,9 +3715,9 @@ mod tests {
         let hits = found(
             &index,
             "deploy",
-            &super::SearchFilter {
+            &super::IndexFilter {
                 rooms: vec![room],
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             },
         );
 
@@ -4076,9 +4132,9 @@ mod tests {
             index
                 .search(
                     "deploy",
-                    &super::SearchFilter {
+                    &super::IndexFilter {
                         in_thread: Some(wanted),
-                        ..super::SearchFilter::default()
+                        ..super::IndexFilter::default()
                     },
                     super::SearchOrder::Rank,
                     10,
@@ -4104,9 +4160,9 @@ mod tests {
             index
                 .search_pinned(
                     "deploy",
-                    &super::SearchFilter {
+                    &super::IndexFilter {
                         pinned: Some(wanted),
-                        ..super::SearchFilter::default()
+                        ..super::IndexFilter::default()
                     },
                     pinned.clone(),
                     super::SearchOrder::Recent,
@@ -4129,7 +4185,7 @@ mod tests {
         let hits: Vec<String> = index
             .search(
                 "deploy",
-                &super::SearchFilter::default(),
+                &super::IndexFilter::default(),
                 super::SearchOrder::Oldest,
                 10,
                 0,
@@ -4300,7 +4356,7 @@ mod tests {
             index
                 .search(
                     "secret",
-                    &super::SearchFilter::default(),
+                    &super::IndexFilter::default(),
                     super::SearchOrder::Rank,
                     10,
                     0,
@@ -4318,10 +4374,10 @@ mod tests {
         let hits = found(
             &index,
             "deploy",
-            &super::SearchFilter {
+            &super::IndexFilter {
                 rooms: vec![room],
                 not_senders: vec![matrix_sdk::ruma::user_id!("@alice:localhost").to_owned()],
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             },
         );
 
@@ -4402,44 +4458,44 @@ mod tests {
                 Vec::new(),
             )
         });
-        let filter = |filter: super::SearchFilter| {
+        let filter = |filter: super::IndexFilter| {
             found(
                 &index,
                 "deploy",
-                &super::SearchFilter {
+                &super::IndexFilter {
                     rooms: vec![room.clone()],
                     ..filter
                 },
             )
         };
 
-        let plain = filter(super::SearchFilter::default());
+        let plain = filter(super::IndexFilter::default());
         assert!(!plain.contains(&"$renamed".to_owned()));
         assert_eq!(
-            filter(super::SearchFilter {
+            filter(super::IndexFilter {
                 state_events: Some(true),
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             }),
             vec!["$renamed".to_owned()]
         );
         assert_eq!(
-            filter(super::SearchFilter {
+            filter(super::IndexFilter {
                 file_types: vec!["PDF".to_owned()],
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             }),
             vec!["$notes".to_owned()]
         );
         assert!(
-            filter(super::SearchFilter {
+            filter(super::IndexFilter {
                 pattern: Some(r"pipe\w+ is".to_owned()),
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             })
             .contains(&"$erwan".to_owned())
         );
         assert!(
-            filter(super::SearchFilter {
+            filter(super::IndexFilter {
                 pattern: Some("(unclosed".to_owned()),
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             })
             .is_empty()
         );
@@ -4452,10 +4508,10 @@ mod tests {
         let hits = found(
             &index,
             "deploy",
-            &super::SearchFilter {
+            &super::IndexFilter {
                 rooms: vec![room],
                 not_has: vec![super::SearchAttachment::Image],
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             },
         );
 
@@ -4470,10 +4526,10 @@ mod tests {
         let hits = found(
             &index,
             "deploy",
-            &super::SearchFilter {
+            &super::IndexFilter {
                 rooms: vec![room],
                 not_mentions: vec![matrix_sdk::ruma::user_id!("@erwan:localhost").to_owned()],
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             },
         );
 
@@ -4500,9 +4556,9 @@ mod tests {
         let hits = found(
             &index,
             "deploy",
-            &super::SearchFilter {
+            &super::IndexFilter {
                 not_rooms: vec![other],
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             },
         );
 
@@ -4760,7 +4816,7 @@ mod tests {
             let oldest = *room_index.chunks.values().next().expect("a chunk");
             room_index.unload(oldest);
         }
-        let filter = super::SearchFilter::default();
+        let filter = super::IndexFilter::default();
 
         let hot = core
             .search_messages("w1x", &filter, super::SearchOrder::Rank, 30, 0, 0)
@@ -4840,9 +4896,9 @@ mod tests {
                 super::SearchOrder::Recent,
                 super::SearchOrder::Oldest,
             ] {
-                let filter = super::SearchFilter {
+                let filter = super::IndexFilter {
                     rooms: scope.clone(),
-                    ..super::SearchFilter::default()
+                    ..super::IndexFilter::default()
                 };
                 let mut cursor = core.older_start(&filter).await.expect("a cold chunk");
                 let mut seen = std::collections::HashSet::new();
@@ -4931,7 +4987,7 @@ mod tests {
             .rooms
             .insert(room.clone(), room_index);
 
-        let filter = super::SearchFilter::default();
+        let filter = super::IndexFilter::default();
         let start = core
             .older_start(&filter)
             .await
@@ -6293,10 +6349,10 @@ mod tests {
         })
     }
 
-    fn scoped_to(room_id: &matrix_sdk::ruma::OwnedRoomId) -> super::SearchFilter {
-        super::SearchFilter {
+    fn scoped_to(room_id: &matrix_sdk::ruma::OwnedRoomId) -> super::IndexFilter {
+        super::IndexFilter {
             rooms: vec![room_id.clone()],
-            ..super::SearchFilter::default()
+            ..super::IndexFilter::default()
         }
     }
 
@@ -6587,9 +6643,9 @@ mod tests {
         assert_eq!(files[0]["content"]["filename"], "notes.pdf");
         assert_eq!(files[0]["content"]["size"], 4096);
 
-        let filter = super::SearchFilter {
+        let filter = super::IndexFilter {
             rooms: vec![room_id.clone()],
-            ..super::SearchFilter::default()
+            ..super::IndexFilter::default()
         };
         let hits = core
             .search_messages("notes", &filter, super::SearchOrder::Rank, 10, 0, 0)
@@ -6698,7 +6754,7 @@ mod tests {
             .expect("room event cache");
         reingest_whole_room(&mut *core.search_index.lock().await, &cache, &room_id).await;
 
-        let filter = super::SearchFilter {
+        let filter = super::IndexFilter {
             after_ts: Some(1_000),
             ..scoped_to(&room_id)
         };
@@ -6752,7 +6808,7 @@ mod tests {
             .expect("room event cache");
         reingest_whole_room(&mut *core.search_index.lock().await, &cache, &room_id).await;
 
-        let filter = super::SearchFilter {
+        let filter = super::IndexFilter {
             senders: vec![sender.to_owned()],
             ..scoped_to(&room_id)
         };
@@ -6930,9 +6986,9 @@ mod tests {
 
         let hits = index.search(
             "deploy",
-            &super::SearchFilter {
+            &super::IndexFilter {
                 mentions: vec![alice.to_owned()],
-                ..super::SearchFilter::default()
+                ..super::IndexFilter::default()
             },
             super::SearchOrder::Rank,
             10,
@@ -7294,9 +7350,9 @@ mod stress {
                     &room_id(),
                     &sample,
                     "deploy",
-                    &super::SearchFilter::default(),
+                    &super::IndexFilter::default(),
                     &super::FoldedTerms::of(
-                        &super::SearchFilter::default(),
+                        &super::IndexFilter::default(),
                         std::collections::HashSet::new(),
                     ),
                     super::ColdWindow::all(1),

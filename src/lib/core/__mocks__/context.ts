@@ -20,6 +20,18 @@ export function createCoreStub<T extends Record<string, unknown>>(overrides = {}
     ),
     roomPermissions: vi.fn<(...args: never[]) => Promise<unknown>>(pending),
     roomStateEvent: vi.fn<(...args: never[]) => Promise<unknown>>(() => Promise.resolve(null)),
+    memberListThreshold: vi.fn<(...args: never[]) => Promise<number | null>>(() =>
+      Promise.resolve(null)
+    ),
+    roomBanner: vi.fn<(...args: never[]) => Promise<string | null>>(() => Promise.resolve(null)),
+    canonicalAlias: vi.fn<(...args: never[]) => Promise<unknown>>(() =>
+      Promise.resolve({ alias: null, alternatives: [] })
+    ),
+    historyVisibility: vi.fn<(...args: never[]) => Promise<string>>(() =>
+      Promise.resolve('shared')
+    ),
+    powerLevelTags: vi.fn<(...args: never[]) => Promise<unknown>>(() => Promise.resolve({})),
+    roomAbbreviations: vi.fn<(...args: never[]) => Promise<unknown[]>>(() => Promise.resolve([])),
     roomViaServers: vi.fn<(...args: never[]) => Promise<string[]>>(() => Promise.resolve([])),
     unjoinedSpaceParents: vi.fn<(...args: never[]) => Promise<unknown[]>>(() =>
       Promise.resolve([])

@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
 
   import type {
+    FieldEdit,
     PronounView,
     ProfileView,
     RoomPermissionsView,
@@ -9,11 +10,7 @@
     TimelineItemView,
   } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
-  import {
-    COSMETIC_EVENT_TYPES,
-    pronounContent,
-    writeMemberColors,
-  } from '#lib/features/composer/slash-commands.js';
+  import { COSMETIC_EVENT_TYPES, pronounSets } from '#lib/features/composer/slash-commands.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import MentionProfileCard from '#lib/features/room/members/MentionProfileCard.svelte';
   import { canSendState } from '#lib/features/room/settings/permission-groups.js';
@@ -116,6 +113,10 @@
 
   const previewMessage = $derived<TimelineItemView>({
     id: 'profile-message-preview',
+    row: 'message',
+    forwardable: true,
+    redactable: true,
+    visibility: 'always',
     event_id: null,
     transaction_id: null,
     send_state: null,
@@ -130,6 +131,7 @@
       emote: false,
       notice: false,
       edited: false,
+      jumbo: null,
     },
     in_reply_to: null,
     forum_title: null,
@@ -155,14 +157,6 @@
     if (avatarPreview) URL.revokeObjectURL(avatarPreview);
   });
 
-  function record(value: unknown): Record<string, unknown> {
-    return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
-  }
-
-  function text(value: unknown): string {
-    return typeof value === 'string' ? value : '';
-  }
-
   function setAvatar(file: File | null): void {
     if (avatarPreview) URL.revokeObjectURL(avatarPreview);
     avatarFile = file;
@@ -176,35 +170,22 @@
     applied = null;
     setAvatar(null);
     try {
-      const [member, pronounEvent, nextPermissions, nextLevels] = await Promise.all([
-        core.commands.roomStateEvent(target, 'm.room.member', userId),
-        core.commands.roomStateEvent(target, COSMETIC_EVENT_TYPES.pronoun, userId),
+      const [look, nextPermissions, nextLevels] = await Promise.all([
+        core.commands.memberLook(target),
         core.commands.roomPermissions(target),
         core.commands.roomPowerLevels(target),
       ]);
       if (current !== run) return;
-      const memberRecord = record(member);
-      const colors = record(memberRecord['eu.she-a.color']);
-      const memberName = text(memberRecord.displayname);
-      const memberAvatar = text(memberRecord.avatar_url);
-      const sets = record(pronounEvent).pronouns;
       permissions = nextPermissions;
       levels = nextLevels;
       const next: Draft = {
-        name: memberName === profile.display_name ? '' : memberName,
-        pronouns: Array.isArray(sets)
-          ? sets
-              .map((set) => {
-                const entry = record(set);
-                const language = text(entry.language);
-                return `${language ? `${language}:` : ''}${text(entry.summary)}`;
-              })
-              .filter((entry) => entry !== '')
-              .join(', ')
-          : '',
-        light: text(colors.on_light),
-        dark: text(colors.on_dark),
-        avatar: memberAvatar === '' || memberAvatar === profile.avatar_url ? null : memberAvatar,
+        name: look.display_name === profile.display_name ? '' : (look.display_name ?? ''),
+        pronouns: look.pronouns
+          .map((set) => `${set.language ? `${set.language}:` : ''}${set.summary}`)
+          .join(', '),
+        light: look.color_on_light ?? '',
+        dark: look.color_on_dark ?? '',
+        avatar: look.avatar_url === profile.avatar_url ? null : look.avatar_url,
       };
       draft = { ...next };
       base = { ...next };
@@ -218,20 +199,8 @@
     }
   }
 
-  async function writeMember(
-    target: string,
-    fields: Partial<Record<'displayname' | 'avatar_url', string | null>>
-  ): Promise<void> {
-    const rest = Object.fromEntries(
-      Object.entries(
-        record(await core.commands.roomStateEvent(target, 'm.room.member', userId))
-      ).filter(([key]) => !(key in fields))
-    );
-    await core.commands.sendStateEvent(target, 'm.room.member', userId, {
-      ...rest,
-      membership: 'join',
-      ...Object.fromEntries(Object.entries(fields).filter(([, value]) => value)),
-    });
+  function field(value: string | null | undefined): FieldEdit {
+    return value ? { kind: 'set', value } : { kind: 'clear' };
   }
 
   async function save(): Promise<void> {
@@ -247,25 +216,22 @@
           new Uint8Array(await upright.arrayBuffer())
         );
       }
-      if (draft.name !== base.name || avatar !== base.avatar) {
-        await writeMember(spaceId, {
-          displayname: draft.name.trim() || profileName,
-          avatar_url: avatar ?? profile.avatar_url,
-        });
-      }
-      if (draft.light !== base.light || draft.dark !== base.dark) {
-        await writeMemberColors(core.commands, spaceId, userId, {
-          kind: 'set',
-          colors: { on_light: draft.light || undefined, on_dark: draft.dark || undefined },
+      const identityChanged = draft.name !== base.name || avatar !== base.avatar;
+      const colorsChanged = draft.light !== base.light || draft.dark !== base.dark;
+      if (identityChanged || colorsChanged) {
+        await core.commands.setMemberLook(spaceId, {
+          ...(identityChanged && {
+            display_name: field(draft.name.trim() || profileName),
+            avatar_url: field(avatar ?? profile.avatar_url),
+          }),
+          ...(colorsChanged && {
+            color_on_light: field(draft.light),
+            color_on_dark: field(draft.dark),
+          }),
         });
       }
       if (draft.pronouns !== base.pronouns) {
-        await core.commands.sendStateEvent(
-          spaceId,
-          COSMETIC_EVENT_TYPES.pronoun,
-          userId,
-          pronounContent(draft.pronouns.trim() === '' ? 'reset' : draft.pronouns) ?? {}
-        );
+        await core.commands.setPronouns(spaceId, pronounSets(draft.pronouns));
       }
       draft = { ...draft, avatar };
       base = $state.snapshot(draft);
@@ -292,9 +258,9 @@
     applied = progress;
     for (const child of applyTargets) {
       try {
-        await writeMember(child, {
-          displayname: draft.name.trim() || profileName,
-          avatar_url: draft.avatar ?? profile.avatar_url,
+        await core.commands.setMemberLook(child, {
+          display_name: field(draft.name.trim() || profileName),
+          avatar_url: field(draft.avatar ?? profile.avatar_url),
         });
         progress = { ...progress, done: progress.done + 1 };
       } catch (failure) {

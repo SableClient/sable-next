@@ -93,7 +93,15 @@ test('a sticker keeps its fixed width, which no column and no cap bound', () => 
 test('falls back to the measured mean for a row whose height it cannot predict', () => {
   expect(
     estimateRowSize(
-      { kind: 'message', body: 'Hello', html: 'Hello', emote: false, notice: false, edited: false },
+      {
+        kind: 'message',
+        body: 'Hello',
+        html: 'Hello',
+        emote: false,
+        notice: false,
+        edited: false,
+        jumbo: null,
+      },
       mediaColumnPx(320)
     )
   ).toBeUndefined();

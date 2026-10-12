@@ -44,8 +44,8 @@ async function collect(
         wanted.set(image.url, (mime) => entryName(index, image.shortcode, mime));
       }
     }
-    if (draft.avatarUrl !== null && !wanted.has(draft.avatarUrl)) {
-      wanted.set(draft.avatarUrl, (mime) => avatarEntryName(index, mime));
+    if (draft.avatar_url !== null && !wanted.has(draft.avatar_url)) {
+      wanted.set(draft.avatar_url, (mime) => avatarEntryName(index, mime));
     }
   }
 
@@ -130,7 +130,7 @@ export async function importArchive(
 
   return packs.map((pack) => ({
     name: pack.pack.display_name ?? '',
-    avatarUrl:
+    avatar_url:
       pack.pack.avatar_file === undefined ? null : (uploaded.get(pack.pack.avatar_file) ?? null),
     attribution: pack.pack.attribution ?? '',
     usage: pack.pack.usage ?? ALL_USAGES,
