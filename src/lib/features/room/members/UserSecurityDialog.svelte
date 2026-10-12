@@ -1,11 +1,13 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
+  import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import type { UserDeviceView, UserSecurityView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
@@ -108,7 +110,14 @@
       >
       <Dialog.Description>{$i18n.t('timeline.profileEncryptionDescription')}</Dialog.Description>
     </div>
-    <Button size="small" onclick={() => onOpenChange(false)}>{$i18n.t('common.close')}</Button>
+    <IconButton
+      size="small"
+      variant="ghost"
+      label={$i18n.t('common.close')}
+      onclick={() => onOpenChange(false)}
+    >
+      <XIcon />
+    </IconButton>
   </header>
 
   <div class="security-body" style="overflow-y: auto">
@@ -208,6 +217,7 @@
   }
 
   .security-header {
+    align-items: flex-start;
     border-bottom: var(--border-width) solid var(--surface-container-line);
     padding: var(--space-400);
   }
