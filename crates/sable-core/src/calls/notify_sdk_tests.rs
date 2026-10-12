@@ -1,8 +1,3 @@
-#![expect(
-    clippy::large_futures,
-    reason = "the dispatch future is large and cannot be boxed"
-)]
-
 use std::sync::Arc;
 
 use matrix_sdk::{ruma::room_id, test_utils::mocks::MatrixMockServer};

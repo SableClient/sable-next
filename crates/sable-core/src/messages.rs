@@ -840,10 +840,6 @@ const FORWARD_META: &str = "com.famedly.app.forwarded";
 const SABLE_FORWARD_META: &str = "moe.sable.message.forward";
 
 #[cfg(test)]
-#[expect(
-    clippy::large_futures,
-    reason = "the dispatch future is large and cannot be boxed"
-)]
 mod tests {
     use std::sync::{Arc, Mutex};
 

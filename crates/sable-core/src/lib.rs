@@ -689,10 +689,6 @@ impl Core {
 }
 
 #[cfg(test)]
-#[expect(
-    clippy::large_futures,
-    reason = "the dispatch future is large and cannot be boxed"
-)]
 mod tests {
     use super::*;
     use crate::protocol::{Command, CommandErr, CommandOk};
@@ -994,38 +990,18 @@ mod tests {
 }
 
 #[cfg(all(test, not(target_family = "wasm")))]
-#[expect(
-    clippy::large_futures,
-    reason = "the dispatch future is large and cannot be boxed"
-)]
 mod sdk_timeline_tests;
 
 #[cfg(all(test, not(target_family = "wasm")))]
-#[expect(
-    clippy::large_futures,
-    reason = "the dispatch future is large and cannot be boxed"
-)]
 mod sdk_notification_tests;
 
 #[cfg(all(test, not(target_family = "wasm")))]
-#[expect(
-    clippy::large_futures,
-    reason = "the dispatch future is large and cannot be boxed"
-)]
 mod sdk_helpers_tests;
 
 #[cfg(all(test, not(target_family = "wasm")))]
-#[expect(
-    clippy::large_futures,
-    reason = "the dispatch future is large and cannot be boxed"
-)]
 mod sdk_verification_tests;
 
 #[cfg(test)]
-#[expect(
-    clippy::large_futures,
-    reason = "the dispatch future is large and cannot be boxed"
-)]
 mod live_tests {
     use super::*;
     use crate::protocol::{Command, CommandErr, CommandOk};
