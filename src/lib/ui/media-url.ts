@@ -74,6 +74,17 @@ export function imageMime(bytes: Uint8Array): string | undefined {
   return undefined;
 }
 
+export function isAnimatedImage(bytes: Uint8Array): boolean {
+  const type = imageMime(bytes);
+  if (type === 'image/gif') return true;
+  const head = new TextDecoder('latin1').decode(bytes);
+  if (type === 'image/png') {
+    const frames = head.indexOf('acTL');
+    return frames !== -1 && (head.indexOf('IDAT') === -1 || frames < head.indexOf('IDAT'));
+  }
+  return type === 'image/webp' && head.startsWith('VP8X', 12) && (bytes[20] & 0x02) !== 0;
+}
+
 function videoMime(bytes: Uint8Array): string | undefined {
   if (startsWith(bytes, [0x1a, 0x45, 0xdf, 0xa3])) return 'video/webm';
   if (!startsWith(bytes, [0x66, 0x74, 0x79, 0x70], 4)) return undefined;

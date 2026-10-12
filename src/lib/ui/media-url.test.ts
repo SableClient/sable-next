@@ -6,6 +6,7 @@ import {
   cachedMediaUrl,
   discardMediaUrl,
   holdMediaUrl,
+  isAnimatedImage,
   loadMediaUrl,
   mediaAspectRatio,
   retryMediaUrl,
@@ -576,4 +577,33 @@ test('an image sent as octet-stream is served with its own type', async () => {
   await loadMediaUrl(core, 'mxc://example.org/image.bin', 0, 0, 'application/octet-stream');
 
   expect(createObjectURL.mock.calls[0]?.[0]).toMatchObject({ type: 'image/png' });
+});
+
+function ascii(text: string): number[] {
+  return Array.from(text, (char) => char.charCodeAt(0));
+}
+
+test('only a multi-frame picture counts as animated', () => {
+  const png = [0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0];
+  const webp = (flags: number) => [
+    ...ascii('RIFF'),
+    0,
+    0,
+    0,
+    0,
+    ...ascii('WEBP'),
+    ...ascii('VP8X'),
+    0,
+    0,
+    0,
+    0,
+    flags,
+  ];
+
+  expect(isAnimatedImage(new Uint8Array(ascii('GIF89a')))).toBe(true);
+  expect(isAnimatedImage(new Uint8Array([...png, ...ascii('acTL'), ...ascii('IDAT')]))).toBe(true);
+  expect(isAnimatedImage(new Uint8Array([...png, ...ascii('IDAT'), ...ascii('acTL')]))).toBe(false);
+  expect(isAnimatedImage(new Uint8Array(webp(0x02)))).toBe(true);
+  expect(isAnimatedImage(new Uint8Array(webp(0)))).toBe(false);
+  expect(isAnimatedImage(new Uint8Array([0xff, 0xd8, 0xff, 0]))).toBe(false);
 });
