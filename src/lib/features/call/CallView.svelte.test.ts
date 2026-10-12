@@ -8,6 +8,9 @@ vi.mock('./call-telemetry', () => ({ CallTelemetry: vi.fn() }));
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
+import { preferences } from '#lib/settings/preferences.svelte.js';
+
+import { recordCallDebug } from './call-debug.svelte.js';
 import { CallSession } from './call-session.svelte.js';
 import type { CallParticipant } from './call-transport';
 import { idleTransportState } from './call-transport';
@@ -200,4 +203,33 @@ test('the call view counts itself as watching while it is on screen', () => {
   expect(session.views).toBe(1);
   unmount();
   expect(session.views).toBe(0);
+});
+
+test('the debug overlay follows its own switch under developer tools', () => {
+  preferences.developerTools = true;
+  recordCallDebug({
+    requested: 'auto',
+    nativeForced: false,
+    mode: 'compatibility',
+    reason: undefined,
+    stickyAvailable: undefined,
+    peerModes: [],
+    transport: 'livekit-web',
+    backendCount: 1,
+    encrypted: false,
+  });
+  try {
+    preferences.callDebugOverlay = false;
+    const hidden = mountBothSharing();
+    expect(screen.queryByLabelText('Call mode debug')).not.toBeInTheDocument();
+    hidden.unmount();
+
+    preferences.callDebugOverlay = true;
+    mountBothSharing();
+    expect(screen.getByLabelText('Call mode debug')).toBeInTheDocument();
+  } finally {
+    recordCallDebug(null);
+    preferences.developerTools = false;
+    preferences.callDebugOverlay = true;
+  }
 });

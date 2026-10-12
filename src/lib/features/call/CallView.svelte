@@ -388,7 +388,7 @@
     <CallPlayback rooms={session.rooms} telemetry={session.telemetry} />
   </div>
 
-  {#if preferences.developerTools}
+  {#if preferences.developerTools && preferences.callDebugOverlay}
     <CallModeDebug overlay />
   {/if}
 

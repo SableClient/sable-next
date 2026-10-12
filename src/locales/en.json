@@ -1916,6 +1916,7 @@
     "developerSentryWarnings": "warnings",
     "developerSentryDescription": "Error-reporting consent remains controlled from Diagnostics & Privacy. These switches control which categories are retained as debug breadcrumbs.",
     "callStatsOverlay": "Show screen share statistics in calls",
+    "callDebugOverlay": "Show call debug information in calls",
     "showHiddenEvents": "Show hidden events",
     "hiddenEventEdits": "Show edit events",
     "hiddenEventReactions": "Show reaction events",

@@ -360,6 +360,7 @@ export interface Preferences {
 
   developerTools: boolean;
   callStatsOverlay: boolean;
+  callDebugOverlay: boolean;
   showHiddenEvents: boolean;
   hiddenEventEdits: boolean;
   hiddenEventReactions: boolean;
@@ -646,6 +647,7 @@ const DEFAULTS: Preferences = {
 
   developerTools: false,
   callStatsOverlay: false,
+  callDebugOverlay: true,
   showHiddenEvents: false,
   hiddenEventEdits: true,
   hiddenEventReactions: true,
