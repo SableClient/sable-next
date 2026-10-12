@@ -806,7 +806,7 @@ jobs:
           arch_args() {
             local file="tarballs/sable-${VERSION}-linux-$1.tar.gz"
             if [ -e "$file" ]; then
-              echo "$(sha256sum "$file" | awk '{print $1}'):$(stat -c %s "$file")"
+              sha256sum "$file" | awk '{print $1}'
             else
               echo '-'
             fi
@@ -815,7 +815,7 @@ jobs:
 
           src=packaging/flatpak
           sed 's#\.\./\.\./LICENSE#LICENSE#' "$src/moe.sable.client.yml" > flathub/moe.sable.client.yml
-          cp "$src/moe.sable.client.desktop" "$src/moe.sable.client.metainfo.xml" "$src/flathub.json" "$src/sable-next.sh" flathub/
+          cp "$src/moe.sable.client.desktop" "$src/moe.sable.client.metainfo.xml" "$src/flathub.json" "$src/sable.sh" flathub/
           cp LICENSE flathub/LICENSE
           rm -rf flathub/icons && cp -r "$src/icons" flathub/icons
 

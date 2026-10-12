@@ -51,9 +51,14 @@ modules:
 
   - name: sable-next
     buildsystem: simple
+    build-options:
+      strip: false
+      no-debuginfo: true
     build-commands:
-      - install -Dm755 apply_extra ${FLATPAK_DEST}/bin/apply_extra
-      - install -Dm755 sable-next.sh ${FLATPAK_DEST}/bin/sable
+      - mv sable-next/runtime/* sable-next/
+      - rmdir sable-next/runtime
+      - cp -a sable-next ${FLATPAK_DEST}/sable-next
+      - install -Dm755 sable.sh ${FLATPAK_DEST}/bin/sable
       - install -Dm644 LICENSE ${FLATPAK_DEST}/share/licenses/${FLATPAK_ID}/LICENSE
       - install -Dm644 moe.sable.client.metainfo.xml ${FLATPAK_DEST}/share/metainfo/${FLATPAK_ID}.metainfo.xml
       - install -Dm644 moe.sable.client.desktop ${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop
@@ -62,11 +67,11 @@ modules:
       - install -Dm644 128x128.png ${FLATPAK_DEST}/share/icons/hicolor/128x128/apps/${FLATPAK_ID}.png
       - install -Dm644 256x256.png ${FLATPAK_DEST}/share/icons/hicolor/256x256/apps/${FLATPAK_ID}.png
     sources:
-      - type: extra-data
-        filename: sable-next.tar.gz
+      - type: archive
+        dest: sable-next
+        strip-components: 0
         url: https://git.sable.moe/SableClient/sable-next/releases/download/v@VERSION@/sable-@VERSION@-linux-x86_64.tar.gz
         sha256: '@SHA256_X86_64@'
-        size: @SIZE_X86_64@
         only-arches: [x86_64]
         x-checker-data:
           type: json
@@ -74,28 +79,19 @@ modules:
           version-query: .tag_name | sub("^v"; "")
           url-query: .assets[] | select(.name == "sable-" + $version + "-linux-x86_64.tar.gz") | .browser_download_url
           is-main-source: true
-      - type: extra-data
-        filename: sable-next.tar.gz
+      - type: archive
+        dest: sable-next
+        strip-components: 0
         url: https://git.sable.moe/SableClient/sable-next/releases/download/v@VERSION@/sable-@VERSION@-linux-aarch64.tar.gz
         sha256: '@SHA256_AARCH64@'
-        size: @SIZE_AARCH64@
         only-arches: [aarch64]
         x-checker-data:
           type: json
           url: https://git.sable.moe/api/v1/repos/SableClient/sable-next/releases/latest
           version-query: .tag_name | sub("^v"; "")
           url-query: .assets[] | select(.name == "sable-" + $version + "-linux-aarch64.tar.gz") | .browser_download_url
-      - type: script
-        dest-filename: apply_extra
-        commands:
-          - set -eu
-          - mkdir -p sable-next
-          - tar --no-same-owner -xzf sable-next.tar.gz -C sable-next
-          - mv sable-next/runtime/* sable-next/
-          - rmdir sable-next/runtime
-          - rm sable-next.tar.gz
       - type: file
-        path: sable-next.sh
+        path: sable.sh
       - type: file
         path: ../../LICENSE
       - type: file
