@@ -76,7 +76,7 @@
     "mdast-util-gfm-strikethrough": "^2.0.0",
     "mdast-util-gfm-table": "^2.0.0",
     "mdast-util-to-markdown": "^2.1.2",
-    "music-metadata": "12.0.0",
+    "music-metadata": "12.1.0",
     "opus-recorder": "^8.0.5",
     "pdfjs-dist": "6.4.299",
     "phosphor-svelte": "^3.1.0",
@@ -153,7 +153,7 @@
       "version": "^24.14.0"
     }
   },
-  "packageManager": "pnpm@12.10.1",
+  "packageManager": "pnpm@12.11.2",
   "imports": {
     "#src/generated/*": "./src/generated/*.ts",
     "#src/generated/wasm/*.js": "./src/generated/wasm/*.js",
