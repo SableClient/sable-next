@@ -90,7 +90,8 @@
     "inviteMessageShow": "Mostra messaggio da {{name}}",
     "invitesKnown": "Da persone che conosci",
     "invitesStrangers": "Da estranei",
-    "invitesSpam": "Probabile spam"
+    "invitesSpam": "Probabile spam",
+    "invitesSpamCollapse": "Collassa"
   },
   "common": {
     "directMessages": "Messaggi diretti",
@@ -105,6 +106,25 @@
     "tryAgain": "Riprova",
     "directMessage": "Messaggio diretto",
     "undo": "Annulla",
-    "restore": "Ripristina"
+    "restore": "Ripristina",
+    "changeAvatar": "Cambia avatar",
+    "add": "Aggiungi",
+    "always": "Sempre",
+    "allowNotifications": "Consenti notifiche",
+    "back": "Indietro",
+    "supportSable": "Sostieni Sable",
+    "close": "Chiudi",
+    "copy": "Copia",
+    "download": "Scarica",
+    "createARoom": "Crea una stanza",
+    "install": "Installa",
+    "block": "Blocca",
+    "changeBanner": "Cambia banner",
+    "copied": "Copiato",
+    "delete": "Cancella",
+    "import": "Importa",
+    "never": "Mai",
+    "accept": "Accetta",
+    "apply": "Applica"
   }
 }
