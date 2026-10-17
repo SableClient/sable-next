@@ -1,6 +1,6 @@
 {
   "settings": {
-    "verificationCancelled": "Weryfikacja zostałą anulowana: {{reason}}",
+    "verificationCancelled": "Weryfikacja została anulowana: {{reason}}",
     "cancelVerification": "Anuluj weryfikację"
   },
   "room": {
@@ -191,7 +191,7 @@
     "permChildrenHint": "Skopiuj te uprawnienia, poziomy członków i role do każdego pokoju i podprzestrzeni poniżej tej przestrzeni.",
     "permChildrenConfirm_one": "Zastosować te uprawnienia do {{count, number}} pokoju?",
     "permChildrenConfirm_few": "Zastosować te uprawnienia do {{count, number}} pokojów?",
-    "permChildrenConfirm_many": "Zastosować te uprawnienia do {{count, number}} pokoji?",
+    "permChildrenConfirm_many": "Zastosować te uprawnienia do {{count, number}} pokoi?",
     "devDiagLatest": "Ostatnie zdarzenie",
     "devDiagRead": "przeczytane",
     "devDiagNotRead": "nieprzeczytane",
@@ -365,7 +365,7 @@
     "pinsEmptyHint": "Każdy z mocą przypinania może przypiąć wiadomość z jej menu.",
     "inviteConvertConfirm": "Konwertuj i zaproś",
     "jumpBody": "Otwórz pokój na pierwszej wiadomości z konkretnej chwili.",
-    "membersJoined": "Członkowie",
+    "membersJoined": "Dołączeni",
     "membersBanned": "Zbanowani",
     "membersFailed": "Nie można było tego zrobić.",
     "permFailed": "Nie można było zmienić uprawnienia.",
@@ -539,8 +539,8 @@
     "blockSendersConfirm": "Zablokuj i odrzuć",
     "inviteMessageFrom": "Wiadomość od {{name}}",
     "invitesDeclined_one": "Odrzucono {{count, number}} zaproszenie",
-    "invitesDeclined_few": "Odrzucono {{count, number}} zaproszeń",
-    "invitesDeclined_many": "Odrzucono {{count, number}} zaproszenia",
+    "invitesDeclined_few": "Odrzucono {{count, number}} zaproszenia",
+    "invitesDeclined_many": "Odrzucono {{count, number}} zaproszeń",
     "declineAllFailed_one": "Nie udało się odrzucić {{count, number}} zaproszenia",
     "declineAllFailed_few": "Nie udało się odrzucić {{count, number}} zaproszeń",
     "declineAllFailed_many": "Nie udało się odrzucić {{count, number}} zaproszeń",
