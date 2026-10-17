@@ -336,8 +336,8 @@ importers:
         specifier: ^4.0.0
         version: 4.0.0(svelte@5.57.2(patch_hash=49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e)(@typescript-eslint/types@8.71.1))
       tauri-plugin-android-fs-api:
-        specifier: 29.0.0
-        version: 29.0.0
+        specifier: 30.1.0
+        version: 30.1.0
       uint8array-extras:
         specifier: 1.6.0
         version: 1.6.0
@@ -5671,8 +5671,8 @@ packages:
     resolution: {integrity: sha512-MFO/QzvtAOmJbkhOaCTvbGcFN9L9b+JunIsDwaKljSOdcLMea3NJ1k9Usz/rjdfSXTq4dfzfeS7W4p4YOAAHeA==}
     engines: {node: '>=18'}
 
-  tauri-plugin-android-fs-api@29.0.0:
-    resolution: {integrity: sha512-fDCyz/EFyWGEKXu3AxjhgSM07kSXKKzK1Jg4W3CR0kQABrqS9JekvjXz68tgq44JFXpLH9IgL7CwQ+ed8WGiUw==}
+  tauri-plugin-android-fs-api@30.1.0:
+    resolution: {integrity: sha512-31Lm053jLSutvUIb6AHyPCm98RmNNGL48RYp/FE2+BlIUJ6T0/Gh97w8utr7tT8kFxy1fcvFZXSuri8BnPEJ4A==}
 
   teex@1.0.1:
     resolution: {integrity: sha512-eYE6iEI62Ni1H8oIa7KlDU6uQBtqr4Eajni3wX7rpfXD8ysFx8z0+dri+KWEPWpBsxXfxu58x/0jvTVT1ekOSg==}
@@ -11341,7 +11341,7 @@ snapshots:
       minizlib: 3.1.0
       yallist: 5.0.0
 
-  tauri-plugin-android-fs-api@29.0.0:
+  tauri-plugin-android-fs-api@30.1.0:
     dependencies:
       '@tauri-apps/api': 2.12.0
       create-web-stream: 1.1.3

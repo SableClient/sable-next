@@ -91,7 +91,7 @@ tauri = { version = "2.11.3", default-features = false, features = ["macos-proxy
 # The system bar icon contrast is only reachable through the Activity's window.
 [target."cfg(target_os = \"android\")".dependencies]
 jni = "0.22"
-tauri-plugin-android-fs = "=29.0.0"
+tauri-plugin-android-fs = "=30.1.0"
 tauri-plugin-sable-push = { path = "../plugins/tauri-plugin-sable-push", version = "0.1.0" }
 
 # Push drags in Firebase and APNs, which only these two builds should carry.
