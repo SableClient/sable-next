@@ -235,11 +235,15 @@ impl Ffi {
         self.run(async move { app.offer(&event).await }).await
     }
 
-    /// Moves to the next account; see `App::switch_account`.
     pub async fn switch_account(&self, account: String) -> Result<(), FfiError> {
         let app = self.app.clone();
         self.run(async move { app.switch_account(account).await })
             .await
+    }
+
+    pub async fn flush(&self) -> Result<(), FfiError> {
+        let app = self.app.clone();
+        self.run(async move { app.flush().await }).await
     }
 
     pub async fn shutdown(&self) -> Result<(), FfiError> {

@@ -122,6 +122,7 @@ fn a_binding_on_its_own_thread_drives_the_whole_surface_without_a_runtime() {
             if replied.0 == req && *value == json!(5)
     ));
 
+    block(ffi.flush()).unwrap();
     let snapshot: Snapshot = json(&block(ffi.resync(sub)).unwrap());
     assert_eq!((snapshot.rev, snapshot.state), (1, json!({"count": 5})));
     let ranged: Snapshot = json(&block(ffi.range(sub, "null")).unwrap());

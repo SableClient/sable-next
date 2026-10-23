@@ -1018,6 +1018,46 @@ async fn a_persisted_view_is_restored_at_cold_start_and_saved_after_changes() {
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn a_flush_writes_the_changed_views_at_once_and_the_instances_keep_running() {
+    let harness = harness();
+    let replica = harness.subscribe("drafts", Value::Null, None).await;
+    assert_eq!(stored_view(&harness, DRAFTS_A), None);
+
+    dispatch(
+        &harness,
+        &drafts(),
+        json!({"type": "type", "text": "first"}),
+    )
+    .await;
+    harness.settle().await;
+    harness.app.flush().await;
+    assert_eq!(
+        stored_view(&harness, DRAFTS_A),
+        Some(json!({"text": "first"})),
+        "before the settling time is over"
+    );
+
+    harness.app.flush().await;
+    dispatch(
+        &harness,
+        &drafts(),
+        json!({"type": "type", "text": "second"}),
+    )
+    .await;
+    harness.settle().await;
+    assert_eq!(
+        harness.app.resync(replica.sub).await.unwrap().state,
+        json!({"text": "second"}),
+        "the instance is still running"
+    );
+    harness.app.flush().await;
+    assert_eq!(
+        stored_view(&harness, DRAFTS_A),
+        Some(json!({"text": "second"}))
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn one_account_never_starts_from_the_views_of_another() {
     let harness = harness();
     let first = harness.subscribe("drafts", Value::Null, None).await;

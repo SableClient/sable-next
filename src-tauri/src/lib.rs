@@ -471,19 +471,16 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
         session_store(&data_dir),
     );
     let event_sink = Arc::new(EventSink::default());
+    let gate = AccountGate::default();
+    let runtime = runtime::Runtime::new(&core, &gate, &data_dir.to_string_lossy());
     #[cfg(target_os = "ios")]
-    follow_ios_lifecycle(&core);
+    follow_ios_lifecycle(&core, &runtime);
     #[cfg(mobile)]
     network::attach(&core);
     let pushing = core.clone();
     #[cfg(target_os = "android")]
     let _ = cold_push::CORE.set(core.clone());
-    let gate = AccountGate::default();
-    app.manage(runtime::Runtime::new(
-        &core,
-        &gate,
-        &data_dir.to_string_lossy(),
-    ));
+    app.manage(runtime);
     tauri::async_runtime::spawn(restore_ahead_of_webview(core.clone(), gate.clone()));
     app.manage(AppState {
         core,
@@ -561,24 +558,49 @@ fn update_mobile_activity(window: &tauri::Window<BrowserEngine>, event: &tauri::
         tauri::WindowEvent::Resumed => true,
         _ => return,
     };
-    if let Some(state) = window.try_state::<AppState>() {
-        set_mobile_activity(state.core.clone(), active, SYNC_STOP_DELAY);
+    if let (Some(state), Some(runtime)) = (
+        window.try_state::<AppState>(),
+        window.try_state::<runtime::Runtime>(),
+    ) {
+        set_mobile_activity(
+            state.core.clone(),
+            runtime.inner().clone(),
+            active,
+            SYNC_STOP_DELAY,
+        );
     }
 }
 
 #[cfg(target_os = "ios")]
-fn follow_ios_lifecycle(core: &Arc<Core>) {
+fn follow_ios_lifecycle(core: &Arc<Core>, runtime: &runtime::Runtime) {
+    let (core, runtime) = (core.clone(), runtime.clone());
     if ios::in_background() {
-        set_mobile_activity(core.clone(), false, std::time::Duration::ZERO);
+        set_mobile_activity(
+            core.clone(),
+            runtime.clone(),
+            false,
+            std::time::Duration::ZERO,
+        );
     }
-    let core = core.clone();
     ios::observe_lifecycle(move |change| match change {
-        ios::Lifecycle::ResignActive => set_mobile_activity(core.clone(), false, SYNC_STOP_DELAY),
+        ios::Lifecycle::ResignActive => {
+            set_mobile_activity(core.clone(), runtime.clone(), false, SYNC_STOP_DELAY);
+        }
         ios::Lifecycle::EnterBackground => {
-            set_mobile_activity(core.clone(), false, std::time::Duration::ZERO);
+            set_mobile_activity(
+                core.clone(),
+                runtime.clone(),
+                false,
+                std::time::Duration::ZERO,
+            );
         }
         ios::Lifecycle::BecomeActive => {
-            set_mobile_activity(core.clone(), true, std::time::Duration::ZERO);
+            set_mobile_activity(
+                core.clone(),
+                runtime.clone(),
+                true,
+                std::time::Duration::ZERO,
+            );
         }
     });
 }
@@ -595,13 +617,20 @@ fn session_store(data_dir: &std::path::Path) -> Box<dyn sable_core::store::Sessi
     Box::new(sable_core::store::ExclusiveFileSessionStore::new(data_dir))
 }
 
+/// Views are flushed first, as the OS may kill a backgrounded app.
 #[cfg(mobile)]
-fn set_mobile_activity(core: Arc<Core>, active: bool, stop_delay: std::time::Duration) {
+fn set_mobile_activity(
+    core: Arc<Core>,
+    runtime: runtime::Runtime,
+    active: bool,
+    stop_delay: std::time::Duration,
+) {
     core.set_app_active(active);
     #[cfg(target_os = "ios")]
     let background_task = (!active).then(|| ios::BackgroundTask::begin("Pause sync"));
     tauri::async_runtime::spawn(async move {
         if !active {
+            runtime.flush().await;
             tokio::time::sleep(stop_delay).await;
         }
         core.apply_app_activity(active).await;

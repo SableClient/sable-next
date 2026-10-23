@@ -6,7 +6,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use futures_util::StreamExt;
+use futures_util::{FutureExt, StreamExt};
 use sable_protocol::CoreEvent;
 use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
@@ -89,14 +89,15 @@ pub enum Exit {
     Panicked,
 }
 
-/// Called once, when the instance's task has ended and its requests are lost.
+type Written = futures_util::future::Shared<oneshot::Receiver<()>>;
+
+/// Called once the task has ended and its requests are lost.
 pub type ExitHook = BoxOnce<Exit, ()>;
 
 pub struct Started {
     pub instance: Arc<dyn Instance>,
 }
 
-/// An instance without its slice's types, for the host to route to.
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 pub trait Instance: SendOutsideWasm + SyncOutsideWasm {
@@ -110,9 +111,10 @@ pub trait Instance: SendOutsideWasm + SyncOutsideWasm {
 
     async fn core(&self, event: &CoreEvent);
 
-    /// Returns once the instance has disposed, drained, persisted and answered
-    /// the requests it will never answer.
+    /// Returns once the instance has disposed, drained, persisted and lost its requests.
     async fn stop(&self);
+
+    async fn flush(&self);
 }
 
 enum Msg<S: Slice> {
@@ -155,14 +157,14 @@ enum Msg<S: Slice> {
         _busy: Busy,
     },
     Persist,
-    /// An effect of the instance panicked.
+    Flush(oneshot::Sender<Option<Written>>),
     Failed {
         _busy: Busy,
     },
     Stop(oneshot::Sender<()>),
 }
 
-/// Sends to an instance that may be gone, without keeping its inbox open.
+/// Does not keep the inbox of a gone instance open.
 async fn deliver<S: Slice>(tx: &mpsc::WeakSender<Msg<S>>, msg: Msg<S>) -> bool {
     match tx.upgrade() {
         Some(tx) => tx.send(msg).await.is_ok(),
@@ -251,6 +253,15 @@ impl<S: Slice> Instance for Handle<S> {
         let (done, stopped) = oneshot::channel();
         if self.send(Msg::Stop(done)).await.is_ok() {
             let _ = stopped.await;
+        }
+    }
+
+    async fn flush(&self) {
+        let (reply, answer) = oneshot::channel();
+        if self.send(Msg::Flush(reply)).await.is_ok()
+            && let Ok(Some(written)) = answer.await
+        {
+            let _ = written.await;
         }
     }
 }
@@ -419,7 +430,7 @@ struct Actor<S: Slice> {
     streams: HashMap<Name, Armed>,
     next_generation: u64,
     persisting: Option<Task>,
-    last_write: Option<oneshot::Receiver<()>>,
+    last_write: Option<Written>,
     replies: Vec<(ReqId, Outcome)>,
     notices: Vec<(String, String)>,
 }
@@ -560,6 +571,12 @@ impl<S: Slice> Actor<S> {
             Msg::Persist => {
                 self.persisting = None;
                 self.save();
+            }
+            Msg::Flush(reply) => {
+                if S::PERSIST && self.persisting.take().is_some() {
+                    self.save();
+                }
+                let _ = reply.send(self.last_write.clone());
             }
             Msg::Failed { .. } => return Flow::Fail,
             Msg::Stop(done) => return Flow::Stop(done),
@@ -796,7 +813,7 @@ impl<S: Slice> Actor<S> {
         };
         let previous = self.last_write.take();
         let (done, written) = oneshot::channel();
-        self.last_write = Some(written);
+        self.last_write = Some(written.shared());
         let platform = self.shared.ports.platform.clone();
         let key = persist::storage_key(&self.era, &self.origin.id);
         spawn_detached(async move {

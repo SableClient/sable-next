@@ -586,8 +586,18 @@ impl App {
         }
     }
 
-    /// Disposes every instance and waits for them to finish. Without this, they
-    /// stop when the last `App` is dropped, without anyone waiting.
+    /// Writes changed views now and leaves the instances running.
+    pub async fn flush(&self) {
+        let instances: Vec<Arc<dyn Instance>> = self
+            .host()
+            .entries
+            .values()
+            .map(|entry| entry.instance.clone())
+            .collect();
+        join_all(instances.iter().map(|instance| instance.flush())).await;
+    }
+
+    /// Without this, instances stop when the last `App` is dropped, unawaited.
     pub async fn shutdown(&self) {
         let retired = Self::retire_all(&mut self.host());
         join_all(retired.into_iter().map(|retired| self.stop(retired))).await;

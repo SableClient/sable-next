@@ -31,6 +31,7 @@ impl Backend for CoreBackend {
 
 type Channels = Arc<Mutex<HashMap<String, Channel<Batch>>>>;
 
+#[derive(Clone)]
 pub struct Runtime {
     ffi: Ffi,
     tabs: Tabs<String>,
@@ -94,13 +95,16 @@ impl Runtime {
         self.tabs.close(&window.to_owned()).await;
     }
 
-    /// Saves the views the runtime holds, which a quitting process has to do before it exits.
+    #[cfg(mobile)]
+    pub async fn flush(&self) {
+        let _ = self.ffi.flush().await;
+    }
+
     pub async fn shutdown(&self) {
         let _ = self.ffi.shutdown().await;
     }
 }
 
-/// Every command rejects with the `code` of an `FfiError`.
 fn answer(result: Result<String, FfiError>) -> Result<Box<RawValue>, &'static str> {
     result
         .and_then(|json| RawValue::from_string(json).map_err(|_| FfiError::Encode))
