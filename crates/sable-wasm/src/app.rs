@@ -3,25 +3,22 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use js_sys::Function;
 use sable_core::{Core, protocol::RpcError};
-use sable_ffi::{Ffi, Queries};
+use sable_ffi::{AccountGate, Ffi, Queries};
 use sable_runtime::{App, Backend, Platform, PlatformError, Ports, Registry, SystemClock};
 use serde_json::value::RawValue;
-use tokio::sync::RwLock;
 use wasm_bindgen::{JsValue, prelude::*};
 
 use crate::{SableCore, session_store::settle};
 
-/// Holds the runtime's calls back while an account change is under way, so
-/// that the core serves the new account only after `switch_account` returned.
 struct CoreBackend {
     core: Arc<Core>,
-    switching: Arc<RwLock<()>>,
+    gate: AccountGate,
 }
 
 #[async_trait(?Send)]
 impl Backend for CoreBackend {
     async fn call(&self, method: &str, params: &str) -> Result<Box<RawValue>, RpcError> {
-        let _serving = self.switching.read().await;
+        let _serving = self.gate.serving().await;
         Box::pin(self.core.call(method, params)).await
     }
 }
@@ -85,7 +82,7 @@ impl SableApp {
         let ports = Ports {
             backend: Arc::new(CoreBackend {
                 core: core.core.clone(),
-                switching: core.switching.clone(),
+                gate: core.gate.clone(),
             }),
             platform: Arc::new(JsPlatform { get, set }),
             clock: Arc::new(SystemClock),
@@ -94,7 +91,7 @@ impl SableApp {
         #[cfg(feature = "demo")]
         let registry = sable_ffi::demo::register(registry).map_err(|error| error.to_string())?;
         let ffi = Ffi::new(App::new(registry, ports, ""), Queries::default());
-        core.app.replace(Some(ffi.clone()));
+        core.gate.attach(ffi.clone());
         Ok(SableApp { ffi })
     }
 

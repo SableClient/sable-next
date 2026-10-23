@@ -1,8 +1,8 @@
-//! The surface a binding wraps, driven the way a binding drives it: strings of JSON in and out.
-
 #![cfg(test)]
 
-use sable_ffi::{Ffi, FfiError, Queries};
+use std::sync::{Arc, Mutex};
+
+use sable_ffi::{AccountGate, Ffi, FfiError, Queries, Tabs};
 use sable_protocol::{CoreEvent, CoreEventKind, RpcError};
 use sable_runtime::{
     AppEvent, Batch, Cmd, Cx, Doc, Handshake, Interest, Lifetime, Outcome, Registry, Slice,
@@ -238,4 +238,163 @@ fn a_dropped_runtime_is_a_stopped_call_not_a_hang() {
     drop(runtime);
     let result = block(ffi.dispatch(COUNTER, r#"{"type":"add","n":1}"#));
     assert_eq!(result.unwrap_err(), FfiError::Stopped);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_runtime_moves_to_the_new_account_before_the_call_that_changed_it_returns() {
+    let mut registry = Registry::new();
+    registry.add::<Counter>().unwrap();
+    let harness = TestApp::new(registry);
+    let ffi = Ffi::new(
+        harness.app.clone(),
+        Queries::default(),
+        tokio::runtime::Handle::current(),
+    );
+    let gate = AccountGate::default();
+    gate.attach(ffi.clone());
+    let epoch = || harness.app.epoch();
+
+    let serving = gate.serving().await;
+    let changing = tokio::spawn({
+        let gate = gate.clone();
+        async move {
+            gate.run(
+                "session.switch_account",
+                async { Ok::<_, ()>(r#"{"account_id":"b"}"#.to_owned()) },
+                String::as_str,
+                || (),
+            )
+            .await
+        }
+    });
+    tokio::task::yield_now().await;
+    assert!(
+        !changing.is_finished(),
+        "the change waits for calls in flight"
+    );
+    drop(serving);
+
+    changing.await.unwrap().unwrap();
+    assert_eq!(epoch(), 1);
+
+    gate.run(
+        "rooms.list",
+        async { Ok::<_, ()>("[]".to_owned()) },
+        String::as_str,
+        || (),
+    )
+    .await
+    .unwrap();
+    gate.run(
+        "session.restore",
+        async { Ok::<_, ()>(r#"{"account_id":"b"}"#.to_owned()) },
+        String::as_str,
+        || (),
+    )
+    .await
+    .unwrap();
+    assert_eq!(epoch(), 1, "the same account is not a change");
+}
+
+type Delivered = Arc<Mutex<Vec<(&'static str, Batch)>>>;
+
+fn tabs(harness: &TestApp) -> (Tabs<&'static str>, Delivered, tokio::task::JoinHandle<()>) {
+    let delivered = Delivered::default();
+    let sink = delivered.clone();
+    let tabs = Tabs::new(
+        Ffi::new(
+            harness.app.clone(),
+            Queries::default(),
+            tokio::runtime::Handle::current(),
+        ),
+        move |window: &&'static str, batch| sink.lock().unwrap().push((window, batch)),
+    );
+    let pump = tokio::spawn({
+        let tabs = tabs.clone();
+        async move { tabs.pump().await }
+    });
+    (tabs, delivered, pump)
+}
+
+const SUBSCRIBE: &str = r#"{"slice":"counter","key":null}"#;
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn each_window_gets_only_its_own_subscriptions_and_replies() {
+    let mut registry = Registry::new();
+    registry.add::<Counter>().unwrap();
+    let harness = TestApp::new(registry);
+    let (tabs, delivered, _pump) = tabs(&harness);
+    tabs.open("one").await;
+    tabs.open("two").await;
+    let first: Subscribed = json(&tabs.subscribe(&"one", SUBSCRIBE).await.unwrap());
+    let second: Subscribed = json(&tabs.subscribe(&"two", SUBSCRIBE).await.unwrap());
+
+    tabs.dispatch(COUNTER, r#"{"type":"add","n":2}"#)
+        .await
+        .unwrap();
+    harness.settle().await;
+    let req = tabs
+        .request(&"two", COUNTER, r#"{"type":"read"}"#)
+        .await
+        .unwrap();
+    harness.settle().await;
+    while !delivered
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|(_, batch)| matches!(batch.events.as_slice(), [AppEvent::Reply { .. }]))
+    {
+        tokio::task::yield_now().await;
+    }
+
+    let delivered = delivered.lock().unwrap();
+    let events_of = |window: &str| -> Vec<&AppEvent> {
+        delivered
+            .iter()
+            .filter(|(to, _)| *to == window)
+            .flat_map(|(_, batch)| &batch.events)
+            .collect()
+    };
+    assert!(matches!(
+        events_of("one").as_slice(),
+        [AppEvent::Patch { sub, .. }] if *sub == first.sub
+    ));
+    assert!(matches!(
+        events_of("two").as_slice(),
+        [AppEvent::Patch { sub, .. }, AppEvent::Reply { req: replied, .. }]
+            if *sub == second.sub && replied.0 == req
+    ));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_window_cannot_touch_another_windows_subscription_and_closing_lets_go() {
+    let mut registry = Registry::new();
+    registry.add::<Counter>().unwrap();
+    let harness = TestApp::new(registry);
+    let (tabs, delivered, _pump) = tabs(&harness);
+    tabs.open("one").await;
+    tabs.open("two").await;
+    let subscribed: Subscribed = json(&tabs.subscribe(&"one", SUBSCRIBE).await.unwrap());
+
+    assert_eq!(
+        tabs.resync(&"two", subscribed.sub.0).await,
+        Err(FfiError::UnknownSub)
+    );
+    assert_eq!(
+        tabs.unsubscribe(&"two", subscribed.sub.0).await,
+        Err(FfiError::UnknownSub)
+    );
+
+    tabs.close(&"one").await;
+    tabs.dispatch(COUNTER, r#"{"type":"add","n":1}"#)
+        .await
+        .unwrap();
+    harness.settle().await;
+    tokio::task::yield_now().await;
+
+    assert!(delivered.lock().unwrap().is_empty());
+    assert_eq!(
+        tabs.resync(&"one", subscribed.sub.0).await,
+        Err(FfiError::UnknownSub)
+    );
 }

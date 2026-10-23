@@ -1,8 +1,9 @@
 import * as Sentry from '@sentry/sveltekit';
 import { Channel, invoke } from '@tauri-apps/api/core';
 
-import type { RpcError, CoreEvent } from '#src/generated/protocol';
+import type { Batch, RpcError, CoreEvent } from '#src/generated/protocol';
 import { CoreError, type Transport } from './index';
+import type { Link } from '../lib/runtime/link';
 import { rawInvoke } from '#lib/platform/raw-invoke.js';
 import { resetWebStorage } from '#lib/platform/session-storage.js';
 import { migrateV1 } from '#lib/migrations/v1/migration.js';
@@ -17,6 +18,39 @@ async function carry<T>(
   } catch (error) {
     throw new CoreError(error as RpcError);
   }
+}
+
+/** The runtime never restarts without the process, so this link has no `onRestart`. */
+export function createTauriLink(): Link {
+  const batchListeners = new Set<(batch: Batch) => void>();
+  const channel = new Channel<Batch>();
+  channel.onmessage = (batch) => {
+    for (const listener of batchListeners) listener(batch);
+  };
+  const connected = invoke('runtime_connect', { channel });
+
+  const call = async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
+    await connected;
+    try {
+      return await invoke<T>(command, args);
+    } catch (code) {
+      throw new Error(String(code), { cause: code });
+    }
+  };
+
+  return {
+    handshake: () => call('runtime_handshake'),
+    subscribe: (request) => call('runtime_subscribe', { request }),
+    unsubscribe: (sub) => call('runtime_unsubscribe', { sub }),
+    resync: (sub) => call('runtime_resync', { sub }),
+    range: (sub, range) => call('runtime_range', { sub, range }),
+    dispatch: (target, action) => call('runtime_dispatch', { target, action }),
+    request: (target, action) => call('runtime_request', { target, action }),
+    onBatch: (listener) => {
+      batchListeners.add(listener);
+      return () => batchListeners.delete(listener);
+    },
+  };
 }
 
 /**

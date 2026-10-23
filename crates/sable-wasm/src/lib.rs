@@ -15,9 +15,9 @@ use sable_core::{
     Core,
     protocol::{CoreEvent, RpcError},
 };
-use sable_ffi::Ffi;
+use sable_ffi::AccountGate;
 use session_store::JsSessionStore;
-use tokio::sync::{RwLock, mpsc::UnboundedReceiver};
+use tokio::sync::mpsc::UnboundedReceiver;
 use wasm_bindgen::{JsValue, prelude::*};
 
 /// Most events a single crossing into JS carries.
@@ -197,31 +197,8 @@ pub fn set_log_capture(enabled: bool) {
 #[wasm_bindgen]
 pub struct SableCore {
     pub(crate) core: Arc<Core>,
-    /// Held for writing while the account changes, so the runtime's calls wait for it.
-    pub(crate) switching: Arc<RwLock<()>>,
-    app: RefCell<Option<Ffi>>,
-    account: RefCell<String>,
+    pub(crate) gate: AccountGate,
     events: RefCell<Option<UnboundedReceiver<CoreEvent>>>,
-}
-
-impl SableCore {
-    /// Moves the runtime to the account `method` left active, before the call returns to its caller.
-    async fn follow_account(&self, method: &str, json: &str) -> Result<(), String> {
-        let Some(account) = sable_ffi::account_after(method, json) else {
-            return Ok(());
-        };
-        if *self.account.borrow() == account {
-            return Ok(());
-        }
-        let app = self.app.borrow().clone();
-        if let Some(app) = app {
-            app.switch_account(account.clone())
-                .await
-                .map_err(|_| js_err(&RpcError::Unavailable))?;
-        }
-        *self.account.borrow_mut() = account;
-        Ok(())
-    }
 }
 
 #[wasm_bindgen]
@@ -248,9 +225,7 @@ impl SableCore {
 
         SableCore {
             core,
-            switching: Arc::new(RwLock::new(())),
-            app: RefCell::new(None),
-            account: RefCell::new(String::new()),
+            gate: AccountGate::default(),
             events: RefCell::new(Some(events)),
         }
     }
@@ -263,19 +238,19 @@ impl SableCore {
     /// Returns a JSON-encoded command error when parsing or the call fails.
     #[wasm_bindgen]
     pub async fn call(&self, method: String, params: String) -> Result<String, String> {
-        let moving = if sable_ffi::changes_account(&method) {
-            Some(self.switching.write().await)
-        } else {
-            None
-        };
-        let json = Box::pin(self.core.call(&method, &params))
+        self.gate
+            .run(
+                &method,
+                async {
+                    Box::pin(self.core.call(&method, &params))
+                        .await
+                        .map(|json| Box::<str>::from(json).into_string())
+                        .map_err(|error| js_err(&error))
+                },
+                String::as_str,
+                || js_err(&RpcError::Unavailable),
+            )
             .await
-            .map(|json| Box::<str>::from(json).into_string())
-            .map_err(|error| js_err(&error))?;
-        if moving.is_some() {
-            self.follow_account(&method, &json).await?;
-        }
-        Ok(json)
     }
 
     /// Stops syncing and refuses further calls, before another worker takes the stores.

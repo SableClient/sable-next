@@ -237,6 +237,7 @@ checksum = "fb5dfbc6d8d2675589ccbe4d0fd61df2419075625f8c1a62325e718e2b0049f9"
 name = "app"
 version = "2.1.6"
 dependencies = [
+ "async-trait",
  "base64 0.23.1",
  "block2",
  "cef",
@@ -255,8 +256,10 @@ dependencies = [
  "regex-lite",
  "rust-ini",
  "sable-core",
+ "sable-ffi",
  "sable-hdr",
  "sable-loopback",
+ "sable-runtime",
  "sentry",
  "serde",
  "serde_json",

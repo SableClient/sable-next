@@ -31,6 +31,7 @@ pub mod permission_grants;
 mod portal_theme;
 #[cfg(desktop)]
 pub mod proxy;
+mod runtime;
 #[cfg(target_os = "linux")]
 pub mod screen_audio;
 mod sentry;
@@ -60,6 +61,7 @@ use sable_core::{
     Core, GalleryAttachment,
     protocol::{CoreEvent, RpcError},
 };
+use sable_ffi::AccountGate;
 use tauri::{
     AppHandle, Manager, State,
     ipc::{Channel, InvokeBody, Request, Response},
@@ -74,6 +76,7 @@ use tauri::Wry as BrowserEngine;
 
 struct AppState {
     core: Arc<Core>,
+    gate: AccountGate,
     event_sink: Arc<EventSink>,
 }
 
@@ -125,7 +128,15 @@ async fn call(
     method: String,
     params: Box<serde_json::value::RawValue>,
 ) -> Result<Box<serde_json::value::RawValue>, RpcError> {
-    Box::pin(state.core.call(&method, params.get())).await
+    state
+        .gate
+        .run(
+            &method,
+            Box::pin(state.core.call(&method, params.get())),
+            |json| json.get(),
+            || RpcError::Unavailable,
+        )
+        .await
 }
 
 #[tauri::command]
@@ -467,9 +478,16 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     let pushing = core.clone();
     #[cfg(target_os = "android")]
     let _ = cold_push::CORE.set(core.clone());
-    tauri::async_runtime::spawn(restore_ahead_of_webview(core.clone()));
+    let gate = AccountGate::default();
+    app.manage(runtime::Runtime::new(
+        &core,
+        &gate,
+        &data_dir.to_string_lossy(),
+    ));
+    tauri::async_runtime::spawn(restore_ahead_of_webview(core.clone(), gate.clone()));
     app.manage(AppState {
         core,
+        gate,
         event_sink: event_sink.clone(),
     });
     spawn_event_pump(app.handle().clone(), pushing, events, event_sink);
@@ -814,11 +832,17 @@ fn open_external_url(app: AppHandle<BrowserEngine>, url: String) -> Result<(), R
         .map_err(|_| RpcError::Unavailable)
 }
 
-async fn restore_ahead_of_webview(core: Arc<Core>) {
+async fn restore_ahead_of_webview(core: Arc<Core>, gate: AccountGate) {
     if !matches!(core.v1_migration_complete().await, Ok(true)) {
         return;
     }
-    if let Err(error) = Box::pin(core.run(sable_core::api::session::RestoreParams {})).await {
+    let restore = gate.run(
+        "session.restore",
+        Box::pin(core.call("session.restore", "{}")),
+        |json| json.get(),
+        || RpcError::Unavailable,
+    );
+    if let Err(error) = restore.await {
         log::warn!("Early session restore failed: {error:?}");
     }
 }
@@ -1002,6 +1026,14 @@ pub fn run() {
             v1_migration::finish_v1_migration,
             v1_migration::skip_v1_migration,
             call,
+            runtime::runtime_connect,
+            runtime::runtime_handshake,
+            runtime::runtime_subscribe,
+            runtime::runtime_unsubscribe,
+            runtime::runtime_resync,
+            runtime::runtime_range,
+            runtime::runtime_dispatch,
+            runtime::runtime_request,
             subscribe_events,
             fetch_media,
             forget_media,
@@ -1089,10 +1121,21 @@ pub fn run() {
             return;
         }
     };
-    app.run(|app, event| {
-        if matches!(event, tauri::RunEvent::Exit) {
+    app.run(|app, event| match event {
+        tauri::RunEvent::Exit => {
             hang_up_before_exit(app);
+            stop_runtime_before_exit(app);
         }
+        tauri::RunEvent::WindowEvent {
+            label,
+            event: tauri::WindowEvent::Destroyed,
+            ..
+        } => {
+            if let Some(runtime) = app.try_state::<runtime::Runtime>() {
+                tauri::async_runtime::block_on(runtime.close(&label));
+            }
+        }
+        _ => {}
     });
 }
 
@@ -1109,6 +1152,18 @@ fn hang_up_before_exit(app: &AppHandle<BrowserEngine>) {
     });
     if ended.is_err() {
         log::warn!("calls were still hanging up when the app exited");
+    }
+}
+
+fn stop_runtime_before_exit(app: &AppHandle<BrowserEngine>) {
+    let Some(runtime) = app.try_state::<runtime::Runtime>() else {
+        return;
+    };
+    let stopped = tauri::async_runtime::block_on(async {
+        tokio::time::timeout(EXIT_HANGUP_TIMEOUT, runtime.shutdown()).await
+    });
+    if stopped.is_err() {
+        log::warn!("the runtime was still saving when the app exited");
     }
 }
 

@@ -3,7 +3,7 @@ import { isTauri } from '@tauri-apps/api/core';
 import type { Transport } from './index';
 import { createElectronTransport } from './electron';
 import { isElectron } from '#lib/platform/electron.js';
-import { createTauriTransport } from './tauri';
+import { createTauriLink, createTauriTransport } from './tauri';
 import { createWebTransport, prewarmWebWorker } from './web';
 import { createNativeLink } from './electron';
 import { createWebLink, startLink } from './web-runtime';
@@ -18,6 +18,8 @@ export function prewarmTransport(): void {
 }
 
 export function startRuntime(): void {
-  if (isTauri()) return;
-  void startLink(() => (isElectron() ? createNativeLink() : createWebLink()));
+  void startLink(() => {
+    if (isTauri()) return createTauriLink();
+    return isElectron() ? createNativeLink() : createWebLink();
+  });
 }

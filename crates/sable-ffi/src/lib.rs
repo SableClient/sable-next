@@ -16,10 +16,12 @@ mod account;
 pub mod demo;
 #[cfg(not(target_family = "wasm"))]
 mod files;
+#[cfg(not(target_family = "wasm"))]
+mod tabs;
 
 use std::{collections::HashMap, future::Future, sync::Arc};
 
-pub use account::{account_after, changes_account};
+pub use account::{AccountGate, account_after, changes_account};
 #[cfg(not(target_family = "wasm"))]
 pub use files::FileStorage;
 use sable_protocol::CoreEvent;
@@ -28,6 +30,8 @@ use sable_runtime::{
 };
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
+#[cfg(not(target_family = "wasm"))]
+pub use tabs::Tabs;
 
 /// Why a call failed. Shells report these as an opaque failure and log the code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]

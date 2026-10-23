@@ -1,33 +1,24 @@
-//! The app runtime over the core the process already holds.
-
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use napi::{Status, bindgen_prelude::within_runtime_if_available};
 use napi_derive::napi;
-use sable_core::{
-    Core,
-    protocol::RpcError,
-    session::{SNAPSHOT_DIR, account_store_id},
-};
-use sable_ffi::{Ffi, FfiError, FileStorage, Queries};
+use sable_core::{Core, protocol::RpcError, session::snapshot_dir};
+use sable_ffi::{AccountGate, Ffi, FfiError, FileStorage, Queries};
 use sable_runtime::{App, Backend, Ports, Registry, SystemClock};
 use serde_json::value::RawValue;
-use tokio::sync::RwLock;
 
 use crate::SableCore;
 
-/// Holds the runtime's calls back while an account change is under way, so
-/// that the core serves the new account only after `switch_account` returned.
 struct CoreBackend {
     core: Arc<Core>,
-    switching: Arc<RwLock<()>>,
+    gate: AccountGate,
 }
 
 #[async_trait]
 impl Backend for CoreBackend {
     async fn call(&self, method: &str, params: &str) -> Result<Box<RawValue>, RpcError> {
-        let _serving = self.switching.read().await;
+        let _serving = self.gate.serving().await;
         Box::pin(self.core.call(method, params)).await
     }
 }
@@ -51,15 +42,10 @@ impl SableApp {
         let ports = Ports {
             backend: Arc::new(CoreBackend {
                 core: core.core.clone(),
-                switching: core.switching.clone(),
+                gate: core.gate.clone(),
             }),
             platform: Arc::new(FileStorage::new(move |account: &str| {
-                if account.is_empty() {
-                    PathBuf::from(&data_dir)
-                } else {
-                    PathBuf::from(account_store_id(&data_dir, account))
-                }
-                .join(SNAPSHOT_DIR)
+                snapshot_dir(&data_dir, account)
             })),
             clock: Arc::new(SystemClock),
         };
@@ -70,7 +56,7 @@ impl SableApp {
         let registry = sable_ffi::demo::register(registry)
             .map_err(|error| napi::Error::new(Status::GenericFailure, error.to_string()))?;
         let ffi = Ffi::new(App::new(registry, ports, ""), Queries::default(), runtime);
-        let _ = core.app.set(ffi.clone());
+        core.gate.attach(ffi.clone());
         Ok(Self { ffi })
     }
 

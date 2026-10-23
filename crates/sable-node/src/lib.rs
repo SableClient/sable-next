@@ -11,7 +11,7 @@ mod screen_audio;
 use std::{
     io::{self, Write},
     sync::{
-        Arc, Mutex, Once, OnceLock, PoisonError,
+        Arc, Mutex, Once, PoisonError,
         atomic::{AtomicBool, Ordering},
     },
 };
@@ -27,8 +27,8 @@ use sable_core::{
     protocol::{CoreEvent, RpcError},
     store::ExclusiveFileSessionStore,
 };
-use sable_ffi::Ffi;
-use tokio::sync::{RwLock, mpsc::UnboundedReceiver};
+use sable_ffi::AccountGate;
+use tokio::sync::mpsc::UnboundedReceiver;
 
 type Callback = ThreadsafeFunction<String, (), String, Status, false>;
 
@@ -168,29 +168,7 @@ pub fn set_log_capture(enabled: bool) {
 pub struct SableCore {
     core: Arc<Core>,
     events: Mutex<Option<UnboundedReceiver<CoreEvent>>>,
-    /// Held for writing while the account changes, so the runtime's calls wait for it.
-    switching: Arc<RwLock<()>>,
-    app: OnceLock<Ffi>,
-    account: Mutex<String>,
-}
-
-impl SableCore {
-    /// Moves the runtime to the account `method` left active, before the call returns to its caller.
-    async fn follow_account(&self, method: &str, json: &str) -> napi::Result<()> {
-        let Some(account) = sable_ffi::account_after(method, json) else {
-            return Ok(());
-        };
-        if *self.account.lock().unwrap_or_else(PoisonError::into_inner) == account {
-            return Ok(());
-        }
-        if let Some(app) = self.app.get() {
-            app.switch_account(account.clone())
-                .await
-                .map_err(|_| js_err(&RpcError::Unavailable))?;
-        }
-        *self.account.lock().unwrap_or_else(PoisonError::into_inner) = account;
-        Ok(())
-    }
+    gate: AccountGate,
 }
 
 #[napi]
@@ -208,9 +186,7 @@ impl SableCore {
         Self {
             core,
             events: Mutex::new(Some(events)),
-            switching: Arc::new(RwLock::new(())),
-            app: OnceLock::new(),
-            account: Mutex::new(String::new()),
+            gate: AccountGate::default(),
         }
     }
 
@@ -235,19 +211,19 @@ impl SableCore {
 
     #[napi]
     pub async fn call(&self, method: String, params: String) -> napi::Result<String> {
-        let moving = if sable_ffi::changes_account(&method) {
-            Some(self.switching.write().await)
-        } else {
-            None
-        };
-        let json = Box::pin(self.core.call(&method, &params))
+        self.gate
+            .run(
+                &method,
+                async {
+                    Box::pin(self.core.call(&method, &params))
+                        .await
+                        .map(|json| Box::<str>::from(json).into_string())
+                        .map_err(|error| js_err(&error))
+                },
+                String::as_str,
+                || js_err(&RpcError::Unavailable),
+            )
             .await
-            .map(|json| Box::<str>::from(json).into_string())
-            .map_err(|error| js_err(&error))?;
-        if moving.is_some() {
-            self.follow_account(&method, &json).await?;
-        }
-        Ok(json)
     }
 
     #[napi]

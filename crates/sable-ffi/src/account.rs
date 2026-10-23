@@ -1,8 +1,13 @@
-//! Which core calls move the app to another account, and to which.
+use std::{
+    future::Future,
+    sync::{Arc, Mutex, OnceLock, PoisonError},
+};
 
 use serde_json::Value;
+use tokio::sync::{RwLock, RwLockReadGuard};
 
-/// Whether a core call can change the account the core serves.
+use crate::Ffi;
+
 #[must_use]
 pub fn changes_account(method: &str) -> bool {
     matches!(
@@ -26,6 +31,72 @@ pub fn account_after(method: &str, result: &str) -> Option<String> {
         }
         "session.logout" => Some(String::new()),
         _ => None,
+    }
+}
+
+/// The core serves the new account to the runtime only after `switch_account` returned:
+/// runtime calls hold the gate for reading, an account change for writing.
+#[derive(Clone, Default)]
+pub struct AccountGate {
+    inner: Arc<GateState>,
+}
+
+#[derive(Default)]
+struct GateState {
+    switching: RwLock<()>,
+    account: Mutex<String>,
+    ffi: OnceLock<Ffi>,
+}
+
+impl AccountGate {
+    /// Before this, account changes only wait.
+    pub fn attach(&self, ffi: Ffi) {
+        let _ = self.inner.ffi.set(ffi);
+    }
+
+    pub async fn serving(&self) -> RwLockReadGuard<'_, ()> {
+        self.inner.switching.read().await
+    }
+
+    /// When the call changes the account, the runtime moves to it before this returns.
+    ///
+    /// # Errors
+    ///
+    /// The call's error, or `unavailable()` when the runtime cannot follow.
+    pub async fn run<T, E>(
+        &self,
+        method: &str,
+        call: impl Future<Output = Result<T, E>>,
+        json: impl for<'a> FnOnce(&'a T) -> &'a str,
+        unavailable: impl FnOnce() -> E,
+    ) -> Result<T, E> {
+        if !changes_account(method) {
+            return call.await;
+        }
+        let _moving = self.inner.switching.write().await;
+        let result = call.await?;
+        let Some(account) = account_after(method, json(&result)) else {
+            return Ok(result);
+        };
+        let current = self
+            .inner
+            .account
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        if current != account {
+            if let Some(ffi) = self.inner.ffi.get() {
+                ffi.switch_account(account.clone())
+                    .await
+                    .map_err(|_| unavailable())?;
+            }
+            *self
+                .inner
+                .account
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner) = account;
+        }
+        Ok(result)
     }
 }
 

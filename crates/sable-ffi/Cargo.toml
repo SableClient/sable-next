@@ -10,6 +10,7 @@ publish.workspace = true
 demo = []
 
 [dependencies]
+tokio = { version = "1", default-features = false, features = ["sync"] }
 sable-protocol = { path = "../sable-protocol", version = "0.1.0" }
 sable-runtime = { path = "../sable-runtime", version = "0.1.0" }
 serde = { workspace = true }

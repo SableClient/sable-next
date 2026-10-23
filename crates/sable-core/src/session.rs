@@ -209,8 +209,18 @@ impl AccountRegistry {
     }
 }
 
-/// Where the runtime saves its views, inside the data directory they belong to.
 pub const SNAPSHOT_DIR: &str = "snapshots";
+
+/// `""` is no account.
+#[must_use]
+pub fn snapshot_dir(data_dir: &str, account_id: &str) -> std::path::PathBuf {
+    let base = if account_id.is_empty() {
+        data_dir.to_owned()
+    } else {
+        account_store_id(data_dir, account_id)
+    };
+    std::path::Path::new(&base).join(SNAPSHOT_DIR)
+}
 
 #[must_use]
 pub fn account_store_id(base_store_id: &str, account_id: &str) -> String {
