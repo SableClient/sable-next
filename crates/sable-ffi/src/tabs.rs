@@ -4,11 +4,17 @@ use std::{
     sync::{Arc, Mutex, MutexGuard, PoisonError},
 };
 
-use sable_runtime::{AppEvent, Batch, Subscribed};
+use sable_runtime::{
+    AppEvent, Batch, Subscribed,
+    rt::{SendOutsideWasm, SyncOutsideWasm},
+};
 
 use crate::{Ffi, FfiError};
 
+#[cfg(not(target_family = "wasm"))]
 type Sink<K> = Arc<dyn Fn(&K, Batch) + Send + Sync>;
+#[cfg(target_family = "wasm")]
+type Sink<K> = Arc<dyn Fn(&K, Batch)>;
 
 struct State<K> {
     windows: HashSet<K>,
@@ -66,9 +72,12 @@ impl<K> Clone for Tabs<K> {
     }
 }
 
-impl<K: Clone + Eq + Hash + Send + 'static> Tabs<K> {
+impl<K: Clone + Eq + Hash + SendOutsideWasm + 'static> Tabs<K> {
     #[must_use]
-    pub fn new(ffi: Ffi, send: impl Fn(&K, Batch) + Send + Sync + 'static) -> Self {
+    pub fn new(
+        ffi: Ffi,
+        send: impl Fn(&K, Batch) + SendOutsideWasm + SyncOutsideWasm + 'static,
+    ) -> Self {
         Self {
             ffi,
             state: Arc::new(Mutex::new(State {
@@ -204,5 +213,74 @@ impl<K: Clone + Eq + Hash + Send + 'static> Tabs<K> {
             };
             self.deliver(batch.tick, routed);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sable_runtime::{Outcome, ReqId, SubId};
+
+    use super::*;
+
+    fn state() -> State<&'static str> {
+        State {
+            windows: HashSet::from(["one"]),
+            subs: HashMap::new(),
+            reqs: HashMap::new(),
+            issuing: 0,
+            early: Vec::new(),
+            tick: 0,
+        }
+    }
+
+    fn patch(sub: u32) -> AppEvent {
+        AppEvent::Patch {
+            sub: SubId(sub),
+            rev: 1,
+            epoch: 0,
+            ops: Vec::new(),
+        }
+    }
+
+    fn reply(req: u64) -> AppEvent {
+        AppEvent::Reply {
+            req: ReqId(req),
+            epoch: 0,
+            outcome: Outcome::Ok {
+                value: serde_json::json!(1),
+            },
+        }
+    }
+
+    #[test]
+    fn an_event_that_outruns_its_call_is_held_and_placed_once_the_owner_is_known() {
+        let mut state = state();
+        state.issuing = 1;
+        assert_eq!(state.route(vec![patch(7), reply(3)]), HashMap::new());
+        assert_eq!(state.early.len(), 2);
+
+        state.subs.insert(7, "one");
+        state.reqs.insert(3, "one");
+        let held = std::mem::take(&mut state.early);
+        let routed = state.route(held);
+
+        assert_eq!(routed["one"], [patch(7), reply(3)]);
+    }
+
+    #[test]
+    fn an_event_nobody_owns_is_dropped_when_no_call_is_in_flight() {
+        let mut state = state();
+
+        assert_eq!(state.route(vec![patch(7), reply(3)]), HashMap::new());
+        assert_eq!(state.early, []);
+    }
+
+    #[test]
+    fn a_reply_goes_out_once() {
+        let mut state = state();
+        state.reqs.insert(3, "one");
+
+        assert_eq!(state.route(vec![reply(3)])["one"], [reply(3)]);
+        assert_eq!(state.route(vec![reply(3)]), HashMap::new());
     }
 }

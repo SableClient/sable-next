@@ -1,16 +1,16 @@
-import type { AppEvent, Batch, Subscribed } from '#src/generated/protocol';
+import type { Batch } from '#src/generated/protocol';
 import type { AppMessage, AppRequest } from './app-protocol';
 
-/** The calls of the wasm `SableApp`, which speak JSON. */
 export interface AppApi {
   handshake(): string;
-  subscribe(request: string): Promise<string>;
-  unsubscribe(sub: number): Promise<void>;
-  resync(sub: number): Promise<string>;
-  range(sub: number, window: string): Promise<string>;
+  open(tab: number): Promise<void>;
+  close(tab: number): Promise<void>;
+  subscribe(tab: number, request: string): Promise<string>;
+  unsubscribe(tab: number, sub: number): Promise<void>;
+  resync(tab: number, sub: number): Promise<string>;
+  range(tab: number, sub: number, window: string): Promise<string>;
   dispatch(target: string, action: string): Promise<void>;
-  request(target: string, action: string): Promise<bigint | number>;
-  nextBatch(): Promise<string>;
+  request(tab: number, target: string, action: string): Promise<bigint | number>;
 }
 
 export type TabPort = {
@@ -21,8 +21,7 @@ export type TabPort = {
 
 interface Tab {
   port: TabPort;
-  subs: Set<number>;
-  reqs: Set<number>;
+  opened: Promise<void>;
   closed: boolean;
   watching: AbortController;
 }
@@ -33,177 +32,89 @@ function tabGone(tab: string, signal: AbortSignal): Promise<void> {
     .then(() => undefined);
 }
 
-/** The wasm app rejects with the code of an `FfiError` as a string. */
+/** The app rejects with the code of an `FfiError` as a string, or as the message of an error. */
 function errorCode(error: unknown): string {
   if (typeof error === 'string') return error;
   return error instanceof Error ? error.message : 'invalid';
 }
 
-/**
- * Serves the tabs of one worker from one `App`. Each tab is a subscriber: the
- * host remembers which tab asked for each subscription and request, sends it
- * only their events, and releases what it holds when the tab goes away.
- */
 export function createAppHost(app: Promise<AppApi>, gone: typeof tabGone = tabGone) {
-  const tabs = new Set<Tab>();
-  const subOwners = new Map<number, Tab>();
-  const reqOwners = new Map<number, Tab>();
-  // Events can come out of the app before the call that created their subscription or request returns.
-  let issuing = 0;
-  let early: AppEvent[] = [];
-  let lastTick = 0;
+  const tabs = new Map<number, Tab>();
+  let nextTab = 1;
 
-  function route(events: AppEvent[], tick: number): void {
-    const perTab = new Map<Tab, AppEvent[]>();
-    const give = (tab: Tab, event: AppEvent) => {
-      const own = perTab.get(tab);
-      if (own) own.push(event);
-      else perTab.set(tab, [event]);
-    };
-    for (const event of events) {
-      if (event.type === 'notice') {
-        for (const tab of tabs) give(tab, event);
-        continue;
-      }
-      const owners = event.type === 'reply' ? reqOwners : subOwners;
-      const tab = owners.get(event.type === 'reply' ? event.req : event.sub);
-      if (tab) {
-        give(tab, event);
-        if (event.type === 'reply') reqOwners.delete(event.req);
-      } else if (issuing > 0) {
-        early.push(event);
-      }
-    }
-    for (const [tab, own] of perTab) {
-      const batch: Batch = { tick, events: own };
-      tab.port.postMessage({ batch });
-    }
-  }
-
-  function replayEarly(): void {
-    const held = early;
-    early = [];
-    route(held, lastTick);
-  }
-
-  async function pump(): Promise<void> {
-    const api = await app;
-    for (;;) {
-      const batch = JSON.parse(await api.nextBatch()) as Batch;
-      lastTick = batch.tick;
-      route(batch.events, batch.tick);
-    }
-  }
-
-  pump().catch((error: unknown) => {
-    console.debug('[sable worker] the app stopped delivering batches', error);
-  });
-
-  async function serve(tab: Tab, request: Exclude<AppRequest, { op: 'hello' }>) {
+  async function serve(id: number, request: Exclude<AppRequest, { op: 'hello' }>) {
     const api = await app;
     const json = JSON.stringify;
-    const owned = (sub: number) => {
-      if (subOwners.get(sub) !== tab) throw new Error('unknown_sub');
-    };
     switch (request.op) {
       case 'handshake':
         return JSON.parse(api.handshake()) as unknown;
-      case 'subscribe': {
-        issuing++;
-        try {
-          const subscribed = JSON.parse(await api.subscribe(json(request.request))) as Subscribed;
-          if (tab.closed) {
-            await api.unsubscribe(subscribed.sub);
-            return subscribed;
-          }
-          subOwners.set(subscribed.sub, tab);
-          tab.subs.add(subscribed.sub);
-          return subscribed;
-        } finally {
-          issuing--;
-        }
-      }
+      case 'subscribe':
+        return JSON.parse(await api.subscribe(id, json(request.request))) as unknown;
       case 'unsubscribe':
-        owned(request.sub);
-        subOwners.delete(request.sub);
-        tab.subs.delete(request.sub);
-        return api.unsubscribe(request.sub);
+        return api.unsubscribe(id, request.sub);
       case 'resync':
-        owned(request.sub);
-        return JSON.parse(await api.resync(request.sub)) as unknown;
+        return JSON.parse(await api.resync(id, request.sub)) as unknown;
       case 'range':
-        owned(request.sub);
-        return JSON.parse(await api.range(request.sub, json(request.window))) as unknown;
+        return JSON.parse(await api.range(id, request.sub, json(request.window))) as unknown;
       case 'dispatch':
         return api.dispatch(json(request.target), json(request.action));
-      case 'request': {
-        issuing++;
-        try {
-          const req = Number(await api.request(json(request.target), json(request.action)));
-          if (!tab.closed) {
-            reqOwners.set(req, tab);
-            tab.reqs.add(req);
-          }
-          return req;
-        } finally {
-          issuing--;
-        }
-      }
+      case 'request':
+        return Number(await api.request(id, json(request.target), json(request.action)));
     }
   }
 
-  async function release(tab: Tab): Promise<void> {
+  async function release(id: number, tab: Tab): Promise<void> {
     if (tab.closed) return;
     tab.closed = true;
     tab.watching.abort();
-    tabs.delete(tab);
-    for (const req of tab.reqs) reqOwners.delete(req);
-    const api = await app;
-    for (const sub of tab.subs) {
-      subOwners.delete(sub);
-      await api.unsubscribe(sub);
-    }
+    tabs.delete(id);
+    await tab.opened;
+    await (await app).close(id);
   }
 
   function attach(port: TabPort): void {
+    const id = nextTab++;
     const tab: Tab = {
       port,
-      subs: new Set(),
-      reqs: new Set(),
+      opened: app.then((api) => api.open(id)),
       closed: false,
       watching: new AbortController(),
     };
-    tabs.add(tab);
+    tabs.set(id, tab);
     port.onmessage = ({ data }) => {
       if (data.op === 'hello') {
         gone(data.tab, tab.watching.signal).then(
-          () => release(tab),
+          () => release(id, tab),
           () => undefined
         );
       } else {
-        const { id } = data;
-        serve(tab, data)
+        const request = data.id;
+        tab.opened
+          .then(() => serve(id, data))
           .then(
             (ok) => {
-              port.postMessage({ id, ok });
+              port.postMessage({ id: request, ok });
             },
             (error: unknown) => {
-              port.postMessage({ id, error: errorCode(error) });
+              port.postMessage({ id: request, error: errorCode(error) });
             }
-          )
-          .finally(replayEarly);
+          );
       }
     };
     port.start();
   }
 
+  function deliver(tab: number, batch: string): void {
+    tabs.get(tab)?.port.postMessage({ batch: JSON.parse(batch) as Batch });
+  }
+
   function handlePanic(): void {
-    for (const tab of tabs) tab.port.postMessage({ crashed: true });
+    for (const tab of tabs.values()) tab.port.postMessage({ crashed: true });
   }
 
   function handleSuperseded(): void {
-    for (const tab of tabs) tab.port.postMessage({ superseded: true });
+    for (const tab of tabs.values()) tab.port.postMessage({ superseded: true });
   }
 
-  return { attach, handlePanic, handleSuperseded };
+  return { attach, deliver, handlePanic, handleSuperseded };
 }

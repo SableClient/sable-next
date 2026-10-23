@@ -16,7 +16,6 @@ mod account;
 pub mod demo;
 #[cfg(not(target_family = "wasm"))]
 mod files;
-#[cfg(not(target_family = "wasm"))]
 mod tabs;
 
 use std::{collections::HashMap, future::Future, sync::Arc};
@@ -30,16 +29,13 @@ use sable_runtime::{
 };
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
-#[cfg(not(target_family = "wasm"))]
 pub use tabs::Tabs;
 
-/// Why a call failed. Shells report these as an opaque failure and log the code.
+/// Shells log the code and report an opaque failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum FfiError {
-    /// The input is not valid JSON for the call.
     #[error("input is not valid for this call")]
     Invalid,
-    /// The input is larger than the runtime decodes.
     #[error("input is too large")]
     TooLarge,
     #[error("no such slice")]

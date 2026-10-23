@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use js_sys::Function;
 use sable_core::{Core, protocol::RpcError};
-use sable_ffi::{AccountGate, Ffi, Queries};
+use sable_ffi::{AccountGate, Ffi, FfiError, Queries, Tabs};
 use sable_runtime::{App, Backend, Platform, PlatformError, Ports, Registry, SystemClock};
 use serde_json::value::RawValue;
 use wasm_bindgen::{JsValue, prelude::*};
@@ -57,11 +57,16 @@ impl Platform for JsPlatform {
 #[wasm_bindgen]
 pub struct SableApp {
     ffi: Ffi,
+    tabs: Tabs<u32>,
+}
+
+fn code(error: FfiError) -> String {
+    error.code().to_owned()
 }
 
 #[wasm_bindgen]
 impl SableApp {
-    /// `get` and `set` are the platform's storage and each must return a Promise.
+    /// `send(tab, batch)` takes the JSON of the batch that belongs to a tab.
     ///
     /// # Errors
     ///
@@ -78,7 +83,12 @@ impl SableApp {
             reason = "only registering a slice can fail, and none is registered without `demo`"
         )
     )]
-    pub fn new(core: &SableCore, get: Function, set: Function) -> Result<SableApp, String> {
+    pub fn new(
+        core: &SableCore,
+        get: Function,
+        set: Function,
+        send: Function,
+    ) -> Result<SableApp, String> {
         let ports = Ports {
             backend: Arc::new(CoreBackend {
                 core: core.core.clone(),
@@ -92,91 +102,81 @@ impl SableApp {
         let registry = sable_ffi::demo::register(registry).map_err(|error| error.to_string())?;
         let ffi = Ffi::new(App::new(registry, ports, ""), Queries::default());
         core.gate.attach(ffi.clone());
-        Ok(SableApp { ffi })
+        let tabs = Tabs::new(ffi.clone(), move |tab: &u32, batch| {
+            if let Ok(json) = serde_json::to_string(&batch) {
+                let _ = send.call2(
+                    &JsValue::NULL,
+                    &JsValue::from(*tab),
+                    &JsValue::from_str(&json),
+                );
+            }
+        });
+        wasm_bindgen_futures::spawn_local({
+            let tabs = tabs.clone();
+            async move { tabs.pump().await }
+        });
+        Ok(SableApp { ffi, tabs })
+    }
+
+    /// Lets go of what an earlier tab of that number held.
+    pub async fn open(&self, tab: u32) {
+        self.tabs.open(tab).await;
+    }
+
+    pub async fn close(&self, tab: u32) {
+        self.tabs.close(&tab).await;
     }
 
     /// # Errors
     ///
     /// Rejects with the code of the `FfiError`.
     pub fn handshake(&self) -> Result<String, String> {
-        self.ffi
-            .handshake()
-            .map_err(|error| error.code().to_owned())
+        self.ffi.handshake().map_err(code)
     }
 
     /// # Errors
     ///
     /// Rejects with the code of the `FfiError`.
-    pub async fn subscribe(&self, request: String) -> Result<String, String> {
-        self.ffi
-            .subscribe(&request)
-            .await
-            .map_err(|error| error.code().to_owned())
+    pub async fn subscribe(&self, tab: u32, request: String) -> Result<String, String> {
+        self.tabs.subscribe(&tab, &request).await.map_err(code)
     }
 
     /// # Errors
     ///
     /// Rejects with the code of the `FfiError`.
-    pub async fn unsubscribe(&self, sub: u32) -> Result<(), String> {
-        self.ffi
-            .unsubscribe(sub)
-            .await
-            .map_err(|error| error.code().to_owned())
+    pub async fn unsubscribe(&self, tab: u32, sub: u32) -> Result<(), String> {
+        self.tabs.unsubscribe(&tab, sub).await.map_err(code)
     }
 
     /// # Errors
     ///
     /// Rejects with the code of the `FfiError`.
-    pub async fn resync(&self, sub: u32) -> Result<String, String> {
-        self.ffi
-            .resync(sub)
-            .await
-            .map_err(|error| error.code().to_owned())
+    pub async fn resync(&self, tab: u32, sub: u32) -> Result<String, String> {
+        self.tabs.resync(&tab, sub).await.map_err(code)
     }
 
     /// # Errors
     ///
     /// Rejects with the code of the `FfiError`.
-    pub async fn range(&self, sub: u32, window: String) -> Result<String, String> {
-        self.ffi
-            .range(sub, &window)
-            .await
-            .map_err(|error| error.code().to_owned())
+    pub async fn range(&self, tab: u32, sub: u32, window: String) -> Result<String, String> {
+        self.tabs.range(&tab, sub, &window).await.map_err(code)
     }
 
     /// # Errors
     ///
     /// Rejects with the code of the `FfiError`.
     pub async fn dispatch(&self, target: String, action: String) -> Result<(), String> {
-        self.ffi
-            .dispatch(&target, &action)
-            .await
-            .map_err(|error| error.code().to_owned())
+        self.tabs.dispatch(&target, &action).await.map_err(code)
     }
 
-    /// Resolves with the id that the answering `Reply` carries.
-    ///
     /// # Errors
     ///
     /// Rejects with the code of the `FfiError`.
-    pub async fn request(&self, target: String, action: String) -> Result<u64, String> {
-        self.ffi
-            .request(&target, &action)
+    pub async fn request(&self, tab: u32, target: String, action: String) -> Result<u64, String> {
+        self.tabs
+            .request(&tab, &target, &action)
             .await
-            .map_err(|error| error.code().to_owned())
-    }
-
-    /// The next `Batch` as JSON, waiting for one.
-    ///
-    /// # Errors
-    ///
-    /// Rejects with the code of the `FfiError`.
-    #[wasm_bindgen(js_name = nextBatch)]
-    pub async fn next_batch(&self) -> Result<String, String> {
-        self.ffi
-            .next_batch()
-            .await
-            .map_err(|error| error.code().to_owned())
+            .map_err(code)
     }
 
     pub async fn shutdown(&self) {
@@ -209,6 +209,7 @@ mod tests {
                 "key, value",
                 "globalThis[key] = value; return Promise.resolve();",
             ),
+            Function::new_with_args("tab, batch", ""),
         )
         .expect("the app builds")
     }
@@ -232,7 +233,7 @@ mod tests {
     #[wasm_bindgen_test]
     async fn an_unknown_slice_rejects_with_its_code() {
         let rejection = app()
-            .subscribe(r#"{"slice":"nope","key":null}"#.to_owned())
+            .subscribe(1, r#"{"slice":"nope","key":null}"#.to_owned())
             .await
             .expect_err("no such slice");
 

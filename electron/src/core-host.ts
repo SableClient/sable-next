@@ -23,7 +23,11 @@ interface NativeCore {
 
 interface NativeModule {
   SableCore: new (dataDir: string, logFilter: string | null) => NativeCore;
-  SableApp: new (core: NativeCore, dataDir: string) => AppApi & { shutdown(): Promise<void> };
+  SableApp: new (
+    core: NativeCore,
+    dataDir: string,
+    send: (batch: [tab: number, json: string]) => void
+  ) => AppApi & { shutdown(): Promise<void> };
   setLogHandler(notify: (line: string) => void): void;
   setLogCapture(enabled: boolean): void;
 }
@@ -36,7 +40,9 @@ if (!dataDir) throw new Error('SABLE_DATA_DIR is not set');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const native = require('./sable_node.node') as NativeModule;
 const instance = new native.SableCore(dataDir, process.env.SABLE_LOG ?? null);
-const app = new native.SableApp(instance, dataDir);
+const app = new native.SableApp(instance, dataDir, ([tab, batch]) => {
+  appHost.deliver(tab, batch);
+});
 void instance.restore();
 
 function unwrap<T>(promise: Promise<T>): Promise<T> {

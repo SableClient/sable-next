@@ -1,10 +1,14 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use napi::{Status, bindgen_prelude::within_runtime_if_available};
+use napi::{
+    Status,
+    bindgen_prelude::within_runtime_if_available,
+    threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode},
+};
 use napi_derive::napi;
 use sable_core::{Core, protocol::RpcError, session::snapshot_dir};
-use sable_ffi::{AccountGate, Ffi, FfiError, FileStorage, Queries};
+use sable_ffi::{AccountGate, Ffi, FfiError, FileStorage, Queries, Tabs};
 use sable_runtime::{App, Backend, Ports, Registry, SystemClock};
 use serde_json::value::RawValue;
 
@@ -27,18 +31,19 @@ fn rejection(error: FfiError) -> napi::Error {
     napi::Error::new(Status::GenericFailure, error.code())
 }
 
-/// The runtime for the windows of one process. Every failure rejects with the
-/// `code` of an `FfiError`. `SableCore.call` keeps it informed of the account.
+type BatchSink = ThreadsafeFunction<(u32, String), (), (u32, String), Status, false>;
+
 #[napi]
 pub struct SableApp {
     ffi: Ffi,
+    tabs: Tabs<u32>,
 }
 
 #[napi]
 impl SableApp {
-    /// Views are saved in the data directory of their account.
+    /// `send([tab, batch])` takes the JSON of the batch that belongs to a window.
     #[napi(constructor)]
-    pub fn new(core: &SableCore, data_dir: String) -> napi::Result<Self> {
+    pub fn new(core: &SableCore, data_dir: String, send: BatchSink) -> napi::Result<Self> {
         let ports = Ports {
             backend: Arc::new(CoreBackend {
                 core: core.core.clone(),
@@ -57,7 +62,27 @@ impl SableApp {
             .map_err(|error| napi::Error::new(Status::GenericFailure, error.to_string()))?;
         let ffi = Ffi::new(App::new(registry, ports, ""), Queries::default(), runtime);
         core.gate.attach(ffi.clone());
-        Ok(Self { ffi })
+        let tabs = Tabs::new(ffi.clone(), move |tab: &u32, batch| {
+            if let Ok(json) = serde_json::to_string(&batch) {
+                send.call((*tab, json), ThreadsafeFunctionCallMode::NonBlocking);
+            }
+        });
+        napi::bindgen_prelude::spawn({
+            let tabs = tabs.clone();
+            async move { tabs.pump().await }
+        });
+        Ok(Self { ffi, tabs })
+    }
+
+    /// Lets go of what an earlier tab of that number held.
+    #[napi]
+    pub async fn open(&self, tab: u32) {
+        self.tabs.open(tab).await;
+    }
+
+    #[napi]
+    pub async fn close(&self, tab: u32) {
+        self.tabs.close(&tab).await;
     }
 
     #[napi]
@@ -66,45 +91,41 @@ impl SableApp {
     }
 
     #[napi]
-    pub async fn subscribe(&self, request: String) -> napi::Result<String> {
-        self.ffi.subscribe(&request).await.map_err(rejection)
+    pub async fn subscribe(&self, tab: u32, request: String) -> napi::Result<String> {
+        self.tabs.subscribe(&tab, &request).await.map_err(rejection)
     }
 
     #[napi]
-    pub async fn unsubscribe(&self, sub: u32) -> napi::Result<()> {
-        self.ffi.unsubscribe(sub).await.map_err(rejection)
+    pub async fn unsubscribe(&self, tab: u32, sub: u32) -> napi::Result<()> {
+        self.tabs.unsubscribe(&tab, sub).await.map_err(rejection)
     }
 
     #[napi]
-    pub async fn resync(&self, sub: u32) -> napi::Result<String> {
-        self.ffi.resync(sub).await.map_err(rejection)
+    pub async fn resync(&self, tab: u32, sub: u32) -> napi::Result<String> {
+        self.tabs.resync(&tab, sub).await.map_err(rejection)
     }
 
     #[napi]
-    pub async fn range(&self, sub: u32, window: String) -> napi::Result<String> {
-        self.ffi.range(sub, &window).await.map_err(rejection)
+    pub async fn range(&self, tab: u32, sub: u32, window: String) -> napi::Result<String> {
+        self.tabs.range(&tab, sub, &window).await.map_err(rejection)
     }
 
     #[napi]
     pub async fn dispatch(&self, target: String, action: String) -> napi::Result<()> {
-        self.ffi.dispatch(&target, &action).await.map_err(rejection)
+        self.tabs
+            .dispatch(&target, &action)
+            .await
+            .map_err(rejection)
     }
 
-    /// Resolves with the id that the answering `Reply` carries.
     #[napi]
-    pub async fn request(&self, target: String, action: String) -> napi::Result<i64> {
+    pub async fn request(&self, tab: u32, target: String, action: String) -> napi::Result<i64> {
         let req = self
-            .ffi
-            .request(&target, &action)
+            .tabs
+            .request(&tab, &target, &action)
             .await
             .map_err(rejection)?;
         i64::try_from(req).map_err(|_| rejection(FfiError::Encode))
-    }
-
-    /// The next `Batch` as JSON, waiting for one.
-    #[napi]
-    pub async fn next_batch(&self) -> napi::Result<String> {
-        self.ffi.next_batch().await.map_err(rejection)
     }
 
     #[napi]

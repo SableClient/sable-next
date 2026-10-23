@@ -1,54 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { AppEvent, Batch } from '#src/generated/protocol';
 import { createAppHost, type AppApi, type TabPort } from './app-host';
 import type { AppMessage, AppRequest } from './app-protocol';
 
 const flush = () => new Promise<void>((done) => setTimeout(done, 0));
 
 function fakeApp() {
-  const batches: (string | Error)[] = [];
-  let wake: () => void = () => undefined;
-  let nextSub = 1;
-  let nextReq = 100;
-  let subscribeGate: Promise<void> | null = null;
-  const api = {
-    handshake: () => JSON.stringify({ schema: 's', slices: ['demo'] }),
-    subscribe: vi.fn(async () => {
-      const sub = nextSub++;
-      await subscribeGate;
-      return JSON.stringify({ sub, snapshot: { rev: 0, epoch: 0, state: { sub } } });
-    }),
-    unsubscribe: vi.fn(() => Promise.resolve()),
-    resync: vi.fn(() => Promise.resolve(JSON.stringify({ rev: 1, epoch: 0, state: {} }))),
-    range: vi.fn(() => Promise.resolve(JSON.stringify({ rev: 1, epoch: 0, state: {} }))),
-    dispatch: vi.fn(() => Promise.resolve()),
-    request: vi.fn(() => Promise.resolve(BigInt(nextReq++))),
-    nextBatch: () =>
-      new Promise<string>((resolve) => {
-        const take = () => {
-          const next = batches.shift();
-          if (next === undefined) wake = take;
-          else resolve(next as string);
-        };
-        take();
-      }),
-  } satisfies AppApi;
   return {
-    api,
-    push(batch: Batch) {
-      batches.push(JSON.stringify(batch));
-      wake();
-    },
-    holdSubscribes() {
-      let release = () => {};
-      subscribeGate = new Promise((done) => (release = done));
-      return () => {
-        subscribeGate = null;
-        release();
-      };
-    },
-  };
+    handshake: vi.fn(() => JSON.stringify({ schema: 's', slices: ['demo'] })),
+    open: vi.fn<AppApi['open']>(() => Promise.resolve()),
+    close: vi.fn<AppApi['close']>(() => Promise.resolve()),
+    subscribe: vi.fn<AppApi['subscribe']>(() => Promise.resolve(JSON.stringify({ sub: 1 }))),
+    unsubscribe: vi.fn<AppApi['unsubscribe']>(() => Promise.resolve()),
+    resync: vi.fn(() => Promise.resolve(JSON.stringify({ rev: 1 }))),
+    range: vi.fn<AppApi['range']>(() => Promise.resolve(JSON.stringify({ rev: 2 }))),
+    dispatch: vi.fn(() => Promise.resolve()),
+    request: vi.fn(() => Promise.resolve(BigInt(100))),
+  } satisfies AppApi;
 }
 
 function fakeTab() {
@@ -58,136 +26,113 @@ function fakeTab() {
     onmessage: null,
     start: () => undefined,
   };
-  const send = (request: AppRequest) =>
-    port.onmessage?.({ data: request } as MessageEvent<AppRequest>);
   let nextId = 1;
   const call = async (request: Record<string, unknown>) => {
     const id = nextId++;
-    send({ id, ...request } as AppRequest);
+    port.onmessage?.({ data: { id, ...request } } as MessageEvent<AppRequest>);
     await flush();
     return sent.find((message) => 'id' in message && message.id === id);
   };
-  const batches = () => sent.flatMap((message) => ('batch' in message ? [message.batch] : []));
-  return { port, sent, send, call, batches };
+  const hello = (tab: string) =>
+    port.onmessage?.({ data: { op: 'hello', tab } } as MessageEvent<AppRequest>);
+  return { port, sent, call, hello };
 }
-
-const patch = (sub: number, rev = 1): AppEvent => ({ type: 'patch', sub, rev, epoch: 0, ops: [] });
 
 function setup() {
   const app = fakeApp();
   const gone = new Map<string, () => void>();
   const host = createAppHost(
-    Promise.resolve(app.api),
+    Promise.resolve(app),
     (tab) => new Promise<void>((resolve) => gone.set(tab, resolve))
   );
-  const attach = () => {
-    const tab = fakeTab();
-    host.attach(tab.port);
-    return tab;
-  };
-  return { app, host, attach, gone };
+  return { app, host, gone };
 }
 
+const target = { slice: 'demo', key: null };
+
 describe('createAppHost', () => {
-  it('sends each tab only the events of its own subscriptions', async () => {
-    const { app, attach } = setup();
-    const [one, two] = [attach(), attach()];
-    await one.call({ op: 'subscribe', request: { slice: 'demo', key: null } });
-    await two.call({ op: 'subscribe', request: { slice: 'demo', key: null } });
+  it('opens each port as a tab of its own before it serves it', async () => {
+    const { app, host } = setup();
+    const [one, two] = [fakeTab(), fakeTab()];
+    host.attach(one.port);
+    host.attach(two.port);
 
-    app.push({ tick: 7, events: [patch(1), patch(2, 5), patch(1, 2)] });
-    await flush();
+    await one.call({ op: 'subscribe', request: target });
+    await two.call({ op: 'subscribe', request: target });
 
-    expect(one.batches()).toEqual([{ tick: 7, events: [patch(1), patch(1, 2)] }]);
-    expect(two.batches()).toEqual([{ tick: 7, events: [patch(2, 5)] }]);
+    expect(app.open.mock.calls).toEqual([[1], [2]]);
+    expect(app.subscribe.mock.calls.map(([tab]) => tab)).toEqual([1, 2]);
   });
 
-  it('routes a reply to the tab that asked, once', async () => {
-    const { app, attach } = setup();
-    const [one, two] = [attach(), attach()];
-    const answer = await two.call({
-      op: 'request',
-      target: { slice: 'demo', key: null },
-      action: {},
+  it('answers each call with what the app returned, decoded', async () => {
+    const { app, host } = setup();
+    const tab = fakeTab();
+    host.attach(tab.port);
+
+    expect(await tab.call({ op: 'handshake' })).toEqual({
+      id: 1,
+      ok: { schema: 's', slices: ['demo'] },
     });
-    expect(answer).toEqual({ id: 1, ok: 100 });
-
-    const reply: AppEvent = {
-      type: 'reply',
-      req: 100,
-      epoch: 0,
-      outcome: { status: 'ok', value: 1 },
-    };
-    app.push({ tick: 1, events: [reply] });
-    app.push({ tick: 2, events: [reply] });
-    await flush();
-
-    expect(one.batches()).toEqual([]);
-    expect(two.batches()).toEqual([{ tick: 1, events: [reply] }]);
-  });
-
-  it('delivers an event that outran the call that created its subscription, after the answer', async () => {
-    const { app, attach } = setup();
-    const tab = attach();
-    const release = app.holdSubscribes();
-    tab.send({ id: 1, op: 'subscribe', request: { slice: 'demo', key: null } });
-    await flush();
-
-    app.push({ tick: 1, events: [patch(1)] });
-    await flush();
-    expect(tab.sent).toEqual([]);
-    release();
-    await flush();
-
-    expect(tab.sent.map((message) => Object.keys(message)[0])).toEqual(['id', 'batch']);
-  });
-
-  it('refuses a tab the subscription of another', async () => {
-    const { app, attach } = setup();
-    const [one, two] = [attach(), attach()];
-    await one.call({ op: 'subscribe', request: { slice: 'demo', key: null } });
-
-    expect(await two.call({ op: 'resync', sub: 1 })).toEqual({ id: 1, error: 'unknown_sub' });
-    expect(await two.call({ op: 'unsubscribe', sub: 1 })).toEqual({ id: 2, error: 'unknown_sub' });
-    expect(app.api.resync).not.toHaveBeenCalled();
-  });
-
-  it('releases the subscriptions of a tab that went away', async () => {
-    const { app, attach, gone } = setup();
-    const tab = attach();
-    tab.send({ op: 'hello', tab: 'a' });
-    await tab.call({ op: 'subscribe', request: { slice: 'demo', key: null } });
-
-    gone.get('a')?.();
-    await flush();
-    app.push({ tick: 1, events: [patch(1)] });
-    await flush();
-
-    expect(app.api.unsubscribe).toHaveBeenCalledWith(1);
-    expect(tab.batches()).toEqual([]);
-  });
-
-  it('shows every tab a notice and tells them when the worker panics', async () => {
-    const { app, host, attach } = setup();
-    const [one, two] = [attach(), attach()];
-    const notice: AppEvent = { type: 'notice', slice: 'demo', stage: 's', text: 't', epoch: 0 };
-
-    app.push({ tick: 1, events: [notice] });
-    await flush();
-    host.handlePanic();
-
-    expect(one.sent).toEqual([{ batch: { tick: 1, events: [notice] } }, { crashed: true }]);
-    expect(two.sent).toEqual(one.sent);
+    expect(await tab.call({ op: 'subscribe', request: target })).toEqual({ id: 2, ok: { sub: 1 } });
+    expect(await tab.call({ op: 'resync', sub: 1 })).toEqual({ id: 3, ok: { rev: 1 } });
+    expect(await tab.call({ op: 'range', sub: 1, window: { start: 0, end: 5 } })).toEqual({
+      id: 4,
+      ok: { rev: 2 },
+    });
+    expect(await tab.call({ op: 'request', target, action: {} })).toEqual({ id: 5, ok: 100 });
+    expect(app.range).toHaveBeenCalledWith(1, 1, '{"start":0,"end":5}');
   });
 
   it('answers a call the app rejects with its code', async () => {
-    const { app, attach } = setup();
-    const tab = attach();
-    app.api.subscribe.mockRejectedValueOnce('unknown_slice');
+    const { app, host } = setup();
+    const tab = fakeTab();
+    host.attach(tab.port);
+    app.subscribe.mockRejectedValueOnce('unknown_slice');
+    app.unsubscribe.mockRejectedValueOnce(new Error('unknown_sub'));
 
-    expect(await tab.call({ op: 'subscribe', request: { slice: 'x', key: null } })).toEqual({
+    expect(await tab.call({ op: 'subscribe', request: target })).toEqual({
       id: 1,
       error: 'unknown_slice',
     });
+    expect(await tab.call({ op: 'unsubscribe', sub: 9 })).toEqual({ id: 2, error: 'unknown_sub' });
+  });
+
+  it('hands the app’s batch for a tab to that tab alone', () => {
+    const { host } = setup();
+    const [one, two] = [fakeTab(), fakeTab()];
+    host.attach(one.port);
+    host.attach(two.port);
+
+    host.deliver(2, JSON.stringify({ tick: 4, events: [] }));
+
+    expect(one.sent).toEqual([]);
+    expect(two.sent).toEqual([{ batch: { tick: 4, events: [] } }]);
+  });
+
+  it('lets go of a tab that went away and stops delivering to it', async () => {
+    const { app, host, gone } = setup();
+    const tab = fakeTab();
+    host.attach(tab.port);
+    tab.hello('a');
+
+    gone.get('a')?.();
+    await flush();
+    host.deliver(1, JSON.stringify({ tick: 1, events: [] }));
+
+    expect(app.close).toHaveBeenCalledWith(1);
+    expect(tab.sent).toEqual([]);
+  });
+
+  it('tells every tab when the worker panics or a newer tab takes over', () => {
+    const { host } = setup();
+    const [one, two] = [fakeTab(), fakeTab()];
+    host.attach(one.port);
+    host.attach(two.port);
+
+    host.handlePanic();
+    host.handleSuperseded();
+
+    expect(one.sent).toEqual([{ crashed: true }, { superseded: true }]);
+    expect(two.sent).toEqual(one.sent);
   });
 });

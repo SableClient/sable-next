@@ -59,7 +59,10 @@ const created = claimStore(() => {
     const app = new SableApp(
       instance,
       (key: string) => loadSnapshot(key),
-      (key: string, value: string) => saveSnapshot(key, value)
+      (key: string, value: string) => saveSnapshot(key, value),
+      (tab: number, batch: string) => {
+        appHost.deliver(tab, batch);
+      }
     );
     started = { instance, app };
 

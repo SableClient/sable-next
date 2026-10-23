@@ -21,6 +21,7 @@ struct View {
 enum Action {
     Add { n: i64 },
     Read,
+    Notify,
 }
 
 struct Counter;
@@ -55,6 +56,7 @@ impl Slice for Counter {
                 Cmd::none()
             }
             Action::Read => Cmd::reply(cx.req(), Ok::<_, RpcError>(state.view().count)),
+            Action::Notify => Cmd::notice("saved", "Saved"),
         }
     }
 }
@@ -397,4 +399,33 @@ async fn a_window_cannot_touch_another_windows_subscription_and_closing_lets_go(
         tabs.resync(&"one", subscribed.sub.0).await,
         Err(FfiError::UnknownSub)
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn every_window_gets_a_notice() {
+    let mut registry = Registry::new();
+    registry.add::<Counter>().unwrap();
+    let harness = TestApp::new(registry);
+    let (tabs, delivered, _pump) = tabs(&harness);
+    tabs.open("one").await;
+    tabs.open("two").await;
+    tabs.subscribe(&"one", SUBSCRIBE).await.unwrap();
+
+    tabs.dispatch(COUNTER, r#"{"type":"notify"}"#)
+        .await
+        .unwrap();
+    harness.settle().await;
+    while delivered.lock().unwrap().len() < 2 {
+        tokio::task::yield_now().await;
+    }
+
+    let mut windows: Vec<_> = delivered
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(_, batch)| matches!(batch.events.as_slice(), [AppEvent::Notice { .. }]))
+        .map(|(window, _)| *window)
+        .collect();
+    windows.sort_unstable();
+    assert_eq!(windows, ["one", "two"]);
 }
