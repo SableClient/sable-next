@@ -70,6 +70,7 @@ run = [
   "pnpm knip",
   "cargo fmt --all -- --check",
   "cargo machete",
+  "node scripts/check/crate-edges.mjs",
   # --all-features would turn on both desktop runtimes and download CEF.
   "cargo clippy --locked --workspace --exclude app --all-targets --all-features -- -D warnings",
   "cargo clippy --locked -p app --all-targets -- -D warnings",
