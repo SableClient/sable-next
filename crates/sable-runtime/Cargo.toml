@@ -31,11 +31,15 @@ wasm-bindgen-futures = { workspace = true }
 
 [dev-dependencies]
 proptest = "1.12"
-tokio = { workspace = true, features = ["rt", "macros", "time"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["registry"] }
 
 [[test]]
 name = "journeys"
+required-features = ["testing"]
+
+[[test]]
+name = "lifecycle"
 required-features = ["testing"]
 
 [lints]

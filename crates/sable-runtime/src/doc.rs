@@ -15,6 +15,28 @@ use crate::{
 const ITEMS_PATH: &str = "/items";
 const TOTAL_PATH: &str = "/total";
 
+fn covers(outer: &str, inner: &str) -> bool {
+    inner
+        .strip_prefix(outer)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
+
+fn add_path(paths: &mut Vec<String>, path: &str) {
+    if paths.iter().any(|known| covers(known, path)) {
+        return;
+    }
+    paths.retain(|known| !covers(path, known));
+    paths.push(path.to_owned());
+}
+
+/// The outermost array on the way to `path`, or `path` itself.
+fn sendable<'a>(whole: &Value, path: &'a str) -> &'a str {
+    path.match_indices('/')
+        .filter_map(|(end, _)| path.get(..end))
+        .find(|prefix| whole.pointer(prefix).is_some_and(Value::is_array))
+        .unwrap_or(path)
+}
+
 fn encode<T: Serialize>(value: &T) -> Result<Value, AppError> {
     serde_json::to_value(value).map_err(|error| {
         tracing::error!(%error, "state does not serialize");
@@ -47,24 +69,20 @@ impl<V: Serialize> Doc<V> {
         &self.view
     }
 
-    /// Edits the document, which is then sent whole.
+    /// The whole document is sent.
     pub fn view_mut(&mut self) -> &mut V {
         self.dirty = Dirty::Whole;
         &mut self.view
     }
 
-    /// Edits the document, which is then sent as the value at `path` alone: a
-    /// JSON pointer to an object field that `edit` changes and nothing else.
+    /// Only the value at `path` is sent, so `edit` must change nothing outside it.
+    /// A path into an array sends the whole array.
     pub fn edit(&mut self, path: &str, edit: impl FnOnce(&mut V)) {
         edit(&mut self.view);
         match &mut self.dirty {
             Dirty::Whole => {}
             Dirty::Clean => self.dirty = Dirty::Paths(vec![path.to_owned()]),
-            Dirty::Paths(paths) => {
-                if !paths.iter().any(|known| known == path) {
-                    paths.push(path.to_owned());
-                }
-            }
+            Dirty::Paths(paths) => add_path(paths, path),
         }
     }
 }
@@ -95,9 +113,12 @@ impl<V: Serialize + SendOutsideWasm + 'static> Render for Doc<V> {
             Dirty::Paths(paths) => paths,
         };
         let whole = encode(&self.view)?;
+        let mut sent = Vec::with_capacity(paths.len());
+        for path in &paths {
+            add_path(&mut sent, sendable(&whole, path));
+        }
         Ok(Some(
-            paths
-                .into_iter()
+            sent.into_iter()
                 .map(|path| match whole.pointer(&path) {
                     Some(value) => Op::Replace {
                         value: value.clone(),
@@ -111,6 +132,10 @@ impl<V: Serialize + SendOutsideWasm + 'static> Render for Doc<V> {
 
     fn project(&self, changes: &Vec<Op>, _window: Option<Window>) -> Result<Vec<Op>, AppError> {
         Ok(changes.clone())
+    }
+
+    fn clear(&mut self) {
+        self.dirty = Dirty::Clean;
     }
 }
 
@@ -143,6 +168,19 @@ impl<T: Serialize + Clone> ListDoc<T> {
     #[must_use]
     pub fn items(&self) -> &[T] {
         &self.items
+    }
+
+    #[must_use]
+    pub fn from_cached(cached: Value) -> Option<Self>
+    where
+        T: DeserializeOwned,
+    {
+        let Value::Object(mut cached) = cached else {
+            return None;
+        };
+        serde_json::from_value(cached.remove("items")?)
+            .ok()
+            .map(Self::new)
     }
 
     /// # Errors
@@ -253,6 +291,11 @@ impl<T: Serialize + Clone + SendOutsideWasm + 'static> Render for ListDoc<T> {
             });
         }
         Ok(ops)
+    }
+
+    fn clear(&mut self) {
+        self.len_before = self.items.len();
+        self.pending.clear();
     }
 }
 
@@ -456,6 +499,81 @@ mod tests {
         assert!(
             Doc::<Profile>::from_cached(json!({"name": "n", "count": 1, "bio": null})).is_some()
         );
+    }
+
+    #[test]
+    fn a_path_covers_the_paths_below_it_in_either_order() {
+        for order in [["/a/b", "/a"], ["/a", "/a/b"]] {
+            let mut doc = Doc::new(json!({"a": {"b": 1}, "c": 2}));
+            for path in order {
+                doc.edit(path, |_| {});
+            }
+            assert_eq!(
+                doc.drain().unwrap(),
+                Some(vec![Op::Replace {
+                    path: "/a".to_owned(),
+                    value: json!({"b": 1})
+                }]),
+                "{order:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn siblings_stay_apart() {
+        let mut doc = Doc::new(json!({"a": {"b": 1, "bb": 2}}));
+        doc.edit("/a/b", |_| {});
+        doc.edit("/a/bb", |_| {});
+        assert_eq!(doc.drain().unwrap().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn a_path_into_an_array_sends_the_array() {
+        let mut doc = Doc::new(json!({"rows": [{"x": 1}, {"x": 2}], "n": 1}));
+        doc.edit("/rows/1/x", |_| {});
+        doc.edit("/rows/0", |_| {});
+        assert_eq!(
+            doc.drain().unwrap(),
+            Some(vec![Op::Replace {
+                path: "/rows".to_owned(),
+                value: json!([{"x": 1}, {"x": 2}])
+            }])
+        );
+    }
+
+    #[test]
+    fn clearing_forgets_what_was_edited_without_serializing() {
+        struct Broken;
+
+        impl Serialize for Broken {
+            fn serialize<S: serde::Serializer>(&self, _: S) -> Result<S::Ok, S::Error> {
+                Err(serde::ser::Error::custom("broken"))
+            }
+        }
+
+        let mut doc = Doc::new(Broken);
+        let _ = doc.view_mut();
+        doc.clear();
+        assert!(doc.drain().unwrap().is_none());
+
+        let mut list = ListDoc::new(vec![1]);
+        list.apply(VectorDiff::PushBack { value: 2 }).unwrap();
+        list.clear();
+        assert!(list.drain().unwrap().is_none());
+        assert_eq!(list.items(), [1, 2]);
+    }
+
+    #[test]
+    fn a_cached_list_must_have_the_shape_of_its_view() {
+        assert_eq!(
+            ListDoc::<u32>::from_cached(json!({"total": 2, "items": [1, 2]}))
+                .unwrap()
+                .items(),
+            [1, 2]
+        );
+        for wrong in [json!([1, 2]), json!({"total": 1}), json!({"items": ["x"]})] {
+            assert!(ListDoc::<u32>::from_cached(wrong).is_none());
+        }
     }
 
     fn list(count: usize) -> ListDoc<usize> {

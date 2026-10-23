@@ -18,7 +18,7 @@ use sable_protocol::{CoreEvent, CoreEventKind, RpcError, VectorDiff};
 use sable_runtime::{
     AppError, AppEvent, Clock, Cmd, Cx, Doc, Followed, Interest, Lifetime, ListDoc, LostReason, Op,
     Outcome, Registry, ReplyError, ReqId, Rpc, Slice, SubscribeRequest, SystemClock, Target,
-    Window,
+    WIRE_SCHEMA, Window,
     testing::{Gate, Replica, TestApp, assert_patches_converge},
 };
 use serde::{Deserialize, Serialize};
@@ -636,7 +636,7 @@ async fn changing_account_loses_requests_disposes_instances_and_asks_for_resyncs
         .unwrap();
     harness.settle().await;
 
-    harness.app.switch_account().await;
+    harness.app.switch_account("account-b").await;
     harness.settle().await;
     assert_eq!(harness.app.epoch(), 1);
     assert_eq!(
@@ -856,7 +856,7 @@ async fn a_stream_belongs_to_its_instance() {
         1,
         "a new stream starts over"
     );
-    harness.app.switch_account().await;
+    harness.app.switch_account("account-b").await;
     harness.advance(Duration::from_secs(5)).await;
     let fresh = harness.app.resync(replica.sub).await.unwrap();
     assert_eq!(fresh.state["ticks"], 0, "the stream died with its instance");
@@ -958,8 +958,26 @@ async fn an_instance_that_keeps_panicking_stays_down() {
         harness.app.resync(replica.sub).await.unwrap_err(),
         AppError::Stopped
     );
-    harness.app.switch_account().await;
+    harness.app.switch_account("account-b").await;
     harness.app.resync(replica.sub).await.unwrap();
+}
+
+fn saved(view: &Value) -> String {
+    json!({"schema": WIRE_SCHEMA, "view": view}).to_string()
+}
+
+fn stored_view(harness: &TestApp, key: &str) -> Option<Value> {
+    let stored = harness.platform.stored(key)?;
+    Some(serde_json::from_str::<Value>(&stored).unwrap()["view"].clone())
+}
+
+const DRAFTS_A: &str = "snapshot/account-a/drafts/null";
+
+fn drafts() -> Target {
+    Target {
+        slice: "drafts".to_owned(),
+        key: Value::Null,
+    }
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -967,45 +985,108 @@ async fn a_persisted_view_is_restored_at_cold_start_and_saved_after_changes() {
     let harness = harness();
     harness
         .platform
-        .store("snapshot/drafts/null", r#"{"text":"saved"}"#);
+        .store(DRAFTS_A, &saved(&json!({"text": "saved"})));
     let replica = harness.subscribe("drafts", Value::Null, None).await;
     assert_eq!(replica.state, json!({"text": "saved"}));
-    let target = Target {
-        slice: "drafts".to_owned(),
-        key: Value::Null,
-    };
 
-    dispatch(&harness, &target, json!({"type": "type", "text": "new"})).await;
+    dispatch(&harness, &drafts(), json!({"type": "type", "text": "new"})).await;
     harness.advance(Duration::from_secs(1)).await;
     assert_eq!(
-        harness.platform.stored("snapshot/drafts/null").as_deref(),
-        Some(r#"{"text":"saved"}"#),
+        stored_view(&harness, DRAFTS_A),
+        Some(json!({"text": "saved"})),
         "writes wait for the changes to settle"
     );
     harness.advance(Duration::from_secs(1)).await;
     assert_eq!(
-        harness.platform.stored("snapshot/drafts/null").as_deref(),
-        Some(r#"{"text":"new"}"#)
+        stored_view(&harness, DRAFTS_A),
+        Some(json!({"text": "new"}))
     );
 
-    dispatch(&harness, &target, json!({"type": "type", "text": "newer"})).await;
+    dispatch(
+        &harness,
+        &drafts(),
+        json!({"type": "type", "text": "newer"}),
+    )
+    .await;
     harness.settle().await;
-    harness.app.switch_account().await;
+    harness.app.switch_account("account-b").await;
     assert_eq!(
-        harness.platform.stored("snapshot/drafts/null").as_deref(),
-        Some(r#"{"text":"newer"}"#),
+        stored_view(&harness, DRAFTS_A),
+        Some(json!({"text": "newer"})),
         "disposing saves at once"
     );
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn a_view_that_no_longer_fits_is_not_restored() {
+async fn one_account_never_starts_from_the_views_of_another() {
     let harness = harness();
-    harness
-        .platform
-        .store("snapshot/drafts/null", r#"{"text":3}"#);
-    let replica = harness.subscribe("drafts", Value::Null, None).await;
-    assert_eq!(replica.state, json!({"text": ""}));
+    let first = harness.subscribe("drafts", Value::Null, None).await;
+    dispatch(
+        &harness,
+        &drafts(),
+        json!({"type": "type", "text": "private to a"}),
+    )
+    .await;
+    harness.settle().await;
+
+    harness.app.switch_account("account-b").await;
+    let second = harness.app.resync(first.sub).await.unwrap();
+    assert_eq!(second.state, json!({"text": ""}), "b starts empty");
+    dispatch(&harness, &drafts(), json!({"type": "type", "text": "b's"})).await;
+    harness.app.switch_account("account-a").await;
+
+    let back = harness.app.resync(first.sub).await.unwrap();
+    assert_eq!(back.state, json!({"text": "private to a"}));
+    assert_eq!(
+        stored_view(&harness, "snapshot/account-b/drafts/null"),
+        Some(json!({"text": "b's"}))
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_view_that_no_longer_fits_or_comes_from_another_wire_is_not_restored() {
+    for stored in [
+        saved(&json!({"text": 3})),
+        json!({"schema": "0000000000000000", "view": {"text": "old"}}).to_string(),
+        r#"{"text":"unwrapped"}"#.to_owned(),
+        "not json".to_owned(),
+    ] {
+        let harness = harness();
+        harness.platform.store(DRAFTS_A, &stored);
+        let replica = harness.subscribe("drafts", Value::Null, None).await;
+        assert_eq!(replica.state, json!({"text": ""}), "{stored}");
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_slow_write_is_never_overtaken_by_the_one_that_disposing_makes() {
+    let harness = harness();
+    let gate = Gate::default();
+    harness.platform.hold_writes(&gate);
+    harness.subscribe("drafts", Value::Null, None).await;
+    dispatch(&harness, &drafts(), json!({"type": "type", "text": "one"})).await;
+    harness.advance(Duration::from_secs(2)).await;
+    dispatch(&harness, &drafts(), json!({"type": "type", "text": "two"})).await;
+    harness.settle().await;
+
+    let app = harness.app.clone();
+    let switching = tokio::spawn(async move { app.switch_account("account-b").await });
+    for _ in 0..100 {
+        tokio::task::yield_now().await;
+    }
+    assert!(
+        !switching.is_finished(),
+        "disposing waits for the write before it"
+    );
+    gate.open();
+    switching.await.unwrap();
+    assert_eq!(
+        harness.platform.writes(DRAFTS_A),
+        [
+            saved(&json!({"text": "one"})),
+            saved(&json!({"text": "two"}))
+        ]
+    );
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -1066,7 +1147,7 @@ async fn bad_calls_are_errors_and_never_panics() {
     };
     assert_eq!(
         subscribe("nope", Value::Null).await.unwrap_err(),
-        AppError::UnknownSlice("nope".to_owned())
+        AppError::UnknownSlice
     );
     assert_eq!(
         subscribe("room", json!(5)).await.unwrap_err(),
@@ -1112,7 +1193,7 @@ async fn a_window_follows_part_of_a_list() {
     assert_eq!(replica.state, json!({"total": 10, "items": [2, 3]}));
     let moved = harness
         .app
-        .range(replica.sub, Window { start: 7, end: 20 })
+        .range(replica.sub, Some(Window { start: 7, end: 20 }))
         .await
         .unwrap();
     assert_eq!(moved.state, json!({"total": 10, "items": [7, 8, 9]}));

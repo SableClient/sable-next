@@ -6,8 +6,8 @@ pub enum AppError {
     Invalid,
     #[error("input is larger than {limit} bytes")]
     TooLarge { limit: usize },
-    #[error("no slice named `{0}`")]
-    UnknownSlice(String),
+    #[error("no such slice")]
+    UnknownSlice,
     #[error("no such subscription")]
     UnknownSub,
     #[error("the slice has stopped")]

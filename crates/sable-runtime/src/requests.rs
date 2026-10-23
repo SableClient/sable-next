@@ -6,10 +6,14 @@ use std::{
     },
 };
 
-use crate::{instance::InstanceId, rt::Task, wire::ReqId};
+use crate::{
+    instance::{InstanceId, Origin},
+    rt::Task,
+    wire::ReqId,
+};
 
 struct Pending {
-    instance: InstanceId,
+    origin: Origin,
     expiry: Option<Task>,
 }
 
@@ -25,14 +29,13 @@ impl Requests {
         self.pending.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Registers a request to `instance`. `expiry` makes the task that gives up on
-    /// it, and runs once the request can already be finished.
-    pub fn open(&self, instance: InstanceId, expiry: impl FnOnce(ReqId) -> Task) -> ReqId {
+    /// `expiry` runs once the request can already be finished.
+    pub fn open(&self, origin: Origin, expiry: impl FnOnce(ReqId) -> Task) -> ReqId {
         let req = ReqId(self.next.fetch_add(1, Ordering::Relaxed) + 1);
         self.lock().insert(
             req,
             Pending {
-                instance,
+                origin,
                 expiry: None,
             },
         );
@@ -48,17 +51,16 @@ impl Requests {
         self.lock().remove(&req).is_some()
     }
 
-    pub fn has(&self, instance: &InstanceId) -> bool {
-        self.lock()
-            .values()
-            .any(|request| request.instance == *instance)
+    /// Across every run of the instance.
+    pub fn has(&self, id: &InstanceId) -> bool {
+        self.lock().values().any(|request| request.origin.id == *id)
     }
 
-    pub fn lose(&self, matching: impl Fn(&InstanceId) -> bool) -> Vec<ReqId> {
+    pub fn lose(&self, matching: impl Fn(&Origin) -> bool) -> Vec<ReqId> {
         let mut pending = self.lock();
         let lost: Vec<ReqId> = pending
             .iter()
-            .filter(|(_, request)| matching(&request.instance))
+            .filter(|(_, request)| matching(&request.origin))
             .map(|(req, _)| *req)
             .collect();
         for req in &lost {
@@ -75,10 +77,13 @@ mod tests {
     use super::*;
     use crate::rt::spawn;
 
-    fn id() -> InstanceId {
-        InstanceId {
-            slice: "s",
-            key: "null".to_owned(),
+    fn origin(slice: &'static str, generation: u64) -> Origin {
+        Origin {
+            id: InstanceId {
+                slice,
+                key: "null".to_owned(),
+            },
+            generation,
         }
     }
 
@@ -86,7 +91,7 @@ mod tests {
     async fn the_expiry_task_finds_the_request_already_open() {
         let requests = Arc::new(Requests::default());
         let seen = Arc::new(Mutex::new(None));
-        let req = requests.open(id(), |req| {
+        let req = requests.open(origin("s", 1), |req| {
             let (requests, seen) = (requests.clone(), seen.clone());
             spawn(async move {
                 *seen.lock().unwrap() = Some(requests.finish(req));
@@ -100,14 +105,12 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn losing_takes_only_the_requests_that_match() {
         let requests = Requests::default();
-        let other = InstanceId {
-            slice: "t",
-            key: "null".to_owned(),
-        };
-        let mine = requests.open(id(), |_| spawn(async {}));
-        let theirs = requests.open(other.clone(), |_| spawn(async {}));
-        assert_eq!(requests.lose(|lost| *lost == id()), [mine]);
-        assert!(requests.has(&other));
-        assert!(requests.finish(theirs));
+        let old = requests.open(origin("s", 1), |_| spawn(async {}));
+        let new = requests.open(origin("s", 2), |_| spawn(async {}));
+        let other = requests.open(origin("t", 1), |_| spawn(async {}));
+        assert_eq!(requests.lose(|lost| *lost == origin("s", 1)), [old]);
+        assert!(requests.has(&origin("s", 2).id));
+        assert!(requests.finish(new));
+        assert!(requests.finish(other));
     }
 }

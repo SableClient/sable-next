@@ -55,6 +55,7 @@ impl Drop for Task {
     }
 }
 
+/// On native targets this must run inside a tokio runtime.
 pub fn spawn(future: impl Future<Output = ()> + SendOutsideWasm + 'static) -> Task {
     let (future, handle) = abortable(future);
     spawn_detached(async move {

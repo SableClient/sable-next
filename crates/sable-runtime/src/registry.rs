@@ -4,7 +4,7 @@ use serde_json::Value;
 
 use crate::{
     error::AppError,
-    instance::{ExitHook, Shared, Started, Typed},
+    instance::{Era, ExitHook, Shared, Started, Typed},
     rt::{SendOutsideWasm, SyncOutsideWasm},
     slice::{Interest, Lifetime, Slice},
 };
@@ -16,15 +16,11 @@ pub trait AnySlice: SendOutsideWasm + SyncOutsideWasm {
 
     fn interest(&self) -> Interest;
 
-    /// The canonical form of `key`, which names the instance.
-    ///
     /// # Errors
     ///
     /// `Invalid` when `key` is not this slice's key.
     fn key_id(&self, key: &Value) -> Result<String, AppError>;
 
-    /// Starts the instance named by `key`.
-    ///
     /// # Errors
     ///
     /// `Invalid` when `key` is not this slice's key.
@@ -32,6 +28,8 @@ pub trait AnySlice: SendOutsideWasm + SyncOutsideWasm {
         &self,
         key: &Value,
         shared: Arc<Shared>,
+        era: Era,
+        generation: u64,
         on_exit: ExitHook,
     ) -> Result<Started, AppError>;
 }

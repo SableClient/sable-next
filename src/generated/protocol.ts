@@ -16,8 +16,8 @@ export type AnimalIdentityView = {
 /**  `epoch` is the account the event belongs to. Replies of an old epoch arrive as `Lost`. */
 export type AppEvent = { type: "patch"; sub: SubId; rev: number; epoch: number; ops: Op[] } |
 /**  Comes after every patch the request caused. */
-{ type: "reply"; req: ReqId; epoch: number; outcome: Outcome } | { type: "notice"; slice: string; stage: string; text: string } |
-/**  The subscription missed patches; ask for a snapshot. */
+{ type: "reply"; req: ReqId; epoch: number; outcome: Outcome } | { type: "notice"; slice: string; stage: string; text: string; epoch: number } |
+/**  Ask for a snapshot. */
 { type: "resync"; sub: SubId; epoch: number };
 
 export type ArgumentDraft = boolean | string[] | string;
@@ -363,10 +363,7 @@ export type GalleryItemView = { kind: "image"; filename: string; caption: string
 
 export type GestureView = "hug" | "cuddle" | "wave" | "poke" | "headpat";
 
-/**
- *  What a shell asks of the runtime before it uses it: which wire it speaks
- *  and which slices it has. A UI whose `schema` differs reloads, or restarts its worker.
- */
+/**  A UI whose `schema` differs reloads, or restarts its worker. */
 export type Handshake = {
 	schema: string,
 	slices: string[],
@@ -680,7 +677,7 @@ export type NotificationView = {
 };
 
 /**  Paths are JSON pointers. */
-export type Op = { op: "add"; path: string; value: unknown } | { op: "replace"; path: string; value: unknown } | { op: "remove"; path: string } |
+export type Op = { op: "replace"; path: string; value: unknown } | { op: "remove"; path: string } |
 /**  Edits the array at `path` the way `VectorDiff` edits a vector. */
 { op: "list"; path: string; diffs: VectorDiff<unknown>[] };
 
@@ -3955,4 +3952,4 @@ export function createRpc(call: RpcCall): Rpc {
 }
 
 
-export const WIRE_SCHEMA = 'f3e7d0655a89b715';
+export const WIRE_SCHEMA = '6e6d98021ca8e147';

@@ -15,6 +15,7 @@ use crate::{
     cmd::{Cmd, Effect, Name},
     error::AppError,
     outbox::Outbox,
+    persist,
     ports::Ports,
     registry::AnySlice,
     requests::Requests,
@@ -23,12 +24,12 @@ use crate::{
     wire::{AppEvent, LostReason, Outcome, ReplyError, ReqId, Snapshot, SubId, Window},
 };
 
-/// Messages an instance reads before it publishes what they changed.
+/// Messages read before publishing what they changed.
 const BATCH: usize = 256;
-/// Messages that wait for one instance; senders wait when it is full.
 const INBOX: usize = 256;
-/// How long a persisted view waits for further changes before it is written.
 const PERSIST_DELAY: Duration = Duration::from_secs(2);
+/// Inputs one message may set off, so a slice that keeps producing inputs still reads its inbox.
+const MAX_STEPS: usize = 10_000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InstanceId {
@@ -36,7 +37,19 @@ pub struct InstanceId {
     pub key: String,
 }
 
-/// What every instance shares with the host.
+/// The next run of the same id is another origin.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Origin {
+    pub id: InstanceId,
+    pub generation: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct Era {
+    pub epoch: u64,
+    pub account: Arc<str>,
+}
+
 pub struct Shared {
     pub ports: Ports,
     pub outbox: Arc<Outbox>,
@@ -45,8 +58,7 @@ pub struct Shared {
 }
 
 impl Shared {
-    /// Answers the requests of the instances `matching` with `Lost`.
-    pub fn lose(&self, matching: impl Fn(&InstanceId) -> bool, reason: LostReason) {
+    pub fn lose(&self, matching: impl Fn(&Origin) -> bool, reason: LostReason) {
         for req in self.requests.lose(matching) {
             self.lose_reply(req, reason);
         }
@@ -55,16 +67,17 @@ impl Shared {
     pub fn lose_reply(&self, req: ReqId, reason: LostReason) {
         self.reply(
             req,
+            self.outbox.epoch(),
             Outcome::Error {
                 error: ReplyError::Lost { reason },
             },
         );
     }
 
-    pub fn reply(&self, req: ReqId, outcome: Outcome) {
+    pub fn reply(&self, req: ReqId, epoch: u64, outcome: Outcome) {
         self.outbox.push(AppEvent::Reply {
             req,
-            epoch: self.outbox.epoch(),
+            epoch,
             outcome,
         });
     }
@@ -80,7 +93,6 @@ pub enum Exit {
 pub type ExitHook = BoxOnce<Exit, ()>;
 
 pub struct Started {
-    pub key: String,
     pub instance: Arc<dyn Instance>,
 }
 
@@ -98,7 +110,8 @@ pub trait Instance: SendOutsideWasm + SyncOutsideWasm {
 
     async fn core(&self, event: &CoreEvent);
 
-    /// Returns once the instance has disposed, drained and persisted.
+    /// Returns once the instance has disposed, drained, persisted and answered
+    /// the requests it will never answer.
     async fn stop(&self);
 }
 
@@ -120,6 +133,11 @@ enum Msg<S: Slice> {
         input: S::Input,
         _busy: Busy,
     },
+    StreamEnded {
+        name: Name,
+        generation: u64,
+        _busy: Busy,
+    },
     Subscribe {
         sub: SubId,
         window: Option<Window>,
@@ -137,7 +155,19 @@ enum Msg<S: Slice> {
         _busy: Busy,
     },
     Persist,
+    /// An effect of the instance panicked.
+    Failed {
+        _busy: Busy,
+    },
     Stop(oneshot::Sender<()>),
+}
+
+/// Sends to an instance that may be gone, without keeping its inbox open.
+async fn deliver<S: Slice>(tx: &mpsc::WeakSender<Msg<S>>, msg: Msg<S>) -> bool {
+    match tx.upgrade() {
+        Some(tx) => tx.send(msg).await.is_ok(),
+        None => false,
+    }
 }
 
 struct Handle<S: Slice> {
@@ -193,8 +223,8 @@ impl<S: Slice> Instance for Handle<S> {
     }
 
     async fn action(&self, action: Value, req: Option<ReqId>) -> Result<(), AppError> {
-        let action: S::Action = serde_json::from_value(action).map_err(|error| {
-            tracing::debug!(slice = S::NAME, %error, "undecodable action");
+        let action: S::Action = serde_json::from_value(action).map_err(|_| {
+            tracing::debug!(slice = S::NAME, "undecodable action");
             AppError::Invalid
         })?;
         self.send(Msg::Input {
@@ -233,6 +263,15 @@ impl<S> Typed<S> {
     }
 }
 
+struct Start<S: Slice> {
+    key: S::Key,
+    origin: Origin,
+    era: Era,
+    tx: mpsc::WeakSender<Msg<S>>,
+    shared: Arc<Shared>,
+    on_exit: ExitHook,
+}
+
 impl<S: Slice> AnySlice for Typed<S> {
     fn name(&self) -> &'static str {
         S::NAME
@@ -255,82 +294,88 @@ impl<S: Slice> AnySlice for Typed<S> {
         &self,
         key: &Value,
         shared: Arc<Shared>,
+        era: Era,
+        generation: u64,
         on_exit: ExitHook,
     ) -> Result<Started, AppError> {
         let key: S::Key = serde_json::from_value(key.clone()).map_err(|_| AppError::Invalid)?;
-        let key_json = serde_json::to_string(&key).map_err(|_| AppError::Invalid)?;
-        let id = InstanceId {
-            slice: S::NAME,
-            key: key_json.clone(),
+        let origin = Origin {
+            id: InstanceId {
+                slice: S::NAME,
+                key: serde_json::to_string(&key).map_err(|_| AppError::Invalid)?,
+            },
+            generation,
         };
         let (tx, rx) = mpsc::channel(INBOX);
         let handle = Handle::<S> {
-            tx: tx.clone(),
+            tx,
             activity: shared.activity.clone(),
         };
-        spawn_detached(supervise::<S>(key, id, tx, rx, shared, on_exit));
+        spawn_detached(supervise(
+            Start {
+                key,
+                origin,
+                era,
+                tx: handle.tx.downgrade(),
+                shared,
+                on_exit,
+            },
+            rx,
+        ));
         Ok(Started {
-            key: key_json,
             instance: Arc::new(handle),
         })
     }
 }
 
-async fn supervise<S: Slice>(
-    key: S::Key,
-    id: InstanceId,
-    tx: mpsc::Sender<Msg<S>>,
-    rx: mpsc::Receiver<Msg<S>>,
-    shared: Arc<Shared>,
-    on_exit: ExitHook,
-) {
+enum Ended {
+    Stopped(Option<oneshot::Sender<()>>),
+    Failed,
+}
+
+async fn supervise<S: Slice>(start: Start<S>, rx: mpsc::Receiver<Msg<S>>) {
+    let Start {
+        key,
+        origin,
+        era,
+        tx,
+        shared,
+        on_exit,
+    } = start;
     let actor = {
-        let (id, shared) = (id.clone(), shared.clone());
+        let (origin, era, shared) = (origin.clone(), era, shared.clone());
         async move {
-            let cached = load::<S>(&shared, &id).await;
+            let cached = if S::PERSIST {
+                let saved = persist::storage_key(&era, &origin.id);
+                persist::load(&*shared.ports.platform, &saved).await
+            } else {
+                None
+            };
             let (state, init) = S::init(&key, cached);
-            let mut actor = Actor::new(key, state, id, tx, shared);
+            let mut actor = Actor::new(key, state, origin, era, tx, shared);
             actor.exec_all(init);
             actor.run(rx).await
         }
     };
-    let (exit, done) = guarded(actor).await.map_or_else(
-        || {
-            tracing::error!(slice = S::NAME, "an instance panicked");
+    let (exit, done) = match guarded(actor).await {
+        Some(Ended::Stopped(done)) => (Exit::Stopped, done),
+        Some(Ended::Failed) | None => {
+            tracing::error!(slice = S::NAME, "an instance failed");
             (Exit::Panicked, None)
-        },
-        |done| (Exit::Stopped, done),
-    );
+        }
+    };
     let reason = match exit {
         Exit::Stopped => LostReason::InstanceStopped,
         Exit::Panicked => LostReason::InstanceFailed,
     };
-    shared.lose(|lost| *lost == id, reason);
+    shared.lose(|lost| *lost == origin, reason);
     on_exit(exit);
     if let Some(done) = done {
         let _ = done.send(());
     }
 }
 
-fn storage_key(id: &InstanceId) -> String {
-    format!("snapshot/{}/{}", id.slice, id.key)
-}
-
-async fn load<S: Slice>(shared: &Shared, id: &InstanceId) -> Option<Value> {
-    if !S::PERSIST {
-        return None;
-    }
-    let stored = shared
-        .ports
-        .platform
-        .storage_get(&storage_key(id))
-        .await
-        .ok()??;
-    serde_json::from_str(&stored).ok()
-}
-
-/// `None` when the future panicked. Wasm aborts on a panic, so a page there
-/// recovers by restarting its worker instead.
+/// `None` when the future panicked. Wasm aborts instead, and the page restarts its worker.
 #[cfg(not(target_family = "wasm"))]
 async fn guarded<T>(future: impl std::future::Future<Output = T>) -> Option<T> {
     use futures_util::FutureExt;
@@ -356,18 +401,25 @@ struct Subscriber {
     rev: u64,
 }
 
+enum Flow {
+    Continue,
+    Stop(oneshot::Sender<()>),
+    Fail,
+}
+
 struct Actor<S: Slice> {
     key: S::Key,
-    id: InstanceId,
-    tx: mpsc::Sender<Msg<S>>,
+    origin: Origin,
+    era: Era,
+    tx: mpsc::WeakSender<Msg<S>>,
     shared: Arc<Shared>,
-    epoch: u64,
     state: S::State,
     subscribers: Vec<Subscriber>,
     timers: HashMap<Name, Armed>,
     streams: HashMap<Name, Armed>,
     next_generation: u64,
     persisting: Option<Task>,
+    last_write: Option<oneshot::Receiver<()>>,
     replies: Vec<(ReqId, Outcome)>,
     notices: Vec<(String, String)>,
 }
@@ -376,14 +428,15 @@ impl<S: Slice> Actor<S> {
     fn new(
         key: S::Key,
         state: S::State,
-        id: InstanceId,
-        tx: mpsc::Sender<Msg<S>>,
+        origin: Origin,
+        era: Era,
+        tx: mpsc::WeakSender<Msg<S>>,
         shared: Arc<Shared>,
     ) -> Self {
         Self {
             key,
-            epoch: shared.outbox.epoch(),
-            id,
+            origin,
+            era,
             tx,
             shared,
             state,
@@ -392,34 +445,39 @@ impl<S: Slice> Actor<S> {
             streams: HashMap::new(),
             next_generation: 0,
             persisting: None,
+            last_write: None,
             replies: Vec::new(),
             notices: Vec::new(),
         }
     }
 
-    async fn run(mut self, mut rx: mpsc::Receiver<Msg<S>>) -> Option<oneshot::Sender<()>> {
+    async fn run(mut self, mut rx: mpsc::Receiver<Msg<S>>) -> Ended {
         self.settle();
 
         let mut batch = Vec::with_capacity(BATCH);
         while rx.recv_many(&mut batch, BATCH).await > 0 {
-            let mut stop = None;
+            let mut flow = Flow::Continue;
             for msg in batch.drain(..) {
-                if let Msg::Stop(done) = msg {
-                    stop = Some(done);
+                flow = self.handle(msg);
+                if !matches!(flow, Flow::Continue) {
                     break;
                 }
-                self.handle(msg);
             }
             self.settle();
-            if stop.is_some() {
-                self.dispose().await;
-                return stop;
+            match flow {
+                Flow::Continue => {}
+                Flow::Stop(done) => {
+                    self.dispose().await;
+                    return Ended::Stopped(Some(done));
+                }
+                Flow::Fail => return Ended::Failed,
             }
         }
-        None
+        self.dispose().await;
+        Ended::Stopped(None)
     }
 
-    fn handle(&mut self, msg: Msg<S>) {
+    fn handle(&mut self, msg: Msg<S>) -> Flow {
         match msg {
             Msg::Input { input, req, .. } => self.reduce(input, req),
             Msg::Timer {
@@ -451,24 +509,42 @@ impl<S: Slice> Actor<S> {
                     self.reduce(input, None);
                 }
             }
+            Msg::StreamEnded {
+                name, generation, ..
+            } => {
+                if self
+                    .streams
+                    .get(name)
+                    .is_some_and(|stream| stream.generation == generation)
+                {
+                    self.streams.remove(name);
+                }
+            }
             Msg::Subscribe {
                 sub, window, reply, ..
             } => {
                 self.settle();
-                let snapshot = S::view(&mut self.state).snapshot(window);
-                let _ = reply.send(snapshot.map(|state| {
-                    self.subscribers.push(Subscriber {
-                        id: sub,
-                        window,
-                        rev: 0,
-                    });
-                    self.shared.outbox.caught_up(sub);
-                    Snapshot {
-                        rev: 0,
-                        epoch: self.epoch,
-                        state,
+                match S::view(&mut self.state).snapshot(window) {
+                    Ok(state) => {
+                        let snapshot = Snapshot {
+                            rev: 0,
+                            epoch: self.era.epoch,
+                            state,
+                        };
+                        if reply.send(Ok(snapshot)).is_ok() {
+                            self.subscribers.retain(|known| known.id != sub);
+                            self.subscribers.push(Subscriber {
+                                id: sub,
+                                window,
+                                rev: 0,
+                            });
+                            self.shared.outbox.caught_up(sub);
+                        }
                     }
-                }));
+                    Err(error) => {
+                        let _ = reply.send(Err(error));
+                    }
+                }
             }
             Msg::Resync {
                 sub, window, reply, ..
@@ -483,41 +559,39 @@ impl<S: Slice> Actor<S> {
             }
             Msg::Persist => {
                 self.persisting = None;
-                if let Some(json) = self.cache_json() {
-                    let platform = self.shared.ports.platform.clone();
-                    let key = storage_key(&self.id);
-                    spawn_detached(async move {
-                        if let Err(error) = platform.storage_set(&key, &json).await {
-                            tracing::warn!(%error, "a view was not persisted");
-                        }
-                    });
-                }
+                self.save();
             }
-            Msg::Stop(_) => {}
+            Msg::Failed { .. } => return Flow::Fail,
+            Msg::Stop(done) => return Flow::Stop(done),
         }
+        Flow::Continue
     }
 
     fn resync(&mut self, sub: SubId, window: Option<Window>) -> Result<Snapshot, AppError> {
-        let at = self
+        let subscriber = self
             .subscribers
-            .iter()
-            .position(|subscriber| subscriber.id == sub)
+            .iter_mut()
+            .find(|subscriber| subscriber.id == sub)
             .ok_or(AppError::UnknownSub)?;
-        let window = window.or_else(|| self.subscribers.get(at).and_then(|s| s.window));
         let state = S::view(&mut self.state).snapshot(window)?;
-        let subscriber = self.subscribers.get_mut(at).ok_or(AppError::UnknownSub)?;
         subscriber.window = window;
         self.shared.outbox.caught_up(sub);
         Ok(Snapshot {
             rev: subscriber.rev,
-            epoch: self.epoch,
+            epoch: self.era.epoch,
             state,
         })
     }
 
     fn reduce(&mut self, input: S::Input, req: Option<ReqId>) {
         let mut queue = VecDeque::from([(input, req)]);
+        let mut steps = 0;
         while let Some((input, req)) = queue.pop_front() {
+            steps += 1;
+            if steps > MAX_STEPS {
+                tracing::error!(slice = S::NAME, "inputs kept coming; the rest are dropped");
+                return;
+            }
             let span = tracing::debug_span!("reduce", slice = S::NAME, ?req);
             let cmd = span.in_scope(|| S::reduce(&self.key, &mut self.state, input, &Cx::new(req)));
             for effect in cmd.0 {
@@ -545,15 +619,18 @@ impl<S: Slice> Actor<S> {
                 let working = activity.begin();
                 let work = work(self.shared.ports.clone());
                 spawn_detached(async move {
-                    if let Some(input) = work.await {
-                        let _ = tx
-                            .send(Msg::Input {
-                                input,
-                                req: None,
-                                _busy: activity.begin(),
-                            })
-                            .await;
-                    }
+                    let msg = match guarded(work).await {
+                        Some(Some(input)) => Msg::Input {
+                            input,
+                            req: None,
+                            _busy: activity.begin(),
+                        },
+                        Some(None) => return,
+                        None => Msg::Failed {
+                            _busy: activity.begin(),
+                        },
+                    };
+                    deliver(&tx, msg).await;
                     drop(working);
                 });
             }
@@ -572,17 +649,32 @@ impl<S: Slice> Actor<S> {
                 let tx = self.tx.clone();
                 let activity = self.shared.activity.clone();
                 let task = spawn(async move {
-                    while let Some(input) = stream.next().await {
-                        let msg = Msg::Item {
+                    let ran = guarded(async {
+                        while let Some(input) = stream.next().await {
+                            let msg = Msg::Item {
+                                name,
+                                generation,
+                                input,
+                                _busy: activity.begin(),
+                            };
+                            if !deliver(&tx, msg).await {
+                                return;
+                            }
+                        }
+                    })
+                    .await;
+                    let msg = if ran.is_some() {
+                        Msg::StreamEnded {
                             name,
                             generation,
-                            input,
                             _busy: activity.begin(),
-                        };
-                        if tx.send(msg).await.is_err() {
-                            break;
                         }
-                    }
+                    } else {
+                        Msg::Failed {
+                            _busy: activity.begin(),
+                        }
+                    };
+                    deliver(&tx, msg).await;
                 });
                 self.streams.insert(
                     name,
@@ -613,14 +705,13 @@ impl<S: Slice> Actor<S> {
         let activity = self.shared.activity.clone();
         let task = spawn(async move {
             clock.sleep(delay).await;
-            let _ = tx
-                .send(Msg::Timer {
-                    name,
-                    generation,
-                    input,
-                    _busy: activity.begin(),
-                })
-                .await;
+            let msg = Msg::Timer {
+                name,
+                generation,
+                input,
+                _busy: activity.begin(),
+            };
+            deliver(&tx, msg).await;
         });
         self.timers.insert(
             name,
@@ -636,7 +727,7 @@ impl<S: Slice> Actor<S> {
         self.publish();
         for (req, outcome) in self.replies.drain(..) {
             if self.shared.requests.finish(req) {
-                self.shared.reply(req, outcome);
+                self.shared.reply(req, self.era.epoch, outcome);
             }
         }
         for (stage, text) in self.notices.drain(..) {
@@ -644,12 +735,17 @@ impl<S: Slice> Actor<S> {
                 slice: S::NAME.to_owned(),
                 stage,
                 text,
+                epoch: self.era.epoch,
             });
         }
     }
 
     fn publish(&mut self) {
         let view = S::view(&mut self.state);
+        if self.subscribers.is_empty() && !S::PERSIST {
+            view.clear();
+            return;
+        }
         let changes = match view.drain() {
             Ok(Some(changes)) => changes,
             Ok(None) => return,
@@ -668,7 +764,7 @@ impl<S: Slice> Actor<S> {
                     subscriber.rev += 1;
                     self.shared
                         .outbox
-                        .patch(subscriber.id, subscriber.rev, self.epoch, ops);
+                        .patch(subscriber.id, subscriber.rev, self.era.epoch, ops);
                 }
                 Err(error) => {
                     tracing::error!(slice = S::NAME, %error, "a change could not be projected");
@@ -681,19 +777,37 @@ impl<S: Slice> Actor<S> {
             let clock = self.shared.ports.clock.clone();
             self.persisting = Some(spawn(async move {
                 clock.sleep(PERSIST_DELAY).await;
-                let _ = tx.send(Msg::Persist).await;
+                deliver(&tx, Msg::Persist).await;
             }));
         }
     }
 
-    fn cache_json(&mut self) -> Option<String> {
-        match S::view(&mut self.state).snapshot(None) {
-            Ok(view) => Some(view.to_string()),
+    /// Chained after the previous write, so the last one saved is the latest.
+    fn save(&mut self) {
+        let view = match S::view(&mut self.state).snapshot(None) {
+            Ok(view) => view,
             Err(error) => {
                 tracing::error!(slice = S::NAME, %error, "a view could not be persisted");
-                None
+                return;
             }
-        }
+        };
+        let Some(json) = persist::encode(&view) else {
+            return;
+        };
+        let previous = self.last_write.take();
+        let (done, written) = oneshot::channel();
+        self.last_write = Some(written);
+        let platform = self.shared.ports.platform.clone();
+        let key = persist::storage_key(&self.era, &self.origin.id);
+        spawn_detached(async move {
+            if let Some(previous) = previous {
+                let _ = previous.await;
+            }
+            if let Err(error) = platform.storage_set(&key, &json).await {
+                tracing::warn!(%error, "a view was not persisted");
+            }
+            let _ = done.send(());
+        });
     }
 
     async fn dispose(&mut self) {
@@ -705,16 +819,11 @@ impl<S: Slice> Actor<S> {
         self.timers.clear();
         self.streams.clear();
         self.persisting = None;
-        if S::PERSIST
-            && let Some(json) = self.cache_json()
-            && let Err(error) = self
-                .shared
-                .ports
-                .platform
-                .storage_set(&storage_key(&self.id), &json)
-                .await
-        {
-            tracing::warn!(%error, "a view was not persisted");
+        if S::PERSIST {
+            self.save();
+        }
+        if let Some(written) = self.last_write.take() {
+            let _ = written.await;
         }
     }
 }

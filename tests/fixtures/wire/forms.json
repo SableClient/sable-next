@@ -51,7 +51,7 @@
         "epoch": 1,
         "ops": [
           {
-            "op": "add",
+            "op": "replace",
             "path": "/names/ann",
             "value": "Ann"
           },
@@ -122,7 +122,8 @@
         "type": "notice",
         "slice": "bookmarks",
         "stage": "saved",
-        "text": "Saved"
+        "text": "Saved",
+        "epoch": 0
       }
     ]
   },

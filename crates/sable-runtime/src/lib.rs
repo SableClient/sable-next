@@ -9,6 +9,7 @@ mod followed;
 mod instance;
 mod outbox;
 mod patch;
+mod persist;
 mod ports;
 mod registry;
 mod requests;

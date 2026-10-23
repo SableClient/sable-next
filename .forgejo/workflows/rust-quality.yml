@@ -85,7 +85,7 @@ jobs:
         run: cargo nextest run --locked --workspace --exclude app --all-features
 
       - name: Check generated bindings are current
-        run: cargo run --locked -p sable-core --example generate-types --features typegen -- --check
+        run: cargo run --locked -p sable-typegen -- --check
 
   # --all-features would turn on both desktop runtimes and download CEF, so the
   # app crate stays on its default runtime. The Linux release job covers CEF.

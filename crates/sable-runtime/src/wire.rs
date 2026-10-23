@@ -6,29 +6,23 @@ use serde_json::Value;
 use crate::error::AppError;
 use sable_protocol::VectorDiff;
 
-/// The most bytes of JSON the runtime decodes from a shell in one call.
 pub const MAX_INPUT_BYTES: usize = 1 << 20;
 
-/// Decodes untrusted JSON from a shell. Nothing of the input is echoed in the error.
+/// Nothing of the input is echoed in the error or the log.
 ///
 /// # Errors
 ///
-/// `TooLarge` past [`MAX_INPUT_BYTES`], `Invalid` for anything that does not decode,
-/// including nesting deeper than `serde_json` allows.
+/// `TooLarge` past [`MAX_INPUT_BYTES`], `Invalid` for anything that does not decode.
 pub fn decode<T: DeserializeOwned>(json: &str) -> Result<T, AppError> {
     if json.len() > MAX_INPUT_BYTES {
         return Err(AppError::TooLarge {
             limit: MAX_INPUT_BYTES,
         });
     }
-    serde_json::from_str(json).map_err(|error| {
-        tracing::debug!(%error, "undecodable input");
-        AppError::Invalid
-    })
+    serde_json::from_str(json).map_err(|_| AppError::Invalid)
 }
 
-/// The hash of the types that cross the boundary, written by the type generator.
-/// A shell and a UI that disagree on it were not built from the same source.
+/// Written by the type generator. A UI that disagrees was built from another source.
 pub const WIRE_SCHEMA: &str = include_str!("../schema.hash");
 
 #[must_use]
@@ -39,8 +33,7 @@ pub fn fnv1a_hex(text: &str) -> String {
     format!("{hash:016x}")
 }
 
-/// What a shell asks of the runtime before it uses it: which wire it speaks
-/// and which slices it has. A UI whose `schema` differs reloads, or restarts its worker.
+/// A UI whose `schema` differs reloads, or restarts its worker.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct Handshake {
@@ -118,11 +111,6 @@ pub struct Subscribed {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum Op {
-    Add {
-        path: String,
-        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
-        value: Value,
-    },
     Replace {
         path: String,
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
@@ -222,8 +210,10 @@ pub enum AppEvent {
         slice: String,
         stage: String,
         text: String,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        epoch: u64,
     },
-    /// The subscription missed patches; ask for a snapshot.
+    /// Ask for a snapshot.
     Resync {
         sub: SubId,
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
@@ -255,6 +245,36 @@ mod tests {
                 limit: MAX_INPUT_BYTES
             })
         );
+    }
+
+    #[test]
+    fn input_of_exactly_the_limit_is_decoded_and_one_byte_more_is_not() {
+        let (head, tail) = (r#"{"slice":""#, r#""}"#);
+        let json = format!(
+            "{head}{}{tail}",
+            "a".repeat(MAX_INPUT_BYTES - head.len() - tail.len())
+        );
+        assert_eq!(json.len(), MAX_INPUT_BYTES);
+        assert_eq!(decode::<Target>(&json).unwrap().key, Value::Null);
+        assert_eq!(
+            decode::<Target>(&format!("{json} ")),
+            Err(AppError::TooLarge {
+                limit: MAX_INPUT_BYTES
+            })
+        );
+    }
+
+    #[test]
+    fn a_key_nested_near_the_parser_limit_decodes_and_past_it_does_not() {
+        let nested = |depth: usize| {
+            format!(
+                r#"{{"slice":"s","key":{}0{}}}"#,
+                "[".repeat(depth),
+                "]".repeat(depth)
+            )
+        };
+        assert_eq!(decode::<Target>(&nested(100)).unwrap().slice, "s");
+        assert_eq!(decode::<Target>(&nested(200)), Err(AppError::Invalid));
     }
 
     #[test]

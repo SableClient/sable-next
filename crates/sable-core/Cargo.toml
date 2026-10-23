@@ -11,24 +11,11 @@ default = ["client"]
 client = []
 server = []
 unoptimized-build = []
-typegen = [
-  "dep:specta",
-  "dep:specta-serde",
-  "dep:specta-typescript",
-  "dep:sable-runtime",
-  "sable-model/typegen",
-  "sable-protocol/typegen",
-  "sable-runtime/typegen",
-]
-
-[[example]]
-name = "generate-types"
-required-features = ["typegen"]
+typegen = ["dep:specta", "dep:specta-typescript", "sable-model/typegen", "sable-protocol/typegen"]
 
 [dependencies]
 sable-model = { path = "../sable-model", version = "0.1.0" }
 sable-protocol = { path = "../sable-protocol", version = "0.1.0" }
-sable-runtime = { path = "../sable-runtime", version = "0.1.0", optional = true }
 matrix-sdk = { workspace = true, features = ["qrcode"] }
 qrcode = { version = "0.14.1", default-features = false }
 matrix-sdk-ui = { workspace = true }
@@ -45,7 +32,6 @@ serde_with = { workspace = true }
 futures-util = { workspace = true }
 tracing = { workspace = true }
 specta = { workspace = true, optional = true }
-specta-serde = { workspace = true, optional = true }
 specta-typescript = { workspace = true, optional = true }
 url = { workspace = true }
 percent-encoding = { workspace = true }

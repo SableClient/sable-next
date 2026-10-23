@@ -163,6 +163,9 @@ impl Backend for FakeBackend {
 pub struct FakePlatform {
     storage: Mutex<HashMap<String, String>>,
     opened: Mutex<Vec<String>>,
+    writes: Mutex<Vec<(String, String)>>,
+    held: Mutex<Option<Gate>>,
+    held_reads: Mutex<Option<Gate>>,
 }
 
 impl FakePlatform {
@@ -175,6 +178,24 @@ impl FakePlatform {
         locked(&self.storage).insert(key.to_owned(), value.to_owned());
     }
 
+    /// In the order the writes finished.
+    #[must_use]
+    pub fn writes(&self, key: &str) -> Vec<String> {
+        locked(&self.writes)
+            .iter()
+            .filter(|(written, _)| written == key)
+            .map(|(_, value)| value.clone())
+            .collect()
+    }
+
+    pub fn hold_reads(&self, gate: &Gate) {
+        *locked(&self.held_reads) = Some(gate.clone());
+    }
+
+    pub fn hold_writes(&self, gate: &Gate) {
+        *locked(&self.held) = Some(gate.clone());
+    }
+
     #[must_use]
     pub fn opened(&self) -> Vec<String> {
         locked(&self.opened).clone()
@@ -184,11 +205,20 @@ impl FakePlatform {
 #[async_trait]
 impl Platform for FakePlatform {
     async fn storage_get(&self, key: &str) -> Result<Option<String>, PlatformError> {
+        let held = locked(&self.held_reads).clone();
+        if let Some(gate) = held {
+            gate.wait().await;
+        }
         Ok(self.stored(key))
     }
 
     async fn storage_set(&self, key: &str, value: &str) -> Result<(), PlatformError> {
+        let held = locked(&self.held).clone();
+        if let Some(gate) = held {
+            gate.wait().await;
+        }
         self.store(key, value);
+        locked(&self.writes).push((key.to_owned(), value.to_owned()));
         Ok(())
     }
 
@@ -315,7 +345,8 @@ pub struct TestApp {
     activity: Arc<Activity>,
 }
 
-/// How many times `settle` lets the executor run before it gives up.
+pub const ACCOUNT: &str = "account-a";
+
 const SETTLE_LIMIT: usize = 100_000;
 
 impl TestApp {
@@ -337,7 +368,7 @@ impl TestApp {
             clock: clock.clone(),
         };
         Self {
-            app: App::with_activity(registry, ports, activity.clone()),
+            app: App::with_activity(registry, ports, ACCOUNT, activity.clone()),
             backend,
             platform,
             clock,
@@ -396,9 +427,7 @@ impl TestApp {
     }
 }
 
-/// Dispatches `steps` to one instance of `S`, a step at a time, and checks after each
-/// that a replica fed only the patches holds what a fresh snapshot holds.
-///
+/// After each step, a replica fed only patches must equal a fresh snapshot.
 pub async fn assert_patches_converge<S: Slice>(
     expect: impl FnOnce(&FakeBackend),
     key: Value,

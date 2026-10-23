@@ -1,5 +1,4 @@
-//! Replays ops onto a JSON state. Shells and tests apply patches with [`apply`];
-//! the TypeScript twin is `src/lib/runtime/patch.ts`.
+//! Replays ops onto a JSON state, for Rust shells and for tests.
 
 use sable_protocol::VectorDiff;
 use serde_json::Value;
@@ -26,7 +25,7 @@ fn unescape(token: &str) -> String {
 pub fn apply(target: &mut Value, ops: &[Op]) -> Result<(), PatchError> {
     for op in ops {
         match op {
-            Op::Add { path, value } | Op::Replace { path, value } => {
+            Op::Replace { path, value } => {
                 set(target, path, value.clone())?;
             }
             Op::Remove { path } => remove(target, path)?,
@@ -161,7 +160,7 @@ mod tests {
         let mut value = json!({});
         apply(
             &mut value,
-            &[Op::Add {
+            &[Op::Replace {
                 path: "/a~1b~0c".to_owned(),
                 value: json!(1),
             }],

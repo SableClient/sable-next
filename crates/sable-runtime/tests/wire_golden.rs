@@ -57,7 +57,7 @@ fn forms() -> Value {
             rev: 3,
             epoch: 1,
             ops: vec![
-                Op::Add { path: "/names/ann".to_owned(), value: json!("Ann") },
+                Op::Replace { path: "/names/ann".to_owned(), value: json!("Ann") },
                 Op::Remove { path: "/names/bob".to_owned() },
             ],
         }),
@@ -72,6 +72,7 @@ fn forms() -> Value {
             slice: "bookmarks".to_owned(),
             stage: "saved".to_owned(),
             text: "Saved".to_owned(),
+            epoch: 0,
         }),
         "resync": batch(10, AppEvent::Resync { sub: SubId(1), epoch: 1 }),
         "handshake": Handshake {

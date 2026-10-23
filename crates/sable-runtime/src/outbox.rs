@@ -8,13 +8,12 @@ use std::{
 
 use tokio::sync::Notify;
 
-use crate::wire::{AppEvent, Batch, Op, SubId};
+use crate::wire::{AppEvent, Batch, LostReason, Op, Outcome, ReplyError, SubId};
 
-/// The most weighted ops that wait for one subscription.
+/// Weighted ops per subscription.
 const PENDING_CAP: usize = 1024;
-/// The most events one batch carries.
 const BATCH_LIMIT: usize = 256;
-/// The most notices that wait; the oldest go first.
+/// Past the cap, the oldest go first.
 const NOTICE_CAP: usize = 32;
 
 #[derive(Default)]
@@ -42,18 +41,34 @@ fn weight(ops: &[Op]) -> usize {
 }
 
 impl State {
-    const fn is_stale(event: &AppEvent, epoch: u64) -> bool {
+    /// A reply that missed the switch is lost rather than dropped, so its request never hangs.
+    fn current(event: AppEvent, epoch: u64) -> Option<AppEvent> {
         match event {
             AppEvent::Patch { epoch: at, .. }
-            | AppEvent::Reply { epoch: at, .. }
-            | AppEvent::Resync { epoch: at, .. } => *at != epoch,
-            AppEvent::Notice { .. } => false,
+            | AppEvent::Resync { epoch: at, .. }
+            | AppEvent::Notice { epoch: at, .. }
+                if at != epoch =>
+            {
+                None
+            }
+            AppEvent::Reply { req, epoch: at, .. } if at != epoch => Some(AppEvent::Reply {
+                req,
+                epoch,
+                outcome: Outcome::Error {
+                    error: ReplyError::Lost {
+                        reason: LostReason::EpochChanged,
+                    },
+                },
+            }),
+            event => Some(event),
         }
     }
 
     fn lag(&mut self, sub: SubId) {
         let epoch = self.epoch;
-        let queue = self.subs.entry(sub).or_default();
+        let Some(queue) = self.subs.get_mut(&sub) else {
+            return;
+        };
         if queue.lagging {
             return;
         }
@@ -82,7 +97,9 @@ impl Outbox {
             return;
         }
         let cost = weight(&ops);
-        let queue = state.subs.entry(sub).or_default();
+        let Some(queue) = state.subs.get_mut(&sub) else {
+            return;
+        };
         if queue.lagging {
             return;
         }
@@ -101,17 +118,13 @@ impl Outbox {
         self.ready.notify_one();
     }
 
-    /// Tells a subscriber to ask for a snapshot, once.
     pub fn lag(&self, sub: SubId) {
         self.lock().lag(sub);
         self.ready.notify_one();
     }
 
-    /// The subscriber has a snapshot again, so patches flow to it.
     pub fn caught_up(&self, sub: SubId) {
-        if let Some(queue) = self.lock().subs.get_mut(&sub) {
-            queue.lagging = false;
-        }
+        self.lock().subs.entry(sub).or_default().lagging = false;
     }
 
     pub fn forget(&self, sub: SubId) {
@@ -122,12 +135,12 @@ impl Outbox {
         );
     }
 
-    /// Queues a reply or notice behind the patches that came before it.
+    /// Queued behind the patches that came before it.
     pub fn push(&self, event: AppEvent) {
         let mut state = self.lock();
-        if State::is_stale(&event, state.epoch) {
+        let Some(event) = State::current(event, state.epoch) else {
             return;
-        }
+        };
         if matches!(event, AppEvent::Notice { .. }) {
             let notices = state
                 .queue
@@ -153,7 +166,11 @@ impl Outbox {
         let mut state = self.lock();
         state.epoch += 1;
         let epoch = state.epoch;
-        state.queue.retain(|event| !State::is_stale(event, epoch));
+        let queued = std::mem::take(&mut state.queue);
+        state.queue = queued
+            .into_iter()
+            .filter_map(|event| State::current(event, epoch))
+            .collect();
         for queue in state.subs.values_mut() {
             *queue = SubQueue::default();
         }
@@ -199,7 +216,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::wire::{Outcome, ReqId};
+    use crate::wire::ReqId;
 
     fn replace(n: usize) -> Vec<Op> {
         vec![Op::Replace {
@@ -208,16 +225,43 @@ mod tests {
         }]
     }
 
+    fn tracked(subs: &[u32]) -> Outbox {
+        let outbox = Outbox::default();
+        for sub in subs {
+            outbox.caught_up(SubId(*sub));
+        }
+        outbox
+    }
+
+    fn reply(epoch: u64) -> AppEvent {
+        AppEvent::Reply {
+            req: ReqId(1),
+            epoch,
+            outcome: Outcome::Ok { value: json!(1) },
+        }
+    }
+
+    fn lost(epoch: u64) -> AppEvent {
+        AppEvent::Reply {
+            req: ReqId(1),
+            epoch,
+            outcome: Outcome::Error {
+                error: ReplyError::Lost {
+                    reason: LostReason::EpochChanged,
+                },
+            },
+        }
+    }
+
     #[test]
     fn a_slow_subscriber_gets_one_resync_in_place_of_its_patches() {
-        let outbox = Outbox::default();
+        let outbox = tracked(&[1, 2]);
         for rev in 1..=PENDING_CAP as u64 + 10 {
             outbox.patch(SubId(1), rev, 0, replace(0));
         }
         outbox.patch(SubId(2), 1, 0, replace(0));
-        let batch = outbox.take().unwrap();
         assert_eq!(
-            batch.events,
+            outbox.take().unwrap().events,
             [
                 AppEvent::Resync {
                     sub: SubId(1),
@@ -235,7 +279,7 @@ mod tests {
 
     #[test]
     fn a_lagging_subscriber_gets_nothing_until_it_catches_up() {
-        let outbox = Outbox::default();
+        let outbox = tracked(&[1]);
         outbox.lag(SubId(1));
         outbox.lag(SubId(1));
         outbox.patch(SubId(1), 1, 0, replace(1));
@@ -250,19 +294,23 @@ mod tests {
 
     #[test]
     fn draining_makes_room_under_the_cap() {
-        let outbox = Outbox::default();
-        for round in 0..4 {
+        let outbox = tracked(&[1]);
+        for _ in 0..4 {
             for rev in 0..PENDING_CAP as u64 {
-                outbox.patch(SubId(1), round * 10_000 + rev, 0, replace(0));
+                outbox.patch(SubId(1), rev, 0, replace(0));
             }
-            assert_eq!(outbox.take().unwrap().events.len(), BATCH_LIMIT);
-            while outbox.take().is_some() {}
+            let mut taken = 0;
+            while let Some(batch) = outbox.take() {
+                assert!(batch.events.len() <= BATCH_LIMIT);
+                taken += batch.events.len();
+            }
+            assert_eq!(taken, PENDING_CAP, "no patch was swapped for a resync");
         }
     }
 
     #[test]
     fn ticks_count_batches() {
-        let outbox = Outbox::default();
+        let outbox = tracked(&[1]);
         outbox.patch(SubId(1), 1, 0, replace(1));
         assert_eq!(outbox.take().unwrap().tick, 1);
         assert!(outbox.take().is_none());
@@ -272,13 +320,8 @@ mod tests {
 
     #[test]
     fn a_new_epoch_drops_the_old_one() {
-        let outbox = Outbox::default();
+        let outbox = tracked(&[1]);
         outbox.patch(SubId(1), 1, 0, replace(1));
-        outbox.push(AppEvent::Reply {
-            req: ReqId(1),
-            epoch: 0,
-            outcome: Outcome::Ok { value: json!(1) },
-        });
         assert_eq!(outbox.next_epoch(), 1);
         outbox.patch(SubId(1), 2, 0, replace(2));
         outbox.lag(SubId(1));
@@ -292,6 +335,28 @@ mod tests {
     }
 
     #[test]
+    fn a_reply_that_missed_the_switch_is_lost_not_dropped() {
+        let outbox = Outbox::default();
+        outbox.push(reply(0));
+        outbox.next_epoch();
+        outbox.push(reply(0));
+        assert_eq!(outbox.take().unwrap().events, [lost(1), lost(1)]);
+    }
+
+    #[test]
+    fn a_notice_from_another_epoch_is_dropped() {
+        let outbox = Outbox::default();
+        outbox.next_epoch();
+        outbox.push(AppEvent::Notice {
+            slice: "s".to_owned(),
+            stage: "old".to_owned(),
+            text: String::new(),
+            epoch: 0,
+        });
+        assert!(outbox.take().is_none());
+    }
+
+    #[test]
     fn old_notices_make_room_for_new_ones() {
         let outbox = Outbox::default();
         for n in 0..NOTICE_CAP + 3 {
@@ -299,6 +364,7 @@ mod tests {
                 slice: "s".to_owned(),
                 stage: n.to_string(),
                 text: String::new(),
+                epoch: 0,
             });
         }
         let events = outbox.take().unwrap().events;
@@ -307,10 +373,12 @@ mod tests {
     }
 
     #[test]
-    fn a_forgotten_subscriber_leaves_nothing_behind() {
-        let outbox = Outbox::default();
+    fn a_forgotten_subscriber_stays_forgotten() {
+        let outbox = tracked(&[1]);
         outbox.patch(SubId(1), 1, 0, replace(1));
         outbox.forget(SubId(1));
+        outbox.patch(SubId(1), 2, 0, replace(2));
+        outbox.lag(SubId(1));
         assert!(outbox.take().is_none());
     }
 }

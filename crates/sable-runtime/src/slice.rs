@@ -84,8 +84,8 @@ pub trait Render: SendOutsideWasm + 'static {
     /// `Encode` when the state does not serialize.
     fn drain(&mut self) -> Result<Option<Self::Changes>, AppError>;
 
-    /// The ops a subscriber of `window` applies to its copy.
-    ///
+    fn clear(&mut self);
+
     /// # Errors
     ///
     /// `Encode` when the state does not serialize.
