@@ -13,8 +13,8 @@ pnpm test:e2e
 Include tests for changed behavior. Keep pull requests focused and explain any changes that affect storage, authentication, or native capabilities.
 
 After changing `crates/sable-protocol/src/lib.rs`, run `mise run generate:types`
-and commit `src/generated/protocol.ts`. `mise run check:types` checks for drift.
-Both commands enable the optional `sable-core/typegen` feature for Specta.
+and commit `src/generated/protocol.ts` and `crates/sable-runtime/schema.hash`. `mise run check:types` checks for drift. The runtime that serves these types is described in [docs/runtime-v2.md](docs/runtime-v2.md).
+Both commands run the `sable-typegen` crate.
 
 ## Certificate of origin
 
