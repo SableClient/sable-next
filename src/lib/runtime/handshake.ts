@@ -1,15 +1,16 @@
 import { WIRE_SCHEMA, type Handshake } from '#src/generated/protocol';
 
-/** Why a UI and the runtime it reached cannot talk. The shell reloads the page or restarts its worker. */
 export type WireMismatch =
   | { kind: 'schema'; expected: string; actual: string }
   | { kind: 'missing_slices'; missing: string[] };
 
-/**
- * Checks the runtime's handshake against the types this UI was built with and
- * the slices it needs. The versions are locked: a schema that differs is never
- * worked around.
- */
+export class WireMismatchError extends Error {
+  constructor(readonly mismatch: WireMismatch) {
+    super(`The runtime does not match this UI: ${mismatch.kind}`);
+    this.name = 'WireMismatchError';
+  }
+}
+
 export function checkHandshake(
   handshake: Handshake,
   needed: readonly string[] = [],
