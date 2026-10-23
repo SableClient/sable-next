@@ -27,12 +27,31 @@ pub fn decode<T: DeserializeOwned>(json: &str) -> Result<T, AppError> {
     })
 }
 
-/// Names one subscription for as long as it lives.
+/// The hash of the types that cross the boundary, written by the type generator.
+/// A shell and a UI that disagree on it were not built from the same source.
+pub const WIRE_SCHEMA: &str = include_str!("../schema.hash");
+
+#[must_use]
+pub fn fnv1a_hex(text: &str) -> String {
+    let hash = text.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+    });
+    format!("{hash:016x}")
+}
+
+/// What a shell asks of the runtime before it uses it: which wire it speaks
+/// and which slices it has. A UI whose `schema` differs reloads, or restarts its worker.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct Handshake {
+    pub schema: String,
+    pub slices: Vec<String>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct SubId(pub u32);
 
-/// Names one request, and the reply that answers it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct ReqId(
@@ -242,6 +261,13 @@ mod tests {
     fn deep_nesting_is_an_error_not_a_stack_overflow() {
         let json = format!("{}{}", "[".repeat(100_000), "]".repeat(100_000));
         assert_eq!(decode::<Value>(&json), Err(AppError::Invalid));
+    }
+
+    #[test]
+    fn fnv1a_hex_is_stable_and_sensitive() {
+        assert_eq!(fnv1a_hex(""), "cbf29ce484222325");
+        assert_eq!(fnv1a_hex("a"), "af63dc4c8601ec8c");
+        assert_ne!(fnv1a_hex("type A = 1;"), fnv1a_hex("type A = 2;"));
     }
 
     #[test]

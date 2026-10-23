@@ -13,6 +13,13 @@ export type AnimalIdentityView = {
 	animal_need: string | null,
 };
 
+/**  `epoch` is the account the event belongs to. Replies of an old epoch arrive as `Lost`. */
+export type AppEvent = { type: "patch"; sub: SubId; rev: number; epoch: number; ops: Op[] } |
+/**  Comes after every patch the request caused. */
+{ type: "reply"; req: ReqId; epoch: number; outcome: Outcome } | { type: "notice"; slice: string; stage: string; text: string } |
+/**  The subscription missed patches; ask for a snapshot. */
+{ type: "resync"; sub: SubId; epoch: number };
+
 export type ArgumentDraft = boolean | string[] | string;
 
 export type ArgumentError = "required" | "invalid";
@@ -48,6 +55,12 @@ export type AvatarChangeView = {
 export type AvatarEditView = { kind: "keep" } | { kind: "clear" } | { kind: "url"; url: string } |
 /**  Encrypted in the webview with the account data key in hand. */
 { kind: "encrypted"; file: unknown };
+
+/**  Apply its events together, in order, before the UI draws. */
+export type Batch = {
+	tick: number,
+	events: AppEvent[],
+};
 
 export type BookmarkView = {
 	bookmark_id: string,
@@ -350,6 +363,15 @@ export type GalleryItemView = { kind: "image"; filename: string; caption: string
 
 export type GestureView = "hug" | "cuddle" | "wave" | "poke" | "headpat";
 
+/**
+ *  What a shell asks of the runtime before it uses it: which wire it speaks
+ *  and which slices it has. A UI whose `schema` differs reloads, or restarts its worker.
+ */
+export type Handshake = {
+	schema: string,
+	slices: string[],
+};
+
 export type HierarchyRoom = {
 	room: HierarchyRoomView,
 	suggested: boolean,
@@ -539,6 +561,8 @@ export type LoginFlowsView = {
 
 export type LoginIdentifier = { kind: "user"; user: string } | { kind: "email"; address: string };
 
+export type LostReason = "epoch_changed" | "expired" | "instance_stopped" | "instance_failed";
+
 export type MatrixLink = { kind: "user"; user_id: string } | { kind: "room"; room_id: string } | { kind: "event"; room_id: string; event_id: string };
 
 /**  MSC4278. `None` means the event does not say. */
@@ -655,12 +679,19 @@ export type NotificationView = {
 	noisy: boolean | null,
 };
 
+/**  Paths are JSON pointers. */
+export type Op = { op: "add"; path: string; value: unknown } | { op: "replace"; path: string; value: unknown } | { op: "remove"; path: string } |
+/**  Edits the array at `path` the way `VectorDiff` edits a vector. */
+{ op: "list"; path: string; diffs: VectorDiff<unknown>[] };
+
 export type OpenIdTokenView = {
 	access_token: string,
 	token_type: string,
 	matrix_server_name: string,
 	expires_in_ms: number,
 };
+
+export type Outcome = { status: "ok"; value: unknown } | { status: "error"; error: ReplyError };
 
 export type Outgoing = {
 	thread_root: string | null,
@@ -1069,6 +1100,8 @@ export type RelationsView = {
 	prev_batch: string | null,
 };
 
+export type ReplyError = { kind: "rpc"; error: unknown } | { kind: "encode" } | { kind: "lost"; reason: LostReason };
+
 /**  What a quoted event was, when it has no body to show. */
 export type ReplyFallbackView = { kind: "redacted" } | { kind: "reaction"; key: string } | { kind: "redaction" } | { kind: "verification_request" } | { kind: "event"; event_type: string };
 
@@ -1085,6 +1118,8 @@ export type ReplyView = {
 	/**  Set instead of `body` when the replied-to event has none to show. */
 	fallback: ReplyFallbackView | null,
 };
+
+export type ReqId = number;
 
 export type ResolvedQuery = {
 	filter: SearchFilter,
@@ -1549,6 +1584,13 @@ export type SlashInvocation = { command: "bug_report" } | { command: "gif_search
 
 export type SlashParse = { kind: "none" } | { kind: "literal"; body: string } | { kind: "unknown"; name: string } | { kind: "usage"; name: string; developer_only: boolean } | { kind: "command"; name: string; developer_only: boolean; invocation: SlashInvocation };
 
+/**  Patches for the subscription carry `rev + 1`, `rev + 2`, and so on. */
+export type Snapshot = {
+	rev: number,
+	epoch: number,
+	state: unknown,
+};
+
 export type SpaceChildEdge = {
 	room_id: string,
 	via: string[],
@@ -1607,9 +1649,27 @@ export type StatusView = {
 	emoji: string | null,
 };
 
+export type SubId = number;
+
+/**  `window` is only read by list slices. */
+export type SubscribeRequest = {
+	window?: Window | null,
+} & Target;
+
+export type Subscribed = {
+	sub: SubId,
+	snapshot: Snapshot,
+};
+
 export type SubscriptionId = number;
 
 export type SyncStatus = { state: "offline" } | { state: "syncing" } | { state: "live" } | { state: "error"; message: string };
+
+/**  `key` is `null` for a singleton. */
+export type Target = {
+	slice: string,
+	key: unknown,
+};
 
 export type TargetSuggestion = {
 	label: string,
@@ -1926,6 +1986,12 @@ export type WebPusherView = {
 	endpoint: string,
 	auth: string,
 	event_id_only: boolean,
+};
+
+/**  `start..end` in list order. */
+export type Window = {
+	start: number,
+	end: number,
 };
 
 export type ZonedInstant = {
@@ -3888,3 +3954,5 @@ export function createRpc(call: RpcCall): Rpc {
   };
 }
 
+
+export const WIRE_SCHEMA = 'f3e7d0655a89b715';

@@ -19,7 +19,7 @@ use sable_runtime::{
     AppError, AppEvent, Clock, Cmd, Cx, Doc, Followed, Interest, Lifetime, ListDoc, LostReason, Op,
     Outcome, Registry, ReplyError, ReqId, Rpc, Slice, SubscribeRequest, SystemClock, Target,
     Window,
-    testing::{TestApp, Gate, Replica, assert_patches_converge},
+    testing::{Gate, Replica, TestApp, assert_patches_converge},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -1242,5 +1242,15 @@ fn a_replica_refuses_a_gap_in_revisions() {
     assert_eq!(
         replica.apply(&skipped).unwrap_err().to_string(),
         "patch 2 follows 0, so one went missing"
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn the_handshake_names_the_wire_and_the_slices() {
+    let handshake = harness().app.handshake();
+    assert_eq!(handshake.schema, sable_runtime::WIRE_SCHEMA);
+    assert_eq!(
+        handshake.slices,
+        ["counter", "deaf", "drafts", "profiles", "room"]
     );
 }

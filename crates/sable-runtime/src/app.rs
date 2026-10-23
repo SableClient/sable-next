@@ -24,7 +24,8 @@ use crate::{
     rt::{Activity, Task, spawn},
     slice::{Interest, Lifetime},
     wire::{
-        Batch, LostReason, ReqId, Snapshot, SubId, SubscribeRequest, Subscribed, Target, Window,
+        Batch, Handshake, LostReason, ReqId, Snapshot, SubId, SubscribeRequest, Subscribed, Target,
+        WIRE_SCHEMA, Window,
     },
 };
 
@@ -118,6 +119,21 @@ impl App {
             .get(name)
             .map(Box::as_ref)
             .ok_or_else(|| AppError::UnknownSlice(name.to_owned()))
+    }
+
+    #[must_use]
+    pub fn handshake(&self) -> Handshake {
+        let mut slices: Vec<String> = self
+            .inner
+            .slices
+            .keys()
+            .map(|name| (*name).to_owned())
+            .collect();
+        slices.sort_unstable();
+        Handshake {
+            schema: WIRE_SCHEMA.to_owned(),
+            slices,
+        }
     }
 
     /// The account the runtime is serving. Patches and replies carry it.

@@ -1,0 +1,146 @@
+{
+  "subscribed": {
+    "sub": 1,
+    "snapshot": {
+      "rev": 0,
+      "epoch": 0,
+      "state": {
+        "total": 2,
+        "items": [
+          "a",
+          "b"
+        ]
+      }
+    }
+  },
+  "patch": {
+    "tick": 4,
+    "events": [
+      {
+        "type": "patch",
+        "sub": 1,
+        "rev": 1,
+        "epoch": 0,
+        "ops": [
+          {
+            "op": "replace",
+            "path": "/total",
+            "value": 3
+          },
+          {
+            "op": "list",
+            "path": "/items",
+            "diffs": [
+              {
+                "op": "push_back",
+                "value": "c"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "document_patch": {
+    "tick": 5,
+    "events": [
+      {
+        "type": "patch",
+        "sub": 2,
+        "rev": 3,
+        "epoch": 1,
+        "ops": [
+          {
+            "op": "add",
+            "path": "/names/ann",
+            "value": "Ann"
+          },
+          {
+            "op": "remove",
+            "path": "/names/bob"
+          }
+        ]
+      }
+    ]
+  },
+  "reply_ok": {
+    "tick": 6,
+    "events": [
+      {
+        "type": "reply",
+        "req": 7,
+        "epoch": 0,
+        "outcome": {
+          "status": "ok",
+          "value": {
+            "id": "x"
+          }
+        }
+      }
+    ]
+  },
+  "reply_rpc_error": {
+    "tick": 7,
+    "events": [
+      {
+        "type": "reply",
+        "req": 7,
+        "epoch": 0,
+        "outcome": {
+          "status": "error",
+          "error": {
+            "kind": "rpc",
+            "error": {
+              "code": "denied"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "reply_lost": {
+    "tick": 8,
+    "events": [
+      {
+        "type": "reply",
+        "req": 7,
+        "epoch": 0,
+        "outcome": {
+          "status": "error",
+          "error": {
+            "kind": "lost",
+            "reason": "epoch_changed"
+          }
+        }
+      }
+    ]
+  },
+  "notice": {
+    "tick": 9,
+    "events": [
+      {
+        "type": "notice",
+        "slice": "bookmarks",
+        "stage": "saved",
+        "text": "Saved"
+      }
+    ]
+  },
+  "resync": {
+    "tick": 10,
+    "events": [
+      {
+        "type": "resync",
+        "sub": 1,
+        "epoch": 1
+      }
+    ]
+  },
+  "handshake": {
+    "schema": "0123456789abcdef",
+    "slices": [
+      "bookmarks",
+      "timeline"
+    ]
+  }
+}

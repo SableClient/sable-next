@@ -28,6 +28,6 @@ pub use ports::{Backend, Clock, Platform, PlatformError, Ports, Rpc, SystemClock
 pub use registry::{AnySlice, DuplicateSlice, Registry};
 pub use slice::{Cx, Interest, Key, Lifetime, Render, Slice};
 pub use wire::{
-    AppEvent, Batch, LostReason, MAX_INPUT_BYTES, Op, Outcome, ReplyError, ReqId, Snapshot, SubId,
-    SubscribeRequest, Subscribed, Target, Window, decode,
+    AppEvent, Batch, Handshake, LostReason, MAX_INPUT_BYTES, Op, Outcome, ReplyError, ReqId,
+    Snapshot, SubId, SubscribeRequest, Subscribed, Target, WIRE_SCHEMA, Window, decode, fnv1a_hex,
 };
