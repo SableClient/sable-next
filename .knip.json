@@ -12,7 +12,8 @@
         "config": [
           "playwright.config.ts",
           "tests/e2e/playwright.preload.config.ts",
-          "tests/e2e/playwright.migration.config.ts"
+          "tests/e2e/playwright.migration.config.ts",
+          "tests/e2e/playwright.runtime.config.ts"
         ]
       },
       "ignoreDependencies": [

@@ -64,6 +64,11 @@ class FakeLink implements Link {
     this.listener = listener;
     return () => undefined;
   };
+  restarted: () => void = () => undefined;
+  onRestart = (listener: () => void) => {
+    this.restarted = listener;
+    return () => undefined;
+  };
 
   push(...events: AppEvent[]): void {
     this.listener({ tick: ++this.tick, events });
@@ -372,6 +377,35 @@ describe('reconnect', () => {
 
     expect(sub.get()?.total).toBe(5);
     expect(link.subscribed).toHaveLength(2);
+  });
+
+  it('reconnects by itself when the link restarts, and reports a mismatch it finds', async () => {
+    const { link, client, onError } = await setup();
+    const sub = await open(client);
+
+    link.initial = snapshot({ total: 9, items: [] });
+    link.restarted();
+    await flush();
+    expect(sub.get()?.total).toBe(9);
+
+    link.handshakeValue = { schema: forms.handshake.schema, slices: [] };
+    link.restarted();
+    await flush();
+    expect(onError).toHaveBeenCalledWith(expect.any(WireMismatchError));
+  });
+
+  it('lets a subscription that lost its first subscribe to a restart still load', async () => {
+    const { link, client } = await setup();
+    const subscribe = link.subscribe;
+    link.subscribe = () => {
+      link.subscribe = subscribe;
+      link.restarted();
+      return Promise.reject(new Error('the worker restarted'));
+    };
+    const sub = client.subscribe(target);
+    await sub.loaded;
+
+    expect(sub.get()).toEqual({ total: 2, items: ['a', 'b'] });
   });
 
   it('throws the mismatch of the runtime it came back to', async () => {

@@ -1,6 +1,9 @@
 #![cfg(target_family = "wasm")]
 #![recursion_limit = "512"]
 
+mod app;
+#[cfg(feature = "demo")]
+mod demo;
 mod session_store;
 
 use std::{
@@ -14,8 +17,9 @@ use sable_core::{
     Core,
     protocol::{CoreEvent, RpcError},
 };
+use sable_ffi::Ffi;
 use session_store::JsSessionStore;
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::{RwLock, mpsc::UnboundedReceiver};
 use wasm_bindgen::{JsValue, prelude::*};
 
 /// Most events a single crossing into JS carries.
@@ -43,7 +47,7 @@ fn encode_batch(batch: &[CoreEvent]) -> Option<String> {
     serde_json::to_string(&kept).ok()
 }
 
-fn js_err(error: &RpcError) -> String {
+pub(crate) fn js_err(error: &RpcError) -> String {
     serde_json::to_string(error)
         .unwrap_or_else(|_| r#"{"code":"failed","log_id":"serialization failed"}"#.to_owned())
 }
@@ -194,8 +198,32 @@ pub fn set_log_capture(enabled: bool) {
 /// frontend cannot tell the two apart.
 #[wasm_bindgen]
 pub struct SableCore {
-    core: Arc<Core>,
+    pub(crate) core: Arc<Core>,
+    /// Held for writing while the account changes, so the runtime's calls wait for it.
+    pub(crate) switching: Arc<RwLock<()>>,
+    app: RefCell<Option<Ffi>>,
+    account: RefCell<String>,
     events: RefCell<Option<UnboundedReceiver<CoreEvent>>>,
+}
+
+impl SableCore {
+    /// Moves the runtime to the account `method` left active, before the call returns to its caller.
+    async fn follow_account(&self, method: &str, json: &str) -> Result<(), String> {
+        let Some(account) = app::account_after(method, json) else {
+            return Ok(());
+        };
+        if *self.account.borrow() == account {
+            return Ok(());
+        }
+        let app = self.app.borrow().clone();
+        if let Some(app) = app {
+            app.switch_account(account.clone())
+                .await
+                .map_err(|_| js_err(&RpcError::Unavailable))?;
+        }
+        *self.account.borrow_mut() = account;
+        Ok(())
+    }
 }
 
 #[wasm_bindgen]
@@ -222,6 +250,9 @@ impl SableCore {
 
         SableCore {
             core,
+            switching: Arc::new(RwLock::new(())),
+            app: RefCell::new(None),
+            account: RefCell::new(String::new()),
             events: RefCell::new(Some(events)),
         }
     }
@@ -234,10 +265,19 @@ impl SableCore {
     /// Returns a JSON-encoded command error when parsing or the call fails.
     #[wasm_bindgen]
     pub async fn call(&self, method: String, params: String) -> Result<String, String> {
-        Box::pin(self.core.call(&method, &params))
+        let moving = if app::changes_account(&method) {
+            Some(self.switching.write().await)
+        } else {
+            None
+        };
+        let json = Box::pin(self.core.call(&method, &params))
             .await
             .map(|json| Box::<str>::from(json).into_string())
-            .map_err(|error| js_err(&error))
+            .map_err(|error| js_err(&error))?;
+        if moving.is_some() {
+            self.follow_account(&method, &json).await?;
+        }
+        Ok(json)
     }
 
     /// Stops syncing and refuses further calls, before another worker takes the stores.

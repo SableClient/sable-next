@@ -1719,6 +1719,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     class FakePort {
       onmessage: ((event: MessageEvent) => void) | null = null;
       onmessageerror: ((event: MessageEvent) => void) | null = null;
+      claim: (() => void) | null = null;
 
       start(): void {}
 
@@ -1734,7 +1735,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         media?: { source: string; width: number; height: number };
         forget?: { source: string };
         reset?: true;
+        runtime?: true;
+        disconnect?: true;
       }): void {
+        if (request.runtime || request.disconnect) return;
+        this.claim?.();
         if (request.reset) {
           window.setTimeout(() => {
             this.onmessage?.({ data: { id: request.id, uri: null } } as MessageEvent);
@@ -1869,7 +1874,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       port = new FakePort();
 
       constructor() {
-        activePort = this.port;
+        this.port.claim = () => {
+          activePort = this.port;
+        };
       }
 
       addEventListener(): void {}

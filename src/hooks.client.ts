@@ -10,7 +10,7 @@ import { untrackFetch } from '#lib/observability/untracked-fetch.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { loadModel } from '#lib/model/model.js';
 import { CoreError } from '#src/transport';
-import { prewarmTransport } from './transport/create';
+import { prewarmTransport, startRuntime } from './transport/create';
 
 const dsn = import.meta.env.VITE_SENTRY_DSN;
 const environment = import.meta.env.VITE_SENTRY_ENVIRONMENT ?? import.meta.env.MODE;
@@ -20,6 +20,7 @@ const sampleEverything = environment === 'development' || environment === 'previ
 installDynamicImportRecovery();
 tolerateUnknownListeners();
 prewarmTransport();
+startRuntime();
 
 if (dsn && preferences.errorReporting) {
   Sentry.init({

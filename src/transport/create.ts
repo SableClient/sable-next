@@ -5,6 +5,7 @@ import { createElectronTransport } from './electron';
 import { isElectron } from '#lib/platform/electron.js';
 import { createTauriTransport } from './tauri';
 import { createWebTransport, prewarmWebWorker } from './web';
+import { startWebRuntime } from './web-runtime';
 
 export function createTransport(): Transport {
   if (isTauri()) return createTauriTransport();
@@ -13,4 +14,8 @@ export function createTransport(): Transport {
 
 export function prewarmTransport(): void {
   if (!isTauri() && !isElectron()) prewarmWebWorker();
+}
+
+export function startRuntime(): void {
+  if (!isTauri() && !isElectron()) void startWebRuntime();
 }

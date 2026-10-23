@@ -13,18 +13,16 @@ export interface Host {
   track(sub: SubId, subscription: Subscription<unknown>): void;
   untrack(sub: SubId): void;
   forget(subscription: Subscription<unknown>): void;
-  /** Applies the events that arrived for `sub` before it was tracked. */
   replay(sub: SubId): void;
   opening(): () => void;
 }
 
-/**
- * A mirror of one slice instance. `get` returns the same value until a batch
- * changes it, and `subscribe` hears once per such batch, which is the contract
- * of React's `useSyncExternalStore` and of Svelte's `createSubscriber`.
- */
+/** `get` keeps its identity until a batch changes it, and `subscribe` hears once per such batch, as `useSyncExternalStore` expects. */
 export class Subscription<S> {
+  /** Resolves once the first snapshot is in, and rejects if the first subscribe fails. */
   readonly loaded: Promise<void>;
+  #loadedNow: () => void = () => undefined;
+  #loadedFailed: (error: unknown) => void = () => undefined;
   #state: S | undefined;
   #rev = 0;
   #epoch = 0;
@@ -43,8 +41,12 @@ export class Subscription<S> {
     private readonly host: Host
   ) {
     this.#window = window;
-    this.loaded = this.open();
+    this.loaded = new Promise((resolve, reject) => {
+      this.#loadedNow = resolve;
+      this.#loadedFailed = reject;
+    });
     this.loaded.catch(() => undefined);
+    this.open().catch(this.#loadedFailed);
   }
 
   get = (): S | undefined => this.#state;
@@ -76,11 +78,15 @@ export class Subscription<S> {
     const generation = this.host.generation;
     const done = this.host.opening();
     try {
-      const { sub, snapshot } = await this.host.link.subscribe({
-        ...this.target,
-        window: this.#window,
-      });
-      if (generation !== this.host.generation) return;
+      const subscribed = await this.host.link
+        .subscribe({ ...this.target, window: this.#window })
+        .catch((error: unknown) => {
+          // A restart rejects what was in flight; the new connection subscribes again.
+          if (generation === this.host.generation) throw error;
+          return null;
+        });
+      if (!subscribed || generation !== this.host.generation) return;
+      const { sub, snapshot } = subscribed;
       if (this.#closed) {
         await this.host.link.unsubscribe(sub);
         return;
@@ -90,6 +96,7 @@ export class Subscription<S> {
       this.#load(snapshot);
       this.host.replay(sub);
       this.notify();
+      this.#loadedNow();
     } finally {
       done();
     }

@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import init, {
+  SableApp,
   SableCore,
   setLogCapture,
   setLogFilter,
@@ -8,7 +9,9 @@ import init, {
   setPanicHandler,
 } from '#src/generated/wasm/sable_wasm.js';
 import { clearSession, loadSession, saveSession } from '#lib/platform/session-storage.js';
+import { loadSnapshot, saveSnapshot } from '#lib/platform/snapshot-storage.js';
 import { installFirefoxFetchLimit } from './adaptive-fetch';
+import { createAppHost } from './app-host';
 import { createCoreWorkerBoundary } from './core-worker-boundary';
 import { claimStore } from './store-ownership';
 import { installUploadDeadline } from './upload-deadline';
@@ -20,18 +23,22 @@ const SHUTDOWN_LIMIT_MS = 5_000;
 installUploadDeadline(self);
 installFirefoxFetchLimit(self);
 
-let started: SableCore | null = null;
+let started: { instance: SableCore; app: SableApp } | null = null;
 
 async function stopCore(): Promise<void> {
   if (!started) return;
   await Promise.race([
-    started.shutdown(),
+    (async () => {
+      await started.app.shutdown();
+      await started.instance.shutdown();
+    })(),
     new Promise((resolve) => setTimeout(resolve, SHUTDOWN_LIMIT_MS)),
   ]);
 }
 
-const core = claimStore(() => {
+const created = claimStore(() => {
   boundary.handleSuperseded();
+  appHost.handleSuperseded();
   void stopCore().finally(() => {
     self.close();
   });
@@ -49,10 +56,18 @@ const core = claimStore(() => {
       () => clearSession(),
       new URLSearchParams(self.location.search).get('event-cache') !== 'memory'
     );
-    started = instance;
+    const app = new SableApp(
+      instance,
+      (key: string) => loadSnapshot(key),
+      (key: string, value: string) => saveSnapshot(key, value)
+    );
+    started = { instance, app };
 
-    return instance;
+    return started;
   });
+
+const core = created.then(({ instance }) => instance);
+const appHost = createAppHost(created.then(({ app }) => app));
 
 const boundary = createCoreWorkerBoundary(
   core,
@@ -75,6 +90,7 @@ const boundary = createCoreWorkerBoundary(
 // A trap unwinds only its own call, so close the worker rather than keep re-entering a corrupted module; the next connect builds a fresh one.
 function crash(message: string, stack?: string): void {
   boundary.handlePanic(message, stack);
+  appHost.handlePanic();
   setTimeout(() => {
     self.close();
   }, 0);
@@ -123,8 +139,14 @@ self.onconnect = (connect: MessageEvent) => {
     get onmessage() {
       return port.onmessage;
     },
+    // A tab hands the worker a second port for the runtime, which is not the boundary's.
     set onmessage(handler) {
-      port.onmessage = handler;
+      port.onmessage =
+        handler &&
+        ((event: MessageEvent) => {
+          if ((event.data as { runtime?: true }).runtime) appHost.attach(event.ports[0]);
+          else handler.call(port, event);
+        });
     },
     get onmessageerror() {
       return port.onmessageerror;

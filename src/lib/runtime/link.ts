@@ -20,4 +20,5 @@ export interface Link {
   dispatch(target: Target, action: unknown): Promise<void>;
   request(target: Target, action: unknown): Promise<ReqId>;
   onBatch(listener: (batch: Batch) => void): () => void;
+  onRestart?(listener: () => void): () => void;
 }

@@ -61,6 +61,9 @@ export class Client implements Host {
     link.onBatch((batch) => {
       this.#apply(batch);
     });
+    link.onRestart?.(() => {
+      this.reconnect().catch(this.onError);
+    });
   }
 
   async check(): Promise<void> {

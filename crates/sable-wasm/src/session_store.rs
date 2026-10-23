@@ -18,11 +18,14 @@ impl JsSessionStore {
     }
 }
 
-async fn call(function: &Function, argument: &JsValue) -> Result<JsValue, JsValue> {
-    let returned = function.call1(&JsValue::NULL, argument)?;
-    // A non-Promise return must fail loudly, not hang on a missing `then`.
-    let promise = returned.dyn_into::<Promise>()?;
+/// A non-Promise return must fail loudly, not hang on a missing `then`.
+pub async fn settle(returned: Result<JsValue, JsValue>) -> Result<JsValue, JsValue> {
+    let promise = returned?.dyn_into::<Promise>()?;
     JsFuture::from(promise).await
+}
+
+async fn call(function: &Function, argument: &JsValue) -> Result<JsValue, JsValue> {
+    settle(function.call1(&JsValue::NULL, argument)).await
 }
 
 #[async_trait(?Send)]

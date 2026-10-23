@@ -27,6 +27,7 @@ const cargoArgs = [
   'wasm32-unknown-unknown',
   '--profile',
   profile,
+  ...(process.env.SABLE_WASM_FEATURES ? ['--features', process.env.SABLE_WASM_FEATURES] : []),
 ];
 
 const MAX_RELEASE_WASM_BYTES = 20 * 1024 * 1024;

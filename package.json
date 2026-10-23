@@ -16,6 +16,7 @@
     "test:coverage": "svelte-kit sync && vitest run --coverage",
     "test:e2e": "SABLE_WASM_OUTPUT=src/generated/wasm-e2e playwright test",
     "test:timeline": "playwright test -c tests/e2e/playwright.timeline.config.ts",
+    "test:runtime": "playwright test -c tests/e2e/playwright.runtime.config.ts",
     "prepare": "svelte-kit sync || echo ''; node scripts/dev/install-git-hooks.mjs",
     "check:theme": "node scripts/check/theme-tokens.mjs",
     "check:locales": "node scripts/check/locale-keys.mjs",
