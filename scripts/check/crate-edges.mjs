@@ -6,7 +6,7 @@ const root = join(import.meta.dirname, '../..');
 // Workspace crates a crate may depend on. A crate missing from this table, or
 // an edge missing from its row, fails the check: add it here deliberately.
 const allowed = {
-  'sable-protocol': [],
+  'sable-protocol': ['sable-model'],
   'sable-model': [],
   'sable-runtime': ['sable-protocol'],
   'sable-ffi': ['sable-protocol', 'sable-runtime'],

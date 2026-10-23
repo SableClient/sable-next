@@ -7302,6 +7302,7 @@ dependencies = [
  "rust-stemmers",
  "rustls",
  "sable-model",
+ "sable-protocol",
  "serde",
  "serde_json",
  "serde_with",
@@ -7395,6 +7396,18 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "sable-protocol"
+version = "0.1.0"
+dependencies = [
+ "ruma",
+ "sable-model",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-typescript",
 ]
 
 [[package]]

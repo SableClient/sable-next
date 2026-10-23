@@ -155,8 +155,6 @@ pub(crate) const CALL_MEMBER_TYPE: &str = "org.matrix.msc3401.call.member";
 /// back: it is there for other clients.
 pub(crate) const CALL_TYPE: &str = "org.matrix.msc3401.call";
 
-pub(crate) const FORUM_ROOM_TYPE: &str = "pl.chrome.forum";
-
 pub(crate) const FORUM_TITLE: &str = "moe.sable.forum.title";
 
 pub(crate) const RTC_SLOT_TYPE: &str = "org.matrix.msc4143.rtc.slot";

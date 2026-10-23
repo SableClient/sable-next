@@ -43,7 +43,7 @@ mod preview;
 mod probed_state;
 mod profile_overrides;
 pub mod profiles;
-pub mod protocol;
+pub use sable_protocol as protocol;
 pub mod push_check;
 pub mod push_rules;
 mod qr_login;

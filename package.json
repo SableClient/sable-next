@@ -32,7 +32,7 @@
     "document-change": "mise run knope:document-change",
     "wasm:build": "node scripts/build/build-wasm.mjs --release",
     "wasm:dev": "node scripts/build/build-wasm.mjs",
-    "wasm:watch": "watchexec --restart --watch crates/sable-core --watch crates/sable-wasm --watch crates/sable-model --watch crates/sable-model-wasm -- pnpm wasm:dev",
+    "wasm:watch": "watchexec --restart --watch crates/sable-core --watch crates/sable-wasm --watch crates/sable-protocol --watch crates/sable-model --watch crates/sable-model-wasm -- pnpm wasm:dev",
     "android:build": "node scripts/build/android.mjs",
     "ios:frameworks": "node scripts/build/download-ios-frameworks.mjs",
     "tauri": "tauri",

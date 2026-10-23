@@ -1,5 +1,5 @@
-use matrix_sdk::RoomState;
-use matrix_sdk::ruma::{
+use ruma::room::RoomType;
+use ruma::{
     OwnedDeviceId, OwnedEventId, OwnedMxcUri, OwnedRoomAliasId, OwnedRoomId, OwnedServerName,
     OwnedUserId,
 };
@@ -15,7 +15,54 @@ pub use sable_model::slash::{GestureView, MessageKind};
 pub use sable_model::spaces::{RoomJoinRuleView, SpaceChildEdge};
 use serde::{Deserialize, Serialize};
 
-use crate::api::rooms::RoomKind;
+/// Room types that Sable supports.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum RoomKind {
+    /// No room type
+    Text,
+    /// `m.space`
+    Space,
+    /// `org.matrix.msc3417.call`
+    Voice,
+    /// `pl.chrome.forum`
+    Forum,
+    /// `chat.commet.calendar`
+    Calendar,
+}
+
+pub const FORUM_ROOM_TYPE: &str = "pl.chrome.forum";
+pub const CALENDAR_ROOM_TYPE: &str = "chat.commet.calendar";
+
+impl RoomKind {
+    /// Create a [`RoomKind`] from a [`RoomType`].
+    ///
+    /// Returns None if the room type is unsupported by Sable.
+    #[must_use]
+    pub fn from_room_type(room_type: Option<&RoomType>) -> Option<Self> {
+        match room_type {
+            None => Some(Self::Text),
+            Some(RoomType::Space) => Some(Self::Space),
+            Some(RoomType::Call) => Some(Self::Voice),
+            Some(other) if other.as_str() == FORUM_ROOM_TYPE => Some(Self::Forum),
+            Some(other) if other.as_str() == CALENDAR_ROOM_TYPE => Some(Self::Calendar),
+            Some(_) => None,
+        }
+    }
+
+    /// Convert this [`RoomKind`] to a [`RoomType`].
+    #[must_use]
+    pub fn as_room_type(&self) -> Option<RoomType> {
+        match self {
+            Self::Text => None,
+            Self::Space => Some(RoomType::Space),
+            Self::Voice => Some(RoomType::Call),
+            Self::Forum => Some(RoomType::from(FORUM_ROOM_TYPE)),
+            Self::Calendar => Some(RoomType::from(CALENDAR_ROOM_TYPE)),
+        }
+    }
+}
 
 #[derive(Debug, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
@@ -954,18 +1001,6 @@ pub enum RoomStateView {
     Banned,
 }
 
-impl From<RoomState> for RoomStateView {
-    fn from(value: RoomState) -> Self {
-        match value {
-            RoomState::Joined => Self::Joined,
-            RoomState::Invited => Self::Invited,
-            RoomState::Knocked => Self::Knocked,
-            RoomState::Left => Self::Left,
-            RoomState::Banned => Self::Banned,
-        }
-    }
-}
-
 /// A room as the server describes it to someone who may not be in it.
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
@@ -1794,6 +1829,76 @@ pub enum TimelineItemContentView {
     Unsupported {
         description: String,
     },
+}
+
+impl TimelineItemContentView {
+    #[must_use]
+    pub const fn row_kind(&self) -> TimelineRowKind {
+        match self {
+            Self::Message { .. }
+            | Self::Image { .. }
+            | Self::Video { .. }
+            | Self::Audio { .. }
+            | Self::File { .. }
+            | Self::Sticker { .. }
+            | Self::Gallery { .. }
+            | Self::Location { .. }
+            | Self::LiveLocation { .. }
+            | Self::Poll { .. }
+            | Self::Redacted { .. } => TimelineRowKind::Message,
+            Self::DateDivider { .. } | Self::ReadMarker | Self::TimelineStart => {
+                TimelineRowKind::Annotation
+            }
+            Self::CallInvite
+            | Self::VerificationRequest
+            | Self::Cute { .. }
+            | Self::Malformed { .. }
+            | Self::UnableToDecrypt { .. }
+            | Self::Membership { .. }
+            | Self::ProfileChange { .. }
+            | Self::StateEvent { .. }
+            | Self::HiddenEvent { .. }
+            | Self::Unsupported { .. } => TimelineRowKind::Event,
+        }
+    }
+
+    #[must_use]
+    pub const fn forwardable(&self) -> bool {
+        matches!(
+            self,
+            Self::Message { .. }
+                | Self::Image { .. }
+                | Self::Video { .. }
+                | Self::Audio { .. }
+                | Self::File { .. }
+                | Self::Sticker { .. }
+                | Self::Location { .. }
+                | Self::Gallery { .. }
+        )
+    }
+
+    #[must_use]
+    pub const fn visibility(&self) -> TimelineVisibility {
+        match self {
+            Self::Membership {
+                change: MembershipChangeView::Other,
+                ..
+            } => TimelineVisibility::MembershipOther,
+            Self::Membership { .. } => TimelineVisibility::Membership,
+            Self::ProfileChange { .. } => TimelineVisibility::ProfileChange,
+            Self::Redacted { .. } => TimelineVisibility::Tombstone,
+            Self::StateEvent { change: None, .. } | Self::HiddenEvent { .. } => {
+                TimelineVisibility::Hidden
+            }
+            _ => TimelineVisibility::Always,
+        }
+    }
+
+    #[must_use]
+    pub const fn redactable(&self) -> bool {
+        !matches!(self, Self::Redacted { .. })
+            && !matches!(self.row_kind(), TimelineRowKind::Annotation)
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]

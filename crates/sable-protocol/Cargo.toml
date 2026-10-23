@@ -1,0 +1,21 @@
+[package]
+name = "sable-protocol"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+typegen = ["dep:specta", "dep:specta-typescript", "sable-model/typegen"]
+
+[dependencies]
+sable-model = { path = "../sable-model", version = "0.1.0" }
+ruma = { workspace = true, features = ["unstable-msc3417"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+specta = { workspace = true, optional = true }
+specta-typescript = { workspace = true, optional = true }
+
+[lints]
+workspace = true
