@@ -13,6 +13,7 @@ use crate::{Core, ResultExt};
 
 domain! {
     restore,
+    active_session,
     list_accounts,
     switch_account,
     remove_account,
@@ -53,6 +54,18 @@ impl Handler for RestoreParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<Option<SessionInfo>, RpcError> {
         core.restore().await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct ActiveSessionParams {}
+
+impl Handler for ActiveSessionParams {
+    type Ok = Option<SessionInfo>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Option<SessionInfo>, RpcError> {
+        Ok(core.active_session_info().await)
     }
 }
 

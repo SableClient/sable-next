@@ -5,6 +5,8 @@ import {
   type WorkerCore,
   type WorkerPort,
 } from '../../src/worker/core-worker-boundary.ts';
+import { createAppHost, type AppApi, type TabPort } from '../../src/worker/app-host.ts';
+import type { AppRequest } from '../../src/worker/app-protocol.ts';
 import type { WorkerRequest } from '../../src/worker/protocol.ts';
 
 interface NativeCore {
@@ -21,6 +23,11 @@ interface NativeCore {
 
 interface NativeModule {
   SableCore: new (dataDir: string, logFilter: string | null) => NativeCore;
+  SableApp: new (
+    core: NativeCore,
+    dataDir: string,
+    send: (batch: [tab: number, json: string]) => void
+  ) => AppApi & { shutdown(): Promise<void> };
   setLogHandler(notify: (line: string) => void): void;
   setLogCapture(enabled: boolean): void;
 }
@@ -33,6 +40,9 @@ if (!dataDir) throw new Error('SABLE_DATA_DIR is not set');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const native = require('./sable_node.node') as NativeModule;
 const instance = new native.SableCore(dataDir, process.env.SABLE_LOG ?? null);
+const app = new native.SableApp(instance, dataDir, ([tab, batch]) => {
+  appHost.deliver(tab, batch);
+});
 void instance.restore();
 
 function unwrap<T>(promise: Promise<T>): Promise<T> {
@@ -59,7 +69,9 @@ const boundary = createCoreWorkerBoundary(
   },
   () => {
     process.exit(0);
-  }
+  },
+  undefined,
+  () => app.shutdown()
 );
 native.setLogHandler(boundary.handleLog);
 
@@ -103,9 +115,55 @@ function wrap(port: MessagePortMain): WorkerPort {
   };
 }
 
+const closed = new Map<string, Promise<void>>();
+
+const appHost = createAppHost(
+  Promise.resolve(app),
+  (tab) => closed.get(tab) ?? new Promise(() => {})
+);
+
+function wrapTab(port: MessagePortMain): TabPort {
+  const portClosed = new Promise<void>((resolve) => port.once('close', resolve));
+  let onmessage: TabPort['onmessage'] = null;
+  port.on('message', (event) => {
+    const data = event.data as AppRequest;
+    if (data.op === 'hello') {
+      closed.set(data.tab, portClosed);
+      void portClosed.then(() => closed.delete(data.tab));
+    }
+    void onmessage?.({ data } as MessageEvent<AppRequest>);
+  });
+
+  return {
+    postMessage: (message) => {
+      port.postMessage(message);
+    },
+    get onmessage() {
+      return onmessage;
+    },
+    set onmessage(handler) {
+      onmessage = handler;
+    },
+    start: () => {
+      port.start();
+    },
+  };
+}
+
 process.parentPort.on('message', (event) => {
+  if (event.data === 'stop') {
+    // The views are saved as the app stops, which must finish before the process is killed.
+    void app.shutdown().finally(() => {
+      process.parentPort.postMessage('stopped');
+    });
+    return;
+  }
   if (event.ports.length !== 1) return;
   const [port] = event.ports;
+  if (event.data === 'runtime') {
+    appHost.attach(wrapTab(port));
+    return;
+  }
   boundary.connect(wrap(port));
 
   const queued = backlog;

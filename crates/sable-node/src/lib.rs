@@ -4,6 +4,7 @@
     reason = "every export rejects with the JSON `RpcError` as its message"
 )]
 
+mod app;
 #[cfg(windows)]
 mod screen_audio;
 
@@ -26,6 +27,7 @@ use sable_core::{
     protocol::{CoreEvent, RpcError},
     store::ExclusiveFileSessionStore,
 };
+use sable_ffi::AccountGate;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 type Callback = ThreadsafeFunction<String, (), String, Status, false>;
@@ -162,10 +164,37 @@ pub fn set_log_capture(enabled: bool) {
     LOG_CAPTURE.store(enabled, Ordering::Relaxed);
 }
 
+async fn gate_call(
+    gate: &AccountGate,
+    core: &Arc<Core>,
+    method: &str,
+    params: &str,
+) -> napi::Result<String> {
+    gate.run(
+        method,
+        async {
+            Box::pin(core.call(method, params))
+                .await
+                .map(|json| Box::<str>::from(json).into_string())
+                .map_err(|error| js_err(&error))
+        },
+        || async {
+            Box::pin(core.call("session.active_session", params))
+                .await
+                .map(|json| Box::<str>::from(json).into_string())
+                .map_err(|error| js_err(&error))
+        },
+        String::as_str,
+        || js_err(&RpcError::Unavailable),
+    )
+    .await
+}
+
 #[napi]
 pub struct SableCore {
     core: Arc<Core>,
     events: Mutex<Option<UnboundedReceiver<CoreEvent>>>,
+    gate: AccountGate,
 }
 
 #[napi]
@@ -183,6 +212,7 @@ impl SableCore {
         Self {
             core,
             events: Mutex::new(Some(events)),
+            gate: AccountGate::default(),
         }
     }
 
@@ -190,13 +220,13 @@ impl SableCore {
     pub fn restore<'env>(&self, env: &'env Env) -> napi::Result<PromiseRaw<'env, ()>> {
         // Keep JS-owned borrows on this thread: pending futures are dropped by Tokio at shutdown.
         let core = self.core.clone();
+        let gate = self.gate.clone();
         env.spawn_future(async move {
             if !matches!(core.v1_migration_complete().await, Ok(true)) {
                 return Ok(());
             }
-            if let Err(error) = Box::pin(core.run(sable_core::api::session::RestoreParams {})).await
-            {
-                tracing::warn!(?error, "early session restore failed");
+            if let Err(error) = gate_call(&gate, &core, "session.restore", "{}").await {
+                tracing::warn!(%error, "early session restore failed");
             }
             Ok(())
         })
@@ -224,12 +254,8 @@ impl SableCore {
         params: String,
     ) -> napi::Result<PromiseRaw<'env, String>> {
         let core = self.core.clone();
-        env.spawn_future(async move {
-            Box::pin(core.call(&method, &params))
-                .await
-                .map(|json| Box::<str>::from(json).into_string())
-                .map_err(|error| js_err(&error))
-        })
+        let gate = self.gate.clone();
+        env.spawn_future(async move { gate_call(&gate, &core, &method, &params).await })
     }
 
     #[napi]

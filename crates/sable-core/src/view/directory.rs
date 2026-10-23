@@ -8,7 +8,9 @@ use matrix_sdk::ruma::room::{JoinRuleKind, JoinRuleSummary};
 use matrix_sdk::{RoomState, RoomStrippedStateVia};
 
 use crate::api::rooms::RoomKind;
-use crate::protocol::{PublicRoomView, RoomJoinRuleView, RoomPreviewViaView, RoomPreviewView};
+use crate::protocol::{
+    PublicRoomView, RoomJoinRuleView, RoomPreviewViaView, RoomPreviewView, RoomStateView,
+};
 
 #[must_use]
 pub fn public_room(chunk: &PublicRoomsChunk) -> PublicRoomView {
@@ -104,8 +106,18 @@ pub fn room_preview_view(preview: &RoomPreview) -> RoomPreviewView {
             .join_rule
             .as_ref()
             .map_or(RoomJoinRuleView::Unknown, join_rule_summary_view),
-        state: preview.state.map(Into::into),
+        state: preview.state.map(room_state_view),
         via: RoomPreviewViaView::Unknown,
+    }
+}
+
+pub(super) const fn room_state_view(state: RoomState) -> RoomStateView {
+    match state {
+        RoomState::Joined => RoomStateView::Joined,
+        RoomState::Invited => RoomStateView::Invited,
+        RoomState::Knocked => RoomStateView::Knocked,
+        RoomState::Left => RoomStateView::Left,
+        RoomState::Banned => RoomStateView::Banned,
     }
 }
 
@@ -126,7 +138,7 @@ pub fn room_preview_from_stripped_state(
         room_kind: None,
         num_joined_members,
         join_rule: RoomJoinRuleView::Unknown,
-        state: membership.map(Into::into),
+        state: membership.map(room_state_view),
         via: match via {
             RoomStrippedStateVia::Client => RoomPreviewViaView::Client,
             RoomStrippedStateVia::Remote(server) => RoomPreviewViaView::Remote { server },

@@ -27,6 +27,7 @@ const cargoArgs = [
   'wasm32-unknown-unknown',
   '--profile',
   profile,
+  ...(process.env.SABLE_WASM_FEATURES ? ['--features', process.env.SABLE_WASM_FEATURES] : []),
 ];
 
 const MAX_RELEASE_WASM_BYTES = 20 * 1024 * 1024;
@@ -153,7 +154,7 @@ const unlockOutput = lockOutput(output);
 
 try {
   const generated = await bindgen('sable_wasm.wasm', 'sable_wasm', {
-    optimize: ['-O3', '--gufa', '-O3'],
+    optimize: ['-O3', '--gufa', '-O3', '--merge-similar-functions'],
     budget: MAX_RELEASE_WASM_BYTES,
     features: ['reference-types', 'multivalue', 'bulk-memory'],
   });

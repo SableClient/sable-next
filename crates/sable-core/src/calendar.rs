@@ -20,7 +20,7 @@ use crate::protocol::{
 use crate::room_settings::EmptyContent;
 use crate::{Core, ResultExt};
 
-pub(crate) const CALENDAR_ROOM_TYPE: &str = "chat.commet.calendar";
+pub(crate) use sable_protocol::CALENDAR_ROOM_TYPE;
 pub(crate) const RSVP_EVENT: &str = "moe.sable.calendar.rsvp";
 const CALENDAR_EVENTS: &str = "chat.commet.calendar_events";
 const CALENDAR_CREATE: &str = "chat.commet.calendar_create";

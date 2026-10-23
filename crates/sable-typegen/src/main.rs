@@ -1,8 +1,9 @@
-use std::{borrow::Cow, error::Error, path::Path};
+use std::{borrow::Cow, error::Error, hash::Hasher, path::Path};
 
 use sable_core::protocol::{
     AttachmentInfoView, CoreEvent, RpcError, SendAttachmentRequest, SendGalleryRequest,
 };
+use sable_runtime::{Batch, Handshake, SubscribeRequest, Subscribed};
 use specta::{Format, FormatError, Types, datatype::DataType};
 
 struct ProtocolFormat;
@@ -133,6 +134,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .register::<AttachmentInfoView>()
         .register::<SendAttachmentRequest>()
         .register::<SendGalleryRequest>()
+        .register::<Batch>()
+        .register::<Handshake>()
+        .register::<SubscribeRequest>()
+        .register::<Subscribed>()
         .register::<sable_model::search_query::ParsedQuery>()
         .register::<sable_model::matrix_link::MatrixLink>()
         .register::<sable_model::matrix_link::ViaSplit>()
@@ -173,16 +178,26 @@ fn main() -> Result<(), Box<dyn Error>> {
             .collect::<Vec<_>>()
             .join("\n")
     );
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../src/generated/protocol.ts");
+    let mut hasher = fnv::FnvHasher::default();
+    hasher.write(output.as_bytes());
+    let schema = format!("{:016x}", hasher.finish());
+    let output = format!("{output}\nexport const WIRE_SCHEMA = '{schema}';\n");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let generated = [
+        (root.join("src/generated/protocol.ts"), output),
+        (root.join("crates/sable-runtime/schema.hash"), schema),
+    ];
 
-    if check {
-        if std::fs::read_to_string(&path).ok().as_deref() != Some(output.as_str()) {
-            return Err(
-                "generated protocol is missing or stale; run `mise run generate:types`".into(),
-            );
+    for (path, content) in generated {
+        if check {
+            if std::fs::read_to_string(&path).ok().as_deref() != Some(content.as_str()) {
+                return Err(
+                    "generated protocol is missing or stale; run `mise run generate:types`".into(),
+                );
+            }
+        } else {
+            std::fs::write(path, content)?;
         }
-    } else {
-        std::fs::write(path, output)?;
     }
 
     Ok(())

@@ -1,6 +1,7 @@
 #![cfg(target_family = "wasm")]
 #![recursion_limit = "512"]
 
+mod app;
 mod session_store;
 
 use std::{
@@ -14,6 +15,7 @@ use sable_core::{
     Core,
     protocol::{CoreEvent, RpcError},
 };
+use sable_ffi::AccountGate;
 use session_store::JsSessionStore;
 use tokio::sync::mpsc::UnboundedReceiver;
 use wasm_bindgen::{JsValue, prelude::*};
@@ -43,7 +45,7 @@ fn encode_batch(batch: &[CoreEvent]) -> Option<String> {
     serde_json::to_string(&kept).ok()
 }
 
-fn js_err(error: &RpcError) -> String {
+pub(crate) fn js_err(error: &RpcError) -> String {
     serde_json::to_string(error)
         .unwrap_or_else(|_| r#"{"code":"failed","log_id":"serialization failed"}"#.to_owned())
 }
@@ -194,7 +196,8 @@ pub fn set_log_capture(enabled: bool) {
 /// frontend cannot tell the two apart.
 #[wasm_bindgen]
 pub struct SableCore {
-    core: Arc<Core>,
+    pub(crate) core: Arc<Core>,
+    pub(crate) gate: AccountGate,
     events: RefCell<Option<UnboundedReceiver<CoreEvent>>>,
 }
 
@@ -222,6 +225,7 @@ impl SableCore {
 
         SableCore {
             core,
+            gate: AccountGate::default(),
             events: RefCell::new(Some(events)),
         }
     }
@@ -234,10 +238,25 @@ impl SableCore {
     /// Returns a JSON-encoded command error when parsing or the call fails.
     #[wasm_bindgen]
     pub async fn call(&self, method: String, params: String) -> Result<String, String> {
-        Box::pin(self.core.call(&method, &params))
+        self.gate
+            .run(
+                &method,
+                async {
+                    Box::pin(self.core.call(&method, &params))
+                        .await
+                        .map(|json| Box::<str>::from(json).into_string())
+                        .map_err(|error| js_err(&error))
+                },
+                || async {
+                    Box::pin(self.core.call("session.active_session", &params))
+                        .await
+                        .map(|json| Box::<str>::from(json).into_string())
+                        .map_err(|error| js_err(&error))
+                },
+                String::as_str,
+                || js_err(&RpcError::Unavailable),
+            )
             .await
-            .map(|json| Box::<str>::from(json).into_string())
-            .map_err(|error| js_err(&error))
     }
 
     /// Stops syncing and refuses further calls, before another worker takes the stores.

@@ -23,9 +23,8 @@ use matrix_sdk_ui::{
 };
 
 use crate::protocol::{
-    MembershipChangeView, MentionView, PerMessageProfileView, ReactionGroup, SendBlockView,
-    SendStateView, TimelineItemContentView, TimelineItemView, TimelineRowKind, TimelineVisibility,
-    UploadProgressView,
+    MentionView, PerMessageProfileView, ReactionGroup, SendBlockView, SendStateView,
+    TimelineItemContentView, TimelineItemView, UploadProgressView,
 };
 
 use super::content::{content, raw_formatted_body};
@@ -243,76 +242,6 @@ fn replaced_event(content: &serde_json::Value) -> Option<OwnedEventId> {
         return None;
     }
     OwnedEventId::try_from(relation.get("event_id")?.as_str()?).ok()
-}
-
-impl TimelineItemContentView {
-    #[must_use]
-    pub const fn row_kind(&self) -> TimelineRowKind {
-        match self {
-            Self::Message { .. }
-            | Self::Image { .. }
-            | Self::Video { .. }
-            | Self::Audio { .. }
-            | Self::File { .. }
-            | Self::Sticker { .. }
-            | Self::Gallery { .. }
-            | Self::Location { .. }
-            | Self::LiveLocation { .. }
-            | Self::Poll { .. }
-            | Self::Redacted { .. }
-            | Self::UnableToDecrypt { .. } => TimelineRowKind::Message,
-            Self::DateDivider { .. } | Self::ReadMarker | Self::TimelineStart => {
-                TimelineRowKind::Annotation
-            }
-            Self::CallInvite
-            | Self::VerificationRequest
-            | Self::Cute { .. }
-            | Self::Malformed { .. }
-            | Self::Membership { .. }
-            | Self::ProfileChange { .. }
-            | Self::StateEvent { .. }
-            | Self::HiddenEvent { .. }
-            | Self::Unsupported { .. } => TimelineRowKind::Event,
-        }
-    }
-
-    #[must_use]
-    pub const fn forwardable(&self) -> bool {
-        matches!(
-            self,
-            Self::Message { .. }
-                | Self::Image { .. }
-                | Self::Video { .. }
-                | Self::Audio { .. }
-                | Self::File { .. }
-                | Self::Sticker { .. }
-                | Self::Location { .. }
-                | Self::Gallery { .. }
-        )
-    }
-
-    #[must_use]
-    pub const fn visibility(&self) -> TimelineVisibility {
-        match self {
-            Self::Membership {
-                change: MembershipChangeView::Other,
-                ..
-            } => TimelineVisibility::MembershipOther,
-            Self::Membership { .. } => TimelineVisibility::Membership,
-            Self::ProfileChange { .. } => TimelineVisibility::ProfileChange,
-            Self::Redacted { .. } => TimelineVisibility::Tombstone,
-            Self::StateEvent { change: None, .. } | Self::HiddenEvent { .. } => {
-                TimelineVisibility::Hidden
-            }
-            _ => TimelineVisibility::Always,
-        }
-    }
-
-    #[must_use]
-    pub const fn redactable(&self) -> bool {
-        !matches!(self, Self::Redacted { .. })
-            && !matches!(self.row_kind(), TimelineRowKind::Annotation)
-    }
 }
 
 #[must_use]

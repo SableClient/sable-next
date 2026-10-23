@@ -159,7 +159,7 @@ mod tests {
         let mut cache = HashMap::from([(kept.to_owned(), info()), (gone.to_owned(), info())]);
         let mut rows = RoomListRows::default();
         rows.apply(&VectorDiff::Reset {
-            values: vec![summary(kept, &rules), summary(gone, &rules)],
+            values: vec![summary(kept, &rules), summary(gone, &rules)].into(),
         });
 
         rows.apply(&VectorDiff::Remove { index: 1 });
@@ -177,7 +177,8 @@ mod tests {
             values: vec![
                 summary(room_id!("!busy:example.org"), &rules),
                 summary(quiet, &rules),
-            ],
+            ]
+            .into(),
         });
 
         let rules = muted(&rules, quiet);

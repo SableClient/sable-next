@@ -13,6 +13,9 @@ export type AnimalIdentityView = {
 	animal_need: string | null,
 };
 
+/**  `epoch` is the account the event belongs to. Replies of an old epoch arrive as `Lost`. */
+export type AppEvent = { type: "patch"; sub: SubId; rev: number; epoch: number; ops: Op[] } | { type: "reply"; req: ReqId; epoch: number; outcome: Outcome } | { type: "notice"; slice: string; notice: unknown; epoch: number } | { type: "resync"; sub: SubId; epoch: number };
+
 export type ArgumentDraft = boolean | string[] | string;
 
 export type ArgumentError = "required" | "invalid";
@@ -48,6 +51,12 @@ export type AvatarChangeView = {
 export type AvatarEditView = { kind: "keep" } | { kind: "clear" } | { kind: "url"; url: string } |
 /**  Encrypted in the webview with the account data key in hand. */
 { kind: "encrypted"; file: unknown };
+
+/**  Apply its events together, in order, before the UI draws. */
+export type Batch = {
+	tick: number,
+	events: AppEvent[],
+};
 
 export type BookmarkView = {
 	bookmark_id: string,
@@ -211,7 +220,7 @@ export type CoreEvent = ({ type: "account_lock_changed"; account_id: string; loc
 	type: "sync_status",
 } & SyncStatus | ({ type: "session_ended"; reason: string }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; diffs?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; subscription?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "session_tokens_refreshed" }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; diffs?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; subscription?: never; total?: never; user_id?: never; user_ids?: never } |
 /**  One batch is one render, so it stays batched all the way to the UI. */
-({ type: "room_list_diff"; subscription: SubscriptionId; diffs: VectorDiff<RoomListItemView>[] }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "timeline_diff"; subscription: SubscriptionId; diffs: VectorDiff<TimelineItemView>[] }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "timeline_pagination"; subscription: SubscriptionId; loading: boolean; reached_start: boolean }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; diffs?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "timeline_aggregations"; subscription: SubscriptionId; items: TimelineItemView[] }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; diffs?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } |
+({ type: "room_list_diff"; subscription: SubscriptionId; diffs: VectorDiffWire<RoomListItemView>[] }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "timeline_diff"; subscription: SubscriptionId; diffs: VectorDiffWire<TimelineItemView>[] }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "timeline_pagination"; subscription: SubscriptionId; loading: boolean; reached_start: boolean }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; diffs?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "timeline_aggregations"; subscription: SubscriptionId; items: TimelineItemView[] }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; diffs?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } |
 /**
  *  Our own user excluded. Absolute, so an empty list replaces the previous
  *  one. Sent for every joined room, since a room list row shows it too.
@@ -349,6 +358,11 @@ export type GalleryAttachmentView = {
 export type GalleryItemView = { kind: "image"; filename: string; caption: string | null; source: string; mime: string | null; width: number | null; height: number | null; size: number | null; blurhash: string | null; thumbnail: string | null; spoiler: string | null } | { kind: "video"; filename: string; caption: string | null; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; thumbnail: string | null; spoiler: string | null } | { kind: "audio"; filename: string; caption: string | null; source: string; mime: string | null; duration_ms: number | null; waveform: number[] | null } | { kind: "file"; filename: string; caption: string | null; source: string; mime: string | null; size: number | null };
 
 export type GestureView = "hug" | "cuddle" | "wave" | "poke" | "headpat";
+
+export type Handshake = {
+	schema: string,
+	slices: string[],
+};
 
 export type HierarchyRoom = {
 	room: HierarchyRoomView,
@@ -539,6 +553,8 @@ export type LoginFlowsView = {
 
 export type LoginIdentifier = { kind: "user"; user: string } | { kind: "email"; address: string };
 
+export type LostReason = "epoch_changed" | "expired" | "instance_stopped";
+
 export type MatrixLink = { kind: "user"; user_id: string } | { kind: "room"; room_id: string } | { kind: "event"; room_id: string; event_id: string };
 
 /**  MSC4278. `None` means the event does not say. */
@@ -655,12 +671,16 @@ export type NotificationView = {
 	noisy: boolean | null,
 };
 
+export type Op = { op: "fields"; fields: { [key in string]: unknown } } | { op: "list"; field: string; diffs: VectorDiffWire<unknown>[] };
+
 export type OpenIdTokenView = {
 	access_token: string,
 	token_type: string,
 	matrix_server_name: string,
 	expires_in_ms: number,
 };
+
+export type Outcome = { status: "ok"; value: unknown } | { status: "error"; error: ReplyError };
 
 export type Outgoing = {
 	thread_root: string | null,
@@ -1070,6 +1090,8 @@ export type RelationsView = {
 	prev_batch: string | null,
 };
 
+export type ReplyError = { kind: "rpc"; error: RpcError } | { kind: "encode" } | { kind: "lost"; reason: LostReason };
+
 /**  What a quoted event was, when it has no body to show. */
 export type ReplyFallbackView = { kind: "redacted" } | { kind: "reaction"; key: string } | { kind: "redaction" } | { kind: "verification_request" } | { kind: "event"; event_type: string };
 
@@ -1086,6 +1108,8 @@ export type ReplyView = {
 	/**  Set instead of `body` when the replied-to event has none to show. */
 	fallback: ReplyFallbackView | null,
 };
+
+export type ReqId = number;
 
 export type ResolvedQuery = {
 	filter: SearchFilter,
@@ -1552,6 +1576,12 @@ export type SlashInvocation = { command: "bug_report" } | { command: "gif_search
 
 export type SlashParse = { kind: "none" } | { kind: "literal"; body: string } | { kind: "unknown"; name: string } | { kind: "usage"; name: string; developer_only: boolean } | { kind: "command"; name: string; developer_only: boolean; invocation: SlashInvocation };
 
+export type Snapshot = {
+	rev: number,
+	epoch: number,
+	state: unknown,
+};
+
 export type SpaceChildEdge = {
 	room_id: string,
 	via: string[],
@@ -1610,9 +1640,25 @@ export type StatusView = {
 	emoji: string | null,
 };
 
+export type SubId = number;
+
+export type SubscribeRequest = {
+	window?: Window | null,
+} & Target;
+
+export type Subscribed = {
+	sub: SubId,
+	snapshot: Snapshot,
+};
+
 export type SubscriptionId = number;
 
 export type SyncStatus = { state: "offline" } | { state: "syncing" } | { state: "live" } | { state: "error"; message: string };
+
+export type Target = {
+	slice: string,
+	key: unknown,
+};
 
 export type TargetSuggestion = {
 	label: string,
@@ -1856,11 +1902,25 @@ export type UserSecurityView = {
 
 export type UtdCauseView = "unknown" | "sent_before_we_joined" | "verification_violation" | "unsigned_device" | "unknown_device" | "historical_message_backup_disabled" | "historical_message_device_unverified" | "withheld_for_unverified_or_insecure_device" | "withheld_by_sender";
 
-/**
- *  Mirrors `eyeball_im::VectorDiff`, which is not `Type` and whose `Vector<T>`
- *  has to flatten to a plain array on the wire.
- */
-export type VectorDiff<T> = { op: "append"; values: T[] } | { op: "clear" } | { op: "push_front"; value: T } | { op: "push_back"; value: T } | { op: "pop_front" } | { op: "pop_back" } | { op: "insert"; index: number; value: T } | { op: "set"; index: number; value: T } | { op: "remove"; index: number } | { op: "truncate"; length: number } | { op: "reset"; values: T[] };
+export type VectorDiffWire<T> = ({ Append: {
+	values: T[],
+} }) & { Clear?: never; Insert?: never; PopBack?: never; PopFront?: never; PushBack?: never; PushFront?: never; Remove?: never; Reset?: never; Set?: never; Truncate?: never } | ({ Clear: Record<string, never> }) & { Append?: never; Insert?: never; PopBack?: never; PopFront?: never; PushBack?: never; PushFront?: never; Remove?: never; Reset?: never; Set?: never; Truncate?: never } | ({ PushFront: {
+	value: T,
+} }) & { Append?: never; Clear?: never; Insert?: never; PopBack?: never; PopFront?: never; PushBack?: never; Remove?: never; Reset?: never; Set?: never; Truncate?: never } | ({ PushBack: {
+	value: T,
+} }) & { Append?: never; Clear?: never; Insert?: never; PopBack?: never; PopFront?: never; PushFront?: never; Remove?: never; Reset?: never; Set?: never; Truncate?: never } | ({ PopFront: Record<string, never> }) & { Append?: never; Clear?: never; Insert?: never; PopBack?: never; PushBack?: never; PushFront?: never; Remove?: never; Reset?: never; Set?: never; Truncate?: never } | ({ PopBack: Record<string, never> }) & { Append?: never; Clear?: never; Insert?: never; PopFront?: never; PushBack?: never; PushFront?: never; Remove?: never; Reset?: never; Set?: never; Truncate?: never } | ({ Insert: {
+	index: number,
+	value: T,
+} }) & { Append?: never; Clear?: never; PopBack?: never; PopFront?: never; PushBack?: never; PushFront?: never; Remove?: never; Reset?: never; Set?: never; Truncate?: never } | ({ Set: {
+	index: number,
+	value: T,
+} }) & { Append?: never; Clear?: never; Insert?: never; PopBack?: never; PopFront?: never; PushBack?: never; PushFront?: never; Remove?: never; Reset?: never; Truncate?: never } | ({ Remove: {
+	index: number,
+} }) & { Append?: never; Clear?: never; Insert?: never; PopBack?: never; PopFront?: never; PushBack?: never; PushFront?: never; Reset?: never; Set?: never; Truncate?: never } | ({ Truncate: {
+	length: number,
+} }) & { Append?: never; Clear?: never; Insert?: never; PopBack?: never; PopFront?: never; PushBack?: never; PushFront?: never; Remove?: never; Reset?: never; Set?: never } | ({ Reset: {
+	values: T[],
+} }) & { Append?: never; Clear?: never; Insert?: never; PopBack?: never; PopFront?: never; PushBack?: never; PushFront?: never; Remove?: never; Set?: never; Truncate?: never };
 
 export type VerificationStateView = "unknown" | "verified" | "unverified";
 
@@ -1929,6 +1989,11 @@ export type WebPusherView = {
 	endpoint: string,
 	auth: string,
 	event_id_only: boolean,
+};
+
+export type Window = {
+	start: number,
+	end: number,
 };
 
 export type ZonedInstant = {
@@ -3004,6 +3069,7 @@ export type Rpc = {
   };
   session: {
     restore: (params?: Record<string, never>) => Promise<SessionInfo | null>;
+    activeSession: (params?: Record<string, never>) => Promise<SessionInfo | null>;
     listAccounts: (params?: Record<string, never>) => Promise<SessionInfo[]>;
     switchAccount: (params: {
 	account_id: string,
@@ -3495,6 +3561,7 @@ export type RpcMethods = {
   'search.coverage': Rpc['search']['coverage'];
   'search.metrics': Rpc['search']['metrics'];
   'session.restore': Rpc['session']['restore'];
+  'session.active_session': Rpc['session']['activeSession'];
   'session.list_accounts': Rpc['session']['listAccounts'];
   'session.switch_account': Rpc['session']['switchAccount'];
   'session.remove_account': Rpc['session']['removeAccount'];
@@ -3827,6 +3894,7 @@ export function createRpc(call: RpcCall): Rpc {
     },
     session: {
       restore: (params = {}) => call('session.restore', params) as ReturnType<Rpc['session']['restore']>,
+      activeSession: (params = {}) => call('session.active_session', params) as ReturnType<Rpc['session']['activeSession']>,
       listAccounts: (params = {}) => call('session.list_accounts', params) as ReturnType<Rpc['session']['listAccounts']>,
       switchAccount: (params) => call('session.switch_account', params) as ReturnType<Rpc['session']['switchAccount']>,
       removeAccount: (params) => call('session.remove_account', params) as ReturnType<Rpc['session']['removeAccount']>,
@@ -3893,3 +3961,5 @@ export function createRpc(call: RpcCall): Rpc {
   };
 }
 
+
+export const WIRE_SCHEMA = 'f3d9ab5374809f1f';

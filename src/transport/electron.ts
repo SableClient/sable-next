@@ -3,6 +3,7 @@ import { on } from 'svelte/events';
 
 import type { Transport } from './index';
 import { createWebTransport, type CoreConnection } from './web';
+import { createWebLink } from './web-runtime';
 import { resetWebStorage } from '#lib/platform/session-storage.js';
 
 function openNativeCore(): CoreConnection {
@@ -23,6 +24,24 @@ function openNativeCore(): CoreConnection {
     retire() {},
     copiesBuffers: true,
   };
+}
+
+export function createNativeLink() {
+  return createWebLink(() => ({
+    handOver: (port) => {
+      window.postMessage('sable-runtime-connect', window.location.origin, [port]);
+    },
+    onFailure: (handler) => {
+      const release = on(window, 'message', (event) => {
+        if (event.source !== window) return;
+        const exit = (event.data as { sableCoreExit?: unknown } | null)?.sableCoreExit;
+        if (typeof exit !== 'string') return;
+        release();
+        handler(exit);
+      });
+    },
+    retire() {},
+  }));
 }
 
 export function createElectronTransport(): Transport {

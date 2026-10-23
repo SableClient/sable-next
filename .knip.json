@@ -4,6 +4,7 @@
     ".": {
       "entry": [
         "scripts/**/*.mjs",
+        "crates/sable-node/tests/native-lifecycle.mjs",
         "tests/fixtures/generate-v1-crypto.mjs",
         "tests/e2e/global.setup.ts",
         "tests/e2e/global.teardown.ts"
@@ -12,7 +13,8 @@
         "config": [
           "playwright.config.ts",
           "tests/e2e/playwright.preload.config.ts",
-          "tests/e2e/playwright.migration.config.ts"
+          "tests/e2e/playwright.migration.config.ts",
+          "tests/e2e/playwright.runtime.config.ts"
         ]
       },
       "ignoreDependencies": [

@@ -1,0 +1,54 @@
+[package]
+name = "sable-runtime"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+typegen = ["dep:specta", "dep:specta-typescript", "sable-protocol/typegen"]
+testing = ["tokio/test-util"]
+
+[dependencies]
+sable-protocol = { path = "../sable-protocol", version = "0.1.0" }
+async-trait = "0.1"
+futures-util = { workspace = true }
+eyeball-im = { version = "0.9.1", features = ["serde"] }
+eyeball-im-util = "0.11.0"
+imbl = "7.0.2"
+serde = { workspace = true }
+serde_json = { workspace = true, features = ["raw_value"] }
+specta = { workspace = true, optional = true }
+specta-typescript = { workspace = true, optional = true }
+thiserror = { workspace = true }
+tokio = { version = "1", default-features = false, features = ["sync"] }
+tracing = { workspace = true }
+jiff = { version = "0.2.38", default-features = false, features = ["std"] }
+n0-future = "0.3.2"
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+tokio = { version = "1", default-features = false, features = ["sync", "rt", "time"] }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+jiff = { version = "0.2.38", default-features = false, features = ["std", "js"] }
+
+[dev-dependencies]
+proptest = "1.12"
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time", "test-util"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["registry"] }
+
+[[test]]
+name = "event_routing"
+required-features = ["testing"]
+
+[[test]]
+name = "journeys"
+required-features = ["testing"]
+
+[[test]]
+name = "lifecycle"
+required-features = ["testing"]
+
+[lints]
+workspace = true

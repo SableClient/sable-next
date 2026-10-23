@@ -122,6 +122,7 @@ test('removes the rebuildable stores but keeps the session, crypto stores and se
     'sable-next-account-a1::matrix-sdk-state',
     'sable-next-account-a1::event_cache',
     'sable-next-account-a1::media',
+    'sable-next-account-a1::snapshots',
     'sable-next-account-a1::sable-search',
     'sable-next-account-a1::matrix-sdk-crypto',
     'sable-next-account-a1::matrix-sdk-crypto-meta',
@@ -134,6 +135,7 @@ test('removes the rebuildable stores but keeps the session, crypto stores and se
     'sable-next-account-a1',
     'sable-next-account-a1::event_cache',
     'sable-next-account-a1::media',
+    'sable-next-account-a1::snapshots',
   ]);
 });
 
@@ -162,9 +164,11 @@ test('derives every account store when database listing is unavailable', async (
     'sable-next',
     'sable-next::event_cache',
     'sable-next::media',
+    'sable-next::snapshots',
     'sable-next-account-a1',
     'sable-next-account-a1::event_cache',
     'sable-next-account-a1::media',
+    'sable-next-account-a1::snapshots',
   ]);
 });
 
@@ -220,6 +224,7 @@ test('deletes every store of the signed-out account, crypto included', async () 
     'sable-next-account-a1::matrix-sdk-state',
     'sable-next-account-a1::event_cache',
     'sable-next-account-a1::media',
+    'sable-next-account-a1::snapshots',
     'sable-next-account-a1::sable-search',
     'sable-next-account-a1::matrix-sdk-crypto',
     'sable-next-account-a1::matrix-sdk-crypto-meta',
@@ -234,6 +239,7 @@ test('deletes every store of the signed-out account, crypto included', async () 
     'sable-next-account-a1::matrix-sdk-state',
     'sable-next-account-a1::event_cache',
     'sable-next-account-a1::media',
+    'sable-next-account-a1::snapshots',
     'sable-next-account-a1::sable-search',
     'sable-next-account-a1::matrix-sdk-crypto',
     'sable-next-account-a1::matrix-sdk-crypto-meta',
@@ -250,6 +256,7 @@ test('derives the account stores when database listing is unavailable', async ()
     'sable-next-account-a1::matrix-sdk-state',
     'sable-next-account-a1::event_cache',
     'sable-next-account-a1::media',
+    'sable-next-account-a1::snapshots',
     'sable-next-account-a1::sable-search',
     'sable-next-account-a1::matrix-sdk-crypto',
     'sable-next-account-a1::matrix-sdk-crypto-meta',

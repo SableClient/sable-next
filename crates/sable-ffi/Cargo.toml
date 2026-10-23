@@ -1,0 +1,32 @@
+[package]
+name = "sable-ffi"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+demo = []
+
+[dependencies]
+tokio = { version = "1", default-features = false, features = ["sync"] }
+sable-protocol = { path = "../sable-protocol", version = "0.1.0" }
+sable-runtime = { path = "../sable-runtime", version = "0.1.0" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+async-trait = "0.1"
+atomic-write-file = "0.3.1"
+fnv = "1.0.7"
+tokio = { version = "1", default-features = false, features = ["rt", "fs"] }
+
+[dev-dependencies]
+tempfile = "3"
+futures-executor = "0.3"
+sable-runtime = { path = "../sable-runtime", version = "0.1.0", features = ["testing"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time"] }
+
+[lints]
+workspace = true

@@ -211,6 +211,8 @@ async function serveApp(request: Request): Promise<Response> {
 let mainWindow: BrowserWindow | null = null;
 let core: UtilityProcess | null = null;
 let quitting = false;
+let coreStopped = false;
+const CORE_STOP_LIMIT_MS = 5_000;
 let pageListening = false;
 let savedWindowState = readWindowState(windowStatePath);
 
@@ -296,6 +298,20 @@ ipcMain.on('sable-deep-links-listening', (event) => {
   if (isAppFrame(event.senderFrame)) pageListening = true;
 });
 
+/** The core host saves what the runtime holds as it stops, so it must be asked before it is killed. */
+function stopCore(child: UtilityProcess): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, CORE_STOP_LIMIT_MS);
+    const done = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    child.once('message', done);
+    child.once('exit', done);
+    child.postMessage('stop');
+  });
+}
+
 function startCore(): UtilityProcess {
   const child = utilityProcess.fork(join(__dirname, 'core-host.cjs'), [], {
     serviceName: 'Sable Core',
@@ -375,11 +391,16 @@ ipcMain.on('sable-window-toggle-maximize', (event) => {
 ipcMain.on('sable-window-close', (event) => windowOf(event)?.close());
 ipcMain.handle('sable-window-is-maximized', (event) => windowOf(event)?.isMaximized() ?? false);
 
-ipcMain.on('sable-core-connect', (event) => {
-  if (event.ports.length !== 1 || !isAppFrame(event.senderFrame)) return;
-  core ??= startCore();
-  core.postMessage('connect', event.ports);
-});
+for (const [channel, kind] of [
+  ['sable-core-connect', 'connect'],
+  ['sable-runtime-connect', 'runtime'],
+] as const) {
+  ipcMain.on(channel, (event) => {
+    if (event.ports.length !== 1 || !isAppFrame(event.senderFrame)) return;
+    core ??= startCore();
+    core.postMessage(kind, event.ports);
+  });
+}
 
 function createWindow(): BrowserWindow {
   const restored = savedWindowState
@@ -668,6 +689,15 @@ if (!app.requestSingleInstanceLock()) {
     if (mainWindow && !mainWindow.isDestroyed()) rememberWindowState(mainWindow);
     persistWindowState();
     desktopTray.destroy();
+  });
+
+  app.on('before-quit', (event) => {
+    if (!core || coreStopped) return;
+    event.preventDefault();
+    coreStopped = true;
+    void stopCore(core).then(() => {
+      app.quit();
+    });
   });
 
   app.on('window-all-closed', () => {

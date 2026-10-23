@@ -6,7 +6,13 @@ const V1_MIGRATION_KEY = 'v1-migrated';
 
 const APP_DATABASE_PREFIX = 'sable-next';
 const ACCOUNT_STORE_INFIX = '-account-';
-const CACHE_DATABASE_SUFFIXES = ['', '::matrix-sdk-state', '::event_cache', '::media'];
+const CACHE_DATABASE_SUFFIXES = [
+  '',
+  '::matrix-sdk-state',
+  '::event_cache',
+  '::media',
+  '::snapshots',
+];
 const SEARCH_DATABASE_SUFFIX = '::sable-search';
 const STATE_DATABASE_SUFFIX = '::matrix-sdk-state';
 const SEARCH_KEY_PREFIX = 'sable.search.';

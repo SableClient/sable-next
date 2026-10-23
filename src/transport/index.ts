@@ -4,6 +4,7 @@ import type {
   CoreEvent,
   PerMessageProfileView,
 } from '#src/generated/protocol';
+import type { VectorDiffWire } from '#src/generated/protocol';
 
 export type AttachmentThumbnail = {
   bytes: Uint8Array<ArrayBuffer>;
@@ -97,58 +98,21 @@ export interface Transport {
   close(): void;
 }
 
-/** Applies a batch of diffs to a local array. The only Matrix state the UI owns. */
-export function applyDiffs<T>(current: readonly T[], diffs: readonly Diff<T>[]): T[] {
+/** Applies a batch of typed VectorDiffs to a local array. The only Matrix state the UI owns. */
+export function applyDiffs<T>(current: readonly T[], diffs: readonly VectorDiffWire<T>[]): T[] {
   const next = [...current];
   for (const diff of diffs) {
-    switch (diff.op) {
-      case 'append':
-        next.push(...diff.values);
-        break;
-      case 'clear':
-        next.length = 0;
-        break;
-      case 'push_front':
-        next.unshift(diff.value);
-        break;
-      case 'push_back':
-        next.push(diff.value);
-        break;
-      case 'pop_front':
-        next.shift();
-        break;
-      case 'pop_back':
-        next.pop();
-        break;
-      case 'insert':
-        next.splice(diff.index, 0, diff.value);
-        break;
-      case 'set':
-        next[diff.index] = diff.value;
-        break;
-      case 'remove':
-        next.splice(diff.index, 1);
-        break;
-      case 'truncate':
-        next.length = diff.length;
-        break;
-      case 'reset':
-        next.splice(0, next.length, ...diff.values);
-        break;
-    }
+    if ('Clear' in diff) next.length = 0;
+    else if ('PopFront' in diff) next.shift();
+    else if ('PopBack' in diff) next.pop();
+    else if ('Append' in diff && diff.Append) next.push(...diff.Append.values);
+    else if ('PushFront' in diff && diff.PushFront) next.unshift(diff.PushFront.value);
+    else if ('PushBack' in diff && diff.PushBack) next.push(diff.PushBack.value);
+    else if ('Insert' in diff && diff.Insert) next.splice(diff.Insert.index, 0, diff.Insert.value);
+    else if ('Set' in diff && diff.Set) next[diff.Set.index] = diff.Set.value;
+    else if ('Remove' in diff && diff.Remove) next.splice(diff.Remove.index, 1);
+    else if ('Truncate' in diff && diff.Truncate) next.length = diff.Truncate.length;
+    else if ('Reset' in diff) next.splice(0, next.length, ...diff.Reset.values);
   }
   return next;
 }
-
-type Diff<T> =
-  | { op: 'append'; values: readonly T[] }
-  | { op: 'clear' }
-  | { op: 'push_front'; value: T }
-  | { op: 'push_back'; value: T }
-  | { op: 'pop_front' }
-  | { op: 'pop_back' }
-  | { op: 'insert'; index: number; value: T }
-  | { op: 'set'; index: number; value: T }
-  | { op: 'remove'; index: number }
-  | { op: 'truncate'; length: number }
-  | { op: 'reset'; values: readonly T[] };

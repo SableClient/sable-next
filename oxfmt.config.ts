@@ -12,6 +12,8 @@ export default {
     'vendor',
     'plugins/tauri-plugin-sable-push/permissions',
     'src/generated',
+    // Written by the runtime's wire golden test.
+    'tests/fixtures/wire',
     'src-tauri/icons',
     // Handlebars behind a .yml extension; oxfmt parses it as YAML and fails.
     'src-tauri/ios-project.yml',

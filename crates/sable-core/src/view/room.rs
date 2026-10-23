@@ -23,6 +23,7 @@ use crate::protocol::{
 };
 
 use super::diff::diff_values;
+use super::directory::room_state_view;
 use super::space::{kept_children, space_children};
 
 // Independent room capabilities.
@@ -91,7 +92,7 @@ pub fn room_list_item<S: BuildHasher>(
             // `m.room.encryption` is not loaded, so neither answer is honest.
             EncryptionState::Unknown => None,
         },
-        state: item.state().into(),
+        state: room_state_view(item.state()),
         is_tombstoned: info.is_some_and(|i| i.is_tombstoned),
         room_kind: RoomKind::from_room_type(item.room_type().as_ref()),
         call_participants: item.active_room_call_participants(),

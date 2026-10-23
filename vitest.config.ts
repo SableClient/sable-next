@@ -83,7 +83,6 @@ export default mergeConfig(
           ...mergeConfig(
             viteConfig,
             defineProject({
-              optimizeDeps: { include: ['katex'] },
               test: {
                 name: 'browser',
                 include: ['src/**/*.browser.test.ts', 'tests/e2e/fixtures/*.browser.test.ts'],

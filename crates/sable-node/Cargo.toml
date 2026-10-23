@@ -9,8 +9,14 @@ publish.workspace = true
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+demo = ["sable-ffi/demo"]
+
 [dependencies]
 sable-core = { path = "../sable-core", version = "0.1.0" }
+sable-ffi = { path = "../sable-ffi", version = "0.1.0" }
+sable-runtime = { path = "../sable-runtime", version = "0.1.0" }
+async-trait = "0.1"
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "tokio_rt"] }
 napi-derive = "3.6.12"
 serde_json = { workspace = true }

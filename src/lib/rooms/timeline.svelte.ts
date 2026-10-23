@@ -357,7 +357,7 @@ export class RoomTimeline {
         const before = this.items;
         const items = applyDiffs(before, event.diffs);
         this.items = items;
-        if (event.diffs.some((diff) => diff.op === 'clear' || diff.op === 'reset')) {
+        if (event.diffs.some((diff) => 'Clear' in diff || 'Reset' in diff)) {
           const oldest = items.find((item) => item.event_id !== null)?.timestamp ?? Infinity;
           this.aggregations = this.aggregations.filter((item) => item.timestamp >= oldest);
         }

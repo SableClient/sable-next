@@ -57,6 +57,9 @@ tauri-plugin-clipboard-manager = "2.4.1"
 # returns the keys a UnifiedPush distributor produces.
 tauri-plugin-notifications = { version = "0.5.0", git = "https://github.com/SableClient/tauri-plugin-notifications.git", rev = "8097a87cb78cc4bf47c819ed59be4080db319a97", default-features = false }
 sable-core = { path = "../crates/sable-core", version = "0.1.0" }
+sable-ffi = { path = "../crates/sable-ffi", version = "0.1.0" }
+sable-runtime = { path = "../crates/sable-runtime", version = "0.1.0" }
+async-trait = "0.1"
 tokio = { workspace = true }
 # default-features drags in reqwest and native-tls; ureq is a sync rustls
 # transport with no async runtime of its own.
@@ -171,6 +174,7 @@ objc2-photos = { version = "0.3.2", default-features = false, features = [
 default = ["wry", "geolocation"]
 wry = ["tauri/wry", "dep:webkit2gtk"]
 geolocation = ["dep:tauri-plugin-geolocation"]
+demo = ["sable-ffi/demo"]
 cef = [
   "dep:tauri-runtime-cef",
   "dep:winit",

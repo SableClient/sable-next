@@ -29,6 +29,7 @@ export default defineConfig({
           : true,
   },
   optimizeDeps: {
+    include: ['katex'],
     exclude: ['phosphor-svelte'],
   },
   resolve: {

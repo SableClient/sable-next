@@ -31,12 +31,15 @@ pub(crate) fn apply_diff<T: Clone>(items: &mut Vec<T>, diff: &VectorDiff<T>) {
             }
         }
         VectorDiff::Truncate { length } => items.truncate(*length),
-        VectorDiff::Reset { values } => values.clone_into(items),
+        VectorDiff::Reset { values } => {
+            items.clear();
+            items.extend(values.iter().cloned());
+        }
     }
 }
 
 #[must_use]
-pub fn map_diff<T, U>(
+pub fn map_diff<T, U: Clone>(
     diff: eyeball_im::VectorDiff<T>,
     mut map: impl FnMut(&T) -> U,
 ) -> VectorDiff<U> {

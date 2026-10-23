@@ -134,9 +134,10 @@ export interface CoreConnection {
   copiesBuffers?: true;
 }
 
-function openSharedWorker(): CoreConnection {
-  const adopted = prewarmed;
-  prewarmed = null;
+/** `adopt` takes the worker `prewarmWebWorker` opened, which only the core's transport should. */
+export function openSharedWorker(adopt = true): CoreConnection {
+  const adopted = adopt ? prewarmed : null;
+  if (adopt) prewarmed = null;
   const generation = adopted?.generation ?? readGeneration();
   const worker = adopted?.worker ?? openWorker(generation);
 

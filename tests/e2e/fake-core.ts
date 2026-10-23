@@ -703,59 +703,61 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             visibility: 'always',
           };
           return [...items.slice(0, 5), marker, ...items.slice(5, 10)].map((value, index) => ({
-            op: 'insert' as const,
-            index,
-            value,
+            Insert: { index, value },
           }));
         }
         case 'empty_room':
           return [];
         case 'endless_history':
           return Array.from({ length: 20 }, (_, index) => ({
-            op: 'insert',
-            index,
-            value: {
-              ...first,
-              id: `endless-${String(page)}-${String(index)}`,
-              event_id: `$endless-${String(page)}-${String(index)}:example.test`,
-              timestamp: 1_600_000_000_000 + page * 100 + index,
-              content: messageContent(
-                `Endless ${String(page)}-${String(index)} ${'wraps and wraps '.repeat((index % 5) * 4)}`
-              ),
+            Insert: {
+              index,
+              value: {
+                ...first,
+                id: `endless-${String(page)}-${String(index)}`,
+                event_id: `$endless-${String(page)}-${String(index)}:example.test`,
+                timestamp: 1_600_000_000_000 + page * 100 + index,
+                content: messageContent(
+                  `Endless ${String(page)}-${String(index)} ${'wraps and wraps '.repeat((index % 5) * 4)}`
+                ),
+              },
             },
           }));
         case 'delayed_history':
           return items.slice(0, -1).map((value, index) => ({
-            op: 'insert',
-            index,
-            value: {
-              ...value,
-              id: `delayed-older-${String(index)}`,
-              event_id: `$delayed-older-${String(index)}:example.test`,
-              content: messageContent(`Delayed older ${String(index)}`),
+            Insert: {
+              index,
+              value: {
+                ...value,
+                id: `delayed-older-${String(index)}`,
+                event_id: `$delayed-older-${String(index)}:example.test`,
+                content: messageContent(`Delayed older ${String(index)}`),
+              },
             },
           }));
         case 'delayed_pagination':
           return Array.from({ length: 20 }, (_, index) => ({
-            op: 'insert',
-            index: index + 1,
-            value: {
-              ...first,
-              id: `${roomName.toLowerCase()}-history-${String(page)}-${String(index)}`,
-              event_id: `$${roomName.toLowerCase()}-history-${String(page)}-${String(index)}`,
-              timestamp: 1_699_999_000_000 + index,
-              content: messageContent(`${roomName} history ${String(page)} ${String(index)}`),
+            Insert: {
+              index: index + 1,
+              value: {
+                ...first,
+                id: `${roomName.toLowerCase()}-history-${String(page)}-${String(index)}`,
+                event_id: `$${roomName.toLowerCase()}-history-${String(page)}-${String(index)}`,
+                timestamp: 1_699_999_000_000 + index,
+                content: messageContent(`${roomName} history ${String(page)} ${String(index)}`),
+              },
             },
           }));
         default:
           return [
             {
-              op: 'push_front',
-              value: {
-                ...first,
-                id: `${roomName.toLowerCase()}-history-${String(page)}`,
-                event_id: `$${roomName.toLowerCase()}-history-${String(page)}`,
-                content: messageContent(`${roomName} history ${String(page)}`),
+              PushFront: {
+                value: {
+                  ...first,
+                  id: `${roomName.toLowerCase()}-history-${String(page)}`,
+                  event_id: `$${roomName.toLowerCase()}-history-${String(page)}`,
+                  content: messageContent(`${roomName} history ${String(page)}`),
+                },
               },
             },
           ];
@@ -1338,14 +1340,15 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               subscription: params.subscription,
               diffs: [
                 {
-                  op: 'insert',
-                  index: 1,
-                  value: {
-                    ...timelineItems(roomName)[0],
-                    id: 'thread-reply-older',
-                    event_id: '$thread-reply-older:example.test',
-                    content: messageContent('Older thread reply'),
-                    thread_root: '$thread-root:example.test',
+                  Insert: {
+                    index: 1,
+                    value: {
+                      ...timelineItems(roomName)[0],
+                      id: 'thread-reply-older',
+                      event_id: '$thread-reply-older:example.test',
+                      content: messageContent('Older thread reply'),
+                      thread_root: '$thread-root:example.test',
+                    },
                   },
                 },
               ],
@@ -1363,7 +1366,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               subscription: params.subscription,
               diffs: items
                 .slice(state.oldest, previous)
-                .map((value, index) => ({ op: 'insert' as const, index, value })),
+                .map((value, index) => ({ Insert: { index, value } })),
             });
             return {
               direction: params.direction,
@@ -1383,9 +1386,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             port.emit({
               type: 'timeline_diff',
               subscription: params.subscription,
-              diffs: [
-                { op: 'append', values: items.slice(state.page * 20, (state.page + 1) * 20) },
-              ],
+              diffs: [{ Append: { values: items.slice(state.page * 20, (state.page + 1) * 20) } }],
             });
           }, 50);
           return { direction: params.direction, reached_end: state.page >= 3 };
@@ -1399,7 +1400,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           port.emit({
             type: 'timeline_diff',
             subscription: params.subscription,
-            diffs: [{ op: 'append', values }],
+            diffs: [{ Append: { values } }],
           });
           return { direction: params.direction, reached_end: false };
         }
@@ -1434,7 +1435,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             port.emit({
               type: 'timeline_diff',
               subscription: params.subscription,
-              diffs: values.map((value) => ({ op: 'push_back' as const, value })),
+              diffs: values.map((value) => ({ PushBack: { value } })),
             });
           }, 250);
           return { direction: params.direction, reached_end: page >= 16 };
@@ -1720,6 +1721,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     class FakePort {
       onmessage: ((event: MessageEvent) => void) | null = null;
       onmessageerror: ((event: MessageEvent) => void) | null = null;
+      claim: (() => void) | null = null;
 
       start(): void {}
 
@@ -1735,7 +1737,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         media?: { source: string; width: number; height: number };
         forget?: { source: string };
         reset?: true;
+        runtime?: true;
+        disconnect?: true;
       }): void {
+        if (request.runtime || request.disconnect) return;
+        this.claim?.();
         if (request.reset) {
           window.setTimeout(() => {
             this.onmessage?.({ data: { id: request.id, uri: null } } as MessageEvent);
@@ -1813,11 +1819,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             subscription,
             diffs: [
               {
-                op: 'set',
-                index: 19,
-                value: {
-                  ...last,
-                  content: messageContent(`Delayed layout event ${'wraps '.repeat(80)}`),
+                Set: {
+                  index: 19,
+                  value: {
+                    ...last,
+                    content: messageContent(`Delayed layout event ${'wraps '.repeat(80)}`),
+                  },
                 },
               },
             ],
@@ -1826,9 +1833,48 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       }
     }
 
+    function normalizeTestDiff(diff: unknown): unknown {
+      if (typeof diff !== 'object' || diff === null || !('op' in diff)) return diff;
+      const legacy = diff as Record<string, unknown>;
+      switch (legacy.op) {
+        case 'append':
+          return { Append: { values: legacy.values } };
+        case 'clear':
+          return { Clear: {} };
+        case 'push_front':
+          return { PushFront: { value: legacy.value } };
+        case 'push_back':
+          return { PushBack: { value: legacy.value } };
+        case 'pop_front':
+          return { PopFront: {} };
+        case 'pop_back':
+          return { PopBack: {} };
+        case 'insert':
+          return { Insert: { index: legacy.index, value: legacy.value } };
+        case 'set':
+          return { Set: { index: legacy.index, value: legacy.value } };
+        case 'remove':
+          return { Remove: { index: legacy.index } };
+        case 'truncate':
+          return { Truncate: { length: legacy.length } };
+        case 'reset':
+          return { Reset: { values: legacy.values } };
+        default:
+          return diff;
+      }
+    }
+
+    function normalizeTestEvent(event: unknown): unknown {
+      if (typeof event !== 'object' || event === null || !('type' in event)) return event;
+      const value = event as { type?: unknown; diffs?: unknown[] };
+      return value.type === 'timeline_diff' && Array.isArray(value.diffs)
+        ? { ...value, diffs: value.diffs.map(normalizeTestDiff) }
+        : event;
+    }
+
     Object.defineProperty(window, '__e2eEmitTimelineEvent', {
       configurable: true,
-      value: (event: unknown) => activePort?.emit(event as CoreEvent),
+      value: (event: unknown) => activePort?.emit(normalizeTestEvent(event) as CoreEvent),
     });
     function receiveMessage(body: string, own = false): void {
       const id = `live-arrival-${arrivals.length}`;
@@ -1847,7 +1893,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           activePort?.emit({
             type: 'timeline_diff',
             subscription,
-            diffs: [{ op: 'push_back', value: item }],
+            diffs: [{ PushBack: { value: item } }],
           });
         }
       }
@@ -1862,7 +1908,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         activePort?.emit({
           type: 'room_list_diff',
           subscription: 1,
-          diffs: [{ op: 'set', index: 0, value: summary({ ...room, unread: room.unread + 1 }) }],
+          diffs: [{ Set: { index: 0, value: summary({ ...room, unread: room.unread + 1 }) } }],
         }),
     });
 
@@ -1870,7 +1916,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       port = new FakePort();
 
       constructor() {
-        activePort = this.port;
+        this.port.claim = () => {
+          activePort = this.port;
+        };
       }
 
       addEventListener(): void {}

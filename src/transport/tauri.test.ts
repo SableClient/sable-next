@@ -1,18 +1,22 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 const invoke = vi.fn();
+const channels: { onmessage: ((events: unknown) => void) | null }[] = [];
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke,
   Channel: class {
     onmessage: ((events: unknown) => void) | null = null;
+    constructor() {
+      channels.push(this);
+    }
   },
 }));
 vi.mock('#lib/platform/session-storage.js', () => ({ resetWebStorage: () => Promise.resolve() }));
 const captureException = vi.fn();
 vi.mock('@sentry/sveltekit', () => ({ captureException }));
 
-const { createTauriTransport } = await import('./tauri');
+const { createTauriLink, createTauriTransport } = await import('./tauri');
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -140,4 +144,36 @@ test.each(['attachment', 'gallery'])('carries %s thumbnails as binary', async (k
   expect(bytes.slice(24, 29)).toEqual(new Uint8Array([1, 2, 255, 216, 255]));
   expect(decodeURIComponent(headersOf(call).request)).not.toContain('bytes');
   if (kind === 'gallery') expect(bytes.slice(29)).toEqual(bytes.slice(0, 29));
+});
+
+test('the runtime link connects its window first and then makes its calls', async () => {
+  invoke.mockReset();
+  invoke.mockResolvedValue({ schema: 's', slices: [] });
+  const link = createTauriLink();
+
+  await link.handshake();
+  await link.range(4, { start: 0, end: 10 });
+
+  expect(invoke.mock.calls.map((call) => String(call[0]))).toEqual([
+    'runtime_connect',
+    'runtime_handshake',
+    'runtime_range',
+  ]);
+  expect(invoke).toHaveBeenLastCalledWith('runtime_range', {
+    sub: 4,
+    range: { start: 0, end: 10 },
+  });
+});
+
+test('the runtime link delivers the batches of its channel and rejects with the error code', async () => {
+  invoke.mockReset();
+  invoke.mockResolvedValueOnce(undefined).mockRejectedValueOnce('unknown_sub');
+  const link = createTauriLink();
+  const heard = vi.fn();
+  link.onBatch(heard);
+
+  channels.at(-1)?.onmessage?.({ tick: 2, events: [] });
+
+  expect(heard).toHaveBeenCalledWith({ tick: 2, events: [] });
+  await expect(link.resync(9)).rejects.toThrow('unknown_sub');
 });

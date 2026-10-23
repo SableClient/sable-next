@@ -99,7 +99,7 @@ test('inbox counts follow badge defaults, and a mute silences it at once', async
     listener({
       type: 'room_list_diff',
       subscription: 1,
-      diffs: [{ op: 'set', index: 0, value: muted }],
+      diffs: [{ Set: { index: 0, value: muted } }],
     });
   }
   expect(countNotifications(roomList.rooms, roomList.badgeUnreadFor)).toBe(0);
@@ -131,7 +131,7 @@ test('clears a room avatar when a room-list diff supplies null', async () => {
   eventListeners[0]?.({
     type: 'room_list_diff',
     subscription: 1,
-    diffs: [{ op: 'set', index: 0, value: clearedRoom }],
+    diffs: [{ Set: { index: 0, value: clearedRoom } }],
   });
 
   expect(roomList.rooms[0]?.avatar_url).toBeNull();
@@ -293,7 +293,7 @@ test('a diff after an empty first answer replaces the painted snapshot rather th
   eventListeners[0]?.({
     type: 'room_list_diff',
     subscription: 1,
-    diffs: [{ op: 'append', values: [first, second] }],
+    diffs: [{ Append: { values: [first, second] } }],
   });
 
   expect(roomList.rooms.map((room) => room.room_id)).toEqual([first.room_id, second.room_id]);
@@ -330,7 +330,7 @@ test('waits for a room to be listed, and gives up after the timeout', async () =
   eventListeners[0]?.({
     type: 'room_list_diff',
     subscription: 1,
-    diffs: [{ op: 'append', values: [late] }],
+    diffs: [{ Append: { values: [late] } }],
   });
   await waiting;
 

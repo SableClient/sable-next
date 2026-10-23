@@ -30,6 +30,7 @@ vi.mock('@sentry/sveltekit', async () => {
 vi.mock('#lib/platform/telemetry.js', () => ({ syncTelemetryConsent: vi.fn() }));
 vi.mock('#lib/settings/preferences.svelte.js', () => ({ preferences: { errorReporting: true } }));
 vi.mock('#src/transport', () => ({ CoreError: class CoreError extends Error {} }));
+vi.mock('#src/transport/create', () => ({ prewarmTransport: vi.fn(), startRuntime: vi.fn() }));
 vi.mock('./worker/core.worker.ts?sharedworker&url', () => ({ default: 'core.worker.js' }));
 vi.mock('#src/generated/wasm/sable_wasm_version.js', () => ({ default: 'test-wasm-version' }));
 vi.mock('#lib/migrations/v1/migration.js', () => ({ migrateV1: vi.fn() }));

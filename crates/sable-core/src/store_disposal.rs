@@ -96,6 +96,7 @@ fn discard_databases(store_id: &str) -> Result<(), StoreError> {
         "::matrix-sdk-crypto-meta",
         "::event_cache",
         "::media",
+        "::snapshots",
         "::sable-search",
     ] {
         factory

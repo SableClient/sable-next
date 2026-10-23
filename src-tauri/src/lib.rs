@@ -31,6 +31,7 @@ pub mod permission_grants;
 mod portal_theme;
 #[cfg(desktop)]
 pub mod proxy;
+mod runtime;
 #[cfg(target_os = "linux")]
 pub mod screen_audio;
 mod sentry;
@@ -60,6 +61,7 @@ use sable_core::{
     Core,
     protocol::{CoreEvent, RpcError},
 };
+use sable_ffi::AccountGate;
 use tauri::{
     AppHandle, Manager, State,
     ipc::{Channel, InvokeBody, Request, Response},
@@ -74,6 +76,7 @@ use tauri::Wry as BrowserEngine;
 
 struct AppState {
     core: Arc<Core>,
+    gate: AccountGate,
     event_sink: Arc<EventSink>,
 }
 
@@ -125,7 +128,16 @@ async fn call(
     method: String,
     params: Box<serde_json::value::RawValue>,
 ) -> Result<Box<serde_json::value::RawValue>, RpcError> {
-    Box::pin(state.core.call(&method, params.get())).await
+    state
+        .gate
+        .run(
+            &method,
+            Box::pin(state.core.call(&method, params.get())),
+            || Box::pin(state.core.call("session.active_session", params.get())),
+            |json| json.get(),
+            || RpcError::Unavailable,
+        )
+        .await
 }
 
 #[tauri::command]
@@ -475,16 +487,20 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
         session_store(&data_dir),
     );
     let event_sink = Arc::new(EventSink::default());
+    let gate = AccountGate::default();
+    let runtime = runtime::Runtime::new(&core, &gate, &data_dir.to_string_lossy());
     #[cfg(target_os = "ios")]
-    follow_ios_lifecycle(&core);
+    follow_ios_lifecycle(&core, &runtime);
     #[cfg(mobile)]
     network::attach(&core);
     let pushing = core.clone();
     #[cfg(target_os = "android")]
     let _ = cold_push::CORE.set(core.clone());
-    tauri::async_runtime::spawn(restore_ahead_of_webview(core.clone()));
+    app.manage(runtime);
+    tauri::async_runtime::spawn(restore_ahead_of_webview(core.clone(), gate.clone()));
     app.manage(AppState {
         core,
+        gate,
         event_sink: event_sink.clone(),
     });
     spawn_event_pump(app.handle().clone(), pushing, events, event_sink);
@@ -558,24 +574,49 @@ fn update_mobile_activity(window: &tauri::Window<BrowserEngine>, event: &tauri::
         tauri::WindowEvent::Resumed => true,
         _ => return,
     };
-    if let Some(state) = window.try_state::<AppState>() {
-        set_mobile_activity(state.core.clone(), active, SYNC_STOP_DELAY);
+    if let (Some(state), Some(runtime)) = (
+        window.try_state::<AppState>(),
+        window.try_state::<runtime::Runtime>(),
+    ) {
+        set_mobile_activity(
+            state.core.clone(),
+            runtime.inner().clone(),
+            active,
+            SYNC_STOP_DELAY,
+        );
     }
 }
 
 #[cfg(target_os = "ios")]
-fn follow_ios_lifecycle(core: &Arc<Core>) {
+fn follow_ios_lifecycle(core: &Arc<Core>, runtime: &runtime::Runtime) {
+    let (core, runtime) = (core.clone(), runtime.clone());
     if ios::in_background() {
-        set_mobile_activity(core.clone(), false, std::time::Duration::ZERO);
+        set_mobile_activity(
+            core.clone(),
+            runtime.clone(),
+            false,
+            std::time::Duration::ZERO,
+        );
     }
-    let core = core.clone();
     ios::observe_lifecycle(move |change| match change {
-        ios::Lifecycle::ResignActive => set_mobile_activity(core.clone(), false, SYNC_STOP_DELAY),
+        ios::Lifecycle::ResignActive => {
+            set_mobile_activity(core.clone(), runtime.clone(), false, SYNC_STOP_DELAY);
+        }
         ios::Lifecycle::EnterBackground => {
-            set_mobile_activity(core.clone(), false, std::time::Duration::ZERO);
+            set_mobile_activity(
+                core.clone(),
+                runtime.clone(),
+                false,
+                std::time::Duration::ZERO,
+            );
         }
         ios::Lifecycle::BecomeActive => {
-            set_mobile_activity(core.clone(), true, std::time::Duration::ZERO);
+            set_mobile_activity(
+                core.clone(),
+                runtime.clone(),
+                true,
+                std::time::Duration::ZERO,
+            );
         }
     });
 }
@@ -592,14 +633,21 @@ fn session_store(data_dir: &std::path::Path) -> Box<dyn sable_core::store::Sessi
     Box::new(sable_core::store::ExclusiveFileSessionStore::new(data_dir))
 }
 
+/// Views are flushed first, as the OS may kill a backgrounded app.
 #[cfg(mobile)]
-fn set_mobile_activity(core: Arc<Core>, active: bool, stop_delay: std::time::Duration) {
+fn set_mobile_activity(
+    core: Arc<Core>,
+    runtime: runtime::Runtime,
+    active: bool,
+    stop_delay: std::time::Duration,
+) {
     core.set_app_active(active);
     core.record_app_activity(active);
     #[cfg(target_os = "ios")]
     let background_task = (!active).then(|| ios::BackgroundTask::begin("Pause sync"));
     tauri::async_runtime::spawn(async move {
         if !active {
+            runtime.flush().await;
             tokio::time::sleep(stop_delay).await;
         }
         core.apply_app_activity(active).await;
@@ -830,11 +878,18 @@ fn open_external_url(app: AppHandle<BrowserEngine>, url: String) -> Result<(), R
         .map_err(|_| RpcError::Unavailable)
 }
 
-async fn restore_ahead_of_webview(core: Arc<Core>) {
+async fn restore_ahead_of_webview(core: Arc<Core>, gate: AccountGate) {
     if !matches!(core.v1_migration_complete().await, Ok(true)) {
         return;
     }
-    if let Err(error) = Box::pin(core.run(sable_core::api::session::RestoreParams {})).await {
+    let restore = gate.run(
+        "session.restore",
+        Box::pin(core.call("session.restore", "{}")),
+        || Box::pin(core.call("session.active_session", "{}")),
+        |json| json.get(),
+        || RpcError::Unavailable,
+    );
+    if let Err(error) = restore.await {
         log::warn!("Early session restore failed: {error:?}");
     }
 }
@@ -1018,6 +1073,14 @@ pub fn run() {
             v1_migration::finish_v1_migration,
             v1_migration::skip_v1_migration,
             call,
+            runtime::runtime_connect,
+            runtime::runtime_handshake,
+            runtime::runtime_subscribe,
+            runtime::runtime_unsubscribe,
+            runtime::runtime_resync,
+            runtime::runtime_range,
+            runtime::runtime_dispatch,
+            runtime::runtime_request,
             subscribe_events,
             fetch_media,
             forget_media,
@@ -1108,10 +1171,21 @@ pub fn run() {
             return;
         }
     };
-    app.run(|app, event| {
-        if matches!(event, tauri::RunEvent::Exit) {
+    app.run(|app, event| match event {
+        tauri::RunEvent::Exit => {
             hang_up_before_exit(app);
+            stop_runtime_before_exit(app);
         }
+        tauri::RunEvent::WindowEvent {
+            label,
+            event: tauri::WindowEvent::Destroyed,
+            ..
+        } => {
+            if let Some(runtime) = app.try_state::<runtime::Runtime>() {
+                tauri::async_runtime::block_on(runtime.close(&label));
+            }
+        }
+        _ => {}
     });
 }
 
@@ -1128,6 +1202,18 @@ fn hang_up_before_exit(app: &AppHandle<BrowserEngine>) {
     });
     if ended.is_err() {
         log::warn!("calls were still hanging up when the app exited");
+    }
+}
+
+fn stop_runtime_before_exit(app: &AppHandle<BrowserEngine>) {
+    let Some(runtime) = app.try_state::<runtime::Runtime>() else {
+        return;
+    };
+    let stopped = tauri::async_runtime::block_on(async {
+        tokio::time::timeout(EXIT_HANGUP_TIMEOUT, runtime.shutdown()).await
+    });
+    if stopped.is_err() {
+        log::warn!("the runtime was still saving when the app exited");
     }
 }
 

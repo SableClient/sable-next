@@ -79,7 +79,11 @@ class FakeCore {
     this.emit({
       type: 'timeline_diff',
       subscription,
-      diffs: [{ op: direction === 'forward' ? 'push_back' : 'push_front', value: item('history') }],
+      diffs: [
+        direction === 'forward'
+          ? { PushBack: { value: item('history') } }
+          : { PushFront: { value: item('history') } },
+      ],
     });
     return Promise.resolve({ direction, reached_end: true });
   }
@@ -119,7 +123,7 @@ test('requests live context as part of its snapshot subscription', async () => {
   core.emit({
     type: 'timeline_diff',
     subscription: 1,
-    diffs: [{ op: 'push_back', value: item('live') }],
+    diffs: [{ PushBack: { value: item('live') } }],
   });
 
   expect(timeline.items.map((entry) => entry.id)).toEqual(['initial', 'live']);
@@ -142,14 +146,14 @@ test('a reload drops the aggregations older than what it kept, and a page brings
   core.emit({
     type: 'timeline_diff',
     subscription: 1,
-    diffs: [{ op: 'clear' }, { op: 'append', values: [at('kept', 20)] }],
+    diffs: [{ Clear: {} }, { Append: { values: [at('kept', 20)] } }],
   });
   expect(timeline.aggregations.map((entry) => entry.id)).toEqual(['new-reaction']);
 
   core.emit({
     type: 'timeline_diff',
     subscription: 1,
-    diffs: [{ op: 'push_front', value: at('page', 1) }],
+    diffs: [{ PushFront: { value: at('page', 1) } }],
   });
   core.emit({ type: 'timeline_aggregations', subscription: 1, items: [old] });
   expect(timeline.aggregations.map((entry) => entry.id)).toEqual(['new-reaction', 'old-reaction']);
@@ -286,7 +290,7 @@ test('returning from unread opens live at its latest messages without paging', a
   core.emit({
     type: 'timeline_diff',
     subscription: 3,
-    diffs: [{ op: 'push_back', value: item('next') }],
+    diffs: [{ PushBack: { value: item('next') } }],
   });
   expect(timeline.items.at(-1)?.id).toBe('next');
 });
@@ -523,7 +527,7 @@ test('a forward page is done when its command replies and its messages land afte
   core.emit({
     type: 'timeline_diff',
     subscription: 1,
-    diffs: [{ op: 'push_back', value: item('newer') }],
+    diffs: [{ PushBack: { value: item('newer') } }],
   });
   expect(timeline.items.at(-1)?.id).toBe('newer');
   await timeline.stop();
@@ -678,8 +682,8 @@ test('applies a delayed initial history diff after pagination settles', async ()
     type: 'timeline_diff',
     subscription: 1,
     diffs: [
-      { op: 'insert', index: 0, value: item('history-1') },
-      { op: 'insert', index: 1, value: item('history-2') },
+      { Insert: { index: 0, value: item('history-1') } },
+      { Insert: { index: 1, value: item('history-2') } },
     ],
   });
 
@@ -698,7 +702,7 @@ test('a live page is done when its command replies and its diff lands after', as
   core.emit({
     type: 'timeline_diff',
     subscription: 1,
-    diffs: [{ op: 'push_front', value: item('history') }],
+    diffs: [{ PushFront: { value: item('history') } }],
   });
   expect(timeline.items.map((entry) => entry.id)).toEqual(['history', 'initial']);
 });
@@ -754,7 +758,7 @@ test('a live page applies diffs that land before its reply', async () => {
   core.emit({
     type: 'timeline_diff',
     subscription: 1,
-    diffs: [{ op: 'push_front', value: item('history') }],
+    diffs: [{ PushFront: { value: item('history') } }],
   });
   expect(timeline.backwardPagination).toBe('loading');
 
@@ -895,7 +899,7 @@ test('a stale failed start cannot stop the active room subscription', async () =
   core.emit({
     type: 'timeline_diff',
     subscription: 2,
-    diffs: [{ op: 'push_back', value: item('live') }],
+    diffs: [{ PushBack: { value: item('live') } }],
   });
 
   expect(timeline.items.map((entry) => entry.id)).toEqual(['second', 'live']);
@@ -953,7 +957,7 @@ test('a diff that lands before the snapshot reply keeps later indices aligned', 
   core.emit({
     type: 'timeline_diff',
     subscription: 1,
-    diffs: [{ op: 'insert', index: 0, value: item('divider') }],
+    diffs: [{ Insert: { index: 0, value: item('divider') } }],
   });
   const response = core.responses.get('!room:example.org');
   if (!response) throw new Error('subscription was not created');
@@ -963,15 +967,12 @@ test('a diff that lands before the snapshot reply keeps later indices aligned', 
   core.emit({
     type: 'timeline_diff',
     subscription: 1,
-    diffs: [{ op: 'push_back', value: item('echo') }],
+    diffs: [{ PushBack: { value: item('echo') } }],
   });
   core.emit({
     type: 'timeline_diff',
     subscription: 1,
-    diffs: [
-      { op: 'remove', index: 2 },
-      { op: 'insert', index: 2, value: item('remote') },
-    ],
+    diffs: [{ Remove: { index: 2 } }, { Insert: { index: 2, value: item('remote') } }],
   });
 
   expect(timeline.items.map((entry) => entry.id)).toEqual(['divider', 'a', 'remote']);
@@ -1001,7 +1002,7 @@ test('a cleared timeline drops the start it had reached', async () => {
   await timeline.paginateBackward(25);
   expect(timeline.backwardPagination).toBe('end');
 
-  core.emit({ type: 'timeline_diff', subscription: 1, diffs: [{ op: 'clear' }] });
+  core.emit({ type: 'timeline_diff', subscription: 1, diffs: [{ Clear: {} }] });
 
   expect(timeline.items).toEqual([]);
   expect(timeline.backwardPagination).toBe('idle');
@@ -1021,7 +1022,7 @@ test('a clear mid-pagination discards the answer that pagination brings back', a
   const pagination = timeline.paginateBackward(25);
   expect(timeline.backwardPagination).toBe('loading');
 
-  core.emit({ type: 'timeline_diff', subscription: 1, diffs: [{ op: 'clear' }] });
+  core.emit({ type: 'timeline_diff', subscription: 1, diffs: [{ Clear: {} }] });
   expect(timeline.backwardPagination).toBe('idle');
 
   pending.settle({ direction: 'backward', reached_end: true });
@@ -1044,7 +1045,7 @@ test('a clear mid forward page discards its answer and leaves forward paging ret
   const pagination = timeline.paginateForward(25);
   expect(timeline.forwardPagination).toBe('loading');
 
-  core.emit({ type: 'timeline_diff', subscription: 1, diffs: [{ op: 'clear' }] });
+  core.emit({ type: 'timeline_diff', subscription: 1, diffs: [{ Clear: {} }] });
   expect(timeline.forwardPagination).toBe('idle');
 
   pending.settle({ direction: 'forward', reached_end: true });

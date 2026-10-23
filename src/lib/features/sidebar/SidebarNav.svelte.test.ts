@@ -213,7 +213,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
     listener({
       type: 'room_list_diff',
       subscription: 1,
-      diffs: [{ op: 'set', index: 0, value: incoming }],
+      diffs: [{ Set: { index: 0, value: incoming } }],
     });
   await tick();
 
@@ -239,7 +239,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
     listener({
       type: 'room_list_diff',
       subscription: 1,
-      diffs: [{ op: 'set', index: 0, value: withCounts({ ...incoming, unread: 0 }) }],
+      diffs: [{ Set: { index: 0, value: withCounts({ ...incoming, unread: 0 }) } }],
     });
   await tick();
 
@@ -274,7 +274,7 @@ test('keeps the rail order when a room-list reset reorders spaces', async () => 
     listener({
       type: 'room_list_diff',
       subscription: 1,
-      diffs: [{ op: 'reset', values: [beta, alpha] }],
+      diffs: [{ Reset: { values: [beta, alpha] } }],
     });
   }
   await tick();
