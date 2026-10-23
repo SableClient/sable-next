@@ -7411,6 +7411,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sable-ffi"
+version = "0.1.0"
+dependencies = [
+ "futures-executor",
+ "sable-protocol",
+ "sable-runtime",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+]
+
+[[package]]
 name = "sable-hdr"
 version = "0.1.0"
 dependencies = [
