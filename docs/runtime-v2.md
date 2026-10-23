@@ -120,6 +120,8 @@ A request ends exactly once, with one of:
   - `EpochChanged`: the account changed.
   - `InstanceStopped` or `InstanceFailed`: the instance went away.
 
+A reply is delivered whatever its epoch. A reply that reaches the outbox from an old epoch has already become `Lost(EpochChanged)`, so a shell that dropped old-epoch replies would leave its request waiting for ever.
+
 A shell that restarts its worker rejects its own pending requests.
 
 ## Ticks, epochs and accounts
@@ -135,12 +137,14 @@ Patches, replies, notices, resyncs and snapshots carry the account `epoch`.
 3. loses the old account's requests,
 4. tells every subscriber to resync.
 
-A reply that reaches the outbox from an old epoch becomes `Lost(EpochChanged)`. Patches, notices and resyncs from an old epoch are dropped.
+A reply that reaches the outbox from an old epoch becomes `Lost(EpochChanged)`, and is delivered (see Requests). Patches, notices and resyncs from an old epoch are dropped.
 
 Running effect tasks are not cancelled when their instance stops. Their results are discarded, but any call they already made still reaches the core. A shell must therefore:
 
 - call `switch_account` before the core starts serving the new account, and
 - either make the core reject calls for an account it has left, or hold the new backend back until `switch_account` returns.
+
+`AccountGate` in `sable-ffi` does the second for every shell. The runtime's calls to the core hold the gate for reading. `session.restore`, `session.switch_account` and `session.logout` hold it for writing, call the core, then call `switch_account` with the account id of the result (none after a logout) before they return. `changes_account` and `account_after` say which calls these are and to which account they lead.
 
 ## State, patches and windows
 
@@ -177,6 +181,13 @@ A slice with `PERSIST` gets its last saved view in `init`. It saves the view 2 s
 
 The slice decides how to read a saved view, with `Doc::from_cached` or `ListDoc::from_cached`. A saved view that no longer fits is ignored.
 
+`App::flush` writes the views that changed since their last write, now, and returns once they are written. Unlike `shutdown`, it leaves the instances running. A shell flushes when it may be killed without a warning: Tauri on mobile does it as the app goes to the background.
+
+Where a shell keeps the views:
+
+- Web: IndexedDB, in the worker, one database for each account (`sable-next-account-<id>::snapshots`). The existing cache reset and account removal delete them with the account's other databases.
+- Electron and Tauri: files in `snapshots` inside the account's data directory (`FileStorage`, `sable_core::session::snapshot_dir`). `session.reset_local_cache` deletes them, and removing the account deletes its directory.
+
 ## The wire and the handshake
 
 The UI and the runtime must be built from the same source.
@@ -187,9 +198,7 @@ The UI and the runtime must be built from the same source.
 
 On a mismatch, the shell does not try to keep running:
 
-- Web: reload the page. If the worker is the stale side, restart the worker. A tab loaded before an update reloads.
-- Several tabs: one shared worker owns the app, and each tab is a subscriber. The shell maps each `SubId` to its tab, sends a subscription's events to that tab, and sends a reply to the tab that asked. A tab that disagrees with the worker reloads.
-- Desktop (Tauri, Electron): the core and the UI ship together, so a mismatch means a broken install. Show the error and offer an update.
+- Web and desktop: the window reloads, once per session. A page loaded before an update reloads and meets a worker of its own build. If it still does not match after the reload, it logs the mismatch and stays.
 - React Native: set Expo's `runtimeVersion` to the native fingerprint, so an over-the-air bundle only loads on a native build of the same Rust core. If a mismatch is still reported, ask for a store update.
 
 `tests/fixtures/wire/forms.json` pins the wire forms: snapshot, patches, replies, notice, resync and handshake. Both the Rust golden test and the TypeScript test read it. Changing a form fails both tests until the fixture is regenerated and the shells are updated:
@@ -210,11 +219,43 @@ An instance that fails three times stays down until the account changes.
 
 On wasm, the release profile aborts on a panic, so the worker stops. The shell restarts the worker, which creates a new `App`. The UI runs the handshake again, rejects its pending requests and resubscribes. Persisted views give it something to show until the core catches up.
 
+## Shells
+
+Every shell gives the runtime a `Backend` over the core it already runs, a `Platform` with storage and nothing else yet (`open_url` and the rest stay `Unsupported`), and a clock. The UI connects through a `Link` (`src/lib/runtime/link.ts`) to the client in `src/lib/runtime/`, which `startRuntime` in `src/transport/create.ts` starts in every build.
+
+Several windows share one runtime. `Tabs<K>` in `sable-ffi` is the one implementation of what that takes: it remembers which window asked for each subscription and request, sends a window only its own events, sends a notice to every window, refuses a window another's subscription, and lets go of what a window held when it closes or its page reloads. Events that come out of the runtime before the call that creates their id returns are held and placed once the id is known. A shell supplies the window key and a function that delivers a batch.
+
+|                         | Web                                                                                                                                                                                                | Electron                                                                                            | Tauri                                                                                               |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Where the runtime runs  | The SharedWorker that holds the core                                                                                                                                                               | The utility process that holds the core                                                             | The app process                                                                                     |
+| Window key              | A number for each tab's port                                                                                                                                                                       | A number for each window's port                                                                     | The window label                                                                                    |
+| How a window reaches it | A `MessageChannel` port handed over the core port                                                                                                                                                  | The same, through the preload and the main process                                                  | `runtime_*` commands and a `Channel<Batch>` for each window                                         |
+| A window is gone        | Its Web Lock is released                                                                                                                                                                           | Its port closes                                                                                     | Its window is destroyed                                                                             |
+| Views                   | IndexedDB                                                                                                                                                                                          | Files                                                                                               | Files                                                                                               |
+| Restart                 | The worker panics or fails to start: the link retires the worker, opens the next one and the client reconnects, at most 3 times in a row without a handshake. A superseded worker is not restarted | The utility process exits: the main process starts it on the next connect and the client reconnects | None: the runtime lives as long as the process. An instance that panics is restarted by the runtime |
+| Flush                   | The worker's `stop` shuts the app down before a cache reset or a takeover                                                                                                                          | The main process asks the utility process to stop before the app quits                              | Shutdown on `RunEvent::Exit`, and a flush as the mobile app goes to the background                  |
+
+On the web and in Electron, `src/worker/app-host.ts` holds only the ports and the Web Lock: it numbers the ports, forwards each call to the native `SableApp` with its tab number, and posts the batches that `SableApp` hands back. The routing is `Tabs`.
+
+`SableCore.call` (wasm, napi) and the `call` command (Tauri) keep the gate described under Ticks, epochs and accounts. A window that connects needs no account: the runtime starts on none and moves when the core does.
+
+A restart rejects every request that was waiting, and the client subscribes again with the window each subscription had. `client.reconnect()` does this; a link that can restart calls it by `onRestart`.
+
+### Known gaps
+
+- Core events are not offered to the runtime. No slice has an `INTEREST` yet, so nothing needs them. The first slice that does must call `Ffi::offer` from the shell's event path.
+- Logins are not part of the account ordering. The login methods return no account id, so the runtime learns the account when the UI calls `session.restore` next.
+- There is no end-to-end test of the Electron or Tauri shells in a real window. Electron has a test of the napi surface from Node, and Tauri has tests of `Tabs` and the gate. The Tauri commands are compiled and linted, not run.
+- Native views are not flushed when an Android or iOS process is killed without the app first going to the background, and Electron or Tauri on desktop lose up to 2 seconds of changes if the process is killed rather than quit.
+- The Tauri shell code is checked on iOS (`cargo check -p app --target aarch64-apple-ios`). Checking Android needs the NDK.
+
 ## `sable-ffi`
 
 `Ffi` is the surface that shells bind. It takes and returns JSON strings, integer ids, and a flat `FfiError` with a stable `code()`.
 
-Its calls are `handshake`, `subscribe`, `unsubscribe`, `resync`, `range`, `dispatch`, `request`, `query` (pure functions registered by name), `next_batch` and `try_next_batch`, `offer` (for a shell that holds the core in Rust), `switch_account` and `shutdown`.
+Its calls are `handshake`, `subscribe`, `unsubscribe`, `resync`, `range`, `dispatch`, `request`, `query` (pure functions registered by name), `next_batch` and `try_next_batch`, `offer` (for a shell that holds the core in Rust), `switch_account`, `flush` and `shutdown`.
+
+Beside `Ffi`, the crate holds what every shell would otherwise write again: `Tabs`, `AccountGate`, `FileStorage` (native) and, with the feature `demo`, a `counter` slice that the shells' tests use. A shell with a `demo` feature (`sable-wasm`, `sable-node`, `app`) registers it; no release build does.
 
 Every JSON input is decoded with a 1 MiB size limit and a nesting limit. No error repeats the caller's input.
 
@@ -237,7 +278,20 @@ The tests:
 - `tests/wire_golden.rs`: the wire fixture.
 - `crates/sable-ffi/tests/ffi.rs`: the `Ffi` surface, called from a thread with no runtime.
 
+- `crates/sable-ffi/tests/ffi.rs` also covers `Tabs` (isolation, replies, notices, release) and `AccountGate`.
+
 ```sh
 cargo nextest run -p sable-runtime --all-features
 cargo nextest run -p sable-ffi
 ```
+
+The shells:
+
+```sh
+pnpm test:runtime
+SABLE_NODE_LIBRARY=target/debug/libsable_node.dylib pnpm exec vitest run electron/src/native-runtime.test.ts
+```
+
+- `pnpm test:runtime` builds `sable-wasm` with the `demo` feature into `src/generated/wasm-runtime`, starts `vite dev` and drives two pages that share one worker (`tests/e2e/runtime-tabs.spec.ts`). It checks that each page follows only its own subscription, that a reply reaches only the page that asked, that a page whose handshake does not match reloads, and that a worker that panics restarts, both pages subscribe again and the persisted view comes back. It needs Chromium and no homeserver.
+- `SABLE_NODE_LIBRARY` is the library of `cargo build -p sable-node --features demo` (`.so` on Linux, `.dll` on Windows). The test loads it in Node and drives the napi surface: handshake, rejection codes, patches, replies, the view saved on disk as the app stops and the next run starting from it. It is skipped when the variable is not set.
+- The Tauri build is checked on iOS with `cargo check -p app --target aarch64-apple-ios`.

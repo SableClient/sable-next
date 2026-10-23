@@ -10,6 +10,8 @@ mise run ci
 pnpm test:e2e
 ```
 
+After changing a shell (`sable-wasm`, `sable-node`, `src-tauri`) or the worker, also run `pnpm test:runtime`. [docs/runtime-v2.md](docs/runtime-v2.md#testing) lists the shell tests.
+
 Include tests for changed behavior. Keep pull requests focused and explain any changes that affect storage, authentication, or native capabilities.
 
 After changing `crates/sable-protocol/src/lib.rs`, run `mise run generate:types`
