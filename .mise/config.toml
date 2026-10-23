@@ -126,7 +126,7 @@ run = ["pnpm lint:fix", "pnpm stylelint:fix", "cargo fmt --all"]
 
 [tasks."generate:types"]
 description = "Regenerate TypeScript bindings from Rust (Specta)"
-run = "cargo run --locked -p sable-core --example generate-types --features typegen"
+run = "cargo run --locked -p sable-typegen"
 
 [tasks."generate:emoji-properties"]
 description = "Regenerate the Rust emoji property tables from Node's Unicode data"
@@ -142,7 +142,7 @@ run = "node scripts/generate/admin-commands.mjs"
 
 [tasks."check:types"]
 description = "Check that generated protocol types match Rust"
-run = "cargo run --locked -p sable-core --example generate-types --features typegen -- --check"
+run = "cargo run --locked -p sable-typegen -- --check"
 
 [tasks."wasm:build"]
 description = "Build the WASM core for the web client"

@@ -41,7 +41,18 @@ exceptions = [
 multiple-versions = "deny"
 wildcards = "deny"
 highlight = "all"
-deny = []
+# The SDK stays behind `sable-core`: protocol, runtime, FFI and slice crates
+# must build without it. Only the SDK's entry points are listed because every
+# other matrix-sdk crate is reachable through them
+deny = [
+  { crate = "matrix-sdk", wrappers = [
+    "sable-core",
+    "matrix-sdk-ui",
+  ], reason = "only sable-core talks to the SDK" },
+  { crate = "matrix-sdk-ui", wrappers = [
+    "sable-core",
+  ], reason = "only sable-core talks to the SDK" },
+]
 # These exact older versions are pulled by transitive crates with incompatible
 # semver requirements. Keep the duplicate check strict for any new versions.
 skip = [

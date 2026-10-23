@@ -50,6 +50,10 @@ cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-target
 cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-test
 ```
 
+```sh
+CARGO_INCREMENTAL=0 cargo nextest run --locked -p sable-runtime -p sable-ffi --all-features
+```
+
 `mise run check` runs the whole set. `sable-core` does not build at `opt-level = 0`, so the workspace profiles already raise it. The wasm tests run in a SharedWorker inside Chrome and need `chromedriver`.
 
 The `rust-quality` workflow runs the same commands, with `cargo deny check` and `cargo fmt --check`.
