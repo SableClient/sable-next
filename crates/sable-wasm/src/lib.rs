@@ -2,8 +2,6 @@
 #![recursion_limit = "512"]
 
 mod app;
-#[cfg(feature = "demo")]
-mod demo;
 mod session_store;
 
 use std::{
@@ -209,7 +207,7 @@ pub struct SableCore {
 impl SableCore {
     /// Moves the runtime to the account `method` left active, before the call returns to its caller.
     async fn follow_account(&self, method: &str, json: &str) -> Result<(), String> {
-        let Some(account) = app::account_after(method, json) else {
+        let Some(account) = sable_ffi::account_after(method, json) else {
             return Ok(());
         };
         if *self.account.borrow() == account {
@@ -265,7 +263,7 @@ impl SableCore {
     /// Returns a JSON-encoded command error when parsing or the call fails.
     #[wasm_bindgen]
     pub async fn call(&self, method: String, params: String) -> Result<String, String> {
-        let moving = if app::changes_account(&method) {
+        let moving = if sable_ffi::changes_account(&method) {
             Some(self.switching.write().await)
         } else {
             None

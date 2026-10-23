@@ -131,9 +131,10 @@ contextBridge.exposeInMainWorld('sableElectron', {
 });
 
 window.addEventListener('message', (event) => {
-  if (event.source !== window || event.data !== 'sable-core-connect') return;
-  if (event.ports.length !== 1) return;
-  ipcRenderer.postMessage('sable-core-connect', null, [...event.ports]);
+  if (event.source !== window || event.ports.length !== 1) return;
+  const channel: unknown = event.data;
+  if (channel !== 'sable-core-connect' && channel !== 'sable-runtime-connect') return;
+  ipcRenderer.postMessage(channel, null, [...event.ports]);
 });
 
 ipcRenderer.on('sable-core-exit', (_event, message: string) => {

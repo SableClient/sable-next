@@ -122,14 +122,11 @@ test.describe('two tabs of one worker', () => {
     });
 
     await page.evaluate(async (webRuntimeModule) => {
-      const { createWebLink, startWebRuntime } = (await import(
-        webRuntimeModule
-      )) as WebRuntimeModule;
-      const link = createWebLink();
-      void startWebRuntime({
-        ...link,
+      const { createWebLink, startLink } = (await import(webRuntimeModule)) as WebRuntimeModule;
+      void startLink(() => ({
+        ...createWebLink(),
         handshake: () => Promise.resolve({ schema: '0000000000000000', slices: [] }),
-      });
+      }));
     }, WEB_RUNTIME_MODULE);
 
     await page.waitForFunction(() => !('stale' in window));

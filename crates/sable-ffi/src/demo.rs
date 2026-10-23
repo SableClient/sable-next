@@ -1,23 +1,24 @@
-//! A slice for tests of the shells, built only with the `demo` feature.
+//! A slice for shell tests.
 
-use sable_runtime::{Cmd, Cx, Doc, Lifetime, Slice};
+use sable_protocol::RpcError;
+use sable_runtime::{Cmd, Cx, Doc, DuplicateSlice, Lifetime, Registry, Slice};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct CounterView {
+struct CounterView {
     count: i64,
 }
 
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum CounterAction {
+enum CounterAction {
     Add { n: i64 },
     Double,
     Panic,
 }
 
-pub struct Counter;
+struct Counter;
 
 impl Slice for Counter {
     const NAME: &'static str = "counter";
@@ -54,13 +55,18 @@ impl Slice for Counter {
             }
             CounterAction::Double => {
                 state.edit("/count", |view| view.count *= 2);
-                Cmd::reply(
-                    cx.req(),
-                    Ok::<_, sable_core::protocol::RpcError>(state.view().count),
-                )
+                Cmd::reply(cx.req(), Ok::<_, RpcError>(state.view().count))
             }
             #[expect(clippy::panic, reason = "the shells' tests need a worker that aborts")]
             CounterAction::Panic => panic!("the demo slice was told to panic"),
         }
     }
+}
+
+/// # Errors
+///
+/// `DuplicateSlice` when the registry already has `counter`.
+pub fn register(mut registry: Registry) -> Result<Registry, DuplicateSlice> {
+    registry.add::<Counter>()?;
+    Ok(registry)
 }

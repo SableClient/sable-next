@@ -4,38 +4,12 @@ use async_trait::async_trait;
 use js_sys::Function;
 use sable_core::{Core, protocol::RpcError};
 use sable_ffi::{Ffi, Queries};
-#[cfg(feature = "demo")]
-use sable_runtime::DuplicateSlice;
 use sable_runtime::{App, Backend, Platform, PlatformError, Ports, Registry, SystemClock};
-use serde_json::{Value, value::RawValue};
+use serde_json::value::RawValue;
 use tokio::sync::RwLock;
 use wasm_bindgen::{JsValue, prelude::*};
 
 use crate::{SableCore, session_store::settle};
-
-/// What the account is after `method` returned `result`, for the core calls that change it.
-pub(crate) fn account_after(method: &str, result: &str) -> Option<String> {
-    match method {
-        "session.restore" | "session.switch_account" => {
-            let info: Value = serde_json::from_str(result).ok()?;
-            Some(
-                info.get("account_id")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default()
-                    .to_owned(),
-            )
-        }
-        "session.logout" => Some(String::new()),
-        _ => None,
-    }
-}
-
-pub(crate) fn changes_account(method: &str) -> bool {
-    matches!(
-        method,
-        "session.restore" | "session.switch_account" | "session.logout"
-    )
-}
 
 /// Holds the runtime's calls back while an account change is under way, so
 /// that the core serves the new account only after `switch_account` returned.
@@ -83,14 +57,6 @@ impl Platform for JsPlatform {
     }
 }
 
-#[cfg(feature = "demo")]
-fn with_demo(mut registry: Registry) -> Result<Registry, DuplicateSlice> {
-    registry.add::<crate::demo::Counter>()?;
-    Ok(registry)
-}
-
-/// The runtime for the tabs of one worker. Every failure rejects with the
-/// `code` of an `FfiError`. `SableCore.call` keeps it informed of the account.
 #[wasm_bindgen]
 pub struct SableApp {
     ffi: Ffi,
@@ -126,7 +92,7 @@ impl SableApp {
         };
         let registry = Registry::new();
         #[cfg(feature = "demo")]
-        let registry = with_demo(registry).map_err(|error| error.to_string())?;
+        let registry = sable_ffi::demo::register(registry).map_err(|error| error.to_string())?;
         let ffi = Ffi::new(App::new(registry, ports, ""), Queries::default());
         core.app.replace(Some(ffi.clone()));
         Ok(SableApp { ffi })
@@ -226,7 +192,7 @@ mod tests {
     use js_sys::Function;
     use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
 
-    use super::{SableApp, account_after, changes_account};
+    use super::SableApp;
     use crate::SableCore;
 
     wasm_bindgen_test_configure!(run_in_shared_worker);
@@ -274,25 +240,5 @@ mod tests {
             .expect_err("no such slice");
 
         assert_eq!(rejection, "unknown_slice");
-    }
-
-    #[wasm_bindgen_test]
-    fn only_the_calls_that_change_the_account_are_followed() {
-        assert!(changes_account("session.restore"));
-        assert!(!changes_account("rooms.list"));
-        assert_eq!(
-            account_after("session.restore", "null"),
-            Some(String::new())
-        );
-        assert_eq!(
-            account_after("session.restore", r#"{"account_id":"3"}"#),
-            Some("3".to_owned())
-        );
-        assert_eq!(
-            account_after("session.switch_account", r#"{"account_id":"4"}"#),
-            Some("4".to_owned())
-        );
-        assert_eq!(account_after("session.logout", "null"), Some(String::new()));
-        assert_eq!(account_after("rooms.list", "[]"), None);
     }
 }

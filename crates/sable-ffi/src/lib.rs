@@ -11,8 +11,17 @@
     reason = "every call fails with an `FfiError`, which says what each variant means"
 )]
 
+mod account;
+#[cfg(feature = "demo")]
+pub mod demo;
+#[cfg(not(target_family = "wasm"))]
+mod files;
+
 use std::{collections::HashMap, future::Future, sync::Arc};
 
+pub use account::{account_after, changes_account};
+#[cfg(not(target_family = "wasm"))]
+pub use files::FileStorage;
 use sable_protocol::CoreEvent;
 use sable_runtime::{
     App, AppError, Batch, SubId, SubscribeRequest, Target, Window, decode, rt::SendOutsideWasm,

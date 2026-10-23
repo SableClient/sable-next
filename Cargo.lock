@@ -7414,11 +7414,13 @@ dependencies = [
 name = "sable-ffi"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "futures-executor",
  "sable-protocol",
  "sable-runtime",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.21",
  "tokio",
 ]
@@ -7485,11 +7487,14 @@ dependencies = [
 name = "sable-node"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "napi",
  "napi-build",
  "napi-derive",
  "sable-core",
+ "sable-ffi",
  "sable-loopback",
+ "sable-runtime",
  "serde_json",
  "tokio",
  "tracing",

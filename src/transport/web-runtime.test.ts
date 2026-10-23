@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AppMessage, AppRequest } from '#src/worker/app-protocol';
-import type { CoreConnection } from './web';
-import { createWebLink } from './web-runtime';
+import { createWebLink, type RuntimeConnection } from './web-runtime';
 
 const flush = () => new Promise<void>((done) => setTimeout(done, 0));
 
@@ -13,35 +12,30 @@ function fakeWorker() {
     send(message: AppMessage): void;
   }[] = [];
   const retired = vi.fn();
-  const open = (): CoreConnection => {
-    return {
-      port: {
-        postMessage: (message: { runtime?: true }, transfer?: MessagePort[]) => {
-          if (message.runtime && transfer) {
-            const [port] = transfer;
-            const requests: AppRequest[] = [];
-            port.onmessage = ({ data }: MessageEvent<AppRequest>) => {
-              requests.push(data);
-              if ('id' in data && data.op === 'handshake') {
-                port.postMessage({ id: data.id, ok: { schema: 's', slices: [] } });
-              }
-            };
-            workers.push({
-              port,
-              requests,
-              send: (reply) => {
-                port.postMessage(reply);
-              },
-            });
-          }
+  const failures: ((message: string) => void)[] = [];
+  const open = (): RuntimeConnection => ({
+    handOver: (port) => {
+      const requests: AppRequest[] = [];
+      port.onmessage = ({ data }: MessageEvent<AppRequest>) => {
+        requests.push(data);
+        if ('id' in data && data.op === 'handshake') {
+          port.postMessage({ id: data.id, ok: { schema: 's', slices: [] } });
+        }
+      };
+      workers.push({
+        port,
+        requests,
+        send: (reply) => {
+          port.postMessage(reply);
         },
-        close: () => undefined,
-      } as unknown as MessagePort,
-      onFailure: () => undefined,
-      retire: retired,
-    };
-  };
-  return { open, workers, retired };
+      });
+    },
+    onFailure: (handler) => {
+      failures.push(handler);
+    },
+    retire: retired,
+  });
+  return { open, workers, retired, failures };
 }
 
 const lockRequest = vi.fn(() => new Promise(() => undefined));
@@ -110,6 +104,20 @@ describe('createWebLink', () => {
     expect(restarted).toHaveBeenCalledTimes(1);
     await expect(pending).rejects.toThrow('the worker restarted');
     expect(await link.handshake()).toEqual({ schema: 's', slices: [] });
+  });
+
+  it('restarts when the process behind the link fails to run', async () => {
+    const { open, workers, failures } = fakeWorker();
+    const link = createWebLink(open);
+    const restarted = vi.fn();
+    link.onRestart?.(restarted);
+
+    failures[0]('core exited with code 1');
+    failures[0]('core exited with code 1');
+    await flush();
+
+    expect(workers).toHaveLength(2);
+    expect(restarted).toHaveBeenCalledTimes(1);
   });
 
   it('gives up on a worker that keeps panicking before a handshake', async () => {

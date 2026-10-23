@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [features]
-demo = []
+demo = ["sable-ffi/demo"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

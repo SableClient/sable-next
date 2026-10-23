@@ -3,20 +3,38 @@ import type { AppMessage, AppRequest } from '#src/worker/app-protocol';
 import { connect } from '../lib/runtime/client';
 import { WireMismatchError } from '../lib/runtime/handshake';
 import type { Link } from '../lib/runtime/link';
-import { openSharedWorker, type CoreConnection } from './web';
+import { openSharedWorker } from './web';
 
 const RELOAD_KEY = 'sable-runtime-reloaded';
 /** Restarts in a row that fail to reach a handshake before the link gives up. */
 const MAX_RESTARTS = 3;
 
+export interface RuntimeConnection {
+  handOver(port: MessagePort): void;
+  onFailure(handler: (message: string) => void): void;
+  retire(): void;
+}
+
+function openRuntimeWorker(): RuntimeConnection {
+  const connection = openSharedWorker(false);
+  return {
+    handOver(port) {
+      connection.port.postMessage({ runtime: true }, [port]);
+      connection.port.postMessage({ disconnect: true });
+    },
+    onFailure: (handler) => {
+      connection.onFailure(handler);
+    },
+    retire: () => {
+      connection.retire();
+    },
+  };
+}
+
 type Waiting = { resolve: (value: never) => void; reject: (error: Error) => void };
 
-/**
- * A `Link` to the one worker that owns the app. The worker takes a port of its
- * own for this tab, so the runtime's traffic never mixes with the core's.
- * When the worker panics, the link opens the next worker and tells the client.
- */
-export function createWebLink(open: () => CoreConnection = () => openSharedWorker(false)): Link {
+/** The runtime gets a port of its own, so its traffic never mixes with the core's. */
+export function createWebLink(open: () => RuntimeConnection = openRuntimeWorker): Link {
   const tab = crypto.randomUUID();
   const batchListeners = new Set<(batch: Batch) => void>();
   const restartListeners = new Set<() => void>();
@@ -38,23 +56,29 @@ export function createWebLink(open: () => CoreConnection = () => openSharedWorke
   function attach(): void {
     const connection = open();
     const channel = new MessageChannel();
-    connection.port.postMessage({ runtime: true }, [channel.port2]);
-    connection.port.postMessage({ disconnect: true });
+    connection.handOver(channel.port2);
     port = channel.port1;
+    let ended = false;
+    const restart = () => {
+      if (ended) return;
+      ended = true;
+      connection.retire();
+      channel.port1.close();
+      if (++restarts > MAX_RESTARTS) {
+        broken = new Error('the worker keeps crashing');
+        rejectPending(broken);
+        return;
+      }
+      attach();
+      rejectPending(new Error('the worker restarted'));
+      for (const listener of restartListeners) listener();
+    };
+    connection.onFailure(restart);
     port.onmessage = ({ data }: MessageEvent<AppMessage>) => {
       if ('batch' in data) {
         for (const listener of batchListeners) listener(data.batch);
       } else if ('crashed' in data) {
-        connection.retire();
-        port.close();
-        if (++restarts > MAX_RESTARTS) {
-          broken = new Error('the worker keeps crashing');
-          rejectPending(broken);
-          return;
-        }
-        attach();
-        rejectPending(new Error('the worker restarted'));
-        for (const listener of restartListeners) listener();
+        restart();
       } else if ('superseded' in data) {
         broken = new Error('a newer tab took over the worker');
         rejectPending(broken);
@@ -105,7 +129,6 @@ export function createWebLink(open: () => CoreConnection = () => openSharedWorke
   };
 }
 
-/** A tab and a worker built from different sources cannot talk, and a reload brings the page up to date. */
 function reloadOnce(error: unknown): void {
   if (!(error instanceof WireMismatchError)) {
     console.error('[sable runtime]', error);
@@ -119,9 +142,9 @@ function reloadOnce(error: unknown): void {
   location.reload();
 }
 
-export async function startWebRuntime(link: Link = createWebLink()): Promise<void> {
+export async function startLink(open: () => Link): Promise<void> {
   try {
-    await connect(link, { onError: reloadOnce });
+    await connect(open(), { onError: reloadOnce });
     sessionStorage.removeItem(RELOAD_KEY);
   } catch (error) {
     reloadOnce(error);

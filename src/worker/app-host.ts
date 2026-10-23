@@ -9,7 +9,7 @@ export interface AppApi {
   resync(sub: number): Promise<string>;
   range(sub: number, window: string): Promise<string>;
   dispatch(target: string, action: string): Promise<void>;
-  request(target: string, action: string): Promise<bigint>;
+  request(target: string, action: string): Promise<bigint | number>;
   nextBatch(): Promise<string>;
 }
 

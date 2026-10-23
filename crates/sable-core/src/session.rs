@@ -209,6 +209,9 @@ impl AccountRegistry {
     }
 }
 
+/// Where the runtime saves its views, inside the data directory they belong to.
+pub const SNAPSHOT_DIR: &str = "snapshots";
+
 #[must_use]
 pub fn account_store_id(base_store_id: &str, account_id: &str) -> String {
     format!("{base_store_id}-account-{account_id}")

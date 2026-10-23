@@ -408,6 +408,9 @@ impl Core {
                     outcome = Err(self.failed("reset_local_cache", error));
                 }
             }
+            if let Err(error) = remove_snapshots(&self.store_id) {
+                outcome = Err(self.failed("reset_local_cache", error));
+            }
             outcome
         };
         self.restore().await?;
@@ -1399,10 +1402,22 @@ fn oauth_account_deactivate_url(
 #[cfg(not(target_family = "wasm"))]
 const CACHE_DATABASES: [&str; 2] = ["matrix-sdk-event-cache.sqlite3", "matrix-sdk-media.sqlite3"];
 
+/// The views the runtime saved are caches too.
+#[cfg(not(target_family = "wasm"))]
+fn remove_snapshots(data_dir: &str) -> Result<(), crate::CoreError> {
+    let path = std::path::Path::new(data_dir).join(session::SNAPSHOT_DIR);
+    match std::fs::remove_dir_all(&path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(source) => Err(crate::store::StoreError::Path { path, source }.into()),
+    }
+}
+
 #[cfg(not(target_family = "wasm"))]
 async fn reset_account_cache(account: &PersistedAccount) -> Result<(), crate::CoreError> {
     use matrix_sdk_base::crypto::store::CryptoStore as _;
 
+    remove_snapshots(&account.store_id)?;
     let store = std::path::Path::new(&account.store_id).join("store");
     if !store.exists() {
         return Ok(());
@@ -2026,6 +2041,49 @@ mod regression_tests {
             2
         );
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn a_cache_reset_removes_the_views_the_runtime_saved() {
+        use super::{remove_snapshots, reset_account_cache};
+        use crate::session::{Credentials, PersistedAccount, PersistedSession};
+
+        let base = tempfile::tempdir().unwrap();
+        let store_id = session::account_store_id(base.path().to_str().unwrap(), "a1");
+        let account = PersistedAccount {
+            account_id: "a1".to_owned(),
+            store_id: store_id.clone(),
+            session: PersistedSession {
+                oauth_issuer: None,
+                oauth_redirect_uri: None,
+                resolved_homeserver: None,
+                homeserver: "https://example.org".to_owned(),
+                credentials: Credentials::Password(
+                    serde_json::from_value(serde_json::json!({
+                        "user_id": "@alice:example.org",
+                        "device_id": "DEVICE",
+                        "access_token": "token"
+                    }))
+                    .unwrap(),
+                ),
+            },
+            needs_reauth: false,
+            device_invalidated: false,
+        };
+        let saved = |dir: &str| {
+            let views = std::path::Path::new(dir).join(session::SNAPSHOT_DIR);
+            std::fs::create_dir_all(&views).unwrap();
+            std::fs::write(views.join("view"), "{}").unwrap();
+            views
+        };
+        let (account_views, base_views) = (saved(&store_id), saved(base.path().to_str().unwrap()));
+
+        reset_account_cache(&account).await.unwrap();
+        remove_snapshots(base.path().to_str().unwrap()).unwrap();
+        remove_snapshots(base.path().to_str().unwrap()).unwrap();
+
+        assert!(!account_views.exists());
+        assert!(!base_views.exists());
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
