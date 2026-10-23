@@ -454,6 +454,94 @@ pub enum CoreEvent {
     },
 }
 
+impl CoreEvent {
+    #[must_use]
+    pub const fn kind(&self) -> CoreEventKind {
+        match self {
+            Self::AccountLockChanged { .. } => CoreEventKind::AccountLockChanged,
+            Self::SyncStatus(..) => CoreEventKind::SyncStatus,
+            Self::SessionEnded { .. } => CoreEventKind::SessionEnded,
+            Self::SessionTokensRefreshed => CoreEventKind::SessionTokensRefreshed,
+            Self::RoomListDiff { .. } => CoreEventKind::RoomListDiff,
+            Self::TimelineDiff { .. } => CoreEventKind::TimelineDiff,
+            Self::TimelinePagination { .. } => CoreEventKind::TimelinePagination,
+            Self::TimelineAggregations { .. } => CoreEventKind::TimelineAggregations,
+            Self::Typing { .. } => CoreEventKind::Typing,
+            Self::EncryptionStatus { .. } => CoreEventKind::EncryptionStatus,
+            Self::KeyBackupDownload { .. } => CoreEventKind::KeyBackupDownload,
+            Self::DevicesChanged { .. } => CoreEventKind::DevicesChanged,
+            Self::SearchCoverage { .. } => CoreEventKind::SearchCoverage,
+            Self::Notification { .. } => CoreEventKind::Notification,
+            Self::NotificationSettingsChanged => CoreEventKind::NotificationSettingsChanged,
+            Self::InboxChanged => CoreEventKind::InboxChanged,
+            Self::AccountDataChanged { .. } => CoreEventKind::AccountDataChanged,
+            Self::SpaceSidebarChanged { .. } => CoreEventKind::SpaceSidebarChanged,
+            Self::RoomWidgetsChanged { .. } => CoreEventKind::RoomWidgetsChanged,
+            Self::WidgetRoomEvent { .. } => CoreEventKind::WidgetRoomEvent,
+            Self::WidgetToDevice { .. } => CoreEventKind::WidgetToDevice,
+            Self::CalendarChanged { .. } => CoreEventKind::CalendarChanged,
+            Self::RoomCosmeticsChanged { .. } => CoreEventKind::RoomCosmeticsChanged,
+            Self::ProfileChanged { .. } => CoreEventKind::ProfileChanged,
+            Self::MembersChanged { .. } => CoreEventKind::MembersChanged,
+            Self::BotCommandsChanged { .. } => CoreEventKind::BotCommandsChanged,
+            Self::ImagePacksChanged { .. } => CoreEventKind::ImagePacksChanged,
+            Self::Verification { .. } => CoreEventKind::Verification,
+            Self::QrLogin { .. } => CoreEventKind::QrLogin,
+            Self::CallEncryptionKey { .. } => CoreEventKind::CallEncryptionKey,
+            Self::CallBackends { .. } => CoreEventKind::CallBackends,
+            Self::CallSignalingError { .. } => CoreEventKind::CallSignalingError,
+            Self::CallMembers { .. } => CoreEventKind::CallMembers,
+            Self::IncomingCall { .. } => CoreEventKind::IncomingCall,
+            Self::IncomingCallEnded { .. } => CoreEventKind::IncomingCallEnded,
+            Self::MediaProgress { .. } => CoreEventKind::MediaProgress,
+            Self::Presence { .. } => CoreEventKind::Presence,
+        }
+    }
+}
+
+/// What a `CoreEvent` is, without its payload.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum CoreEventKind {
+    AccountLockChanged,
+    SyncStatus,
+    SessionEnded,
+    SessionTokensRefreshed,
+    RoomListDiff,
+    TimelineDiff,
+    TimelinePagination,
+    TimelineAggregations,
+    Typing,
+    EncryptionStatus,
+    KeyBackupDownload,
+    DevicesChanged,
+    SearchCoverage,
+    Notification,
+    NotificationSettingsChanged,
+    InboxChanged,
+    AccountDataChanged,
+    SpaceSidebarChanged,
+    RoomWidgetsChanged,
+    WidgetRoomEvent,
+    WidgetToDevice,
+    CalendarChanged,
+    RoomCosmeticsChanged,
+    ProfileChanged,
+    MembersChanged,
+    BotCommandsChanged,
+    ImagePacksChanged,
+    Verification,
+    QrLogin,
+    CallEncryptionKey,
+    CallBackends,
+    CallSignalingError,
+    CallMembers,
+    IncomingCall,
+    IncomingCallEnded,
+    MediaProgress,
+    Presence,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
@@ -465,7 +553,7 @@ pub enum PresenceView {
 
 /// Mirrors `eyeball_im::VectorDiff`, which is not `Type` and whose `Vector<T>`
 /// has to flatten to a plain array on the wire.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum VectorDiff<T> {
