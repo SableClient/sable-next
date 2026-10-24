@@ -1,6 +1,7 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { isRecord } from '#lib/guards.js';
 import { reactionKey } from '#lib/model/model.js';
-import type { StateChangeView, TimelineItemView } from '#src/generated/protocol';
+import type { StateChangeView } from '#src/generated/protocol';
 
 import { isCustomReaction } from '../messages/reaction-emote-label';
 import { relationOf } from './timeline-event-index';
@@ -54,7 +55,7 @@ export function reactionSource(content: unknown): string | null {
 }
 
 function hiddenEventText(
-  content: Extract<TimelineItemView['content'], { kind: 'hidden_event' }>,
+  content: Extract<ResolvedItem['content'], { kind: 'hidden_event' }>,
   user: string,
   t: Translate
 ): string {
@@ -95,8 +96,8 @@ const MODERATED: ReadonlySet<string> = new Set([
 const CUTE_TYPES: ReadonlySet<string> = new Set(['hug', 'cuddle', 'wave', 'poke', 'googly_eyes']);
 
 function membershipText(
-  content: Extract<TimelineItemView['content'], { kind: 'membership' }>,
-  item: TimelineItemView,
+  content: Extract<ResolvedItem['content'], { kind: 'membership' }>,
+  item: ResolvedItem,
   t: Translate
 ): string {
   const user = content.display_name ?? content.user_id;
@@ -112,7 +113,7 @@ function membershipText(
   return reason ? t('timeline.withReason', { text, reason }) : text;
 }
 
-export function stateEventText(item: TimelineItemView, t: Translate): string {
+export function stateEventText(item: ResolvedItem, t: Translate): string {
   const content = item.content;
   switch (content.kind) {
     case 'call_invite':
@@ -167,7 +168,7 @@ export function stateEventText(item: TimelineItemView, t: Translate): string {
 const SUBJECT_MARKER = '\u0000';
 
 export function stateEventSubject(
-  item: TimelineItemView,
+  item: ResolvedItem,
   t: Translate
 ): { userId: string; name: string; before: string; after: string } | null {
   const content = item.content;

@@ -1,8 +1,7 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { afterEach, expect, test, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js', async () => {
   const mock = await import('#lib/core/__mocks__/context.js');
@@ -35,7 +34,7 @@ const WRAPPED = `Receipted ${'and wrapped '.repeat(12)}`;
 const TWO_READERS = ['@bob:example.test', '@carol:example.test'];
 const FOUR_READERS = [...TWO_READERS, '@dave:example.test', '@erin:example.test'];
 
-function item(id: string, body: string, patch: Partial<TimelineItemView> = {}): TimelineItemView {
+function item(id: string, body: string, patch: Partial<ResolvedItem> = {}): ResolvedItem {
   return withRowFields({
     id,
     event_id: `$${id}:example.test`,
@@ -52,7 +51,6 @@ function item(id: string, body: string, patch: Partial<TimelineItemView> = {}): 
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -72,7 +70,7 @@ function item(id: string, body: string, patch: Partial<TimelineItemView> = {}): 
 }
 
 async function mountItem(
-  view: TimelineItemView,
+  view: ResolvedItem,
   props: { layout?: 'modern' | 'compact' | 'bubble'; alignOwn?: boolean } = {}
 ) {
   Object.assign(core, { userProfile: vi.fn().mockRejectedValue(new Error('no profile')) });
@@ -196,7 +194,7 @@ test('an emote-only message keeps the badge on its bottom edge', async () => {
     content: {
       ...base.content,
       html: '<img src="mxc://example.test/emote" alt=":party:" title=":party:" />',
-    } as TimelineItemView['content'],
+    } as ResolvedItem['content'],
     read_by: TWO_READERS,
   });
 
@@ -229,7 +227,7 @@ test('a short receipted notice keeps its text on one line', async () => {
         ...base.content,
         html: '<p>miam miam</p>',
         notice: true,
-      } as TimelineItemView['content'],
+      } as ResolvedItem['content'],
       read_by: TWO_READERS,
     },
     { layout: 'bubble' }
@@ -265,7 +263,7 @@ test('own trailing reactions clear a wide receipt stack', async () => {
   await mountItem(
     item('own-reacted', 'hello there', {
       is_own: true,
-      reactions: [{ key: '👍', senders: ['@bob:example.test'] }] as TimelineItemView['reactions'],
+      reactions: [{ key: '👍', senders: ['@bob:example.test'] }] as ResolvedItem['reactions'],
       read_by: FOUR_READERS,
     }),
     { layout: 'bubble' }

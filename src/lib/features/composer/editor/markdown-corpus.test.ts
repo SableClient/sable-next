@@ -49,7 +49,7 @@ test.each(corpus)('plain mode sends $markdown as the corpus says', (entry) => {
   expect({
     body: message.body,
     formatted_body: message.formatted,
-    mentions: { user_ids: message.mentions.userIds, room: message.mentions.room },
+    mentions: { user_ids: message.mentions.user_ids, room: message.mentions.room },
   }).toEqual({
     body: entry.body,
     formatted_body: entry.formatted_body,

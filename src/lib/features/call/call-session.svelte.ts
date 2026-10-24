@@ -283,7 +283,7 @@ export class CallSession {
       const supported =
         this.#deps.e2eeSupported ?? (await import('./key-provider')).isCallE2eeSupported;
       if (attempt !== this.#attemptGeneration) return;
-      if (grant.encryptMedia && !supported()) {
+      if (grant.encrypt_media && !supported()) {
         telemetry.failure('call.encryption.unsupported', new Error('OperationError'));
         await this.#teardown();
         this.#fail('e2ee-unsupported');
@@ -294,21 +294,21 @@ export class CallSession {
       const transport = await telemetry.step(
         'call.transport.create',
         async () =>
-          this.#deps.createTransport?.(grant.encryptMedia) ??
-          (grant.mode === undefined || grant.mode === 'legacy'
+          this.#deps.createTransport?.(grant.encrypt_media) ??
+          (grant.mode === 'legacy'
             ? await createNativeTransport(
                 String(grant.session),
                 grant.identity,
                 this.#deps.roomName?.(roomId) ?? roomId
               )
             : null) ??
-          (grant.backends?.length
+          (grant.backends.length
             ? (await import('./multi-sfu-transport')).createMultiSfuTransport(
-                grant.encryptMedia,
+                grant.encrypt_media,
                 telemetry
               )
             : (await import('./livekit-transport')).createLivekitTransport({
-                encryptMedia: grant.encryptMedia,
+                encryptMedia: grant.encrypt_media,
                 telemetry,
               }))
       );
@@ -320,28 +320,28 @@ export class CallSession {
       this.#livekit = isLivekit(transport) ? transport : undefined;
       const transportKind = this.#livekit
         ? 'livekit-web'
-        : grant.backends?.length
+        : grant.backends.length
           ? 'livekit-multi'
           : 'native';
       recordCallDebug({
         requested: preferences.callMode,
         nativeForced: hasNativeCalls(),
-        mode: grant.mode ?? 'legacy',
-        reason: grant.modeReason,
-        stickyAvailable: grant.stickyAvailable,
-        peerModes: grant.peerModes ?? [],
+        mode: grant.mode,
+        reason: grant.mode_reason,
+        stickyAvailable: grant.sticky_available,
+        peerModes: grant.peer_modes,
         transport: transportKind,
-        backendCount: grant.backends?.length ?? 0,
-        encrypted: grant.encryptMedia,
+        backendCount: grant.backends.length,
+        encrypted: grant.encrypt_media,
       });
       telemetry.event('call.transport.selected', {
         'call.transport': transportKind,
-        'call.mode': grant.mode ?? 'legacy',
-        'call.mode_reason': grant.modeReason ?? 'unknown',
-        'call.sticky_available': grant.stickyAvailable ?? false,
-        'call.peer_modes': (grant.peerModes ?? []).join(',') || 'none',
-        'call.backend_count': grant.backends?.length ?? 0,
-        'call.encryption_requested': grant.encryptMedia,
+        'call.mode': grant.mode,
+        'call.mode_reason': grant.mode_reason,
+        'call.sticky_available': grant.sticky_available,
+        'call.peer_modes': grant.peer_modes.join(',') || 'none',
+        'call.backend_count': grant.backends.length,
+        'call.encryption_requested': grant.encrypt_media,
       });
       this.#unsubscribeTransport = transport.subscribe((state) => {
         this.transport = state;
@@ -383,13 +383,13 @@ export class CallSession {
       });
 
       this.#grant = grant;
-      this.listenOnly = grant.canPublish === false;
+      this.listenOnly = !grant.can_publish;
 
-      this.encryptsMedia = grant.encryptMedia;
+      this.encryptsMedia = grant.encrypt_media;
       this.mediaReady = false;
       this.#drain();
 
-      if (grant.encryptMedia) {
+      if (grant.encrypt_media) {
         await telemetry.step('call.encryption.wait_for_key', () => this.#waitForOwnKey());
       }
       if (attempt !== this.#attemptGeneration) return;
@@ -397,7 +397,7 @@ export class CallSession {
       this.lifecycle = 'connecting';
       const encryptionKeys = this.#pendingKeys.splice(0, this.#pendingKeys.length);
       const connectBackends = this.#latestBackends?.backends ?? grant.backends;
-      const connectPublisherId = this.#latestBackends?.publisherId ?? grant.publisherId;
+      const connectPublisherId = this.#latestBackends?.publisherId ?? grant.publisher_id;
       this.#keysAccepted = true;
       await telemetry.step('call.transport.connect', async () => {
         await transport.connect({

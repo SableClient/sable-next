@@ -1,6 +1,7 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { createContext } from 'svelte';
 
-import type { EditVersionView, TimelineItemView } from '#src/generated/protocol';
+import type { EditVersionView } from '#src/generated/protocol';
 import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
 
 import type { MessageActions } from './message-menu-items';
@@ -14,13 +15,13 @@ export type MessageDialog =
   | { kind: 'sheet'; actions: () => MessageActions }
   | { kind: 'report' | 'forward' | 'steal' | 'reproxy' | 'receipts' };
 
-export type OpenMessageDialog = MessageDialog & { key: number; item: TimelineItemView };
+export type OpenMessageDialog = MessageDialog & { key: number; item: ResolvedItem };
 
 export class MessageDialogs {
   stack = $state.raw<readonly OpenMessageDialog[]>([]);
   #next = 0;
 
-  open(item: TimelineItemView, dialog: MessageDialog): void {
+  open(item: ResolvedItem, dialog: MessageDialog): void {
     if (this.isOpen(item, dialog.kind)) return;
     this.stack = [...this.stack, { ...dialog, item, key: this.#next++ }];
   }
@@ -29,7 +30,7 @@ export class MessageDialogs {
     this.stack = this.stack.filter((entry) => entry.key !== key);
   }
 
-  isOpen(item: TimelineItemView, kind: MessageDialog['kind']): boolean {
+  isOpen(item: ResolvedItem, kind: MessageDialog['kind']): boolean {
     return this.stack.some((entry) => entry.item.id === item.id && entry.kind === kind);
   }
 }

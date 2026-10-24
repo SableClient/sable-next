@@ -566,7 +566,7 @@ describe('typed Markdown', () => {
     type('**');
     expect(editor.state.doc.firstChild?.lastChild?.type.name).toBe('mention');
     expect(editor.state.doc.firstChild?.lastChild?.attrs.userId).toBe('@one:example.org');
-    expect(serializeComposer(editor.state.doc).mentions.userIds).toEqual(['@one:example.org']);
+    expect(serializeComposer(editor.state.doc).mentions.user_ids).toEqual(['@one:example.org']);
   });
 });
 

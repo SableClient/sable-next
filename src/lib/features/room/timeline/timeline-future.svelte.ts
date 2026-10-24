@@ -1,11 +1,10 @@
 import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
-import type { TimelineItemView } from '#src/generated/protocol';
 
 export class TimelineFuture {
   pending = $state(false);
   failed = $state(false);
   #task: Promise<void> | null = null;
-  #requestedItems: readonly TimelineItemView[] | null = null;
+  #requestedCount: number | null = null;
 
   constructor(
     private readonly timeline: () => RoomTimeline,
@@ -13,17 +12,17 @@ export class TimelineFuture {
   ) {}
 
   canRefill(): boolean {
-    return !this.failed && this.timeline().items !== this.#requestedItems;
+    return !this.failed && this.timeline().itemCount !== this.#requestedCount;
   }
 
   request(manual = false): Promise<void> {
     if (this.#task) return this.#task;
     if (manual) {
       this.failed = false;
-      this.#requestedItems = null;
+      this.#requestedCount = null;
     }
     if (!this.canRefill()) return Promise.resolve();
-    this.#requestedItems = this.timeline().items;
+    this.#requestedCount = this.timeline().itemCount;
     this.pending = true;
     const task: Promise<void> = Promise.resolve()
       .then(() => (this.#task === task ? this.load() : undefined))
@@ -42,7 +41,7 @@ export class TimelineFuture {
 
   reset(): void {
     this.#task = null;
-    this.#requestedItems = null;
+    this.#requestedCount = null;
     this.pending = false;
     this.failed = false;
   }

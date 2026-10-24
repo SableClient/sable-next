@@ -1,36 +1,25 @@
-import type {
-  ImageSourcePackReferenceView,
-  MessageKind,
-  PerMessageProfileView,
-  UrlPreviewView,
-  Rpc,
-} from '#src/generated/protocol';
+import type { ComposerMentions, Rpc, RpcParams } from '#src/generated/protocol';
 
-export interface OutgoingMentions {
-  userIds: string[];
-  room: boolean;
-}
+export type OutgoingMentions = ComposerMentions;
 
-const noMentions: OutgoingMentions = { userIds: [], room: false };
+const noMentions: OutgoingMentions = { user_ids: [], room: false };
 
-export type SendMessageOptions = {
-  inReplyTo?: string | null;
-  silentReply?: boolean;
-  threadRoot?: string | null;
-  formatted?: string | null;
+type SendParams = RpcParams<Rpc['messages']['send']>;
+
+export type SendMessageOptions = Omit<
+  Partial<SendParams>,
+  'room_id' | 'body' | 'mentions' | 'mentions_room'
+> & {
   mentions?: OutgoingMentions;
-  persona?: PerMessageProfileView | null;
-  kind?: MessageKind;
-  linkPreviews?: UrlPreviewView[];
-  noLinkPreviews?: boolean;
-  imageSourcePacks?: ImageSourcePackReferenceView[];
-  botCommand?: unknown;
-  forumTitle?: string | null;
 };
 
-export type EditMessageOptions = Omit<SendMessageOptions, 'inReplyTo' | 'silentReply'> & {
-  mediaCaption?: boolean;
-  transactionId?: string | null;
+type EditParams = RpcParams<Rpc['messages']['edit']>;
+
+export type EditMessageOptions = Omit<
+  Partial<EditParams>,
+  'room_id' | 'event_id' | 'body' | 'mentions' | 'mentions_room'
+> & {
+  mentions?: OutgoingMentions;
 };
 
 export async function sendMessage(
@@ -45,17 +34,17 @@ export async function sendMessage(
     body,
     formatted: options.formatted ?? null,
     kind: options.kind ?? 'text',
-    thread_root: options.threadRoot ?? null,
-    in_reply_to: options.inReplyTo ?? null,
-    mentions: [...mentions.userIds],
+    thread_root: options.thread_root ?? null,
+    in_reply_to: options.in_reply_to ?? null,
+    mentions: [...mentions.user_ids],
     mentions_room: mentions.room,
-    silent_reply: options.silentReply ?? false,
+    silent_reply: options.silent_reply ?? false,
     persona: $state.snapshot(options.persona ?? null),
-    link_previews: $state.snapshot(options.linkPreviews ?? []),
-    no_link_previews: options.noLinkPreviews ?? false,
-    image_source_packs: $state.snapshot(options.imageSourcePacks ?? []),
-    bot_command: $state.snapshot(options.botCommand ?? null),
-    forum_title: options.forumTitle ?? null,
+    link_previews: $state.snapshot(options.link_previews ?? []),
+    no_link_previews: options.no_link_previews ?? false,
+    image_source_packs: $state.snapshot(options.image_source_packs ?? []),
+    bot_command: $state.snapshot(options.bot_command ?? null),
+    forum_title: options.forum_title ?? null,
   });
 }
 
@@ -70,15 +59,15 @@ export async function editMessage(
   await rpc.messages.edit({
     room_id: roomId,
     event_id: eventId,
-    transaction_id: options.transactionId ?? null,
+    transaction_id: options.transaction_id ?? null,
     body,
     formatted: options.formatted ?? null,
     kind: options.kind ?? 'text',
-    media_caption: options.mediaCaption ?? false,
-    thread_root: options.threadRoot ?? null,
-    mentions: [...mentions.userIds],
+    media_caption: options.media_caption ?? false,
+    thread_root: options.thread_root ?? null,
+    mentions: [...mentions.user_ids],
     mentions_room: mentions.room,
     persona: $state.snapshot(options.persona ?? null),
-    forum_title: options.forumTitle ?? null,
+    forum_title: options.forum_title ?? null,
   });
 }

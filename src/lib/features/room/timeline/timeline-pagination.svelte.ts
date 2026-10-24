@@ -1,5 +1,4 @@
 import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
-import type { TimelineItemView } from '#src/generated/protocol';
 
 export const MAX_EMPTY_REFILLS = 5;
 
@@ -7,7 +6,7 @@ export class TimelinePagination {
   exhausted = $state(false);
   pending = $state(false);
   #task: Promise<boolean> | null = null;
-  #refillItems: readonly TimelineItemView[] | null = null;
+  #refillCount: number | null = null;
   #emptyRefills = 0;
   #loadedItemCount = 0;
 
@@ -17,15 +16,15 @@ export class TimelinePagination {
   ) {}
 
   observeItems(): void {
-    const loaded = this.timeline().items.length;
+    const loaded = this.timeline().itemCount;
     if (loaded < this.#loadedItemCount) this.exhausted = false;
     this.#loadedItemCount = loaded;
   }
 
   canRefill(): boolean {
-    const items = this.timeline().items;
-    if (items !== this.#refillItems) {
-      this.#refillItems = items;
+    const count = this.timeline().itemCount;
+    if (count !== this.#refillCount) {
+      this.#refillCount = count;
       this.#emptyRefills = 0;
     }
     if (this.#emptyRefills >= MAX_EMPTY_REFILLS) return false;

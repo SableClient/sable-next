@@ -3,6 +3,7 @@
 import { render, screen } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
 
+import { asWireItems } from '#lib/test-support/timeline-wire.js';
 import type { BookmarkView, TimelineItemView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
@@ -46,7 +47,7 @@ test('a cold bookmark preview keeps its room sender and loads global colors with
   await vi.waitFor(() => {
     expect(core.rpc.timeline.eventItems).toHaveBeenCalled();
   });
-  event.resolve([{ ...item(false), sender_name: 'Room Alice' }]);
+  event.resolve(asWireItems([{ ...item(false), sender_name: 'Room Alice' }]));
   await screen.findByText('waves');
   await screen.findByText('Room Alice');
   profile.resolve({ display_name: 'Alice on the bridge', name_color_light: '#2244aa' });

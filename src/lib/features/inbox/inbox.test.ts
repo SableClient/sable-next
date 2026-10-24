@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { BookmarkView, RoomListItemView } from '#src/generated/protocol';
 
-import { applyBadgeMode, badgeModeFor, roomUnread, type RoomUnread } from '#lib/rooms/unread.js';
+import { roomUnread, type RoomUnread } from '#lib/rooms/unread.js';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 import {
@@ -51,11 +51,16 @@ function room(overrides: Partial<RoomListItemView>): RoomListItemView {
   });
 }
 
-const badgeFor: RoomUnread = (summary) =>
-  applyBadgeMode(
-    roomUnread(summary),
-    badgeModeFor(summary, summary.notification.room, { direct: 'all', group: 'mentions' })
-  );
+function countingBadges(counted: { direct: boolean; group: boolean }): RoomUnread {
+  return (summary) => {
+    const counts = roomUnread(summary);
+    if (summary.notification.room === 'mute') return counts;
+    const counting = summary.is_direct ? counted.direct : counted.group;
+    return { ...counts, notifying: counting ? Math.max(counts.notifying, counts.unread) : 0 };
+  };
+}
+
+const badgeFor = countingBadges({ direct: true, group: false });
 
 test('an unknown filter falls back to showing everything', () => {
   expect(parseFilter(null)).toBe('all');
@@ -100,11 +105,7 @@ test('rooms set to badge every message also count toward the inbox badge', () =>
     room({ room_id: '!chat', is_direct: true, unread: 3, notifying: 3 }),
     room({ room_id: '!channel', unread: 7, notifying: 7 }),
   ];
-  const unreadFor: RoomUnread = (summary) =>
-    applyBadgeMode(
-      roomUnread(summary),
-      badgeModeFor(summary, null, { direct: 'all', group: 'all' })
-    );
+  const unreadFor = countingBadges({ direct: true, group: true });
 
   expect(countNotifications(rooms, unreadFor)).toBe(10);
 });
@@ -170,9 +171,9 @@ test('notifications are ordered by the latest event, undated last', () => {
 });
 
 test('notificationCount prefers the counted badge over the raw unread total', () => {
-  expect(notificationCount({ unread: 9, highlight: 2, notifying: 2 })).toBe(2);
-  expect(notificationCount({ unread: 9, highlight: 0, notifying: 0 })).toBe(0);
-  expect(notificationCount({ unread: 3, highlight: 0, notifying: 3 })).toBe(3);
+  expect(notificationCount({ unread: 9, highlight: 2, marked: false, notifying: 2 })).toBe(2);
+  expect(notificationCount({ unread: 9, highlight: 0, marked: false, notifying: 0 })).toBe(0);
+  expect(notificationCount({ unread: 3, highlight: 0, marked: false, notifying: 3 })).toBe(3);
 });
 
 test('invites are counted separately from notifications', () => {

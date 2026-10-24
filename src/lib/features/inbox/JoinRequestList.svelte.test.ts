@@ -2,9 +2,8 @@
 
 import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import type { MemberView, RoomPermissionsView, RoomListItemView } from '#src/generated/protocol';
-import type { CoreClient } from '#lib/core/client.svelte.js';
 
 vi.mock('#lib/core/context.js');
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
@@ -14,6 +13,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
 import { RoomList } from '#lib/rooms/room-list.svelte.js';
+import { FakeRuntime, roomsView } from '#lib/test-support/fake-runtime.js';
 import JoinRequestList from './JoinRequestList.svelte';
 
 const core = baseCore;
@@ -23,7 +23,16 @@ Object.assign(core.rpc.members, {
   denyKnock: vi.fn<(params: { room_id: string; user_id: string }) => Promise<null>>(),
 });
 Object.assign(core.rpc.rooms, { invite: vi.fn<() => Promise<null>>() });
-const roomList = new RoomList(core as unknown as CoreClient);
+const runtime = new FakeRuntime({ rooms: roomsView([]) });
+const roomList = new RoomList(() => runtime.client());
+const setRooms = (rooms: RoomListItemView[]) => {
+  runtime.set('rooms', roomsView(rooms));
+};
+
+beforeAll(() => roomList.start());
+afterAll(() => {
+  roomList.stop();
+});
 const room = {
   room_id: '!room:example.org',
   name: 'Room',
@@ -57,11 +66,11 @@ beforeEach(() => {
   core.rpc.members.list.mockReset().mockResolvedValue([alice]);
   core.rpc.rooms.invite.mockReset().mockResolvedValue(null);
   core.rpc.members.denyKnock.mockReset().mockResolvedValue(null);
-  roomList.rooms = [room];
+  setRooms([room]);
 });
 
 test('approves room requests and denies space requests', async () => {
-  roomList.rooms = [room, space];
+  setRooms([room, space]);
   render(JoinRequestList);
   const user = userEvent.setup();
   await screen.findAllByText('Alice');
@@ -88,12 +97,12 @@ test('approves room requests and denies space requests', async () => {
 });
 
 test('only loads requests in joined knock rooms where we can moderate', async () => {
-  roomList.rooms = [
+  setRooms([
     room,
     { ...space, join_rule: 'knock_restricted' },
     { ...room, room_id: '!invited:example.org', state: 'invited' },
     { ...room, room_id: '!private:example.org', join_rule: 'invite' },
-  ];
+  ]);
   core.rpc.members.permissions.mockImplementation(({ room_id }) =>
     Promise.resolve(
       room_id === room.room_id
@@ -139,7 +148,7 @@ test('keeps a failed request available for retry', async () => {
 });
 
 test('shows requests from other rooms when one fails to load and retries', async () => {
-  roomList.rooms = [room, space];
+  setRooms([room, space]);
   core.rpc.members.list.mockImplementation(({ room_id }) =>
     room_id === room.room_id ? Promise.reject(new Error('offline')) : Promise.resolve([alice])
   );
@@ -158,13 +167,13 @@ test('refreshes live requests without restoring an answered request from stale s
   await userEvent.click(screen.getByRole('button', { name: 'Approve' }));
   await screen.findByText('No pending join requests.');
 
-  roomList.rooms = [{ ...room }];
+  setRooms([{ ...room }]);
   await vi.waitFor(() => {
     expect(core.rpc.members.list).toHaveBeenCalledTimes(2);
   });
   expect(screen.queryByText('Alice')).not.toBeInTheDocument();
 
   core.rpc.members.list.mockResolvedValue([{ ...alice, member_ts: 2 }]);
-  roomList.rooms = [{ ...room }];
+  setRooms([{ ...room }]);
   await screen.findByText('Alice');
 });

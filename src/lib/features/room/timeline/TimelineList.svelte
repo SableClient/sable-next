@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ResolvedItem, ResolvedRow } from '#lib/rooms/timeline-item.js';
   import { page } from '$app/state';
   import { onDestroy, untrack, type Snippet } from 'svelte';
   import { on } from 'svelte/events';
@@ -8,11 +9,7 @@
   import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
 
-  import type {
-    MemberView,
-    PerMessageProfileView,
-    TimelineItemView,
-  } from '#src/generated/protocol';
+  import type { MemberView, PerMessageProfileView } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
   import { dismissKeyboardOnScroll } from '#lib/platform/keyboard.js';
   import { windowActivity } from '#lib/platform/window-activity.js';
@@ -47,28 +44,13 @@
   import TimelineSkeleton from './TimelineSkeleton.svelte';
   import TypingIndicator, { type TypingUser } from './TypingIndicator.svelte';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
-  import { groupMemberEvents } from '../members/member-groups';
   import { TimelineEventIndex } from './timeline-event-index';
-  import {
-    cumulativeReadBy,
-    cumulativeReadTimestamps,
-    isCollapsed,
-    latestEventId,
-    mergeAggregations,
-    personaLookup,
-    replyTarget,
-    unreadCountAfter,
-    visibleAggregations,
-    visibleTimelineItems,
-    withReadMarkerBefore,
-    type ReplyDirection,
-  } from './timeline-format';
+  import { personaLookup, replyTarget, type ReplyDirection } from './timeline-format';
   import { TimelinePagination } from './timeline-pagination.svelte.js';
   import { TimelineFocus } from './timeline-focus.svelte.js';
   import { TimelineFuture } from './timeline-future.svelte.js';
+  import { GAP_ROW } from './timeline-gap';
   import { TimelineHistoryController } from './timeline-history';
-  import { TimelineIdentityTracker } from './timeline-identity';
-  import { TimelineUnread } from './timeline-unread.svelte.js';
   import {
     estimatedColumnPx,
     estimateRowSize,
@@ -94,7 +76,6 @@
     onRead: (eventId: string, fullyRead: boolean) => Promise<void>;
     onFullyRead?: (roomId: string, eventId: string) => void;
     hasUnread?: boolean;
-    onLoadReadMarker?: () => Promise<string | null>;
     onRequestUnread?: (eventId: string) => Promise<void>;
     onResumeLive?: () => Promise<void>;
     onMarkRead?: () => Promise<void>;
@@ -145,7 +126,6 @@
     onRead,
     onFullyRead,
     hasUnread = false,
-    onLoadReadMarker,
     onRequestUnread,
     onResumeLive,
     onMarkRead,
@@ -186,18 +166,14 @@
     timelineStart,
   }: Props = $props();
 
+  $effect(() => {
+    timeline.show({ readOnly, threadRoot: threadRootId });
+  });
+
   const dialogs = provideMessageDialogs(new MessageDialogs());
   const messageMenu = provideMessageMenu(new OpenMessageMenu());
 
-  interface RowValue {
-    item: TimelineItemView;
-    group: readonly TimelineItemView[] | null;
-    collapsed: boolean;
-    groupStart: boolean;
-    unreadCount: number;
-  }
-  const identity = new TimelineIdentityTracker();
-  const unread = new TimelineUnread();
+  type RowValue = ResolvedRow;
   let unreadNavigation: AbortController | null = null;
   let jumpingUnread = $state(false);
   let markingRead = $state(false);
@@ -220,53 +196,47 @@
   const loadRetry = new LoadRetry();
   onDestroy(() => {
     unreadNavigation?.abort();
-    unread.destroy();
     settleFullyRead();
     loadRetry.reset();
   });
-  let followingRead = $state(false);
-  let eventItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
-  let allItems = $derived(
-    mergeAggregations(eventItems, visibleAggregations(timeline.aggregations, preferences), {
-      start: timeline.backwardPagination === 'end',
-      end: timeline.mode.kind === 'live' || timeline.forwardPagination === 'end',
-    })
-  );
-  let visibleItems = $derived(
-    unread.firstEventId !== null
-      ? withReadMarkerBefore(allItems, unread.firstEventId)
-      : followingRead
-        ? allItems.filter((item) => item.content.kind !== 'read_marker')
-        : allItems
-  );
-  let entries = $derived.by((): readonly TimelineEntry<RowValue>[] => {
-    identity.reconcile(visibleItems);
-    const units = groupMemberEvents(visibleItems);
-    const unitItems = units.map((unit) => unit.item);
-    return units.map(({ item, index: source, group }, index) => {
-      const collapsed =
-        !(
-          threadRootId &&
-          (item.event_id === threadRootId || unitItems[index - 1]?.event_id === threadRootId)
-        ) && isCollapsed(unitItems, index, preferences.replyPreviewStyle);
-      return {
-        key: identity.key(visibleItems, source),
-        value: {
-          item,
-          group,
-          collapsed,
-          groupStart: index > 0 && !collapsed,
-          unreadCount:
-            item.content.kind === 'read_marker' ? unreadCountAfter(visibleItems, source) : 0,
-        },
-      };
-    });
+  /** Stands for a row the runtime has not sent: the list keeps its place while the rows come. */
+  const gaps: TimelineEntry<RowValue>[] = [];
+  function gapAt(index: number): TimelineEntry<RowValue> {
+    return (gaps[index] ??= { key: `gap:${String(index)}`, value: GAP_ROW });
+  }
+  const entryCache = new WeakMap<ResolvedRow, TimelineEntry<RowValue>>();
+  function entryOf(row: ResolvedRow): TimelineEntry<RowValue> {
+    let entry = entryCache.get(row);
+    if (!entry) {
+      entry = { key: row.key, value: row };
+      entryCache.set(row, entry);
+    }
+    return entry;
+  }
+  let listedRows: readonly ResolvedRow[] = [];
+  let listedEntries: readonly TimelineEntry<RowValue>[] = [];
+  let listedFirst = 0;
+  let entries = $derived.by(() => {
+    const listed = timeline.rows;
+    const first = timeline.first;
+    if (listed !== listedRows || first !== listedFirst) {
+      listedRows = listed;
+      listedFirst = first;
+      listedEntries = [
+        ...Array.from({ length: first }, (_, index) => gapAt(index)),
+        ...listed.map(entryOf),
+      ];
+    }
+    return listedEntries;
   });
+  let visibleCount = $derived(timeline.total);
+  let unread = $derived(timeline.unread);
   let events = $derived(new TimelineEventIndex(timeline.items, timeline.aggregations));
   function holdsEvent({ item, group }: RowValue, eventId: string | null): boolean {
     if (eventId === null) return false;
     return (
-      item.event_id === eventId || (group?.some((member) => member.event_id === eventId) ?? false)
+      item.event_id === eventId ||
+      (group?.some((member) => member.item.event_id === eventId) ?? false)
     );
   }
   function entryFor(eventId: string | null): TimelineEntry<RowValue> | undefined {
@@ -299,8 +269,11 @@
       roomId && eventId ? (fetchedItems.get(roomId, eventId)?.per_message_profile ?? null) : null
     )
   );
-  let readersByItem = $derived(cumulativeReadBy(timeline.items));
-  let receiptTimestampsByItem = $derived(cumulativeReadTimestamps(timeline.items));
+  let receiptsByItem = $derived(
+    new Map(
+      timeline.rows.flatMap((row) => (row.receipts ? [[row.item.id, row.receipts] as const] : []))
+    )
+  );
   let menuOpen = $state(false);
   const pagination = new TimelinePagination(
     () => timeline,
@@ -328,14 +301,12 @@
     canRequestFuture: () => future.canRefill(),
   });
   let noHistory = $derived(
-    visibleItems.length === 0 && (pagination.exhausted || timeline.backwardPagination === 'end')
+    visibleCount === 0 && (pagination.exhausted || timeline.backwardPagination === 'end')
   );
-  let awaitingContent = $derived(
-    visibleItems.length === 0 && timeline.error === null && !noHistory
-  );
-  let emptyFailure = $derived(visibleItems.length === 0 && timeline.error !== null);
+  let awaitingContent = $derived(visibleCount === 0 && timeline.error === null && !noHistory);
+  let emptyFailure = $derived(visibleCount === 0 && timeline.error !== null);
   $effect(() => {
-    if (visibleItems.length > 0) {
+    if (visibleCount > 0) {
       loadRetry.reset();
       return;
     }
@@ -352,13 +323,15 @@
     loadRetry.schedule(() => void onRetryLoad());
     return () => loadRetry.cancel();
   });
-  let readEventId = $derived.by(() => {
-    if (!revealed || !viewport || unread.blocking || markingRead) return null;
+  let newestShown = $derived.by(() => {
+    if (!revealed || !viewport) return null;
     if (windowState.pinned) {
-      return (
-        latestEventId(timeline.items) ??
-        latestEventId(windowState.rows.map((row) => row.value.item))
-      );
+      if (timeline.latestEventId !== null) return timeline.latestEventId;
+      for (let index = windowState.rows.length - 1; index >= 0; index -= 1) {
+        const eventId = windowState.rows[index].value.item.event_id;
+        if (eventId) return eventId;
+      }
+      return null;
     }
     if (windowState.lastFullyVisible === null) return null;
     for (let index = windowState.rows.length - 1; index >= 0; index -= 1) {
@@ -368,9 +341,10 @@
     }
     return null;
   });
-  let unreadCount = $derived(unread.count(eventItems));
+  let readEventId = $derived(unread.blocking || markingRead ? null : newestShown);
+  let unreadCount = $derived(unread.count);
   let unreadInView = $derived.by(() => {
-    const index = entries.findIndex(({ value }) => holdsEvent(value, unread.firstEventId));
+    const index = entries.findIndex(({ value }) => holdsEvent(value, unread.first_event_id));
     return (
       index >= 0 &&
       windowState.firstVisible !== null &&
@@ -380,34 +354,24 @@
     );
   });
   $effect(() => {
-    const focused = windowActivity.active;
-    if (opened && live)
-      untrack(() => unread.trackBackground(eventItems, focused && !windowActivity.recentlyResumed));
-    unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
-    if (!reading || !revealed || !focused) return;
-    if (unreadInView) unread.observe(unread.firstEventId);
-    else if (live && windowState.pinned && opened && !jumpingUnread && !unread.background)
-      unread.reachLatest();
+    const focused = windowActivity.active && !windowActivity.recentlyResumed;
+    const newest = reading && revealed && !jumpingUnread ? newestShown : null;
+    if (opened) timeline.viewing(focused, newest);
+    if (reading && revealed && focused && unreadInView)
+      timeline.observeUnread(unread.first_event_id);
   });
   let holdAtLatest = $state(untrack(() => !preferences.openRoomsAtUnread));
-  let hadUnread = untrack(() => hasUnread);
   $effect(() => {
-    if (hadUnread && !hasUnread && unread.initialized && !holdAtLatest)
-      untrack(() => unread.dismiss());
-    hadUnread = hasUnread;
+    if (unread.initialized) timeline.roomUnread(hasUnread, holdAtLatest);
   });
   let historyLoading = $derived(
     revealed &&
-      visibleItems.length > 0 &&
+      visibleCount > 0 &&
       (pagination.pending || timeline.backwardPagination === 'loading')
   );
   let live = $derived(timeline.mode.kind === 'live');
-  let oldestUnreadLoaded = $derived(
-    (timeline.backwardPagination === 'end' || pagination.exhausted) &&
-      (live || timeline.forwardPagination === 'end')
-  );
   let futureLoading = $derived(
-    revealed && !live && visibleItems.length > 0 && timeline.forwardPagination === 'loading'
+    revealed && !live && visibleCount > 0 && timeline.forwardPagination === 'loading'
   );
   let historyLoadingVisible = $state(false);
   $effect(() => {
@@ -449,6 +413,7 @@
   function windowChanged(state: TimelineWindowState<RowValue>): void {
     const wasScrolling = windowState.scrolling;
     windowState = state;
+    timeline.cover(state.start, !state.scrolling);
     const node = viewport;
     const height = node?.clientHeight ?? 0;
     const distance = node === null ? 0 : node.scrollHeight - height - node.scrollTop;
@@ -460,15 +425,12 @@
       state.end === entries.length &&
       node !== null &&
       distance <= TIMELINE_LAYOUT.jumpToLatestRem * 16;
-    if (!state.pinned) followingRead = false;
     if (wasScrolling && !state.scrolling) historyController.onScrollSettled();
   }
   function readerScrolled(delta: number): void {
     historyController.clearUserScrollPending();
     if (!revealed) return;
     if (delta < 0) holdAtLatest = false;
-    if (delta > 0 && windowState.pinned && windowActivity.active && !holdAtLatest)
-      unread.reachLatest();
     historyController.observeScroll(delta < 0, nearLatest);
     if (
       timeline.mode.kind !== 'live' &&
@@ -575,13 +537,9 @@
       return;
     }
     await engine.update(entries);
-    const initializingUnread = unread.initialize(
-      timeline.items,
-      hasUnread,
-      onLoadReadMarker,
-      eventItems,
-      timeline.readMarkerEventId
-    );
+    const initializingUnread = timeline.initializeUnread(hasUnread).catch((error: unknown) => {
+      console.warn('[sable timeline] starting the unread tracker failed', error);
+    });
     const landingPending = landingEventId !== null && onRequestUnread !== undefined;
     if (
       !entries.some(({ value }) => value.item.content.kind === 'read_marker') &&
@@ -592,7 +550,6 @@
     }
     await initializingUnread;
     if (disposed) return;
-    unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
     if (focusEventId) {
       const target = focusEventId;
       const entry = entryFor(focusEventId);
@@ -617,7 +574,7 @@
           !landed &&
           !holdAtLatest &&
           unread.active &&
-          unread.firstEventId !== null &&
+          unread.first_event_id !== null &&
           !disposed
         ) {
           await jumpToUnread();
@@ -635,7 +592,7 @@
     }
   }
   $effect(() => {
-    const count = visibleItems.length;
+    const count = visibleCount;
     pagination.observeItems();
     const engine = controller;
     const node = viewport;
@@ -694,7 +651,7 @@
   $effect(() => {
     if (
       timeline.mode.kind !== 'unread' ||
-      timeline.mode.eventId === heldContext ||
+      timeline.mode.event_id === heldContext ||
       timeline.forwardPagination !== 'end' ||
       timeline.loading ||
       timeline.resumingLive ||
@@ -781,7 +738,7 @@
   let handledLanding: string | null = null;
   let landedEventId = $state<string | null>(null);
   function markLanded(eventId: string | null): void {
-    if (timeline.mode.kind === 'unread') heldContext = timeline.mode.eventId;
+    if (timeline.mode.kind === 'unread') heldContext = timeline.mode.event_id;
     handledLanding = landingEventId;
     landedEventId = eventId;
     onLanded?.();
@@ -829,8 +786,7 @@
     };
   }
   async function markRead(eventId: string): Promise<void> {
-    if (windowState.pinned) followingRead = true;
-    const fullyRead = !holdAtLatest && eventId === latestEventId(timeline.items);
+    const fullyRead = !holdAtLatest && eventId === timeline.latestEventId;
     await onRead(eventId, fullyRead);
     if (!holdAtLatest) readUpTo = eventId;
     if (fullyRead) fullyReadAt = eventId;
@@ -838,7 +794,7 @@
       settleFullyRead();
       return;
     }
-    if (!holdAtLatest && eventId === latestEventId(timeline.items)) unread.dismiss();
+    if (!holdAtLatest) timeline.read(eventId);
   }
   async function jumpToUnread(): Promise<void> {
     const engine = controller;
@@ -853,30 +809,28 @@
     unreadError = null;
     const current = () => !disposed && !navigation.signal.aborted;
     try {
-      await unread.initialize(
-        timeline.items,
-        hasUnread,
-        onLoadReadMarker,
-        eventItems,
-        timeline.readMarkerEventId
-      );
+      await timeline.initializeUnread(hasUnread);
       if (unread.failed) {
         unreadError = 'jump';
         return;
       }
-      if (current() && !entryFor(unread.firstEventId) && unread.readEventId && onRequestUnread) {
+      if (
+        current() &&
+        !entryFor(unread.first_event_id) &&
+        unread.read_event_id !== null &&
+        onRequestUnread
+      ) {
         switchingToUnread = true;
         try {
-          await onRequestUnread(unread.readEventId);
+          await onRequestUnread(unread.read_event_id);
         } finally {
           switchingToUnread = false;
         }
         await flushed();
       }
       if (!current()) return;
-      unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
       if (!unread.active) return;
-      const target = entryFor(unread.firstEventId);
+      const target = entryFor(unread.first_event_id);
       if (!target) {
         unreadError = 'jump';
         return;
@@ -897,10 +851,7 @@
     unreadError = null;
     try {
       await onMarkRead();
-      if (!disposed) {
-        unread.clear();
-        followingRead = windowState.pinned;
-      }
+      if (!disposed) timeline.clearUnread();
     } catch (error) {
       console.warn('[sable timeline] mark as read failed', error);
       if (!disposed) unreadError = 'read';
@@ -910,7 +861,7 @@
   }
   export function dismissUnread(): void {
     unreadNavigation?.abort();
-    unread.clear();
+    timeline.clearUnread();
   }
   let replayingEventId = $state<string | null>(null);
   async function replayHighlight(eventId: string): Promise<void> {
@@ -929,7 +880,7 @@
   }
 
   export function stepReply(direction: ReplyDirection): string | null {
-    const target = replyTarget(eventItems, replyEventId, direction, preferences.showHiddenEvents);
+    const target = replyTarget(timeline.rows, replyEventId, direction);
     const key = entryFor(target)?.key;
     const row = key ? viewport?.querySelector(`[data-timeline-key="${CSS.escape(key)}"]`) : null;
     if (key && controller && viewport && !(row && withinViewport(row, viewport))) {
@@ -955,7 +906,7 @@
       onJumpToLive?.();
       return;
     }
-    unread.reachLatest();
+    holdAtLatest = false;
     void controller?.jumpTo(null, 'start', !shouldReduceMotion());
   }
   function onEscape(event: KeyboardEvent): void {
@@ -983,7 +934,7 @@
   }
 </script>
 
-{#snippet timelineItem(item: TimelineItemView, collapsed = false, unreadCount = 0)}
+{#snippet timelineItem(item: ResolvedItem, collapsed = false, unreadCount = 0)}
   {@const edited = editEventId !== null && item.event_id === editEventId}
   <TimelineItem
     {item}
@@ -1038,7 +989,7 @@
   atLatest={windowState.pinned && timeline.forwardPagination === 'end'}
   onRead={markRead}
 />
-<TimelineAnnouncements {timeline} {visibleItems} />
+<TimelineAnnouncements {timeline} />
 <MessageContextMenu menu={messageMenu} />
 <MessageDialogHost
   {dialogs}
@@ -1046,8 +997,8 @@
   {roomId}
   {members}
   {currentUserId}
-  readers={(item) => readersByItem.get(item.id) ?? item.read_by}
-  receiptTimestamps={(item) => receiptTimestampsByItem.get(item.id) ?? item.read_timestamps}
+  readers={(item) => receiptsByItem.get(item.id)?.readers ?? item.read_by}
+  receiptTimestamps={(item) => receiptsByItem.get(item.id)?.timestamps ?? item.read_timestamps}
   {canRedactOwn}
   {canRedactOthers}
   {onMatrixLink}
@@ -1150,7 +1101,7 @@
         <div class={['items', `layout-${preferences.layout}`]}>
           <div class="window-rows">
             {#each rows as row (row.key)}
-              {@const { item, group, collapsed, groupStart } = row.value}
+              {@const { item, group, collapsed, group_start: groupStart } = row.value}
               <div
                 class={['item', { collapsed, 'group-start': groupStart }]}
                 data-event-id={item.event_id ?? undefined}
@@ -1161,17 +1112,20 @@
                 {#if threadRootId && item.event_id === threadRootId}
                   <p class="thread-original">{i18n.t('timeline.originalMessage')}</p>
                 {/if}
-                {#if timelineStart && item.content.kind === 'timeline_start'}
+                {#if row.value === GAP_ROW}
+                  <div class="gap" aria-hidden="true"></div>
+                {:else if timelineStart && item.content.kind === 'timeline_start'}
                   {@render timelineStart()}
                 {:else if group}
                   <TimelineMemberGroup
-                    items={group}
+                    items={group.map((member) => member.item)}
+                    segments={row.value.segments}
                     {members}
                     {onSenderProfile}
                     renderItem={timelineItem}
                   />
                 {:else}
-                  {@render timelineItem(item, collapsed, row.value.unreadCount)}
+                  {@render timelineItem(item, collapsed, row.value.unread_count)}
                 {/if}
               </div>
             {/each}
@@ -1202,18 +1156,18 @@
           {/if}
         {/snippet}
       </EmptyState>
-    {:else if visibleItems.length === 0}
+    {:else if visibleCount === 0}
       <EmptyState
         class="timeline-empty"
-        title={timeline.items.length > 0
+        title={timeline.itemCount > 0
           ? i18n.t('timeline.allFiltered')
           : i18n.t('timeline.noMessages')}
-        description={timeline.items.length > 0 ? i18n.t('timeline.allFilteredHint') : undefined}
+        description={timeline.itemCount > 0 ? i18n.t('timeline.allFilteredHint') : undefined}
       />
     {/if}
   </div>
 
-  {#if revealed && visibleItems.length > 0 && (live ? jumpToLatestVisible : onJumpToLive !== undefined)}
+  {#if revealed && visibleCount > 0 && (live ? jumpToLatestVisible : onJumpToLive !== undefined)}
     {@const jumpLabel = i18n.t('timeline.jumpToLatest')}
     <div
       class="jump-to-latest-motion"
@@ -1249,6 +1203,10 @@
 </div>
 
 <style>
+  .gap {
+    block-size: var(--size-x300);
+  }
+
   .thread-original {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);

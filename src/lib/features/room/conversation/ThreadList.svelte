@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { type ResolvedItem, resolveItem } from '#lib/rooms/timeline-item.js';
   import { onMount } from 'svelte';
-  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
+  import type { MemberView } from '#src/generated/protocol';
   import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -33,7 +34,7 @@
   let { roomId, members, modal = false, onOpenThread, onClose }: Props = $props();
 
   const core = useCoreClient();
-  let roots = $state.raw<TimelineItemView[]>([]);
+  let roots = $state.raw<ResolvedItem[]>([]);
   let nextBatch = $state<string | null>(null);
   let loading = $state(false);
   let failed = $state(false);
@@ -46,7 +47,8 @@
     try {
       const page = await core.rpc.timeline.listThreads({ room_id: roomId, from });
       if (run !== generation) return;
-      roots = from === null ? page.roots : [...roots, ...page.roots];
+      const loaded = page.roots.map(resolveItem);
+      roots = from === null ? loaded : [...roots, ...loaded];
       nextBatch = page.next_batch;
     } catch (error) {
       console.debug('[sable room] threads unavailable', error);

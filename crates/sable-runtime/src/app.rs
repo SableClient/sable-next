@@ -519,31 +519,45 @@ impl App {
     }
 
     pub async fn offer(&self, event: &CoreEvent) {
-        let wanting: Vec<Arc<dyn Instance>> = {
+        self.offer_batch(std::slice::from_ref(event)).await;
+    }
+
+    pub async fn offer_batch(&self, events: &[CoreEvent]) {
+        let deliveries = {
             let host = self.host();
-            let mut routes: HashMap<&str, Option<String>> = HashMap::new();
-            host.entries
-                .iter()
-                .filter(|(_, entry)| entry.interest.wants(event))
-                .filter(|(id, _)| {
-                    routes
-                        .entry(id.slice)
-                        .or_insert_with(|| {
-                            self.slice(id.slice)
-                                .ok()
-                                .and_then(|slice| slice.event_key(event))
+            let mut deliveries = Vec::new();
+            for event in events {
+                let wanting: Vec<Arc<dyn Instance>> = {
+                    let mut routes: HashMap<&str, Option<String>> = HashMap::new();
+                    host.entries
+                        .iter()
+                        .filter(|(_, entry)| entry.interest.wants(event))
+                        .filter(|(id, _)| {
+                            routes
+                                .entry(id.slice)
+                                .or_insert_with(|| {
+                                    self.slice(id.slice)
+                                        .ok()
+                                        .and_then(|slice| slice.event_key(event))
+                                })
+                                .as_ref()
+                                .is_none_or(|key| *key == id.key)
                         })
-                        .as_ref()
-                        .is_none_or(|key| *key == id.key)
-                })
-                .map(|(_, entry)| entry.instance.clone())
-                .collect()
+                        .map(|(_, entry)| entry.instance.clone())
+                        .collect()
+                };
+                if wanting.is_empty() {
+                    continue;
+                }
+                let event = Arc::new(event.clone());
+                deliveries.extend(wanting.into_iter().map(|instance| {
+                    let event = event.clone();
+                    async move { instance.core(event).await }
+                }));
+            }
+            deliveries
         };
-        if wanting.is_empty() {
-            return;
-        }
-        let event = Arc::new(event.clone());
-        join_all(wanting.iter().map(|instance| instance.core(event.clone()))).await;
+        join_all(deliveries).await;
     }
 
     pub async fn switch_account(&self, account: impl Into<String>) {

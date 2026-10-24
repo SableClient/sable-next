@@ -13,6 +13,8 @@ demo = []
 tokio = { version = "1", default-features = false, features = ["sync"] }
 sable-protocol = { path = "../sable-protocol", version = "0.1.0" }
 sable-runtime = { path = "../sable-runtime", version = "0.1.0" }
+sable-slices = { path = "../sable-slices", version = "0.1.0" }
+tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

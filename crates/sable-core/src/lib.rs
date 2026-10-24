@@ -251,6 +251,7 @@ struct Subscription {
     timeline: Option<Arc<Timeline>>,
     overlay: Option<Arc<std::sync::Mutex<timeline_overlay::TimelineOverlay>>>,
     thread_root: Option<OwnedEventId>,
+    timeline_key: Option<sable_model::timeline::TimelineKey>,
     kind: SubscriptionKind,
 }
 

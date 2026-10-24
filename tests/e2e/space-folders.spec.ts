@@ -80,7 +80,7 @@ test('a folder opens to its spaces and takes another one by drag', async ({ page
   await group(page);
 
   await page.getByRole('button', { name: 'Alpha, Beta' }).click();
-  await expect(spaceOrder(page)).resolves.toEqual(['Alpha', 'Beta', 'Gamma']);
+  await expect.poll(() => spaceOrder(page)).toEqual(['Alpha', 'Beta', 'Gamma']);
 
   await expect(async () => {
     await railLink(page, 'Gamma').dragTo(railLink(page, 'Alpha'), {

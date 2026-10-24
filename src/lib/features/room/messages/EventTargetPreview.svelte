@@ -1,8 +1,9 @@
 <script lang="ts">
+  import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
   import type { Component, Snippet } from 'svelte';
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpRightIcon';
 
-  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
+  import type { MemberView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -76,7 +77,7 @@
   );
   let replyStyle = $derived(reply ? preferences.replyPreviewStyle : null);
 
-  function previewOf(item: TimelineItemView, t: Translate): Preview {
+  function previewOf(item: ResolvedItem, t: Translate): Preview {
     const content = item.content;
     if (content.kind === 'redacted') return { sender: item.sender, body: t('timeline.redacted') };
     if (content.kind === 'hidden_event' && content.event_type === 'm.reaction') {

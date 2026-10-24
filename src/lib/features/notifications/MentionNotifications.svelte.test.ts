@@ -6,8 +6,9 @@ import { afterEach, expect, test, vi } from 'vitest';
 vi.mock('#lib/core/context.js');
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
+import type { MentionNotificationModeView } from '#src/generated/protocol';
 
-type Mode = 'off' | 'notify' | 'loud';
+type Mode = MentionNotificationModeView;
 
 const core = Object.assign(baseCore, {
   session: { user_id: '@erwan:example.org' },

@@ -1,5 +1,5 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { isRecord } from '#lib/guards.js';
-import type { TimelineItemView } from '#src/generated/protocol';
 
 export interface Relation {
   eventId: string;
@@ -16,7 +16,7 @@ export function relationOf(content: unknown): Relation | null {
   };
 }
 
-export function isEditEvent(item: TimelineItemView): boolean {
+export function isEditEvent(item: ResolvedItem): boolean {
   return (
     item.content.kind === 'hidden_event' &&
     item.content.event_type === 'm.room.message' &&
@@ -30,7 +30,7 @@ export function editedBody(content: unknown): string | null {
   return isRecord(replacement) && typeof replacement.body === 'string' ? replacement.body : null;
 }
 
-export function redactionTarget(item: TimelineItemView): string | null {
+export function redactionTarget(item: ResolvedItem): string | null {
   const content = item.content;
   if (content.kind !== 'hidden_event' || content.event_type !== 'm.room.redaction') return null;
   if (content.redacts) return content.redacts;
@@ -40,19 +40,19 @@ export function redactionTarget(item: TimelineItemView): string | null {
 }
 
 export class TimelineEventIndex {
-  readonly #items: readonly TimelineItemView[];
-  readonly #aggregations: readonly TimelineItemView[];
-  #byId: Map<string, TimelineItemView> | null = null;
-  #edits: Map<string, TimelineItemView[]> | null = null;
+  readonly #items: readonly ResolvedItem[];
+  readonly #aggregations: readonly ResolvedItem[];
+  #byId: Map<string, ResolvedItem> | null = null;
+  #edits: Map<string, ResolvedItem[]> | null = null;
   #reasons: Map<string, string> | null = null;
   #redactors: Map<string, string> | null = null;
 
-  constructor(items: readonly TimelineItemView[], aggregations: readonly TimelineItemView[]) {
+  constructor(items: readonly ResolvedItem[], aggregations: readonly ResolvedItem[]) {
     this.#items = items;
     this.#aggregations = aggregations;
   }
 
-  get(eventId: string): TimelineItemView | null {
+  get(eventId: string): ResolvedItem | null {
     if (this.#byId === null) {
       this.#byId = new Map();
       for (const item of [...this.#items, ...this.#aggregations]) {
@@ -76,7 +76,7 @@ export class TimelineEventIndex {
     return this.#reasons.get(eventId) ?? null;
   }
 
-  redactor(item: TimelineItemView): string | null {
+  redactor(item: ResolvedItem): string | null {
     if (item.content.kind !== 'redacted') return null;
     if (this.#redactors === null) {
       this.#redactors = new Map();
@@ -90,7 +90,7 @@ export class TimelineEventIndex {
     return by && by !== item.sender ? by : null;
   }
 
-  editBefore(edit: TimelineItemView): TimelineItemView | null {
+  editBefore(edit: ResolvedItem): ResolvedItem | null {
     if (edit.content.kind !== 'hidden_event') return null;
     const target = relationOf(edit.content.content)?.eventId;
     if (!target) return null;
@@ -105,7 +105,7 @@ export class TimelineEventIndex {
         this.#edits.set(of, list);
       }
     }
-    let previous: TimelineItemView | null = null;
+    let previous: ResolvedItem | null = null;
     for (const candidate of this.#edits.get(target) ?? []) {
       if (candidate.event_id === edit.event_id || candidate.timestamp > edit.timestamp) continue;
       if (previous === null || candidate.timestamp >= previous.timestamp) previous = candidate;

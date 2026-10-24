@@ -1,11 +1,10 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { expect, test, vi } from 'vitest';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -38,7 +37,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
 import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
-function plainMultiline(): TimelineItemView {
+function plainMultiline(): ResolvedItem {
   return withRowFields({
     id: 'item',
     event_id: '$item',
@@ -55,7 +54,6 @@ function plainMultiline(): TimelineItemView {
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,

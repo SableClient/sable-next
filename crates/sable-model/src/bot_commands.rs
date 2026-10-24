@@ -1050,9 +1050,9 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        ArgumentDraft, ArgumentError, ArgumentValue, InvocationResult, LiteralValue, RoomReference,
-        RoomReferenceKind, build_invocation, drafts_from_text, is_server_name, match_bot_command,
-        parse_bot_command,
+        ArgumentDraft, ArgumentError, ArgumentValue, BotCommandDescription, InvocationResult,
+        LiteralValue, RoomReference, RoomReferenceKind, build_invocation, drafts_from_text,
+        is_server_name, match_bot_command, parse_bot_command, parse_descriptions,
     };
 
     fn ban() -> super::BotCommand {
@@ -1085,6 +1085,28 @@ mod tests {
             ],
         });
         assert_eq!(parse_bot_command("@b:x", None, None, &content), None);
+    }
+
+    #[test]
+    fn descriptions_keep_the_newest_command_per_sender() {
+        let description = |sender: &str, command: &str, body: &str| BotCommandDescription {
+            sender: sender.to_owned(),
+            sender_name: Some("Bot".to_owned()),
+            sender_avatar: None,
+            content: json!({
+                "command": command,
+                "description": { "m.text": [{ "body": body }] },
+            }),
+        };
+        let parsed = parse_descriptions(&[
+            description("@bot:x", "ping", "old"),
+            description("@bot:x", "ping", "new"),
+            description("@other:x", "ping", "other"),
+            description("@bot:x", "", "invalid"),
+        ]);
+
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].description.as_deref(), Some("new"));
     }
 
     #[test]

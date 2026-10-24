@@ -1,10 +1,9 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { render } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { expect, test, vi } from 'vitest';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -24,7 +23,7 @@ test('a target names its sender in the colour of their profile', async () => {
     sender_name: 'Bob',
     timestamp: 0,
     content: { kind: 'message', body: 'Pinned', html: null, emote: false, notice: false },
-  } as unknown as TimelineItemView;
+  } as unknown as ResolvedItem;
   const { container } = render(EventTargetPreview, {
     props: { eventId: '$pinned:example.org', events: new TimelineEventIndex([target], []) },
   });

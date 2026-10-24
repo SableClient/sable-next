@@ -1,9 +1,6 @@
 <script lang="ts">
-  import type {
-    MemberView,
-    PerMessageProfileView,
-    TimelineItemView,
-  } from '#src/generated/protocol';
+  import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
+  import type { MemberView, PerMessageProfileView } from '#src/generated/protocol';
   import type { Snippet } from 'svelte';
   import { on } from 'svelte/events';
 
@@ -13,13 +10,14 @@
   import { opensFrom } from './message-preview';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import { TIMELINE_LAYOUT_STYLE, timelineLayoutStyle } from '../timeline/timeline-layout';
-  import { isCollapsed } from '../timeline/timeline-format';
+  import { timelineCollapsed } from '#lib/model/model.js';
+  import { groupInput } from '../timeline/timeline-format';
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
   interface Props {
     roomId: string;
     eventId: string;
-    item?: TimelineItemView | null;
+    item?: ResolvedItem | null;
     members?: readonly MemberView[];
     fallback: Snippet;
     loading?: Snippet;
@@ -60,7 +58,9 @@
   let shown = $derived(item ?? eventItems.get(roomId, eventId) ?? null);
   let previous = $derived(previousEventId ? eventItems.get(roomId, previousEventId) : null);
   let collapsed = $derived(
-    shown && previous ? isCollapsed([previous, shown], 1, preferences.replyPreviewStyle) : false
+    shown && previous
+      ? timelineCollapsed(groupInput(previous), groupInput(shown), preferences.replyPreviewStyle)
+      : false
   );
 
   function openMessage(node: HTMLElement): () => void {

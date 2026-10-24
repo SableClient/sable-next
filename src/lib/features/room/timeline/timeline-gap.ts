@@ -1,0 +1,42 @@
+import type { ResolvedItem, ResolvedRow } from '#lib/rooms/timeline-item.js';
+
+const GAP_ITEM: ResolvedItem = {
+  id: 'gap',
+  row: 'annotation',
+  forwardable: false,
+  redactable: false,
+  visibility: 'always',
+  event_id: null,
+  transaction_id: null,
+  send_state: null,
+  sender: null,
+  sender_name: null,
+  sender_avatar: null,
+  timestamp: 0,
+  content: { kind: 'unsupported', description: '' },
+  in_reply_to: null,
+  thread_root: null,
+  thread_summary: null,
+  reactions: [],
+  is_own: false,
+  read_by: [],
+  read_timestamps: {},
+  per_message_profile: null,
+  bundled_link_previews: [],
+  link_previews_removed: null,
+  mention: 'none',
+  forwarded: null,
+  forum_title: null,
+};
+/** The row of a place in the list whose rows the runtime has not sent. */
+export const GAP_ROW: ResolvedRow = {
+  key: 'gap',
+  reply_target: false,
+  item: GAP_ITEM,
+  group: null,
+  segments: [],
+  collapsed: false,
+  group_start: false,
+  unread_count: 0,
+  receipts: null,
+};

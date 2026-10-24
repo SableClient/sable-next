@@ -1,6 +1,6 @@
 import { on } from 'svelte/events';
 
-import type { BackwardPaginationState } from '#lib/rooms/timeline.svelte.js';
+import type { PaginationStateView } from '#src/generated/protocol';
 
 import { TIMELINE_LAYOUT } from './timeline-layout';
 
@@ -9,7 +9,7 @@ const AUTOSCROLL_BUTTON = 1;
 type Gesture = 'none' | 'press' | 'wheel' | 'touch' | 'keys' | 'autoscroll';
 
 interface TimelineHistoryControllerOptions {
-  getBackwardPagination: () => BackwardPaginationState;
+  getBackwardPagination: () => PaginationStateView;
   isNearOldest: () => boolean;
   isScrolling: () => boolean;
   requestHistory: () => Promise<boolean>;
@@ -17,7 +17,7 @@ interface TimelineHistoryControllerOptions {
 
 export interface HistoryDecisionInput {
   wanted: boolean;
-  pagination: BackwardPaginationState;
+  pagination: PaginationStateView;
   nearOldest: boolean;
   requestPending: boolean;
   msSinceRequest: number;

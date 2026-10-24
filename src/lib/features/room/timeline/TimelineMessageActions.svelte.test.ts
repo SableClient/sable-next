@@ -515,7 +515,6 @@ test('offers to add a message inline emote to your own pack', async () => {
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     },
   });
   render(TimelineItemHarness, {

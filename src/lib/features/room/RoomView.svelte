@@ -72,7 +72,7 @@
   import { powerTag } from './members/power-tags';
   import { splitVia } from '#lib/rooms/join-address.js';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
-  import { eventBefore } from './timeline/timeline-format';
+  import { eventBefore } from '#lib/model/model.js';
   import { RoomSession } from './room-session.svelte.js';
   import { MemberProfile } from './members/member-profile.svelte.js';
   import { RoomPanels } from './room-panels.svelte.js';
@@ -101,7 +101,7 @@
   const personas = usePersonaStore();
   const roomList = useRoomList();
   const timelineOwner = Symbol('room-view');
-  const activeTimeline = activeRoomTimeline(core);
+  const activeTimeline = activeRoomTimeline();
   const timeline = activeTimeline.timeline;
   const memberLoader = new RoomMemberLoader();
   const call = useCallSession();
@@ -405,7 +405,6 @@
     void resolvedRoomId;
     memberLoader.reset();
     untrack(() => conversation.followRoom());
-    conversation.forgetRequestedDetails();
     receiptsOpen = false;
     panels.reset();
     closeProfile();
@@ -425,12 +424,6 @@
 
   $effect(() => {
     if (desktop && panels.desktopMembersOpen) void loadMembers();
-  });
-
-  // The SDK loads a replied-to event lazily, so a reply preview stays blank
-  // until it is asked for.
-  $effect(() => {
-    conversation.fetchMissingReplyDetails();
   });
 
   // Returning to live drops the anchor from the URL.
@@ -457,6 +450,8 @@
     const activeRoomId = timelineRoomId;
     if (!activeRoomId) return;
     const targetEventId = timelineEventId;
+    // A linked event may sit in a thread, so its place is known only once it is resolved.
+    if (eventId !== null && resolvedPermalink === null) return;
     const anchor = untrack(() => {
       // A loaded event is reached by scrolling, but only while live.
       const loaded = timeline.items.some((item) => item.event_id === targetEventId);
@@ -482,7 +477,8 @@
         anchor,
         hiddenEvents,
         openAtUnread,
-        landingEventId
+        landingEventId,
+        resolvedRoom === undefined || roomHasUnread
       )
     );
     void untrack(() => loadMembers());
@@ -668,7 +664,13 @@
 
   function markUnreadFrom(eventId: string): void {
     void core.rpc.timeline
-      .markUnread({ room_id: resolvedRoomId, read_marker: eventBefore(timeline.items, eventId) })
+      .markUnread({
+        room_id: resolvedRoomId,
+        read_marker: eventBefore(
+          timeline.items.map((item) => item.event_id),
+          eventId
+        ),
+      })
       .catch((error: unknown) => {
         console.warn('[sable room] mark as unread failed', error);
         toasts.error(i18n.t('errors.actionFailed'));
@@ -693,10 +695,6 @@
       fully_read: false,
     });
     list?.dismissUnread();
-  }
-
-  function loadReadMarker(): Promise<string | null> {
-    return core.rpc.timeline.readMarker({ room_id: resolvedRoomId });
   }
 
   function requestUnread(eventId: string): Promise<void> {
@@ -812,7 +810,6 @@
       onRead={markRead}
       onFullyRead={setFullyRead}
       hasUnread={resolvedRoom === undefined || roomHasUnread}
-      onLoadReadMarker={loadReadMarker}
       onRequestUnread={requestUnread}
       onResumeLive={resumeLive}
       onMarkRead={markAllRead}

@@ -138,7 +138,7 @@
 
   let { children }: Props = $props();
   const core = useCoreClient();
-  const roomList = new RoomList(core);
+  const roomList = new RoomList();
   provideRoomList(roomList);
   const spaceSidebar = new SpaceSidebar();
   provideSpaceSidebar(spaceSidebar);
@@ -841,7 +841,9 @@
     void roomList.start().catch((error: unknown) => {
       console.warn('[sable rooms] room list unavailable', error);
     });
-    void spaceSidebar.start(core);
+    void spaceSidebar.start().catch((error: unknown) => {
+      console.warn('[sable nav] space layout unavailable', error);
+    });
     notifications.start(core, openNotification);
     presence.start(core);
     dismissedInvites.start(core);
@@ -911,10 +913,6 @@
   let quietWhenActiveElsewhere = $derived(
     preferences.sendPresence && preferences.pushInactiveTimeout !== 'off'
   );
-
-  $effect(() => {
-    roomList.setPresentationActive(active);
-  });
 
   $effect(() => {
     if (core.status !== 'ready') return;

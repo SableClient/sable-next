@@ -1,11 +1,8 @@
+import type { RoomUnreadView } from '#src/generated/protocol';
+
 export type UnreadBadgeMode = 'dot' | 'count';
 
-export interface UnreadBadgeCounts {
-  unread: number;
-  highlight: number;
-  marked?: boolean;
-  notifying?: number;
-}
+export type UnreadBadgeCounts = RoomUnreadView;
 
 export interface UnreadBadgeSettings {
   showUnreadCounts: boolean;
@@ -32,7 +29,7 @@ export function resolveUnreadBadge(
     return counts.marked ? { mode: 'dot', count: 0, highlight: false } : null;
   }
 
-  const notified = (counts.notifying ?? 0) > 0;
+  const notified = counts.notifying > 0;
   const highlight = mention || notified;
   const numeric = mention
     ? settings.showPingCounts
@@ -41,7 +38,7 @@ export function resolveUnreadBadge(
 
   return {
     mode: 'count',
-    count: notified && !mention ? (counts.notifying ?? count) : count,
+    count: notified && !mention ? counts.notifying : count,
     highlight,
   };
 }

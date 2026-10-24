@@ -1,8 +1,8 @@
 import type {
-  AvatarEditView,
-  FieldEdit,
   ProfileOverrideView,
   ProfileOverridesView,
+  Rpc,
+  RpcParams,
   SealStateView,
 } from '#src/generated/protocol';
 
@@ -19,11 +19,7 @@ export interface OverrideColors {
   dark: string | null;
 }
 
-export interface OverrideEdit {
-  display_name: FieldEdit;
-  avatar: AvatarEditView;
-  color: FieldEdit;
-}
+export type OverrideEdit = Omit<RpcParams<Rpc['account']['setProfileOverride']>, 'user_id'>;
 
 export type Protection = SealStateView;
 

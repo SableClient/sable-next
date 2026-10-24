@@ -102,6 +102,7 @@ pub enum LobbyAction {
 /// What the sections depend on besides the rooms. `loaded: None` treats every
 /// level as described; `keep_empty` names subspaces shown even without rooms.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(default)]
 pub struct SectionInputs {
     pub loaded: Option<HashSet<String>>,

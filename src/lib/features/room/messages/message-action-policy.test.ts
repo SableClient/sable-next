@@ -1,10 +1,10 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { expect, test } from 'vitest';
-import type { TimelineItemView } from '#src/generated/protocol';
 
 import { messageActionPolicy } from './message-action-policy';
 import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
-function item(overrides: Partial<TimelineItemView> = {}): TimelineItemView {
+function item(overrides: Partial<ResolvedItem> = {}): ResolvedItem {
   return withRowFields({
     id: 'item',
     event_id: '$item',
@@ -21,7 +21,6 @@ function item(overrides: Partial<TimelineItemView> = {}): TimelineItemView {
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -40,7 +39,7 @@ function item(overrides: Partial<TimelineItemView> = {}): TimelineItemView {
   });
 }
 
-function policy(overrides: Partial<TimelineItemView> = {}, hasLinkPreviews = false) {
+function policy(overrides: Partial<ResolvedItem> = {}, hasLinkPreviews = false) {
   return messageActionPolicy({
     item: item(overrides),
     roomId: '!room:example.org',
@@ -95,7 +94,7 @@ function mediaContent(
   kind: (typeof MEDIA_KINDS)[number],
   caption: string | null = 'the code',
   html: string | null = null
-): TimelineItemView['content'] {
+): ResolvedItem['content'] {
   const common = {
     filename: 'main.rs',
     caption,
@@ -271,7 +270,6 @@ test('edited messages can still be annotated through their original event', () =
       emote: false,
       notice: false,
       edited: true,
-      jumbo: null,
     },
   });
 

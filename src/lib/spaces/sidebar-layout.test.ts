@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   applyDrop,
-  sameLayout,
   folderName,
   layoutSpaceIds,
   mergeSpaces,
@@ -67,8 +66,8 @@ describe('space order history', () => {
     const known = rememberSpaceIds([], ['!alpha', '!beta']);
     const dragged = applyDrop(
       mergeSpaces([], orderedKnownSpaceIds(known, ['!alpha', '!beta'])),
-      { kind: 'space', roomId: '!beta' },
-      { kind: 'space', roomId: '!alpha' },
+      { kind: 'space', room_id: '!beta', folder_id: null },
+      { kind: 'space', room_id: '!alpha', folder_id: null },
       'above'
     );
 
@@ -86,8 +85,8 @@ describe('applyDrop', () => {
     expect(
       applyDrop(
         items,
-        { kind: 'space', roomId: '!c' },
-        { kind: 'space', roomId: '!a' },
+        { kind: 'space', room_id: '!c', folder_id: null },
+        { kind: 'space', room_id: '!a', folder_id: null },
         'into',
         fixedId
       )
@@ -98,7 +97,12 @@ describe('applyDrop', () => {
     const items = [folder('f', ['!a']), space('!b')];
 
     expect(
-      applyDrop(items, { kind: 'space', roomId: '!b' }, { kind: 'folder', folderId: 'f' }, 'into')
+      applyDrop(
+        items,
+        { kind: 'space', room_id: '!b', folder_id: null },
+        { kind: 'folder', folder_id: 'f' },
+        'into'
+      )
     ).toEqual([folder('f', ['!a', '!b'])]);
   });
 
@@ -106,10 +110,20 @@ describe('applyDrop', () => {
     const items = [space('!a'), space('!b'), space('!c')];
 
     expect(
-      applyDrop(items, { kind: 'space', roomId: '!c' }, { kind: 'space', roomId: '!a' }, 'above')
+      applyDrop(
+        items,
+        { kind: 'space', room_id: '!c', folder_id: null },
+        { kind: 'space', room_id: '!a', folder_id: null },
+        'above'
+      )
     ).toEqual([space('!c'), space('!a'), space('!b')]);
     expect(
-      applyDrop(items, { kind: 'space', roomId: '!a' }, { kind: 'space', roomId: '!b' }, 'below')
+      applyDrop(
+        items,
+        { kind: 'space', room_id: '!a', folder_id: null },
+        { kind: 'space', room_id: '!b', folder_id: null },
+        'below'
+      )
     ).toEqual([space('!b'), space('!a'), space('!c')]);
   });
 
@@ -119,8 +133,8 @@ describe('applyDrop', () => {
     expect(
       applyDrop(
         items,
-        { kind: 'space', roomId: '!c' },
-        { kind: 'space', roomId: '!a', folderId: 'f' },
+        { kind: 'space', room_id: '!c', folder_id: null },
+        { kind: 'space', room_id: '!a', folder_id: 'f' },
         'below'
       )
     ).toEqual([folder('f', ['!a', '!c', '!b'])]);
@@ -132,8 +146,8 @@ describe('applyDrop', () => {
     expect(
       applyDrop(
         items,
-        { kind: 'space', roomId: '!c', folderId: 'f' },
-        { kind: 'space', roomId: '!a', folderId: 'f' },
+        { kind: 'space', room_id: '!c', folder_id: 'f' },
+        { kind: 'space', room_id: '!a', folder_id: 'f' },
         'above'
       )
     ).toEqual([folder('f', ['!c', '!a', '!b'])]);
@@ -145,8 +159,8 @@ describe('applyDrop', () => {
     expect(
       applyDrop(
         items,
-        { kind: 'space', roomId: '!b', folderId: 'f' },
-        { kind: 'space', roomId: '!c' },
+        { kind: 'space', room_id: '!b', folder_id: 'f' },
+        { kind: 'space', room_id: '!c', folder_id: null },
         'below'
       )
     ).toEqual([folder('f', ['!a']), space('!c'), space('!b')]);
@@ -158,8 +172,8 @@ describe('applyDrop', () => {
     expect(
       applyDrop(
         items,
-        { kind: 'space', roomId: '!b', folderId: 'f' },
-        { kind: 'folder', folderId: 'f' },
+        { kind: 'space', room_id: '!b', folder_id: 'f' },
+        { kind: 'folder', folder_id: 'f' },
         'below'
       )
     ).toEqual([space('!a'), space('!b'), space('!c')]);
@@ -169,7 +183,12 @@ describe('applyDrop', () => {
     const items = [space('!a'), folder('f', ['!b', '!c'])];
 
     expect(
-      applyDrop(items, { kind: 'folder', folderId: 'f' }, { kind: 'space', roomId: '!a' }, 'above')
+      applyDrop(
+        items,
+        { kind: 'folder', folder_id: 'f' },
+        { kind: 'space', room_id: '!a', folder_id: null },
+        'above'
+      )
     ).toEqual([folder('f', ['!b', '!c']), space('!a')]);
   });
 
@@ -177,7 +196,12 @@ describe('applyDrop', () => {
     const items = [space('!a'), folder('f', ['!b'], 'Work')];
 
     expect(
-      applyDrop(items, { kind: 'folder', folderId: 'f' }, { kind: 'space', roomId: '!a' }, 'into')
+      applyDrop(
+        items,
+        { kind: 'folder', folder_id: 'f' },
+        { kind: 'space', room_id: '!a', folder_id: null },
+        'into'
+      )
     ).toEqual([folder('f', ['!a', '!b'], 'Work')]);
   });
 
@@ -185,7 +209,12 @@ describe('applyDrop', () => {
     const items = [folder('f', ['!b']), space('!a')];
 
     expect(
-      applyDrop(items, { kind: 'folder', folderId: 'f' }, { kind: 'space', roomId: '!a' }, 'below')
+      applyDrop(
+        items,
+        { kind: 'folder', folder_id: 'f' },
+        { kind: 'space', room_id: '!a', folder_id: null },
+        'below'
+      )
     ).toEqual([space('!a'), folder('f', ['!b'])]);
   });
 
@@ -199,7 +228,12 @@ describe('applyDrop', () => {
     const items = [folder('f', ['!a']), folder('g', ['!b', '!c'])];
 
     expect(
-      applyDrop(items, { kind: 'folder', folderId: 'g' }, { kind: 'folder', folderId: 'f' }, 'into')
+      applyDrop(
+        items,
+        { kind: 'folder', folder_id: 'g' },
+        { kind: 'folder', folder_id: 'f' },
+        'into'
+      )
     ).toEqual([folder('f', ['!a', '!b', '!c'])]);
   });
 
@@ -209,8 +243,8 @@ describe('applyDrop', () => {
     expect(
       applyDrop(
         items,
-        { kind: 'folder', folderId: 'g' },
-        { kind: 'space', roomId: '!a', folderId: 'f' },
+        { kind: 'folder', folder_id: 'g' },
+        { kind: 'space', room_id: '!a', folder_id: 'f' },
         'above'
       )
     ).toEqual([folder('f', ['!b', '!a'])]);
@@ -220,7 +254,12 @@ describe('applyDrop', () => {
     const items = [space('!a'), space('!b')];
 
     expect(
-      applyDrop(items, { kind: 'space', roomId: '!a' }, { kind: 'space', roomId: '!a' }, 'below')
+      applyDrop(
+        items,
+        { kind: 'space', room_id: '!a', folder_id: null },
+        { kind: 'space', room_id: '!a', folder_id: null },
+        'below'
+      )
     ).toEqual(items);
   });
 });
@@ -274,18 +313,6 @@ describe('ungroupFolder', () => {
     const items = [folder('f', ['!a']), folder('g', ['!b'])];
 
     expect(ungroupFolder(items, 'g')).toEqual([folder('f', ['!a']), space('!b')]);
-  });
-});
-
-describe('sameLayout', () => {
-  it('sees a difference in a folder name, in order and in kind', () => {
-    expect(sameLayout([folder('f', ['!a'])], [folder('f', ['!a'])])).toBe(true);
-    expect(sameLayout([folder('f', ['!a'], 'Work')], [folder('f', ['!a'])])).toBe(false);
-    expect(sameLayout([folder('f', ['!a', '!b'])], [folder('f', ['!b', '!a'])])).toBe(false);
-    expect(sameLayout([space('!a'), folder('f', ['!b'])], [folder('f', ['!b']), space('!a')])).toBe(
-      false
-    );
-    expect(sameLayout([space('!a')], [space('!a'), space('!b')])).toBe(false);
   });
 });
 

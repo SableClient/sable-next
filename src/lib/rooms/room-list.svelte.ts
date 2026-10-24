@@ -1,35 +1,25 @@
-import { createContext, untrack } from 'svelte';
+import { createContext } from 'svelte';
 
-import type {
-  CoreEvent,
-  NotificationModeView,
-  RoomListItemView,
-  SubscriptionId,
-} from '#src/generated/protocol';
-import { applyDiffs } from '#src/transport';
+import type { NotificationModeView, RoomListItemView, RoomsView } from '#src/generated/protocol';
 
-import { bufferSubscription } from '#lib/core/buffered-subscription.js';
-import type { CoreClient } from '#lib/core/client.svelte.js';
 import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
+import { runtime } from '#lib/runtime/app.js';
+import type { Client } from '#lib/runtime/client.js';
+import { SliceHandle } from '#lib/runtime/handle.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { quietTargets } from './quiet-rooms.svelte.js';
-import { readRoomListSnapshot, writeRoomListSnapshot } from './room-list-snapshot.js';
-import { quietRoomIds } from './spaces.js';
 import {
-  applyBadgeMode,
-  badgeModeFor,
-  quietUnread,
+  NO_UNREAD,
   roomNotifications,
   type RoomUnread,
   roomUnread,
+  type UnreadCount,
 } from './unread.js';
 
-type RoomListDiffs = Extract<CoreEvent, { type: 'room_list_diff' }>['diffs'];
-
-const SNAPSHOT_WRITE_DELAY_MS = 1_000;
-const WARM_ROOM_LIMIT = 32;
-const WARM_BATCH_MS = 100;
+const NO_ROOMS: RoomListItemView[] = [];
+const NO_BADGES: RoomsView['badges'] = {};
+const NO_IDS: string[] = [];
 
 /** Only use an alias when it resolves locally to this room. */
 const aliasOwners = new WeakMap<readonly RoomListItemView[], Map<string, string>>();
@@ -98,39 +88,56 @@ export function findRoomByPathId(
 
 const NOBODY_TYPING: readonly string[] = [];
 
+const roomIndexes = new WeakMap<readonly RoomListItemView[], Map<string, RoomListItemView>>();
+
+function roomIndex(rooms: readonly RoomListItemView[]): Map<string, RoomListItemView> {
+  let index = roomIndexes.get(rooms);
+  if (index === undefined) {
+    index = new Map(rooms.map((room) => [room.room_id, room]));
+    roomIndexes.set(rooms, index);
+  }
+  return index;
+}
+
+/** The rooms slice of the runtime, read the way the app reads it. */
 export class RoomList {
-  rooms = $state.raw<RoomListItemView[]>([]);
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity
-  typingUsers = $state.raw<ReadonlyMap<string, readonly string[]>>(new Map());
-
-  private subscription: SubscriptionId | null = null;
-  private unsubscribeEvents: (() => void) | null = null;
-  private unsubscribeTyping: (() => void) | null = null;
-  private startPromise: Promise<void> | null = null;
-  private generation = 0;
-  private snapshotAccountId: string | null = null;
-  private snapshotWriteTimer: ReturnType<typeof setTimeout> | undefined;
-  private snapshotDirty = false;
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- resolved from setRooms, never rendered
+  private readonly handle: SliceHandle<'rooms'>;
+  private stopPreferences: (() => void) | null = null;
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- resolved from the subscription, never rendered
   private readonly listedWaiters = new Set<{ roomId: string; resolve: () => void }>();
-  private presentationActive = true;
-  private live = $state(false);
-  private warmed: string[] = [];
-  private pendingWarm: string[] = [];
-  private warmTimer: ReturnType<typeof setTimeout> | undefined;
 
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt wholesale, never mutated
-  private readonly roomsById = $derived(new Map(this.rooms.map((room) => [room.room_id, room])));
-  readonly quietRoomIds = $derived(quietRoomIds(this.rooms, quietTargets()));
+  constructor(connect: () => Promise<Client> = runtime) {
+    this.handle = new SliceHandle('rooms', null, connect, {
+      onChange: () => {
+        this.resolveListed();
+      },
+      onOpen: () => {
+        this.sendPreferences();
+      },
+    });
+  }
 
-  constructor(private readonly core: CoreClient) {}
+  get rooms(): RoomListItemView[] {
+    return this.handle.view?.items ?? NO_ROOMS;
+  }
 
   get settled(): boolean {
-    return this.live;
+    return this.handle.view?.settled ?? false;
+  }
+
+  get quietRoomIds(): ReadonlySet<string> {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt from the status, never mutated
+    return new Set(this.handle.view?.quiet_room_ids ?? NO_IDS);
+  }
+
+  /** What each joined space's badge shows, for the spaces that show anything. */
+  get spaceUnread(): ReadonlyMap<string, UnreadCount> {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt from the status, never mutated
+    return new Map(Object.entries(this.handle.view?.space_unread ?? NO_BADGES));
   }
 
   byId(roomId: string | null | undefined): RoomListItemView | undefined {
-    return roomId === null || roomId === undefined ? undefined : this.roomsById.get(roomId);
+    return roomId === null || roomId === undefined ? undefined : roomIndex(this.rooms).get(roomId);
   }
 
   whenListed(roomId: string, timeoutMs: number): Promise<void> {
@@ -154,27 +161,11 @@ export class RoomList {
   }
 
   warm(roomId: string): void {
-    if (this.warmed.includes(roomId)) return;
-    this.warmed.push(roomId);
-    if (this.warmed.length > WARM_ROOM_LIMIT) this.warmed.shift();
-    this.pendingWarm.push(roomId);
-    this.warmTimer ??= setTimeout(() => {
-      this.warmTimer = undefined;
-      const roomIds = this.pendingWarm;
-      this.pendingWarm = [];
-      this.core.rpc.timeline.warmRooms({ room_ids: roomIds }).catch((error: unknown) => {
-        console.debug('[sable rooms] rooms not warmed', error);
-      });
-    }, WARM_BATCH_MS);
-  }
-
-  setPresentationActive(active: boolean): void {
-    this.presentationActive = active;
-    if (active) this.flushSnapshot();
+    this.handle.send({ type: 'warm', room_id: roomId });
   }
 
   typingUserIds(roomId: string): readonly string[] {
-    return this.typingUsers.get(roomId) ?? NOBODY_TYPING;
+    return this.handle.view?.typing[roomId] ?? NOBODY_TYPING;
   }
 
   notificationOverride(roomId: string): NotificationModeView | null {
@@ -188,156 +179,43 @@ export class RoomList {
 
   readonly unreadFor: RoomUnread = roomUnread;
 
-  readonly badgeUnreadFor: RoomUnread = (room) => {
-    const counts = roomUnread(room);
-    if (this.quietRoomIds.has(room.room_id)) return quietUnread(counts);
-    return applyBadgeMode(
-      counts,
-      badgeModeFor(room, room.notification.room, {
-        direct: preferences.badgeDefaultDirect,
-        group: preferences.badgeDefaultGroup,
-      })
-    );
-  };
+  readonly badgeUnreadFor: RoomUnread = (room) =>
+    this.handle.view?.badges[room.room_id] ?? NO_UNREAD;
 
   readonly notificationsFor: RoomUnread = roomNotifications;
 
+  /** Follows the room list, and sends the reader's preferences now and whenever they change. */
   async start(): Promise<void> {
-    if (this.subscription !== null) return;
-    if (this.startPromise) return this.startPromise;
-
-    untrack(() => {
-      this.paintSnapshot();
+    this.stopPreferences ??= $effect.root(() => {
+      $effect(() => {
+        this.sendPreferences();
+      });
     });
-    const promise = this.startSubscription();
-    this.startPromise = promise;
-
-    try {
-      await promise;
-    } finally {
-      if (this.startPromise === promise) this.startPromise = null;
-    }
+    await this.handle.open();
   }
 
   stop(): void {
-    this.generation += 1;
-    this.startPromise = null;
-    untrack(() => {
-      this.flushSnapshot(true);
-    });
-    this.live = false;
-    this.snapshotAccountId = null;
-    clearTimeout(this.warmTimer);
-    this.warmTimer = undefined;
-    this.warmed = [];
-    this.pendingWarm = [];
-    this.rooms = [];
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    this.typingUsers = new Map();
-    this.unsubscribeEvents?.();
-    this.unsubscribeEvents = null;
-    this.unsubscribeTyping?.();
-    this.unsubscribeTyping = null;
-
-    const subscription = this.subscription;
-    this.subscription = null;
-    if (subscription !== null) {
-      this.core.rpc.timeline.unsubscribe({ subscription }).catch((error: unknown) => {
-        console.debug('[sable rooms] room list not unsubscribed', error);
-      });
-    }
+    this.stopPreferences?.();
+    this.stopPreferences = null;
+    this.handle.close();
   }
 
-  private async startSubscription(): Promise<void> {
-    const generation = this.generation;
-    const buffered = bufferSubscription<CoreEvent, RoomListDiffs[number], RoomListItemView>(
-      (listener) => this.core.subscribeEvents(listener),
-      (event) => (event.type === 'room_list_diff' ? event : null),
-      applyDiffs,
-      (diffs) => {
-        this.setRooms(applyDiffs(this.live ? this.rooms : [], diffs));
-      }
-    );
-
-    let response;
-    try {
-      response = await this.core.rpc.timeline.subscribeRoomList();
-    } catch (error) {
-      buffered.stop();
-      throw error;
-    }
-
-    if (generation !== this.generation) {
-      this.core.rpc.timeline
-        .unsubscribe({ subscription: response.subscription })
-        .catch((error: unknown) => {
-          console.debug('[sable rooms] stale room list not unsubscribed', error);
-        });
-      buffered.stop();
-      return;
-    }
-
-    this.subscription = response.subscription;
-    const rooms = buffered.activate(response.subscription, response.rooms);
-    if (rooms.length > 0 || !this.snapshotPainted()) this.setRooms(rooms);
-    this.unsubscribeEvents = buffered.stop;
-    this.unsubscribeTyping = this.core.subscribeEvents((event) => {
-      if (event.type !== 'typing') return;
-
-      // eslint-disable-next-line svelte/prefer-svelte-reactivity
-      const rooms = new Map(this.typingUsers);
-      if (event.user_ids.length > 0) rooms.set(event.room_id, event.user_ids);
-      else rooms.delete(event.room_id);
-      this.typingUsers = rooms;
+  private sendPreferences(): void {
+    this.handle.send({
+      type: 'set_preferences',
+      quiet_targets: [...quietTargets()],
+      badge_defaults: {
+        direct: preferences.badgeDefaultDirect,
+        group: preferences.badgeDefaultGroup,
+      },
     });
   }
 
-  private paintSnapshot(): void {
-    const accountId = this.core.session?.account_id ?? null;
-    this.snapshotAccountId = accountId;
-    if (accountId === null || this.rooms.length > 0) return;
-    const snapshot = readRoomListSnapshot(accountId);
-    if (snapshot && snapshot.length > 0) this.rooms = snapshot;
-  }
-
-  private snapshotPainted(): boolean {
-    return !this.live && this.rooms.length > 0;
-  }
-
-  private scheduleSnapshotWrite(): void {
-    this.snapshotDirty = true;
-    if (
-      !this.presentationActive ||
-      this.snapshotAccountId === null ||
-      this.snapshotWriteTimer !== undefined
-    )
-      return;
-    this.snapshotWriteTimer = setTimeout(() => {
-      this.flushSnapshot();
-    }, SNAPSHOT_WRITE_DELAY_MS);
-  }
-
-  private flushSnapshot(force = false): void {
-    if (this.snapshotWriteTimer !== undefined) clearTimeout(this.snapshotWriteTimer);
-    this.snapshotWriteTimer = undefined;
-    if (
-      !this.snapshotDirty ||
-      this.snapshotAccountId === null ||
-      !this.live ||
-      (!force && !this.presentationActive)
-    )
-      return;
-    writeRoomListSnapshot(this.snapshotAccountId, this.rooms);
-    this.snapshotDirty = false;
-  }
-
-  private setRooms(rooms: RoomListItemView[]): void {
-    this.live = true;
-    this.rooms = rooms;
+  private resolveListed(): void {
+    const rooms = this.rooms;
     for (const waiter of this.listedWaiters) {
       if (rooms.some((room) => room.room_id === waiter.roomId)) waiter.resolve();
     }
-    this.scheduleSnapshotWrite();
   }
 }
 

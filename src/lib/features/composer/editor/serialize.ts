@@ -15,7 +15,7 @@ import {
 } from 'prosemirror-model';
 
 import type { OutgoingMentions } from '#lib/core/client.svelte.js';
-import type { ImageSourcePackReferenceView } from '#src/generated/protocol';
+import type { ComposerContent, ImageSourcePackReferenceView } from '#src/generated/protocol';
 
 import { mfmUnixtime, parseMfmColor, parseMfmUnixtime, utcFallbackLabel } from '../time-markup';
 import { mathPlugin } from './math';
@@ -24,12 +24,11 @@ import { isMscLink, linkMscs } from './msc-links';
 import { codeLanguage, composerSchema, parseMatrixHtml, ROOM_PING } from './schema';
 import { docToMarkdown } from './to-markdown';
 
-export interface ComposerMessage {
-  body: string;
+export type ComposerMessage = Omit<ComposerContent, 'formatted_body' | 'mentions'> & {
   formatted: string | null;
   mentions: OutgoingMentions;
   imageSourcePacks?: ImageSourcePackReferenceView[];
-}
+};
 
 type AutolinkState = MarkdownSerializerState & { inAutolink?: boolean };
 const SPOILER_FALLBACK = '\uE000';
@@ -541,7 +540,7 @@ export function mentionsOf(doc: ProseMirrorNode): OutgoingMentions {
     return false;
   });
 
-  return { userIds: [...userIds], room: mentionsRoom(doc) };
+  return { user_ids: [...userIds], room: mentionsRoom(doc) };
 }
 
 const tokenizer = MarkdownIt('commonmark', { html: false })

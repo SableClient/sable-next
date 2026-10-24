@@ -101,7 +101,6 @@ test('falls back to the measured mean for a row whose height it cannot predict',
         emote: false,
         notice: false,
         edited: false,
-        jumbo: null,
       },
       mediaColumnPx(320)
     )

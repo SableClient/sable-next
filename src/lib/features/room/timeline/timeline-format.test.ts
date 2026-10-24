@@ -1,33 +1,17 @@
+import type { ResolvedItem, ResolvedRow } from '#lib/rooms/timeline-item.js';
 import { expect, test } from 'vitest';
 
 import type {
   MembershipChangeView,
   PerMessageProfileView,
   StateChangeView,
-  TimelineItemView,
 } from '#src/generated/protocol';
-
-import { preferences } from '#lib/settings/preferences.svelte.js';
-import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';
 
 import { rowFields } from './row-fixtures';
 import { stateEventSubject, stateEventText, type Translate } from './state-event-text';
-import {
-  canRedact,
-  cumulativeReadBy,
-  cumulativeReadTimestamps,
-  eventBefore,
-  isCollapsed,
-  mergeAggregations,
-  personaLookup,
-  readReceiptEventId,
-  replyTarget,
-  unreadCountAfter,
-  visibleAggregations,
-  visibleTimelineItems,
-} from './timeline-format';
+import { canRedact, personaLookup, readReceiptEventId, replyTarget } from './timeline-format';
 
-const items = [{ event_id: '$older' }, { event_id: '$latest' }] as TimelineItemView[];
+const items = [{ event_id: '$older' }, { event_id: '$latest' }] as ResolvedItem[];
 const scrolledPast = {
   visibleEventId: '$latest',
   documentVisible: true,
@@ -37,61 +21,6 @@ const scrolledPast = {
 test('marks the newest event scrolled past', () => {
   expect(readReceiptEventId(items, scrolledPast)).toBe('$latest');
   expect(readReceiptEventId(items, { ...scrolledPast, visibleEventId: '$older' })).toBe('$older');
-});
-
-test('an old message lists everyone who read it or anything after it', () => {
-  const timeline = [
-    { id: 'old', read_by: [] },
-    { id: 'middle', read_by: ['@bob:example.org'] },
-    { id: 'new', read_by: ['@carol:example.org'] },
-  ] as TimelineItemView[];
-  const readers = cumulativeReadBy(timeline);
-
-  expect(readers.get('old')).toEqual(['@bob:example.org', '@carol:example.org']);
-  expect(readers.get('middle')).toEqual(['@bob:example.org', '@carol:example.org']);
-  expect(readers.get('new')).toEqual(['@carol:example.org']);
-});
-
-test('a message keeps its own readers alongside later ones', () => {
-  const timeline = [
-    { id: 'a', read_by: ['@bob:example.org'] },
-    { id: 'b', read_by: ['@bob:example.org', '@carol:example.org'] },
-  ] as TimelineItemView[];
-
-  expect(cumulativeReadBy(timeline).get('a')).toEqual(['@bob:example.org', '@carol:example.org']);
-});
-
-test('receipt times follow the latest reader position without inventing missing times', () => {
-  const timeline: TimelineItemView[] = [
-    {
-      ...message,
-      id: 'old',
-      read_by: ['@bob:example.org', '@carol:example.org'],
-      read_timestamps: { '@bob:example.org': 100, '@carol:example.org': 200 },
-    },
-    {
-      ...message,
-      id: 'new',
-      read_by: ['@bob:example.org', '@carol:example.org'],
-      read_timestamps: { '@bob:example.org': 300 },
-    },
-  ];
-
-  const timestamps = cumulativeReadTimestamps(timeline);
-  expect(timestamps.get('new')).toEqual({ '@bob:example.org': 300 });
-  expect(timestamps.get('old')).toEqual({ '@bob:example.org': 300 });
-});
-
-test('the read marker for a marked-unread message is the event before it', () => {
-  const rows = [
-    { event_id: '$first' },
-    { event_id: null },
-    { event_id: '$second' },
-  ] as TimelineItemView[];
-
-  expect(eventBefore(rows, '$second')).toBe('$first');
-  expect(eventBefore(rows, '$first')).toBeNull();
-  expect(eventBefore(rows, '$missing')).toBeNull();
 });
 
 test('does not repeat or rewind the receipt', () => {
@@ -110,59 +39,13 @@ test('reads nothing while the document is hidden or no row is past', () => {
   expect(readReceiptEventId(items, { ...scrolledPast, visibleEventId: null })).toBeNull();
 });
 
-const defaults: TimelinePreferences = {
-  layout: 'modern',
-  hideMembershipEvents: false,
-  hideProfileChanges: true,
-  hideTopicChanges: false,
-  hideMemberInReadOnly: true,
-  showTombstoneEvents: false,
-  showHiddenEvents: false,
-  hiddenEventEdits: true,
-  hiddenEventReactions: true,
-  hiddenEventRedactions: true,
-  hiddenEventOther: true,
-};
-
-function aggregation(eventType: string, id: string): TimelineItemView {
-  return {
-    id,
-    content: { kind: 'hidden_event', event_type: eventType, content: null, redacts: null },
-  } as unknown as TimelineItemView;
-}
-
-test('an aggregation is filtered by its own event type', () => {
-  const on: TimelinePreferences = { ...defaults, showHiddenEvents: true };
-  const aggregations = [
-    aggregation('m.reaction', '$reaction'),
-    aggregation('m.room.redaction', '$redaction'),
-    aggregation('m.room.message', '$edit'),
-    aggregation('m.beacon', '$beacon'),
-  ];
-
-  expect(visibleAggregations(aggregations, defaults)).toEqual([]);
-  expect(visibleAggregations(aggregations, on).map((entry) => entry.id)).toEqual([
-    '$reaction',
-    '$redaction',
-    '$edit',
-    '$beacon',
-  ]);
-  expect(
-    visibleAggregations(aggregations, {
-      ...on,
-      hiddenEventReactions: false,
-      hiddenEventOther: false,
-    }).map((entry) => entry.id)
-  ).toEqual(['$redaction', '$edit']);
-});
-
-const noReceipts: Pick<TimelineItemView, 'read_by' | 'read_timestamps'> = {
+const noReceipts: Pick<ResolvedItem, 'read_by' | 'read_timestamps'> = {
   read_by: [],
   read_timestamps: {},
 };
 
-function item(content: TimelineItemView['content'], id: string = content.kind): TimelineItemView {
-  return { id, content, ...noReceipts, ...rowFields(content) } as TimelineItemView;
+function item(content: ResolvedItem['content'], id: string = content.kind): ResolvedItem {
+  return { id, content, ...noReceipts, ...rowFields(content) } as ResolvedItem;
 }
 
 const message = item({
@@ -172,10 +55,8 @@ const message = item({
   emote: false,
   notice: false,
   edited: false,
-  jumbo: null,
 });
-const divider = item({ kind: 'date_divider', timestamp: 0 });
-const readMarker = item({ kind: 'read_marker' });
+
 const joined = item({
   kind: 'membership',
   user_id: '@a:b',
@@ -183,414 +64,16 @@ const joined = item({
   display_name: null,
   reason: null,
 });
+
+const divider = item({ kind: 'date_divider', timestamp: 0 });
 const renamed = item({
   kind: 'profile_change',
   user_id: '@a:b',
   display_name: { old: 'a', new: 'b' },
   avatar: null,
 });
-const topic = item({
-  kind: 'state_event',
-  event_type: 'm.room.topic',
-  state_key: '',
-  content: null,
-  prev_content: null,
-  change: null,
-});
 
-function withEvent(row: TimelineItemView, eventId: string | null): TimelineItemView {
-  return { ...row, id: eventId ?? row.id, event_id: eventId };
-}
-
-const replyRows = [
-  withEvent(message, '$first'),
-  withEvent(joined, '$joined'),
-  withEvent(item({ kind: 'redacted', reason: null, redacted_by: null }), '$redacted'),
-  withEvent(divider, null),
-  withEvent(message, '$second'),
-  withEvent(message, null),
-];
-
-test('the first reply step picks the latest message, skipping echoes', () => {
-  expect(replyTarget(replyRows, null, 'older', false)).toBe('$second');
-  expect(replyTarget(replyRows, null, 'newer', false)).toBeNull();
-});
-
-test('reply steps skip redactions and non-message rows unless hidden events are shown', () => {
-  expect(replyTarget(replyRows, '$second', 'older', false)).toBe('$first');
-  expect(replyTarget(replyRows, '$first', 'newer', false)).toBe('$second');
-  expect(replyTarget(replyRows, '$second', 'older', true)).toBe('$joined');
-});
-
-test('a reply step stays on the oldest row and clears past the newest', () => {
-  expect(replyTarget(replyRows, '$first', 'older', false)).toBe('$first');
-  expect(replyTarget(replyRows, '$second', 'newer', false)).toBeNull();
-});
-
-test('a reply to a row that is not shown restarts from the latest message', () => {
-  expect(replyTarget(replyRows, '$elsewhere', 'older', false)).toBe('$second');
-  expect(replyTarget(replyRows, '$joined', 'older', false)).toBe('$second');
-});
-
-test('hides profile changes and raw state events by default, keeping joins', () => {
-  const visible = visibleTimelineItems([joined, renamed, topic, message], defaults);
-  expect(visible.map((entry) => entry.content.kind)).toEqual(['membership', 'message']);
-});
-
-test('shows an event the SDK left in the timeline twice only once, where it first appears', () => {
-  const first = { ...withEvent(message, '$dup'), read_by: ['@bob:example.org'] };
-  const later = { ...withEvent(message, '$dup'), id: 'second-copy', read_by: [] };
-  const next = withEvent(message, '$next');
-
-  const visible = visibleTimelineItems([first, next, later], defaults);
-
-  expect(visible.map((entry) => entry.id)).toEqual(['$dup', '$next']);
-  expect(visible[0].read_by).toEqual(['@bob:example.org']);
-});
-
-test('a receipt on a hidden event moves to the last event before it', () => {
-  const read = { ...withEvent(message, '$read'), read_by: ['@bob:example.org'] };
-  const renameRead = {
-    ...withEvent(renamed, '$rename'),
-    read_by: ['@carol:example.org'],
-    read_timestamps: { '@carol:example.org': 7 },
-  };
-
-  const visible = visibleTimelineItems([read, renameRead], defaults);
-
-  expect(visible).toHaveLength(1);
-  expect(visible[0].read_by).toEqual(['@bob:example.org', '@carol:example.org']);
-  expect(visible[0].read_timestamps).toEqual({ '@carol:example.org': 7 });
-});
-
-test('a receipt on a hidden event before any shown one is dropped', () => {
-  const renameRead = { ...withEvent(renamed, '$rename'), read_by: ['@carol:example.org'] };
-
-  expect(visibleTimelineItems([renameRead, message], defaults)).toEqual([message]);
-});
-
-test('honours each toggle independently', () => {
-  const shown = visibleTimelineItems([joined, renamed, topic], {
-    ...defaults,
-    hideMembershipEvents: true,
-    hideProfileChanges: false,
-    showHiddenEvents: true,
-  });
-  expect(shown.map((entry) => entry.content.kind)).toEqual(['profile_change', 'state_event']);
-});
-
-const removed = item({ kind: 'redacted', reason: null, redacted_by: null });
-
-test('keeps tombstones out unless the preference asks for them', () => {
-  expect(visibleTimelineItems([removed, message], defaults)).toEqual([message]);
-  expect(
-    visibleTimelineItems([removed, message], { ...defaults, showTombstoneEvents: true })
-  ).toEqual([removed, message]);
-});
-
-test('drops member events in a read-only room', () => {
-  expect(visibleTimelineItems([joined, message], defaults, { readOnly: true })).toEqual([message]);
-  expect(
-    visibleTimelineItems(
-      [joined, message],
-      { ...defaults, hideMemberInReadOnly: false },
-      {
-        readOnly: true,
-      }
-    )
-  ).toEqual([joined, message]);
-});
-
-test('gates raw state events behind the hidden-event switches', () => {
-  expect(visibleTimelineItems([topic], defaults)).toEqual([]);
-  expect(visibleTimelineItems([topic], { ...defaults, showHiddenEvents: true })).toEqual([topic]);
-  expect(
-    visibleTimelineItems([topic], {
-      ...defaults,
-      showHiddenEvents: true,
-      hiddenEventOther: false,
-    })
-  ).toEqual([]);
-});
-
-test.each(['m.room.server_acl', 'com.example.custom_state'])(
-  'gates raw %s state events behind both hidden-event switches',
-  (eventType) => {
-    const state = item({
-      kind: 'state_event',
-      event_type: eventType,
-      state_key: '',
-      content: {},
-      prev_content: null,
-      change: null,
-    });
-
-    for (const showHiddenEvents of [false, true]) {
-      for (const hiddenEventOther of [false, true]) {
-        expect(
-          visibleTimelineItems([state, message], {
-            ...defaults,
-            showHiddenEvents,
-            hiddenEventOther,
-          })
-        ).toEqual(showHiddenEvents && hiddenEventOther ? [state, message] : [message]);
-      }
-    }
-  }
-);
-
-test('keeps described room changes visible with other hidden events disabled', () => {
-  const changes = [
-    stateChange({ kind: 'room_name', name: 'Lobby', previous: null }),
-    stateChange({ kind: 'room_topic', topic: 'hi' }),
-    stateChange({ kind: 'room_avatar', removed: true }),
-    stateChange({ kind: 'pinned_events', added: ['$pin'], removed: [], total: 1 }),
-    stateChange({ kind: 'call_membership', joined: true }),
-  ];
-
-  for (const showHiddenEvents of [false, true]) {
-    expect(
-      visibleTimelineItems(changes, {
-        ...defaults,
-        showHiddenEvents,
-        hiddenEventOther: false,
-      })
-    ).toEqual(changes);
-  }
-});
-
-test("keeps a persona message out of the account's collapsed run", () => {
-  const account = item(
-    {
-      kind: 'message',
-      body: 'a',
-      html: 'a',
-      emote: false,
-      notice: false,
-      edited: false,
-      jumbo: null,
-    },
-    'a'
-  );
-  const persona = item(
-    {
-      kind: 'message',
-      body: 'b',
-      html: 'b',
-      emote: false,
-      notice: false,
-      edited: false,
-      jumbo: null,
-    },
-    'b'
-  );
-  const items = [
-    { ...account, sender: '@a:b', timestamp: 0 },
-    { ...persona, sender: '@a:b', timestamp: 1000, per_message_profile: { id: 'kris' } },
-  ] as TimelineItemView[];
-
-  expect(isCollapsed(items, 1)).toBe(false);
-});
-
-test('stacks consecutive state rows without a group gap', () => {
-  expect(isCollapsed([joined, renamed, topic], 1)).toBe(true);
-  expect(isCollapsed([joined, renamed, topic], 2)).toBe(true);
-  expect(isCollapsed([message, joined], 1)).toBe(false);
-  expect(isCollapsed([joined, message], 1)).toBe(false);
-  expect(isCollapsed([divider, joined], 1)).toBe(false);
-});
-
-test('groups media with the messages around it', () => {
-  const picture = {
-    ...item({ kind: 'image' } as TimelineItemView['content'], 'picture'),
-    sender: '@a:b',
-    timestamp: 0,
-  } as TimelineItemView;
-  const text = { ...message, id: 'text', sender: '@a:b', timestamp: 1000 } as TimelineItemView;
-  const later = { ...picture, id: 'later', timestamp: 2000 };
-
-  expect(isCollapsed([picture, text], 1)).toBe(true);
-  expect(isCollapsed([text, later], 1)).toBe(true);
-  expect(isCollapsed([picture, later], 1)).toBe(true);
-});
-
-test('only a connected reply preview starts a new message group', () => {
-  const first = {
-    ...message,
-    id: 'first',
-    sender: '@a:b',
-    timestamp: 0,
-    in_reply_to: null,
-  } as TimelineItemView;
-  const reply = {
-    ...message,
-    id: 'reply',
-    sender: '@a:b',
-    timestamp: 1000,
-    in_reply_to: {
-      event_id: '$original',
-      sender: '@b:b',
-      sender_mentioned: false,
-      sender_name: 'Bob',
-      body: 'Earlier message',
-      fallback: null,
-    },
-  } as TimelineItemView;
-  const run = [first, reply];
-
-  expect(isCollapsed(run, 1, 'connected')).toBe(false);
-  expect(isCollapsed(run, 1, 'compact')).toBe(true);
-  expect(isCollapsed(run, 1, 'expanded')).toBe(true);
-});
-
-test('drops a divider whose whole run was filtered out', () => {
-  expect(visibleTimelineItems([divider, renamed, divider, message], defaults)).toEqual([
-    divider,
-    message,
-  ]);
-  expect(visibleTimelineItems([divider, renamed], defaults)).toEqual([]);
-});
-
-test('shows read markers only before unread messages', () => {
-  expect(visibleTimelineItems([message, readMarker], defaults)).toEqual([message]);
-  expect(visibleTimelineItems([readMarker, message, readMarker], defaults)).toEqual([
-    readMarker,
-    message,
-  ]);
-  expect(visibleTimelineItems([readMarker, divider, message], defaults)).toEqual([
-    readMarker,
-    divider,
-    message,
-  ]);
-  expect(visibleTimelineItems([divider, readMarker, message], defaults)).toEqual([
-    divider,
-    readMarker,
-    message,
-  ]);
-  const ownMessage = { ...message, id: 'own', is_own: true };
-  expect(visibleTimelineItems([message, readMarker, ownMessage], defaults)).toEqual([
-    message,
-    ownMessage,
-  ]);
-  const renamedRoom = stateChange({ kind: 'room_name', name: 'Lobby', previous: null });
-  expect(visibleTimelineItems([message, readMarker, renamedRoom], defaults)).toEqual([
-    message,
-    renamedRoom,
-  ]);
-});
-
-test('keeps an unclassified membership change out of the timeline', () => {
-  const other = item({
-    kind: 'membership',
-    user_id: '@a:b',
-    change: 'other',
-    display_name: null,
-    reason: null,
-  });
-  expect(visibleTimelineItems([other, message], defaults)).toEqual([message]);
-  expect(visibleTimelineItems([other, message], { ...defaults, showHiddenEvents: true })).toEqual([
-    other,
-    message,
-  ]);
-  expect(
-    visibleTimelineItems([other, message], {
-      ...defaults,
-      showHiddenEvents: true,
-      hideMembershipEvents: true,
-    })
-  ).toEqual([message]);
-});
-
-test('slots aggregation rows into the timeline by timestamp', () => {
-  const at = (id: string, timestamp: number): TimelineItemView => ({
-    ...item({ kind: 'hidden_event', event_type: 'm.reaction', content: null, redacts: null }, id),
-    timestamp,
-  });
-  const sent = { ...message, timestamp: 10 };
-  const before = at('$before', 9);
-  const after = at('$after', 11);
-
-  const whole = { start: true, end: true };
-  expect(mergeAggregations([sent], [after, before], whole)).toEqual([before, sent, after]);
-  expect(mergeAggregations([sent], [], whole)).toEqual([sent]);
-  expect(mergeAggregations([sent, before], [before], whole)).toEqual([sent, before]);
-});
-
-test('date dividers keep aggregations in chronological order across history pages', () => {
-  const at = (day: number, hour: number) => new Date(2026, 9, day, hour).getTime();
-  const dateDivider = (day: number): TimelineItemView => {
-    const timestamp = at(day, 20);
-    return {
-      ...item({ kind: 'date_divider', timestamp }, `day-${day}`),
-      event_id: null,
-      timestamp,
-    };
-  };
-  const first = { ...message, id: 'first', event_id: '$first', timestamp: at(6, 10) };
-  const second = { ...message, id: 'second', event_id: '$second', timestamp: at(6, 20) };
-  const third = { ...message, id: 'third', event_id: '$third', timestamp: at(7, 20) };
-  const firstDay = dateDivider(6);
-  const secondDay = dateDivider(7);
-  const aggregations = [at(6, 12), at(6, 23), at(7, 0), at(7, 12)].map((timestamp, index) => ({
-    ...aggregation('m.reaction', `reaction-${index}`),
-    event_id: `$reaction-${index}`,
-    timestamp,
-  }));
-
-  expect(
-    mergeAggregations([firstDay, first, second, secondDay, third], aggregations, {
-      start: false,
-      end: true,
-    })
-  ).toEqual([
-    firstDay,
-    first,
-    aggregations[0],
-    second,
-    aggregations[1],
-    secondDay,
-    aggregations[2],
-    aggregations[3],
-    third,
-  ]);
-});
-
-test('drops aggregation rows outside the loaded range', () => {
-  const at = (id: string, timestamp: number): TimelineItemView => ({
-    ...item({ kind: 'hidden_event', event_type: 'm.reaction', content: null, redacts: null }, id),
-    timestamp,
-  });
-  const first = { ...message, id: 'first', event_id: '$first', timestamp: 10 };
-  const last = { ...message, id: 'last', event_id: '$last', timestamp: 20 };
-  const older = at('$older', 5);
-  const inside = at('$inside', 15);
-  const newer = at('$newer', 25);
-  const aggregations = [older, inside, newer];
-
-  expect(mergeAggregations([first, last], aggregations, { start: false, end: true })).toEqual([
-    first,
-    inside,
-    last,
-    newer,
-  ]);
-  expect(mergeAggregations([first, last], aggregations, { start: false, end: false })).toEqual([
-    first,
-    inside,
-    last,
-  ]);
-  expect(mergeAggregations([], aggregations, { start: false, end: true })).toEqual([]);
-});
-
-test('a live location share counts as unread', () => {
-  const marker = item({ kind: 'read_marker' }, 'marker');
-  const share = {
-    ...item({ kind: 'live_location' } as TimelineItemView['content'], '$share'),
-    is_own: false,
-  };
-  expect(unreadCountAfter([marker, share], 0)).toBe(1);
-});
-
-function stateChange(change: StateChangeView): TimelineItemView {
+function stateChange(change: StateChangeView): ResolvedItem {
   return {
     ...item({
       kind: 'state_event',
@@ -604,6 +87,59 @@ function stateChange(change: StateChangeView): TimelineItemView {
     sender_name: 'Alice',
   };
 }
+
+function row(eventId: string | null, replyTargetFlag: boolean): ResolvedRow {
+  return {
+    key: eventId ?? 'echo',
+    reply_target: replyTargetFlag,
+    item: { event_id: eventId } as ResolvedItem,
+    group: null,
+    segments: [],
+    collapsed: false,
+    group_start: false,
+    unread_count: 0,
+    receipts: null,
+  };
+}
+
+const replyRows = [
+  row('$first', true),
+  row('$joined', false),
+  row(null, false),
+  row('$second', true),
+];
+
+test('the first reply step picks the latest message', () => {
+  expect(replyTarget(replyRows, null, 'older')).toBe('$second');
+  expect(replyTarget(replyRows, null, 'newer')).toBeNull();
+});
+
+test('reply steps skip the rows the runtime does not offer', () => {
+  expect(replyTarget(replyRows, '$second', 'older')).toBe('$first');
+  expect(replyTarget(replyRows, '$first', 'newer')).toBe('$second');
+});
+
+test('a reply step stays on the oldest row and clears past the newest', () => {
+  expect(replyTarget(replyRows, '$first', 'older')).toBe('$first');
+  expect(replyTarget(replyRows, '$second', 'newer')).toBeNull();
+});
+
+test('a reply to a row that is not offered restarts from the latest message', () => {
+  expect(replyTarget(replyRows, '$elsewhere', 'older')).toBe('$second');
+  expect(replyTarget(replyRows, '$joined', 'older')).toBe('$second');
+});
+
+test('a folded run offers each of its members', () => {
+  const folded: ResolvedRow = {
+    ...row('$b', true),
+    group: [
+      { reply_target: true, item: { event_id: '$a' } as ResolvedItem },
+      { reply_target: false, item: { event_id: '$x' } as ResolvedItem },
+      { reply_target: true, item: { event_id: '$b' } as ResolvedItem },
+    ],
+  };
+  expect(replyTarget([folded], '$b', 'older')).toBe('$a');
+});
 
 test('words the state changes the core recognises', () => {
   const t = (key: string, values?: Record<string, unknown>) =>
@@ -637,7 +173,7 @@ test('names the moderator and the reason on a membership someone else performed'
     reason: string | null,
     sender: string,
     senderName: string | null = null
-  ): TimelineItemView => ({
+  ): ResolvedItem => ({
     ...item({ kind: 'membership', user_id: '@bob:b', change, display_name: 'Bob', reason }),
     sender,
     sender_name: senderName,
@@ -691,28 +227,11 @@ test('a mixed pin change reports both counts, as v1 does', () => {
   ).toBe('timeline.pinnedAddedPart / timeline.pinnedRemovedPart');
 });
 
-test('an unworded state event keeps its raw type and stays behind the dev toggles', () => {
-  const raw = item({
-    kind: 'state_event',
-    event_type: 'm.room.power_levels',
-    state_key: '',
-    content: null,
-    prev_content: null,
-    change: null,
-  });
-
-  expect(stateEventText(raw, (k) => k)).toBe('timeline.hiddenStateEvent');
-  expect(visibleTimelineItems([raw], defaults)).toEqual([]);
-  expect(
-    visibleTimelineItems([stateChange({ kind: 'room_topic', topic: 'hi' })], defaults)
-  ).toHaveLength(1);
-});
-
 test('anything you sent is yours to redact, not only your text', () => {
-  const own = (content: TimelineItemView['content']) =>
-    ({ ...item(content), is_own: true }) as TimelineItemView;
-  const theirs = (content: TimelineItemView['content']) =>
-    ({ ...item(content), is_own: false }) as TimelineItemView;
+  const own = (content: ResolvedItem['content']) =>
+    ({ ...item(content), is_own: true }) as ResolvedItem;
+  const theirs = (content: ResolvedItem['content']) =>
+    ({ ...item(content), is_own: false }) as ResolvedItem;
   const image = {
     kind: 'image',
     html: null,
@@ -742,17 +261,6 @@ test('anything you sent is yours to redact, not only your text', () => {
   expect(canRedact(own({ kind: 'redacted', reason: null, redacted_by: null }), true, true)).toBe(
     false
   );
-});
-
-test('a room whose every event is redacted is not blank at the shipped default', () => {
-  const deleted = item({ kind: 'redacted', reason: null, redacted_by: null }, 'gone');
-
-  // A room can be all-redacted — delete every poll in it and this is what is
-  // left — and hiding those rows left nothing on screen at all.
-  expect(preferences.showTombstoneEvents).toBe(true);
-  expect(visibleTimelineItems([deleted], { ...defaults, showTombstoneEvents: true })).toEqual([
-    deleted,
-  ]);
 });
 
 test('splits the state copy around the subject so the name can open a profile', () => {
@@ -795,7 +303,7 @@ test('the persona lookup resolves a reply target and reports a miss as null', ()
   const items = [
     { event_id: '$a', per_message_profile: { display_name: 'Ghost' } },
     { event_id: '$b', per_message_profile: null },
-  ] as unknown as TimelineItemView[];
+  ] as unknown as ResolvedItem[];
   const lookup = personaLookup(items);
 
   expect(lookup('$a')?.display_name).toBe('Ghost');
@@ -804,7 +312,7 @@ test('the persona lookup resolves a reply target and reports a miss as null', ()
 });
 
 test('the persona lookup asks the fallback only for a target outside the window', () => {
-  const items = [{ event_id: '$a', per_message_profile: null }] as unknown as TimelineItemView[];
+  const items = [{ event_id: '$a', per_message_profile: null }] as unknown as ResolvedItem[];
   const asked: (string | null | undefined)[] = [];
   const lookup = personaLookup(items, (eventId) => {
     asked.push(eventId);
@@ -824,7 +332,7 @@ test('the persona lookup reads the items only when first asked', () => {
 
       return Reflect.get(target, property, receiver) as unknown;
     },
-  }) as unknown as TimelineItemView[];
+  }) as unknown as ResolvedItem[];
 
   const lookup = personaLookup(items);
   expect(reads).toBe(0);
@@ -836,7 +344,7 @@ test('the persona lookup reads the items only when first asked', () => {
 
 test('a hidden event names its sender, as v1 does', () => {
   const t: Translate = (key, values) => `${key}:${JSON.stringify(values)}`;
-  const hidden = (eventType: string, content: unknown): TimelineItemView => ({
+  const hidden = (eventType: string, content: unknown): ResolvedItem => ({
     ...item({ kind: 'hidden_event', event_type: eventType, content, redacts: null }),
     sender: '@alice:example.org',
     sender_name: 'Alice',
@@ -852,7 +360,7 @@ test('a hidden event names its sender, as v1 does', () => {
 
 test('a hidden reaction reports the key it carries', () => {
   const t: Translate = (key, values) => `${key}:${JSON.stringify(values)}`;
-  const reaction = (content: unknown): TimelineItemView => ({
+  const reaction = (content: unknown): ResolvedItem => ({
     ...item({ kind: 'hidden_event', event_type: 'm.reaction', content, redacts: null }),
     sender: '@alice:example.org',
     sender_name: 'Alice',
@@ -879,7 +387,7 @@ test('a hidden reaction reports the key it carries', () => {
 });
 
 test('a cleared avatar is not the same sentence as a replaced one', () => {
-  const avatarChange = (newUrl: string | null): TimelineItemView =>
+  const avatarChange = (newUrl: string | null): ResolvedItem =>
     item({
       kind: 'profile_change',
       user_id: '@bob:example.org',
@@ -891,28 +399,4 @@ test('a cleared avatar is not the same sentence as a replaced one', () => {
     'timeline.profileAvatarChanged'
   );
   expect(stateEventText(avatarChange(null), (k) => k)).toBe('timeline.profileAvatarRemoved');
-});
-
-test('topic changes show unless the preference hides them', () => {
-  const retitled = item({
-    kind: 'state_event',
-    event_type: 'm.room.topic',
-    state_key: '',
-    content: null,
-    prev_content: null,
-    change: { kind: 'room_topic', topic: 'Now playing' },
-  });
-  const renamedRoom = item({
-    kind: 'state_event',
-    event_type: 'm.room.name',
-    state_key: '',
-    content: null,
-    prev_content: null,
-    change: { kind: 'room_name', name: 'New', previous: 'Old' },
-  });
-
-  expect(visibleTimelineItems([retitled, renamedRoom], defaults)).toEqual([retitled, renamedRoom]);
-  expect(
-    visibleTimelineItems([retitled, renamedRoom], { ...defaults, hideTopicChanges: true })
-  ).toEqual([renamedRoom]);
 });

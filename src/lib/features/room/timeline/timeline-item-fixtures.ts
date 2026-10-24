@@ -1,8 +1,9 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { vi } from 'vitest';
 
-import type { TimelineItemView, UrlPreviewView } from '#src/generated/protocol';
+import type { UrlPreviewView } from '#src/generated/protocol';
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
@@ -65,7 +66,7 @@ export function resetTimelineItemTest(): void {
   core.userProfile.mockRejectedValue(new Error('profile unavailable'));
 }
 
-export function item(emote: boolean): TimelineItemView {
+export function item(emote: boolean): ResolvedItem {
   return withRowFields({
     id: 'item',
     event_id: '$item',
@@ -82,7 +83,6 @@ export function item(emote: boolean): TimelineItemView {
       emote,
       notice: false,
       edited: false,
-      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -100,7 +100,7 @@ export function item(emote: boolean): TimelineItemView {
   });
 }
 
-export function imageItem(body = 'photo.png'): TimelineItemView {
+export function imageItem(body = 'photo.png'): ResolvedItem {
   return withRowFields({
     ...item(false),
     content: {
@@ -121,7 +121,7 @@ export function imageItem(body = 'photo.png'): TimelineItemView {
   });
 }
 
-export function fileItem(caption: string | null = 'the code'): TimelineItemView {
+export function fileItem(caption: string | null = 'the code'): ResolvedItem {
   return withRowFields({
     ...item(false),
     content: {
@@ -138,9 +138,9 @@ export function fileItem(caption: string | null = 'the code'): TimelineItemView 
 
 export function replyItem(
   body = 'A reply with enough text to show how the preview is rendered.',
-  mention: TimelineItemView['mention'] = 'none',
+  mention: ResolvedItem['mention'] = 'none',
   isMentioned = false
-): TimelineItemView {
+): ResolvedItem {
   return {
     ...item(false),
     mention,

@@ -17,16 +17,20 @@ pub fn apply(target: &mut Value, ops: &[crate::wire::Op]) -> Result<(), PatchErr
     for op in ops {
         match op {
             crate::wire::Op::Fields { fields } => {
-                let Value::Object(target) = target else {
-                    return Err(PatchError::NotAList(String::new()));
-                };
-                target.extend(fields.clone());
+                for (field, value) in fields {
+                    let (parent, leaf) = target_path(target, field)?;
+                    let Value::Object(parent) = parent else {
+                        return Err(PatchError::NotAList(field.clone()));
+                    };
+                    parent.insert(leaf.to_owned(), value.clone());
+                }
             }
             crate::wire::Op::List { field, diffs } => {
+                let (target, leaf) = target_path(target, field)?;
                 let Value::Object(target) = target else {
                     return Err(PatchError::Missing(field.clone()));
                 };
-                let Some(Value::Array(items)) = target.get_mut(field) else {
+                let Some(Value::Array(items)) = target.get_mut(leaf) else {
                     return Err(PatchError::NotAList(field.clone()));
                 };
                 apply_diffs(items, diffs)?;
@@ -34,6 +38,31 @@ pub fn apply(target: &mut Value, ops: &[crate::wire::Op]) -> Result<(), PatchErr
         }
     }
     Ok(())
+}
+
+#[cfg(any(test, feature = "testing"))]
+fn target_path<'a, 'b>(
+    target: &'a mut Value,
+    field: &'b str,
+) -> Result<(&'a mut Value, &'b str), PatchError> {
+    let mut parts = field.rsplitn(2, '.');
+    let Some(leaf) = parts.next() else {
+        return Err(PatchError::Missing(field.to_owned()));
+    };
+    let parent = parts.next().unwrap_or_default();
+    if parent.is_empty() {
+        return Ok((target, leaf));
+    }
+    let mut current = target;
+    for part in parent.split('.') {
+        let Value::Object(fields) = current else {
+            return Err(PatchError::Missing(field.to_owned()));
+        };
+        current = fields
+            .get_mut(part)
+            .ok_or_else(|| PatchError::Missing(field.to_owned()))?;
+    }
+    Ok((current, leaf))
 }
 
 pub fn apply_diffs<T: Clone>(

@@ -3,10 +3,8 @@ import { describe, expect, test } from 'vitest';
 import {
   buildInvocation,
   draftsFromText,
-  emptyDrafts,
   matchBotCommand,
   parseBotCommand,
-  parseBotCommands,
   type BotCommand,
 } from './bot-commands';
 
@@ -93,17 +91,6 @@ describe('parseBotCommand', () => {
     expect(parseBotCommand(described(unknown))).toBeNull();
     expect(parseBotCommand(described(nested))).toBeNull();
   });
-
-  test('keeps one description per sender and command', () => {
-    const parsed = parseBotCommands([
-      described({ command: 'ping' }),
-      described({ command: 'ping', description: { 'm.text': [{ body: 'newer' }] } }),
-      described({ command: 'ping' }, '@other:example.org'),
-      described({}),
-    ]);
-    expect(parsed).toHaveLength(2);
-    expect(parsed[0].description).toBe('newer');
-  });
 });
 
 describe('matchBotCommand', () => {
@@ -162,7 +149,8 @@ describe('buildInvocation', () => {
 
   test('omits an unset optional boolean and reports what is missing or malformed', () => {
     const result = buildInvocation(command(), {
-      ...emptyDrafts(command()),
+      target_room: '',
+      target_users: [],
       timeout_seconds: 'soon',
     });
     expect(result).toEqual({

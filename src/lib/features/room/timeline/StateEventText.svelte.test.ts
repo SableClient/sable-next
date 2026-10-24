@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -7,8 +8,6 @@ import { afterEach, expect, test, vi } from 'vitest';
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 import StateEventText from './StateEventText.svelte';
 import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
@@ -18,7 +17,7 @@ afterEach(() => {
   core.userProfile.mockRejectedValue(new Error('profile unavailable'));
 });
 
-function membership(change: 'left' | 'joined', userId: string, name: string): TimelineItemView {
+function membership(change: 'left' | 'joined', userId: string, name: string): ResolvedItem {
   return withRowFields({
     id: 'state',
     event_id: '$state',
@@ -58,7 +57,7 @@ test.each([
   [{ kind: 'cute', cute_type: 'googly_eyes', body: '👀' }, 'Alice sent googly eyes 👀'],
   [{ kind: 'cute', cute_type: 'unknown', body: '✨' }, 'Alice sent ✨'],
   [{ kind: 'malformed', event_type: 'm.room.message' }, 'Could not read event: m.room.message'],
-] satisfies [TimelineItemView['content'], string][])(
+] satisfies [ResolvedItem['content'], string][])(
   'renders the event notice for %j',
   (content, expected) => {
     const item = { ...membership('joined', '@alice:example.org', 'Alice'), content };

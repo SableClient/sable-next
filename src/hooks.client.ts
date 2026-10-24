@@ -9,6 +9,7 @@ import { isLivekitMissingKey, scrubSentryEvent } from '#lib/observability/sentry
 import { untrackFetch } from '#lib/observability/untracked-fetch.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { loadModel } from '#lib/model/model.js';
+import { forgetLegacyRoomListSnapshots } from '#lib/rooms/legacy-snapshot.js';
 import { CoreError } from '#src/transport';
 import { prewarmTransport, startRuntime } from '#src/transport/create';
 
@@ -21,6 +22,7 @@ installDynamicImportRecovery();
 tolerateUnknownListeners();
 prewarmTransport();
 startRuntime();
+forgetLegacyRoomListSnapshots();
 
 if (dsn && preferences.errorReporting) {
   Sentry.init({

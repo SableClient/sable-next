@@ -1,10 +1,7 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import type { Component } from 'svelte';
 
-import type {
-  MembershipChangeView,
-  StateChangeView,
-  TimelineItemView,
-} from '#src/generated/protocol';
+import type { MembershipChangeView, StateChangeView } from '#src/generated/protocol';
 
 import AtIcon from 'phosphor-svelte/lib/AtIcon';
 import EnvelopeSimpleIcon from 'phosphor-svelte/lib/EnvelopeSimpleIcon';
@@ -57,14 +54,14 @@ function stateChangeIcon(change: StateChangeView): Component {
   }
 }
 
-function hiddenEventIcon(item: TimelineItemView): Component {
+function hiddenEventIcon(item: ResolvedItem): Component {
   if (item.content.kind !== 'hidden_event') return CodeIcon;
   if (item.content.event_type === 'm.reaction') return SmileyIcon;
   if (item.content.event_type === 'm.room.redaction') return TrashIcon;
   return isEditEvent(item) ? PencilSimpleIcon : CodeIcon;
 }
 
-export function stateEventIcon(item: TimelineItemView): Component {
+export function stateEventIcon(item: ResolvedItem): Component {
   const content = item.content;
   switch (content.kind) {
     case 'membership':

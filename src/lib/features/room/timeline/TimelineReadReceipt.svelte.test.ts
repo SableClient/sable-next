@@ -1,3 +1,4 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { render } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
@@ -14,9 +15,10 @@ vi.mock('#lib/platform/window-decorations.js', async (importOriginal) => ({
   },
 }));
 
-import type { TimelineItemView } from '#src/generated/protocol';
-import type { CoreClient } from '#lib/core/client.svelte.js';
-import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+import { NO_UNREAD, RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+import { staticTimelineOf } from '#lib/test-support/static-timeline.svelte.js';
+
+const StaticTimeline = staticTimelineOf(RoomTimeline, NO_UNREAD);
 
 import TimelineReadReceipt from './TimelineReadReceipt.svelte';
 import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
@@ -31,7 +33,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function item(): TimelineItemView {
+function item(): ResolvedItem {
   return withRowFields({
     id: 'latest',
     event_id: '$latest',
@@ -48,7 +50,6 @@ function item(): TimelineItemView {
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -76,9 +77,11 @@ function deferred<T>() {
 
 test.each(['thread', 'focused'] as const)('%s receipt scope is respected', async (kind) => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.mode = kind === 'thread' ? { kind, rootEventId: '$root' } : { kind, eventId: '$latest' };
-  timeline.items = [item()];
+  const timeline = new StaticTimeline();
+  timeline.patch({
+    mode: kind === 'thread' ? { kind, root_event_id: '$root' } : { kind, event_id: '$latest' },
+  });
+  timeline.patch({ items: [item()] });
   const read = vi.fn().mockResolvedValue(undefined);
   const instance = render(TimelineReadReceipt, {
     props: { timeline, visibleEventId: '$latest', onRead: read },
@@ -92,8 +95,8 @@ test.each(['thread', 'focused'] as const)('%s receipt scope is respected', async
 
 test('does not duplicate a read receipt while the first request is pending', async () => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.items = [item()];
+  const timeline = new StaticTimeline();
+  timeline.patch({ items: [item()] });
   const pending = deferred<undefined>();
   const read = vi.fn(() => pending.promise);
   const instance = render(TimelineReadReceipt, {
@@ -106,7 +109,7 @@ test('does not duplicate a read receipt while the first request is pending', asy
 
   await tick();
   await vi.advanceTimersByTimeAsync(500);
-  timeline.items = [...timeline.items];
+  timeline.patch({ items: [...timeline.items] });
   await tick();
   await vi.advanceTimersByTimeAsync(500);
 
@@ -118,14 +121,14 @@ test('does not duplicate a read receipt while the first request is pending', asy
 
 test('a queued receipt is discarded when switching to focused history', async () => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.items = [item()];
+  const timeline = new StaticTimeline();
+  timeline.patch({ items: [item()] });
   const read = vi.fn().mockResolvedValue(undefined);
   const instance = render(TimelineReadReceipt, {
     props: { timeline, visibleEventId: '$latest', onRead: read },
   });
   await tick();
-  timeline.mode = { kind: 'focused', eventId: '$latest' };
+  timeline.patch({ mode: { kind: 'focused', event_id: '$latest' } });
   await tick();
   await vi.advanceTimersByTimeAsync(500);
   expect(read).not.toHaveBeenCalled();
@@ -135,9 +138,9 @@ test('a queued receipt is discarded when switching to focused history', async ()
 
 test('a focused timeline read to the live end sends a receipt', async () => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.mode = { kind: 'focused', eventId: '$latest' };
-  timeline.items = [item()];
+  const timeline = new StaticTimeline();
+  timeline.patch({ mode: { kind: 'focused', event_id: '$latest' } });
+  timeline.patch({ items: [item()] });
   const read = vi.fn().mockResolvedValue(undefined);
   const instance = render(TimelineReadReceipt, {
     props: { timeline, visibleEventId: '$latest', atLatest: true, onRead: read },
@@ -149,14 +152,14 @@ test('a focused timeline read to the live end sends a receipt', async () => {
   vi.useRealTimers();
 });
 
-function itemWithId(id: string): TimelineItemView {
+function itemWithId(id: string): ResolvedItem {
   return { ...item(), id, event_id: `$${id}` };
 }
 
 test('new messages stay unread after native focus is lost while the page reports visible', async () => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.items = [itemWithId('a')];
+  const timeline = new StaticTimeline();
+  timeline.patch({ items: [itemWithId('a')] });
   const read = vi.fn().mockResolvedValue(undefined);
   const props = $state({ timeline, visibleEventId: '$a', onRead: read });
   const instance = render(TimelineReadReceipt, { props });
@@ -167,7 +170,7 @@ test('new messages stay unread after native focus is lost while the page reports
 
   native.onFocus?.(false);
   await tick();
-  timeline.items = [...timeline.items, itemWithId('b')];
+  timeline.patch({ items: [...timeline.items, itemWithId('b')] });
   props.visibleEventId = '$b';
   await tick();
   await vi.advanceTimersByTimeAsync(1000);
@@ -185,8 +188,8 @@ test('new messages stay unread after native focus is lost while the page reports
 
 test('a fast scroll across many rows sends one receipt for the newest', async () => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.items = [itemWithId('a'), itemWithId('b'), itemWithId('c')];
+  const timeline = new StaticTimeline();
+  timeline.patch({ items: [itemWithId('a'), itemWithId('b'), itemWithId('c')] });
   const read = vi.fn(() => Promise.resolve(undefined));
   const props = $state({ timeline, visibleEventId: '$a', onRead: read });
   const instance = render(TimelineReadReceipt, { props });
@@ -210,8 +213,8 @@ test('a fast scroll across many rows sends one receipt for the newest', async ()
 
 test('waits for the current receipt before sending the newer one', async () => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.items = [itemWithId('a'), itemWithId('b')];
+  const timeline = new StaticTimeline();
+  timeline.patch({ items: [itemWithId('a'), itemWithId('b')] });
   const first = deferred<undefined>();
   const read = vi
     .fn()
@@ -237,8 +240,8 @@ test('waits for the current receipt before sending the newer one', async () => {
 
 test('drops an older candidate queued while a newer receipt is pending', async () => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.items = [itemWithId('a'), itemWithId('b'), itemWithId('c')];
+  const timeline = new StaticTimeline();
+  timeline.patch({ items: [itemWithId('a'), itemWithId('b'), itemWithId('c')] });
   const newest = deferred<undefined>();
   const read = vi.fn(() => newest.promise);
   const props = $state({ timeline, visibleEventId: '$c', onRead: read });
@@ -258,8 +261,8 @@ test('drops an older candidate queued while a newer receipt is pending', async (
 
 test('does not flush a queued receipt after unmount', async () => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.items = [itemWithId('a'), itemWithId('b'), itemWithId('c')];
+  const timeline = new StaticTimeline();
+  timeline.patch({ items: [itemWithId('a'), itemWithId('b'), itemWithId('c')] });
   const first = deferred<undefined>();
   const read = vi.fn(() => first.promise);
   const props = $state({ timeline, visibleEventId: '$a', onRead: read });
@@ -279,8 +282,8 @@ test('does not flush a queued receipt after unmount', async () => {
 
 test('keeps the newest queued receipt when the viewport moves backward', async () => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.items = [itemWithId('a'), itemWithId('b'), itemWithId('c')];
+  const timeline = new StaticTimeline();
+  timeline.patch({ items: [itemWithId('a'), itemWithId('b'), itemWithId('c')] });
   const first = deferred<undefined>();
   const read = vi
     .fn()
@@ -305,8 +308,8 @@ test('keeps the newest queued receipt when the viewport moves backward', async (
 
 test('a queued receipt waits for the window instead of being sent while hidden', async () => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.items = [itemWithId('a'), itemWithId('b'), itemWithId('c')];
+  const timeline = new StaticTimeline();
+  timeline.patch({ items: [itemWithId('a'), itemWithId('b'), itemWithId('c')] });
   const first = deferred<undefined>();
   const read = vi
     .fn()
@@ -340,8 +343,8 @@ test('a queued receipt waits for the window instead of being sent while hidden',
 
 test('hiding the document does not send the pending receipt', async () => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.items = [itemWithId('a')];
+  const timeline = new StaticTimeline();
+  timeline.patch({ items: [itemWithId('a')] });
   const read = vi.fn(() => Promise.resolve(undefined));
   const instance = render(TimelineReadReceipt, {
     props: { timeline, visibleEventId: '$a', onRead: read },
@@ -367,8 +370,8 @@ test('hiding the document does not send the pending receipt', async () => {
 
 test('unread navigation blocks receipts even when the viewport is at latest', async () => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.items = [item()];
+  const timeline = new StaticTimeline();
+  timeline.patch({ items: [item()] });
   const read = vi.fn().mockResolvedValue(undefined);
   const props = $state({ timeline, visibleEventId: '$latest', enabled: false, onRead: read });
   const instance = render(TimelineReadReceipt, { props });
@@ -385,8 +388,8 @@ test('unread navigation blocks receipts even when the viewport is at latest', as
 
 test('blocking receipts discards a previously queued receipt', async () => {
   vi.useFakeTimers();
-  const timeline = new RoomTimeline({} as CoreClient);
-  timeline.items = [item()];
+  const timeline = new StaticTimeline();
+  timeline.patch({ items: [item()] });
   const read = vi.fn().mockResolvedValue(undefined);
   const props = $state({ timeline, visibleEventId: '$latest', enabled: true, onRead: read });
   const instance = render(TimelineReadReceipt, { props });

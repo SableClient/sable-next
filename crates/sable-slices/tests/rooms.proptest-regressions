@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 9048d2fa7ce88864b5dbbdc7af64a7b63340c6262d2dcfc7d868b8a46f91ec28 # shrinks to windowed = false, steps = [[Core(RoomListDiff { subscription: SubscriptionId(7), diffs: [Reset { values: [] }] })]]

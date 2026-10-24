@@ -1,21 +1,14 @@
-import type { CallIntent, CallMode, CallModeReason, Rpc } from '#src/generated/protocol';
+import type {
+  CallBackendView,
+  CallIntent,
+  CallMode,
+  Rpc,
+  RpcResult,
+} from '#src/generated/protocol';
 
-export type CallGrant = {
-  session: number;
-  url: string;
-  jwt: string;
-  identity: string;
-  encryptMedia: boolean;
-  mode?: 'legacy' | 'compatibility' | 'matrix_2';
-  modeReason?: CallModeReason;
-  stickyAvailable?: boolean;
-  peerModes?: CallMode[];
-  canPublish?: boolean;
-  publisherId?: string;
-  backends?: CallBackendGrant[];
-};
+export type CallGrant = RpcResult<Rpc['calls']['join']>;
 
-export type CallBackendGrant = { id: string; url: string; jwt: string; identity: string };
+export type CallBackendGrant = CallBackendView;
 
 export async function joinCall(
   rpc: Rpc,
@@ -30,18 +23,5 @@ export async function joinCall(
     mode: mode ?? null,
     intent,
   });
-  return {
-    session: response.session,
-    url: response.url,
-    jwt: response.jwt,
-    identity: response.identity,
-    encryptMedia: response.encrypt_media,
-    mode: response.mode,
-    modeReason: response.mode_reason,
-    stickyAvailable: response.sticky_available,
-    peerModes: response.peer_modes,
-    canPublish: response.can_publish,
-    publisherId: response.publisher_id,
-    backends: response.backends,
-  };
+  return response;
 }

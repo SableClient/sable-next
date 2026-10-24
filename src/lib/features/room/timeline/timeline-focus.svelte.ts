@@ -35,7 +35,7 @@ export class TimelineFocus<T> {
         this.deps.timeline().backwardPagination === 'loading'
       )
         break;
-      const before = this.deps.timeline().items;
+      const before = this.deps.timeline().itemCount;
       if (this.deps.timeline().forwardPagination !== 'end') {
         if (this.deps.canRequestFuture?.() === false) break;
         await this.deps.requestFuture();
@@ -48,7 +48,7 @@ export class TimelineFocus<T> {
         this.deps.history.exhausted = end;
       } else break;
       if (!current() || this.deps.timeline().error !== null) break;
-      if (this.deps.timeline().items === before) break;
+      if (this.deps.timeline().itemCount === before) break;
       await engine.update(this.deps.entries());
       await new Promise(requestAnimationFrame);
     }

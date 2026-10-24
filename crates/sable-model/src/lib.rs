@@ -31,4 +31,6 @@ pub mod sidebar;
 pub mod slash;
 pub mod spaces;
 pub mod text;
+pub mod timeline;
 pub mod truncate;
+pub mod unread;

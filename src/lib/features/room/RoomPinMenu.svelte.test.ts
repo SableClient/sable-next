@@ -1,10 +1,9 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
@@ -76,7 +75,7 @@ const image = {
   mention: 'none',
   forwarded: null,
   forum_title: null,
-} satisfies TimelineItemView;
+} satisfies ResolvedItem;
 
 const secondImage = withRowFields({
   ...image,

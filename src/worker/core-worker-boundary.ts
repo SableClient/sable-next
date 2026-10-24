@@ -1,8 +1,6 @@
 import { attachmentBytes } from '../transport/attachment-bytes';
-import { createRpc } from '#src/generated/protocol';
-import type { RpcError, RpcResult, CoreEvent, SubscriptionId, Rpc } from '#src/generated/protocol';
+import type { CoreEvent, RpcError } from '#src/generated/protocol';
 import type { WorkerMessage, WorkerRequest } from './protocol';
-import { TimelineEventRouter } from './timeline-event-router';
 
 const logFlushMs = 250;
 const logBufferLimit = 500;
@@ -36,7 +34,7 @@ function rejectionPayload(cause: unknown): string {
   return typeof cause === 'string' ? cause : '';
 }
 
-/** Owns page ports and enforces timeline subscription ownership at the worker boundary. */
+/** Owns the page ports and carries the core's events and calls across them. */
 export function createCoreWorkerBoundary(
   core: Promise<WorkerCore>,
   setLogCapture: (enabled: boolean) => void = () => {},
@@ -45,7 +43,6 @@ export function createCoreWorkerBoundary(
   stop: () => Promise<void> = () => Promise.resolve()
 ) {
   const ports = new Set<WorkerPort>();
-  const timelineEvents = new TimelineEventRouter<WorkerPort>();
   let panic: string | null = null;
   let logs: string[] = [];
   let droppedLogs = 0;
@@ -62,21 +59,6 @@ export function createCoreWorkerBoundary(
 
   function closePort(port: WorkerPort): void {
     ports.delete(port);
-    const subscriptions = timelineEvents.removeOwner(port);
-    if (subscriptions.length === 0) return;
-
-    void core.then(async (instance) => {
-      for (const subscription of subscriptions) {
-        try {
-          await createRpc(async (method, params) =>
-            instance.call(method, JSON.stringify(params))
-          ).timeline.unsubscribe({ subscription });
-        } catch (error) {
-          // The owner is gone, so cleanup errors cannot be reported to a page.
-          console.debug('[sable worker] closed port subscription not released', error);
-        }
-      }
-    });
   }
 
   function broadcast(message: WorkerMessage): void {
@@ -133,29 +115,7 @@ export function createCoreWorkerBoundary(
 
   /** `json` is a `CoreEvent[]`: the core batches whatever had queued up. */
   function handleEvent(json: string): void {
-    const shared: CoreEvent[] = [];
-    const routed = new Map<WorkerPort, CoreEvent[]>();
-
-    for (const event of JSON.parse(json) as CoreEvent[]) {
-      if (event.type === 'timeline_diff' || event.type === 'timeline_pagination') {
-        const owner = timelineEvents.route(event);
-        if (!owner) continue;
-        const batch = routed.get(owner);
-        if (batch) batch.push(event);
-        else routed.set(owner, [event]);
-        continue;
-      }
-      shared.push(event);
-    }
-
-    if (shared.length > 0) broadcast({ events: shared });
-    for (const [owner, events] of routed) {
-      try {
-        owner.postMessage({ events });
-      } catch {
-        closePort(owner);
-      }
-    }
+    broadcast({ events: JSON.parse(json) as CoreEvent[] });
   }
 
   function connect(port: WorkerPort): void {
@@ -209,7 +169,6 @@ export function createCoreWorkerBoundary(
         return;
       }
       const { id } = request;
-      let pendingTimeline = false;
 
       if (panic !== null) {
         port.postMessage({
@@ -322,58 +281,11 @@ export function createCoreWorkerBoundary(
         if ('call' in request) {
           const { method } = request.call;
           const params = JSON.stringify(request.call.params);
-          if (method === 'timeline.paginate' || method === 'timeline.unsubscribe') {
-            const { subscription } = request.call.params as {
-              subscription: SubscriptionId;
-            };
-            if (!timelineEvents.owns(subscription, port)) {
-              port.postMessage({
-                id,
-                err: { code: 'denied' },
-              } satisfies WorkerMessage);
-              return;
-            }
-          }
-
-          if (method === 'timeline.subscribe') {
-            for (let attempt = 0; attempt < 3; attempt += 1) {
-              if (!ports.has(port)) return;
-              timelineEvents.begin(port);
-              pendingTimeline = true;
-              const ok = JSON.parse(await instance.call(method, params)) as RpcResult<
-                Rpc['timeline']['subscribe']
-              >;
-              if (typeof ok.subscription !== 'number')
-                throw new Error('Invalid timeline subscription response');
-              const events = timelineEvents.claim(ok.subscription, port);
-              pendingTimeline = false;
-              if (events === null || events === 'overflow' || !ports.has(port)) {
-                await instance.call(
-                  'timeline.unsubscribe',
-                  JSON.stringify({ subscription: ok.subscription })
-                );
-                if (events === 'overflow' && ports.has(port)) continue;
-                return;
-              }
-              port.postMessage({ id, ok });
-              if (events.length > 0) port.postMessage({ events });
-              return;
-            }
-            throw new Error('Timeline startup overflowed; retry opening the room');
-          }
           const ok: unknown = JSON.parse(await instance.call(method, params));
-          if (method === 'timeline.unsubscribe') {
-            timelineEvents.release(
-              (request.call.params as { subscription: SubscriptionId }).subscription
-            );
-          }
           port.postMessage({ id, ok } satisfies WorkerMessage);
           return;
         }
       } catch (cause) {
-        if (pendingTimeline) {
-          timelineEvents.cancelPending(port);
-        }
         const payload = rejectionPayload(cause);
         let err: RpcError = { code: 'failed', log_id: payload || String(cause) };
         if (payload) {

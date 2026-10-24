@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { render } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
 
-import type { MembershipChangeView, TimelineItemView } from '#src/generated/protocol';
+import type { MembershipChangeView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -22,7 +23,7 @@ function setup(change: MembershipChangeView): HTMLElement {
       display_name: 'Bob',
       reason: null,
     },
-  } as TimelineItemView;
+  } as ResolvedItem;
 
   return render(TimelineNotice, { item, unreadCount: 0 }).container;
 }

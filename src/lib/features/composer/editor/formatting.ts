@@ -20,6 +20,7 @@ import {
 import { canJoin, findWrapping, liftTarget } from 'prosemirror-transform';
 
 import type { ShortcutId } from '#lib/ui/shortcuts/shortcuts.js';
+import type { MfmColorArgs } from '#src/generated/protocol';
 
 import { composerSchema } from './schema';
 import { atomText, markdownSlice } from './serialize';
@@ -565,10 +566,7 @@ export function activeMarks(state: EditorState): FormatAction[] {
 
 export type ColorKind = 'fg' | 'bg';
 
-export interface ActiveColors {
-  fg: string | null;
-  bg: string | null;
-}
+export type ActiveColors = MfmColorArgs;
 
 function colorOf(state: EditorState, type: MarkType): string | null {
   const { from, to, $from, empty } = state.selection;

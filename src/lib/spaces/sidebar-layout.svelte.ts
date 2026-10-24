@@ -1,14 +1,19 @@
 import { createContext } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 
-import type { CoreClient } from '#lib/core/client.svelte.js';
+import type { SidebarAction } from '#src/generated/protocol';
+
 import { t } from '#lib/i18n.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
+import { runtime } from '#lib/runtime/app.js';
+import type { Client } from '#lib/runtime/client.js';
+import { SliceHandle } from '#lib/runtime/handle.svelte.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 
-import { isFolder, sameLayout, type SidebarItem } from './sidebar-layout.js';
+import { isFolder, type SidebarItem } from './sidebar-layout.js';
 
 const OPEN_FOLDERS_KEY = 'sable-open-space-folders';
+const NO_ITEMS: SidebarItem[] = [];
 
 function loadOpenFolders(): string[] {
   return readJson(
@@ -20,120 +25,64 @@ function loadOpenFolders(): string[] {
 }
 
 export class SpaceSidebar {
-  items = $state.raw<SidebarItem[]>([]);
+  private readonly handle: SliceHandle<'sidebar'>;
   readonly openFolders = new SvelteSet<string>(loadOpenFolders());
 
-  private core: CoreClient | null = null;
-  private unsubscribeEvents: (() => void) | null = null;
-  private generation = 0;
-  private revision = 0;
-  private loaded = false;
-  private pending: { items: SidebarItem[]; stored: boolean } | null = null;
-
-  async start(core: CoreClient): Promise<void> {
-    const generation = ++this.generation;
-    const revision = this.revision;
-    this.core = core;
-    this.pending = null;
-    this.loaded = false;
-
-    this.unsubscribeEvents?.();
-    this.unsubscribeEvents = core.subscribeEvents((event) => {
-      if (event.type !== 'space_sidebar_changed' || generation !== this.generation) return;
-
-      this.receive(event.items);
+  constructor(connect: () => Promise<Client> = runtime) {
+    this.handle = new SliceHandle('sidebar', null, connect, {
+      onChange: () => {
+        if (this.handle.view?.loaded) this.pruneOpenFolders();
+      },
+      onNotice: () => {
+        toasts.error(t('errors.actionFailed'));
+      },
     });
+  }
 
-    try {
-      const items = await core.rpc.spaces.sidebar();
-      if (generation === this.generation && revision === this.revision) this.setItems(items);
-    } catch (error) {
-      console.debug('[sable nav] space layout unavailable', error);
-    }
+  get items(): SidebarItem[] {
+    return this.handle.view?.items ?? NO_ITEMS;
+  }
+
+  async start(): Promise<void> {
+    await this.handle.open();
   }
 
   stop(): void {
-    this.generation += 1;
-    this.core = null;
-    this.items = [];
-    this.pending = null;
-    this.loaded = false;
-    this.unsubscribeEvents?.();
-    this.unsubscribeEvents = null;
+    this.handle.close();
   }
 
   write(items: SidebarItem[]): void {
-    const core = this.core;
-    if (core === null) return;
-    if (!this.loaded) {
-      toasts.error(t('errors.actionFailed'));
-      return;
-    }
-
-    const previous = this.items;
-    const previousOpen = [...this.openFolders];
-    const pending = { items, stored: false };
-    this.pending = pending;
-    this.setItems(items);
-
-    void core.rpc.spaces.setSidebar({ items }).then(
-      () => {
-        if (this.pending === pending) pending.stored = true;
-      },
-      (error: unknown) => {
-        console.warn('[sable nav] space layout not saved', error);
-        toasts.error(t('errors.actionFailed'));
-        if (this.pending !== pending) return;
-
-        this.pending = null;
-        this.setItems(previous);
-        for (const folderId of previousOpen) this.openFolders.add(folderId);
-      }
-    );
+    this.send({ type: 'write', items });
   }
 
   toggleFolder(folderId: string): void {
-    if (this.openFolders.has(folderId)) {
-      this.openFolders.delete(folderId);
-    } else {
-      this.openFolders.add(folderId);
-    }
-
+    if (this.openFolders.has(folderId)) this.openFolders.delete(folderId);
+    else this.openFolders.add(folderId);
     this.persistOpenFolders();
-  }
-
-  private receive(items: SidebarItem[]): void {
-    const pending = this.pending;
-    if (pending !== null) {
-      if (!pending.stored && !sameLayout(items, pending.items)) return;
-
-      this.pending = null;
-    }
-
-    this.setItems(items);
-  }
-
-  private setItems(items: SidebarItem[]): void {
-    this.revision += 1;
-    this.loaded = true;
-    this.items = items;
-
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const folderIds = new Set(items.filter(isFolder).map((folder) => folder.id));
-    let pruned = false;
-    for (const folderId of this.openFolders) {
-      if (folderIds.has(folderId)) continue;
-
-      this.openFolders.delete(folderId);
-      pruned = true;
-    }
-    if (pruned) this.persistOpenFolders();
   }
 
   adoptOpenFolders(ids: readonly string[]): void {
     this.openFolders.clear();
     for (const id of ids) this.openFolders.add(id);
     this.persistOpenFolders();
+  }
+
+  private send(action: SidebarAction): void {
+    this.handle.dispatch(action).catch((error: unknown) => {
+      console.warn('[sable nav] space layout not sent', error);
+    });
+  }
+
+  private pruneOpenFolders(): void {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- only used during this update
+    const folders = new Set(this.items.filter(isFolder).map((folder) => folder.id));
+    let pruned = false;
+    for (const id of this.openFolders) {
+      if (folders.has(id)) continue;
+      this.openFolders.delete(id);
+      pruned = true;
+    }
+    if (pruned) this.persistOpenFolders();
   }
 
   private persistOpenFolders(): void {

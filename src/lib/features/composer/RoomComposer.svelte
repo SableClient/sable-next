@@ -821,11 +821,11 @@
           : {
               body: '',
               formatted: null,
-              mentions: { userIds: [], room: false },
+              mentions: { user_ids: [], room: false },
               imageSourcePacks: [],
             };
         const message = attachmentsCancelEdit
-          ? { ...serialized, body: '', formatted: null, mentions: { userIds: [], room: false } }
+          ? { ...serialized, body: '', formatted: null, mentions: { user_ids: [], room: false } }
           : untouched
             ? { ...serialized, ...untouched }
             : serialized;

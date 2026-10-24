@@ -1,56 +1,15 @@
 import { expect, test } from 'vitest';
 
-import type { MembershipChangeView, TimelineItemView } from '#src/generated/protocol';
+import type { TimelineMemberCategoryView, TimelineSegmentView } from '#src/generated/protocol';
 
-import {
-  groupMemberEvents,
-  memberGroupSegments,
-  memberGroupSummary,
-  type MemberGroupToken,
-} from './member-groups';
+import { memberGroupSummary, type MemberGroupToken } from './member-groups';
 
-function member(
-  user: string,
-  change: MembershipChangeView,
-  extra: Partial<TimelineItemView> = {}
-): TimelineItemView {
+function segment(category: TimelineMemberCategoryView, ...users: string[]): TimelineSegmentView {
   return {
-    id: `${user}-${change}`,
-    event_id: `$${user}-${change}`,
-    sender: `@${user}:x`,
-    sender_name: null,
-    reactions: [],
-    content: {
-      kind: 'membership',
-      user_id: `@${user}:x`,
-      change,
-      display_name: user.toUpperCase(),
-      reason: null,
-    },
-    ...extra,
-  } as TimelineItemView;
+    category,
+    users: users.map((user) => ({ user_id: `@${user}:x`, name: user.toUpperCase() })),
+  };
 }
-
-function rename(user: string, to: string): TimelineItemView {
-  return member(user, 'joined', {
-    id: `${user}-${to}`,
-    event_id: `$${user}-${to}`,
-    sender_name: to,
-    content: {
-      kind: 'profile_change',
-      user_id: `@${user}:x`,
-      display_name: { old: user, new: to },
-      avatar: null,
-    },
-  });
-}
-
-const message = {
-  id: 'message',
-  event_id: '$message',
-  reactions: [],
-  content: { kind: 'message', body: 'hi', html: 'hi', emote: false, notice: false, edited: false },
-} as unknown as TimelineItemView;
 
 const t = (key: string, values?: Record<string, unknown>): string => {
   const templates: Record<string, string> = {
@@ -72,48 +31,11 @@ function text(tokens: MemberGroupToken[]): string {
     .join('');
 }
 
-test('a run of two or more member events becomes one unit keyed on its newest event', () => {
-  const items = [message, member('a', 'joined'), member('b', 'joined'), message];
-  const units = groupMemberEvents(items);
-
-  expect(units.map((unit) => unit.index)).toEqual([0, 2, 3]);
-  expect(units[1].item).toBe(items[2]);
-  expect(units[1].group).toEqual([items[1], items[2]]);
-  expect(units[0].group).toBeNull();
-});
-
-test('a lone member event, a moderated one or reactions stay their own row', () => {
-  const items = [
-    member('a', 'joined'),
-    member('b', 'banned'),
-    member('c', 'joined', { reactions: [{ key: '👍', senders: ['@a:x'] }] as never }),
-  ];
-
-  expect(groupMemberEvents(items).every((unit) => unit.group === null)).toBe(true);
-});
-
-test('membership events with reasons are grouped', () => {
-  const items = [
-    member('a', 'left', {
-      content: {
-        kind: 'membership',
-        user_id: '@a:x',
-        change: 'left',
-        display_name: 'A',
-        reason: 'IRC quit',
-      },
-    }),
-    member('b', 'joined'),
-  ];
-
-  expect(groupMemberEvents(items)).toEqual([{ item: items[1], index: 1, group: items }]);
-});
-
 test('lists up to three names and folds the rest into a count', () => {
-  const few = memberGroupSegments([member('a', 'joined'), member('b', 'joined')]);
+  const few = [segment('joined', 'a', 'b')];
   expect(text(memberGroupSummary(few, t, 'en'))).toBe('[A] and [B] joined');
 
-  const many = memberGroupSegments(['a', 'b', 'c', 'd', 'e'].map((user) => member(user, 'joined')));
+  const many = [segment('joined', 'a', 'b', 'c', 'd', 'e')];
   const tokens = memberGroupSummary(many, t, 'en');
   expect(text(tokens)).toBe('[A], [B], and <3 others> joined');
   expect(tokens.find((token) => token.kind === 'others')).toEqual({
@@ -123,33 +45,16 @@ test('lists up to three names and folds the rest into a count', () => {
   });
 });
 
-test('each kind of change gets its own clause, and a user is named once per clause', () => {
-  const segments = memberGroupSegments([
-    member('a', 'joined'),
-    member('a', 'left'),
-    member('b', 'invitation_accepted'),
-    member('a', 'joined', { id: 'again', event_id: '$again' }),
-  ]);
-
-  expect(segments.map((segment) => segment.category)).toEqual(['joined', 'left']);
+test('each kind of change gets its own clause', () => {
+  const segments = [segment('joined', 'a', 'b'), segment('left', 'a')];
   expect(text(memberGroupSummary(segments, t, 'en'))).toBe('[A] and [B] joined and [A] left');
 });
 
-test('name changes collapse with adjacent member events', () => {
-  const items = [rename('a', 'A1'), rename('a', 'A2'), member('b', 'joined'), rename('c', 'C')];
-  const units = groupMemberEvents(items);
-
-  expect(units).toEqual([{ item: items[3], index: 3, group: items }]);
-  expect(text(memberGroupSummary(memberGroupSegments(items), t, 'en'))).toBe(
-    '[A1] and [C] changed their name and [B] joined'
+test('name changes and invitations read as their own clauses', () => {
+  const names = [segment('name', 'a', 'c'), segment('joined', 'b')];
+  expect(text(memberGroupSummary(names, t, 'en'))).toBe(
+    '[A] and [C] changed their name and [B] joined'
   );
-});
-
-test('an invitation collapses with the join that answers it', () => {
-  const items = [member('a', 'invited'), member('a', 'invitation_accepted'), member('b', 'left')];
-
-  expect(groupMemberEvents(items)).toEqual([{ item: items[2], index: 2, group: items }]);
-  expect(text(memberGroupSummary(memberGroupSegments(items), t, 'en'))).toBe(
-    '[A] invited, [A] joined, and [B] left'
-  );
+  const invited = [segment('invited', 'a'), segment('joined', 'a'), segment('left', 'b')];
+  expect(text(memberGroupSummary(invited, t, 'en'))).toBe('[A] invited, [A] joined, and [B] left');
 });

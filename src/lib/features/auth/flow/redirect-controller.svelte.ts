@@ -5,7 +5,7 @@ import {
   redirectLoginType,
   nativeRedirectUri,
 } from '#lib/auth/redirect.js';
-import type { LoginFlowsView, RegistrationResultView } from '#src/generated/protocol';
+import type { AuthIntent, LoginFlowsView, RegistrationResultView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { t } from '#lib/i18n.js';
 import { deliversDeepLinks } from '#lib/platform/deep-links.js';
@@ -18,7 +18,7 @@ import {
 } from '#lib/features/auth/registration/registration-errors.js';
 
 type RedirectType = 'oidc' | 'sso';
-type RedirectIntent = 'login' | 'register';
+type RedirectIntent = AuthIntent;
 type FallbackResult = Extract<RegistrationResultView, { state: 'fallback' }>;
 
 interface RedirectControllerOptions {

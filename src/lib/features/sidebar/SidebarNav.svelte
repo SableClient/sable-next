@@ -9,7 +9,7 @@
   import { useCallSession } from '#lib/features/call/call-session.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { addUnread, spacesContainingRoom, spaceUnreadTotals } from '#lib/rooms/spaces.js';
+  import { addUnread, spacesContainingRoom } from '#lib/rooms/spaces.js';
   import type { UnreadCount } from '#lib/rooms/unread.js';
   import { hasUnread } from '#lib/rooms/unread.js';
   import {
@@ -108,7 +108,7 @@
     )
   );
   let callRoom = $derived(roomList.byId(call.roomId));
-  let spaceUnread = $derived(spaceUnreadTotals(spaces, roomList.rooms, roomList.badgeUnreadFor));
+  let spaceUnread = $derived(roomList.spaceUnread);
   let callSpaces = $derived(
     call.active ? spacesContainingRoom(spaces, roomList.rooms, call.roomId) : new Set<string>()
   );
@@ -146,6 +146,8 @@
     return rooms.reduce((total, room) => addUnread(total, roomList.badgeUnreadFor(room)), {
       unread: 0,
       highlight: 0,
+      marked: false as boolean,
+      notifying: 0,
     });
   }
 

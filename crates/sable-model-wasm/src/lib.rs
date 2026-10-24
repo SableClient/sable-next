@@ -8,6 +8,8 @@
     reason = "wasm-bindgen takes an optional string only as Option<String>"
 )]
 
+use sable_model::timeline::{self, TimelineGroupInput, TimelineReplyStyleView};
+
 use std::collections::HashSet;
 
 use sable_model::bot_commands::{
@@ -76,22 +78,10 @@ pub fn parse_bot_command(description: &str) -> Result<String, JsError> {
     json(&bot_commands::parse_description(&description))
 }
 
-#[wasm_bindgen(js_name = parseBotCommands)]
-pub fn parse_bot_commands(descriptions: &str) -> Result<String, JsError> {
-    json(&bot_commands::parse_descriptions(&decode::<
-        Vec<BotCommandDescription>,
-    >(descriptions)?))
-}
-
 #[wasm_bindgen(js_name = matchBotCommand)]
 pub fn match_bot_command(line: &str, commands: &str) -> Result<String, JsError> {
     let commands = decode::<Vec<BotCommand>>(commands)?;
     json(&bot_commands::match_bot_command(line, &commands))
-}
-
-#[wasm_bindgen(js_name = emptyDrafts)]
-pub fn empty_drafts(command: &str) -> Result<String, JsError> {
-    json(&bot_commands::empty_drafts(&decode::<BotCommand>(command)?))
 }
 
 #[wasm_bindgen(js_name = draftsFromText)]
@@ -171,6 +161,22 @@ pub fn active_elsewhere(presence: &str, inactive_here_ms: Option<f64>) -> Result
     Ok(notifications::active_elsewhere(
         &decode::<notifications::OwnPresence>(presence)?,
         inactive_here_ms,
+    ))
+}
+
+#[wasm_bindgen(js_name = timelineCollapsed)]
+pub fn timeline_collapsed(previous: &str, current: &str, style: &str) -> Result<bool, JsError> {
+    Ok(decode::<TimelineGroupInput>(current)?.collapsed_after(
+        &decode::<TimelineGroupInput>(previous)?,
+        decode::<TimelineReplyStyleView>(style)?,
+    ))
+}
+
+#[wasm_bindgen(js_name = eventBefore)]
+pub fn event_before(events: &str, target: &str) -> Result<Option<String>, JsError> {
+    Ok(timeline::event_before(
+        &decode::<Vec<Option<String>>>(events)?,
+        target,
     ))
 }
 
@@ -289,28 +295,6 @@ pub fn build_calendar_event(
         now_ms,
         time_zone,
     ))
-}
-
-#[wasm_bindgen(js_name = parseDuration)]
-#[must_use]
-pub fn parse_duration(value: &str) -> f64 {
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "a duration in milliseconds is far below 2^53"
-    )]
-    let ms = calendar::parse_duration(value) as f64;
-    ms
-}
-
-#[wasm_bindgen(js_name = formatDuration)]
-#[must_use]
-pub fn format_duration(ms: f64) -> String {
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "rounded to whole minutes anyway"
-    )]
-    let ms = ms as i64;
-    calendar::format_duration(ms)
 }
 
 #[wasm_bindgen(js_name = lobbyAction)]

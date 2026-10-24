@@ -3,11 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   agenda,
   buildEvent,
-  formatDuration,
   localToEpoch,
   monthGrid,
   occursOn,
-  parseDuration,
   readEntry,
   tallyRsvps,
   type Occurrence,
@@ -18,14 +16,6 @@ function entry(event: Record<string, unknown>, eventId = '$a') {
 }
 
 describe('calendar events', () => {
-  it('round-trips durations', () => {
-    expect(parseDuration('PT2H30M')).toBe(150 * 60_000);
-    expect(parseDuration('P1W')).toBe(7 * 24 * 3_600_000);
-    expect(formatDuration(150 * 60_000)).toBe('PT2H30M');
-    expect(formatDuration(24 * 3_600_000)).toBe('P1D');
-    expect(formatDuration(0)).toBe('PT0S');
-  });
-
   it('reads a start in its own time zone', () => {
     expect(localToEpoch('2026-10-01T20:00:00', 'Europe/Paris')).toBe(
       Date.UTC(2026, 9, 1, 18, 0, 0)

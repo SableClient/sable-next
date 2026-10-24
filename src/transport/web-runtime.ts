@@ -2,7 +2,8 @@ import type { Batch } from '#src/generated/protocol';
 import { releaseProxy, wrap, type Remote } from 'comlink';
 
 import type { AppMessage, AppRemote, AppRequest } from '#src/worker/app-protocol';
-import { connect } from '../lib/runtime/client';
+import { NEEDED_SLICES } from '../lib/runtime/app';
+import { connect, type Client } from '../lib/runtime/client';
 import { WireMismatchError } from '../lib/runtime/handshake';
 import type { Link } from '../lib/runtime/link';
 import { openSharedWorker } from './web';
@@ -140,11 +141,13 @@ function reloadOnce(error: unknown): void {
   location.reload();
 }
 
-export async function startLink(open: () => Link): Promise<void> {
+export async function startLink(open: () => Link): Promise<Client> {
   try {
-    await connect(open(), { onError: reloadOnce });
+    const client = await connect(open(), { needed: NEEDED_SLICES, onError: reloadOnce });
     sessionStorage.removeItem(RELOAD_KEY);
+    return client;
   } catch (error) {
     reloadOnce(error);
+    throw error;
   }
 }

@@ -23,7 +23,7 @@ export class MemberProfileRelations {
     void this.core.userRelations(userId).then(
       (relations) => {
         if (generation !== this.#generation) return;
-        this.rooms = relations.mutualRooms;
+        this.rooms = relations.mutual_rooms;
         this.ignored = relations.ignored;
       },
       (error: unknown) => {

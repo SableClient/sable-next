@@ -1,4 +1,4 @@
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { expect, SIGNED_OUT, test } from './fixtures/test';
 import { timelineImage, timelineItem, withRowFields } from './fixtures/timeline-items';
 
@@ -6,7 +6,7 @@ test.use({ storageState: SIGNED_OUT });
 
 const long = 'UnbrokenContent'.repeat(30);
 const source = JSON.stringify({ Plain: 'mxc://example.test/history-image' });
-const message = (html: string): TimelineItemView => ({
+const message = (html: string): ResolvedItem => ({
   ...timelineItem('general-19', long),
   content: {
     kind: 'message',
@@ -15,7 +15,6 @@ const message = (html: string): TimelineItemView => ({
     emote: false,
     notice: false,
     edited: false,
-    jumbo: null,
   },
 });
 const alteredMessage = (flags: { emote?: boolean; notice?: boolean; edited?: boolean }) => {
@@ -23,7 +22,7 @@ const alteredMessage = (flags: { emote?: boolean; notice?: boolean; edited?: boo
   if (item.content.kind === 'message') Object.assign(item.content, flags);
   return item;
 };
-const cases: Record<string, TimelineItemView> = {
+const cases: Record<string, ResolvedItem> = {
   text: message(`<p>${long}</p>`),
   emote: alteredMessage({ emote: true }),
   notice: alteredMessage({ notice: true }),

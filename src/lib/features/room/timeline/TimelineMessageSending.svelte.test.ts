@@ -1,10 +1,9 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -32,7 +31,7 @@ import { withRowFields } from './row-fixtures.js';
 afterEach(resetTimelineItemTest);
 
 test('a message waiting for the server shows a sending status until it is sent', async () => {
-  const sending: TimelineItemView = {
+  const sending: ResolvedItem = {
     ...item(false),
     event_id: null,
     transaction_id: 'txn-text',
@@ -56,7 +55,7 @@ test('a message waiting for the server shows a sending status until it is sent',
 });
 
 test('shows an indeterminate upload bar until the core reports progress', async () => {
-  const upload: TimelineItemView = {
+  const upload: ResolvedItem = {
     ...imageItem(),
     event_id: null,
     is_own: true,
@@ -71,7 +70,7 @@ test('shows an indeterminate upload bar until the core reports progress', async 
 });
 
 test('a right click on a message still sending does not open the browser menu', async () => {
-  const sending: TimelineItemView = {
+  const sending: ResolvedItem = {
     ...item(false),
     event_id: null,
     transaction_id: 'txn-text',
@@ -89,7 +88,7 @@ test('a right click on a message still sending does not open the browser menu', 
 
 test('cancels an upload that is still sending', async () => {
   const onCancelSend = vi.fn();
-  const upload: TimelineItemView = {
+  const upload: ResolvedItem = {
     ...imageItem(),
     event_id: null,
     transaction_id: 'txn-upload',
@@ -109,7 +108,7 @@ test('cancels an upload that is still sending', async () => {
 });
 
 test('fills one bar across a gallery and names the item uploading', async () => {
-  const gallery: TimelineItemView = withRowFields({
+  const gallery: ResolvedItem = withRowFields({
     ...item(false),
     event_id: null,
     is_own: true,

@@ -171,7 +171,7 @@ test('unlinking a mention makes its Matrix ID literal for a bot command', () => 
   expect(serializeComposer(doc)).toEqual({
     body: '!ban sable-coc @doesnm:doesnmlab.xyz russian troll',
     formatted: null,
-    mentions: { userIds: [], room: false },
+    mentions: { user_ids: [], room: false },
   });
 });
 
@@ -334,7 +334,7 @@ describe('setHtml', () => {
     expect(doc && serializeComposer(doc)).toEqual({
       body: 'ask Member One',
       formatted: 'ask <a href="https://matrix.to/#/@one:example.org">Member One</a>',
-      mentions: { userIds: ['@one:example.org'], room: false },
+      mentions: { user_ids: ['@one:example.org'], room: false },
     });
   });
 });

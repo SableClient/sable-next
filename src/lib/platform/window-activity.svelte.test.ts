@@ -161,3 +161,32 @@ test('goes idle after five minutes without input and wakes on input', () => {
   stop();
   vi.useRealTimers();
 });
+
+test('tells a reader when the grace after a long absence ends', () => {
+  vi.useFakeTimers();
+  const now = vi.spyOn(performance, 'now');
+  now.mockReturnValue(1_000_000);
+  const seen: boolean[] = [];
+  const stop = $effect.root(() => {
+    $effect(() => {
+      seen.push(windowActivity.recentlyResumed);
+    });
+  });
+  flushSync();
+
+  focused = false;
+  window.dispatchEvent(new Event('blur'));
+  flushSync();
+  now.mockReturnValue(1_040_000);
+  focused = true;
+  window.dispatchEvent(new Event('focus'));
+  flushSync();
+  now.mockReturnValue(1_049_000);
+  vi.advanceTimersByTime(8_000);
+  flushSync();
+
+  expect(seen.at(-1)).toBe(false);
+  expect(seen).toContain(true);
+  stop();
+  vi.useRealTimers();
+});

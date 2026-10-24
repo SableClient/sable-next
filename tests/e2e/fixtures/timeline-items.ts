@@ -1,12 +1,12 @@
 // These shapes must track TimelineItemContentView in src/generated/protocol.ts; the app
 // reads content.html, so a body-only override renders the previous text.
-import type { TimelineItemView } from '#src/generated/protocol';
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { withRowFields } from '../../../src/lib/features/room/timeline/row-fixtures';
 
 export { withRowFields };
 
-export function timelineItem(id: string, body: string): TimelineItemView {
+export function timelineItem(id: string, body: string): ResolvedItem {
   return withRowFields({
     id,
     event_id: `$${id}:example.test`,
@@ -23,7 +23,6 @@ export function timelineItem(id: string, body: string): TimelineItemView {
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -41,7 +40,7 @@ export function timelineItem(id: string, body: string): TimelineItemView {
   });
 }
 
-export function readMarkerItem(id: string): TimelineItemView {
+export function readMarkerItem(id: string): ResolvedItem {
   return withRowFields({
     ...timelineItem(id, ''),
     event_id: null,
@@ -56,11 +55,11 @@ export function timelineMessage(
   sender: string,
   timestamp: number,
   body: string
-): TimelineItemView {
+): ResolvedItem {
   return { ...timelineItem(id, body), sender, sender_name: sender, timestamp };
 }
 
-export function timelineImage(id: string): TimelineItemView {
+export function timelineImage(id: string): ResolvedItem {
   return {
     ...timelineItem(id, 'History image'),
     content: {
@@ -89,7 +88,7 @@ export function historyItems(options: {
   count: number;
   timestampBase: number;
   body?: (index: number) => string;
-}): TimelineItemView[] {
+}): ResolvedItem[] {
   const { idPrefix, label, count, timestampBase, body } = options;
   return Array.from({ length: count }, (_, index) => ({
     ...timelineItem(
@@ -102,7 +101,7 @@ export function historyItems(options: {
   }));
 }
 
-export function timelineWideImageWithoutDimensions(id: string): TimelineItemView {
+export function timelineWideImageWithoutDimensions(id: string): ResolvedItem {
   return {
     ...timelineItem(id, 'History image'),
     content: {

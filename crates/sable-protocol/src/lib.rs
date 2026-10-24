@@ -14,7 +14,16 @@ pub use sable_model::search_filter::{SearchAttachment, SearchFilter};
 pub use sable_model::sidebar::SidebarItemView;
 pub use sable_model::slash::{GestureView, MessageKind};
 pub use sable_model::spaces::{RoomJoinRuleView, SpaceChildEdge};
+pub use sable_model::timeline::{TimelineKey, TimelineReplyStyleView, TimelineRowKind};
 use serde::{Deserialize, Serialize};
+
+/// For `skip_serializing_if`: a field at its default is left off the wire, and the typegen makes it optional.
+pub mod skip {
+    #[must_use]
+    pub fn is_default<T: Default + PartialEq>(value: &T) -> bool {
+        *value == T::default()
+    }
+}
 
 /// Room types that Sable supports.
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -211,7 +220,7 @@ pub enum RpcError {
     },
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
 pub enum PaginationDirection {
@@ -282,6 +291,8 @@ pub enum CoreEvent {
     },
     TimelineDiff {
         subscription: SubscriptionId,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        key: Option<TimelineKey>,
         #[cfg_attr(
             feature = "typegen",
             specta(type = Vec<VectorDiffWire<TimelineItemView>>)
@@ -469,6 +480,21 @@ pub enum CoreEvent {
 }
 
 impl CoreEvent {
+    /// Whether the page reads this event. The room list, the typing indicators, the sidebar layout
+    /// and the timelines reach it as slice patches, and the slices read these events in Rust.
+    #[must_use]
+    pub const fn reaches_page(&self) -> bool {
+        !matches!(
+            self.kind(),
+            CoreEventKind::RoomListDiff
+                | CoreEventKind::Typing
+                | CoreEventKind::SpaceSidebarChanged
+                | CoreEventKind::TimelineDiff
+                | CoreEventKind::TimelinePagination
+                | CoreEventKind::TimelineAggregations
+        )
+    }
+
     #[must_use]
     pub const fn kind(&self) -> CoreEventKind {
         match self {
@@ -789,7 +815,7 @@ pub struct SearchContextView {
 
 // Hand-narrowed, keeping the UI off the SDK's shapes.
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 // Independent room capabilities.
 #[expect(
@@ -835,7 +861,7 @@ pub struct RoomListItemView {
     pub latest_event: Option<LatestEventView>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct RoomUnreadView {
     pub unread: u32,
@@ -1091,7 +1117,7 @@ pub enum RoomTag {
     Favourite,
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
 pub enum RoomStateView {
@@ -1183,22 +1209,12 @@ pub struct SpaceParentView {
     pub via: Vec<String>,
 }
 
-/// How a timeline row is drawn: a message carries a sender, a hover menu and
-/// reactions; an event is a one-line notice; an annotation is a divider.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-#[serde(rename_all = "snake_case")]
-pub enum TimelineRowKind {
-    Message,
-    Event,
-    Annotation,
-}
-
 /// Which reader preference can hide a row; `always` rows are always shown.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
 pub enum TimelineVisibility {
+    #[default]
     Always,
     Membership,
     /// A membership event that changed nothing a reader would notice.
@@ -1209,58 +1225,79 @@ pub enum TimelineVisibility {
     Hidden,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct TimelineItemView {
     /// Not an event id. Stable across a local echo becoming remote.
     pub id: String,
     pub row: TimelineRowKind,
     /// Content another room can receive as it is.
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub forwardable: bool,
     /// Whether the event can be redacted at all; the room's power levels
     /// decide whether the reader may.
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub redactable: bool,
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub visibility: TimelineVisibility,
     /// Absent while the event is still a local echo.
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub event_id: Option<OwnedEventId>,
     /// A local echo's only handle, since it has no event id yet.
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub transaction_id: Option<String>,
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub send_state: Option<SendStateView>,
     /// Dividers and markers have no sender.
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub sender: Option<OwnedUserId>,
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub sender_name: Option<String>,
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub sender_avatar: Option<String>,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub timestamp: u64,
     pub content: TimelineItemContentView,
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub in_reply_to: Option<ReplyView>,
     /// Set on the root and on every reply, so a UI with no thread view can hide
     /// the replies.
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub thread_root: Option<OwnedEventId>,
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub thread_summary: Option<ThreadSummaryView>,
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub reactions: Vec<ReactionGroup>,
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub is_own: bool,
     /// Already reduced by the SDK to one receipt per user.
     #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub read_by: Vec<OwnedUserId>,
     /// Available receipt timestamps in milliseconds since the Unix epoch.
     #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, specta_typescript::Number<u64>>))]
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub read_timestamps: std::collections::BTreeMap<String, u64>,
     /// MSC4144. When set, this is the identity to show as the sender; `sender`
     /// stays the account that actually sent it and must remain reachable.
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub per_message_profile: Option<PerMessageProfileView>,
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub bundled_link_previews: Vec<UrlPreviewView>,
-    #[cfg_attr(feature = "typegen", specta(optional))]
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub link_previews_removed: Option<bool>,
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub mention: MentionView,
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub forwarded: Option<ForwardedView>,
+    #[serde(default, skip_serializing_if = "skip::is_default")]
     pub forum_title: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct ForwardedView {
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
@@ -1276,10 +1313,11 @@ pub struct ForwardedView {
 }
 
 /// `Loud` covers `@room` and anything the push rules chose to highlight.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
 pub enum MentionView {
+    #[default]
     None,
     Silent,
     Loud,
@@ -1348,7 +1386,7 @@ pub enum RoomAttachmentContentView {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct UrlPreviewView {
     pub url: String,
@@ -1367,7 +1405,7 @@ pub struct UrlPreviewView {
     pub author_name: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct UrlPreviewVideoView {
     pub source: String,
@@ -1529,7 +1567,7 @@ pub struct AttachmentInfoView {
 /// MSC4144 per-message profile, letting one account send under several
 /// identities. Read from the unstable `com.beeper.per_message_profile` key,
 /// falling back to the stable `m.per_message_profile` once servers emit it.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct PerMessageProfileView {
     pub id: Option<String>,
@@ -1611,7 +1649,7 @@ pub struct PersonaCatalogView {
 
 /// The SDK loads the body lazily, so it is absent for an event we have never
 /// seen until `FetchEventDetails` fills it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct ReplyView {
     #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -1635,7 +1673,7 @@ pub struct EditVersionView {
     pub html: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct ThreadSummaryView {
     /// Excludes the root, so zero if every reply was redacted.
@@ -1650,7 +1688,7 @@ pub struct ThreadSummaryView {
 }
 
 /// Without this a failed send renders as an ordinary message.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum SendStateView {
@@ -1716,7 +1754,7 @@ pub enum QrLoginFailureView {
     Other,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SendBlockView {
@@ -1724,7 +1762,7 @@ pub enum SendBlockView {
     VerifyThisDevice,
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct UploadProgressView {
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
@@ -1735,7 +1773,7 @@ pub struct UploadProgressView {
     pub total: usize,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TimelineItemContentView {
@@ -1745,12 +1783,15 @@ pub enum TimelineItemContentView {
         /// Sanitised display HTML, safe to inject as-is.
         html: String,
         /// `m.emote`, which reads as an action by the sender rather than speech.
+        #[serde(default, skip_serializing_if = "skip::is_default")]
         emote: bool,
+        #[serde(default, skip_serializing_if = "skip::is_default")]
         notice: bool,
+        #[serde(default, skip_serializing_if = "skip::is_default")]
         edited: bool,
         /// Drawn larger, 1 to 4, when the message is nothing but emoji or
         /// inline emotes.
-        #[cfg_attr(feature = "typegen", specta(optional))]
+        #[serde(default, skip_serializing_if = "skip::is_default")]
         jumbo: Option<u8>,
     },
     Image {
@@ -2003,7 +2044,7 @@ impl TimelineItemContentView {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum StateChangeView {
@@ -2031,7 +2072,7 @@ pub enum StateChangeView {
     },
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum GalleryItemView {
@@ -2083,7 +2124,7 @@ pub enum GalleryItemView {
     },
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
 pub enum UtdCauseView {
@@ -2156,7 +2197,7 @@ pub struct ScheduledMessageView {
     pub delivery_ts: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct PollView {
     pub question: String,
@@ -2171,7 +2212,7 @@ pub struct PollView {
     pub edited: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct PollAnswerView {
     #[cfg_attr(feature = "typegen", specta(type = Option<Vec<String>>))]
@@ -2186,7 +2227,7 @@ pub struct PollAnswerView {
 
 /// The SDK's `MembershipChange`, narrowed to the transitions worth wording.
 /// Anything unrecognised collapses to `Other`, which the UI hides.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
 pub enum MembershipChangeView {
@@ -2209,21 +2250,21 @@ pub enum MembershipChangeView {
 
 /// `None` on either side means the name was unset, which reads differently from
 /// a rename.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct DisplayNameChangeView {
     pub old: Option<String>,
     pub new: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct AvatarChangeView {
     pub old: Option<String>,
     pub new: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct ReactionGroup {
     pub key: String,
@@ -2341,7 +2382,7 @@ pub struct KeywordNotificationView {
     pub mode: MentionNotificationModeView,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct NotificationSettingsView {
     /// The room's own rule. `null` means it follows `default`.
@@ -2396,7 +2437,7 @@ pub enum PushFetchView {
 }
 
 /// Structured, so arranging and localising the preview stays with the UI.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct LatestEventView {
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
@@ -2890,4 +2931,36 @@ pub struct BookmarkView {
     pub event_ts: u64,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub bookmarked_ts: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_events_that_slices_read_do_not_reach_the_page() {
+        let subscription = SubscriptionId(1);
+        let slice_only = [
+            CoreEvent::RoomListDiff {
+                subscription,
+                diffs: Vec::new(),
+            },
+            CoreEvent::Typing {
+                room_id: OwnedRoomId::try_from("!a:x").unwrap(),
+                user_ids: Vec::new(),
+            },
+            CoreEvent::SpaceSidebarChanged { items: Vec::new() },
+        ];
+        assert!(slice_only.iter().all(|event| !event.reaches_page()));
+        assert!(
+            !CoreEvent::TimelineDiff {
+                subscription,
+                key: None,
+                diffs: Vec::new()
+            }
+            .reaches_page()
+        );
+        assert!(CoreEvent::InboxChanged.reaches_page());
+        assert!(CoreEvent::SessionTokensRefreshed.reaches_page());
+    }
 }

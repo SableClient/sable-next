@@ -532,7 +532,7 @@
     {@const typing =
       !preferences.hideTypingIndicators &&
       room !== undefined &&
-      roomList.typingUsers.has(room.room_id) &&
+      roomList.typingUserIds(room.room_id).length > 0 &&
       mentions === 0 &&
       unread === 0 &&
       !marked}

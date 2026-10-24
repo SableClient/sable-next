@@ -1,12 +1,18 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { TimelineItemView } from '#src/generated/protocol';
 import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+import type { StaticTimeline } from '#lib/test-support/static-timeline.svelte.js';
 
+vi.mock('#lib/rooms/timeline.svelte.js', async (importActual) => {
+  const actual = await importActual<typeof import('#lib/rooms/timeline.svelte.js')>();
+  const { staticTimelineOf } = await import('#lib/test-support/static-timeline.svelte.js');
+  return { ...actual, RoomTimeline: staticTimelineOf(actual.RoomTimeline, actual.NO_UNREAD) };
+});
 vi.mock('#lib/core/context.js');
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({ useRoomList: () => ({ rooms: [] }) }));
 vi.mock('#lib/personas/personas.svelte.js', () => ({
@@ -26,7 +32,7 @@ afterEach(() => {
   core.fetchMedia.mockReset();
 });
 
-function image(eventId: string, filename: string): TimelineItemView {
+function image(eventId: string, filename: string): ResolvedItem {
   return withRowFields({
     id: eventId,
     event_id: eventId,
@@ -68,9 +74,11 @@ function image(eventId: string, filename: string): TimelineItemView {
 }
 
 test('an image in a thread opens the viewer on that image', async () => {
-  vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (this: RoomTimeline) {
-    this.items = [image('$first', 'first.png'), image('$second', 'second.png')];
-    this.hasSnapshot = true;
+  vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (
+    this: StaticTimeline
+  ) {
+    this.patch({ items: [image('$first', 'first.png'), image('$second', 'second.png')] });
+    this.patch({ hasSnapshot: true });
     return Promise.resolve();
   });
   vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();
@@ -96,11 +104,12 @@ test('the header keeps a spoiler-safe topic visible', async () => {
     emote: false,
     notice: false,
     edited: false,
-    jumbo: null,
   };
-  vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (this: RoomTimeline) {
-    this.items = [root];
-    this.hasSnapshot = true;
+  vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (
+    this: StaticTimeline
+  ) {
+    this.patch({ items: [root] });
+    this.patch({ hasSnapshot: true });
     return Promise.resolve();
   });
   vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();
@@ -113,9 +122,11 @@ test('the header keeps a spoiler-safe topic visible', async () => {
 });
 
 test('a linked reply missing from the thread opens on its context', async () => {
-  vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (this: RoomTimeline) {
-    this.items = [image('$root', 'first.png')];
-    this.hasSnapshot = true;
+  vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (
+    this: StaticTimeline
+  ) {
+    this.patch({ items: [image('$root', 'first.png')] });
+    this.patch({ hasSnapshot: true });
     return Promise.resolve();
   });
   const start = vi.spyOn(RoomTimeline.prototype, 'start').mockResolvedValue();
@@ -137,9 +148,11 @@ test('a linked reply missing from the thread opens on its context', async () => 
 });
 
 test('a linked reply already in the thread keeps the thread timeline', async () => {
-  vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (this: RoomTimeline) {
-    this.items = [image('$root', 'first.png'), image('$reply', 'reply.png')];
-    this.hasSnapshot = true;
+  vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (
+    this: StaticTimeline
+  ) {
+    this.patch({ items: [image('$root', 'first.png'), image('$reply', 'reply.png')] });
+    this.patch({ hasSnapshot: true });
     return Promise.resolve();
   });
   const start = vi.spyOn(RoomTimeline.prototype, 'start').mockResolvedValue();
@@ -158,10 +171,12 @@ test('a linked reply already in the thread keeps the thread timeline', async () 
 });
 
 test('a plain thread offers no jump back to the thread', async () => {
-  vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (this: RoomTimeline) {
-    this.mode = { kind: 'thread', rootEventId: '$root' };
-    this.items = [image('$root', 'first.png'), image('$reply', 'reply.png')];
-    this.hasSnapshot = true;
+  vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (
+    this: StaticTimeline
+  ) {
+    this.patch({ mode: { kind: 'thread', root_event_id: '$root' } });
+    this.patch({ items: [image('$root', 'first.png'), image('$reply', 'reply.png')] });
+    this.patch({ hasSnapshot: true });
     return Promise.resolve();
   });
   vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();
@@ -184,16 +199,16 @@ test('a reply opened on its context jumps back to the live thread', async () => 
       }) as unknown as Animation
   );
   const startThread = vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (
-    this: RoomTimeline
+    this: StaticTimeline
   ) {
-    this.mode = { kind: 'thread', rootEventId: '$root' };
-    this.items = [image('$root', 'first.png')];
-    this.hasSnapshot = true;
+    this.patch({ mode: { kind: 'thread', root_event_id: '$root' } });
+    this.patch({ items: [image('$root', 'first.png')] });
+    this.patch({ hasSnapshot: true });
     return Promise.resolve();
   });
-  vi.spyOn(RoomTimeline.prototype, 'start').mockImplementation(function (this: RoomTimeline) {
-    this.mode = { kind: 'focused', eventId: '$older' };
-    this.items = [image('$root', 'first.png'), image('$older', 'older.png')];
+  vi.spyOn(RoomTimeline.prototype, 'start').mockImplementation(function (this: StaticTimeline) {
+    this.patch({ mode: { kind: 'focused', event_id: '$older' } });
+    this.patch({ items: [image('$root', 'first.png'), image('$older', 'older.png')] });
     return Promise.resolve();
   });
   vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();
@@ -215,13 +230,13 @@ test('a reply opened on its context jumps back to the live thread', async () => 
 test('a failed subscription can be retried without replacing the composer', async () => {
   let attempts = 0;
   const start = vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (
-    this: RoomTimeline
+    this: StaticTimeline
   ) {
-    this.mode = { kind: 'thread', rootEventId: '$root' };
+    this.patch({ mode: { kind: 'thread', root_event_id: '$root' } });
     attempts += 1;
-    this.error = attempts === 1 ? 'load_failed' : null;
-    this.hasSnapshot = attempts > 1;
-    if (attempts > 1) this.items = [image('$root', 'first.png')];
+    this.patch({ error: attempts === 1 ? 'load_failed' : null });
+    this.patch({ hasSnapshot: attempts > 1 });
+    if (attempts > 1) this.patch({ items: [image('$root', 'first.png')] });
     return Promise.resolve();
   });
   vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();
@@ -248,13 +263,12 @@ test.each([false, true])(
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     };
     vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (
-      this: RoomTimeline
+      this: StaticTimeline
     ) {
-      this.items = [root];
-      this.hasSnapshot = true;
+      this.patch({ items: [root] });
+      this.patch({ hasSnapshot: true });
       return Promise.resolve();
     });
     vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();

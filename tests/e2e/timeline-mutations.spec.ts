@@ -53,7 +53,7 @@ test('a deletion above the viewport does not move the reader', async ({
   await expect(timeline.jumpToLatest).toBeVisible();
   await timeline.waitForScrollSettled();
 
-  const before = await timeline.visibleRange();
+  const anchor = await timeline.fullyVisibleAnchor();
   await expect.poll(() => timeline.eventIdAboveViewport()).not.toBeNull();
   const doomed = await timeline.eventIdAboveViewport();
   if (!doomed) throw new Error('no rendered row above the reader');
@@ -63,7 +63,7 @@ test('a deletion above the viewport does not move the reader', async ({
   await expect(timeline.itemByEventId(doomed)).toContainText(en.timeline.redacted, {
     timeout: 20_000,
   });
-  await expect.poll(() => timeline.visibleRange()).toEqual(before);
+  await timeline.expectAnchorHeld(anchor);
 });
 
 test('an image without dimensions takes the file shape without losing the newest message', async ({

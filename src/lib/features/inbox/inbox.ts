@@ -1,11 +1,16 @@
-import type { BookmarkView, InboxItemView, RoomListItemView } from '#src/generated/protocol';
+import type {
+  BookmarkView,
+  InboxFilter,
+  InboxItemView,
+  RoomListItemView,
+} from '#src/generated/protocol';
 
 import { formatTime } from '#lib/ui/date-time.js';
 import { currentLocale } from '#lib/i18n.js';
 import { hasUnread, type RoomUnread, roomUnread } from '#lib/rooms/unread.js';
 import type { UnreadCount } from '#lib/rooms/unread.js';
 
-export type NotificationFilter = 'all' | 'mentions' | 'direct';
+export type NotificationFilter = InboxFilter;
 export type InboxTab = 'notifications' | 'invites' | 'requests';
 
 export const NOTIFICATION_GROUP_LIMIT = 5;
@@ -52,7 +57,7 @@ export function parseFilter(value: string | null): NotificationFilter {
 }
 
 export function notificationCount(counts: UnreadCount): number {
-  return Math.max(counts.notifying ?? 0, counts.highlight);
+  return Math.max(counts.notifying, counts.highlight);
 }
 
 function matchesFilter(
@@ -112,8 +117,7 @@ export function hasMarkedUnread(
   unreadFor: RoomUnread = roomUnread
 ): boolean {
   return rooms.some(
-    (room) =>
-      room.state === 'joined' && room.room_kind !== 'space' && (unreadFor(room).marked ?? false)
+    (room) => room.state === 'joined' && room.room_kind !== 'space' && unreadFor(room).marked
   );
 }
 

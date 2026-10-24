@@ -29,6 +29,7 @@
     unread: 0,
     highlight: countNotifications(roomList.rooms, roomList.badgeUnreadFor),
     marked: false,
+    notifying: 0,
   });
   let inviteCounts = $derived({
     unread: 0,
@@ -38,6 +39,7 @@
       )
     ),
     marked: false,
+    notifying: 0,
   });
 
   const landing: InboxTab = untrack(() =>

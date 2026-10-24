@@ -1,6 +1,5 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { expect, test } from 'vitest';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 import {
   editedBody,
@@ -16,16 +15,16 @@ function hidden(
   content: unknown,
   timestamp = 0,
   redacts: string | null = null
-): TimelineItemView {
+): ResolvedItem {
   return {
     id: eventId,
     event_id: eventId,
     timestamp,
     content: { kind: 'hidden_event', event_type: eventType, content, redacts },
-  } as TimelineItemView;
+  } as ResolvedItem;
 }
 
-function edit(eventId: string, target: string, body: string, timestamp: number): TimelineItemView {
+function edit(eventId: string, target: string, body: string, timestamp: number): ResolvedItem {
   return hidden(
     eventId,
     'm.room.message',
@@ -52,7 +51,7 @@ test('reads the relation, the replacement body and the redacted event', () => {
 });
 
 test('an edit diffs against the edit before it', () => {
-  const message = { id: '$m', event_id: '$m', content: { kind: 'message' } } as TimelineItemView;
+  const message = { id: '$m', event_id: '$m', content: { kind: 'message' } } as ResolvedItem;
   const first = edit('$e1', '$m', 'one', 1);
   const second = edit('$e2', '$m', 'two', 2);
   const other = edit('$e3', '$n', 'three', 1);
@@ -78,18 +77,18 @@ test('a redaction reason is found by the event it redacted', () => {
   expect(index.redactionReason('$other')).toBeNull();
 });
 
-function deleted(sender: string, redactedBy?: string): TimelineItemView {
+function deleted(sender: string, redactedBy?: string): ResolvedItem {
   return {
     id: '$msg',
     event_id: '$msg',
     sender,
     content: { kind: 'redacted', reason: null, redacted_by: redactedBy },
-  } as TimelineItemView;
+  } as ResolvedItem;
 }
 
 test('a deletion names its redactor unless the author made it', () => {
   const redaction = (sender: string) =>
-    ({ ...hidden('$x', 'm.room.redaction', {}, 0, '$msg'), sender }) as TimelineItemView;
+    ({ ...hidden('$x', 'm.room.redaction', {}, 0, '$msg'), sender }) as ResolvedItem;
 
   const live = new TimelineEventIndex([], [redaction('@mod:x')]);
   expect(live.redactor(deleted('@alice:x'))).toBe('@mod:x');

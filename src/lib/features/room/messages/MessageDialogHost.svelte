@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
   import type {
     EditVersionView,
     ImageSourcePackView,
@@ -6,7 +7,6 @@
     MessageKind,
     PerMessageProfileView,
     PersonaView,
-    TimelineItemView,
   } from '#src/generated/protocol';
 
   import { formattedForEditing } from '#lib/composer/composer-context.js';
@@ -40,12 +40,12 @@
 
   interface Props {
     dialogs: MessageDialogs;
-    events: { get(eventId: string): TimelineItemView | null };
+    events: { get(eventId: string): ResolvedItem | null };
     roomId?: string;
     members?: readonly MemberView[];
     currentUserId?: string | null;
-    readers?: (item: TimelineItemView) => readonly string[];
-    receiptTimestamps?: (item: TimelineItemView) => Readonly<Record<string, number>>;
+    readers?: (item: ResolvedItem) => readonly string[];
+    receiptTimestamps?: (item: ResolvedItem) => Readonly<Record<string, number>>;
     canRedactOwn?: boolean;
     canRedactOthers?: boolean;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
@@ -86,11 +86,11 @@
   const personaStore = usePersonaStore();
   const roomList = useRoomList();
 
-  function live(entry: OpenMessageDialog): TimelineItemView {
+  function live(entry: OpenMessageDialog): ResolvedItem {
     return (entry.item.event_id && events.get(entry.item.event_id)) || entry.item;
   }
 
-  function preview(item: TimelineItemView): string | null {
+  function preview(item: ResolvedItem): string | null {
     return item.content.kind === 'message' ? item.content.body : null;
   }
 
@@ -101,14 +101,14 @@
     };
   }
 
-  function report(item: TimelineItemView, reason: string | null): void {
+  function report(item: ResolvedItem, reason: string | null): void {
     if (!item.event_id) return;
     void core.rpc.messages
       .report({ room_id: roomId, event_id: item.event_id, reason })
       .catch(failed('report'));
   }
 
-  function forward(item: TimelineItemView, toRoomIds: string[], includeMetadata: boolean): void {
+  function forward(item: ResolvedItem, toRoomIds: string[], includeMetadata: boolean): void {
     const eventId = item.event_id;
     if (!eventId) return;
     for (const toRoomId of toRoomIds) {
@@ -130,13 +130,13 @@
     }
   }
 
-  function reproxyKind(content: TimelineItemView['content']): MessageKind {
+  function reproxyKind(content: ResolvedItem['content']): MessageKind {
     if (content.kind !== 'message') return 'text';
     if (content.emote) return 'emote';
     return content.notice ? 'notice' : 'text';
   }
 
-  function reproxy(item: TimelineItemView, persona: PersonaView | null): void {
+  function reproxy(item: ResolvedItem, persona: PersonaView | null): void {
     const content = item.content;
     if (!item.event_id) return;
     const media =
@@ -160,13 +160,13 @@
     void editMessage(core.rpc, roomId, item.event_id, body, {
       formatted: formattedForEditing(content.html),
       kind: reproxyKind(content),
-      mediaCaption: media,
-      threadRoot: item.thread_root ?? null,
+      media_caption: media,
+      thread_root: item.thread_root ?? null,
       persona: persona ? projectPersona(persona, preferences.personaFallback && body !== '') : null,
     }).catch(failed('reproxy'));
   }
 
-  function replyToVersion(item: TimelineItemView, version: EditVersionView): void {
+  function replyToVersion(item: ResolvedItem, version: EditVersionView): void {
     if (!item.event_id || !onReply) return;
     const body = replyPreviewBody({
       kind: 'message',
@@ -175,7 +175,6 @@
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     });
     onReply(version.event_id, { of: item.event_id, body, html: version.html });
   }

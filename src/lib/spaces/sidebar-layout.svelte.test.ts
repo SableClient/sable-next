@@ -2,8 +2,8 @@
 
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { CoreClient } from '#lib/core/client.svelte.js';
-import type { CoreEvent } from '#src/generated/protocol';
+import { FakeRuntime } from '#lib/test-support/fake-runtime.js';
+import { toasts } from '#lib/ui/toasts.svelte.js';
 
 import type { SidebarItem } from './sidebar-layout.js';
 import { SpaceSidebar } from './sidebar-layout.svelte.js';
@@ -13,234 +13,115 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function fakeCore(overrides: Partial<Record<string, unknown>> = {}) {
-  const listeners = new Set<(event: CoreEvent) => void>();
-  const core = {
-    subscribeEvents: (listener: (event: CoreEvent) => void) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    rpc: {
-      spaces: {
-        sidebar: vi.fn(() => Promise.resolve<SidebarItem[]>([])),
-        setSidebar: vi.fn(() => Promise.resolve()),
-        ...overrides,
-      },
-    },
-  };
-
-  return {
-    core: core as unknown as CoreClient,
-    calls: core.rpc.spaces,
-    emit(event: CoreEvent) {
-      for (const listener of listeners) listener(event);
-    },
-    listenerCount: () => listeners.size,
-  };
-}
-
 const folder: SidebarItem = { kind: 'folder', id: 'f', name: 'Work', content: ['!a:example.org'] };
 const lifted: SidebarItem[] = [{ kind: 'space', room_id: '!a:example.org' }];
 
-test('loads the stored layout', async () => {
-  const { core } = fakeCore({ sidebar: vi.fn(() => Promise.resolve([folder])) });
-  const sidebar = new SpaceSidebar();
+async function started(items: SidebarItem[] = [], loaded = true) {
+  const runtime = new FakeRuntime({ sidebar: { items, loaded } });
+  const sidebar = new SpaceSidebar(() => runtime.client());
+  await sidebar.start();
+  return { runtime, sidebar };
+}
 
-  await sidebar.start(core);
-
+test('shows the layout the slice serves and follows its patches', async () => {
+  const { runtime, sidebar } = await started([folder]);
   expect(sidebar.items).toEqual([folder]);
+  runtime.set('sidebar', { items: lifted, loaded: true });
+  expect(sidebar.items).toEqual(lifted);
+  sidebar.stop();
 });
 
-test('takes a layout another device wrote', async () => {
-  const harness = fakeCore();
-  const sidebar = new SpaceSidebar();
-  await sidebar.start(harness.core);
-
-  harness.emit({ type: 'space_sidebar_changed', items: [folder] });
-
-  expect(sidebar.items).toEqual([folder]);
-});
-
-test('keeps a sync layout when an older initial read finishes', async () => {
-  const read = Promise.withResolvers<SidebarItem[]>();
-  const harness = fakeCore({ sidebar: vi.fn(() => read.promise) });
-  const sidebar = new SpaceSidebar();
-  const starting = sidebar.start(harness.core);
-
-  harness.emit({ type: 'space_sidebar_changed', items: [folder] });
-  read.resolve([]);
-  await starting;
-
-  expect(sidebar.items).toEqual([folder]);
-  expect(harness.calls.setSidebar).not.toHaveBeenCalled();
-});
-
-test('does not save a layout before the initial read finishes', async () => {
-  const read = Promise.withResolvers<SidebarItem[]>();
-  const harness = fakeCore({ sidebar: vi.fn(() => read.promise) });
-  const sidebar = new SpaceSidebar();
-  const starting = sidebar.start(harness.core);
-
-  sidebar.write(lifted);
-
-  expect(harness.calls.setSidebar).not.toHaveBeenCalled();
-  read.resolve([folder]);
-  await starting;
-  expect(sidebar.items).toEqual([folder]);
-});
-
-test('does not save a fallback layout after a failed read', async () => {
-  const harness = fakeCore({ sidebar: vi.fn(() => Promise.reject(new Error('store closed'))) });
-  const sidebar = new SpaceSidebar();
-  vi.spyOn(console, 'debug').mockImplementation(() => undefined);
-  await sidebar.start(harness.core);
-
-  sidebar.write(lifted);
-
-  expect(harness.calls.setSidebar).not.toHaveBeenCalled();
-  expect(sidebar.items).toEqual([]);
-
-  harness.emit({ type: 'space_sidebar_changed', items: [folder] });
-  sidebar.write(lifted);
-  expect(harness.calls.setSidebar).toHaveBeenCalledWith({ items: lifted });
-});
-
-test('shows a write before it is stored', async () => {
-  const harness = fakeCore();
-  const sidebar = new SpaceSidebar();
-  await sidebar.start(harness.core);
-
-  sidebar.write([folder]);
-
-  expect(sidebar.items).toEqual([folder]);
-  expect(harness.calls.setSidebar).toHaveBeenCalledWith({ items: [folder] });
-});
-
-test('puts the previous layout back when the write is refused', async () => {
-  const harness = fakeCore({ setSidebar: vi.fn(() => Promise.reject(new Error('denied'))) });
-  const sidebar = new SpaceSidebar();
-  await sidebar.start(harness.core);
-  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-
+test('asks the slice to write a layout', async () => {
+  const { runtime, sidebar } = await started();
   sidebar.write([folder]);
   await vi.waitFor(() => {
-    expect(sidebar.items).toEqual([]);
+    expect(runtime.dispatched).toEqual([
+      { target: { slice: 'sidebar', key: null }, action: { type: 'write', items: [folder] } },
+    ]);
   });
+  sidebar.stop();
 });
 
-test('ignores a layout from a sync that predates its own write', async () => {
-  const harness = fakeCore({ sidebar: vi.fn(() => Promise.resolve([folder])) });
-  const sidebar = new SpaceSidebar();
-  await sidebar.start(harness.core);
-
-  sidebar.write(lifted);
-  harness.emit({ type: 'space_sidebar_changed', items: [folder] });
-
-  expect(sidebar.items).toEqual(lifted);
+test('tells the user when the core refused a layout', async () => {
+  const { runtime, sidebar } = await started();
+  const error = vi.spyOn(toasts, 'error').mockReturnValue(0);
+  runtime.notice('sidebar', { type: 'save_failed' });
+  runtime.notice('rooms', { type: 'save_failed' });
+  expect(error).toHaveBeenCalledTimes(1);
+  sidebar.stop();
 });
 
-test('settles once its own write comes back', async () => {
-  const harness = fakeCore({ sidebar: vi.fn(() => Promise.resolve([folder])) });
-  const sidebar = new SpaceSidebar();
-  await sidebar.start(harness.core);
-
-  sidebar.write(lifted);
-  harness.emit({
-    type: 'space_sidebar_changed',
-    items: [{ kind: 'space', room_id: '!a:example.org' }],
-  });
-  harness.emit({ type: 'space_sidebar_changed', items: [folder] });
-
-  expect(sidebar.items).toEqual([folder]);
-});
-
-test('takes another device change made after its own write was stored', async () => {
-  const harness = fakeCore({ sidebar: vi.fn(() => Promise.resolve([])) });
-  const sidebar = new SpaceSidebar();
-  await sidebar.start(harness.core);
-
-  sidebar.write(lifted);
-  await vi.waitFor(() => {
-    expect(harness.calls.setSidebar).toHaveBeenCalled();
-  });
-  await Promise.resolve();
-  harness.emit({ type: 'space_sidebar_changed', items: [folder] });
-
-  expect(sidebar.items).toEqual([folder]);
-});
-
-test('a rejected write does not undo a newer one', async () => {
-  let refuse: ((error: Error) => void) | undefined;
-  const harness = fakeCore({
-    setSidebar: vi
-      .fn()
-      .mockImplementationOnce(
-        () =>
-          new Promise((_, reject) => {
-            refuse = reject;
-          })
-      )
-      .mockImplementation(() => Promise.resolve()),
-  });
-  const sidebar = new SpaceSidebar();
-  await sidebar.start(harness.core);
-  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-
-  sidebar.write([folder]);
-  sidebar.write(lifted);
-  refuse?.(new Error('denied'));
-  await Promise.resolve();
-
-  expect(sidebar.items).toEqual(lifted);
-});
-
-test('persists which folders are open and forgets ones that are gone', async () => {
-  const harness = fakeCore({ sidebar: vi.fn(() => Promise.resolve([folder])) });
-  const sidebar = new SpaceSidebar();
-  await sidebar.start(harness.core);
-
-  sidebar.toggleFolder('f');
+test('toggles folders locally and persists rapid changes', async () => {
+  localStorage.setItem('sable-open-space-folders', '["f"]');
+  const { runtime, sidebar } = await started([folder]);
   expect(sidebar.openFolders.has('f')).toBe(true);
-  expect(localStorage.getItem('sable-open-space-folders')).toBe('["f"]');
-
-  const restored = new SpaceSidebar();
-  expect(restored.openFolders.has('f')).toBe(true);
-
-  sidebar.write([{ kind: 'space', room_id: '!a:example.org' }]);
-  expect(sidebar.openFolders.has('f')).toBe(false);
+  sidebar.toggleFolder('f');
+  expect(sidebar.openFolders.size).toBe(0);
   expect(localStorage.getItem('sable-open-space-folders')).toBe('[]');
+  sidebar.toggleFolder('f');
+  expect([...sidebar.openFolders]).toEqual(['f']);
+  expect(localStorage.getItem('sable-open-space-folders')).toBe('["f"]');
+  expect(runtime.dispatched).toEqual([]);
+  sidebar.stop();
+});
+
+test('adopts synced open folders before the runtime is started', () => {
+  const runtime = new FakeRuntime({ sidebar: { items: [], loaded: false } });
+  const sidebar = new SpaceSidebar(() => runtime.client());
+  sidebar.adoptOpenFolders(['f', 'g']);
+  expect([...sidebar.openFolders]).toEqual(['f', 'g']);
+  expect(localStorage.getItem('sable-open-space-folders')).toBe('["f","g"]');
+  sidebar.adoptOpenFolders([]);
+  expect(sidebar.openFolders.size).toBe(0);
+  expect(localStorage.getItem('sable-open-space-folders')).toBe('[]');
+  expect(runtime.dispatched).toEqual([]);
+});
+
+test('restores open folders from local storage after a snapshot is discarded', async () => {
+  const first = await started([folder]);
+  first.sidebar.toggleFolder('f');
+  first.sidebar.stop();
+  const again = await started([folder]);
+  expect([...again.sidebar.openFolders]).toEqual(['f']);
+  expect(localStorage.getItem('sable-open-space-folders')).toBe('["f"]');
+  expect(again.runtime.dispatched).toEqual([]);
+  again.sidebar.stop();
+});
+
+test('prunes missing folders only after the layout has loaded, including an empty layout', async () => {
+  localStorage.setItem('sable-open-space-folders', '["f","gone"]');
+  const { runtime, sidebar } = await started([], false);
+  expect([...sidebar.openFolders]).toEqual(['f', 'gone']);
+  runtime.set('sidebar', { items: [folder], loaded: true });
+  expect([...sidebar.openFolders]).toEqual(['f']);
+  expect(localStorage.getItem('sable-open-space-folders')).toBe('["f"]');
+  runtime.set('sidebar', { items: [], loaded: true });
+  expect(sidebar.openFolders.size).toBe(0);
+  expect(localStorage.getItem('sable-open-space-folders')).toBe('[]');
+  sidebar.stop();
 });
 
 test('drops its subscription and layout on stop', async () => {
-  const harness = fakeCore({ sidebar: vi.fn(() => Promise.resolve([folder])) });
-  const sidebar = new SpaceSidebar();
-  await sidebar.start(harness.core);
-
+  const { runtime, sidebar } = await started([folder]);
   sidebar.stop();
-
+  await Promise.resolve();
   expect(sidebar.items).toEqual([]);
-  expect(harness.listenerCount()).toBe(0);
-
-  harness.emit({ type: 'space_sidebar_changed', items: [folder] });
-  expect(sidebar.items).toEqual([]);
+  expect(runtime.unsubscribed).toHaveLength(1);
 });
 
-test('a late read from a previous session does not overwrite the current one', async () => {
-  let release: ((items: SidebarItem[]) => void) | undefined;
-  const harness = fakeCore({
-    sidebar: vi.fn(
-      () =>
-        new Promise<SidebarItem[]>((resolve) => {
-          release = resolve;
-        })
-    ),
+test('a start that is stopped before the runtime answers subscribes to nothing', async () => {
+  const runtime = new FakeRuntime({ sidebar: { items: [folder], loaded: true } });
+  let release: (() => void) | undefined;
+  const sidebar = new SpaceSidebar(async () => {
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return runtime.client();
   });
-  const sidebar = new SpaceSidebar();
-  const pending = sidebar.start(harness.core);
-
+  const pending = sidebar.start();
   sidebar.stop();
-  release?.([folder]);
+  release?.();
   await pending;
-
   expect(sidebar.items).toEqual([]);
+  expect(runtime.unsubscribed).toEqual([]);
 });

@@ -498,12 +498,13 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     let _ = cold_push::CORE.set(core.clone());
     app.manage(runtime);
     tauri::async_runtime::spawn(restore_ahead_of_webview(core.clone(), gate.clone()));
+    let offering = gate.clone();
     app.manage(AppState {
         core,
         gate,
         event_sink: event_sink.clone(),
     });
-    spawn_event_pump(app.handle().clone(), pushing, events, event_sink);
+    spawn_event_pump(app.handle().clone(), pushing, offering, events, event_sink);
     #[cfg(desktop)]
     notifications::register_actions(app.handle());
     #[cfg(desktop)]
@@ -897,6 +898,7 @@ async fn restore_ahead_of_webview(core: Arc<Core>, gate: AccountGate) {
 fn spawn_event_pump<R: tauri::Runtime>(
     notifier: AppHandle<R>,
     pushing: Arc<Core>,
+    gate: AccountGate,
     mut events: tokio::sync::mpsc::UnboundedReceiver<CoreEvent>,
     event_sink: Arc<EventSink>,
 ) {
@@ -910,7 +912,11 @@ fn spawn_event_pump<R: tauri::Runtime>(
                     _ => None,
                 })
                 .collect();
-            event_sink.send(std::mem::take(&mut batch));
+            gate.offer(&batch).await;
+            batch.retain(CoreEvent::reaches_page);
+            if !batch.is_empty() {
+                event_sink.send(std::mem::take(&mut batch));
+            }
 
             if showing.is_empty() {
                 continue;

@@ -1,11 +1,10 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { expect, test } from 'vitest';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 import { collectForumThreads } from './forum-threads';
 import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
-function item(overrides: Partial<TimelineItemView> & { id: string }): TimelineItemView {
+function item(overrides: Partial<ResolvedItem> & { id: string }): ResolvedItem {
   return withRowFields({
     event_id: `$${overrides.id}`,
     transaction_id: null,
@@ -21,7 +20,6 @@ function item(overrides: Partial<TimelineItemView> & { id: string }): TimelineIt
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -236,7 +234,6 @@ test('keeps the root details needed for its own forum actions', () => {
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     },
   });
 

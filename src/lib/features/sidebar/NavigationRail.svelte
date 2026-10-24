@@ -341,8 +341,8 @@
 
   function entryRef(item: SidebarItem): LayoutRef {
     return item.kind === 'space'
-      ? { kind: 'space', roomId: item.room_id }
-      : { kind: 'folder', folderId: item.id };
+      ? { kind: 'space', room_id: item.room_id, folder_id: null }
+      : { kind: 'folder', folder_id: item.id };
   }
 
   let contextIndex = $derived.by(() => {
@@ -357,7 +357,7 @@
     if (targetIndex < 0 || targetIndex >= entries.length) return;
 
     onReorder?.(
-      { kind: 'space', roomId: contextSpace.room_id },
+      { kind: 'space', room_id: contextSpace.room_id, folder_id: null },
       entryRef(entries[targetIndex]),
       direction === 'up' ? 'above' : 'below'
     );
@@ -646,7 +646,11 @@
 {#snippet spaceSlot(roomId: string, folderId?: string)}
   {@const item = spaceItem(roomId)}
   {#if item !== null}
-    {@const ref = { kind: 'space', roomId, folderId } satisfies LayoutRef}
+    {@const ref = {
+      kind: 'space',
+      room_id: roomId,
+      folder_id: folderId ?? null,
+    } satisfies LayoutRef}
     {#if folderId === undefined}
       <div
         class="rail-menu-anchor"
@@ -716,7 +720,7 @@
 {/snippet}
 
 {#snippet closedFolder(folder: SidebarFolder)}
-  {@const ref = { kind: 'folder', folderId: folder.id } satisfies LayoutRef}
+  {@const ref = { kind: 'folder', folder_id: folder.id } satisfies LayoutRef}
   <div
     class={[
       'rail-slot',
@@ -752,7 +756,7 @@
 {/snippet}
 
 {#snippet openFolder(folder: SidebarFolder)}
-  {@const ref = { kind: 'folder', folderId: folder.id } satisfies LayoutRef}
+  {@const ref = { kind: 'folder', folder_id: folder.id } satisfies LayoutRef}
   <div
     class={[
       'folder-open',

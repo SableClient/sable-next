@@ -1,11 +1,10 @@
 import { expect, test, vi } from 'vitest';
 import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
-import type { TimelineItemView } from '#src/generated/protocol';
 import { TimelineFuture } from './timeline-future.svelte.js';
 
 function fixture(load = vi.fn(async () => {})) {
-  const timeline = { items: [] } as unknown as RoomTimeline;
-  const future = new TimelineFuture(() => timeline, load);
+  const timeline = { itemCount: 0 };
+  const future = new TimelineFuture(() => timeline as unknown as RoomTimeline, load);
   return { timeline, future, load };
 }
 
@@ -33,14 +32,7 @@ test('an automatic page waits for new items and interaction can still retry', as
 test('raw progress continues paging even when events are hidden', async () => {
   const { timeline, future, load } = fixture();
   for (let i = 0; i < 10; i++) {
-    timeline.items = [
-      ...timeline.items,
-      {
-        id: String(i),
-        event_id: `$${i}`,
-        content: { kind: 'redacted', reason: null },
-      } as TimelineItemView,
-    ];
+    timeline.itemCount += 1;
     await future.request();
   }
   expect(load).toHaveBeenCalledTimes(10);

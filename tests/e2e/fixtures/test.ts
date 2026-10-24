@@ -1,3 +1,4 @@
+import { inflateSync } from 'node:zlib';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { expect, test as base, type Page } from '@playwright/test';
@@ -299,11 +300,20 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         statePath,
         async (page) => {
           const shell = new AppShell(page);
-          for (const roomId of [generalId, randomId, clubhouseId]) {
+          const timeline = new RoomTimeline(page);
+          for (const [roomId, firstMessage] of [
+            [generalId, 'Welcome to General'],
+            [randomId, 'Welcome to Random'],
+            [clubhouseId, 'Clubhouse notice board'],
+          ] as const) {
             await shell.openRoom(roomId);
             await expect(
               page.locator('.timeline-viewport .item[data-event-id]').first()
             ).toBeVisible({ timeout: 30_000 });
+            await timeline.scrollToAndNotify(0);
+            await expect(timeline.message(firstMessage).first()).toHaveCount(1, {
+              timeout: 30_000,
+            });
           }
           await expect
             .poll(
@@ -312,7 +322,12 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
                   origins: {
                     indexedDB?: {
                       name: string;
-                      stores: { records: { key: unknown }[] }[];
+                      stores: {
+                        records: {
+                          key: unknown;
+                          valueEncoded?: { ta?: { b: string } };
+                        }[];
+                      }[];
                     }[];
                   }[];
                 };
@@ -321,18 +336,32 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
                   .filter((database) => database.name.endsWith('::sable-search'))
                   .flatMap((database) =>
                     database.stores.flatMap((store) =>
-                      store.records.map((record) =>
-                        typeof record.key === 'string' ? record.key : ''
-                      )
+                      store.records
+                        .filter(
+                          (record) =>
+                            typeof record.key === 'string' &&
+                            record.key.startsWith('sable.search.chunk.')
+                        )
+                        .flatMap((record) => {
+                          const bytes = record.valueEncoded?.ta?.b;
+                          if (!bytes) return [];
+                          const chunk = JSON.parse(
+                            inflateSync(Buffer.from(bytes, 'base64')).toString('utf8')
+                          ) as { documents: { body: string }[] };
+                          return chunk.documents.map((document) => document.body);
+                        })
                     )
                   );
               },
               { timeout: 150_000, intervals: [1_000] }
             )
             .toEqual(
-              expect.arrayContaining(
-                [generalId, randomId, clubhouseId].map((roomId) => `sable.search.room.${roomId}`)
-              )
+              expect.arrayContaining([
+                ...searchBodies('General'),
+                ...searchBodies('Random'),
+                'Clubhouse notice board',
+                'Clubhouse thread reply',
+              ])
             );
         },
         async (page) => {

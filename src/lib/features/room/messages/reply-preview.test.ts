@@ -46,7 +46,6 @@ test.each([
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     })
   ).toBe(expected);
 });
@@ -118,7 +117,6 @@ test('a spoiler stays hidden in the preview', () => {
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     })
   ).toBe('look [Spoiler] here & there');
   expect(

@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { expect, test, vi } from 'vitest';
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import type { TimelineItemView } from '#src/generated/protocol';
 import { MessageActionExecutor } from './message-action-controller.svelte.js';
 import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
-function message(): TimelineItemView {
+function message(): ResolvedItem {
   return withRowFields({
     id: 'item',
     event_id: '$item',
@@ -22,7 +22,6 @@ function message(): TimelineItemView {
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,

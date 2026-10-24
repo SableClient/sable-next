@@ -174,10 +174,10 @@
         encrypted: encryptable && encrypted,
         // A `$state` array is a Proxy, which postMessage cannot clone.
         invite: [...invites],
-        parentSpace: parentSpace === '' ? null : parentSpace,
+        parent_space: parentSpace === '' ? null : parentSpace,
         alias: aliasToSend,
-        roomVersion: roomVersionToSend,
-        joinRule: joinRuleToSend,
+        room_version: roomVersionToSend,
+        join_rule: joinRuleToSend,
         federate,
       });
       const target = roomPathParamFromId(roomId);

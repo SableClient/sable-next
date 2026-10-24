@@ -48,8 +48,13 @@ fn js_err(error: &RpcError) -> napi::Error {
     napi::Error::new(Status::GenericFailure, json)
 }
 
+/// The events the page reads, as JSON.
 fn encode_batch(batch: &[CoreEvent]) -> Option<String> {
-    match serde_json::to_string(batch) {
+    let page: Vec<&CoreEvent> = batch.iter().filter(|event| event.reaches_page()).collect();
+    if page.is_empty() {
+        return None;
+    }
+    match serde_json::to_string(&page) {
         Ok(json) => return Some(json),
         Err(error) => {
             tracing::error!(
@@ -59,8 +64,8 @@ fn encode_batch(batch: &[CoreEvent]) -> Option<String> {
         }
     }
 
-    let kept: Vec<&CoreEvent> = batch
-        .iter()
+    let kept: Vec<&CoreEvent> = page
+        .into_iter()
         .filter(|event| serde_json::to_string(event).is_ok())
         .collect();
 
@@ -353,14 +358,15 @@ impl SableCore {
             .take()
             .ok_or_else(|| napi::Error::new(Status::InvalidArg, "events are already subscribed"))?;
 
+        let gate = self.gate.clone();
         napi::bindgen_prelude::spawn(async move {
             let mut batch = Vec::new();
             while events.recv_many(&mut batch, EVENT_BATCH_LIMIT).await > 0 {
-                let encoded = encode_batch(&batch);
-                batch.clear();
-                if let Some(json) = encoded {
+                if let Some(json) = encode_batch(&batch) {
                     on_events.call(json, ThreadsafeFunctionCallMode::NonBlocking);
                 }
+                gate.offer(&batch).await;
+                batch.clear();
             }
         });
 

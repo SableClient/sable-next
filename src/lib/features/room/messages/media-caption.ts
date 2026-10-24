@@ -1,12 +1,12 @@
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 
 export type MediaCaptionContent = Extract<
-  TimelineItemView['content'],
+  ResolvedItem['content'],
   { kind: 'image' | 'video' | 'audio' | 'file' }
 >;
 
 export function isMediaCaptionContent(
-  content: TimelineItemView['content']
+  content: ResolvedItem['content']
 ): content is MediaCaptionContent {
   return (
     content.kind === 'image' ||

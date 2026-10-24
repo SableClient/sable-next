@@ -45,6 +45,7 @@
     unread: 0,
     highlight: inboxCount,
     marked: hasMarkedUnread(roomList.rooms, roomList.badgeUnreadFor),
+    notifying: 0,
   });
 
   let hasAlerts = $derived(alertProviders.some((provider) => provider.priority !== null));

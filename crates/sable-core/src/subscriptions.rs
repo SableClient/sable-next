@@ -216,6 +216,7 @@ impl Core {
                 timeline: None,
                 overlay: None,
                 thread_root: None,
+                timeline_key: None,
                 kind: SubscriptionKind::Other,
             },
         );
@@ -242,6 +243,7 @@ impl Core {
         self: &Arc<Self>,
         SubscribeParams {
             room_id,
+            key: timeline_key,
             focus,
             hidden_events,
         }: SubscribeParams,
@@ -281,6 +283,7 @@ impl Core {
                     TimelineFocusView::Thread { root_event_id } => Some(root_event_id.clone()),
                     TimelineFocusView::Live | TimelineFocusView::Event { .. } => None,
                 },
+                timeline_key: timeline_key.clone(),
                 kind: if live {
                     SubscriptionKind::LiveTimeline(room_id.clone())
                 } else {
@@ -321,6 +324,7 @@ impl Core {
         let stream_room = room.clone();
         let stream_timeline = timeline.clone();
         let stream_overlay = overlay.clone();
+        let stream_key = timeline_key.clone();
         let task = spawn(async move {
             pin_mut!(stream);
             loop {
@@ -357,6 +361,7 @@ impl Core {
                             if let Some(index) = overlay.index_of_event(&target) {
                                 core.emit(CoreEvent::TimelineDiff {
                                     subscription,
+                                    key: stream_key.clone(),
                                     diffs: vec![
                                         overlay.apply(crate::protocol::VectorDiff::Set {
                                             index,
@@ -411,6 +416,7 @@ impl Core {
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
                 core.emit(CoreEvent::TimelineDiff {
                     subscription,
+                    key: stream_key.clone(),
                     diffs: diffs.into_iter().map(|diff| overlay.apply(diff)).collect(),
                 });
             }
@@ -525,6 +531,7 @@ impl Core {
             if !diffs.is_empty() {
                 self.emit(CoreEvent::TimelineDiff {
                     subscription: *subscription,
+                    key: entry.timeline_key.clone(),
                     diffs,
                 });
             }

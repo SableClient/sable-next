@@ -2,7 +2,7 @@ import type { ImagePackView, MemberView, RoomListItemView } from '#src/generated
 import { expect, test } from 'vitest';
 
 import type { AutocompleteQuery } from './autocomplete';
-import { parseBotCommands } from './bot-commands';
+import { parseBotCommand } from './bot-commands';
 import { rememberSuggestion } from './suggestion-usage';
 import { suggestionsFor, type PackEmote } from './suggestions';
 
@@ -276,7 +276,7 @@ test('two rooms claiming one alias are suggested once', () => {
 });
 
 test('a bot command is offered under its bot, and never over a built-in of the same name', () => {
-  const bots = parseBotCommands([
+  const bots = [
     {
       sender: '@bot:example.org',
       sender_name: 'Moderation',
@@ -293,7 +293,9 @@ test('a bot command is offered under its bot, and never over a built-in of the s
       sender_avatar: null,
       content: { command: 'me' },
     },
-  ]);
+  ]
+    .map((view) => parseBotCommand(view))
+    .filter((command) => command !== null);
 
   expect(suggestionsFor(commandQuery('cau'), [], [], [], undefined, null, null, bots)).toEqual([
     {

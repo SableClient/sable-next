@@ -2,9 +2,8 @@
 
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import type { RoomPermissionsView, RoomListItemView } from '#src/generated/protocol';
-import type { CoreClient } from '#lib/core/client.svelte.js';
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
@@ -16,12 +15,22 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
 
 import { core } from '#lib/core/__mocks__/context.js';
 import { RoomList } from '#lib/rooms/room-list.svelte.js';
+import { FakeRuntime, roomsView } from '#lib/test-support/fake-runtime.js';
 import { goto } from '#lib/test-support/app-navigation.js';
 import { visit } from '#lib/test-support/app-state.js';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 import InboxView from './InboxView.svelte';
 
-const roomList = new RoomList(core as unknown as CoreClient);
+const runtime = new FakeRuntime({ rooms: roomsView([]) });
+const roomList = new RoomList(() => runtime.client());
+const setRooms = (rooms: RoomListItemView[]) => {
+  runtime.set('rooms', roomsView(rooms));
+};
+
+beforeAll(() => roomList.start());
+afterAll(() => {
+  roomList.stop();
+});
 const room = withCounts({
   room_id: '!room:example.org',
   name: 'Room',
@@ -61,7 +70,7 @@ Object.assign(core.rpc.account, { inviteTriage: vi.fn(() => Promise.resolve([]))
 beforeEach(() => {
   goto.mockClear();
   visit('/inbox');
-  roomList.rooms = [room];
+  setRooms([room]);
 });
 
 test('switches between notifications, invites and actionable join requests', async () => {
@@ -103,33 +112,33 @@ test('keeps the notification filter while navigating tabs with the keyboard', as
 });
 
 test('shows the pending invite count on the invites tab', () => {
-  roomList.rooms = [
+  setRooms([
     room,
     { ...room, room_id: '!a:example.org', state: 'invited' },
     { ...room, room_id: '!b:example.org', state: 'invited' },
-  ];
+  ]);
   render(InboxView);
   expect(screen.getByRole('tab', { name: /Invites/ })).toHaveTextContent('2');
 });
 
 test('lands on the invites tab when only invites are waiting', () => {
-  roomList.rooms = [room, { ...room, room_id: '!a:example.org', state: 'invited' }];
+  setRooms([room, { ...room, room_id: '!a:example.org', state: 'invited' }]);
   render(InboxView);
   expect(screen.getByRole('tab', { name: /Invites/ })).toHaveAttribute('aria-selected', 'true');
 });
 
 test('lands on the invites tab ahead of notifications', () => {
-  roomList.rooms = [
+  setRooms([
     withCounts({ ...room, unread: 1, notifying: 1, highlight: 1 }),
     { ...room, room_id: '!a:example.org', state: 'invited' },
-  ];
+  ]);
   render(InboxView);
   expect(screen.getByRole('tab', { name: /Invites/ })).toHaveAttribute('aria-selected', 'true');
 });
 
 test('keeps an explicit tab over pending invites', () => {
   visit('/inbox?tab=notifications');
-  roomList.rooms = [room, { ...room, room_id: '!a:example.org', state: 'invited' }];
+  setRooms([room, { ...room, room_id: '!a:example.org', state: 'invited' }]);
   render(InboxView);
   expect(screen.getByRole('tab', { name: /Notifications/ })).toHaveAttribute(
     'aria-selected',
@@ -138,16 +147,22 @@ test('keeps an explicit tab over pending invites', () => {
 });
 
 test('a room behind the badge with nothing in the feed still gets a row', async () => {
-  roomList.rooms = [
-    withCounts({
-      ...room,
-      is_direct: true,
-      direct_targets: [],
-      unread: 2,
-      notifying: 2,
-      notification: { room: null, default: 'all' },
-    }),
-  ];
+  runtime.set(
+    'rooms',
+    roomsView(
+      [
+        withCounts({
+          ...room,
+          is_direct: true,
+          direct_targets: [],
+          unread: 2,
+          notifying: 2,
+          notification: { room: null, default: 'all' },
+        }),
+      ],
+      { badges: { [room.room_id]: { unread: 2, highlight: 0, marked: false, notifying: 2 } } }
+    )
+  );
   render(InboxView);
   const user = userEvent.setup();
 

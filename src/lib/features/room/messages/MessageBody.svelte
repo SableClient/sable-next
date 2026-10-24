@@ -1,6 +1,7 @@
 <script lang="ts">
+  import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
   import { on } from 'svelte/events';
-  import type { TimelineItemView, MemberView } from '#src/generated/protocol';
+  import type { MemberView } from '#src/generated/protocol';
 
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
 
@@ -34,7 +35,7 @@
   const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
 
   interface Props {
-    item: TimelineItemView;
+    item: ResolvedItem;
     canRedactOthers: boolean;
     redactionReason?: string | null;
     redactedBy?: string | null;

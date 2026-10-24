@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import type { BackwardPaginationState } from '#lib/rooms/timeline.svelte.js';
+import type { PaginationStateView } from '#src/generated/protocol';
 
 import { nextHistoryDecision, TimelineHistoryController } from './timeline-history';
 import { TIMELINE_LAYOUT } from './timeline-layout';
@@ -15,7 +15,7 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
 
 function setup(requestHistory = vi.fn<() => Promise<boolean>>().mockResolvedValue(true)) {
   const state = {
-    pagination: 'idle' as BackwardPaginationState,
+    pagination: 'idle' as PaginationStateView,
     nearOldest: true,
     scrolling: false,
   };
@@ -49,7 +49,7 @@ afterEach(() => {
 describe('nextHistoryDecision', () => {
   const base = {
     wanted: true,
-    pagination: 'idle' as BackwardPaginationState,
+    pagination: 'idle' as PaginationStateView,
     nearOldest: true,
     requestPending: false,
     msSinceRequest: Number.POSITIVE_INFINITY,
@@ -58,8 +58,8 @@ describe('nextHistoryDecision', () => {
   test.for([
     [{}, 'request'],
     [{ wanted: false }, 'wait'],
-    [{ pagination: 'end' as BackwardPaginationState }, 'stop'],
-    [{ pagination: 'loading' as BackwardPaginationState }, 'wait'],
+    [{ pagination: 'end' as PaginationStateView }, 'stop'],
+    [{ pagination: 'loading' as PaginationStateView }, 'wait'],
     [{ nearOldest: false }, 'stop'],
     [{ requestPending: true }, 'wait'],
     [{ msSinceRequest: 0 }, 'wait'],

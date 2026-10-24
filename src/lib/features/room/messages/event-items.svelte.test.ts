@@ -1,16 +1,20 @@
 // @vitest-environment happy-dom
 
+import { asWireItems } from '#lib/test-support/timeline-wire.js';
+
+import { type ResolvedItem } from '#lib/rooms/timeline-item.js';
+import type { TimelineItemView } from '#src/generated/protocol';
 import { flushSync } from 'svelte';
 import { expect, test, vi } from 'vitest';
 
-import type { TimelineItemView } from '#src/generated/protocol';
 import { EventItems, MAX_EVENT_ITEMS } from './event-items.svelte';
 
-const item = (eventId: string) => ({ event_id: eventId }) as TimelineItemView;
+const item = (eventId: string) =>
+  ({ event_id: eventId, content: { kind: 'call_invite' } }) as ResolvedItem;
 
 function directory() {
   const eventItems = vi.fn(({ event_ids }: { room_id: string; event_ids: string[] }) =>
-    Promise.resolve(event_ids.map(item))
+    Promise.resolve(asWireItems(event_ids.map(item)))
   );
   return { items: new EventItems({ eventItems }, () => '@me:x'), eventItems };
 }
@@ -19,7 +23,7 @@ test('a cold derived reader updates when its first fetch completes', async () =>
   const response = Promise.withResolvers<TimelineItemView[]>();
   const eventItems = vi.fn(() => response.promise);
   const items = new EventItems({ eventItems }, () => '@me:x');
-  let latest: TimelineItemView | null = null;
+  let latest: ResolvedItem | null = null;
   let pending = false;
   const stop = $effect.root(() => {
     const shown = $derived(items.get('!r', '$a') ?? null);
@@ -34,10 +38,10 @@ test('a cold derived reader updates when its first fetch completes', async () =>
     expect(pending).toBe(true);
   });
 
-  response.resolve([item('$a')]);
+  response.resolve([item('$a')] as unknown as TimelineItemView[]);
   await vi.waitFor(() => {
     flushSync();
-    expect(latest).toEqual(item('$a'));
+    expect(latest).toMatchObject(item('$a'));
     expect(pending).toBe(false);
   });
   stop();
@@ -94,7 +98,7 @@ test('the cache keeps the most recently used events', () => {
 test('an event on screen is never evicted from under its reader', () => {
   const { items } = directory();
   items.put('!r', [item('$shown')]);
-  const seen: (TimelineItemView | null | undefined)[] = [];
+  const seen: (ResolvedItem | null | undefined)[] = [];
   const stop = $effect.root(() => {
     $effect(() => {
       seen.push(items.get('!r', '$shown'));
@@ -105,7 +109,7 @@ test('an event on screen is never evicted from under its reader', () => {
     '!r',
     Array.from({ length: MAX_EVENT_ITEMS * 2 }, (_, i) => item(`$${i}`))
   );
-  const edited = { ...item('$shown'), edited: true } as TimelineItemView;
+  const edited = { ...item('$shown'), edited: true } as ResolvedItem;
   items.put('!r', [edited]);
   flushSync();
 
@@ -117,7 +121,7 @@ test('an event whose lookup failed is requested again after a delay, a bounded n
   vi.useFakeTimers();
   const eventItems = vi.fn(() => Promise.reject(new Error('room not ready')));
   const items = new EventItems({ eventItems }, () => '@me:x');
-  let latest: TimelineItemView | null | undefined;
+  let latest: ResolvedItem | null | undefined;
   const stop = $effect.root(() => {
     $effect(() => {
       latest = items.get('!r', '$a');
@@ -154,9 +158,9 @@ test('a recovered lookup shows the event and stops retrying', async () => {
   const eventItems = vi
     .fn<(params: { room_id: string; event_ids: string[] }) => Promise<TimelineItemView[]>>()
     .mockRejectedValueOnce(new Error('room not ready'))
-    .mockResolvedValue([item('$a')]);
+    .mockResolvedValue(asWireItems([item('$a')]));
   const items = new EventItems({ eventItems }, () => '@me:x');
-  let latest: TimelineItemView | null | undefined;
+  let latest: ResolvedItem | null | undefined;
   const stop = $effect.root(() => {
     $effect(() => {
       latest = items.get('!r', '$a');
@@ -169,7 +173,7 @@ test('a recovered lookup shows the event and stops retrying', async () => {
   await vi.advanceTimersByTimeAsync(0);
   flushSync();
 
-  expect(latest).toEqual(item('$a'));
+  expect(latest?.event_id).toBe('$a');
   await vi.advanceTimersByTimeAsync(60000);
   expect(eventItems).toHaveBeenCalledTimes(2);
   stop();

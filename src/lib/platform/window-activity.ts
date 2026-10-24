@@ -27,8 +27,14 @@ function noteActivity(): void {
 }
 
 const subscribe = createSubscriber((notify) => {
+  let graceEnds: ReturnType<typeof setTimeout> | undefined;
   const update = (): void => {
+    const before = resumedAt;
     noteActivity();
+    if (resumedAt !== before) {
+      clearTimeout(graceEnds);
+      graceEnds = setTimeout(notify, RESUME_GRACE_MS);
+    }
     notify();
   };
   let stopped = false;
@@ -66,6 +72,7 @@ const subscribe = createSubscriber((notify) => {
   ];
   return () => {
     stopped = true;
+    clearTimeout(graceEnds);
     unlisten();
     nativeFocused = null;
     pageShown = true;
@@ -127,6 +134,7 @@ export const windowActivity = {
   },
 
   get recentlyResumed(): boolean {
+    subscribe();
     return performance.now() - resumedAt < RESUME_GRACE_MS;
   },
 };

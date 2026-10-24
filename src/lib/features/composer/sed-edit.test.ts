@@ -60,7 +60,7 @@ test('keeps the mentions of the edited message', () => {
     sed('s/fish/cat')
   );
   expect(edited?.formatted).toContain('https://matrix.to/#/@ana:example.org');
-  expect([...(edited?.mentions.userIds ?? [])]).toEqual(['@ana:example.org']);
+  expect([...(edited?.mentions.user_ids ?? [])]).toEqual(['@ana:example.org']);
 });
 
 test('an empty replacement deletes the formatted match', () => {

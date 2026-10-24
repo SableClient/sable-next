@@ -1,8 +1,9 @@
 import { expect, test, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
+import { SvelteMap } from 'svelte/reactivity';
 
-import type { RoomListItemView } from '#src/generated/protocol';
+import type { RoomListItemView, Rpc, SearchCoverageView } from '#src/generated/protocol';
 
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
@@ -19,8 +20,10 @@ vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('#lib/rooms/room-list.svelte.js')>()),
   useRoomList: () => ({
-    rooms,
-    labelFor: (roomId: string) => rooms.find((room) => room.room_id === roomId)?.name ?? roomId,
+    get rooms() {
+      return [...listedRooms.values()];
+    },
+    labelFor: (roomId: string) => listedRooms.get(roomId)?.name ?? roomId,
   }),
 }));
 
@@ -61,22 +64,31 @@ const rooms = [
   room({ room_id: '!random:example.org', name: 'Random' }),
 ];
 
-async function mount() {
+const listedRooms = new SvelteMap<string, RoomListItemView>();
+const coverage = new SvelteMap<string, SearchCoverageView>();
+Object.defineProperty(core, 'searchCoverage', { get: () => coverage.get('current') ?? null });
+
+async function mount(initialRooms = rooms) {
+  listedRooms.clear();
+  coverage.clear();
+  for (const room of initialRooms) listedRooms.set(room.room_id, room);
+  const searchMessages = vi
+    .fn<Rpc['search']['messages']>()
+    .mockResolvedValue({ hits: [], older: null });
   Object.assign(core, {
     session: { user_id: '@me:example.org' },
     searchCoverageUnavailable: false,
-    searchCoverage: null,
     refreshSearchCoverage: vi.fn().mockResolvedValue(undefined),
     rpc: {
       account: { searchUserDirectory: vi.fn().mockResolvedValue([]) },
-      search: { messages: vi.fn().mockResolvedValue({ hits: [], older: null }) },
+      search: { messages: searchMessages },
     },
   });
   const screen = await render(SearchView);
   const field = screen.getByRole('combobox', { name: en.common.searchMessages });
   const listbox = screen.getByRole('listbox', { name: en.search.suggestions });
   const chips = screen.getByRole('list', { name: en.search.activeFilters }).getByRole('listitem');
-  return { screen, field, listbox, chips };
+  return { screen, field, listbox, chips, searchMessages };
 }
 
 test('typing an operator prefix offers completions and Tab accepts one', async () => {
@@ -370,4 +382,32 @@ test('a starter filter begins a filter and offers its values', async () => {
 
   await expect.element(field).toHaveFocus();
   await expect.element(screen.getByRole('listbox')).toBeVisible();
+});
+
+test('searches a room filter when the room directory arrives after the query', async () => {
+  const { field, chips, searchMessages } = await mount([]);
+  await userEvent.fill(field.element(), 'message in:General ');
+  await expect.element(chips).toHaveLength(1);
+  expect(searchMessages).not.toHaveBeenCalled();
+
+  for (const room of rooms) listedRooms.set(room.room_id, room);
+
+  await expect.poll(() => searchMessages.mock.calls.length).toBe(1);
+  expect(searchMessages.mock.calls[0]?.[0].filter?.rooms).toEqual(['!general:example.org']);
+});
+
+test('refreshes a query as more messages enter the search index', async () => {
+  const { field, searchMessages } = await mount();
+  await userEvent.fill(field.element(), 'welcome');
+  await expect.poll(() => searchMessages.mock.calls.length).toBe(1);
+
+  coverage.set('current', {
+    documents: 80,
+    rooms_pending: 1,
+    rooms_failed: 0,
+    state: 'indexing',
+  });
+
+  await expect.poll(() => searchMessages.mock.calls.length).toBe(2);
+  expect(searchMessages.mock.calls.at(-1)?.[0].query).toBe('welcome');
 });

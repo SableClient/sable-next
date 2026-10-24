@@ -59,7 +59,7 @@ const baseProfile: ProfileView = {
 function mountCard(patch: Partial<ProfileView>) {
   Object.assign(core, {
     session: { user_id: '@me:example.test' },
-    userRelations: vi.fn().mockResolvedValue({ mutualRooms: [], ignored: false }),
+    userRelations: vi.fn().mockResolvedValue({ mutual_rooms: [], ignored: false }),
   });
   Object.assign(core.rpc.members, { list: vi.fn().mockResolvedValue([]) });
   return render(MentionProfileCard, {

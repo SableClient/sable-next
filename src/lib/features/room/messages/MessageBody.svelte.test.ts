@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedContent, ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { TimelineItemContentView, TimelineItemView } from '#src/generated/protocol';
+import type { TimelineItemContentView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -33,7 +34,7 @@ afterEach(() => {
   core.media.fetchMedia.mockClear();
 });
 
-function item(content: TimelineItemContentView): TimelineItemView {
+function item(content: TimelineItemContentView): ResolvedItem {
   return withRowFields({
     id: 'item',
     event_id: '$item',
@@ -43,7 +44,7 @@ function item(content: TimelineItemContentView): TimelineItemView {
     sender_name: 'Alice',
     sender_avatar: null,
     timestamp: 0,
-    content,
+    content: content as ResolvedContent,
     in_reply_to: null,
     thread_root: null,
     thread_summary: null,

@@ -1,6 +1,7 @@
 <script lang="ts">
+  import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
   import type { Snippet } from 'svelte';
-  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
+  import type { MemberView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
 
@@ -9,7 +10,7 @@
   import StateEventSubjectName from '../members/StateEventSubjectName.svelte';
 
   interface Props {
-    item: TimelineItemView;
+    item: ResolvedItem;
     members?: readonly MemberView[];
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
     reaction?: Snippet;

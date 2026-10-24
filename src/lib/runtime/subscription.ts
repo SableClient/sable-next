@@ -29,6 +29,7 @@ export class Subscription<S> {
   #sub: SubId | undefined;
   #window: Window | null;
   #listeners = new Set<() => void>();
+  #openers = new Set<() => void>();
   #dirty = false;
   #closed = false;
   #held: SubEvent[] | null = null;
@@ -55,6 +56,12 @@ export class Subscription<S> {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
   };
+
+  /** Runs after the state arrives from a new subscribe, at first and after a restart. */
+  onOpen(listener: () => void): () => void {
+    this.#openers.add(listener);
+    return () => this.#openers.delete(listener);
+  }
 
   /** Moves the part of a list the subscription follows, `null` for all of it. */
   async range(window: Window | null): Promise<void> {
@@ -96,6 +103,7 @@ export class Subscription<S> {
       this.#load(snapshot);
       this.host.replay(sub);
       this.notify();
+      for (const listener of this.#openers) listener();
       this.#loadedNow();
     } finally {
       done();

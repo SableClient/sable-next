@@ -9,12 +9,12 @@ import {
   type RegistrationFlowsView,
   type SessionInfo,
   type SyncStatus,
-  type MutualRoomView,
   type ProfilePropagationView,
   type ProfileView,
   type RegistrationResultView,
   type VerificationView,
   type Rpc,
+  type RpcResult,
   createRpc,
 } from '#src/generated/protocol';
 
@@ -27,7 +27,6 @@ import { V1MigrationError } from '#lib/migrations/v1/migration.js';
 import QuickLRU from 'quick-lru';
 import { on } from 'svelte/events';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
-import { clearRoomListSnapshot } from '#lib/rooms/room-list-snapshot.js';
 import { clearRecentSearches } from '#lib/search/recent-searches.svelte.js';
 import { reportSessionFailure } from '#lib/observability/session-telemetry.js';
 import {
@@ -119,7 +118,7 @@ async function resolveHomeserverInPage(
   return resolved;
 }
 
-export type UserRelations = { mutualRooms: MutualRoomView[]; ignored: boolean };
+export type UserRelations = RpcResult<Rpc['account']['userRelations']>;
 export type CoreStatus = 'idle' | 'starting' | 'signed-out' | 'authenticating' | 'ready' | 'error';
 export type CoreSession = SessionInfo;
 export type ActiveVerification = { userId: string; flowId: string; state: VerificationView };
@@ -702,10 +701,7 @@ export class CoreClient {
     }
 
     const response = await this.rpc.account.userRelations({ user_id: userId });
-    const relations = {
-      mutualRooms: response.mutual_rooms,
-      ignored: response.ignored,
-    };
+    const relations = response;
     this.relationsCache.set(userId, { accountId, relations });
     return relations;
   }
@@ -769,7 +765,6 @@ export class CoreClient {
     await this.#rpcOn(transport).session.removeAccount({ account_id: accountId });
     await this.refreshAccounts();
     discardAccountStore(transport, accountId);
-    clearRoomListSnapshot(accountId);
     if (userId !== undefined) clearRecentSearches(userId);
   }
 
@@ -784,7 +779,6 @@ export class CoreClient {
     this.status = 'authenticating';
     if (accountId !== null) {
       discardAccountStore(transport, accountId);
-      clearRoomListSnapshot(accountId);
     }
     if (userId !== null) clearRecentSearches(userId);
 
@@ -805,7 +799,6 @@ export class CoreClient {
   async resetCaches(): Promise<void> {
     const accountIds = this.accounts.map((account) => account.account_id);
     await this.ensureTransport().resetCaches(accountIds);
-    for (const accountId of accountIds) clearRoomListSnapshot(accountId);
   }
 
   async requestVerification(userId: string, deviceId: string | null = null): Promise<string> {

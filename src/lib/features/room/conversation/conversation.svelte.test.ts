@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { afterEach, expect, test, vi } from 'vitest';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
@@ -25,7 +24,7 @@ import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 const ROOM = '!room:example.org';
 
-function item(eventId: string, sender: string): TimelineItemView {
+function item(eventId: string, sender: string): ResolvedItem {
   return withRowFields({
     id: eventId,
     event_id: eventId,
@@ -33,11 +32,11 @@ function item(eventId: string, sender: string): TimelineItemView {
     sender_name: 'Ana',
     reactions: [],
     content: { kind: 'message', body: 'Hello', html: '<p>Hello</p>' },
-  } as unknown as TimelineItemView);
+  } as unknown as ResolvedItem);
 }
 
 function setup(
-  items: TimelineItemView[],
+  items: ResolvedItem[],
   userId: string,
   store: Partial<PersonaStore> = {},
   beforeSend?: () => Promise<void>,
@@ -94,7 +93,11 @@ function setup(
     associationFor: (id: string) =>
       stub.disabledIn(id) ? false : (stub.selectionFor(id) ?? undefined),
   } as unknown as PersonaStore;
-  const timeline = { items, aggregations: [], subscriptionId: 7 } as unknown as RoomTimeline;
+  const timeline = {
+    items,
+    aggregations: [] as ResolvedItem[],
+    subscriptionId: 7,
+  };
 
   return {
     sendMessage,
@@ -115,7 +118,7 @@ function setup(
     conversation: new Conversation({
       core,
       personas,
-      timeline,
+      timeline: timeline as unknown as RoomTimeline,
       roomId: () => ROOM,
       beforeSend,
       threadRoot,
@@ -138,7 +141,7 @@ test('quick reactions resume live before choosing the latest message', async () 
     withRowFields({
       ...item('$state', '@ana:example.org'),
       content: { kind: 'state_event' },
-    } as TimelineItemView),
+    } as ResolvedItem),
     { ...item('$pending', '@kris:example.org'), event_id: null },
     withRowFields({
       ...item('$redacted', '@ana:example.org'),
@@ -172,7 +175,7 @@ test.each(['message', 'image', 'sticker', 'unable_to_decrypt'] as const)(
     const latest = withRowFields({
       ...item('$latest', '@ana:example.org'),
       content: { kind },
-    } as TimelineItemView);
+    } as ResolvedItem);
     const fixture = setup([item('$old', '@ana:example.org'), latest], '@kris:example.org');
     await fixture.conversation.quickReact(ROOM, '😂');
     expect(fixture.toggleReaction).toHaveBeenCalledWith({
@@ -288,7 +291,7 @@ test('a reply notifies the author it answers', async () => {
   expect(sendMessage).toHaveBeenCalledWith(
     ROOM,
     'sure',
-    expect.objectContaining({ inReplyTo: '$one:example.org', silentReply: false })
+    expect.objectContaining({ in_reply_to: '$one:example.org', silent_reply: false })
   );
 });
 
@@ -334,7 +337,7 @@ test('muting the reply stops the mention', async () => {
   expect(sendMessage).toHaveBeenCalledWith(
     ROOM,
     'sure',
-    expect.objectContaining({ silentReply: true })
+    expect.objectContaining({ silent_reply: true })
   );
 });
 
@@ -368,7 +371,7 @@ test.each([
     );
     const { conversation } = fixture;
     const file = new File(['picture'], 'picture.png', { type: 'image/png' });
-    const mentions = { userIds: ['@bea:example.org'], room: false };
+    const mentions = { user_ids: ['@bea:example.org'], room: false };
 
     for (const kind of ['attachment', 'gallery', 'gif', 'location'] as const) {
       conversation.reply('$one:example.org');
@@ -444,7 +447,7 @@ test('a reply to a persona message names the persona', () => {
   const target = withRowFields({
     ...item('$one:example.org', '@ana:example.org'),
     per_message_profile: { display_name: 'Ghost' },
-  } as unknown as TimelineItemView);
+  } as unknown as ResolvedItem);
   const { conversation } = setup([target], '@kris:example.org');
 
   conversation.reply('$one:example.org');
@@ -483,7 +486,6 @@ test('a reply keeps the target formatting for its composer preview', () => {
     emote: false,
     notice: false,
     edited: false,
-    jumbo: null,
   };
   const { conversation } = setup([target], '@kris:example.org');
 
@@ -504,7 +506,6 @@ test('a reply context uses rendered preview text', () => {
     emote: false,
     notice: false,
     edited: false,
-    jumbo: null,
   };
   const { conversation } = setup([target], '@kris:example.org');
   conversation.reply('$one:example.org');
@@ -538,7 +539,7 @@ test('a reply to an earlier version targets the edit and quotes its text', async
   expect(sendMessage).toHaveBeenCalledWith(
     ROOM,
     'typo',
-    expect.objectContaining({ inReplyTo: '$edit:example.org' })
+    expect.objectContaining({ in_reply_to: '$edit:example.org' })
   );
 });
 
@@ -555,7 +556,7 @@ test('editing a pending message uses its transaction ID', async () => {
     ROOM,
     null,
     'corrected',
-    expect.objectContaining({ transactionId: 'transaction-1' })
+    expect.objectContaining({ transaction_id: 'transaction-1' })
   );
 });
 
@@ -571,7 +572,7 @@ test('editing a file caption replaces the caption and keeps the attachment', asy
       mime: 'text/plain',
       size: 128,
     },
-  } as unknown as TimelineItemView);
+  } as unknown as ResolvedItem);
   const { conversation, editMessage } = setup([file], '@kris:example.org');
 
   conversation.editLast();
@@ -587,15 +588,15 @@ test('editing a file caption replaces the caption and keeps the attachment', asy
     ROOM,
     '$file',
     'the new code',
-    expect.objectContaining({ mediaCaption: true })
+    expect.objectContaining({ media_caption: true })
   );
 });
 
-function ownMessage(eventId: string, body: string): TimelineItemView {
+function ownMessage(eventId: string, body: string): ResolvedItem {
   return withRowFields({
     ...item(eventId, '@kris:example.org'),
     content: { kind: 'message', body, html: `<p>${body}</p>` },
-  } as unknown as TimelineItemView);
+  } as unknown as ResolvedItem);
 }
 
 test('s/old/new edits your last message when sed edits are on', async () => {
@@ -646,7 +647,7 @@ test('an edit shows in the timeline only when inline editing is on and the targe
   const caption = withRowFields({
     ...item('$photo', '@kris:example.org'),
     content: { kind: 'image', caption: 'sunset', html: 'sunset' },
-  } as unknown as TimelineItemView);
+  } as unknown as ResolvedItem);
   const { conversation } = setup([ownMessage('$text', 'hello'), caption], '@kris:example.org');
 
   conversation.edit('$text', 'hello', null);
@@ -685,10 +686,9 @@ test('keeps an edited message kind and persona when returning to live drops its 
       emote: true,
       notice: false,
       edited: false,
-      jumbo: null,
     },
     per_message_profile: { display_name: 'Ghost', avatar_url: null },
-  } as TimelineItemView);
+  } as ResolvedItem);
   const fixture = setup([original], '@kris:example.org', {}, () => {
     fixture.timeline.items = [];
     return Promise.resolve();
@@ -716,7 +716,7 @@ test('a pending edit follows its stable timeline ID after sync drops the transac
     event_id: null,
     transaction_id: 'transaction-1',
   };
-  const items: TimelineItemView[] = [pending];
+  const items: ResolvedItem[] = [pending];
   const { conversation, editMessage } = setup(items, '@kris:example.org');
   conversation.editLast();
   items[0] = { ...pending, event_id: '$sent', transaction_id: null };
@@ -725,7 +725,7 @@ test('a pending edit follows its stable timeline ID after sync drops the transac
     ROOM,
     '$sent',
     'corrected',
-    expect.objectContaining({ transactionId: null })
+    expect.objectContaining({ transaction_id: null })
   );
 });
 
@@ -754,7 +754,7 @@ test('an empty caption edit keeps the attachment', async () => {
     ROOM,
     '$image',
     '',
-    expect.objectContaining({ mediaCaption: true })
+    expect.objectContaining({ media_caption: true })
   );
 });
 
@@ -976,45 +976,6 @@ test('saving an edited queued message replaces its queue entry', async () => {
   expect(conversation.context).toBeNull();
 });
 
-test('a reply the SDK has not filled asks the core for its details once', async () => {
-  const reply = withRowFields({
-    ...item('$reply:example.org', '@kris:example.org'),
-    in_reply_to: { event_id: '$reaction:example.org', sender: null, body: null, fallback: null },
-  } as unknown as TimelineItemView);
-  const filled = withRowFields({
-    ...item('$filled:example.org', '@kris:example.org'),
-    in_reply_to: {
-      event_id: '$gone:example.org',
-      sender: null,
-      body: null,
-      fallback: { kind: 'redacted' },
-    },
-  } as unknown as TimelineItemView);
-  const fetchEventDetails = vi.fn(() => Promise.reject(new Error('unsupported')));
-  const core = {
-    session: { user_id: '@kris:example.org' },
-    rpc: { timeline: { fetchEventDetails } },
-  } as unknown as CoreClient;
-  const timeline = { items: [reply, filled] } as unknown as RoomTimeline;
-  const conversation = new Conversation({
-    core,
-    personas: {} as PersonaStore,
-    timeline,
-    roomId: () => ROOM,
-  });
-
-  conversation.fetchMissingReplyDetails();
-  conversation.fetchMissingReplyDetails();
-  await vi.waitFor(() => {
-    expect(fetchEventDetails).toHaveBeenCalledOnce();
-  });
-  expect(fetchEventDetails).toHaveBeenCalledWith({
-    room_id: ROOM,
-    event_id: '$reply:example.org',
-    thread_root: null,
-  });
-});
-
 test('editing steps back to the own message before the one being edited', () => {
   const me = '@kris:example.org';
   const { conversation } = setup(
@@ -1046,7 +1007,7 @@ test('editing the last own message includes an image caption', () => {
       caption: 'A photo',
       html: '<strong>A photo</strong>',
     },
-  } as unknown as TimelineItemView);
+  } as unknown as ResolvedItem);
   const { conversation } = setup([image], me);
 
   conversation.editLast();
@@ -1090,7 +1051,7 @@ test('a dismissed link is not previewed and the dismissal is spent by the send',
   expect(fixture.urlPreview).toHaveBeenCalledTimes(1);
   expect(fixture.urlPreview).toHaveBeenCalledWith({ url: 'https://b.example/', service: null });
   expect(fixture.sendMessage.mock.calls[0]?.[2]).toMatchObject({
-    noLinkPreviews: false,
+    no_link_previews: false,
   });
   expect(fixture.conversation.dismissedPreviews).toEqual([]);
 });
@@ -1104,8 +1065,8 @@ test('dismissing every link sends an explicit opt-out', async () => {
 
   expect(fixture.urlPreview).not.toHaveBeenCalled();
   expect(fixture.sendMessage.mock.calls[0]?.[2]).toMatchObject({
-    linkPreviews: [],
-    noLinkPreviews: true,
+    link_previews: [],
+    no_link_previews: true,
   });
 });
 

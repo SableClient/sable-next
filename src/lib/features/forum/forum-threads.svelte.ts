@@ -1,5 +1,6 @@
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { RoomTimeline, type BackwardPaginationState } from '#lib/rooms/timeline.svelte.js';
+import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+import type { PaginationStateView } from '#src/generated/protocol';
 
 import { collectForumThreads, type ForumThread } from './forum-threads';
 
@@ -7,7 +8,7 @@ export class ForumThreads {
   private readonly timeline: RoomTimeline;
 
   constructor(private readonly core: CoreClient) {
-    this.timeline = new RoomTimeline(core);
+    this.timeline = new RoomTimeline();
   }
 
   readonly threads: ForumThread[] = $derived.by(() =>
@@ -18,7 +19,7 @@ export class ForumThreads {
     return this.timeline.loading;
   }
 
-  get backwardPagination(): BackwardPaginationState {
+  get backwardPagination(): PaginationStateView {
     return this.timeline.backwardPagination;
   }
 

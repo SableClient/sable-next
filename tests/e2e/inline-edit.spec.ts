@@ -1,6 +1,5 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import type { Page } from '@playwright/test';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 import type { RoomCoreMode } from './fake-core';
 import { expect, test, SIGNED_OUT } from './fixtures/test';
@@ -12,7 +11,7 @@ test.use({ storageState: SIGNED_OUT, viewport: { width: 1100, height: 700 } });
 
 const OWN = '@e2e:example.test';
 
-function own(id: string, body: string): TimelineItemView {
+function own(id: string, body: string): ResolvedItem {
   return { ...timelineItem(id, body), sender: OWN, sender_name: 'E2E', is_own: true };
 }
 

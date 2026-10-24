@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   clearDraft,
@@ -19,6 +19,7 @@ import { adoptQuietRooms, quietRooms } from '#lib/rooms/quiet-rooms.svelte.js';
 import { readRecent, writeRecent } from '#lib/emoji/recent-packs.svelte.js';
 import { adoptRecentReactions, recentReactionEntries } from '#lib/emoji/recents.svelte.js';
 import { SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
+import { FakeRuntime } from '#lib/test-support/fake-runtime.js';
 
 import { draftsDocumentFor, recentEmojiDocument, workspaceDocument } from './sync-documents';
 
@@ -51,9 +52,12 @@ beforeEach(reset);
 afterEach(reset);
 
 describe('the workspace document', () => {
-  it('round-trips picker and layout state', () => {
-    const sidebar = new SpaceSidebar();
+  it('round-trips picker and layout state', async () => {
+    const runtime = new FakeRuntime({ sidebar: { items: [], loaded: true } });
+    const sidebar = new SpaceSidebar(() => runtime.client());
+    await sidebar.start();
     const document = workspaceDocument(sidebar);
+    const openFolders = () => [...sidebar.openFolders];
 
     writeRecent(['blobwave']);
     writeRecent(['party'], 'sticker');
@@ -62,11 +66,20 @@ describe('the workspace document', () => {
     adoptRoomIconOverrides([['!room:example.org', 'never']]);
     adoptQuietRooms(['!space:example.org']);
     sidebar.adoptOpenFolders(['folder-1']);
+    await vi.waitFor(() => {
+      expect(openFolders()).toEqual(['folder-1']);
+    });
     const { content } = document.snapshot();
 
     reset();
     sidebar.adoptOpenFolders([]);
+    await vi.waitFor(() => {
+      expect(openFolders()).toEqual([]);
+    });
     expect(document.adopt(content)).toBe(true);
+    await vi.waitFor(() => {
+      expect(openFolders()).toEqual(['folder-1']);
+    });
 
     expect(readRecent()).toEqual(['blobwave']);
     expect(readRecent('sticker')).toEqual(['party']);
@@ -74,7 +87,7 @@ describe('the workspace document', () => {
     expect(recentGifs()).toEqual([gif]);
     expect(roomIconOverrides()).toEqual({ '!room:example.org': 'never' });
     expect(quietRooms()).toEqual(['!space:example.org']);
-    expect([...sidebar.openFolders]).toEqual(['folder-1']);
+    sidebar.stop();
   });
 
   it('drops a favourite pointing off a provider CDN', () => {

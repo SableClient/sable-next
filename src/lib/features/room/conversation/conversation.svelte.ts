@@ -1,3 +1,4 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import type {
   PackImageInfoView,
   ImageSourcePackView,
@@ -5,7 +6,6 @@ import type {
   MessageKind,
   PerMessageProfileView,
   PersonaView,
-  TimelineItemView,
   UrlPreviewView,
 } from '#src/generated/protocol';
 
@@ -52,7 +52,7 @@ import { stateEventText } from '#lib/features/room/timeline/state-event-text.js'
 import { isMessageRow } from '#lib/features/room/timeline/timeline-format.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
-const NO_MENTIONS: OutgoingMentions = { userIds: [], room: false };
+const NO_MENTIONS: OutgoingMentions = { user_ids: [], room: false };
 
 export type ConversationSendResult = { kind: 'gifSearch'; query: string };
 
@@ -88,8 +88,6 @@ export class Conversation {
   readonly #encrypted: () => boolean | null;
   readonly #threadRoot: string | null;
   readonly #beforeSend: () => Promise<void>;
-  /* eslint-disable-next-line svelte/prefer-svelte-reactivity */
-  readonly #requestedDetails = new Set<string>();
 
   constructor({
     core,
@@ -197,14 +195,14 @@ export class Conversation {
         edited?.event_id ?? (pending.eventId.startsWith('$') ? pending.eventId : null),
         body,
         {
-          transactionId: edited?.event_id ? null : edited?.transaction_id,
+          transaction_id: edited?.event_id ? null : edited?.transaction_id,
           formatted,
           mentions,
           kind: editedKind(edited),
-          mediaCaption: pending.mediaCaption,
-          threadRoot: this.#threadRoot,
+          media_caption: pending.mediaCaption,
+          thread_root: this.#threadRoot,
           persona: pending.persona ?? null,
-          forumTitle: this.forumTitle,
+          forum_title: this.forumTitle,
         }
       );
       this.forumTitle = '';
@@ -263,17 +261,17 @@ export class Conversation {
       dismissed
     );
     await sendMessage(this.#core.rpc, targetRoomId, outgoing.body, {
-      inReplyTo: pending?.eventId ?? null,
-      threadRoot: this.#threadRoot,
+      in_reply_to: pending?.eventId ?? null,
+      thread_root: this.#threadRoot,
       formatted: outgoing.formatted,
       mentions: untouched || outcome.verbatim === true ? mentions : NO_MENTIONS,
-      silentReply: pending?.silentReply ?? false,
+      silent_reply: pending?.silentReply ?? false,
       kind: outcome.msgtype,
       persona: outgoing.persona,
-      linkPreviews,
-      noLinkPreviews: suppressed,
-      imageSourcePacks,
-      forumTitle: this.#threadRoot === null && !pending?.eventId ? this.forumTitle : null,
+      link_previews: linkPreviews,
+      no_link_previews: suppressed,
+      image_source_packs: imageSourcePacks,
+      forum_title: this.#threadRoot === null && !pending?.eventId ? this.forumTitle : null,
     });
     this.forumTitle = '';
     this.context = null;
@@ -289,11 +287,11 @@ export class Conversation {
     await this.#beforeSend();
     const profile = this.#personaFor(targetRoomId, '', null).persona;
     await sendMessage(this.#core.rpc, targetRoomId, body, {
-      inReplyTo: pending?.eventId ?? null,
-      threadRoot: this.#threadRoot,
-      mentions: { userIds: [bot], room: false },
-      silentReply: pending?.silentReply ?? false,
-      botCommand: invocation,
+      in_reply_to: pending?.eventId ?? null,
+      thread_root: this.#threadRoot,
+      mentions: { user_ids: [bot], room: false },
+      silent_reply: pending?.silentReply ?? false,
+      bot_command: invocation,
       persona: profile ? { ...profile, has_fallback: false } : null,
     });
     if (pending) this.context = null;
@@ -666,7 +664,7 @@ export class Conversation {
     };
   };
 
-  #editTimelineItem(item: TimelineItemView, itemId: string): boolean {
+  #editTimelineItem(item: ResolvedItem, itemId: string): boolean {
     if (item.content.kind === 'message') {
       this.edit(itemId, item.content.body, item.content.html);
       return true;
@@ -692,13 +690,13 @@ export class Conversation {
       if (body === null) break;
       await this.#beforeSend();
       await editMessage(this.#core.rpc, targetRoomId, item.event_id, body, {
-        transactionId: item.event_id ? null : item.transaction_id,
+        transaction_id: item.event_id ? null : item.transaction_id,
         formatted: rich?.formatted ?? null,
         mentions: rich?.mentions,
         kind: editedKind(item),
-        threadRoot: this.#threadRoot,
+        thread_root: this.#threadRoot,
         persona: item.per_message_profile ?? null,
-        forumTitle: item.forum_title ?? '',
+        forum_title: item.forum_title ?? '',
       });
       return;
     }
@@ -772,29 +770,6 @@ export class Conversation {
     return draft?.eventId === eventId ? draft.doc : undefined;
   };
 
-  readonly forgetRequestedDetails = (): void => {
-    this.#requestedDetails.clear();
-  };
-
-  readonly fetchMissingReplyDetails = (): void => {
-    const roomId = this.#roomId();
-
-    for (const item of this.#timeline.items) {
-      const reply = item.in_reply_to;
-      if (!reply || reply.body !== null || reply.fallback !== null) continue;
-
-      const eventId = item.event_id;
-      if (eventId === null || this.#requestedDetails.has(eventId)) continue;
-
-      this.#requestedDetails.add(eventId);
-      void this.#core.rpc.timeline
-        .fetchEventDetails({ room_id: roomId, event_id: eventId, thread_root: this.#threadRoot })
-        .catch((error: unknown) => {
-          console.debug('[sable room] reply details unavailable', error);
-        });
-    }
-  };
-
   #consumeReply(): ComposerContext | null {
     const reply = this.context?.kind === 'reply' ? this.context : null;
     if (reply !== null) this.context = null;
@@ -816,7 +791,7 @@ export class Conversation {
   }
 }
 
-function editedKind(edited: TimelineItemView | undefined): MessageKind {
+function editedKind(edited: ResolvedItem | undefined): MessageKind {
   const content = edited?.content;
   if (content?.kind !== 'message') return 'text';
   if (content.emote) return 'emote';

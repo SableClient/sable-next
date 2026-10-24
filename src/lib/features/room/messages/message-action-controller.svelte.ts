@@ -1,5 +1,6 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { copyText as writeClipboard } from '#lib/platform/clipboard.js';
-import type { TimelineItemView, ImageSourcePackView } from '#src/generated/protocol';
+import type { ImageSourcePackView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
 import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
@@ -32,7 +33,7 @@ export interface MessageCallbacks {
 }
 
 interface MessageActionContext extends MessageCallbacks {
-  item: TimelineItemView;
+  item: ResolvedItem;
   roomId: string;
   canPin: boolean;
   canRedactOwn: boolean;

@@ -50,15 +50,10 @@ impl Runtime {
                 snapshot_dir(&data_dir, account)
             })),
         };
-        let registry = Registry::new();
-        #[cfg(feature = "demo")]
-        let registry = match sable_ffi::demo::register(registry) {
-            Ok(registry) => registry,
-            Err(error) => {
-                tracing::error!(%error, "a demo slice is registered twice");
-                Registry::new()
-            }
-        };
+        let registry = sable_ffi::registry().unwrap_or_else(|error| {
+            tracing::error!(%error, "a slice is registered twice");
+            Registry::new()
+        });
         let RuntimeHandle::Tokio(tokio) = handle();
         let ffi = Ffi::new(App::new(registry, ports, ""), tokio);
         gate.attach(ffi.clone());

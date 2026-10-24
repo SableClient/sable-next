@@ -20,11 +20,9 @@ export type {
 export {
   buildInvocation,
   draftsFromText,
-  emptyDrafts,
   literalLabel,
   matchBotCommand,
   parseBotCommand,
-  parseBotCommands,
   type ArgumentDrafts,
 } from '#lib/model/model.js';
 

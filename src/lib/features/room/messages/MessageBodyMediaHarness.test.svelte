@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { RoomJoinRuleView, TimelineItemView } from '#src/generated/protocol';
+  import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
+  import type { RoomJoinRuleView } from '#src/generated/protocol';
   import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 
   import MessageBody from './MessageBody.svelte';
@@ -9,7 +10,7 @@
   } from '../media/room-media-previews.svelte.js';
 
   interface Props {
-    item: TimelineItemView;
+    item: ResolvedItem;
     joinRule: RoomJoinRuleView;
     onOpenMedia?: (eventId: string) => void;
   }

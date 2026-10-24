@@ -77,7 +77,7 @@
       {#if pendingAlerts > 1}
         <UnreadBadge
           class="priority-{mainPriority}"
-          counts={{ unread: 0, highlight: pendingAlerts }}
+          counts={{ unread: 0, highlight: pendingAlerts, marked: false, notifying: 0 }}
           aria-hidden="true"
         />
       {/if}
@@ -109,7 +109,7 @@
             {#if pendingAlerts > 1}
               <UnreadBadge
                 class="priority-{mainPriority}"
-                counts={{ unread: 0, highlight: pendingAlerts }}
+                counts={{ unread: 0, highlight: pendingAlerts, marked: false, notifying: 0 }}
                 aria-hidden="true"
               />
             {/if}

@@ -1,5 +1,6 @@
 import { base64ToUint8Array } from 'uint8array-extras';
 
+import type { CallBackendView } from '#src/generated/protocol';
 import type { ScreenAudioChoice } from '#lib/platform/screen-audio-stream.js';
 
 export type CallEncryptionKey = {
@@ -51,7 +52,7 @@ export type CallTransportConnectOptions = {
   backends?: CallBackendGrant[];
 };
 
-export type CallBackendGrant = { id: string; url: string; jwt: string; identity: string };
+export type CallBackendGrant = CallBackendView;
 export type CallTransportRoom = { backendId: string; room: import('livekit-client').Room };
 
 export type CallAudioRoute = {

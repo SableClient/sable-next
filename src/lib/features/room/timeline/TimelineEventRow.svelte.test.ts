@@ -1,10 +1,9 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { render } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -64,7 +63,7 @@ test('renders a redacted row and a worded state change without throwing', async 
 });
 
 test('a membership row keeps its notice look and still carries the action layer', async () => {
-  const joined: TimelineItemView = withRowFields({
+  const joined: ResolvedItem = withRowFields({
     ...item(false),
     content: {
       kind: 'membership',
@@ -90,7 +89,7 @@ test('a membership row keeps its notice look and still carries the action layer'
 });
 
 test('a date divider stays a plain annotation with nothing to act on', async () => {
-  const divider: TimelineItemView = withRowFields({
+  const divider: ResolvedItem = withRowFields({
     ...item(false),
     event_id: null,
     content: { kind: 'date_divider', timestamp: 0 },

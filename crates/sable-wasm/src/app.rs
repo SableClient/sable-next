@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use js_sys::Function;
 use sable_core::{Core, protocol::RpcError};
 use sable_ffi::{AccountGate, AppError, Ffi, Tabs};
-use sable_runtime::{App, Backend, Platform, PlatformError, Ports, Registry};
+use sable_runtime::{App, Backend, Platform, PlatformError, Ports};
 use serde_json::value::RawValue;
 use wasm_bindgen::{JsValue, prelude::*};
 
@@ -70,13 +70,6 @@ impl SableApp {
         clippy::arc_with_non_send_sync,
         reason = "the worker is one thread, and `Ports` holds its parts in `Arc`s"
     )]
-    #[cfg_attr(
-        not(feature = "demo"),
-        expect(
-            clippy::unnecessary_wraps,
-            reason = "only registering a slice can fail, and none is registered without `demo`"
-        )
-    )]
     pub fn new(
         core: &SableCore,
         get: Function,
@@ -90,9 +83,7 @@ impl SableApp {
             }),
             platform: Arc::new(JsPlatform { get, set }),
         };
-        let registry = Registry::new();
-        #[cfg(feature = "demo")]
-        let registry = sable_ffi::demo::register(registry).map_err(|error| error.to_string())?;
+        let registry = sable_ffi::registry().map_err(|error| error.to_string())?;
         let ffi = Ffi::new(App::new(registry, ports, ""));
         core.gate.attach(ffi.clone());
         let tabs = Tabs::new(ffi.clone(), move |tab: &u32, batch| {
@@ -194,9 +185,9 @@ mod tests {
         assert_eq!(
             handshake["slices"],
             serde_json::json!(if cfg!(feature = "demo") {
-                vec!["counter"]
+                vec!["counter", "rooms", "sidebar", "timeline"]
             } else {
-                vec![]
+                vec!["rooms", "sidebar", "timeline"]
             })
         );
     }

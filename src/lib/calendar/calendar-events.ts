@@ -8,12 +8,7 @@ import type {
 import { buildCalendarEvent, calendarWallTimes, readCalendarEntries } from '#lib/model/model.js';
 
 export type { CalendarItem, Frequency } from '#src/generated/protocol';
-export {
-  formatDuration,
-  parseDuration,
-  readCalendarEntries as readEntries,
-  tallyRsvps,
-} from '#lib/model/model.js';
+export { readCalendarEntries as readEntries, tallyRsvps } from '#lib/model/model.js';
 
 export const CALENDAR_ROOM_TYPE = 'chat.commet.calendar';
 export const RSVP_EVENT = 'moe.sable.calendar.rsvp';

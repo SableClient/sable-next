@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { ImagePackView, MemberView, TimelineItemView } from '#src/generated/protocol';
+import type { ImagePackView, MemberView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -128,7 +129,7 @@ test('uses a custom emote shortcode rather than its Matrix media URI', async () 
         key: 'mxc://example.org/neocat',
         senders: ['@alice:example.org'],
       },
-    ] satisfies TimelineItemView['reactions'],
+    ] satisfies ResolvedItem['reactions'],
     eventId: '$event',
     currentUserId: null,
     members: [] as MemberView[],
@@ -153,7 +154,7 @@ test('names an image from a pack we cannot see by the shortcode it was sent with
   render(MessageReactionsHarness, {
     reactions: [
       { key: 'mxc://remote.example/parrot', senders: ['@alice:example.org'] },
-    ] satisfies TimelineItemView['reactions'],
+    ] satisfies ResolvedItem['reactions'],
     eventId: '$named',
     currentUserId: null,
     members: [] as MemberView[],
@@ -178,7 +179,7 @@ test('shows the shortcode in place of an image that cannot load', async () => {
   render(MessageReactionsHarness, {
     reactions: [
       { key: 'mxc://dead.example/parrot', senders: ['@alice:example.org'] },
-    ] satisfies TimelineItemView['reactions'],
+    ] satisfies ResolvedItem['reactions'],
     eventId: '$fallback',
     currentUserId: null,
     members: [] as MemberView[],

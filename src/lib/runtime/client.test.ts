@@ -123,6 +123,25 @@ describe('connect', () => {
 });
 
 describe('subscription', () => {
+  it('tells its openers each time the state arrives from a subscribe, and not once they are gone', async () => {
+    const { link, client } = await setup();
+    const sub = client.subscribe<{ total: number; items: string[] }>(target);
+    const opened = vi.fn();
+    const gone = vi.fn();
+    sub.onOpen(opened);
+    sub.onOpen(gone)();
+    await sub.loaded;
+
+    expect(opened).toHaveBeenCalledTimes(1);
+    expect(sub.get()).toEqual({ total: 2, items: ['a', 'b'] });
+
+    link.restarted();
+    await flush();
+
+    expect(opened).toHaveBeenCalledTimes(2);
+    expect(gone).not.toHaveBeenCalled();
+  });
+
   it('holds the snapshot and applies the fixture batch with one notification', async () => {
     const { link, client } = await setup();
     const sub = await open(client);

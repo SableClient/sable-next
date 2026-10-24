@@ -1,9 +1,10 @@
 <script lang="ts">
+  import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
   import { Collapsible } from 'bits-ui';
   import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
 
-  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
+  import type { MemberView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
   import { reactionKey } from '#lib/model/model.js';
@@ -32,7 +33,7 @@
   const MAX_PIN_PREVIEWS = 4;
 
   interface Props {
-    item: TimelineItemView;
+    item: ResolvedItem;
     unreadCount: number;
     roomId?: string;
     events?: TimelineEventIndex;

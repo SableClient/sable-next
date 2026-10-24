@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { TimelineItemView } from '#src/generated/protocol';
-
+  import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { isRecord } from '#lib/guards.js';
   import { i18n } from '#lib/i18n.js';
@@ -14,7 +13,7 @@
   } from '../timeline/timeline-event-index';
 
   interface Props {
-    item: TimelineItemView;
+    item: ResolvedItem;
     roomId?: string;
     events?: TimelineEventIndex;
   }

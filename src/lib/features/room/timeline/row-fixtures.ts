@@ -1,6 +1,7 @@
-import type { TimelineItemContentView, TimelineItemView } from '#src/generated/protocol';
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
+import type { TimelineItemContentView } from '#src/generated/protocol';
 
-type RowFields = Pick<TimelineItemView, 'row' | 'forwardable' | 'redactable' | 'visibility'>;
+type RowFields = Pick<ResolvedItem, 'row' | 'forwardable' | 'redactable' | 'visibility'>;
 
 const MESSAGE_KINDS: ReadonlySet<string> = new Set([
   'message',
@@ -31,7 +32,7 @@ const FORWARDABLE_KINDS: ReadonlySet<string> = new Set([
   'gallery',
 ]);
 
-function visibility(content: TimelineItemContentView): TimelineItemView['visibility'] {
+function visibility(content: TimelineItemContentView): ResolvedItem['visibility'] {
   switch (content.kind) {
     case 'membership':
       return content.change === 'other' ? 'membership_other' : 'membership';
@@ -63,7 +64,7 @@ export function rowFields(content: TimelineItemContentView): RowFields {
   };
 }
 
-export function withRowFields<T extends Omit<TimelineItemView, keyof RowFields>>(
+export function withRowFields<T extends Omit<ResolvedItem, keyof RowFields>>(
   item: T
 ): T & RowFields {
   return { ...item, ...rowFields(item.content) };

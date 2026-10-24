@@ -1,4 +1,4 @@
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import type { MediaItem } from './media/media-viewer-types.js';
 import { timelineMediaItems } from './media/media-items.js';
 import type { StandaloneMedia } from './media/media-viewer-opener.svelte.js';
@@ -15,7 +15,7 @@ export class RoomMediaViewer {
   );
   #standaloneSequence = 0;
 
-  constructor(private readonly timelineItems: (() => readonly TimelineItemView[]) | null) {}
+  constructor(private readonly timelineItems: (() => readonly ResolvedItem[]) | null) {}
 
   open(eventId: string): void {
     this.standaloneItem = null;

@@ -1,4 +1,5 @@
 import type {
+  InviteAvatarsView,
   MediaPreviewConfigView,
   MediaPreviewsView,
   RoomJoinRuleView,
@@ -12,7 +13,7 @@ export const MEDIA_PREVIEW_EVENT = 'm.media_preview_config';
 export const UNSTABLE_MEDIA_PREVIEW_EVENT = 'io.element.msc4278.media_preview_config';
 
 export type MediaPreviews = MediaPreviewsView;
-export type InviteAvatars = 'on' | 'off';
+export type InviteAvatars = InviteAvatarsView;
 
 export type MediaPreviewConfig = Partial<MediaPreviewConfigView>;
 

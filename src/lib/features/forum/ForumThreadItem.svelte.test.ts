@@ -62,7 +62,6 @@ const root = withRowFields({
     emote: false,
     notice: false,
     edited: false,
-    jumbo: null,
   },
   in_reply_to: null,
   thread_root: null,

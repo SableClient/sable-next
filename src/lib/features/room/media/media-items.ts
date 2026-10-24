@@ -1,4 +1,4 @@
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { isPdfAttachment } from '#lib/ui/pdf-attachment.js';
 
 import type { MediaItem } from './media-viewer-types.js';
@@ -11,7 +11,7 @@ export function galleryEventId(id: string): string {
   return id.replace(/:gallery:\d+$/, '');
 }
 
-export function timelineMediaItems(entries: readonly TimelineItemView[]): MediaItem[] {
+export function timelineMediaItems(entries: readonly ResolvedItem[]): MediaItem[] {
   return entries.flatMap((entry): MediaItem[] => {
     const eventId = entry.event_id;
     if (eventId === null) return [];

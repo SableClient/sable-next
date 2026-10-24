@@ -1,10 +1,10 @@
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 
 export function previewMessage(
   id: string,
   body: string,
-  fields: Partial<TimelineItemView> = {}
-): TimelineItemView {
+  fields: Partial<ResolvedItem> = {}
+): ResolvedItem {
   return {
     id,
     row: 'message',
@@ -25,7 +25,6 @@ export function previewMessage(
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,

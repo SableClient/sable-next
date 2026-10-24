@@ -8,7 +8,7 @@ use serde_with::{DefaultOnError, NoneAsEmptyString, serde_as};
 pub const VERIFICATION_REQUEST_MSGTYPE: &str = "m.key.verification.request";
 
 /// What a quoted event was, when it has no body to show.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ReplyFallbackView {

@@ -7702,10 +7702,12 @@ dependencies = [
  "futures-executor",
  "sable-protocol",
  "sable-runtime",
+ "sable-slices",
  "serde",
  "serde_json",
  "tempfile",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -7835,6 +7837,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "sable-slices"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "ruma",
+ "sable-model",
+ "sable-protocol",
+ "sable-runtime",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-typescript",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "sable-typegen"
 version = "0.1.0"
 dependencies = [
@@ -7843,6 +7862,7 @@ dependencies = [
  "sable-model",
  "sable-protocol",
  "sable-runtime",
+ "sable-slices",
  "specta",
  "specta-serde",
  "specta-typescript",

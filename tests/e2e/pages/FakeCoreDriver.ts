@@ -49,7 +49,12 @@ export class FakeCoreDriver {
     });
   }
 
-  subscription(index = 0): Promise<number> {
+  /** The runtime opens the timeline once the room mounts, so the core's subscription can come a moment later. */
+  async subscription(index = 0): Promise<number> {
+    await this.page.waitForFunction(
+      (at) => typeof window.__e2eTimelineSubscriptions[at] === 'number',
+      index
+    );
     return this.page.evaluate((at) => window.__e2eTimelineSubscriptions[at], index);
   }
 

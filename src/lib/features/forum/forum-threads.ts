@@ -1,9 +1,10 @@
-import type { TimelineItemContentView, TimelineItemView } from '#src/generated/protocol';
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
+import type { TimelineItemContentView } from '#src/generated/protocol';
 import { isMediaCaptionContent } from '#lib/features/room/messages/media-caption.js';
 
 export interface ForumThread {
   id: string;
-  item: TimelineItemView;
+  item: ResolvedItem;
   eventId: string;
   title: string | null;
   sender: string | null;
@@ -48,30 +49,30 @@ function htmlOf(content: TimelineItemContentView): string | null {
   return null;
 }
 
-function isPost(item: TimelineItemView): boolean {
+function isPost(item: ResolvedItem): boolean {
   if (item.event_id === null) return false;
   if (item.thread_root !== null && item.thread_root !== item.event_id) return false;
   if (item.in_reply_to !== null) return false;
   return POST_KINDS.has(item.content.kind);
 }
 
-function isUnread(latest: TimelineItemView, currentUserId: string | null): boolean {
+function isUnread(latest: ResolvedItem, currentUserId: string | null): boolean {
   if (currentUserId === null) return false;
   if (latest.sender === currentUserId) return false;
   return !latest.read_by.includes(currentUserId);
 }
 
 export function collectForumThreads(
-  items: readonly TimelineItemView[],
+  items: readonly ResolvedItem[],
   currentUserId: string | null
 ): ForumThread[] {
-  const roots = new Map<string, TimelineItemView>();
+  const roots = new Map<string, ResolvedItem>();
   for (const item of items) {
     if (item.event_id === null) continue;
     if (item.thread_summary !== null || isPost(item)) roots.set(item.event_id, item);
   }
 
-  const latestReplies = new Map<string, TimelineItemView>();
+  const latestReplies = new Map<string, ResolvedItem>();
   for (const item of items) {
     const rootId = item.thread_root;
     if (rootId === null || item.event_id === rootId || !roots.has(rootId)) continue;

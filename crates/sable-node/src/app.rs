@@ -9,7 +9,7 @@ use napi::{
 use napi_derive::napi;
 use sable_core::{Core, protocol::RpcError, session::snapshot_dir};
 use sable_ffi::{AccountGate, AppError, Ffi, FileStorage, Tabs};
-use sable_runtime::{App, Backend, Ports, Registry};
+use sable_runtime::{App, Backend, Ports};
 use serde_json::value::RawValue;
 
 use crate::SableCore;
@@ -54,9 +54,7 @@ impl SableApp {
         };
         let runtime = within_runtime_if_available(tokio::runtime::Handle::try_current)
             .map_err(|error| napi::Error::new(Status::GenericFailure, error.to_string()))?;
-        let registry = Registry::new();
-        #[cfg(feature = "demo")]
-        let registry = sable_ffi::demo::register(registry)
+        let registry = sable_ffi::registry()
             .map_err(|error| napi::Error::new(Status::GenericFailure, error.to_string()))?;
         let ffi = Ffi::new(App::new(registry, ports, ""), runtime);
         core.gate.attach(ffi.clone());

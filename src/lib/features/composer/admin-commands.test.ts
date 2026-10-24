@@ -11,7 +11,7 @@ import {
   loadAdminCommands,
   type AdminCommand,
 } from './admin-commands';
-import { buildInvocation, draftsFromText, parseBotCommands } from './bot-commands';
+import { buildInvocation, draftsFromText, parseBotCommand } from './bot-commands';
 
 const commands: AdminCommand[] = [
   {
@@ -122,14 +122,16 @@ test('until the catalog loads only the prefix completes', async () => {
 });
 
 test('commands the server advertises complete like the catalog', () => {
-  const advertised = parseBotCommands(
-    ['users reset-password', 'users create', 'rooms list'].map((command) => ({
-      sender: adminBot('@alice:example.org'),
-      sender_name: null,
-      sender_avatar: null,
-      content: { command, description: { 'm.text': [{ body: `${command} help` }] } },
-    }))
-  );
+  const advertised = ['users reset-password', 'users create', 'rooms list']
+    .map((command) =>
+      parseBotCommand({
+        sender: adminBot('@alice:example.org'),
+        sender_name: null,
+        sender_avatar: null,
+        content: { command, description: { 'm.text': [{ body: `${command} help` }] } },
+      })
+    )
+    .filter((command) => command !== null);
   const tree = adminCommandTree(advertised);
 
   expect(adminBot('@alice:example.org')).toBe('@conduit:example.org');

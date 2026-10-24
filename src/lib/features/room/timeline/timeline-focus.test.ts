@@ -1,18 +1,20 @@
 // @vitest-environment happy-dom
 import { expect, test, vi } from 'vitest';
+import type { TimelineModeView } from '#src/generated/protocol';
 import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 import type { TimelineWindow } from '#lib/timeline/timeline-window.js';
 import { TimelineFocus } from './timeline-focus.svelte.js';
 import { TimelinePagination } from './timeline-pagination.svelte.js';
 
 function fixture() {
-  const timeline = {
-    mode: { kind: 'focused' },
+  const state = {
+    mode: { kind: 'focused' } as TimelineModeView,
     error: null,
-    items: [],
+    itemCount: 0,
     forwardPagination: 'idle',
     backwardPagination: 'end',
-  } as unknown as RoomTimeline;
+  };
+  const timeline = state as unknown as RoomTimeline;
   const viewport = document.createElement('div');
   const jump = Promise.withResolvers<boolean>();
   const requestFuture = vi.fn(async () => {});
@@ -29,7 +31,7 @@ function fixture() {
     requestFuture,
   });
   const engine = { jumpTo, update: vi.fn(async () => {}) } as unknown as TimelineWindow<unknown>;
-  return { timeline, focus, engine, jump, jumpTo, requestFuture };
+  return { timeline, state, focus, engine, jump, jumpTo, requestFuture };
 }
 
 test('reader interaction aborts focus positioning before pagination begins', async () => {
@@ -45,9 +47,9 @@ test('reader interaction aborts focus positioning before pagination begins', asy
 });
 
 test('switching timeline mode prevents stale focus positioning from fetching more pages', async () => {
-  const { timeline, focus, engine, jump, requestFuture } = fixture();
+  const { state, focus, engine, jump, requestFuture } = fixture();
   const position = focus.position(engine, '$target', 'row', false);
-  timeline.mode = { kind: 'live' };
+  state.mode = { kind: 'live' };
   jump.resolve(true);
   await position;
   expect(requestFuture).not.toHaveBeenCalled();

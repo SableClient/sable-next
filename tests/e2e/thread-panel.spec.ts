@@ -269,6 +269,7 @@ for (const context of ['desktop', 'mobile'] as const) {
       await opener.click();
       await expect(thread).toBeVisible();
       await threadEditor.fill('Unsent thread draft');
+      await expect(thread.locator('.timeline-viewport')).not.toHaveClass(/initial/);
       const subscribeCount = await core.subscribeCount();
       await page.setViewportSize({ width: 390, height: 844 });
       await expect(threadEditor).toHaveText('Unsent thread draft');

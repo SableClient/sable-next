@@ -1,10 +1,9 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -20,7 +19,7 @@ test('a redacted reaction renders as removed instead of as a generic hidden even
     sender_name: 'Alice',
     timestamp: 0,
     content: { kind: 'hidden_event', event_type: 'm.reaction', content: {}, redacts: null },
-  } as TimelineItemView;
+  } as ResolvedItem;
 
   const container = renderWithTooltips(TimelineNotice, { item, unreadCount: 0 }).container;
 
@@ -56,7 +55,7 @@ test.each([
         },
         redacts: null,
       },
-    } as TimelineItemView;
+    } as ResolvedItem;
 
     renderWithTooltips(TimelineNotice, {
       item,

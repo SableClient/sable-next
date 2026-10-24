@@ -1,10 +1,11 @@
 <script lang="ts">
+  import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import WarningIcon from 'phosphor-svelte/lib/WarningIcon';
   import { onDestroy } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
 
-  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
+  import type { MemberView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { RoomPacks } from '#lib/emoji/room-packs.svelte.js';
@@ -30,7 +31,7 @@
   } from './reaction-emote-label.js';
 
   interface Props {
-    reactions: TimelineItemView['reactions'];
+    reactions: ResolvedItem['reactions'];
     eventId: string | null;
     currentUserId: string | null;
     members: readonly MemberView[];

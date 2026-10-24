@@ -18,6 +18,13 @@ applies the whole batch before rendering.
 subscriber's window. `None` selects the whole list. Backpressure sends
 `Resync`; the client must fetch a snapshot before applying more patches.
 
+Timelines live in `crates/sable-slices/src/timeline`. The slice filters and groups
+rows, tracks unread state and owns pagination. Windowed subscribers also receive
+the full event list for media, editing, receipts and navigation. Threads and forums
+derive their items from rows. Lists use patches. The local unread boundary remains
+separate from the SDK marker: the SDK marker cannot move backwards and follows
+shared read state.
+
 ## Adding a slice
 
 Implement `Slice`: key, state, view, action, input,

@@ -1,10 +1,12 @@
 import type { Attachment } from 'svelte/attachments';
 import { on } from 'svelte/events';
 
+import type { DropInstruction } from '#src/generated/protocol';
+
 export const REORDER_DRAG_TYPE = 'application/x-sable-reorder';
 
 export type DropEdge = 'above' | 'below';
-export type DropInstruction = DropEdge | 'into';
+export type { DropInstruction };
 
 const INTO_BAND = 0.3;
 

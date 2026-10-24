@@ -1,10 +1,9 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { expect, test } from 'vitest';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 import { galleryEventId, galleryItemId, timelineMediaItems } from './media-items.js';
 
-function gallery(items: Extract<TimelineItemView['content'], { kind: 'gallery' }>['items']) {
+function gallery(items: Extract<ResolvedItem['content'], { kind: 'gallery' }>['items']) {
   return {
     id: 'item',
     row: 'message',
@@ -32,7 +31,7 @@ function gallery(items: Extract<TimelineItemView['content'], { kind: 'gallery' }
     mention: 'none',
     forwarded: null,
     forum_title: null,
-  } satisfies TimelineItemView;
+  } satisfies ResolvedItem;
 }
 
 test('lists a gallery pdf as a file the viewer can open, and skips other files', () => {

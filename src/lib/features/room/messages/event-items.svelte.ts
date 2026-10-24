@@ -1,6 +1,7 @@
+import { type ResolvedItem, resolveItem } from '#lib/rooms/timeline-item.js';
 import { createContext } from 'svelte';
-import { createSubscriber, SvelteMap } from 'svelte/reactivity';
-import type { TimelineItemView, Rpc } from '#src/generated/protocol';
+import { SvelteMap, createSubscriber } from 'svelte/reactivity';
+import type { Rpc } from '#src/generated/protocol';
 
 export type EventItemCommands = Pick<Rpc['timeline'], 'eventItems'>;
 
@@ -8,7 +9,9 @@ export const MAX_EVENT_ITEMS = 512;
 const RETRY_DELAYS_MS = [1000, 5000, 15000];
 
 class EventItemSlot {
-  value = $state.raw<TimelineItemView | null | undefined>(undefined);
+  constructor(private readonly notify: () => void) {}
+
+  value = $state.raw<ResolvedItem | null | undefined>(undefined);
   pending = $state(false);
   watched = false;
   readonly watch = createSubscriber(() => {
@@ -17,12 +20,17 @@ class EventItemSlot {
       this.watched = false;
     };
   });
+
+  set(value: ResolvedItem | null | undefined): void {
+    this.value = value;
+    this.notify();
+  }
 }
 
 export class EventItems {
-  readonly #items = new SvelteMap<string, EventItemSlot>();
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- eviction order nothing renders from
-  readonly #recent = new Set<string>();
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- each slot is its own signal
+  readonly #items = new Map<string, EventItemSlot>();
+  readonly #versions = new SvelteMap<string, number>();
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a request queue nothing renders from
   readonly #queued = new Map<string, Set<string>>();
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- retry bookkeeping nothing renders from
@@ -40,37 +48,34 @@ export class EventItems {
 
   #slot(key: string): EventItemSlot {
     let slot = this.#items.get(key);
-    if (!slot) {
-      slot = new EventItemSlot();
+    if (slot) {
+      this.#items.delete(key);
+    } else {
+      slot = new EventItemSlot(() => {
+        this.#versions.set(key, (this.#versions.get(key) ?? 0) + 1);
+      });
       this.#evict();
-      this.#items.set(key, slot);
     }
-    this.#recent.delete(key);
-    this.#recent.add(key);
+    this.#items.set(key, slot);
     return slot;
   }
 
   #evict(): void {
     if (this.#items.size < MAX_EVENT_ITEMS) return;
-    for (const key of this.#recent) {
-      if (this.#items.get(key)?.watched) continue;
-      this.#recent.delete(key);
+    for (const [key, slot] of this.#items) {
+      if (slot.watched) continue;
       this.#items.delete(key);
       this.#failures.delete(key);
       return;
     }
   }
 
-  get(roomId: string, eventId: string): TimelineItemView | null | undefined {
+  get(roomId: string, eventId: string): ResolvedItem | null | undefined {
     const key = this.#key(roomId, eventId);
-    const slot = this.#items.get(key);
-    if (slot) {
-      this.#recent.delete(key);
-      this.#recent.add(key);
-      slot.watch();
-    }
-    const found = slot?.value;
-    // Create slot state in the queued flush so a derived reader can track it.
+    const slot = this.#slot(key);
+    slot.watch();
+    void this.#versions.get(key);
+    const found = slot.value;
     if (found === undefined) this.#request(roomId, eventId);
     return found;
   }
@@ -79,13 +84,13 @@ export class EventItems {
     return this.#items.get(this.#key(roomId, eventId))?.pending ?? false;
   }
 
-  peek(roomId: string, eventId: string): TimelineItemView | null {
+  peek(roomId: string, eventId: string): ResolvedItem | null {
     return this.#items.get(this.#key(roomId, eventId))?.value ?? null;
   }
 
-  put(roomId: string, items: readonly TimelineItemView[]): void {
+  put(roomId: string, items: readonly ResolvedItem[]): void {
     for (const item of items) {
-      if (item.event_id !== null) this.#slot(this.#key(roomId, item.event_id)).value = item;
+      if (item.event_id !== null) this.#slot(this.#key(roomId, item.event_id)).set(item);
     }
   }
 
@@ -115,7 +120,7 @@ export class EventItems {
     this.#failures.set(key, attempt + 1);
     setTimeout(() => {
       const slot = this.#items.get(key);
-      if (slot?.value === null) slot.value = undefined;
+      if (slot?.value === null) slot.set(undefined);
     }, RETRY_DELAYS_MS[attempt]);
   }
 
@@ -131,18 +136,20 @@ export class EventItems {
         if (wanted.length === 0) return;
         for (const id of wanted) {
           const slot = this.#slot(this.#key(roomId, id, owner));
-          slot.value = null;
+          slot.set(null);
           slot.pending = true;
         }
         // eslint-disable-next-line svelte/prefer-svelte-reactivity -- tracks this request's misses only
         const missing = new Set(wanted);
         try {
-          const items = await this.commands.eventItems({ room_id: roomId, event_ids: wanted });
+          const items = (
+            await this.commands.eventItems({ room_id: roomId, event_ids: wanted })
+          ).map(resolveItem);
           for (const item of items) {
             if (item.event_id === null) continue;
             const key = this.#key(roomId, item.event_id, owner);
             const slot = this.#slot(key);
-            slot.value = item;
+            slot.set(item);
             slot.pending = false;
             this.#failures.delete(key);
             missing.delete(item.event_id);

@@ -183,7 +183,7 @@
       kind,
       public: room?.join_rule === 'public',
       encrypted,
-      roomVersion: target,
+      room_version: target,
       predecessor: id,
     });
     await core.rpc.rooms.setTombstone({

@@ -36,7 +36,7 @@ test('plain text sends no formatted body', () => {
   expect(message).toEqual({
     body: 'just words',
     formatted: null,
-    mentions: { userIds: [], room: false },
+    mentions: { user_ids: [], room: false },
   });
 });
 
@@ -349,7 +349,7 @@ test('a plain-mode edit keeps pills between markdown and across paragraphs', () 
   expect(serializePlain(changed)).toEqual({
     body: '**hey** @_one\n\n#Room :wave:!',
     formatted: html.replace(/<\/p>$/, '!</p>'),
-    mentions: { userIds: ['@one:example.org'], room: false },
+    mentions: { user_ids: ['@one:example.org'], room: false },
   });
 });
 
@@ -559,7 +559,7 @@ test('a room mention keeps its # name in the body and links in the formatted bod
   expect(message).toEqual({
     body: '#General',
     formatted: '<a href="https://matrix.to/#/#general:example.org">#General</a>',
-    mentions: { userIds: [], room: false },
+    mentions: { user_ids: [], room: false },
   });
 });
 
@@ -594,13 +594,13 @@ test('a user pill becomes an m.mentions entry, once', () => {
     )
   );
 
-  expect(message.mentions).toEqual({ userIds: ['@one:example.org'], room: false });
+  expect(message.mentions).toEqual({ user_ids: ['@one:example.org'], room: false });
 });
 
 test('@room in the body asks for a room mention', () => {
   const message = serializeComposer(docOf(para(composerSchema.text('@room heads up'))));
 
-  expect(message.mentions).toEqual({ userIds: [], room: true });
+  expect(message.mentions).toEqual({ user_ids: [], room: true });
 });
 
 test('a word ending in @room is not a room mention', () => {
@@ -736,7 +736,7 @@ describe('plain text mode', () => {
     const who = mention.create({ userId: '@amp:example.org', name: 'amp' });
     const message = serializePlain(docOf(para([who, composerSchema.text(' hi')])));
 
-    expect(message.mentions.userIds).toEqual(['@amp:example.org']);
+    expect(message.mentions.user_ids).toEqual(['@amp:example.org']);
     expect(message.formatted).toContain('https://matrix.to/#/@amp:example.org');
   });
 
@@ -755,8 +755,8 @@ describe('plain text mode', () => {
 
     expect(message.body).toBe(`${before}@someone:server${after}`);
     expect(message.formatted).toBe(formatted);
-    expect(message.mentions).toEqual({ userIds: [], room: false });
-    expect(serializeComposer(richFromPlain(source)).mentions.userIds).toEqual([]);
+    expect(message.mentions).toEqual({ user_ids: [], room: false });
+    expect(serializeComposer(richFromPlain(source)).mentions.user_ids).toEqual([]);
   });
 
   test('a mention outside code still notifies when the same user appears inside code', () => {
@@ -768,7 +768,7 @@ describe('plain text mode', () => {
     expect(message.formatted).toBe(
       '<code>@someone:server</code> hi <a href="https://matrix.to/#/@someone:server">@someone:server</a>'
     );
-    expect(message.mentions.userIds).toEqual(['@someone:server']);
+    expect(message.mentions.user_ids).toEqual(['@someone:server']);
   });
 
   test('the body names the mention rather than spelling out its link', () => {
@@ -1145,7 +1145,7 @@ describe('clipboard slices', () => {
     expect(serializeComposer(parseMatrixHtml('<p><strong></strong></p>'))).toEqual({
       body: '',
       formatted: null,
-      mentions: { userIds: [], room: false },
+      mentions: { user_ids: [], room: false },
     });
   });
 });

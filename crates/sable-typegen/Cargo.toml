@@ -12,6 +12,7 @@ sable-core = { path = "../sable-core", version = "0.1.0", features = ["typegen"]
 sable-model = { path = "../sable-model", version = "0.1.0", features = ["typegen"] }
 sable-protocol = { path = "../sable-protocol", version = "0.1.0", features = ["typegen"] }
 sable-runtime = { path = "../sable-runtime", version = "0.1.0", features = ["typegen"] }
+sable-slices = { path = "../sable-slices", version = "0.1.0", features = ["typegen"] }
 specta = { workspace = true }
 specta-serde = { workspace = true }
 specta-typescript = { workspace = true }

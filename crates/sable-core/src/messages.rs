@@ -2471,6 +2471,7 @@ mod tests {
                 timeline: Some(timeline),
                 overlay: None,
                 thread_root: Some(root.to_owned()),
+                timeline_key: None,
                 kind: crate::SubscriptionKind::FocusedTimeline(room_id.to_owned()),
             },
         );
@@ -2603,6 +2604,7 @@ mod tests {
                 timeline: Some(timeline),
                 overlay: None,
                 thread_root: Some(root.to_owned()),
+                timeline_key: None,
                 kind: crate::SubscriptionKind::FocusedTimeline(room_id.to_owned()),
             },
         );

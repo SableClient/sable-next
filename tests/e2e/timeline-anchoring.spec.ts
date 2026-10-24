@@ -45,12 +45,12 @@ test('switches the active timeline to the selected room', async ({
   await app.openRooms();
   await app.openRoomFromList('General');
   await expect(page.getByText('Welcome to General')).toBeVisible();
+  const staleSubscription = await core.subscription();
   await app.openRoomFromList('Random');
 
   await expect.poll(() => core.subscribeCount()).toBe(2);
   await expect(page.getByText('Welcome to Random')).toBeVisible();
 
-  const staleSubscription = await core.subscription(0);
   await core.emitTimelineDiff(staleSubscription, [
     { op: 'push_back', value: timelineItem('stale', 'Stale General event') },
   ]);

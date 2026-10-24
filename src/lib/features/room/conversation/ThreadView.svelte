@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
+  import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
+  import type { MemberView } from '#src/generated/protocol';
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import XIcon from 'phosphor-svelte/lib/XIcon';
   import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
@@ -39,7 +40,7 @@
     rootEventId: string;
     focusEventId?: string | null;
     roomName?: string | null;
-    rootMessage?: TimelineItemView | null;
+    rootMessage?: ResolvedItem | null;
     sidePanel?: boolean;
     backLabel?: string;
     members?: readonly MemberView[];
@@ -91,7 +92,7 @@
   const core = useCoreClient();
   const personas = usePersonaStore();
   const roomList = useRoomList();
-  const timeline = new RoomTimeline(core);
+  const timeline = new RoomTimeline();
   const conversation = new Conversation({
     core,
     personas,
@@ -127,10 +128,6 @@
     return () => {
       navigation.abort();
     };
-  });
-
-  $effect(() => {
-    conversation.fetchMissingReplyDetails();
   });
 
   onMount(() => {

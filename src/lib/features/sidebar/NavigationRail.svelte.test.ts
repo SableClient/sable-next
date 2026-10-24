@@ -6,7 +6,7 @@ import { userEvent } from '@testing-library/user-event';
 import { tick, type ComponentProps } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import type { RoomListItemView } from '#src/generated/protocol';
+import type { RoomListItemView, RoomUnreadView } from '#src/generated/protocol';
 
 const listed = vi.hoisted((): RoomListItemView[] => []);
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
@@ -68,6 +68,12 @@ const linkTo = (href: string) =>
   screen.queryAllByRole('link').find((link) => link.getAttribute('href') === href) ?? null;
 const spaceOrder = () =>
   [...document.querySelectorAll('.rail-slot a')].map((link) => link.getAttribute('aria-label'));
+const unread = (unread: number, highlight: number): RoomUnreadView => ({
+  unread,
+  highlight,
+  marked: false,
+  notifying: 0,
+});
 
 async function openMenu(target: Element): Promise<HTMLElement[]> {
   await user.pointer({ keys: '[MouseRight]', target });
@@ -112,7 +118,7 @@ test('badges unread direct chats', async () => {
   renderRail({
     props: {
       spaces: [],
-      directUnread: { unread: 3, highlight: 3 },
+      directUnread: unread(3, 3),
       mobile: true,
     },
   });
@@ -128,7 +134,7 @@ test('badges the unspaced section', async () => {
   renderRail({
     props: {
       spaces: [],
-      unspacedUnread: { unread: 4, highlight: 2 },
+      unspacedUnread: unread(4, 2),
       mobile: true,
     },
   });
@@ -157,8 +163,8 @@ test('home carries no badge, the unspaced section does', async () => {
   renderRail({
     props: {
       spaces: [],
-      homeUnread: { unread: 9, highlight: 5 },
-      unspacedUnread: { unread: 4, highlight: 2 },
+      homeUnread: unread(9, 5),
+      unspacedUnread: unread(4, 2),
       mobile: true,
     },
   });
@@ -181,7 +187,7 @@ test('search leaves the rail when the preference is off', async () => {
 });
 
 test('uses a dot for ordinary unread messages outside spaces', async () => {
-  renderRail({ spaces: [], unspacedUnread: { unread: 2, highlight: 0 }, mobile: true });
+  renderRail({ spaces: [], unspacedUnread: unread(2, 0), mobile: true });
   await tick();
 
   expect(tab('nav.unspaced').querySelector('.unread-badge-dot')).toBeInTheDocument();
@@ -233,8 +239,8 @@ test('badges a space with its mentions and dots one with only unread messages', 
     props: {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
       spaceUnread: new Map([
-        ['!a:example.org', { unread: 7, highlight: 3 }],
-        ['!b:example.org', { unread: 4, highlight: 0 }],
+        ['!a:example.org', unread(7, 3)],
+        ['!b:example.org', unread(4, 0)],
       ]),
       mobile: true,
     },
@@ -291,7 +297,7 @@ test('marks a whole section read from the tab that badges it', async () => {
   renderRail({
     props: {
       spaces: [],
-      directUnread: { unread: 2, highlight: 0 },
+      directUnread: unread(2, 0),
       onMarkSectionRead: (section: string) => marked.push(section),
       mobile: true,
     },
@@ -309,7 +315,7 @@ test('marks the rooms outside spaces read from their tab', async () => {
   renderRail({
     props: {
       spaces: [],
-      unspacedUnread: { unread: 2, highlight: 0 },
+      unspacedUnread: unread(2, 0),
       onMarkSectionRead: (section: string) => marked.push(section),
       mobile: true,
     },
@@ -466,7 +472,7 @@ test('shows a collapsed folder as one tab, with the names of the spaces inside',
       layout: [
         { kind: 'folder', id: 'f', name: null, content: ['!a:example.org', '!b:example.org'] },
       ],
-      spaceUnread: new Map([['!b:example.org', { unread: 3, highlight: 0 }]]),
+      spaceUnread: new Map([['!b:example.org', unread(3, 0)]]),
       openFolders: new Set<string>(),
       onToggleFolder: (folderId: string) => toggled.push(folderId),
       mobile: true,

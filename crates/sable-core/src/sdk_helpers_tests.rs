@@ -226,20 +226,16 @@ async fn persona_mutations_do_not_write_when_the_catalog_read_fails() {
         .mount(server.server())
         .await;
 
-    assert!(
-        core.run(RemoveParams {
-            id: "stale".to_owned()
-        })
-        .await
-        .is_err()
-    );
-    assert!(
-        core.run(ReorderParams {
-            ids: vec!["stale".to_owned()]
-        })
-        .await
-        .is_err()
-    );
+    core.run(RemoveParams {
+        id: "stale".to_owned(),
+    })
+    .await
+    .unwrap_err();
+    core.run(ReorderParams {
+        ids: vec!["stale".to_owned()],
+    })
+    .await
+    .unwrap_err();
 }
 
 #[tokio::test]
@@ -740,7 +736,7 @@ async fn local_read_waits_for_open_stores() {
 
     let pending = core.with_open_stores(async || {
         assert!(*core.stores_open.borrow());
-        assert!(core.activity_lock.try_lock().is_err());
+        core.activity_lock.try_lock().unwrap_err();
         ran.store(true, std::sync::atomic::Ordering::SeqCst);
         client.state_store().get_custom_value(b"missing").await
     });
@@ -754,7 +750,7 @@ async fn local_read_waits_for_open_stores() {
     core.stores_open.send_replace(true);
     assert_eq!(pending.await.unwrap(), None);
     assert!(ran.load(std::sync::atomic::Ordering::SeqCst));
-    assert!(core.activity_lock.try_lock().is_ok());
+    drop(core.activity_lock.try_lock().unwrap());
 }
 
 #[tokio::test]
@@ -820,7 +816,7 @@ async fn space_sidebar_does_not_read_while_stores_are_closing() {
 
     client.resume().await.unwrap();
     core.stores_open.send_replace(true);
-    assert!(pending.await.unwrap().is_empty());
+    assert_eq!(pending.await.unwrap().as_slice(), &[]);
 }
 
 #[tokio::test]
@@ -863,6 +859,7 @@ async fn timeline_waits_for_stores_to_open() {
     core.stores_open.send_replace(false);
 
     let pending = core.run(SubscribeParams {
+        key: None,
         room_id: room_id.to_owned(),
         focus: TimelineFocusView::Live,
         hidden_events: false,
@@ -975,6 +972,7 @@ async fn event_focus_clears_its_explicit_sync_subscription_after_unsubscribing()
     let SubscribeOk { subscription, .. } = core
         .run(SubscribeParams {
             room_id: room_id.to_owned(),
+            key: None,
             focus: TimelineFocusView::Event {
                 event_id: target.to_owned(),
             },
@@ -1027,6 +1025,7 @@ async fn an_open_room_is_resubscribed_after_the_sync_session_expires() {
     let core = core(&server, client).await;
     core.run(SubscribeParams {
         room_id: room_id.to_owned(),
+        key: None,
         focus: TimelineFocusView::Live,
         hidden_events: false,
     })
@@ -3091,6 +3090,7 @@ async fn a_live_redaction_shows_its_reason_in_an_open_timeline() {
     } = core
         .run(SubscribeParams {
             room_id: room_id.to_owned(),
+            key: None,
             focus: TimelineFocusView::Live,
             hidden_events: false,
         })
@@ -3127,6 +3127,7 @@ async fn a_live_redaction_shows_its_reason_in_an_open_timeline() {
             if let CoreEvent::TimelineDiff {
                 subscription: from,
                 diffs,
+                ..
             } = event
                 && from == subscription
             {
@@ -3176,6 +3177,7 @@ async fn a_queued_reproxy_reaches_an_open_timeline_before_the_server_echoes_it()
     } = core
         .run(SubscribeParams {
             room_id: room_id.to_owned(),
+            key: None,
             focus: TimelineFocusView::Live,
             hidden_events: false,
         })
@@ -3211,6 +3213,7 @@ async fn a_queued_reproxy_reaches_an_open_timeline_before_the_server_echoes_it()
             if let CoreEvent::TimelineDiff {
                 subscription: from,
                 diffs,
+                ..
             } = event
                 && from == subscription
             {

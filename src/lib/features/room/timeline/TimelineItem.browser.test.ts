@@ -1,10 +1,11 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { afterEach, expect, test, vi } from 'vitest';
 import { commands, page, userEvent } from 'vitest/browser';
 
 import en from '../../../../locales/en.json' with { type: 'json' };
 import { render } from 'vitest-browser-svelte';
 
-import type { ProfileView, TimelineItemView } from '#src/generated/protocol';
+import type { ProfileView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js', async () => {
   const mock = await import('#lib/core/__mocks__/context.js');
@@ -62,7 +63,7 @@ const profile: ProfileView = {
   legacy_fields: [],
 };
 
-function message(id: string, sender: string, senderName: string): TimelineItemView {
+function message(id: string, sender: string, senderName: string): ResolvedItem {
   return withRowFields({
     id,
     event_id: `$${id}:example.test`,
@@ -79,7 +80,6 @@ function message(id: string, sender: string, senderName: string): TimelineItemVi
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,
@@ -97,7 +97,7 @@ function message(id: string, sender: string, senderName: string): TimelineItemVi
   });
 }
 
-function replyToAlice(id: string, sender: string, senderName: string): TimelineItemView {
+function replyToAlice(id: string, sender: string, senderName: string): ResolvedItem {
   return {
     ...message(id, sender, senderName),
     in_reply_to: {
@@ -112,7 +112,7 @@ function replyToAlice(id: string, sender: string, senderName: string): TimelineI
 }
 
 function mountItem(
-  item: TimelineItemView,
+  item: ResolvedItem,
   layout: 'modern' | 'compact' = 'modern',
   extra: Record<string, unknown> = {}
 ) {
@@ -335,7 +335,7 @@ function galleryItem(id: string, items: { filename: string; width: number; heigh
         spoiler: null,
       })),
     },
-  }) as TimelineItemView;
+  }) as ResolvedItem;
 }
 
 for (const [name, width] of [

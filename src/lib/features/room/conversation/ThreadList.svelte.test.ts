@@ -1,11 +1,10 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { screen, within } from '@testing-library/svelte';
 import { renderWithTooltips } from '#lib/test-support/render-with-tooltips.js';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -57,7 +56,7 @@ afterEach(() => {
   listThreads.mockReset();
 });
 
-function root(id: string, body: string): TimelineItemView {
+function root(id: string, body: string): ResolvedItem {
   return withRowFields({
     id,
     event_id: id,
@@ -74,7 +73,6 @@ function root(id: string, body: string): TimelineItemView {
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     },
     in_reply_to: null,
     thread_root: null,

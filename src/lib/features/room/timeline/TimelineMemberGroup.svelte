@@ -1,28 +1,30 @@
 <script lang="ts">
+  import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
   import type { Snippet } from 'svelte';
   import { cubicOut } from 'svelte/easing';
   import { slide } from 'svelte/transition';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
 
-  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
+  import type { MemberView, TimelineSegmentView } from '#src/generated/protocol';
 
   import { currentLocale, i18n } from '#lib/i18n.js';
   import { motionMs, MOTION_MS } from '#lib/ui/motion.js';
   import ResponsiveDialog from '#lib/ui/primitives/ResponsiveDialog.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
-  import { memberGroupSegments, memberGroupSummary } from '../members/member-groups';
+  import { memberGroupSummary } from '../members/member-groups';
   import MemberUserList from '../members/MemberUserList.svelte';
   import StateEventSubjectName from '../members/StateEventSubjectName.svelte';
 
   interface Props {
-    items: readonly TimelineItemView[];
-    renderItem: Snippet<[TimelineItemView]>;
+    items: readonly ResolvedItem[];
+    segments: readonly TimelineSegmentView[];
+    renderItem: Snippet<[ResolvedItem]>;
     members?: readonly MemberView[];
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
   }
 
-  let { items, renderItem, members = [], onSenderProfile }: Props = $props();
+  let { items, segments, renderItem, members = [], onSenderProfile }: Props = $props();
   const eventsId = $props.id();
   let expanded = $state(false);
   let toggleLabel = $derived(
@@ -30,7 +32,6 @@
       count: items.length,
     })
   );
-  let segments = $derived(memberGroupSegments(items));
   let tokens = $derived(memberGroupSummary(segments, i18n.t, currentLocale()));
   let open = $state(false);
   let openSegment = $state(0);
@@ -45,7 +46,7 @@
     <h2>{title}</h2>
     <MemberUserList
       {title}
-      userIds={listed?.users.map((user) => user.userId) ?? []}
+      userIds={listed?.users.map((user) => user.user_id) ?? []}
       {members}
       onMemberProfile={onSenderProfile}
       showHeader={false}

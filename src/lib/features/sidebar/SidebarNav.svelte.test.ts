@@ -5,7 +5,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 
-import type { CoreEvent, RoomListItemView } from '#src/generated/protocol';
+import type { RoomListItemView } from '#src/generated/protocol';
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
@@ -42,7 +42,7 @@ core.rpc.members.permissions.mockResolvedValue({
 
 import SidebarNav from './SidebarNavHarness.test.svelte';
 import { RoomList } from '#lib/rooms/room-list.svelte.js';
-import type { CoreClient } from '#lib/core/client.svelte.js';
+import { FakeRuntime, roomsView } from '#lib/test-support/fake-runtime.js';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 beforeEach(() => {
@@ -83,15 +83,16 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomListItemView 
   });
 }
 
-async function startRoomList(core: CoreClient): Promise<RoomList> {
-  const roomList = new RoomList(core);
+async function startRoomList(rooms: RoomListItemView[]): Promise<FakeRuntime> {
+  const runtime = new FakeRuntime({ rooms: roomsView(rooms) });
+  const roomList = new RoomList(() => runtime.client());
   fixture.roomList = roomList;
   onTestFinished(() => {
     roomList.stop();
     fixture.roomList = null;
   });
   await roomList.start();
-  return roomList;
+  return runtime;
 }
 
 function railOrder(names: readonly string[]): (string | null)[] {
@@ -134,16 +135,7 @@ test.each([
       { ...space('!unspaced:example.org', 'Unspaced'), room_kind: 'text' },
       { ...space('!dm:example.org', 'Alice'), room_kind: 'text', is_direct: true },
     ];
-    const client = {
-      subscribeEvents: () => () => {},
-      rpc: {
-        timeline: {
-          subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms }),
-          unsubscribe: () => Promise.resolve(),
-        },
-      },
-    } as unknown as CoreClient;
-    await startRoomList(client);
+    await startRoomList(rooms as RoomListItemView[]);
     visit(path, params);
     render(SidebarNav);
     await tick();
@@ -173,25 +165,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
     is_direct: true,
     direct_targets: ['@alice:example.org'],
   };
-  const listeners = new Set<(event: CoreEvent) => void>();
-  const core = {
-    subscribeEvents: (listener: (event: CoreEvent) => void) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    rpc: {
-      timeline: {
-        subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
-        unsubscribe: () => Promise.resolve(),
-      },
-      notifications: {
-        settings: () => Promise.resolve({ room: null, default: 'all' }),
-      },
-    },
-  } as unknown as CoreClient;
-  await startRoomList(core);
+  const runtime = await startRoomList([room]);
   render(SidebarNav, { mobile: true });
   await tick();
 
@@ -209,12 +183,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
       event_id: '$message',
     },
   });
-  for (const listener of listeners)
-    listener({
-      type: 'room_list_diff',
-      subscription: 1,
-      diffs: [{ Set: { index: 0, value: incoming } }],
-    });
+  runtime.set('rooms', roomsView([incoming]));
   await tick();
 
   const dm = screen.getByRole('link', { name: 'Alice' });
@@ -235,12 +204,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
   await tick();
   expect(screen.getByRole('link', { name: 'Alice' })).toBeInTheDocument();
 
-  for (const listener of listeners)
-    listener({
-      type: 'room_list_diff',
-      subscription: 1,
-      diffs: [{ Set: { index: 0, value: withCounts({ ...incoming, unread: 0 }) } }],
-    });
+  runtime.set('rooms', roomsView([withCounts({ ...incoming, unread: 0 })]));
   await tick();
 
   expect(screen.queryByRole('link', { name: 'Alice' })).not.toBeInTheDocument();
@@ -249,34 +213,13 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
 test('keeps the rail order when a room-list reset reorders spaces', async () => {
   const alpha = space('!alpha:example.org', 'Alpha');
   const beta = space('!beta:example.org', 'Beta');
-  const listeners = new Set<(event: CoreEvent) => void>();
-  const core = {
-    subscribeEvents: (listener: (event: CoreEvent) => void) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    rpc: {
-      timeline: {
-        subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [alpha, beta] }),
-        unsubscribe: () => Promise.resolve(),
-      },
-    },
-  } as unknown as CoreClient;
-  await startRoomList(core);
+  const runtime = await startRoomList([alpha, beta]);
   render(SidebarNav, { mobile: true });
   await tick();
 
   expect(railOrder(['Alpha', 'Beta'])).toEqual(['Alpha', 'Beta']);
 
-  for (const listener of listeners) {
-    listener({
-      type: 'room_list_diff',
-      subscription: 1,
-      diffs: [{ Reset: { values: [beta, alpha] } }],
-    });
-  }
+  runtime.set('rooms', roomsView([beta, alpha]));
   await tick();
 
   expect(railOrder(['Alpha', 'Beta'])).toEqual(['Alpha', 'Beta']);
@@ -290,16 +233,7 @@ test('a subspace pinned in the stored layout joins the rail beside its parent', 
       { room_id: child.room_id, via: [], order: null, origin_server_ts: 1, suggested: false },
     ],
   };
-  const core = {
-    subscribeEvents: () => () => {},
-    rpc: {
-      timeline: {
-        subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [parent, child] }),
-        unsubscribe: () => Promise.resolve(),
-      },
-    },
-  } as unknown as CoreClient;
-  await startRoomList(core);
+  await startRoomList([parent, child]);
 
   const first = render(SidebarNav, { mobile: true });
   await tick();
@@ -321,16 +255,7 @@ test('a muted direct chat marked unread by hand still reaches the navbar', async
     marked_unread: true,
     notification: { room: 'mute', default: 'all' },
   });
-  const core = {
-    subscribeEvents: () => () => {},
-    rpc: {
-      timeline: {
-        subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
-        unsubscribe: () => Promise.resolve(),
-      },
-    },
-  } as unknown as CoreClient;
-  await startRoomList(core);
+  await startRoomList([room]);
 
   render(SidebarNav, { mobile: true });
   await tick();
@@ -348,16 +273,7 @@ test('a muted room marked unread by hand still marks its section as unread', asy
     marked_unread: true,
     notification: { room: 'mute', default: 'all' },
   });
-  const core = {
-    subscribeEvents: () => () => {},
-    rpc: {
-      timeline: {
-        subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
-        unsubscribe: () => Promise.resolve(),
-      },
-    },
-  } as unknown as CoreClient;
-  await startRoomList(core);
+  await startRoomList([room]);
 
   render(SidebarNav, { mobile: true });
   await tick();
@@ -378,16 +294,7 @@ test('a section totals its notifying rooms in green', async () => {
     notifying: 4,
     notification: { room: 'all', default: 'all' },
   });
-  const core = {
-    subscribeEvents: () => () => {},
-    rpc: {
-      timeline: {
-        subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
-        unsubscribe: () => Promise.resolve(),
-      },
-    },
-  } as unknown as CoreClient;
-  await startRoomList(core);
+  await startRoomList([room]);
 
   render(SidebarNav, { mobile: true });
   await tick();

@@ -460,10 +460,12 @@ pub fn alert(
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct OwnPresence {
     #[serde(default)]
     pub presence: String,
     #[serde(default)]
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub last_active_ago: Option<u64>,
 }
 

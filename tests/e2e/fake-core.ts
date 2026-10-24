@@ -1,4 +1,7 @@
 import type { Page } from '@playwright/test';
+import { WIRE_SCHEMA } from '#src/generated/protocol';
+import { installFakeTimelineSlice } from './fixtures/fake-timeline';
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import type {
   AbbreviationView,
   BookmarkView,
@@ -13,6 +16,7 @@ import type {
   MemberView,
   RoomListItemView,
   RpcMethods,
+  TimelineDocView,
   TimelineFocusView,
   RpcParams,
   RpcResult,
@@ -21,9 +25,21 @@ import type {
   SpaceChildEdge,
   SpaceHierarchyRoomView,
   SubscriptionId,
-  TimelineItemView,
   Rpc,
 } from '#src/generated/protocol';
+
+type VectorDiff<T> =
+  | { op: 'append'; values: T[] }
+  | { op: 'clear' }
+  | { op: 'push_front'; value: T }
+  | { op: 'push_back'; value: T }
+  | { op: 'pop_front' }
+  | { op: 'pop_back' }
+  | { op: 'insert'; index: number; value: T }
+  | { op: 'set'; index: number; value: T }
+  | { op: 'remove'; index: number }
+  | { op: 'truncate'; length: number }
+  | { op: 'reset'; values: T[] };
 
 export type RoomCoreMode =
   | 'ready'
@@ -60,6 +76,8 @@ declare global {
     __e2eAccounts?: SessionInfo[];
     __e2eSwitchAccountError?: boolean;
     __e2eSwitchAccountDelayMs?: number;
+    __e2eHoldRooms?: boolean;
+    __e2eReleaseRooms: () => void;
     __e2eCalls: { method: string; params: unknown }[];
     __e2eProfileSaveError?: boolean;
     __e2eSendError?: string;
@@ -71,25 +89,33 @@ declare global {
     __e2eAnchorPositions: number[];
     __e2eTimelineRooms: string[];
     __e2eTimelineSubscriptions: number[];
+    __e2eActiveTimelineSubscriptions: () => number[];
     __e2eTimelineFocus: TimelineFocusView[];
     __e2ePaginationDirections: string[];
     __e2eRefreshRoom: () => void;
     __e2eReceiveMessage: (body: string) => void;
     __e2eEmitTimelineEvent: (event: unknown) => void;
     __e2eTimelineRebuilds: number;
+    __e2eWireSchema: string;
   }
 }
 
 export async function installFakeCore(page: Page, mode: WorkerMode): Promise<void> {
+  await page.addInitScript(installFakeTimelineSlice);
+  await page.addInitScript((schema: string) => {
+    window.__e2eWireSchema = schema;
+  }, WIRE_SCHEMA);
   await page.addInitScript((workerMode: WorkerMode) => {
     window.__e2ePaginationDirections = [];
     window.__e2eTimelineFocus = [];
+    /** The timeline events the fake sends hold whole items, as the fake timeline reads them. */
+    type FakeEvent =
+      | Exclude<CoreEvent, { type: 'timeline_diff' | 'timeline_aggregations' }>
+      | { type: 'timeline_diff'; subscription: number; diffs: VectorDiff<ResolvedItem>[] }
+      | { type: 'timeline_aggregations'; subscription: number; items: ResolvedItem[] };
     /** Keyed by wire method; a missing one answers `null`. */
     type RpcHandlers = {
-      [M in keyof RpcMethods]?: (
-        params: RpcParams<RpcMethods[M]>,
-        port: FakePort
-      ) => RpcResult<RpcMethods[M]> | typeof NO_REPLY;
+      [M in keyof RpcMethods]?: (params: RpcParams<RpcMethods[M]>, port: FakePort) => unknown;
     };
 
     const NO_REPLY = Symbol('no-reply');
@@ -409,7 +435,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       sessionStorage.setItem(BOOKMARKS_KEY, JSON.stringify(entries));
     };
 
-    const timelineItems = (roomName: string, offset = 0): TimelineItemView[] =>
+    const timelineItems = (roomName: string, offset = 0): ResolvedItem[] =>
       Array.from(
         { length: workerMode === 'forward_history' || workerMode === 'unread_catchup' ? 80 : 20 },
         (_, relativeIndex) => {
@@ -434,7 +460,6 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               emote: false,
               notice: false,
               edited: false,
-              jumbo: null,
             },
             in_reply_to: null,
             thread_root: null,
@@ -539,7 +564,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       number,
       { roomId: string; page: number; live: boolean; thread: boolean; oldest: number }
     >();
-    const arrivals: TimelineItemView[] = [];
+    const arrivals: ResolvedItem[] = [];
     let unreadContextOpened = false;
     const notificationKeywords: KeywordNotificationView[] = [];
     let defaultGroupMode: 'all' | 'mentions' = 'mentions';
@@ -559,6 +584,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       username: 'loud',
     };
     let activePort: FakePort | null = null;
+    let knownPort: FakePort | null = null;
 
     const servedBytes = new Map<string, Promise<Uint8Array>>();
     function servedPng(source: string): Promise<Uint8Array> {
@@ -607,10 +633,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       return found;
     };
 
-    const timelineSnapshot = (roomName: string): TimelineItemView[] => {
+    const timelineSnapshot = (roomName: string): ResolvedItem[] => {
       const items = timelineItems(roomName);
       const first = items[0];
-      const timelineStart: TimelineItemView = {
+      const timelineStart: ResolvedItem = {
         ...first,
         id: `${roomName.toLowerCase()}-date-divider`,
         event_id: null,
@@ -623,7 +649,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         redactable: false,
         visibility: 'always',
       };
-      const readMarker: TimelineItemView = {
+      const readMarker: ResolvedItem = {
         ...first,
         id: `${roomName.toLowerCase()}-read-marker`,
         event_id: null,
@@ -650,7 +676,6 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               emote: false,
               notice: false,
               edited: false,
-              jumbo: null,
             },
           }));
         case 'delayed_pagination':
@@ -671,26 +696,25 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
 
     const messageContent = (
       body: string
-    ): Extract<TimelineItemView['content'], { kind: 'message' }> => ({
+    ): Extract<ResolvedItem['content'], { kind: 'message' }> => ({
       kind: 'message',
       body,
       html: body,
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     });
 
     const paginationDiffs = (
       roomName: string,
       page: number
-    ): Extract<CoreEvent, { type: 'timeline_diff' }>['diffs'] => {
+    ): Extract<FakeEvent, { type: 'timeline_diff' }>['diffs'] => {
       const items = timelineItems(roomName);
       const first = items[0];
       switch (workerMode) {
         case 'unread_history': {
           if (page > 1) return [];
-          const marker: TimelineItemView = {
+          const marker: ResolvedItem = {
             ...first,
             id: `${roomName.toLowerCase()}-read-marker`,
             event_id: null,
@@ -703,61 +727,59 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             visibility: 'always',
           };
           return [...items.slice(0, 5), marker, ...items.slice(5, 10)].map((value, index) => ({
-            Insert: { index, value },
+            op: 'insert' as const,
+            index,
+            value,
           }));
         }
         case 'empty_room':
           return [];
         case 'endless_history':
           return Array.from({ length: 20 }, (_, index) => ({
-            Insert: {
-              index,
-              value: {
-                ...first,
-                id: `endless-${String(page)}-${String(index)}`,
-                event_id: `$endless-${String(page)}-${String(index)}:example.test`,
-                timestamp: 1_600_000_000_000 + page * 100 + index,
-                content: messageContent(
-                  `Endless ${String(page)}-${String(index)} ${'wraps and wraps '.repeat((index % 5) * 4)}`
-                ),
-              },
+            op: 'insert',
+            index,
+            value: {
+              ...first,
+              id: `endless-${String(page)}-${String(index)}`,
+              event_id: `$endless-${String(page)}-${String(index)}:example.test`,
+              timestamp: 1_600_000_000_000 + page * 100 + index,
+              content: messageContent(
+                `Endless ${String(page)}-${String(index)} ${'wraps and wraps '.repeat((index % 5) * 4)}`
+              ),
             },
           }));
         case 'delayed_history':
           return items.slice(0, -1).map((value, index) => ({
-            Insert: {
-              index,
-              value: {
-                ...value,
-                id: `delayed-older-${String(index)}`,
-                event_id: `$delayed-older-${String(index)}:example.test`,
-                content: messageContent(`Delayed older ${String(index)}`),
-              },
+            op: 'insert',
+            index,
+            value: {
+              ...value,
+              id: `delayed-older-${String(index)}`,
+              event_id: `$delayed-older-${String(index)}:example.test`,
+              content: messageContent(`Delayed older ${String(index)}`),
             },
           }));
         case 'delayed_pagination':
           return Array.from({ length: 20 }, (_, index) => ({
-            Insert: {
-              index: index + 1,
-              value: {
-                ...first,
-                id: `${roomName.toLowerCase()}-history-${String(page)}-${String(index)}`,
-                event_id: `$${roomName.toLowerCase()}-history-${String(page)}-${String(index)}`,
-                timestamp: 1_699_999_000_000 + index,
-                content: messageContent(`${roomName} history ${String(page)} ${String(index)}`),
-              },
+            op: 'insert',
+            index: index + 1,
+            value: {
+              ...first,
+              id: `${roomName.toLowerCase()}-history-${String(page)}-${String(index)}`,
+              event_id: `$${roomName.toLowerCase()}-history-${String(page)}-${String(index)}`,
+              timestamp: 1_699_999_000_000 + index,
+              content: messageContent(`${roomName} history ${String(page)} ${String(index)}`),
             },
           }));
         default:
           return [
             {
-              PushFront: {
-                value: {
-                  ...first,
-                  id: `${roomName.toLowerCase()}-history-${String(page)}`,
-                  event_id: `$${roomName.toLowerCase()}-history-${String(page)}`,
-                  content: messageContent(`${roomName} history ${String(page)}`),
-                },
+              op: 'push_front',
+              value: {
+                ...first,
+                id: `${roomName.toLowerCase()}-history-${String(page)}`,
+                event_id: `$${roomName.toLowerCase()}-history-${String(page)}`,
+                content: messageContent(`${roomName} history ${String(page)}`),
               },
             },
           ];
@@ -1000,7 +1022,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'account.search_user_directory': () => ({ limited: false, results: [] }),
       'account.media_preview_config': () => ({ media_previews: null, invite_avatars: null }),
       'account.set_media_preview_config': (params) => params.config,
-      'account.profile_overrides': () => ({ overrides: [], protection: 'plain', can_seal: false }),
+      'account.profile_overrides': () => ({
+        overrides: [],
+        protection: 'plain',
+        can_seal: false,
+      }),
       'account.set_profile_override': () => ({
         overrides: [],
         protection: 'plain',
@@ -1239,10 +1265,6 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'widgets.send_delayed_event': () => 'e2e-widget-delay',
       'widgets.send_sticky_event': () => '$e2e-widget-sticky',
       'widgets.room_sticky_events': () => [],
-      'timeline.subscribe_room_list': () => ({
-        subscription: 1,
-        rooms: joinedRooms,
-      }),
       'timeline.subscribe': (params) => {
         const focus = params.focus ?? { kind: 'live' };
         window.__e2eTimelineFocus.push(focus);
@@ -1266,13 +1288,14 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         });
         timelineRooms.push(params.room_id);
         timelineSubscriptions.push(subscription);
-        const roomName = subscriptionRoom(subscription).name ?? '';
+        const openedRoom = subscriptionRoom(subscription);
+        const roomName = openedRoom.name ?? '';
         const items = timelineItems(roomName);
         const unreadContext =
           (workerMode === 'unread_history' || workerMode === 'unread_catchup') &&
           focus.kind === 'event';
         if (unreadContext) unreadContextOpened = true;
-        const marker: TimelineItemView = {
+        const marker: ResolvedItem = {
           ...items[0],
           id: `${roomName.toLowerCase()}-read-marker`,
           event_id: null,
@@ -1286,6 +1309,13 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         };
         return {
           subscription,
+          forward_end: ![
+            'forward_history',
+            'unread_history',
+            'unread_context_error',
+            'unread_catchup',
+          ].includes(workerMode),
+          has_unread: openedRoom.unread > 0 || openedRoom.highlight > 0 || openedRoom.marked_unread,
           items: unreadContext
             ? [...items.slice(0, 5), marker, ...items.slice(5, 20)]
             : workerMode === 'thread_links' && focus.kind === 'thread'
@@ -1340,15 +1370,14 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               subscription: params.subscription,
               diffs: [
                 {
-                  Insert: {
-                    index: 1,
-                    value: {
-                      ...timelineItems(roomName)[0],
-                      id: 'thread-reply-older',
-                      event_id: '$thread-reply-older:example.test',
-                      content: messageContent('Older thread reply'),
-                      thread_root: '$thread-root:example.test',
-                    },
+                  op: 'insert',
+                  index: 1,
+                  value: {
+                    ...timelineItems(roomName)[0],
+                    id: 'thread-reply-older',
+                    event_id: '$thread-reply-older:example.test',
+                    content: messageContent('Older thread reply'),
+                    thread_root: '$thread-root:example.test',
                   },
                 },
               ],
@@ -1366,15 +1395,15 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               subscription: params.subscription,
               diffs: items
                 .slice(state.oldest, previous)
-                .map((value, index) => ({ Insert: { index, value } })),
+                .map((value, index) => ({ op: 'insert' as const, index, value })),
             });
             return {
               direction: params.direction,
               reached_end: state.oldest === 0,
             };
           }
-          state.page += 1;
-          if (state.page === 3) {
+          const page = ++state.page;
+          if (page === 3) {
             arrivals.push({
               ...items[79],
               id: 'during-handoff',
@@ -1386,7 +1415,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             port.emit({
               type: 'timeline_diff',
               subscription: params.subscription,
-              diffs: [{ Append: { values: items.slice(state.page * 20, (state.page + 1) * 20) } }],
+              diffs: [{ op: 'append', values: items.slice(page * 20, (page + 1) * 20) }],
             });
           }, 50);
           return { direction: params.direction, reached_end: state.page >= 3 };
@@ -1400,7 +1429,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           port.emit({
             type: 'timeline_diff',
             subscription: params.subscription,
-            diffs: [{ Append: { values } }],
+            diffs: [{ op: 'append', values }],
           });
           return { direction: params.direction, reached_end: false };
         }
@@ -1435,7 +1464,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             port.emit({
               type: 'timeline_diff',
               subscription: params.subscription,
-              diffs: values.map((value) => ({ PushBack: { value } })),
+              diffs: values.map((value) => ({ op: 'push_back' as const, value })),
             });
           }, 250);
           return { direction: params.direction, reached_end: page >= 16 };
@@ -1490,7 +1519,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               ? JSON.stringify({
                   type: 'm.room.message',
                   content: {
-                    'm.relates_to': { rel_type: 'm.replace', event_id: '$general-8:example.test' },
+                    'm.relates_to': {
+                      rel_type: 'm.replace',
+                      event_id: '$general-8:example.test',
+                    },
                   },
                 })
               : '{}',
@@ -1718,6 +1750,261 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       return 0;
     };
 
+    interface Held {
+      slice: string;
+      key: string;
+      rev: number;
+      window?: { start: number; end: number } | null;
+      sent?: Record<string, string>;
+    }
+    const runtimeSubs = new Map<number, Held>();
+    window.__e2eActiveTimelineSubscriptions = () =>
+      [...runtimeSubs.values()]
+        .filter(({ slice }) => slice === 'timeline')
+        .map(({ key }) => window.__e2eTimeline.doc(key).status.subscription)
+        .filter((subscription) => subscription !== null);
+    /** The part of a timeline a subscriber follows, which is how many rows cross to the page. */
+    const windowedDoc = (doc: TimelineDocView, window: Held['window']): TimelineDocView => {
+      if (!window) {
+        const shown = { ...doc };
+        delete shown.events;
+        return shown;
+      }
+      const end = Math.min(window.end, doc.items.length);
+      return { ...doc, items: doc.items.slice(Math.min(window.start, end), end) };
+    };
+    const partsOf = (doc: TimelineDocView): Record<string, string> =>
+      Object.fromEntries(
+        Object.entries(doc).map(([field, value]) => [field, JSON.stringify(value)])
+      );
+    let runtimePort: MessagePort | null = null;
+    let runtimeTick = 0;
+    let nextRuntimeSub = 1;
+    let nextRuntimeRequest = 0;
+    const typing: Record<string, string[]> = {};
+    const shownBadges = () =>
+      Object.fromEntries(
+        joinedRooms
+          .filter(
+            ({ counts }) =>
+              counts.unread > 0 || counts.highlight > 0 || counts.marked || counts.notifying > 0
+          )
+          .map((listed) => [listed.room_id, { ...listed.counts }])
+      );
+    const sliceState = (slice: string, key: string): unknown =>
+      slice === 'timeline'
+        ? window.__e2eTimeline.doc(key)
+        : slice === 'rooms'
+          ? {
+              total: joinedRooms.length,
+              items: joinedRooms,
+              settled: true,
+              typing: {},
+              quiet_room_ids: [],
+              badge_defaults: { direct: 'all', group: 'mentions' },
+              badges: shownBadges(),
+              space_unread: {},
+            }
+          : { items: readSidebar(), loaded: true };
+    const publish = (slice: string, ops: unknown[], key = ''): void => {
+      const events = [...runtimeSubs.entries()]
+        .filter(([, held]) => held.slice === slice && held.key === key)
+        .map(([sub, held]) => ({ type: 'patch', sub, rev: ++held.rev, epoch: 0, ops }));
+      if (events.length > 0) runtimePort?.postMessage({ batch: { tick: ++runtimeTick, events } });
+    };
+    window.__e2eTimelineBridge = {
+      publish: (key, doc) => {
+        // Only what changed goes out, as the runtime does, so an unchanged part keeps its identity.
+        const events: unknown[] = [];
+        for (const [sub, held] of runtimeSubs) {
+          if (held.slice !== 'timeline' || held.key !== key) continue;
+          const shown = windowedDoc(doc, held.window);
+          const sent = (held.sent ??= {});
+          const ops: unknown[] = [];
+          for (const [field, value] of Object.entries(shown)) {
+            const json = JSON.stringify(value);
+            if (sent[field] === json) continue;
+            sent[field] = json;
+            ops.push({ op: 'fields', fields: { [field]: value } });
+          }
+          if (ops.length > 0) events.push({ type: 'patch', sub, rev: ++held.rev, epoch: 0, ops });
+        }
+        if (events.length > 0) runtimePort?.postMessage({ batch: { tick: ++runtimeTick, events } });
+      },
+      call: (method, params) =>
+        new Promise((resolve, reject) => {
+          const port = activePort ?? knownPort;
+          commandLog.push(method);
+          calls.push({ method, params });
+          const handler = (
+            rpcHandlers as Record<
+              string,
+              ((params: unknown, port: FakePort) => unknown) | undefined
+            >
+          )[method];
+          let outcome: { ok: unknown } | { err: FakeCoreError };
+          try {
+            outcome = { ok: handler && port ? handler(params, port) : null };
+          } catch (error) {
+            if (!(error instanceof FakeCoreError)) throw error;
+            outcome = { err: error };
+          }
+          if ('ok' in outcome && outcome.ok === NO_REPLY) return;
+          window.setTimeout(
+            () => {
+              if ('err' in outcome) {
+                reject(outcome.err);
+                return;
+              }
+              resolve(outcome.ok);
+              if (method === 'timeline.subscribe') {
+                port?.subscribed(
+                  (outcome.ok as RpcResult<Rpc['timeline']['subscribe']>).subscription
+                );
+              }
+            },
+            replyDelay(method, params)
+          );
+        }),
+    };
+    const serveRuntime = (port: MessagePort): void => {
+      runtimePort = port;
+      const snapshot = (sub: number) => {
+        const held = runtimeSubs.get(sub);
+        let state = sliceState(held?.slice ?? '', held?.key ?? '');
+        if (held?.slice === 'timeline') {
+          const shown = windowedDoc(state as TimelineDocView, held.window);
+          held.sent = partsOf(shown);
+          state = shown;
+        }
+        return { rev: held?.rev ?? 0, epoch: 0, state };
+      };
+      const api = {
+        handshake: () => ({
+          schema: window.__e2eWireSchema,
+          slices: ['rooms', 'sidebar', 'timeline'],
+        }),
+        subscribe: (request: {
+          slice: string;
+          key?: unknown;
+          window?: { start: number; end: number } | null;
+        }) => {
+          const sub = nextRuntimeSub++;
+          runtimeSubs.set(sub, {
+            slice: request.slice,
+            key: request.slice === 'timeline' ? JSON.stringify(request.key) : '',
+            rev: 0,
+            window: request.window ?? null,
+          });
+          return new Promise<{ sub: number; snapshot: unknown }>((resolve) => {
+            const subscribed = (): void => {
+              resolve({ sub, snapshot: snapshot(sub) });
+            };
+            if (request.slice === 'rooms' && window.__e2eHoldRooms) {
+              window.__e2eReleaseRooms = subscribed;
+            } else subscribed();
+          });
+        },
+        unsubscribe: (sub: number) => {
+          runtimeSubs.delete(sub);
+        },
+        resync: (sub: number) => snapshot(sub),
+        range: (sub: number, nextWindow: { start: number; end: number } | null) => {
+          const held = runtimeSubs.get(sub);
+          if (held) held.window = nextWindow;
+          return snapshot(sub);
+        },
+        request: (target: { slice: string; key?: unknown }, action: unknown) => {
+          const req = ++nextRuntimeRequest;
+          const reply = (outcome: unknown): void => {
+            port.postMessage({
+              batch: { tick: ++runtimeTick, events: [{ type: 'reply', req, epoch: 0, outcome }] },
+            });
+          };
+          void window.__e2eTimeline.act(JSON.stringify(target.key), action).then(
+            (value) => {
+              reply({ status: 'ok', value });
+            },
+            () => {
+              reply({
+                status: 'error',
+                error: { kind: 'rpc', error: { code: 'failed', log_id: 'e2e' } },
+              });
+            }
+          );
+          return req;
+        },
+        dispatch: (target: { slice: string; key?: unknown }, action: unknown) => {
+          if (target.slice === 'timeline') {
+            void window.__e2eTimeline.act(JSON.stringify(target.key), action);
+          }
+          const sidebarAction = action as { type?: string; items?: SidebarItemView[] };
+          if (target.slice === 'sidebar' && sidebarAction.type === 'write') {
+            sessionStorage.setItem(SIDEBAR_KEY, JSON.stringify(sidebarAction.items));
+            publish('sidebar', [{ op: 'replace', path: '/items', value: sidebarAction.items }]);
+          }
+        },
+      };
+      type ComlinkArgument = { value: unknown };
+      type ComlinkRequest = {
+        id: string;
+        type: string;
+        path?: string[];
+        argumentList?: ComlinkArgument[];
+      };
+      type ComlinkWire =
+        | { type: 'RAW'; value: unknown }
+        | {
+            type: 'HANDLER';
+            name: 'throw';
+            value: {
+              isError: true;
+              value: { message: string; name: string; stack?: string };
+            };
+          };
+      port.onmessage = ({ data }: MessageEvent<ComlinkRequest>) => {
+        const path = data.path ?? [];
+        const parent = path.slice(0, -1).reduce<unknown>((value, field) => {
+          return (value as Record<string, unknown>)[field];
+        }, api);
+        const value = path.reduce<unknown>((current, field) => {
+          return (current as Record<string, unknown>)[field];
+        }, api);
+        const args = (data.argumentList ?? []).map((argument) => argument.value);
+        const reply = (wire: ComlinkWire): void => {
+          port.postMessage({ id: data.id, ...wire });
+        };
+        const error = (cause: unknown): void => {
+          const exception = cause instanceof Error ? cause : new Error(String(cause));
+          reply({
+            type: 'HANDLER',
+            name: 'throw',
+            value: {
+              isError: true,
+              value: { message: exception.message, name: exception.name, stack: exception.stack },
+            },
+          });
+        };
+        try {
+          if (data.type === 'GET') {
+            reply({ type: 'RAW', value });
+          } else if (data.type === 'APPLY') {
+            Promise.resolve((value as (...values: unknown[]) => unknown).apply(parent, args)).then(
+              (result) => {
+                reply({ type: 'RAW', value: result });
+              },
+              error
+            );
+          } else if (data.type === 'RELEASE') {
+            reply({ type: 'RAW', value: undefined });
+          }
+        } catch (cause) {
+          error(cause);
+        }
+      };
+      port.start();
+    };
+
     class FakePort {
       onmessage: ((event: MessageEvent) => void) | null = null;
       onmessageerror: ((event: MessageEvent) => void) | null = null;
@@ -1727,20 +2014,28 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
 
       close(): void {}
 
-      emit(event: CoreEvent): void {
+      emit(event: FakeEvent): void {
+        window.__e2eTimeline.onCoreEvent(event as CoreEvent);
         this.onmessage?.({ data: { events: [event] } } as MessageEvent);
       }
 
-      postMessage(request: {
-        id: number;
-        call?: { method: string; params: unknown };
-        media?: { source: string; width: number; height: number };
-        forget?: { source: string };
-        reset?: true;
-        runtime?: true;
-        disconnect?: true;
-      }): void {
-        if (request.runtime || request.disconnect) return;
+      postMessage(
+        request: {
+          id: number;
+          call?: { method: string; params: unknown };
+          media?: { source: string; width: number; height: number };
+          forget?: { source: string };
+          reset?: true;
+          runtime?: true;
+          disconnect?: true;
+        },
+        transfer: Transferable[] = []
+      ): void {
+        if (request.runtime) {
+          serveRuntime(transfer[0] as MessagePort);
+          return;
+        }
+        if (request.disconnect) return;
         this.claim?.();
         if (request.reset) {
           window.setTimeout(() => {
@@ -1819,12 +2114,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             subscription,
             diffs: [
               {
-                Set: {
-                  index: 19,
-                  value: {
-                    ...last,
-                    content: messageContent(`Delayed layout event ${'wraps '.repeat(80)}`),
-                  },
+                op: 'set',
+                index: 19,
+                value: {
+                  ...last,
+                  content: messageContent(`Delayed layout event ${'wraps '.repeat(80)}`),
                 },
               },
             ],
@@ -1833,52 +2127,21 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       }
     }
 
-    function normalizeTestDiff(diff: unknown): unknown {
-      if (typeof diff !== 'object' || diff === null || !('op' in diff)) return diff;
-      const legacy = diff as Record<string, unknown>;
-      switch (legacy.op) {
-        case 'append':
-          return { Append: { values: legacy.values } };
-        case 'clear':
-          return { Clear: {} };
-        case 'push_front':
-          return { PushFront: { value: legacy.value } };
-        case 'push_back':
-          return { PushBack: { value: legacy.value } };
-        case 'pop_front':
-          return { PopFront: {} };
-        case 'pop_back':
-          return { PopBack: {} };
-        case 'insert':
-          return { Insert: { index: legacy.index, value: legacy.value } };
-        case 'set':
-          return { Set: { index: legacy.index, value: legacy.value } };
-        case 'remove':
-          return { Remove: { index: legacy.index } };
-        case 'truncate':
-          return { Truncate: { length: legacy.length } };
-        case 'reset':
-          return { Reset: { values: legacy.values } };
-        default:
-          return diff;
-      }
-    }
-
-    function normalizeTestEvent(event: unknown): unknown {
-      if (typeof event !== 'object' || event === null || !('type' in event)) return event;
-      const value = event as { type?: unknown; diffs?: unknown[] };
-      return value.type === 'timeline_diff' && Array.isArray(value.diffs)
-        ? { ...value, diffs: value.diffs.map(normalizeTestDiff) }
-        : event;
-    }
-
     Object.defineProperty(window, '__e2eEmitTimelineEvent', {
       configurable: true,
-      value: (event: unknown) => activePort?.emit(normalizeTestEvent(event) as CoreEvent),
+      value: (event: unknown) => {
+        const emitted = event as CoreEvent;
+        if (emitted.type === 'typing') {
+          if (emitted.user_ids.length > 0) typing[emitted.room_id] = emitted.user_ids;
+          else Reflect.deleteProperty(typing, emitted.room_id);
+          publish('rooms', [{ op: 'fields', fields: { typing: { ...typing } } }]);
+        }
+        (activePort ?? knownPort)?.emit(emitted as FakeEvent);
+      },
     });
     function receiveMessage(body: string, own = false): void {
       const id = `live-arrival-${arrivals.length}`;
-      const item: TimelineItemView = {
+      const item: ResolvedItem = {
         ...timelineItems('General')[0],
         id,
         event_id: own ? null : `$${id}:example.test`,
@@ -1890,10 +2153,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       arrivals.push(item);
       for (const [subscription, state] of subscriptions) {
         if (state.roomId === room.room_id && state.live) {
-          activePort?.emit({
+          (activePort ?? knownPort)?.emit({
             type: 'timeline_diff',
             subscription,
-            diffs: [{ PushBack: { value: item } }],
+            diffs: [{ op: 'push_back', value: item }],
           });
         }
       }
@@ -1904,18 +2167,20 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     });
     Object.defineProperty(window, '__e2eRefreshRoom', {
       configurable: true,
-      value: () =>
-        activePort?.emit({
-          type: 'room_list_diff',
-          subscription: 1,
-          diffs: [{ Set: { index: 0, value: summary({ ...room, unread: room.unread + 1 }) } }],
-        }),
+      value: () => {
+        joinedRooms[0] = summary({ ...room, unread: room.unread + 1 });
+        publish('rooms', [
+          { op: 'list', path: '/items', diffs: [{ op: 'set', index: 0, value: joinedRooms[0] }] },
+          { op: 'fields', fields: { badges: shownBadges() } },
+        ]);
+      },
     });
 
     class FakeSharedWorker {
       port = new FakePort();
 
       constructor() {
+        knownPort = this.port;
         this.port.claim = () => {
           activePort = this.port;
         };

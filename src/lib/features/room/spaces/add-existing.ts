@@ -1,6 +1,6 @@
-import type { RoomListItemView } from '#src/generated/protocol';
+import type { DirectoryRoomType, RoomListItemView } from '#src/generated/protocol';
 
-export type AddExistingKind = 'rooms' | 'spaces';
+export type AddExistingKind = DirectoryRoomType;
 
 export function addableChildren(
   rooms: readonly RoomListItemView[],

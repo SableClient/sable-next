@@ -1,19 +1,7 @@
-import type { CreateJoinRuleView, RoomKind, Rpc } from '#src/generated/protocol';
+import type { Rpc, RpcParams } from '#src/generated/protocol';
 
-export type CreateRoomOptions = {
-  name?: string | null;
-  topic?: string | null;
-  kind?: RoomKind;
-  public?: boolean;
-  encrypted?: boolean;
-  invite?: string[];
-  parentSpace?: string | null;
-  alias?: string | null;
-  roomVersion?: string | null;
-  joinRule?: CreateJoinRuleView | null;
-  federate?: boolean;
-  predecessor?: string | null;
-};
+type CreateParams = RpcParams<Rpc['rooms']['create']>;
+export type CreateRoomOptions = Partial<Omit<CreateParams, 'room_id'>>;
 
 export function createRoom(rpc: Pick<Rpc, 'rooms'>, options: CreateRoomOptions): Promise<string> {
   return rpc.rooms.create({
@@ -23,10 +11,10 @@ export function createRoom(rpc: Pick<Rpc, 'rooms'>, options: CreateRoomOptions):
     public: options.public ?? false,
     encrypted: options.encrypted ?? true,
     invite: [...(options.invite ?? [])],
-    parent_space: options.parentSpace ?? null,
+    parent_space: options.parent_space ?? null,
     alias: options.alias ?? null,
-    room_version: options.roomVersion ?? null,
-    join_rule: options.joinRule ?? null,
+    room_version: options.room_version ?? null,
+    join_rule: options.join_rule ?? null,
     federate: options.federate ?? true,
     predecessor: options.predecessor ?? null,
   });

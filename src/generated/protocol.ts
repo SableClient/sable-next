@@ -52,6 +52,13 @@ export type AvatarEditView = { kind: "keep" } | { kind: "clear" } | { kind: "url
 /**  Encrypted in the webview with the account data key in hand. */
 { kind: "encrypted"; file: unknown };
 
+export type BadgeDefaults = {
+	direct: BadgeNotificationMode,
+	group: BadgeNotificationMode,
+};
+
+export type BadgeNotificationMode = "all" | "mentions" | "quiet";
+
 /**  Apply its events together, in order, before the UI draws. */
 export type Batch = {
 	tick: number,
@@ -191,6 +198,11 @@ export type CallSupportView = {
 	can_join: boolean,
 };
 
+export type ChildOrderOverride = {
+	parent_id: string,
+	children: SpaceChildEdge[],
+};
+
 export type ComposerContent = {
 	body: string,
 	formatted_body: string | null,
@@ -220,7 +232,7 @@ export type CoreEvent = ({ type: "account_lock_changed"; account_id: string; loc
 	type: "sync_status",
 } & SyncStatus | ({ type: "session_ended"; reason: string }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; diffs?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; subscription?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "session_tokens_refreshed" }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; diffs?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; subscription?: never; total?: never; user_id?: never; user_ids?: never } |
 /**  One batch is one render, so it stays batched all the way to the UI. */
-({ type: "room_list_diff"; subscription: SubscriptionId; diffs: VectorDiffWire<RoomListItemView>[] }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "timeline_diff"; subscription: SubscriptionId; diffs: VectorDiffWire<TimelineItemView>[] }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "timeline_pagination"; subscription: SubscriptionId; loading: boolean; reached_start: boolean }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; diffs?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "timeline_aggregations"; subscription: SubscriptionId; items: TimelineItemView[] }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; diffs?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } |
+({ type: "room_list_diff"; subscription: SubscriptionId; diffs: VectorDiffWire<RoomListItemView>[] }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "timeline_diff"; subscription: SubscriptionId; key?: TimelineKey; diffs: VectorDiffWire<TimelineItemView>[] }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "timeline_pagination"; subscription: SubscriptionId; loading: boolean; reached_start: boolean }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; diffs?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; items?: never; key?: never; key_index?: never; last_active_ago?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } | ({ type: "timeline_aggregations"; subscription: SubscriptionId; items: TimelineItemView[] }) & { account_id?: never; avatar_url?: never; backend_id?: never; backends?: never; coverage?: never; current?: never; devices?: never; diffs?: never; display_name?: never; download?: never; encrypted?: never; event?: never; event_type?: never; expires_at_ms?: never; fatal?: never; flow_id?: never; grant?: never; has_video?: never; identity?: never; key?: never; key_index?: never; last_active_ago?: never; loading?: never; locked?: never; members?: never; notification?: never; notification_event_id?: never; own?: never; presence?: never; progress?: never; publisher_id?: never; reached_start?: never; reason?: never; revision?: never; ring?: never; room_id?: never; room_name?: never; sender?: never; sender_name?: never; session?: never; source?: never; stage?: never; state?: never; status?: never; status_message?: never; total?: never; user_id?: never; user_ids?: never } |
 /**
  *  Our own user excluded. Absolute, so an empty list replaces the previous
  *  one. Sent for every joined room, since a room list row shows it too.
@@ -273,6 +285,8 @@ export type DisplayNameChangeView = {
 	old: string | null,
 	new: string | null,
 };
+
+export type DropInstruction = "above" | "below" | "into";
 
 export type EditVersionView = {
 	event_id: string,
@@ -537,6 +551,12 @@ export type LatestEventView = {
 	event_id: string | null,
 };
 
+/**
+ *  What a drag picked up or landed on: a space, possibly inside a folder, or a
+ *  whole folder.
+ */
+export type LayoutRef = { kind: "space"; room_id: string; folder_id: string | null } | { kind: "folder"; folder_id: string };
+
 export type LiteralValue = boolean | number | string | RoomReference;
 
 export type LobbyAction = "join" | "knock";
@@ -647,6 +667,8 @@ export type NDay = {
 	nth: number | null,
 };
 
+export type NoNotice = never;
+
 export type NotificationModeView = "all" | "mentions" | "mute";
 
 export type NotificationSettingsView = {
@@ -699,6 +721,11 @@ export type OverrideColorView = { kind: "unset" } | { kind: "cleared" } | { kind
  */
 export type OverrideTextView = { kind: "unset" } | { kind: "cleared" } | { kind: "set"; value: string };
 
+export type OwnPresence = {
+	presence: string,
+	last_active_ago: number,
+};
+
 export type PackAddressView = {
 	room_id: string,
 	state_key: string,
@@ -742,6 +769,8 @@ export type PackTargetView = { kind: "room"; room_id: string; state_key: string 
 { kind: "account" };
 
 export type PaginationDirection = "backward" | "forward";
+
+export type PaginationStateView = "idle" | "loading" | "end";
 
 export type ParameterSchema = { schema_type: "primitive"; type: PrimitiveType } | { schema_type: "literal"; value: LiteralValue } | { schema_type: "union"; variants: ScalarSchema[] } | { schema_type: "array"; items: ItemSchema };
 
@@ -1296,6 +1325,29 @@ export type RoomVersionsView = {
 	available: RoomVersionView[],
 };
 
+export type RoomsAction = { type: "set_preferences"; quiet_targets: string[]; badge_defaults: BadgeDefaults } | { type: "warm"; room_id: string };
+
+export type RoomsStatus = {
+	/**  False until the rows come from the server rather than a saved copy. */
+	settled: boolean,
+	typing: { [key in string]: string[] },
+	quiet_room_ids: string[],
+	badge_defaults: BadgeDefaults,
+	badges: { [key in string]: UnreadCountView },
+	space_unread: { [key in string]: UnreadCountView },
+};
+
+export type RoomsView = {
+	total: number,
+	items: RoomListItemView[],
+	settled: boolean,
+	typing: { [key in string]: string[] },
+	quiet_room_ids: string[],
+	badge_defaults: BadgeDefaults,
+	badges: { [key in string]: UnreadCountView },
+	space_unread: { [key in string]: UnreadCountView },
+};
+
 /**
  *  Stable serialized codes. Source chains, inputs and bodies stay native-side
  *  and are logged there, so nothing leaks across the wire. The last four words
@@ -1503,6 +1555,18 @@ export type SearchTuning = {
 	max_events: number,
 };
 
+/**
+ *  What the sections depend on besides the rooms. `loaded: None` treats every
+ *  level as described; `keep_empty` names subspaces shown even without rooms.
+ */
+export type SectionInputs = {
+	loaded: string[] | null,
+	failed: string[],
+	keep_empty: string[],
+	joined: string[],
+	invited: string[],
+};
+
 export type SendAttachmentRequest = {
 	room_id: string,
 	filename: string,
@@ -1553,7 +1617,18 @@ export type SessionInfo = {
 
 export type ShareHistoryView = "shared" | "unencrypted" | "no_cross_signing" | "history_not_shared";
 
+export type SidebarAction = { type: "write"; items: SidebarItemView[] };
+
 export type SidebarItemView = { kind: "space"; room_id: string } | { kind: "folder"; id: string; name: string | null; content: string[] };
+
+export type SidebarNotice =
+/**  A layout was refused and the server is being reloaded. */
+{ type: "save_failed" };
+
+export type SidebarView = {
+	items: SidebarItemView[],
+	loaded: boolean,
+};
 
 export type SignOutSafetyView = {
 	encryption: EncryptionStatusView,
@@ -1653,6 +1728,12 @@ export type Subscribed = {
 
 export type SubscriptionId = number;
 
+export type SuggestedOverride = {
+	parent_id: string,
+	room_id: string,
+	suggested: boolean,
+};
+
 export type SyncStatus = { state: "offline" } | { state: "syncing" } | { state: "live" } | { state: "error"; message: string };
 
 export type Target = {
@@ -1688,7 +1769,99 @@ export type ThreadSummaryView = {
 	latest_fallback: ReplyFallbackView | null,
 };
 
+export type TimelineAction =
+/**  How the timeline is shown. Takes effect at once, in any state. */
+{ type: "configure"; filters: TimelineFiltersView; reply_style: TimelineReplyStyleView; read_only: boolean;
+/**  The reader's offset from UTC in minutes, to find where their days begin. */
+utc_offset_minutes: number;
+/**  The thread whose root and first reply are never collapsed. */
+thread_root: string | null } |
+/**  Answers once the timeline is open. A failure is `status.error`, not an error reply. */
+{ type: "open"; target: TimelineModeView; hidden_events: boolean;
+/**  Open at the read marker. */
+unread: boolean;
+/**  The room has messages the reader has not read, so the tracker starts active. */
+has_unread: boolean;
+/**  Where to land: the live timeline when the event is loaded, its context when not. */
+landing: string | null } |
+/**  Answers when the live timeline is back, or with an error when it cannot be. */
+{ type: "resume_live" } |
+/**  Releases the core's subscription and empties the timeline. */
+{ type: "stop" } |
+/**  The view that held the timeline has gone: forget what only it knew. */
+{ type: "release" } |
+/**  Starts tracking where the reader stopped. Answers once the read marker is known. */
+{ type: "initialize_unread"; has_unread: boolean } |
+/**  The first row in view is the first unread one. */
+{ type: "observe_unread"; first_visible: string | null } |
+/**
+ *  What the window shows. Arrivals while it is unfocused start an unread
+ *  boundary, and showing the newest row while focused reaches the end of
+ *  the unread messages.
+ */
+{ type: "viewing"; focused: boolean; newest: string | null } |
+/**
+ *  A read receipt was sent up to this event. At the newest event, the unread
+ *  boundary is dismissed.
+ */
+{ type: "read"; event_id: string } |
+/**
+ *  Whether the room has messages the reader has not read, as the room list
+ *  says. Reading them elsewhere dismisses the unread boundary.
+ */
+{ type: "room_unread"; has_unread: boolean; keep_boundary?: boolean } | { type: "clear_unread" } |
+/**  Answers with whether the end was reached. */
+{ type: "paginate"; direction: PaginationDirection; count: number };
+
+/**
+ *  What a subscription to a timeline holds, for the generated types: the
+ *  document is built part by part and never serialized through this type.
+ */
+export type TimelineDocView = {
+	total: number,
+	/**  The rows to draw. A subscription's window moves over this list. */
+	items: TimelineRowView[],
+	status: TimelineStatus,
+	aggregations: TimelineListView<TimelineItemView>,
+	events?: TimelineListView<TimelineItemView>,
+};
+
+/**  Which events the reader has chosen not to see. */
+export type TimelineFiltersView = {
+	hide_membership_events: boolean,
+	hide_profile_changes: boolean,
+	hide_topic_changes: boolean,
+	hide_member_in_read_only: boolean,
+	show_tombstone_events: boolean,
+	show_hidden_events: boolean,
+	hidden_event_edits: boolean,
+	hidden_event_reactions: boolean,
+	hidden_event_redactions: boolean,
+	hidden_event_other: boolean,
+};
+
 export type TimelineFocusView = { kind: "live" } | { kind: "event"; event_id: string } | { kind: "thread"; root_event_id: string };
+
+/**  Only the facts a preview needs; message bodies and media stay in the shell. */
+export type TimelineGroupInput = {
+	row: TimelineRowKind,
+	sender: string | null,
+	timestamp: number | null,
+	reply: boolean,
+	profile: TimelineGroupProfile | null,
+};
+
+/**  A group member with its item by value, for the generated types. */
+export type TimelineGroupMemberView = {
+	reply_target: boolean,
+	item: TimelineItemView,
+};
+
+export type TimelineGroupProfile = {
+	id: string | null,
+	display_name: string | null,
+	avatar_url: string | null,
+};
 
 export type TimelineItemContentView = { kind: "message";
 /**  Plain text, for previews and notifications. */
@@ -1696,12 +1869,12 @@ body: string;
 /**  Sanitised display HTML, safe to inject as-is. */
 html: string;
 /**  `m.emote`, which reads as an action by the sender rather than speech. */
-emote: boolean; notice: boolean; edited: boolean;
+emote?: boolean; notice?: boolean; edited?: boolean;
 /**
  *  Drawn larger, 1 to 4, when the message is nothing but emoji or
  *  inline emotes.
  */
-jumbo: number | null } | { kind: "image"; filename: string; caption: string | null;
+jumbo?: number } | { kind: "image"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
 html: string | null; source: string; mime: string | null; width: number | null; height: number | null; size: number | null; blurhash: string | null; thumbnail: string | null; spoiler: string | null; animated: boolean | null } | { kind: "video"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
@@ -1775,47 +1948,67 @@ export type TimelineItemView = {
 	id: string,
 	row: TimelineRowKind,
 	/**  Content another room can receive as it is. */
-	forwardable: boolean,
+	forwardable?: boolean,
 	/**
 	 *  Whether the event can be redacted at all; the room's power levels
 	 *  decide whether the reader may.
 	 */
-	redactable: boolean,
-	visibility: TimelineVisibility,
+	redactable?: boolean,
+	visibility?: TimelineVisibility,
 	/**  Absent while the event is still a local echo. */
-	event_id: string | null,
+	event_id?: string,
 	/**  A local echo's only handle, since it has no event id yet. */
-	transaction_id: string | null,
-	send_state: SendStateView | null,
+	transaction_id?: string,
+	send_state?: SendStateView,
 	/**  Dividers and markers have no sender. */
-	sender: string | null,
-	sender_name: string | null,
-	sender_avatar: string | null,
+	sender?: string,
+	sender_name?: string,
+	sender_avatar?: string,
 	timestamp: number,
 	content: TimelineItemContentView,
-	in_reply_to: ReplyView | null,
+	in_reply_to?: ReplyView,
 	/**
 	 *  Set on the root and on every reply, so a UI with no thread view can hide
 	 *  the replies.
 	 */
-	thread_root: string | null,
-	thread_summary: ThreadSummaryView | null,
-	reactions: ReactionGroup[],
-	is_own: boolean,
+	thread_root?: string,
+	thread_summary?: ThreadSummaryView,
+	reactions?: ReactionGroup[],
+	is_own?: boolean,
 	/**  Already reduced by the SDK to one receipt per user. */
-	read_by: string[],
+	read_by?: string[],
 	/**  Available receipt timestamps in milliseconds since the Unix epoch. */
-	read_timestamps: { [key in string]: number },
+	read_timestamps?: { [key in string]: number },
 	/**
 	 *  MSC4144. When set, this is the identity to show as the sender; `sender`
 	 *  stays the account that actually sent it and must remain reachable.
 	 */
-	per_message_profile: PerMessageProfileView | null,
-	bundled_link_previews: UrlPreviewView[],
-	link_previews_removed: boolean | null,
-	mention: MentionView,
-	forwarded: ForwardedView | null,
-	forum_title: string | null,
+	per_message_profile?: PerMessageProfileView,
+	bundled_link_previews?: UrlPreviewView[],
+	link_previews_removed?: boolean,
+	mention?: MentionView,
+	forwarded?: ForwardedView,
+	forum_title?: string,
+};
+
+export type TimelineKey = {
+	room_id: string,
+	view: string,
+};
+
+/**  A list as the document serves it. */
+export type TimelineListView<T> = {
+	total: number,
+	items: T[],
+};
+
+export type TimelineMemberCategoryView = "joined" | "left" | "invited" | "invitation_rejected" | "knocked" | "knock_retracted" | "other" | "name" | "avatar";
+
+export type TimelineModeView = { kind: "live" } | { kind: "unread"; event_id: string } | { kind: "focused"; event_id: string } | { kind: "thread"; root_event_id: string };
+
+/**  What a request to paginate answers with. */
+export type TimelinePaginated = {
+	reached_end: boolean,
 };
 
 export type TimelineReadDiagnostics = {
@@ -1825,11 +2018,77 @@ export type TimelineReadDiagnostics = {
 	receipt_event_id: string | null,
 };
 
+/**  The readers of a row and when each read it. */
+export type TimelineReceiptsView = {
+	readers: string[],
+	timestamps?: { [key in string]: number },
+};
+
+export type TimelineReplyStyleView = "connected" | "compact" | "expanded";
+
 /**
  *  How a timeline row is drawn: a message carries a sender, a hover menu and
  *  reactions; an event is a one-line notice; an annotation is a divider.
  */
 export type TimelineRowKind = "message" | "event" | "annotation";
+
+/**  A row with its items by value, for the generated types. */
+export type TimelineRowView = {
+	key: string,
+	reply_target: boolean,
+	item: TimelineItemView,
+	group?: TimelineGroupMemberView[],
+	segments?: TimelineSegmentView[],
+	collapsed?: boolean,
+	group_start?: boolean,
+	unread_count?: number,
+	later_receipts?: TimelineReceiptsView,
+};
+
+/**  Who went through one kind of membership change in a run of them. */
+export type TimelineSegmentView = {
+	category: TimelineMemberCategoryView,
+	users: TimelineSubjectView[],
+};
+
+/**  Everything about a timeline that is not a list. */
+export type TimelineStatus = {
+	mode: TimelineModeView,
+	loading: boolean,
+	resuming_live: boolean,
+	has_snapshot: boolean,
+	forward_pagination: PaginationStateView,
+	backward_pagination: PaginationStateView,
+	/**  `load_failed` when the last open or pagination failed. */
+	error: string | null,
+	/**  The core's subscription, which a call that needs it names. */
+	subscription: SubscriptionId | null,
+	can_resume_live: boolean,
+	/**  The newest events are in the list. */
+	reaches_latest: boolean,
+	latest_event_id: string | null,
+	/**  Items the core holds, before the reader's filters leave rows of them. */
+	item_count: number,
+	unread: TimelineUnreadView,
+};
+
+export type TimelineSubjectView = {
+	user_id: string,
+	name: string,
+};
+
+export type TimelineUnreadView = {
+	initialized: boolean,
+	loading: boolean,
+	active: boolean,
+	first_event_id: string | null,
+	read_event_id: string | null,
+	failed: boolean,
+	/**  Messages from the first unread one on that the reader can see. */
+	count: number,
+	/**  The timeline should not be drawn yet. */
+	blocking: boolean,
+};
 
 /**  Which reader preference can hide a row; `always` rows are always shown. */
 export type TimelineVisibility = "always" | "membership" |
@@ -1843,6 +2102,13 @@ export type TurnServerView = {
 	password: string,
 	uris: string[],
 	ttl_ms: number,
+};
+
+export type UnreadCountView = {
+	unread: number,
+	highlight: number,
+	marked: boolean,
+	notifying: number,
 };
 
 export type UnreadDiagnosticsView = {
@@ -3159,6 +3425,7 @@ export type Rpc = {
 }>;
     subscribe: (params: {
 	room_id: string,
+	key?: TimelineKey | null,
 	focus?: TimelineFocusView,
 	/**
 	 *  Relaxes the event filter so events the SDK would otherwise drop
@@ -3622,6 +3889,13 @@ export type RpcMethods = {
 
 export type RpcCall = (method: keyof RpcMethods, params: unknown) => Promise<unknown>;
 
+/** What each slice of the runtime serves and accepts, and what it tells besides its view. */
+export interface Slices {
+  timeline: { key: TimelineKey; view: TimelineDocView; action: TimelineAction; notice: NoNotice };
+  rooms: { key: null; view: RoomsView; action: RoomsAction; notice: NoNotice };
+  sidebar: { key: null; view: SidebarView; action: SidebarAction; notice: SidebarNotice };
+}
+
 /** Binds every method to `call` on its wire name. */
 export function createRpc(call: RpcCall): Rpc {
   return {
@@ -3962,4 +4236,4 @@ export function createRpc(call: RpcCall): Rpc {
 }
 
 
-export const WIRE_SCHEMA = 'f3d9ab5374809f1f';
+export const WIRE_SCHEMA = '5f83e26b003eae1e';

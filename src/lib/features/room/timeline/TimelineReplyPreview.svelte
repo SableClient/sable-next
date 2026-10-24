@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpRightIcon';
 
   import type {
@@ -6,7 +7,6 @@
     PerMessageProfileView,
     ProfileView,
     ReplyView,
-    TimelineItemView,
   } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
@@ -21,7 +21,7 @@
 
   interface Props {
     reply: ReplyView;
-    target: TimelineItemView | null;
+    target: ResolvedItem | null;
     sender: string | null;
     persona: PerMessageProfileView | null;
     profile: ProfileView | null;

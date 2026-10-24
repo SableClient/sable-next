@@ -8,6 +8,7 @@ use sable_runtime::{
     AppEvent, Batch, Cmd, Cx, Doc, Handshake, Interest, Lifetime, Outcome, Registry, Slice,
     Snapshot, Subscribed, WIRE_SCHEMA, testing::TestApp,
 };
+use sable_slices::rpc::spaces::SpaceSidebar;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -79,6 +80,61 @@ fn runtime() -> tokio::runtime::Runtime {
         .unwrap()
 }
 
+#[test]
+fn events_queued_before_an_account_switch_do_not_reach_the_new_account() {
+    let runtime = runtime();
+    let harness = TestApp::new(sable_slices::register(Registry::new()).unwrap());
+    harness.backend.expect::<SpaceSidebar>().returns(Vec::new());
+    let ffi = Ffi::new(harness.app.clone(), runtime.handle().clone());
+    let gate = AccountGate::default();
+    gate.attach(ffi.clone());
+
+    let first: Subscribed =
+        json(&block(ffi.subscribe(r#"{"slice":"sidebar","key":null}"#)).unwrap());
+    runtime.block_on(harness.settle());
+
+    let serving = runtime.block_on(gate.serving());
+    let switch = runtime.spawn({
+        let gate = gate.clone();
+        async move {
+            gate.run(
+                "session.switch_account",
+                async { Ok::<_, ()>(r#"{"account_id":"account-b"}"#) },
+                || async { Ok::<_, ()>(r#"{"account_id":"account-a"}"#) },
+                |json| json,
+                || (),
+            )
+            .await
+            .unwrap();
+        }
+    });
+    runtime.block_on(async { tokio::task::yield_now().await });
+
+    let stale = runtime.spawn({
+        let gate = gate.clone();
+        async move {
+            gate.offer(&[CoreEvent::SpaceSidebarChanged {
+                items: vec![sable_protocol::SidebarItemView::Space {
+                    room_id: "!stale:example.org".to_owned(),
+                }],
+            }])
+            .await;
+        }
+    });
+    runtime.block_on(async { tokio::task::yield_now().await });
+    drop(serving);
+    runtime.block_on(switch).unwrap();
+    runtime.block_on(stale).unwrap();
+
+    let second: Subscribed =
+        json(&block(ffi.subscribe(r#"{"slice":"sidebar","key":null}"#)).unwrap());
+    runtime.block_on(harness.settle());
+    let view: sable_runtime::Snapshot = json(&block(ffi.resync(second.sub.0)).unwrap());
+
+    assert_eq!(first.snapshot.state["items"], json!([]));
+    assert_eq!(view.state["items"], json!([]));
+}
+
 fn block<F: std::future::Future>(future: F) -> F::Output {
     futures_executor::block_on(future)
 }
@@ -126,9 +182,7 @@ fn a_binding_on_its_own_thread_drives_the_whole_surface_without_a_runtime() {
     let ranged: Snapshot = json(&block(ffi.range(sub, "null")).unwrap());
     assert_eq!(ranged.state, json!({"count": 5}));
 
-    runtime
-        .block_on(ffi.offer(CoreEvent::InboxChanged))
-        .unwrap();
+    let _ = runtime.block_on(ffi.offer(&CoreEvent::InboxChanged));
     runtime.block_on(harness.settle());
     assert_eq!(
         json::<Snapshot>(&block(ffi.resync(sub)).unwrap()).state["count"],
@@ -522,4 +576,33 @@ mod account_disposal {
         changed.store(false, Ordering::SeqCst);
         app.shutdown().await;
     }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_gate_hands_core_events_to_the_runtime_once_it_is_attached() {
+    let mut registry = Registry::new();
+    registry.add::<Counter>().unwrap();
+    let harness = TestApp::new(registry);
+    let ffi = Ffi::new(harness.app.clone(), tokio::runtime::Handle::current());
+    let gate = AccountGate::default();
+    let subscribed: Subscribed = json(
+        &ffi.subscribe(r#"{"slice":"counter","key":null}"#)
+            .await
+            .unwrap(),
+    );
+
+    gate.offer(&[CoreEvent::InboxChanged]).await;
+    harness.settle().await;
+    let count = |snapshot: &str| json::<Snapshot>(snapshot).state["count"].clone();
+    assert_eq!(
+        count(&ffi.resync(subscribed.sub.0).await.unwrap()),
+        0,
+        "nothing is offered before the runtime is attached"
+    );
+
+    gate.attach(ffi.clone());
+    gate.offer(&[CoreEvent::InboxChanged, CoreEvent::SessionTokensRefreshed])
+        .await;
+    harness.settle().await;
+    assert_eq!(count(&ffi.resync(subscribed.sub.0).await.unwrap()), 100);
 }

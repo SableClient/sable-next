@@ -53,6 +53,7 @@ interface Unmeasured {
 
 interface PrefixEstimate<T> {
   items: readonly TimelineEntry<T>[];
+  leading: number;
   start: number;
   measured: number;
   unmeasured: Map<string, Unmeasured>;
@@ -72,7 +73,8 @@ const EPSILON = 0.5;
 
 export class TimelineWindow<T> {
   private items: readonly TimelineEntry<T>[] = [];
-  private pending: readonly TimelineEntry<T>[] | null = null;
+  private leading = 0;
+  private pending: { items: readonly TimelineEntry<T>[]; leading: number } | null = null;
   private rows: readonly TimelineRow<T>[] = [];
   private anchors: Anchor[] = [];
   private start = 0;
@@ -214,9 +216,14 @@ export class TimelineWindow<T> {
     });
   }
 
-  update(items: readonly TimelineEntry<T>[]): Promise<void> {
-    if (this.disposed || items === this.items || items === this.pending) return this.task;
-    this.pending = items;
+  update(items: readonly TimelineEntry<T>[], leading = 0): Promise<void> {
+    if (
+      this.disposed ||
+      (items === this.items && leading === this.leading) ||
+      (this.pending !== null && items === this.pending.items && leading === this.pending.leading)
+    )
+      return this.task;
+    this.pending = { items, leading };
     if (this.active) return this.task;
     return this.drain();
   }
@@ -230,7 +237,11 @@ export class TimelineWindow<T> {
     const cancelled = () => this.disposed || signal?.aborted === true;
     if (cancelled()) return false;
     if (key !== null) {
-      const index = (this.pending ?? this.items).findIndex((item) => item.key === key);
+      const pending = this.pending;
+      const pendingItems = pending?.items ?? this.items;
+      const pendingLeading = pending?.leading ?? this.leading;
+      const localIndex = pendingItems.findIndex((item) => item.key === key);
+      const index = localIndex < 0 ? -1 : pendingLeading + localIndex;
       if (index < 0) return false;
       if (
         !this.pending &&
@@ -247,9 +258,9 @@ export class TimelineWindow<T> {
     clearTimeout(this.timer);
     if (this.pending || this.rendering) await this.drain();
     if (version !== this.jumpVersion || cancelled()) return false;
-    const index =
-      key === null ? this.items.length - 1 : this.items.findIndex((item) => item.key === key);
-    if (key !== null && index < 0) return false;
+    const localIndex = key === null ? -1 : this.items.findIndex((item) => item.key === key);
+    const index = key === null ? this.totalLength() - 1 : this.leading + localIndex;
+    if (key !== null && localIndex < 0) return false;
     const previous = {
       start: this.start,
       end: this.end,
@@ -261,7 +272,7 @@ export class TimelineWindow<T> {
       if (smooth) leadIn = index >= this.end ? -1 : 1;
       await this.renderRange(
         Math.max(0, index - PAGE),
-        Math.min(this.items.length, index + PAGE + 1)
+        Math.min(this.totalLength(), index + PAGE + 1)
       );
     }
     if (version !== this.jumpVersion || cancelled()) {
@@ -336,15 +347,18 @@ export class TimelineWindow<T> {
 
   private async applyPending(): Promise<void> {
     while (this.pending && !this.active && !this.disposed) {
-      const next = this.pending;
+      const { items: next, leading } = this.pending;
       const protectedKeys = this.protectedKeys();
       this.pending = null;
       const firstKey = this.rows[0]?.key;
-      const first = firstKey ? next.findIndex((entry) => entry.key === firstKey) : -1;
+      const firstIndex = firstKey ? next.findIndex((entry) => entry.key === firstKey) : -1;
+      const first = firstIndex < 0 ? -1 : leading + firstIndex;
       const anchorIndex = this.anchors
         .map((anchor) => next.findIndex((entry) => entry.key === anchor.key))
         .find((index) => index >= 0);
+      const anchor = anchorIndex === undefined ? undefined : leading + anchorIndex;
       this.items = next;
+      this.leading = leading;
       const keys = new Set(next.map((entry) => entry.key));
       for (const [key, size] of this.sizes) {
         if (keys.has(key)) continue;
@@ -353,22 +367,22 @@ export class TimelineWindow<T> {
         this.countBucket(size.bucket, -size.height);
       }
       if (this.pinned || !this.ready || (first < 0 && anchorIndex === undefined)) {
-        const latest = Math.max(0, next.length - PAGE * 2);
+        const latest = Math.max(leading, this.totalLength() - PAGE * 2);
         this.start =
           this.pinned && this.ready && first === this.start ? Math.max(latest, first) : latest;
-        this.end = next.length;
+        this.end = this.totalLength();
       } else {
-        this.start = Math.max(0, anchorIndex !== undefined ? anchorIndex - PAGE : first);
+        this.start = Math.max(0, anchor !== undefined ? anchor - PAGE : first);
         this.end = Math.min(
-          next.length,
-          Math.max(this.start + PAGE * 2, (anchorIndex ?? first) + PAGE)
+          this.totalLength(),
+          Math.max(this.start + PAGE * 2, (anchor ?? first) + PAGE)
         );
       }
       for (const key of protectedKeys) {
         const index = next.findIndex((entry) => entry.key === key);
         if (index < 0) continue;
-        this.start = Math.min(this.start, index);
-        this.end = Math.max(this.end, index + 1);
+        this.start = Math.min(this.start, leading + index);
+        this.end = Math.max(this.end, leading + index + 1);
       }
       await this.renderRange(this.start, this.end);
       this.layout();
@@ -379,9 +393,11 @@ export class TimelineWindow<T> {
   private async renderRange(start: number, end: number): Promise<void> {
     this.start = start;
     this.end = end;
+    const localStart = Math.max(0, start - this.leading);
+    const localEnd = Math.min(this.items.length, end - this.leading);
     this.rows = this.items
-      .slice(start, end)
-      .map((entry, index) => ({ ...entry, index: start + index }));
+      .slice(localStart, localEnd)
+      .map((entry, index) => ({ ...entry, index: this.leading + localStart + index }));
     this.rowBuckets = new Map(this.rows.map((row) => [row.key, this.bucketOf(row.value)]));
     this.rendering = true;
     try {
@@ -504,14 +520,27 @@ export class TimelineWindow<T> {
 
   private estimatePrefix(): number {
     let cache = this.prefix;
-    if (cache === null || cache.items !== this.items) {
-      cache = { items: this.items, start: 0, measured: 0, unmeasured: new Map() };
+    if (cache === null || cache.items !== this.items || cache.leading !== this.leading) {
+      cache = {
+        items: this.items,
+        leading: this.leading,
+        start: 0,
+        measured: 0,
+        unmeasured: new Map(),
+      };
       this.prefix = cache;
     }
     if (cache.start !== this.start) {
       const from = Math.min(cache.start, this.start);
       const sign = this.start > cache.start ? 1 : -1;
-      for (const item of this.items.slice(from, Math.max(cache.start, this.start))) {
+      for (let index = from; index < Math.max(cache.start, this.start); index += 1) {
+        const item = this.items.at(index - this.leading);
+        if (item === undefined) {
+          const counted = cache.unmeasured.get('');
+          if (counted) counted.count += sign;
+          else cache.unmeasured.set('', { count: sign, hint: undefined });
+          continue;
+        }
         const size = this.sizes.get(item.key);
         if (size !== undefined) {
           cache.measured += sign * size.height;
@@ -544,7 +573,7 @@ export class TimelineWindow<T> {
     if (this.options.canFollowLatest?.() === false) return false;
     const viewport = this.options.viewport;
     return (
-      this.end === this.items.length &&
+      this.end === this.totalLength() &&
       (offset ?? viewport.scrollTop) >= viewport.scrollHeight - viewport.clientHeight - tolerance
     );
   }
@@ -580,7 +609,7 @@ export class TimelineWindow<T> {
       if (key && height > 0) this.setSize(key, height, this.rowBuckets.get(key) ?? '');
     }
     const contentFits =
-      this.start === 0 && this.end === this.items.length && contentHeight <= viewportHeight;
+      this.start === 0 && this.end === this.totalLength() && contentHeight <= viewportHeight;
     const reachedEnd =
       canFollowLatest &&
       (contentFits || (this.ready && viewportHeight > this.viewportHeight && this.atEnd(1)));
@@ -720,7 +749,7 @@ export class TimelineWindow<T> {
     const last = visible.at(-1)?.index;
     if (this.protectedKeys().length === 0 && first !== undefined && last !== undefined) {
       const start = Math.max(0, first - PAGE);
-      const end = Math.min(this.items.length, Math.max(start + PAGE * 2, last + PAGE + 1));
+      const end = Math.min(this.totalLength(), Math.max(start + PAGE * 2, last + PAGE + 1));
       if (start !== this.start || end !== this.end) await this.renderRange(start, end);
     }
     this.layout();
@@ -736,18 +765,23 @@ export class TimelineWindow<T> {
       let top = 0;
       let index = 0;
       const offset = this.options.viewport.scrollTop;
-      while (index < this.items.length - 1) {
-        const entry = this.items[index];
+      while (index < this.totalLength() - 1) {
+        const entry = this.items.at(index - this.leading);
         const size =
-          this.sizes.get(entry.key)?.height ??
-          this.estimatedSize(this.bucketOf(entry.value), this.options.estimateSize?.(entry.value));
+          entry === undefined
+            ? this.estimatedSize()
+            : (this.sizes.get(entry.key)?.height ??
+              this.estimatedSize(
+                this.bucketOf(entry.value),
+                this.options.estimateSize?.(entry.value)
+              ));
         if (top + size > offset) break;
         top += size;
         index++;
       }
       await this.renderProtectedRange(
         Math.max(0, index - PAGE),
-        Math.min(this.items.length, index + PAGE + 1)
+        Math.min(this.totalLength(), index + PAGE + 1)
       );
       this.setTop(this.estimatePrefix());
       this.layout();
@@ -755,11 +789,11 @@ export class TimelineWindow<T> {
     }
     if (
       (this.start === 0 || first - this.start >= PAGE / 2) &&
-      (this.end === this.items.length || this.end - last >= PAGE / 2)
+      (this.end === this.totalLength() || this.end - last >= PAGE / 2)
     )
       return;
     const start = Math.max(0, first - PAGE);
-    const end = Math.min(this.items.length, Math.max(start + PAGE * 2, last + PAGE + 1));
+    const end = Math.min(this.totalLength(), Math.max(start + PAGE * 2, last + PAGE + 1));
     if (start === this.start && end === this.end) return;
     await this.renderProtectedRange(start, end);
     this.layout();
@@ -767,7 +801,8 @@ export class TimelineWindow<T> {
 
   private async renderProtectedRange(start: number, end: number): Promise<void> {
     for (const key of this.protectedKeys()) {
-      const index = this.items.findIndex((item) => item.key === key);
+      const localIndex = this.items.findIndex((item) => item.key === key);
+      const index = localIndex < 0 ? -1 : this.leading + localIndex;
       if (index >= 0) {
         start = Math.min(start, index);
         end = Math.max(end, index + 1);
@@ -775,6 +810,10 @@ export class TimelineWindow<T> {
     }
     if (start === this.start && end === this.end) return;
     await this.renderRange(start, end);
+  }
+
+  private totalLength(): number {
+    return this.leading + this.items.length;
   }
 
   private protectedKeys(): string[] {

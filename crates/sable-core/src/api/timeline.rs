@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{Handler, Json};
 use crate::protocol::{RpcError, EditVersionView, PaginationDirection, PinReadStateView, RelationsView, RoomListItemView, SubscriptionId, TimelineItemView};
+use sable_model::timeline::TimelineKey;
 use crate::thread_receipts::thread_receipts;
 use crate::timelines::receipt_thread_root;
 use crate::widgets::RelationsFilter;
@@ -85,6 +86,8 @@ impl Handler for SubscribeRoomListParams {
 pub struct SubscribeParams {
     #[cfg_attr(feature = "typegen", specta(type = String))]
     pub room_id: OwnedRoomId,
+    #[serde(default)]
+    pub key: Option<TimelineKey>,
     #[serde(default)]
     pub focus: TimelineFocusView,
     /// Relaxes the event filter so events the SDK would otherwise drop

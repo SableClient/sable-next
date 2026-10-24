@@ -70,6 +70,12 @@
   );
   let directory = $derived({ rooms, people });
   const search = new MessageSearch(core, () => directory);
+  let resolution = $derived(JSON.stringify([search.resolved, core.searchCoverage?.documents]));
+
+  $effect(() => {
+    void resolution;
+    untrack(() => search.schedule());
+  });
 
   const LOOKUP_DELAY_MS = 300;
   const PEOPLE_OPERATORS: ReadonlySet<string> = new Set(['from', 'mentions', 'with']);

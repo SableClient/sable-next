@@ -4,6 +4,7 @@
   import { provideCoreClient } from '#lib/core/context.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { provideRoomList, RoomList } from '#lib/rooms/room-list.svelte.js';
+  import { FakeRuntime, roomsView } from '#lib/test-support/fake-runtime.js';
   import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
   import { untrack, type ComponentProps } from 'svelte';
 
@@ -25,8 +26,9 @@
   );
 
   provideCoreClient(untrack(() => core));
-  const roomList = untrack(() => new RoomList(core));
-  roomList.rooms = untrack(() => rooms ?? []);
+  const runtime = untrack(() => new FakeRuntime({ rooms: roomsView(rooms ?? []) }));
+  const roomList = new RoomList(() => runtime.client());
+  void roomList.start();
   provideRoomList(roomList);
   providePersonaStore(untrack(() => new PersonaStore(core)));
 

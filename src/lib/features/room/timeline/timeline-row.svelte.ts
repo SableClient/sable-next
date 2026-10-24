@@ -1,6 +1,7 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { onDestroy, type Snippet } from 'svelte';
 
-import type { MemberView, PerMessageProfileView, TimelineItemView } from '#src/generated/protocol';
+import type { MemberView, PerMessageProfileView } from '#src/generated/protocol';
 
 import { copyText } from '#lib/platform/clipboard.js';
 import { useCoreClient } from '#lib/core/context.js';
@@ -30,7 +31,7 @@ import { TimelineItemEngagement } from './timeline-item-engagement.svelte';
 import { selectedText, withSelectedText } from './timeline-item-selection';
 
 export interface TimelineItemProps extends MessageCallbacks {
-  item: TimelineItemView;
+  item: ResolvedItem;
   collapsed: boolean;
   unreadCount?: number;
   replyPersona?: PerMessageProfileView | null;
@@ -74,7 +75,7 @@ export interface TimelineItemProps extends MessageCallbacks {
 }
 
 export interface TimelineRowOptions extends MessageCallbacks {
-  item: TimelineItemView;
+  item: ResolvedItem;
   roomId: string;
   canPin: boolean;
   canRedactOwn: boolean;

@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, Mutex, OnceLock, PoisonError},
 };
 
+use sable_protocol::CoreEvent;
 use serde_json::Value;
 use tokio::sync::{RwLock, RwLockReadGuard};
 
@@ -51,6 +52,32 @@ struct GateState {
 impl AccountGate {
     pub fn attach(&self, ffi: Ffi) {
         let _ = self.inner.ffi.set(ffi);
+    }
+
+    /// Hands the events that slices follow to the runtime, in the order the core emitted them.
+    pub async fn offer(&self, events: &[CoreEvent]) {
+        let captured = self
+            .inner
+            .account
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        let _serving = self.serving().await;
+        if *self
+            .inner
+            .account
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            != captured
+        {
+            return;
+        }
+        let Some(ffi) = self.inner.ffi.get() else {
+            return;
+        };
+        if let Err(error) = ffi.offer_batch(events.to_owned()).await {
+            tracing::warn!(?error, "could not offer core events to the runtime");
+        }
     }
 
     pub async fn serving(&self) -> RwLockReadGuard<'_, ()> {

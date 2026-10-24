@@ -1,33 +1,38 @@
 import { expect, test } from 'vitest';
+import type { RoomUnreadView } from '#src/generated/protocol';
 
 import { formatUnreadCount, hideQuietDot, resolveUnreadBadge } from './unread-badge.js';
 
 const off = { showUnreadCounts: false, badgeCountDMsOnly: false, showPingCounts: false };
+const counts = (overrides: Partial<RoomUnreadView>): RoomUnreadView => ({
+  unread: 0,
+  highlight: 0,
+  marked: false,
+  notifying: 0,
+  ...overrides,
+});
 
 test('nothing to badge yields nothing', () => {
   expect(resolveUnreadBadge(undefined, off)).toBeNull();
-  expect(resolveUnreadBadge({ unread: 0, highlight: 0 }, off)).toBeNull();
+  expect(resolveUnreadBadge(counts({}), off)).toBeNull();
 });
 
 test('a hand-marked room dots with no count', () => {
-  expect(resolveUnreadBadge({ unread: 0, highlight: 0, marked: true }, off)).toEqual({
+  expect(resolveUnreadBadge(counts({ marked: true }), off)).toEqual({
     mode: 'dot',
     count: 0,
     highlight: false,
   });
   expect(
-    resolveUnreadBadge(
-      { unread: 0, highlight: 0, marked: true },
-      {
-        ...off,
-        showUnreadCounts: true,
-      }
-    )?.mode
+    resolveUnreadBadge(counts({ marked: true }), {
+      ...off,
+      showUnreadCounts: true,
+    })?.mode
   ).toBe('dot');
 });
 
 test('room counts number a room whatever its messages notified', () => {
-  const counts = { unread: 4, highlight: 0, notifying: 0 };
+  const counts = { unread: 4, highlight: 0, marked: false, notifying: 0 };
 
   expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true })).toEqual({
     mode: 'count',
@@ -42,14 +47,14 @@ test('room counts number a room whatever its messages notified', () => {
 });
 
 test('a direct chat mention follows the mention count setting', () => {
-  const counts = { unread: 4, highlight: 1 };
+  const counts = { unread: 4, highlight: 1, marked: false, notifying: 0 };
 
   expect(resolveUnreadBadge(counts, { ...off, badgeCountDMsOnly: true }, true)?.mode).toBe('dot');
   expect(resolveUnreadBadge(counts, { ...off, showPingCounts: true }, true)?.mode).toBe('count');
 });
 
 test('a mention counts mentions, not messages', () => {
-  const counts = { unread: 9, highlight: 2 };
+  const counts = { unread: 9, highlight: 2, marked: false, notifying: 0 };
 
   expect(resolveUnreadBadge(counts, { ...off, showPingCounts: true })).toEqual({
     mode: 'count',
@@ -69,7 +74,7 @@ test('counts stop spelling themselves out past a thousand', () => {
 });
 
 test('a room whose ordinary messages notify is always counted, and counted loudly', () => {
-  const counts = { unread: 6, highlight: 0, notifying: 6 };
+  const counts = { unread: 6, highlight: 0, marked: false, notifying: 6 };
 
   expect(resolveUnreadBadge(counts, off)).toEqual({ mode: 'count', count: 6, highlight: true });
   expect(resolveUnreadBadge(counts, off, true)).toEqual({
@@ -80,20 +85,20 @@ test('a room whose ordinary messages notify is always counted, and counted loudl
 });
 
 test('a direct chat that did not notify is numbered by the direct-message setting alone', () => {
-  const counts = { unread: 3, highlight: 0, notifying: 0 };
+  const counts = { unread: 3, highlight: 0, marked: false, notifying: 0 };
 
   expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true }, true)?.mode).toBe('dot');
   expect(resolveUnreadBadge(counts, { ...off, badgeCountDMsOnly: true }, true)?.mode).toBe('count');
 });
 
 test('room counts do not number a mention', () => {
-  const counts = { unread: 5, highlight: 1, notifying: 5 };
+  const counts = { unread: 5, highlight: 1, marked: false, notifying: 5 };
 
   expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true })?.mode).toBe('dot');
 });
 
 test('a notifying room still counts a mention as the mention', () => {
-  const counts = { unread: 9, highlight: 2, notifying: 9 };
+  const counts = { unread: 9, highlight: 2, marked: false, notifying: 9 };
 
   expect(resolveUnreadBadge(counts, { ...off, showPingCounts: true })).toEqual({
     mode: 'count',
@@ -103,7 +108,7 @@ test('a notifying room still counts a mention as the mention', () => {
 });
 
 test('a room that notified nothing keeps its quiet dot', () => {
-  expect(resolveUnreadBadge({ unread: 6, highlight: 0, notifying: 0 }, off)).toEqual({
+  expect(resolveUnreadBadge(counts({ unread: 6, notifying: 0 }), off)).toEqual({
     mode: 'dot',
     count: 6,
     highlight: false,
@@ -111,11 +116,11 @@ test('a room that notified nothing keeps its quiet dot', () => {
 });
 
 test('notifying does not resurrect a room with nothing unread', () => {
-  expect(resolveUnreadBadge({ unread: 0, highlight: 0, notifying: 0 }, off)).toBeNull();
+  expect(resolveUnreadBadge(counts({ notifying: 0 }), off)).toBeNull();
 });
 
 test('an aggregate counts what notified, not every unread message under it', () => {
-  const counts = { unread: 32, highlight: 0, notifying: 2 };
+  const counts = { unread: 32, highlight: 0, marked: false, notifying: 2 };
 
   expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true })).toEqual({
     mode: 'count',
@@ -125,10 +130,10 @@ test('an aggregate counts what notified, not every unread message under it', () 
 });
 
 test('hiding unread dots keeps mentions, counts and hand-marked rooms', () => {
-  const quiet = resolveUnreadBadge({ unread: 4, highlight: 0, notifying: 0 }, off);
-  const mention = resolveUnreadBadge({ unread: 4, highlight: 1 }, off);
-  const counted = resolveUnreadBadge({ unread: 4, highlight: 0, notifying: 2 }, off);
-  const marked = resolveUnreadBadge({ unread: 0, highlight: 0, marked: true }, off);
+  const quiet = resolveUnreadBadge(counts({ unread: 4, notifying: 0 }), off);
+  const mention = resolveUnreadBadge(counts({ unread: 4, highlight: 1 }), off);
+  const counted = resolveUnreadBadge(counts({ unread: 4, notifying: 2 }), off);
+  const marked = resolveUnreadBadge(counts({ marked: true }), off);
 
   expect(hideQuietDot(quiet, true)).toEqual(quiet);
   expect(hideQuietDot(quiet, false)).toBeNull();

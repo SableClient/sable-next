@@ -6,6 +6,7 @@ import { isElectron } from '#lib/platform/electron.js';
 import { createTauriLink, createTauriTransport } from './tauri';
 import { createWebTransport, prewarmWebWorker } from './web';
 import { createNativeLink } from './electron';
+import { provideRuntime } from '#lib/runtime/app.js';
 import { createWebLink, startLink } from './web-runtime';
 
 export function createTransport(): Transport {
@@ -18,8 +19,10 @@ export function prewarmTransport(): void {
 }
 
 export function startRuntime(): void {
-  void startLink(() => {
-    if (isTauri()) return createTauriLink();
-    return isElectron() ? createNativeLink() : createWebLink();
-  });
+  provideRuntime(
+    startLink(() => {
+      if (isTauri()) return createTauriLink();
+      return isElectron() ? createNativeLink() : createWebLink();
+    })
+  );
 }

@@ -1,6 +1,6 @@
 import { uint8ArrayToBase64 } from 'uint8array-extras';
 
-import type { PushFetchView, WebPushValidation } from '#src/generated/protocol';
+import type { OwnPresence, PushFetchView, WebPushValidation } from '#src/generated/protocol';
 
 import { isRecord } from '#lib/guards.js';
 import { visibleName } from '#lib/model/model.js';
@@ -111,8 +111,11 @@ export async function completePushPayload(
 
 export async function fetchOwnPresence(
   fetcher: Pick<PushFetcher, 'session' | 'fetch'>
-): Promise<unknown> {
-  return get(fetcher, `presence/${encodeURIComponent(fetcher.session.userId)}/status`);
+): Promise<OwnPresence | null> {
+  return (await get(
+    fetcher,
+    `presence/${encodeURIComponent(fetcher.session.userId)}/status`
+  )) as OwnPresence | null;
 }
 
 async function get(

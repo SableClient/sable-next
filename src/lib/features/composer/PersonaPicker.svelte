@@ -88,12 +88,10 @@
   );
   let editOpen = $state(false);
   let activeAvatarUrl = $derived(
-    !!active && shorthandHint
-      ? shorthandHint?.trigger.alternate_avatar_id
-        ? active.alternate_avatars?.find(
-            (avatar) => avatar.id === shorthandHint.trigger.alternate_avatar_id
-          )?.avatar_url
-        : active?.avatar_url
+    !!active && shorthandHint?.trigger.alternate_avatar_id
+      ? active.alternate_avatars?.find(
+          (avatar) => avatar.id === shorthandHint.trigger.alternate_avatar_id
+        )?.avatar_url
       : !!selected && !!active && selected.alternate_avatar_id
         ? active.alternate_avatars?.find((avatar) => avatar.id === selected.alternate_avatar_id)
             ?.avatar_url

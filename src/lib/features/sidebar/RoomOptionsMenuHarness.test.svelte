@@ -2,6 +2,7 @@
   import type { CoreClient } from '#lib/core/client.svelte.js';
   import { provideCoreClient } from '#lib/core/context.js';
   import { provideRoomList, RoomList } from '#lib/rooms/room-list.svelte.js';
+  import { FakeRuntime, roomsView } from '#lib/test-support/fake-runtime.js';
   import { untrack } from 'svelte';
 
   import type { RoomListItemView } from '#src/generated/protocol';
@@ -16,15 +17,16 @@
   }
 
   let { core, room, rooms, registerRefresh }: Props = $props();
-  const roomList = untrack(() => new RoomList(core));
-  roomList.rooms = untrack(() => rooms);
+  const runtime = untrack(() => new FakeRuntime({ rooms: roomsView(rooms) }));
+  const roomList = new RoomList(() => runtime.client());
+  void roomList.start();
 
   provideCoreClient(untrack(() => core));
   provideRoomList(roomList);
 
   untrack(() =>
     registerRefresh(() => {
-      roomList.rooms = [...roomList.rooms];
+      runtime.set('rooms', roomsView([...roomList.rooms]));
     })
   );
 </script>

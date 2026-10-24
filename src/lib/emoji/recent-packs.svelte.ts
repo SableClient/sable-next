@@ -1,6 +1,7 @@
 import { readJson, writeJson } from '#lib/platform/local-json.js';
+import type { ImageUsageView } from '#src/generated/protocol';
 
-export type RecentUsage = 'emoticon' | 'sticker';
+export type RecentUsage = ImageUsageView;
 
 const storageKeys: Record<RecentUsage, string> = {
   emoticon: 'sable.composer.recentEmotes',

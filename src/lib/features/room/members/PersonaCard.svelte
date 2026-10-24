@@ -68,7 +68,6 @@
     }
   });
   let displayName = $derived(profile.display_name ?? accountName);
-  let accountLabel = $derived(displayName === accountName ? accountId : accountName);
 </script>
 
 <ProfileCard

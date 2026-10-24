@@ -33,6 +33,17 @@ describe('applyOps', () => {
     expect(next.names).toBe(names);
   });
 
+  it('applies list diffs to a nested document field', () => {
+    const status = { mode: 'live' };
+    const state = { events: { total: 1, items: ['a'] }, status };
+    const next = applyOps(state, [
+      { op: 'fields', fields: { 'events.total': 2 } },
+      { op: 'list', field: 'events.items', diffs: [{ PushBack: { value: 'b' } }] },
+    ]) as typeof state;
+    expect(next).toEqual({ events: { total: 2, items: ['a', 'b'] }, status });
+    expect(next.status).toBe(status);
+  });
+
   it('edits a list with every diff form', () => {
     const state = { items: [1, 2, 3, 4] };
     const next = applyOps(state, [

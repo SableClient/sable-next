@@ -264,32 +264,6 @@ test('an interrupted storage connection requires an explicit reload', async () =
   expect(core.storageInterrupted).toBe(true);
 });
 
-test('resetting caches also drops the persisted room list snapshot', async () => {
-  const fake = fakeTransport({ 'session.restore': session, 'session.list_accounts': [session] });
-  const core = createCoreClient(() => fake.transport);
-  const stored = new Map<string, string>();
-  vi.stubGlobal('localStorage', {
-    getItem: (key: string) => stored.get(key) ?? null,
-    removeItem: (key: string) => {
-      stored.delete(key);
-    },
-    setItem: (key: string, value: string) => {
-      stored.set(key, value);
-    },
-  });
-  stored.set(`sable.room-list.${session.account_id}`, JSON.stringify([{ room_id: '!room' }]));
-
-  try {
-    await core.start();
-    await core.resetCaches();
-
-    expect(fake.resetCaches).toHaveBeenCalledWith([session.account_id]);
-    expect(stored.get(`sable.room-list.${session.account_id}`)).toBeUndefined();
-  } finally {
-    vi.unstubAllGlobals();
-  }
-});
-
 test('logging out selects another saved account instead of returning to sign-in', async () => {
   const accounts = { accounts: [session, otherSession] };
   const fake = fakeTransport({
@@ -630,7 +604,7 @@ test('sending an attachment forwards its rich caption, mentions, reply, and thre
     caption: 'hey Member One :wave:',
     formattedCaption:
       'hey <a href="https://matrix.to/#/@one:example.org">Member One</a> <img data-mx-emoticon>',
-    mentions: { userIds: ['@one:example.org'], room: true },
+    mentions: { user_ids: ['@one:example.org'], room: true },
     inReplyTo: '$reply:example.org',
     threadRoot: '$thread:example.org',
     persona: {
@@ -788,7 +762,7 @@ test('sending a gallery forwards shared metadata and every attachment', async ()
   await core.media.sendGallery('!room:example.org', [first, second], {
     caption: 'Weekend',
     formattedCaption: '<strong>Weekend</strong>',
-    mentions: { userIds: ['@one:example.org'], room: true },
+    mentions: { user_ids: ['@one:example.org'], room: true },
     inReplyTo: '$reply',
     threadRoot: '$thread',
     persona,

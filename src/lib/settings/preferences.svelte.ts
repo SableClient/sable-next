@@ -1,6 +1,10 @@
 import { untrack } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
-import type { PresenceView, ProfilePropagationView } from '#src/generated/protocol';
+import type {
+  MediaPreviewsView,
+  PresenceView,
+  ProfilePropagationView,
+} from '#src/generated/protocol';
 import type { GifProviderSetting } from '#lib/gif/providers.js';
 import type { MemberSort } from '#lib/rooms/member-listing.js';
 import type { RoomSort } from '#lib/rooms/room-sort.js';
@@ -17,7 +21,7 @@ export type { BadgeNotificationMode };
 export type ThreadPresentation = 'timeline' | 'panel';
 export type TimelineLayout = 'modern' | 'compact' | 'bubble';
 export type MessageSpacing = 'none' | 'compact' | 'cozy' | 'roomy';
-export type MediaAutoLoad = 'on' | 'private' | 'off';
+export type MediaAutoLoad = MediaPreviewsView;
 export type ImageMetadata = 'location' | 'all' | 'keep';
 export type TimelineEmoteSize = 'default' | '20' | '24' | '32' | '48' | '64';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';

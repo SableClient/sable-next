@@ -1,13 +1,13 @@
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { historyItems, timelineItem } from './fixtures/timeline-items';
-import type { TimelineItemView } from '#src/generated/protocol';
 import { nextFrames } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT });
 
 const EMOTES_PER_MESSAGE = 8;
 
-function voiceMessage(id: string): TimelineItemView {
+function voiceMessage(id: string): ResolvedItem {
   return {
     ...timelineItem(id, 'voice.ogg'),
     content: {

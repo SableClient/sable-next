@@ -1,6 +1,6 @@
 import escapeStringRegexp from 'escape-string-regexp';
 
-import type { RoomListItemView } from '#src/generated/protocol';
+import type { AbbreviationView, RoomListItemView } from '#src/generated/protocol';
 
 import type { AbbreviationEntry } from './settings/abbreviations';
 
@@ -8,11 +8,7 @@ const MAX_SPACE_DEPTH = 4;
 
 const SKIP_SELECTOR = 'a, abbr, code, pre, time, .code-head, [data-mx-maths], [data-mx-spoiler]';
 
-export interface AbbreviationMatch {
-  term: string;
-  definition: string;
-  cased: boolean;
-}
+export type AbbreviationMatch = AbbreviationView;
 
 export type AbbreviationMap = ReadonlyMap<string, readonly AbbreviationMatch[]>;
 

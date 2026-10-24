@@ -19,7 +19,7 @@ import { CoreError } from '#src/transport';
 
 const core = Object.assign(baseCore, {
   session: { user_id: '@me:example.org' },
-  userRelations: vi.fn<() => Promise<{ mutualRooms: MutualRoomView[]; ignored: boolean }>>(),
+  userRelations: vi.fn<() => Promise<{ mutual_rooms: MutualRoomView[]; ignored: boolean }>>(),
   setUserIgnored: vi.fn<() => Promise<void>>(),
 });
 Object.assign(core.rpc.rooms, { createDm: vi.fn<() => Promise<string>>() });
@@ -87,7 +87,7 @@ const emptyProfile: ProfileView = {
   legacy_fields: [],
 };
 
-core.userRelations.mockResolvedValue({ mutualRooms: [], ignored: false });
+core.userRelations.mockResolvedValue({ mutual_rooms: [], ignored: false });
 
 const user = userEvent.setup();
 
@@ -961,7 +961,7 @@ test('asks before lowering your own role', async () => {
 
 test('lists mutual rooms in a menu of their own, with direct messages last', async () => {
   core.userRelations.mockResolvedValueOnce({
-    mutualRooms: [
+    mutual_rooms: [
       { room_id: '!dm:example.org', name: 'Alice', is_space: false },
       { room_id: '!general:example.org', name: 'General', is_space: false },
       { room_id: '!space:example.org', name: 'Space', is_space: true },

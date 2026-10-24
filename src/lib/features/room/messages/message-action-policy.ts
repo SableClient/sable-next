@@ -1,11 +1,11 @@
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { isRecord } from '#lib/guards.js';
 
 import { canRedact } from '../timeline/timeline-format';
 import { isMediaCaptionContent, type MediaCaptionContent } from './media-caption';
 
 export type MessageActionPolicyInput = {
-  item: TimelineItemView;
+  item: ResolvedItem;
   roomId: string;
   canPin: boolean;
   canRedactOwn: boolean;

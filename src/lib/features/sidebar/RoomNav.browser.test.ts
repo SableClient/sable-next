@@ -11,6 +11,7 @@ const roomsFixture = vi.hoisted(() => {
   const fixture = {
     rooms: [] as RoomListItemView[],
     typingUsers: new Map<string, readonly string[]>(),
+    typingUserIds: (roomId: string): readonly string[] => fixture.typingUsers.get(roomId) ?? [],
     warm: () => {},
     byId: (roomId: string | null) => fixture.rooms.find((room) => room.room_id === roomId),
     notificationOverride: () => null,

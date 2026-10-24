@@ -18,9 +18,19 @@ use std::future::Future;
 
 use sable_protocol::CoreEvent;
 pub use sable_runtime::AppError;
-use sable_runtime::{App, SubId, SubscribeRequest, Target, Window, decode, rt::SendOutsideWasm};
+use sable_runtime::{
+    App, DuplicateSlice, Registry, SubId, SubscribeRequest, Target, Window, decode,
+    rt::SendOutsideWasm,
+};
 use serde::Serialize;
 use serde_json::Value;
+
+pub fn registry() -> Result<Registry, DuplicateSlice> {
+    let registry = sable_slices::register(Registry::new())?;
+    #[cfg(feature = "demo")]
+    let registry = demo::register(registry)?;
+    Ok(registry)
+}
 
 fn encode<T: Serialize>(value: &T) -> Result<String, AppError> {
     serde_json::to_string(value).map_err(|_| AppError::Encode)
@@ -125,9 +135,16 @@ impl Ffi {
         encode(&self.app.next_batch().await)
     }
 
-    pub async fn offer(&self, event: CoreEvent) -> Result<(), AppError> {
+    pub async fn offer(&self, event: &CoreEvent) -> Result<(), AppError> {
         let app = self.app.clone();
+        let event = event.clone();
         self.run(async move { app.offer(&event).await }).await
+    }
+
+    pub async fn offer_batch(&self, events: Vec<CoreEvent>) -> Result<(), AppError> {
+        let app = self.app.clone();
+        self.run(async move { app.offer_batch(&events).await })
+            .await
     }
 
     pub async fn switch_account(&self, account: String) -> Result<(), AppError> {

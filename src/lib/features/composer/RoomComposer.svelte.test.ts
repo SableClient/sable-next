@@ -23,7 +23,7 @@ import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 import { flushed } from '#lib/ui/flushed.js';
 
-import { parseBotCommands, type BotCommandInvocation } from './bot-commands';
+import { parseBotCommand, type BotCommandInvocation } from './bot-commands';
 import type { ComposerContext } from '#lib/composer/composer-context.js';
 import { invalidatePacks } from '#lib/emoji/load-packs.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
@@ -97,7 +97,7 @@ const mediaConfig = vi.fn(() => Promise.resolve({ upload_size: 100 * 1024 * 1024
 
 const scheduleAttachment = vi.fn(() => Promise.resolve('delayed'));
 
-const botCommands: BotCommand[] = parseBotCommands([
+const botCommands: BotCommand[] = [
   {
     sender: '@bot:example.org',
     sender_name: 'Bot',
@@ -116,7 +116,9 @@ const botCommands: BotCommand[] = parseBotCommands([
     sender_avatar: null,
     content: { command: 'register' },
   },
-]);
+]
+  .map((view) => parseBotCommand(view))
+  .filter((command): command is BotCommand => command !== null);
 
 function core(): CoreClient {
   return {
@@ -144,7 +146,7 @@ interface ComposerProps {
     roomId: string,
     body: string,
     formatted: string | null,
-    mentions: { userIds: string[]; room: boolean }
+    mentions: { user_ids: string[]; room: boolean }
   ) => Promise<void>;
   onSendBotCommand?: (
     roomId: string,
@@ -338,7 +340,7 @@ test.each([
 
   await vi.waitFor(() => {
     expect(send).toHaveBeenCalledWith('!room:example.org', source, formatted, {
-      userIds: [],
+      user_ids: [],
       room: false,
     });
   });
@@ -392,7 +394,7 @@ test('sends multiple staged files as one gallery', async () => {
   expect(gallery).toHaveBeenCalledWith('!room:example.org', [first, second], {
     caption: null,
     formattedCaption: null,
-    mentions: { userIds: [], room: false },
+    mentions: { user_ids: [], room: false },
   });
   expect(attachment).not.toHaveBeenCalled();
 });
@@ -587,7 +589,7 @@ test.each([true, false])(
 
     await vi.waitFor(() => {
       expect(message).toHaveBeenCalledWith('!room:example.org', body, html, {
-        userIds: ['@one:example.org'],
+        user_ids: ['@one:example.org'],
         room: false,
       });
     });
@@ -608,7 +610,7 @@ test('submitting an untouched rich edit hands back the original body and html', 
 
   await vi.waitFor(() => {
     expect(message).toHaveBeenCalledWith('!room:example.org', 'some **bold** text', html, {
-      userIds: [],
+      user_ids: [],
       room: false,
     });
   });
@@ -701,7 +703,7 @@ test.each([true, false])(
       caption: 'hey Member One :wave:',
       formattedCaption:
         'hey <a href="https://matrix.to/#/@one:example.org">Member One</a> <img data-mx-emoticon="" src="mxc://example.org/wave" alt="wave" title="wave" height="32">',
-      mentions: { userIds: ['@one:example.org'], room: false },
+      mentions: { user_ids: ['@one:example.org'], room: false },
       spoiler: false,
     });
   }
@@ -734,7 +736,7 @@ test('the caption toggle sends text beside a lone attachment', async () => {
 
   expect(attachment).toHaveBeenCalledWith('!room:example.org', file, { spoiler: false });
   expect(message).toHaveBeenCalledWith('!room:example.org', 'look at this', null, {
-    userIds: [],
+    user_ids: [],
     room: false,
   });
 });
@@ -778,7 +780,7 @@ test('text follows two attachments as its own message', async () => {
     spoiler: false,
   });
   expect(message).toHaveBeenCalledWith('!room:example.org', 'both of these', null, {
-    userIds: [],
+    user_ids: [],
     room: false,
   });
 });
@@ -1071,7 +1073,7 @@ test('a failed send offers a retry that sends the restored message', async () =>
   });
   expect(send).toHaveBeenLastCalledWith('!room:example.org', 'hold on', null, {
     room: false,
-    userIds: [],
+    user_ids: [],
   });
   expect(screen.queryByRole('alert')).toBeNull();
 });
@@ -1656,7 +1658,7 @@ test('a send tap sends immediately', async () => {
       '!room:example.org',
       'now',
       null,
-      { userIds: [], room: false },
+      { user_ids: [], room: false },
     ]);
     await vi.advanceTimersByTimeAsync(SCHEDULE_PRESS_MS);
     expect(document.body.textContent).not.toContain('Schedule this message');
@@ -2126,7 +2128,7 @@ test('clearing an attachment caption sends an edit without asking to delete', as
   submit();
   await vi.waitFor(() => {
     expect(onSend).toHaveBeenCalledWith('!room:example.org', '', null, {
-      userIds: [],
+      user_ids: [],
       room: false,
     });
   });
@@ -2623,6 +2625,7 @@ test.each([
         : []
     );
     await flushed();
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     submit();
 
@@ -2700,7 +2703,7 @@ test('without bot command support an unknown command still goes to the slash han
 
   await vi.waitFor(() => {
     expect(onSend).toHaveBeenCalledWith('!room:example.org', '/warn @spam:example.org 7', null, {
-      userIds: [],
+      user_ids: [],
       room: false,
     });
   });

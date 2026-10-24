@@ -31,7 +31,7 @@
   let { onComplete }: { onComplete: () => void } = $props();
   const core = useCoreClient();
   providePersonaStore(new PersonaStore(core));
-  provideRoomList(new RoomList(core));
+  provideRoomList(new RoomList());
   providePinnedEvents(new PinnedEvents(core.rpc.timeline));
   provideBookmarks(new Bookmarks(core.rpc.account));
   provideMessageDialogs(new MessageDialogs());

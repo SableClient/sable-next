@@ -23,8 +23,13 @@ use wasm_bindgen::{JsValue, prelude::*};
 /// Most events a single crossing into JS carries.
 const EVENT_BATCH_LIMIT: usize = 256;
 
+/// The events the page reads, as JSON.
 fn encode_batch(batch: &[CoreEvent]) -> Option<String> {
-    match serde_json::to_string(batch) {
+    let page: Vec<&CoreEvent> = batch.iter().filter(|event| event.reaches_page()).collect();
+    if page.is_empty() {
+        return None;
+    }
+    match serde_json::to_string(&page) {
         Ok(json) => return Some(json),
         Err(error) => {
             tracing::error!(
@@ -34,8 +39,8 @@ fn encode_batch(batch: &[CoreEvent]) -> Option<String> {
         }
     }
 
-    let kept: Vec<&CoreEvent> = batch
-        .iter()
+    let kept: Vec<&CoreEvent> = page
+        .into_iter()
         .filter(|event| serde_json::to_string(event).is_ok())
         .collect();
 
@@ -356,16 +361,17 @@ impl SableCore {
             .take()
             .ok_or_else(|| JsValue::from_str("events are already subscribed"))?;
 
+        let gate = self.gate.clone();
         wasm_bindgen_futures::spawn_local(async move {
             let mut batch = Vec::new();
             while events.recv_many(&mut batch, EVENT_BATCH_LIMIT).await > 0 {
-                let encoded = encode_batch(&batch);
-                batch.clear();
-                if let Some(json) = encoded
+                if let Some(json) = encode_batch(&batch)
                     && let Err(error) = on_event.call1(&JsValue::NULL, &JsValue::from_str(&json))
                 {
                     tracing::error!(?error, "the event callback threw; keeping the stream open");
                 }
+                gate.offer(&batch).await;
+                batch.clear();
             }
         });
 

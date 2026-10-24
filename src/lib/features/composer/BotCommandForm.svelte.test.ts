@@ -8,7 +8,7 @@ import type { RoomListItemView } from '#src/generated/protocol';
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 
 import BotCommandForm from './BotCommandForm.svelte';
-import { emptyDrafts, parseBotCommand, type BotCommand } from './bot-commands';
+import { parseBotCommand, type BotCommand } from './bot-commands';
 
 const command = parseBotCommand({
   sender: '@conduit:example.org',
@@ -33,6 +33,10 @@ const command = parseBotCommand({
 
 function room(room_id: string, canonical_alias: string): RoomListItemView {
   return { room_id, name: 'Lobby', canonical_alias, avatar_url: null } as RoomListItemView;
+}
+
+function emptyDrafts(command: BotCommand): Record<string, string> {
+  return Object.fromEntries(command.parameters.map(({ key }) => [key, '']));
 }
 
 test('rooms sharing a canonical alias are offered once', () => {

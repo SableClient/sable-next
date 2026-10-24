@@ -1,9 +1,5 @@
-import type {
-  MemberView,
-  PerMessageProfileView,
-  ProfileView,
-  TimelineItemView,
-} from '#src/generated/protocol';
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
+import type { MemberView, PerMessageProfileView, ProfileView } from '#src/generated/protocol';
 
 import { i18n } from '#lib/i18n.js';
 import { splitDisplayNamePronouns, withDisplayNamePronouns } from '#lib/personas/pronouns.js';
@@ -14,7 +10,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 import { findMember, memberName, personaWithColor } from '../members/members.js';
 
 export interface MessageSenderOptions {
-  item: TimelineItemView;
+  item: ResolvedItem;
   members: readonly MemberView[];
   profile: ProfileView | null;
   cosmetics: SenderCosmetics | null;

@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { type ResolvedItem, resolveItem } from '#lib/rooms/timeline-item.js';
   import { untrack } from 'svelte';
   import VirtualList from 'svelte-tiny-virtual-list';
   import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
   import IconContext from 'phosphor-svelte/lib/IconContext';
-  import type { MemberView, PinReadStateView, TimelineItemView } from '#src/generated/protocol';
+  import type { MemberView, PinReadStateView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -57,7 +58,7 @@
   let loading = $state(false);
   let pinnedIds = $state.raw<string[]>([]);
   let shownIds = $state.raw<string[]>([]);
-  let entries = $state.raw<ReadonlyMap<string, TimelineItemView>>(new Map());
+  let entries = $state.raw<ReadonlyMap<string, ResolvedItem>>(new Map());
   let pending = $state.raw<ReadonlySet<string>>(new Set());
   let settled = $state.raw<ReadonlySet<string>>(new Set());
   let unreadCount = $state(0);
@@ -131,7 +132,9 @@
   async function resolve(target: string, ids: string[], current: number): Promise<void> {
     if (ids.length === 0) return;
     try {
-      const items = await core.rpc.timeline.eventItems({ room_id: target, event_ids: ids });
+      const items = (await core.rpc.timeline.eventItems({ room_id: target, event_ids: ids })).map(
+        resolveItem
+      );
       if (current !== run) return;
       if (items.length > 0) {
         entries = new Map([

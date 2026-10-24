@@ -1,11 +1,10 @@
 // @vitest-environment happy-dom
 
+import type { ResolvedItem } from '#lib/rooms/timeline-item.js';
 import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
-
-import type { TimelineItemView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -566,7 +565,7 @@ test('a message the core sized as jumbo reads at that size', async () => {
 
 test('renders a link preview for every link in a message', async () => {
   setPreference('urlPreviews', true);
-  const message: TimelineItemView = withRowFields({
+  const message: ResolvedItem = withRowFields({
     ...item(false),
     content: {
       kind: 'message',
@@ -575,7 +574,6 @@ test('renders a link preview for every link in a message', async () => {
       emote: false,
       notice: false,
       edited: false,
-      jumbo: null,
     },
   });
   const instance = render(TimelineItemHarness, {
@@ -594,7 +592,7 @@ test('renders a link preview for every link in a message', async () => {
 
 test('a message whose embeds were removed renders none, bundled or found', async () => {
   setPreference('urlPreviews', true);
-  const message: TimelineItemView = withRowFields({
+  const message: ResolvedItem = withRowFields({
     ...item(false),
     content: {
       kind: 'message',
@@ -603,7 +601,6 @@ test('a message whose embeds were removed renders none, bundled or found', async
       emote: false,
       notice: false,
       edited: true,
-      jumbo: null,
     },
     bundled_link_previews: [
       {
@@ -652,7 +649,7 @@ test('compact layout shows the time alone and keeps the full date in its tooltip
 });
 
 test('quotes a reply to a membership event as its timeline text', async () => {
-  const target: TimelineItemView = withRowFields({
+  const target: ResolvedItem = withRowFields({
     ...item(false),
     id: 'member',
     event_id: '$original',
@@ -665,7 +662,7 @@ test('quotes a reply to a membership event as its timeline text', async () => {
     },
   });
   const base = replyItem('');
-  const reply: TimelineItemView = {
+  const reply: ResolvedItem = {
     ...base,
     in_reply_to: base.in_reply_to && { ...base.in_reply_to, body: null },
   };

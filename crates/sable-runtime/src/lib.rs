@@ -12,6 +12,7 @@
 
 mod app;
 mod cmd;
+mod diff;
 mod doc;
 mod error;
 mod instance;
@@ -29,6 +30,7 @@ mod wire;
 
 pub use app::App;
 pub use cmd::{Cmd, Name};
+pub use diff::list_diff;
 pub use doc::{Doc, ListChanges, ListDoc};
 pub use error::AppError;
 #[cfg(any(test, feature = "testing"))]

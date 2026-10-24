@@ -1148,6 +1148,7 @@ async fn warmed_rooms_join_the_subscription_set_up_to_a_cap() {
     let core = core_for(&server, client).await;
     core.run(SubscribeParams {
         room_id: open_room_id.to_owned(),
+        key: None,
         focus: TimelineFocusView::Live,
         hidden_events: false,
     })
@@ -1195,6 +1196,7 @@ async fn an_opened_room_stays_subscribed_after_another_room_opens() {
     } = core
         .run(SubscribeParams {
             room_id: first_room_id.to_owned(),
+            key: None,
             focus: TimelineFocusView::Live,
             hidden_events: false,
         })
@@ -1207,6 +1209,7 @@ async fn an_opened_room_stays_subscribed_after_another_room_opens() {
     .unwrap();
     core.run(SubscribeParams {
         room_id: second_room_id.to_owned(),
+        key: None,
         focus: TimelineFocusView::Live,
         hidden_events: false,
     })
@@ -1244,6 +1247,7 @@ async fn timeline_subscriptions_remain_active_until_each_is_unsubscribed() {
     } = core
         .run(SubscribeParams {
             room_id: first_room_id.to_owned(),
+            key: None,
             focus: TimelineFocusView::Live,
             hidden_events: false,
         })
@@ -1255,6 +1259,7 @@ async fn timeline_subscriptions_remain_active_until_each_is_unsubscribed() {
     } = core
         .run(SubscribeParams {
             room_id: second_room_id.to_owned(),
+            key: None,
             focus: TimelineFocusView::Live,
             hidden_events: false,
         })
@@ -1302,6 +1307,7 @@ async fn live_timeline_reports_its_back_pagination_status() {
     let SubscribeOk { subscription, .. } = core
         .run(SubscribeParams {
             room_id: room_id.to_owned(),
+            key: None,
             focus: TimelineFocusView::Live,
             hidden_events: false,
         })
@@ -1480,6 +1486,7 @@ async fn a_sticker_reaches_the_server_as_an_m_sticker_event() {
 
     core.run(SubscribeParams {
         room_id: room_id.to_owned(),
+        key: None,
         focus: TimelineFocusView::Live,
         hidden_events: false,
     })
@@ -1679,6 +1686,7 @@ async fn media_replies_preserve_silent_mentions_on_the_wire() {
             });
             core.run(SubscribeParams {
                 room_id: room_id.to_owned(),
+                key: None,
                 focus: TimelineFocusView::Live,
                 hidden_events: false,
             })
@@ -4277,7 +4285,7 @@ async fn a_live_redaction_drops_the_reactions() {
         })
         .expect("the deleted message");
 
-    assert!(view.reactions.is_empty());
+    assert_eq!(view.reactions, []);
 }
 
 #[tokio::test]
@@ -5133,6 +5141,7 @@ async fn message_types_send_the_selected_profile() {
         let core = core_for(&server, client).await;
         core.run(SubscribeParams {
             room_id: room_id.to_owned(),
+            key: None,
             focus: TimelineFocusView::Live,
             hidden_events: false,
         })

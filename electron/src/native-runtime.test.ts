@@ -62,7 +62,9 @@ describe.skipIf(!library)('the native runtime', () => {
     const { app, sent, next } = await start(dir);
     await app.open(2);
 
-    expect(JSON.parse(app.handshake())).toMatchObject({ slices: ['counter'] });
+    expect(JSON.parse(app.handshake())).toMatchObject({
+      slices: ['counter', 'rooms', 'sidebar', 'timeline'],
+    });
     await expect(app.subscribe(1, '{"slice":"nope","key":null}')).rejects.toThrow('unknown_slice');
 
     const { sub, snapshot } = JSON.parse(await app.subscribe(1, counter)) as Subscribed;
