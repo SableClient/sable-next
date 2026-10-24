@@ -56,6 +56,9 @@
   </screenshots>
 
   <releases>
+    <release version="2.2.0" date="2026-10-24">
+      <url type="details">https://git.sable.moe/SableClient/sable-next/releases/tag/v2.2.0</url>
+    </release>
     <release version="2.1.6" date="2026-10-23">
       <url type="details">https://git.sable.moe/SableClient/sable-next/releases/tag/v2.1.6</url>
     </release>

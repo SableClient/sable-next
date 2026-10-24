@@ -1,5 +1,23 @@
 # Sable Changelog
 
+## 2.2.0 (2026-10-24)
+
+### Features
+
+* Keep other devices quiet while you are using Sable, until you have been away for a chosen time. Receiving a push no longer shows you as online.
+
+### Fixes
+
+* Share audio from selected apps on macOS and from several apps at once on Windows. Keep audio capture from blocking the app.
+* Add CSP to web builds and block framing and base URL injection.
+* Require separate device permissions for embedded sites and reject unsafe download filenames in Electron.
+* Fix crashes when reopening the iOS app after it was in the background.
+* Fix MAS device management after legacy SSO login and restore the devices dashboard (#1250).
+* Dismiss the mobile keyboard when scrolling the message timeline (#1321).
+* Wrap checkable menu option labels to avoid a missing text-node crash (#1341).
+* Show push notification content after an app update. Fix profiles, room versions and web push on servers that send both profile capability names. Stop offering Founder as an assignable role.
+* Preserve saved sessions after temporary storage and token-refresh failures. Fix Electron crashes during shutdown and when its terminal closes.
+
 ## 2.1.6 (2026-10-23)
 
 ### Fixes

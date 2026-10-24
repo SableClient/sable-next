@@ -1,6 +1,6 @@
 {
   "name": "sable-next",
-  "version": "2.1.6",
+  "version": "2.2.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
