@@ -76,7 +76,7 @@
     "mdast-util-gfm-strikethrough": "^2.0.0",
     "mdast-util-gfm-table": "^2.0.0",
     "mdast-util-to-markdown": "^2.1.2",
-    "music-metadata": "12.2.1",
+    "music-metadata": "12.2.2",
     "opus-recorder": "^8.0.5",
     "pdfjs-dist": "6.4.299",
     "phosphor-svelte": "^3.1.1",
