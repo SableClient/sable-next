@@ -26,7 +26,7 @@ env:
 jobs:
   setup-release:
     name: Resolve release target
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -74,7 +74,7 @@ jobs:
     name: Build web assets
     needs: setup-release
     if: ${{ needs.setup-release.outputs.skip != 'true' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -284,7 +284,7 @@ jobs:
   publish-nightly-flatpak:
     name: Publish the nightly Flatpak repo
     needs: [setup-release, build-nightly-flatpak]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     if: ${{ !cancelled() && needs.setup-release.outputs.nightly == 'true' && needs.setup-release.outputs.skip != 'true' }}
     permissions:
@@ -428,7 +428,7 @@ jobs:
   handoff:
     name: Publish handoff manifest
     needs: [setup-release, electron]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: read
