@@ -32,6 +32,7 @@
     scope: SelectionScope;
     scopeChoice?: boolean;
     hasSpace?: boolean;
+    variant?: 'popover' | 'sheet';
     onScope: (scope: SelectionScope) => void;
     onChoose: (persona: PersonaView | null) => void;
     onAlternateAvatarChoose: (
@@ -47,6 +48,7 @@
     scope,
     scopeChoice = false,
     hasSpace = false,
+    variant,
     onScope,
     onChoose,
     onAlternateAvatarChoose,
@@ -201,7 +203,7 @@
   </li>
 {/snippet}
 
-<div class="persona-menu">
+<div class={['persona-menu', { sheet: variant === 'sheet' }]}>
   {#if alternateAvatarMode && !!selected}
     {@const current = personas.find((persona) => persona.id === selected.persona_id)}
     {#if current}
@@ -291,13 +293,23 @@
 
 <style>
   .persona-menu {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-200);
+    height: min(24rem, 60dvh);
+  }
+
+  .persona-menu.sheet {
+    padding: var(--space-050);
   }
 
   .persona-toolbar {
     display: flex;
     gap: var(--space-200);
+  }
+
+  .persona-menu.sheet .persona-toolbar {
+    padding: 0 var(--space-250);
   }
 
   .persona-toolbar :global(> button) {
@@ -313,9 +325,11 @@
   .persona-options {
     display: flex;
     flex-flow: column nowrap;
-    height: 18rem;
+    flex-grow: 1;
+    height: fit-content;
     list-style: none;
     margin: 0;
+    min-height: 0;
     overflow-y: auto;
     padding: 0;
   }

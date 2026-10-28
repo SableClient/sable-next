@@ -214,6 +214,7 @@
           {scope}
           {scopeChoice}
           {hasSpace}
+          variant="popover"
           onScope={setScope}
           onChoose={choose}
           onAlternateAvatarChoose={alternateAvatarChoose}
@@ -256,6 +257,7 @@
       {scope}
       {scopeChoice}
       {hasSpace}
+      variant="sheet"
       onScope={setScope}
       onChoose={choose}
       onAlternateAvatarChoose={alternateAvatarChoose}
