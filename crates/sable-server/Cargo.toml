@@ -23,7 +23,7 @@ openidconnect = "4.0.1"
 rpassword = "7.5.4"
 sable-core = { path = "../sable-core", version = "0.1.0" }
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
 time.workspace = true
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["net", "signal", "time"] }
