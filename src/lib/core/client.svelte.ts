@@ -131,6 +131,26 @@ function discardAccountStore(transport: Transport, accountId: string): void {
   });
 }
 
+function describeEvent(event: CoreEvent): string {
+  switch (event.type) {
+    case 'sync_status':
+      return event.state === 'error'
+        ? `sync_status error: ${event.message}`
+        : `sync_status ${event.state}`;
+    case 'qr_login': {
+      const side = event.grant ? 'grant' : 'login';
+      const { progress } = event;
+      return progress.stage === 'failed'
+        ? `qr_login ${side} failed: ${progress.reason}`
+        : `qr_login ${side} ${progress.stage}`;
+    }
+    case 'presence':
+      return `presence ${event.presence}`;
+    default:
+      return event.type;
+  }
+}
+
 export class CoreClient {
   status = $state<CoreStatus>('idle');
   session = $state<CoreSession | null>(null);
@@ -1141,7 +1161,12 @@ export class CoreClient {
   }
 
   private readonly handleEvent = (event: CoreEvent): void => {
-    recordDebugLog('debug', event.type === 'sync_status' ? 'sync' : 'general', 'core', event.type);
+    recordDebugLog(
+      'debug',
+      event.type === 'sync_status' ? 'sync' : 'general',
+      'core',
+      describeEvent(event)
+    );
     switch (event.type) {
       case 'account_lock_changed':
         if (event.locked) this.lockedAccountId = event.account_id;

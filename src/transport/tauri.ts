@@ -4,6 +4,8 @@ import { Channel, invoke } from '@tauri-apps/api/core';
 
 import type { RpcError, CoreEvent } from '#src/generated/protocol';
 import { CoreError, type Transport } from './index';
+import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
+import { wasmLogLevel } from '#lib/observability/wasm-log.js';
 import { rawInvoke } from '#lib/platform/raw-invoke.js';
 import { resetWebStorage } from '#lib/platform/session-storage.js';
 import { migrateV1 } from '#lib/migrations/v1/migration.js';
@@ -43,6 +45,14 @@ export function createTauriTransport(): Transport {
   };
 
   const ready = invoke<unknown>('subscribe_events', { channel });
+
+  const logs = new Channel<string[]>();
+  logs.onmessage = (lines) => {
+    for (const line of lines) {
+      const level = wasmLogLevel(line);
+      recordDebugLog(level, level === 'error' ? 'error' : 'general', 'core', line.trim());
+    }
+  };
 
   return {
     async call(method, params) {
@@ -139,7 +149,11 @@ export function createTauriTransport(): Transport {
       return carry<string>('upload_media', bytes, { mime });
     },
 
-    setDebugLogs() {},
+    setDebugLogs(enabled) {
+      invoke('set_debug_logs', { enabled, channel: logs }).catch((error: unknown) => {
+        console.warn('[sable transport] core log capture unavailable', error);
+      });
+    },
 
     subscribe(onEvent) {
       listeners.add(onEvent);

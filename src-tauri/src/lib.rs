@@ -6,6 +6,7 @@
 mod android_secrets;
 #[cfg(target_os = "android")]
 mod cold_push;
+mod debug_log;
 #[cfg(target_os = "ios")]
 // Objective-C bindings expose PhotoKit calls as unsafe; keep that exception out
 // of the Rust-only application code.
@@ -631,16 +632,29 @@ fn spawn_event_pump<R: tauri::Runtime>(
 fn install_logging() {
     use tracing_subscriber::prelude::*;
 
-    let filter = tracing_subscriber::EnvFilter::try_from_env("SABLE_LOG").unwrap_or_else(|_| {
-        tracing_subscriber::EnvFilter::new(
-            "info,matrix_sdk_base::room::display_name=error,matrix_sdk::latest_events=off,matrix_sdk::http_client=off",
-        )
-    });
+    let filter = || {
+        tracing_subscriber::EnvFilter::try_from_env("SABLE_LOG").unwrap_or_else(|_| {
+            tracing_subscriber::EnvFilter::new(
+                "info,matrix_sdk_base::room::display_name=error,matrix_sdk::latest_events=off,matrix_sdk::http_client=off",
+            )
+        })
+    };
+    #[cfg(target_os = "android")]
+    let console = paranoid_android::layer("sable");
+    #[cfg(not(target_os = "android"))]
+    let console = tracing_subscriber::fmt::layer();
     let sentry = ::sentry::integrations::tracing::layer()
         .event_filter(sentry::tracing_filter)
         .span_filter(|_| false);
     let subscriber = tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_filter(filter))
+        .with(console.with_filter(filter()))
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_ansi(false)
+                .without_time()
+                .with_writer(debug_log::MakeDebugLogWriter)
+                .with_filter(filter()),
+        )
         .with(sentry);
     if let Err(error) = subscriber.try_init() {
         eprintln!("could not install the log subscriber: {error}");
@@ -746,6 +760,7 @@ pub fn run() {
             share_inbox::share_inbox_read,
             share_inbox::share_inbox_clear,
             sentry::set_native_sentry_enabled,
+            debug_log::set_debug_logs,
             has_geolocation,
             #[cfg(target_os = "ios")]
             ios::save_media_to_photos,
