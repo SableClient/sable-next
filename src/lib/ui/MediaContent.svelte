@@ -40,6 +40,7 @@
     size?: number | null;
     blurhash?: string | null;
     thumbnail?: string | null;
+    thumbnailMime?: string | null;
     durationMs?: number | null;
     waveform?: number[] | null;
     audioMetadata?: AudioMetadataView | null;
@@ -59,6 +60,7 @@
     size = null,
     blurhash = null,
     thumbnail = null,
+    thumbnailMime = null,
     durationMs = null,
     waveform = null,
     audioMetadata = null,
@@ -204,6 +206,7 @@
     {height}
     {blurhash}
     {thumbnail}
+    {thumbnailMime}
     {playback}
     class={className}
   />

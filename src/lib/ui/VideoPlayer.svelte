@@ -27,6 +27,7 @@
     height?: number | null;
     blurhash?: string | null;
     thumbnail?: string | null;
+    thumbnailMime?: string | null;
     playback?: VideoPlaybackView | null;
     class?: string;
   }
@@ -39,6 +40,7 @@
     height = null,
     blurhash = null,
     thumbnail = null,
+    thumbnailMime = null,
     playback = null,
     class: className = '',
   }: Props = $props();
@@ -215,6 +217,7 @@
       <MediaImage
         class="media-poster"
         source={thumbnail}
+        mime={thumbnailMime}
         alt=""
         width={800}
         height={600}

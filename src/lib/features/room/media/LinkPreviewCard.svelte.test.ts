@@ -51,6 +51,7 @@ afterEach(() => {
   preferences.encryptedUrlPreviews = false;
   preferences.clientEmbeds = false;
   preferences.encryptedClientEmbeds = false;
+  preferences.autoplayGifs = true;
   vi.restoreAllMocks();
   mediaViewerState.close();
 });
@@ -437,6 +438,28 @@ test('a video-only preview plays inline without the card', async () => {
 
   expect(screen.getByRole('button', { name: /Play/ })).toBeInTheDocument();
   expect(container.querySelector('.link-preview')).toBeNull();
+});
+
+test('a GIF poster on a video preview stays still while GIF autoplay is off', async () => {
+  preferences.urlPreviews = true;
+  preferences.autoplayGifs = false;
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  core.rpc.messages.urlPreview.mockResolvedValue(
+    preview({
+      url: 'https://tenor.example/view/clip',
+      image: 'mxc://example.org/poster',
+      image_mime: 'image/gif',
+      video: { source: 'mxc://example.org/clip', mime: 'video/mp4', width: 480, height: 362 },
+    })
+  );
+  const { container } = render(LinkPreviewCard, {
+    url: 'https://tenor.example/view/clip',
+    encrypted: false,
+  });
+
+  await vi.waitFor(() => {
+    expect(container.querySelector('.media-poster .gif-preview-source')).not.toBeNull();
+  });
 });
 
 test('a page with a video keeps its text under the player', async () => {

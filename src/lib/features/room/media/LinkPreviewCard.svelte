@@ -88,6 +88,7 @@
     width={preview.video.width}
     height={preview.video.height}
     thumbnail={preview.image}
+    thumbnailMime={preview.image_mime}
   />
 {:else if preview?.image && !mediaHidden && preview.title === null && preview.site_name === null}
   <MediaImage
@@ -121,6 +122,7 @@
         width={preview.video.width}
         height={preview.video.height}
         thumbnail={preview.image}
+        thumbnailMime={preview.image_mime}
       />
     {:else if preview.image && !mediaHidden}
       <MediaImage
