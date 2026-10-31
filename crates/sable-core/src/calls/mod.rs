@@ -1,3 +1,4 @@
+mod content;
 mod invite_service;
 mod invites;
 mod keys;
