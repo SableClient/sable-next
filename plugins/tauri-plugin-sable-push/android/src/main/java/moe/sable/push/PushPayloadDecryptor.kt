@@ -27,7 +27,7 @@ internal object PushPayloadDecryptor {
     private external fun nativeMaintainPush(storeDir: String, operation: String): String?
 
     fun maintain(context: Context, operation: String): Boolean =
-        available() && runCatching { nativeMaintainPush(context.filesDir.absolutePath, operation) == "ok" }.getOrDefault(false)
+        available(context) && runCatching { nativeMaintainPush(context.filesDir.absolutePath, operation) == "ok" }.getOrDefault(false)
 
     private external fun nativeDecryptPush(
         storeDir: String,
@@ -71,7 +71,7 @@ internal object PushPayloadDecryptor {
     ): Boolean
 
     fun activeElsewhere(context: Context, userId: String, deviceId: String, roomId: String): Boolean {
-        if (!available()) return false
+        if (!available(context)) return false
         return try {
             nativeActiveElsewhere(context.dataDir.absolutePath, userId, deviceId, roomId)
         } catch (error: Throwable) {
@@ -95,7 +95,7 @@ internal object PushPayloadDecryptor {
         seedRoomId: String,
         roomIds: List<String>,
     ): List<String>? {
-        if (!available()) return null
+        if (!available(context)) return null
         val json = try {
             nativeReadRooms(
                 context.dataDir.absolutePath,
@@ -134,7 +134,7 @@ internal object PushPayloadDecryptor {
         payloadName: String?,
         content: JSONObject?,
     ): JSONObject? {
-        if (!available()) return null
+        if (!available(context)) return null
         val json = try {
             nativePushMedia(
                 context.dataDir.absolutePath, userId, deviceId, roomId,
@@ -168,7 +168,7 @@ internal object PushPayloadDecryptor {
     ): Boolean
 
     fun reply(context: Context, action: ConversationAction, deviceId: String, privateReceipt: Boolean): Boolean =
-        available() && runCatching {
+        available(context) && runCatching {
             nativeReply(
                 context.dataDir.absolutePath, action.userId, deviceId, action.roomId,
                 action.text.orEmpty(), action.id, action.eventId, privateReceipt,
@@ -176,18 +176,19 @@ internal object PushPayloadDecryptor {
         }.onFailure { Log.i(TAG, "Reply not sent: ${it.message}") }.getOrDefault(false)
 
     fun markRead(context: Context, action: ConversationAction, deviceId: String, privateReceipt: Boolean): Boolean =
-        available() && runCatching {
+        available(context) && runCatching {
             nativeMarkRead(
                 context.dataDir.absolutePath, action.userId, deviceId, action.roomId,
                 action.eventId, privateReceipt,
             )
         }.onFailure { Log.i(TAG, "Receipt not sent: ${it.message}") }.getOrDefault(false)
 
-    private fun available(): Boolean {
+    private fun available(context: Context): Boolean {
         loaded?.let { return it }
 
         val result = try {
             System.loadLibrary(HOST_LIBRARY)
+            Secrets.install(context)
             true
         } catch (error: UnsatisfiedLinkError) {
             Log.i(TAG, "No native decryptor in this build: ${error.message}")
@@ -218,7 +219,7 @@ internal object PushPayloadDecryptor {
     }
 
     private fun run(context: Context, native: (String) -> String?): PushDecryptResult {
-        if (!available()) return PushDecryptResult.Failure(PushOutcome.NO_NATIVE_LIB)
+        if (!available(context)) return PushDecryptResult.Failure(PushOutcome.NO_NATIVE_LIB)
 
         val clear = try {
             native(context.dataDir.absolutePath)

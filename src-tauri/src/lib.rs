@@ -3,6 +3,8 @@
 //! The native carrier. A feature adds an RPC handler in `sable_core::api`, except to move bytes or reach something only this process has.
 
 #[cfg(target_os = "android")]
+mod android_secrets;
+#[cfg(target_os = "android")]
 mod cold_push;
 #[cfg(target_os = "ios")]
 // Objective-C bindings expose PhotoKit calls as unsafe; keep that exception out
@@ -357,7 +359,44 @@ async fn set_notification_encrypted_content(
     Ok(())
 }
 
+#[cfg(not(target_os = "android"))]
+fn install_keyring(app: &tauri::App<tauri::Wry>) -> Result<(), String> {
+    #[cfg(target_os = "ios")]
+    let (service, group) = {
+        let _ = app;
+        let group = ios::keychain_group()?;
+        (group.clone(), Some(group))
+    };
+    #[cfg(not(target_os = "ios"))]
+    let (service, group) = (app.config().identifier.clone(), None::<String>);
+    sable_core::secrets::install_os_keyring(service, group.as_deref())
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(not(target_os = "android"))]
+fn refuse_without_keyring(app: &tauri::App<tauri::Wry>, error: &str) {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+
+    log::error!("no usable credential store: {error}");
+    let handle = app.handle().clone();
+    app.dialog()
+        .message(format!(
+            "Sable keeps your login and message keys in the system keyring, and none is available.\n\n\
+             On Linux, install and unlock a Secret Service provider such as GNOME Keyring or KWallet, \
+             then start Sable again.\n\n{error}"
+        ))
+        .title("No system keyring")
+        .kind(MessageDialogKind::Error)
+        .show(move |_| handle.exit(1));
+}
+
 fn setup(app: &mut tauri::App<tauri::Wry>) -> Result<(), Box<dyn std::error::Error>> {
+    // Before any window, so no page asks a core that never started.
+    #[cfg(not(target_os = "android"))]
+    if let Err(error) = install_keyring(app) {
+        refuse_without_keyring(app, &error);
+        return Ok(());
+    }
     for config in &app.config().app.windows {
         let builder = tauri::WebviewWindowBuilder::from_config(app.handle(), config)?;
         #[cfg(target_os = "android")]

@@ -66,6 +66,12 @@ final class NotificationService: UNNotificationServiceExtension {
                 return
             }
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let keychain = Bundle.main.object(forInfoDictionaryKey: "SableKeychainGroup") as? String,
+                      keychain.withCString({ sable_push_install_keychain($0) }) else {
+                    Self.log.error("keychain unavailable, showing the generic alert")
+                    self?.finish(content)
+                    return
+                }
                 let result = root.path.withCString { path in
                     payload.withCString { json in sable_push_render(path, json) }
                 }

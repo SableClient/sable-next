@@ -23,15 +23,26 @@ interface NativeModule {
   SableCore: new (dataDir: string, logFilter: string | null) => NativeCore;
   setLogHandler(notify: (line: string) => void): void;
   setLogCapture(enabled: boolean): void;
+  installKeyring(service: string): void;
 }
 
 const EVENT_BACKLOG_LIMIT = 4096;
 
 const dataDir = process.env.SABLE_DATA_DIR;
 if (!dataDir) throw new Error('SABLE_DATA_DIR is not set');
+const identifier = process.env.SABLE_IDENTIFIER;
+if (!identifier) throw new Error('SABLE_IDENTIFIER is not set');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const native = require('./sable_node.node') as NativeModule;
+try {
+  native.installKeyring(identifier);
+} catch (error) {
+  process.parentPort.postMessage({
+    keyringUnavailable: error instanceof Error ? error.message : String(error),
+  });
+  process.exit(1);
+}
 const instance = new native.SableCore(dataDir, process.env.SABLE_LOG ?? null);
 void instance.restore();
 

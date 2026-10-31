@@ -162,6 +162,16 @@ pub fn set_log_capture(enabled: bool) {
     LOG_CAPTURE.store(enabled, Ordering::Relaxed);
 }
 
+/// Must succeed before a `SableCore` is made.
+///
+/// # Errors
+/// When the OS has no usable credential store.
+#[napi]
+pub fn install_keyring(service: String) -> napi::Result<()> {
+    sable_core::secrets::install_os_keyring(service, None)
+        .map_err(|error| napi::Error::new(Status::GenericFailure, error.to_string()))
+}
+
 #[napi]
 pub struct SableCore {
     core: Arc<Core>,

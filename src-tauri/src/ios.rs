@@ -135,6 +135,17 @@ fn share_sentry_consent(enabled: bool) -> Result<(), String> {
 }
 
 /// # Errors
+/// When the Info.plist lacks `SableKeychainGroup`.
+pub fn keychain_group() -> Result<String, String> {
+    use objc2_foundation::NSBundle;
+    NSBundle::mainBundle()
+        .objectForInfoDictionaryKey(&NSString::from_str("SableKeychainGroup"))
+        .and_then(|value| value.downcast::<NSString>().ok())
+        .map(|group| group.to_string())
+        .ok_or_else(|| "missing SableKeychainGroup in Info.plist".to_owned())
+}
+
+/// # Errors
 /// When the signed app has no accessible App Group container.
 pub fn shared_store_dir() -> Result<std::path::PathBuf, String> {
     use objc2_foundation::{NSBundle, NSFileManager};

@@ -3499,10 +3499,12 @@ mod tests {
         logins.save("a1", OAUTH_DEVICE, &repaired).unwrap();
         let path = std::fs::read_dir(store_dir.join("credentials"))
             .unwrap()
-            .next()
-            .unwrap()
-            .unwrap()
-            .path();
+            .map(|entry| entry.unwrap().path())
+            .find(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "tokens")
+            })
+            .unwrap();
         std::fs::write(&path, b"corrupt tokens").unwrap();
         let requests = settled_request_count(&server).await;
 

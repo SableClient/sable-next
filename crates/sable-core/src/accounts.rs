@@ -2583,10 +2583,12 @@ mod regression_tests {
         let before = core.sessions.load().await.unwrap().unwrap();
         let path = std::fs::read_dir(std::path::Path::new(&core.store_id).join("credentials"))
             .unwrap()
-            .next()
-            .unwrap()
-            .unwrap()
-            .path();
+            .map(|entry| entry.unwrap().path())
+            .find(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "tokens")
+            })
+            .unwrap();
         std::fs::write(&path, b"unreadable tokens").unwrap();
 
         assert!(!core.load_login_tokens(&mut registry).await.unwrap());

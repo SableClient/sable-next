@@ -49,6 +49,7 @@ targets:
       path: SableNotificationService/Info.plist
       properties:
         SableAppGroup: group.{{app.identifier}}
+        SableKeychainGroup: $(AppIdentifierPrefix){{app.identifier}}.shared
         CFBundleDisplayName: Sable
         CFBundleShortVersionString: {{apple.bundle-version-short}}
         CFBundleVersion: "{{apple.bundle-version}}"
@@ -60,6 +61,7 @@ targets:
       path: SableNotificationService/SableNotificationService.entitlements
       properties:
         com.apple.security.application-groups: [group.{{app.identifier}}]
+        keychain-access-groups: [$(AppIdentifierPrefix){{app.identifier}}.shared]
         com.apple.developer.default-data-protection: NSFileProtectionCompleteUntilFirstUserAuthentication
         com.apple.developer.usernotifications.communication: true
     settings:
@@ -124,6 +126,7 @@ targets:
           cuba: AppIconCuba
         # APP-ICON ALIASES END
         LSRequiresIPhoneOS: true
+        SableKeychainGroup: $(AppIdentifierPrefix){{app.identifier}}.shared
         UILaunchStoryboardName: LaunchScreen
         UIBackgroundModes: [audio, voip, remote-notification]
         NSUserActivityTypes: [INSendMessageIntent]
@@ -161,6 +164,7 @@ targets:
         aps-environment: development
         com.apple.developer.usernotifications.communication: true
         com.apple.security.application-groups: [group.{{app.identifier}}]
+        keychain-access-groups: [$(AppIdentifierPrefix){{app.identifier}}.shared]
         com.apple.developer.default-data-protection: NSFileProtectionCompleteUntilFirstUserAuthentication
     scheme:
       environmentVariables:

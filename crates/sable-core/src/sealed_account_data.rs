@@ -59,6 +59,11 @@ impl AccountDataKey {
         Ok(Self(key))
     }
 
+    #[cfg(not(target_family = "wasm"))]
+    pub(crate) const fn from_bytes(key: [u8; KEY_SIZE]) -> Self {
+        Self(key)
+    }
+
     fn from_base64(encoded: &str) -> Option<Self> {
         BASE64
             .decode(encoded.trim())

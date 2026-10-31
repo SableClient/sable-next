@@ -76,6 +76,18 @@ tempfile = { workspace = true }
 rusqlite = { version = "0.40.2", default-features = false, features = ["backup"] }
 tokio = { workspace = true }
 
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+keyring-core = "1.0.1"
+apple-native-keyring-store = { version = "1.0.2", features = ["keychain", "protected"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring-core = "1.0.1"
+windows-native-keyring-store = "1.1.0"
+
+[target.'cfg(all(unix, not(any(target_os = "macos", target_os = "ios", target_os = "android"))))'.dependencies]
+keyring-core = "1.0.1"
+zbus-secret-service-keyring-store = { version = "1.0.1", features = ["rt-async-io-crypto-rust"] }
+
 [target.'cfg(target_os = "android")'.dependencies]
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std", "tls12"] }
 webpki-roots = "1"

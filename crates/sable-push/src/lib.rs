@@ -684,6 +684,24 @@ async fn render(root: &Path, payload: &Value) -> (Option<Value>, Option<Issue>) 
 }
 
 /// # Safety
+/// `group` must be a valid NUL-terminated UTF-8 string for this call.
+#[expect(
+    unsafe_code,
+    reason = "C ABI used by the notification service extension"
+)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sable_push_install_keychain(group: *const c_char) -> bool {
+    if group.is_null() {
+        return false;
+    }
+    // SAFETY: the caller guarantees a valid C string for the duration of this call.
+    let Ok(group) = unsafe { CStr::from_ptr(group) }.to_str() else {
+        return false;
+    };
+    sable_core::secrets::install_os_keyring(group.to_owned(), Some(group)).is_ok()
+}
+
+/// # Safety
 /// Both arguments must be valid NUL-terminated UTF-8 strings for this call.
 /// The returned string must be released with `sable_push_free` exactly once.
 #[expect(

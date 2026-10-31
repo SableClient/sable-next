@@ -29,6 +29,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import moe.sable.push.ConversationShortcuts
+import moe.sable.push.Secrets
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -45,6 +46,8 @@ class MainActivity : TauriActivity() {
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
+    // Before Tauri starts the core, which reads saved logins.
+    Secrets.install(this)
     NativeSentry.apply(this, getSharedPreferences("sentry", MODE_PRIVATE).getBoolean("enabled", false))
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)

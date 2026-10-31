@@ -18,6 +18,10 @@ pub enum StoreError {
     Message(String),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    #[error("the system keyring is unavailable: {0}")]
+    SecretsUnavailable(String),
+    #[error("a saved key is missing from the system keyring")]
+    KeyMissing,
     #[error(transparent)]
     Backend(Cause),
 }

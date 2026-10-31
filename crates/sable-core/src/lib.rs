@@ -58,6 +58,8 @@ mod rooms;
 mod scheduled;
 mod sealed_account_data;
 pub mod search;
+#[cfg(not(target_family = "wasm"))]
+pub mod secrets;
 pub mod session;
 mod space_parents;
 pub mod spaces;

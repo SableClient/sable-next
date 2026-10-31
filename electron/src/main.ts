@@ -348,7 +348,20 @@ function startCore(): UtilityProcess {
     serviceName: 'Sable Core',
     // Explorer launches on Windows have no stdout handle for Chromium to inherit.
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, SABLE_DATA_DIR: dataDir },
+    env: { ...process.env, SABLE_DATA_DIR: dataDir, SABLE_IDENTIFIER: IDENTIFIER },
+  });
+
+  child.on('message', (message: unknown) => {
+    if (typeof message !== 'object' || message === null || !('keyringUnavailable' in message))
+      return;
+    quitting = true;
+    dialog.showErrorBox(
+      'No system keyring',
+      'Sable keeps your login and message keys in the system keyring, and none is available.\n\n' +
+        'On Linux, install and unlock a Secret Service provider such as GNOME Keyring or KWallet, ' +
+        `then start Sable again.\n\n${String(message.keyringUnavailable)}`
+    );
+    app.exit(1);
   });
 
   child.stdout?.on('data', (chunk: Buffer) => {
