@@ -24,7 +24,7 @@ interface NativeModule {
   SableCore: new (dataDir: string, logFilter: string | null) => NativeCore;
   setLogHandler(notify: (line: string) => void): void;
   setLogCapture(enabled: boolean): void;
-  installKeyring(service: string, dataDir: string): void;
+  installKeyring(service: string, dataDir: string, logFilter: string | null): void;
   setProxy(url: string): void;
 }
 
@@ -39,7 +39,7 @@ if (!identifier) throw new Error('SABLE_IDENTIFIER is not set');
 const native = require('./sable_node.node') as NativeModule;
 function keyringFailure(service: string, directory: string): string | null {
   try {
-    native.installKeyring(service, directory);
+    native.installKeyring(service, directory, process.env.SABLE_LOG ?? null);
     return null;
   } catch (error) {
     return error instanceof Error ? error.message : String(error);

@@ -211,9 +211,33 @@ mod keyring {
     use super::SecretBackend;
     use crate::store::StoreError;
 
+    #[derive(Clone)]
     pub(super) struct Keyring {
         store: Arc<CredentialStore>,
         service: String,
+    }
+
+    /// oo7 can lose a race and never answer, which would hang whatever waits on the key.
+    #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "windows")))]
+    fn answered<T: Send + 'static>(
+        work: impl FnOnce() -> Result<T, StoreError> + Send + 'static,
+    ) -> Result<T, StoreError> {
+        const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        std::thread::spawn(move || {
+            let _ = sender.send(work());
+        });
+        receiver.recv_timeout(TIMEOUT).unwrap_or_else(|_| {
+            Err(StoreError::SecretsUnavailable(
+                "the Secret Service did not answer".to_owned(),
+            ))
+        })
+    }
+
+    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "windows"))]
+    fn answered<T>(work: impl FnOnce() -> Result<T, StoreError>) -> Result<T, StoreError> {
+        work()
     }
 
     fn unavailable(error: &Error) -> StoreError {
@@ -253,15 +277,19 @@ mod keyring {
                 windows_native_keyring_store::Store::new().map_err(|error| unavailable(&error))?
             };
             #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "windows")))]
-            let store: Arc<CredentialStore> = {
+            return {
                 let _ = access_group;
-                zbus_secret_service_keyring_store::Store::new()
-                    .map_err(|error| unavailable(&error))?
+                answered(move || {
+                    let store: Arc<CredentialStore> =
+                        zbus_secret_service_keyring_store::Store::new()
+                            .map_err(|error| unavailable(&error))?;
+                    let keyring = Self { store, service };
+                    keyring.probe()?;
+                    Ok(keyring)
+                })
             };
-            let keyring = Self { store, service };
-            #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "windows")))]
-            keyring.probe()?;
-            Ok(keyring)
+            #[cfg(any(target_os = "ios", target_os = "macos", target_os = "windows"))]
+            Ok(Self { store, service })
         }
 
         /// A Secret Service can answer reads and still refuse every write, as one started without
@@ -294,22 +322,26 @@ mod keyring {
 
     impl SecretBackend for Keyring {
         fn get(&self, name: &str) -> Result<Option<Vec<u8>>, StoreError> {
-            match self.entry(name)?.get_secret() {
+            let (keyring, name) = (self.clone(), name.to_owned());
+            answered(move || match keyring.entry(&name)?.get_secret() {
                 Ok(secret) => Ok(Some(secret)),
                 Err(Error::NoEntry) => Ok(None),
                 Err(error) => Err(failure(error)),
-            }
+            })
         }
 
         fn set(&self, name: &str, secret: &[u8]) -> Result<(), StoreError> {
-            self.entry(name)?.set_secret(secret).map_err(failure)
+            let (keyring, name) = (self.clone(), name.to_owned());
+            let secret = zeroize::Zeroizing::new(secret.to_vec());
+            answered(move || keyring.entry(&name)?.set_secret(&secret).map_err(failure))
         }
 
         fn delete(&self, name: &str) -> Result<(), StoreError> {
-            match self.entry(name)?.delete_credential() {
+            let (keyring, name) = (self.clone(), name.to_owned());
+            answered(move || match keyring.entry(&name)?.delete_credential() {
                 Ok(()) | Err(Error::NoEntry) => Ok(()),
                 Err(error) => Err(failure(error)),
-            }
+            })
         }
     }
 }

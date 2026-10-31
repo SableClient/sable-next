@@ -140,7 +140,12 @@ pub fn set_log_capture(enabled: bool) {
 /// # Errors
 /// When the keyring `data_dir` keeps its keys in is unavailable.
 #[napi]
-pub fn install_keyring(service: String, data_dir: String) -> napi::Result<()> {
+pub fn install_keyring(
+    service: String,
+    data_dir: String,
+    log_filter: Option<String>,
+) -> napi::Result<()> {
+    init(&log_filter.unwrap_or_else(|| DEFAULT_LOG_FILTER.to_owned()));
     sable_core::secrets::install_os_keyring_or_files(service, &std::path::PathBuf::from(data_dir))
         .map_err(|error| napi::Error::new(Status::GenericFailure, error.to_string()))
 }
