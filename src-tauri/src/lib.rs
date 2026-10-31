@@ -687,16 +687,7 @@ fn with_platform_plugins(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<
     builder
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-#[expect(
-    clippy::too_many_lines,
-    reason = "the platform-specific builder remains together"
-)]
-pub fn run() {
-    // Before the threads Tauri spawns, so they inherit the panic handler.
-    let sentry_guard = sentry::init();
-    install_logging();
-
+fn app_builder(sentry_client: Option<&::sentry::Client>) -> tauri::Builder<tauri::Wry> {
     let builder = tauri::Builder::<tauri::Wry>::new();
     #[cfg(target_os = "ios")]
     let builder = builder.on_web_content_process_terminate(|webview| {
@@ -706,7 +697,7 @@ pub fn run() {
             tracing::error!(%error, "webview reload failed");
         }
     });
-    let builder = if let Some(client) = sentry_guard.as_ref() {
+    let builder = if let Some(client) = sentry_client {
         builder.plugin(tauri_plugin_sentry::init_with_no_injection(client))
     } else {
         builder
@@ -715,7 +706,7 @@ pub fn run() {
     #[cfg(mobile)]
     let builder = with_platform_plugins(builder);
 
-    let app = match builder
+    builder
         .plugin(tauri_plugin_deep_link::init())
         .plugin(
             tauri_plugin_opener::Builder::new()
@@ -729,6 +720,15 @@ pub fn run() {
         .plugin(tauri_plugin_notifications::init())
         .register_asynchronous_uri_scheme_protocol(map_tiles::TILE_URI_SCHEME, map_tiles::respond)
         .setup(setup)
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    // Before the threads Tauri spawns, so they inherit the panic handler.
+    let sentry_guard = sentry::init();
+    install_logging();
+
+    let app = match app_builder(sentry_guard.as_deref())
         .invoke_handler(tauri::generate_handler![
             v1_migration::v1_migration_complete,
             v1_migration::begin_v1_migration,
