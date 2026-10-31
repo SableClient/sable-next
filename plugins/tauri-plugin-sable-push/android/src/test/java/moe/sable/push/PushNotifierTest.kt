@@ -1094,6 +1094,35 @@ class PushNotifierTest {
     }
 
     @Test
+    fun showFromPush_aFetchedEncryptedMessageHidesItsBodyUnlessEncryptedContentIsAllowed() {
+        PushPolicy(context).accounts = mapOf("@alice:example.org" to "ALICE")
+        mockkObject(PushPayloadDecryptor)
+        try {
+            every { PushPayloadDecryptor.fetch(any(), any(), any(), any(), any()) } returns
+                PushDecryptResult.Success(
+                    """{"type":"m.room.message","content":{"body":"secret"},"sender":"@bob:example.org",""" +
+                        """"sender_display_name":"Bob","room_name":"Room","encrypted":true}"""
+                )
+            every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any()) } returns
+                JSONObject().put("sender_name", "Bob")
+            val payload = { event: String ->
+                JSONObject().put("room_id", "!bare:example.org").put("event_id", event)
+                    .put("user_id", "@alice:example.org").toString()
+            }
+
+            PushNotifier.showFromPush(context, payload("\$one"))
+            assertEquals(listOf("Encrypted message"), shownTexts())
+
+            notificationManager.cancelAll()
+            PushPolicy(context).showEncryptedContent = true
+            PushNotifier.showFromPush(context, payload("\$two"))
+            assertEquals("secret", shownTexts().last())
+        } finally {
+            unmockkObject(PushPayloadDecryptor)
+        }
+    }
+
+    @Test
     fun showFromPush_eventIdOnlyPushTheRulesSilenceIsDiscarded() {
         PushPolicy(context).accounts = mapOf("@alice:example.org" to "ALICE")
         mockkObject(PushPayloadDecryptor)

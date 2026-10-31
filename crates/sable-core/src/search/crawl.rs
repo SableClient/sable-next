@@ -139,6 +139,21 @@ impl CrawlMetrics {
     }
 }
 
+fn decrypted_or_utd(
+    event: Raw<AnyTimelineEvent>,
+    result: matrix_sdk::Result<TimelineEvent>,
+) -> TimelineEvent {
+    result.unwrap_or_else(|_| {
+        TimelineEvent::from_utd(
+            event.cast(),
+            UnableToDecryptInfo {
+                session_id: None,
+                reason: UnableToDecryptReason::Unknown,
+            },
+        )
+    })
+}
+
 fn now_ms() -> u64 {
     MilliSecondsSinceUnixEpoch::now().get().into()
 }
@@ -702,15 +717,14 @@ impl Core {
                 },
             );
         }
-        match room.decrypt_event(event.cast_ref_unchecked(), None).await {
-            Ok(decrypted) => {
-                if decrypted.kind.is_utd() {
-                    self.search_crawl.lock().await.lost_sessions.insert(session);
-                }
-                decrypted
-            }
-            Err(_) => TimelineEvent::from_plaintext(event.cast()),
+        let result = room.decrypt_event(event.cast_ref_unchecked(), None).await;
+        if result
+            .as_ref()
+            .is_ok_and(|decrypted| decrypted.kind.is_utd())
+        {
+            self.search_crawl.lock().await.lost_sessions.insert(session);
         }
+        decrypted_or_utd(event, result)
     }
 
     pub(super) async fn crawl_once(
@@ -902,8 +916,32 @@ mod tests {
     use super::{
         BLIND_EVENTS_BEFORE_SKIP, CRAWL_BACKOFF_CAP, CRAWL_BASE_EVENTS, CRAWL_BATCH, CRAWL_PAUSE,
         CRAWL_READABLE_PAUSE, CRAWL_TRICKLE_PAUSE, CrawlBatch, CrawlOutcome, CrawlProgress,
-        MAX_CRAWLED_EVENTS, PUSHBACKS_BEFORE_SKIP,
+        MAX_CRAWLED_EVENTS, PUSHBACKS_BEFORE_SKIP, decrypted_or_utd,
     };
+
+    #[test]
+    fn test_a_decrypt_error_is_retried_like_an_undecryptable_event() {
+        let event = serde_json::from_value(serde_json::json!({
+            "type": "m.room.encrypted",
+            "event_id": "$failed",
+            "sender": "@alice:localhost",
+            "origin_server_ts": 1_000,
+            "room_id": "!crawled:localhost",
+            "content": {
+                "algorithm": "m.megolm.v1.aes-sha2",
+                "session_id": "session",
+                "ciphertext": "x"
+            }
+        }))
+        .expect("raw event");
+
+        let failed = decrypted_or_utd(
+            event,
+            Err(matrix_sdk::Error::UnknownError("store failure".into())),
+        );
+
+        assert!(failed.kind.is_utd());
+    }
 
     fn room() -> OwnedRoomId {
         room_id!("!crawled:localhost").to_owned()

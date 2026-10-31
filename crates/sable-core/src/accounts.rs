@@ -3002,6 +3002,59 @@ mod regression_tests {
     }
 
     #[tokio::test]
+    async fn a_bookmark_in_an_encrypted_room_stores_no_message_details() {
+        let (server, core, room) = core_with_room().await;
+        let room_id = room.room_id().to_owned();
+        server
+            .mock_room_state_encryption()
+            .encrypted()
+            .mount()
+            .await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path_regex(r"/event/"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "type": "m.room.message",
+                "event_id": "$secret",
+                "room_id": room_id,
+                "sender": "@alice:example.org",
+                "origin_server_ts": 5,
+                "content": { "msgtype": "m.image", "body": "holiday.png" },
+            })))
+            .mount(server.server())
+            .await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path_regex(r"/account_data/"))
+            .respond_with(
+                ResponseTemplate::new(404).set_body_json(
+                    serde_json::json!({"errcode":"M_NOT_FOUND", "error":"not found"}),
+                ),
+            )
+            .mount(server.server())
+            .await;
+        wiremock::Mock::given(wiremock::matchers::method("PUT"))
+            .and(wiremock::matchers::path_regex(r"/account_data/"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({})))
+            .mount(server.server())
+            .await;
+
+        core.set_bookmark(&room_id, &event_id!("$secret").to_owned(), true, 1000)
+            .await
+            .unwrap();
+
+        let requests = server.server().received_requests().await.unwrap();
+        let item = requests
+            .iter()
+            .find(|request| {
+                request.method.as_str() == "PUT"
+                    && request.url.path().contains("pl.chrome.bookmark.")
+            })
+            .expect("bookmark item written");
+        let body: serde_json::Value = serde_json::from_slice(&item.body).unwrap();
+        assert_eq!(body["msgtype"], serde_json::Value::Null, "{body}");
+        assert_eq!(body["body_preview"], serde_json::Value::Null, "{body}");
+    }
+
+    #[tokio::test]
     async fn encryption_lookup_failure_prevents_plaintext_operations() {
         let (server, core, room) = core_with_room().await;
         let room_id = room.room_id().to_owned();

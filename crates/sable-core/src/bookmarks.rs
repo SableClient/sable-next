@@ -259,7 +259,9 @@ impl Core {
             sender: raw.sender,
             room_name: room.cached_display_name().map(|name| name.to_string()),
             body_preview: (!encrypted).then_some(body).flatten(),
-            msgtype: raw.content.and_then(|content| content.msgtype),
+            msgtype: (!encrypted)
+                .then(|| raw.content.and_then(|content| content.msgtype))
+                .flatten(),
         };
         self.put_global_account_data(item_event(id), &item, "bookmarks")
             .await

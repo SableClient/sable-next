@@ -49,7 +49,7 @@ use tracing::warn;
 use self::persist::ChunkId;
 use crate::Core;
 use crate::attachments::{attachment_contents, fits, link_urls};
-use crate::messages::raw_content;
+use crate::messages::{raw_content, valid_replacements};
 use crate::protocol::{
     self, RoomAttachmentContentView, RoomAttachmentKind, RoomAttachmentView, RpcError,
     SearchAttachment,
@@ -1734,6 +1734,11 @@ impl MessageIndex {
                     {
                         continue;
                     }
+                    if replacement_of(message).is_some()
+                        && !edit_is_valid(cache, &target, &event).await
+                    {
+                        continue;
+                    }
 
                     let cached = latest_content(cache, &target, &index.redacted).await;
                     let existing = index.document(&target).cloned();
@@ -2538,24 +2543,40 @@ async fn latest_content(
         .ok()
         .flatten()?;
 
-    let (original, content) = room_message(&original)?;
-    if replacement_of(&original).is_some() {
+    edited_document(&original, &replacements, redacted)
+}
+
+fn edited_document(
+    original: &TimelineEvent,
+    replacements: &[TimelineEvent],
+    redacted: &HashSet<OwnedEventId>,
+) -> Option<Document> {
+    let (message, content) = room_message(original)?;
+    if replacement_of(&message).is_some() {
         return None;
     }
 
     Some(
-        replacements
-            .iter()
+        valid_replacements(original, replacements)
             .filter_map(room_message)
             .filter(|(edit, _)| !redacted.contains(&edit.event_id))
             .fold(
-                document_of(&original, content.as_ref()),
+                document_of(&message, content.as_ref()),
                 |document, (edit, raw)| match replacement_of(&edit) {
                     Some(replacement) => with_edit(document, &edit, replacement, raw.as_ref()),
                     None => document,
                 },
             ),
     )
+}
+
+async fn edit_is_valid(cache: &RoomEventCache, target: &EventId, edit: &TimelineEvent) -> bool {
+    match cache.find_event(target).await {
+        Ok(Some(original)) => valid_replacements(&original, std::slice::from_ref(edit))
+            .next()
+            .is_some(),
+        _ => true,
+    }
 }
 
 impl Core {
@@ -5656,6 +5677,67 @@ mod tests {
         assert_eq!(restored.len(), 3_000);
         assert!(restored.already_classified(event_id!("$reaction")));
         assert!(!restored.dirty);
+    }
+
+    #[test]
+    fn test_a_plaintext_edit_cannot_rewrite_an_encrypted_message() {
+        use matrix_sdk::deserialized_responses::{
+            AlgorithmInfo, DecryptedRoomEvent, EncryptionInfo, TimelineEvent, VerificationState,
+        };
+        use serde_json::json;
+
+        let original = json!({
+            "type": "m.room.message",
+            "event_id": "$original",
+            "room_id": "!room:localhost",
+            "sender": "@alice:localhost",
+            "origin_server_ts": 1_000,
+            "content": { "msgtype": "m.text", "body": "hello" }
+        });
+        let edit = TimelineEvent::from_plaintext(
+            serde_json::from_value(json!({
+                "type": "m.room.message",
+                "event_id": "$edit",
+                "sender": "@alice:localhost",
+                "origin_server_ts": 2_000,
+                "content": {
+                    "msgtype": "m.text",
+                    "body": "* forged",
+                    "m.new_content": { "msgtype": "m.text", "body": "forged" },
+                    "m.relates_to": { "rel_type": "m.replace", "event_id": "$original" }
+                }
+            }))
+            .expect("edit"),
+        );
+        let encrypted = TimelineEvent::from_decrypted(
+            DecryptedRoomEvent {
+                event: serde_json::from_value(original.clone()).expect("original"),
+                encryption_info: std::sync::Arc::new(EncryptionInfo {
+                    sender: user_id!("@alice:localhost").to_owned(),
+                    sender_device: None,
+                    forwarder: None,
+                    algorithm_info: AlgorithmInfo::MegolmV1AesSha2 {
+                        curve25519_key: String::new(),
+                        sender_claimed_keys: std::collections::BTreeMap::new(),
+                        session_id: None,
+                    },
+                    verification_state: VerificationState::Verified,
+                }),
+                unsigned_encryption_info: None,
+            },
+            None,
+        );
+        let plain = TimelineEvent::from_plaintext(serde_json::from_value(original).expect("raw"));
+        let redacted = std::collections::HashSet::new();
+
+        let kept = super::edited_document(&encrypted, std::slice::from_ref(&edit), &redacted)
+            .expect("a document");
+        assert_eq!(kept.body, "hello");
+        assert_eq!(kept.edited_at, None);
+
+        let applied = super::edited_document(&plain, std::slice::from_ref(&edit), &redacted)
+            .expect("a document");
+        assert_eq!(applied.body, "forged");
     }
 
     #[test]

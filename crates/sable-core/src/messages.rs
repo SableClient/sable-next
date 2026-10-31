@@ -1013,7 +1013,7 @@ fn replaced_event(event: &TimelineEvent) -> Option<OwnedEventId> {
     relation.get("event_id")?.as_str()?.parse().ok()
 }
 
-fn valid_replacements<'a>(
+pub(crate) fn valid_replacements<'a>(
     event: &'a TimelineEvent,
     replacements: &'a [TimelineEvent],
 ) -> impl Iterator<Item = &'a TimelineEvent> {
@@ -1042,6 +1042,9 @@ pub(crate) fn latest_valid_replacement<'a>(
 }
 
 fn edit_version(event: &TimelineEvent, replacement: bool) -> Option<EditVersionView> {
+    if event.kind.is_utd() {
+        return None;
+    }
     let raw = serde_json::from_str::<serde_json::Value>(event.raw().json().get()).ok()?;
     let content = raw.get("content")?;
     let content = if replacement {
@@ -1361,6 +1364,30 @@ fn add_forward_fallback(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn an_undecryptable_version_is_left_out_of_the_edit_history() {
+        use matrix_sdk::deserialized_responses::{
+            TimelineEvent, UnableToDecryptInfo, UnableToDecryptReason,
+        };
+
+        let raw = serde_json::from_value(serde_json::json!({
+            "type": "m.room.encrypted",
+            "event_id": "$utd",
+            "sender": "@alice:example.org",
+            "origin_server_ts": 1,
+            "content": { "algorithm": "m.megolm.v1.aes-sha2", "ciphertext": "x" },
+        }))
+        .unwrap();
+        let utd = TimelineEvent::from_utd(
+            raw,
+            UnableToDecryptInfo {
+                session_id: None,
+                reason: UnableToDecryptReason::Unknown,
+            },
+        );
+        assert!(super::edit_version(&utd, false).is_none());
+    }
     use std::sync::{Arc, Mutex};
 
     use matrix_sdk::{

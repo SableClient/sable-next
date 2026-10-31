@@ -756,7 +756,11 @@ object PushNotifier {
     )
 
     private fun messageText(context: Context, notification: JSONObject): String {
-        if (!PushPolicy(context).showContent) return "New message"
+        val policy = PushPolicy(context)
+        if (!policy.showContent) return "New message"
+        if (notification.optBoolean(ENCRYPTED_FLAG) && !policy.showEncryptedContent) {
+            return "Encrypted message"
+        }
         if (notification.optString("type") != "m.room.encrypted") {
             PushDiagnostics.record(context, PushOutcome.PLAINTEXT, traceOf(notification))
             return notification.optJSONObject("content")

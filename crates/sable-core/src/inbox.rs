@@ -1,7 +1,7 @@
 use sable_model::text::visible_name;
 
 use crate::api::notifications::InboxFilter;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::Ordering;
 
 use matrix_sdk::Room;
@@ -30,6 +30,10 @@ const PAGE_SIZE: u16 = 50;
 const MAX_PAGES: usize = 5;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "persisted flags of one stored entry"
+)]
 pub(crate) struct Entry {
     room_id: OwnedRoomId,
     event_id: OwnedEventId,
@@ -40,6 +44,8 @@ pub(crate) struct Entry {
     highlight: bool,
     is_direct: bool,
     encrypted: bool,
+    #[serde(default)]
+    undecryptable: bool,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -85,18 +91,28 @@ impl UnreadScan {
 }
 
 fn merge(entries: &mut Vec<Entry>, fresh: Vec<Entry>) -> usize {
-    let mut known: HashSet<OwnedEventId> =
-        entries.iter().map(|entry| entry.event_id.clone()).collect();
-    let before = entries.len();
+    let mut known: HashMap<OwnedEventId, usize> = entries
+        .iter()
+        .enumerate()
+        .map(|(at, entry)| (entry.event_id.clone(), at))
+        .collect();
+    let mut changed = 0;
     for entry in fresh {
-        if known.insert(entry.event_id.clone()) {
+        let at = known.get(&entry.event_id).copied();
+        if let Some(stored) = at.and_then(|at| entries.get_mut(at)) {
+            if stored.undecryptable && !entry.undecryptable {
+                *stored = entry;
+                changed += 1;
+            }
+        } else {
+            known.insert(entry.event_id.clone(), entries.len());
             entries.push(entry);
+            changed += 1;
         }
     }
-    let added = entries.len() - before;
     entries.sort_by_key(|entry| std::cmp::Reverse(entry.ts));
     entries.truncate(MAX_ENTRIES);
-    added
+    changed
 }
 
 fn preview(body: String) -> String {
@@ -365,10 +381,13 @@ async fn backfill_candidates(
 }
 
 impl Core {
+    fn shows_inbox_body(&self, encrypted: bool) -> bool {
+        self.notification_content.load(Ordering::Relaxed)
+            && (!encrypted || self.notification_encrypted_content.load(Ordering::Relaxed))
+    }
+
     fn inbox_body(&self, event: &AnySyncTimelineEvent, encrypted: bool) -> Option<String> {
-        if !self.notification_content.load(Ordering::Relaxed)
-            || (encrypted && !self.notification_encrypted_content.load(Ordering::Relaxed))
-        {
+        if !self.shows_inbox_body(encrypted) {
             return None;
         }
         if matches!(
@@ -419,6 +438,7 @@ impl Core {
             highlight: actions.iter().any(Action::is_highlight),
             is_direct: is_dm(room).await,
             encrypted,
+            undecryptable: notifications::raw_is_encrypted(raw),
         })
     }
 
@@ -460,10 +480,39 @@ impl Core {
             )
             .await
         {
-            Ok(added) if added > 0 => self.emit_if_current(generation, CoreEvent::InboxChanged),
+            Ok(changed) if changed > 0 => {
+                self.emit_if_current(generation, CoreEvent::InboxChanged);
+            }
             Err(error) => warn!(?error, "recording an inbox notification failed"),
             _ => {}
         }
+    }
+
+    pub(crate) async fn refresh_undecryptable_inbox_entry(
+        &self,
+        room: &Room,
+        event: &TimelineEvent,
+        actions: &[Action],
+        generation: u64,
+    ) {
+        let Some(event_id) = event.event_id() else {
+            return;
+        };
+        let client = room.client();
+        let stored = {
+            let _guard = self.inbox_lock.lock().await;
+            self.with_open_stores(async || load(&client).await).await
+        };
+        if !stored.is_ok_and(|stored| {
+            stored
+                .entries
+                .iter()
+                .any(|entry| entry.event_id == event_id && entry.undecryptable)
+        }) {
+            return;
+        }
+        self.record_live_inbox(room, event.raw(), actions, generation)
+            .await;
     }
 
     pub(crate) async fn inbox_notifications(
@@ -518,7 +567,9 @@ impl Core {
                 ts: entry.ts,
                 sender: entry.sender.to_string(),
                 sender_name: entry.sender_name.and_then(visible_name),
-                body: entry.body,
+                body: entry
+                    .body
+                    .filter(|_| self.shows_inbox_body(entry.encrypted)),
                 highlight: entry.highlight,
                 is_direct: entry.is_direct,
                 encrypted: entry.encrypted,
@@ -736,6 +787,38 @@ mod tests {
             .unwrap();
         assert_eq!(items.len(), 1);
         assert!(!items[0].read);
+    }
+
+    #[tokio::test]
+    async fn a_stored_encrypted_preview_is_hidden_once_the_setting_is_off() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, _room) = setup(&server, 1).await;
+        let stored = Entry {
+            body: Some("secret".to_owned()),
+            encrypted: true,
+            ..entry("secret", 200)
+        };
+        core.record_inbox(&client, vec![stored], BTreeMap::new(), BTreeMap::new())
+            .await
+            .unwrap();
+        core.notification_content
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+
+        core.notification_encrypted_content
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        let (items, _) = core
+            .inbox_notifications(InboxFilter::All, false, 30, None)
+            .await
+            .unwrap();
+        assert_eq!(items[0].body.as_deref(), Some("secret"));
+
+        core.notification_encrypted_content
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+        let (items, _) = core
+            .inbox_notifications(InboxFilter::All, false, 30, None)
+            .await
+            .unwrap();
+        assert_eq!(items[0].body, None);
     }
 
     #[tokio::test]
@@ -1080,6 +1163,7 @@ mod tests {
             highlight: false,
             is_direct: false,
             encrypted: false,
+            undecryptable: false,
         }
     }
 
@@ -1092,6 +1176,26 @@ mod tests {
         assert_eq!(added, 1);
         let order: Vec<u64> = entries.iter().map(|entry| entry.ts).collect();
         assert_eq!(order, vec![30, 20, 10]);
+    }
+
+    #[test]
+    fn merge_replaces_an_undecryptable_entry_with_its_decrypted_version() {
+        let mut stale = entry("a", 10);
+        stale.undecryptable = true;
+        stale.highlight = true;
+        let mut decrypted = entry("a", 10);
+        decrypted.body = Some("hello".to_owned());
+        let mut entries = vec![stale];
+
+        let changed = merge(&mut entries, vec![decrypted.clone()]);
+
+        assert_eq!(changed, 1);
+        assert_eq!(entries, vec![decrypted.clone()]);
+
+        let mut still_encrypted = entry("a", 10);
+        still_encrypted.undecryptable = true;
+        assert_eq!(merge(&mut entries, vec![still_encrypted]), 0);
+        assert_eq!(entries, vec![decrypted]);
     }
 
     #[test]

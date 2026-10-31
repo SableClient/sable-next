@@ -478,6 +478,11 @@ async fn decrypt_push_event(
     else {
         return ColdPush::Undecryptable;
     };
+    if let Ok(Some(sender)) = event.get_field::<matrix_sdk::ruma::OwnedUserId>("sender")
+        && client.is_user_ignored(&sender).await
+    {
+        return ColdPush::Discard;
+    }
     let _ = crate::rooms::fill_own_member(&room).await;
     let push_context = room.push_context().await.ok().flatten();
     let Ok(decrypted) = room.decrypt_event(&event, push_context.as_ref()).await else {
@@ -2409,6 +2414,31 @@ mod tests {
             .add_state_event(factory.member(user_id!("@alice:example.org")))
             .add_state_event(factory.member(user_id!("@sender:example.org")))
             .add_state_event(factory.power_levels())
+    }
+
+    #[tokio::test]
+    async fn a_cold_push_from_an_ignored_sender_is_discarded() {
+        let fixture = ColdFixture::new("ignored", cold_room_with_members(), None).await;
+        let client = fixture.client.as_ref().unwrap();
+        fixture
+            .server
+            .mock_sync()
+            .ok_and_run(client, |builder| {
+                builder.add_global_account_data(
+                    matrix_sdk_test::event_factory::EventFactory::new()
+                        .ignored_user_list([user_id!("@sender:example.org").to_owned()]),
+                );
+            })
+            .await;
+        let message = fixture
+            .push(
+                "m.room.message",
+                json!({"msgtype":"m.text", "body":"hello"}),
+            )
+            .await;
+
+        assert_eq!(fixture.decrypt("A", &message).await, ColdPush::Discard);
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     #[tokio::test]

@@ -3,6 +3,8 @@ use sable_model::text::visible_name;
 use std::sync::Arc;
 
 use futures_util::{StreamExt, pin_mut};
+use matrix_sdk::deserialized_responses::TimelineEvent;
+use matrix_sdk::event_cache::RedecryptorReport;
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::MilliSecondsSinceUnixEpoch;
 use matrix_sdk::ruma::events::room::member::{MembershipState, OriginalSyncRoomMemberEvent};
@@ -11,6 +13,7 @@ use matrix_sdk::ruma::events::typing::SyncTypingEvent;
 use matrix_sdk::ruma::events::{
     AnyGlobalAccountDataEvent, AnyStrippedStateEvent, AnySyncTimelineEvent,
 };
+use matrix_sdk::ruma::push::Action;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk_ui::sync_service::State as SyncState;
 
@@ -45,6 +48,25 @@ impl Drop for NotificationWorkerRoute {
             route.take();
         }
     }
+}
+
+fn redecrypted_notification(
+    event: &TimelineEvent,
+    actions: Vec<Action>,
+    now: MilliSecondsSinceUnixEpoch,
+) -> Option<Notification> {
+    if event.kind.is_utd()
+        || !notifications::notifies(&actions)
+        || event
+            .timestamp()
+            .is_none_or(|sent| notifications::is_backfill(now, sent))
+    {
+        return None;
+    }
+    Some(Notification {
+        event: RawAnySyncOrStrippedTimelineEvent::Sync(event.raw().clone()),
+        actions,
+    })
 }
 
 impl Core {
@@ -180,8 +202,10 @@ impl Core {
         *route
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(sender.clone());
+        let redecrypted = sender.clone();
         let route_guard = NotificationWorkerRoute { route, sender };
         drop(routes);
+        self.watch_redecrypted_notifications(client, redecrypted, generation);
 
         let core = self.clone();
         let client = client.clone();
@@ -267,6 +291,63 @@ impl Core {
                         && !read
                     {
                         core.emit_if_current(generation, CoreEvent::Notification { notification });
+                    }
+                }
+            })
+            .abort_on_drop(),
+        );
+    }
+
+    fn watch_redecrypted_notifications(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        notifications: NotificationSender,
+        generation: u64,
+    ) {
+        let Some(event_cache) = client.event_cache() else {
+            return;
+        };
+        let mut reports = event_cache.subscribe_to_decryption_reports();
+        let core = self.clone();
+        let client = client.clone();
+        self.track_session_task(
+            spawn(async move {
+                while let Some(report) = reports.next().await {
+                    let Ok(RedecryptorReport::ResolvedUtds { room_id, events }) = report else {
+                        continue;
+                    };
+                    let Some(room) = client.get_room(&room_id) else {
+                        continue;
+                    };
+                    let Some(event_cache) = client.event_cache() else {
+                        return;
+                    };
+                    let Ok((cache, _drop_handles)) = event_cache.room(&room_id).await else {
+                        continue;
+                    };
+                    for event_id in events {
+                        let Ok(Some(event)) = cache.find_event(&event_id).await else {
+                            continue;
+                        };
+                        let actions = match event.push_actions() {
+                            Some(actions) => actions.to_vec(),
+                            None => room
+                                .event_push_actions(event.raw())
+                                .await
+                                .ok()
+                                .flatten()
+                                .unwrap_or_default(),
+                        };
+                        core.refresh_undecryptable_inbox_entry(&room, &event, &actions, generation)
+                            .await;
+                        if let Some(notification) = redecrypted_notification(
+                            &event,
+                            actions,
+                            MilliSecondsSinceUnixEpoch::now(),
+                        ) && notifications.send((notification, room.clone())).is_err()
+                        {
+                            return;
+                        }
                     }
                 }
             })
@@ -623,6 +704,11 @@ pub(crate) async fn retry_backoff(failures: u32) {
 
 #[cfg(test)]
 mod tests {
+    use matrix_sdk::deserialized_responses::{
+        TimelineEvent, UnableToDecryptInfo, UnableToDecryptReason,
+    };
+    use matrix_sdk::ruma::MilliSecondsSinceUnixEpoch;
+    use matrix_sdk::ruma::push::Action;
     use matrix_sdk::ruma::serde::Raw;
     use matrix_sdk::ruma::{room_id, user_id};
     use matrix_sdk::test_utils::mocks::MatrixMockServer;
@@ -635,6 +721,38 @@ mod tests {
     use crate::store::MemorySessionStore;
 
     const ALICE: &str = "@alice:example.org";
+
+    #[test]
+    fn a_fresh_redecrypted_event_that_notifies_is_forwarded_once_and_stale_ones_are_not() {
+        let raw: Raw<matrix_sdk::ruma::events::AnySyncTimelineEvent> =
+            serde_json::from_value(json!({
+                "type": "m.room.message",
+                "event_id": "$late",
+                "sender": ALICE,
+                "origin_server_ts": 100_000,
+                "content": { "msgtype": "m.text", "body": "hi @bob" }
+            }))
+            .expect("event");
+        let event = TimelineEvent::from_plaintext(raw.clone());
+        let at = |ms: u64| MilliSecondsSinceUnixEpoch(ms.try_into().expect("timestamp"));
+
+        assert!(
+            super::redecrypted_notification(&event, vec![Action::Notify], at(110_000)).is_some()
+        );
+        assert!(
+            super::redecrypted_notification(&event, vec![Action::Notify], at(500_000)).is_none()
+        );
+        assert!(super::redecrypted_notification(&event, Vec::new(), at(110_000)).is_none());
+
+        let utd = TimelineEvent::from_utd(
+            raw,
+            UnableToDecryptInfo {
+                session_id: None,
+                reason: UnableToDecryptReason::Unknown,
+            },
+        );
+        assert!(super::redecrypted_notification(&utd, vec![Action::Notify], at(110_000)).is_none());
+    }
 
     fn member<T>(
         event_id: &str,

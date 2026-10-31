@@ -108,6 +108,13 @@ fn scrub_fields(fields: &mut std::collections::BTreeMap<String, serde_json::Valu
                 | "module_path"
                 | "file"
                 | "line"
+                | "cause"
+                | "age"
+                | "own_identity_trusted"
+                | "same_homeserver"
+                | "backup"
+                | "account_cross_signed"
+                | "device_cross_signed"
         )
     });
     for value in fields.values_mut() {
@@ -328,7 +335,14 @@ mod tests {
                 target: "matrix_sdk_crypto::olm::account",
                 "Failed to decrypt a non-pre-key message with all available sessions"
             );
-            tracing::warn!(target: "sable_core::utd", reported = true, "unable to decrypt a message");
+            tracing::warn!(
+                target: "sable_core::utd",
+                reported = true,
+                cause = "WithheldBySender",
+                age = "later",
+                backup = "Enabled",
+                "unable to decrypt a message"
+            );
             tracing::warn!(target: "matrix_sdk_crypto::machine", "a routine warning");
         });
         let envelopes = transport.0.lock().unwrap();
@@ -348,6 +362,10 @@ mod tests {
                 Some("unable to decrypt a message"),
             ]
         );
+        let utd = serde_json::to_string(&events[1]).unwrap();
+        for field in ["WithheldBySender", "later", "Enabled"] {
+            assert!(utd.contains(field), "{field} missing from {utd}");
+        }
     }
 
     #[test]
