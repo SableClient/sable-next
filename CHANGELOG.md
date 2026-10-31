@@ -1,5 +1,21 @@
 # Sable Changelog
 
+## 2.3.0 (2026-10-31)
+
+### Features
+
+* Encrypt the local message and key stores with a key from the system keyring. Existing stores are encrypted on the first start without signing in again, and the room list is fetched again once. Notification previews show a generic alert until the app has been opened after the update.
+* Seal saved logins with a key kept in the system keyring, the Android Keystore or the iOS Keychain. On Linux, Sable now needs a Secret Service such as GNOME Keyring or KWallet and explains how to set one up when none is available.
+
+* Account settings layout adjustment
+
+### Fixes
+
+* Add open at sign-in, start hidden, native unread badges, taskbar flashing and zoom shortcuts to the desktop app.
+* Default screen sharing to H.264 and enable hardware video encoding and decoding in the desktop app.
+* Fix joining big spaces by alias failing with a URL too long error.
+* Seal the saved web session with a browser key that page scripts cannot export. The browser keeps that key in its profile, so the web app still relies on the device being protected.
+
 ## 2.2.3 (2026-10-30)
 
 ### Fixes
