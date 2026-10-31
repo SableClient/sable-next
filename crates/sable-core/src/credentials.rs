@@ -73,7 +73,8 @@ impl LoginTokens {
         Ok(Some(serde_json::from_value(tokens)?))
     }
 
-    /// `Ok(None)` only when the login has no file: an unreadable one must not pass for missing.
+    /// `Ok(None)` when the login has no file, or its key is gone from the keyring for good. An
+    /// unreadable file must not pass for missing.
     pub(crate) fn read(
         &self,
         account_id: &str,

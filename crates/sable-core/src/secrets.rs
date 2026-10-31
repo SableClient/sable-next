@@ -257,14 +257,23 @@ mod keyring {
                     .map_err(|error| unavailable(&error))?
             };
             let keyring = Self { store, service };
-            // A Secret Service can answer reads and still refuse every write, as one started
-            // without a default collection does, so the first login save would fail instead.
-            let probe = keyring.entry("probe")?;
+            #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "windows")))]
+            keyring.probe()?;
+            Ok(keyring)
+        }
+
+        /// A Secret Service can answer reads and still refuse every write, as one started without
+        /// a default collection does, so the first login save would fail instead.
+        #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "windows")))]
+        fn probe(&self) -> Result<(), StoreError> {
+            let mut name = [0u8; 8];
+            getrandom::fill(&mut name).map_err(StoreError::backend)?;
+            let probe = self.entry(&format!("probe-{}", u64::from_le_bytes(name)))?;
             probe
                 .set_secret(b"probe")
                 .map_err(|error| unavailable(&error))?;
             match probe.delete_credential() {
-                Ok(()) | Err(Error::NoEntry) => Ok(keyring),
+                Ok(()) | Err(Error::NoEntry) => Ok(()),
                 Err(error) => Err(unavailable(&error)),
             }
         }

@@ -6,6 +6,7 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.annotation.Keep
 import java.security.KeyStore
+import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -41,7 +42,12 @@ object Secrets {
         val bytes = Base64.decode(sealed, Base64.NO_WRAP)
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(TAG_BITS, bytes, 0, IV_SIZE))
-        return cipher.doFinal(bytes, IV_SIZE, bytes.size - IV_SIZE)
+        // Sealed with a Keystore key that has since been replaced.
+        return try {
+            cipher.doFinal(bytes, IV_SIZE, bytes.size - IV_SIZE)
+        } catch (_: AEADBadTagException) {
+            null
+        }
     }
 
     @JvmStatic

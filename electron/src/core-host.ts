@@ -35,91 +35,105 @@ if (!identifier) throw new Error('SABLE_IDENTIFIER is not set');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const native = require('./sable_node.node') as NativeModule;
-try {
-  native.installKeyring(identifier);
-} catch (error) {
-  process.parentPort.postMessage({
-    keyringUnavailable: error instanceof Error ? error.message : String(error),
-  });
-  process.exit(1);
-}
-const instance = new native.SableCore(dataDir, process.env.SABLE_LOG ?? null);
-void instance.restore();
-
-function unwrap<T>(promise: Promise<T>): Promise<T> {
-  return promise.catch((error: unknown) => {
-    throw new Error(error instanceof Error ? error.message : String(error));
-  });
-}
-
-const core: WorkerCore = {
-  call: (method, params) => unwrap(instance.call(method, params)),
-  fetchMedia: (source, width, height, background) =>
-    unwrap(instance.fetchMedia(source, width, height, background)),
-  forgetMedia: (source) => unwrap(instance.forgetMedia(source)),
-  sendAttachment: (request, bytes) => unwrap(instance.sendAttachment(request, bytes)),
-  sendGallery: (request, items) => unwrap(instance.sendGallery(request, items)),
-  uploadMedia: (mime, bytes) => unwrap(instance.uploadMedia(mime, bytes)),
-  setActive: (active) => unwrap(instance.setActive(active)),
-};
-
-const boundary = createCoreWorkerBoundary(
-  Promise.resolve(core),
-  (enabled) => {
-    native.setLogCapture(enabled);
-  },
-  () => {
-    process.exit(0);
+function keyringFailure(service: string): string | null {
+  try {
+    native.installKeyring(service);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
   }
-);
-native.setLogHandler(boundary.handleLog);
-
-let backlog: string[] | null = [];
-let backlogged = 0;
-instance.subscribeEvents((json) => {
-  if (!backlog) {
-    boundary.handleEvent(json);
-  } else if (backlogged < EVENT_BACKLOG_LIMIT) {
-    backlog.push(json);
-    backlogged += (JSON.parse(json) as unknown[]).length;
-  }
-});
-
-function wrap(port: MessagePortMain): WorkerPort {
-  let onmessage: WorkerPort['onmessage'] = null;
-  const deliver = (data: WorkerRequest) => {
-    void onmessage?.({ data } as MessageEvent<WorkerRequest>);
-  };
-  port.on('message', (event) => {
-    deliver(event.data as WorkerRequest);
-  });
-  port.on('close', () => {
-    deliver({ disconnect: true });
-  });
-
-  return {
-    postMessage: (message) => {
-      port.postMessage(message);
-    },
-    get onmessage() {
-      return onmessage;
-    },
-    set onmessage(handler) {
-      onmessage = handler;
-    },
-    onmessageerror: null,
-    start: () => {
-      port.start();
-    },
-  };
 }
 
-process.parentPort.on('message', (event) => {
-  if (event.ports.length !== 1) return;
-  const [port] = event.ports;
-  boundary.connect(wrap(port));
+function serve(directory: string): void {
+  const instance = new native.SableCore(directory, process.env.SABLE_LOG ?? null);
+  void instance.restore();
 
-  const queued = backlog;
-  backlog = null;
-  for (const json of queued ?? []) boundary.handleEvent(json);
-});
+  function unwrap<T>(promise: Promise<T>): Promise<T> {
+    return promise.catch((error: unknown) => {
+      throw new Error(error instanceof Error ? error.message : String(error));
+    });
+  }
+
+  const core: WorkerCore = {
+    call: (method, params) => unwrap(instance.call(method, params)),
+    fetchMedia: (source, width, height, background) =>
+      unwrap(instance.fetchMedia(source, width, height, background)),
+    forgetMedia: (source) => unwrap(instance.forgetMedia(source)),
+    sendAttachment: (request, bytes) => unwrap(instance.sendAttachment(request, bytes)),
+    sendGallery: (request, items) => unwrap(instance.sendGallery(request, items)),
+    uploadMedia: (mime, bytes) => unwrap(instance.uploadMedia(mime, bytes)),
+    setActive: (active) => unwrap(instance.setActive(active)),
+  };
+
+  const boundary = createCoreWorkerBoundary(
+    Promise.resolve(core),
+    (enabled) => {
+      native.setLogCapture(enabled);
+    },
+    () => {
+      process.exit(0);
+    }
+  );
+  native.setLogHandler(boundary.handleLog);
+
+  let backlog: string[] | null = [];
+  let backlogged = 0;
+  instance.subscribeEvents((json) => {
+    if (!backlog) {
+      boundary.handleEvent(json);
+    } else if (backlogged < EVENT_BACKLOG_LIMIT) {
+      backlog.push(json);
+      backlogged += (JSON.parse(json) as unknown[]).length;
+    }
+  });
+
+  function wrap(port: MessagePortMain): WorkerPort {
+    let onmessage: WorkerPort['onmessage'] = null;
+    const deliver = (data: WorkerRequest) => {
+      void onmessage?.({ data } as MessageEvent<WorkerRequest>);
+    };
+    port.on('message', (event) => {
+      deliver(event.data as WorkerRequest);
+    });
+    port.on('close', () => {
+      deliver({ disconnect: true });
+    });
+
+    return {
+      postMessage: (message) => {
+        port.postMessage(message);
+      },
+      get onmessage() {
+        return onmessage;
+      },
+      set onmessage(handler) {
+        onmessage = handler;
+      },
+      onmessageerror: null,
+      start: () => {
+        port.start();
+      },
+    };
+  }
+
+  process.parentPort.on('message', (event) => {
+    if (event.ports.length !== 1) return;
+    const [port] = event.ports;
+    boundary.connect(wrap(port));
+
+    const queued = backlog;
+    backlog = null;
+    for (const json of queued ?? []) boundary.handleEvent(json);
+  });
+}
+
+const failure = keyringFailure(identifier);
+if (failure === null) {
+  serve(dataDir);
+} else {
+  process.parentPort.postMessage({ keyringUnavailable: failure });
+  // The main process quits once it shows the error; this only covers a lost message.
+  setTimeout(() => {
+    process.exit(1);
+  }, 10_000);
+}
