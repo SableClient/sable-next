@@ -2,6 +2,7 @@ const DATABASE_NAME = 'sable-next-session';
 const DATABASE_VERSION = 1;
 const STORE_NAME = 'session';
 const SESSION_KEY = 'current';
+const SEALING_KEY = 'sealing-key';
 const V1_MIGRATION_KEY = 'v1-migrated';
 
 const APP_DATABASE_PREFIX = 'sable-next';
@@ -73,6 +74,75 @@ function transaction(
   );
 }
 
+function readRecord(key: string): Promise<unknown> {
+  return openDatabase().then(
+    (database) =>
+      new Promise((resolve, reject) => {
+        const tx = database.transaction(STORE_NAME, 'readonly');
+        const request = tx.objectStore(STORE_NAME).get(key);
+        tx.oncomplete = () => {
+          resolve(request.result);
+        };
+        tx.onabort = tx.onerror = () => {
+          reject(tx.error ?? new Error('Could not read the session database'));
+        };
+      })
+  );
+}
+
+interface Sealed {
+  iv: Uint8Array<ArrayBuffer>;
+  data: ArrayBuffer;
+}
+
+function isSealed(value: unknown): value is Sealed {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as Sealed).iv instanceof Uint8Array &&
+    (value as Sealed).data instanceof ArrayBuffer
+  );
+}
+
+let sealingKey: Promise<CryptoKey> | undefined;
+
+// Only keeps the raw key from being exported. Same-origin scripts can still use it, and the
+// browser keeps it beside the data it seals, so anyone holding the profile can read both.
+function loadSealingKey(): Promise<CryptoKey> {
+  sealingKey ??= (async () => {
+    const saved = await readRecord(SEALING_KEY);
+    if (saved instanceof CryptoKey) return saved;
+    const key = await globalThis.crypto.subtle.generateKey(
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+    // Another context may have saved its key first: theirs wins.
+    await transaction('readwrite', (store) => store.add(key, SEALING_KEY)).catch(
+      (error: unknown) => {
+        if (!(error instanceof DOMException && error.name === 'ConstraintError')) throw error;
+      }
+    );
+    const kept = await readRecord(SEALING_KEY);
+    if (!(kept instanceof CryptoKey)) throw new Error('Could not keep the session sealing key');
+    return kept;
+  })().catch((error: unknown) => {
+    sealingKey = undefined;
+    throw asError(error);
+  });
+  return sealingKey;
+}
+
+async function seal(bytes: Uint8Array<ArrayBuffer>): Promise<Sealed> {
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+  const data = await globalThis.crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    await loadSealingKey(),
+    bytes
+  );
+  return { iv, data };
+}
+
 function toBytes(value: unknown): Uint8Array | null {
   if (value == null) return null;
   if (value instanceof Uint8Array) return new Uint8Array(value);
@@ -84,33 +154,33 @@ function asError(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error(String(cause));
 }
 
-export function loadSession(): Promise<Uint8Array | null> {
-  return openDatabase().then(
-    (database) =>
-      new Promise((resolve, reject) => {
-        const tx = database.transaction(STORE_NAME, 'readonly');
-        const request = tx.objectStore(STORE_NAME).get(SESSION_KEY);
-
-        request.onsuccess = () => {
-          try {
-            resolve(toBytes(request.result));
-          } catch (error) {
-            reject(asError(error));
-          }
-        };
-        request.onerror = () => {
-          reject(request.error ?? new Error('Could not load the session'));
-        };
-        tx.onerror = () => {
-          reject(tx.error ?? new Error('Could not read the session database'));
-        };
-      })
-  );
+export async function loadSession(): Promise<Uint8Array | null> {
+  const value = await readRecord(SESSION_KEY);
+  if (isSealed(value)) {
+    try {
+      return new Uint8Array(
+        await globalThis.crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: value.iv },
+          await loadSealingKey(),
+          value.data
+        )
+      );
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'OperationError') {
+        console.warn('The saved session can no longer be opened; signing out');
+        return null;
+      }
+      throw asError(error);
+    }
+  }
+  const bytes = toBytes(value);
+  if (bytes) await saveSession(bytes);
+  return bytes;
 }
 
-export function saveSession(bytes: Uint8Array): Promise<void> {
-  // Copy the WASM-owned bytes before IndexedDB takes ownership of the value.
-  const value = Uint8Array.from(bytes).buffer;
+export async function saveSession(bytes: Uint8Array): Promise<void> {
+  // Copy the WASM-owned bytes before sealing yields to the event loop.
+  const value = await seal(Uint8Array.from(bytes));
   return transaction('readwrite', (store) => store.put(value, SESSION_KEY));
 }
 
@@ -137,8 +207,8 @@ export function markV1MigrationComplete(): Promise<void> {
 }
 
 export async function saveV1Session(bytes: Uint8Array): Promise<void> {
+  const value = await seal(Uint8Array.from(bytes));
   const database = await openDatabase();
-  const value = Uint8Array.from(bytes).buffer;
   return new Promise((resolve, reject) => {
     const tx = database.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
