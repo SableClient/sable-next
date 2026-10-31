@@ -17,7 +17,7 @@ use serde_json::{Value, value::RawValue};
 use tokio::sync::{broadcast, mpsc};
 use tower_sessions::Session;
 
-use crate::{EventRecord, Server, SessionRevocation, UserRuntime, unauthorized};
+use crate::{EventRecord, Server, SessionRevocation, UserRuntime, auth_routes::unauthorized};
 
 const MAX_WEBSOCKET_MESSAGE_SIZE: usize = 1024 * 1024;
 const PING_TIMEOUT: Duration = Duration::from_secs(60);

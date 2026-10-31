@@ -2,8 +2,12 @@
 #![expect(clippy::missing_errors_doc, reason = "errors are the returned types")]
 
 mod auth;
+mod auth_routes;
+mod cli;
 pub mod config;
+mod media;
 mod oidc;
+mod oidc_routes;
 mod outbound;
 mod sessions;
 mod users;
@@ -11,7 +15,6 @@ mod ws;
 
 use std::{
     collections::{HashMap, VecDeque},
-    io::{IsTerminal, Read},
     net::{IpAddr, SocketAddr},
     path::PathBuf,
     sync::{
@@ -22,41 +25,35 @@ use std::{
 };
 
 use axum::{
-    Extension, Router,
-    body::{Body, Bytes},
-    extract::{FromRequestParts, Path as AxumPath, Query, State},
-    http::{HeaderMap, HeaderValue, Method, StatusCode, header},
-    middleware::{self, Next},
-    response::{IntoResponse, Response},
+    Router,
+    http::{HeaderValue, Method, header},
+    middleware,
     routing::{get, post},
 };
-use axum_client_ip::{ClientIp, ClientIpSource};
-use axum_extra::{
-    TypedHeader,
-    headers::{
-        Cookie, HeaderMapExt,
-        authorization::{Authorization, Basic},
-    },
-};
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use clap::{Parser, Subcommand};
-use sable_core::{Core, protocol::RpcError, store::ExclusiveFileSessionStore};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use axum_client_ip::ClientIpSource;
+use clap::Parser;
+use sable_core::{Core, store::ExclusiveFileSessionStore};
+use serde::Serialize;
 use tokio::sync::{Mutex, OnceCell, Semaphore, broadcast, watch};
 use tower::limit::ConcurrencyLimitLayer;
-use tower_governor::{
-    GovernorError, GovernorLayer, governor::GovernorConfigBuilder, key_extractor::KeyExtractor,
-};
+use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
 use tower_http::{
     limit::RequestBodyLimitLayer,
     services::{ServeDir, ServeFile},
     set_header::response::SetResponseHeaderLayer,
 };
-use tower_sessions::{Expiry, Session, SessionManagerLayer, cookie::SameSite};
+use tower_sessions::{Expiry, SessionManagerLayer, cookie::SameSite};
 
 use crate::{
-    auth::{Auth, logout as destroy_session},
+    auth::Auth,
+    auth_routes::{
+        ClientIpKeyExtractor, auth_middleware, auth_status, authenticate, cancel_on_shutdown,
+        extract_client_ip, logout, server_identity,
+    },
+    cli::Cli,
     config::{Config, is_loopback_url},
+    media::{forget_media, media, send_attachment, send_gallery, upload},
+    oidc_routes::{oidc_callback, oidc_start, oidc_status},
     sessions::SessionMemoryStore,
 };
 
@@ -614,649 +611,17 @@ impl Frontend {
     }
 }
 
-#[derive(Deserialize)]
-struct MediaQuery {
-    width: Option<u32>,
-    height: Option<u32>,
-    background: Option<bool>,
-    source: Option<String>,
-    inline: Option<bool>,
-}
-
 async fn health() -> &'static str {
     "ok"
 }
 
-#[derive(Deserialize)]
-struct OidcCallback {
-    code: String,
-    state: String,
-}
-
-async fn oidc_status(State(server): State<Server>) -> Response {
-    let mut response = axum::Json(
-        serde_json::json!({ "oidc": server.oidc.is_some(), "local": server.auth.local_enabled() }),
-    )
-    .into_response();
-    response
-        .headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    response
-}
-
-async fn oidc_start(
-    State(server): State<Server>,
-    Extension(ClientIp(ip)): Extension<ClientIp>,
-    headers: HeaderMap,
-) -> Response {
-    let Some(oidc) = &server.oidc else {
-        return StatusCode::NOT_FOUND.into_response();
-    };
-    {
-        let mut transactions = server.oidc_transactions.lock().await;
-        transactions.retain(|_, (created, _, _)| created.elapsed() < Duration::from_secs(600));
-        if let Some(previous) = oidc_cookie(&headers) {
-            transactions.remove(&previous);
-        }
-        if transactions.len() >= 1024
-            || transactions
-                .values()
-                .filter(|(_, owner, _)| *owner == ip)
-                .count()
-                >= 5
-        {
-            return StatusCode::SERVICE_UNAVAILABLE.into_response();
-        }
-    }
-    let Ok((url, transaction)) = oidc.start().await else {
-        return StatusCode::BAD_GATEWAY.into_response();
-    };
-    let cookie = uuid::Uuid::new_v4().to_string();
-    let mut transactions = server.oidc_transactions.lock().await;
-    transactions.retain(|_, (created, _, _)| created.elapsed() < Duration::from_secs(600));
-    if let Some(previous) = oidc_cookie(&headers) {
-        transactions.remove(&previous);
-    }
-    if transactions.len() >= 1024
-        || transactions
-            .values()
-            .filter(|(_, owner, _)| *owner == ip)
-            .count()
-            >= 5
-    {
-        return StatusCode::SERVICE_UNAVAILABLE.into_response();
-    }
-    transactions.insert(cookie.clone(), (Instant::now(), ip, transaction));
-    let mut response = axum::response::Redirect::temporary(&url).into_response();
-    let cookie =
-        format!("__Host-sable_oidc={cookie}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=600");
-    if let Ok(value) = HeaderValue::from_str(&cookie) {
-        response.headers_mut().append(header::SET_COOKIE, value);
-    }
-    response
-}
-
-fn oidc_cookie(headers: &HeaderMap) -> Option<String> {
-    headers
-        .typed_get::<Cookie>()?
-        .get("__Host-sable_oidc")
-        .map(ToOwned::to_owned)
-}
-
-async fn oidc_callback(
-    State(server): State<Server>,
-    session: Session,
-    headers: HeaderMap,
-    Query(query): Query<OidcCallback>,
-) -> Response {
-    let Some(oidc) = &server.oidc else {
-        return StatusCode::NOT_FOUND.into_response();
-    };
-    let cookie = oidc_cookie(&headers);
-    let Some(cookie) = cookie else {
-        return StatusCode::BAD_REQUEST.into_response();
-    };
-    let transaction = server.oidc_transactions.lock().await.remove(&cookie);
-    let Some((created, _, transaction)) = transaction else {
-        return StatusCode::BAD_REQUEST.into_response();
-    };
-    if created.elapsed() >= Duration::from_secs(600) || transaction.state != query.state {
-        return StatusCode::BAD_REQUEST.into_response();
-    }
-    let Ok(subject) = oidc.exchange(query.code, transaction).await else {
-        return StatusCode::UNAUTHORIZED.into_response();
-    };
-    let user_id = if server.oidc_auto_provision {
-        server
-            .auth
-            .provision_oidc(oidc.issuer.clone(), subject)
-            .await
-    } else {
-        server.auth.oidc_user(&oidc.issuer, &subject)
-    };
-    let Some(user_id) = user_id else {
-        return StatusCode::FORBIDDEN.into_response();
-    };
-    if server.auth.login(&session, &user_id, None).await.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
-    let mut response = axum::response::Redirect::to("/").into_response();
-    response.headers_mut().append(
-        header::SET_COOKIE,
-        HeaderValue::from_static(
-            "__Host-sable_oidc=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0",
-        ),
-    );
-    response
-}
-
-#[derive(Clone)]
-struct ServerUserId(String);
-
-async fn server_identity(Extension(user): Extension<ServerUserId>) -> Response {
-    let mut response = axum::Json(serde_json::json!({ "id": user.0 })).into_response();
-    response
-        .headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    response
-}
-
-async fn auth_status(State(server): State<Server>, session: Session) -> Response {
-    if server.auth.authenticate(&session).await.is_some() {
-        StatusCode::NO_CONTENT.into_response()
-    } else {
-        unauthorized().into_response()
-    }
-}
-
-async fn authenticate(
-    State(server): State<Server>,
-    session: Session,
-    credentials: Option<TypedHeader<Authorization<Basic>>>,
-) -> Response {
-    let Ok(permit) = server.password_checks.clone().try_acquire_owned() else {
-        return StatusCode::TOO_MANY_REQUESTS.into_response();
-    };
-    let Some((user_id, version)) = server
-        .auth
-        .check_basic(credentials.as_ref().map(|TypedHeader(value)| value), permit)
-        .await
-    else {
-        let mut response = StatusCode::UNAUTHORIZED.into_response();
-        response.headers_mut().insert(
-            header::WWW_AUTHENTICATE,
-            HeaderValue::from_static("Basic realm=\"Sable\", charset=\"UTF-8\""),
-        );
-        return response;
-    };
-    if server
-        .auth
-        .login(&session, &user_id, Some(version))
-        .await
-        .is_err()
-    {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
-    StatusCode::NO_CONTENT.into_response()
-}
-
-async fn logout(State(server): State<Server>, session: Session) -> Response {
-    let id = session.id();
-    if destroy_session(&session).await.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
-    if let Some(id) = id {
-        let _ = server
-            .session_revocations
-            .send(SessionRevocation::Session(id));
-    }
-    StatusCode::NO_CONTENT.into_response()
-}
-
-async fn cancel_on_shutdown(
-    State(server): State<Server>,
-    request: axum::http::Request<Body>,
-    next: Next,
-) -> Response {
-    let mut shutdown = server.shutdown.subscribe();
-    if *shutdown.borrow() || server.runtimes.shutting_down.load(Ordering::Acquire) {
-        return StatusCode::SERVICE_UNAVAILABLE.into_response();
-    }
-    tokio::select! {
-        _ = shutdown.changed() => StatusCode::SERVICE_UNAVAILABLE.into_response(),
-        response = next.run(request) => response,
-    }
-}
-
-async fn auth_middleware(
-    State(server): State<Server>,
-    mut request: axum::http::Request<Body>,
-    next: Next,
-) -> Response {
-    let path = request.uri().path().to_owned();
-    if !path.starts_with("/_sable/") && path != "/_sable" {
-        return next.run(request).await;
-    }
-    let session = request.extensions().get::<Session>().cloned();
-    let user_id = if let Some(session) = &session {
-        server.auth.authenticate(session).await
-    } else {
-        None
-    };
-    if matches!(
-        path.as_str(),
-        "/_sable/oidc/status" | "/_sable/oidc/start" | "/_sable/oidc/callback"
-    ) {
-        return next.run(request).await;
-    }
-    if path == "/_sable/auth" {
-        if request.method() != Method::GET
-            && request.method() != Method::HEAD
-            && request.headers().contains_key(header::COOKIE)
-            && !same_origin(request.headers(), &server.public_url)
-        {
-            return StatusCode::FORBIDDEN.into_response();
-        }
-        return next.run(request).await;
-    }
-    let Some(user_id) = user_id else {
-        return unauthorized().into_response();
-    };
-    if request
-        .headers()
-        .get("x-sable-user")
-        .is_some_and(|expected| expected.as_bytes() != user_id.as_bytes())
-    {
-        return StatusCode::FORBIDDEN.into_response();
-    }
-    let state_change = request.method() != Method::GET && request.method() != Method::HEAD;
-    let websocket = path == "/_sable/ws";
-    if (state_change || websocket) && !same_origin(request.headers(), &server.public_url) {
-        return StatusCode::FORBIDDEN.into_response();
-    }
-    let runtime = match server.runtimes.get(&user_id).await {
-        Ok(runtime) => runtime,
-        Err(error) => {
-            tracing::error!(%error, "failed to open user runtime");
-            return StatusCode::SERVICE_UNAVAILABLE.into_response();
-        }
-    };
-    // Logout must remain available even if a user has exhausted their request quota.
-    let (_request, _user_request) = if path == "/_sable/logout" || websocket {
-        (None, None)
-    } else {
-        let Ok(request_permit) = server.http_requests.clone().try_acquire_owned() else {
-            return StatusCode::TOO_MANY_REQUESTS.into_response();
-        };
-        let Ok(user_permit) = runtime.http_requests.clone().try_acquire_owned() else {
-            return StatusCode::TOO_MANY_REQUESTS.into_response();
-        };
-        (Some(request_permit), Some(user_permit))
-    };
-    let _upload = if matches!(
-        path.as_str(),
-        "/_sable/upload" | "/_sable/send-attachment" | "/_sable/send-gallery"
-    ) {
-        match runtime.uploads.clone().try_acquire_owned() {
-            Ok(permit) => Some(permit),
-            Err(_) => return StatusCode::TOO_MANY_REQUESTS.into_response(),
-        }
-    } else {
-        None
-    };
-    let Some(session_id) = session.and_then(|session| session.id()) else {
-        return unauthorized().into_response();
-    };
-    request.extensions_mut().insert(runtime);
-    request
-        .extensions_mut()
-        .insert(ServerUserId(user_id.clone()));
-    if path == "/_sable/logout" {
-        return next.run(request).await;
-    }
-
-    run_protected_request(&server, session_id, &user_id, request, next).await
-}
-
-async fn run_protected_request(
-    server: &Server,
-    session_id: tower_sessions::session::Id,
-    user_id: &str,
-    request: axum::http::Request<Body>,
-    next: Next,
-) -> Response {
-    let mut revocations = server.session_revocations.subscribe();
-    let valid_session = || async {
-        let session = Session::new(Some(session_id), Arc::new(server.sessions.clone()), None);
-        server.auth.authenticate(&session).await.as_deref() == Some(user_id)
-    };
-    if !valid_session().await {
-        return unauthorized().into_response();
-    }
-    let response = next.run(request);
-    tokio::pin!(response);
-    loop {
-        tokio::select! {
-            result = &mut response => {
-                return if valid_session().await { result } else { unauthorized().into_response() };
-            }
-            revoked = revocations.recv() => {
-                if SessionRevocation::ends(&revoked, session_id, user_id) {
-                    return unauthorized().into_response();
-                }
-            }
-        }
-    }
-}
-
-fn same_origin(headers: &HeaderMap, public_url: &str) -> bool {
-    headers
-        .get(header::ORIGIN)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|origin| origin == public_url)
-}
-
-#[derive(Clone, Copy)]
-struct ClientIpKeyExtractor;
-
-impl KeyExtractor for ClientIpKeyExtractor {
-    type Key = IpAddr;
-
-    fn extract<T>(&self, request: &axum::http::Request<T>) -> Result<Self::Key, GovernorError> {
-        request
-            .extensions()
-            .get::<ClientIp>()
-            .map(|ClientIp(ip)| *ip)
-            .ok_or(GovernorError::UnableToExtractKey)
-    }
-}
-
-fn unauthorized() -> Response {
-    StatusCode::UNAUTHORIZED.into_response()
-}
-
-async fn extract_client_ip(request: axum::http::Request<Body>, next: Next) -> Response {
-    let (mut parts, body) = request.into_parts();
-    let Ok(client_ip) = ClientIp::from_request_parts(&mut parts, &()).await else {
-        return StatusCode::BAD_REQUEST.into_response();
-    };
-    parts.extensions.insert(client_ip);
-    next.run(axum::http::Request::from_parts(parts, body)).await
-}
-
-async fn media(
-    Extension(runtime): Extension<Arc<UserRuntime>>,
-    AxumPath((media_server, media_id)): AxumPath<(String, String)>,
-    Query(query): Query<MediaQuery>,
-) -> Response {
-    let source = query
-        .source
-        .and_then(|source| URL_SAFE_NO_PAD.decode(source).ok())
-        .and_then(|bytes| String::from_utf8(bytes).ok())
-        .unwrap_or_else(|| format!("mxc://{media_server}/{media_id}"));
-    let bytes = match runtime
-        .core
-        .fetch_media(
-            source,
-            query.width.unwrap_or(0),
-            query.height.unwrap_or(0),
-            query.background.unwrap_or(false),
-        )
-        .await
-    {
-        Ok(bytes) => bytes,
-        Err(error) => return rpc_error_response(error),
-    };
-    let content_type = if query.width.unwrap_or(0) > 0 || query.height.unwrap_or(0) > 0 {
-        "image/jpeg"
-    } else {
-        "application/octet-stream"
-    };
-    let mut response = (StatusCode::OK, bytes).into_response();
-    response
-        .headers_mut()
-        .insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
-    response.headers_mut().insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("private, no-store"),
-    );
-    let disposition = if query.inline.unwrap_or(false) && content_type.starts_with("image/") {
-        "inline"
-    } else {
-        "attachment"
-    };
-    response.headers_mut().insert(
-        header::CONTENT_DISPOSITION,
-        HeaderValue::from_static(disposition),
-    );
-    response
-}
-
-async fn upload(
-    Extension(runtime): Extension<Arc<UserRuntime>>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Response {
-    let mime = headers
-        .get(header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("application/octet-stream")
-        .to_owned();
-    match runtime.core.upload_media(mime, body.into()).await {
-        Ok(uri) => (StatusCode::OK, axum::Json(uri)).into_response(),
-        Err(error) => rpc_error_response(error),
-    }
-}
-
-#[derive(Deserialize)]
-struct ForgetMediaRequest {
-    source: String,
-}
-
-async fn forget_media(
-    Extension(runtime): Extension<Arc<UserRuntime>>,
-    axum::Json(request): axum::Json<ForgetMediaRequest>,
-) -> Response {
-    match runtime.core.forget_media(request.source).await {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(error) => rpc_error_response(error),
-    }
-}
-
-async fn send_attachment(
-    Extension(runtime): Extension<Arc<UserRuntime>>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Response {
-    let Ok(request) = decode_carried::<sable_core::protocol::SendAttachmentRequest>(&headers)
-    else {
-        return StatusCode::BAD_REQUEST.into_response();
-    };
-    match runtime.core.send_attachment(request, body.into()).await {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(error) => rpc_error_response(error),
-    }
-}
-
-async fn send_gallery(
-    Extension(runtime): Extension<Arc<UserRuntime>>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Response {
-    let Ok(request) = decode_carried::<sable_core::protocol::SendGalleryRequest>(&headers) else {
-        return StatusCode::BAD_REQUEST.into_response();
-    };
-    match runtime.core.send_gallery(request, body.into()).await {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(error) => rpc_error_response(error),
-    }
-}
-
-fn decode_carried<T: DeserializeOwned>(headers: &HeaderMap) -> Result<T, ()> {
-    let Some(encoded) = headers
-        .get("x-sable-request")
-        .and_then(|value| value.to_str().ok())
-    else {
-        return Err(());
-    };
-    URL_SAFE_NO_PAD
-        .decode(encoded)
-        .map_err(|_| ())
-        .and_then(|request| serde_json::from_slice(&request).map_err(|_| ()))
-}
-
-fn rpc_error_response(error: RpcError) -> Response {
-    (StatusCode::BAD_GATEWAY, axum::Json(error)).into_response()
-}
-
-#[derive(Parser)]
-#[command(name = "sable-server")]
-struct Cli {
-    #[command(subcommand)]
-    command: Option<Command>,
-    #[arg(long)]
-    config: Option<PathBuf>,
-}
-
-#[derive(Subcommand)]
-enum Command {
-    HashPassword,
-    AddUser {
-        username: String,
-    },
-    AddOidcUser {
-        subject: String,
-    },
-    DisableUser {
-        id: String,
-    },
-    RemoveUser {
-        id: String,
-        #[arg(long)]
-        delete_data: bool,
-    },
-    EnableUser {
-        id: String,
-    },
-    SetUserPassword {
-        id: String,
-    },
-    ListUsers,
-}
-
-#[expect(
-    clippy::too_many_lines,
-    reason = "CLI dispatch keeps administrative operations together"
-)]
 pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing_subscriber::fmt::init();
     let cli = Cli::parse();
-    if matches!(cli.command, Some(Command::HashPassword)) {
-        use argon2::{Argon2, Params, PasswordHasher, Version};
-
-        let password = if std::io::stdin().is_terminal() {
-            rpassword::prompt_password("Password: ")?
-        } else {
-            let mut password = String::new();
-            std::io::stdin().read_to_string(&mut password)?;
-            password.trim_end().to_owned()
-        };
-        let params = Params::new(19_456, 2, 1, None)?;
-        let argon2 = Argon2::new(argon2::Algorithm::Argon2id, Version::V0x13, params);
-        println!("{}", argon2.hash_password(password.as_bytes())?);
-        return Ok(());
+    if let Some(command) = cli.command {
+        return command.run(cli.config);
     }
     let config = Config::load(cli.config)?;
-    if let Some(Command::AddUser { ref username }) = cli.command {
-        use argon2::{Argon2, Params, PasswordHasher, Version};
-        if username == &config.username {
-            return Err("username is reserved for the existing account".into());
-        }
-        let password = rpassword::prompt_password("Password: ")?;
-        if password.is_empty() {
-            return Err("password cannot be empty".into());
-        }
-        let argon2 = Argon2::new(
-            argon2::Algorithm::Argon2id,
-            Version::V0x13,
-            Params::new(19_456, 2, 1, None)?,
-        );
-        let hash = argon2.hash_password(password.as_bytes())?.to_string();
-        let id =
-            users::UserRegistry::add_local(&config.data_dir.join("users.json"), username, &hash)?;
-        println!("Created user {username} ({id}).");
-        return Ok(());
-    }
-    if let Some(Command::AddOidcUser { ref subject }) = cli.command {
-        let issuer = config
-            .oidc_issuer
-            .as_deref()
-            .ok_or("OIDC issuer is not configured")?;
-        let id =
-            users::UserRegistry::add_oidc(&config.data_dir.join("users.json"), issuer, subject)?;
-        println!("Created OIDC user {id}.");
-        return Ok(());
-    }
-    if let Some(Command::DisableUser { ref id }) = cli.command {
-        users::UserRegistry::set_disabled(&config.data_dir.join("users.json"), id, true)?;
-        println!("Disabled user {id}.");
-        return Ok(());
-    }
-    if let Some(Command::EnableUser { ref id }) = cli.command {
-        users::UserRegistry::set_disabled(&config.data_dir.join("users.json"), id, false)?;
-        println!("Enabled user {id}.");
-        return Ok(());
-    }
-    if let Some(Command::SetUserPassword { ref id }) = cli.command {
-        use argon2::{Argon2, Params, PasswordHasher, Version};
-        let password = rpassword::prompt_password("Password: ")?;
-        if password.is_empty() {
-            return Err("password cannot be empty".into());
-        }
-        let argon2 = Argon2::new(
-            argon2::Algorithm::Argon2id,
-            Version::V0x13,
-            Params::new(19_456, 2, 1, None)?,
-        );
-        let hash = argon2.hash_password(password.as_bytes())?.to_string();
-        users::UserRegistry::set_password(&config.data_dir.join("users.json"), id, hash)?;
-        println!("Updated password for user {id}.");
-        return Ok(());
-    }
-    if matches!(cli.command, Some(Command::ListUsers)) {
-        let users = users::UserRegistry::load(&config.data_dir.join("users.json"))?;
-        for user in users.users {
-            println!(
-                "{}\t{}\t{}",
-                user.id,
-                user.username.as_deref().unwrap_or("OIDC"),
-                if user.disabled { "disabled" } else { "enabled" }
-            );
-        }
-        return Ok(());
-    }
-    if let Some(Command::RemoveUser {
-        ref id,
-        delete_data,
-    }) = cli.command
-    {
-        let uuid = uuid::Uuid::parse_str(id)?;
-        if uuid.to_string() != *id {
-            return Err("user ID must be a canonical UUID".into());
-        }
-        let _lock = lock_instance(&config.data_dir)?;
-        users::UserRegistry::mark_deleted(&config.data_dir.join("users.json"), id)?;
-        if delete_data {
-            let path = config.data_dir.join("users").join(id);
-            match std::fs::remove_dir_all(path) {
-                Ok(()) => {}
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => return Err(error.into()),
-            }
-        }
-        println!("Removed user {id}.");
-        return Ok(());
-    }
     let listener = tokio::net::TcpListener::bind(&config.listen_addr).await?;
     let server = Server::new(config)?;
     tracing::info!(address = %listener.local_addr()?, "sable server listening");
@@ -1312,85 +677,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn oidc_cookie_is_read_from_multiple_cookie_headers() {
-        let mut headers = HeaderMap::new();
-        headers.append(header::COOKIE, HeaderValue::from_static("other=value"));
-        headers.append(
-            header::COOKIE,
-            HeaderValue::from_static("another=value; __Host-sable_oidc=transaction"),
-        );
-        assert_eq!(oidc_cookie(&headers).as_deref(), Some("transaction"));
-        assert_eq!(oidc_cookie(&HeaderMap::new()), None);
-    }
-
-    #[test]
     fn instance_lock_prevents_concurrent_server_or_removal() {
         let dir = tempfile::tempdir().unwrap();
         let lock = lock_instance(dir.path()).unwrap();
         lock_instance(dir.path()).unwrap_err();
         drop(lock);
         drop(lock_instance(dir.path()).unwrap());
-    }
-
-    #[tokio::test]
-    async fn oidc_callback_rejects_mismatched_and_replayed_state() {
-        let dir = tempfile::tempdir().unwrap();
-        let config = Config {
-            listen_addr: "127.0.0.1:18008".into(),
-            public_url: "http://127.0.0.1:18008".into(),
-            client_ip_source: ClientIpSource::ConnectInfo,
-            data_dir: dir.path().to_owned(),
-            max_active_users: 128,
-            allowed_private_cidrs: vec!["127.0.0.1/32".into()],
-            username: "legacy".into(),
-            password_hash: None,
-            oidc_issuer: Some("http://127.0.0.1:9999".into()),
-            oidc_client_id: Some("client".into()),
-            oidc_client_secret: Some("secret".into()),
-            oidc_auto_provision: false,
-            frontend_dir: dir.path().join("missing"),
-        };
-        let server = Server::new(config).unwrap();
-        server.oidc_transactions.lock().await.insert(
-            "cookie".into(),
-            (
-                Instant::now(),
-                IpAddr::from([127, 0, 0, 1]),
-                oidc::Transaction {
-                    state: "expected".into(),
-                    nonce: "nonce".into(),
-                    verifier: "verifier".into(),
-                },
-            ),
-        );
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            header::COOKIE,
-            HeaderValue::from_static("__Host-sable_oidc=cookie"),
-        );
-        let session = Session::new(None, Arc::new(SessionMemoryStore::default()), None);
-        let response = oidc_callback(
-            State(server.clone()),
-            session.clone(),
-            headers.clone(),
-            Query(OidcCallback {
-                code: "code".into(),
-                state: "wrong".into(),
-            }),
-        )
-        .await;
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-        let replay = oidc_callback(
-            State(server),
-            session,
-            headers,
-            Query(OidcCallback {
-                code: "code".into(),
-                state: "expected".into(),
-            }),
-        )
-        .await;
-        assert_eq!(replay.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
