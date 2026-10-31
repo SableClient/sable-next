@@ -1,6 +1,7 @@
 //! Bounded, UI-independent notification decryption for the iOS service extension.
 
 use std::ffi::{CStr, CString, c_char};
+use std::ops::ControlFlow;
 use std::path::Path;
 
 use sable_core::notifications::{ColdPush, PushImage, PushMedia, PushSession, push_sender_name};
@@ -192,6 +193,35 @@ struct ReadPushOut {
 struct ReadRoomsOut {
     read_rooms: Vec<String>,
     user_id: String,
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+enum Rendered {
+    Read(ReadPushOut),
+    ReadRooms(ReadRoomsOut),
+    Discard(DiscardOut),
+    Ring(RingPushOut),
+    Content(Box<ContentPushOut>),
+}
+
+impl Rendered {
+    fn read(clear: bool, room_id: Option<&str>, user_id: String) -> Self {
+        Self::Read(ReadPushOut {
+            read: ReadOut {
+                clear,
+                room_id: room_id.map(str::to_owned),
+            },
+            user_id,
+        })
+    }
+
+    const fn discard(read_rooms: Vec<String>) -> Self {
+        Self::Discard(DiscardOut {
+            discard: true,
+            read_rooms,
+        })
+    }
 }
 
 /// A field kept as received when present, `null` included.
@@ -422,21 +452,24 @@ fn decrypted_event(push: ColdPush) -> Result<Option<Value>, DiscardOut> {
     }
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "policy and account are rechecked in order after each await"
-)]
-async fn render(root: &Path, payload: &Value) -> (Option<Value>, Option<Issue>) {
-    let settings = policy(root);
-    if !settings.enabled {
-        return (None, None);
-    }
-    let notification = notification(payload);
-    let Ok(target) = PushTarget::deserialize(notification) else {
-        return (None, Some("payload"));
+type Outcome = (Option<Rendered>, Option<Issue>);
+type Flow<T> = ControlFlow<Outcome, T>;
+
+const fn stop<T>(issue: Issue) -> Flow<T> {
+    Flow::Break((None, Some(issue)))
+}
+
+const fn finish<T>(rendered: Rendered) -> Flow<T> {
+    Flow::Break((Some(rendered), None))
+}
+
+fn parse_target(payload: &Value, notification: &Value) -> Flow<(PushTarget, String)> {
+    let Ok(mut target) = PushTarget::deserialize(notification) else {
+        return stop(Issue::Payload);
     };
     let Some(user) = target
         .user_id
+        .take()
         .or_else(|| {
             PayloadUser::deserialize(payload)
                 .unwrap_or_default()
@@ -446,23 +479,18 @@ async fn render(root: &Path, payload: &Value) -> (Option<Value>, Option<Issue>) 
         .and_then(Value::as_str)
         .map(str::to_owned)
     else {
-        return (None, Some("payload"));
+        return stop(Issue::Payload);
     };
-    let room_id = target.room_id.as_deref().filter(|room| !room.is_empty());
-    let Some((account_id, device_id)) = signed_in(root, &user).await else {
-        return (None, Some("no_account"));
-    };
-    let zero_unread = target.counts.and_then(|counts| counts.unread) == Some(0);
-    if zero_unread && target.event_id.as_deref().is_none_or(str::is_empty) {
-        let read = ReadPushOut {
-            read: ReadOut {
-                clear: settings.clear_on_read,
-                room_id: room_id.map(str::to_owned),
-            },
-            user_id: user,
-        };
-        return (serde_json::to_value(read).ok(), None);
-    }
+    Flow::Continue((target, user))
+}
+
+async fn open_session(
+    root: &Path,
+    settings: &Policy,
+    account: &Account,
+    room_id: Option<&str>,
+    payload: &Value,
+) -> (Option<PushSession>, Vec<String>) {
     let shown = shown_rooms(payload);
     let reconcile = shown
         .iter()
@@ -471,32 +499,40 @@ async fn render(root: &Path, payload: &Value) -> (Option<Value>, Option<Issue>) 
         .collect::<Vec<_>>();
     let session_room = room_id.or_else(|| shown.first().map(String::as_str));
     let session = match (session_room, room_id.is_some() || settings.clear_on_read) {
-        (Some(seed), true) => Box::pin(PushSession::open(root, &user, &device_id, seed)).await,
+        (Some(seed), true) => {
+            Box::pin(PushSession::open(
+                root,
+                &account.user,
+                &account.device_id,
+                seed,
+            ))
+            .await
+        }
         _ => None,
     };
-    let mut issue = session.is_none().then_some("no_session");
-    let read_rooms = if settings.clear_on_read {
-        match session.as_ref() {
-            Some(session) => session.read_rooms(&reconcile).await.unwrap_or_default(),
-            None => Vec::new(),
+    let read_rooms = match session.as_ref() {
+        Some(session) if settings.clear_on_read => {
+            session.read_rooms(&reconcile).await.unwrap_or_default()
         }
-    } else {
-        Vec::new()
+        _ => Vec::new(),
     };
-    let Some(room_id) = room_id else {
-        if !read_rooms.is_empty() {
-            return (
-                serde_json::to_value(ReadRoomsOut {
-                    read_rooms,
-                    user_id: user,
-                })
-                .ok(),
-                None,
-            );
-        }
-        return (None, Some("payload"));
-    };
-    let fetched = match (target.kind.as_deref(), target.event_id.as_deref(), &session) {
+    (session, read_rooms)
+}
+
+struct Fetched {
+    completed: Option<Value>,
+    encrypted: bool,
+    noisy: bool,
+    failed: bool,
+}
+
+async fn fetch_event(
+    session: Option<&PushSession>,
+    target: &PushTarget,
+    notification: &Value,
+    read_rooms: &[String],
+) -> Flow<Fetched> {
+    let fetched = match (target.kind.as_deref(), target.event_id.as_deref(), session) {
         (kind, Some(event_id), Some(session))
             if !event_id.is_empty() && kind.is_none_or(|kind| RING_TYPES.contains(&kind)) =>
         {
@@ -504,183 +540,288 @@ async fn render(root: &Path, payload: &Value) -> (Option<Value>, Option<Issue>) 
         }
         _ => PushFetchView::Unavailable,
     };
-    let (completed, fetched_encrypted, fetched_noisy) = match fetched {
-        PushFetchView::Discard => {
-            return (
-                serde_json::to_value(DiscardOut {
-                    discard: true,
-                    read_rooms,
-                })
-                .ok(),
-                None,
-            );
-        }
-        PushFetchView::Event { event } => {
-            (complete(notification, &event), event.encrypted, event.noisy)
-        }
+    match fetched {
+        PushFetchView::Discard => finish(Rendered::discard(read_rooms.to_vec())),
+        PushFetchView::Event { event } => Flow::Continue(Fetched {
+            completed: complete(notification, &event),
+            encrypted: event.encrypted,
+            noisy: event.noisy,
+            failed: false,
+        }),
         PushFetchView::Unavailable => {
             if target
                 .kind
                 .as_deref()
                 .is_some_and(|kind| RING_TYPES.contains(&kind))
             {
-                return (
-                    serde_json::to_value(DiscardOut {
-                        discard: true,
-                        read_rooms,
-                    })
-                    .ok(),
-                    None,
-                );
+                return finish(Rendered::discard(read_rooms.to_vec()));
             }
-            if target.kind.is_none() {
-                issue = issue.or(Some("fetch_failed"));
-            }
-            (None, false, false)
+            Flow::Continue(Fetched {
+                completed: None,
+                encrypted: false,
+                noisy: false,
+                failed: target.kind.is_none(),
+            })
         }
-    };
-    let notification = completed.as_ref().unwrap_or(notification);
-    let Ok(target) = PushTarget::deserialize(notification) else {
-        return (None, Some("payload"));
-    };
-    let ciphertext = target.kind.as_deref() == Some("m.room.encrypted");
-    let encrypted = ciphertext || fetched_encrypted;
-    let event = match decrypted_event(
-        Box::pin(clear_event(session.as_ref(), notification, ciphertext)).await,
-    ) {
-        Ok(event) => event,
-        Err(mut discard) => {
-            discard.read_rooms = read_rooms;
-            return (serde_json::to_value(discard).ok(), None);
-        }
-    };
-    if zero_unread
-        && !event.as_ref().is_some_and(|event| {
-            event["type"]
-                .as_str()
-                .is_some_and(|kind| RING_TYPES.contains(&kind))
-        })
-    {
-        let read = ReadPushOut {
-            read: ReadOut {
-                clear: settings.clear_on_read,
-                room_id: Some(room_id.to_owned()),
-            },
-            user_id: user,
-        };
-        return (serde_json::to_value(read).ok(), None);
     }
-    if encrypted && event.is_none() {
-        issue = issue.or(Some("undecryptable"));
-    }
-    let sender_id = target.sender.filter(|sender| !sender.is_empty());
-    let sender = match &session {
-        Some(session) => {
-            session
-                .sender_name(sender_id.as_deref(), target.sender_display_name.as_deref())
-                .await
+}
+
+fn is_ring_event(event: Option<&Value>) -> bool {
+    event.is_some_and(|event| {
+        event["type"]
+            .as_str()
+            .is_some_and(|kind| RING_TYPES.contains(&kind))
+    })
+}
+
+struct Account {
+    user: String,
+    id: String,
+    device_id: String,
+}
+
+struct Message {
+    title: String,
+    text: String,
+    body: String,
+    invite: bool,
+}
+
+struct Alert<'a> {
+    root: &'a Path,
+    notification: &'a Value,
+    target: PushTarget,
+    account: Account,
+    room_id: &'a str,
+    read_rooms: Vec<String>,
+    session: Option<PushSession>,
+    issue: Option<Issue>,
+    event: Option<Value>,
+    encrypted: bool,
+    fetched_noisy: bool,
+}
+
+impl Alert<'_> {
+    async fn sender_name(&self, sender_id: Option<&str>) -> String {
+        let display_name = self.target.sender_display_name.as_deref();
+        match &self.session {
+            Some(session) => session.sender_name(sender_id, display_name).await,
+            None => push_sender_name(sender_id, display_name),
         }
-        None => push_sender_name(sender_id.as_deref(), target.sender_display_name.as_deref()),
-    };
-    if let Some(mut ring) = event.as_ref().and_then(|event| ring(event, &sender))
-        && let Some(content) = ring.as_object_mut()
-    {
+    }
+
+    fn ring_payload(&self, sender: &str) -> Option<Value> {
+        let event = self.event.as_ref()?;
+        let mut ring = ring(event, sender)?;
+        let content = ring.as_object_mut()?;
         content.insert(
             "notification_event_id".to_owned(),
-            target.event_id.clone().into(),
+            self.target.event_id.clone().into(),
         );
         let has_video = event
-            .as_ref()
-            .and_then(|event| event.get("content"))
+            .get("content")
             .and_then(|content| content.get("m.call.intent"))
-            .and_then(serde_json::Value::as_str)
+            .and_then(Value::as_str)
             == Some("video");
         content.insert("has_video".to_owned(), has_video.into());
-        let ring = RingPushOut {
-            ring,
-            room_id: room_id.to_owned(),
-            user_id: user,
-            read_rooms,
+        Some(ring)
+    }
+
+    fn message(&self, current: &Policy, sender: &str, room_name: &str) -> Message {
+        let invite = self.event.as_ref().is_some_and(is_invite);
+        let title = if invite {
+            INVITE_TITLE
+        } else {
+            [room_name, sender]
+                .into_iter()
+                .find(|name| !name.is_empty())
+                .unwrap_or(HIDDEN_BODY)
+        }
+        .to_owned();
+        let text = if invite {
+            invite_body(sender, room_name)
+        } else {
+            message_text(current, self.event.as_ref(), self.encrypted)
         };
-        return (serde_json::to_value(ring).ok(), None);
-    }
-    let room_name = target.room_name.unwrap_or_default();
-    let invite = event.as_ref().is_some_and(is_invite);
-    let title = if invite {
-        INVITE_TITLE
-    } else {
-        [room_name.as_str(), sender.as_str()]
-            .into_iter()
-            .find(|name| !name.is_empty())
-            .unwrap_or(HIDDEN_BODY)
-    }
-    .to_owned();
-    // Recheck policy after decryption, which may overlap a settings change.
-    let current = policy(root);
-    if !current.enabled {
-        return (None, None);
-    }
-    let text = if invite {
-        invite_body(&sender, &room_name)
-    } else {
-        message_text(&current, event.as_ref(), encrypted)
-    };
-    let body = if invite || sender.is_empty() {
-        text.clone()
-    } else {
-        format!("{sender}: {text}")
-    };
-    let previews = current.content && (!encrypted || current.encrypted_content);
-    let content = event
-        .as_ref()
-        .and_then(|event| event.get("content"))
-        .filter(|_| previews);
-    let active_elsewhere = match &session {
-        Some(session) if !invite && current.quiet_when_active_elsewhere => {
-            Box::pin(session.active_elsewhere()).await
+        let body = if invite || sender.is_empty() {
+            text.clone()
+        } else {
+            format!("{sender}: {text}")
+        };
+        Message {
+            title,
+            text,
+            body,
+            invite,
         }
-        _ => false,
-    };
-    let media = match (sender_id.as_deref(), &session) {
-        (Some(sender), Some(session)) if !invite => {
-            Box::pin(session.media(Some(sender), target.sender_display_name.as_deref(), content))
+    }
+
+    async fn render(mut self) -> Flow<Outcome> {
+        let sender_id = self
+            .target
+            .sender
+            .take()
+            .filter(|sender| !sender.is_empty());
+        let sender = self.sender_name(sender_id.as_deref()).await;
+        if let Some(ring) = self.ring_payload(&sender) {
+            return finish(Rendered::Ring(RingPushOut {
+                ring,
+                room_id: self.room_id.to_owned(),
+                user_id: self.account.user,
+                read_rooms: self.read_rooms,
+            }));
+        }
+        let room_name = self.target.room_name.take().unwrap_or_default();
+        // Recheck policy after decryption, which may overlap a settings change.
+        let current = policy(self.root);
+        if !current.enabled {
+            return Flow::Break((None, None));
+        }
+        let message = self.message(&current, &sender, &room_name);
+        let previews = current.content && (!self.encrypted || current.encrypted_content);
+        let content = self
+            .event
+            .as_ref()
+            .and_then(|event| event.get("content"))
+            .filter(|_| previews);
+        let session = self.session.take();
+        let active_elsewhere = match &session {
+            Some(session) if !message.invite && current.quiet_when_active_elsewhere => {
+                Box::pin(session.active_elsewhere()).await
+            }
+            _ => false,
+        };
+        let media = match (sender_id.as_deref(), &session) {
+            (Some(sender), Some(session)) if !message.invite => {
+                Box::pin(session.media(
+                    Some(sender),
+                    self.target.sender_display_name.as_deref(),
+                    content,
+                ))
                 .await
+            }
+            _ => PushMedia::default(),
+        };
+        let members = session.as_ref().and_then(PushSession::joined_members);
+        drop(session);
+        let Account {
+            user,
+            id,
+            device_id,
+        } = self.account;
+        if signed_in(self.root, &user).await != Some((id, device_id)) {
+            return Flow::Break((None, None));
         }
-        _ => PushMedia::default(),
-    };
-    let members = session.as_ref().and_then(PushSession::joined_members);
-    drop(session);
-    if signed_in(root, &user).await != Some((account_id, device_id)) {
+        let noisy = self
+            .event
+            .as_ref()
+            .and_then(|event| event.get(sable_core::notifications::NOISY_KEY))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+            || self.fetched_noisy
+            || rings(self.notification);
+        let content = ContentPushOut {
+            title: message.title,
+            body: message.body,
+            text: message.text,
+            sender,
+            sender_id,
+            event_id: self.target.event_id.filter(|event| !event.is_empty()),
+            room_id: self.room_id.to_owned(),
+            user_id: user,
+            sounds: current.sounds,
+            noisy,
+            invite: message.invite,
+            active_elsewhere,
+            group: !room_name.is_empty(),
+            sender_avatar: media.sender,
+            room_avatar: media.room,
+            image: media.image,
+            members,
+            read_rooms: self.read_rooms,
+        };
+        Flow::Continue((Some(Rendered::Content(Box::new(content))), self.issue))
+    }
+}
+
+async fn render(root: &Path, payload: &Value) -> Outcome {
+    let settings = policy(root);
+    if !settings.enabled {
         return (None, None);
     }
-    let noisy = event
-        .as_ref()
-        .and_then(|event| event.get(sable_core::notifications::NOISY_KEY))
-        .and_then(Value::as_bool)
-        .unwrap_or(false)
-        || fetched_noisy
-        || rings(notification);
-    let content = ContentPushOut {
-        title,
-        body,
-        text,
-        sender,
-        sender_id,
-        event_id: target.event_id.filter(|event| !event.is_empty()),
-        room_id: room_id.to_owned(),
-        user_id: user,
-        sounds: current.sounds,
-        noisy,
-        invite,
-        active_elsewhere,
-        group: !room_name.is_empty(),
-        sender_avatar: media.sender,
-        room_avatar: media.room,
-        image: media.image,
-        members,
-        read_rooms,
+    let (Flow::Break(outcome) | Flow::Continue(outcome)) =
+        render_enabled(root, payload, &settings).await;
+    outcome
+}
+
+async fn render_enabled(root: &Path, payload: &Value, settings: &Policy) -> Flow<Outcome> {
+    let notification = notification(payload);
+    let (target, user) = parse_target(payload, notification)?;
+    let room_id = target.room_id.as_deref().filter(|room| !room.is_empty());
+    let Some((account_id, device_id)) = signed_in(root, &user).await else {
+        return stop(Issue::NoAccount);
     };
-    (serde_json::to_value(content).ok(), issue)
+    let zero_unread = target.counts.as_ref().and_then(|counts| counts.unread) == Some(0);
+    if zero_unread && target.event_id.as_deref().is_none_or(str::is_empty) {
+        return finish(Rendered::read(settings.clear_on_read, room_id, user));
+    }
+    let account = Account {
+        user,
+        id: account_id,
+        device_id,
+    };
+    let (session, read_rooms) = open_session(root, settings, &account, room_id, payload).await;
+    let mut issue = session.is_none().then_some(Issue::NoSession);
+    let Some(room_id) = room_id else {
+        return if read_rooms.is_empty() {
+            stop(Issue::Payload)
+        } else {
+            finish(Rendered::ReadRooms(ReadRoomsOut {
+                read_rooms,
+                user_id: account.user,
+            }))
+        };
+    };
+    let fetched = fetch_event(session.as_ref(), &target, notification, &read_rooms).await?;
+    if fetched.failed {
+        issue = issue.or(Some(Issue::FetchFailed));
+    }
+    let notification = fetched.completed.as_ref().unwrap_or(notification);
+    let Ok(target) = PushTarget::deserialize(notification) else {
+        return stop(Issue::Payload);
+    };
+    let ciphertext = target.kind.as_deref() == Some("m.room.encrypted");
+    let Ok(event) =
+        decrypted_event(Box::pin(clear_event(session.as_ref(), notification, ciphertext)).await)
+    else {
+        return finish(Rendered::discard(read_rooms));
+    };
+    if zero_unread && !is_ring_event(event.as_ref()) {
+        return finish(Rendered::read(
+            settings.clear_on_read,
+            Some(room_id),
+            account.user,
+        ));
+    }
+    let encrypted = ciphertext || fetched.encrypted;
+    if encrypted && event.is_none() {
+        issue = issue.or(Some(Issue::Undecryptable));
+    }
+    Alert {
+        root,
+        notification,
+        target,
+        account,
+        room_id,
+        read_rooms,
+        session,
+        issue,
+        event,
+        encrypted,
+        fetched_noisy: fetched.noisy,
+    }
+    .render()
+    .await
 }
 
 /// # Safety
@@ -724,13 +865,13 @@ pub unsafe extern "C" fn sable_push_render(
         // SAFETY: same contract as root above.
         let payload = unsafe { CStr::from_ptr(payload) }.to_str().ok();
         let Some(payload) = payload.and_then(|payload| serde_json::from_str(payload).ok()) else {
-            return (None, Some("payload"));
+            return (None, Some(Issue::Payload));
         };
         let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
         else {
-            return (None, Some("runtime"));
+            return (None, Some(Issue::Runtime));
         };
         runtime.block_on(async {
             sable_core::notifications::settle_refreshes(Box::pin(tokio::time::timeout(
@@ -738,19 +879,44 @@ pub unsafe extern "C" fn sable_push_render(
                 render(Path::new(root), &payload),
             )))
             .await
-            .unwrap_or((None, Some("timeout")))
+            .unwrap_or((None, Some(Issue::Timeout)))
         })
     });
-    let (rendered, issue) = rendered.unwrap_or((None, Some("panic")));
+    let (rendered, issue) = rendered.unwrap_or((None, Some(Issue::Panic)));
     if let Some(issue) = issue {
         report(Path::new(root), issue);
     }
     rendered
-        .and_then(|rendered| CString::new(rendered.to_string()).ok())
+        .and_then(|rendered| CString::new(serde_json::to_string(&rendered).ok()?).ok())
         .map_or(std::ptr::null_mut(), CString::into_raw)
 }
 
-type Issue = &'static str;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Issue {
+    Payload,
+    NoAccount,
+    NoSession,
+    FetchFailed,
+    Undecryptable,
+    Runtime,
+    Timeout,
+    Panic,
+}
+
+impl Issue {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Payload => "payload",
+            Self::NoAccount => "no_account",
+            Self::NoSession => "no_session",
+            Self::FetchFailed => "fetch_failed",
+            Self::Undecryptable => "undecryptable",
+            Self::Runtime => "runtime",
+            Self::Timeout => "timeout",
+            Self::Panic => "panic",
+        }
+    }
+}
 
 #[derive(Deserialize)]
 struct Reporting {
@@ -774,6 +940,7 @@ fn report(root: &Path, issue: Issue) {
     options.environment = reporting.environment.map(Into::into);
     options.release = reporting.release.map(Into::into);
     let _guard = sentry::init(options);
+    let issue = issue.as_str();
     sentry::with_scope(
         |scope| scope.set_tag("push.issue", issue),
         || sentry::capture_message(&format!("iOS push: {issue}"), sentry::Level::Warning),
@@ -798,7 +965,8 @@ mod tests {
     use super::*;
 
     async fn rendered(root: &Path, payload: &Value) -> Option<Value> {
-        render(root, payload).await.0
+        let rendered = render(root, payload).await.0;
+        rendered.map(|rendered| serde_json::to_value(rendered).unwrap())
     }
 
     #[test]
@@ -1039,13 +1207,16 @@ mod tests {
             "user_id": "@alice:example.org", "room_id": "!room:example.org",
             "event_id": "$e", "unread_count": 1
         });
-        assert_eq!(render(&root, &sygnal_event_id_only).await, (None, None));
+        assert!(matches!(
+            render(&root, &sygnal_event_id_only).await,
+            (None, None)
+        ));
 
         std::fs::write(root.join("push-policy.json"), r#"{"enabled":true}"#).unwrap();
-        assert_eq!(
+        assert!(matches!(
             render(&root, &sygnal_event_id_only).await,
-            (None, Some("no_account"))
-        );
+            (None, Some(Issue::NoAccount))
+        ));
 
         let registry = json!({"version":1,"active_account_id":"a1","next_account_id":2,"accounts":[{
             "account_id":"a1","store_id":"old","needs_reauth":false,
@@ -1058,8 +1229,11 @@ mod tests {
             .await
             .unwrap();
         let (alert, issue) = render(&root, &sygnal_event_id_only).await;
-        assert_eq!(alert.unwrap()["body"], json!("New message"));
-        assert_eq!(issue, Some("no_session"));
+        assert_eq!(
+            serde_json::to_value(alert.unwrap()).unwrap()["body"],
+            json!("New message")
+        );
+        assert_eq!(issue, Some(Issue::NoSession));
         std::fs::remove_dir_all(root).unwrap();
     }
 
@@ -1258,7 +1432,10 @@ mod tests {
         let root = shape_root("wire").await;
         let render_wire = async |payload: Value| {
             let (value, issue) = render(&root, &payload).await;
-            (value.map(|value| value.to_string()), issue)
+            (
+                value.map(|value| serde_json::to_string(&value).unwrap()),
+                issue.map(Issue::as_str),
+            )
         };
 
         assert_eq!(
@@ -1412,5 +1589,21 @@ mod tests {
             })
             .to_string()
         );
+    }
+
+    #[test]
+    fn issues_keep_their_reported_names() {
+        for (issue, name) in [
+            (Issue::Payload, "payload"),
+            (Issue::NoAccount, "no_account"),
+            (Issue::NoSession, "no_session"),
+            (Issue::FetchFailed, "fetch_failed"),
+            (Issue::Undecryptable, "undecryptable"),
+            (Issue::Runtime, "runtime"),
+            (Issue::Timeout, "timeout"),
+            (Issue::Panic, "panic"),
+        ] {
+            assert_eq!(issue.as_str(), name);
+        }
     }
 }
