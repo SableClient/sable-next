@@ -133,8 +133,7 @@ async fn handle_socket(
     _connection: tokio::sync::OwnedSemaphorePermit,
     _user_connection: tokio::sync::OwnedSemaphorePermit,
 ) {
-    let mut shutdown = server.shutdown.subscribe();
-    if *shutdown.borrow() {
+    if server.shutdown.is_cancelled() {
         return;
     }
     let valid_session = || async {
@@ -152,7 +151,7 @@ async fn handle_socket(
         tokio::pin!(greeting);
         loop {
             tokio::select! {
-                _ = shutdown.changed() => { writer.abort(); return; }
+                () = server.shutdown.cancelled() => { writer.abort(); return; }
                 revoked = revocations.recv() => {
                     if SessionRevocation::ends(&revoked, session_id, &user_id) {
                         writer.abort();
@@ -173,7 +172,7 @@ async fn handle_socket(
     let mut tasks = tokio::task::JoinSet::new();
     loop {
         tokio::select! {
-            _ = shutdown.changed() => break,
+            () = server.shutdown.cancelled() => break,
             revoked = revocations.recv() => {
                 if SessionRevocation::ends(&revoked, session_id, &user_id) { break; }
             }

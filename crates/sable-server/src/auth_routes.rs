@@ -86,12 +86,11 @@ pub(super) async fn cancel_on_shutdown(
     request: axum::http::Request<Body>,
     next: Next,
 ) -> Response {
-    let mut shutdown = server.shutdown.subscribe();
-    if *shutdown.borrow() || server.runtimes.shutting_down.load(Ordering::Acquire) {
+    if server.shutdown.is_cancelled() || server.runtimes.shutting_down.load(Ordering::Acquire) {
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
     }
     tokio::select! {
-        _ = shutdown.changed() => StatusCode::SERVICE_UNAVAILABLE.into_response(),
+        () = server.shutdown.cancelled() => StatusCode::SERVICE_UNAVAILABLE.into_response(),
         response = next.run(request) => response,
     }
 }

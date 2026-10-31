@@ -34,7 +34,7 @@ use axum_client_ip::ClientIpSource;
 use clap::Parser;
 use sable_core::{Core, store::ExclusiveFileSessionStore};
 use serde::Serialize;
-use tokio::sync::{Mutex, OnceCell, Semaphore, broadcast, watch};
+use tokio::sync::{Mutex, OnceCell, Semaphore, broadcast};
 use tower::limit::ConcurrencyLimitLayer;
 use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
 use tower_http::{
@@ -105,7 +105,7 @@ pub struct Server {
     client_ip_source: ClientIpSource,
     sessions: SessionMemoryStore,
     session_revocations: broadcast::Sender<SessionRevocation>,
-    shutdown: watch::Sender<bool>,
+    shutdown: tokio_util::sync::CancellationToken,
     connections: Arc<Semaphore>,
     rpc_tasks: Arc<Semaphore>,
     http_requests: Arc<Semaphore>,
@@ -335,7 +335,7 @@ impl Server {
             client_ip_source: config.client_ip_source,
             sessions: SessionMemoryStore::default(),
             session_revocations: broadcast::channel(MAX_CONNECTIONS).0,
-            shutdown: watch::channel(false).0,
+            shutdown: tokio_util::sync::CancellationToken::new(),
             connections: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
             rpc_tasks: Arc::new(Semaphore::new(MAX_RPC_TASKS)),
             http_requests: Arc::new(Semaphore::new(MAX_HTTP_REQUESTS)),
@@ -371,7 +371,7 @@ impl Server {
 
     fn begin_shutdown(&self) {
         self.runtimes.shutting_down.store(true, Ordering::Release);
-        self.shutdown.send_replace(true);
+        self.shutdown.cancel();
     }
 
     pub fn app(&self) -> Router {
