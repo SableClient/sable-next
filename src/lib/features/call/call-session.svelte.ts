@@ -471,10 +471,13 @@ export class CallSession {
 
   async #device(kind: CallDeviceError, action: () => Promise<void> | undefined): Promise<void> {
     if (this.listenOnly) return;
+    const attempt = this.#attemptGeneration;
     try {
       await action();
       if (this.deviceError === kind) this.clearDeviceError();
     } catch (error) {
+      if (attempt !== this.#attemptGeneration || !this.active || this.lifecycle === 'leaving')
+        return;
       if (kind === 'screen' && error instanceof Error && error.name === 'NotAllowedError') return;
       this.clearDeviceError();
       this.deviceError = error instanceof ScreenAudioError ? 'screenAudio' : kind;
@@ -754,6 +757,7 @@ export class CallSession {
     this.#livekit = undefined;
     this.#grant = undefined;
     this.listenOnly = false;
+    this.choosingScreenAudio = false;
     this.#session = undefined;
     this.#screenSharing = false;
     this.#buffer = [];

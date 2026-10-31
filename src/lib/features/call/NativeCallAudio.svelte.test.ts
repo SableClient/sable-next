@@ -77,3 +77,28 @@ test('replacement tracks receive the current volume again', async () => {
   });
   expect(setVolume).toHaveBeenLastCalledWith('alice', 0.5, true);
 });
+
+test('volume updates still queued when the call ends are dropped', async () => {
+  let release = () => {};
+  const setVolume = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      })
+  );
+  const { unmount } = render(NativeCallAudio, {
+    participants: [participant],
+    deafened: false,
+    volumeOf: () => 0.5,
+    setVolume,
+  });
+  await waitFor(() => {
+    expect(setVolume).toHaveBeenCalledOnce();
+  });
+
+  unmount();
+  release();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(setVolume).toHaveBeenCalledOnce();
+});

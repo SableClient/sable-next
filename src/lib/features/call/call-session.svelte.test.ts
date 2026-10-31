@@ -1122,3 +1122,37 @@ test('toggling a running screen share stops it without reopening a picker', asyn
   expect(setEnabled).toHaveBeenCalledExactlyOnceWith(false);
   expect(session.choosingScreenAudio).toBe(false);
 });
+
+test('leaving closes the screen sound picker', async () => {
+  const { client, transport } = harness();
+  transport.capabilities = { screenShare: { setEnabled: vi.fn(() => Promise.resolve()) } };
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+  screenAudio.supported.mockReturnValue(true);
+  await session.toggleScreenShare();
+  screenAudio.supported.mockReturnValue(false);
+
+  await session.leave();
+
+  expect(session.choosingScreenAudio).toBe(false);
+});
+
+test('a camera failure that lands after leaving is not reported', async () => {
+  const { client, transport } = harness();
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+  let fail = (_error: Error) => {};
+  vi.mocked(transport.setCameraEnabled).mockImplementationOnce(
+    () =>
+      new Promise((_resolve, reject) => {
+        fail = reject;
+      })
+  );
+
+  const enabling = session.setCameraEnabled(true);
+  await session.leave();
+  fail(new Error('NotAllowedError'));
+  await enabling;
+
+  expect(session.deviceError).toBeNull();
+});

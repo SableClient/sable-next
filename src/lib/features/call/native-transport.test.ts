@@ -34,6 +34,7 @@ const plugin = {
   ),
   setAudioInput: vi.fn(() => Promise.resolve(snapshot(6))),
   setNativeCallParticipantVolume: vi.fn(() => Promise.resolve(snapshot(9))),
+  disconnectNativeCall: vi.fn(() => Promise.resolve(snapshot(10))),
 };
 
 const platform = vi.hoisted(() => ({ android: true }));
@@ -114,6 +115,33 @@ test('the native transport names the system call on connect', async () => {
   expect(plugin.connectNativeCall).toHaveBeenLastCalledWith(
     expect.objectContaining({ callId: '7', callerName: 'Room A' })
   );
+});
+
+test('a hang-up during connect neither leaks the listener nor starts the call', async () => {
+  const stop = vi.fn(() => undefined);
+  let listening = (_stop: () => undefined) => {};
+  plugin.listenNativeCallSnapshot.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        listening = resolve;
+      })
+  );
+  plugin.connectNativeCall.mockClear();
+  const transport = await createNativeTransport('7', 'self', 'Room A');
+  const connecting = transport?.connect({
+    url: 'wss://sfu.example.org',
+    token: 'jwt',
+    microphoneEnabled: true,
+    cameraEnabled: false,
+    encryptionKeys: [],
+  });
+
+  await transport?.disconnect();
+  listening(stop);
+  await connecting;
+
+  expect(stop).toHaveBeenCalledOnce();
+  expect(plugin.connectNativeCall).not.toHaveBeenCalled();
 });
 
 test('the native transport places and clears the local video overlay', async () => {

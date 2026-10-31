@@ -1,5 +1,6 @@
 <script lang="ts">
   /* eslint-disable svelte/prefer-svelte-reactivity */
+  import { onDestroy } from 'svelte';
   import type { CallParticipant } from './call-transport';
   import { ignoreError } from './call-transport';
 
@@ -14,6 +15,10 @@
 
   const levels = new Map<string, number>();
   let pending = Promise.resolve();
+  let destroyed = false;
+  onDestroy(() => {
+    destroyed = true;
+  });
 
   $effect(() => {
     const current = new Set<string>();
@@ -28,7 +33,7 @@
         levels.set(key, volume);
         const apply = setVolume;
         pending = pending
-          .then(() => apply(participant.identity, volume, screen))
+          .then(() => (destroyed ? undefined : apply(participant.identity, volume, screen)))
           .catch((error: unknown) => {
             if (levels.get(key) === volume) levels.delete(key);
             ignoreError(error);

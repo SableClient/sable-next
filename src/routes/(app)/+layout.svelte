@@ -158,6 +158,10 @@
     roomName: (roomId) => roomList.byId(roomId)?.name,
   });
   provideCallSession(callSession);
+  $effect(() => {
+    void core.accountRevision;
+    return () => void callSession.leave();
+  });
   let screenSharePick = $state.raw<{
     sources: ScreenShareCandidate[];
     settle: (id: string | null) => void;
