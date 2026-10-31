@@ -947,8 +947,10 @@ impl Core {
             let result = self.send_left_membership(call, slot_closed).await;
             if result.is_ok()
                 && let Ok(client) = self.client().await
+                && let Err(error) =
+                    delayed_events::update(&client, delay_id, UpdateAction::Cancel).await
             {
-                let _ = delayed_events::update(&client, delay_id, UpdateAction::Cancel).await;
+                tracing::debug!("could not cancel the delayed leave: {error}");
             }
             return result;
         }

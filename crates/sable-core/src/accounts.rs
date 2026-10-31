@@ -629,11 +629,14 @@ impl Core {
     async fn forget_login_tokens(&self, account_id: Option<&str>) {
         let logins = crate::credentials::LoginTokens::new(std::path::Path::new(&self.store_id));
         let account_id = account_id.map(ToOwned::to_owned);
-        let _ = tokio::task::spawn_blocking(move || match account_id {
+        if let Err(error) = tokio::task::spawn_blocking(move || match account_id {
             Some(account_id) => logins.forget(&account_id),
             None => logins.forget_all(),
         })
-        .await;
+        .await
+        {
+            tracing::warn!("could not forget the saved tokens: {error}");
+        }
     }
 
     #[cfg(target_family = "wasm")]
@@ -1028,6 +1031,7 @@ impl Core {
         self.prepare_account_client(&client, &homeserver, &account_id)
             .await?;
 
+        // Do not disrupt the active session unless its replacement started
         // successfully. `take_session` also aborts its owned watcher tasks.
         if let Some(previous) = self.take_session().await {
             previous.sync_service.stop().await;
@@ -1193,18 +1197,21 @@ impl Core {
         );
 
         if let Some(user_id) = verification_user_id {
-            drop(spawn(async move {
-                if let Err(error) = verification_client
-                    .encryption()
-                    .request_user_identity(&user_id)
-                    .await
-                {
-                    tracing::warn!(
-                        operation = "verification",
-                        "could not refresh own device list: {error}"
-                    );
-                }
-            }));
+            self.track_session_task(
+                spawn(async move {
+                    if let Err(error) = verification_client
+                        .encryption()
+                        .request_user_identity(&user_id)
+                        .await
+                    {
+                        tracing::warn!(
+                            operation = "verification",
+                            "could not refresh own device list: {error}"
+                        );
+                    }
+                })
+                .abort_on_drop(),
+            );
         }
 
         // `Suspended` found no session to stop while this one was still starting.

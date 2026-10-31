@@ -483,7 +483,9 @@ async fn decrypt_push_event(
     {
         return ColdPush::Discard;
     }
-    let _ = crate::rooms::fill_own_member(&room).await;
+    if let Err(error) = crate::rooms::fill_own_member(&room).await {
+        tracing::debug!("could not load the own member before decrypting: {error}");
+    }
     let push_context = room.push_context().await.ok().flatten();
     let Ok(decrypted) = room.decrypt_event(&event, push_context.as_ref()).await else {
         return undecryptable;

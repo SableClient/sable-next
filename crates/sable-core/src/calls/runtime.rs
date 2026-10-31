@@ -1519,7 +1519,9 @@ pub(super) fn terminate(
     let core = core.clone();
     core.clone().track_session_task(
         spawn(async move {
-            let _ = core.leave_call(session).await;
+            if let Err(error) = core.leave_call(session).await {
+                tracing::warn!("could not leave the call after a signaling error: {error:?}");
+            }
             core.emit_if_current(
                 generation,
                 CoreEvent::CallSignalingError {
