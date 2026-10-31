@@ -33,6 +33,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
 });
 
 import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
+import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
 import {
@@ -621,4 +622,36 @@ test('a long swipe on a message that is not being edited edits it', async () => 
   await swipeLeft(message, 3000);
 
   expect(onEdit).toHaveBeenCalledOnce();
+});
+
+test('a swipe opens the member list instead of replying or editing when set to', async () => {
+  setPreference('messageSwipeAction', 'members');
+  try {
+    const onReply = vi.fn();
+    const onEdit = vi.fn();
+    const onSwipeMembers = vi.fn();
+    render(TimelineItemHarness, {
+      props: {
+        core,
+        item: {
+          item: { ...item(false), is_own: true },
+          collapsed: false,
+          onReply,
+          onEdit,
+          onSwipeMembers,
+        },
+      },
+    });
+    await tick();
+    const message = document.querySelector('.message');
+    if (!message) throw new Error('message was not rendered');
+
+    await swipeLeft(message, 3000);
+
+    expect(onSwipeMembers).toHaveBeenCalledOnce();
+    expect(onReply).not.toHaveBeenCalled();
+    expect(onEdit).not.toHaveBeenCalled();
+  } finally {
+    setPreference('messageSwipeAction', 'reply');
+  }
 });

@@ -44,6 +44,7 @@ const RENAMED = {
   hideMembershipInReadOnly: 'hideMemberInReadOnly',
   hideReads: 'hideReadReceipts',
   useRightBubbles: 'alignOwnMessages',
+  rightSwipeAction: 'messageSwipeAction',
   editorToolbar: 'formattingToolbar',
   editorEmojiButton: 'composerEmoteButton',
   editorMicButton: 'composerVoiceButton',

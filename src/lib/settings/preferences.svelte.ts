@@ -264,6 +264,7 @@ export interface Preferences {
   captionPosition: CaptionPosition;
   usernameClick: UsernameClick;
   doubleTapReact: boolean;
+  messageSwipeAction: 'reply' | 'members';
   showSingleReactionCount: boolean;
   showAllTimestamps: boolean;
   showRoleTooltip: boolean;
@@ -467,6 +468,7 @@ const ENUMS = {
   timeZone: timeZoneValues(),
   enterForNewline: ['adaptive', 'newline', 'send'],
   composerForm: ['short', 'adaptive', 'tall'],
+  messageSwipeAction: ['reply', 'members'],
   weekStart: ['sunday', 'monday', 'saturday'],
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
   showRoomIcon: ['always', 'sometimes', 'collapsed', 'never'],
@@ -620,6 +622,7 @@ const DEFAULTS: Preferences = {
   captionPosition: 'below',
   usernameClick: 'mention',
   doubleTapReact: true,
+  messageSwipeAction: 'reply',
   showSingleReactionCount: true,
   showAllTimestamps: false,
   showRoleTooltip: false,

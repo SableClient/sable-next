@@ -84,6 +84,7 @@
     placeholder = false,
     placeholderCharacters = 35,
     overrideCosmetics = null,
+    onSwipeMembers,
   }: TimelineItemProps = $props();
 
   const row = new TimelineRow(() => ({
@@ -108,6 +109,7 @@
     onOpenThread,
     onCopyLink,
     onMenuOpenChange,
+    onSwipeMembers,
   }));
 
   let defaultEmoteSize = $derived(preferences.timelineEmoteSize === 'default');
@@ -371,6 +373,7 @@
         offset={row.swipe.offset}
         armed={row.swipe.action !== 'none'}
         edit={row.swipe.action === 'edit'}
+        members={row.swipeOpensMembers}
       />
     {/if}
     {#if row.showActions}

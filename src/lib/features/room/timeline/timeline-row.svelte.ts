@@ -71,6 +71,7 @@ export interface TimelineItemProps extends MessageCallbacks {
   placeholder?: boolean;
   placeholderCharacters?: number;
   overrideCosmetics?: SenderCosmetics | null;
+  onSwipeMembers?: () => void;
 }
 
 export interface TimelineRowOptions extends MessageCallbacks {
@@ -87,6 +88,7 @@ export interface TimelineRowOptions extends MessageCallbacks {
   replySender: string | null;
   hasLinkPreviews: boolean;
   onMenuOpenChange?: (open: boolean) => void;
+  onSwipeMembers?: () => void;
 }
 
 export class TimelineRow {
@@ -128,11 +130,14 @@ export class TimelineRow {
       }
     );
     this.swipe = new MessageSwipe({
-      enabled: () => this.actionable && this.actions.onReply !== undefined,
-      canEdit: () => this.actionable && this.actions.onEdit !== undefined,
+      enabled: () =>
+        this.actionable && (this.swipeOpensMembers || this.actions.onReply !== undefined),
+      canEdit: () =>
+        this.actionable && !this.swipeOpensMembers && this.actions.onEdit !== undefined,
       onReply: () => {
-        const { selected, onCancelContext } = this.#options();
-        if (selected) onCancelContext?.();
+        const { selected, onCancelContext, onSwipeMembers } = this.#options();
+        if (this.swipeOpensMembers) onSwipeMembers?.();
+        else if (selected) onCancelContext?.();
         else this.actions.onReply?.();
       },
       onEdit: () => {
@@ -197,6 +202,10 @@ export class TimelineRow {
     return send_state?.status === 'failed' ? send_state : null;
   });
   readonly pending = $derived.by(() => this.#options().item.send_state?.status === 'sending');
+  readonly swipeOpensMembers = $derived.by(
+    () =>
+      preferences.messageSwipeAction === 'members' && this.#options().onSwipeMembers !== undefined
+  );
   readonly actionable = $derived.by(() => {
     const { item, preview } = this.#options();
     return !preview && item.event_id !== null && this.stalled === null && !this.pending;

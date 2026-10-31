@@ -801,6 +801,7 @@
         : conversation.toggleReaction}
       onDelete={conversation.redact}
       onReply={roomSession.permissions?.can_post === false ? undefined : conversation.reply}
+      onSwipeMembers={toggleMembers}
       onCancelContext={conversation.clearContext}
       onOpenThread={openThread}
       onEdit={roomSession.permissions?.can_post === false ? undefined : conversation.edit}

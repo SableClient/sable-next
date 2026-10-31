@@ -82,6 +82,7 @@
 
   interface Props extends MessageCallbacks {
     timeline: RoomTimeline;
+    onSwipeMembers?: () => void;
     focusEventId?: string | null;
     landingEventId?: string | null;
     replyEventId?: string | null;
@@ -160,6 +161,7 @@
     currentUserId,
     onToggleReaction,
     onReply,
+    onSwipeMembers,
     onCancelContext,
     onOpenThread,
     onEdit,
@@ -1014,6 +1016,7 @@
     {currentUserId}
     {onToggleReaction}
     {onReply}
+    {onSwipeMembers}
     {onCancelContext}
     {onOpenThread}
     {onEdit}

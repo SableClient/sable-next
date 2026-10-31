@@ -6,6 +6,7 @@ import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
 import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
 import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
 import GlobeIcon from 'phosphor-svelte/lib/GlobeIcon';
+import HandSwipeLeftIcon from 'phosphor-svelte/lib/HandSwipeLeftIcon';
 import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
 import LayoutIcon from 'phosphor-svelte/lib/LayoutIcon';
 import DatabaseIcon from 'phosphor-svelte/lib/DatabaseIcon';
@@ -302,6 +303,18 @@ export const timelineCategory: SettingsCategory = {
       icon: HeartIcon,
       name: 'settings.doubleTapReact',
       type: 'boolean',
+      supported: supportsTouch,
+    },
+    {
+      key: 'messageSwipeAction',
+      section: 'messages',
+      icon: HandSwipeLeftIcon,
+      name: 'settings.messageSwipeAction',
+      type: 'select',
+      options: [
+        { value: 'reply', label: 'settings.messageSwipeActionReply' },
+        { value: 'members', label: 'settings.messageSwipeActionMembers' },
+      ],
       supported: supportsTouch,
     },
     {

@@ -33,6 +33,7 @@
     events,
     onMenuOpenChange,
     overrideCosmetics = null,
+    onSwipeMembers,
   }: TimelineItemProps = $props();
 
   const row = new TimelineRow(() => ({
@@ -57,6 +58,7 @@
     onOpenThread,
     onCopyLink,
     onMenuOpenChange,
+    onSwipeMembers,
   }));
 </script>
 
@@ -82,7 +84,11 @@
   {@attach row.attach}
 >
   {#if row.swipe.offset > 0}
-    <TimelineSwipeAction offset={row.swipe.offset} armed={row.swipe.action !== 'none'} />
+    <TimelineSwipeAction
+      offset={row.swipe.offset}
+      armed={row.swipe.action !== 'none'}
+      members={row.swipeOpensMembers}
+    />
   {/if}
   {#if row.showActions}
     <MessageActions
