@@ -32,9 +32,11 @@ pub(crate) struct ShareBatch {
     pub target: Option<ShareTarget>,
 }
 
+/// Written by `MainActivity.kt`.
+const SHARE_MANIFEST_VERSION: u32 = 1;
+
 #[derive(Deserialize)]
 struct ShareManifest {
-    #[expect(dead_code, reason = "the manifest version is parsed but not read")]
     version: u32,
     items: Vec<ShareItem>,
     #[serde(default)]
@@ -49,7 +51,14 @@ fn validate_component(value: &str) -> Result<(), String> {
 }
 
 fn parse_manifest(json: &str) -> Result<ShareManifest, String> {
-    serde_json::from_str(json).map_err(|err| err.to_string())
+    let manifest: ShareManifest = serde_json::from_str(json).map_err(|err| err.to_string())?;
+    if manifest.version != SHARE_MANIFEST_VERSION {
+        return Err(format!(
+            "unsupported share manifest version {}",
+            manifest.version
+        ));
+    }
+    Ok(manifest)
 }
 
 fn inbox_root<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
@@ -193,6 +202,11 @@ mod tests {
     #[test]
     fn parse_manifest_rejects_garbage() {
         assert!(parse_manifest("not json").is_err());
+    }
+
+    #[test]
+    fn parse_manifest_rejects_an_unknown_version() {
+        assert!(parse_manifest(r#"{"version":2,"items":[]}"#).is_err());
     }
 
     #[tokio::test]
