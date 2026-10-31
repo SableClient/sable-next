@@ -64,7 +64,7 @@ mod stable {
         }
 
         #[request]
-        pub struct Request {
+        pub(crate) struct Request {
             #[ruma_api(path)]
             pub room_id: OwnedRoomId,
             #[ruma_api(path)]
@@ -84,7 +84,7 @@ mod stable {
         }
 
         #[response]
-        pub struct Response {
+        pub(crate) struct Response {
             pub delay_id: String,
         }
     }
@@ -104,7 +104,7 @@ mod stable {
         }
 
         #[request]
-        pub struct Request {
+        pub(crate) struct Request {
             #[ruma_api(path)]
             pub delay_id: String,
             #[ruma_api(path)]
@@ -112,7 +112,7 @@ mod stable {
         }
 
         #[response]
-        pub struct Response {}
+        pub(crate) struct Response {}
     }
 }
 

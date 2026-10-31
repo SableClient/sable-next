@@ -478,12 +478,10 @@ impl Core {
                 Some(AuthData::Dummy(dummy))
             }
             "m.login.registration_token" if token_needs_fallback => {
-                if *acknowledge_fallback {
+                (*acknowledge_fallback).then(|| {
                     *acknowledge_fallback = false;
-                    Some(AuthData::fallback_acknowledgement(pending.session.clone()))
-                } else {
-                    None
-                }
+                    AuthData::fallback_acknowledgement(pending.session.clone())
+                })
             }
             "m.login.registration_token" => pending.registration_token.as_ref().map(|token| {
                 let mut registration_token =

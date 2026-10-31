@@ -23,7 +23,7 @@ static INSTALLED: OnceLock<Vec<String>> = OnceLock::new();
 static START_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Install one process-wide egress guard for every Matrix client.
-pub fn install(allow: &[String]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub(crate) fn install(allow: &[String]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _lock = START_LOCK
         .lock()
         .map_err(|_| "outbound guard lock poisoned")?;

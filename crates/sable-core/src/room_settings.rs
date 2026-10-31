@@ -557,9 +557,10 @@ fn room_state_by_type(
 
 fn has_out_of_range_integer(value: &serde_json::Value) -> bool {
     match value {
-        serde_json::Value::Number(number) => number.as_i64().map_or(number.is_u64(), |int| {
-            !(-MAX_SAFE_INTEGER..=MAX_SAFE_INTEGER).contains(&int)
-        }),
+        serde_json::Value::Number(number) => number.as_i64().map_or_else(
+            || number.is_u64(),
+            |int| !(-MAX_SAFE_INTEGER..=MAX_SAFE_INTEGER).contains(&int),
+        ),
         serde_json::Value::Array(values) => values.iter().any(has_out_of_range_integer),
         serde_json::Value::Object(map) => map.values().any(has_out_of_range_integer),
         _ => false,

@@ -556,7 +556,7 @@ pub fn timeline_item(
             }
             let local = event
                 .send_state()
-                .and(event.transaction_id())
+                .and_then(|_| event.transaction_id())
                 .and_then(|transaction_id| local_content.get(transaction_id));
             raw.echo_formatted_body = local.and_then(|fields| fields.formatted_body.clone());
             raw.echo_spoiler = local.and_then(|fields| fields.spoiler.clone());
@@ -606,7 +606,7 @@ pub fn timeline_item(
                 mention,
                 forwarded,
                 forum_title,
-                shield: msg_like(event.content()).and(shield(event.get_shield(false))),
+                shield: msg_like(event.content()).and_then(|_| shield(event.get_shield(false))),
             }
         }
 

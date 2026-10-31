@@ -165,7 +165,7 @@ mod empty_response {
 
     /// Accepts successful responses without requiring a JSON body.
     #[response]
-    pub struct Response {
+    pub(super) struct Response {
         #[ruma_api(raw_body)]
         pub body: Vec<u8>,
     }
@@ -213,7 +213,7 @@ mod list_web_pushers {
     pub(super) struct Request {}
 
     #[response]
-    pub struct Response {
+    pub(super) struct Response {
         pub pushers: Vec<super::RawPusher>,
     }
 }

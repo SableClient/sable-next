@@ -30,7 +30,7 @@ const BG_COLOR: u8 = 8;
 
 impl Mark {
     /// The composer schema's mark order, which is also the order marks nest in.
-    pub const fn rank(&self) -> u8 {
+    pub(super) const fn rank(&self) -> u8 {
         match self {
             Self::Strong => 0,
             Self::Em => 1,
@@ -132,7 +132,7 @@ pub(super) enum Inline {
 }
 
 impl Inline {
-    pub fn marks(&self) -> &[Mark] {
+    pub(super) fn marks(&self) -> &[Mark] {
         match self {
             Self::Text(_, marks)
             | Self::Break(marks)

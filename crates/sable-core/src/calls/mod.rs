@@ -72,10 +72,10 @@ mod transport_discovery {
     }
 
     #[request]
-    pub struct Request {}
+    pub(super) struct Request {}
 
     #[response]
-    pub struct Response {
+    pub(super) struct Response {
         #[serde(default)]
         pub transports: Vec<ruma::api::client::rtc::RtcTransport>,
         #[serde(default)]

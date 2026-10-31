@@ -6,14 +6,14 @@ use wasm_bindgen_futures::JsFuture;
 
 /// A `SharedWorker` has no `localStorage`, so the JS side owns `IndexedDB` and hands
 /// it over as three functions.
-pub struct JsSessionStore {
+pub(crate) struct JsSessionStore {
     load: Function,
     save: Function,
     clear: Function,
 }
 
 impl JsSessionStore {
-    pub fn new(load: Function, save: Function, clear: Function) -> Self {
+    pub(crate) fn new(load: Function, save: Function, clear: Function) -> Self {
         Self { load, save, clear }
     }
 }

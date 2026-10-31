@@ -10,7 +10,7 @@ use tower_sessions::{
 
 /// Prevent an in-flight request from recreating a session deleted by logout.
 #[derive(Clone, Debug, Default)]
-pub struct SessionMemoryStore {
+pub(crate) struct SessionMemoryStore {
     inner: MemoryStore,
     writes: Arc<Mutex<()>>,
 }

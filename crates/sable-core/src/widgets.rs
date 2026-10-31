@@ -65,7 +65,7 @@ macro_rules! livekit_endpoint {
             }
 
             #[request]
-            pub struct Request {
+            pub(crate) struct Request {
                 #[ruma_api(header = CONTENT_TYPE)]
                 pub content_type: String,
                 #[ruma_api(raw_body)]
@@ -73,7 +73,7 @@ macro_rules! livekit_endpoint {
             }
 
             #[response]
-            pub struct Response {
+            pub(crate) struct Response {
                 #[ruma_api(raw_body)]
                 pub body: Vec<u8>,
             }
@@ -784,10 +784,13 @@ impl Core {
         {
             managers_from_account_data(&widgets, &mut managers);
         }
-        Ok(managers.into_iter().next().unwrap_or(IntegrationManager {
-            api_url: DEFAULT_INTEGRATION_MANAGER.0.to_owned(),
-            ui_url: DEFAULT_INTEGRATION_MANAGER.1.to_owned(),
-        }))
+        Ok(managers
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| IntegrationManager {
+                api_url: DEFAULT_INTEGRATION_MANAGER.0.to_owned(),
+                ui_url: DEFAULT_INTEGRATION_MANAGER.1.to_owned(),
+            }))
     }
 
     pub(crate) async fn integration_manager_terms(&self) -> Result<Vec<TermsPolicyView>, RpcError> {

@@ -509,12 +509,12 @@ pub fn plan_default_mode(
             [
                 RuleWrite::Actions {
                     kind: RuleKind::Underride,
-                    rule_id: rule_id.to_string(),
+                    rule_id: rule_id.to_owned(),
                     actions,
                 },
                 RuleWrite::Enabled {
                     kind: RuleKind::Underride,
-                    rule_id: rule_id.to_string(),
+                    rule_id: rule_id.to_owned(),
                     enabled: true,
                 },
             ]

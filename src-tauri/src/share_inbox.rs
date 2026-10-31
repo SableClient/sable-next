@@ -6,7 +6,7 @@ use tauri::{AppHandle, Manager, Runtime};
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ShareItem {
+pub(crate) struct ShareItem {
     pub kind: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
@@ -18,14 +18,14 @@ pub struct ShareItem {
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ShareTarget {
+pub(crate) struct ShareTarget {
     pub user_id: String,
     pub room_id: String,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ShareBatch {
+pub(crate) struct ShareBatch {
     pub batch_id: String,
     pub items: Vec<ShareItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -61,7 +61,9 @@ fn inbox_root<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-pub async fn share_inbox_drain<R: Runtime>(app: AppHandle<R>) -> Result<Vec<ShareBatch>, String> {
+pub(crate) async fn share_inbox_drain<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<Vec<ShareBatch>, String> {
     let root = inbox_root(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
         let entries = match std::fs::read_dir(&root) {
@@ -102,7 +104,7 @@ pub async fn share_inbox_drain<R: Runtime>(app: AppHandle<R>) -> Result<Vec<Shar
 }
 
 #[tauri::command]
-pub async fn share_inbox_read<R: Runtime>(
+pub(crate) async fn share_inbox_read<R: Runtime>(
     app: AppHandle<R>,
     batch_id: String,
     file_name: String,
@@ -134,7 +136,7 @@ async fn read_inbox_file(
 }
 
 #[tauri::command]
-pub async fn share_inbox_clear<R: Runtime>(
+pub(crate) async fn share_inbox_clear<R: Runtime>(
     app: AppHandle<R>,
     batch_id: String,
 ) -> Result<(), String> {

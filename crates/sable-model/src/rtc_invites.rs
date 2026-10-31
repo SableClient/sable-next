@@ -71,9 +71,10 @@ fn expiry(value: &Value, now: u64) -> Option<(u64, u64)> {
                 .or_else(|| unsigned.get("sticky_duration_ttl_ms"))
         })
         .and_then(Value::as_u64);
-    let expires = ttl.map_or(origin.min(now).saturating_add(duration), |ttl| {
-        now.saturating_add(ttl.min(duration))
-    });
+    let expires = ttl.map_or_else(
+        || origin.min(now).saturating_add(duration),
+        |ttl| now.saturating_add(ttl.min(duration)),
+    );
     (duration > 0 && expires > now).then_some((expires, origin.saturating_add(duration)))
 }
 
@@ -416,7 +417,7 @@ impl Invitations {
         if self.redacted.len() < MAX_ENTRIES {
             self.redacted
                 .entry(id.to_owned())
-                .or_insert(now.saturating_add(MAX_STICKY_MS));
+                .or_insert_with(|| now.saturating_add(MAX_STICKY_MS));
         }
         self.legacy.remove(id);
         for entry in self.entries.values_mut() {

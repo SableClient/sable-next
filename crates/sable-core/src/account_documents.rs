@@ -66,7 +66,7 @@ pub(crate) async fn shows_media_previews(room: &matrix_sdk::Room) -> bool {
             .ok()
             .flatten()
             .and_then(|raw| raw.get_field::<Value>("content").ok().flatten());
-        level = level.or(media_preview_config(content.as_ref()).media_previews);
+        level = level.or_else(|| media_preview_config(content.as_ref()).media_previews);
     }
     for event in [MEDIA_PREVIEW_EVENT, UNSTABLE_MEDIA_PREVIEW_EVENT] {
         let content = room
@@ -77,7 +77,7 @@ pub(crate) async fn shows_media_previews(room: &matrix_sdk::Room) -> bool {
             .ok()
             .flatten()
             .and_then(|raw| raw.deserialize_as::<Value>().ok());
-        level = level.or(media_preview_config(content.as_ref()).media_previews);
+        level = level.or_else(|| media_preview_config(content.as_ref()).media_previews);
     }
     match level.unwrap_or(MediaPreviewsView::On) {
         MediaPreviewsView::On => true,
@@ -366,7 +366,7 @@ mod tests {
         let dm = matrix_sdk::ruma::owned_room_id!("!dm:a.org");
         let space = matrix_sdk::ruma::owned_room_id!("!space:a.org");
 
-        let linked = dm_spaces_content(Some(stored.clone()), dm.clone(), vec![space.clone()]);
+        let linked = dm_spaces_content(Some(stored), dm.clone(), vec![space.clone()]);
         assert_eq!(
             linked,
             json!({ "rooms": { "!dm:a.org": ["!space:a.org"] }, "kept": 1 })

@@ -971,7 +971,10 @@ impl Core {
         persisted: PersistedSession,
         reauth: Option<&PersistedAccount>,
     ) -> Result<SessionGeneration<'_>, RpcError> {
-        if let Err(RpcError::SlidingSyncUnsupported) = self.require_sliding_sync(&client).await {
+        if matches!(
+            self.require_sliding_sync(&client).await,
+            Err(RpcError::SlidingSyncUnsupported)
+        ) {
             if let Err(error) = client.logout().await {
                 tracing::warn!(?error, "could not log out a session without Sliding Sync");
             }
@@ -2190,7 +2193,8 @@ mod regression_tests {
                     0
                 )
                 .len(),
-            2
+            2,
+            "both restored documents should match"
         );
         Ok(())
     }

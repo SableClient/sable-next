@@ -37,7 +37,7 @@ pub(super) struct Cell<I> {
 }
 
 impl<I> Block<I> {
-    pub fn contents<'a>(&'a self, out: &mut Vec<&'a I>) {
+    pub(super) fn contents<'a>(&'a self, out: &mut Vec<&'a I>) {
         match self {
             Self::Paragraph(content) | Self::Heading(_, content) | Self::Subtext(content) => {
                 out.push(content);
@@ -57,7 +57,7 @@ impl<I> Block<I> {
         }
     }
 
-    pub fn map<J>(self, f: &mut dyn FnMut(I) -> J) -> Block<J> {
+    pub(super) fn map<J>(self, f: &mut dyn FnMut(I) -> J) -> Block<J> {
         fn all<I, J>(blocks: Vec<Block<I>>, f: &mut dyn FnMut(I) -> J) -> Vec<Block<J>> {
             blocks.into_iter().map(|block| block.map(f)).collect()
         }

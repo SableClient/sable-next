@@ -19,7 +19,7 @@ const SESSION_LIFETIME: Duration = Duration::from_hours(168);
 const DUMMY_PASSWORD_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$P+eI2tfGQ1sd90QtbQ8wFA$Obgt2lytjJYQTynFGGi4Lu+2hlyyipgjDot5QXzqxjs";
 
 #[derive(Clone)]
-pub struct Auth {
+pub(crate) struct Auth {
     username: Arc<str>,
     password_hash: Option<Arc<str>>,
     registry: Arc<RegistryCache>,
@@ -92,7 +92,7 @@ fn file_stamp(path: &std::path::Path) -> io::Result<RegistryStamp> {
 }
 
 impl Auth {
-    pub fn new(
+    pub(crate) fn new(
         username: impl Into<Arc<str>>,
         password_hash: Option<String>,
         users_path: PathBuf,
@@ -123,14 +123,16 @@ impl Auth {
         })
     }
 
-    pub async fn reload_if_changed(&self) -> io::Result<Option<(Arc<UserRegistry>, Vec<String>)>> {
+    pub(crate) async fn reload_if_changed(
+        &self,
+    ) -> io::Result<Option<(Arc<UserRegistry>, Vec<String>)>> {
         let registry = self.registry.clone();
         tokio::task::spawn_blocking(move || registry.reload())
             .await
             .map_err(io::Error::other)?
     }
 
-    pub async fn authenticate(&self, session: &Session) -> Option<String> {
+    pub(crate) async fn authenticate(&self, session: &Session) -> Option<String> {
         let created_at = session
             .get::<u64>(SESSION_CREATED_AT)
             .await
@@ -147,21 +149,17 @@ impl Auth {
             .ok()
             .flatten()?;
         let version = session.get::<u64>(SESSION_VERSION).await.ok().flatten()?;
-        if (id == LEGACY_USER_ID && self.password_hash.is_some() && version == 0)
+        ((id == LEGACY_USER_ID && self.password_hash.is_some() && version == 0)
             || self
                 .registry
                 .snapshot()
                 .users
                 .iter()
-                .any(|user| user.id == id && !user.disabled && user.session_version == version)
-        {
-            Some(id)
-        } else {
-            None
-        }
+                .any(|user| user.id == id && !user.disabled && user.session_version == version))
+        .then_some(id)
     }
 
-    pub async fn check_basic(
+    pub(crate) async fn check_basic(
         &self,
         credentials: Option<&Authorization<Basic>>,
         permit: tokio::sync::OwnedSemaphorePermit,
@@ -202,7 +200,7 @@ impl Auth {
         (known && valid).then_some((id, version))
     }
 
-    pub fn local_enabled(&self) -> bool {
+    pub(crate) fn local_enabled(&self) -> bool {
         self.password_hash.is_some()
             || self
                 .registry
@@ -212,7 +210,7 @@ impl Auth {
                 .any(|user| !user.disabled && user.password_hash.is_some())
     }
 
-    pub fn oidc_user(&self, issuer: &str, subject: &str) -> Option<String> {
+    pub(crate) fn oidc_user(&self, issuer: &str, subject: &str) -> Option<String> {
         self.registry
             .snapshot()
             .users
@@ -227,7 +225,7 @@ impl Auth {
             .map(|user| user.id.clone())
     }
 
-    pub async fn provision_oidc(&self, issuer: String, subject: String) -> Option<String> {
+    pub(crate) async fn provision_oidc(&self, issuer: String, subject: String) -> Option<String> {
         let path = self.registry.path.clone();
         let user_id = tokio::task::spawn_blocking(move || {
             UserRegistry::provision_oidc(&path, &issuer, &subject)
@@ -242,7 +240,7 @@ impl Auth {
         user_id
     }
 
-    pub async fn login(
+    pub(crate) async fn login(
         &self,
         session: &Session,
         user_id: &str,
@@ -275,7 +273,7 @@ impl Auth {
     }
 }
 
-pub async fn logout(session: &Session) -> Result<(), tower_sessions::session::Error> {
+pub(crate) async fn logout(session: &Session) -> Result<(), tower_sessions::session::Error> {
     session.flush().await
 }
 

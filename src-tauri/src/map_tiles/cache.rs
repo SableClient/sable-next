@@ -13,7 +13,7 @@ pub(super) struct CachedTile {
 }
 
 impl CachedTile {
-    pub fn revalidate(
+    pub(super) fn revalidate(
         &self,
         request: &impl RequestLike,
         response: &impl ResponseLike,
@@ -47,11 +47,11 @@ impl CachedTile {
         }
     }
 
-    pub fn load(path: &Path) -> Option<Self> {
+    pub(super) fn load(path: &Path) -> Option<Self> {
         serde_json::from_slice(&fs::read(path).ok()?).ok()
     }
 
-    pub fn load_policy(path: &Path) -> Option<CachePolicy> {
+    pub(super) fn load_policy(path: &Path) -> Option<CachePolicy> {
         #[derive(Deserialize)]
         struct Stored {
             policy: CachePolicy,
@@ -61,7 +61,7 @@ impl CachedTile {
             .map(|stored| stored.policy)
     }
 
-    pub fn save(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    pub(super) fn save(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }

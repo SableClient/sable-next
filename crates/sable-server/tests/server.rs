@@ -79,7 +79,11 @@ async fn cookie(base: &str) -> String {
         .send()
         .await
         .expect("auth request");
-    assert_eq!(response.status(), reqwest::StatusCode::NO_CONTENT);
+    assert_eq!(
+        response.status(),
+        reqwest::StatusCode::NO_CONTENT,
+        "basic auth should succeed"
+    );
     response
         .headers()
         .get(reqwest::header::SET_COOKIE)

@@ -16,7 +16,7 @@ use tokio::sync::Semaphore;
 mod cache;
 use cache::CachedTile;
 
-pub const TILE_URI_SCHEME: &str = "sable-tiles";
+pub(crate) const TILE_URI_SCHEME: &str = "sable-tiles";
 
 const TILE_ORIGIN: &str = "https://tile.openstreetmap.org";
 const CACHE_SUBDIR: &str = "sable-tiles";
@@ -33,7 +33,7 @@ static LANE: Semaphore = Semaphore::const_new(MAX_CONCURRENT_REQUESTS);
     clippy::needless_pass_by_value,
     reason = "tauri hands the handler both by value"
 )]
-pub fn respond<R: Runtime>(
+pub(crate) fn respond<R: Runtime>(
     ctx: UriSchemeContext<'_, R>,
     request: Request<Vec<u8>>,
     responder: UriSchemeResponder,
@@ -49,7 +49,7 @@ pub fn respond<R: Runtime>(
     });
 }
 
-pub fn cleanup_cache<R: Runtime>(app: &AppHandle<R>) {
+pub(crate) fn cleanup_cache<R: Runtime>(app: &AppHandle<R>) {
     let Ok(dir) = cache_dir(app) else { return };
     tauri::async_runtime::spawn_blocking(move || {
         for tile in walk_tiles(&dir) {

@@ -178,7 +178,7 @@ const REPORTED_SDK_WARNINGS: &[&str] = &[
     "matrix_sdk_crypto::gossiping",
 ];
 
-pub fn tracing_filter(
+pub(crate) fn tracing_filter(
     metadata: &tracing::Metadata<'_>,
 ) -> sentry::integrations::tracing::EventFilter {
     use sentry::integrations::tracing::EventFilter;
@@ -207,7 +207,7 @@ pub fn tracing_filter(
 
 static CONSENT: AtomicBool = AtomicBool::new(false);
 
-pub fn init() -> Option<sentry::ClientInitGuard> {
+pub(crate) fn init() -> Option<sentry::ClientInitGuard> {
     let dsn = option_env!("SENTRY_DSN")?;
     CONSENT.store(consent(), Ordering::Relaxed);
     #[cfg(target_os = "ios")]
@@ -237,7 +237,7 @@ pub fn init() -> Option<sentry::ClientInitGuard> {
 }
 
 #[tauri::command]
-pub fn set_native_sentry_enabled(enabled: bool) {
+pub(crate) fn set_native_sentry_enabled(enabled: bool) {
     CONSENT.store(enabled, Ordering::Relaxed);
     persist_consent(enabled);
     #[cfg(target_os = "android")]

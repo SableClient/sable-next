@@ -579,9 +579,10 @@ impl StickyMemberships {
         let expires_at_ms = event
             .unsigned
             .and_then(|unsigned| unsigned.msc4354_ttl_ms.or(unsigned.ttl_ms)?.0)
-            .map_or(now_ms.min(created_ts).saturating_add(duration), |ttl| {
-                now_ms.saturating_add(ttl.min(duration))
-            });
+            .map_or_else(
+                || now_ms.min(created_ts).saturating_add(duration),
+                |ttl| now_ms.saturating_add(ttl.min(duration)),
+            );
         if duration == 0 || expires_at_ms <= now_ms {
             return false;
         }

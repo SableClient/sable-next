@@ -67,7 +67,8 @@ impl Device {
                 .iter()
                 .find(|device| device.is_own)
                 .unwrap()
-                .is_verified
+                .is_verified,
+            "the own device should be verified"
         );
     }
 

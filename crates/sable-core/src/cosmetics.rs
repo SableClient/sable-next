@@ -142,7 +142,7 @@ pub(crate) fn resolve(room: &Layer, space: Option<&Layer>) -> Vec<SenderCosmetic
                 theme(own)
                     .as_ref()
                     .or(own.color.as_ref())
-                    .or(theme(inherited).as_ref())
+                    .or_else(|| theme(inherited).as_ref())
                     .or(inherited.color.as_ref())
                     .cloned()
             };

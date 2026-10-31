@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 
 const METADATA_TTL: std::time::Duration = std::time::Duration::from_hours(1);
 
-pub struct Oidc {
+pub(crate) struct Oidc {
     pub issuer: String,
     pub client_id: String,
     pub client_secret: String,
@@ -16,7 +16,7 @@ pub struct Oidc {
     pub(crate) metadata: Mutex<Option<(std::time::Instant, CoreProviderMetadata)>>,
 }
 
-pub struct Transaction {
+pub(crate) struct Transaction {
     pub state: String,
     pub nonce: String,
     pub verifier: String,
@@ -55,7 +55,7 @@ impl Oidc {
         }
     }
 
-    pub async fn start(
+    pub(crate) async fn start(
         &self,
     ) -> Result<(String, Transaction), Box<dyn std::error::Error + Send + Sync>> {
         let metadata = self.metadata().await?;
@@ -84,7 +84,7 @@ impl Oidc {
         ))
     }
 
-    pub async fn exchange(
+    pub(crate) async fn exchange(
         &self,
         code: String,
         transaction: Transaction,

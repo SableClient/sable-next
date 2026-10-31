@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct User {
+pub(crate) struct User {
     pub id: String,
     pub username: Option<String>,
     pub password_hash: Option<String>,
@@ -19,18 +19,18 @@ pub struct User {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
-pub struct OidcIdentity {
+pub(crate) struct OidcIdentity {
     pub issuer: String,
     pub subject: String,
 }
 
 #[derive(Default, Deserialize, Serialize)]
-pub struct UserRegistry {
+pub(crate) struct UserRegistry {
     pub users: Vec<User>,
 }
 
 impl UserRegistry {
-    pub fn load(path: &Path) -> io::Result<Self> {
+    pub(crate) fn load(path: &Path) -> io::Result<Self> {
         let bytes = match std::fs::read(path) {
             Ok(bytes) => bytes,
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Self::default()),
@@ -41,7 +41,11 @@ impl UserRegistry {
         Ok(registry)
     }
 
-    pub fn add_local(path: &Path, username: &str, password_hash: &str) -> io::Result<String> {
+    pub(crate) fn add_local(
+        path: &Path,
+        username: &str,
+        password_hash: &str,
+    ) -> io::Result<String> {
         if username.is_empty() || password_hash.is_empty() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -62,7 +66,7 @@ impl UserRegistry {
         )
     }
 
-    pub fn add_oidc(path: &Path, issuer: &str, subject: &str) -> io::Result<String> {
+    pub(crate) fn add_oidc(path: &Path, issuer: &str, subject: &str) -> io::Result<String> {
         Self::add(
             path,
             User {
@@ -80,7 +84,11 @@ impl UserRegistry {
         )
     }
 
-    pub fn provision_oidc(path: &Path, issuer: &str, subject: &str) -> io::Result<Option<String>> {
+    pub(crate) fn provision_oidc(
+        path: &Path,
+        issuer: &str,
+        subject: &str,
+    ) -> io::Result<Option<String>> {
         let mut id = None;
         Self::update(path, |registry| {
             if let Some(user) = registry.users.iter().find(|user| {
@@ -121,7 +129,7 @@ impl UserRegistry {
         Ok(id)
     }
 
-    pub fn set_disabled(path: &Path, id: &str, disabled: bool) -> io::Result<()> {
+    pub(crate) fn set_disabled(path: &Path, id: &str, disabled: bool) -> io::Result<()> {
         Self::update(path, |registry| {
             let user = registry
                 .users
@@ -142,7 +150,7 @@ impl UserRegistry {
         })
     }
 
-    pub fn mark_deleted(path: &Path, id: &str) -> io::Result<()> {
+    pub(crate) fn mark_deleted(path: &Path, id: &str) -> io::Result<()> {
         Self::update(path, |registry| {
             let user = registry
                 .users
@@ -158,7 +166,7 @@ impl UserRegistry {
         })
     }
 
-    pub fn set_password(path: &Path, id: &str, hash: String) -> io::Result<()> {
+    pub(crate) fn set_password(path: &Path, id: &str, hash: String) -> io::Result<()> {
         Self::update(path, |registry| {
             let user = registry
                 .users
@@ -196,7 +204,7 @@ impl UserRegistry {
         sable_core::store::write_atomic_private(path, &bytes)
     }
 
-    pub fn validate(&self) -> io::Result<()> {
+    pub(crate) fn validate(&self) -> io::Result<()> {
         let mut ids = HashSet::new();
         let mut usernames = HashSet::new();
         let mut identities = HashSet::new();

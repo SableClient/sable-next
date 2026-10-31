@@ -33,7 +33,7 @@ fn java_hash(text: &str) -> i32 {
 
 /// Must equal what the plugin's Android service computes for a cold
 /// notification, or a warm alert stacks beside it instead of replacing it.
-pub fn room_notification_id(user_id: &str, room_id: &str) -> i32 {
+pub(crate) fn room_notification_id(user_id: &str, room_id: &str) -> i32 {
     let hash = java_hash(&format!("{user_id}\0{room_id}"));
     if hash == i32::MIN { 0 } else { hash.abs() }
 }
@@ -68,7 +68,7 @@ static PUSH_REGISTRATION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::cons
     not(mobile),
     expect(dead_code, reason = "only a mobile registration can fail")
 )]
-pub enum PushRegistrationError {
+pub(crate) enum PushRegistrationError {
     NoSession,
     Capabilities,
     Platform { message: String },
@@ -97,7 +97,7 @@ fn push_store<R: Runtime>(app: &AppHandle<R>) -> Result<std::path::PathBuf, RpcE
         .ok_or(RpcError::Unavailable)
 }
 
-pub struct PushStore(pub std::path::PathBuf);
+pub(crate) struct PushStore(pub std::path::PathBuf);
 
 fn registered_pushers(root: &std::path::Path) -> Result<Vec<RegisteredPusher>, RpcError> {
     match std::fs::read(root.join("pushers.json")) {
@@ -108,7 +108,7 @@ fn registered_pushers(root: &std::path::Path) -> Result<Vec<RegisteredPusher>, R
 }
 
 #[derive(serde::Serialize)]
-pub struct DevicePusher {
+pub(crate) struct DevicePusher {
     pushkey: String,
     app_id: String,
 }
@@ -116,7 +116,7 @@ pub struct DevicePusher {
 /// # Errors
 ///
 /// When the pusher ledger cannot be read.
-pub fn device_pusher<R: Runtime>(
+pub(crate) fn device_pusher<R: Runtime>(
     app: &AppHandle<R>,
     user_id: &str,
     device_id: &str,
@@ -430,7 +430,7 @@ fn body(view: &NotificationView, content: bool) -> String {
     }
 }
 
-pub async fn show<R: Runtime>(
+pub(crate) async fn show<R: Runtime>(
     app: &AppHandle<R>,
     core: &sable_core::Core,
     view: &NotificationView,
@@ -532,11 +532,11 @@ async fn show_generic<R: Runtime>(
     }
 }
 
-pub async fn permission<R: Runtime>(app: &AppHandle<R>) -> &'static str {
+pub(crate) async fn permission<R: Runtime>(app: &AppHandle<R>) -> &'static str {
     grant(app.notifications().permission_state().await)
 }
 
-pub async fn request_permission<R: Runtime>(app: &AppHandle<R>) -> &'static str {
+pub(crate) async fn request_permission<R: Runtime>(app: &AppHandle<R>) -> &'static str {
     grant(app.notifications().request_permission().await)
 }
 
@@ -554,7 +554,11 @@ fn grant(
     }
 }
 
-pub async fn show_test<R: Runtime>(app: &AppHandle<R>, core: &sable_core::Core, sequence: u32) {
+pub(crate) async fn show_test<R: Runtime>(
+    app: &AppHandle<R>,
+    core: &sable_core::Core,
+    sequence: u32,
+) {
     show(app, core, &test_view(sequence)).await;
 }
 
@@ -610,7 +614,7 @@ pub async fn forget_left_conversations<R: Runtime>(app: &AppHandle<R>, core: &sa
     }
 }
 
-pub async fn dismiss<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_ids: &[String]) {
+pub(crate) async fn dismiss<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_ids: &[String]) {
     #[cfg(not(target_os = "android"))]
     for room_id in room_ids {
         forget(user_id, room_id);
@@ -625,7 +629,11 @@ pub async fn dismiss<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_ids: &[
     remove_posted(app, ids).await;
 }
 
-pub async fn dismiss_read<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_ids: &[String]) {
+pub(crate) async fn dismiss_read<R: Runtime>(
+    app: &AppHandle<R>,
+    user_id: &str,
+    room_ids: &[String],
+) {
     #[cfg(not(target_os = "android"))]
     for room_id in room_ids {
         forget(user_id, room_id);
@@ -685,7 +693,7 @@ async fn remove_posted<R: Runtime>(app: &AppHandle<R>, ids: Vec<i32>) {
         reason = "only android declares accounts to the push plugin"
     )
 )]
-pub struct PushAccount {
+pub(crate) struct PushAccount {
     pub user_id: String,
     pub device_id: String,
 }
@@ -696,7 +704,7 @@ pub struct PushAccount {
     not(mobile),
     expect(dead_code, reason = "only a mobile build registers a pusher")
 )]
-pub struct PushConfig {
+pub(crate) struct PushConfig {
     pub gateway_url: String,
     #[serde(default)]
     pub gateway_override: bool,
@@ -1159,7 +1167,7 @@ async fn retire_old_pushers(root: &std::path::Path, identity: &(String, String))
 /// # Errors
 ///
 /// When the homeserver refuses to delete the pusher.
-pub async fn unregister_push<R: Runtime>(app: &AppHandle<R>) -> Result<(), RpcError> {
+pub(crate) async fn unregister_push<R: Runtime>(app: &AppHandle<R>) -> Result<(), RpcError> {
     let _guard = PUSH_REGISTRATION_LOCK.lock().await;
     #[cfg(mobile)]
     app.notifications()
@@ -1195,7 +1203,7 @@ pub async fn unregister_push<R: Runtime>(app: &AppHandle<R>) -> Result<(), RpcEr
 /// Never; the signature mirrors the mobile one.
 #[cfg(not(mobile))]
 #[expect(clippy::unused_async, reason = "mirrors the mobile signature")]
-pub async fn register_push<R: Runtime>(
+pub(crate) async fn register_push<R: Runtime>(
     _app: &AppHandle<R>,
     _core: &Arc<sable_core::Core>,
     _config: PushConfig,
