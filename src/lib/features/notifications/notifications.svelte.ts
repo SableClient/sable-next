@@ -341,6 +341,7 @@ export class NotificationCenter {
       });
       return;
     }
+    electronBridge()?.requestAttention();
 
     notification.addEventListener('click', () => {
       const electron = electronBridge();

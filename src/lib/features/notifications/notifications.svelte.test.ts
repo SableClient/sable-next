@@ -506,7 +506,8 @@ test.each(['browser', 'electron'])(
     const focus = vi.fn();
     const showWindow = vi.fn();
     vi.stubGlobal('focus', focus);
-    if (platform === 'electron') vi.stubGlobal('sableElectron', { showWindow });
+    if (platform === 'electron')
+      vi.stubGlobal('sableElectron', { showWindow, requestAttention: vi.fn() });
     preferences.systemNotifications = true;
     const open = vi.fn();
     const notifications = center(open);

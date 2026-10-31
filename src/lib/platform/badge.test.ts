@@ -7,17 +7,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('uses the Electron Linux tray without the web Badging API', async () => {
-  const setTrayUnread = vi.fn().mockResolvedValue(undefined);
+it('sends the count to Electron without the web Badging API', async () => {
+  const setBadge = vi.fn().mockResolvedValue(undefined);
   vi.stubGlobal('sableElectron', {
     platform: 'linux',
-    setTrayUnread,
-  } satisfies Pick<ElectronBridge, 'platform' | 'setTrayUnread'>);
+    setBadge,
+  } satisfies Pick<ElectronBridge, 'platform' | 'setBadge'>);
   vi.stubGlobal('navigator', {});
 
   await setUnreadBadge(3);
   await setUnreadBadge(0);
-  expect(setTrayUnread.mock.calls).toEqual([[true], [false]]);
+  expect(setBadge.mock.calls).toEqual([
+    [3, null],
+    [0, null],
+  ]);
 });
 
 it('sets and clears the browser badge', async () => {

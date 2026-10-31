@@ -1,4 +1,4 @@
-import { dialog, type BrowserWindow, type Session } from 'electron';
+import { dialog, systemPreferences, type BrowserWindow, type Session } from 'electron';
 import { readFileSync } from 'node:fs';
 
 import { writeJson } from './persistence';
@@ -46,6 +46,14 @@ function kindsOf(permission: string, mediaTypes: readonly string[] = []): string
   return mediaTypes.map((type) => (type === 'audio' ? 'microphone' : 'camera'));
 }
 
+async function askSystem(kinds: string[]): Promise<boolean> {
+  for (const kind of kinds) {
+    if (kind !== 'microphone' && kind !== 'camera') continue;
+    if (!(await systemPreferences.askForMediaAccess(kind))) return false;
+  }
+  return true;
+}
+
 export function enforcePermissions(
   session: Session,
   grantsPath: string,
@@ -54,7 +62,7 @@ export function enforcePermissions(
 ): void {
   const grants = new Set(readGrants(grantsPath));
   const embeddedGrants = new Map<string, Set<string>>();
-  const granted = (kinds: string[]) => systemAsks || kinds.every((kind) => grants.has(kind));
+  const granted = (kinds: string[]) => kinds.every((kind) => grants.has(kind));
 
   async function confirm(kinds: string[], origin: string | null = null): Promise<boolean> {
     const parent = window();
@@ -121,6 +129,12 @@ export function enforcePermissions(
     const kinds = kindsOf(permission, 'mediaTypes' in details ? details.mediaTypes : undefined);
     if (!kinds) {
       callback(false);
+      return;
+    }
+    if (!origin && systemAsks) {
+      void askSystem(kinds).then(callback, () => {
+        callback(false);
+      });
       return;
     }
     if (origin ? kinds.every((kind) => embeddedGrants.get(origin)?.has(kind)) : granted(kinds)) {

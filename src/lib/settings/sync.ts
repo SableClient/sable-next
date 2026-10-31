@@ -63,6 +63,8 @@ export const NON_SYNCABLE_KEYS = new Set<keyof Preferences>([
   'hardwareVideoAcceleration',
   'smoothScrolling',
   'webRtcIpPolicy',
+  'launchAtLogin',
+  'startMinimized',
   'developerTools',
   'soundsNotificationVolume',
   'soundsCameraOnVolume',

@@ -408,6 +408,8 @@ export interface Preferences {
   hardwareVideoAcceleration: boolean;
   smoothScrolling: boolean;
   webRtcIpPolicy: WebRtcIpPolicy;
+  launchAtLogin: boolean;
+  startMinimized: boolean;
 
   settingsSync: boolean;
   syncDrafts: boolean;
@@ -722,7 +724,7 @@ const DEFAULTS: Preferences = {
   callScreenResolution: '720',
   callScreenBitrate: 'auto',
   callScreenFramerate: '30',
-  callScreenCodec: 'auto',
+  callScreenCodec: 'h264',
   callSimulcast: true,
 
   pushGatewayUrl: '',
@@ -758,6 +760,8 @@ const DEFAULTS: Preferences = {
   hardwareVideoAcceleration: true,
   smoothScrolling: true,
   webRtcIpPolicy: 'default',
+  launchAtLogin: false,
+  startMinimized: false,
 
   settingsSync: false,
   syncDrafts: true,

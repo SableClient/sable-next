@@ -2,7 +2,7 @@ import DesktopIcon from 'phosphor-svelte/lib/DesktopIcon';
 import FilmStripIcon from 'phosphor-svelte/lib/FilmStripIcon';
 import GraphicsCardIcon from 'phosphor-svelte/lib/GraphicsCardIcon';
 import MouseIcon from 'phosphor-svelte/lib/MouseIcon';
-import { isElectron } from '#lib/platform/electron.js';
+import { electronBridge, isElectron } from '#lib/platform/electron.js';
 import {
   supportsCustomTitleBar,
   supportsSmoothScrollingToggle,
@@ -56,6 +56,22 @@ export const desktopCategories: SettingsCategory[] = isElectron()
             type: 'boolean',
             gatedBy: 'showSystemTrayIcon',
             supported: supportsTray,
+          },
+          {
+            key: 'launchAtLogin',
+            section: 'window',
+            icon: DesktopIcon,
+            name: 'settings.launchAtLogin',
+            type: 'boolean',
+            supported: () => electronBridge()?.autostartAvailable === true,
+          },
+          {
+            key: 'startMinimized',
+            section: 'window',
+            icon: DesktopIcon,
+            name: 'settings.startMinimized',
+            description: 'settings.startMinimizedHint',
+            type: 'boolean',
           },
           {
             key: 'hardwareAcceleration',

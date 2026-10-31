@@ -10,6 +10,8 @@ export interface ElectronSettings {
   smoothScrolling: boolean;
   webRtcIpPolicy: WebRtcIpPolicy;
   updateChannel: UpdateChannel;
+  launchAtLogin: boolean;
+  startMinimized: boolean;
 }
 
 export interface ScreenShareCandidate {
@@ -21,7 +23,10 @@ export interface ScreenShareCandidate {
 export interface ElectronBridge {
   platform: string;
   screenAudioAvailable: boolean;
-  setTrayUnread(unread: boolean): Promise<void>;
+  autostartAvailable: boolean;
+  setBadge(count: number, overlay: string | null): Promise<void>;
+  requestAttention(): void;
+  clearWebCaches(): Promise<void>;
   applyWindowSettings(settings: DesktopWindowSettings): Promise<DesktopWindowState | null>;
   minimizeWindow(): void;
   showWindow(): void;

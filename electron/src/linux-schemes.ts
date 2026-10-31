@@ -19,20 +19,24 @@ async function attempt(command: string, args: string[]): Promise<string> {
   }
 }
 
+export function desktopExec(identifier: string): string {
+  const exec = process.defaultApp
+    ? ['env', `SABLE_IDENTIFIER=${identifier}`, process.execPath, resolve(app.getAppPath())]
+    : [process.env.APPIMAGE ?? process.execPath];
+  return exec.map(quote).join(' ');
+}
+
 export async function claimSchemes(
   applications: string,
   identifier: string,
   schemes: string[]
 ): Promise<void> {
-  const exec = process.defaultApp
-    ? ['env', `SABLE_IDENTIFIER=${identifier}`, process.execPath, resolve(app.getAppPath())]
-    : [process.env.APPIMAGE ?? process.execPath];
   const mimeTypes = schemes.map((scheme) => `x-scheme-handler/${scheme}`);
   const entry = [
     '[Desktop Entry]',
     'Type=Application',
     `Name=${app.getName()}`,
-    `Exec=${[...exec.map(quote), '%u'].join(' ')}`,
+    `Exec=${desktopExec(identifier)} %u`,
     'Terminal=false',
     `MimeType=${mimeTypes.join(';')};`,
     'NoDisplay=true',

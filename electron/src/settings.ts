@@ -18,6 +18,8 @@ const DEFAULTS = {
   webRtcIpPolicy: 'default',
   updateChannel: 'stable',
   customTitleBar: process.platform === 'win32',
+  launchAtLogin: false,
+  startMinimized: false,
 } as const;
 
 const SettingsSchema = v.object({
@@ -27,6 +29,8 @@ const SettingsSchema = v.object({
   webRtcIpPolicy: v.fallback(v.picklist(WEBRTC_IP_POLICIES), DEFAULTS.webRtcIpPolicy),
   updateChannel: v.fallback(v.picklist(['stable', 'nightly']), DEFAULTS.updateChannel),
   customTitleBar: v.fallback(v.boolean(), DEFAULTS.customTitleBar),
+  launchAtLogin: v.fallback(v.boolean(), DEFAULTS.launchAtLogin),
+  startMinimized: v.fallback(v.boolean(), DEFAULTS.startMinimized),
 });
 
 export type Settings = v.InferOutput<typeof SettingsSchema>;

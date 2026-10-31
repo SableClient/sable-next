@@ -1,12 +1,16 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 import type { Session } from 'electron';
 
-const { showMessageBox, readGrantsFile, writeGrantsFile } = vi.hoisted(() => ({
+const { showMessageBox, askForMediaAccess, readGrantsFile, writeGrantsFile } = vi.hoisted(() => ({
   showMessageBox: vi.fn(() => Promise.resolve({ response: 1 })),
+  askForMediaAccess: vi.fn(() => Promise.resolve(true)),
   readGrantsFile: vi.fn(() => '[]'),
   writeGrantsFile: vi.fn(() => Promise.resolve()),
 }));
-vi.mock('electron', () => ({ dialog: { showMessageBox } }));
+vi.mock('electron', () => ({
+  dialog: { showMessageBox },
+  systemPreferences: { askForMediaAccess },
+}));
 vi.mock('node:fs', () => ({ readFileSync: readGrantsFile }));
 vi.mock('./persistence', () => ({ writeJson: writeGrantsFile }));
 
@@ -129,6 +133,9 @@ test.each(['audio', 'video'] as const)(
       expect(callback).toHaveBeenCalledWith(process.platform === 'darwin');
     });
     expect(showMessageBox).toHaveBeenCalledTimes(process.platform === 'darwin' ? 0 : 1);
+    if (process.platform === 'darwin') {
+      expect(askForMediaAccess).toHaveBeenCalledWith(type === 'audio' ? 'microphone' : 'camera');
+    }
   }
 );
 

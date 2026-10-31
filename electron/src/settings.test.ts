@@ -10,6 +10,8 @@ test('a partial file preserves valid settings and supplies defaults', () => {
     webRtcIpPolicy: 'default',
     updateChannel: 'nightly',
     customTitleBar: process.platform === 'win32',
+    launchAtLogin: false,
+    startMinimized: false,
   });
 });
 

@@ -5,6 +5,7 @@ import {
   dialog,
   ipcMain,
   Menu,
+  nativeImage,
   protocol,
   screen,
   session,
@@ -35,6 +36,7 @@ import type {
 
 import { deepLinksIn, deepLinkSchemes } from './deep-links';
 import { AuthWindows } from './auth-window';
+import { autostartAvailable, setLaunchAtLogin } from './autostart';
 import { registerContextMenu } from './context-menu';
 import { claimSchemes } from './linux-schemes';
 import { openExternal, originOf } from './navigation';
@@ -126,14 +128,17 @@ function setFeatures(enable: string[], disable: string[]): void {
 
 if (!settings.hardwareAcceleration) app.disableHardwareAcceleration();
 const enabledFeatures = isLinux ? ['WebRtcPipeWireCamera'] : [];
-if (isLinux && settings.hardwareAcceleration && settings.hardwareVideoAcceleration) {
-  enabledFeatures.push(
-    'AcceleratedVideoDecodeLinuxGL',
-    'AcceleratedVideoDecodeLinuxZeroCopyGL',
-    'AcceleratedVideoEncoder'
-  );
+if (settings.hardwareAcceleration && settings.hardwareVideoAcceleration) {
+  enabledFeatures.push('AcceleratedVideoEncoder', 'AcceleratedVideoDecoder');
+  if (isLinux) {
+    enabledFeatures.push('AcceleratedVideoDecodeLinuxGL', 'AcceleratedVideoDecodeLinuxZeroCopyGL');
+  }
 }
-setFeatures(enabledFeatures, isLinux ? ['WaylandWpColorManagerV1'] : []);
+setFeatures(enabledFeatures, [
+  'HardwareMediaKeyHandling',
+  'MediaSessionService',
+  ...(isLinux ? ['WaylandWpColorManagerV1'] : []),
+]);
 if (!settings.smoothScrolling) app.commandLine.appendSwitch('disable-smooth-scrolling');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
@@ -204,6 +209,10 @@ let core: UtilityProcess | null = null;
 let quitting = false;
 let pageListening = false;
 let savedWindowState = readWindowState(windowStatePath);
+let startHidden = settings.startMinimized || process.argv.includes('--start-minimized');
+let lastCrashReload = 0;
+const CRASH_RELOAD_INTERVAL_MS = 30_000;
+const MAX_ZOOM_LEVEL = 3;
 
 function rememberWindowState(window: BrowserWindow): void {
   if (window.isDestroyed()) return;
@@ -373,6 +382,15 @@ ipcMain.on('sable-apply-settings', (event, value: unknown) => {
   if (!isAppFrame(event.senderFrame)) return;
   const next = { ...sanitize(value), customTitleBar: settings.customTitleBar };
   if (JSON.stringify(next) === JSON.stringify(settings)) return;
+  if (next.launchAtLogin !== settings.launchAtLogin && autostartAvailable()) {
+    void setLaunchAtLogin(
+      next.launchAtLogin,
+      IDENTIFIER,
+      join(app.getPath('appData'), 'autostart')
+    ).catch((error: unknown) => {
+      console.error('[sable autostart] could not update the login item', error);
+    });
+  }
   settings = next;
   setUpdateChannel(next.updateChannel);
   persistSettings();
@@ -386,9 +404,32 @@ ipcMain.on('sable-telemetry-consent', (event, enabled: unknown) => {
   setTelemetryConsent(enabled);
 });
 
-ipcMain.handle('sable-tray-unread', (event, unread: unknown) => {
-  if (!isAppFrame(event.senderFrame) || typeof unread !== 'boolean') return;
-  desktopTray.setUnread(unread);
+ipcMain.handle('sable-badge', (event, count: unknown, overlay: unknown) => {
+  if (!isAppFrame(event.senderFrame) || !Number.isInteger(count) || (count as number) < 0) return;
+  const unread = count as number;
+  desktopTray.setUnread(unread > 0);
+  if (process.platform !== 'win32') {
+    app.setBadgeCount(unread);
+    return;
+  }
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) return;
+  if (unread > 0 && typeof overlay === 'string') {
+    window.setOverlayIcon(nativeImage.createFromDataURL(overlay), `${unread} unread`);
+  } else {
+    window.setOverlayIcon(null, '');
+  }
+});
+
+ipcMain.on('sable-request-attention', (event) => {
+  const window = windowOf(event);
+  if (window && !window.isFocused()) window.flashFrame(true);
+});
+
+ipcMain.handle('sable-clear-web-caches', async (event) => {
+  if (!isAppFrame(event.senderFrame)) return;
+  await event.sender.session.clearCache();
+  await event.sender.session.clearCodeCaches({});
 });
 
 ipcMain.handle('sable-apply-window-settings', (event, value: unknown) => {
@@ -443,9 +484,11 @@ function createWindow(): BrowserWindow {
       preload: join(__dirname, 'preload.cjs'),
       sandbox: true,
       contextIsolation: true,
+      backgroundThrottling: false,
       additionalArguments: [
         ...(supportsAutoUpdate() ? [] : ['--sable-disable-auto-update']),
         ...(screenAudioAvailable ? ['--sable-screen-audio'] : []),
+        ...(autostartAvailable() ? ['--sable-autostart'] : []),
       ],
     },
   });
@@ -457,9 +500,18 @@ function createWindow(): BrowserWindow {
   window.on('resize', remember);
 
   window.once('ready-to-show', () => {
+    if (startHidden) {
+      startHidden = false;
+      if (process.platform === 'darwin' || desktopTray.available) return;
+      window.minimize();
+      return;
+    }
     if (restored?.fullscreen) window.setFullScreen(true);
     else if (restored?.maximized) window.maximize();
     window.show();
+  });
+  window.on('focus', () => {
+    window.flashFrame(false);
   });
   window.on('closed', () => {
     if (mainWindow !== window) return;
@@ -486,7 +538,17 @@ function createWindow(): BrowserWindow {
     }
   });
   window.webContents.on('before-input-event', (event, input) => {
-    if (input.type !== 'keyDown' || input.isAutoRepeat) return;
+    if (input.type !== 'keyDown') return;
+    if (process.platform !== 'darwin' && input.control && !input.alt && !input.meta) {
+      const step = { '=': 0.5, '+': 0.5, '-': -0.5, '0': 0 }[input.key];
+      if (step !== undefined) {
+        event.preventDefault();
+        const level = step === 0 ? 0 : window.webContents.getZoomLevel() + step;
+        window.webContents.setZoomLevel(Math.min(MAX_ZOOM_LEVEL, Math.max(-MAX_ZOOM_LEVEL, level)));
+        return;
+      }
+    }
+    if (input.isAutoRepeat) return;
     const f12 = input.key === 'F12' && !input.control && !input.shift && !input.alt && !input.meta;
     const inspect =
       input.key.toLowerCase() === 'i' &&
@@ -503,8 +565,13 @@ function createWindow(): BrowserWindow {
     cancelPicks();
     screenAudio.stop();
   });
-  window.webContents.on('render-process-gone', () => {
+  window.webContents.on('render-process-gone', (_event, details) => {
     screenAudio.stop();
+    if (details.reason === 'clean-exit' || quitting) return;
+    const now = Date.now();
+    if (now - lastCrashReload < CRASH_RELOAD_INTERVAL_MS) return;
+    lastCrashReload = now;
+    window.webContents.reload();
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
     openExternal(url);
@@ -736,6 +803,16 @@ if (!app.requestSingleInstanceLock()) {
       () => mainWindow
     );
     registerScreenShare();
+    if (process.platform !== 'darwin') {
+      const available = new Set(session.defaultSession.availableSpellCheckerLanguages);
+      const languages = app
+        .getPreferredSystemLanguages()
+        .flatMap((language) => [language, language.split('-')[0]])
+        .filter(
+          (language, index, all) => available.has(language) && all.indexOf(language) === index
+        );
+      if (languages.length > 0) session.defaultSession.setSpellCheckerLanguages(languages);
+    }
     registerUpdater(isAppFrame);
     setUpdateChannel(settings.updateChannel);
     mainWindow = createWindow();

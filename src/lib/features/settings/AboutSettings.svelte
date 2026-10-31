@@ -16,7 +16,7 @@
     supportsAutoUpdate,
     updatePlatform,
   } from '#lib/platform/updates.js';
-  import { isElectron } from '#lib/platform/electron.js';
+  import { electronBridge, isElectron } from '#lib/platform/electron.js';
   import { hostsServiceWorker } from '#lib/platform/service-worker.js';
   import { checkForWebUpdate } from '#lib/platform/web-updates.svelte.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
@@ -69,6 +69,7 @@
     resetFailed = false;
     try {
       await core.resetCaches();
+      await electronBridge()?.clearWebCaches();
       window.location.reload();
     } catch {
       resetting = false;

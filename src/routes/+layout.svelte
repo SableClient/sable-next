@@ -198,6 +198,8 @@
       smoothScrolling: preferences.smoothScrolling,
       webRtcIpPolicy: preferences.webRtcIpPolicy,
       updateChannel: preferences.updateChannel,
+      launchAtLogin: preferences.launchAtLogin,
+      startMinimized: preferences.startMinimized,
     });
   });
 

@@ -33,8 +33,13 @@ ipcRenderer.on('sable-pick-screen', (_event, request: number, sources: ScreenSha
 contextBridge.exposeInMainWorld('sableElectron', {
   platform: process.platform,
   screenAudioAvailable: process.argv.includes('--sable-screen-audio'),
-  setTrayUnread: (unread: boolean) =>
-    ipcRenderer.invoke('sable-tray-unread', unread) as Promise<void>,
+  autostartAvailable: process.argv.includes('--sable-autostart'),
+  setBadge: (count: number, overlay: string | null) =>
+    ipcRenderer.invoke('sable-badge', count, overlay) as Promise<void>,
+  requestAttention: () => {
+    ipcRenderer.send('sable-request-attention');
+  },
+  clearWebCaches: () => ipcRenderer.invoke('sable-clear-web-caches') as Promise<void>,
   applyWindowSettings: (settings: unknown) =>
     ipcRenderer.invoke('sable-apply-window-settings', settings) as Promise<{
       trayAvailable: boolean;
