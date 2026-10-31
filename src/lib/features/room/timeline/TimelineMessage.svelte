@@ -25,6 +25,7 @@
   import SenderName from '../members/SenderName.svelte';
   import RoleTagIcon from '../members/RoleTagIcon.svelte';
   import ForwardedLine from '../messages/ForwardedLine.svelte';
+  import MessageShieldLine from './MessageShieldLine.svelte';
   import '../members/sender-identity.css';
   import { formatFullTimestamp, formatMessageTimestamp, formatTime } from '#lib/ui/date-time.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -558,6 +559,9 @@
           {#each previewUrls as url (url)}
             <LinkEmbed {url} {encrypted} />
           {/each}
+        {/if}
+        {#if item.shield}
+          <MessageShieldLine shield={item.shield} />
         {/if}
         {#if threadTarget && onOpenThread}
           {@const target = threadTarget}

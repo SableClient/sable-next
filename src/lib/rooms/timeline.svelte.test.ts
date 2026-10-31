@@ -38,6 +38,7 @@ function item(id: string): TimelineItemView {
     mention: 'none',
     forwarded: null,
     forum_title: null,
+    shield: null,
   });
 }
 

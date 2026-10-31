@@ -167,6 +167,105 @@ async fn timeline_view_preserves_available_read_receipt_timestamps() {
 }
 
 #[tokio::test]
+async fn a_plaintext_message_in_an_encrypted_room_is_flagged() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!clear:example.org");
+    let event_id = event_id!("$clear");
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
+    server
+        .mock_room_state_encryption()
+        .encrypted()
+        .mount()
+        .await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(factory.room_encryption())
+                .add_timeline_event(factory.text_msg("in the clear").event_id(event_id)),
+        )
+        .await;
+    let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
+        .await
+        .unwrap();
+    let items = timeline.items().await;
+    let item = items
+        .iter()
+        .find(|item| item.as_event().and_then(|event| event.event_id()) == Some(event_id))
+        .unwrap();
+    let view = crate::view::timeline_item(
+        item,
+        client.user_id(),
+        &crate::view::Highlights::default(),
+        &crate::view::LocalContent::default(),
+    );
+    assert_eq!(
+        view.shield,
+        Some(crate::protocol::MessageShieldView {
+            code: crate::protocol::MessageShieldCode::SentInClear,
+            critical: true,
+        })
+    );
+}
+
+#[tokio::test]
+async fn only_a_state_change_that_came_encrypted_is_hidden_as_forged() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!forged:example.org");
+    let member_id = event_id!("$member");
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
+    server
+        .mock_room_state_encryption()
+        .encrypted()
+        .mount()
+        .await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(factory.room_encryption())
+                .add_timeline_event(
+                    factory
+                        .member(user_id!("@alice:example.org"))
+                        .membership(matrix_sdk::ruma::events::room::member::MembershipState::Join)
+                        .display_name("Alice")
+                        .event_id(member_id),
+                ),
+        )
+        .await;
+    let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
+        .await
+        .unwrap();
+    let items = timeline.items().await;
+    let item = |id| {
+        items
+            .iter()
+            .find(|item| item.as_event().and_then(|event| event.event_id()) == Some(id))
+            .unwrap()
+    };
+    let view = |id| {
+        crate::view::timeline_item(
+            item(id),
+            client.user_id(),
+            &crate::view::Highlights::default(),
+            &crate::view::LocalContent::default(),
+        )
+    };
+
+    let member = view(member_id);
+    assert_eq!(member.shield, None);
+    assert_ne!(
+        member.visibility,
+        crate::protocol::TimelineVisibility::Hidden
+    );
+    let state = item(member_id).as_event().unwrap().content();
+    assert!(!crate::view::forged_state(false, state));
+    assert!(crate::view::forged_state(true, state));
+}
+
+#[tokio::test]
 async fn live_timeline_receives_sync_and_reconciles_a_limited_gap() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
@@ -1077,6 +1176,33 @@ async fn a_legacy_pack_keyed_by_a_file_path_is_copied_under_a_generated_key() {
     core.run(ConvertLegacyParams {
         room_id: room_id.to_owned(),
         state_keys: vec![r"E:\temp".to_owned()],
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn enabling_encryption_sets_the_recommended_key_rotation() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!encrypt:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    server
+        .mock_room_send_state()
+        .for_type(matrix_sdk::ruma::events::StateEventType::RoomEncryption)
+        .body_matches_partial_json(json!({
+            "algorithm": "m.megolm.v1.aes-sha2",
+            "rotation_period_ms": 604_800_000,
+            "rotation_period_msgs": 100,
+        }))
+        .ok(event_id!("$encryption"))
+        .mock_once()
+        .mount()
+        .await;
+
+    let core = core_for(&server, client).await;
+    core.run(crate::api::room_state::EnableEncryptionParams {
+        room_id: room_id.to_owned(),
     })
     .await
     .unwrap();

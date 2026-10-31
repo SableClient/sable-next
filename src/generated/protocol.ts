@@ -629,6 +629,13 @@ export type MentionView = "none" | "silent" | "loud";
 
 export type MessageKind = "text" | "emote" | "notice";
 
+export type MessageShieldCode = "authenticity_not_guaranteed" | "unknown_device" | "unsigned_device" | "unverified_identity" | "verification_violation" | "mismatched_sender" | "sent_in_clear";
+
+export type MessageShieldView = {
+	code: MessageShieldCode,
+	critical: boolean,
+};
+
 export type MfmColor = {
 	raw: string,
 	args: MfmColorArgs,
@@ -1830,6 +1837,7 @@ export type TimelineItemView = {
 	mention: MentionView,
 	forwarded: ForwardedView | null,
 	forum_title: string | null,
+	shield: MessageShieldView | null,
 };
 
 export type TimelineReadDiagnostics = {

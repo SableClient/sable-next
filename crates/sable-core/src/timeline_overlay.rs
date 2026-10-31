@@ -260,6 +260,7 @@ mod tests {
             mention: MentionView::None,
             forwarded: None,
             forum_title: None,
+            shield: None,
         }
     }
 

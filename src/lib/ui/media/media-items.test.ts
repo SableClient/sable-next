@@ -32,6 +32,7 @@ function gallery(items: Extract<TimelineItemView['content'], { kind: 'gallery' }
     mention: 'none',
     forwarded: null,
     forum_title: null,
+    shield: null,
   } satisfies TimelineItemView;
 }
 

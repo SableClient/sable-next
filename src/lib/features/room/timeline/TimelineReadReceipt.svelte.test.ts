@@ -50,6 +50,7 @@ function item(): TimelineItemView {
     mention: 'none',
     forwarded: null,
     forum_title: null,
+    shield: null,
   });
 }
 

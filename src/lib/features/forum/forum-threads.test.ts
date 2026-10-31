@@ -36,6 +36,7 @@ function item(overrides: Partial<TimelineItemView> & { id: string }): TimelineIt
     mention: 'none',
     forwarded: null,
     forum_title: null,
+    shield: null,
     ...overrides,
   });
 }

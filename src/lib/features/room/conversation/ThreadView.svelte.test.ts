@@ -67,6 +67,7 @@ function image(eventId: string, filename: string): TimelineItemView {
     mention: 'none',
     forwarded: null,
     forum_title: null,
+    shield: null,
   });
 }
 

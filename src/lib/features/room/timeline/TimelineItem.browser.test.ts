@@ -94,6 +94,7 @@ function message(id: string, sender: string, senderName: string): TimelineItemVi
     mention: 'none',
     forwarded: null,
     forum_title: null,
+    shield: null,
   });
 }
 

@@ -40,6 +40,7 @@ export function previewMessage(
     mention: 'none',
     forwarded: null,
     forum_title: null,
+    shield: null,
     ...fields,
   };
 }

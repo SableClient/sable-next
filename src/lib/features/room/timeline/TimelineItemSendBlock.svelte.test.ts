@@ -69,6 +69,7 @@ function failed(blocked: NonNullable<TimelineItemView['send_state']>): TimelineI
     mention: 'none',
     forwarded: null,
     forum_title: null,
+    shield: null,
   });
 }
 

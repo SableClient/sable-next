@@ -89,6 +89,7 @@ function root(id: string, body: string): TimelineItemView {
     mention: 'none',
     forwarded: null,
     forum_title: null,
+    shield: null,
   });
 }
 

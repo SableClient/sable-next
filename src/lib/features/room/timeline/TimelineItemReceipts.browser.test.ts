@@ -67,6 +67,7 @@ function item(id: string, body: string, patch: Partial<TimelineItemView> = {}): 
     mention: 'none',
     forwarded: null,
     forum_title: null,
+    shield: null,
     ...patch,
   });
 }

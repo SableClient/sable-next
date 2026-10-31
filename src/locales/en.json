@@ -1022,6 +1022,15 @@
     "forwardedFromRoom": "Forwarded from {{room}}",
     "forwardedFromAnotherRoom": "Forwarded from another room",
     "forwardedFromEarlier": "Forwarded from earlier",
+    "shield": {
+      "authenticityNotGuaranteed": "The authenticity of this encrypted message can't be guaranteed on this device.",
+      "unknownDevice": "Encrypted by an unknown or deleted device.",
+      "unsignedDevice": "Encrypted by a device not verified by its owner.",
+      "unverifiedIdentity": "Encrypted by an unverified user.",
+      "verificationViolation": "The sender's verified identity was reset.",
+      "mismatchedSender": "The sender of this message doesn't match the device that encrypted it.",
+      "sentInClear": "Not encrypted."
+    },
     "morePronouns": "+{{count, number}}",
     "sending": "Sending…",
     "uploading": "Uploading attachment",

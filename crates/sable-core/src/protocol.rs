@@ -1138,6 +1138,27 @@ pub struct TimelineItemView {
     pub mention: MentionView,
     pub forwarded: Option<ForwardedView>,
     pub forum_title: Option<String>,
+    pub shield: Option<MessageShieldView>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct MessageShieldView {
+    pub code: MessageShieldCode,
+    pub critical: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum MessageShieldCode {
+    AuthenticityNotGuaranteed,
+    UnknownDevice,
+    UnsignedDevice,
+    UnverifiedIdentity,
+    VerificationViolation,
+    MismatchedSender,
+    SentInClear,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

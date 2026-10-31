@@ -77,6 +77,7 @@ const image = {
   mention: 'none',
   forwarded: null,
   forum_title: null,
+  shield: null,
 } satisfies TimelineItemView;
 
 const secondImage = withRowFields({

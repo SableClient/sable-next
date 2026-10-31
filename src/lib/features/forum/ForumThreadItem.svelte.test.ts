@@ -77,6 +77,7 @@ const root = withRowFields({
   mention: 'none',
   forwarded: null,
   forum_title: null,
+  shield: null,
 });
 
 const thread: ForumThread = {

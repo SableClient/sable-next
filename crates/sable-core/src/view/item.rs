@@ -17,15 +17,16 @@ use matrix_sdk_base::store::SerializableEventContent;
 use matrix_sdk_ui::{
     eyeball_im,
     timeline::{
-        EventSendState, EventTimelineItem, MsgLikeKind, Profile, TimelineDetails, TimelineItem,
-        TimelineItemContent, TimelineItemKind, VirtualTimelineItem,
+        EventSendState, EventTimelineItem, MsgLikeKind, Profile, TimelineDetails,
+        TimelineEventShieldState, TimelineEventShieldStateCode, TimelineItem, TimelineItemContent,
+        TimelineItemKind, VirtualTimelineItem,
     },
 };
 
 use crate::protocol::{
-    MembershipChangeView, MentionView, PerMessageProfileView, ReactionGroup, SendBlockView,
-    SendStateView, TimelineItemContentView, TimelineItemView, TimelineRowKind, TimelineVisibility,
-    UploadProgressView,
+    MembershipChangeView, MentionView, MessageShieldCode, MessageShieldView, PerMessageProfileView,
+    ReactionGroup, SendBlockView, SendStateView, TimelineItemContentView, TimelineItemView,
+    TimelineRowKind, TimelineVisibility, UploadProgressView,
 };
 
 use super::content::{content, raw_formatted_body};
@@ -322,6 +323,40 @@ impl TimelineItemContentView {
     }
 }
 
+/// State is never encrypted without MSC4362, so a decrypted state change is forged.
+pub(crate) const fn forged_state(encrypted: bool, content: &TimelineItemContent) -> bool {
+    encrypted
+        && matches!(
+            content,
+            TimelineItemContent::MembershipChange(_)
+                | TimelineItemContent::ProfileChange(_)
+                | TimelineItemContent::OtherState(_)
+                | TimelineItemContent::FailedToParseState { .. }
+        )
+}
+
+const fn shield(state: TimelineEventShieldState) -> Option<MessageShieldView> {
+    let (code, critical) = match state {
+        TimelineEventShieldState::Red { code } => (code, true),
+        TimelineEventShieldState::Grey { code } => (code, false),
+        TimelineEventShieldState::None => return None,
+    };
+    let code = match code {
+        TimelineEventShieldStateCode::AuthenticityNotGuaranteed => {
+            MessageShieldCode::AuthenticityNotGuaranteed
+        }
+        TimelineEventShieldStateCode::UnknownDevice => MessageShieldCode::UnknownDevice,
+        TimelineEventShieldStateCode::UnsignedDevice => MessageShieldCode::UnsignedDevice,
+        TimelineEventShieldStateCode::UnverifiedIdentity => MessageShieldCode::UnverifiedIdentity,
+        TimelineEventShieldStateCode::VerificationViolation => {
+            MessageShieldCode::VerificationViolation
+        }
+        TimelineEventShieldStateCode::MismatchedSender => MessageShieldCode::MismatchedSender,
+        TimelineEventShieldStateCode::SentInClear => MessageShieldCode::SentInClear,
+    };
+    Some(MessageShieldView { code, critical })
+}
+
 #[must_use]
 pub fn aggregation_item(
     event: &AnySyncTimelineEvent,
@@ -363,9 +398,14 @@ pub fn aggregation_item(
         mention: MentionView::None,
         forwarded: None,
         forum_title: None,
+        shield: None,
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one field per line of the item it builds"
+)]
 pub async fn standalone_item(
     core: &crate::Core,
     room: &Room,
@@ -473,6 +513,7 @@ pub async fn standalone_item(
         per_message_profile: message_profile,
         forwarded: original.content.as_ref().and_then(forward_meta),
         forum_title: None,
+        shield: None,
     })
 }
 
@@ -491,6 +532,10 @@ fn message_profile(
 }
 
 #[must_use]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one field per line of the item it builds"
+)]
 pub fn timeline_item(
     item: &Arc<TimelineItem>,
     own_user_id: Option<&UserId>,
@@ -523,13 +568,18 @@ pub fn timeline_item(
             let forwarded = forwarded(event, &raw);
             let forum_title = forum_title(raw.message());
             let content = content(event.content(), message_profile.as_ref(), &raw, own_user_id);
+            let visibility = if forged_state(event.encryption_info().is_some(), event.content()) {
+                TimelineVisibility::Hidden
+            } else {
+                content.visibility()
+            };
 
             TimelineItemView {
                 id,
                 row: content.row_kind(),
                 forwardable: content.forwardable(),
                 redactable: content.redactable(),
-                visibility: content.visibility(),
+                visibility,
                 event_id: event.event_id().map(ToOwned::to_owned),
                 transaction_id: event.transaction_id().map(ToString::to_string),
                 send_state: event.send_state().map(send_state),
@@ -556,6 +606,7 @@ pub fn timeline_item(
                 mention,
                 forwarded,
                 forum_title,
+                shield: msg_like(event.content()).and(shield(event.get_shield(false))),
             }
         }
 
@@ -598,6 +649,7 @@ pub fn timeline_item(
                 mention: MentionView::None,
                 forwarded: None,
                 forum_title: None,
+                shield: None,
             }
         }
     }
