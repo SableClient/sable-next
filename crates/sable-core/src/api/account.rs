@@ -10,7 +10,7 @@ use super::{Handler, Json};
 use crate::media::mxc_uri;
 use crate::profile_overrides::OverrideEdit;
 use crate::profiles::profile_view;
-use crate::protocol::{BookmarkView, RpcError, FieldEdit, InviteTriageView, MediaPreviewConfigView, MutualRoomView, PresenceView, ProfileOverridesView, ProfileView, SealedAccountDataView, UserDirectoryEntryView};
+use crate::protocol::{BookmarkView, RpcError, FieldEdit, InviteTriageView, MediaPreviewConfigView, MediaPreviewsView, MutualRoomView, PresenceView, ProfileOverridesView, ProfileView, SealedAccountDataView, UserDirectoryEntryView};
 use crate::{Core, ResultExt, presence};
 
 domain! {
@@ -42,6 +42,7 @@ domain! {
     set_bookmark,
     media_preview_config,
     set_media_preview_config,
+    set_room_media_previews,
     profile_overrides,
     set_profile_override,
 }
@@ -764,6 +765,24 @@ impl Handler for SetMediaPreviewConfigParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<MediaPreviewConfigView, RpcError> {
         core.set_media_preview_settings(self).await
+    }
+}
+
+/// `None` drops the room's own value so the account's applies.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetRoomMediaPreviewsParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub media_previews: Option<MediaPreviewsView>,
+}
+
+impl Handler for SetRoomMediaPreviewsParams {
+    type Ok = MediaPreviewConfigView;
+
+    async fn run(self, core: &Arc<Core>) -> Result<MediaPreviewConfigView, RpcError> {
+        core.set_room_media_previews(&self.room_id, self.media_previews)
+            .await
     }
 }
 

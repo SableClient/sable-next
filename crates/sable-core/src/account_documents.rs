@@ -4,8 +4,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 use serde_with::{DefaultOnError, VecSkipError, serde_as};
 
-use crate::Core;
 use crate::protocol::{InviteAvatarsView, MediaPreviewConfigView, MediaPreviewsView, RpcError};
+use crate::{Core, ResultExt};
 
 const MEDIA_PREVIEW_EVENT: &str = "m.media_preview_config";
 const UNSTABLE_MEDIA_PREVIEW_EVENT: &str = "io.element.msc4278.media_preview_config";
@@ -92,6 +92,23 @@ pub(crate) async fn shows_media_previews(room: &matrix_sdk::Room) -> bool {
 }
 
 /// Keeps every other field of the stored event and overwrites only what is set.
+fn room_media_previews_content(
+    stored: Option<Value>,
+    previews: Option<MediaPreviewsView>,
+) -> Value {
+    let update = MediaPreviewConfigView {
+        media_previews: previews,
+        invite_avatars: None,
+    };
+    let mut content = media_preview_content(stored, update);
+    if previews.is_none()
+        && let Value::Object(map) = &mut content
+    {
+        map.remove("media_previews");
+    }
+    content
+}
+
 pub(crate) fn media_preview_content(
     stored: Option<Value>,
     update: MediaPreviewConfigView,
@@ -198,6 +215,32 @@ impl Core {
         Ok(media_preview_config(Some(&content)))
     }
 
+    pub(crate) async fn set_room_media_previews(
+        &self,
+        room_id: &OwnedRoomId,
+        previews: Option<MediaPreviewsView>,
+    ) -> Result<MediaPreviewConfigView, RpcError> {
+        let _guard = self.account_data_lock.lock().await;
+        let stored = match self.room_document(room_id, MEDIA_PREVIEW_EVENT).await? {
+            Some(stable) => Some(stable),
+            None => {
+                self.room_document(room_id, UNSTABLE_MEDIA_PREVIEW_EVENT)
+                    .await?
+            }
+        };
+        let content = room_media_previews_content(stored, previews);
+        let room = self.room(room_id).await?;
+        for event in [MEDIA_PREVIEW_EVENT, UNSTABLE_MEDIA_PREVIEW_EVENT] {
+            let raw = matrix_sdk::ruma::serde::Raw::new(&content)
+                .or_failed(self, "set_room_media_previews")?
+                .cast_unchecked();
+            room.set_account_data_raw(event.into(), raw)
+                .await
+                .map_err(|error| self.room_error("set_room_media_previews", error))?;
+        }
+        Ok(media_preview_config(Some(&content)))
+    }
+
     pub(crate) async fn dismissed_invites(&self) -> Result<Vec<OwnedRoomId>, RpcError> {
         Ok(dismissed_invites(
             self.account_document(DISMISSED_INVITES_EVENT)
@@ -227,8 +270,25 @@ impl Core {
 mod tests {
     use serde_json::json;
 
-    use super::{dismissed_invites, media_preview_config, media_preview_content};
+    use super::{
+        dismissed_invites, media_preview_config, media_preview_content, room_media_previews_content,
+    };
     use crate::protocol::{InviteAvatarsView, MediaPreviewConfigView, MediaPreviewsView};
+
+    #[test]
+    fn a_room_override_is_set_and_cleared_without_touching_other_fields() {
+        let stored = json!({ "invite_avatars": "off", "media_previews": "on" });
+
+        let off = room_media_previews_content(Some(stored.clone()), Some(MediaPreviewsView::Off));
+        assert_eq!(
+            off,
+            json!({ "invite_avatars": "off", "media_previews": "off" })
+        );
+
+        let cleared = room_media_previews_content(Some(stored), None);
+        assert_eq!(cleared, json!({ "invite_avatars": "off" }));
+        assert_eq!(media_preview_config(Some(&cleared)).media_previews, None);
+    }
 
     #[test]
     fn an_unknown_preview_value_reads_as_off_and_a_missing_one_as_unset() {

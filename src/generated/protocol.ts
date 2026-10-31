@@ -2099,6 +2099,10 @@ export type Rpc = {
     setMediaPreviewConfig: (params: {
 	config: MediaPreviewConfigView,
 }) => Promise<MediaPreviewConfigView>;
+    setRoomMediaPreviews: (params: {
+	room_id: string,
+	media_previews: MediaPreviewsView | null,
+}) => Promise<MediaPreviewConfigView>;
     profileOverrides: (params?: Record<string, never>) => Promise<ProfileOverridesView>;
     setProfileOverride: (params: {
 	user_id: string,
@@ -3358,6 +3362,7 @@ export type RpcMethods = {
   'account.set_bookmark': Rpc['account']['setBookmark'];
   'account.media_preview_config': Rpc['account']['mediaPreviewConfig'];
   'account.set_media_preview_config': Rpc['account']['setMediaPreviewConfig'];
+  'account.set_room_media_previews': Rpc['account']['setRoomMediaPreviews'];
   'account.profile_overrides': Rpc['account']['profileOverrides'];
   'account.set_profile_override': Rpc['account']['setProfileOverride'];
   'auth.discover_homeserver': Rpc['auth']['discoverHomeserver'];
@@ -3664,6 +3669,7 @@ export function createRpc(call: RpcCall): Rpc {
       setBookmark: (params) => call('account.set_bookmark', params) as ReturnType<Rpc['account']['setBookmark']>,
       mediaPreviewConfig: (params) => call('account.media_preview_config', params) as ReturnType<Rpc['account']['mediaPreviewConfig']>,
       setMediaPreviewConfig: (params) => call('account.set_media_preview_config', params) as ReturnType<Rpc['account']['setMediaPreviewConfig']>,
+      setRoomMediaPreviews: (params) => call('account.set_room_media_previews', params) as ReturnType<Rpc['account']['setRoomMediaPreviews']>,
       profileOverrides: (params = {}) => call('account.profile_overrides', params) as ReturnType<Rpc['account']['profileOverrides']>,
       setProfileOverride: (params) => call('account.set_profile_override', params) as ReturnType<Rpc['account']['setProfileOverride']>,
     },

@@ -753,6 +753,8 @@
     "appearanceIconTitle": "Show room icons in the sidebar",
     "appearanceIconHint": "Overrides your account-wide choice inside this space.",
     "appearanceIconDefault": "Default ({{mode}})",
+    "mediaTitle": "Load media",
+    "mediaHint": "Only for you. Syncs to your other devices and clients.",
     "historyVisibility": {
       "shared": "All messages",
       "invited": "After invite",

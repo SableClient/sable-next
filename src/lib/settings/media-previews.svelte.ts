@@ -63,6 +63,13 @@ class MediaPreviewSettings {
     return core.rpc.account.mediaPreviewConfig({ room_id: roomId });
   }
 
+  /** `null` drops the room's own value so the account's applies. */
+  async setRoom(roomId: string, previews: MediaPreviewsView | null): Promise<MediaPreviewConfig> {
+    const core = this.sync.core;
+    if (core === null) return {};
+    return core.rpc.account.setRoomMediaPreviews({ room_id: roomId, media_previews: previews });
+  }
+
   async set(next: MediaPreviewConfig): Promise<void> {
     const core = this.sync.core;
     if (core === null) return;
