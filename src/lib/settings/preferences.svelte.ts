@@ -264,6 +264,7 @@ export interface Preferences {
   captionPosition: CaptionPosition;
   usernameClick: UsernameClick;
   doubleTapReact: boolean;
+  showSingleReactionCount: boolean;
   showRoleTooltip: boolean;
   doubleTapReaction: string;
   hideTypingIndicators: boolean;
@@ -618,6 +619,7 @@ const DEFAULTS: Preferences = {
   captionPosition: 'below',
   usernameClick: 'mention',
   doubleTapReact: true,
+  showSingleReactionCount: true,
   showRoleTooltip: false,
   doubleTapReaction: '❤️',
   hideTypingIndicators: false,

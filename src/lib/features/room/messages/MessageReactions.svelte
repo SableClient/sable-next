@@ -10,6 +10,7 @@
   import { RoomPacks } from '#lib/emoji/room-packs.svelte.js';
   import { shortcodeFor } from '#lib/emoji/emoji.js';
   import { i18n } from '#lib/i18n.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
@@ -185,7 +186,9 @@
             <em>{reaction.key}</em>
           {/if}
         </span>
-        <span class="reaction-count">{reaction.senders.length}</span>
+        {#if reaction.senders.length > 1 || preferences.showSingleReactionCount}
+          <span class="reaction-count">{reaction.senders.length}</span>
+        {/if}
       </button>
     {/snippet}
     {@const emojiShortcode = isCustomReaction(reaction.key) ? null : shortcodeFor(reaction.key)}

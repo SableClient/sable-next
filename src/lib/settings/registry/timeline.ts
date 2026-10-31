@@ -298,6 +298,13 @@ export const timelineCategory: SettingsCategory = {
       supported: supportsTouch,
     },
     {
+      key: 'showSingleReactionCount',
+      section: 'messages',
+      icon: SmileyIcon,
+      name: 'settings.showSingleReactionCount',
+      type: 'boolean',
+    },
+    {
       key: 'showRoleTooltip',
       section: 'messages',
       icon: UserCircleIcon,

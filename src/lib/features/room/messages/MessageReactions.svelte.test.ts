@@ -12,6 +12,7 @@ import { core } from '#lib/core/__mocks__/context.js';
 import { invalidatePacks } from '#lib/emoji/load-packs.js';
 
 import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
+import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import { guardTouchClicks } from '#lib/ui/trailing-click.js';
 
@@ -223,4 +224,28 @@ test('plain emoji reactions do not load the room packs', async () => {
   await screen.findByRole('button', { name: /👍/ });
   await Promise.resolve();
   expect(core.rpc.packs.list).not.toHaveBeenCalled();
+});
+
+test('hides the count on single reactions when turned off', async () => {
+  setPreference('showSingleReactionCount', false);
+  try {
+    render(MessageReactionsHarness, {
+      reactions: [
+        { key: '👍', senders: ['@alice:example.org'] },
+        { key: '🎉', senders: ['@alice:example.org', '@bob:example.org'] },
+      ],
+      eventId: '$event',
+      currentUserId: null,
+      members: [],
+      roomId: '!room:example.org',
+      actionable: false,
+    });
+
+    const single = await screen.findByRole('button', { name: /👍/ });
+    const double = screen.getByRole('button', { name: /🎉/ });
+    expect(single.querySelector('.reaction-count')).toBeNull();
+    expect(double.querySelector('.reaction-count')?.textContent).toBe('2');
+  } finally {
+    setPreference('showSingleReactionCount', true);
+  }
 });
