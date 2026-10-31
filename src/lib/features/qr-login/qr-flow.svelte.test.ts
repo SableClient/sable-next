@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+
 import { expect, test, vi } from 'vitest';
 
 import type { CoreEvent } from '#src/generated/protocol';
@@ -101,6 +103,40 @@ test('continues the grant when the other device confirms the check code', async 
   await vi.waitFor(() => {
     expect(core.qrGrantContinue).toHaveBeenCalledWith(true);
   });
+  stop();
+});
+
+test('waits for the user to come back from the approval browser before continuing', () => {
+  const { core, emit } = fakeCore();
+  const flow = new QrFlow(
+    core,
+    () => 'grant',
+    undefined,
+    undefined,
+    () => true
+  );
+  const stop = flow.listen();
+  let visibility: DocumentVisibilityState = 'visible';
+  vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+  const turn = (next: DocumentVisibilityState) => {
+    visibility = next;
+    document.dispatchEvent(new Event('visibilitychange'));
+  };
+
+  emit({
+    type: 'qr_login',
+    grant: true,
+    progress: { stage: 'waiting_for_auth', verification_uri: 'https://auth.example/approve' },
+  });
+  turn('visible');
+  expect(core.qrGrantContinue).not.toHaveBeenCalled();
+
+  turn('hidden');
+  turn('visible');
+  turn('hidden');
+  turn('visible');
+
+  expect(core.qrGrantContinue).toHaveBeenCalledExactlyOnceWith(true);
   stop();
 });
 
