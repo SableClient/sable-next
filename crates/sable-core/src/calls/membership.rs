@@ -712,10 +712,14 @@ fn alias_foci(event: &mut serde_json::Value, room_id: &str) {
     }
 }
 
+#[expect(
+    deprecated,
+    reason = "calls still get their token from the JWT service of the earlier MSC4195"
+)]
 fn livekit_urls(foci: &[Focus]) -> Vec<String> {
     foci.iter()
         .filter_map(|focus| match focus {
-            Focus::Livekit(livekit) => Some(livekit.service_url.clone()),
+            Focus::Livekit(livekit) => livekit.service_url.clone(),
             _ => None,
         })
         .filter(|url| !url.is_empty())

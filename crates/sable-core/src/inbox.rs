@@ -642,7 +642,7 @@ mod tests {
         },
         test_utils::mocks::MatrixMockServer,
     };
-    use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
+    use matrix_sdk_test::{JoinedRoomBuilder, User, event_factory::EventFactory};
     use matrix_sdk_ui::sync_service::SyncService;
     use serde_json::json;
     use wiremock::{
@@ -658,14 +658,14 @@ mod tests {
     async fn setup(server: &MatrixMockServer, notified: u64) -> (Arc<Core>, Client, Room) {
         let client = server.client_builder().build().await;
         let room_id = room_id!("!room:example.org");
-        let factory = EventFactory::new().room(room_id).sender(*ALICE);
+        let factory = EventFactory::new().room(room_id).sender(User::Alice);
         server.mock_room_state_encryption().plain().mount().await;
         let room = server
             .sync_room(
                 &client,
                 JoinedRoomBuilder::new(room_id)
                     .add_state_event(factory.member(client.user_id().unwrap()))
-                    .add_state_event(factory.member(*ALICE))
+                    .add_state_event(factory.member(User::Alice))
                     .add_state_event(factory.power_levels())
                     .set_unread_notifications_count(
                         json!({"notification_count": notified, "highlight_count": notified}),
@@ -689,7 +689,7 @@ mod tests {
         user: Option<&matrix_sdk::ruma::UserId>,
     ) -> serde_json::Value {
         json!({"type": "m.room.message", "event_id": event_id, "room_id": "!room:example.org",
-            "sender": *ALICE, "origin_server_ts": ts,
+            "sender": User::Alice, "origin_server_ts": ts,
             "content": {"msgtype": "m.text", "body": "hello", "m.mentions": {"user_ids": user.into_iter().collect::<Vec<_>>()}}})
     }
 
@@ -750,14 +750,12 @@ mod tests {
         )
         .await
         .unwrap();
-        let factory = EventFactory::new().room(room.room_id()).sender(*ALICE);
+        let factory = EventFactory::new().room(room.room_id()).sender(User::Alice);
         server
             .mock_sync()
             .ok_and_run(&client, |builder| {
                 builder.add_global_account_data(
-                    factory
-                        .direct()
-                        .add_user((*ALICE).to_owned(), room.room_id()),
+                    factory.direct().add_user(User::Alice, room.room_id()),
                 );
             })
             .await;
@@ -776,14 +774,12 @@ mod tests {
         let (core, client, room) = setup(&server, 0).await;
         let raw = serde_json::from_value(message("$bridged", 200, None)).unwrap();
         assert!(core.inbox_entry(&room, &raw, &[]).await.is_none());
-        let factory = EventFactory::new().room(room.room_id()).sender(*ALICE);
+        let factory = EventFactory::new().room(room.room_id()).sender(User::Alice);
         server
             .mock_sync()
             .ok_and_run(&client, |builder| {
                 builder.add_global_account_data(
-                    factory
-                        .direct()
-                        .add_user((*ALICE).to_owned(), room.room_id()),
+                    factory.direct().add_user(User::Alice, room.room_id()),
                 );
             })
             .await;
@@ -795,7 +791,7 @@ mod tests {
     async fn delayed_receipt_does_not_hide_a_newer_unread_message() {
         let server = MatrixMockServer::new().await;
         let (core, client, room) = setup(&server, 1).await;
-        let factory = EventFactory::new().room(room.room_id()).sender(*ALICE);
+        let factory = EventFactory::new().room(room.room_id()).sender(User::Alice);
         server
             .sync_room(
                 &client,
@@ -873,7 +869,7 @@ mod tests {
     async fn an_unfetchable_receipt_event_falls_back_to_the_receipt_time() {
         let server = MatrixMockServer::new().await;
         let (core, client, room) = setup(&server, 1).await;
-        let factory = EventFactory::new().room(room.room_id()).sender(*ALICE);
+        let factory = EventFactory::new().room(room.room_id()).sender(User::Alice);
         server
             .sync_room(
                 &client,
@@ -994,13 +990,13 @@ mod tests {
             if index > 0 {
                 let room_id =
                     matrix_sdk::ruma::RoomId::parse(format!("!{name}:example.org")).unwrap();
-                let factory = EventFactory::new().room(&room_id).sender(*ALICE);
+                let factory = EventFactory::new().room(&room_id).sender(User::Alice);
                 server
                     .sync_room(
                         &client,
                         JoinedRoomBuilder::new(&room_id)
                             .add_state_event(factory.member(client.user_id().unwrap()))
-                            .add_state_event(factory.member(*ALICE))
+                            .add_state_event(factory.member(User::Alice))
                             .add_state_event(factory.power_levels())
                             .set_unread_notifications_count(
                                 json!({"notification_count": 1, "highlight_count": 1}),

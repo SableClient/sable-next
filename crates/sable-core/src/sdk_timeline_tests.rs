@@ -22,7 +22,7 @@ use matrix_sdk::{
         MatrixMockServer, RoomContextResponseTemplate, RoomMessagesResponseTemplate,
     },
 };
-use matrix_sdk_test::{ALICE, InvitedRoomBuilder, JoinedRoomBuilder, event_factory::EventFactory};
+use matrix_sdk_test::{InvitedRoomBuilder, JoinedRoomBuilder, User, event_factory::EventFactory};
 use matrix_sdk_ui::sync_service::{State as SyncState, SyncService};
 use serde_json::json;
 use wiremock::{
@@ -106,7 +106,7 @@ async fn timeline_view_preserves_available_read_receipt_timestamps() {
     let event_id = event_id!("$read");
     let bob = user_id!("@bob:example.org");
     let carol = user_id!("@carol:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let timestamp = matrix_sdk::ruma::MilliSecondsSinceUnixEpoch::from_system_time(
         std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
     )
@@ -171,7 +171,7 @@ async fn live_timeline_receives_sync_and_reconciles_a_limited_gap() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!timeline:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -208,7 +208,7 @@ async fn live_timeline_back_paginates_through_the_event_cache() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!pagination:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -242,7 +242,7 @@ async fn hidden_events_admit_only_events_the_sdk_can_render_and_place() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!hidden:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let target = event_id!("$target");
 
     server.mock_room_state_encryption().plain().mount().await;
@@ -270,7 +270,7 @@ async fn hidden_events_admit_only_events_the_sdk_can_render_and_place() {
                         json!({
                             "type": "com.example.custom",
                             "event_id": "$custom",
-                            "sender": ALICE.as_str(),
+                            "sender": User::Alice.as_str(),
                             "origin_server_ts": 9,
                             "content": {"m.relates_to": {"rel_type": "m.thread", "event_id": target}},
                         })
@@ -466,7 +466,7 @@ async fn permalink_timeline_loads_and_contains_its_target() {
     let client = server.client_builder().build().await;
     let room_id = room_id!("!permalink:example.org");
     let target = event_id!("$target");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     let room = server.sync_joined_room(&client, room_id).await;
     server.mock_room_state_encryption().plain().mount().await;
@@ -778,7 +778,7 @@ async fn a_refused_pin_puts_back_the_marker_it_advanced() {
                 .add_state_event(
                     EventFactory::new()
                         .room(room_id)
-                        .sender(*ALICE)
+                        .sender(User::Alice)
                         .room_pinned_events(seen.clone()),
                 )
                 .add_account_data(
@@ -1116,7 +1116,7 @@ async fn a_written_state_event_is_read_back_until_sync_delivers_it() {
             JoinedRoomBuilder::new(room_id).add_state_event(
                 EventFactory::new()
                     .room(room_id)
-                    .sender(*ALICE)
+                    .sender(User::Alice)
                     .room_topic("theirs"),
             ),
         )
@@ -2026,7 +2026,7 @@ async fn a_room_read_elsewhere_reports_the_server_unread_count() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!read-elsewhere:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     let room = server
         .sync_room(
@@ -2070,7 +2070,7 @@ async fn a_count_truncated_by_the_local_cache_falls_back_to_the_server_count() {
         .user_id()
         .expect("the mock client is logged in")
         .to_owned();
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     let room = server
         .sync_room(
@@ -2126,7 +2126,7 @@ async fn a_server_that_pushes_every_encrypted_event_does_not_count_them_as_unrea
         .user_id()
         .expect("the mock client is logged in")
         .to_owned();
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     let room = server
         .sync_room(
@@ -2191,7 +2191,7 @@ async fn unread_reply_counts_persist_until_read() {
         .user_id()
         .expect("the mock client is logged in")
         .to_owned();
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let mention = |event_id| {
         factory
             .text_msg("hey")
@@ -2290,7 +2290,7 @@ async fn a_receipt_on_the_latest_event_clears_a_stale_server_count() {
         .user_id()
         .expect("the mock client is logged in")
         .to_owned();
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     let room = server
         .sync_room(
@@ -2384,7 +2384,7 @@ async fn a_poll_carries_its_tally_and_the_answer_this_account_picked() {
     let client = server.client_builder().build().await;
     let room_id = room_id!("!poll:example.org");
     let own = client.user_id().expect("a logged-in client").to_owned();
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let start = event_id!("$poll");
 
     server.mock_room_state_encryption().plain().mount().await;
@@ -2444,7 +2444,7 @@ async fn a_poll_that_repeats_an_answer_id_lists_it_once() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!poll-repeat:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let answers = UnstablePollAnswers::try_from(vec![
         UnstablePollAnswer::new("0", "ramen"),
         UnstablePollAnswer::new("0", "curry"),
@@ -2482,7 +2482,7 @@ async fn an_undisclosed_poll_withholds_its_tally_until_it_closes() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!undisclosed:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let start = event_id!("$poll");
 
     let content = poll_content("lunch?", &["ramen"], true)
@@ -2544,7 +2544,7 @@ async fn a_poll_kind_we_do_not_recognise_withholds_its_tally() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!custom:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let start = event_id!("$poll");
 
     let mut content = poll_content("lunch?", &["ramen"], false)
@@ -2584,7 +2584,7 @@ async fn a_location_reaches_the_view_with_its_coordinates_parsed() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!location:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -2631,7 +2631,7 @@ async fn live_location_beacons_reach_the_view_as_updated_coordinates() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!live-location:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let timestamp = MilliSecondsSinceUnixEpoch::now();
     server.mock_room_state_encryption().plain().mount().await;
     let share_event_id = event_id!("$share");
@@ -2647,7 +2647,7 @@ async fn live_location_beacons_reach_the_view_as_updated_coordinates() {
                             true,
                             Some(timestamp),
                         )
-                        .state_key(*ALICE)
+                        .state_key(User::Alice)
                         .event_id(share_event_id),
                 )
                 .add_timeline_event(
@@ -2680,7 +2680,7 @@ async fn an_emoji_only_message_is_sized_as_jumbo() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!jumbo:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -2712,7 +2712,7 @@ async fn a_notice_is_marked_as_one_rather_than_read_as_speech() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!notice:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -2752,7 +2752,7 @@ async fn a_gallery_reaches_the_view_as_one_item_per_attachment() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!gallery:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -2807,7 +2807,7 @@ async fn a_gallery_item_carries_what_a_single_attachment_does() {
                 >(json!({
                     "type": "m.room.message",
                     "event_id": "$gallery",
-                    "sender": *ALICE,
+                    "sender": User::Alice,
                     "origin_server_ts": 1,
                     "content": {
                         "msgtype": "dm.filament.gallery",
@@ -2873,7 +2873,7 @@ async fn a_reply_quotes_formatted_text() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!formatted-reply:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -2911,7 +2911,7 @@ async fn a_reply_to_an_uncaptioned_gallery_quotes_its_file_names() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!gallery-reply:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -2953,7 +2953,7 @@ async fn a_reply_to_a_verification_request_does_not_quote_its_fallback_body() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!verification-reply:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let request = RoomMessageEventContent::new(MessageType::VerificationRequest(
@@ -2999,7 +2999,7 @@ async fn replies_to_state_and_membership_events_carry_no_body() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!state-reply:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -3013,7 +3013,7 @@ async fn replies_to_state_and_membership_events_carry_no_body() {
                         .reply_to(event_id!("$name"))
                         .event_id(event_id!("$reply")),
                 )
-                .add_timeline_event(factory.member(*ALICE).event_id(event_id!("$member")))
+                .add_timeline_event(factory.member(User::Alice).event_id(event_id!("$member")))
                 .add_timeline_event(
                     factory
                         .text_msg("welcome")
@@ -3060,7 +3060,7 @@ async fn a_renamed_room_carries_both_names_and_a_new_topic_carries_its_text() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!named:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -3096,7 +3096,7 @@ async fn a_pin_change_reports_what_was_added_and_dropped() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!pinned:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -3131,7 +3131,7 @@ async fn joining_a_call_is_worded_as_a_join() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!call:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -3139,7 +3139,7 @@ async fn joining_a_call_is_worded_as_a_join() {
             &client,
             JoinedRoomBuilder::new(room_id).add_timeline_event(
                 factory
-                    .call_membership_state(ALICE.to_owned(), "DEVICE".to_owned())
+                    .call_membership_state(User::Alice, "DEVICE".to_owned())
                     .event_id(event_id!("$joined")),
             ),
         )
@@ -3242,14 +3242,18 @@ async fn invisible_member_names_use_the_user_id() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let room_id = room_id!("!names:example.org");
-        let factory = EventFactory::new().room(room_id).sender(*ALICE);
+        let factory = EventFactory::new().room(room_id).sender(User::Alice);
         server.mock_room_state_encryption().plain().mount().await;
         let builder = JoinedRoomBuilder::new(room_id)
-            .add_state_event(factory.member(*ALICE).display_name(name))
+            .add_state_event(factory.member(User::Alice).display_name(name))
             .add_state_event(factory.member(client.user_id().unwrap()))
             .add_timeline_event(factory.text_msg("hello").event_id(event_id!("$hidden")));
         let room = server.sync_room(&client, builder).await;
-        let member = room.get_member_no_sync(*ALICE).await.unwrap().unwrap();
+        let member = room
+            .get_member_no_sync(User::Alice.into())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(crate::view::member_view(&member).display_name, None);
 
         let timeline = Arc::new(
@@ -3368,7 +3372,7 @@ async fn mark_read_body(
         .build()
         .await;
     let room_id = room_id!("!receipts:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = JoinedRoomBuilder::new(room_id)
@@ -3527,7 +3531,7 @@ async fn marking_unread_from_a_message_walks_the_read_marker_back() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!unread-from:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     server
@@ -3638,7 +3642,7 @@ async fn a_receipt_short_of_the_latest_message_leaves_the_marker() {
         .build()
         .await;
     let room_id = room_id!("!receipts:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     server.mock_room_state_encryption().plain().mount().await;
     server
         .sync_room(
@@ -3684,7 +3688,7 @@ async fn read_marker_for(fully_read: bool) -> Option<String> {
         .user_id()
         .expect("the mock client is logged in")
         .to_owned();
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let room = JoinedRoomBuilder::new(room_id)
         .add_timeline_bulk([
             factory
@@ -3769,7 +3773,7 @@ async fn invited_direct_room_summary_is_direct() {
         let own = client.user_id().expect("a logged-in client").to_owned();
         let member = matrix_sdk::ruma::serde::Raw::new(&json!({
             "type": "m.room.member",
-            "sender": *ALICE,
+            "sender": User::Alice,
             "state_key": own,
             "content": { "membership": "invite", "is_direct": is_direct },
         }))
@@ -3813,18 +3817,19 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
     let client = server.client_builder().build().await;
     let room_id = room_id!("!dm-avatar:example.org");
     let avatar = matrix_sdk::ruma::mxc_uri!("mxc://example.org/alice");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     server
         .mock_sync()
         .ok_and_run(&client, |builder| {
-            builder
-                .add_global_account_data(factory.direct().add_user((*ALICE).to_owned(), room_id));
+            builder.add_global_account_data(factory.direct().add_user(User::Alice, room_id));
             builder.add_joined_room(
                 JoinedRoomBuilder::new(room_id)
-                    .set_room_summary(json!({"m.heroes": [*ALICE], "m.joined_member_count": 2}))
+                    .set_room_summary(
+                        json!({"m.heroes": [User::Alice], "m.joined_member_count": 2}),
+                    )
                     .add_state_event(
                         factory
-                            .member(*ALICE)
+                            .member(User::Alice)
                             .display_name("Alice")
                             .avatar_url(avatar),
                     ),
@@ -3852,7 +3857,7 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
     for (update, expected) in [
         (
             JoinedRoomBuilder::new(room_id)
-                .add_state_event(factory.member(*ALICE).avatar_url(updated)),
+                .add_state_event(factory.member(User::Alice).avatar_url(updated)),
             Some(updated.as_str()),
         ),
         (
@@ -3864,7 +3869,7 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
             Some(updated.as_str()),
         ),
         (
-            JoinedRoomBuilder::new(room_id).add_state_event(factory.member(*ALICE)),
+            JoinedRoomBuilder::new(room_id).add_state_event(factory.member(User::Alice)),
             None,
         ),
     ] {
@@ -3891,7 +3896,7 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
             builder.add_global_account_data(factory.direct());
             builder.add_joined_room(
                 JoinedRoomBuilder::new(room_id)
-                    .add_state_event(factory.member(*ALICE).avatar_url(avatar)),
+                    .add_state_event(factory.member(User::Alice).avatar_url(avatar)),
             );
         })
         .await;
@@ -3915,7 +3920,7 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
     let client = server.client_builder().build().await;
     let room_id = room_id!("!room-avatar:example.org");
     let avatar = matrix_sdk::ruma::mxc_uri!("mxc://example.org/room-picture");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server
         .sync_room(
@@ -3949,7 +3954,7 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
                     "content": {"url": null},
                     "event_id": "$room-avatar-cleared",
                     "origin_server_ts": 0,
-                    "sender": *ALICE,
+                    "sender": User::Alice,
                     "state_key": "",
                     "type": "m.room.avatar",
                 }))
@@ -4012,7 +4017,7 @@ async fn sliding_sync_room_summary_prefers_avatar_state_over_the_avatar_property
                 "content": content,
                 "event_id": "$room-avatar",
                 "origin_server_ts": 0,
-                "sender": *ALICE,
+                "sender": User::Alice,
                 "state_key": "",
                 "type": "m.room.avatar",
             }]);
@@ -4100,7 +4105,7 @@ async fn sliding_sync_hero_avatar_is_not_the_avatar_of_a_room_that_is_not_direct
                 room_id.to_string(): {
                     "avatar": "mxc://example.org/alice",
                     "heroes": [{
-                        "user_id": *ALICE,
+                        "user_id": User::Alice,
                         "displayname": "Alice",
                         "avatar_url": "mxc://example.org/alice",
                     }],
@@ -4140,7 +4145,7 @@ async fn a_mention_is_loud_from_the_ruleset_not_the_stamped_flag() {
     let client = server.client_builder().build().await;
     let own_user_id = client.user_id().expect("a logged-in user").to_owned();
     let room_id = room_id!("!mention:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     let room = server
         .sync_room(
@@ -4148,7 +4153,7 @@ async fn a_mention_is_loud_from_the_ruleset_not_the_stamped_flag() {
             JoinedRoomBuilder::new(room_id)
                 .add_state_bulk([
                     factory.member(&own_user_id).into_raw(),
-                    factory.member(*ALICE).into_raw(),
+                    factory.member(User::Alice).into_raw(),
                     factory.power_levels().into_raw(),
                 ])
                 .add_timeline_event(
@@ -4202,7 +4207,7 @@ async fn a_deleted_mention_is_not_highlighted() {
     let client = server.client_builder().build().await;
     let own_user_id = client.user_id().expect("a logged-in user").to_owned();
     let room_id = room_id!("!deleted-mention:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     let room = server
         .sync_room(
@@ -4210,7 +4215,7 @@ async fn a_deleted_mention_is_not_highlighted() {
             JoinedRoomBuilder::new(room_id)
                 .add_state_bulk([
                     factory.member(&own_user_id).into_raw(),
-                    factory.member(*ALICE).into_raw(),
+                    factory.member(User::Alice).into_raw(),
                     factory.power_levels().into_raw(),
                 ])
                 .add_timeline_event(
@@ -4279,7 +4284,7 @@ async fn a_live_redaction_drops_the_reactions() {
     let client = server.client_builder().build().await;
     let own_user_id = client.user_id().expect("a logged-in user").to_owned();
     let room_id = room_id!("!live-redaction:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let target = event_id!("$target");
 
     server.mock_room_state_encryption().plain().mount().await;
@@ -4289,7 +4294,7 @@ async fn a_live_redaction_drops_the_reactions() {
             JoinedRoomBuilder::new(room_id)
                 .add_state_bulk([
                     factory.member(&own_user_id).into_raw(),
-                    factory.member(*ALICE).into_raw(),
+                    factory.member(User::Alice).into_raw(),
                     factory.power_levels().into_raw(),
                 ])
                 .add_timeline_event(factory.text_msg("hey").event_id(target))
@@ -4307,7 +4312,7 @@ async fn a_live_redaction_drops_the_reactions() {
 
     let redaction = json!({
         "type": "m.room.redaction",
-        "sender": ALICE.to_string(),
+        "sender": User::Alice.to_string(),
         "event_id": "$redaction",
         "origin_server_ts": 1_000_000,
         "redacts": target,
@@ -4466,7 +4471,7 @@ async fn incoming_messages_preserve_literal_markdown_and_authored_html() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!literal-markdown:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let plain = "*test* **bold** `code` ||bars|| $x$ $[unixtime 0] <b>literal</b>";
     let formatted = "<p>*test* **bold** `code` ||bars|| $x$ $[unixtime 0] <em>authored</em></p>";
 
@@ -4503,7 +4508,7 @@ async fn a_time_element_survives_the_sdk_sanitizer() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!time:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -4530,7 +4535,7 @@ async fn an_edit_renders_the_formatted_body_of_its_new_content() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!edited-time:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let original = event_id!("$original");
 
     server.mock_room_state_encryption().plain().mount().await;
@@ -4649,8 +4654,8 @@ async fn an_invite_joined_without_a_required_state_member_becomes_joined() {
     let invite = respond(json!({
         "initial": true,
         "invite_state": [
-            {"content": {"name": "Invited"}, "sender": *ALICE, "state_key": "", "type": "m.room.name"},
-            {"content": {"membership": "invite"}, "sender": *ALICE, "state_key": own, "type": "m.room.member"}
+            {"content": {"name": "Invited"}, "sender": User::Alice, "state_key": "", "type": "m.room.name"},
+            {"content": {"membership": "invite"}, "sender": User::Alice, "state_key": own, "type": "m.room.member"}
         ]
     }))
     .mount_as_scoped(server.server())
@@ -4678,7 +4683,7 @@ async fn an_invite_joined_without_a_required_state_member_becomes_joined() {
             "unsigned": {"prev_content": {"membership": "invite"}}
         }],
         "required_state": [
-            {"content": {"name": "Invited"}, "event_id": "$name", "origin_server_ts": 1, "sender": *ALICE, "state_key": "", "type": "m.room.name"}
+            {"content": {"name": "Invited"}, "event_id": "$name", "origin_server_ts": 1, "sender": User::Alice, "state_key": "", "type": "m.room.name"}
         ]
     }))
     .mount_as_scoped(server.server())
@@ -4963,7 +4968,7 @@ async fn an_emptied_state_event_is_a_state_event_not_a_deleted_message() {
             "type": "m.room.pinned_events",
             "state_key": "",
             "event_id": id,
-            "sender": ALICE.to_string(),
+            "sender": User::Alice.to_string(),
             "origin_server_ts": 1,
             "content": {},
         }))
@@ -5009,7 +5014,7 @@ async fn a_pin_list_with_junk_entries_still_reads_as_a_pin_change() {
         "type": "m.room.pinned_events",
         "state_key": "",
         "event_id": "$pins",
-        "sender": ALICE.to_string(),
+        "sender": User::Alice.to_string(),
         "origin_server_ts": 1,
         "content": { "pinned": ["$a", "nex", "$b", "$new", "@nex:example.org", 4, [], {}] },
         "unsigned": { "prev_content": { "pinned": ["$a", "nex", "$b"] } },
@@ -5057,7 +5062,7 @@ async fn an_ignore_change_resyncs_rooms_with_their_history_gap() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!ignored:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let ignore_change = Arc::new(AtomicBool::new(false));
     let ignore_sent = Arc::new(AtomicBool::new(false));
 
@@ -5333,7 +5338,7 @@ async fn thread_lists_are_notified_when_room_cache_changes() {
     .await
     .unwrap();
     while events.try_recv().is_ok() {}
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     server
         .sync_room(
             &client,
@@ -5368,7 +5373,7 @@ async fn thread_actions_accept_linked_context_only_for_its_inferred_root() {
     let room_id = room_id!("!linked-thread:example.org");
     let root = event_id!("$root");
     let target = event_id!("$older-reply");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     server
         .sync_room(
             &client,
@@ -5442,7 +5447,7 @@ async fn redacting_a_topic_the_server_already_stripped_leaves_the_room_without_t
     let topic = json!({
         "type": "m.room.topic",
         "state_key": "",
-        "sender": ALICE.to_string(),
+        "sender": User::Alice.to_string(),
         "event_id": "$topic",
         "origin_server_ts": 1_000_000,
         "content": {},
@@ -5461,7 +5466,7 @@ async fn redacting_a_topic_the_server_already_stripped_leaves_the_room_without_t
 
     let redaction = json!({
         "type": "m.room.redaction",
-        "sender": ALICE.to_string(),
+        "sender": User::Alice.to_string(),
         "event_id": "$redaction",
         "origin_server_ts": 2_000_000,
         "redacts": "$topic",

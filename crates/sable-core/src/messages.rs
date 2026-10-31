@@ -2847,12 +2847,12 @@ mod tests {
     #[tokio::test]
     async fn reading_a_thread_sends_only_a_receipt_scoped_to_its_root() {
         use crate::api::timeline::MarkReadParams;
-        use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
+        use matrix_sdk_test::{JoinedRoomBuilder, User, event_factory::EventFactory};
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let room_id = room_id!("!thread:example.org");
         let root = event_id!("$root");
-        let factory = EventFactory::new().room(room_id).sender(*ALICE);
+        let factory = EventFactory::new().room(room_id).sender(User::Alice);
         server.mock_room_state_encryption().plain().mount().await;
         server
             .sync_room(
@@ -2914,11 +2914,11 @@ mod tests {
 
     async fn receipt_body(read: &str, viewed: Option<&str>) -> serde_json::Value {
         use crate::api::timeline::MarkReadParams;
-        use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
+        use matrix_sdk_test::{JoinedRoomBuilder, User, event_factory::EventFactory};
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let room_id = room_id!("!thread:example.org");
-        let factory = EventFactory::new().room(room_id).sender(*ALICE);
+        let factory = EventFactory::new().room(room_id).sender(User::Alice);
         server.mock_room_state_encryption().plain().mount().await;
         server
             .sync_room(
@@ -3002,12 +3002,12 @@ mod tests {
     async fn a_thread_timeline_is_already_at_its_end_going_forward() {
         use crate::api::timeline::{PaginateOk, PaginateParams};
         use crate::protocol::PaginationDirection;
-        use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
+        use matrix_sdk_test::{JoinedRoomBuilder, User, event_factory::EventFactory};
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let room_id = room_id!("!thread:example.org");
         let root = event_id!("$root");
-        let factory = EventFactory::new().room(room_id).sender(*ALICE);
+        let factory = EventFactory::new().room(room_id).sender(User::Alice);
         server.mock_room_state_encryption().plain().mount().await;
         server
             .sync_room(

@@ -433,7 +433,7 @@ mod tests {
             ruma::{event_id, room_id},
             test_utils::mocks::MatrixMockServer,
         };
-        use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
+        use matrix_sdk_test::{JoinedRoomBuilder, User, event_factory::EventFactory};
         use matrix_sdk_ui::sync_service::SyncService;
         use wiremock::{
             Mock, ResponseTemplate,
@@ -445,7 +445,7 @@ mod tests {
         server.mock_room_state_encryption().plain().mount().await;
         let room_id = room_id!("!reactions:example.org");
         let target = event_id!("$message");
-        let factory = EventFactory::new().room(room_id).sender(*ALICE);
+        let factory = EventFactory::new().room(room_id).sender(User::Alice);
         server
             .sync_room(
                 &client,

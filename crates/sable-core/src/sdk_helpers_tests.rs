@@ -1090,7 +1090,7 @@ fn space_child_ties_follow_ruma_room_id_order() {
 async fn event_focus_clears_its_explicit_sync_subscription_after_unsubscribing() {
     use futures_util::StreamExt;
     use matrix_sdk::{ruma::event_id, test_utils::mocks::RoomContextResponseTemplate};
-    use matrix_sdk_test::{ALICE, event_factory::EventFactory};
+    use matrix_sdk_test::{User, event_factory::EventFactory};
     use wiremock::matchers::path_regex;
 
     let server = MatrixMockServer::new().await;
@@ -1105,7 +1105,7 @@ async fn event_focus_clears_its_explicit_sync_subscription_after_unsubscribing()
         .ok(RoomContextResponseTemplate::new(
             EventFactory::new()
                 .room(room_id)
-                .sender(*ALICE)
+                .sender(User::Alice)
                 .text_msg("target")
                 .event_id(target)
                 .into_event(),
@@ -3205,7 +3205,7 @@ async fn server_features_lists_only_enabled_unstable_features() {
 #[tokio::test]
 async fn a_live_redaction_shows_its_reason_in_an_open_timeline() {
     use matrix_sdk::ruma::event_id;
-    use matrix_sdk_test::{ALICE, event_factory::EventFactory};
+    use matrix_sdk_test::{User, event_factory::EventFactory};
 
     use crate::protocol::TimelineItemContentView;
     use crate::view::apply_diff;
@@ -3214,7 +3214,7 @@ async fn a_live_redaction_shows_its_reason_in_an_open_timeline() {
     let client = server.client_builder().build().await;
     let room_id = room_id!("!reason:example.org");
     let target = event_id!("$target");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     server.mock_room_state_encryption().plain().mount().await;
     server
         .sync_room(
@@ -3240,7 +3240,7 @@ async fn a_live_redaction_shows_its_reason_in_an_open_timeline() {
 
     let redaction = json!({
         "type": "m.room.redaction",
-        "sender": ALICE.to_string(),
+        "sender": User::Alice.to_string(),
         "event_id": "$redaction",
         "origin_server_ts": 1_000_000,
         "redacts": target,

@@ -140,11 +140,15 @@ fn pick_focus(
         .or_else(|| configured.filter(|url| !url.trim().is_empty()))
 }
 
+#[expect(
+    deprecated,
+    reason = "calls still get their token from the JWT service of the earlier MSC4195"
+)]
 fn livekit_service_urls(transports: Vec<RtcTransport>) -> Vec<String> {
     transports
         .into_iter()
         .filter_map(|transport| match transport {
-            RtcTransport::LiveKit(livekit) => Some(livekit.service_url),
+            RtcTransport::LiveKit(livekit) => livekit.service_url,
             _ => None,
         })
         .filter(|url| !url.trim().is_empty())

@@ -6,7 +6,7 @@ use matrix_sdk::{
     test_utils::mocks::MatrixMockServer,
 };
 use matrix_sdk_test::{
-    ALICE, InvitedRoomBuilder, JoinedRoomBuilder, event_factory::EventFactory, stripped_state_event,
+    InvitedRoomBuilder, JoinedRoomBuilder, User, event_factory::EventFactory, stripped_state_event,
 };
 use matrix_sdk_ui::sync_service::SyncService;
 use serde_json::json;
@@ -73,11 +73,11 @@ async fn stripped_invite_notifies_without_an_invented_event_id() {
             .ok_and_run(&client, |builder| {
                 builder.add_invited_room(InvitedRoomBuilder::new(room_id).add_state_bulk([
                     stripped_state_event!({
-                        "type": "m.room.member", "sender": *ALICE, "state_key": *ALICE,
+                        "type": "m.room.member", "sender": User::Alice, "state_key": User::Alice,
                         "content": { "membership": "join", "displayname": "Alice" }
                     }),
                     stripped_state_event!({
-                        "type": "m.room.member", "sender": *ALICE, "state_key": own,
+                        "type": "m.room.member", "sender": User::Alice, "state_key": own,
                         "content": { "membership": "invite", "is_direct": true }
                     }),
                 ]));
@@ -86,7 +86,7 @@ async fn stripped_invite_notifies_without_an_invented_event_id() {
         let view = next_notification(&mut events).await;
         assert_eq!(view.room_id, room_id);
         assert_eq!(view.event_id, None);
-        assert_eq!(view.sender, *ALICE);
+        assert_eq!(view.sender, User::Alice);
         assert_eq!(view.sender_name.as_deref(), Some("Alice"));
         assert_eq!(view.body, "invited you");
         assert!(view.is_direct);
@@ -108,7 +108,7 @@ async fn a_replayed_invite_alerts_once() {
     let own = client.user_id().unwrap().to_owned();
     let invite = |room_id: &matrix_sdk::ruma::RoomId| {
         InvitedRoomBuilder::new(room_id).add_state_event(stripped_state_event!({
-            "type": "m.room.member", "sender": *ALICE, "state_key": own,
+            "type": "m.room.member", "sender": User::Alice, "state_key": own,
             "content": { "membership": "invite" }
         }))
     };
@@ -148,7 +148,7 @@ async fn a_replayed_message_alerts_once() {
     let client = server.client_builder().build().await;
     let room_id = room_id!("!replay:example.org");
     server.mock_room_state_encryption().plain().mount().await;
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     server
         .sync_room(
             &client,
@@ -175,7 +175,7 @@ async fn a_replayed_message_alerts_once() {
     let message = |event_id: &str, body: &str| {
         json!({
             "type": "m.room.message", "event_id": event_id, "room_id": room_id,
-            "sender": *ALICE, "origin_server_ts": MilliSecondsSinceUnixEpoch::now(),
+            "sender": User::Alice, "origin_server_ts": MilliSecondsSinceUnixEpoch::now(),
             "content": { "msgtype": "m.text", "body": body }
         })
     };
@@ -238,7 +238,7 @@ async fn a_message_delivered_late_by_a_resumed_sync_does_not_alert() {
     let client = server.client_builder().build().await;
     let room_id = room_id!("!late:example.org");
     server.mock_room_state_encryption().plain().mount().await;
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     server
         .sync_room(
             &client,
@@ -256,7 +256,7 @@ async fn a_message_delivered_late_by_a_resumed_sync_does_not_alert() {
     let message = |event_id: &str, sent: MilliSecondsSinceUnixEpoch| {
         json!({
             "type": "m.room.message", "event_id": event_id, "room_id": room_id,
-            "sender": *ALICE, "origin_server_ts": sent,
+            "sender": User::Alice, "origin_server_ts": sent,
             "content": { "msgtype": "m.text", "body": event_id }
         })
     };
@@ -446,7 +446,7 @@ async fn a_message_alerts_when_the_server_reports_no_counts() {
     let client = server.client_builder().build().await;
     let room_id = room_id!("!synapse:example.org");
     server.mock_room_state_encryption().plain().mount().await;
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     server
         .sync_room(
             &client,
@@ -471,7 +471,7 @@ async fn a_message_alerts_when_the_server_reports_no_counts() {
         .unwrap();
     let message = json!({
         "type": "m.room.message", "event_id": "$fresh", "room_id": room_id,
-        "sender": *ALICE, "origin_server_ts": MilliSecondsSinceUnixEpoch::now(),
+        "sender": User::Alice, "origin_server_ts": MilliSecondsSinceUnixEpoch::now(),
         "content": { "msgtype": "m.text", "body": "hello" }
     });
     Mock::given(method("GET"))
@@ -521,7 +521,7 @@ async fn sticker_notifications_do_not_block_sync_or_reappear_after_reading() {
         let client = server.client_builder().build().await;
         let room_id = room_id!("!stickers:example.org");
         server.mock_room_state_encryption().plain().mount().await;
-        let factory = EventFactory::new().room(room_id).sender(*ALICE);
+        let factory = EventFactory::new().room(room_id).sender(User::Alice);
         server
             .sync_room(
                 &client,
@@ -547,7 +547,7 @@ async fn sticker_notifications_do_not_block_sync_or_reappear_after_reading() {
         let sent = MilliSecondsSinceUnixEpoch::now();
         let event = json!({
             "type": "m.sticker", "event_id": "$sticker", "room_id": room_id,
-            "sender": *ALICE, "origin_server_ts": sent,
+            "sender": User::Alice, "origin_server_ts": sent,
             "content": { "body": "wave", "url": "mxc://example.org/wave", "info": { "w": 1, "h": 1, "mimetype": "image/png", "size": 1 } }
         });
         let requested = Arc::new(tokio::sync::Notify::new());
@@ -601,7 +601,7 @@ async fn sticker_notifications_do_not_block_sync_or_reappear_after_reading() {
                     Some(MilliSecondsSinceUnixEpoch::now()),
                 ).into_event()));
             builder.add_invited_room(InvitedRoomBuilder::new(invite_room).add_state_event(stripped_state_event!({
-                "type": "m.room.member", "sender": *ALICE, "state_key": client.user_id().unwrap(),
+                "type": "m.room.member", "sender": User::Alice, "state_key": client.user_id().unwrap(),
                 "content": { "membership": "invite" }
             })));
         })).await.expect("read sync completes before context response");
@@ -632,7 +632,7 @@ async fn an_encrypted_room_defaults_to_the_rule_its_decrypted_messages_hit() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!settings:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
     let mut rules = Ruleset::server_default(client.user_id().unwrap());
     rules
         .set_actions(
@@ -825,7 +825,7 @@ async fn rooms_whose_flag_disagrees_with_their_member_count_get_their_own_rules(
         .mock_sync()
         .ok_and_run(&client, |builder| {
             builder.add_global_account_data(factory.push_rules(rules));
-            builder.add_global_account_data(factory.direct().add_user(ALICE.to_owned(), flagged));
+            builder.add_global_account_data(factory.direct().add_user(User::Alice, flagged));
             builder.add_joined_room(JoinedRoomBuilder::new(flagged).set_joined_members_count(3));
             builder.add_joined_room(JoinedRoomBuilder::new(pair).set_joined_members_count(2));
         })

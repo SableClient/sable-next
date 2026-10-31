@@ -690,7 +690,7 @@ mod tests {
 
         let state = SqliteStateStore::open(&store, None).await.unwrap();
         state
-            .set_custom_value_no_read(b"sable.reactions", b"state".to_vec())
+            .set_custom_value_no_read(b"sable.reactions", b"reaction history".to_vec())
             .await
             .unwrap();
         state
@@ -815,7 +815,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             state.get_custom_value(b"sable.reactions").await.unwrap(),
-            Some(b"state".to_vec())
+            Some(b"reaction history".to_vec())
         );
         assert!(
             state
@@ -824,6 +824,10 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+        state.close().await.unwrap();
+        let raw =
+            std::fs::read(store_dir(store_id).join(matrix_sdk::STATE_STORE_DATABASE_NAME)).unwrap();
+        assert!(!raw.windows(16).any(|window| window == b"reaction history"));
     }
 
     #[tokio::test]

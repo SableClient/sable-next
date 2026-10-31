@@ -207,6 +207,16 @@ fn content(
     content_at(room_id, own, intent, keys::now_ms())
 }
 
+#[expect(
+    deprecated,
+    reason = "calls still get their token from the JWT service of the earlier MSC4195"
+)]
+fn service_focus(alias: String, service: String) -> Focus {
+    let mut focus = RumaLivekitFocus::with_service_url(service);
+    focus.alias = Some(alias);
+    Focus::Livekit(focus)
+}
+
 fn content_at(
     room_id: &OwnedRoomId,
     own: &CallMember,
@@ -286,12 +296,7 @@ fn content_at(
                 ActiveFocus::Livekit(focus_active),
                 own.foci
                     .iter()
-                    .map(|service| {
-                        Focus::Livekit(RumaLivekitFocus::new(
-                            Some(room_id.to_string()),
-                            service.clone(),
-                        ))
-                    })
+                    .map(|service| service_focus(room_id.to_string(), service.clone()))
                     .collect(),
                 Some(MilliSecondsSinceUnixEpoch(
                     UInt::try_from(own.created_ts).unwrap_or(UInt::MAX),

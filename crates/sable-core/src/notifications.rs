@@ -1953,6 +1953,20 @@ mod tests {
 
     const COLD_ROOM: &str = "!cold:example.org";
 
+    /// The SDK closes its SQLite connections on a blocking thread after the client drops, which
+    /// can still write a journal while the directory is being removed.
+    async fn remove_data_dir(path: &std::path::Path) {
+        for _ in 0..20 {
+            match tokio::fs::remove_dir_all(path).await {
+                Err(error) if error.kind() == std::io::ErrorKind::DirectoryNotEmpty => {
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                }
+                result => return result.unwrap(),
+            }
+        }
+        panic!("{} stayed in use", path.display());
+    }
+
     struct ColdFixture {
         data_dir: std::path::PathBuf,
         client: Option<matrix_sdk::Client>,
@@ -2061,7 +2075,7 @@ mod tests {
         );
         assert!(!fixture.data_dir.join("session.json").exists());
 
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     async fn shared_room_key(client: &matrix_sdk::Client) -> OutboundGroupSession {
@@ -2424,7 +2438,7 @@ mod tests {
             fixture.decrypt("A", &message).await,
             ColdPush::Clear(_)
         ));
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
 
         let mut rules = Ruleset::server_default(user_id!("@alice:example.org"));
         rules
@@ -2447,7 +2461,7 @@ mod tests {
             session(&fixture).await.decrypt(&message).await,
             ColdPush::Discard
         );
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     fn cold_room_without_me() -> JoinedRoomBuilder {
@@ -2486,7 +2500,7 @@ mod tests {
             fixture.decrypt("A", &sticker).await,
             ColdPush::Clear(_)
         ));
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
 
         let fixture = ColdFixture::new("fetched-member", cold_room_without_me(), None).await;
         let factory =
@@ -2511,7 +2525,7 @@ mod tests {
             fixture.decrypt("A", &message).await,
             ColdPush::Clear(_)
         ));
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     fn pushes_every_encrypted_event() -> Ruleset {
@@ -2543,7 +2557,7 @@ mod tests {
             fixture.decrypt("A", &message).await,
             ColdPush::Clear(_)
         ));
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
 
         let fixture = ColdFixture::new(
             "unevaluated-msc4028",
@@ -2558,7 +2572,7 @@ mod tests {
             )
             .await;
         assert_eq!(fixture.decrypt("A", &message).await, ColdPush::Unevaluated);
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     #[tokio::test]
@@ -2597,7 +2611,7 @@ mod tests {
         let clear = serde_json::from_str::<serde_json::Value>(&clear).unwrap();
         assert_eq!(clear["content"]["body"], "hello");
         assert_eq!(clear.get(super::NOISY_KEY), None);
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     #[tokio::test]
@@ -2629,7 +2643,7 @@ mod tests {
         let clear = serde_json::from_str::<serde_json::Value>(&clear).unwrap();
         assert_eq!(clear["content"]["body"], "ring");
         assert_eq!(clear[super::NOISY_KEY], true);
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     #[tokio::test]
@@ -2654,7 +2668,7 @@ mod tests {
             fixture.decrypt_locally(&unknown).await,
             ColdPush::NeedsKey { quietly: false }
         );
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
 
         let fixture = ColdFixture::new(
             "needs-key-quietly",
@@ -2666,7 +2680,7 @@ mod tests {
             fixture.decrypt_locally(&unknown).await,
             ColdPush::NeedsKey { quietly: true }
         );
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     async fn fetch(fixture: &ColdFixture, device: &str, event: serde_json::Value) -> PushFetchView {
@@ -2748,7 +2762,7 @@ mod tests {
             matches!(fetched, PushFetchView::Event { .. }),
             "{fetched:?}"
         );
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     #[tokio::test]
@@ -2774,7 +2788,7 @@ mod tests {
         .await;
 
         assert!(matches!(fetched, PushFetchView::Discard), "{fetched:?}");
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     #[tokio::test]
@@ -2793,7 +2807,7 @@ mod tests {
         assert_eq!(event.content["body"], "while the app runs");
 
         drop(app);
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     #[tokio::test]
@@ -2818,7 +2832,7 @@ mod tests {
             PushFetchView::Unavailable
         ));
 
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     #[tokio::test]
@@ -2834,7 +2848,7 @@ mod tests {
         };
         assert!(event.noisy);
 
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     #[tokio::test]
@@ -2857,7 +2871,7 @@ mod tests {
         assert_eq!(again.sender, first.sender);
         assert_eq!(again.image.unwrap().path, image_file.path);
 
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     #[tokio::test]
@@ -2876,7 +2890,7 @@ mod tests {
         assert!(media.image.is_none());
         assert!(media.sender.is_some());
 
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     #[test]
@@ -3066,7 +3080,7 @@ mod tests {
             .await;
         assert_eq!(media.sender_name, "@bob:example.org");
         drop(session);
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     #[tokio::test]
@@ -3102,7 +3116,7 @@ mod tests {
         );
 
         drop(session);
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     async fn session(fixture: &ColdFixture) -> super::PushSession {
@@ -3212,7 +3226,7 @@ mod tests {
                 expected
             );
         }
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     async fn mount_notified_event(fixture: &ColdFixture, thread_root: Option<&EventId>) {
@@ -3324,7 +3338,7 @@ mod tests {
                 "selected={selected}"
             );
 
-            tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+            remove_data_dir(&fixture.data_dir).await;
         }
     }
 
@@ -3356,7 +3370,7 @@ mod tests {
 
         assert!(session(&fixture).await.mark_read("$notified", true,).await);
 
-        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+        remove_data_dir(&fixture.data_dir).await;
     }
 
     const OAUTH_USER: &str = "@example:localhost";

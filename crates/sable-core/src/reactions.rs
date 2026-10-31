@@ -227,7 +227,7 @@ mod tests {
             ruma::{event_id, room_id},
             test_utils::mocks::MatrixMockServer,
         };
-        use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
+        use matrix_sdk_test::{JoinedRoomBuilder, User, event_factory::EventFactory};
         use matrix_sdk_ui::sync_service::SyncService;
 
         for reactions_first in [false, true] {
@@ -235,7 +235,7 @@ mod tests {
             let client = server.client_builder().build().await;
             server.mock_room_state_encryption().plain().mount().await;
             let room_id = room_id!("!reactions:example.org");
-            let factory = EventFactory::new().room(room_id).sender(*ALICE);
+            let factory = EventFactory::new().room(room_id).sender(User::Alice);
             let original = event_id!("$original");
             let annotation = event_id!("$annotation");
             let replacement = event_id!("$replacement");
@@ -244,7 +244,7 @@ mod tests {
             let custom = |event_id, relation| {
                 Raw::new(&json!({
                     "type": "com.example.custom", "event_id": event_id,
-                    "sender": *ALICE, "origin_server_ts": 1,
+                    "sender": User::Alice, "origin_server_ts": 1,
                     "content": {"m.relates_to": {"rel_type": relation, "event_id": original}},
                 }))
                 .unwrap()
@@ -253,7 +253,7 @@ mod tests {
             let image_reaction = |target, event_id| {
                 Raw::new(&json!({
                     "type": "m.reaction", "event_id": event_id,
-                    "sender": *ALICE, "origin_server_ts": 2,
+                    "sender": User::Alice, "origin_server_ts": 2,
                     "content": {
                         "shortcode": "invalid",
                         "m.relates_to": {"rel_type": "m.annotation", "event_id": target, "key": "mxc://example.org/invalid"},
@@ -481,7 +481,7 @@ mod tests {
             ruma::{event_id, room_id},
             test_utils::mocks::MatrixMockServer,
         };
-        use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
+        use matrix_sdk_test::{JoinedRoomBuilder, User, event_factory::EventFactory};
         use matrix_sdk_ui::timeline::RoomExt as _;
 
         let server = MatrixMockServer::new().await;
@@ -489,7 +489,7 @@ mod tests {
         server.mock_room_state_encryption().plain().mount().await;
         let room_id = room_id!("!redacted:example.org");
         let me = client.user_id().unwrap().to_owned();
-        let factory = EventFactory::new().room(room_id).sender(*ALICE);
+        let factory = EventFactory::new().room(room_id).sender(User::Alice);
         let target = event_id!("$target");
         let room = server
             .sync_room(
