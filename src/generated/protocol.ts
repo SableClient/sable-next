@@ -1360,9 +1360,7 @@ export type RpcError = { code: "not_logged_in" } | { code: "unknown_subscription
 /**  The media's server keeps failing; asking again before this is pointless. */
 { code: "media_server_unavailable"; retry_after_ms: number } |
 /**  Refused, recoverable by user action. */
-{ code: "denied" } |
-/**  Banned from the room, so joining is refused. */
-{ code: "banned"; reason: string | null } | { code: "rate_limited"; retry_after_ms: number | null } | { code: "registration_unavailable" } | { code: "username_taken" } | { code: "invalid_username" } | { code: "invalid_email" } | { code: "unknown_email" } | { code: "email_verification_failed" } | { code: "weak_password" } | { code: "registration_stage_failed"; stage: string } |
+{ code: "denied" } | { code: "banned"; reason: string | null } | { code: "rate_limited"; retry_after_ms: number | null } | { code: "registration_unavailable" } | { code: "username_taken" } | { code: "invalid_username" } | { code: "invalid_email" } | { code: "unknown_email" } | { code: "email_verification_failed" } | { code: "weak_password" } | { code: "registration_stage_failed"; stage: string } |
 /**  The homeserver advertises OAuth endpoints that cannot be reached. */
 { code: "auth_provider_unreachable" } |
 /**  Detail is in the core's log under `log_id`. */

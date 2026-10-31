@@ -144,7 +144,6 @@ pub enum RpcError {
     },
     /// Refused, recoverable by user action.
     Denied,
-    /// Banned from the room, so joining is refused.
     Banned {
         reason: Option<String>,
     },
