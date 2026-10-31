@@ -36,3 +36,29 @@ pub fn rpc_error_json(error: &RpcError) -> String {
     serde_json::to_string(error)
         .unwrap_or_else(|_| r#"{"code":"failed","log_id":"serialization failed"}"#.to_owned())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{encode_event_batch, rpc_error_json};
+    use crate::protocol::{CoreEvent, RpcError};
+
+    #[test]
+    fn a_batch_encodes_as_one_json_array() {
+        let json = encode_event_batch(&[
+            CoreEvent::SessionTokensRefreshed,
+            CoreEvent::SessionTokensRefreshed,
+        ])
+        .unwrap();
+
+        let events: Vec<serde_json::Value> = serde_json::from_str(&json).unwrap();
+        assert_eq!(events.len(), 2, "both events survive: {json}");
+    }
+
+    #[test]
+    fn an_rpc_error_keeps_its_code() {
+        let json: serde_json::Value =
+            serde_json::from_str(&rpc_error_json(&RpcError::Unavailable)).unwrap();
+
+        assert_eq!(json["code"], "unavailable");
+    }
+}
