@@ -1133,6 +1133,44 @@ jobs:
           protect="$protect,$(cat channel/* | grep -oE 'download/nightly-[^/]+' \
             | cut -d/ -f2 | sort -u | tr '\n' ',')"
           node scripts/ci/forgejo-release.mjs prune --keep "$NIGHTLY_KEEP" --protect "$protect"
+  sign-release:
+    name: Sign release checksums
+    needs: [setup-release, electron-linux, electron-macos, obtainium, altstore]
+    if: ${{ needs.setup-release.outputs.skip != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      RELEASE_GPG_KEY: ${{ secrets.RELEASE_GPG_KEY }}
+      RELEASE_GPG_KEY_ID: ${{ secrets.RELEASE_GPG_KEY_ID }}
+    steps:
+      - name: Check out repository
+        if: ${{ env.RELEASE_GPG_KEY != '' && env.RELEASE_GPG_KEY_ID != '' }}
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Download the release assets
+        if: ${{ env.RELEASE_GPG_KEY != '' && env.RELEASE_GPG_KEY_ID != '' }}
+        run: |
+          mkdir assets
+          node scripts/ci/forgejo-release.mjs download --pattern '*' --dir assets
+          rm -f assets/SHA256SUMS assets/SHA256SUMS.asc
+      - name: Sign and upload the checksums
+        if: ${{ env.RELEASE_GPG_KEY != '' && env.RELEASE_GPG_KEY_ID != '' }}
+        run: |
+          GNUPGHOME="$(mktemp -d)"
+          export GNUPGHOME
+          printf '%s\n' "$RELEASE_GPG_KEY" | gpg --batch --import
+          (cd assets && sha256sum -- *) > SHA256SUMS
+          gpg --batch --yes --local-user "$RELEASE_GPG_KEY_ID" \
+            --armor --detach-sign --output SHA256SUMS.asc SHA256SUMS
+          node scripts/ci/forgejo-release.mjs upload SHA256SUMS SHA256SUMS.asc
+      - name: Report the skipped signing
+        if: ${{ env.RELEASE_GPG_KEY == '' || env.RELEASE_GPG_KEY_ID == '' }}
+        run: echo '::notice::RELEASE_GPG_KEY/RELEASE_GPG_KEY_ID are not set; skipping the checksum signature.'
   distribute-aur:
     name: Publish to the AUR
     needs: [setup-release, electron-linux]
