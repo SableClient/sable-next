@@ -27,7 +27,9 @@
     const target =
       room?.state === 'joined' && room?.room_kind !== 'space' && !room.is_tombstoned
         ? roomSectionPath(roomList.rooms, room.room_id)
-        : resolve('/(app)/rooms');
+        : preferences.showHome
+          ? resolve('/(app)/home')
+          : resolve('/(app)/rooms');
     redirected = true;
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- takeAfterLogin() and roomSectionPath() resolve their routes
     void goto(requestedPath || target, { replace: true });
