@@ -22,7 +22,7 @@ use crate::protocol::RpcError;
 
 use crate::session::{Credentials, PersistedSession};
 
-use crate::{Core, PendingLogin};
+use crate::{Core, LoginMethod, PendingLogin};
 use crate::{protocol, session};
 
 impl Core {
@@ -366,21 +366,25 @@ impl Core {
             .append_pair("response_mode", response_mode(&redirect_uri));
         let authorization_url = authorization_url.to_string();
         let mut pending = self.pending_login.lock().await;
-        if matches!(pending.as_ref(), Some(PendingLogin::Sso(_, _, _, _, _, _))) {
+        if pending
+            .as_ref()
+            .is_some_and(|pending| pending.method == LoginMethod::Sso)
+        {
             return Err(RpcError::Unavailable);
         }
 
         if pending.is_some() {
             tracing::warn!("replacing unfinished OIDC login with a new attempt");
         }
-        *pending = Some(PendingLogin::Oidc(
+        *pending = Some(PendingLogin {
+            method: LoginMethod::Oidc,
             account_id,
             account_store_id,
             homeserver,
             redirect_uri,
             client,
             reauth,
-        ));
+        });
 
         tracing::info!(
             operation = "oidc_login",
@@ -397,7 +401,13 @@ impl Core {
         let url = Url::parse(&callback_url).or_failed(self, "complete_oidc_login_callback_url")?;
 
         let mut pending = self.pending_login.lock().await;
-        let Some(PendingLogin::Oidc(_, _, _, expected_redirect_uri, client, _)) = pending.as_ref()
+        let Some(PendingLogin {
+            redirect_uri: expected_redirect_uri,
+            client,
+            ..
+        }) = pending
+            .as_ref()
+            .filter(|pending| pending.method == LoginMethod::Oidc)
         else {
             tracing::warn!("no pending OIDC login: it was started elsewhere or the core restarted");
             return Err(RpcError::Unavailable);
@@ -417,14 +427,15 @@ impl Core {
             .await
             .or_failed(self, "complete_oidc_login")?;
 
-        let Some(PendingLogin::Oidc(
+        let Some(PendingLogin {
             account_id,
             account_store_id,
             homeserver,
             redirect_uri,
             client,
             reauth,
-        )) = pending.take()
+            ..
+        }) = pending.take()
         else {
             return Err(RpcError::Unavailable);
         };
@@ -511,14 +522,15 @@ impl Core {
         if pending.is_some() {
             return Err(RpcError::Unavailable);
         }
-        *pending = Some(PendingLogin::Sso(
+        *pending = Some(PendingLogin {
+            method: LoginMethod::Sso,
             account_id,
             account_store_id,
             homeserver,
             redirect_uri,
             client,
             reauth,
-        ));
+        });
 
         tracing::info!(
             operation = "sso_login",
@@ -541,7 +553,13 @@ impl Core {
         }
 
         let mut pending = self.pending_login.lock().await;
-        let Some(PendingLogin::Sso(_, _, _, expected_redirect_uri, _, _)) = pending.as_ref() else {
+        let Some(PendingLogin {
+            redirect_uri: expected_redirect_uri,
+            ..
+        }) = pending
+            .as_ref()
+            .filter(|pending| pending.method == LoginMethod::Sso)
+        else {
             tracing::warn!("no pending SSO login: it was started elsewhere or the core restarted");
             return Err(RpcError::Unavailable);
         };
@@ -554,8 +572,14 @@ impl Core {
             ));
         }
 
-        let Some(PendingLogin::Sso(account_id, account_store_id, homeserver, _, client, reauth)) =
-            pending.take()
+        let Some(PendingLogin {
+            account_id,
+            account_store_id,
+            homeserver,
+            client,
+            reauth,
+            ..
+        }) = pending.take()
         else {
             return Err(RpcError::Unavailable);
         };

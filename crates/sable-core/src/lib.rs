@@ -237,23 +237,20 @@ struct CachedTimeline {
     hidden_events: bool,
 }
 
-enum PendingLogin {
-    Oidc(
-        String,
-        String,
-        String,
-        Url,
-        matrix_sdk::Client,
-        Option<session::PersistedAccount>,
-    ),
-    Sso(
-        String,
-        String,
-        String,
-        Url,
-        matrix_sdk::Client,
-        Option<session::PersistedAccount>,
-    ),
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LoginMethod {
+    Oidc,
+    Sso,
+}
+
+struct PendingLogin {
+    method: LoginMethod,
+    account_id: String,
+    account_store_id: String,
+    homeserver: String,
+    redirect_uri: Url,
+    client: matrix_sdk::Client,
+    reauth: Option<session::PersistedAccount>,
 }
 
 struct Subscription {
@@ -546,10 +543,8 @@ impl Core {
             .cloned()
             .collect();
         clients.extend(self.client().await.ok());
-        if let Some(PendingLogin::Oidc(.., client, _) | PendingLogin::Sso(.., client, _)) =
-            self.pending_login.lock().await.as_ref()
-        {
-            clients.push(client.clone());
+        if let Some(pending) = self.pending_login.lock().await.as_ref() {
+            clients.push(pending.client.clone());
         }
         clients.extend(
             self.pending_registration
