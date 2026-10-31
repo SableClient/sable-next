@@ -110,7 +110,7 @@ impl Handler for DevicesParams {
     async fn run(self, core: &Arc<Core>) -> Result<DevicesOk, RpcError> {
         let client = core.client().await?;
         let oauth = client.oauth().full_session().is_some();
-        let metadata = core.account_management_metadata(&client).await?;
+        let metadata = core.oauth_metadata(&client, "account_management_metadata").await?;
         let account_management_url = metadata.as_ref().and_then(|metadata| {
             use matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::{
                 AccountManagementAction, AccountManagementActionData,

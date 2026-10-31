@@ -30,6 +30,7 @@ mod media_health;
 mod member_look;
 mod messages;
 pub mod notifications;
+mod oauth_metadata;
 mod outgoing;
 mod pack_edits;
 mod password_reset;
@@ -69,6 +70,8 @@ mod store_disposal;
 mod store_encryption;
 mod subscriptions;
 mod sync_support;
+#[cfg(test)]
+mod test_support;
 mod thread_receipts;
 mod timeline_overlay;
 mod timelines;

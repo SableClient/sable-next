@@ -273,6 +273,12 @@ pub enum CoreEvent {
         devices: Vec<DeviceView>,
     },
 
+    /// Fetched once per session start. `None` when the homeserver has no OAuth.
+    #[serde(rename = "oauth_metadata")]
+    OAuthMetadata {
+        metadata: Option<OAuthMetadataView>,
+    },
+
     SearchCoverage {
         coverage: SearchCoverageView,
     },
@@ -2643,6 +2649,14 @@ pub struct SessionInfo {
     pub device_id: String,
     pub homeserver: String,
     pub needs_reauth: bool,
+}
+
+/// The account management part of the homeserver's OAuth 2.0 metadata (MSC4191).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct OAuthMetadataView {
+    pub account_management_uri: Option<String>,
+    pub account_management_actions_supported: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

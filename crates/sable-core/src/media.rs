@@ -864,18 +864,22 @@ where
         .await
 }
 
-fn is_transient(error: &matrix_sdk::Error) -> bool {
+pub(crate) fn is_transient_http(http: &HttpError) -> bool {
     let retryable = |status: reqwest::StatusCode| {
         status.is_server_error() || matches!(status.as_u16(), 408 | 429)
     };
+    match http {
+        HttpError::Reqwest(error) => error.status().is_none_or(retryable),
+        HttpError::Api(_) => http
+            .as_client_api_error()
+            .is_some_and(|error| retryable(error.status_code)),
+        _ => false,
+    }
+}
+
+fn is_transient(error: &matrix_sdk::Error) -> bool {
     match error {
-        matrix_sdk::Error::Http(http) => match http.as_ref() {
-            HttpError::Reqwest(error) => error.status().is_none_or(retryable),
-            HttpError::Api(_) => http
-                .as_client_api_error()
-                .is_some_and(|error| retryable(error.status_code)),
-            _ => false,
-        },
+        matrix_sdk::Error::Http(http) => is_transient_http(http),
         matrix_sdk::Error::UnknownError(error) => error.is::<matrix_sdk::timeout::ElapsedError>(),
         _ => false,
     }

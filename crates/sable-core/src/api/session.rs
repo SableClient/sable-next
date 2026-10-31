@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use super::Handler;
 use crate::protocol::{
-    HomeserverSoftwareView, OpenIdTokenView, RpcError, SessionInfo, SyncStatus, TermsPolicyView,
+    HomeserverSoftwareView, OAuthMetadataView, OpenIdTokenView, RpcError, SessionInfo, SyncStatus, TermsPolicyView,
 };
 use crate::{Core, ResultExt};
 
@@ -19,6 +19,7 @@ domain! {
     logout,
     reset_local_cache,
     homeserver_info,
+    oauth_metadata,
     request_open_id_token,
     access_token,
     open_id_token,
@@ -227,6 +228,23 @@ impl Handler for SyncStatusParams {
         Ok(crate::watchers::sync_status(
             core.sync_service().await?.state().get(),
         ))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct OauthMetadataParams {}
+
+impl Handler for OauthMetadataParams {
+    type Ok = Option<OAuthMetadataView>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Option<OAuthMetadataView>, RpcError> {
+        let client = core.client().await?;
+        Ok(core
+            .oauth_metadata(&client, "oauth_metadata")
+            .await?
+            .as_ref()
+            .map(crate::oauth_metadata::view))
     }
 }
 

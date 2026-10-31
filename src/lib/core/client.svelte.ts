@@ -6,6 +6,7 @@ import {
   type AuthIntent,
   type LoginFlowsView,
   type LoginIdentifier,
+  type OAuthMetadataView,
   type RegistrationFlowsView,
   type SessionInfo,
   type SyncStatus,
@@ -154,6 +155,8 @@ export class CoreClient {
   searchCoverageUnavailable = $state(false);
   /** Every device on this account, replaced whole on change. */
   deviceList = $state.raw<DeviceView[]>([]);
+  /** The homeserver's OAuth metadata: `undefined` until known, `null` when it has no OAuth. */
+  oauthMetadata = $state.raw<OAuthMetadataView | null | undefined>(undefined);
   unresponsive = $state(false);
   localNetworkBlocked = $state<string | null>(null);
   accountRevision = $state(0);
@@ -901,6 +904,7 @@ export class CoreClient {
     this.unresponsive = false;
     this.encryption = null;
     this.deviceList = [];
+    this.oauthMetadata = undefined;
     this.searchCoverage = null;
     this.searchCoverageUnavailable = false;
     this.localNetworkBlocked = null;
@@ -936,6 +940,7 @@ export class CoreClient {
     if (changed && session) {
       void this.primeEncryptionStatus();
       void this.primeSyncStatus();
+      void this.primeOAuthMetadata();
       void this.primeOwnProfile(session.user_id);
       if (browserGatesCoreNetwork()) void grantLocalNetworkAccess(session.homeserver);
     }
@@ -1104,6 +1109,17 @@ export class CoreClient {
     }
   }
 
+  private async primeOAuthMetadata(): Promise<void> {
+    const revision = this.accountRevision;
+    try {
+      const metadata = await this.rpc.session.oauthMetadata();
+      if (revision !== this.accountRevision || this.oauthMetadata !== undefined) return;
+      this.oauthMetadata = metadata;
+    } catch (error) {
+      console.debug('[sable core] OAuth metadata unavailable', error);
+    }
+  }
+
   private applySyncStatus(status: SyncStatus): void {
     this.sync = status;
     if (status.state !== 'offline') {
@@ -1141,6 +1157,9 @@ export class CoreClient {
       case 'devices_changed':
         this.deviceEvents += 1;
         this.deviceList = event.devices;
+        return;
+      case 'oauth_metadata':
+        this.oauthMetadata = event.metadata;
         return;
       case 'profile_changed':
         this.invalidateProfile(event.user_id);

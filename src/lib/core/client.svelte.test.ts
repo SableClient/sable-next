@@ -1571,6 +1571,34 @@ test('keeps newer trust events when the initial status read completes', async ()
   core.stop();
 });
 
+test('reads the OAuth metadata at session start and keeps a newer push', async () => {
+  const metadata = { account_management_uri: null, account_management_actions_supported: [] };
+  const pushed = {
+    account_management_uri: 'https://auth.example.org/account',
+    account_management_actions_supported: ['org.matrix.session_end'],
+  };
+  let answer: (value: object | null) => void = () => {};
+  const fake = fakeTransport({
+    'session.restore': session,
+    'session.list_accounts': [session],
+    'session.oauth_metadata': () =>
+      new Promise<object | null>((resolve) => {
+        answer = resolve;
+      }),
+  });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  expect(core.oauthMetadata).toBeUndefined();
+  fake.emit({ type: 'oauth_metadata', metadata: pushed } as unknown as CoreEvent);
+  answer(metadata);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(core.oauthMetadata).toEqual(pushed);
+  core.stop();
+  expect(core.oauthMetadata).toBeUndefined();
+});
+
 test('a stale login callback that fails does not discard the first status read', async () => {
   const known = {
     verification: 'unverified',

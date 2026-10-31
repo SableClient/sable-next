@@ -1112,15 +1112,7 @@ mod tests {
     }
 
     async fn core_with(server: &MatrixMockServer, client: matrix_sdk::Client) -> Arc<Core> {
-        let (core, _events) = Core::new("widgets", Box::new(MemorySessionStore::default()));
-        *core.session.write().await = Some(Session {
-            account_id: "widgets".to_owned(),
-            homeserver: server.server().uri(),
-            oauth: false,
-            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
-            client,
-        });
-        core
+        crate::test_support::signed_in_core(server, client).await.0
     }
 
     async fn delayed_events_server() -> (MatrixMockServer, matrix_sdk::Client) {

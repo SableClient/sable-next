@@ -34,19 +34,6 @@ impl SessionGeneration<'_> {
 }
 
 impl Core {
-    pub(crate) async fn account_management_metadata(
-        &self,
-        client: &matrix_sdk::Client,
-    ) -> Result<Option<AuthorizationServerMetadata>, RpcError> {
-        match client.oauth().server_metadata().await {
-            Ok(metadata) => Ok(Some(metadata)),
-            Err(error) if error.is_not_supported() && client.oauth().full_session().is_none() => {
-                Ok(None)
-            }
-            Err(error) => Err(self.failed("account_management_metadata", error)),
-        }
-    }
-
     pub(crate) async fn delete_device(
         &self,
         DeleteDeviceParams {
@@ -57,7 +44,10 @@ impl Core {
         let client = self.client().await?;
         let devices = [device_id];
 
-        if let Some(metadata) = self.account_management_metadata(&client).await? {
+        if let Some(metadata) = self
+            .oauth_metadata(&client, "account_management_metadata")
+            .await?
+        {
             return oauth_device_delete_url(&metadata, &devices[0]).map(Some);
         }
 
@@ -104,12 +94,11 @@ impl Core {
     ) -> Result<Option<String>, RpcError> {
         let client = self.client().await?;
 
-        if client.oauth().full_session().is_some() {
-            let metadata = client
-                .oauth()
-                .server_metadata()
-                .await
-                .or_failed(self, "deactivate_account_metadata")?;
+        if client.oauth().full_session().is_some()
+            && let Some(metadata) = self
+                .oauth_metadata(&client, "deactivate_account_metadata")
+                .await?
+        {
             return oauth_account_deactivate_url(&metadata).map(Some);
         }
 
@@ -1071,6 +1060,7 @@ impl Core {
         self.watch_encryption(&client, generation);
         self.watch_account_data_key_sharing(&client, generation);
         self.watch_devices(&client, generation);
+        self.watch_oauth_metadata(&client, generation);
         self.watch_notifications(&client, generation).await;
         self.watch_notification_settings(generation);
         self.watch_space_sidebar(&client, generation);
@@ -1709,7 +1699,7 @@ mod regression_tests {
             .oauth()
             .mock_server_metadata()
             .ok_https()
-            .expect(2)
+            .expect(1)
             .mount()
             .await;
         server.mock_devices().ok().mount().await;
