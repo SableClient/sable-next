@@ -3,6 +3,7 @@ import { resolve } from '$app/paths';
 import type { Rpc } from '#src/generated/protocol';
 
 import { joinRoom } from '#lib/core/api/rooms.js';
+import { isBanned } from '#lib/rooms/join-errors.js';
 import { roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
 
 export type JoinOrKnock =
@@ -22,6 +23,7 @@ export async function joinOrOfferKnock(
   try {
     return { kind: 'joined', roomId: await joinRoom(rpc, address, via) };
   } catch (joinError) {
+    if (isBanned(joinError)) throw joinError;
     const preview = await rpc.rooms.preview({ address, via: [...via] }).catch((error: unknown) => {
       console.debug('[sable room] preview unavailable', error);
       return null;

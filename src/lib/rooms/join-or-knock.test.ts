@@ -9,6 +9,7 @@ vi.mock('$app/paths', () => ({
     path.replace('/(app)', '').replace(/\[([^\]]+)\]/g, (_, key: string) => params[key] ?? key),
 }));
 
+import { CoreError } from '#src/transport';
 import { joinOrOfferKnock, knockPagePath } from './join-or-knock.js';
 
 function rpcWith(
@@ -65,4 +66,13 @@ test('the knock page path carries the address and routing servers', () => {
   expect(knockPagePath('!id:example.org', ['a.org', 'b.org'])).toBe(
     '/rooms/!id%3Aexample.org?via=a.org&via=b.org'
   );
+});
+
+test('a banned user is not offered a knock', async () => {
+  const banned = new CoreError({ code: 'banned', reason: null });
+  const preview = vi.fn(() => Promise.resolve({ join_rule: 'knock' as const }));
+  const rpc = rpcWith(() => Promise.reject(banned), preview);
+
+  await expect(joinOrOfferKnock(rpc, '!room:example.org')).rejects.toBe(banned);
+  expect(preview).not.toHaveBeenCalled();
 });

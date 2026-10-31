@@ -144,6 +144,10 @@ pub enum RpcError {
     },
     /// Refused, recoverable by user action.
     Denied,
+    /// Banned from the room, so joining is refused.
+    Banned {
+        reason: Option<String>,
+    },
     RateLimited {
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         retry_after_ms: Option<u64>,

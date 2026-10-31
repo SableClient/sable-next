@@ -13,23 +13,36 @@ struct PendingInvite {
     reason: Option<String>,
 }
 
-async fn pending_invite(room: Room) -> PendingInvite {
+/// Who set our membership in `room` to `state`, and the reason they gave.
+pub(crate) async fn own_membership(
+    room: &Room,
+    state: &MembershipState,
+) -> Option<(OwnedUserId, Option<String>)> {
     let member = room
         .get_member_no_sync(room.own_user_id())
         .await
         .ok()
-        .flatten();
-    let event = member
-        .as_ref()
-        .map(|member| member.event())
-        .filter(|event| event.membership() == &MembershipState::Invite);
+        .flatten()?;
+    let event = member.event();
+    (event.membership() == state).then(|| {
+        (
+            event.sender().to_owned(),
+            event
+                .reason()
+                .map(str::trim)
+                .filter(|reason| !reason.is_empty())
+                .map(ToOwned::to_owned),
+        )
+    })
+}
+
+async fn pending_invite(room: Room) -> PendingInvite {
+    let (inviter, reason) = own_membership(&room, &MembershipState::Invite)
+        .await
+        .map_or((None, None), |(inviter, reason)| (Some(inviter), reason));
     PendingInvite {
-        inviter: event.map(|event| event.sender().to_owned()),
-        reason: event
-            .and_then(|event| event.reason())
-            .map(str::trim)
-            .filter(|reason| !reason.is_empty())
-            .map(ToOwned::to_owned),
+        inviter,
+        reason,
         room,
     }
 }

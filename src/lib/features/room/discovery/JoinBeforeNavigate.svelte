@@ -8,6 +8,8 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { joinRoom, knockRoom } from '#lib/core/api/rooms.js';
   import { i18n } from '#lib/i18n.js';
+  import { CoreError } from '#src/transport';
+  import { bannedMessage } from '#lib/rooms/join-errors.js';
   import { joinVia, roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { childRouting } from '#lib/rooms/spaces.js';
@@ -88,7 +90,9 @@
      so it tries joining first and offers to knock only once that is refused. */
   let currentMembership = $derived(membership ?? preview?.state ?? 'left');
   let invited = $derived(currentMembership === 'invited');
-  let banned = $derived(currentMembership === 'banned');
+  let joinBanned = $state(false);
+  let banReason = $state<string | null>(null);
+  let banned = $derived(currentMembership === 'banned' || joinBanned);
   let mustKnock = $derived(preview?.join_rule === 'knock' && !invited);
   let restricted = $derived(
     preview?.join_rule === 'restricted' || preview?.join_rule === 'knock_restricted'
@@ -119,7 +123,12 @@
       await goto(target, { replace: true });
     } catch (error) {
       console.warn('[sable room] join failed', error);
-      failedAction = 'join';
+      if (error instanceof CoreError && error.detail.code === 'banned') {
+        banReason = error.detail.reason;
+        joinBanned = true;
+      } else {
+        failedAction = 'join';
+      }
     } finally {
       busy = false;
     }
@@ -269,7 +278,7 @@
         {/if}
         {#if banned}
           <p role="alert" style:color="var(--crit-main)">
-            {i18n.t('join.banned')}
+            {bannedMessage(banReason)}
           </p>
         {/if}
         {#if !failed && !banned}

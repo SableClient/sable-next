@@ -3470,6 +3470,46 @@ async fn join_by_alias_routes_through_the_resolved_servers_and_the_caller_via() 
 }
 
 #[tokio::test]
+async fn joining_a_room_we_are_banned_from_says_so_with_the_reason() {
+    use matrix_sdk::ruma::user_id;
+    use matrix_sdk_test::LeftRoomBuilder;
+    use matrix_sdk_test::event_factory::EventFactory;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!banned:example.org");
+    let me = client.user_id().unwrap().to_owned();
+    let ban = EventFactory::new()
+        .room(room_id)
+        .sender(user_id!("@mod:example.org"))
+        .member(user_id!("@mod:example.org"))
+        .banned(me)
+        .reason("  spam  ");
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_left_room(LeftRoomBuilder::new(room_id).add_timeline_event(ban));
+        })
+        .await;
+    Mock::given(method("POST"))
+        .and(path_regex("^/_matrix/client/v3/join/"))
+        .respond_with(
+            ResponseTemplate::new(403)
+                .set_body_json(json!({"errcode": "M_FORBIDDEN", "error": "You are banned"})),
+        )
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    let error = core.join_room(room_id.as_str(), &[]).await.unwrap_err();
+
+    assert!(
+        matches!(&error, RpcError::Banned { reason: Some(reason) } if reason == "spam"),
+        "{error:?}"
+    );
+}
+
+#[tokio::test]
 async fn join_by_alias_caps_the_servers_of_a_big_room() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

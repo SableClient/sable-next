@@ -10,9 +10,11 @@ use matrix_sdk::ruma::api::FeatureFlag;
 use matrix_sdk::ruma::api::client::directory::get_public_rooms_filtered;
 use matrix_sdk::ruma::api::client::membership::joined_rooms;
 use matrix_sdk::ruma::api::client::space::get_hierarchy;
+use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::directory::{Filter, RoomTypeFilter};
 use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
+use matrix_sdk::ruma::events::room::member::MembershipState;
 use matrix_sdk::ruma::events::room::tombstone::RoomTombstoneEventContent;
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
 use matrix_sdk::ruma::{
@@ -535,10 +537,22 @@ impl Core {
         let client = self.client().await?;
         let (room_id, servers) = self.join_route(&client, address, via, "join_room").await?;
 
-        let room = client
+        let room = match client
             .join_room_by_id_or_alias((&*room_id).into(), &servers)
             .await
-            .map_err(|error| self.room_error("join_room", error))?;
+        {
+            Ok(room) => room,
+            Err(error) => {
+                if error.client_api_error_kind() == Some(&ErrorKind::Forbidden)
+                    && let Some(room) = client.get_room(&room_id)
+                    && let Some((_, reason)) =
+                        crate::invites::own_membership(&room, &MembershipState::Ban).await
+                {
+                    return Err(RpcError::Banned { reason });
+                }
+                return Err(self.room_error("join_room", error));
+            }
+        };
 
         Ok(room.room_id().to_owned())
     }

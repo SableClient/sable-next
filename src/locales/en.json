@@ -807,6 +807,7 @@
     "unavailable": "Sable could not find this room. It may be private, or may not exist.",
     "invited": "You are invited to this room",
     "banned": "You are banned from this room.",
+    "bannedReason": "You are banned from this room. Reason: {{reason}}",
     "members_one": "{{count, number}} member",
     "members_other": "{{count, number}} members",
     "provenance": "Provided by {{server}}",
