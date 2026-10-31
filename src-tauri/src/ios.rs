@@ -47,9 +47,10 @@ pub(crate) async fn open_in_app_auth_url(
             let Some(url) = NSURL::URLWithString(&value) else {
                 return;
             };
-            // with_webview runs on the main thread and owns the view controller.
+            // SAFETY: with_webview runs on the main thread and view_controller() is the live UIViewController owned by the webview
+            let controller: &AnyObject = unsafe { &*webview.view_controller().cast::<AnyObject>() };
+            // SAFETY: SableAuthBrowser declares presentURL:id:from:completion: as (NSURL, NSString, UIViewController, void block) returning void, all arguments are live objects
             unsafe {
-                let controller: &AnyObject = &*webview.view_controller().cast();
                 let _: () = msg_send![class,
                     presentURL: &*url,
                     id: &*id,
@@ -78,9 +79,8 @@ pub(crate) async fn close_in_app_auth_window(
         .with_webview(move |_| {
             if let Some(class) = AnyClass::get(c"SableAuthBrowser") {
                 let id = NSString::from_str(&id);
-                unsafe {
-                    let _: () = msg_send![class, dismissWithId: &*id];
-                }
+                // SAFETY: SableAuthBrowser declares dismissWithId: taking an NSString and returning void
+                let _: () = unsafe { msg_send![class, dismissWithId: &*id] };
             }
         })
         .map_err(|error| error.to_string())
@@ -94,9 +94,8 @@ pub(crate) fn watch_network(core: &std::sync::Arc<sable_core::Core>) -> Result<(
             core.set_search_network_unmetered(unmetered.as_bool());
         }
     });
-    unsafe {
-        let _: () = msg_send![class, startWithHandler: &*handler];
-    }
+    // SAFETY: SableNetwork declares startWithHandler: taking a (BOOL) block and returning void, and the callee copies the block
+    let _: () = unsafe { msg_send![class, startWithHandler: &*handler] };
     Ok(())
 }
 
@@ -106,6 +105,7 @@ pub(crate) fn set_sentry_enabled(enabled: bool) -> Result<(), String> {
     let dsn = NSString::from_str(option_env!("SENTRY_DSN").unwrap_or_default());
     let environment = NSString::from_str(option_env!("SENTRY_ENVIRONMENT").unwrap_or_default());
     let release = NSString::from_str(option_env!("SENTRY_APP_VERSION").unwrap_or_default());
+    // SAFETY: SableSentry declares setEnabled:dsn:environment:release: as (BOOL, NSString, NSString, NSString) returning void, all strings are live
     unsafe {
         let _: () = msg_send![class,
             setEnabled: enabled,
@@ -182,6 +182,7 @@ fn allowed(status: PHAuthorizationStatus) -> bool {
 }
 
 fn authorize_blocking() -> Result<(), String> {
+    // SAFETY: a class method that only reads the current authorization and is callable from any thread
     let status =
         unsafe { PHPhotoLibrary::authorizationStatusForAccessLevel(PHAccessLevel::AddOnly) };
     if allowed(status) {
@@ -200,6 +201,7 @@ fn authorize_blocking() -> Result<(), String> {
             let _ = sender.send(status);
         }
     });
+    // SAFETY: the handler block takes one PHAuthorizationStatus as the API requires, Photos copies it, and it may run on any queue because it only sends on a Mutex-guarded channel
     unsafe {
         PHPhotoLibrary::requestAuthorizationForAccessLevel_handler(
             PHAccessLevel::AddOnly,
@@ -239,22 +241,24 @@ fn write_to_photos(
         leaf.to_string_lossy()
     ));
     std::fs::write(&path, bytes).map_err(|error| format!("failed to write photo: {error}"))?;
-    let result = unsafe {
-        let path = NSString::from_str(&path.to_string_lossy());
-        let url = NSURL::fileURLWithPath(&path);
-        let change: RcBlock<dyn Fn()> = RcBlock::new(move || {
-            let request = PHAssetCreationRequest::creationRequestForAsset();
-            request.addResourceWithType_fileURL_options(resource_type, &url, None);
+    let file = NSString::from_str(&path.to_string_lossy());
+    let url = NSURL::fileURLWithPath(&file);
+    let change: RcBlock<dyn Fn()> = RcBlock::new(move || {
+        // SAFETY: creation requests are only valid inside a performChanges block, which this closure is
+        let request = unsafe { PHAssetCreationRequest::creationRequestForAsset() };
+        // SAFETY: url is a live file URL to a file that exists until after performChangesAndWait returns
+        unsafe { request.addResourceWithType_fileURL_options(resource_type, &url, None) };
+    });
+    // SAFETY: sharedPhotoLibrary has no preconditions
+    let library = unsafe { PHPhotoLibrary::sharedPhotoLibrary() };
+    // SAFETY: change is a live no-argument block that runs synchronously before this call returns
+    let result =
+        unsafe { library.performChangesAndWait_error(RcBlock::as_ptr(&change)) }.map_err(|error| {
+            format!(
+                "failed to save media to Photos: {}",
+                error.localizedDescription()
+            )
         });
-        PHPhotoLibrary::sharedPhotoLibrary()
-            .performChangesAndWait_error(RcBlock::as_ptr(&change))
-            .map_err(|error| {
-                format!(
-                    "failed to save media to Photos: {}",
-                    error.localizedDescription()
-                )
-            })
-    };
     let _ = std::fs::remove_file(path);
     result
 }
@@ -289,14 +293,19 @@ const extern "C-unwind" fn input_accessory_view_nil(
 }
 
 pub(crate) fn hide_form_accessory_bar(window: &tauri::WebviewWindow) {
-    let _ = window.with_webview(|webview| unsafe {
-        let webview: *mut AnyObject = webview.inner().cast();
-        let scroll_view: *mut AnyObject = msg_send![&*webview, scrollView];
-        let subviews: *mut AnyObject = msg_send![&*scroll_view, subviews];
-        let count: usize = msg_send![&*subviews, count];
+    let _ = window.with_webview(|webview| {
+        // SAFETY: with_webview runs on the main thread and inner() is the live WKWebView
+        let webview: &AnyObject = unsafe { &*webview.inner().cast::<AnyObject>() };
+        // SAFETY: WKWebView.scrollView is a non-nil UIScrollView
+        let scroll_view: &AnyObject = unsafe { msg_send![webview, scrollView] };
+        // SAFETY: UIView.subviews returns a non-nil NSArray
+        let subviews: &AnyObject = unsafe { msg_send![scroll_view, subviews] };
+        // SAFETY: NSArray.count returns NSUInteger
+        let count: usize = unsafe { msg_send![subviews, count] };
         for index in 0..count {
-            let subview: *mut AnyObject = msg_send![&*subviews, objectAtIndex: index];
-            let class = (*subview).class();
+            // SAFETY: index is below count, so objectAtIndex: returns a live element
+            let subview: &AnyObject = unsafe { msg_send![subviews, objectAtIndex: index] };
+            let class = subview.class();
             if !class.name().to_bytes().starts_with(b"WKContent") {
                 continue;
             }
@@ -312,27 +321,38 @@ pub(crate) fn hide_form_accessory_bar(window: &tauri::WebviewWindow) {
                 let Some(mut builder) = ClassBuilder::new(&name, class) else {
                     continue;
                 };
-                builder.add_method(
-                    sel!(inputAccessoryView),
-                    input_accessory_view_nil as extern "C-unwind" fn(_, _) -> _,
-                );
+                // SAFETY: the function takes (self, _cmd) and returns an object pointer, matching the inputAccessoryView signature
+                unsafe {
+                    builder.add_method(
+                        sel!(inputAccessoryView),
+                        input_accessory_view_nil as extern "C-unwind" fn(_, _) -> _,
+                    );
+                }
                 builder.register()
             };
-            AnyObject::set_class(&*subview, subclass);
+            // SAFETY: subclass derives from the view's current class and adds no ivars, so the layout is unchanged
+            unsafe { AnyObject::set_class(subview, subclass) };
         }
     });
 }
 
 #[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "tauri extracts command arguments by value"
+)]
 pub(crate) fn set_system_bars_hidden(
     window: tauri::WebviewWindow,
     hidden: bool,
 ) -> Result<(), String> {
     window
-        .with_webview(move |webview| unsafe {
-            let controller: *mut AnyObject = webview.view_controller().cast();
-            let _: () = msg_send![&*controller, setPrefersStatusBarHidden: hidden];
-            let _: () = msg_send![&*controller, setPrefersHomeIndicatorAutoHidden: hidden];
+        .with_webview(move |webview| {
+            // SAFETY: with_webview runs on the main thread and view_controller() is the live UIViewController
+            let controller: &AnyObject = unsafe { &*webview.view_controller().cast::<AnyObject>() };
+            // SAFETY: UIViewController declares setPrefersStatusBarHidden: taking a BOOL
+            let _: () = unsafe { msg_send![controller, setPrefersStatusBarHidden: hidden] };
+            // SAFETY: UIViewController declares setPrefersHomeIndicatorAutoHidden: taking a BOOL
+            let _: () = unsafe { msg_send![controller, setPrefersHomeIndicatorAutoHidden: hidden] };
         })
         .map_err(|error| error.to_string())
 }
@@ -350,6 +370,7 @@ const UI_APPLICATION_STATE_BACKGROUND: isize = 2;
 
 /// A push or call wake launches the app here without it ever resigning active.
 pub(crate) fn in_background() -> bool {
+    // SAFETY: UIApplication.applicationState returns a UIApplicationState (NSInteger)
     let state: isize = unsafe { msg_send![shared_application(), applicationState] };
     state == UI_APPLICATION_STATE_BACKGROUND
 }
@@ -365,9 +386,12 @@ pub(crate) enum Lifecycle {
 /// tao's `Focused` follows the key window, which also changes in the background.
 pub(crate) fn observe_lifecycle(handler: impl Fn(Lifecycle) + 'static) {
     let handler = std::rc::Rc::new(handler);
+    // SAFETY: +defaultCenter returns the non-nil shared NSNotificationCenter
     let center: &AnyObject =
         unsafe { msg_send![objc2::class!(NSNotificationCenter), defaultCenter] };
+    // SAFETY: +mainQueue returns the non-nil main NSOperationQueue
     let queue: &AnyObject = unsafe { msg_send![objc2::class!(NSOperationQueue), mainQueue] };
+    // SAFETY: UIKit notification names are immutable constants initialized when the framework loads
     let observed = unsafe {
         [
             (
@@ -391,6 +415,7 @@ pub(crate) fn observe_lifecycle(handler: impl Fn(Lifecycle) + 'static) {
     for (name, change) in observed {
         let handler = handler.clone();
         let block = RcBlock::new(move |_: *mut AnyObject| (*handler)(change));
+        // SAFETY: addObserverForName:object:queue:usingBlock: takes (NSString, nil, NSOperationQueue, block) and returns a retained observer, the block is copied and the handler is only run on the main queue
         let _: objc2::rc::Retained<AnyObject> = unsafe {
             msg_send![center,
                 addObserverForName: name,
@@ -407,15 +432,18 @@ pub(crate) struct BackgroundTask(Arc<AtomicUsize>);
 
 impl BackgroundTask {
     pub(crate) fn is_active(&self) -> bool {
+        // SAFETY: UIBackgroundTaskInvalid is an immutable constant initialized when UIKit loads
         self.0.load(Ordering::SeqCst) != unsafe { UIBackgroundTaskInvalid }
     }
 
     /// Call on the main thread so the expiration handler cannot run before the identifier is stored.
     pub(crate) fn begin(name: &str) -> Self {
+        // SAFETY: UIBackgroundTaskInvalid is an immutable constant initialized when UIKit loads
         let task = Arc::new(AtomicUsize::new(unsafe { UIBackgroundTaskInvalid }));
         let expired = task.clone();
         let handler = RcBlock::new(move || end_background_task(&expired));
         let name = NSString::from_str(name);
+        // SAFETY: beginBackgroundTaskWithName:expirationHandler: takes (NSString, void block) and returns a UIBackgroundTaskIdentifier (NSUInteger), the block is copied
         let identifier: usize = unsafe {
             msg_send![shared_application(), beginBackgroundTaskWithName: &*name, expirationHandler: &*handler]
         };
@@ -431,27 +459,35 @@ impl Drop for BackgroundTask {
 }
 
 fn shared_application() -> &'static AnyObject {
+    // SAFETY: +sharedApplication returns the non-nil singleton, which lives for the whole process
     unsafe { msg_send![objc2::class!(UIApplication), sharedApplication] }
 }
 
 fn end_background_task(task: &AtomicUsize) {
+    // SAFETY: UIBackgroundTaskInvalid is an immutable constant initialized when UIKit loads
     let invalid = unsafe { UIBackgroundTaskInvalid };
     let identifier = task.swap(invalid, Ordering::SeqCst);
     if identifier != invalid {
-        unsafe {
-            let _: () = msg_send![shared_application(), endBackgroundTask: identifier];
-        }
+        // SAFETY: identifier came from beginBackgroundTask and the swap above ensures it is ended only once
+        let _: () = unsafe { msg_send![shared_application(), endBackgroundTask: identifier] };
     }
 }
 
 #[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "tauri extracts command arguments by value"
+)]
 pub(crate) fn haptic_feedback(app: tauri::AppHandle, strong: bool) -> Result<(), String> {
-    app.run_on_main_thread(move || unsafe {
+    app.run_on_main_thread(move || {
+        // SAFETY: +alloc returns a fresh allocation that is initialized exactly once below
         let allocated: objc2::rc::Allocated<AnyObject> =
-            msg_send![objc2::class!(UIImpactFeedbackGenerator), alloc];
+            unsafe { msg_send![objc2::class!(UIImpactFeedbackGenerator), alloc] };
+        // SAFETY: initWithStyle: takes a UIImpactFeedbackStyle (NSInteger) and runs on the main thread as UIKit requires
         let generator: objc2::rc::Retained<AnyObject> =
-            msg_send![allocated, initWithStyle: isize::from(strong)];
-        let _: () = msg_send![&*generator, impactOccurred];
+            unsafe { msg_send![allocated, initWithStyle: isize::from(strong)] };
+        // SAFETY: impactOccurred takes no arguments and returns void
+        let _: () = unsafe { msg_send![&*generator, impactOccurred] };
     })
     .map_err(|error| error.to_string())
 }
