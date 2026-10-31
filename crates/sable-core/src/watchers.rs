@@ -6,7 +6,6 @@ use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::event_cache::RedecryptorReport;
 use matrix_sdk::executor::{JoinHandleExt, spawn};
-use matrix_sdk::ruma::MilliSecondsSinceUnixEpoch;
 use matrix_sdk::ruma::events::room::member::{MembershipState, OriginalSyncRoomMemberEvent};
 use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
 use matrix_sdk::ruma::events::typing::SyncTypingEvent;
@@ -15,6 +14,7 @@ use matrix_sdk::ruma::events::{
 };
 use matrix_sdk::ruma::push::Action;
 use matrix_sdk::ruma::serde::Raw;
+use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedEventId};
 use matrix_sdk_ui::sync_service::State as SyncState;
 
 use crate::protocol::{CoreEvent, SyncStatus};
@@ -225,7 +225,7 @@ impl Core {
                     .into_iter()
                     .map(|room| room.room_id().to_owned())
                     .collect();
-                let mut alerted_events = std::collections::HashSet::new();
+                let mut alerted_events = std::collections::HashMap::new();
                 while let Some((notification, room)) = pending.recv().await {
                     let Notification { event, actions } = notification;
                     let every_encrypted = core.every_encrypted_event_pushed().await;
@@ -249,13 +249,16 @@ impl Core {
                             let Ok(event) = raw.deserialize() else {
                                 continue;
                             };
+                            let now = MilliSecondsSinceUnixEpoch::now();
                             if Some(event.sender()) == client.user_id()
-                                || notifications::is_backfill(
-                                    MilliSecondsSinceUnixEpoch::now(),
+                                || notifications::is_backfill(now, event.origin_server_ts())
+                                || notifications::is_read(&room, event.origin_server_ts()).await
+                                || !first_alert(
+                                    &mut alerted_events,
+                                    now,
+                                    event.event_id(),
                                     event.origin_server_ts(),
                                 )
-                                || notifications::is_read(&room, event.origin_server_ts()).await
-                                || !alerted_events.insert(event.event_id().to_owned())
                             {
                                 continue;
                             }
@@ -702,6 +705,18 @@ pub(crate) async fn retry_backoff(failures: u32) {
     .await;
 }
 
+/// Backfill is rejected before this check, so ids older than the backfill
+/// window can never repeat and are dropped.
+fn first_alert(
+    alerted: &mut std::collections::HashMap<OwnedEventId, MilliSecondsSinceUnixEpoch>,
+    now: MilliSecondsSinceUnixEpoch,
+    event_id: &EventId,
+    sent: MilliSecondsSinceUnixEpoch,
+) -> bool {
+    alerted.retain(|_, sent| !notifications::is_backfill(now, *sent));
+    alerted.insert(event_id.to_owned(), sent).is_none()
+}
+
 #[cfg(test)]
 mod tests {
     use matrix_sdk::deserialized_responses::{
@@ -721,6 +736,35 @@ mod tests {
     use crate::store::MemorySessionStore;
 
     const ALICE: &str = "@alice:example.org";
+
+    #[test]
+    fn an_alerted_event_is_alerted_once_and_forgotten_after_the_backfill_window() {
+        let at = |ms: u64| MilliSecondsSinceUnixEpoch(ms.try_into().expect("timestamp"));
+        let event_id = matrix_sdk::ruma::event_id!("$event");
+        let mut alerted = std::collections::HashMap::new();
+
+        assert!(super::first_alert(
+            &mut alerted,
+            at(100_000),
+            event_id,
+            at(100_000)
+        ));
+        assert!(!super::first_alert(
+            &mut alerted,
+            at(100_500),
+            event_id,
+            at(100_000)
+        ));
+
+        let other = matrix_sdk::ruma::event_id!("$other");
+        assert!(super::first_alert(
+            &mut alerted,
+            at(500_000),
+            other,
+            at(500_000)
+        ));
+        assert!(!alerted.contains_key(event_id));
+    }
 
     #[test]
     fn a_fresh_redecrypted_event_that_notifies_is_forwarded_once_and_stale_ones_are_not() {
