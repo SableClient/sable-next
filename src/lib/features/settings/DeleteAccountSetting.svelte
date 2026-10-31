@@ -72,7 +72,7 @@
 
 <SettingsSection headingId="account-delete" title={i18n.t('settings.deleteAccount')}>
   <ul class="settings-rows">
-    <SettingsRow id="delete-account" description={i18n.t('settings.deleteAccountHint')}>
+    <SettingsRow id="delete-account" title={i18n.t('settings.deleteAccountHint')}>
       <Button variant="danger" onclick={() => (open = true)}>
         {i18n.t('settings.deleteAccountAction')}
       </Button>
