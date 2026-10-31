@@ -274,6 +274,10 @@
 </AppPageShell>
 
 <style>
+  :global(.settings-scroll .app-page-shell.emote-settings-page) {
+    overflow: visible;
+  }
+
   .emote-settings {
     display: grid;
     gap: var(--space-300);
