@@ -41,9 +41,9 @@ async fn pending_invite(room: Room) -> PendingInvite {
         .await
         .map_or((None, None), |(inviter, reason)| (Some(inviter), reason));
     PendingInvite {
+        room,
         inviter,
         reason,
-        room,
     }
 }
 
