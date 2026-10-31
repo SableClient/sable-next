@@ -70,13 +70,10 @@ pub(crate) fn edit_content(
     }
 }
 
-fn spoiler_keys(event: &serde_json::Value) -> serde_json::Map<String, serde_json::Value> {
+fn spoiler_keys(content: &serde_json::Value) -> serde_json::Map<String, serde_json::Value> {
     [SPOILER_PROPERTY, SPOILER_REASON_PROPERTY]
         .into_iter()
-        .filter_map(|key| {
-            let value = event.get("content")?.get(key)?;
-            Some((key.to_owned(), value.clone()))
-        })
+        .filter_map(|key| Some((key.to_owned(), content.get(key)?.clone())))
         .collect()
 }
 
@@ -314,17 +311,13 @@ impl Core {
                 )
                 .await
                 .or_failed(self, "edit_message")?;
-            let content = raw_content(&event).ok_or(RpcError::Unsupported)?;
+            let original = raw_content(&event).ok_or(RpcError::Unsupported)?;
             if [FORWARDED, FAMEDLY_FORWARDED, SABLE_FORWARDED]
                 .iter()
-                .any(|key| content.get(key).is_some())
+                .any(|key| original.get(key).is_some())
             {
                 return Err(RpcError::Unsupported);
             }
-            let original = event
-                .raw()
-                .deserialize_as_unchecked::<serde_json::Value>()
-                .or_failed(self, "edit_message")?;
             let latest = latest_valid_replacement(&event, &replacements)
                 .unwrap_or(&event)
                 .raw()
@@ -332,7 +325,7 @@ impl Core {
                 .or_failed(self, "edit_message")?;
             retain_reply_mention(
                 &room,
-                &content,
+                &original,
                 latest_message(&latest).ok_or(RpcError::Unsupported)?,
                 &mut edited,
             )
@@ -777,8 +770,10 @@ impl Core {
             .then(|| latest_valid_replacement(&event, &replacements))
             .flatten()
             .and_then(|edit| {
-                let edit =
-                    serde_json::from_str::<serde_json::Value>(edit.raw().json().get()).ok()?;
+                let edit = edit
+                    .raw()
+                    .deserialize_as_unchecked::<serde_json::Value>()
+                    .ok()?;
                 latest_message(&edit)?.as_object().cloned()
             });
         let source_content = match (edited, original) {
@@ -1030,12 +1025,11 @@ fn edit_version(event: &TimelineEvent, replacement: bool) -> Option<EditVersionV
     if event.kind.is_utd() {
         return None;
     }
-    let raw = serde_json::from_str::<serde_json::Value>(event.raw().json().get()).ok()?;
-    let content = raw.get("content")?;
+    let raw = raw_content(event)?;
     let content = if replacement {
-        content.get("m.new_content")?
+        raw.get("m.new_content")?
     } else {
-        content
+        &raw
     };
     let formatted = content
         .get("format")
@@ -1390,20 +1384,20 @@ mod tests {
 
     #[test]
     fn a_caption_edit_keeps_the_spoiler_and_its_reason() {
-        let event = json!({"content": {
+        let content = json!({
             "body": "photo.png",
             "page.codeberg.everypizza.msc4193.spoiler": true,
             "page.codeberg.everypizza.msc4193.spoiler.reason": "plot",
-        }});
+        });
 
-        let kept = super::spoiler_keys(&event);
+        let kept = super::spoiler_keys(&content);
 
         assert_eq!(kept.len(), 2);
         assert_eq!(
             kept["page.codeberg.everypizza.msc4193.spoiler.reason"],
             "plot"
         );
-        assert!(super::spoiler_keys(&json!({"content": {"body": "x"}})).is_empty());
+        assert!(super::spoiler_keys(&json!({"body": "x"})).is_empty());
     }
 
     use crate::{Core, session::Session, store::MemorySessionStore};
