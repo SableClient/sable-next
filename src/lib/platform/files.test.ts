@@ -352,6 +352,35 @@ test('Android retries a public image under a new name when MediaStore refuses th
   );
 });
 
+test('Android retries the whole save when MediaStore runs out of names on publishing (#1441)', async () => {
+  mocks.isTauri.mockReturnValue(true);
+  mocks.osType.mockReturnValue('android');
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]))));
+  vi.spyOn(Date, 'now').mockReturnValue(1000);
+  mocks.androidFs.createNewPublicImageFile
+    .mockResolvedValueOnce({ uri: 'content://pictures/first' })
+    .mockResolvedValueOnce({ uri: 'content://pictures/second' });
+  mocks.androidFs.setPublicFilePending.mockRejectedValueOnce(
+    new Error('Failed to build unique file')
+  );
+
+  await expect(saveImageToPhotos('https://example.org/image.png', 'image.png')).resolves.toBe(
+    'saved'
+  );
+
+  expect(mocks.androidFs.removeFile).toHaveBeenCalledWith({ uri: 'content://pictures/first' });
+  expect(mocks.androidFs.createNewPublicImageFile).toHaveBeenLastCalledWith(
+    'Pictures',
+    'image-1000.png',
+    'image/png',
+    { isPending: true, requestPermission: true }
+  );
+  expect(mocks.androidFs.setPublicFilePending).toHaveBeenLastCalledWith(
+    { uri: 'content://pictures/second' },
+    false
+  );
+});
+
 test('an image with no type or extension is saved by its bytes, as a profile picture is (#510)', async () => {
   mocks.isTauri.mockReturnValue(true);
   mocks.osType.mockReturnValue('android');

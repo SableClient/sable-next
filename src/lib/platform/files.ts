@@ -239,20 +239,25 @@ async function saveAndroidFile(
           isPending: true,
           requestPermission: true,
         });
-  const uri = await create(filename).catch((error: unknown) => {
+  const save = async (name: string): Promise<void> => {
+    const uri = await create(name);
+    try {
+      await AndroidFs.writeFile(uri, bytes);
+      await AndroidFs.setPublicFilePending(uri, false);
+      await AndroidFs.scanPublicFile(uri);
+    } catch (error) {
+      await AndroidFs.removeFile(uri).catch((removeError: unknown) => {
+        console.debug('[sable files] partial Android file not removed', removeError);
+      });
+      throw error;
+    }
+  };
+  // MediaStore tries only 32 numbered variants of a name, and a pending file
+  // takes its final name only when the flag is cleared, so the whole save retries.
+  await save(filename).catch((error: unknown) => {
     console.debug('[sable files] public file name is taken, retrying', error);
-    return create(timestamped(filename));
+    return save(timestamped(filename));
   });
-  try {
-    await AndroidFs.writeFile(uri, bytes);
-    await AndroidFs.setPublicFilePending(uri, false);
-    await AndroidFs.scanPublicFile(uri);
-  } catch (error) {
-    await AndroidFs.removeFile(uri).catch((removeError: unknown) => {
-      console.debug('[sable files] partial Android file not removed', removeError);
-    });
-    throw error;
-  }
 }
 
 export function fileNameFromPath(path: string, index: number): string {
