@@ -7,6 +7,7 @@ use futures_util::future::{self, Either};
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::event_cache::{PaginationStatus, RoomEventCacheUpdate};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId, RoomId, UserId};
 use matrix_sdk::send_queue::RoomSendQueueUpdate;
 use matrix_sdk_base::event_cache::Event;
@@ -31,6 +32,8 @@ use crate::timelines::{
 };
 use crate::view;
 use crate::{Core, Subscription, SubscriptionKind, Task};
+
+const BRIDGE_EVENTS: [&str; 2] = ["m.bridge", "uk.half-shot.bridge"];
 
 enum Wake {
     Diffs(Option<Vec<VectorDiff<Arc<TimelineItem>>>>),
@@ -315,6 +318,11 @@ impl Core {
                 view::timeline_item(item, own_user_id.as_deref(), &highlights, &local_content)
             })
             .collect();
+        let encrypted = room.encryption_state().is_encrypted();
+        let stored_bridge = encrypted && self.stored_bridge(&room).await;
+        if stored_bridge {
+            overlay.lock().set_bridged();
+        }
         // Seeded before the stream starts, so its diffs apply to this snapshot.
         let items = overlay.lock().reset(items);
         let core = self.clone();
@@ -462,6 +470,18 @@ impl Core {
             .abort_on_drop()
         });
 
+        let bridge_task = (encrypted && !stored_bridge).then(|| {
+            let core = self.clone();
+            let room = room.clone();
+            spawn(async move {
+                if core.served_bridge(&room).await {
+                    core.overlay_room(room.room_id(), TimelineOverlay::set_bridged)
+                        .await;
+                }
+            })
+            .abort_on_drop()
+        });
+
         let mut subscriptions = self.subscriptions.lock().await;
         let Some(entry) = subscriptions.get_mut(&subscription) else {
             return Err(RpcError::Unavailable);
@@ -469,6 +489,7 @@ impl Core {
         entry.tasks = status_task
             .into_iter()
             .chain(aggregation_task)
+            .chain(bridge_task)
             .chain(threads_task)
             .chain([task])
             .collect();
@@ -481,6 +502,41 @@ impl Core {
             items,
             aggregations,
         })
+    }
+
+    async fn stored_bridge(&self, room: &matrix_sdk::Room) -> bool {
+        for event_type in BRIDGE_EVENTS {
+            let events = self
+                .with_open_stores(async || {
+                    room.get_state_events(StateEventType::from(event_type))
+                        .await
+                })
+                .await;
+            if events.is_ok_and(|events| !events.is_empty()) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Sliding sync never asks for bridge state, so the store only has it when
+    /// the timeline carried it.
+    async fn served_bridge(&self, room: &matrix_sdk::Room) -> bool {
+        match self
+            .room_state_snapshot(&room.client(), room.room_id())
+            .await
+        {
+            Ok(snapshot) => snapshot.iter().any(|raw| {
+                raw.get_field::<String>("type")
+                    .ok()
+                    .flatten()
+                    .is_some_and(|event_type| BRIDGE_EVENTS.contains(&event_type.as_str()))
+            }),
+            Err(error) => {
+                tracing::debug!(room = %room.room_id(), %error, "bridge state unavailable");
+                false
+            }
+        }
     }
 
     /// Lays a member's new profile over every open timeline of the room.

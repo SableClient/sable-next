@@ -7,7 +7,9 @@ use matrix_sdk::ruma::{OwnedEventId, OwnedUserId};
 use sable_model::event_preview::event_preview;
 use serde_json::Value;
 
-use crate::protocol::{ReplyFallbackView, TimelineItemContentView, TimelineItemView, VectorDiff};
+use crate::protocol::{
+    MessageShieldCode, ReplyFallbackView, TimelineItemContentView, TimelineItemView, VectorDiff,
+};
 use crate::view::apply_diff;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,6 +47,7 @@ pub(crate) struct TimelineOverlay {
     profiles: HashMap<OwnedUserId, SenderProfile>,
     replies: HashMap<OwnedEventId, ReplyFallback>,
     redactions: HashMap<OwnedEventId, String>,
+    bridged: bool,
 }
 
 impl TimelineOverlay {
@@ -87,6 +90,9 @@ impl TimelineOverlay {
                 reason: Some(reason.clone()),
                 redacted_by: redacted_by.clone(),
             };
+        }
+        if self.bridged && mismatched_sender(&item) {
+            item.shield = None;
         }
         item
     }
@@ -148,7 +154,8 @@ impl TimelineOverlay {
             let unchanged = next.sender_name == item.sender_name
                 && next.sender_avatar == item.sender_avatar
                 && next.in_reply_to == item.in_reply_to
-                && redaction_reason(&next) == redaction_reason(item);
+                && redaction_reason(&next) == redaction_reason(item)
+                && next.shield == item.shield;
             if unchanged {
                 continue;
             }
@@ -205,6 +212,16 @@ impl TimelineOverlay {
                 .is_some_and(|reply| reply.event_id == touched)
         })
     }
+
+    pub(crate) fn set_bridged(&mut self) -> Vec<VectorDiff<TimelineItemView>> {
+        self.bridged = true;
+        self.refresh(mismatched_sender)
+    }
+}
+
+fn mismatched_sender(item: &TimelineItemView) -> bool {
+    item.shield
+        .is_some_and(|shield| shield.code == MessageShieldCode::MismatchedSender)
 }
 
 fn redaction_reason(item: &TimelineItemView) -> Option<&str> {
@@ -222,7 +239,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::protocol::{MentionView, ReplyView, TimelineItemContentView};
+    use crate::protocol::{MentionView, MessageShieldView, ReplyView, TimelineItemContentView};
 
     fn item(id: &str, sender: &str, reply: Option<ReplyView>) -> TimelineItemView {
         let content = TimelineItemContentView::Message {
@@ -276,6 +293,40 @@ mod tests {
 
     fn read(source: &Value) -> ReplyFallback {
         ReplyFallback::from_source(source).expect("a stand-in")
+    }
+
+    fn shielded(id: &str, code: MessageShieldCode) -> TimelineItemView {
+        TimelineItemView {
+            shield: Some(MessageShieldView {
+                code,
+                critical: true,
+            }),
+            ..item(id, "@ghost:x", None)
+        }
+    }
+
+    #[test]
+    fn a_bridged_room_drops_only_mismatched_sender_shields() {
+        let mut overlay = TimelineOverlay::default();
+        overlay.reset(vec![
+            shielded("a", MessageShieldCode::MismatchedSender),
+            shielded("b", MessageShieldCode::UnknownDevice),
+        ]);
+
+        let diffs = overlay.set_bridged();
+
+        assert!(matches!(
+            diffs.as_slice(),
+            [VectorDiff::Set { index: 0, .. }]
+        ));
+        assert_eq!(overlay.items[0].shield, None);
+        assert!(overlay.items[1].shield.is_some());
+        let VectorDiff::PushBack { value } = overlay.apply(VectorDiff::PushBack {
+            value: shielded("c", MessageShieldCode::MismatchedSender),
+        }) else {
+            unreachable!()
+        };
+        assert_eq!(value.shield, None);
     }
 
     #[test]
