@@ -2286,10 +2286,6 @@ export type Rpc = {
     signOutSafety: (params?: Record<string, never>) => Promise<SignOutSafetyView>;
     devices: (params?: Record<string, never>) => Promise<{
 	devices: DeviceView[],
-	account_management: boolean,
-	account_management_url: string | null,
-	/**  Signed in with OAuth, which is what linking a device by QR code needs. */
-	oauth: boolean,
 }>;
     userSecurity: (params: {
 	user_id: string,

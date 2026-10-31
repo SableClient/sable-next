@@ -1614,14 +1614,7 @@ mod regression_tests {
             .await;
         server.mock_devices().ok().mount().await;
 
-        let devices = DevicesParams {}.run(&core).await.unwrap();
-        assert!(!devices.oauth);
-        assert!(devices.account_management);
         let base = server.server().uri().replace("http://", "https://");
-        assert_eq!(
-            devices.account_management_url.unwrap(),
-            format!("{base}/account?action=org.matrix.sessions_list")
-        );
         let url = core
             .delete_device(DeleteDeviceParams {
                 device_id: "OTHER".into(),
@@ -1659,9 +1652,6 @@ mod regression_tests {
             .mount(server.server())
             .await;
 
-        let devices = DevicesParams {}.run(&core).await.unwrap();
-        assert!(!devices.account_management);
-        assert!(devices.account_management_url.is_none());
         assert!(
             core.delete_device(DeleteDeviceParams {
                 device_id: "OTHER".into(),
