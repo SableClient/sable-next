@@ -18,7 +18,7 @@
 }
 
 .sender-identity:has(> .sender-identity-pronouns, > .sender-identity-via) > .sender-identity-name {
-  flex-shrink: 0;
+  flex-shrink: 1;
   max-width: min(24ch, 100%);
 }
 
@@ -55,7 +55,7 @@
 
 .sender-identity-via {
   display: flex;
-  flex-shrink: 1;
+  flex-shrink: 1000;
   font-size: var(--font-size-small);
   max-width: 24ch;
   min-width: 3rem;
@@ -73,7 +73,7 @@
 }
 
 .sender-identity-pronouns {
-  flex-shrink: 1000;
+  flex-shrink: 1000000;
   min-width: 0;
 }
 

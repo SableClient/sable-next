@@ -65,7 +65,11 @@
 </script>
 
 {#if splitPronouns.visible.length > 0}
-  <span {...rest} class={['pronoun-pill-container', className]} bind:this={container}>
+  <span
+    {...rest}
+    class={['pronoun-pill-container', { empty: shown === 0 }, className]}
+    bind:this={container}
+  >
     <span class="pronoun-pill-sizer" aria-hidden="true" bind:this={sizer}>
       {#each splitPronouns.visible as pronoun, index (index)}
         <span class="pronoun-pill" lang={pronoun.language ?? undefined} data-text={pronoun.summary}
@@ -106,6 +110,11 @@
     min-width: 0;
     overflow: hidden;
     position: relative;
+  }
+
+  /* Still measured, but its leftover space moves to the end of the row. */
+  .pronoun-pill-container.empty {
+    order: 1;
   }
 
   .pronoun-pill-sizer,
