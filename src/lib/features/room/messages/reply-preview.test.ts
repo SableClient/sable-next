@@ -43,8 +43,7 @@ test.each([
       kind: 'message',
       body,
       html,
-      emote: false,
-      notice: false,
+      msgtype: 'text',
       edited: false,
       jumbo: null,
     })
@@ -115,8 +114,7 @@ test('a spoiler stays hidden in the preview', () => {
       kind: 'message',
       body: 'look ||secret|| here',
       html: 'look <span data-mx-spoiler="">sec<b>ret</b></span> here &amp; there',
-      emote: false,
-      notice: false,
+      msgtype: 'text',
       edited: false,
       jumbo: null,
     })

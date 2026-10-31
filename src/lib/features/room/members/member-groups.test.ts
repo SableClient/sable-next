@@ -49,7 +49,7 @@ const message = {
   id: 'message',
   event_id: '$message',
   reactions: [],
-  content: { kind: 'message', body: 'hi', html: 'hi', emote: false, notice: false, edited: false },
+  content: { kind: 'message', body: 'hi', html: 'hi', msgtype: 'text', edited: false },
 } as unknown as TimelineItemView;
 
 const t = (key: string, values?: Record<string, unknown>): string => {

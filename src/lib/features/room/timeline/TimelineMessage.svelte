@@ -126,8 +126,8 @@
     item.in_reply_to ? (events?.get(item.in_reply_to.event_id) ?? null) : null
   );
   let replySender = $derived(item.in_reply_to?.sender ?? replyTarget?.sender ?? null);
-  let emote = $derived(item.content.kind === 'message' && item.content.emote);
-  let notice = $derived(item.content.kind === 'message' && item.content.notice);
+  let emote = $derived(item.content.kind === 'message' && item.content.msgtype === 'emote');
+  let notice = $derived(item.content.kind === 'message' && item.content.msgtype === 'notice');
   let jumbo = $derived(item.content.kind === 'message' ? (item.content.jumbo ?? null) : null);
   let upload = $derived(
     item.send_state?.status === 'sending' ? (item.send_state.progress ?? null) : null
@@ -480,7 +480,7 @@
             <ForwardedLine forwarded={item.forwarded} {roomId} {members} {onJumpToEvent} />
           </div>
         {/if}
-        {#if item.content.kind === 'message' && item.content.emote}
+        {#if item.content.kind === 'message' && item.content.msgtype === 'emote'}
           <div
             class={['emote', { 'has-receipts': inlineReceipts }]}
             style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}

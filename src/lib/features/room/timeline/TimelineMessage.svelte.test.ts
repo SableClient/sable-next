@@ -556,8 +556,7 @@ test('a message the core sized as jumbo reads at that size', async () => {
       kind: 'message' as const,
       body: ':rotate:',
       html,
-      emote: false,
-      notice: false,
+      msgtype: 'text',
       edited: false,
       jumbo: 1,
     },
@@ -578,8 +577,7 @@ test('renders a link preview for every link in a message', async () => {
       kind: 'message',
       body: 'https://example.org/one https://example.org/two',
       html: '<a href="https://example.org/one">one</a> <a href="https://example.org/two">two</a>',
-      emote: false,
-      notice: false,
+      msgtype: 'text',
       edited: false,
       jumbo: null,
     },
@@ -606,8 +604,7 @@ test('a message whose embeds were removed renders none, bundled or found', async
       kind: 'message',
       body: 'https://example.org/one',
       html: '<a href="https://example.org/one">one</a>',
-      emote: false,
-      notice: false,
+      msgtype: 'text',
       edited: true,
       jumbo: null,
     },
@@ -647,8 +644,7 @@ test('whitelist-only entries preview only the selected links', async () => {
       kind: 'message' as const,
       body: 'https://example.org/allowed https://example.org/omitted',
       html: '<a href="https://example.org/allowed">allowed</a> <a href="https://example.org/omitted">omitted</a>',
-      emote: false,
-      notice: false,
+      msgtype: 'text' as const,
       edited: false,
       jumbo: null,
     },
@@ -674,7 +670,10 @@ test.each(['image', 'emote'] as const)('renders bundled previews on %s messages'
   const base = kind === 'image' ? imageItem() : item(false);
   const message = {
     ...base,
-    content: base.content.kind === 'message' ? { ...base.content, emote: true } : base.content,
+    content:
+      base.content.kind === 'message'
+        ? { ...base.content, msgtype: 'emote' as const }
+        : base.content,
     bundled_link_previews: [{ ...previewWhitelistEntry(url), title: 'Bundled preview' }],
   };
   const instance = render(TimelineItemHarness, {

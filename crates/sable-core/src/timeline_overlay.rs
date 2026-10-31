@@ -228,8 +228,7 @@ mod tests {
         let content = TimelineItemContentView::Message {
             body: id.to_owned(),
             html: id.to_owned(),
-            emote: false,
-            notice: false,
+            msgtype: crate::protocol::MessageKind::Text,
             edited: false,
             jumbo: None,
         };

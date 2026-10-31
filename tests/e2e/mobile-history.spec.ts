@@ -48,8 +48,7 @@ for (const source of ['reply', 'link']) {
                 kind: 'message' as const,
                 body: `Jump ${id}`,
                 html: `<a href="https://matrix.to/#/!room:example.test/$target-${id}:example.test">Jump ${id}</a>`,
-                emote: false,
-                notice: false,
+                msgtype: 'text',
                 edited: false,
               },
               in_reply_to: {

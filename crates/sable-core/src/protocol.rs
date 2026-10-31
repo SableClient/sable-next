@@ -1663,9 +1663,8 @@ pub enum TimelineItemContentView {
         body: String,
         /// Sanitised display HTML, safe to inject as-is.
         html: String,
-        /// `m.emote`, which reads as an action by the sender rather than speech.
-        emote: bool,
-        notice: bool,
+        /// An emote reads as an action by the sender rather than speech.
+        msgtype: MessageKind,
         edited: bool,
         /// Drawn larger, 1 to 4, when the message is nothing but emoji or
         /// inline emotes.

@@ -49,8 +49,7 @@ function item(id: string, body: string, patch: Partial<TimelineItemView> = {}): 
       kind: 'message',
       body,
       html: body,
-      emote: false,
-      notice: false,
+      msgtype: 'text',
       edited: false,
       jumbo: null,
     },
@@ -229,7 +228,7 @@ test('a short receipted notice keeps its text on one line', async () => {
       content: {
         ...base.content,
         html: '<p>miam miam</p>',
-        notice: true,
+        msgtype: 'notice',
       } as TimelineItemView['content'],
       read_by: TWO_READERS,
     },

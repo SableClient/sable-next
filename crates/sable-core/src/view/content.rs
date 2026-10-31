@@ -18,8 +18,8 @@ use sable_model::jumbo;
 
 use crate::matrix_html::{display_html, strip_profile_fallback_body, strip_profile_fallback_html};
 use crate::protocol::{
-    AvatarChangeView, DisplayNameChangeView, PerMessageProfileView, PollAnswerView, PollView,
-    TimelineItemContentView, UtdCauseView,
+    AvatarChangeView, DisplayNameChangeView, MessageKind, PerMessageProfileView, PollAnswerView,
+    PollView, TimelineItemContentView, UtdCauseView,
 };
 
 use super::media::{
@@ -46,15 +46,18 @@ fn text_message(
     let body = strip_profile_fallback_body(msgtype.body(), fallback);
     let formatted = formatted.map(|formatted| strip_profile_fallback_html(&formatted, fallback));
     let html = display_html(&body, formatted.as_deref());
-    let emote = matches!(msgtype, MessageType::Emote(_));
-    let jumbo = (!emote)
+    let kind = match msgtype {
+        MessageType::Emote(_) => MessageKind::Emote,
+        MessageType::Notice(_) => MessageKind::Notice,
+        _ => MessageKind::Text,
+    };
+    let jumbo = (kind != MessageKind::Emote)
         .then(|| jumbo::emoji_level(&body).or_else(|| jumbo::emoticon_level(&html)))
         .flatten();
     TimelineItemContentView::Message {
         html,
         body,
-        emote,
-        notice: matches!(msgtype, MessageType::Notice(_)),
+        msgtype: kind,
         edited,
         jumbo,
     }

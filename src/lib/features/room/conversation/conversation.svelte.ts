@@ -828,7 +828,5 @@ export class Conversation {
 
 function editedKind(edited: TimelineItemView | undefined): MessageKind {
   const content = edited?.content;
-  if (content?.kind !== 'message') return 'text';
-  if (content.emote) return 'emote';
-  return content.notice ? 'notice' : 'text';
+  return content?.kind === 'message' ? content.msgtype : 'text';
 }

@@ -131,9 +131,7 @@
   }
 
   function reproxyKind(content: TimelineItemView['content']): MessageKind {
-    if (content.kind !== 'message') return 'text';
-    if (content.emote) return 'emote';
-    return content.notice ? 'notice' : 'text';
+    return content.kind === 'message' ? content.msgtype : 'text';
   }
 
   function reproxy(item: TimelineItemView, persona: PersonaView | null): void {
@@ -172,8 +170,7 @@
       kind: 'message',
       body: version.body,
       html: version.html,
-      emote: false,
-      notice: false,
+      msgtype: 'text',
       edited: false,
       jumbo: null,
     });

@@ -1,4 +1,4 @@
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { MessageKind, TimelineItemView } from '#src/generated/protocol';
 import { expect, SIGNED_OUT, test } from './fixtures/test';
 import { timelineImage, timelineItem, withRowFields } from './fixtures/timeline-items';
 
@@ -12,21 +12,20 @@ const message = (html: string): TimelineItemView => ({
     kind: 'message',
     body: long,
     html,
-    emote: false,
-    notice: false,
+    msgtype: 'text',
     edited: false,
     jumbo: null,
   },
 });
-const alteredMessage = (flags: { emote?: boolean; notice?: boolean; edited?: boolean }) => {
+const alteredMessage = (flags: { msgtype?: MessageKind; edited?: boolean }) => {
   const item = message(`<p>${long}</p>`);
   if (item.content.kind === 'message') Object.assign(item.content, flags);
   return item;
 };
 const cases: Record<string, TimelineItemView> = {
   text: message(`<p>${long}</p>`),
-  emote: alteredMessage({ emote: true }),
-  notice: alteredMessage({ notice: true }),
+  emote: alteredMessage({ msgtype: 'emote' }),
+  notice: alteredMessage({ msgtype: 'notice' }),
   edited: alteredMessage({ edited: true }),
   url: message(`<a href="https://example.test/${long}">https://example.test/${long}</a>`),
   'inline code': message(`<p><code>${long}</code></p>`),
@@ -37,7 +36,7 @@ const cases: Record<string, TimelineItemView> = {
   maths: message(`<div data-mx-maths="${'x+'.repeat(100)}x"></div>`),
   'inline maths': message(`<span data-mx-maths="\\mathrm{${long}}"></span>`),
   persona: {
-    ...alteredMessage({ emote: true }),
+    ...alteredMessage({ msgtype: 'emote' }),
     per_message_profile: {
       id: 'persona',
       display_name: long,

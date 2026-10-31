@@ -97,8 +97,7 @@ test('the header keeps a spoiler-safe topic visible', async () => {
     kind: 'message',
     body: 'Release secret',
     html: 'Release <span data-mx-spoiler>secret</span>',
-    emote: false,
-    notice: false,
+    msgtype: 'text',
     edited: false,
     jumbo: null,
   };
@@ -273,8 +272,7 @@ test.each([false, true])(
       kind: 'message',
       body: 'Read-only discussion',
       html: 'Read-only discussion',
-      emote: false,
-      notice: false,
+      msgtype: 'text',
       edited: false,
       jumbo: null,
     };

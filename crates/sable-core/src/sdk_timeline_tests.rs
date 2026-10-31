@@ -2857,8 +2857,8 @@ async fn a_notice_is_marked_as_one_rather_than_read_as_speech() {
     )
     .into_iter()
     .filter_map(|content| match content {
-        crate::protocol::TimelineItemContentView::Message { body, notice, .. } => {
-            Some((body, notice))
+        crate::protocol::TimelineItemContentView::Message { body, msgtype, .. } => {
+            Some((body, msgtype == crate::protocol::MessageKind::Notice))
         }
         _ => None,
     })

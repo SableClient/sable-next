@@ -1730,8 +1730,8 @@ export type TimelineItemContentView = { kind: "message";
 body: string;
 /**  Sanitised display HTML, safe to inject as-is. */
 html: string;
-/**  `m.emote`, which reads as an action by the sender rather than speech. */
-emote: boolean; notice: boolean; edited: boolean;
+/**  An emote reads as an action by the sender rather than speech. */
+msgtype: MessageKind; edited: boolean;
 /**
  *  Drawn larger, 1 to 4, when the message is nothing but emoji or
  *  inline emotes.

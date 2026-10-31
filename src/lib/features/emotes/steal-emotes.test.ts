@@ -26,8 +26,7 @@ function message(html: string | null): TimelineItemContentView {
     kind: 'message',
     body: 'hey',
     html,
-    emote: false,
-    notice: false,
+    msgtype: 'text',
     edited: false,
   } as TimelineItemContentView;
 }

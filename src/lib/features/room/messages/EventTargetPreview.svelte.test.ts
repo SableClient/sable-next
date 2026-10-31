@@ -23,7 +23,7 @@ test('a target names its sender in the colour of their profile', async () => {
     sender: '@bob:example.org',
     sender_name: 'Bob',
     timestamp: 0,
-    content: { kind: 'message', body: 'Pinned', html: null, emote: false, notice: false },
+    content: { kind: 'message', body: 'Pinned', html: null, msgtype: 'text' },
   } as unknown as TimelineItemView;
   const { container } = render(EventTargetPreview, {
     props: { eventId: '$pinned:example.org', events: new TimelineEventIndex([target], []) },
