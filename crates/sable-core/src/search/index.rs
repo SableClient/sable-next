@@ -4,6 +4,8 @@ use std::time::Duration;
 
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::event_cache::RoomEventCache;
+use matrix_sdk::ruma::events::room::message::SyncRoomMessageEvent;
+use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
 use matrix_sdk::ruma::events::{
     AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
 };
@@ -1063,10 +1065,6 @@ impl MessageIndex {
         queue
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one sequential scan kept in a single function"
-    )]
     pub(super) fn scan_cold(
         &self,
         room_id: &OwnedRoomId,
@@ -1084,118 +1082,18 @@ impl MessageIndex {
         let Some(index) = self.rooms.get(room_id) else {
             return (Vec::new(), 0);
         };
-        let mut documents: Vec<Document> = stored
-            .documents
-            .iter()
-            .filter(|document| {
-                !index.key_of.contains_key(&document.event_id)
-                    && !index.pending_redactions.contains(&document.event_id)
-            })
-            .cloned()
-            .collect();
+        let documents = unindexed_cold_documents(index, stored);
         if documents.is_empty() {
             return (Vec::new(), 0);
         }
-        documents.sort_by(|left, right| {
-            left.origin_server_ts
-                .cmp(&right.origin_server_ts)
-                .then_with(|| left.event_id.cmp(&right.event_id))
-        });
-        for document in &mut documents {
-            document.folded = document.body.to_lowercase();
-        }
-
-        let mut matched: Vec<(usize, f64)> = if query.is_empty() {
-            documents
-                .iter()
-                .enumerate()
-                .filter(|(_, document)| document.matches(filter, terms))
-                .map(|(position, _)| (position, 0.0))
-                .collect()
-        } else {
-            let mut scratch: Index<usize> =
-                Index::new_with_capacity(BODY_FIELD_COUNT, documents.len(), documents.len());
-            for (position, document) in documents.iter().enumerate() {
-                scratch.add_document(
-                    &[body_field],
-                    tokenize::tokenize,
-                    position,
-                    &Body(document.body.clone()),
-                );
-            }
-            scratch
-                .query(
-                    query,
-                    &mut bm25::new(),
-                    tokenize::tokenize,
-                    &BODY_FIELD_BOOST,
-                )
-                .into_iter()
-                .filter(|result| {
-                    documents
-                        .get(result.key)
-                        .is_some_and(|document| document.matches(filter, terms))
-                })
-                .map(|result| (result.key, result.score))
-                .collect()
-        };
-
-        matched.sort_by(|left, right| {
-            right
-                .1
-                .partial_cmp(&left.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| {
-                    let id = |position: &usize| {
-                        documents.get(*position).map(|document| &document.event_id)
-                    };
-                    id(&left.0).cmp(&id(&right.0))
-                })
-        });
+        let matched = rank_cold_documents(&documents, query, filter, terms);
         let total = matched.len();
-
-        let line = |document: &Document| {
-            (!document.body.is_empty() && !filter.not_senders.contains(&document.sender)).then(
-                || ContextLine {
-                    event_id: document.event_id.clone(),
-                    body: document.body.clone(),
-                    sender: document.sender.clone(),
-                    origin_server_ts: document.origin_server_ts,
-                },
-            )
-        };
         let hits = matched
             .into_iter()
             .skip(skip)
             .take(take)
             .filter_map(|(position, score)| {
-                let document = documents.get(position)?;
-                let mut before: Vec<ContextLine> = documents
-                    .get(..position)
-                    .unwrap_or_default()
-                    .iter()
-                    .rev()
-                    .filter_map(line)
-                    .take(context)
-                    .collect();
-                before.reverse();
-                let after = documents
-                    .get(position + 1..)
-                    .unwrap_or_default()
-                    .iter()
-                    .filter_map(line)
-                    .take(context)
-                    .collect();
-                Some(Hit {
-                    room_id: room_id.clone(),
-                    event_id: document.event_id.clone(),
-                    body: document.body.clone(),
-                    sender: document.sender.clone(),
-                    origin_server_ts: document.origin_server_ts,
-                    score,
-                    before,
-                    after,
-                })
+                cold_hit(room_id, &documents, position, score, context, filter)
             })
             .collect();
         (hits, total)
@@ -1281,10 +1179,6 @@ impl MessageIndex {
         }
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one sequential flow kept in a single function"
-    )]
     pub(super) async fn ingest_with(
         &mut self,
         room_id: &OwnedRoomId,
@@ -1334,104 +1228,245 @@ impl MessageIndex {
             }
             index.mark_classified(event_id.to_owned(), ts);
 
-            let message = match event.raw().deserialize() {
-                Ok(AnySyncTimelineEvent::MessageLike(message)) => message,
-                Ok(AnySyncTimelineEvent::State(state)) => {
-                    if !index.redacted.contains(state.event_id()) {
-                        index.upsert(state_document(&state, raw_content(&event).as_ref()));
-                    }
-                    continue;
-                }
-                Err(_) => continue,
-            };
-
-            if let Some(document) = poll_start_document(&message) {
-                if !index.redacted.contains(&document.event_id) {
-                    index.upsert(document);
-                }
-                continue;
-            }
-
-            if let AnySyncMessageLikeEvent::Sticker(SyncMessageLikeEvent::Original(sticker)) =
-                &message
-            {
-                if !index.redacted.contains(&sticker.event_id) {
-                    index.upsert(sticker_document(sticker));
-                }
-                continue;
-            }
-
-            match message {
-                AnySyncMessageLikeEvent::RoomMessage(message) => {
-                    let Some(message) = message.as_original() else {
-                        continue;
-                    };
-                    let content = raw_content(&event);
-                    let target = edited_or_own_event_id(message);
-                    if index.redacted.contains(&message.event_id)
-                        || index.redacted.contains(&target)
-                    {
-                        continue;
-                    }
-                    if replacement_of(message).is_some()
-                        && !edit_is_valid(cache, &target, &event).await
-                    {
-                        continue;
-                    }
-
-                    let cached = latest_content(cache, &target, &index.redacted).await;
-                    let existing = index.document(&target).cloned();
-                    let document = match replacement_of(message) {
-                        Some(replacement) => {
-                            index.edits.insert(message.event_id.clone(), target.clone());
-                            let base = cached.or(existing);
-                            if base.is_none() && index.has_cold() {
-                                let pending = index
-                                    .pending_edits
-                                    .remove(&target)
-                                    .unwrap_or_else(|| provisional_edit(message, target.clone()));
-                                let edited =
-                                    with_edit(pending, message, replacement, content.as_ref());
-                                index.pending_edits.insert(target, edited);
-                                index.dirty = true;
-                                continue;
-                            }
-                            let base = base.unwrap_or_else(|| provisional_edit(message, target));
-                            with_edit(base, message, replacement, content.as_ref())
-                        }
-                        None => adopt_edit(
-                            cached.unwrap_or_else(|| document_of(message, content.as_ref())),
-                            existing.as_ref(),
-                        ),
-                    };
-
-                    index.upsert(document);
-                }
-
-                AnySyncMessageLikeEvent::RoomRedaction(redaction) => {
-                    let Some(redacted) = redacted_event_id(&redaction, rules) else {
-                        continue;
-                    };
-                    index.redacted.insert(redacted.clone());
-
-                    if let Some(target) = index.edits.remove(&redacted) {
-                        match latest_content(cache, &target, &index.redacted).await {
-                            Some(document) => index.upsert(document),
-                            None => index.forget_message(&target),
-                        }
-                    } else {
-                        index.edits.retain(|_, target| *target != redacted);
-                        index.forget_message(&redacted);
-                    }
-                }
-
-                _ => {}
-            }
+            apply_event(index, &event, cache, rules).await;
         }
 
         self.unload_to_budget();
         fresh
     }
+}
+
+async fn apply_event(
+    index: &mut RoomIndex,
+    event: &TimelineEvent,
+    cache: &RoomEventCache,
+    rules: &RedactionRules,
+) {
+    let message = match event.raw().deserialize() {
+        Ok(AnySyncTimelineEvent::MessageLike(message)) => message,
+        Ok(AnySyncTimelineEvent::State(state)) => {
+            if !index.redacted.contains(state.event_id()) {
+                index.upsert(state_document(&state, raw_content(event).as_ref()));
+            }
+            return;
+        }
+        Err(_) => return,
+    };
+
+    if let Some(document) = poll_start_document(&message) {
+        if !index.redacted.contains(&document.event_id) {
+            index.upsert(document);
+        }
+        return;
+    }
+
+    if let AnySyncMessageLikeEvent::Sticker(SyncMessageLikeEvent::Original(sticker)) = &message {
+        if !index.redacted.contains(&sticker.event_id) {
+            index.upsert(sticker_document(sticker));
+        }
+        return;
+    }
+
+    match message {
+        AnySyncMessageLikeEvent::RoomMessage(message) => {
+            apply_room_message(index, event, &message, cache).await;
+        }
+        AnySyncMessageLikeEvent::RoomRedaction(redaction) => {
+            apply_redaction(index, &redaction, cache, rules).await;
+        }
+        _ => {}
+    }
+}
+
+async fn apply_room_message(
+    index: &mut RoomIndex,
+    event: &TimelineEvent,
+    message: &SyncRoomMessageEvent,
+    cache: &RoomEventCache,
+) {
+    let Some(message) = message.as_original() else {
+        return;
+    };
+    let content = raw_content(event);
+    let target = edited_or_own_event_id(message);
+    if index.redacted.contains(&message.event_id) || index.redacted.contains(&target) {
+        return;
+    }
+    if replacement_of(message).is_some() && !edit_is_valid(cache, &target, event).await {
+        return;
+    }
+
+    let cached = latest_content(cache, &target, &index.redacted).await;
+    let existing = index.document(&target).cloned();
+    let document = match replacement_of(message) {
+        Some(replacement) => {
+            index.edits.insert(message.event_id.clone(), target.clone());
+            let base = cached.or(existing);
+            if base.is_none() && index.has_cold() {
+                let pending = index
+                    .pending_edits
+                    .remove(&target)
+                    .unwrap_or_else(|| provisional_edit(message, target.clone()));
+                let edited = with_edit(pending, message, replacement, content.as_ref());
+                index.pending_edits.insert(target, edited);
+                index.dirty = true;
+                return;
+            }
+            let base = base.unwrap_or_else(|| provisional_edit(message, target));
+            with_edit(base, message, replacement, content.as_ref())
+        }
+        None => adopt_edit(
+            cached.unwrap_or_else(|| document_of(message, content.as_ref())),
+            existing.as_ref(),
+        ),
+    };
+
+    index.upsert(document);
+}
+
+async fn apply_redaction(
+    index: &mut RoomIndex,
+    redaction: &SyncRoomRedactionEvent,
+    cache: &RoomEventCache,
+    rules: &RedactionRules,
+) {
+    let Some(redacted) = redacted_event_id(redaction, rules) else {
+        return;
+    };
+    index.redacted.insert(redacted.clone());
+
+    if let Some(target) = index.edits.remove(&redacted) {
+        match latest_content(cache, &target, &index.redacted).await {
+            Some(document) => index.upsert(document),
+            None => index.forget_message(&target),
+        }
+    } else {
+        index.edits.retain(|_, target| *target != redacted);
+        index.forget_message(&redacted);
+    }
+}
+
+fn unindexed_cold_documents(index: &RoomIndex, stored: &persist::StoredChunk) -> Vec<Document> {
+    let mut documents: Vec<Document> = stored
+        .documents
+        .iter()
+        .filter(|document| {
+            !index.key_of.contains_key(&document.event_id)
+                && !index.pending_redactions.contains(&document.event_id)
+        })
+        .cloned()
+        .collect();
+    documents.sort_by(|left, right| {
+        left.origin_server_ts
+            .cmp(&right.origin_server_ts)
+            .then_with(|| left.event_id.cmp(&right.event_id))
+    });
+    for document in &mut documents {
+        document.folded = document.body.to_lowercase();
+    }
+    documents
+}
+
+fn rank_cold_documents(
+    documents: &[Document],
+    query: &str,
+    filter: &IndexFilter,
+    terms: &FoldedTerms,
+) -> Vec<(usize, f64)> {
+    let mut matched: Vec<(usize, f64)> = if query.is_empty() {
+        documents
+            .iter()
+            .enumerate()
+            .filter(|(_, document)| document.matches(filter, terms))
+            .map(|(position, _)| (position, 0.0))
+            .collect()
+    } else {
+        let mut scratch: Index<usize> =
+            Index::new_with_capacity(BODY_FIELD_COUNT, documents.len(), documents.len());
+        for (position, document) in documents.iter().enumerate() {
+            scratch.add_document(
+                &[body_field],
+                tokenize::tokenize,
+                position,
+                &Body(document.body.clone()),
+            );
+        }
+        scratch
+            .query(
+                query,
+                &mut bm25::new(),
+                tokenize::tokenize,
+                &BODY_FIELD_BOOST,
+            )
+            .into_iter()
+            .filter(|result| {
+                documents
+                    .get(result.key)
+                    .is_some_and(|document| document.matches(filter, terms))
+            })
+            .map(|result| (result.key, result.score))
+            .collect()
+    };
+
+    matched.sort_by(|left, right| {
+        right
+            .1
+            .partial_cmp(&left.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| {
+                let id =
+                    |position: &usize| documents.get(*position).map(|document| &document.event_id);
+                id(&left.0).cmp(&id(&right.0))
+            })
+    });
+    matched
+}
+
+fn cold_hit(
+    room_id: &OwnedRoomId,
+    documents: &[Document],
+    position: usize,
+    score: f64,
+    context: usize,
+    filter: &IndexFilter,
+) -> Option<Hit> {
+    let line = |document: &Document| {
+        (!document.body.is_empty() && !filter.not_senders.contains(&document.sender)).then(|| {
+            ContextLine {
+                event_id: document.event_id.clone(),
+                body: document.body.clone(),
+                sender: document.sender.clone(),
+                origin_server_ts: document.origin_server_ts,
+            }
+        })
+    };
+    let document = documents.get(position)?;
+    let mut before: Vec<ContextLine> = documents
+        .get(..position)
+        .unwrap_or_default()
+        .iter()
+        .rev()
+        .filter_map(line)
+        .take(context)
+        .collect();
+    before.reverse();
+    let after = documents
+        .get(position + 1..)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(line)
+        .take(context)
+        .collect();
+    Some(Hit {
+        room_id: room_id.clone(),
+        event_id: document.event_id.clone(),
+        body: document.body.clone(),
+        sender: document.sender.clone(),
+        origin_server_ts: document.origin_server_ts,
+        score,
+        before,
+        after,
+    })
 }
 
 #[derive(Clone, PartialEq, Eq)]
