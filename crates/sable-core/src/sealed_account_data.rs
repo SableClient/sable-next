@@ -52,6 +52,12 @@ struct Envelope {
 
 pub(crate) struct AccountDataKey([u8; KEY_SIZE]);
 
+impl Drop for AccountDataKey {
+    fn drop(&mut self) {
+        zeroize::Zeroize::zeroize(&mut self.0);
+    }
+}
+
 impl AccountDataKey {
     pub(crate) fn generate() -> Result<Self, getrandom::Error> {
         let mut key = [0u8; KEY_SIZE];

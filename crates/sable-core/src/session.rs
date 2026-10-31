@@ -592,7 +592,7 @@ async fn build_account_client(
         let key = role.store_key(store_id).await?;
         let store = role
             .store_config(std::path::Path::new(store_id).join("store"))
-            .key(key.as_ref().map(crate::secrets::Key::as_slice));
+            .key(key.as_ref().map(|key| key.as_slice()));
         let cache = store
             .clone()
             .path(std::path::Path::new(store_id).join("cache"));

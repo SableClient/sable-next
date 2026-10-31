@@ -29,7 +29,7 @@ fn key_reference(store_id: &str) -> PathBuf {
 }
 
 pub(crate) fn config(path: impl AsRef<Path>, key: Option<&Key>) -> SqliteStoreConfig {
-    SqliteStoreConfig::new(path).key(key.map(Key::as_slice))
+    SqliteStoreConfig::new(path).key(key.map(|key| key.as_slice()))
 }
 
 /// `None` for a store saved before stores were encrypted.
@@ -713,7 +713,7 @@ mod tests {
         let identity_keys = plaintext_store(store_id).await;
 
         let key = super::account_key(store_id).await.unwrap().unwrap();
-        assert_eq!(super::saved_key(store_id).unwrap(), Some(key));
+        assert_eq!(super::saved_key(store_id).unwrap(), Some(key.clone()));
         assert!(!directory.path().join("store.old").exists());
         assert!(!directory.path().join("store.new").exists());
         assert!(!directory.path().join("cache").exists());
@@ -893,7 +893,7 @@ mod tests {
 
         assert!(super::saved_key(store_id).unwrap().is_none());
         let key = super::account_key(store_id).await.unwrap().unwrap();
-        assert_eq!(super::saved_key(store_id).unwrap(), Some(key));
+        assert_eq!(super::saved_key(store_id).unwrap(), Some(key.clone()));
         assert_eq!(super::account_key(store_id).await.unwrap(), Some(key));
     }
 

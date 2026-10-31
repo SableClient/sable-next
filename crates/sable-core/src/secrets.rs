@@ -8,7 +8,7 @@ use crate::store::StoreError;
 
 pub(crate) const KEY_SIZE: usize = 32;
 
-pub(crate) type Key = [u8; KEY_SIZE];
+pub(crate) type Key = zeroize::Zeroizing<[u8; KEY_SIZE]>;
 
 /// Every call may block on IPC.
 pub trait SecretBackend: Send + Sync {
@@ -46,7 +46,7 @@ fn cached(id: &str) -> Option<Key> {
         .lock()
         .ok()?
         .as_ref()
-        .and_then(|keys| keys.get(id).copied())
+        .and_then(|keys| keys.get(id).cloned())
 }
 
 fn remember(id: &str, key: Key) {
@@ -77,12 +77,14 @@ pub(crate) fn load(id_file: &Path) -> Result<Option<Key>, StoreError> {
     if let Some(key) = cached(&id) {
         return Ok(Some(key));
     }
-    let key: Key = backend()?
-        .get(&id)?
-        .ok_or(StoreError::KeyMissing)?
-        .try_into()
-        .map_err(|_| StoreError::Invalid("a saved key has the wrong length"))?;
-    remember(&id, key);
+    let saved = zeroize::Zeroizing::new(backend()?.get(&id)?.ok_or(StoreError::KeyMissing)?);
+    let key = Key::new(
+        saved
+            .as_slice()
+            .try_into()
+            .map_err(|_| StoreError::Invalid("a saved key has the wrong length"))?,
+    );
+    remember(&id, key.clone());
     Ok(Some(key))
 }
 
@@ -95,21 +97,21 @@ pub(crate) fn load_or_create(id_file: &Path) -> Result<Key, StoreError> {
         Err(StoreError::KeyMissing) => true,
         Err(error) => return Err(error),
     };
-    let mut key = [0u8; KEY_SIZE];
-    getrandom::fill(&mut key).map_err(StoreError::backend)?;
+    let mut key = Key::new([0u8; KEY_SIZE]);
+    getrandom::fill(key.as_mut_slice()).map_err(StoreError::backend)?;
     let mut id = [0u8; 16];
     getrandom::fill(&mut id).map_err(StoreError::backend)?;
     let id = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(id);
 
     // Saved first, so a reference never names a key that was not stored.
-    backend()?.set(&id, &key)?;
+    backend()?.set(&id, key.as_slice())?;
     if !write_reference(id_file, &id, replace)? {
         if let Err(error) = backend()?.delete(&id) {
             tracing::warn!("could not delete an unused key: {error}");
         }
         return load(id_file)?.ok_or(StoreError::KeyMissing);
     }
-    remember(&id, key);
+    remember(&id, key.clone());
     Ok(key)
 }
 
@@ -331,7 +333,7 @@ mod tests {
 
         assert!(super::load(&reference).unwrap().is_none());
         let key = super::load_or_create(&reference).unwrap();
-        assert_eq!(super::load(&reference).unwrap(), Some(key));
+        assert_eq!(super::load(&reference).unwrap(), Some(key.clone()));
         assert_eq!(super::load_or_create(&reference).unwrap(), key);
 
         super::forget(&reference);

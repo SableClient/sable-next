@@ -49,7 +49,7 @@ impl LoginTokens {
 
     fn seal(&self, tokens: &SessionTokens) -> Result<Vec<u8>, StoreError> {
         let key = crate::secrets::load_or_create(&self.key_reference())?;
-        let sealed = AccountDataKey::from_bytes(key)
+        let sealed = AccountDataKey::from_bytes(*key)
             .seal(SEAL_LABEL, &serde_json::to_value(tokens)?)
             .map_err(|error| StoreError::Message(error.to_string()))?;
         Ok(serde_json::to_vec(&sealed)?)
@@ -65,7 +65,7 @@ impl LoginTokens {
             }
             Err(error) => return Err(error),
         };
-        let tokens = AccountDataKey::from_bytes(key)
+        let tokens = AccountDataKey::from_bytes(*key)
             .open(SEAL_LABEL, &serde_json::from_slice(bytes)?)
             .ok_or(StoreError::Invalid(
                 "saved login tokens could not be opened",
