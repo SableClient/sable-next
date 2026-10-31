@@ -17,7 +17,7 @@ use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedEventId};
 use matrix_sdk_ui::sync_service::State as SyncState;
 
-use crate::protocol::{CoreEvent, SyncStatus};
+use crate::protocol::{CoreEvent, RpcError, SyncStatus};
 use matrix_sdk_base::deserialized_responses::RawAnySyncOrStrippedTimelineEvent;
 use matrix_sdk_base::sync::Notification;
 use matrix_sdk_ui::notification_client::{NotificationClient, NotificationProcessSetup};
@@ -67,6 +67,85 @@ fn redecrypted_notification(
 }
 
 impl Core {
+    /// Restarts a stalled sync with backoff and reports each state change.
+    pub(crate) fn watch_sync_state(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        sync_service: &Arc<matrix_sdk_ui::sync_service::SyncService>,
+        generation: u64,
+    ) {
+        let core = self.clone();
+        let mut states = sync_service.state();
+        let restarted = sync_service.clone();
+        let support_client = client.clone();
+        // `Subscriber::next` yields only on *change*, so emit the first by hand.
+        core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(states.get())));
+        self.track_session_task(
+            spawn(async move {
+                let mut failures = 0u32;
+                loop {
+                    let next = if matches!(states.get(), SyncState::Offline) {
+                        matrix_sdk::timeout::timeout(states.next(), OFFLINE_RECHECK).await
+                    } else {
+                        Ok(states.next().await)
+                    };
+                    let Ok(next) = next else {
+                        if server_reachable(&support_client).await && !core.sync_paused() {
+                            restarted.start().await;
+                        }
+                        continue;
+                    };
+                    let Some(state) = next else {
+                        break;
+                    };
+                    if core.sync_paused() {
+                        continue;
+                    }
+                    let stalled = matches!(
+                        state,
+                        SyncState::Error(_) | SyncState::Terminated | SyncState::Idle
+                    );
+                    let running = matches!(state, SyncState::Running);
+                    core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(state)));
+                    if running {
+                        core.resubscribe_timeline_rooms().await;
+                        core.reconcile_memberships().await;
+                        core.fill_own_members().await;
+                        core.align_notification_rules().await;
+                    }
+
+                    if stalled {
+                        if core.detect_account_lock(&support_client, generation).await {
+                            continue;
+                        }
+                        if matches!(
+                            core.require_sliding_sync(&support_client).await,
+                            Err(RpcError::SlidingSyncUnsupported)
+                        ) {
+                            restarted.stop().await;
+                            core.emit_if_current(
+                                generation,
+                                CoreEvent::SyncStatus(crate::protocol::SyncStatus::Error {
+                                    message: "This homeserver does not support Sliding Sync."
+                                        .to_owned(),
+                                }),
+                            );
+                            return;
+                        }
+                        failures = failures.saturating_add(1);
+                        crate::watchers::retry_backoff(failures).await;
+                        if !core.sync_paused() {
+                            restarted.start().await;
+                        }
+                    } else {
+                        failures = 0;
+                    }
+                }
+            })
+            .abort_on_drop(),
+        );
+    }
+
     pub(crate) fn watch_account_data(
         self: &Arc<Self>,
         client: &matrix_sdk::Client,

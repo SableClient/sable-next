@@ -7,7 +7,6 @@ use matrix_sdk::executor::{JoinHandleExt, spawn};
 
 use matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AuthorizationServerMetadata;
 use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
-use matrix_sdk_ui::sync_service::State as SyncState;
 
 use crate::ResultExt;
 use crate::protocol::{CoreEvent, RpcError, SessionInfo};
@@ -20,7 +19,6 @@ use crate::cosmetics;
 use crate::image_packs;
 use crate::search;
 use crate::session;
-use crate::watchers::{OFFLINE_RECHECK, server_reachable, sync_status};
 
 /// Taken after `restore_lock` when both are needed.
 pub(crate) struct SessionTransition<'core> {
@@ -152,6 +150,34 @@ impl Core {
             _activation: activation,
             _swap: self.session_swap_lock.lock().await,
         }
+    }
+
+    pub(crate) async fn registered_store_id(&self, account_id: &str) -> Option<String> {
+        self.accounts.lock().await.as_ref().and_then(|registry| {
+            registry
+                .accounts
+                .iter()
+                .find(|account| account.account_id == account_id)
+                .map(|account| account.store_id.clone())
+        })
+    }
+
+    fn refresh_own_identity(&self, client: &matrix_sdk::Client) {
+        let Some(user_id) = client.user_id().map(ToOwned::to_owned) else {
+            return;
+        };
+        let client = client.clone();
+        self.track_session_task(
+            spawn(async move {
+                if let Err(error) = client.encryption().request_user_identity(&user_id).await {
+                    tracing::warn!(
+                        operation = "verification",
+                        "could not refresh own device list: {error}"
+                    );
+                }
+            })
+            .abort_on_drop(),
+        );
     }
 
     pub(crate) fn sync_paused(&self) -> bool {
@@ -989,10 +1015,6 @@ impl Core {
         Ok(generation)
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one sequential flow kept in a single function"
-    )]
     pub(crate) async fn start_session(
         self: &Arc<Self>,
         client: matrix_sdk::Client,
@@ -1040,8 +1062,6 @@ impl Core {
                 locked: false,
             },
         );
-        let verification_client = client.clone();
-        let verification_user_id = client.user_id().map(ToOwned::to_owned);
         let mut session = self.session.write().await;
         *session = Some(Session {
             account_id: account_id.clone(),
@@ -1082,17 +1102,8 @@ impl Core {
         self.watch_send_queue(&client);
         self.watch_presence(&client, generation);
         let store_id = self
-            .accounts
-            .lock()
+            .registered_store_id(&account_id)
             .await
-            .as_ref()
-            .and_then(|registry| {
-                registry
-                    .accounts
-                    .iter()
-                    .find(|account| account.account_id == account_id)
-                    .map(|account| account.store_id.clone())
-            })
             .unwrap_or_else(|| self.store_id.clone());
         self.watch_search_index(&client, &store_id);
         self.watch_ignored_users(&client);
@@ -1107,94 +1118,9 @@ impl Core {
             .respawn_tasks_for_rooms_with_unsent_requests()
             .await;
 
-        let core = self.clone();
-        let mut states = sync_service.state();
-        let restarted = sync_service.clone();
-        let support_client = client.clone();
-        // `Subscriber::next` yields only on *change*, so emit the first by hand.
-        core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(states.get())));
-        self.track_session_task(
-            spawn(async move {
-                let mut failures = 0u32;
-                loop {
-                    let next = if matches!(states.get(), SyncState::Offline) {
-                        matrix_sdk::timeout::timeout(states.next(), OFFLINE_RECHECK).await
-                    } else {
-                        Ok(states.next().await)
-                    };
-                    let Ok(next) = next else {
-                        if server_reachable(&support_client).await && !core.sync_paused() {
-                            restarted.start().await;
-                        }
-                        continue;
-                    };
-                    let Some(state) = next else {
-                        break;
-                    };
-                    if core.sync_paused() {
-                        continue;
-                    }
-                    let stalled = matches!(
-                        state,
-                        SyncState::Error(_) | SyncState::Terminated | SyncState::Idle
-                    );
-                    let running = matches!(state, SyncState::Running);
-                    core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(state)));
-                    if running {
-                        core.resubscribe_timeline_rooms().await;
-                        core.reconcile_memberships().await;
-                        core.fill_own_members().await;
-                        core.align_notification_rules().await;
-                    }
+        self.watch_sync_state(&client, &sync_service, generation);
 
-                    if stalled {
-                        if core.detect_account_lock(&support_client, generation).await {
-                            continue;
-                        }
-                        if matches!(
-                            core.require_sliding_sync(&support_client).await,
-                            Err(RpcError::SlidingSyncUnsupported)
-                        ) {
-                            restarted.stop().await;
-                            core.emit_if_current(
-                                generation,
-                                CoreEvent::SyncStatus(crate::protocol::SyncStatus::Error {
-                                    message: "This homeserver does not support Sliding Sync."
-                                        .to_owned(),
-                                }),
-                            );
-                            return;
-                        }
-                        failures = failures.saturating_add(1);
-                        crate::watchers::retry_backoff(failures).await;
-                        if !core.sync_paused() {
-                            restarted.start().await;
-                        }
-                    } else {
-                        failures = 0;
-                    }
-                }
-            })
-            .abort_on_drop(),
-        );
-
-        if let Some(user_id) = verification_user_id {
-            self.track_session_task(
-                spawn(async move {
-                    if let Err(error) = verification_client
-                        .encryption()
-                        .request_user_identity(&user_id)
-                        .await
-                    {
-                        tracing::warn!(
-                            operation = "verification",
-                            "could not refresh own device list: {error}"
-                        );
-                    }
-                })
-                .abort_on_drop(),
-            );
-        }
+        self.refresh_own_identity(&client);
 
         // `Suspended` found no session to stop while this one was still starting.
         self.apply_app_activity(false).await;

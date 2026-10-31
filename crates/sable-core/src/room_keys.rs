@@ -125,17 +125,8 @@ impl Core {
             .account_id
             .clone();
         let store_id = self
-            .accounts
-            .lock()
+            .registered_store_id(&account_id)
             .await
-            .as_ref()
-            .and_then(|registry| {
-                registry
-                    .accounts
-                    .iter()
-                    .find(|account| account.account_id == account_id)
-                    .map(|account| account.store_id.clone())
-            })
             .ok_or(RpcError::NotLoggedIn)?;
         crate::session::base_client(&store_id).ok_or(RpcError::Unavailable)
     }
