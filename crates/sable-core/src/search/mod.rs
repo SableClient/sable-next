@@ -1,3 +1,4 @@
+mod chunks;
 mod crawl;
 mod document;
 mod network;
@@ -38,6 +39,7 @@ use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId, RoomId};
 use probly_search::{Index, score::bm25};
 use tracing::warn;
 
+use self::chunks::{Saved, document_bytes, save_room, split_chunk};
 use self::document::{
     Document, FoldedTerms, adopt_edit, document_of, indexable_body, latest_content,
     poll_start_document, provisional_edit, replacement_of, room_message, state_document,
@@ -129,9 +131,6 @@ const PINNED_FETCH_CONCURRENCY: usize = 4;
 const INITIAL_DOCUMENTS: usize = 64;
 const CHANGES_BEFORE_FLUSH: usize = 32;
 const TICKS_BEFORE_FLUSH: u32 = 5;
-const CHUNK_WEIGHT: usize = 8_000;
-const DOCUMENT_WEIGHT: usize = 8;
-
 type DocKey = u32;
 
 struct Body(String);
@@ -1649,269 +1648,6 @@ fn now_ms() -> u64 {
         .into()
 }
 
-struct Saved {
-    sizes: HashMap<ChunkId, (usize, usize)>,
-    lost: Vec<ChunkId>,
-    removed: Vec<ChunkId>,
-    merged: Vec<ChunkId>,
-    redactions: HashSet<OwnedEventId>,
-    edits: Vec<Document>,
-    resolved: HashSet<OwnedEventId>,
-}
-
-async fn save_room(
-    client: &matrix_sdk::Client,
-    room_id: &OwnedRoomId,
-    mut flush: persist::Flush,
-) -> Result<Saved, Box<persist::Flush>> {
-    let mut sizes = HashMap::new();
-    for (chunk, stored) in &flush.chunks {
-        let Some(bytes) = persist::write_chunk(client, room_id, *chunk, stored).await else {
-            return Err(Box::new(flush));
-        };
-        sizes.insert(*chunk, (bytes, stored.documents.len()));
-    }
-    apply_sizes(&mut flush.manifest, &sizes, &[]);
-    if !persist::write_manifest(client, room_id, &flush.manifest).await {
-        return Err(Box::new(flush));
-    }
-
-    let redactions: HashSet<OwnedEventId> =
-        flush.manifest.pending_redactions.iter().cloned().collect();
-    let edits = flush.manifest.pending_edits.clone();
-    let mut targets: Vec<ChunkId> = flush.cold.iter().map(|(chunk, _)| *chunk).collect();
-    for chunk in &flush.scan {
-        if !targets.contains(chunk) {
-            targets.push(*chunk);
-        }
-    }
-
-    let mut resolved = HashSet::new();
-    let mut lost = Vec::new();
-    let mut merged = Vec::new();
-    for chunk in targets {
-        let mut stored = match persist::load_chunk(client, room_id, chunk).await {
-            persist::ChunkRead::Found(stored) => stored,
-            persist::ChunkRead::Missing => {
-                lost.push(chunk);
-                continue;
-            }
-            persist::ChunkRead::Unreadable => return Err(Box::new(flush)),
-        };
-        let patch = flush
-            .cold
-            .iter()
-            .find(|(id, _)| *id == chunk)
-            .map(|(_, patch)| patch);
-        if merge_cold(&mut stored, patch, &redactions, &edits, &mut resolved) {
-            let Some(bytes) = persist::write_chunk(client, room_id, chunk, &stored).await else {
-                return Err(Box::new(flush));
-            };
-            sizes.insert(chunk, (bytes, stored.documents.len()));
-        }
-        if patch.is_some() {
-            merged.push(chunk);
-        }
-    }
-
-    if !merged.is_empty() || !lost.is_empty() || !redactions.is_empty() || !edits.is_empty() {
-        apply_sizes(&mut flush.manifest, &sizes, &lost);
-        flush.manifest.pending_redactions.clear();
-        flush.manifest.pending_edits.clear();
-        if !persist::write_manifest(client, room_id, &flush.manifest).await {
-            return Err(Box::new(flush));
-        }
-    }
-    for chunk in &flush.removed {
-        persist::remove_chunk(client, room_id, *chunk).await;
-    }
-    if flush.legacy {
-        persist::remove_legacy(client, room_id).await;
-    }
-
-    Ok(Saved {
-        sizes,
-        lost,
-        removed: flush.removed,
-        merged,
-        redactions,
-        edits,
-        resolved,
-    })
-}
-
-fn apply_sizes(
-    manifest: &mut persist::Manifest,
-    sizes: &HashMap<ChunkId, (usize, usize)>,
-    lost: &[ChunkId],
-) {
-    manifest.chunks.retain(|entry| !lost.contains(&entry.id));
-    for entry in &mut manifest.chunks {
-        if let Some((bytes, count)) = sizes.get(&entry.id) {
-            entry.bytes = *bytes;
-            entry.count = *count;
-        }
-    }
-}
-
-fn merge_cold(
-    stored: &mut persist::StoredChunk,
-    patch: Option<&persist::StoredChunk>,
-    redactions: &HashSet<OwnedEventId>,
-    edits: &[Document],
-    resolved: &mut HashSet<OwnedEventId>,
-) -> bool {
-    let mut changed = false;
-    if let Some(patch) = patch {
-        let mut position: HashMap<OwnedEventId, usize> = stored
-            .documents
-            .iter()
-            .enumerate()
-            .map(|(index, document)| (document.event_id.clone(), index))
-            .collect();
-        for overlay in &patch.documents {
-            if let Some(&index) = position.get(&overlay.event_id) {
-                if let Some(disk) = stored.documents.get_mut(index) {
-                    *disk = adopt_edit(overlay.clone(), Some(disk));
-                }
-            } else {
-                position.insert(overlay.event_id.clone(), stored.documents.len());
-                stored.documents.push(overlay.clone());
-            }
-            changed = true;
-        }
-        let known: HashSet<OwnedEventId> = stored
-            .classified
-            .iter()
-            .map(|(event_id, _)| event_id.clone())
-            .collect();
-        for (event_id, ts) in &patch.classified {
-            if !known.contains(event_id) {
-                stored.classified.push((event_id.clone(), *ts));
-                changed = true;
-            }
-        }
-    }
-
-    let before = stored.documents.len();
-    stored
-        .documents
-        .retain(|document| !redactions.contains(&document.event_id));
-    changed |= stored.documents.len() != before;
-
-    for edit in edits {
-        if let Some(disk) = stored
-            .documents
-            .iter_mut()
-            .find(|document| document.event_id == edit.event_id)
-        {
-            *disk = adopt_edit(disk.clone(), Some(edit));
-            resolved.insert(edit.event_id.clone());
-            changed = true;
-        }
-    }
-    changed
-}
-
-fn document_bytes(document: &Document) -> usize {
-    let media: usize = document
-        .media
-        .iter()
-        .map(|(_, content)| match content {
-            RoomAttachmentContentView::Image {
-                filename,
-                source,
-                blurhash,
-                thumbnail,
-                ..
-            }
-            | RoomAttachmentContentView::Video {
-                filename,
-                source,
-                blurhash,
-                thumbnail,
-                ..
-            } => {
-                filename.len()
-                    + source.len()
-                    + blurhash.as_ref().map_or(0, String::len)
-                    + thumbnail.as_ref().map_or(0, String::len)
-            }
-            RoomAttachmentContentView::File {
-                filename, source, ..
-            } => filename.len() + source.len(),
-            RoomAttachmentContentView::Link { urls, body } => {
-                body.len() + urls.iter().map(String::len).sum::<usize>()
-            }
-        })
-        .sum();
-    DOCUMENT_OVERHEAD + document.body.len() * 2 + media
-}
-
-struct ChunkPiece {
-    start: u64,
-    documents: Vec<Document>,
-    classified: Vec<(OwnedEventId, u64)>,
-}
-
-fn split_chunk(
-    start: u64,
-    documents: Vec<Document>,
-    classified: Vec<(OwnedEventId, u64)>,
-) -> Vec<ChunkPiece> {
-    let mut weights: Vec<(u64, usize)> = documents
-        .iter()
-        .map(|document| (document.origin_server_ts, DOCUMENT_WEIGHT))
-        .chain(classified.iter().map(|(_, ts)| (*ts, 1)))
-        .collect();
-    if weights.iter().map(|(_, weight)| weight).sum::<usize>() <= CHUNK_WEIGHT * 2 {
-        return vec![ChunkPiece {
-            start,
-            documents,
-            classified,
-        }];
-    }
-    weights.sort_unstable();
-
-    let mut starts = vec![start];
-    let mut held = 0;
-    for pair in weights.windows(2) {
-        let &[(ts, weight), (next, _)] = pair else {
-            continue;
-        };
-        held += weight;
-        if held >= CHUNK_WEIGHT && next > ts {
-            starts.push(next);
-            held = 0;
-        }
-    }
-
-    let piece_of = |ts: u64| {
-        starts
-            .partition_point(|&start| start <= ts)
-            .saturating_sub(1)
-    };
-    let mut pieces: Vec<ChunkPiece> = starts
-        .iter()
-        .map(|&start| ChunkPiece {
-            start,
-            documents: Vec::new(),
-            classified: Vec::new(),
-        })
-        .collect();
-    for document in documents {
-        if let Some(piece) = pieces.get_mut(piece_of(document.origin_server_ts)) {
-            piece.documents.push(document);
-        }
-    }
-    for (event_id, ts) in classified {
-        if let Some(piece) = pieces.get_mut(piece_of(ts)) {
-            piece.classified.push((event_id, ts));
-        }
-    }
-    pieces
-}
-
 fn by_rank(left: &Ranked<'_>, right: &Ranked<'_>) -> std::cmp::Ordering {
     right
         .score
@@ -2739,7 +2475,7 @@ mod tests {
         .expect("search index caught up");
     }
 
-    fn document(
+    pub(super) fn document(
         seed: &str,
         body: &str,
         sender: &str,
@@ -4223,49 +3959,6 @@ mod tests {
     }
 
     #[test]
-    fn test_merging_into_a_cold_chunk_keeps_one_copy_and_purges_redactions() {
-        let mut stored = super::persist::StoredChunk::new(
-            vec![
-                document("kept", "old body", "@erwan:localhost", 1, None, Vec::new()),
-                document("gone", "secret", "@erwan:localhost", 2, None, Vec::new()),
-            ],
-            vec![(event_id!("$kept").to_owned(), 1)],
-        );
-        let overlay = super::persist::StoredChunk::new(
-            vec![document(
-                "kept",
-                "old body",
-                "@erwan:localhost",
-                1,
-                None,
-                Vec::new(),
-            )],
-            vec![
-                (event_id!("$kept").to_owned(), 1),
-                (event_id!("$reaction").to_owned(), 1),
-            ],
-        );
-        let redactions = [event_id!("$gone").to_owned()].into_iter().collect();
-        let mut resolved = std::collections::HashSet::new();
-
-        assert!(super::merge_cold(
-            &mut stored,
-            Some(&overlay),
-            &redactions,
-            &[],
-            &mut resolved
-        ));
-
-        let ids: Vec<String> = stored
-            .documents
-            .iter()
-            .map(|document| document.event_id.to_string())
-            .collect();
-        assert_eq!(ids, ["$kept"]);
-        assert_eq!(stored.classified.len(), 2);
-    }
-
-    #[test]
     fn test_a_cold_chunk_with_nothing_left_to_scan_finds_nothing() {
         let room = room_id!("!room:localhost").to_owned();
         let mut index = MessageIndex::new();
@@ -4284,46 +3977,6 @@ mod tests {
 
         assert!(hits.is_empty());
         assert_eq!(total, 0);
-    }
-
-    #[test]
-    fn test_a_pending_edit_lands_on_the_stored_original() {
-        let mut stored = super::persist::StoredChunk::new(
-            vec![document(
-                "original",
-                "typo",
-                "@erwan:localhost",
-                5,
-                None,
-                Vec::new(),
-            )],
-            Vec::new(),
-        );
-        let mut edit = document(
-            "original",
-            "fixed",
-            "@erwan:localhost",
-            900,
-            None,
-            Vec::new(),
-        );
-        edit.edited_at = Some(900);
-        let mut resolved = std::collections::HashSet::new();
-
-        super::merge_cold(
-            &mut stored,
-            None,
-            &std::collections::HashSet::new(),
-            &[edit],
-            &mut resolved,
-        );
-
-        let [original] = stored.documents.as_slice() else {
-            panic!("one document");
-        };
-        assert_eq!(original.body, "fixed");
-        assert_eq!(original.origin_server_ts, 5);
-        assert!(resolved.contains(event_id!("$original")));
     }
 
     #[async_test]
