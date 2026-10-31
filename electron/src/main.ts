@@ -127,7 +127,8 @@ function setFeatures(enable: string[], disable: string[]): void {
 }
 
 if (!settings.hardwareAcceleration) app.disableHardwareAcceleration();
-const enabledFeatures = isLinux ? ['WebRtcPipeWireCamera'] : [];
+// In Flatpak a denied camera portal request leaves enumerateDevices() pending forever.
+const enabledFeatures = isLinux && !process.env.FLATPAK_ID ? ['WebRtcPipeWireCamera'] : [];
 if (settings.hardwareAcceleration && settings.hardwareVideoAcceleration) {
   enabledFeatures.push('AcceleratedVideoEncoder', 'AcceleratedVideoDecoder');
   if (isLinux) {
