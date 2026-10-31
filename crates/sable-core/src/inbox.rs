@@ -242,8 +242,8 @@ pub(crate) async fn receipt_ts(room: &Room) -> matrix_sdk::Result<u64> {
 }
 
 /// The thread's own receipts, which the room's main receipt does not cover.
-async fn thread_receipt_ts(room: &Room, root: &OwnedEventId) -> u64 {
-    let thread = ReceiptThread::Thread(root.clone());
+async fn thread_receipt_ts(room: &Room, thread_root: &OwnedEventId) -> u64 {
+    let thread = ReceiptThread::Thread(thread_root.clone());
     let mut latest = 0;
     for receipt_type in [ReceiptType::Read, ReceiptType::ReadPrivate] {
         let Ok(Some((event_id, _))) = room
@@ -575,18 +575,23 @@ impl Core {
             };
             entry.is_direct = *direct;
             let unread = match &entry.thread_root {
-                Some(root) => {
-                    if !threads.contains_key(root) {
+                Some(thread_root) => {
+                    let thread_read_ts = if let Some(ts) = threads.get(thread_root) {
+                        *ts
+                    } else {
                         let ts = match client.get_room(&entry.room_id) {
                             Some(room) => {
-                                self.with_open_stores(async || thread_receipt_ts(&room, root).await)
-                                    .await
+                                self.with_open_stores(async || {
+                                    thread_receipt_ts(&room, thread_root).await
+                                })
+                                .await
                             }
                             None => 0,
                         };
-                        threads.insert(root.clone(), ts);
-                    }
-                    entry.ts > read.receipt_ts.max(threads[root])
+                        threads.insert(thread_root.clone(), ts);
+                        ts
+                    };
+                    entry.ts > read.receipt_ts.max(thread_read_ts)
                 }
                 None => is_unread(&entry, read),
             };
