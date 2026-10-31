@@ -60,6 +60,7 @@ futures-util = "0.3"
 tracing = { version = "0.1", features = ["release_max_level_debug"] }
 url = "2"
 thiserror = "2"
+parking_lot = "0.12"
 specta = { version = "=2.0.0-rc.27", features = ["derive"] }
 specta-serde = "=0.0.14"
 specta-typescript = "=0.0.14"

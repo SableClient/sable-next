@@ -90,7 +90,7 @@ async fn stripped_invite_notifies_without_an_invented_event_id() {
         assert_eq!(view.sender_name.as_deref(), Some("Alice"));
         assert_eq!(view.body, "invited you");
         assert!(view.is_direct);
-        core.session_tasks.lock().unwrap().clear();
+        core.session_tasks.lock().clear();
         core.watch_notifications(
             &client,
             core.session_generation
@@ -98,7 +98,7 @@ async fn stripped_invite_notifies_without_an_invented_event_id() {
         )
         .await;
     }
-    core.session_tasks.lock().unwrap().clear();
+    core.session_tasks.lock().clear();
 }
 
 #[tokio::test]
@@ -139,7 +139,7 @@ async fn a_replayed_invite_alerts_once() {
         .await;
     assert_eq!(next_notification(&mut events).await.room_id, fresh);
     assert_eq!(next_notification(&mut events).await.room_id, after);
-    core.session_tasks.lock().unwrap().clear();
+    core.session_tasks.lock().clear();
 }
 
 #[tokio::test]
@@ -229,7 +229,7 @@ async fn a_replayed_message_alerts_once() {
         Some("$two".to_owned()),
         "the replayed event must not alert a second time"
     );
-    core.session_tasks.lock().unwrap().clear();
+    core.session_tasks.lock().clear();
 }
 
 #[tokio::test]
@@ -303,7 +303,7 @@ async fn a_message_delivered_late_by_a_resumed_sync_does_not_alert() {
         Some("$live".to_owned()),
         "a message from before the gap is a catch-up, not an arrival"
     );
-    core.session_tasks.lock().unwrap().clear();
+    core.session_tasks.lock().clear();
 }
 
 #[tokio::test]
@@ -437,7 +437,7 @@ async fn bridge_status_events_do_not_notify() {
         notification.event_id.as_deref(),
         Some(event_id!("$message"))
     );
-    core.session_tasks.lock().unwrap().clear();
+    core.session_tasks.lock().clear();
 }
 
 #[tokio::test]
@@ -507,7 +507,7 @@ async fn a_message_alerts_when_the_server_reports_no_counts() {
             .map(|event_id| event_id.to_string()),
         Some("$fresh".to_owned())
     );
-    core.session_tasks.lock().unwrap().clear();
+    core.session_tasks.lock().clear();
 }
 
 #[tokio::test]
@@ -621,7 +621,7 @@ async fn sticker_notifications_do_not_block_sync_or_reappear_after_reading() {
             );
             assert_eq!(view.body, "sent a sticker");
         }
-        core.session_tasks.lock().unwrap().clear();
+        core.session_tasks.lock().clear();
     }
 }
 
@@ -980,5 +980,5 @@ async fn resetting_a_bridged_dm_to_default_does_not_create_a_room_push_rule() {
             .unwrap();
         assert_eq!(settings.room, Some(NotificationModeView::All));
     }
-    core.session_tasks.lock().unwrap().clear();
+    core.session_tasks.lock().clear();
 }

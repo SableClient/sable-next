@@ -31,7 +31,6 @@ impl Core {
         let download = self
             .key_backup_download
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .as_ref()
             .filter(|download| download.account_id == account_id)
             .cloned();
@@ -86,12 +85,7 @@ impl Core {
                 );
             })
             .await;
-        let mut download = self
-            .key_backup_download
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone()
-            .unwrap_or(initial);
+        let mut download = self.key_backup_download.lock().clone().unwrap_or(initial);
         download.state = if result.is_ok() {
             KeyBackupDownloadState::Complete
         } else {
@@ -212,10 +206,7 @@ impl Core {
         if self.session_generation.load(Ordering::SeqCst) != generation {
             return;
         }
-        *self
-            .key_backup_download
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(download.clone());
+        *self.key_backup_download.lock() = Some(download.clone());
         self.emit_if_current(generation, CoreEvent::KeyBackupDownload { download });
     }
 }

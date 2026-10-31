@@ -28,7 +28,7 @@ use crate::search::ignored_user_ids;
 use crate::spaces::{self, SidebarSpacesEvent};
 
 type NotificationSender = tokio::sync::mpsc::UnboundedSender<(Notification, matrix_sdk::Room)>;
-pub(crate) type NotificationRoute = Arc<std::sync::Mutex<Option<NotificationSender>>>;
+pub(crate) type NotificationRoute = Arc<parking_lot::Mutex<Option<NotificationSender>>>;
 
 struct NotificationWorkerRoute {
     route: NotificationRoute,
@@ -37,10 +37,7 @@ struct NotificationWorkerRoute {
 
 impl Drop for NotificationWorkerRoute {
     fn drop(&mut self) {
-        let mut route = self
-            .route
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut route = self.route.lock();
         if route
             .as_ref()
             .is_some_and(|sender| sender.same_channel(&self.sender))
@@ -182,15 +179,11 @@ impl Core {
                     reason = "the WASM core is single-threaded"
                 )
             )]
-            let route: NotificationRoute = Arc::new(std::sync::Mutex::new(None));
+            let route: NotificationRoute = Arc::new(parking_lot::Mutex::new(None));
             let handler_route = route.clone();
             client
                 .register_notification_handler(move |notification, room, _| {
-                    if let Some(sender) = handler_route
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)
-                        .as_ref()
-                    {
+                    if let Some(sender) = handler_route.lock().as_ref() {
                         let _ = sender.send((notification, room));
                     }
                     async {}
@@ -199,9 +192,7 @@ impl Core {
             routes.insert(account_id, route.clone());
             route
         };
-        *route
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(sender.clone());
+        *route.lock() = Some(sender.clone());
         let redecrypted = sender.clone();
         let route_guard = NotificationWorkerRoute { route, sender };
         drop(routes);

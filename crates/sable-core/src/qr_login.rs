@@ -2,7 +2,7 @@ use crate::api::auth::QrCheckCodeParams;
 use crate::api::auth::QrGrantContinueParams;
 use crate::api::auth::StartQrGrantParams;
 use crate::api::auth::StartQrLoginParams;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use futures_util::{Stream, StreamExt, pin_mut};
 use matrix_sdk::authentication::oauth::qrcode::{
@@ -21,37 +21,25 @@ use crate::{Core, Task};
 
 #[derive(Default)]
 pub(crate) struct QrSlots {
-    check_code: std::sync::Mutex<Option<CheckCodeSender>>,
-    continuation: std::sync::Mutex<Option<ContinuationMessageSender>>,
+    check_code: parking_lot::Mutex<Option<CheckCodeSender>>,
+    continuation: parking_lot::Mutex<Option<ContinuationMessageSender>>,
 }
 
 impl QrSlots {
     fn set_check_code(&self, sender: CheckCodeSender) {
-        *self
-            .check_code
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Some(sender);
+        *self.check_code.lock() = Some(sender);
     }
 
     fn set_continuation(&self, sender: ContinuationMessageSender) {
-        *self
-            .continuation
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Some(sender);
+        *self.continuation.lock() = Some(sender);
     }
 
     fn take_check_code(&self) -> Option<CheckCodeSender> {
-        self.check_code
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .take()
+        self.check_code.lock().take()
     }
 
     fn take_continuation(&self) -> Option<ContinuationMessageSender> {
-        self.continuation
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .take()
+        self.continuation.lock().take()
     }
 }
 

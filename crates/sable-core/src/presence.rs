@@ -50,17 +50,11 @@ fn presence_filter() -> FilterDefinition {
 
 impl Core {
     pub(crate) fn desired_presence(&self) -> PresenceView {
-        *self
-            .desired_presence
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        *self.desired_presence.lock()
     }
 
     pub(crate) fn set_desired_presence(&self, presence: PresenceView) {
-        *self
-            .desired_presence
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = presence;
+        *self.desired_presence.lock() = presence;
     }
 
     pub(crate) fn watch_presence(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {

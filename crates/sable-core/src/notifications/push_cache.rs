@@ -1,6 +1,7 @@
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, Mutex, PoisonError};
+use std::sync::{Arc, LazyLock};
 
 use matrix_sdk::store::RoomLoadSettings;
 use tokio::sync::OwnedMutexGuard;
@@ -52,7 +53,7 @@ pub(super) async fn cold_host(
     device_id: &str,
 ) -> Option<ColdHost> {
     let slot = {
-        let mut cache = CACHE.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut cache = CACHE.lock();
         // Checked under the lock `Core::new` takes to evict, so a store is never cached once a core owns it.
         if crate::Core::owning(store_dir).is_some() {
             None
@@ -91,8 +92,5 @@ pub(super) async fn cold_host(
 /// A push still running on an evicted client finishes with it.
 pub fn evict(store_dir: &Path) {
     let store_dir = canonical(store_dir);
-    CACHE
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .retain(|key, _| key.store_dir != store_dir);
+    CACHE.lock().retain(|key, _| key.store_dir != store_dir);
 }

@@ -4106,7 +4106,7 @@ mod tests {
             )
             .await;
         wait_for_hits(&core, &room_id, "subsequent", 1).await;
-        core.session_tasks.lock().unwrap().clear();
+        core.session_tasks.lock().clear();
     }
 
     #[async_test]

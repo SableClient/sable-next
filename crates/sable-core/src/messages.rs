@@ -581,12 +581,7 @@ impl Core {
         if let Some(events) = room.pinned_event_ids() {
             return Ok(unique_pins(events));
         }
-        if let Some(events) = self
-            .probed_pinned_rooms
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .get(room_id)
-        {
+        if let Some(events) = self.probed_pinned_rooms.lock().get(room_id) {
             return Ok(events.clone());
         }
         let events = self.load_pinned(&room, "pinned_events").await?;
@@ -628,7 +623,6 @@ impl Core {
     fn remember_pinned(&self, room_id: &OwnedRoomId, events: &[OwnedEventId]) {
         self.probed_pinned_rooms
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .insert(room_id.clone(), events.to_vec());
     }
 
@@ -873,12 +867,7 @@ impl Core {
     }
 
     pub(crate) async fn watch_pinned(&self, room_id: &OwnedRoomId) {
-        if self
-            .pinned_caches
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .contains_key(room_id)
-        {
+        if self.pinned_caches.lock().contains_key(room_id) {
             return;
         }
         let Ok(room) = self.room(room_id).await else {
@@ -890,10 +879,7 @@ impl Core {
         };
         match event_cache.pinned_events(room_id).await {
             Ok(entry) => {
-                self.pinned_caches
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .insert(room_id.clone(), entry);
+                self.pinned_caches.lock().insert(room_id.clone(), entry);
             }
             Err(error) => tracing::debug!(%room_id, "pinned events cache unavailable: {error}"),
         }
@@ -906,7 +892,6 @@ impl Core {
         let cache = self
             .pinned_caches
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .get(room_id)
             .map(|(cache, _)| cache.clone());
         let Some(cache) = cache else {
@@ -1388,7 +1373,8 @@ mod tests {
         );
         assert!(super::edit_version(&utd, false).is_none());
     }
-    use std::sync::{Arc, Mutex};
+    use parking_lot::Mutex;
+    use std::sync::Arc;
 
     use matrix_sdk::{
         ruma::{event_id, room_id, user_id},
@@ -1983,7 +1969,7 @@ mod tests {
                         "/_matrix/client/v3/rooms/{room}/send/m.room.message/.*"
                     )))
                     .respond_with(move |request: &wiremock::Request| {
-                        *write.lock().unwrap() = serde_json::from_slice(&request.body).unwrap();
+                        *write.lock() = serde_json::from_slice(&request.body).unwrap();
                         ResponseTemplate::new(200).set_body_json(json!({"event_id": "$edited"}))
                     })
                     .expect(1)
@@ -2007,13 +1993,13 @@ mod tests {
                 .await
                 .unwrap();
                 tokio::time::timeout(std::time::Duration::from_secs(2), async {
-                    while sent.lock().unwrap().is_null() {
+                    while sent.lock().is_null() {
                         tokio::task::yield_now().await;
                     }
                 })
                 .await
                 .unwrap();
-                let sent = sent.lock().unwrap();
+                let sent = sent.lock();
                 assert_eq!(sent["m.new_content"][field], json!([]));
                 assert_eq!(
                     sent["m.new_content"]["body"],
@@ -2035,7 +2021,7 @@ mod tests {
         Mock::given(method("GET"))
             .and(path(endpoint.clone()))
             .respond_with(move |_: &wiremock::Request| {
-                ResponseTemplate::new(200).set_body_json(read_pins.lock().unwrap().clone())
+                ResponseTemplate::new(200).set_body_json(read_pins.lock().clone())
             })
             .mount(server.server())
             .await;
@@ -2043,8 +2029,7 @@ mod tests {
         Mock::given(method("PUT"))
             .and(path(endpoint))
             .respond_with(move |request: &wiremock::Request| {
-                *write_pins.lock().unwrap() =
-                    serde_json::from_slice::<Value>(&request.body).unwrap();
+                *write_pins.lock() = serde_json::from_slice::<Value>(&request.body).unwrap();
                 ResponseTemplate::new(200).set_body_json(json!({"event_id": "$pins"}))
             })
             .expect(2)
@@ -2061,7 +2046,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(result, vec![event_id!("$old")]);
-        assert_eq!(*pins.lock().unwrap(), json!({"pinned": ["$old"]}));
+        assert_eq!(*pins.lock(), json!({"pinned": ["$old"]}));
     }
 
     #[tokio::test]
@@ -2095,7 +2080,7 @@ mod tests {
         Mock::given(method("PUT"))
             .and(path(endpoint))
             .respond_with(move |request: &wiremock::Request| {
-                *write.lock().unwrap() = serde_json::from_slice::<Value>(&request.body).unwrap();
+                *write.lock() = serde_json::from_slice::<Value>(&request.body).unwrap();
                 ResponseTemplate::new(200).set_body_json(json!({"event_id": "$pins"}))
             })
             .expect(1)
@@ -2105,10 +2090,7 @@ mod tests {
         core.set_pinned(&room_id.to_owned(), event_id!("$d").to_owned(), true)
             .await
             .unwrap();
-        assert_eq!(
-            *sent.lock().unwrap(),
-            json!({"pinned": ["$a", "$b", "$c", "$d"]})
-        );
+        assert_eq!(*sent.lock(), json!({"pinned": ["$a", "$b", "$c", "$d"]}));
     }
 
     #[tokio::test]

@@ -262,7 +262,7 @@ impl Core {
             ),
         };
         fill_sender_profiles(&room, &timeline);
-        let overlay = Arc::new(std::sync::Mutex::new(TimelineOverlay::default()));
+        let overlay = Arc::new(parking_lot::Mutex::new(TimelineOverlay::default()));
 
         // The SDK replaces its explicit-room set wholesale. Register before
         // computing the union so concurrent live subscriptions see each other.
@@ -316,10 +316,7 @@ impl Core {
             })
             .collect();
         // Seeded before the stream starts, so its diffs apply to this snapshot.
-        let items = overlay
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .reset(items);
+        let items = overlay.lock().reset(items);
         let core = self.clone();
         let stream_user_id = own_user_id.clone();
         let stream_room = room.clone();
@@ -355,9 +352,7 @@ impl Core {
                                 &highlights,
                                 &stream_content,
                             );
-                            let mut overlay = stream_overlay
-                                .lock()
-                                .unwrap_or_else(std::sync::PoisonError::into_inner);
+                            let mut overlay = stream_overlay.lock();
                             if let Some(index) = overlay.index_of_event(&target) {
                                 core.emit(CoreEvent::TimelineDiff {
                                     subscription,
@@ -410,9 +405,7 @@ impl Core {
                         })
                     })
                     .collect();
-                let mut overlay = stream_overlay
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let mut overlay = stream_overlay.lock();
                 core.emit(CoreEvent::TimelineDiff {
                     subscription,
                     diffs: diffs.into_iter().map(|diff| overlay.apply(diff)).collect(),
@@ -545,9 +538,7 @@ impl Core {
             let Some(overlay) = entry.overlay.as_ref().filter(|_| room == room_id) else {
                 continue;
             };
-            let mut overlay = overlay
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut overlay = overlay.lock();
             let diffs = change(&mut overlay);
             if !diffs.is_empty() {
                 self.emit(CoreEvent::TimelineDiff {
@@ -671,10 +662,7 @@ impl Core {
     }
 
     fn remember_warm(&self, room_id: OwnedRoomId) {
-        let mut warm = self
-            .warm_rooms
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut warm = self.warm_rooms.lock();
         warm.retain(|warmed| *warmed != room_id);
         warm.push_back(room_id);
         while warm.len() > MAX_WARM_ROOMS {
@@ -703,13 +691,7 @@ impl Core {
                 | SubscriptionKind::FocusedTimeline(room_id) => Some(room_id.clone()),
                 SubscriptionKind::Other => None,
             })
-            .chain(
-                self.warm_rooms
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .iter()
-                    .cloned(),
-            )
+            .chain(self.warm_rooms.lock().iter().cloned())
             .collect::<std::collections::BTreeSet<_>>();
         drop(subscriptions);
         if room_ids == *subscribed {

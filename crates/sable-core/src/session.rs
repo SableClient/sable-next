@@ -694,16 +694,15 @@ pub(crate) type SharedBaseClient = std::sync::Arc<matrix_sdk_base::BaseClient>;
 
 #[cfg(not(target_family = "wasm"))]
 static BASE_CLIENTS: std::sync::LazyLock<
-    std::sync::Mutex<
+    parking_lot::Mutex<
         std::collections::HashMap<String, std::sync::Weak<matrix_sdk_base::BaseClient>>,
     >,
-> = std::sync::LazyLock::new(std::sync::Mutex::default);
+> = std::sync::LazyLock::new(parking_lot::Mutex::default);
 
 #[cfg(not(target_family = "wasm"))]
 fn register_base_client(store_id: &str, base: SharedBaseClient, client: &Client) {
     BASE_CLIENTS
         .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .insert(store_id.to_owned(), std::sync::Arc::downgrade(&base));
     client.add_event_handler(
         move |_: matrix_sdk::ruma::events::dummy::ToDeviceDummyEvent| {
@@ -742,11 +741,7 @@ pub(crate) fn base_client(store_id: &str) -> Option<SharedBaseClient> {
 
 #[cfg(not(target_family = "wasm"))]
 pub(crate) fn base_client(store_id: &str) -> Option<SharedBaseClient> {
-    BASE_CLIENTS
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .get(store_id)?
-        .upgrade()
+    BASE_CLIENTS.lock().get(store_id)?.upgrade()
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -765,18 +760,13 @@ pub(crate) fn store_lease(_store_id: &str) -> std::future::Ready<StoreLease> {
 #[cfg(not(target_family = "wasm"))]
 pub(crate) async fn store_lease(store_id: &str) -> StoreLease {
     static LEASES: std::sync::LazyLock<
-        std::sync::Mutex<
+        parking_lot::Mutex<
             std::collections::HashMap<std::path::PathBuf, Arc<tokio::sync::Mutex<()>>>,
         >,
-    > = std::sync::LazyLock::new(std::sync::Mutex::default);
+    > = std::sync::LazyLock::new(parking_lot::Mutex::default);
 
     let store = std::fs::canonicalize(store_id).unwrap_or_else(|_| store_id.into());
-    let lease = LEASES
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .entry(store)
-        .or_default()
-        .clone();
+    let lease = LEASES.lock().entry(store).or_default().clone();
     lease.lock_owned().await
 }
 

@@ -457,9 +457,9 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
             })))
             .mount(server.server())
             .await;
-        let updates = std::sync::Mutex::new(Vec::new());
+        let updates = parking_lot::Mutex::new(Vec::new());
         let result = core
-            .download_all_room_keys(&client, |update| updates.lock().unwrap().push(update))
+            .download_all_room_keys(&client, |update| updates.lock().push(update))
             .await
             .unwrap();
         assert_eq!(
@@ -471,13 +471,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
             ),
             (103, 103, 102, 1)
         );
-        assert!(
-            updates
-                .lock()
-                .unwrap()
-                .iter()
-                .any(|update| update.processed == 100)
-        );
+        assert!(updates.lock().iter().any(|update| update.processed == 100));
         assert_eq!(session_ids(&client).await.len(), 102);
         let status = core.backup_status(&client).await.unwrap();
         assert_eq!(

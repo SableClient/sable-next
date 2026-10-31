@@ -159,10 +159,8 @@ impl ProbedState {
 }
 
 impl crate::Core {
-    pub(crate) fn probed_state(&self) -> std::sync::MutexGuard<'_, ProbedState> {
-        self.probed_state
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    pub(crate) fn probed_state(&self) -> parking_lot::MutexGuard<'_, ProbedState> {
+        self.probed_state.lock()
     }
 }
 
@@ -264,10 +262,8 @@ impl crate::Core {
         self.recent_state().members.remove(room_id);
     }
 
-    fn recent_state(&self) -> std::sync::MutexGuard<'_, RecentState> {
-        self.recent_state
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    fn recent_state(&self) -> parking_lot::MutexGuard<'_, RecentState> {
+        self.recent_state.lock()
     }
 }
 

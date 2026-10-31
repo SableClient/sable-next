@@ -210,7 +210,7 @@ async fn deployed_non_sticky_invites_reach_the_call_handler_and_push_validation(
             .query_pairs()
             .any(|(key, _)| key.contains("sticky"))
     );
-    core.session_tasks.lock().unwrap().clear();
+    core.session_tasks.lock().clear();
 }
 
 #[tokio::test]
@@ -314,7 +314,7 @@ async fn sticky_only_invites_are_cancelled_by_withdrawals_and_cross_device_actio
             matches!(incoming_event(&mut events, &format!("{action}: ended")).await, CoreEvent::IncomingCallEnded { notification_event_id } if notification_event_id == id)
         );
     }
-    core.session_tasks.lock().unwrap().clear();
+    core.session_tasks.lock().clear();
 }
 
 #[tokio::test]

@@ -3095,14 +3095,11 @@ async fn markdown_to_content_needs_no_session() {
 /// An account-data event the server stores, served back slowly enough that two
 /// unguarded read-modify-writes would both read the empty document.
 #[derive(Clone, Default)]
-struct StoredAccountData(Arc<std::sync::Mutex<Option<serde_json::Value>>>);
+struct StoredAccountData(Arc<parking_lot::Mutex<Option<serde_json::Value>>>);
 
 impl wiremock::Respond for StoredAccountData {
     fn respond(&self, request: &wiremock::Request) -> ResponseTemplate {
-        let mut stored = self
-            .0
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut stored = self.0.lock();
         if request.method == wiremock::http::Method::PUT {
             *stored = request.body_json().ok();
             return ResponseTemplate::new(200).set_body_json(json!({}));
@@ -3146,11 +3143,7 @@ async fn invites_dismissed_at_once_are_all_kept() {
     );
     assert!(first.is_ok() && second.is_ok());
 
-    let kept = stored
-        .0
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .clone();
+    let kept = stored.0.lock().clone();
     assert_eq!(
         kept,
         Some(json!({"roomIds": ["!first:example.org", "!second:example.org"]}))

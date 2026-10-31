@@ -404,18 +404,13 @@ impl Core {
     }
 
     fn cosmetics_fetch_lock(&self, room_id: &RoomId) -> Arc<tokio::sync::Mutex<()>> {
-        let mut locks = self
-            .cosmetics_fetches
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut locks = self.cosmetics_fetches.lock();
         locks.retain(|_, lock| Arc::strong_count(lock) > 1);
         locks.entry(room_id.to_owned()).or_default().clone()
     }
 
-    fn cosmetics_cache(&self) -> std::sync::MutexGuard<'_, CosmeticsCache> {
-        self.cosmetics
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    fn cosmetics_cache(&self) -> parking_lot::MutexGuard<'_, CosmeticsCache> {
+        self.cosmetics.lock()
     }
 
     pub(crate) fn note_cosmetic_state(

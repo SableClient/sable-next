@@ -177,11 +177,7 @@ impl Core {
         let mut probe = None;
         if let Some((server, media_id)) = &origin {
             let now = now_ms();
-            let admission = self
-                .media_health
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .admit(server, media_id, now);
+            let admission = self.media_health.lock().admit(server, media_id, now);
             match admission {
                 Admission::Refused { retry_after_ms } => {
                     tracing::warn!(
@@ -216,10 +212,7 @@ impl Core {
             );
         }
         if let Some((server, media_id)) = &origin {
-            let mut health = self
-                .media_health
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut health = self.media_health.lock();
             match &result {
                 Ok(_) => health.succeeded(server, media_id),
                 Err(error) if is_not_found(error) => {
@@ -832,11 +825,7 @@ struct ProbeGuard<'a> {
 impl Drop for ProbeGuard<'_> {
     fn drop(&mut self) {
         if self.armed {
-            self.core
-                .media_health
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .abandoned(self.server);
+            self.core.media_health.lock().abandoned(self.server);
         }
     }
 }

@@ -1347,11 +1347,7 @@ mod server_tests {
             .expect("cached");
         assert_eq!(cached.packs.len(), 1);
 
-        *core
-            .recent_state
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            crate::probed_state::RecentState::default();
+        *core.recent_state.lock() = crate::probed_state::RecentState::default();
         let _state = Mock::given(method("GET"))
             .and(path_regex(ROOM_STATE_PATH))
             .respond_with(ResponseTemplate::new(500))

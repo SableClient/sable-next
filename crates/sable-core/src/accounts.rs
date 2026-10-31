@@ -753,10 +753,7 @@ impl Core {
         self.account_clients.lock().await.remove(account_id);
         let route = self.notification_routes.lock().await.remove(account_id);
         if let Some(route) = route {
-            route
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .take();
+            route.lock().take();
         }
     }
 
@@ -920,20 +917,11 @@ impl Core {
             self.flush_search_index(&client).await;
         }
         let mut session = self.session.write().await;
-        self.session_handlers
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clear();
-        self.session_tasks
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clear();
+        self.session_handlers.lock().clear();
+        self.session_tasks.lock().clear();
         self.subscriptions.lock().await.clear();
         self.room_subscriptions.lock().await.clear();
-        self.warm_rooms
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clear();
+        self.warm_rooms.lock().clear();
         self.timelines.lock().await.clear();
         self.thread_timelines.lock().await.clear();
         self.account_data_types.lock().await.clear();
@@ -941,25 +929,11 @@ impl Core {
         self.calendars.lock().await.clear();
         *self.push_rules.lock().await = None;
         self.set_read_room(None);
-        self.probed_pinned_rooms
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clear();
-        self.pinned_caches
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clear();
-        *self
-            .cosmetics
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            cosmetics::CosmeticsCache::default();
+        self.probed_pinned_rooms.lock().clear();
+        self.pinned_caches.lock().clear();
+        *self.cosmetics.lock() = cosmetics::CosmeticsCache::default();
         *self.probed_state() = crate::probed_state::ProbedState::default();
-        *self
-            .recent_state
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            crate::probed_state::RecentState::default();
+        *self.recent_state.lock() = crate::probed_state::RecentState::default();
         *self.search_index.lock().await = search::MessageIndex::new();
         self.search_crawl.lock().await.reset();
         self.server_search.lock().await.reset();
@@ -1509,7 +1483,7 @@ mod regression_tests {
 
     struct DelayedSecondSave {
         attempts: Arc<std::sync::atomic::AtomicUsize>,
-        bytes: Arc<std::sync::Mutex<Option<Vec<u8>>>>,
+        bytes: Arc<parking_lot::Mutex<Option<Vec<u8>>>>,
         started: Arc<tokio::sync::Notify>,
         release: Arc<tokio::sync::Notify>,
     }
@@ -1517,11 +1491,7 @@ mod regression_tests {
     #[async_trait::async_trait]
     impl crate::store::SessionStore for DelayedSecondSave {
         async fn load(&self) -> Result<Option<Vec<u8>>, crate::store::StoreError> {
-            Ok(self
-                .bytes
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone())
+            Ok(self.bytes.lock().clone())
         }
 
         async fn save(&self, bytes: Vec<u8>) -> Result<(), crate::store::StoreError> {
@@ -1533,10 +1503,7 @@ mod regression_tests {
                 self.started.notify_one();
                 self.release.notified().await;
             }
-            *self
-                .bytes
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(bytes);
+            *self.bytes.lock() = Some(bytes);
             Ok(())
         }
 
@@ -2079,7 +2046,7 @@ mod regression_tests {
             )
             .await
             .unwrap();
-            handler_counts.push(core.session_handlers.lock().unwrap().len());
+            handler_counts.push(core.session_handlers.lock().len());
             assert_eq!(core.account_clients.lock().await.len(), 1);
             assert_eq!(core.credential_writers.lock().await.len(), 1);
         }
@@ -2328,7 +2295,7 @@ mod regression_tests {
         })).unwrap();
         client.restore_session(matrix).await.unwrap();
         let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
-        let persisted = Arc::new(std::sync::Mutex::new(None));
+        let persisted = Arc::new(parking_lot::Mutex::new(None));
         let persistence_started = Arc::new(tokio::sync::Notify::new());
         let release_persistence = Arc::new(tokio::sync::Notify::new());
         let base = tempfile::tempdir().unwrap();
@@ -2363,14 +2330,13 @@ mod regression_tests {
 
         let arrived = Arc::new(tokio::sync::Notify::new());
         let (release, wait) = std::sync::mpsc::sync_channel(1);
-        let wait = std::sync::Mutex::new(wait);
+        let wait = parking_lot::Mutex::new(wait);
         let received = arrived.clone();
         Mock::given(method("POST"))
             .and(path("/_matrix/client/v3/refresh"))
             .respond_with(move |_: &wiremock::Request| {
                 received.notify_one();
                 wait.lock()
-                    .unwrap()
                     .recv_timeout(std::time::Duration::from_secs(10))
                     .unwrap();
                 ResponseTemplate::new(200).set_body_json(

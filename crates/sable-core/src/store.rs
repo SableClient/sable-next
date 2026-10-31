@@ -271,33 +271,23 @@ impl SessionStore for FileSessionStore {
 
 #[derive(Default)]
 pub struct MemorySessionStore {
-    bytes: std::sync::Mutex<Option<Vec<u8>>>,
+    bytes: parking_lot::Mutex<Option<Vec<u8>>>,
 }
 
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 impl SessionStore for MemorySessionStore {
     async fn load(&self) -> Result<Option<Vec<u8>>, StoreError> {
-        Ok(self
-            .bytes
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone())
+        Ok(self.bytes.lock().clone())
     }
 
     async fn save(&self, bytes: Vec<u8>) -> Result<(), StoreError> {
-        *self
-            .bytes
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(bytes);
+        *self.bytes.lock() = Some(bytes);
         Ok(())
     }
 
     async fn clear(&self) -> Result<(), StoreError> {
-        *self
-            .bytes
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+        *self.bytes.lock() = None;
         Ok(())
     }
 }

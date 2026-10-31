@@ -116,7 +116,7 @@ pub(crate) type Task = AbortOnDrop<()>;
 
 /// Lets pushes and pusher upkeep use the clients of the core that owns their store.
 #[cfg(not(target_family = "wasm"))]
-static CORES: std::sync::Mutex<Vec<std::sync::Weak<Core>>> = std::sync::Mutex::new(Vec::new());
+static CORES: parking_lot::Mutex<Vec<std::sync::Weak<Core>>> = parking_lot::Mutex::new(Vec::new());
 
 /// Owns every piece of Matrix state. A carrier only moves `Command`s in and
 /// `CoreEvent`s out.
@@ -138,11 +138,11 @@ pub struct Core {
     credential_writers: Mutex<HashMap<String, u64>>,
     next_credential_writer: AtomicU64,
     account_clients: Mutex<HashMap<String, matrix_sdk::Client>>,
-    session_handlers: std::sync::Mutex<Vec<matrix_sdk::event_handler::EventHandlerDropGuard>>,
-    probed_pinned_rooms: std::sync::Mutex<
+    session_handlers: parking_lot::Mutex<Vec<matrix_sdk::event_handler::EventHandlerDropGuard>>,
+    probed_pinned_rooms: parking_lot::Mutex<
         HashMap<matrix_sdk::ruma::OwnedRoomId, Vec<matrix_sdk::ruma::OwnedEventId>>,
     >,
-    pinned_caches: std::sync::Mutex<
+    pinned_caches: parking_lot::Mutex<
         HashMap<
             matrix_sdk::ruma::OwnedRoomId,
             (
@@ -151,14 +151,14 @@ pub struct Core {
             ),
         >,
     >,
-    cosmetics: std::sync::Mutex<cosmetics::CosmeticsCache>,
-    cosmetics_fetches: std::sync::Mutex<HashMap<matrix_sdk::ruma::OwnedRoomId, Arc<Mutex<()>>>>,
-    probed_state: std::sync::Mutex<probed_state::ProbedState>,
-    recent_state: std::sync::Mutex<probed_state::RecentState>,
-    media_health: std::sync::Mutex<media_health::MediaHealth>,
+    cosmetics: parking_lot::Mutex<cosmetics::CosmeticsCache>,
+    cosmetics_fetches: parking_lot::Mutex<HashMap<matrix_sdk::ruma::OwnedRoomId, Arc<Mutex<()>>>>,
+    probed_state: parking_lot::Mutex<probed_state::ProbedState>,
+    recent_state: parking_lot::Mutex<probed_state::RecentState>,
+    media_health: parking_lot::Mutex<media_health::MediaHealth>,
     media_downloads: tokio::sync::Semaphore,
     key_backup_downloads: tokio::sync::Semaphore,
-    key_backup_download: std::sync::Mutex<Option<protocol::KeyBackupDownloadView>>,
+    key_backup_download: parking_lot::Mutex<Option<protocol::KeyBackupDownloadView>>,
     notification_routes: Mutex<HashMap<String, watchers::NotificationRoute>>,
     session_swap_lock: Mutex<()>,
     restore_lock: Mutex<()>,
@@ -169,10 +169,10 @@ pub struct Core {
     pending_registration: Mutex<Option<registration::PendingRegistration>>,
     qr_flow: Mutex<Option<qr_login::QrFlow>>,
     pending_identity_reset: Mutex<Option<verification::PendingIdentityReset>>,
-    session_tasks: std::sync::Mutex<Vec<Task>>,
+    session_tasks: parking_lot::Mutex<Vec<Task>>,
     subscriptions: Mutex<HashMap<SubscriptionId, Subscription>>,
     room_subscriptions: Mutex<std::collections::BTreeSet<OwnedRoomId>>,
-    warm_rooms: std::sync::Mutex<std::collections::VecDeque<OwnedRoomId>>,
+    warm_rooms: parking_lot::Mutex<std::collections::VecDeque<OwnedRoomId>>,
     account_data_lock: Mutex<()>,
     inbox_lock: Mutex<()>,
     account_data_types: Mutex<std::collections::BTreeSet<String>>,
@@ -198,13 +198,13 @@ pub struct Core {
     activity_lock: Mutex<()>,
     stores_open: watch::Sender<bool>,
     server_search_enabled: AtomicBool,
-    read_room: std::sync::Mutex<Option<OwnedRoomId>>,
+    read_room: parking_lot::Mutex<Option<OwnedRoomId>>,
     search_index: Mutex<search::MessageIndex>,
     search_crawl: Mutex<search::CrawlProgress>,
     server_search: Mutex<search::ServerSearch>,
     foreground_paginations: AtomicU32,
     call_sessions: Mutex<HashMap<protocol::CallSessionId, CallSession>>,
-    desired_presence: std::sync::Mutex<protocol::PresenceView>,
+    desired_presence: parking_lot::Mutex<protocol::PresenceView>,
 }
 
 struct CallSession {
@@ -256,7 +256,7 @@ struct PendingLogin {
 struct Subscription {
     tasks: Vec<Task>,
     timeline: Option<Arc<Timeline>>,
-    overlay: Option<Arc<std::sync::Mutex<timeline_overlay::TimelineOverlay>>>,
+    overlay: Option<Arc<parking_lot::Mutex<timeline_overlay::TimelineOverlay>>>,
     thread_root: Option<OwnedEventId>,
     kind: SubscriptionKind,
 }
@@ -311,14 +311,14 @@ impl Core {
             activity_lock: Mutex::new(()),
             stores_open: watch::Sender::new(true),
             server_search_enabled: AtomicBool::new(true),
-            read_room: std::sync::Mutex::new(None),
+            read_room: parking_lot::Mutex::new(None),
             next_subscription: AtomicU32::new(1),
             foreground_paginations: AtomicU32::new(0),
             next_log_id: AtomicU64::new(1),
             next_registration_attempt: AtomicU64::new(1),
             session_generation: AtomicU64::new(1),
             key_backup_downloads: tokio::sync::Semaphore::new(1),
-            key_backup_download: std::sync::Mutex::new(None),
+            key_backup_download: parking_lot::Mutex::new(None),
             session_attempt_generation: AtomicU64::new(1),
             session_activation_lock: Mutex::new(()),
             session_store_lock: Mutex::new(()),
@@ -327,14 +327,14 @@ impl Core {
             credential_writers: Mutex::new(HashMap::new()),
             next_credential_writer: AtomicU64::new(1),
             account_clients: Mutex::new(HashMap::new()),
-            session_handlers: std::sync::Mutex::new(Vec::new()),
-            probed_pinned_rooms: std::sync::Mutex::new(HashMap::new()),
-            pinned_caches: std::sync::Mutex::new(HashMap::new()),
-            cosmetics: std::sync::Mutex::new(cosmetics::CosmeticsCache::default()),
-            cosmetics_fetches: std::sync::Mutex::new(HashMap::new()),
-            probed_state: std::sync::Mutex::new(probed_state::ProbedState::default()),
-            recent_state: std::sync::Mutex::new(probed_state::RecentState::default()),
-            media_health: std::sync::Mutex::new(media_health::MediaHealth::default()),
+            session_handlers: parking_lot::Mutex::new(Vec::new()),
+            probed_pinned_rooms: parking_lot::Mutex::new(HashMap::new()),
+            pinned_caches: parking_lot::Mutex::new(HashMap::new()),
+            cosmetics: parking_lot::Mutex::new(cosmetics::CosmeticsCache::default()),
+            cosmetics_fetches: parking_lot::Mutex::new(HashMap::new()),
+            probed_state: parking_lot::Mutex::new(probed_state::ProbedState::default()),
+            recent_state: parking_lot::Mutex::new(probed_state::RecentState::default()),
+            media_health: parking_lot::Mutex::new(media_health::MediaHealth::default()),
             media_downloads: tokio::sync::Semaphore::new(media::MAX_MEDIA_DOWNLOADS),
             notification_routes: Mutex::new(HashMap::new()),
             session_swap_lock: Mutex::new(()),
@@ -346,10 +346,10 @@ impl Core {
             pending_registration: Mutex::new(None),
             qr_flow: Mutex::new(None),
             pending_identity_reset: Mutex::new(None),
-            session_tasks: std::sync::Mutex::new(Vec::new()),
+            session_tasks: parking_lot::Mutex::new(Vec::new()),
             subscriptions: Mutex::new(HashMap::new()),
             room_subscriptions: Mutex::new(std::collections::BTreeSet::new()),
-            warm_rooms: std::sync::Mutex::new(std::collections::VecDeque::new()),
+            warm_rooms: parking_lot::Mutex::new(std::collections::VecDeque::new()),
             account_data_lock: Mutex::new(()),
             inbox_lock: Mutex::new(()),
             account_data_types: Mutex::new(std::collections::BTreeSet::new()),
@@ -364,13 +364,10 @@ impl Core {
             search_crawl: Mutex::new(search::CrawlProgress::default()),
             server_search: Mutex::new(search::ServerSearch::default()),
             call_sessions: Mutex::new(HashMap::new()),
-            desired_presence: std::sync::Mutex::new(protocol::PresenceView::Online),
+            desired_presence: parking_lot::Mutex::new(protocol::PresenceView::Online),
         });
         #[cfg(not(target_family = "wasm"))]
-        CORES
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .push(Arc::downgrade(&core));
+        CORES.lock().push(Arc::downgrade(&core));
         #[cfg(not(target_family = "wasm"))]
         notifications::evict_push_cache(std::path::Path::new(&core.store_id));
         (core, rx)
@@ -380,9 +377,7 @@ impl Core {
     #[cfg(not(target_family = "wasm"))]
     pub(crate) fn owning(base_store: &std::path::Path) -> Option<Arc<Self>> {
         let wanted = std::fs::canonicalize(base_store).unwrap_or_else(|_| base_store.into());
-        let mut cores = CORES
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut cores = CORES.lock();
         cores.retain(|core| core.strong_count() > 0);
         cores
             .iter()
@@ -423,19 +418,12 @@ impl Core {
     }
 
     pub(crate) fn set_read_room(&self, room_id: Option<OwnedRoomId>) {
-        *self
-            .read_room
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = room_id;
+        *self.read_room.lock() = room_id;
     }
 
     #[must_use]
     pub(crate) fn is_read_room(&self, room_id: &RoomId) -> bool {
-        self.read_room
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .as_deref()
-            == Some(room_id)
+        self.read_room.lock().as_deref() == Some(room_id)
     }
 
     /// No carrier means no UI, and syncing continues, so a drop is not an error.
@@ -445,10 +433,7 @@ impl Core {
 
     /// Session tasks must outlive their spawn call. Dropping `Task` aborts it.
     pub(crate) fn track_session_task(&self, task: Task) {
-        self.session_tasks
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .push(task);
+        self.session_tasks.lock().push(task);
     }
 
     pub(crate) fn track_session_handler(
@@ -458,7 +443,6 @@ impl Core {
     ) {
         self.session_handlers
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(client.event_handler_drop_guard(handle));
     }
 

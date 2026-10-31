@@ -1,7 +1,8 @@
 //! Sanitises untrusted message bodies; every HTML string the UI renders comes from here.
 
+use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
-use std::sync::{LazyLock, Mutex, PoisonError};
+use std::sync::LazyLock;
 
 use ammonia::{Builder, UrlRelative};
 use html5ever::tree_builder::{NodeOrText, TreeSink};
@@ -559,9 +560,7 @@ pub fn display_html(body: &str, formatted: Option<&str>) -> String {
         return render_html(body, None);
     };
     let key = (body.to_owned(), formatted.to_owned());
-    let mut cache = DISPLAY_HTML_CACHE
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
+    let mut cache = DISPLAY_HTML_CACHE.lock();
     if let Some(html) = cache.get(&key) {
         return html.clone();
     }

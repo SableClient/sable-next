@@ -7538,6 +7538,7 @@ dependencies = [
  "matrix_indexed_db_futures",
  "mime",
  "miniz_oxide 0.9.1",
+ "parking_lot",
  "pastey",
  "percent-encoding",
  "probly-search",

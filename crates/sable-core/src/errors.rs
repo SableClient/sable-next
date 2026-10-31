@@ -316,9 +316,11 @@ fn error_chain(error: &dyn std::error::Error) -> String {
 mod tests {
     use std::{
         io::{self, Write},
-        sync::{Arc, Mutex, PoisonError},
+        sync::Arc,
         time::Duration,
     };
+
+    use parking_lot::Mutex;
 
     use matrix_sdk::ruma::api::error::RetryAfter;
 
@@ -335,17 +337,11 @@ mod tests {
 
     impl Write for TestWriter {
         fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-            self.0
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .write(bytes)
+            self.0.lock().write(bytes)
         }
 
         fn flush(&mut self) -> io::Result<()> {
-            self.0
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .flush()
+            self.0.lock().flush()
         }
     }
 
@@ -367,7 +363,7 @@ mod tests {
 
         assert!(matches!(result, Err(RpcError::Failed { .. })));
         assert!(
-            String::from_utf8(output.lock().unwrap().clone())
+            String::from_utf8(output.lock().clone())
                 .unwrap()
                 .contains("context=\"test_label\"")
         );

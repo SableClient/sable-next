@@ -135,7 +135,7 @@ pub async fn decrypt_cold_push(
 
 #[cfg(not(target_family = "wasm"))]
 #[derive(Clone, Default)]
-struct PendingRefreshes(std::sync::Arc<std::sync::Mutex<Vec<tokio::task::JoinHandle<()>>>>);
+struct PendingRefreshes(std::sync::Arc<parking_lot::Mutex<Vec<tokio::task::JoinHandle<()>>>>);
 
 #[cfg(not(target_family = "wasm"))]
 tokio::task_local! {
@@ -146,12 +146,7 @@ tokio::task_local! {
 pub async fn settle_refreshes<T>(operation: impl std::future::Future<Output = T>) -> T {
     let pending = PendingRefreshes::default();
     let result = PENDING_REFRESHES.scope(pending.clone(), operation).await;
-    let tasks = std::mem::take(
-        &mut *pending
-            .0
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner),
-    );
+    let tasks = std::mem::take(&mut *pending.0.lock());
     for task in tasks {
         let _ = task.await;
     }
@@ -193,11 +188,7 @@ impl PushClient {
             let _ = sent.send(client.oauth().refresh_access_token().await.is_ok());
         });
         let _ = PENDING_REFRESHES.try_with(|pending| {
-            pending
-                .0
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .push(task);
+            pending.0.lock().push(task);
         });
         refreshed.await.unwrap_or(false)
     }

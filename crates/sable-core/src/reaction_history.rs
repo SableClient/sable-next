@@ -426,7 +426,8 @@ mod tests {
     #[tokio::test]
     #[cfg(not(target_family = "wasm"))]
     async fn reaction_history_records_additions_once_and_survives_a_new_core() {
-        use std::sync::{Arc, Mutex};
+        use parking_lot::Mutex;
+        use std::sync::Arc;
 
         use crate::{api::messages::ReactParams, session::Session, store::MemorySessionStore};
         use matrix_sdk::{
@@ -472,7 +473,7 @@ mod tests {
         Mock::given(method("GET"))
             .and(path_regex("/account_data/m.recent_emoji$"))
             .respond_with(move |_: &wiremock::Request| {
-                ResponseTemplate::new(200).set_body_json(get.lock().unwrap().clone())
+                ResponseTemplate::new(200).set_body_json(get.lock().clone())
             })
             .mount(server.server())
             .await;
@@ -480,7 +481,7 @@ mod tests {
         Mock::given(method("PUT"))
             .and(path_regex("/account_data/m.recent_emoji$"))
             .respond_with(move |request: &wiremock::Request| {
-                *put.lock().unwrap() = request.body_json().unwrap();
+                *put.lock() = request.body_json().unwrap();
                 ResponseTemplate::new(200).set_body_json(json!({}))
             })
             .mount(server.server())
@@ -505,9 +506,9 @@ mod tests {
         };
         core.run(react()).await.unwrap();
         assert_eq!(core.frequent_reactions(None).await.unwrap(), ["🔥"]);
-        assert_eq!(stored.lock().unwrap()["recent_emoji"][0]["total"], 1);
+        assert_eq!(stored.lock()["recent_emoji"][0]["total"], 1);
         core.run(react()).await.unwrap();
-        assert_eq!(stored.lock().unwrap()["recent_emoji"][0]["total"], 1);
+        assert_eq!(stored.lock()["recent_emoji"][0]["total"], 1);
         assert!(
             core.run(ReactParams {
                 event_id: event_id!("$missing").to_owned(),
@@ -516,7 +517,7 @@ mod tests {
             .await
             .is_err()
         );
-        assert_eq!(stored.lock().unwrap()["recent_emoji"][0]["total"], 1);
+        assert_eq!(stored.lock()["recent_emoji"][0]["total"], 1);
 
         let (restored, _events) =
             Core::new("history-test", Box::new(MemorySessionStore::default()));
