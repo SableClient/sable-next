@@ -129,6 +129,11 @@ checksum = "sha256:0c872fc18c8e801f21614c6daf2504a5826d5c705bb67f7a583d879f5410d
 url = "https://github.com/watchexec/watchexec/releases/download/v2.8.0/watchexec-2.8.0-x86_64-pc-windows-msvc.zip"
 url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/616138784"
 
+[[tools."cargo:cargo-mutants"]]
+version = "27.1.0"
+backend = "cargo:cargo-mutants"
+specifiers = ["27.1.0"]
+
 [[tools."github:WebAssembly/binaryen"]]
 version = "133"
 backend = "github:WebAssembly/binaryen"

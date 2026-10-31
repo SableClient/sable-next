@@ -77,3 +77,7 @@ storybook-static
 packaging/flatpak/electron/nightly/moe.sable.next.electron.Nightly.yml
 packaging/flatpak/electron/nightly/moe.sable.next.electron.Nightly.metainfo.xml
 packaging/flatpak/moe.sable.client.yml
+
+# cargo-mutants output
+mutants.out/
+mutants.out.old/
