@@ -41,6 +41,7 @@ pub enum InboxFilter {
     All,
     Mentions,
     Direct,
+    Threads,
 }
 
 #[derive(Debug, Deserialize)]

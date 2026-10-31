@@ -462,7 +462,7 @@ export type ImageSourcePackView = {
 
 export type ImageUsageView = "emoticon" | "sticker";
 
-export type InboxFilter = "all" | "mentions" | "direct";
+export type InboxFilter = "all" | "mentions" | "direct" | "threads";
 
 export type InboxItemView = {
 	room_id: string,
@@ -475,6 +475,7 @@ export type InboxItemView = {
 	is_direct: boolean,
 	encrypted: boolean,
 	read: boolean,
+	thread_root: string | null,
 };
 
 export type InviteAvatarsView = "on" | "off";

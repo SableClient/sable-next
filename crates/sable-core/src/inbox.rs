@@ -12,6 +12,7 @@ use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, AnySyncTimelineEvent};
 use matrix_sdk::ruma::push::Action;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, OwnedUserId, UInt};
+use matrix_sdk_common::serde_helpers::extract_thread_root;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
@@ -46,6 +47,8 @@ pub(crate) struct Entry {
     encrypted: bool,
     #[serde(default)]
     undecryptable: bool,
+    #[serde(default)]
+    thread_root: Option<OwnedEventId>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -141,6 +144,7 @@ const fn matches(entry: &Entry, filter: InboxFilter) -> bool {
         InboxFilter::All => true,
         InboxFilter::Mentions => entry.highlight,
         InboxFilter::Direct => entry.is_direct,
+        InboxFilter::Threads => entry.thread_root.is_some(),
     }
 }
 
@@ -235,6 +239,24 @@ async fn stored_receipts(room: &Room) -> matrix_sdk::Result<StoredReceipts> {
 
 pub(crate) async fn receipt_ts(room: &Room) -> matrix_sdk::Result<u64> {
     resolve_receipt_ts(room, stored_receipts(room).await?).await
+}
+
+/// The thread's own receipts, which the room's main receipt does not cover.
+async fn thread_receipt_ts(room: &Room, root: &OwnedEventId) -> u64 {
+    let thread = ReceiptThread::Thread(root.clone());
+    let mut latest = 0;
+    for receipt_type in [ReceiptType::Read, ReceiptType::ReadPrivate] {
+        let Ok(Some((event_id, _))) = room
+            .load_user_receipt(receipt_type, &thread, room.own_user_id())
+            .await
+        else {
+            continue;
+        };
+        if let Ok(event) = room.load_or_fetch_event(&event_id, None).await {
+            latest = latest.max(event_ts(&event).unwrap_or(0));
+        }
+    }
+    latest
 }
 
 async fn resolve_receipt_ts(room: &Room, stored: StoredReceipts) -> matrix_sdk::Result<u64> {
@@ -439,6 +461,7 @@ impl Core {
             is_direct: is_dm(room).await,
             encrypted,
             undecryptable: notifications::raw_is_encrypted(raw),
+            thread_root: extract_thread_root(raw),
         })
     }
 
@@ -525,6 +548,7 @@ impl Core {
         let client = self.client().await?;
         let stored = self.with_open_stores(async || load(&client).await).await?;
         let mut rooms: HashMap<OwnedRoomId, Option<(bool, RoomReadState)>> = HashMap::new();
+        let mut threads: HashMap<OwnedEventId, u64> = HashMap::new();
         let limit = usize::try_from(limit).unwrap_or(usize::MAX);
         let mut items = Vec::new();
         let mut has_more = false;
@@ -550,7 +574,22 @@ impl Core {
                 continue;
             };
             entry.is_direct = *direct;
-            let unread = is_unread(&entry, read);
+            let unread = match &entry.thread_root {
+                Some(root) => {
+                    if !threads.contains_key(root) {
+                        let ts = match client.get_room(&entry.room_id) {
+                            Some(room) => {
+                                self.with_open_stores(async || thread_receipt_ts(&room, root).await)
+                                    .await
+                            }
+                            None => 0,
+                        };
+                        threads.insert(root.clone(), ts);
+                    }
+                    entry.ts > read.receipt_ts.max(threads[root])
+                }
+                None => is_unread(&entry, read),
+            };
             if !matches(&entry, filter)
                 || (!unread && !include_read)
                 || before_ts.is_some_and(|before| entry.ts >= before)
@@ -574,6 +613,7 @@ impl Core {
                 is_direct: entry.is_direct,
                 encrypted: entry.encrypted,
                 read: !unread,
+                thread_root: entry.thread_root.as_ref().map(ToString::to_string),
             });
         }
 
@@ -871,6 +911,79 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_thread_receipt_marks_its_replies_read_and_threads_filter_them() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, room) = setup(&server, 0).await;
+        let factory = EventFactory::new().room(room.room_id()).sender(User::Alice);
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room.room_id()).add_receipt(
+                    factory
+                        .read_receipts()
+                        .add(
+                            event_id!("$read-reply"),
+                            client.user_id().unwrap(),
+                            ReceiptType::Read,
+                            ReceiptThread::Thread(event_id!("$root").to_owned()),
+                        )
+                        .into_event(),
+                ),
+            )
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex("/event/.*read-reply$"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(message(
+                "$read-reply",
+                250,
+                None,
+            )))
+            .mount(server.server())
+            .await;
+        let in_thread = |event: &str, ts| Entry {
+            thread_root: Some(event_id!("$root").to_owned()),
+            ..entry(event, ts)
+        };
+        core.record_inbox(
+            &client,
+            vec![
+                in_thread("seen", 200),
+                in_thread("new", 300),
+                entry("main", 100),
+            ],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+
+        let (items, _) = core
+            .inbox_notifications(InboxFilter::Threads, true, 30, None)
+            .await
+            .unwrap();
+        let read: Vec<_> = items
+            .iter()
+            .map(|item| (item.event_id.as_str(), item.read))
+            .collect();
+        assert_eq!(read, [("$new", false), ("$seen", true)]);
+        assert!(
+            items
+                .iter()
+                .all(|item| item.thread_root.as_deref() == Some("$root"))
+        );
+    }
+
+    #[test]
+    fn an_entry_stored_before_threads_were_recorded_is_not_in_a_thread() {
+        let stored = json!({"room_id": "!room:example.org", "event_id": "$old", "ts": 1,
+            "sender": "@alice:example.org", "sender_name": null, "body": null,
+            "highlight": false, "is_direct": false, "encrypted": false});
+        let entry: Entry = serde_json::from_value(stored).unwrap();
+        assert_eq!(entry.thread_root, None);
+        assert!(!super::matches(&entry, InboxFilter::Threads));
+    }
+
+    #[tokio::test]
     async fn delayed_receipt_does_not_hide_a_newer_unread_message() {
         let server = MatrixMockServer::new().await;
         let (core, client, room) = setup(&server, 1).await;
@@ -1164,6 +1277,7 @@ mod tests {
             is_direct: false,
             encrypted: false,
             undecryptable: false,
+            thread_root: None,
         }
     }
 

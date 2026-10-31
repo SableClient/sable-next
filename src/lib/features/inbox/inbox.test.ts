@@ -61,6 +61,7 @@ test('an unknown filter falls back to showing everything', () => {
   expect(parseFilter(null)).toBe('all');
   expect(parseFilter('unread')).toBe('all');
   expect(parseFilter('mentions')).toBe('mentions');
+  expect(parseFilter('threads')).toBe('threads');
 });
 
 test('the inbox badge counts DMs and mentions, not ordinary room messages', () => {

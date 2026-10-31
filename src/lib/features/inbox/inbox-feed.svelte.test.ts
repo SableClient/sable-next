@@ -16,6 +16,7 @@ function item(eventId: string): InboxItemView {
     is_direct: false,
     encrypted: false,
     read: false,
+    thread_root: null,
   };
 }
 

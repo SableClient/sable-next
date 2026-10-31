@@ -53,7 +53,7 @@ export function parseInboxTab(
 }
 
 export function parseFilter(value: string | null): NotificationFilter {
-  return value === 'mentions' || value === 'direct' ? value : 'all';
+  return value === 'mentions' || value === 'direct' || value === 'threads' ? value : 'all';
 }
 
 export function notificationCount(counts: UnreadCount): number {
@@ -70,6 +70,8 @@ function matchesFilter(
       return room.is_direct && hasUnread(counts);
     case 'mentions':
       return counts.highlight > 0;
+    case 'threads':
+      return false;
     default:
       return hasUnread(counts);
   }

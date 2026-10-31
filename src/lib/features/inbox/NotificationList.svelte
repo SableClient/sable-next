@@ -56,16 +56,18 @@
   });
   const marking = new SvelteSet<string>();
   const readNow = new SvelteSet<string>();
-  const filters: readonly NotificationFilter[] = ['direct', 'mentions', 'all'];
+  const filters: readonly NotificationFilter[] = ['direct', 'mentions', 'threads', 'all'];
   const filterLabels: Record<NotificationFilter, string> = {
     all: 'inbox.filterAll',
     mentions: 'inbox.filterMentions',
     direct: 'inbox.filterDirect',
+    threads: 'inbox.filterThreads',
   };
   const emptyLabels: Record<NotificationFilter, string> = {
     all: 'inbox.notificationsEmptyAll',
     mentions: 'inbox.notificationsEmptyMentions',
     direct: 'inbox.notificationsEmptyDirect',
+    threads: 'inbox.notificationsEmptyThreads',
   };
   let section = $state<HTMLElement>();
   let heading = $state<HTMLElement>();
@@ -326,6 +328,9 @@
           </span>
           {#snippet message()}
             {#each group.items as item, index (item.event_id)}
+              {#if item.thread_root}
+                <p class="thread-label">{i18n.t('inbox.inThread')}</p>
+              {/if}
               <MessagePreview
                 timeline
                 roomId={group.roomId}
@@ -438,6 +443,12 @@
 <style>
   section {
     display: grid;
+  }
+
+  .thread-label {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    margin: 0;
   }
 
   .filters {
