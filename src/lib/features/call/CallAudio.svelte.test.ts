@@ -214,6 +214,19 @@ test('stays muted while deafened when livekit unmutes an element as a participan
   expect(element.muted).toBe(true);
 });
 
+test('leaves a released element alone when livekit recycles it for the next call (#1468)', () => {
+  const track = fakeTrack('voice');
+  const instance = render(CallAudio, { room: fakeRoom(track).room });
+  const element = document.querySelector('audio');
+  if (!element) throw new Error('no audio element');
+  instance.unmount();
+
+  element.muted = true;
+  element.dispatchEvent(new Event('volumechange'));
+
+  expect(element.muted).toBe(true);
+});
+
 test('amplifies a participant above full volume through a gain node', async () => {
   const source = { connect: vi.fn((node: AudioNode) => node), disconnect: vi.fn() };
   const gain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
@@ -270,6 +283,26 @@ test('plays a shared screen at its own volume, apart from the voice', () => {
   const [voiceElement, screenElement] = document.querySelectorAll('audio');
   expect(voiceElement.volume).toBe(0.8);
   expect(screenElement.volume).toBe(0.25);
+});
+
+test('plays a voice at its own volume on an element livekit recycled from a screen share', async () => {
+  const room = fakeRoom();
+  const screenAudio = Object.assign(fakeTrack('screen'), {
+    source: Track.Source.ScreenShareAudio,
+  });
+  const element = screenAudio.attach();
+  const voice = Object.assign(fakeTrack('voice'), { attach: vi.fn(() => element) });
+
+  render(CallAudio, {
+    room: room.room,
+    volumeOf: (_identity: string, screen: boolean) => (screen ? 0 : 0.8),
+  });
+  room.emit(RoomEvent.TrackSubscribed, screenAudio, undefined, { identity: 'participant' });
+  room.emit(RoomEvent.TrackUnsubscribed, screenAudio);
+  room.emit(RoomEvent.TrackSubscribed, voice, undefined, { identity: 'participant' });
+  await tick();
+
+  expect(element.volume).toBe(0.8);
 });
 
 test('replaces room listeners and tracks with the current room', async () => {
