@@ -14,6 +14,7 @@ export type ShortcutId =
   | 'navigation.cyclePreviousUnread'
   | 'room.markRead'
   | 'room.markAllRead'
+  | 'room.close'
   | 'room.replyOlder'
   | 'room.replyNewer'
   | 'room.editOlder'
@@ -146,6 +147,12 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     labelKey: 'shortcuts.markAllRead',
     category: 'room',
     binding: 'mod+shift+escape',
+  },
+  {
+    id: 'room.close',
+    labelKey: 'shortcuts.closeRoom',
+    category: 'room',
+    binding: 'alt+w',
   },
   {
     id: 'room.replyOlder',

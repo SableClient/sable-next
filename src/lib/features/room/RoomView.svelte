@@ -948,6 +948,7 @@
           onMembers={toggleMembers}
           onSettings={() => (settingsOpen = true)}
           onJumpToTime={() => (jumpOpen = true)}
+          onClose={desktop ? backToRoomList : undefined}
           onAttachments={voiceView ? undefined : toggleAttachments}
           onThreads={phone && !voiceView ? toggleThreads : undefined}
           onPins={phone ? () => (pinsOpen = true) : undefined}

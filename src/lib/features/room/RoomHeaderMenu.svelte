@@ -14,6 +14,7 @@
   import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
   import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
   import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
+  import XIcon from 'phosphor-svelte/lib/XIcon';
   import type { RoomListItemView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -37,6 +38,7 @@
     onMembers: () => void;
     onSettings: () => void;
     onJumpToTime?: () => void;
+    onClose?: () => void;
     onAttachments?: () => void;
     onThreads?: () => void;
     onPins?: () => void;
@@ -56,6 +58,7 @@
     onMembers,
     onSettings,
     onJumpToTime,
+    onClose,
     onAttachments,
     onThreads,
     onPins,
@@ -165,6 +168,12 @@
       <ActionMenuItem onSelect={onJumpToTime}>
         <ClockCounterClockwiseIcon />
         {i18n.t('room.menuJumpToTime')}
+      </ActionMenuItem>
+    {/if}
+    {#if onClose}
+      <ActionMenuItem onSelect={onClose}>
+        <XIcon />
+        {i18n.t('room.menuClose')}
       </ActionMenuItem>
     {/if}
 
