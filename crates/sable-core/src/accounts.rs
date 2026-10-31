@@ -898,6 +898,8 @@ impl Core {
         };
         match crate::store_disposal::carry_room_keys(&replaced.store_id, &base).await {
             Ok(imported) => tracing::info!(imported, "carried room keys to the new device"),
+            // Nothing in the old store can be read anymore.
+            Err(crate::store::StoreError::KeyMissing) => {}
             Err(error) => {
                 tracing::error!("could not carry room keys to the new device: {error}");
                 return;
@@ -1449,9 +1451,13 @@ async fn reset_account_cache(account: &PersistedAccount) -> Result<(), crate::Co
 
     session::validate_saved_crypto_store(&account.store_id, &account.session).await?;
 
-    let crypto = matrix_sdk::SqliteCryptoStore::open(&store, None)
-        .await
-        .map_err(crate::CoreError::backend)?;
+    let key = crate::store_encryption::saved_key(&account.store_id)?;
+    let crypto = matrix_sdk::SqliteCryptoStore::open_with_config(&crate::store_encryption::config(
+        &store,
+        key.as_ref(),
+    ))
+    .await
+    .map_err(crate::CoreError::backend)?;
     crypto
         .remove_custom_value(&format!(
             "sliding_sync_store::room-list::{}::instance",
@@ -1461,7 +1467,7 @@ async fn reset_account_cache(account: &PersistedAccount) -> Result<(), crate::Co
         .map_err(crate::CoreError::backend)?;
     drop(crypto);
 
-    search::reset_state_cache(&store).await?;
+    search::reset_state_cache(&store, key.as_ref()).await?;
 
     for directory in [store, std::path::Path::new(&account.store_id).join("cache")] {
         for database in CACHE_DATABASES {

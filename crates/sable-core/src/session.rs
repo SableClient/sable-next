@@ -276,6 +276,14 @@ impl Credentials {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum BuildError {
+    #[error(transparent)]
+    Sdk(#[from] matrix_sdk::ClientBuildError),
+    #[error(transparent)]
+    Store(#[from] crate::store::StoreError),
+}
+
 /// A filesystem path natively, an `IndexedDB` name on the web.
 /// # Errors
 ///
@@ -285,7 +293,7 @@ pub async fn build_client(
     store_id: &str,
     homeserver: &str,
     persistent_event_cache: bool,
-) -> Result<Client, matrix_sdk::ClientBuildError> {
+) -> Result<Client, BuildError> {
     build_account_client(
         apply_server(Client::builder(), homeserver),
         store_id,
@@ -302,7 +310,7 @@ pub async fn build_client_at(
     store_id: &str,
     homeserver_url: &Url,
     persistent_event_cache: bool,
-) -> Result<Client, matrix_sdk::ClientBuildError> {
+) -> Result<Client, BuildError> {
     let builder = crate::tls::apply_sdk(Client::builder()).homeserver_url(homeserver_url.as_str());
 
     build_account_client(
@@ -321,7 +329,7 @@ pub async fn restore_client(
     store_id: &str,
     persisted: &PersistedSession,
     persistent_event_cache: bool,
-) -> Result<Client, matrix_sdk::ClientBuildError> {
+) -> Result<Client, BuildError> {
     match &persisted.resolved_homeserver {
         Some(url) => build_client_at(store_id, url, persistent_event_cache).await,
         None => build_client(store_id, &persisted.homeserver, persistent_event_cache).await,
@@ -427,11 +435,18 @@ pub(crate) async fn validate_saved_crypto_store(
         if !metadata.is_file() {
             return Err("saved crypto database is not a file".into());
         }
-        matrix_sdk::SqliteCryptoStore::open(path, None)
-            .await
-            .map_err(|error| {
-                CoreError::context("saved crypto database could not be opened", error)
-            })?
+        let key = match crate::store_encryption::saved_key(store_id) {
+            Err(crate::store::StoreError::KeyMissing) => {
+                return Err(CoreError::Invalid("saved crypto database key is missing"));
+            }
+            key => key?,
+        };
+        matrix_sdk::SqliteCryptoStore::open_with_config(&crate::store_encryption::config(
+            path,
+            key.as_ref(),
+        ))
+        .await
+        .map_err(|error| CoreError::context("saved crypto database could not be opened", error))?
     };
     #[cfg(target_family = "wasm")]
     let store = matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None)
@@ -489,6 +504,22 @@ impl ClientRole {
         matches!(self, Self::Account)
     }
 
+    #[cfg(not(target_family = "wasm"))]
+    async fn store_key(
+        self,
+        store_id: &str,
+    ) -> Result<Option<crate::secrets::Key>, crate::store::StoreError> {
+        if self.is_account() {
+            crate::store_encryption::account_key(store_id).await
+        } else {
+            crate::store_encryption::saved_key(store_id)?
+                .ok_or(crate::store::StoreError::Invalid(
+                    "the store is not encrypted yet",
+                ))
+                .map(Some)
+        }
+    }
+
     /// A notification service extension is held to a few dozen megabytes.
     #[cfg(not(target_family = "wasm"))]
     fn store_config(self, path: std::path::PathBuf) -> matrix_sdk::SqliteStoreConfig {
@@ -534,7 +565,7 @@ async fn build_account_client(
     store_id: &str,
     role: ClientRole,
     persistent_event_cache: bool,
-) -> Result<Client, matrix_sdk::ClientBuildError> {
+) -> Result<Client, BuildError> {
     let builder = if role.is_account() {
         builder.handle_refresh_tokens()
     } else {
@@ -558,7 +589,10 @@ async fn build_account_client(
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let lock = matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::SingleProcess;
 
-        let store = role.store_config(std::path::Path::new(store_id).join("store"));
+        let key = role.store_key(store_id).await?;
+        let store = role
+            .store_config(std::path::Path::new(store_id).join("store"))
+            .key(key.as_ref().map(crate::secrets::Key::as_slice));
         let cache = store
             .clone()
             .path(std::path::Path::new(store_id).join("cache"));
@@ -567,7 +601,8 @@ async fn build_account_client(
             matrix_sdk::SqliteEventCacheStore::open_with_config(&cache),
             matrix_sdk::SqliteMediaStore::open_with_config(&cache),
             matrix_sdk::SqliteCryptoStore::open_with_config(&store),
-        )?;
+        )
+        .map_err(matrix_sdk::ClientBuildError::from)?;
         let config = matrix_sdk_base::store::StoreConfig::new(lock.clone())
             .state_store(state)
             .event_cache_store(event_cache)
@@ -601,7 +636,9 @@ async fn build_account_client(
     {
         // The SharedWorker is the sole IndexedDB owner in the web runtime.
         let lock = matrix_sdk::cross_process_lock::CrossProcessLockConfig::SingleProcess;
-        let stores = matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None).await?;
+        let stores = matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None)
+            .await
+            .map_err(matrix_sdk::ClientBuildError::from)?;
         let config = matrix_sdk_base::store::StoreConfig::new(lock.clone())
             .state_store(stores.state)
             .media_store(stores.media)
@@ -1033,6 +1070,9 @@ mod tests {
     #[tokio::test]
     async fn account_clients_decrypt_messages_from_all_devices() {
         let store = tempfile::tempdir().unwrap();
+        crate::store_encryption::account_key(store.path().to_str().unwrap())
+            .await
+            .unwrap();
         let client = build_account_client(
             matrix_sdk::Client::builder().homeserver_url("https://example.org"),
             store.path().to_str().unwrap(),

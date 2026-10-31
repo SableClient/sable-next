@@ -574,17 +574,21 @@ pub(super) async fn forget_crawl(client: &matrix_sdk::Client) -> bool {
 }
 
 #[cfg(not(target_family = "wasm"))]
-pub(crate) async fn reset_state_cache(path: &std::path::Path) -> Result<(), StoreError> {
+pub(crate) async fn reset_state_cache(
+    path: &std::path::Path,
+    key: Option<&crate::secrets::Key>,
+) -> Result<(), StoreError> {
     use matrix_sdk::SqliteStateStore;
     use matrix_sdk_base::StateStore as _;
 
-    let source = SqliteStateStore::open(path, None)
+    let source = SqliteStateStore::open_with_config(&crate::store_encryption::config(path, key))
         .await
         .map_err(StoreError::backend)?;
     let temporary = tempfile::tempdir_in(path).map_err(StoreError::backend)?;
-    let target = SqliteStateStore::open(temporary.path(), None)
-        .await
-        .map_err(StoreError::backend)?;
+    let target =
+        SqliteStateStore::open_with_config(&crate::store_encryption::config(temporary.path(), key))
+            .await
+            .map_err(StoreError::backend)?;
 
     let mut rooms: Vec<OwnedRoomId> = match copy_value(&source, &target, &rooms_key()).await? {
         Some(bytes) => serde_json::from_slice(&decode(bytes)?).map_err(StoreError::backend)?,
@@ -716,7 +720,9 @@ mod codec_tests {
             .unwrap();
         store.close().await.unwrap();
 
-        super::reset_state_cache(directory.path()).await.unwrap();
+        super::reset_state_cache(directory.path(), None)
+            .await
+            .unwrap();
 
         let store = matrix_sdk::SqliteStateStore::open(directory.path(), None)
             .await
@@ -769,7 +775,11 @@ mod codec_tests {
             .unwrap();
         store.close().await.unwrap();
 
-        assert!(super::reset_state_cache(directory.path()).await.is_err());
+        assert!(
+            super::reset_state_cache(directory.path(), None)
+                .await
+                .is_err()
+        );
 
         let store = matrix_sdk::SqliteStateStore::open(directory.path(), None)
             .await

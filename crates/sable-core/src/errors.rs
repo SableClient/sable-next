@@ -290,12 +290,13 @@ impl Core {
         }
     }
 
-    pub(crate) fn discovery_error(&self, error: matrix_sdk::ClientBuildError) -> RpcError {
-        match error {
-            matrix_sdk::ClientBuildError::Http(error) => {
+    pub(crate) fn discovery_error(&self, error: impl Into<crate::session::BuildError>) -> RpcError {
+        match error.into() {
+            crate::session::BuildError::Sdk(matrix_sdk::ClientBuildError::Http(error)) => {
                 self.homeserver_http_error("login_flows_discovery", error)
             }
-            _ => RpcError::UnknownHomeserver,
+            crate::session::BuildError::Store(error) => self.failed("account_store", error),
+            crate::session::BuildError::Sdk(_) => RpcError::UnknownHomeserver,
         }
     }
 }

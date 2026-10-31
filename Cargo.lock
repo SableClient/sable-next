@@ -7520,6 +7520,7 @@ dependencies = [
  "qrcode",
  "regex-lite",
  "reqwest 0.13.5",
+ "rmp-serde",
  "ruma",
  "rusqlite",
  "rust-stemmers",

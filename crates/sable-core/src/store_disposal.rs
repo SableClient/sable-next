@@ -33,9 +33,13 @@ pub(crate) async fn carry_room_keys(
         {
             return Ok(0);
         }
-        matrix_sdk::SqliteCryptoStore::open(path, None)
-            .await
-            .map_err(StoreError::backend)?
+        let key = crate::store_encryption::saved_key(store_id)?;
+        matrix_sdk::SqliteCryptoStore::open_with_config(&crate::store_encryption::config(
+            path,
+            key.as_ref(),
+        ))
+        .await
+        .map_err(StoreError::backend)?
     };
     #[cfg(target_family = "wasm")]
     let store = matrix_sdk_indexeddb::IndexeddbCryptoStore::open_with_name(store_id)
@@ -65,9 +69,15 @@ pub(crate) async fn carry_room_keys(
 
 #[cfg(not(target_family = "wasm"))]
 async fn discard_files(base_store_id: &str, store_id: &str) -> Result<(), StoreError> {
+    crate::store_encryption::forget(store_id);
     let root = std::path::Path::new(store_id);
     let paths = if store_id == base_store_id {
-        vec![root.join("store"), root.join("cache")]
+        vec![
+            root.join("store"),
+            root.join("store.new"),
+            root.join("store.old"),
+            root.join("cache"),
+        ]
     } else {
         vec![root.to_owned()]
     };

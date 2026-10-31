@@ -65,6 +65,8 @@ mod space_parents;
 pub mod spaces;
 pub mod store;
 mod store_disposal;
+#[cfg(not(target_family = "wasm"))]
+mod store_encryption;
 mod subscriptions;
 mod sync_support;
 mod thread_receipts;
@@ -681,7 +683,7 @@ impl Core {
         &self,
         store_id: &str,
         homeserver: &str,
-    ) -> Result<matrix_sdk::Client, matrix_sdk::ClientBuildError> {
+    ) -> Result<matrix_sdk::Client, session::BuildError> {
         let resolved = self
             .discovered_homeservers
             .lock()
