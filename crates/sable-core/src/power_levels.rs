@@ -586,6 +586,25 @@ mod tests {
     }
 
     #[test]
+    fn setting_send_messages_also_gates_encrypted_messages() {
+        let next = with_level(&room(), &PowerLevelLocation::event("m.room.message"), 50);
+        assert_eq!(next.events.get("m.room.message"), Some(&50));
+        assert_eq!(next.events.get("m.room.encrypted"), Some(&50));
+    }
+
+    #[test]
+    fn setting_a_call_or_pack_permission_also_gates_its_other_event_types() {
+        let join = with_level(&room(), &PowerLevelLocation::event("m.rtc.member"), 10);
+        assert_eq!(join.events.get("org.matrix.msc4143.rtc.member"), Some(&10));
+        assert_eq!(join.events.get("org.matrix.msc3401.call.member"), Some(&10));
+        let start = with_level(&room(), &PowerLevelLocation::state("m.rtc.slot"), 20);
+        assert_eq!(start.events.get("org.matrix.msc4143.rtc.slot"), Some(&20));
+        assert_eq!(start.events.get("org.matrix.msc3401.call"), Some(&20));
+        let packs = with_level(&room(), &PowerLevelLocation::state("m.room.image_pack"), 30);
+        assert_eq!(packs.events.get("im.ponies.room_emotes"), Some(&30));
+    }
+
+    #[test]
     fn the_content_keeps_what_the_view_does_not_model() {
         let stored = json!({
             "ban": 50,

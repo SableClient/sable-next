@@ -9,7 +9,6 @@ use crate::probed_state::Probed;
 use crate::protocol::{CoreEvent, CreateJoinRuleView, RoomStateEventView, RpcError};
 use crate::view;
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
-use matrix_sdk::ruma::EventEncryptionAlgorithm;
 use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::InitialStateEvent;
@@ -338,7 +337,7 @@ impl Core {
         self.write_room_state(
             room_id,
             ENCRYPTION_EVENT,
-            &RoomEncryptionEventContent::new(EventEncryptionAlgorithm::MegolmV1AesSha2),
+            &RoomEncryptionEventContent::with_recommended_defaults(),
         )
         .await
     }
@@ -661,7 +660,11 @@ impl Core {
             .with_open_stores(async || room.power_levels_or_default().await)
             .await;
 
-        Ok(view::room_permissions(&power_levels, &user_id))
+        Ok(view::room_permissions(
+            &power_levels,
+            &user_id,
+            room.encryption_state().is_encrypted(),
+        ))
     }
 
     pub(crate) async fn room_state_events(

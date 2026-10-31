@@ -579,18 +579,17 @@ impl Core {
                         .is_empty();
             }
         }
+        let member_type = if room.encryption_state().is_encrypted() {
+            "m.room.encrypted"
+        } else if stable {
+            "m.rtc.member"
+        } else {
+            membership::RTC_MEMBER_EVENT_TYPE
+        };
         let can_join = can_join_call(
             state_allowed,
             sticky_available,
-            levels.user_can_send_message(
-                &user_id,
-                if stable {
-                    "m.rtc.member"
-                } else {
-                    membership::RTC_MEMBER_EVENT_TYPE
-                }
-                .into(),
-            ),
+            levels.user_can_send_message(&user_id, member_type.into()),
         );
 
         Ok(CallSupportView {

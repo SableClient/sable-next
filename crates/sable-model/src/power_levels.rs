@@ -7,6 +7,23 @@ use serde::{Deserialize, Serialize};
 
 pub const TAGS_EVENT: &str = "in.cinny.room.power_level_tags";
 
+/// In an encrypted room messages are sent as `m.room.encrypted`, so its level is what applies.
+const COMPANION_EVENTS: &[(&str, &[&str])] = &[
+    ("m.room.message", &["m.room.encrypted"]),
+    ("m.room.image_pack", &["im.ponies.room_emotes"]),
+    (
+        "m.rtc.slot",
+        &["org.matrix.msc4143.rtc.slot", "org.matrix.msc3401.call"],
+    ),
+    (
+        "m.rtc.member",
+        &[
+            "org.matrix.msc4143.rtc.member",
+            "org.matrix.msc3401.call.member",
+        ],
+    ),
+];
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct RoomPowerLevelsView {
@@ -130,6 +147,13 @@ pub fn with_level(
     match location {
         PowerLevelLocation::Event { event_type } | PowerLevelLocation::State { event_type } => {
             next.events.insert(event_type.clone(), level);
+            let companions = COMPANION_EVENTS
+                .iter()
+                .find(|(primary, _)| primary == event_type)
+                .map_or(&[][..], |(_, companions)| companions);
+            for companion in companions {
+                next.events.insert((*companion).to_owned(), level);
+            }
         }
         PowerLevelLocation::EventsDefault => next.events_default = level,
         PowerLevelLocation::StateDefault => next.state_default = level,
@@ -175,11 +199,8 @@ pub fn permission_groups(is_space: bool) -> Vec<PermissionGroup> {
     let calls = group(
         "room.permGroupCalls",
         vec![
-            item("room.permStartCalls", state("org.matrix.msc3401.call")),
-            item(
-                "room.permJoinCalls",
-                state("org.matrix.msc3401.call.member"),
-            ),
+            item("room.permStartCalls", state("m.rtc.slot")),
+            item("room.permJoinCalls", event("m.rtc.member")),
         ],
     );
     let moderation = group(

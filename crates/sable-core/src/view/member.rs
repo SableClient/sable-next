@@ -38,10 +38,19 @@ const fn membership_view(state: &MembershipState) -> MembershipView {
 }
 
 #[must_use]
-pub fn room_permissions(power_levels: &RoomPowerLevels, user_id: &UserId) -> RoomPermissionsView {
+pub fn room_permissions(
+    power_levels: &RoomPowerLevels,
+    user_id: &UserId,
+    encrypted: bool,
+) -> RoomPermissionsView {
+    let message_type = if encrypted {
+        MessageLikeEventType::RoomEncrypted
+    } else {
+        MessageLikeEventType::RoomMessage
+    };
     RoomPermissionsView {
         own_power_level: clamp_power_level(power_levels.for_user(user_id)),
-        can_post: power_levels.user_can_send_message(user_id, MessageLikeEventType::RoomMessage),
+        can_post: power_levels.user_can_send_message(user_id, message_type),
         can_react: power_levels.user_can_send_message(user_id, MessageLikeEventType::Reaction),
         can_redact_own: power_levels.user_can_redact_own_event(user_id),
         can_redact_others: power_levels.user_can_redact_event_of_other(user_id),
@@ -96,6 +105,26 @@ mod tests {
     use serde_json::json;
 
     use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
+
+    #[test]
+    fn posting_in_an_encrypted_room_needs_the_encrypted_level() {
+        use matrix_sdk::ruma::events::room::power_levels::{
+            RoomPowerLevels, RoomPowerLevelsEventContent,
+        };
+
+        let content: RoomPowerLevelsEventContent = serde_json::from_value(json!({
+            "events": {"m.room.message": 0, "m.room.encrypted": 50},
+        }))
+        .unwrap();
+        let levels = RoomPowerLevels::new(
+            content.into(),
+            &matrix_sdk::ruma::room_version_rules::AuthorizationRules::V1,
+            [],
+        );
+        let user = matrix_sdk::ruma::user_id!("@user:example.org");
+        assert!(room_permissions(&levels, user, false).can_post);
+        assert!(!room_permissions(&levels, user, true).can_post);
+    }
 
     #[test]
     fn power_levels_keep_every_matrix_integer() {
