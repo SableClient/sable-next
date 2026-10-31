@@ -1446,7 +1446,7 @@ mod regression_tests {
     }
 
     #[expect(clippy::unwrap_used, reason = "test code")]
-    async fn core_with_room() -> (MatrixMockServer, Arc<Core>, Room) {
+    async fn core_with_room() -> (tempfile::TempDir, MatrixMockServer, Arc<Core>, Room) {
         let server = MatrixMockServer::new().await;
         server
             .mock_versions()
@@ -1459,9 +1459,9 @@ mod regression_tests {
             .sync_joined_room(&client, room_id!("!regression:example.org"))
             .await;
         let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
-        let base = tempfile::tempdir().unwrap().keep();
+        let base = tempfile::tempdir().unwrap();
         let (core, _events) = Core::new(
-            base.to_str().unwrap(),
+            base.path().to_str().unwrap(),
             Box::new(MemorySessionStore::default()),
         );
         *core.session.write().await = Some(Session {
@@ -1471,12 +1471,12 @@ mod regression_tests {
             homeserver: server.server().uri(),
             oauth: false,
         });
-        (server, core, room)
+        (base, server, core, room)
     }
 
     #[tokio::test]
     async fn left_rooms_names_only_the_rooms_the_account_left() {
-        let (server, core, room) = core_with_room().await;
+        let (_store, server, core, room) = core_with_room().await;
         server
             .sync_room(
                 &room.client(),
@@ -1603,7 +1603,7 @@ mod regression_tests {
 
     #[tokio::test]
     async fn legacy_sessions_use_server_device_management() {
-        let (server, core, room) = core_with_room().await;
+        let (_store, server, core, room) = core_with_room().await;
         assert!(room.client().oauth().full_session().is_none());
         server
             .oauth()
@@ -1638,7 +1638,7 @@ mod regression_tests {
 
     #[tokio::test]
     async fn servers_without_oauth_keep_legacy_device_deletion() {
-        let (server, core, _room) = core_with_room().await;
+        let (_store, server, core, _room) = core_with_room().await;
         server
             .oauth()
             .mock_server_metadata()
@@ -1675,7 +1675,7 @@ mod regression_tests {
 
     #[tokio::test]
     async fn invalid_metadata_does_not_use_legacy_device_deletion() {
-        let (server, core, _room) = core_with_room().await;
+        let (_store, server, core, _room) = core_with_room().await;
         server
             .oauth()
             .mock_server_metadata()
@@ -1722,7 +1722,7 @@ mod regression_tests {
     #[tokio::test]
     async fn unknown_token_during_failed_preparation_still_ends_the_active_session() {
         use crate::session::{AccountRegistry, PersistedAccount, current_session};
-        let (server, core, room) = core_with_room().await;
+        let (_store, server, core, room) = core_with_room().await;
         let mut registry = AccountRegistry::empty();
         registry.active_account_id = Some("first".to_owned());
         registry.upsert(PersistedAccount {
@@ -1827,7 +1827,7 @@ mod regression_tests {
     #[tokio::test]
     async fn a_hard_token_rejection_keeps_the_account() {
         use crate::session::{AccountRegistry, PersistedAccount, current_session};
-        let (server, core, room) = core_with_room().await;
+        let (_store, server, core, room) = core_with_room().await;
         let mut registry = AccountRegistry::empty();
         registry.active_account_id = Some("first".to_owned());
         registry.upsert(PersistedAccount {
@@ -1861,7 +1861,7 @@ mod regression_tests {
     async fn becoming_active_starts_an_idle_sync_service_and_hiding_stops_it() {
         use matrix_sdk_ui::sync_service::State;
 
-        let (_server, core, _room) = core_with_room().await;
+        let (_store, _server, core, _room) = core_with_room().await;
         let sync_service = core.sync_service().await.unwrap();
         assert!(matches!(sync_service.state().get(), State::Idle));
 
@@ -1887,7 +1887,7 @@ mod regression_tests {
     async fn a_stale_pause_cannot_stop_a_new_background_interval() {
         use matrix_sdk_ui::sync_service::State;
 
-        let (_server, core, _room) = core_with_room().await;
+        let (_store, _server, core, _room) = core_with_room().await;
         core.set_app_active(true);
         core.apply_app_activity(true).await;
         let sync = core.sync_service().await.unwrap();
@@ -1916,7 +1916,7 @@ mod regression_tests {
 
         use matrix_sdk_ui::sync_service::State;
 
-        let (server, core, _room) = core_with_room().await;
+        let (_store, server, core, _room) = core_with_room().await;
         server
             .mock_sliding_sync()
             .with_delay(Duration::from_secs(60))
@@ -1939,7 +1939,7 @@ mod regression_tests {
 
     #[tokio::test]
     async fn a_shut_down_core_stops_its_session_and_refuses_calls() {
-        let (_server, core, _room) = core_with_room().await;
+        let (_store, _server, core, _room) = core_with_room().await;
 
         core.shutdown().await;
 
@@ -1954,7 +1954,7 @@ mod regression_tests {
     #[tokio::test]
     async fn switching_back_to_a_cached_client_rebuilds_one_set_of_handlers() {
         use crate::session::{AccountRegistry, PersistedAccount, current_session};
-        let (server, core, room) = core_with_room().await;
+        let (_store, server, core, room) = core_with_room().await;
         let client = room.client();
         let mut registry = AccountRegistry::empty();
         registry.upsert(PersistedAccount {
@@ -1994,7 +1994,7 @@ mod regression_tests {
         use crate::session::{AccountRegistry, PersistedAccount, current_session};
         use matrix_sdk_ui::sync_service::State;
 
-        let (server, core, room) = core_with_room().await;
+        let (_store, server, core, room) = core_with_room().await;
         let client = room.client();
         let mut registry = AccountRegistry::empty();
         registry.upsert(PersistedAccount {
@@ -2389,7 +2389,7 @@ mod regression_tests {
     #[expect(clippy::unwrap_used, reason = "test code")]
     async fn logged_in_core() -> (tempfile::TempDir, Arc<Core>, PersistedAccount) {
         use crate::session::{AccountRegistry, current_session};
-        let (server, _, room) = core_with_room().await;
+        let (_store, server, _, room) = core_with_room().await;
         let base = tempfile::tempdir().unwrap();
         let (core, _) = Core::new(
             base.path().to_str().unwrap(),
@@ -2420,7 +2420,7 @@ mod regression_tests {
         Arc<Core>,
         PersistedAccount,
     ) {
-        let (server, _, room) = core_with_room().await;
+        let (_store, server, _, room) = core_with_room().await;
         let base = tempfile::tempdir().unwrap();
         let (core, _) = Core::new(
             base.path().join("data").to_str().unwrap(),
@@ -2656,7 +2656,7 @@ mod regression_tests {
     #[tokio::test]
     async fn rejected_tokens_stay_retired_when_the_registry_write_fails() {
         use crate::session::{AccountRegistry, PersistedAccount, current_session};
-        let (server, _, room) = core_with_room().await;
+        let (_store, server, _, room) = core_with_room().await;
         let base = tempfile::tempdir().unwrap();
         let (core, _) = Core::new(
             base.path().to_str().unwrap(),
@@ -2700,7 +2700,7 @@ mod regression_tests {
     #[tokio::test]
     async fn failed_switch_persistence_keeps_the_previous_session() {
         use crate::session::{AccountRegistry, PersistedAccount, current_session};
-        let (server, previous_core, _) = core_with_room().await;
+        let (_store, server, previous_core, _) = core_with_room().await;
         let previous = previous_core.take_session().await.unwrap();
         let client = previous.client.clone();
         let sync_service = previous.sync_service.clone();
@@ -2754,7 +2754,7 @@ mod regression_tests {
     #[tokio::test]
     async fn token_reload_reads_the_durable_session_and_refuses_retired_writers() {
         use crate::session::{AccountRegistry, PersistedAccount, current_session};
-        let (server, core, room) = core_with_room().await;
+        let (_store, server, core, room) = core_with_room().await;
         let client = room.client();
         let mut registry = AccountRegistry::empty();
         let mut saved = current_session(&client, server.server().uri()).unwrap();
@@ -2799,7 +2799,7 @@ mod regression_tests {
         use crate::session::{AccountRegistry, Credentials, PersistedAccount, current_session};
         use std::sync::atomic::Ordering;
 
-        let (_server, core, room) = core_with_room().await;
+        let (_store, _server, core, room) = core_with_room().await;
         let client = room.client();
         let fresh = current_session(&client, "example.org".to_owned()).unwrap();
         let mut stale = fresh.clone();
@@ -2851,7 +2851,7 @@ mod regression_tests {
 
     #[tokio::test]
     async fn session_teardown_removes_thread_timelines() {
-        let (server, core, room) = core_with_room().await;
+        let (_store, server, core, room) = core_with_room().await;
         server.mock_room_state_encryption().plain().mount().await;
         let room_id = room.room_id().to_owned();
         let thread_root = event_id!("$thread").to_owned();
@@ -2879,7 +2879,7 @@ mod regression_tests {
 
     #[tokio::test]
     async fn session_teardown_waits_for_in_flight_timeline_builders() {
-        let (server, core, room) = core_with_room().await;
+        let (_store, server, core, room) = core_with_room().await;
         server.mock_room_state_encryption().plain().mount().await;
         let room_id = room.room_id().to_owned();
         let cache = core.timelines.lock().await;
@@ -2896,14 +2896,14 @@ mod regression_tests {
 
     #[tokio::test]
     async fn confirmed_unencrypted_rooms_still_allow_plaintext_operations() {
-        let (server, core, room) = core_with_room().await;
+        let (_store, server, core, room) = core_with_room().await;
         server.mock_room_state_encryption().plain().mount().await;
         assert!(!core.room_is_encrypted(&room).await.unwrap());
     }
 
     #[tokio::test]
     async fn a_bookmark_in_an_encrypted_room_stores_no_message_details() {
-        let (server, core, room) = core_with_room().await;
+        let (_store, server, core, room) = core_with_room().await;
         let room_id = room.room_id().to_owned();
         server
             .mock_room_state_encryption()
@@ -2956,7 +2956,7 @@ mod regression_tests {
 
     #[tokio::test]
     async fn encryption_lookup_failure_prevents_plaintext_operations() {
-        let (server, core, room) = core_with_room().await;
+        let (_store, server, core, room) = core_with_room().await;
         let room_id = room.room_id().to_owned();
         assert!(room.encryption_state().is_unknown());
         server

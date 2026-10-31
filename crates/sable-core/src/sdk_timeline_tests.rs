@@ -628,18 +628,8 @@ async fn custom_room_state_reads_from_the_server_when_not_in_the_store() {
     assert_eq!(content, Some(json!({"url": "mxc://example.org/banner"})));
 }
 
-#[expect(clippy::unwrap_used, reason = "test code")]
 async fn core_for(server: &MatrixMockServer, client: matrix_sdk::Client) -> Arc<Core> {
-    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
-    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
-    *core.session.write().await = Some(Session {
-        account_id: "test".to_owned(),
-        client,
-        sync_service,
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
-    core
+    crate::test_support::signed_in_core(server, client).await.0
 }
 
 #[expect(clippy::unwrap_used, reason = "test code")]

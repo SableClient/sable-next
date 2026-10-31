@@ -185,21 +185,11 @@ async fn preview_thumbnail_failures_omit_images() {
     }
 }
 
-#[expect(clippy::unwrap_used, reason = "test code")]
 async fn core_with_events(
     server: &MatrixMockServer,
     client: matrix_sdk::Client,
 ) -> (Arc<Core>, tokio::sync::mpsc::UnboundedReceiver<CoreEvent>) {
-    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
-    let (core, events) = Core::new("helpers-test", Box::new(MemorySessionStore::default()));
-    *core.session.write().await = Some(Session {
-        account_id: "test".into(),
-        client,
-        sync_service,
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
-    (core, events)
+    crate::test_support::signed_in_core(server, client).await
 }
 
 fn persona_json(id: &str, display_name: &str, avatar_url: Option<&str>) -> serde_json::Value {
