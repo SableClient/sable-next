@@ -1919,7 +1919,7 @@
     "settingsSync": "Sync settings across devices",
     "settingsSyncHint": "Preferences, themes, emoji, GIFs and sidebar layout sync as unencrypted account data. Notification permissions, telemetry consent and developer settings stay local.",
     "syncDrafts": "Include unsent drafts",
-    "syncDraftsHint": "Drafts sync as unencrypted account data readable by the homeserver.",
+    "syncDraftsHint": "Carry unsent messages over to your other devices. Draft encryption below shows whether your homeserver can read them.",
     "syncEncryptionTitle": "Draft encryption",
     "syncEncryptionOn": "Your drafts are encrypted before they leave this device.",
     "syncEncryptionLocked": "Enter your recovery key once so this device can read and encrypt your synced drafts. Until then they stay on this device.",
