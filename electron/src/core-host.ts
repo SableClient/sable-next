@@ -6,6 +6,7 @@ import {
   type WorkerPort,
 } from '../../src/worker/core-worker-boundary.ts';
 import type { WorkerRequest } from '../../src/worker/protocol.ts';
+import { coreProxy } from './proxy';
 
 interface NativeCore {
   restore(): Promise<void>;
@@ -24,6 +25,7 @@ interface NativeModule {
   setLogHandler(notify: (line: string) => void): void;
   setLogCapture(enabled: boolean): void;
   installKeyring(service: string, dataDir: string): void;
+  setProxy(url: string): void;
 }
 
 const EVENT_BACKLOG_LIMIT = 4096;
@@ -129,6 +131,8 @@ function serve(directory: string): void {
 
 const failure = keyringFailure(identifier, dataDir);
 if (failure === null) {
+  const proxy = process.env.SABLE_PROXY;
+  if (proxy) native.setProxy(coreProxy(proxy));
   serve(dataDir);
 } else {
   process.parentPort.postMessage({ keyringUnavailable: failure });

@@ -349,7 +349,14 @@ function startCore(): UtilityProcess {
     serviceName: 'Sable Core',
     // Explorer launches on Windows have no stdout handle for Chromium to inherit.
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, SABLE_DATA_DIR: dataDir, SABLE_IDENTIFIER: IDENTIFIER },
+    env: {
+      ...process.env,
+      SABLE_DATA_DIR: dataDir,
+      SABLE_IDENTIFIER: IDENTIFIER,
+      SABLE_PROXY: app.commandLine.hasSwitch('no-proxy-server')
+        ? ''
+        : app.commandLine.getSwitchValue('proxy-server'),
+    },
   });
 
   child.on('message', (message: unknown) => {

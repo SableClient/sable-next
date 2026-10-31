@@ -9,10 +9,10 @@ static PROXY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 ///
 /// When `url` is not a proxy `reqwest` can use, or a proxy was already set.
 #[cfg(not(target_family = "wasm"))]
-pub fn set_proxy(url: &str) -> Result<(), CoreError> {
-    matrix_sdk::reqwest::Proxy::all(url).map_err(CoreError::backend)?;
+pub fn set_proxy(url: String) -> Result<(), CoreError> {
+    matrix_sdk::reqwest::Proxy::all(&url).map_err(CoreError::backend)?;
     PROXY
-        .set(url.to_owned())
+        .set(url)
         .map_err(|_| CoreError::Invalid("the proxy is already set"))
 }
 

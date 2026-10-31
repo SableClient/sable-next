@@ -45,3 +45,23 @@ manifest unchanged. Nightly pruning preserves releases referenced by those manif
 
 The main process uses `electron-updater` with the feed for the channel chosen in
 Settings → About. Stable macOS releases are signed and notarized, so they can install updates. Nightlies built without the signing secrets are unsigned and cannot.
+
+## Proxy
+
+Pass Chromium's `--proxy-server` switch:
+
+```sh
+# Linux
+sable --proxy-server=socks5://127.0.0.1:9050
+# macOS
+open -a Sable --args --proxy-server=socks5://127.0.0.1:9050
+# Windows
+Sable.exe --proxy-server=socks5://127.0.0.1:9050
+```
+
+It applies to the window and the Sable core. `socks5://` resolves host names on the proxy,
+`socks://` is SOCKS4 and `host:port` is an HTTP proxy. Credentials and per-scheme rules
+(`http=a:1;https=b:2`) are not supported, and the core refuses to start with the latter.
+
+Calls use WebRTC over UDP, which SOCKS does not carry. Set Settings → Calls → Network interfaces
+for calls to "Only through a proxy" to keep them off the direct route.
