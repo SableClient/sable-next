@@ -265,9 +265,10 @@ impl Core {
         let overlay = Arc::new(std::sync::Mutex::new(TimelineOverlay::default()));
 
         // The SDK replaces its explicit-room set wholesale. Register before
-        tracing::info!(%room_id, "subscribe_timeline: waiting for room_subscriptions");
+        // computing the union so concurrent live subscriptions see each other.
+        tracing::debug!(%room_id, "subscribe_timeline: waiting for room_subscriptions");
         let mut subscribed = self.room_subscriptions.lock().await;
-        tracing::info!(%room_id, "subscribe_timeline: holding room_subscriptions");
+        tracing::debug!(%room_id, "subscribe_timeline: holding room_subscriptions");
         if live {
             self.remember_warm(room_id.clone());
         }
@@ -292,11 +293,14 @@ impl Core {
             self.subscriptions.lock().await.remove(&subscription);
             return Err(error);
         }
-        tracing::info!(%room_id, "subscribe_timeline: subscriptions synced");
+        tracing::debug!(%room_id, "subscribe_timeline: subscriptions synced");
         let (items, stream) = timeline.subscribe().await;
         let (echoes, mut queue_updates) = match room.send_queue().subscribe().await {
             Ok((echoes, updates)) => (echoes, Some(updates)),
-            Err(_) => (Vec::new(), None),
+            Err(error) => {
+                tracing::warn!(%room_id, "local echoes unavailable: {error}");
+                (Vec::new(), None)
+            }
         };
         let local_content = view::LocalContent::new(&echoes);
         let mut stream_content = view::LocalContent::new(&echoes);
@@ -713,14 +717,14 @@ impl Core {
         }
 
         let room_refs = room_ids.iter().map(OwnedRoomId::as_ref).collect::<Vec<_>>();
-        tracing::info!(rooms = room_refs.len(), "set_room_subscriptions: start");
+        tracing::debug!(rooms = room_refs.len(), "set_room_subscriptions: start");
         let service = self.sync_service().await?;
-        tracing::info!("set_room_subscriptions: sync service acquired");
+        tracing::debug!("set_room_subscriptions: sync service acquired");
         service
             .room_list_service()
             .set_room_subscriptions(&room_refs)
             .await;
-        tracing::info!("set_room_subscriptions: done");
+        tracing::debug!("set_room_subscriptions: done");
         *subscribed = room_ids;
         Ok(())
     }
