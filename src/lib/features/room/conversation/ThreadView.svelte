@@ -154,7 +154,9 @@
     timeline.items.find((item) => item.event_id === rootEventId) ?? rootMessage
   );
   let topic = $derived(
-    original ? replyPreviewBody(original.content).replace(/\s+/g, ' ').trim() : ''
+    original
+      ? (original.forum_title ?? replyPreviewBody(original.content).replace(/\s+/g, ' ').trim())
+      : ''
   );
 
   function requestHistory(): Promise<boolean> {

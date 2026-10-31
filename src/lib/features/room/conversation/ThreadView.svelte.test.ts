@@ -115,6 +115,21 @@ test('the header keeps a spoiler-safe topic visible', async () => {
   expect(screen.getByRole('button', { name: 'Jump to original message' })).toBeVisible();
 });
 
+test('the header shows the post title of a forum topic', async () => {
+  const root = image('$root', 'first.png');
+  root.forum_title = 'Release notes';
+  vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (this: RoomTimeline) {
+    this.items = [root];
+    this.hasSnapshot = true;
+    return Promise.resolve();
+  });
+  vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();
+  render(ThreadViewHarness, {
+    panel: { roomId: '!room:example.org', rootEventId: '$root', onClose: () => {} },
+  });
+  expect(await screen.findByRole('heading', { name: 'Release notes' })).toBeVisible();
+});
+
 test('a linked reply missing from the thread opens on its context', async () => {
   vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (this: RoomTimeline) {
     this.items = [image('$root', 'first.png')];
