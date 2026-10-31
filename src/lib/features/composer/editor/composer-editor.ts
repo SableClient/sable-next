@@ -31,8 +31,9 @@ import type { PackImageView } from '#src/generated/protocol';
 
 import { enterInsertsNewline } from '#lib/settings/enter-key.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
-import { toProseMirrorKey } from '#lib/ui/shortcuts/binding.js';
+import { isNumpadEvent, matchesBinding, toProseMirrorKey } from '#lib/ui/shortcuts/binding.js';
 import { bindingFor } from '#lib/ui/shortcuts/bindings.svelte.js';
+import { isMacPlatform } from '#lib/ui/shortcuts/global-shortcuts.js';
 import type { ShortcutId } from '#lib/ui/shortcuts/shortcuts.js';
 import type { AutocompleteQuery } from '../autocomplete';
 import { filesFrom } from '#lib/composer/composer-files.js';
@@ -86,7 +87,12 @@ function shortcutKeymap(commands: Partial<Record<ShortcutId, Command>>): Plugin 
         const map: Record<string, Command> = {};
         for (const [id, command] of Object.entries(commands)) {
           const binding = bindingFor(id);
-          if (binding) map[toProseMirrorKey(binding)] = command;
+          if (!binding) continue;
+          // ProseMirror keymaps only see event.key, so numpad keys would collide with their main-row twins.
+          if (!isNumpadEvent(event)) map[toProseMirrorKey(binding)] = command;
+          else if (matchesBinding(binding, event, isMacPlatform())) {
+            return command(view.state, view.dispatch, view);
+          }
         }
         return keydownHandler(map)(view, event);
       },

@@ -18,6 +18,7 @@ export interface ParsedBinding {
 
 export interface KeyboardEventLike {
   key: string;
+  code: string;
   ctrlKey: boolean;
   metaKey: boolean;
   altKey: boolean;
@@ -69,6 +70,32 @@ export function parseBinding(binding: string): ParsedBinding {
   return parsed;
 }
 
+const NUMPAD_KEYS: Record<string, string> = {
+  Numpad0: 'num0',
+  Numpad1: 'num1',
+  Numpad2: 'num2',
+  Numpad3: 'num3',
+  Numpad4: 'num4',
+  Numpad5: 'num5',
+  Numpad6: 'num6',
+  Numpad7: 'num7',
+  Numpad8: 'num8',
+  Numpad9: 'num9',
+  NumpadDecimal: 'numdec',
+  NumpadAdd: 'numadd',
+  NumpadSubtract: 'numsub',
+  NumpadMultiply: 'nummult',
+  NumpadDivide: 'numdiv',
+};
+
+export function isNumpadEvent(event: KeyboardEventLike): boolean {
+  return event.code in NUMPAD_KEYS;
+}
+
+function eventKey(event: KeyboardEventLike): string {
+  return NUMPAD_KEYS[event.code] ?? event.key.toLowerCase();
+}
+
 function isNamedKey(key: string): boolean {
   return key.length > 1;
 }
@@ -84,7 +111,7 @@ export function matchesBinding(binding: string, event: KeyboardEventLike, isMac:
   if (isNamedKey(parsed.key) && event.shiftKey !== parsed.shift) return false;
   if (parsed.shift && !event.shiftKey) return false;
 
-  return event.key.toLowerCase() === parsed.key;
+  return eventKey(event) === parsed.key;
 }
 
 export function isEditableTarget(target: EventTarget | null): boolean {
@@ -142,6 +169,11 @@ const DISPLAY_KEY_NAMES: Record<string, string> = {
   arrowleft: 'Left',
   arrowright: 'Right',
   escape: 'Esc',
+  numdec: 'Num .',
+  numadd: 'Num +',
+  numsub: 'Num -',
+  nummult: 'Num *',
+  numdiv: 'Num /',
 };
 
 export function formatBinding(binding: string, isMac: boolean): string {
@@ -156,7 +188,9 @@ export function formatBinding(binding: string, isMac: boolean): string {
 
   const keyName =
     DISPLAY_KEY_NAMES[parsed.key] ??
-    (parsed.key.length === 1 ? parsed.key.toUpperCase() : parsed.key);
+    (parsed.key.length === 1
+      ? parsed.key.toUpperCase()
+      : parsed.key.replace(/^num(\d)$/, 'Num $1'));
   parts.push(keyName);
 
   return parts.join('+');
@@ -193,7 +227,7 @@ export function toProseMirrorKey(binding: string): string {
 const MODIFIER_KEYS = new Set(['control', 'meta', 'alt', 'shift', 'os', 'altgraph']);
 
 export function bindingFromEvent(event: KeyboardEventLike, isMac: boolean): string | null {
-  const key = event.key.toLowerCase();
+  const key = eventKey(event);
   if (MODIFIER_KEYS.has(key)) return null;
 
   const parts: string[] = [];
