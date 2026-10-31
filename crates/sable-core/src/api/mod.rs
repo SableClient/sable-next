@@ -177,8 +177,11 @@ impl Core {
     ///
     /// # Errors
     ///
-    /// Returns the handler's error.
+    /// `Unavailable` after shutdown, otherwise the handler's error.
     pub async fn run<H: Handler>(self: &Arc<Self>, handler: H) -> Result<H::Ok, RpcError> {
+        if self.shut_down.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(RpcError::Unavailable);
+        }
         timed(std::any::type_name::<H>(), Box::pin(handler.run(self))).await
     }
 }
