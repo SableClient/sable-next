@@ -1,7 +1,7 @@
 extends: file:./electron-builder.yml
 productName: Sable Nightly
 extraMetadata:
-  desktopName: sable-nightly
+  desktopName: moe.sable.next.electron.Nightly.desktop
 protocols:
   - name: Sable Nightly
     schemes:

@@ -11,7 +11,7 @@
     "url": "https://git.sable.moe/SableClient/sable-next.git",
     "directory": "electron"
   },
-  "desktopName": "sable-electron",
+  "desktopName": "moe.sable.client.desktop",
   "type": "module",
   "main": "dist/main.cjs",
   "scripts": {

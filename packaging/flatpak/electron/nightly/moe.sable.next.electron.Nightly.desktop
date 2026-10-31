@@ -6,5 +6,5 @@ Exec=sable-electron %U
 Icon=moe.sable.next.electron.Nightly
 Terminal=false
 Categories=Network;InstantMessaging;Chat;
-StartupWMClass=sable-nightly
+StartupWMClass=moe.sable.next.electron.Nightly
 MimeType=x-scheme-handler/matrix;x-scheme-handler/moe.sable.next;

@@ -6,5 +6,5 @@ Exec=sable %U
 Icon=moe.sable.client
 Terminal=false
 Categories=Network;InstantMessaging;Chat;
-StartupWMClass=sable-electron
+StartupWMClass=moe.sable.client
 MimeType=x-scheme-handler/matrix;x-scheme-handler/sable;x-scheme-handler/moe.sable.app;
