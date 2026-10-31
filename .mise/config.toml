@@ -75,6 +75,7 @@ run = [
   "cargo clippy --locked -p app --all-targets -- -D warnings",
   "cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings",
   { task = "check:types" },
+  { task = "check:settings-changes" },
   "cargo deny check",
 ]
 tools = { "github:bnjbvr/cargo-machete" = "0.9.2", "aqua:EmbarkStudios/cargo-deny" = "0.20.2" }
@@ -120,6 +121,10 @@ run = "cargo run --locked -p sable-core --example generate-types --features type
 [tasks."generate:emoji-properties"]
 description = "Regenerate the Rust emoji property tables from Node's Unicode data"
 run = "node scripts/generate/emoji-properties.mjs"
+
+[tasks."generate:settings-changes"]
+description = "Regenerate the list of new and changed settings from release tags"
+run = "node scripts/generate/settings-changes.mjs"
 
 [tasks."generate:installer-assets"]
 description = "Regenerate the Electron installer artwork"
@@ -187,3 +192,7 @@ dir = "infra/web"
 raw_args = true
 hide = true
 tools = { "opentofu" = "1.13.1" }
+
+[tasks."check:settings-changes"]
+description = "Check that the generated settings changes match the release tags"
+run = "node scripts/generate/settings-changes.mjs --check"

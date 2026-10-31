@@ -1,0 +1,34 @@
+{
+  "upcoming": {
+    "added": [
+      "launchAtLogin",
+      "startMinimized",
+      "showAllTimestamps",
+      "messageSwipeAction",
+      "showSingleReactionCount"
+    ],
+    "changed": [
+      {
+        "key": "callScreenCodec",
+        "from": "'auto'",
+        "to": "'h264'"
+      }
+    ]
+  },
+  "v2.2.3": {
+    "added": [],
+    "changed": [
+      {
+        "key": "emoticonToEmoji",
+        "from": "true",
+        "to": "false"
+      }
+    ]
+  },
+  "v2.2.2": {
+    "added": [
+      "emoticonToEmoji"
+    ],
+    "changed": []
+  }
+}

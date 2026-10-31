@@ -864,7 +864,10 @@
     "startRoomTitle": "Start a room",
     "startRoomDescription": "Create a room or space for your own friend group or community.",
     "joinConversationTitle": "Join a room or DM",
-    "joinConversationDescription": "Enter a room address or Matrix user ID to start chatting."
+    "joinConversationDescription": "Enter a room address or Matrix user ID to start chatting.",
+    "settingsChangesTitle": "New and changed settings",
+    "settingsChangesNew": "New",
+    "settingsChangesDefault": "Default changed"
   },
   "emoji": {
     "unicode": "Emoji",

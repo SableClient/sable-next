@@ -14,6 +14,7 @@
   import ActionCard from '#lib/ui/ActionCard.svelte';
   import SableBrandMark from '#lib/ui/SableBrandMark.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
+  import SettingsChangesCard from './SettingsChangesCard.svelte';
 
   interface Props {
     titleKey?: string;
@@ -76,6 +77,8 @@
       </LinkButton>
     </div>
   </section>
+
+  <SettingsChangesCard />
 
   <section class="start-section" aria-labelledby="start-title">
     <div class="section-heading">
