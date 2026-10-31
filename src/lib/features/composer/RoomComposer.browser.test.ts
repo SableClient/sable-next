@@ -365,6 +365,13 @@ test('short composer gives text a full row on narrow screens', async () => {
   expect(layout.controlsTop).toBeGreaterThanOrEqual(layout.editorBottom);
 });
 
+test('an empty short composer stays on one row on narrow screens', async () => {
+  await page.viewport(360, 800);
+  const { editor } = await mount(true, { composerForm: 'short' });
+  const layout = await measure(editor());
+  expect(layout.controlsTop).toBeLessThan(layout.editorBottom);
+});
+
 for (const width of [320, 414, 1280]) {
   test(`long messages do not overlap the expand button at ${String(width)}px`, async () => {
     await page.viewport(width, 800);

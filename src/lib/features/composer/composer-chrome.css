@@ -254,17 +254,6 @@
   grid-template-areas: 'formatting formatting formatting' 'before field after';
 }
 
-@container (width < 24rem) {
-  .composer-row.short {
-    grid-template-areas: 'field field' 'before after';
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .composer-row.short.formatting-open {
-    grid-template-areas: 'field field' 'formatting formatting' 'before after';
-  }
-}
-
 .composer-row.short .composer-expand {
   display: none;
 }
