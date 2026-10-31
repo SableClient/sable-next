@@ -6,7 +6,7 @@ use std::sync::{Arc, LazyLock};
 use matrix_sdk::store::RoomLoadSettings;
 use tokio::sync::OwnedMutexGuard;
 
-use super::{PushHost, push_host};
+use super::cold::{PushHost, push_host};
 
 #[derive(PartialEq, Eq, Hash)]
 struct Key {

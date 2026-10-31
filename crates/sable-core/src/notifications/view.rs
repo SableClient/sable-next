@@ -12,7 +12,6 @@ use matrix_sdk_ui::notification_client::{
 };
 use sable_model::text::visible_name;
 
-use super::{is_rtc_invite, prepare_invite};
 use crate::preview;
 use crate::protocol::{NotificationView, PushEventView, PushFetchView};
 
@@ -271,6 +270,32 @@ fn body(event: &NotificationEvent) -> String {
         NotificationEvent::Invite(_) => "invited you".to_owned(),
         NotificationEvent::Timeline(event) => preview::describe(event.as_ref()),
     }
+}
+
+pub(super) fn is_rtc_invite(event: &serde_json::Value) -> bool {
+    matches!(
+        event["type"].as_str(),
+        Some("m.rtc.invite" | "m.rtc.notification" | "org.matrix.msc4075.rtc.notification")
+    )
+}
+
+pub(super) async fn prepare_invite(room: &matrix_sdk::Room, event: &mut serde_json::Value) -> bool {
+    let Some(invite) = crate::calls::validate_invite(room, event).await else {
+        return false;
+    };
+    let now = u64::from(MilliSecondsSinceUnixEpoch::now().get());
+    let remaining = invite.expires_at_ms.saturating_sub(now);
+    if remaining == 0 {
+        return false;
+    }
+    // These fields describe local presentation; they are never sent back into the room.
+    let content = &mut event["content"];
+    content["notification_type"] = if invite.ring { "ring" } else { "notification" }.into();
+    content["sender_ts"] = now.into();
+    content["lifetime"] = remaining.into();
+    content["m.call.intent"] = if invite.has_video { "video" } else { "audio" }.into();
+    content["body"] = "Call started".into();
+    true
 }
 
 #[cfg(test)]

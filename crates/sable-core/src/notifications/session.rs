@@ -8,18 +8,19 @@ use matrix_sdk::store::RoomLoadSettings;
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 use sable_model::text::visible_name;
 
+use super::cold::{
+    ACCOUNT_DATA_TIMEOUT, ColdPush, KeyFetch, PushHost, cold_push_store_dir, decrypt_push_event,
+    push_host,
+};
 use super::device_activity::DEVICE_ACTIVITY_EVENT;
 use super::media::{
     PUSH_AVATAR_SIZE, PUSH_IMAGE_HEIGHT, PUSH_IMAGE_WIDTH, PUSH_MEDIA_DIRECTORY, PushImage,
     PushMedia, cached_push_media, message_image, prune_push_media, push_sender_name,
 };
-use super::{
-    ACCOUNT_DATA_TIMEOUT, ColdPush, KeyFetch, PushHost, cold_push_store_dir, decrypt_push_event,
-    fetch_push_event_with, push_cache, push_host,
-};
+use super::push_cache;
+use super::view::fetch_push_event_with;
 use crate::protocol::PushFetchView;
 
-#[cfg(not(target_family = "wasm"))]
 pub async fn cold_push_active_elsewhere(
     data_dir: &std::path::Path,
     user_id: &str,
@@ -33,7 +34,6 @@ pub async fn cold_push_active_elsewhere(
     }
 }
 
-#[cfg(not(target_family = "wasm"))]
 pub async fn fetch_cold_push_event(
     data_dir: &std::path::Path,
     user_id: &str,
@@ -49,17 +49,14 @@ pub async fn fetch_cold_push_event(
 
 /// One restored login for every step of a push, which callers must bound to
 /// the platform's notification processing budget.
-#[cfg(not(target_family = "wasm"))]
 pub struct PushSession {
     host: push_cache::ColdHost,
     store_dir: std::path::PathBuf,
     pub(super) room_id: matrix_sdk::ruma::OwnedRoomId,
 }
 
-#[cfg(not(target_family = "wasm"))]
 const READ_ROOMS_TIMEOUT: Duration = Duration::from_secs(5);
 
-#[cfg(not(target_family = "wasm"))]
 fn read_rooms_from_sync(
     joined: &std::collections::BTreeMap<matrix_sdk::ruma::OwnedRoomId, Option<u64>>,
     room_ids: &[matrix_sdk::ruma::OwnedRoomId],
@@ -75,7 +72,6 @@ fn read_rooms_from_sync(
         .collect()
 }
 
-#[cfg(not(target_family = "wasm"))]
 impl PushSession {
     pub async fn open(
         store_dir: &std::path::Path,
@@ -436,7 +432,6 @@ impl PushSession {
     }
 }
 
-#[cfg(not(target_family = "wasm"))]
 pub async fn cold_push_session(
     data_dir: &std::path::Path,
     user_id: &str,
@@ -446,7 +441,6 @@ pub async fn cold_push_session(
     PushSession::cached(&cold_push_store_dir(data_dir), user_id, device_id, room_id).await
 }
 
-#[cfg(not(target_family = "wasm"))]
 pub async fn cold_push_media(
     data_dir: &std::path::Path,
     user_id: &str,

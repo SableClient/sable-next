@@ -1,45 +1,27 @@
 #[cfg(not(target_family = "wasm"))]
-use matrix_sdk::Client;
-use matrix_sdk::ruma::MilliSecondsSinceUnixEpoch;
-#[cfg(not(target_family = "wasm"))]
-use matrix_sdk::ruma::OwnedEventId;
-#[cfg(not(target_family = "wasm"))]
-use matrix_sdk::ruma::RoomId;
-#[cfg(not(target_family = "wasm"))]
-use matrix_sdk::ruma::events::room::encrypted::OriginalSyncRoomEncryptedEvent;
-#[cfg(not(target_family = "wasm"))]
-use matrix_sdk::ruma::serde::Raw;
-#[cfg(not(target_family = "wasm"))]
-use matrix_sdk_ui::notification_client::{
-    NotificationClient, NotificationProcessSetup, NotificationStatus, RawNotificationEvent,
-};
-
-#[cfg(not(target_family = "wasm"))]
-use crate::session::{AccountRegistry, PersistedAccount};
-#[cfg(not(target_family = "wasm"))]
-use crate::store::{FileSessionStore, SessionStore};
-#[cfg(not(target_family = "wasm"))]
-use matrix_sdk::store::RoomLoadSettings;
-
-#[cfg(not(target_family = "wasm"))]
-mod push_cache;
-
-#[cfg(not(target_family = "wasm"))]
-pub use push_cache::evict as evict_push_cache;
-
+mod cold;
 mod device_activity;
 mod media;
+#[cfg(not(target_family = "wasm"))]
+mod push_cache;
 mod pusher;
 #[cfg(not(target_family = "wasm"))]
 mod session;
 mod view;
 
+#[cfg(not(target_family = "wasm"))]
+pub use cold::{
+    ColdPush, PushClient, cold_push_store_dir, decrypt_cold_push, restore_push_client,
+    settle_refreshes,
+};
 pub(crate) use device_activity::set_device_activity;
 #[cfg(not(target_family = "wasm"))]
 pub(crate) use media::clear_push_media;
 pub use media::push_sender_name;
 #[cfg(not(target_family = "wasm"))]
 pub use media::{PushImage, PushMedia};
+#[cfg(not(target_family = "wasm"))]
+pub use push_cache::evict as evict_push_cache;
 #[cfg(not(target_family = "wasm"))]
 pub(crate) use pusher::GATEWAY_PATH;
 pub(crate) use pusher::{gateway, pusher_display_name};
@@ -49,554 +31,11 @@ pub use session::{
     PushSession, cold_push_active_elsewhere, cold_push_media, cold_push_session,
     fetch_cold_push_event,
 };
-#[cfg(not(target_family = "wasm"))]
-use view::fetch_push_event_with;
 pub use view::{
     NOISY_KEY, every_encrypted_event_pushed, fetch_push_event, is_backfill, is_read, notification,
     notifies, uses_direct_push_rules,
 };
 pub(crate) use view::{foreground_notification, invite_notification, raw_is_encrypted};
-
-/// Resolve Android's app-data root to the session and SDK stores under `files`.
-#[cfg(not(target_family = "wasm"))]
-#[must_use]
-pub fn cold_push_store_dir(data_dir: &std::path::Path) -> std::path::PathBuf {
-    data_dir.join("files")
-}
-
-#[cfg(not(target_family = "wasm"))]
-fn push_account<'a>(
-    accounts: &'a AccountRegistry,
-    user_id: &str,
-    device_id: &str,
-) -> Option<&'a PersistedAccount> {
-    accounts.accounts.iter().find(|account| {
-        !account.needs_reauth
-            && account.session.credentials.user_id() == user_id
-            && account.session.credentials.device_id() == device_id
-    })
-}
-
-#[cfg(not(target_family = "wasm"))]
-#[derive(Debug, PartialEq, Eq)]
-pub enum ColdPush {
-    Clear(String),
-    Discard,
-    Unevaluated,
-    NeedsKey { quietly: bool },
-    Undecryptable,
-}
-
-/// Decrypt an Android push.
-#[cfg(not(target_family = "wasm"))]
-pub async fn decrypt_cold_push(
-    data_dir: &std::path::Path,
-    user_id: &str,
-    device_id: &str,
-    room_id: &str,
-    event_json: &str,
-    fetch_keys: bool,
-) -> ColdPush {
-    let store_dir = cold_push_store_dir(data_dir);
-    let Some(host) = push_cache::cold_host(&store_dir, user_id, device_id).await else {
-        return ColdPush::Undecryptable;
-    };
-    let decrypt = || {
-        let key_fetch = if fetch_keys {
-            host.key_fetch()
-        } else {
-            KeyFetch::Never
-        };
-        Box::pin(decrypt_push_event(
-            host.client(),
-            key_fetch,
-            room_id,
-            event_json,
-        ))
-    };
-    let result = decrypt().await;
-    match result {
-        ColdPush::Undecryptable | ColdPush::NeedsKey { .. }
-            if fetch_keys && host.refresh().await =>
-        {
-            decrypt().await
-        }
-        result => result,
-    }
-}
-
-#[cfg(not(target_family = "wasm"))]
-#[derive(Clone, Default)]
-struct PendingRefreshes(std::sync::Arc<parking_lot::Mutex<Vec<tokio::task::JoinHandle<()>>>>);
-
-#[cfg(not(target_family = "wasm"))]
-tokio::task_local! {
-    static PENDING_REFRESHES: PendingRefreshes;
-}
-
-#[cfg(not(target_family = "wasm"))]
-pub async fn settle_refreshes<T>(operation: impl std::future::Future<Output = T>) -> T {
-    let pending = PendingRefreshes::default();
-    let result = PENDING_REFRESHES.scope(pending.clone(), operation).await;
-    let tasks = std::mem::take(&mut *pending.0.lock());
-    for task in tasks {
-        let _ = task.await;
-    }
-    result
-}
-
-/// A notification operation owns refreshes separately from SDK background tasks.
-#[cfg(not(target_family = "wasm"))]
-pub struct PushClient {
-    client: Client,
-    /// Only a client opened without a `Core` refreshes; the app's own clients refresh themselves.
-    refreshes: bool,
-    _lease: Option<crate::session::StoreLease>,
-}
-
-#[cfg(not(target_family = "wasm"))]
-impl std::ops::Deref for PushClient {
-    type Target = Client;
-
-    fn deref(&self) -> &Self::Target {
-        &self.client
-    }
-}
-
-#[cfg(not(target_family = "wasm"))]
-impl PushClient {
-    /// Only OAuth refreshes, under the SDK's cross-process lock; the saved tokens
-    /// are written by the session callbacks while that lock is held.
-    async fn refresh(&self) -> bool {
-        if !self.refreshes
-            || self.client.oauth().full_session().is_none()
-            || !self.token_rejected().await
-        {
-            return false;
-        }
-        let client = self.client.clone();
-        let (sent, refreshed) = tokio::sync::oneshot::channel();
-        let task = tokio::spawn(async move {
-            let _ = sent.send(client.oauth().refresh_access_token().await.is_ok());
-        });
-        let _ = PENDING_REFRESHES.try_with(|pending| {
-            pending.0.lock().push(task);
-        });
-        refreshed.await.unwrap_or(false)
-    }
-
-    async fn token_rejected(&self) -> bool {
-        matches!(
-            self.client.whoami().await,
-            Err(error) if matches!(
-                error.client_api_error_kind(),
-                Some(matrix_sdk::ruma::api::error::ErrorKind::UnknownToken(_))
-            )
-        )
-    }
-
-    /// Retry a failed notification request once with refreshed credentials.
-    ///
-    /// # Errors
-    /// Returns the request error when refresh is unavailable or the retry fails.
-    pub async fn retry<T, E, F: std::future::Future<Output = Result<T, E>>>(
-        &self,
-        request: impl Fn() -> F,
-    ) -> Result<T, E> {
-        let result = request().await;
-        if result.is_err() && self.refresh().await {
-            request().await
-        } else {
-            result
-        }
-    }
-}
-
-/// Restore a notification login, rotating OAuth credentials under the SDK's cross-process lock.
-#[cfg(not(target_family = "wasm"))]
-pub async fn restore_push_client(
-    store_dir: &std::path::Path,
-    user_id: &str,
-    device_id: &str,
-) -> Option<PushClient> {
-    let host = push_host(store_dir, user_id, device_id, RoomLoadSettings::default()).await?;
-    Some(match host {
-        PushHost::Live { client, .. } => PushClient {
-            client,
-            refreshes: false,
-            _lease: None,
-        },
-        PushHost::Shared { client, lease } => PushClient {
-            client,
-            refreshes: false,
-            _lease: Some(lease),
-        },
-        PushHost::Own(client) => client,
-    })
-}
-
-#[cfg(not(target_family = "wasm"))]
-async fn open_push_client(
-    store_dir: &std::path::Path,
-    user_id: &str,
-    device_id: &str,
-    room_load: RoomLoadSettings,
-) -> Option<PushClient> {
-    let account = saved_push_account(store_dir, user_id, device_id).await?;
-    let base_store = store_dir.to_str()?;
-    let client = crate::session::restore_notification_client(
-        &account.store_id,
-        &account.session,
-        room_load,
-        |client| install_push_session_callbacks(client, base_store, &account),
-    )
-    .await
-    .ok()?;
-    Some(PushClient {
-        client,
-        refreshes: true,
-        _lease: None,
-    })
-}
-
-#[cfg(not(target_family = "wasm"))]
-async fn saved_push_account(
-    store_dir: &std::path::Path,
-    user_id: &str,
-    device_id: &str,
-) -> Option<PersistedAccount> {
-    let stored = FileSessionStore::new(store_dir).load().await.ok()??;
-    let base_store = store_dir.to_str()?;
-    let (mut accounts, _) = AccountRegistry::from_bytes(&stored, base_store).ok()?;
-    accounts.reanchor_stores(base_store);
-    let mut account = push_account(&accounts, user_id, device_id).cloned()?;
-    let logins = crate::credentials::LoginTokens::new(store_dir);
-    let (account_id, device_id) = (account.account_id.clone(), device_id.to_owned());
-    let embedded = account.session.credentials.tokens();
-    let (tokens, _) = tokio::task::spawn_blocking(move || {
-        logins.read_or_migrate(&account_id, &device_id, &embedded)
-    })
-    .await
-    .ok()?
-    .ok()?;
-    account.session.credentials.set_tokens(tokens);
-    Some(account)
-}
-
-#[cfg(not(target_family = "wasm"))]
-enum PushHost {
-    Live {
-        client: Client,
-        sync_service: std::sync::Arc<matrix_sdk_ui::sync_service::SyncService>,
-    },
-    Shared {
-        client: Client,
-        lease: crate::session::StoreLease,
-    },
-    Own(PushClient),
-}
-
-#[cfg(not(target_family = "wasm"))]
-impl PushHost {
-    fn client(&self) -> &Client {
-        match self {
-            Self::Live { client, .. } | Self::Shared { client, .. } => client,
-            Self::Own(push) => push,
-        }
-    }
-
-    fn key_fetch(&self) -> KeyFetch {
-        match self {
-            Self::Live { sync_service, .. } => KeyFetch::Live(sync_service.clone()),
-            _ => KeyFetch::Cold,
-        }
-    }
-
-    async fn refresh(&self) -> bool {
-        match self {
-            Self::Own(push) => push.refresh().await,
-            _ => false,
-        }
-    }
-
-    async fn retry<T, E, F: std::future::Future<Output = Result<T, E>>>(
-        &self,
-        request: impl Fn() -> F,
-    ) -> Result<T, E> {
-        match self {
-            Self::Own(push) => push.retry(request).await,
-            _ => request().await,
-        }
-    }
-}
-
-#[cfg(not(target_family = "wasm"))]
-const RESTORE_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
-#[cfg(not(target_family = "wasm"))]
-const ACCOUNT_DATA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
-
-/// A core in this process opens the client, so a store never has two there. Without one, the
-/// push opens its own and never waits for, or blocks, the app.
-#[cfg(not(target_family = "wasm"))]
-async fn push_host(
-    store_dir: &std::path::Path,
-    user_id: &str,
-    device_id: &str,
-    room_load: RoomLoadSettings,
-) -> Option<PushHost> {
-    let Some(core) = crate::Core::owning(store_dir) else {
-        return open_push_client(store_dir, user_id, device_id, room_load)
-            .await
-            .map(PushHost::Own);
-    };
-    let _ = tokio::time::timeout(RESTORE_WAIT, core.restore_lock.lock()).await;
-    if let Some(host) = live_push_host(&core, user_id, device_id).await {
-        return Some(host);
-    }
-    let accounts = core.accounts().await.ok()?;
-    let account = push_account(&accounts, user_id, device_id)?;
-    let lease = crate::session::store_lease(&account.store_id).await;
-    if let Some(host) = live_push_host(&core, user_id, device_id).await {
-        return Some(host);
-    }
-    let client = core.saved_account_client(account, &lease).await.ok()?;
-    client
-        .set_presence(
-            matrix_sdk::ruma::presence::PresenceState::Offline,
-            None,
-            false,
-        )
-        .await
-        .ok()?;
-    Some(PushHost::Shared { client, lease })
-}
-
-#[cfg(not(target_family = "wasm"))]
-async fn live_push_host(core: &crate::Core, user_id: &str, device_id: &str) -> Option<PushHost> {
-    core.session
-        .read()
-        .await
-        .as_ref()
-        .filter(|session| is_login(&session.client, user_id, device_id))
-        .map(|session| PushHost::Live {
-            client: session.client.clone(),
-            sync_service: session.sync_service.clone(),
-        })
-}
-
-#[cfg(not(target_family = "wasm"))]
-fn is_login(client: &Client, user_id: &str, device_id: &str) -> bool {
-    client.user_id().is_some_and(|id| id == user_id)
-        && client.device_id().is_some_and(|id| id == device_id)
-}
-
-/// Synchronous, as the SDK calls them inside a refresh, possibly on a single-threaded runtime.
-#[cfg(not(target_family = "wasm"))]
-fn install_push_session_callbacks(client: &Client, base_store: &str, account: &PersistedAccount) {
-    let base_store = std::path::Path::new(base_store);
-    let device_id = account.session.credentials.device_id();
-    let reload = {
-        let logins = crate::credentials::LoginTokens::new(base_store);
-        let (account_id, device_id) = (account.account_id.clone(), device_id.clone());
-        move |_: Client| {
-            let tokens = logins
-                .read(&account_id, &device_id)?
-                .ok_or("this login has no saved tokens")?;
-            if tokens.access_token.is_empty() {
-                return Err("saved login access token is empty".into());
-            }
-            Ok(tokens)
-        }
-    };
-    let save = {
-        let logins = crate::credentials::LoginTokens::new(base_store);
-        let account_id = account.account_id.clone();
-        move |client: Client| {
-            let tokens = client
-                .session_tokens()
-                .ok_or(crate::store::StoreError::Invalid(
-                    "the refreshed client has no tokens",
-                ))?;
-            logins
-                .save(&account_id, &device_id, &tokens)
-                .map_err(Into::into)
-        }
-    };
-    if let Err(error) = client.set_session_callbacks(Box::new(reload), Box::new(save)) {
-        tracing::error!("could not install push session callbacks: {error}");
-    }
-}
-
-#[cfg(not(target_family = "wasm"))]
-enum KeyFetch {
-    Never,
-    Live(std::sync::Arc<matrix_sdk_ui::sync_service::SyncService>),
-    Cold,
-}
-
-#[cfg(not(target_family = "wasm"))]
-async fn decrypt_push_event(
-    client: &Client,
-    key_fetch: KeyFetch,
-    room_id: &str,
-    event_json: &str,
-) -> ColdPush {
-    let every_encrypted = every_encrypted_event_pushed(client).await;
-    let undecryptable = if every_encrypted {
-        ColdPush::Discard
-    } else {
-        ColdPush::Undecryptable
-    };
-    let Ok(room_id) = RoomId::parse(room_id) else {
-        return ColdPush::Undecryptable;
-    };
-    let Some(room) = client.get_room(&room_id) else {
-        return ColdPush::Undecryptable;
-    };
-    let Ok(event) = Raw::<OriginalSyncRoomEncryptedEvent>::from_json_string(event_json.to_owned())
-    else {
-        return ColdPush::Undecryptable;
-    };
-    if let Ok(Some(sender)) = event.get_field::<matrix_sdk::ruma::OwnedUserId>("sender")
-        && client.is_user_ignored(&sender).await
-    {
-        return ColdPush::Discard;
-    }
-    if let Err(error) = crate::rooms::fill_own_member(&room).await {
-        tracing::debug!("could not load the own member before decrypting: {error}");
-    }
-    let push_context = room.push_context().await.ok().flatten();
-    let Ok(decrypted) = room.decrypt_event(&event, push_context.as_ref()).await else {
-        return undecryptable;
-    };
-
-    match &decrypted.kind {
-        matrix_sdk::deserialized_responses::TimelineEventKind::Decrypted(clear) => {
-            let actions = decrypted.push_actions();
-            return match actions {
-                None if every_encrypted => ColdPush::Unevaluated,
-                None => prepared_push_event(&room, clear.event.json().get(), false).await,
-                Some(actions) if notifies(actions) => {
-                    let noisy = actions
-                        .iter()
-                        .any(|action| action.sound().is_some() || action.is_highlight());
-                    prepared_push_event(&room, clear.event.json().get(), noisy).await
-                }
-                Some(_) => ColdPush::Discard,
-            };
-        }
-        matrix_sdk::deserialized_responses::TimelineEventKind::UnableToDecrypt {
-            utd_info, ..
-        } if utd_info.reason.is_missing_room_key() => {}
-        matrix_sdk::deserialized_responses::TimelineEventKind::UnableToDecrypt { .. }
-        | matrix_sdk::deserialized_responses::TimelineEventKind::PlainText { .. } => {
-            return undecryptable;
-        }
-    }
-
-    let sync_service = match key_fetch {
-        KeyFetch::Never => {
-            return ColdPush::NeedsKey {
-                quietly: every_encrypted,
-            };
-        }
-        KeyFetch::Live(sync_service) => sync_service,
-        KeyFetch::Cold => match crate::session::build_sync(client.clone()).await {
-            Ok(sync_service) => sync_service,
-            Err(_) => return undecryptable,
-        },
-    };
-    let Some(event_id) = event.get_field::<OwnedEventId>("event_id").ok().flatten() else {
-        return undecryptable;
-    };
-    let setup = NotificationProcessSetup::SingleProcess { sync_service };
-    let Ok(notifications) = NotificationClient::new(client.clone(), setup).await else {
-        return undecryptable;
-    };
-    match notifications.get_notification(&room_id, &event_id).await {
-        Ok(NotificationStatus::Event(item)) if item.actions.is_none() && every_encrypted => {
-            ColdPush::Unevaluated
-        }
-        Ok(NotificationStatus::Event(item))
-            if item
-                .actions
-                .as_deref()
-                .is_some_and(|actions| !notifies(actions)) =>
-        {
-            ColdPush::Discard
-        }
-        Ok(NotificationStatus::Event(item)) => match item.raw_event {
-            RawNotificationEvent::Timeline(clear)
-                if clear.get_field::<String>("type").ok().flatten().as_deref()
-                    != Some("m.room.encrypted") =>
-            {
-                let noisy = item.is_noisy == Some(true) || item.has_mention == Some(true);
-                prepared_push_event(&room, clear.json().get(), noisy).await
-            }
-            _ => undecryptable,
-        },
-        Ok(NotificationStatus::EventFilteredOut | NotificationStatus::EventRedacted) => {
-            ColdPush::Discard
-        }
-        Ok(NotificationStatus::EventNotFound) | Err(_) => undecryptable,
-    }
-}
-
-fn is_rtc_invite(event: &serde_json::Value) -> bool {
-    matches!(
-        event["type"].as_str(),
-        Some("m.rtc.invite" | "m.rtc.notification" | "org.matrix.msc4075.rtc.notification")
-    )
-}
-
-async fn prepare_invite(room: &matrix_sdk::Room, event: &mut serde_json::Value) -> bool {
-    let Some(invite) = crate::calls::validate_invite(room, event).await else {
-        return false;
-    };
-    let now = u64::from(MilliSecondsSinceUnixEpoch::now().get());
-    let remaining = invite.expires_at_ms.saturating_sub(now);
-    if remaining == 0 {
-        return false;
-    }
-    // These fields describe local presentation; they are never sent back into the room.
-    let content = &mut event["content"];
-    content["notification_type"] = if invite.ring { "ring" } else { "notification" }.into();
-    content["sender_ts"] = now.into();
-    content["lifetime"] = remaining.into();
-    content["m.call.intent"] = if invite.has_video { "video" } else { "audio" }.into();
-    content["body"] = "Call started".into();
-    true
-}
-
-#[cfg(not(target_family = "wasm"))]
-async fn prepared_push_event(room: &matrix_sdk::Room, clear: &str, noisy: bool) -> ColdPush {
-    let Ok(mut event) = serde_json::from_str::<serde_json::Value>(clear) else {
-        return ColdPush::Undecryptable;
-    };
-    if !is_rtc_invite(&event) {
-        return ColdPush::Clear(marked_noisy(clear, noisy));
-    }
-    if !prepare_invite(room, &mut event).await {
-        return ColdPush::Discard;
-    }
-    let Ok(clear) = serde_json::to_string(&event) else {
-        return ColdPush::Undecryptable;
-    };
-    ColdPush::Clear(marked_noisy(&clear, noisy))
-}
-
-#[cfg(not(target_family = "wasm"))]
-fn marked_noisy(clear: &str, noisy: bool) -> String {
-    if !noisy {
-        return clear.to_owned();
-    }
-    let Ok(mut event) = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(clear)
-    else {
-        return clear.to_owned();
-    };
-    event.insert(NOISY_KEY.to_owned(), true.into());
-    serde_json::to_string(&event).unwrap_or_else(|_| clear.to_owned())
-}
 
 #[cfg(test)]
 mod tests {
@@ -614,10 +53,11 @@ mod tests {
     use matrix_sdk_test::JoinedRoomBuilder;
     use serde_json::json;
 
+    use super::cold::{PushHost, push_account, push_host};
     use super::push_cache::cold_host;
     use super::{
-        ColdPush, PushHost, cold_push_store_dir, decrypt_cold_push, fetch_cold_push_event,
-        push_account, push_host, restore_push_client,
+        ColdPush, cold_push_store_dir, decrypt_cold_push, fetch_cold_push_event,
+        restore_push_client,
     };
     use crate::preview::describe;
     use crate::protocol::PushFetchView;
@@ -2351,7 +1791,7 @@ mod tests {
         }
 
         async fn push_client(&self) -> super::PushClient {
-            super::open_push_client(
+            super::cold::open_push_client(
                 &self.base,
                 OAUTH_USER,
                 OAUTH_DEVICE,
@@ -2513,7 +1953,7 @@ mod tests {
                 .respond_with(ResponseTemplate::new(200).set_body_json(response))
                 .mount_as_scoped(server.server())
                 .await;
-            let prepared = super::prepared_push_event(&room, &event.to_string(), true).await;
+            let prepared = super::cold::prepared_push_event(&room, &event.to_string(), true).await;
             if withdrawn {
                 assert_eq!(prepared, ColdPush::Discard);
             } else {
