@@ -60,7 +60,7 @@ futures-util = "0.3"
 tracing = { version = "0.1", features = ["release_max_level_debug"] }
 url = "2"
 thiserror = "2"
-parking_lot = "0.12"
+parking_lot = "0.13"
 specta = { version = "=2.0.0-rc.27", features = ["derive"] }
 specta-serde = "=0.0.14"
 specta-typescript = "=0.0.14"
@@ -73,7 +73,7 @@ form_urlencoded = "1.2"
 percent-encoding = "2.3"
 time = { version = "0.3", default-features = false }
 html-escape = "0.3"
-html5ever = "0.39"
+html5ever = "0.40"
 linkify = "0.11"
 tempfile = "3"
 jiff = { version = "0.2", default-features = false, features = ["std"] }
