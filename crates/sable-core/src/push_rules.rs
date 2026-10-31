@@ -183,31 +183,34 @@ pub enum RuleWrite {
 }
 
 impl RuleWrite {
+    /// The next `m.push_rules` sync replaces the whole ruleset, so a write the
+    /// local copy rejects is only stale until then.
     fn apply_to(self, rules: &mut Ruleset) {
-        match self {
-            Self::Put(rule) => {
-                let _ = rules.insert(rule, None, None);
-            }
-            Self::PutAfter { rule, after } => {
-                let _ = rules.insert(rule, Some(&after), None);
-            }
+        let result = match self {
+            Self::Put(rule) => rules.insert(rule, None, None).map_err(|e| e.to_string()),
+            Self::PutAfter { rule, after } => rules
+                .insert(rule, Some(&after), None)
+                .map_err(|e| e.to_string()),
             Self::Actions {
                 kind,
                 rule_id,
                 actions,
-            } => {
-                let _ = rules.set_actions(kind, rule_id, actions);
-            }
+            } => rules
+                .set_actions(kind, rule_id, actions)
+                .map_err(|e| e.to_string()),
             Self::Enabled {
                 kind,
                 rule_id,
                 enabled,
-            } => {
-                let _ = rules.set_enabled(kind, rule_id, enabled);
-            }
+            } => rules
+                .set_enabled(kind, rule_id, enabled)
+                .map_err(|e| e.to_string()),
             Self::Delete { kind, rule_id } => {
-                let _ = rules.remove(kind, rule_id);
+                rules.remove(kind, rule_id).map_err(|e| e.to_string())
             }
+        };
+        if let Err(error) = result {
+            tracing::warn!(%error, "push rule write not applied to the local copy");
         }
     }
 }
