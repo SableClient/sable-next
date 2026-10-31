@@ -1,3 +1,5 @@
+import { openDB, type IDBPDatabase } from 'idb';
+
 const DATABASE_NAME = 'sable-next-session';
 const DATABASE_VERSION = 1;
 const STORE_NAME = 'session';
@@ -18,76 +20,26 @@ const CRYPTO_META_DATABASE_SUFFIX = '::matrix-sdk-crypto-meta';
 const CRYPTO_CORE_STORE = 'core';
 const SLIDING_SYNC_KEY_PREFIX = 'sliding_sync_store::';
 
-let databasePromise: Promise<IDBDatabase> | undefined;
+let databasePromise: Promise<IDBPDatabase> | undefined;
 
-function openDatabase(): Promise<IDBDatabase> {
-  databasePromise ??= new Promise((resolve, reject) => {
-    const request = globalThis.indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
-
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        database.createObjectStore(STORE_NAME);
-      }
-    };
-
-    request.onsuccess = () => {
-      const database = request.result;
-      database.onversionchange = () => {
+function openDatabase(): Promise<IDBPDatabase> {
+  databasePromise ??= openDB(DATABASE_NAME, DATABASE_VERSION, {
+    upgrade(database) {
+      if (!database.objectStoreNames.contains(STORE_NAME)) database.createObjectStore(STORE_NAME);
+    },
+    blocking() {
+      const closing = databasePromise;
+      databasePromise = undefined;
+      void closing?.then((database) => {
         database.close();
-        databasePromise = undefined;
-      };
-      resolve(database);
-    };
-
-    request.onerror = () => {
-      reject(request.error ?? new Error('Could not open the session database'));
-    };
+      });
+    },
   });
-
   return databasePromise;
 }
 
-function transaction(
-  mode: IDBTransactionMode,
-  operation: (store: IDBObjectStore) => IDBRequest
-): Promise<void> {
-  return openDatabase().then(
-    (database) =>
-      new Promise((resolve, reject) => {
-        const tx = database.transaction(STORE_NAME, mode);
-        const request = operation(tx.objectStore(STORE_NAME));
-
-        request.onerror = () => {
-          reject(request.error ?? new Error('Session database request failed'));
-        };
-        tx.oncomplete = () => {
-          resolve();
-        };
-        tx.onerror = () => {
-          reject(tx.error ?? new Error('Session database transaction failed'));
-        };
-        tx.onabort = () => {
-          reject(tx.error ?? new Error('Session database transaction aborted'));
-        };
-      })
-  );
-}
-
-function readRecord(key: string): Promise<unknown> {
-  return openDatabase().then(
-    (database) =>
-      new Promise((resolve, reject) => {
-        const tx = database.transaction(STORE_NAME, 'readonly');
-        const request = tx.objectStore(STORE_NAME).get(key);
-        tx.oncomplete = () => {
-          resolve(request.result);
-        };
-        tx.onabort = tx.onerror = () => {
-          reject(tx.error ?? new Error('Could not read the session database'));
-        };
-      })
-  );
+async function readRecord(key: string): Promise<unknown> {
+  return (await openDatabase()).get(STORE_NAME, key);
 }
 
 interface Sealed {
@@ -118,11 +70,9 @@ function loadSealingKey(): Promise<CryptoKey> {
       ['encrypt', 'decrypt']
     );
     // Another context may have saved its key first: theirs wins.
-    await transaction('readwrite', (store) => store.add(key, SEALING_KEY)).catch(
-      (error: unknown) => {
-        if (!(error instanceof DOMException && error.name === 'ConstraintError')) throw error;
-      }
-    );
+    await (await openDatabase()).add(STORE_NAME, key, SEALING_KEY).catch((error: unknown) => {
+      if (!(error instanceof DOMException && error.name === 'ConstraintError')) throw error;
+    });
     const kept = await readRecord(SEALING_KEY);
     if (!(kept instanceof CryptoKey)) throw new Error('Could not keep the session sealing key');
     return kept;
@@ -181,46 +131,29 @@ export async function loadSession(): Promise<Uint8Array | null> {
 export async function saveSession(bytes: Uint8Array): Promise<void> {
   // Copy the WASM-owned bytes before sealing yields to the event loop.
   const value = await seal(Uint8Array.from(bytes));
-  return transaction('readwrite', (store) => store.put(value, SESSION_KEY));
+  await (await openDatabase()).put(STORE_NAME, value, SESSION_KEY);
 }
 
-export function clearSession(): Promise<void> {
-  return transaction('readwrite', (store) => store.delete(SESSION_KEY));
+export async function clearSession(): Promise<void> {
+  await (await openDatabase()).delete(STORE_NAME, SESSION_KEY);
 }
 
 export async function v1MigrationComplete(): Promise<boolean> {
-  const database = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const tx = database.transaction(STORE_NAME, 'readonly');
-    const request = tx.objectStore(STORE_NAME).get(V1_MIGRATION_KEY);
-    tx.oncomplete = () => {
-      resolve(request.result === true);
-    };
-    tx.onabort = tx.onerror = () => {
-      reject(tx.error ?? new Error('Could not read migration status'));
-    };
-  });
+  return (await readRecord(V1_MIGRATION_KEY)) === true;
 }
 
-export function markV1MigrationComplete(): Promise<void> {
-  return transaction('readwrite', (store) => store.put(true, V1_MIGRATION_KEY));
+export async function markV1MigrationComplete(): Promise<void> {
+  await (await openDatabase()).put(STORE_NAME, true, V1_MIGRATION_KEY);
 }
 
 export async function saveV1Session(bytes: Uint8Array): Promise<void> {
   const value = await seal(Uint8Array.from(bytes));
-  const database = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const tx = database.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    store.put(value, SESSION_KEY);
-    store.put(true, V1_MIGRATION_KEY);
-    tx.oncomplete = () => {
-      resolve();
-    };
-    tx.onabort = tx.onerror = () => {
-      reject(tx.error ?? new Error('Could not save the migrated accounts'));
-    };
-  });
+  const tx = (await openDatabase()).transaction(STORE_NAME, 'readwrite');
+  await Promise.all([
+    tx.store.put(value, SESSION_KEY),
+    tx.store.put(true, V1_MIGRATION_KEY),
+    tx.done,
+  ]);
 }
 
 function deleteDatabase(name: string): Promise<void> {
