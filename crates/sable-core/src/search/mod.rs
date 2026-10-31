@@ -753,7 +753,7 @@ impl RoomIndex {
                 continue;
             }
 
-            for (position, (piece_start, documents, ids)) in
+            for (position, piece_chunk) in
                 split_chunk(start, documents, ids).into_iter().enumerate()
             {
                 let piece = if position == 0 {
@@ -761,10 +761,13 @@ impl RoomIndex {
                 } else {
                     let piece = self.next_chunk;
                     self.next_chunk = self.next_chunk.wrapping_add(1);
-                    self.chunks.insert(piece_start, piece);
+                    self.chunks.insert(piece_chunk.start, piece);
                     piece
                 };
-                written.push((piece, persist::StoredChunk::new(documents, ids)));
+                written.push((
+                    piece,
+                    persist::StoredChunk::new(piece_chunk.documents, piece_chunk.classified),
+                ));
             }
         }
 
@@ -2110,7 +2113,11 @@ fn document_bytes(document: &Document) -> usize {
     DOCUMENT_OVERHEAD + document.body.len() * 2 + media
 }
 
-type ChunkPiece = (u64, Vec<Document>, Vec<(OwnedEventId, u64)>);
+struct ChunkPiece {
+    start: u64,
+    documents: Vec<Document>,
+    classified: Vec<(OwnedEventId, u64)>,
+}
 
 fn split_chunk(
     start: u64,
@@ -2123,7 +2130,11 @@ fn split_chunk(
         .chain(classified.iter().map(|(_, ts)| (*ts, 1)))
         .collect();
     if weights.iter().map(|(_, weight)| weight).sum::<usize>() <= CHUNK_WEIGHT * 2 {
-        return vec![(start, documents, classified)];
+        return vec![ChunkPiece {
+            start,
+            documents,
+            classified,
+        }];
     }
     weights.sort_unstable();
 
@@ -2147,16 +2158,20 @@ fn split_chunk(
     };
     let mut pieces: Vec<ChunkPiece> = starts
         .iter()
-        .map(|&start| (start, Vec::new(), Vec::new()))
+        .map(|&start| ChunkPiece {
+            start,
+            documents: Vec::new(),
+            classified: Vec::new(),
+        })
         .collect();
     for document in documents {
         if let Some(piece) = pieces.get_mut(piece_of(document.origin_server_ts)) {
-            piece.1.push(document);
+            piece.documents.push(document);
         }
     }
     for (event_id, ts) in classified {
         if let Some(piece) = pieces.get_mut(piece_of(ts)) {
-            piece.2.push((event_id, ts));
+            piece.classified.push((event_id, ts));
         }
     }
     pieces

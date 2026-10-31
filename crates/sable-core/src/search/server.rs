@@ -39,17 +39,24 @@ pub(super) struct ServerQuery<'a> {
 
 impl ServerQuery<'_> {
     fn signature(&self) -> Signature {
-        (
-            self.query.to_owned(),
-            self.filter.clone(),
-            self.order,
-            self.room_id.clone(),
-            self.context,
-        )
+        Signature {
+            query: self.query.to_owned(),
+            filter: self.filter.clone(),
+            order: self.order,
+            room_id: self.room_id.clone(),
+            context: self.context,
+        }
     }
 }
 
-type Signature = (String, IndexFilter, SearchOrder, OwnedRoomId, usize);
+#[derive(Clone, PartialEq)]
+struct Signature {
+    query: String,
+    filter: IndexFilter,
+    order: SearchOrder,
+    room_id: OwnedRoomId,
+    context: usize,
+}
 
 #[derive(Default)]
 pub(crate) struct ServerSearch {
