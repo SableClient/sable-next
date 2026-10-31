@@ -121,6 +121,11 @@ final class NotificationService: UNNotificationServiceExtension {
                     self?.activeElsewhere = true
                     self?.lock.unlock()
                 }
+                if rendered["noisy"] as? Bool == true {
+                    self?.lock.lock()
+                    self?.originalSound = self?.originalSound ?? .default
+                    self?.lock.unlock()
+                }
                 guard let user = rendered["user_id"] as? String, let room = rendered["room_id"] as? String else {
                     self?.finish(updated)
                     return
