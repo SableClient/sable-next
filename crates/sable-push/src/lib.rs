@@ -1248,4 +1248,169 @@ mod tests {
         ));
         assert!(!rings(&json!({"devices": {"tweaks": {"sound": "x"}}})));
     }
+
+    fn wire(value: &impl Serialize) -> String {
+        serde_json::to_string(value).unwrap()
+    }
+
+    #[tokio::test]
+    async fn rendered_outcomes_keep_the_native_wire_format() {
+        let root = shape_root("wire").await;
+        let render_wire = async |payload: Value| {
+            let (value, issue) = render(&root, &payload).await;
+            (value.map(|value| value.to_string()), issue)
+        };
+
+        assert_eq!(
+            render_wire(shape_push(
+                json!({"room_id":"!room:example.org","counts":{"unread":0}})
+            ))
+            .await,
+            (
+                Some(
+                    json!({
+                        "read": {"clear": true, "room_id": "!room:example.org"},
+                        "user_id": "@alice:example.org"
+                    })
+                    .to_string()
+                ),
+                None
+            )
+        );
+        assert_eq!(
+            render_wire(shape_push(json!({"counts":{"unread":0}}))).await,
+            (
+                Some(
+                    json!({
+                        "read": {"clear": true, "room_id": null},
+                        "user_id": "@alice:example.org"
+                    })
+                    .to_string()
+                ),
+                None
+            )
+        );
+        assert_eq!(
+            render_wire(shape_push(json!({
+                "room_id":"!room:example.org","type":"m.rtc.invite","event_id":"$call"
+            })))
+            .await,
+            (Some(json!({"discard": true}).to_string()), None)
+        );
+        assert_eq!(
+            render_wire(shape_push(json!({
+                "room_id":"!room:example.org","type":"m.room.message","event_id":"$e",
+                "room_name":"Lounge","sender":"@bob:example.org","sender_display_name":"Bob",
+                "content":{"body":"hi"}
+            })))
+            .await,
+            (
+                Some(
+                    json!({
+                        "title": "Lounge",
+                        "body": "Bob: hi",
+                        "text": "hi",
+                        "sender": "Bob",
+                        "sender_id": "@bob:example.org",
+                        "event_id": "$e",
+                        "room_id": "!room:example.org",
+                        "user_id": "@alice:example.org",
+                        "sounds": true,
+                        "noisy": false,
+                        "invite": false,
+                        "active_elsewhere": false,
+                        "group": true,
+                        "sender_avatar": null,
+                        "room_avatar": null,
+                        "image": null,
+                        "members": null
+                    })
+                    .to_string()
+                ),
+                Some("no_session")
+            )
+        );
+        assert_eq!(
+            render_wire(json!({"notification": {}})).await,
+            (None, Some("payload"))
+        );
+        assert_eq!(
+            render_wire(json!({"user_id": "@other:example.org", "notification": {}})).await,
+            (None, Some("no_account"))
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn composite_outcomes_keep_the_native_wire_format() {
+        let rooms = vec!["!a:example.org".to_owned()];
+        assert_eq!(
+            wire(&DiscardOut {
+                discard: true,
+                read_rooms: rooms.clone()
+            }),
+            json!({"discard": true, "read_rooms": ["!a:example.org"]}).to_string()
+        );
+        assert_eq!(
+            wire(&ReadRoomsOut {
+                read_rooms: rooms.clone(),
+                user_id: "@alice:example.org".to_owned()
+            }),
+            json!({"read_rooms": ["!a:example.org"], "user_id": "@alice:example.org"}).to_string()
+        );
+        let mut ring_value = ring(
+            &json!({"type":"m.rtc.notification","origin_server_ts":2_000,
+                "content":{"notification_type":"ring"}}),
+            "Bob",
+        )
+        .unwrap();
+        ring_value["notification_event_id"] = json!("$e");
+        ring_value["has_video"] = json!(true);
+        assert_eq!(
+            wire(&RingPushOut {
+                ring: ring_value,
+                room_id: "!room:example.org".to_owned(),
+                user_id: "@alice:example.org".to_owned(),
+                read_rooms: rooms.clone()
+            }),
+            json!({
+                "ring": {"caller_name": "Bob", "expires_at": 32.0,
+                    "notification_event_id": "$e", "has_video": true},
+                "room_id": "!room:example.org",
+                "user_id": "@alice:example.org",
+                "read_rooms": ["!a:example.org"]
+            })
+            .to_string()
+        );
+        assert_eq!(
+            wire(&ContentPushOut {
+                title: "t".to_owned(),
+                body: "b".to_owned(),
+                text: "x".to_owned(),
+                sender: "s".to_owned(),
+                sender_id: None,
+                event_id: None,
+                room_id: "!r".to_owned(),
+                user_id: "@u".to_owned(),
+                sounds: false,
+                noisy: true,
+                invite: false,
+                active_elsewhere: true,
+                group: false,
+                sender_avatar: Some("mxc://a".to_owned()),
+                room_avatar: None,
+                image: None,
+                members: Some(3),
+                read_rooms: rooms
+            }),
+            json!({
+                "title": "t", "body": "b", "text": "x", "sender": "s", "sender_id": null,
+                "event_id": null, "room_id": "!r", "user_id": "@u", "sounds": false,
+                "noisy": true, "invite": false, "active_elsewhere": true, "group": false,
+                "sender_avatar": "mxc://a", "room_avatar": null, "image": null, "members": 3,
+                "read_rooms": ["!a:example.org"]
+            })
+            .to_string()
+        );
+    }
 }
