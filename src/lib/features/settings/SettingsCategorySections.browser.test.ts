@@ -90,3 +90,16 @@ test('mobile: a dropdown opens as a sheet of choices', async () => {
     .poll(() => screen.getByRole('button', { name: 'Room icons' }).element().textContent)
     .toContain('Never');
 });
+
+test('profile change propagation is disabled when the homeserver lacks MSC4466', async () => {
+  const { core } = await import('#lib/core/__mocks__/context.js');
+  vi.mocked(core.rpc.session.serverFeatures).mockResolvedValueOnce([]);
+  const category = settingsCategories.find((entry) => entry.id === 'account');
+  if (!category) throw new Error('the account category is missing');
+  const screen = await render(SettingsCategorySections, { category });
+
+  await expect.element(screen.getByText('Not supported by your homeserver')).toBeVisible();
+  await expect
+    .element(screen.getByRole('button', { name: 'Apply name and avatar changes to' }))
+    .toBeDisabled();
+});

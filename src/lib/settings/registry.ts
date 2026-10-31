@@ -57,6 +57,8 @@ interface BaseSetting extends SettingsTargetDefinition {
   gatedBy?: BooleanPreference;
   /** The feature behind this setting does not exist yet; shown disabled. */
   unavailable?: true;
+  /** Rendered disabled unless the homeserver advertises this unstable feature. */
+  serverFeature?: string;
   requiresReload?: true;
   panel?: true;
 }
@@ -182,6 +184,7 @@ const categories: SettingsCategory[] = [
         icon: UsersIcon,
         name: 'settings.profileChangePropagation',
         type: 'select',
+        serverFeature: 'computer.gingershaped.msc4466',
         options: [
           { value: 'all', label: 'settings.profileChangePropagationAll' },
           { value: 'unchanged', label: 'settings.profileChangePropagationUnchanged' },

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -25,6 +26,8 @@
   }
 
   let { category, onRangeDraft }: Props = $props();
+
+  const core = useCoreClient();
 
   const items = $derived(
     category.items.filter((setting) => setting.supported?.() !== false && setting.panel !== true)
@@ -60,6 +63,31 @@
     return supportedSettings.find((item) => item.key === setting.gatedBy)?.name ?? '';
   }
 
+  let serverFeatures = $state.raw<readonly string[] | null>(null);
+  const needsServerFeatures = $derived(items.some((setting) => setting.serverFeature));
+
+  $effect(() => {
+    if (!needsServerFeatures) return;
+    let stale = false;
+    core.rpc.session
+      .serverFeatures()
+      .then((flags) => {
+        if (!stale) serverFeatures = flags;
+      })
+      .catch(() => {});
+    return () => {
+      stale = true;
+    };
+  });
+
+  function missingServerFeature(setting: SettingDefinition): boolean {
+    return (
+      setting.serverFeature !== undefined &&
+      serverFeatures !== null &&
+      !serverFeatures.includes(setting.serverFeature)
+    );
+  }
+
   /** Sentry reads its consent once, at boot. */
   let reloadPending = $state(false);
 </script>
@@ -68,7 +96,8 @@
   <ul class="settings settings-rows">
     {#each rows as setting (setting.key)}
       {@const gate = gated(setting)}
-      {@const disabled = setting.unavailable === true || gate}
+      {@const unsupported = missingServerFeature(setting)}
+      {@const disabled = setting.unavailable === true || gate || unsupported}
       {@const anchor = settingFocusId(setting.key)}
       <SettingsRow
         id={anchor}
@@ -81,7 +110,9 @@
           ? i18n.t('settings.notAvailableYet')
           : gate
             ? i18n.t('settings.needsSetting', { name: i18n.t(gateName(setting)) })
-            : undefined}
+            : unsupported
+              ? i18n.t('settings.needsServerFeature')
+              : undefined}
         wide={setting.type !== 'boolean'}
         control={setting.type === 'boolean' && !disabled ? `${anchor}-switch` : undefined}
         class={setting.gatedBy !== undefined ? 'gated' : undefined}
