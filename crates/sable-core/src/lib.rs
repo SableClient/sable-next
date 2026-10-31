@@ -7,6 +7,7 @@ mod accounts;
 pub mod api;
 mod attachments;
 mod auth;
+pub mod binding;
 mod bookmarks;
 mod bot_commands;
 mod calendar;

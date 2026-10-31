@@ -23,16 +23,13 @@ use napi::{
 use napi_derive::napi;
 use sable_core::{
     Core,
+    binding::{DEFAULT_LOG_FILTER, EVENT_BATCH_LIMIT, encode_event_batch, rpc_error_json},
     protocol::{CoreEvent, RpcError},
     store::ExclusiveFileSessionStore,
 };
 use tokio::sync::mpsc::UnboundedReceiver;
 
 type Callback = ThreadsafeFunction<String, (), String, Status, false>;
-
-const EVENT_BATCH_LIMIT: usize = 256;
-
-const DEFAULT_LOG_FILTER: &str = "info,matrix_sdk::http_client=off,matrix_sdk::latest_events::latest_event::builder=off,matrix_sdk_base::room::display_name=off";
 
 const PANIC_MARKER: &str = "SABLE_CORE_PANIC ";
 
@@ -41,31 +38,7 @@ static LOG_CAPTURE: AtomicBool = AtomicBool::new(false);
 static INIT: Once = Once::new();
 
 fn js_err(error: &RpcError) -> napi::Error {
-    let json = serde_json::to_string(error)
-        .unwrap_or_else(|_| r#"{"code":"failed","log_id":"serialization failed"}"#.to_owned());
-    napi::Error::new(Status::GenericFailure, json)
-}
-
-fn encode_batch(batch: &[CoreEvent]) -> Option<String> {
-    match serde_json::to_string(batch) {
-        Ok(json) => return Some(json),
-        Err(error) => {
-            tracing::error!(
-                ?error,
-                "a core event batch did not serialize; dropping what fails"
-            );
-        }
-    }
-
-    let kept: Vec<&CoreEvent> = batch
-        .iter()
-        .filter(|event| serde_json::to_string(event).is_ok())
-        .collect();
-
-    if kept.is_empty() {
-        return None;
-    }
-    serde_json::to_string(&kept).ok()
+    napi::Error::new(Status::GenericFailure, rpc_error_json(error))
 }
 
 struct JsLogWriter {
@@ -169,6 +142,16 @@ pub fn set_log_capture(enabled: bool) {
 #[napi]
 pub fn install_keyring(service: String, data_dir: String) -> napi::Result<()> {
     sable_core::secrets::install_os_keyring_or_files(service, &std::path::PathBuf::from(data_dir))
+        .map_err(|error| napi::Error::new(Status::GenericFailure, error.to_string()))
+}
+
+/// Must run before a `SableCore` is made.
+///
+/// # Errors
+/// When `url` is not a usable proxy or a proxy was already set.
+#[napi]
+pub fn set_proxy(url: String) -> napi::Result<()> {
+    sable_core::tls::set_proxy(url)
         .map_err(|error| napi::Error::new(Status::GenericFailure, error.to_string()))
 }
 
@@ -340,7 +323,7 @@ impl SableCore {
         napi::bindgen_prelude::spawn(async move {
             let mut batch = Vec::new();
             while events.recv_many(&mut batch, EVENT_BATCH_LIMIT).await > 0 {
-                let encoded = encode_batch(&batch);
+                let encoded = encode_event_batch(&batch);
                 batch.clear();
                 if let Some(json) = encoded {
                     on_events.call(json, ThreadsafeFunctionCallMode::NonBlocking);
