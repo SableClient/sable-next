@@ -82,6 +82,13 @@ export const timelineCategory: SettingsCategory = {
       type: 'boolean',
     },
     {
+      key: 'showAllTimestamps',
+      section: 'message-layout',
+      icon: ClockIcon,
+      name: 'settings.showAllTimestamps',
+      type: 'boolean',
+    },
+    {
       key: 'avatarsInMessageHeaders',
       section: 'message-layout',
       icon: LayoutIcon,

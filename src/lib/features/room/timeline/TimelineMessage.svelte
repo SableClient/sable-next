@@ -389,6 +389,8 @@
       <span class="collapsed-pending">
         <Spinner small label={i18n.t('timeline.sending')} />
       </span>
+    {:else if layout !== 'compact' && preferences.showAllTimestamps}
+      <span class="collapsed-pending collapsed-time">{@render messageTime(formatTime)}</span>
     {/if}
     <div
       class="message-content"
@@ -750,6 +752,20 @@
     justify-content: center;
     position: absolute;
     width: var(--avatar-size-small);
+  }
+
+  .collapsed-time {
+    align-items: center;
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-x-small);
+    font-variant-numeric: tabular-nums;
+    height: calc(var(--font-size-editor) * var(--line-height-body));
+    inset-inline-start: 0;
+    justify-content: flex-end;
+    white-space: nowrap;
+    width: calc(
+      var(--page-gutter) + var(--avatar-size-small) + var(--timeline-row-gap) - var(--space-100)
+    );
   }
 
   .message.collapsed.mention-silent > .collapsed-pending,

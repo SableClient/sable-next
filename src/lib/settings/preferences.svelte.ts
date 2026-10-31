@@ -265,6 +265,7 @@ export interface Preferences {
   usernameClick: UsernameClick;
   doubleTapReact: boolean;
   showSingleReactionCount: boolean;
+  showAllTimestamps: boolean;
   showRoleTooltip: boolean;
   doubleTapReaction: string;
   hideTypingIndicators: boolean;
@@ -620,6 +621,7 @@ const DEFAULTS: Preferences = {
   usernameClick: 'mention',
   doubleTapReact: true,
   showSingleReactionCount: true,
+  showAllTimestamps: false,
   showRoleTooltip: false,
   doubleTapReaction: '❤️',
   hideTypingIndicators: false,

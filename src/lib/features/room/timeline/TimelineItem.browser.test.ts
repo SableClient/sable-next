@@ -400,3 +400,23 @@ test('a long handle in a narrow row gives way to the sender name', async () => {
   expect(name.scrollWidth).toBeLessThanOrEqual(name.clientWidth);
   expect(time.getBoundingClientRect().right).toBeLessThanOrEqual(320);
 });
+
+test('a grouped message shows its time in the avatar gutter when every time is shown', async () => {
+  setPreference('showAllTimestamps', true);
+  try {
+    const screen = await mountItem(message('second', '@alice:example.test', 'Alice'), 'modern', {
+      collapsed: true,
+    });
+    screen.container.style.paddingInline = 'var(--page-gutter)';
+    const time = screen.container.querySelector<HTMLElement>('.collapsed-time time');
+    const body = screen.container.querySelector<HTMLElement>('.message-main');
+    if (!time || !body) throw new Error('Missing grouped message time');
+
+    expect(time.getBoundingClientRect().left).toBeGreaterThanOrEqual(0);
+    expect(time.getBoundingClientRect().right).toBeLessThanOrEqual(
+      body.getBoundingClientRect().left
+    );
+  } finally {
+    setPreference('showAllTimestamps', false);
+  }
+});
