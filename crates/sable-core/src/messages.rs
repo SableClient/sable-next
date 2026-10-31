@@ -1,6 +1,7 @@
 use sable_model::text::visible_name;
 
 use crate::api::account::ReportUserParams;
+use crate::api::messages::EditParams;
 use crate::api::rooms::ReportParams;
 use std::collections::{HashMap, HashSet};
 
@@ -235,23 +236,22 @@ async fn retain_reply_mention(
 }
 
 impl Core {
-    #[expect(clippy::too_many_arguments, reason = "mirrors the protocol fields")]
-    pub(crate) async fn edit_message(
-        &self,
-        room_id: &OwnedRoomId,
-        event_id: Option<OwnedEventId>,
-        transaction_id: Option<String>,
-        body: String,
-        formatted: Option<String>,
-        kind: MessageKind,
-        media_caption: bool,
-        thread_root: Option<OwnedEventId>,
-        mentions: Vec<OwnedUserId>,
-        mentions_room: bool,
-        persona: Option<PerMessageProfileView>,
-        forum_title: Option<String>,
-    ) -> Result<(), RpcError> {
-        let mut edited = edit_content(
+    pub(crate) async fn edit_message(&self, params: EditParams) -> Result<(), RpcError> {
+        let EditParams {
+            room_id,
+            event_id,
+            transaction_id,
+            body,
+            formatted,
+            kind,
+            media_caption,
+            thread_root,
+            mentions,
+            mentions_room,
+            persona,
+            forum_title,
+        } = params;
+        let edited = edit_content(
             body,
             formatted,
             kind,
@@ -260,89 +260,122 @@ impl Core {
             mentions_room,
         );
 
-        let item_id = match (event_id, transaction_id) {
-            (Some(event_id), None) => TimelineEventItemId::EventId(event_id),
-            (None, Some(transaction_id)) => {
-                TimelineEventItemId::TransactionId(transaction_id.into())
-            }
-            _ => return Err(RpcError::Unsupported),
-        };
-        if let TimelineEventItemId::TransactionId(transaction_id) = &item_id {
-            let room = self.room(room_id).await?;
-            let (echoes, _updates) = room
-                .send_queue()
-                .subscribe()
-                .await
-                .or_failed(self, "edit_message")?;
-            if let Some(echo) = echoes
-                .into_iter()
-                .find(|echo| echo.transaction_id == *transaction_id)
-                && let matrix_sdk::send_queue::LocalEchoContent::Event {
-                    serialized_event, ..
-                } = echo.content
-            {
-                let previous = serialized_event
-                    .raw()
-                    .0
-                    .deserialize_as_unchecked::<serde_json::Value>()
-                    .or_failed(self, "edit_message")?;
-                retain_reply_mention(&room, &previous, &previous, &mut edited).await;
-            }
-            let queued = if let EditedContent::RoomMessage(message) = &edited {
-                self.edit_local_message(&room, transaction_id, message.clone(), persona.as_ref())
-                    .await?
-            } else {
-                false
-            };
-            if !queued {
-                self.timeline_for(room_id, thread_root.as_ref())
-                    .await?
-                    .edit(&item_id, edited)
-                    .await
-                    .or_failed(self, "edit_message")?;
-            }
-        } else if let TimelineEventItemId::EventId(event_id) = item_id {
-            let room = self.room(room_id).await?;
-            let (event, replacements) = room
-                .load_or_fetch_event_with_relations(
+        let room = self.room(&room_id).await?;
+        match (event_id, transaction_id) {
+            (Some(event_id), None) => {
+                self.edit_sent_message(
+                    &room,
                     &event_id,
-                    Some(vec![RelationType::Replacement]),
-                    None,
+                    edited,
+                    media_caption,
+                    persona.as_ref(),
+                    forum_title,
                 )
                 .await
-                .or_failed(self, "edit_message")?;
-            let original = raw_content(&event).ok_or(RpcError::Unsupported)?;
-            if [FORWARDED, FAMEDLY_FORWARDED, SABLE_FORWARDED]
-                .iter()
-                .any(|key| original.get(key).is_some())
-            {
-                return Err(RpcError::Unsupported);
             }
-            let latest = latest_valid_replacement(&event, &replacements)
-                .unwrap_or(&event)
+            (None, Some(transaction_id)) => {
+                self.edit_queued_message(
+                    &room,
+                    transaction_id.into(),
+                    edited,
+                    persona.as_ref(),
+                    thread_root.as_ref(),
+                )
+                .await
+            }
+            _ => Err(RpcError::Unsupported),
+        }
+    }
+
+    async fn edit_queued_message(
+        &self,
+        room: &matrix_sdk::Room,
+        transaction_id: matrix_sdk::ruma::OwnedTransactionId,
+        mut edited: EditedContent,
+        persona: Option<&PerMessageProfileView>,
+        thread_root: Option<&OwnedEventId>,
+    ) -> Result<(), RpcError> {
+        let (echoes, _updates) = room
+            .send_queue()
+            .subscribe()
+            .await
+            .or_failed(self, "edit_message")?;
+        if let Some(echo) = echoes
+            .into_iter()
+            .find(|echo| echo.transaction_id == transaction_id)
+            && let matrix_sdk::send_queue::LocalEchoContent::Event {
+                serialized_event, ..
+            } = echo.content
+        {
+            let previous = serialized_event
                 .raw()
+                .0
                 .deserialize_as_unchecked::<serde_json::Value>()
                 .or_failed(self, "edit_message")?;
-            retain_reply_mention(
-                &room,
-                &original,
-                latest_message(&latest).ok_or(RpcError::Unsupported)?,
-                &mut edited,
-            )
-            .await;
-            let content = room
-                .make_edit_event(&event_id, edited)
+            retain_reply_mention(room, &previous, &previous, &mut edited).await;
+        }
+        let queued = if let EditedContent::RoomMessage(message) = &edited {
+            self.edit_local_message(room, &transaction_id, message.clone(), persona)
+                .await?
+        } else {
+            false
+        };
+        if !queued {
+            self.timeline_for(&room.room_id().to_owned(), thread_root)
+                .await?
+                .edit(&TimelineEventItemId::TransactionId(transaction_id), edited)
                 .await
                 .or_failed(self, "edit_message")?;
-            let mut retained = preview_keys(&latest);
-            if media_caption {
-                retained.extend(spoiler_keys(&original));
-            }
-            self.edit_with_persona(&room, &content, persona.as_ref(), forum_title, retained)
-                .await?;
         }
-
         Ok(())
+    }
+
+    async fn edit_sent_message(
+        &self,
+        room: &matrix_sdk::Room,
+        event_id: &OwnedEventId,
+        mut edited: EditedContent,
+        media_caption: bool,
+        persona: Option<&PerMessageProfileView>,
+        forum_title: Option<String>,
+    ) -> Result<(), RpcError> {
+        let (event, replacements) = room
+            .load_or_fetch_event_with_relations(
+                event_id,
+                Some(vec![RelationType::Replacement]),
+                None,
+            )
+            .await
+            .or_failed(self, "edit_message")?;
+        let original = raw_content(&event).ok_or(RpcError::Unsupported)?;
+        if [FORWARDED, FAMEDLY_FORWARDED, SABLE_FORWARDED]
+            .iter()
+            .any(|key| original.get(key).is_some())
+        {
+            return Err(RpcError::Unsupported);
+        }
+        let latest = latest_valid_replacement(&event, &replacements)
+            .unwrap_or(&event)
+            .raw()
+            .deserialize_as_unchecked::<serde_json::Value>()
+            .or_failed(self, "edit_message")?;
+        retain_reply_mention(
+            room,
+            &original,
+            latest_message(&latest).ok_or(RpcError::Unsupported)?,
+            &mut edited,
+        )
+        .await;
+        let content = room
+            .make_edit_event(event_id, edited)
+            .await
+            .or_failed(self, "edit_message")?;
+        let mut retained = preview_keys(&latest);
+        if media_caption {
+            retained.extend(spoiler_keys(&original));
+        }
+        self.edit_with_persona(room, &content, persona, forum_title, retained)
+            .await
     }
 
     pub(crate) async fn remove_link_previews(

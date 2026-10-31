@@ -357,6 +357,41 @@ const fn shield(state: TimelineEventShieldState) -> Option<MessageShieldView> {
     Some(MessageShieldView { code, critical })
 }
 
+impl TimelineItemView {
+    /// An item with only its content set, and the flags that content implies.
+    const fn bare(id: String, timestamp: u64, content: TimelineItemContentView) -> Self {
+        Self {
+            id,
+            row: content.row_kind(),
+            forwardable: content.forwardable(),
+            redactable: content.redactable(),
+            visibility: content.visibility(),
+            event_id: None,
+            transaction_id: None,
+            send_state: None,
+            sender: None,
+            sender_name: None,
+            sender_avatar: None,
+            timestamp,
+            content,
+            in_reply_to: None,
+            thread_root: None,
+            thread_summary: None,
+            reactions: Vec::new(),
+            is_own: false,
+            read_by: Vec::new(),
+            read_timestamps: BTreeMap::new(),
+            per_message_profile: None,
+            bundled_link_previews: Vec::new(),
+            link_previews_removed: None,
+            mention: MentionView::None,
+            forwarded: None,
+            forum_title: None,
+            shield: None,
+        }
+    }
+}
+
 #[must_use]
 pub fn aggregation_item(
     event: &AnySyncTimelineEvent,
@@ -372,40 +407,17 @@ pub fn aggregation_item(
         redacts,
     };
     TimelineItemView {
-        id: event_id.to_string(),
-        row: content.row_kind(),
-        forwardable: content.forwardable(),
-        redactable: content.redactable(),
-        visibility: content.visibility(),
-        event_id: Some(event_id),
-        transaction_id: None,
-        send_state: None,
+        event_id: Some(event_id.clone()),
         is_own: own_user_id == Some(sender.as_ref()),
-        sender_name: None,
-        sender_avatar: None,
-        timestamp: event.origin_server_ts().0.into(),
-        content,
         sender: Some(sender),
-        in_reply_to: None,
-        thread_root: None,
-        thread_summary: None,
-        reactions: Vec::new(),
-        read_by: Vec::new(),
-        read_timestamps: BTreeMap::new(),
-        per_message_profile: None,
-        bundled_link_previews: Vec::new(),
-        link_previews_removed: None,
-        mention: MentionView::None,
-        forwarded: None,
-        forum_title: None,
-        shield: None,
+        ..TimelineItemView::bare(
+            event_id.to_string(),
+            event.origin_server_ts().0.into(),
+            content,
+        )
     }
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "one field per line of the item it builds"
-)]
 pub async fn standalone_item(
     core: &crate::Core,
     room: &Room,
@@ -487,33 +499,20 @@ pub async fn standalone_item(
     }
 
     Some(TimelineItemView {
-        id: event_id.to_string(),
-        row: view_content.row_kind(),
-        forwardable: view_content.forwardable(),
-        redactable: view_content.redactable(),
-        visibility: view_content.visibility(),
-        event_id: Some(event_id),
-        transaction_id: None,
-        send_state: None,
+        event_id: Some(event_id.clone()),
         is_own,
         sender_name,
         sender_avatar,
-        timestamp: timestamp.0.into(),
         mention: content_mention(&item_content, is_own, own_user_id.as_deref(), highlighted),
         in_reply_to: in_reply_to(&item_content),
         thread_root: msg_like(&item_content).and_then(|msg| msg.thread_root.clone()),
         thread_summary,
-        content: view_content,
         sender: Some(sender),
-        reactions: Vec::new(),
-        read_by: Vec::new(),
-        read_timestamps: BTreeMap::new(),
         bundled_link_previews: bundled_link_previews(raw.message()),
         link_previews_removed: link_previews_removed(raw.message()),
         per_message_profile: message_profile,
         forwarded: original.content.as_ref().and_then(forward_meta),
-        forum_title: None,
-        shield: None,
+        ..TimelineItemView::bare(event_id.to_string(), timestamp.0.into(), view_content)
     })
 }
 
@@ -532,10 +531,6 @@ fn message_profile(
 }
 
 #[must_use]
-#[expect(
-    clippy::too_many_lines,
-    reason = "one field per line of the item it builds"
-)]
 pub fn timeline_item(
     item: &Arc<TimelineItem>,
     own_user_id: Option<&UserId>,
@@ -622,35 +617,7 @@ pub fn timeline_item(
                 VirtualTimelineItem::TimelineStart => (0, TimelineItemContentView::TimelineStart),
             };
 
-            TimelineItemView {
-                id,
-                row: content.row_kind(),
-                forwardable: content.forwardable(),
-                redactable: content.redactable(),
-                visibility: content.visibility(),
-                event_id: None,
-                transaction_id: None,
-                send_state: None,
-                sender: None,
-                sender_name: None,
-                sender_avatar: None,
-                timestamp,
-                content,
-                in_reply_to: None,
-                thread_root: None,
-                thread_summary: None,
-                reactions: Vec::new(),
-                is_own: false,
-                read_by: Vec::new(),
-                read_timestamps: BTreeMap::new(),
-                per_message_profile: None,
-                bundled_link_previews: Vec::new(),
-                link_previews_removed: None,
-                mention: MentionView::None,
-                forwarded: None,
-                forum_title: None,
-                shield: None,
-            }
+            TimelineItemView::bare(id, timestamp, content)
         }
     }
 }

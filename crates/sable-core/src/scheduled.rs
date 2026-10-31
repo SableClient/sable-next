@@ -1,4 +1,5 @@
 use crate::api::messages::CancelScheduledParams;
+use crate::api::messages::ScheduleAttachmentParams;
 use crate::api::messages::SendScheduledParams;
 use std::time::Duration;
 
@@ -109,7 +110,7 @@ impl Core {
         persona: Option<&crate::protocol::PerMessageProfileView>,
     ) -> Result<String, RpcError> {
         let mut content = serde_json::to_value(content).or_failed(self, "schedule_message")?;
-        if let Some(profile) = persona {
+        if let Some(profile) = &persona {
             crate::personas::stamp_profile(&mut content, profile);
         }
         let content =
@@ -145,18 +146,19 @@ impl Core {
             .or_failed(self, "schedule_message")
     }
 
-    #[expect(clippy::too_many_arguments, reason = "mirrors the protocol fields")]
     pub(crate) async fn schedule_attachment(
         &self,
-        room_id: &OwnedRoomId,
-        filename: String,
-        mime: String,
-        url: String,
-        size: u64,
-        info: Option<AttachmentInfoView>,
-        spoiler: bool,
-        delay_ms: u64,
-        persona: Option<&crate::protocol::PerMessageProfileView>,
+        ScheduleAttachmentParams {
+            room_id,
+            filename,
+            mime,
+            url,
+            size,
+            info,
+            spoiler,
+            delay_ms,
+            persona,
+        }: ScheduleAttachmentParams,
     ) -> Result<String, RpcError> {
         let mime: Mime = mime.parse().map_err(|_| RpcError::InvalidMedia)?;
         let url = OwnedMxcUri::from(url);
@@ -169,7 +171,7 @@ impl Core {
             filename, &mime, url, size, info, spoiler,
         ))
         .or_failed(self, "schedule_attachment")?;
-        if let Some(profile) = persona {
+        if let Some(profile) = &persona {
             crate::personas::stamp_profile(
                 &mut content,
                 &crate::personas::without_fallback(profile),
@@ -177,7 +179,8 @@ impl Core {
         }
         let content =
             serde_json::value::to_raw_value(&content).or_failed(self, "schedule_attachment")?;
-        self.schedule_room_message(room_id, content, delay_ms).await
+        self.schedule_room_message(&room_id, content, delay_ms)
+            .await
     }
 
     pub(crate) async fn cancel_scheduled_message(

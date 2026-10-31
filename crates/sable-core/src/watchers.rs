@@ -226,10 +226,6 @@ impl Core {
         );
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "keep registration and its worker lifetime together"
-    )]
     pub(crate) async fn watch_notifications(
         self: &Arc<Self>,
         client: &matrix_sdk::Client,
@@ -249,25 +245,7 @@ impl Core {
         let route = if let Some(route) = routes.get(&account_id) {
             route.clone()
         } else {
-            // `Room` is not `Send` on wasm, whose runtime is single-threaded; the
-            // alias stays `Arc` because the native target shares it across threads.
-            #[cfg_attr(
-                target_family = "wasm",
-                expect(
-                    clippy::arc_with_non_send_sync,
-                    reason = "the WASM core is single-threaded"
-                )
-            )]
-            let route: NotificationRoute = Arc::new(parking_lot::Mutex::new(None));
-            let handler_route = route.clone();
-            client
-                .register_notification_handler(move |notification, room, _| {
-                    if let Some(sender) = handler_route.lock().as_ref() {
-                        let _ = sender.send((notification, room));
-                    }
-                    async {}
-                })
-                .await;
+            let route = register_notification_route(client).await;
             routes.insert(account_id, route.clone());
             route
         };
@@ -282,89 +260,12 @@ impl Core {
         self.track_session_task(
             spawn(async move {
                 let _route_guard = route_guard;
-                let Ok(sync_service) = core.sync_service().await else {
-                    return;
-                };
-                let setup = NotificationProcessSetup::SingleProcess { sync_service };
-                let Ok(notifications_client) = NotificationClient::new(client.clone(), setup).await
+                let Some(mut notifier) = ForegroundNotifier::new(core, client, generation).await
                 else {
                     return;
                 };
-                let mut alerted_invites: std::collections::HashSet<_> = client
-                    .invited_rooms()
-                    .into_iter()
-                    .map(|room| room.room_id().to_owned())
-                    .collect();
-                let mut alerted_events = std::collections::HashMap::new();
                 while let Some((notification, room)) = pending.recv().await {
-                    let Notification { event, actions } = notification;
-                    let every_encrypted = core.every_encrypted_event_pushed().await;
-                    if let RawAnySyncOrStrippedTimelineEvent::Sync(raw) = &event
-                        && !(every_encrypted && notifications::raw_is_encrypted(raw))
-                    {
-                        core.record_live_inbox(&room, raw, &actions, generation)
-                            .await;
-                    }
-                    if !notifications::notifies(&actions) || core.is_read_room(room.room_id()) {
-                        continue;
-                    }
-                    let mut sent = None;
-                    let notification = match event {
-                        RawAnySyncOrStrippedTimelineEvent::Sync(raw) => {
-                            if crate::calls::is_call_event_type(&raw)
-                                || crate::calls::is_call_membership_event_type(&raw)
-                            {
-                                continue;
-                            }
-                            let Ok(event) = raw.deserialize() else {
-                                continue;
-                            };
-                            let now = MilliSecondsSinceUnixEpoch::now();
-                            if Some(event.sender()) == client.user_id()
-                                || notifications::is_backfill(now, event.origin_server_ts())
-                                || notifications::is_read(&room, event.origin_server_ts()).await
-                                || !first_alert(
-                                    &mut alerted_events,
-                                    now,
-                                    event.event_id(),
-                                    event.origin_server_ts(),
-                                )
-                            {
-                                continue;
-                            }
-                            sent = Some(event.origin_server_ts());
-                            notifications::foreground_notification(
-                                &notifications_client,
-                                &room,
-                                event.event_id(),
-                                every_encrypted,
-                            )
-                            .await
-                        }
-                        RawAnySyncOrStrippedTimelineEvent::Stripped(raw) => {
-                            let Ok(AnyStrippedStateEvent::RoomMember(event)) = raw.deserialize()
-                            else {
-                                continue;
-                            };
-                            if event.state_key != room.own_user_id()
-                                || event.content.membership != MembershipState::Invite
-                                || !alerted_invites.insert(room.room_id().to_owned())
-                            {
-                                continue;
-                            }
-                            notifications::invite_notification(&room, &actions).await
-                        }
-                    };
-                    let read = match sent {
-                        Some(sent) => notifications::is_read(&room, sent).await,
-                        None => false,
-                    };
-                    if let Some(notification) = notification
-                        && !core.is_read_room(room.room_id())
-                        && !read
-                    {
-                        core.emit_if_current(generation, CoreEvent::Notification { notification });
-                    }
+                    notifier.handle(notification, &room).await;
                 }
             })
             .abort_on_drop(),
@@ -777,6 +678,143 @@ pub(crate) async fn retry_backoff(failures: u32) {
 
 /// Backfill is rejected before this check, so ids older than the backfill
 /// window can never repeat and are dropped.
+async fn register_notification_route(client: &matrix_sdk::Client) -> NotificationRoute {
+    // `Room` is not `Send` on wasm, whose runtime is single-threaded; the
+    // alias stays `Arc` because the native target shares it across threads.
+    #[cfg_attr(
+        target_family = "wasm",
+        expect(
+            clippy::arc_with_non_send_sync,
+            reason = "the WASM core is single-threaded"
+        )
+    )]
+    let route: NotificationRoute = Arc::new(parking_lot::Mutex::new(None));
+    let handler_route = route.clone();
+    client
+        .register_notification_handler(move |notification, room, _| {
+            if let Some(sender) = handler_route.lock().as_ref() {
+                let _ = sender.send((notification, room));
+            }
+            async {}
+        })
+        .await;
+    route
+}
+
+/// Turns live sync notifications into in-app alerts, once per event or invite.
+struct ForegroundNotifier {
+    core: Arc<Core>,
+    client: matrix_sdk::Client,
+    notifications: NotificationClient,
+    generation: u64,
+    alerted_invites: std::collections::HashSet<matrix_sdk::ruma::OwnedRoomId>,
+    alerted_events: std::collections::HashMap<OwnedEventId, MilliSecondsSinceUnixEpoch>,
+}
+
+impl ForegroundNotifier {
+    async fn new(core: Arc<Core>, client: matrix_sdk::Client, generation: u64) -> Option<Self> {
+        let sync_service = core.sync_service().await.ok()?;
+        let setup = NotificationProcessSetup::SingleProcess { sync_service };
+        let notifications = NotificationClient::new(client.clone(), setup).await.ok()?;
+        let alerted_invites = client
+            .invited_rooms()
+            .into_iter()
+            .map(|room| room.room_id().to_owned())
+            .collect();
+        Some(Self {
+            core,
+            client,
+            notifications,
+            generation,
+            alerted_invites,
+            alerted_events: std::collections::HashMap::new(),
+        })
+    }
+
+    async fn handle(&mut self, notification: Notification, room: &matrix_sdk::Room) {
+        let Notification { event, actions } = notification;
+        let every_encrypted = self.core.every_encrypted_event_pushed().await;
+        if let RawAnySyncOrStrippedTimelineEvent::Sync(raw) = &event
+            && !(every_encrypted && notifications::raw_is_encrypted(raw))
+        {
+            self.core
+                .record_live_inbox(room, raw, &actions, self.generation)
+                .await;
+        }
+        if !notifications::notifies(&actions) || self.core.is_read_room(room.room_id()) {
+            return;
+        }
+        let (notification, sent) = match event {
+            RawAnySyncOrStrippedTimelineEvent::Sync(raw) => {
+                let Some((event_id, sent)) = self.alertable_event(&raw, room).await else {
+                    return;
+                };
+                let notification = notifications::foreground_notification(
+                    &self.notifications,
+                    room,
+                    &event_id,
+                    every_encrypted,
+                )
+                .await;
+                (notification, Some(sent))
+            }
+            RawAnySyncOrStrippedTimelineEvent::Stripped(raw) => {
+                let Ok(AnyStrippedStateEvent::RoomMember(event)) = raw.deserialize() else {
+                    return;
+                };
+                if event.state_key != room.own_user_id()
+                    || event.content.membership != MembershipState::Invite
+                    || !self.alerted_invites.insert(room.room_id().to_owned())
+                {
+                    return;
+                }
+                (
+                    notifications::invite_notification(room, &actions).await,
+                    None,
+                )
+            }
+        };
+        let read = match sent {
+            Some(sent) => notifications::is_read(room, sent).await,
+            None => false,
+        };
+        if let Some(notification) = notification
+            && !self.core.is_read_room(room.room_id())
+            && !read
+        {
+            self.core
+                .emit_if_current(self.generation, CoreEvent::Notification { notification });
+        }
+    }
+
+    /// The event id and send time of a timeline event that should alert, if any.
+    async fn alertable_event(
+        &mut self,
+        raw: &Raw<AnySyncTimelineEvent>,
+        room: &matrix_sdk::Room,
+    ) -> Option<(OwnedEventId, MilliSecondsSinceUnixEpoch)> {
+        if crate::calls::is_call_event_type(raw) || crate::calls::is_call_membership_event_type(raw)
+        {
+            return None;
+        }
+        let event = raw.deserialize().ok()?;
+        let now = MilliSecondsSinceUnixEpoch::now();
+        if Some(event.sender()) == self.client.user_id()
+            || notifications::is_backfill(now, event.origin_server_ts())
+            || notifications::is_read(room, event.origin_server_ts()).await
+            || !first_alert(
+                &mut self.alerted_events,
+                now,
+                event.event_id(),
+                event.origin_server_ts(),
+            )
+        {
+            return None;
+        }
+        Some((event.event_id().to_owned(), event.origin_server_ts()))
+    }
+}
+
 fn first_alert(
     alerted: &mut std::collections::HashMap<OwnedEventId, MilliSecondsSinceUnixEpoch>,
     now: MilliSecondsSinceUnixEpoch,

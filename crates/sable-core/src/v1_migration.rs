@@ -411,10 +411,6 @@ async fn validate_account(
     Ok(account)
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "one sequential flow kept in a single function"
-)]
 async fn import_batch(
     store: &SqliteCryptoStore,
     expected: &PersistedSession,
@@ -426,24 +422,12 @@ async fn import_batch(
     let mut custom = Vec::new();
     for Entry { key, value } in entries {
         let parts = key_parts(&key);
-        let first = parts.first().ok_or("missing v1 crypto key")?;
+        if parts.is_empty() {
+            return Err("missing v1 crypto key".into());
+        }
         match table {
             "core" => match key.as_str() {
-                "account" => {
-                    let account = Account::from_pickle(decode(value)?)
-                        .map_err(|_| "invalid v1 account pickle")?;
-                    if account.user_id().as_str() != expected.credentials.user_id()
-                        || account.device_id().as_str() != expected.credentials.device_id()
-                    {
-                        return Err("v1 identity mismatch".into());
-                    }
-                    store
-                        .save_pending_changes(PendingChanges {
-                            account: Some(account),
-                        })
-                        .await
-                        .map_err(CoreError::backend)?;
-                }
+                "account" => import_account(store, expected, value).await?,
                 "private_identity" => {
                     changes.private_identity = Some(
                         PrivateCrossSigningIdentity::from_pickle(decode(value)?)
@@ -456,134 +440,196 @@ async fn import_batch(
                 }
                 _ => custom.push((key, decode::<Vec<u8>>(value)?)),
             },
-            "backup_keys" => match key.as_str() {
-                "recovery_key_v1" => changes.backup_decryption_key = Some(decode(value)?),
-                "backup_version_v1" => changes.backup_version = Some(decode(value)?),
-                _ => return Err("unknown v1 backup record".into()),
-            },
             "session" => {
                 let account = validate_account(store, expected).await?;
-                let session = Session::from_pickle(account.device_keys(), decode(value)?)
-                    .map_err(|_| "invalid v1 Olm session")?;
-                if parts.len() != 2
-                    || first != &session.sender_key().to_base64()
-                    || parts.get(1).map(String::as_str) != Some(session.session_id())
-                {
-                    return Err("v1 Olm session key mismatch".into());
-                }
-                changes.sessions.push(session);
+                changes.sessions.push(olm_session(&account, &parts, value)?);
             }
             "inbound_group_sessions3" => {
-                let row: InboundGroupRow =
-                    serde_json::from_value(value).map_err(|_| "invalid v1 room key")?;
-                let session = InboundGroupSession::from_pickle(decode(row.pickled_session)?)
-                    .map_err(|_| "invalid v1 room key pickle")?;
-                if parts.len() != 2
-                    || first != session.room_id().as_str()
-                    || parts.get(1).map(String::as_str) != Some(session.session_id())
-                {
-                    return Err("v1 room key mismatch".into());
-                }
-                if row.needs_backup == 1 || row.needs_backup == true {
-                    session.reset_backup_state();
-                } else {
-                    session.mark_as_backed_up();
-                }
-                changes.inbound_group_sessions.push(session);
+                changes
+                    .inbound_group_sessions
+                    .push(room_key(&parts, value)?);
             }
             "outbound_group_sessions" => {
                 let account = validate_account(store, expected).await?;
-                let session = OutboundGroupSession::from_pickle(
-                    account.device_id().to_owned(),
-                    account.identity_keys().into(),
-                    decode(value)?,
-                )
-                .map_err(|_| "invalid v1 outbound session")?;
-                if parts.len() != 1
-                    || first != session.room_id().as_str()
-                    || session.sender_key() != account.identity_keys().curve25519
-                {
-                    return Err("v1 outbound session key mismatch".into());
-                }
-                changes.outbound_group_sessions.push(session);
-            }
-            "devices" => {
-                let device: matrix_sdk_base::crypto::DeviceData = decode(value)?;
-                if parts.len() != 2
-                    || first != device.user_id().as_str()
-                    || parts.get(1).map(String::as_str) != Some(device.device_id().as_str())
-                {
-                    return Err("v1 device key mismatch".into());
-                }
-                changes.devices.new.push(device);
-            }
-            "identities" => {
-                let identity: matrix_sdk_base::crypto::UserIdentityData = decode(value)?;
-                if parts.len() != 1 || first != identity.user_id().as_str() {
-                    return Err("v1 user identity key mismatch".into());
-                }
-                changes.identities.new.push(identity);
-            }
-            "room_settings" => {
                 changes
-                    .room_settings
-                    .insert(parse_id(first)?, decode(value)?);
-            }
-            "withheld_sessions" => {
-                let session = parts.get(1).ok_or("invalid withheld session key")?;
-                changes
-                    .withheld_session_info
-                    .entry(parse_id(first)?)
-                    .or_default()
-                    .insert(session.clone(), decode(value)?);
-            }
-            "received_room_key_bundles" => changes.received_room_key_bundles.push(decode(value)?),
-            "rooms_pending_key_bundle" => {
-                changes
-                    .rooms_pending_key_bundle
-                    .insert(parse_id(first)?, Some(decode(value)?));
-            }
-            "room_key_backups_fully_downloaded" => {
-                changes
-                    .room_key_backups_fully_downloaded
-                    .insert(parse_id(first)?);
+                    .outbound_group_sessions
+                    .push(outbound_session(&account, &parts, value)?);
             }
             "tracked_users" => tracked.push((
                 parse_id::<matrix_sdk::ruma::OwnedUserId>(&key)?,
                 value.as_bool().ok_or("invalid tracked user")?,
             )),
-            "olm_hashes" => {
-                changes
-                    .message_hashes
-                    .push(matrix_sdk_base::crypto::olm::OlmMessageHash {
-                        sender_key: first.clone(),
-                        hash: parts.get(1).ok_or("invalid v1 message hash")?.clone(),
-                    });
-            }
-            "secrets_inbox2" => changes.secrets.push(SecretsInboxItem {
-                secret_name: first.as_str().into(),
-                secret: decode::<String>(value)?.into(),
-            }),
-            "gossip_requests" => {
-                let bytes: Vec<u8> = serde_json::from_value(
-                    value
-                        .get("request")
-                        .ok_or("invalid v1 key request")?
-                        .clone(),
-                )
-                .map_err(|_| "invalid v1 key request bytes")?;
-                changes.key_requests.push(
-                    serde_json::from_slice(&bytes).map_err(|_| "invalid v1 key request content")?,
-                );
-            }
             "lease_locks" => {}
-            _ => {
-                return Err(CoreError::Message(format!(
-                    "unsupported v1 crypto store: {table}"
-                )));
-            }
+            _ => stage_record(&mut changes, table, &key, &parts, value)?,
         }
     }
+    save_batch(store, changes, tracked, custom).await
+}
+
+/// Stages a record that maps straight onto a crypto store change.
+fn stage_record(
+    changes: &mut Changes,
+    table: &str,
+    key: &str,
+    parts: &[String],
+    value: Value,
+) -> Result<(), CoreError> {
+    let first = parts.first().ok_or("missing v1 crypto key")?;
+    match table {
+        "backup_keys" => match key {
+            "recovery_key_v1" => changes.backup_decryption_key = Some(decode(value)?),
+            "backup_version_v1" => changes.backup_version = Some(decode(value)?),
+            _ => return Err("unknown v1 backup record".into()),
+        },
+        "devices" => {
+            let device: matrix_sdk_base::crypto::DeviceData = decode(value)?;
+            if parts.len() != 2
+                || first != device.user_id().as_str()
+                || parts.get(1).map(String::as_str) != Some(device.device_id().as_str())
+            {
+                return Err("v1 device key mismatch".into());
+            }
+            changes.devices.new.push(device);
+        }
+        "identities" => {
+            let identity: matrix_sdk_base::crypto::UserIdentityData = decode(value)?;
+            if parts.len() != 1 || first != identity.user_id().as_str() {
+                return Err("v1 user identity key mismatch".into());
+            }
+            changes.identities.new.push(identity);
+        }
+        "room_settings" => {
+            changes
+                .room_settings
+                .insert(parse_id(first)?, decode(value)?);
+        }
+        "withheld_sessions" => {
+            let session = parts.get(1).ok_or("invalid withheld session key")?;
+            changes
+                .withheld_session_info
+                .entry(parse_id(first)?)
+                .or_default()
+                .insert(session.clone(), decode(value)?);
+        }
+        "received_room_key_bundles" => changes.received_room_key_bundles.push(decode(value)?),
+        "rooms_pending_key_bundle" => {
+            changes
+                .rooms_pending_key_bundle
+                .insert(parse_id(first)?, Some(decode(value)?));
+        }
+        "room_key_backups_fully_downloaded" => {
+            changes
+                .room_key_backups_fully_downloaded
+                .insert(parse_id(first)?);
+        }
+        "olm_hashes" => {
+            changes
+                .message_hashes
+                .push(matrix_sdk_base::crypto::olm::OlmMessageHash {
+                    sender_key: first.clone(),
+                    hash: parts.get(1).ok_or("invalid v1 message hash")?.clone(),
+                });
+        }
+        "secrets_inbox2" => changes.secrets.push(SecretsInboxItem {
+            secret_name: first.as_str().into(),
+            secret: decode::<String>(value)?.into(),
+        }),
+        "gossip_requests" => {
+            let bytes: Vec<u8> = serde_json::from_value(
+                value
+                    .get("request")
+                    .ok_or("invalid v1 key request")?
+                    .clone(),
+            )
+            .map_err(|_| "invalid v1 key request bytes")?;
+            changes.key_requests.push(
+                serde_json::from_slice(&bytes).map_err(|_| "invalid v1 key request content")?,
+            );
+        }
+        _ => {
+            return Err(CoreError::Message(format!(
+                "unsupported v1 crypto store: {table}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+async fn import_account(
+    store: &SqliteCryptoStore,
+    expected: &PersistedSession,
+    value: Value,
+) -> Result<(), CoreError> {
+    let account = Account::from_pickle(decode(value)?).map_err(|_| "invalid v1 account pickle")?;
+    if account.user_id().as_str() != expected.credentials.user_id()
+        || account.device_id().as_str() != expected.credentials.device_id()
+    {
+        return Err("v1 identity mismatch".into());
+    }
+    store
+        .save_pending_changes(PendingChanges {
+            account: Some(account),
+        })
+        .await
+        .map_err(CoreError::backend)
+}
+
+fn olm_session(account: &Account, parts: &[String], value: Value) -> Result<Session, CoreError> {
+    let session = Session::from_pickle(account.device_keys(), decode(value)?)
+        .map_err(|_| "invalid v1 Olm session")?;
+    if parts.len() != 2
+        || parts.first() != Some(&session.sender_key().to_base64())
+        || parts.get(1).map(String::as_str) != Some(session.session_id())
+    {
+        return Err("v1 Olm session key mismatch".into());
+    }
+    Ok(session)
+}
+
+fn room_key(parts: &[String], value: Value) -> Result<InboundGroupSession, CoreError> {
+    let row: InboundGroupRow = serde_json::from_value(value).map_err(|_| "invalid v1 room key")?;
+    let session = InboundGroupSession::from_pickle(decode(row.pickled_session)?)
+        .map_err(|_| "invalid v1 room key pickle")?;
+    if parts.len() != 2
+        || parts.first().map(String::as_str) != Some(session.room_id().as_str())
+        || parts.get(1).map(String::as_str) != Some(session.session_id())
+    {
+        return Err("v1 room key mismatch".into());
+    }
+    if row.needs_backup == 1 || row.needs_backup == true {
+        session.reset_backup_state();
+    } else {
+        session.mark_as_backed_up();
+    }
+    Ok(session)
+}
+
+fn outbound_session(
+    account: &Account,
+    parts: &[String],
+    value: Value,
+) -> Result<OutboundGroupSession, CoreError> {
+    let session = OutboundGroupSession::from_pickle(
+        account.device_id().to_owned(),
+        account.identity_keys().into(),
+        decode(value)?,
+    )
+    .map_err(|_| "invalid v1 outbound session")?;
+    if parts.len() != 1
+        || parts.first().map(String::as_str) != Some(session.room_id().as_str())
+        || session.sender_key() != account.identity_keys().curve25519
+    {
+        return Err("v1 outbound session key mismatch".into());
+    }
+    Ok(session)
+}
+
+async fn save_batch(
+    store: &SqliteCryptoStore,
+    changes: Changes,
+    tracked: Vec<(matrix_sdk::ruma::OwnedUserId, bool)>,
+    custom: Vec<(String, Vec<u8>)>,
+) -> Result<(), CoreError> {
     store
         .save_changes(changes)
         .await

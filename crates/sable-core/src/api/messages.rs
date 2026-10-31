@@ -485,21 +485,7 @@ impl Handler for EditParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.edit_message(
-            &self.room_id,
-            self.event_id,
-            self.transaction_id,
-            self.body,
-            self.formatted,
-            self.kind,
-            self.media_caption,
-            self.thread_root,
-            self.mentions,
-            self.mentions_room,
-            self.persona,
-            self.forum_title,
-        )
-        .await
+        core.edit_message(self).await
     }
 }
 
@@ -904,18 +890,7 @@ impl Handler for ScheduleAttachmentParams {
     type Ok = String;
 
     async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        core.schedule_attachment(
-            &self.room_id,
-            self.filename,
-            self.mime,
-            self.url,
-            self.size,
-            self.info,
-            self.spoiler,
-            self.delay_ms,
-            self.persona.as_ref(),
-        )
-        .await
+        core.schedule_attachment(self).await
     }
 }
 

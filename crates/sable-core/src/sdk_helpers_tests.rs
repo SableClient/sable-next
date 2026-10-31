@@ -1,3 +1,4 @@
+use crate::api::messages::ScheduleAttachmentParams;
 use crate::api::timeline::TimelineFocusView;
 use crate::api::{account::ProfilePropagationView, rooms::RoomKind};
 use std::{collections::HashMap, sync::Arc};
@@ -1282,17 +1283,17 @@ async fn scheduled_attachments_keep_the_spoiler_on_the_wire() {
     let core = core(&server, client).await;
 
     let delay_id = core
-        .schedule_attachment(
-            &room_id.to_owned(),
-            "a.png".to_owned(),
-            "image/png".to_owned(),
-            "mxc://example.org/abc".to_owned(),
-            7,
-            None,
-            true,
-            1000,
-            None,
-        )
+        .schedule_attachment(ScheduleAttachmentParams {
+            room_id: room_id.to_owned(),
+            filename: "a.png".to_owned(),
+            mime: "image/png".to_owned(),
+            url: "mxc://example.org/abc".to_owned(),
+            size: 7,
+            info: None,
+            spoiler: true,
+            delay_ms: 1000,
+            persona: None,
+        })
         .await
         .unwrap();
     assert_eq!(delay_id, "spoiled");

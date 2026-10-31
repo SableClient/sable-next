@@ -380,26 +380,36 @@ struct LookOut {
     pub animal_need: Option<String>,
 }
 
-impl LookOut {
-    #[expect(clippy::too_many_arguments, reason = "mirrors the protocol fields")]
-    fn new(
-        pronouns: &[PronounView],
-        on_light: Option<&str>,
-        on_dark: Option<&str>,
-        biography: Option<&str>,
-        banner_url: Option<&str>,
-        is_animal: Option<&str>,
-        has_animal: Option<&str>,
-        animal_need: Option<&str>,
-    ) -> Self {
+impl From<&PersonaView> for LookOut {
+    fn from(persona: &PersonaView) -> Self {
         Self {
-            pronouns: pronouns.iter().map(Into::into).collect(),
-            colors: ColorsOut::new(on_light.map(str::to_owned), on_dark.map(str::to_owned)),
-            biography: biography.map(str::to_owned),
-            banner_url: banner_url.map(str::to_owned),
-            is_animal: is_animal.map(str::to_owned),
-            has_animal: has_animal.map(str::to_owned),
-            animal_need: animal_need.map(str::to_owned),
+            pronouns: persona.pronouns.iter().map(Into::into).collect(),
+            colors: ColorsOut::new(
+                persona.color_on_light.clone(),
+                persona.color_on_dark.clone(),
+            ),
+            biography: persona.biography.clone(),
+            banner_url: persona.banner_url.clone(),
+            is_animal: persona.is_animal.clone(),
+            has_animal: persona.has_animal.clone(),
+            animal_need: persona.animal_need.clone(),
+        }
+    }
+}
+
+impl From<&PerMessageProfileView> for LookOut {
+    fn from(profile: &PerMessageProfileView) -> Self {
+        Self {
+            pronouns: profile.pronouns.iter().map(Into::into).collect(),
+            colors: ColorsOut::new(
+                profile.color_on_light.clone(),
+                profile.color_on_dark.clone(),
+            ),
+            biography: profile.biography.clone(),
+            banner_url: profile.banner_url.clone(),
+            is_animal: profile.is_animal.clone(),
+            has_animal: profile.has_animal.clone(),
+            animal_need: profile.animal_need.clone(),
         }
     }
 }
@@ -499,16 +509,7 @@ impl From<&PersonaView> for PersonaOut {
             id: persona.id.clone(),
             displayname: persona.display_name.clone(),
             avatar_url: persona.avatar_url.clone(),
-            look: LookOut::new(
-                &persona.pronouns,
-                persona.color_on_light.as_deref(),
-                persona.color_on_dark.as_deref(),
-                persona.biography.as_deref(),
-                persona.banner_url.as_deref(),
-                persona.is_animal.as_deref(),
-                persona.has_animal.as_deref(),
-                persona.animal_need.as_deref(),
-            ),
+            look: persona.into(),
             pluralkit: persona.pluralkit.as_ref().map(Into::into),
             triggers: persona.triggers.iter().map(Into::into).collect(),
             last_used: persona.last_used,
@@ -683,16 +684,7 @@ pub(crate) fn profile_value(profile: &PerMessageProfileView) -> Value {
             .filter(|name| !name.is_empty())
             .map(clamp_field),
         avatar_url: profile.avatar_url.clone(),
-        look: LookOut::new(
-            &profile.pronouns,
-            profile.color_on_light.as_deref(),
-            profile.color_on_dark.as_deref(),
-            profile.biography.as_deref(),
-            profile.banner_url.as_deref(),
-            profile.is_animal.as_deref(),
-            profile.has_animal.as_deref(),
-            profile.animal_need.as_deref(),
-        ),
+        look: profile.into(),
         has_fallback: profile.has_fallback,
     };
     // Strings, bools and lists of them always serialize.
