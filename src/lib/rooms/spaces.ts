@@ -132,3 +132,35 @@ export function joinedSpaceRooms(
   walk(space);
   return found;
 }
+
+/** Private links show up as children of their spaces, after the space's own. */
+export function withDmSpaceChildren(
+  rooms: readonly RoomListItemView[],
+  links: ReadonlyMap<string, readonly string[]>
+): RoomListItemView[] {
+  if (links.size === 0) return [...rooms];
+  const present = new Set(rooms.map((room) => room.room_id));
+  const childrenOf = new Map<string, string[]>();
+  for (const [roomId, spaceIds] of links) {
+    if (!present.has(roomId)) continue;
+    for (const spaceId of spaceIds)
+      childrenOf.set(spaceId, [...(childrenOf.get(spaceId) ?? []), roomId]);
+  }
+  return rooms.map((room) => {
+    const added = childrenOf.get(room.room_id);
+    if (!added || room.room_kind !== 'space') return room;
+    const known = new Set(room.space_children.map((child) => child.room_id));
+    const extra = added
+      .filter((roomId) => !known.has(roomId))
+      .map((roomId) => ({
+        room_id: roomId,
+        via: [roomId.slice(roomId.indexOf(':') + 1)],
+        order: null,
+        origin_server_ts: 0,
+        suggested: false,
+      }));
+    return extra.length === 0
+      ? room
+      : { ...room, space_children: [...room.space_children, ...extra] };
+  });
+}

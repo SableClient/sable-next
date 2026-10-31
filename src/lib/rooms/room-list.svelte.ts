@@ -14,8 +14,9 @@ import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { quietTargets } from './quiet-rooms.svelte.js';
+import { dmSpaces } from './dm-spaces.svelte.js';
 import { readRoomListSnapshot, writeRoomListSnapshot } from './room-list-snapshot.js';
-import { quietRoomIds } from './spaces.js';
+import { quietRoomIds, withDmSpaceChildren } from './spaces.js';
 import {
   applyBadgeMode,
   badgeModeFor,
@@ -99,7 +100,8 @@ export function findRoomByPathId(
 const NOBODY_TYPING: readonly string[] = [];
 
 export class RoomList {
-  rooms = $state.raw<RoomListItemView[]>([]);
+  #source = $state.raw<RoomListItemView[]>([]);
+  rooms = $derived(withDmSpaceChildren(this.#source, dmSpaces.links));
   // eslint-disable-next-line svelte/prefer-svelte-reactivity
   typingUsers = $state.raw<ReadonlyMap<string, readonly string[]>>(new Map());
 
@@ -231,7 +233,7 @@ export class RoomList {
     this.warmTimer = undefined;
     this.warmed = [];
     this.pendingWarm = [];
-    this.rooms = [];
+    this.#source = [];
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     this.typingUsers = new Map();
     this.unsubscribeEvents?.();
@@ -255,7 +257,7 @@ export class RoomList {
       (event) => (event.type === 'room_list_diff' ? event : null),
       applyDiffs,
       (diffs) => {
-        this.setRooms(applyDiffs(this.live ? this.rooms : [], diffs));
+        this.setRooms(applyDiffs(this.live ? this.#source : [], diffs));
       }
     );
 
@@ -297,7 +299,7 @@ export class RoomList {
     this.snapshotAccountId = accountId;
     if (accountId === null || this.rooms.length > 0) return;
     const snapshot = readRoomListSnapshot(accountId);
-    if (snapshot && snapshot.length > 0) this.rooms = snapshot;
+    if (snapshot && snapshot.length > 0) this.#source = snapshot;
   }
 
   private snapshotPainted(): boolean {
@@ -327,13 +329,13 @@ export class RoomList {
       (!force && !this.presentationActive)
     )
       return;
-    writeRoomListSnapshot(this.snapshotAccountId, this.rooms);
+    writeRoomListSnapshot(this.snapshotAccountId, this.#source);
     this.snapshotDirty = false;
   }
 
   private setRooms(rooms: RoomListItemView[]): void {
     this.live = true;
-    this.rooms = rooms;
+    this.#source = rooms;
     for (const waiter of this.listedWaiters) {
       if (rooms.some((room) => room.room_id === waiter.roomId)) waiter.resolve();
     }

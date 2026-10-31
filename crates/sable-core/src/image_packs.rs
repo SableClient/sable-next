@@ -458,6 +458,7 @@ impl Core {
         let mut seen: BTreeSet<OwnedRoomId> = BTreeSet::from([room_id.to_owned()]);
         let listing = crate::view::listing_spaces(Some(self), client, room_id).await;
         let mut frontier = if listing.is_empty() { parents } else { listing };
+        frontier.extend(Self::synced_dm_spaces_of(client, room_id).await);
 
         for _ in 0..MAX_SPACE_CHAIN {
             let spaces: Vec<matrix_sdk::Room> = frontier

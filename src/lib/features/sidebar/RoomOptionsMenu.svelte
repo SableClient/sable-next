@@ -45,6 +45,7 @@
   import IconContext from 'phosphor-svelte/lib/IconContext';
 
   import AddToSpaceDialog from './AddToSpaceDialog.svelte';
+  import { dmSpaces } from '#lib/rooms/dm-spaces.svelte.js';
   import { wouldCreateCycle } from './add-to-space.js';
   import { markRoomUnread, markRoomsRead, spaceDescendantRooms } from './nav-rooms.js';
 
@@ -145,9 +146,15 @@
       });
   }
 
-  let offeredSpaces = $derived(addableSpaces.filter((space) => manageable.has(space.room_id)));
+  let privateSpaceIds = $derived(room.is_direct ? dmSpaces.spacesOf(room.room_id) : []);
+  let offeredSpaces = $derived(
+    room.is_direct ? addableSpaces : addableSpaces.filter((space) => manageable.has(space.room_id))
+  );
   let removableParent = $derived(
-    parentSpace !== null && manageable.has(parentSpace.room_id) ? parentSpace : null
+    parentSpace !== null &&
+      (privateSpaceIds.includes(parentSpace.room_id) || manageable.has(parentSpace.room_id))
+      ? parentSpace
+      : null
   );
 
   let joinableParents = $state.raw<{ room_id: string; via: string[]; name: string | null }[]>([]);
@@ -222,6 +229,10 @@
   }
 
   function addToSpaces(spaceIds: string[]): void {
+    if (room.is_direct) {
+      void dmSpaces.set(room.room_id, [...privateSpaceIds, ...spaceIds]).catch(report);
+      return;
+    }
     for (const spaceId of spaceIds) {
       void core.rpc.spaces
         .add({ space_id: spaceId, room_id: room.room_id, suggested: null })
@@ -230,6 +241,15 @@
   }
 
   function removeFromSpace(spaceId: string): void {
+    if (privateSpaceIds.includes(spaceId)) {
+      void dmSpaces
+        .set(
+          room.room_id,
+          privateSpaceIds.filter((id) => id !== spaceId)
+        )
+        .catch(report);
+      return;
+    }
     void core.rpc.spaces.remove({ space_id: spaceId, room_id: room.room_id }).catch(report);
   }
 

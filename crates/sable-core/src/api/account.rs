@@ -43,6 +43,8 @@ domain! {
     media_preview_config,
     set_media_preview_config,
     set_room_media_previews,
+    dm_spaces,
+    set_dm_spaces,
     profile_overrides,
     set_profile_override,
 }
@@ -694,6 +696,57 @@ impl Handler for SetInviteDismissedParams {
         Ok(room_id_strings(
             core.set_invite_dismissed(self.room_id, self.dismissed)
                 .await?,
+        ))
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct DmSpaceLink {
+    pub room_id: String,
+    pub space_ids: Vec<String>,
+}
+
+fn dm_space_links(
+    links: std::collections::BTreeMap<OwnedRoomId, Vec<OwnedRoomId>>,
+) -> Vec<DmSpaceLink> {
+    links
+        .into_iter()
+        .map(|(room_id, space_ids)| DmSpaceLink {
+            room_id: room_id.into(),
+            space_ids: room_id_strings(space_ids),
+        })
+        .collect()
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct DmSpacesParams {}
+
+impl Handler for DmSpacesParams {
+    type Ok = Vec<DmSpaceLink>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Vec<DmSpaceLink>, RpcError> {
+        Ok(dm_space_links(core.dm_spaces().await?))
+    }
+}
+
+/// An empty `space_ids` takes the chat out of every space.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetDmSpacesParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub space_ids: Vec<OwnedRoomId>,
+}
+
+impl Handler for SetDmSpacesParams {
+    type Ok = Vec<DmSpaceLink>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Vec<DmSpaceLink>, RpcError> {
+        Ok(dm_space_links(
+            core.set_dm_spaces(self.room_id, self.space_ids).await?,
         ))
     }
 }

@@ -270,6 +270,11 @@ export type DisplayNameChangeView = {
 	new: string | null,
 };
 
+export type DmSpaceLink = {
+	room_id: string,
+	space_ids: string[],
+};
+
 export type DropInstruction = "above" | "below" | "into";
 
 export type EditVersionView = {
@@ -2104,6 +2109,11 @@ export type Rpc = {
 	room_id: string,
 	media_previews: MediaPreviewsView | null,
 }) => Promise<MediaPreviewConfigView>;
+    dmSpaces: (params?: Record<string, never>) => Promise<DmSpaceLink[]>;
+    setDmSpaces: (params: {
+	room_id: string,
+	space_ids: string[],
+}) => Promise<DmSpaceLink[]>;
     profileOverrides: (params?: Record<string, never>) => Promise<ProfileOverridesView>;
     setProfileOverride: (params: {
 	user_id: string,
@@ -3364,6 +3374,8 @@ export type RpcMethods = {
   'account.media_preview_config': Rpc['account']['mediaPreviewConfig'];
   'account.set_media_preview_config': Rpc['account']['setMediaPreviewConfig'];
   'account.set_room_media_previews': Rpc['account']['setRoomMediaPreviews'];
+  'account.dm_spaces': Rpc['account']['dmSpaces'];
+  'account.set_dm_spaces': Rpc['account']['setDmSpaces'];
   'account.profile_overrides': Rpc['account']['profileOverrides'];
   'account.set_profile_override': Rpc['account']['setProfileOverride'];
   'auth.discover_homeserver': Rpc['auth']['discoverHomeserver'];
@@ -3671,6 +3683,8 @@ export function createRpc(call: RpcCall): Rpc {
       mediaPreviewConfig: (params) => call('account.media_preview_config', params) as ReturnType<Rpc['account']['mediaPreviewConfig']>,
       setMediaPreviewConfig: (params) => call('account.set_media_preview_config', params) as ReturnType<Rpc['account']['setMediaPreviewConfig']>,
       setRoomMediaPreviews: (params) => call('account.set_room_media_previews', params) as ReturnType<Rpc['account']['setRoomMediaPreviews']>,
+      dmSpaces: (params = {}) => call('account.dm_spaces', params) as ReturnType<Rpc['account']['dmSpaces']>,
+      setDmSpaces: (params) => call('account.set_dm_spaces', params) as ReturnType<Rpc['account']['setDmSpaces']>,
       profileOverrides: (params = {}) => call('account.profile_overrides', params) as ReturnType<Rpc['account']['profileOverrides']>,
       setProfileOverride: (params) => call('account.set_profile_override', params) as ReturnType<Rpc['account']['setProfileOverride']>,
     },

@@ -23,6 +23,7 @@
   import { MESSAGE_SEARCH_FIELD_ID } from '#lib/features/search/message-search.svelte.js';
   import { InviteActions } from '#lib/rooms/invites.svelte.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
+  import { dmSpaces } from '#lib/rooms/dm-spaces.svelte.js';
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { supporter } from '#lib/supporter/supporter.svelte.js';
   import { PresenceStore, providePresenceStore } from '#lib/rooms/presence.svelte.js';
@@ -884,6 +885,7 @@
     notifications.start(core, openNotification);
     presence.start(core);
     dismissedInvites.start(core);
+    dmSpaces.start(core);
     mediaPreviewSettings.start(core);
     profileOverrides.start(core);
     supporter.start(core);
@@ -893,6 +895,7 @@
       notifications.stop();
       presence.stop();
       dismissedInvites.stop();
+      dmSpaces.stop();
       mediaPreviewSettings.stop();
       profileOverrides.stop();
       supporter.stop();

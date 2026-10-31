@@ -1,4 +1,6 @@
 use crate::api::account::SetMediaPreviewConfigParams;
+use std::collections::BTreeMap;
+
 use matrix_sdk::ruma::OwnedRoomId;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
@@ -10,6 +12,7 @@ use crate::{Core, ResultExt};
 const MEDIA_PREVIEW_EVENT: &str = "m.media_preview_config";
 const UNSTABLE_MEDIA_PREVIEW_EVENT: &str = "io.element.msc4278.media_preview_config";
 const DISMISSED_INVITES_EVENT: &str = "moe.sable.dismissed_invites";
+const DM_SPACES_EVENT: &str = "moe.sable.dm_spaces";
 
 #[derive(Default, Deserialize)]
 struct MediaPreviewIn {
@@ -150,6 +153,47 @@ pub(crate) fn dismissed_invites(content: Option<&Value>) -> Vec<OwnedRoomId> {
         .room_ids
 }
 
+/// Direct chats placed in spaces only for this account, keyed by chat.
+pub(crate) fn dm_spaces(content: Option<&Value>) -> BTreeMap<OwnedRoomId, Vec<OwnedRoomId>> {
+    let Some(Value::Object(rooms)) = content.and_then(|content| content.get("rooms")) else {
+        return BTreeMap::new();
+    };
+    rooms
+        .iter()
+        .filter_map(|(room_id, spaces)| {
+            let room_id = OwnedRoomId::try_from(room_id.as_str()).ok()?;
+            let spaces: Vec<_> = spaces
+                .as_array()?
+                .iter()
+                .filter_map(|space| OwnedRoomId::try_from(space.as_str()?).ok())
+                .collect();
+            (!spaces.is_empty()).then_some((room_id, spaces))
+        })
+        .collect()
+}
+
+fn dm_spaces_content(
+    stored: Option<Value>,
+    room_id: OwnedRoomId,
+    space_ids: Vec<OwnedRoomId>,
+) -> Value {
+    let mut links = dm_spaces(stored.as_ref());
+    if space_ids.is_empty() {
+        links.remove(&room_id);
+    } else {
+        links.insert(room_id, space_ids);
+    }
+    let mut content = match stored {
+        Some(Value::Object(map)) => map,
+        _ => Map::new(),
+    };
+    content.insert(
+        "rooms".to_owned(),
+        serde_json::to_value(links).unwrap_or_default(),
+    );
+    Value::Object(content)
+}
+
 #[derive(Serialize)]
 struct DismissedInvitesOut {
     #[serde(rename = "roomIds")]
@@ -241,6 +285,46 @@ impl Core {
         Ok(media_preview_config(Some(&content)))
     }
 
+    pub(crate) async fn dm_spaces(
+        &self,
+    ) -> Result<BTreeMap<OwnedRoomId, Vec<OwnedRoomId>>, RpcError> {
+        Ok(dm_spaces(
+            self.account_document(DM_SPACES_EVENT).await?.as_ref(),
+        ))
+    }
+
+    /// From the synced copy, for reads too frequent to fetch the server each time.
+    pub(crate) async fn synced_dm_spaces_of(
+        client: &matrix_sdk::Client,
+        room_id: &matrix_sdk::ruma::RoomId,
+    ) -> Vec<OwnedRoomId> {
+        let content = client
+            .account()
+            .account_data_raw(DM_SPACES_EVENT.into())
+            .await
+            .ok()
+            .flatten()
+            .and_then(|raw| raw.deserialize_as::<Value>().ok());
+        dm_spaces(content.as_ref())
+            .remove(room_id)
+            .unwrap_or_default()
+    }
+
+    pub(crate) async fn set_dm_spaces(
+        &self,
+        room_id: OwnedRoomId,
+        space_ids: Vec<OwnedRoomId>,
+    ) -> Result<BTreeMap<OwnedRoomId, Vec<OwnedRoomId>>, RpcError> {
+        let _guard = self.account_data_lock.lock().await;
+        let content = dm_spaces_content(
+            self.account_document(DM_SPACES_EVENT).await?,
+            room_id,
+            space_ids,
+        );
+        self.set_account_data(DM_SPACES_EVENT, &content).await?;
+        Ok(dm_spaces(Some(&content)))
+    }
+
     pub(crate) async fn dismissed_invites(&self) -> Result<Vec<OwnedRoomId>, RpcError> {
         Ok(dismissed_invites(
             self.account_document(DISMISSED_INVITES_EVENT)
@@ -271,9 +355,27 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        dismissed_invites, media_preview_config, media_preview_content, room_media_previews_content,
+        dismissed_invites, dm_spaces, dm_spaces_content, media_preview_config,
+        media_preview_content, room_media_previews_content,
     };
     use crate::protocol::{InviteAvatarsView, MediaPreviewConfigView, MediaPreviewsView};
+
+    #[test]
+    fn a_dm_is_linked_to_spaces_and_unlinked_when_none_are_left() {
+        let stored = json!({ "rooms": { "!dm:a.org": ["!old:a.org"], "!bad": "x" }, "kept": 1 });
+        let dm = matrix_sdk::ruma::owned_room_id!("!dm:a.org");
+        let space = matrix_sdk::ruma::owned_room_id!("!space:a.org");
+
+        let linked = dm_spaces_content(Some(stored.clone()), dm.clone(), vec![space.clone()]);
+        assert_eq!(
+            linked,
+            json!({ "rooms": { "!dm:a.org": ["!space:a.org"] }, "kept": 1 })
+        );
+        assert_eq!(dm_spaces(Some(&linked)).get(&dm), Some(&vec![space]));
+
+        let unlinked = dm_spaces_content(Some(linked), dm, Vec::new());
+        assert_eq!(unlinked, json!({ "rooms": {}, "kept": 1 }));
+    }
 
     #[test]
     fn a_room_override_is_set_and_cleared_without_touching_other_fields() {
