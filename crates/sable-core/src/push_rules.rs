@@ -11,7 +11,7 @@ use matrix_sdk::ruma::events::push_rules::PushRulesEvent;
 use matrix_sdk::ruma::push::{
     Action, AnyPushRuleRef, EventMatchConditionData, EventPropertyIsConditionData,
     HighlightTweakValue, NewConditionalPushRule, NewPushRule, NewSimplePushRule,
-    PredefinedContentRuleId, PredefinedOverrideRuleId, PredefinedUnderrideRuleId, PushCondition,
+    PredefinedOverrideRuleId, PredefinedUnderrideRuleId, PushCondition,
     RoomMemberCountConditionData, RuleKind, Ruleset, ScalarJsonValue,
     SenderNotificationPermissionConditionData, SoundTweakValue, Tweak,
 };
@@ -19,13 +19,18 @@ use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 use tokio::sync::{RwLock, broadcast};
 
 use crate::protocol::{
-    DefaultNotificationModesView, EventNotificationView, EventNotificationsView,
-    MentionNotificationModeView, MentionNotificationsView, MentionRuleView, NotificationModeView,
-    NotificationSettingsView,
+    DefaultNotificationModesView, EventNotificationView, MentionNotificationModeView,
+    NotificationModeView, NotificationSettingsView,
 };
 
+mod categories;
 mod keywords;
 
+use categories::{event_actions, event_notifies};
+pub use categories::{
+    event_notifications, master_muted, mention_notifications, plan_event, plan_master,
+    plan_membership, plan_mention, pushes_every_encrypted_event,
+};
 pub use keywords::{keywords, plan_add_keyword, plan_keyword_mode, plan_remove_keyword};
 
 pub struct PushRules {
@@ -225,7 +230,7 @@ pub fn notifies(actions: &[Action]) -> bool {
         .any(|action| matches!(action, Action::Notify))
 }
 
-fn rule_notifies(rule: AnyPushRuleRef<'_>) -> bool {
+pub(super) fn rule_notifies(rule: AnyPushRuleRef<'_>) -> bool {
     rule.enabled() && notifies(rule.actions())
 }
 
@@ -531,8 +536,8 @@ pub fn plan_default_mode(
 const SHAPE_PREFIX: &str = "moe.sable.shape.";
 const STICKER: &str = "moe.sable.sticker";
 const STICKER_DIRECT: &str = "moe.sable.sticker_one_to_one";
-const RING_ONE_TO_ONE: &str = "moe.sable.ring_one_to_one";
-const RTC_INVITE_TYPES: [(&str, &str, &str); 3] = [
+pub(super) const RING_ONE_TO_ONE: &str = "moe.sable.ring_one_to_one";
+pub(super) const RTC_INVITE_TYPES: [(&str, &str, &str); 3] = [
     (
         "m.rtc.invite",
         "moe.sable.rtc.invite_for_me",
@@ -557,16 +562,16 @@ const RTC_INVITE_GUARDS: [(&str, &str); 3] = [
     ),
     ("m.rtc.notification", "moe.sable.rtc.suppress_invite.legacy"),
 ];
-const RTC_SERVER_USER_RULES: [&str; 2] = [
+pub(super) const RTC_SERVER_USER_RULES: [&str; 2] = [
     ".m.rule.rtc.invite_for_me",
     ".org.matrix.msc4075.rule.rtc.invite_for_me",
 ];
-const RTC_SERVER_ROOM_RULES: [&str; 2] = [
+pub(super) const RTC_SERVER_ROOM_RULES: [&str; 2] = [
     ".m.rule.rtc.invite_for_room",
     ".org.matrix.msc4075.rule.rtc.invite_for_room",
 ];
 const SUPPRESS_BRIDGE_STATUS: &str = "moe.sable.suppress_bridge_status";
-const SUPPRESS_REACTIONS: &str = "moe.sable.suppress_reactions";
+pub(super) const SUPPRESS_REACTIONS: &str = "moe.sable.suppress_reactions";
 /// A room rule matches every event, so these would notify in a room set to all messages.
 const SUPPRESSED_ROOM_EVENTS: [&str; 15] = [
     "m.room.name",
@@ -778,7 +783,7 @@ fn align_stickers(rules: &Ruleset, direct: bool) -> Vec<RuleWrite> {
     }
 }
 
-fn is_rtc_rule(rule_id: &str) -> bool {
+pub(super) fn is_rtc_rule(rule_id: &str) -> bool {
     RTC_SERVER_USER_RULES.contains(&rule_id)
         || RTC_SERVER_ROOM_RULES.contains(&rule_id)
         || RTC_INVITE_TYPES
@@ -1004,262 +1009,6 @@ fn silence_event_type(
             ),
         ))),
     }
-}
-
-const ENCRYPTED_EVENT_RULES: [&str; 2] = [
-    ".m.rule.encrypted_event",
-    ".org.matrix.msc4028.encrypted_event",
-];
-
-#[must_use]
-pub fn pushes_every_encrypted_event(rules: &Ruleset) -> bool {
-    rules.override_.iter().any(|rule| {
-        rule.enabled
-            && ENCRYPTED_EVENT_RULES.contains(&rule.rule_id.as_str())
-            && notifies(&rule.actions)
-    })
-}
-
-fn mention_rule(rules: &Ruleset, rule: MentionRuleView) -> Option<(RuleKind, String)> {
-    #[expect(
-        deprecated,
-        reason = "the legacy room-notif rule is still matched on older servers"
-    )]
-    let candidates: &[(RuleKind, &str)] = match rule {
-        MentionRuleView::Room => &[
-            (
-                RuleKind::Override,
-                PredefinedOverrideRuleId::IsRoomMention.as_str(),
-            ),
-            (
-                RuleKind::Override,
-                PredefinedOverrideRuleId::RoomNotif.as_str(),
-            ),
-        ],
-        MentionRuleView::User => &[(
-            RuleKind::Override,
-            PredefinedOverrideRuleId::IsUserMention.as_str(),
-        )],
-        MentionRuleView::DisplayName => &[(
-            RuleKind::Override,
-            PredefinedOverrideRuleId::ContainsDisplayName.as_str(),
-        )],
-        MentionRuleView::Username => &[(
-            RuleKind::Content,
-            PredefinedContentRuleId::ContainsUserName.as_str(),
-        )],
-    };
-    candidates
-        .iter()
-        .find(|(kind, rule_id)| rules.get(kind.clone(), rule_id).is_some())
-        .map(|(kind, rule_id)| (kind.clone(), (*rule_id).to_owned()))
-}
-
-fn mention_level(rules: &Ruleset, rule: MentionRuleView) -> Option<MentionNotificationModeView> {
-    let (kind, rule_id) = mention_rule(rules, rule)?;
-    rules
-        .get(kind, rule_id)
-        .map(|rule| level(rule.enabled(), rule.actions()))
-}
-
-#[must_use]
-pub fn mention_notifications(rules: &Ruleset) -> MentionNotificationsView {
-    MentionNotificationsView {
-        room: mention_level(rules, MentionRuleView::Room),
-        user: mention_level(rules, MentionRuleView::User),
-        display_name: mention_level(rules, MentionRuleView::DisplayName),
-        username: mention_level(rules, MentionRuleView::Username),
-    }
-}
-
-/// # Errors
-///
-/// When the server has no rule for this kind of mention.
-pub fn plan_mention(
-    rules: &Ruleset,
-    rule: MentionRuleView,
-    mode: MentionNotificationModeView,
-) -> Result<Vec<RuleWrite>, CoreError> {
-    let (kind, rule_id) =
-        mention_rule(rules, rule).ok_or("the server has no rule for this mention")?;
-    Ok(plan_level(kind, &rule_id, mode, true))
-}
-
-fn event_rule(rules: &Ruleset, event: EventNotificationView) -> Option<(RuleKind, String)> {
-    let candidates = match event {
-        EventNotificationView::Membership => {
-            vec![(
-                RuleKind::Override,
-                PredefinedOverrideRuleId::MemberEvent.as_str(),
-            )]
-        }
-        EventNotificationView::Reactions => vec![
-            (
-                RuleKind::Override,
-                PredefinedOverrideRuleId::Reaction.as_str(),
-            ),
-            (RuleKind::Override, SUPPRESS_REACTIONS),
-        ],
-        EventNotificationView::Edits => {
-            vec![(
-                RuleKind::Override,
-                PredefinedOverrideRuleId::SuppressEdits.as_str(),
-            )]
-        }
-        EventNotificationView::Notices => {
-            vec![(
-                RuleKind::Override,
-                PredefinedOverrideRuleId::SuppressNotices.as_str(),
-            )]
-        }
-        EventNotificationView::Invites => {
-            vec![(
-                RuleKind::Override,
-                PredefinedOverrideRuleId::InviteForMe.as_str(),
-            )]
-        }
-        EventNotificationView::Calls => {
-            let mut candidates = vec![(
-                RuleKind::Underride,
-                PredefinedUnderrideRuleId::Call.as_str(),
-            )];
-            candidates.extend(
-                RTC_SERVER_USER_RULES
-                    .into_iter()
-                    .chain(RTC_SERVER_ROOM_RULES)
-                    .chain(
-                        RTC_INVITE_TYPES
-                            .into_iter()
-                            .flat_map(|(_, user, room)| [user, room]),
-                    )
-                    .map(|id| (RuleKind::Override, id)),
-            );
-            candidates
-        }
-    };
-    candidates
-        .into_iter()
-        .find(|(kind, id)| rules.get(kind.clone(), id).is_some())
-        .map(|(kind, id)| (kind, id.to_owned()))
-}
-
-fn event_actions(event: EventNotificationView) -> Vec<Action> {
-    match event {
-        EventNotificationView::Invites => vec![
-            Action::Notify,
-            Action::SetTweak(Tweak::Sound(SoundTweakValue::Default)),
-        ],
-        EventNotificationView::Calls => vec![
-            Action::Notify,
-            Action::SetTweak(Tweak::Sound("ring".into())),
-        ],
-        _ => vec![Action::Notify],
-    }
-}
-
-fn event_notifies(rules: &Ruleset, event: EventNotificationView) -> Option<bool> {
-    let (kind, rule_id) = event_rule(rules, event)?;
-    rules.get(kind, &rule_id).map(rule_notifies)
-}
-
-#[must_use]
-pub fn event_notifications(rules: &Ruleset) -> EventNotificationsView {
-    EventNotificationsView {
-        membership: event_notifies(rules, EventNotificationView::Membership),
-        reactions: event_notifies(rules, EventNotificationView::Reactions),
-        edits: event_notifies(rules, EventNotificationView::Edits),
-        notices: event_notifies(rules, EventNotificationView::Notices),
-        invites: event_notifies(rules, EventNotificationView::Invites),
-        calls: event_notifies(rules, EventNotificationView::Calls),
-    }
-}
-
-/// # Errors
-///
-/// When the server has no rule for this kind of event.
-pub fn plan_event(
-    rules: &Ruleset,
-    event: EventNotificationView,
-    enabled: bool,
-) -> Result<Vec<RuleWrite>, CoreError> {
-    let (kind, rule_id) =
-        event_rule(rules, event).ok_or("the server has no rule for this kind of event")?;
-    let mut targets = vec![(kind, rule_id)];
-    if matches!(event, EventNotificationView::Calls) {
-        for rule in rules
-            .override_
-            .iter()
-            .filter(|rule| is_rtc_rule(&rule.rule_id) || rule.rule_id == RING_ONE_TO_ONE)
-        {
-            if !targets
-                .iter()
-                .any(|(kind, id)| *kind == RuleKind::Override && *id == rule.rule_id)
-            {
-                targets.push((RuleKind::Override, rule.rule_id.clone()));
-            }
-        }
-    }
-    Ok(targets
-        .into_iter()
-        .flat_map(|(kind, rule_id)| {
-            [
-                RuleWrite::Actions {
-                    kind: kind.clone(),
-                    rule_id: rule_id.clone(),
-                    actions: if enabled {
-                        event_actions(event)
-                    } else {
-                        vec![]
-                    },
-                },
-                RuleWrite::Enabled {
-                    kind,
-                    rule_id,
-                    enabled: true,
-                },
-            ]
-        })
-        .collect())
-}
-
-#[must_use]
-pub fn master_muted(rules: &Ruleset) -> Option<bool> {
-    rules
-        .get(
-            RuleKind::Override,
-            PredefinedOverrideRuleId::Master.as_str(),
-        )
-        .map(ruma::push::AnyPushRuleRef::enabled)
-}
-
-#[must_use]
-pub fn plan_master(muted: bool) -> Vec<RuleWrite> {
-    vec![RuleWrite::Enabled {
-        kind: RuleKind::Override,
-        rule_id: PredefinedOverrideRuleId::Master.to_string(),
-        enabled: muted,
-    }]
-}
-
-#[must_use]
-pub fn plan_membership(enabled: bool) -> Vec<RuleWrite> {
-    let rule_id = PredefinedOverrideRuleId::MemberEvent.to_string();
-    vec![
-        RuleWrite::Actions {
-            kind: RuleKind::Override,
-            rule_id: rule_id.clone(),
-            actions: if enabled {
-                vec![Action::Notify]
-            } else {
-                vec![]
-            },
-        },
-        RuleWrite::Enabled {
-            kind: RuleKind::Override,
-            rule_id,
-            enabled: true,
-        },
-    ]
 }
 
 #[cfg(test)]
