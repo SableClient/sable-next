@@ -132,10 +132,6 @@ impl StickySync {
         request
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "Sync and decryption share expiry handling"
-    )]
     pub(super) async fn sync(
         &mut self,
         room: &Room,
@@ -183,30 +179,7 @@ impl StickySync {
         let mut candidates = std::mem::take(&mut self.pending);
         candidates.retain(|(_, expires)| *expires > now);
         for value in events {
-            let duration = value
-                .get("msc4354_sticky")
-                .or_else(|| value.get("sticky"))
-                .and_then(|sticky| sticky.get("duration_ms"))
-                .and_then(Value::as_u64)
-                .unwrap_or(3_600_000)
-                .min(3_600_000);
-            let sent = value
-                .get("origin_server_ts")
-                .and_then(Value::as_u64)
-                .unwrap_or(now)
-                .min(now);
-            let ttl = value
-                .get("unsigned")
-                .and_then(|u| {
-                    u.get("msc4354_sticky_duration_ttl_ms")
-                        .or_else(|| u.get("sticky_duration_remaining_ms"))
-                        .or_else(|| u.get("sticky_duration_ttl_ms"))
-                })
-                .and_then(Value::as_u64);
-            let expires = ttl.map_or_else(
-                || sent.saturating_add(duration),
-                |ttl| now.saturating_add(ttl.min(duration)),
-            );
+            let expires = sticky_expiry(&value, now);
             candidates.push((value, expires));
         }
         let mut resolved = Vec::new();
@@ -224,52 +197,88 @@ impl StickySync {
             {
                 continue;
             }
-            let Ok(raw) =
-                Raw::new(&value).map(Raw::cast_unchecked::<OriginalSyncRoomEncryptedEvent>)
-            else {
-                continue;
-            };
-            let Ok(decrypted) = room.decrypt_event(&raw, None).await else {
-                if self.pending.len() < 1024 {
-                    self.pending.push((value, expires));
-                }
-                continue;
-            };
-            let Some(info) = decrypted.encryption_info() else {
-                if self.pending.len() < 1024 {
-                    self.pending.push((value, expires));
-                }
-                continue;
-            };
-            let Ok(mut plaintext) = serde_json::from_str::<Value>(decrypted.raw().json().get())
-            else {
-                continue;
-            };
-            if let Some(object) = plaintext.as_object_mut() {
-                for field in ["msc4354_sticky", "sticky"] {
-                    if let Some(envelope) = value.get(field) {
-                        object.insert(field.to_owned(), envelope.clone());
-                    }
-                }
-                let unsigned = object
-                    .entry("unsigned")
-                    .or_insert_with(|| serde_json::json!({}));
-                if let Some(unsigned) = unsigned.as_object_mut() {
-                    unsigned.insert(
-                        "msc4354_sticky_duration_ttl_ms".to_owned(),
-                        expires.saturating_sub(now).into(),
-                    );
-                }
+            if let Some(event) = self.decrypt_candidate(room, value, expires, now).await {
+                resolved.push(event);
             }
-            let device = authenticated_device(Some(info), &plaintext);
-            resolved.push(Event {
-                value: plaintext,
-                device,
-                redacts: None,
-            });
         }
         Ok(resolved)
     }
+
+    async fn decrypt_candidate(
+        &mut self,
+        room: &Room,
+        value: Value,
+        expires: u64,
+        now: u64,
+    ) -> Option<Event> {
+        let raw = Raw::new(&value)
+            .map(Raw::cast_unchecked::<OriginalSyncRoomEncryptedEvent>)
+            .ok()?;
+        let Ok(decrypted) = room.decrypt_event(&raw, None).await else {
+            self.defer(value, expires);
+            return None;
+        };
+        let Some(info) = decrypted.encryption_info() else {
+            self.defer(value, expires);
+            return None;
+        };
+        let mut plaintext = serde_json::from_str::<Value>(decrypted.raw().json().get()).ok()?;
+        if let Some(object) = plaintext.as_object_mut() {
+            for field in ["msc4354_sticky", "sticky"] {
+                if let Some(envelope) = value.get(field) {
+                    object.insert(field.to_owned(), envelope.clone());
+                }
+            }
+            let unsigned = object
+                .entry("unsigned")
+                .or_insert_with(|| serde_json::json!({}));
+            if let Some(unsigned) = unsigned.as_object_mut() {
+                unsigned.insert(
+                    "msc4354_sticky_duration_ttl_ms".to_owned(),
+                    expires.saturating_sub(now).into(),
+                );
+            }
+        }
+        let device = authenticated_device(Some(info), &plaintext);
+        Some(Event {
+            value: plaintext,
+            device,
+            redacts: None,
+        })
+    }
+
+    fn defer(&mut self, value: Value, expires: u64) {
+        if self.pending.len() < 1024 {
+            self.pending.push((value, expires));
+        }
+    }
+}
+
+fn sticky_expiry(value: &Value, now: u64) -> u64 {
+    let duration = value
+        .get("msc4354_sticky")
+        .or_else(|| value.get("sticky"))
+        .and_then(|sticky| sticky.get("duration_ms"))
+        .and_then(Value::as_u64)
+        .unwrap_or(3_600_000)
+        .min(3_600_000);
+    let sent = value
+        .get("origin_server_ts")
+        .and_then(Value::as_u64)
+        .unwrap_or(now)
+        .min(now);
+    let ttl = value
+        .get("unsigned")
+        .and_then(|u| {
+            u.get("msc4354_sticky_duration_ttl_ms")
+                .or_else(|| u.get("sticky_duration_remaining_ms"))
+                .or_else(|| u.get("sticky_duration_ttl_ms"))
+        })
+        .and_then(Value::as_u64);
+    ttl.map_or_else(
+        || sent.saturating_add(duration),
+        |ttl| now.saturating_add(ttl.min(duration)),
+    )
 }
 
 pub(crate) fn live_events(room: &Room) -> Vec<Event> {

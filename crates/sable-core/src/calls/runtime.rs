@@ -7,7 +7,7 @@ use matrix_sdk::event_handler::EventHandlerDropGuard;
 use matrix_sdk::executor::{JoinHandleExt as _, spawn};
 use matrix_sdk::ruma::api::client::delayed_events::update_delayed_event::UpdateAction;
 use matrix_sdk::ruma::events::StateEventType;
-use matrix_sdk::ruma::{OwnedDeviceId, OwnedRoomId, OwnedUserId};
+use matrix_sdk::ruma::{OwnedDeviceId, OwnedRoomId, OwnedServerName, OwnedUserId};
 use matrix_sdk::{Client, Room};
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};
@@ -15,7 +15,7 @@ use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::{Mutex, Notify};
 
 use super::content::content;
-use super::discover::{Discovered, discover};
+use super::discover::{Discovered, ModeInfo, discover};
 use super::keys::{self, KeyDistributor, Rolled};
 use super::membership::{self, CallMember, StickyMemberships};
 use super::{HANGUP_DELAY, USE_KEY_DELAY, sfu, sticky};
@@ -479,7 +479,35 @@ fn same_service(left: &str, right: &str) -> bool {
     left.trim_end_matches('/') == right.trim_end_matches('/')
 }
 
-#[expect(clippy::too_many_lines, reason = "Joining and rollback form one flow")]
+async fn discover_state(
+    core: &Arc<Core>,
+    room: &Room,
+    session: CallSessionId,
+    configured: Option<String>,
+    requested: Option<CallMode>,
+    intent: Option<CallIntent>,
+    encrypt_media: bool,
+) -> Result<(Arc<Mutex<State>>, Option<sticky::StickySync>, ModeInfo), RpcError> {
+    let Discovered {
+        own,
+        members,
+        sticky,
+        sticky_sync,
+        slot_closed,
+        mode_info,
+    } = discover(core, room, session, configured, requested).await?;
+    let state = Arc::new(Mutex::new(State::new(
+        own,
+        members,
+        sticky,
+        &room.room_id().to_owned(),
+        encrypt_media,
+        intent,
+        slot_closed,
+    )));
+    Ok((state, sticky_sync, mode_info))
+}
+
 pub(super) async fn join(
     core: &Arc<Core>,
     room_id: OwnedRoomId,
@@ -491,23 +519,16 @@ pub(super) async fn join(
     let room = core.room(&room_id).await?;
     let encrypt_media = core.room_is_encrypted(&room).await?;
     let session = CallSessionId(core.allocate_subscription().0);
-    let Discovered {
-        own,
-        members,
-        sticky,
-        sticky_sync,
-        slot_closed,
-        mode_info,
-    } = discover(core, &room, session, configured.clone(), requested).await?;
-    let state = Arc::new(Mutex::new(State::new(
-        own.clone(),
-        members,
-        sticky,
-        &room_id,
-        encrypt_media,
+    let (state, sticky_sync, mode_info) = discover_state(
+        core,
+        &room,
+        session,
+        configured.clone(),
+        requested,
         intent,
-        slot_closed,
-    )));
+        encrypt_media,
+    )
+    .await?;
     let (wake, handlers) = join_handlers(core, generation, session, &room, &state, encrypt_media);
     let (
         own,
@@ -524,8 +545,7 @@ pub(super) async fn join(
     let mode = own.mode;
     let state_key = state_key(&room, &own);
     if core.session_generation.load(Ordering::SeqCst) != generation {
-        drop(postpone);
-        retract(core, &room, &own, delay).await;
+        abort_join(core, &room, &own, delay, postpone).await;
         return Err(RpcError::NotLoggedIn);
     }
     let Some((publisher_id, backends)) = confirm_join(
@@ -539,15 +559,13 @@ pub(super) async fn join(
     )
     .await
     else {
-        drop(postpone);
-        retract(core, &room, &own, delay).await;
+        abort_join(core, &room, &own, delay, postpone).await;
         return Err(core.failed("join_call", "call membership was not confirmed"));
     };
     let mut calls = core.call_sessions.lock().await;
     if core.session_generation.load(Ordering::SeqCst) != generation {
         drop(calls);
-        drop(postpone);
-        retract(core, &room, &own, delay).await;
+        abort_join(core, &room, &own, delay, postpone).await;
         return Err(RpcError::NotLoggedIn);
     }
     let shared = state.clone();
@@ -559,15 +577,17 @@ pub(super) async fn join(
     drop(postpone);
     let postpone = Some(core.spawn_managed_postpone_loop(delay.clone(), wake.clone()));
     let updates = updates(
-        core.clone(),
-        generation,
-        session,
-        room,
-        state,
+        UpdateContext {
+            core: core.clone(),
+            generation,
+            session,
+            room,
+            state,
+            wake,
+            delay: delay.clone(),
+            encrypted: encrypt_media,
+        },
         sticky_sync,
-        wake,
-        delay.clone(),
-        encrypt_media,
     );
     calls.insert(
         session,
@@ -582,7 +602,38 @@ pub(super) async fn join(
             sticky_member: own.member_id.filter(|_| mode == CallMode::Matrix2),
         },
     );
-    Ok(JoinOk {
+    Ok(join_ok(
+        session,
+        encrypt_media,
+        mode,
+        mode_info,
+        provision,
+        publisher_id,
+        backends,
+    ))
+}
+
+async fn abort_join(
+    core: &Core,
+    room: &Room,
+    own: &CallMember,
+    delay: Option<String>,
+    postpone: Option<crate::Task>,
+) {
+    drop(postpone);
+    retract(core, room, own, delay).await;
+}
+
+fn join_ok(
+    session: CallSessionId,
+    encrypt_media: bool,
+    mode: CallMode,
+    mode_info: ModeInfo,
+    provision: sfu::Provisioned,
+    publisher_id: String,
+    backends: Vec<CallBackendView>,
+) -> JoinOk {
+    JoinOk {
         session,
         url: provision.url,
         jwt: provision.jwt,
@@ -595,7 +646,7 @@ pub(super) async fn join(
         can_publish: provision.can_publish,
         publisher_id,
         backends,
-    })
+    }
 }
 
 pub(super) fn merge_sticky(members: &mut Vec<CallMember>, sticky: Vec<CallMember>) {
@@ -625,21 +676,10 @@ enum Refreshed {
     Ended,
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "Membership and backend refresh form one flow"
-)]
-async fn refresh(
-    core: &Arc<Core>,
-    generation: u64,
-    session: CallSessionId,
+async fn current_members(
     room: &Room,
     shared: &Mutex<State>,
-) -> Refreshed {
-    recheck_slot(room, shared).await;
-    if shared.lock().await.slot_closed_midcall {
-        return Refreshed::Ended;
-    }
+) -> Result<(Vec<CallMember>, CallMember), Refreshed> {
     let mut members = membership::active_members(room).await;
     let own = {
         let mut state = shared.lock().await;
@@ -654,10 +694,10 @@ async fn refresh(
         merge_sticky(&mut members, sticky);
         let present = own_is_present(&members, &state.own);
         if !present && state.own_observed {
-            return Refreshed::Absent;
+            return Err(Refreshed::Absent);
         }
         if !present && keys::now_ms().saturating_sub(state.own.created_ts) > 30_000 {
-            return Refreshed::Ended;
+            return Err(Refreshed::Ended);
         }
         state.own_observed |= present;
         state.own.clone()
@@ -667,6 +707,14 @@ async fn refresh(
             || member.user_id == own.user_id && member.member_id == own.member_id)
     });
     members.push(own.clone());
+    Ok((members, own))
+}
+
+async fn verified_members(
+    room: &Room,
+    members: Vec<CallMember>,
+    own: &CallMember,
+) -> Vec<CallMember> {
     let mut verified = Vec::new();
     for member in members {
         if member.is_own(&own.user_id, own.own_device_id())
@@ -689,21 +737,17 @@ async fn refresh(
             );
         }
     }
-    let own = if own.mode == CallMode::Legacy {
-        let own = follow_oldest_focus(room, shared, own, &verified).await;
-        if let Some(entry) = verified
-            .iter_mut()
-            .find(|member| member.is_own(&own.user_id, own.own_device_id()))
-        {
-            entry.clone_from(&own);
-        }
-        own
-    } else {
-        own
-    };
+    verified
+}
+
+fn wanted_backends(
+    room: &Room,
+    verified: &[CallMember],
+    own: &CallMember,
+) -> BTreeMap<String, (String, Option<OwnedServerName>)> {
     let mut wanted = BTreeMap::new();
-    for member in &verified {
-        if let Some(service) = member_service(member, &verified) {
+    for member in verified {
+        if let Some(service) = member_service(member, verified) {
             wanted.insert(
                 backend_id(&room.room_id().to_owned(), service),
                 (
@@ -722,6 +766,38 @@ async fn refresh(
             own.focus_servers.get(&own_service).cloned(),
         ),
     );
+    wanted
+}
+
+async fn refresh(
+    core: &Arc<Core>,
+    generation: u64,
+    session: CallSessionId,
+    room: &Room,
+    shared: &Mutex<State>,
+) -> Refreshed {
+    recheck_slot(room, shared).await;
+    if shared.lock().await.slot_closed_midcall {
+        return Refreshed::Ended;
+    }
+    let (members, own) = match current_members(room, shared).await {
+        Ok(current) => current,
+        Err(outcome) => return outcome,
+    };
+    let mut verified = verified_members(room, members, &own).await;
+    let own = if own.mode == CallMode::Legacy {
+        let own = follow_oldest_focus(room, shared, own, &verified).await;
+        if let Some(entry) = verified
+            .iter_mut()
+            .find(|member| member.is_own(&own.user_id, own.own_device_id()))
+        {
+            entry.clone_from(&own);
+        }
+        own
+    } else {
+        own
+    };
+    let wanted = wanted_backends(room, &verified, &own);
     let missing = {
         let mut state = shared.lock().await;
         state.members.clone_from(&verified);
@@ -899,10 +975,86 @@ pub(super) async fn set_screen_sharing(
     Ok(())
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "Roster and key updates are published together"
-)]
+async fn emit_roster(
+    core: &Arc<Core>,
+    generation: u64,
+    session: CallSessionId,
+    room: &Room,
+    shared: &Mutex<State>,
+) -> (Vec<CallMember>, Option<Arc<Mutex<KeyDistributor>>>, String) {
+    let mut state = shared.lock().await;
+    let mut views = super::member_views(&state.members);
+    for (view, member) in views.iter_mut().zip(&state.members) {
+        view.backend_id = member_service(member, &state.members)
+            .map(|service| backend_id(&room.room_id().to_owned(), service));
+    }
+    if state.emitted_members.as_ref() != Some(&views) {
+        state.emitted_members = Some(views.clone());
+        core.emit_if_current(
+            generation,
+            CoreEvent::CallMembers {
+                session,
+                members: views,
+            },
+        );
+    }
+    let publisher_id = backend_id(
+        &room.room_id().to_owned(),
+        state.own.foci.first().map_or("", String::as_str),
+    );
+    report_silent_members(&mut state, keys::now_ms());
+    state.revision = state.revision.saturating_add(1);
+    core.emit_if_current(
+        generation,
+        CoreEvent::CallBackends {
+            session,
+            revision: state.revision,
+            publisher_id: publisher_id.clone(),
+            backends: state.backends.values().cloned().collect(),
+        },
+    );
+    (
+        state
+            .members
+            .iter()
+            .filter(|member| {
+                state.own.mode != CallMode::Matrix2 || member.mode == CallMode::Matrix2
+            })
+            .cloned()
+            .collect::<Vec<_>>(),
+        state.distributor.clone(),
+        publisher_id,
+    )
+}
+
+fn log_rolled(rolled: &Rolled, members: usize) {
+    match rolled {
+        Rolled::Nothing => {}
+        Rolled::Deferred { wait_ms } => tracing::info!(
+            members = members,
+            wait_ms,
+            "deferred the call media key rotation until the previous key is in use"
+        ),
+        Rolled::Shared => tracing::info!(
+            members = members,
+            "shared the call media key with new members"
+        ),
+        Rolled::Reshared => tracing::debug!(
+            members = members,
+            "shared the call media key again with every member"
+        ),
+        Rolled::Rotated {
+            announcement,
+            first,
+        } => tracing::info!(
+            members = members,
+            index = announcement.index,
+            first,
+            "rotated the call media key"
+        ),
+    }
+}
+
 async fn publish_update(
     core: &Arc<Core>,
     generation: u64,
@@ -910,51 +1062,8 @@ async fn publish_update(
     room: &Room,
     shared: &Mutex<State>,
 ) {
-    let (verified, distributor, publisher_id) = {
-        let mut state = shared.lock().await;
-        let mut views = super::member_views(&state.members);
-        for (view, member) in views.iter_mut().zip(&state.members) {
-            view.backend_id = member_service(member, &state.members)
-                .map(|service| backend_id(&room.room_id().to_owned(), service));
-        }
-        if state.emitted_members.as_ref() != Some(&views) {
-            state.emitted_members = Some(views.clone());
-            core.emit_if_current(
-                generation,
-                CoreEvent::CallMembers {
-                    session,
-                    members: views,
-                },
-            );
-        }
-        let publisher_id = backend_id(
-            &room.room_id().to_owned(),
-            state.own.foci.first().map_or("", String::as_str),
-        );
-        report_silent_members(&mut state, keys::now_ms());
-        state.revision = state.revision.saturating_add(1);
-        core.emit_if_current(
-            generation,
-            CoreEvent::CallBackends {
-                session,
-                revision: state.revision,
-                publisher_id: publisher_id.clone(),
-                backends: state.backends.values().cloned().collect(),
-            },
-        );
-        (
-            state
-                .members
-                .iter()
-                .filter(|member| {
-                    state.own.mode != CallMode::Matrix2 || member.mode == CallMode::Matrix2
-                })
-                .cloned()
-                .collect::<Vec<_>>(),
-            state.distributor.clone(),
-            publisher_id,
-        )
-    };
+    let (verified, distributor, publisher_id) =
+        emit_roster(core, generation, session, room, shared).await;
     let Some(distributor) = distributor else {
         return;
     };
@@ -963,31 +1072,7 @@ async fn publish_update(
         Rolled::Deferred { wait_ms } => Some(keys::now_ms().saturating_add(*wait_ms)),
         _ => None,
     };
-    match &rolled {
-        Rolled::Nothing => {}
-        Rolled::Deferred { wait_ms } => tracing::info!(
-            members = verified.len(),
-            wait_ms,
-            "deferred the call media key rotation until the previous key is in use"
-        ),
-        Rolled::Shared => tracing::info!(
-            members = verified.len(),
-            "shared the call media key with new members"
-        ),
-        Rolled::Reshared => tracing::debug!(
-            members = verified.len(),
-            "shared the call media key again with every member"
-        ),
-        Rolled::Rotated {
-            announcement,
-            first,
-        } => tracing::info!(
-            members = verified.len(),
-            index = announcement.index,
-            first,
-            "rotated the call media key"
-        ),
-    }
+    log_rolled(&rolled, verified.len());
     if let Rolled::Rotated {
         announcement,
         first,
@@ -1172,21 +1257,29 @@ fn unresolved_reason(pending: &PendingKey, members: &[CallMember]) -> &'static s
     "unknown"
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Event handlers pass session and sender context"
-)]
-async fn receive_call_key(
+#[derive(Clone)]
+struct KeySink {
     core: Arc<Core>,
     generation: u64,
     session: CallSessionId,
     room_id: OwnedRoomId,
     state: Arc<Mutex<State>>,
+}
+
+async fn receive_call_key(
+    sink: KeySink,
     sender: OwnedUserId,
     content: keys::ToDeviceCallEncryptionKeysEventContent,
     encryption: Option<matrix_sdk::deserialized_responses::EncryptionInfo>,
     wire: membership::RtcWire,
 ) {
+    let KeySink {
+        core,
+        generation,
+        session,
+        room_id,
+        state,
+    } = sink;
     if content.room_id != room_id {
         return;
     }
@@ -1279,18 +1372,19 @@ fn watch_keys(
     room_id: OwnedRoomId,
     state: Arc<Mutex<State>>,
 ) -> Vec<EventHandlerDropGuard> {
-    let core1 = core.clone();
-    let room1 = room_id.clone();
-    let state1 = state.clone();
+    let sink = KeySink {
+        core: core.clone(),
+        generation,
+        session,
+        room_id,
+        state,
+    };
+    let legacy_sink = sink.clone();
     let legacy = client.add_event_handler(
         move |event: keys::ToDeviceCallEncryptionKeysEvent,
               encryption: Option<matrix_sdk::deserialized_responses::EncryptionInfo>| {
             receive_call_key(
-                core1.clone(),
-                generation,
-                session,
-                room1.clone(),
-                state1.clone(),
+                legacy_sink.clone(),
                 event.sender,
                 event.content,
                 encryption,
@@ -1298,16 +1392,11 @@ fn watch_keys(
             )
         },
     );
-    let core2 = core.clone();
     let stable = client.add_event_handler(
         move |event: keys::StableEncryptionKeyEvent,
               encryption: Option<matrix_sdk::deserialized_responses::EncryptionInfo>| {
             receive_call_key(
-                core2.clone(),
-                generation,
-                session,
-                room_id.clone(),
-                state.clone(),
+                sink.clone(),
                 event.sender,
                 event.content.content,
                 encryption,
@@ -1426,159 +1515,213 @@ async fn restore_hangup(
     }
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    clippy::too_many_lines,
-    reason = "The session loop coordinates sync, membership and delayed leaves"
-)]
-fn updates(
+struct UpdateContext {
     core: Arc<Core>,
     generation: u64,
     session: CallSessionId,
     room: Room,
     state: Arc<Mutex<State>>,
-    mut sync: Option<sticky::StickySync>,
     wake: Arc<Notify>,
     delay: Arc<Mutex<super::DelayState>>,
     encrypted: bool,
-) -> crate::Task {
-    spawn(async move {
+}
+
+struct StickyWatch<T> {
+    receiver: tokio::sync::broadcast::Receiver<T>,
+    open: bool,
+}
+
+impl<T: Clone> StickyWatch<T> {
+    async fn changed(&mut self) {
+        let update = self.receiver.recv().await;
+        self.open = !matches!(update, Err(RecvError::Closed));
+    }
+}
+
+impl UpdateContext {
+    async fn wait_for_change<T: Clone>(
+        &self,
+        sync: &mut Option<sticky::StickySync>,
+        watch: &mut StickyWatch<T>,
+        interval: Duration,
+    ) {
+        let Some(sync) = sync.as_mut() else {
+            tokio::select! {
+                () = matrix_sdk::sleep::sleep(interval) => {}
+                () = self.wake.notified() => {}
+                () = watch.changed(), if watch.open => {}
+            }
+            return;
+        };
+        let synced = tokio::select! {
+            synced = sync.sync(&self.room, interval) => Some(synced),
+            () = self.wake.notified() => None,
+            () = watch.changed(), if watch.open => None,
+        };
+        match synced {
+            Some(Ok(events)) => {
+                let encrypted = self
+                    .core
+                    .room_is_encrypted(&self.room)
+                    .await
+                    .unwrap_or(true);
+                let mut state = self.state.lock().await;
+                for event in events {
+                    event.apply(&mut state.sticky, encrypted, keys::now_ms());
+                }
+            }
+            Some(Err(_)) => {
+                self.core.emit_if_current(
+                    self.generation,
+                    CoreEvent::CallSignalingError {
+                        session: self.session,
+                        stage: crate::protocol::CallSignalingStage::Sync,
+                        fatal: false,
+                    },
+                );
+                matrix_sdk::sleep::sleep(UPDATE_INTERVAL).await;
+            }
+            None => {}
+        }
+    }
+
+    async fn apply_live_events(&self) {
+        let encrypted = self
+            .core
+            .room_is_encrypted(&self.room)
+            .await
+            .unwrap_or(true);
+        let mut state = self.state.lock().await;
+        for event in sticky::live_events(&self.room) {
+            event.apply(&mut state.sticky, encrypted, keys::now_ms());
+        }
+    }
+
+    async fn encryption_changed(&self) -> bool {
+        match self.core.room_is_encrypted(&self.room).await {
+            Ok(encrypted) => encrypted != self.state.lock().await.distributor.is_some(),
+            Err(_) => false,
+        }
+    }
+
+    fn terminate_membership(&self) {
+        terminate(
+            &self.core,
+            self.generation,
+            self.session,
+            crate::protocol::CallSignalingStage::Membership,
+        );
+    }
+
+    async fn renew_membership(
+        &self,
+        renewed: &mut u64,
+        delay_roster: &mut HashSet<(OwnedUserId, Option<OwnedDeviceId>, Option<String>)>,
+        absent: bool,
+    ) {
+        let (own, intent, roster_changed) = {
+            let state = self.state.lock().await;
+            let roster: HashSet<_> = state
+                .members
+                .iter()
+                .map(|member| {
+                    (
+                        member.user_id.clone(),
+                        member.device_id.clone(),
+                        member.member_id.clone(),
+                    )
+                })
+                .collect();
+            let changed = roster != *delay_roster;
+            *delay_roster = roster;
+            (state.own.clone(), state.intent, changed)
+        };
+        restore_hangup(&self.core, &self.room, &own, &self.delay, self.encrypted).await;
+        let mut refresh_delay = self.encrypted && own.mode == CallMode::Matrix2 && roster_changed;
+        let renew_interval = if own.mode == CallMode::Matrix2 {
+            if self
+                .core
+                .room_is_encrypted(&self.room)
+                .await
+                .unwrap_or(true)
+            {
+                ENCRYPTED_STICKY_RENEW_INTERVAL_MS
+            } else {
+                STICKY_RENEW_INTERVAL_MS
+            }
+        } else {
+            RENEW_INTERVAL_MS
+        };
+        if absent || keys::now_ms().saturating_sub(*renewed) >= renew_interval {
+            match publish_membership(&self.room, &own, intent).await {
+                Ok(_) => {
+                    *renewed = keys::now_ms();
+                    refresh_delay |= self.encrypted && own.mode == CallMode::Matrix2;
+                }
+                Err(error) => {
+                    tracing::warn!(?error, absent, "could not publish the call membership");
+                }
+            }
+        }
+        if refresh_delay {
+            drop(spawn(refresh_encrypted_hangup(
+                self.core.clone(),
+                self.room.clone(),
+                own,
+                self.delay.clone(),
+            )));
+        }
+    }
+
+    async fn run(self, mut sync: Option<sticky::StickySync>) {
         let mut renewed = keys::now_ms();
         let mut delay_roster = HashSet::new();
-        let mut sdk_sticky = room.sticky_events().subscribe();
-        let mut sdk_sticky_open = true;
+        let mut watch = StickyWatch {
+            receiver: self.room.sticky_events().subscribe(),
+            open: true,
+        };
         loop {
             let interval = {
-                let due = state.lock().await.rotation_due_ms;
+                let due = self.state.lock().await.rotation_due_ms;
                 due.map_or(UPDATE_INTERVAL, |due| {
                     UPDATE_INTERVAL.min(Duration::from_millis(
                         due.saturating_sub(keys::now_ms()).max(100),
                     ))
                 })
             };
-            if let Some(sync) = sync.as_mut() {
-                let synced = tokio::select! {
-                    synced = sync.sync(&room, interval) => Some(synced),
-                    () = wake.notified() => None,
-                    update = sdk_sticky.recv(), if sdk_sticky_open => {
-                        sdk_sticky_open = !matches!(update, Err(RecvError::Closed));
-                        None
-                    }
-                };
-                match synced {
-                    Some(Ok(events)) => {
-                        let encrypted = core.room_is_encrypted(&room).await.unwrap_or(true);
-                        let mut state = state.lock().await;
-                        for event in events {
-                            event.apply(&mut state.sticky, encrypted, keys::now_ms());
-                        }
-                    }
-                    Some(Err(_)) => {
-                        core.emit_if_current(
-                            generation,
-                            CoreEvent::CallSignalingError {
-                                session,
-                                stage: crate::protocol::CallSignalingStage::Sync,
-                                fatal: false,
-                            },
-                        );
-                        matrix_sdk::sleep::sleep(UPDATE_INTERVAL).await;
-                    }
-                    None => {}
-                }
-            } else {
-                tokio::select! {
-                    () = matrix_sdk::sleep::sleep(interval) => {}
-                    () = wake.notified() => {}
-                    update = sdk_sticky.recv(), if sdk_sticky_open => {
-                        sdk_sticky_open = !matches!(update, Err(RecvError::Closed));
-                    }
-                }
-            }
-            {
-                let encrypted = core.room_is_encrypted(&room).await.unwrap_or(true);
-                let mut state = state.lock().await;
-                for event in sticky::live_events(&room) {
-                    event.apply(&mut state.sticky, encrypted, keys::now_ms());
-                }
-            }
-            if core.session_generation.load(Ordering::SeqCst) != generation {
+            self.wait_for_change(&mut sync, &mut watch, interval).await;
+            self.apply_live_events().await;
+            if self.core.session_generation.load(Ordering::SeqCst) != self.generation {
                 return;
             }
-            if let Ok(encrypted) = core.room_is_encrypted(&room).await
-                && encrypted != state.lock().await.distributor.is_some()
-            {
-                terminate(
-                    &core,
-                    generation,
-                    session,
-                    crate::protocol::CallSignalingStage::Membership,
-                );
+            if self.encryption_changed().await {
+                self.terminate_membership();
                 return;
             }
-            let absent = match refresh(&core, generation, session, &room, &state).await {
+            let refreshed = refresh(
+                &self.core,
+                self.generation,
+                self.session,
+                &self.room,
+                &self.state,
+            )
+            .await;
+            let absent = match refreshed {
                 Refreshed::Current => false,
                 Refreshed::Absent => true,
                 Refreshed::Ended => {
-                    terminate(
-                        &core,
-                        generation,
-                        session,
-                        crate::protocol::CallSignalingStage::Membership,
-                    );
+                    self.terminate_membership();
                     return;
                 }
             };
-            let (own, intent, roster_changed) = {
-                let state = state.lock().await;
-                let roster: HashSet<_> = state
-                    .members
-                    .iter()
-                    .map(|member| {
-                        (
-                            member.user_id.clone(),
-                            member.device_id.clone(),
-                            member.member_id.clone(),
-                        )
-                    })
-                    .collect();
-                let changed = roster != delay_roster;
-                delay_roster = roster;
-                (state.own.clone(), state.intent, changed)
-            };
-            restore_hangup(&core, &room, &own, &delay, encrypted).await;
-            let mut refresh_delay = encrypted && own.mode == CallMode::Matrix2 && roster_changed;
-            let renew_interval = if own.mode == CallMode::Matrix2 {
-                if core.room_is_encrypted(&room).await.unwrap_or(true) {
-                    ENCRYPTED_STICKY_RENEW_INTERVAL_MS
-                } else {
-                    STICKY_RENEW_INTERVAL_MS
-                }
-            } else {
-                RENEW_INTERVAL_MS
-            };
-            if absent || keys::now_ms().saturating_sub(renewed) >= renew_interval {
-                match publish_membership(&room, &own, intent).await {
-                    Ok(_) => {
-                        renewed = keys::now_ms();
-                        refresh_delay |= encrypted && own.mode == CallMode::Matrix2;
-                    }
-                    Err(error) => {
-                        tracing::warn!(?error, absent, "could not publish the call membership");
-                    }
-                }
-            }
-            if refresh_delay {
-                drop(spawn(refresh_encrypted_hangup(
-                    core.clone(),
-                    room.clone(),
-                    own,
-                    delay.clone(),
-                )));
-            }
+            self.renew_membership(&mut renewed, &mut delay_roster, absent)
+                .await;
         }
-    })
-    .abort_on_drop()
+    }
+}
+
+fn updates(context: UpdateContext, sync: Option<sticky::StickySync>) -> crate::Task {
+    spawn(context.run(sync)).abort_on_drop()
 }
 
 #[cfg(test)]

@@ -321,6 +321,64 @@ pub(crate) async fn active_members(room: &Room) -> Vec<CallMember> {
     members
 }
 
+fn sticky_timing(
+    sticky: Option<StickyField>,
+    unsigned: Option<StickyUnsignedIn>,
+    created_ts: u64,
+    now_ms: u64,
+) -> Option<(u64, u64)> {
+    let duration = sticky.and_then(|sticky| sticky.0?.duration_ms)?;
+    let duration = duration.min(3_600_000);
+    let order_expires_at_ms = created_ts.saturating_add(duration);
+    let expires_at_ms = unsigned
+        .and_then(|unsigned| unsigned.msc4354_ttl_ms.or(unsigned.ttl_ms)?.0)
+        .map_or_else(
+            || now_ms.min(created_ts).saturating_add(duration),
+            |ttl| now_ms.saturating_add(ttl.min(duration)),
+        );
+    if duration == 0 || expires_at_ms <= now_ms {
+        return None;
+    }
+    Some((order_expires_at_ms, expires_at_ms))
+}
+
+fn sticky_wire(content: &StickyContentIn, kind: &str, has_stable_key: bool) -> Option<RtcWire> {
+    let wire = match content
+        .rest
+        .get("slot_id")
+        .and_then(serde_json::Value::as_str)
+    {
+        Some("m.call#ROOM") | None => RtcWire::Deployed,
+        Some("m.call#room") => RtcWire::Stable,
+        _ => return None,
+    };
+    if wire == RtcWire::Stable && (kind != "m.rtc.member" || !has_stable_key) {
+        return None;
+    }
+    Some(wire)
+}
+
+fn sticky_tombstone(content: &StickyContentIn, key: &str, wire: RtcWire) -> Option<bool> {
+    let member_content = content.rest.get("member");
+    let left = member_content
+        .and_then(|member| member.get("membership"))
+        .is_some_and(|membership| membership.as_str() != Some("join"));
+    if left
+        && (member_content
+            .and_then(|member| member.get("id"))
+            .and_then(serde_json::Value::as_str)
+            != Some(key)
+            || content
+                .rest
+                .get("slot_id")
+                .and_then(serde_json::Value::as_str)
+                != Some(wire.slot()))
+    {
+        return None;
+    }
+    Some(left || content.rest.keys().all(|field| field == "slot_id"))
+}
+
 #[serde_as]
 #[derive(Deserialize)]
 struct StickyEventIn {
@@ -531,10 +589,6 @@ impl StickyMemberships {
         self.apply(&value, now_ms)
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "Validation and ordering are kept together"
-    )]
     pub(crate) fn apply(&mut self, value: &serde_json::Value, now_ms: u64) -> bool {
         self.entries.retain(|_, entry| entry.expires_at_ms > now_ms);
         self.redacted.retain(|_, expires| *expires > now_ms);
@@ -567,64 +621,26 @@ impl StickyMemberships {
         let Some(created_ts) = event.origin_server_ts else {
             return false;
         };
-        let Some(duration) = event
-            .msc4354_sticky
-            .or(event.sticky)
-            .and_then(|sticky| sticky.0?.duration_ms)
-        else {
+        let Some((order_expires_at_ms, expires_at_ms)) = sticky_timing(
+            event.msc4354_sticky.or(event.sticky),
+            event.unsigned,
+            created_ts,
+            now_ms,
+        ) else {
             return false;
         };
-        let duration = duration.min(3_600_000);
-        let order_expires_at_ms = created_ts.saturating_add(duration);
-        let expires_at_ms = event
-            .unsigned
-            .and_then(|unsigned| unsigned.msc4354_ttl_ms.or(unsigned.ttl_ms)?.0)
-            .map_or_else(
-                || now_ms.min(created_ts).saturating_add(duration),
-                |ttl| now_ms.saturating_add(ttl.min(duration)),
-            );
-        if duration == 0 || expires_at_ms <= now_ms {
+        let Some(wire) = sticky_wire(&content, &kind, stable_key.is_some()) else {
             return false;
-        }
-        let wire = match content
-            .rest
-            .get("slot_id")
-            .and_then(serde_json::Value::as_str)
-        {
-            Some("m.call#ROOM") | None => RtcWire::Deployed,
-            Some("m.call#room") => RtcWire::Stable,
-            _ => return false,
         };
-        if wire == RtcWire::Stable && kind != "m.rtc.member" {
-            return false;
-        }
-        if wire == RtcWire::Stable && stable_key.is_none() {
-            return false;
-        }
         let entry_key = (sender, key.to_owned(), wire, kind);
         if self.entries.get(&entry_key).is_some_and(|old| {
             (order_expires_at_ms, event_id) <= (old.order_expires_at_ms, old.event_id.as_str())
         }) {
             return false;
         }
-        let member_content = content.rest.get("member");
-        let left = member_content
-            .and_then(|member| member.get("membership"))
-            .is_some_and(|membership| membership.as_str() != Some("join"));
-        if left
-            && (member_content
-                .and_then(|member| member.get("id"))
-                .and_then(serde_json::Value::as_str)
-                != Some(key)
-                || content
-                    .rest
-                    .get("slot_id")
-                    .and_then(serde_json::Value::as_str)
-                    != Some(wire.slot()))
-        {
+        let Some(tombstone) = sticky_tombstone(&content, key, wire) else {
             return false;
-        }
-        let tombstone = left || content.rest.keys().all(|field| field == "slot_id");
+        };
         let member = if tombstone {
             None
         } else {
