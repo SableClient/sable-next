@@ -30,6 +30,7 @@
   import { i18n } from '#lib/i18n.js';
   import { isPackChange } from '#lib/emoji/load-packs.js';
   import { capturesFromCamera, pickFiles } from '#lib/platform/files.js';
+  import { isAndroid } from '#lib/platform/os.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { outgoingPersona } from '#lib/personas/outgoing-persona.js';
   import { personaSpaces } from './persona-spaces.js';
@@ -234,8 +235,11 @@
   const personas = usePersonaStore();
   const appLayout = new AppLayout();
   const roomyPointer = new MediaQuery('(width >= 32rem) and (any-pointer: fine)');
+  const keyboardResizesViewport = isAndroid();
+  let heldCompactHeight = $state<boolean | null>(null);
+  const compactHeight = $derived(heldCompactHeight ?? appLayout.compactHeight);
   const composerShort = $derived(
-    appLayout.compactHeight ||
+    compactHeight ||
       preferences.composerForm === 'short' ||
       (preferences.composerForm === 'adaptive' && roomyPointer.current)
   );
@@ -298,7 +302,7 @@
   let multiline = $state(false);
   let pointerHidden = $state(false);
   const shortLayout = $derived(
-    appLayout.compactHeight || (composerShort && (!multiline || preferences.alwaysInlineEditor))
+    compactHeight || (composerShort && (!multiline || preferences.alwaysInlineEditor))
   );
   let layoutFrame: number | undefined;
   let empty = $state(true);
@@ -1399,7 +1403,14 @@
           hidden={activeBotCommand !== null}
           bind:this={rowEl}
           onmousedown={focusFromRow}
-          onfocusin={() => (lastFocusedRow = rowEl)}
+          onfocusin={(event) => {
+            lastFocusedRow = rowEl;
+            if (keyboardResizesViewport && isEditableTarget(event.target))
+              heldCompactHeight ??= appLayout.compactHeight;
+          }}
+          onfocusout={(event) => {
+            if (!isEditableTarget(event.relatedTarget)) heldCompactHeight = null;
+          }}
           onkeydown={(event) => {
             stepReply(event);
             stepEdit(event);

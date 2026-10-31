@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 
@@ -9,7 +9,14 @@ import { setPreference } from '#lib/settings/preferences.svelte.js';
 import en from '../../../locales/en.json' with { type: 'json' };
 import Harness from './RoomComposerHarness.test.svelte';
 
+const platform = vi.hoisted(() => ({ android: false }));
+vi.mock('#lib/platform/os.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/platform/os.js')>()),
+  isAndroid: () => platform.android,
+}));
+
 afterEach(() => {
+  platform.android = false;
   document.documentElement.style.removeProperty('--keyboard-height');
   setPreference('composerForm', 'tall');
   setPreference('richTextComposer', true);
@@ -92,4 +99,18 @@ test('opening the keyboard keeps the portrait composer readable', async () => {
   expect(controls.getBoundingClientRect().top).toBeGreaterThanOrEqual(
     editor.getBoundingClientRect().bottom
   );
+});
+
+test('the android keyboard keeps a wide portrait composer tall', async () => {
+  platform.android = true;
+  await page.viewport(540, 1000);
+  setPreference('composerForm', 'tall');
+  const screen = await mountComposer();
+  await userEvent.click(screen.getByRole('combobox', { name: en.timeline.messagePlaceholder }));
+  await page.viewport(540, 400);
+  await expect.poll(() => window.innerHeight).toBe(400);
+  await new Promise(requestAnimationFrame);
+  await new Promise(requestAnimationFrame);
+  expect(document.querySelector('.composer-row')?.classList.contains('short')).toBe(false);
+  await expect.element(screen.getByRole('button', { name: en.composer.expand })).toBeVisible();
 });
