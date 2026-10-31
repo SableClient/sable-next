@@ -22,6 +22,12 @@ use crate::search;
 use crate::session;
 use crate::watchers::{OFFLINE_RECHECK, server_reachable, sync_status};
 
+/// Taken after `restore_lock` when both are needed.
+pub(crate) struct SessionTransition<'core> {
+    _activation: tokio::sync::MutexGuard<'core, ()>,
+    _swap: tokio::sync::MutexGuard<'core, ()>,
+}
+
 pub(crate) struct SessionGeneration<'core> {
     value: u64,
     _guard: tokio::sync::MutexGuard<'core, ()>,
@@ -138,6 +144,18 @@ impl Core {
                 None => self.failed("deactivate_account_auth", error),
             })?;
         Ok(None)
+    }
+
+    pub(crate) async fn lock_session_transition(&self) -> SessionTransition<'_> {
+        let activation = self.session_activation_lock.lock().await;
+        SessionTransition {
+            _activation: activation,
+            _swap: self.session_swap_lock.lock().await,
+        }
+    }
+
+    pub(crate) fn sync_paused(&self) -> bool {
+        self.account_locked.load(Ordering::SeqCst) || self.sync_suspended.load(Ordering::SeqCst)
     }
 
     pub(crate) async fn claim_session_generation(&self) -> SessionGeneration<'_> {
@@ -284,8 +302,7 @@ impl Core {
     }
 
     pub(crate) async fn logout(self: &Arc<Self>) -> Result<(), RpcError> {
-        let _activation = self.session_activation_lock.lock().await;
-        let _swap = self.session_swap_lock.lock().await;
+        let _transition = self.lock_session_transition().await;
         let invalidated = self
             .session_attempt_generation
             .fetch_add(1, Ordering::SeqCst)
@@ -356,8 +373,7 @@ impl Core {
     pub async fn shutdown(self: &Arc<Self>) {
         self.shut_down.store(true, Ordering::SeqCst);
         let _restore = self.restore_lock.lock().await;
-        let _activation = self.session_activation_lock.lock().await;
-        let _swap = self.session_swap_lock.lock().await;
+        let _transition = self.lock_session_transition().await;
         let invalidated = self
             .session_attempt_generation
             .fetch_add(1, Ordering::SeqCst)
@@ -376,8 +392,7 @@ impl Core {
     pub(crate) async fn reset_local_cache(self: &Arc<Self>) -> Result<(), RpcError> {
         let outcome = {
             let _restore = self.restore_lock.lock().await;
-            let _activation = self.session_activation_lock.lock().await;
-            let _swap = self.session_swap_lock.lock().await;
+            let _transition = self.lock_session_transition().await;
             let invalidated = self
                 .session_attempt_generation
                 .fetch_add(1, Ordering::SeqCst)
@@ -1108,10 +1123,7 @@ impl Core {
                         Ok(states.next().await)
                     };
                     let Ok(next) = next else {
-                        if server_reachable(&support_client).await
-                            && !core.account_locked.load(Ordering::SeqCst)
-                            && !core.sync_suspended.load(Ordering::SeqCst)
-                        {
+                        if server_reachable(&support_client).await && !core.sync_paused() {
                             restarted.start().await;
                         }
                         continue;
@@ -1119,9 +1131,7 @@ impl Core {
                     let Some(state) = next else {
                         break;
                     };
-                    if core.account_locked.load(Ordering::SeqCst)
-                        || core.sync_suspended.load(Ordering::SeqCst)
-                    {
+                    if core.sync_paused() {
                         continue;
                     }
                     let stalled = matches!(
@@ -1157,9 +1167,7 @@ impl Core {
                         }
                         failures = failures.saturating_add(1);
                         crate::watchers::retry_backoff(failures).await;
-                        if !core.account_locked.load(Ordering::SeqCst)
-                            && !core.sync_suspended.load(Ordering::SeqCst)
-                        {
+                        if !core.sync_paused() {
                             restarted.start().await;
                         }
                     } else {
@@ -1312,8 +1320,7 @@ impl Core {
 
         let core = self.clone();
         drop(spawn(async move {
-            let _activation = core.session_activation_lock.lock().await;
-            let _swap = core.session_swap_lock.lock().await;
+            let _transition = core.lock_session_transition().await;
             if core.session_generation.load(Ordering::SeqCst) != generation {
                 return;
             }

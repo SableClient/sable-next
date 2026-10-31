@@ -62,8 +62,7 @@ impl Core {
                         return;
                     }
                     if matches!(outcome, Ok(true)) {
-                        let _activation = core.session_activation_lock.lock().await;
-                        let _swap = core.session_swap_lock.lock().await;
+                        let _transition = core.lock_session_transition().await;
                         if core.session_generation.load(Ordering::SeqCst) != generation {
                             return;
                         }

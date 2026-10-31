@@ -33,10 +33,7 @@ impl Core {
                         continue;
                     }
                     let _serial = core.activity_lock.lock().await;
-                    if matches!(sync_service.state().get(), State::Running)
-                        && !core.sync_suspended.load(Ordering::SeqCst)
-                        && !core.account_locked.load(Ordering::SeqCst)
-                    {
+                    if matches!(sync_service.state().get(), State::Running) && !core.sync_paused() {
                         tracing::warn!("no sync response for {stall:?}, restarting sync");
                         sync_service.stop().await;
                         sync_service.start().await;
