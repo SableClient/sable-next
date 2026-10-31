@@ -33,6 +33,7 @@ use crate::view;
 const HIERARCHY_PAGE_SIZE: u32 = 100;
 const HIERARCHY_MAX_DEPTH: u32 = 1;
 const DIRECTORY_PAGE_SIZE: u32 = 30;
+const MAX_JOIN_SERVERS: usize = 10;
 const OWN_MEMBER_FILL_MAX_MEMBERS: u64 = 50;
 const MEMBERSHIP_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
 
@@ -520,7 +521,6 @@ impl Core {
         servers.extend(room_id.server_name().map(ToOwned::to_owned));
         servers.extend(resolved);
 
-        const MAX_JOIN_SERVERS: usize = 10;
         let mut seen = std::collections::HashSet::new();
         servers.retain(|server| seen.insert(server.clone()));
         servers.truncate(MAX_JOIN_SERVERS);
