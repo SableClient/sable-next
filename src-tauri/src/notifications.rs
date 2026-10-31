@@ -167,7 +167,7 @@ async fn pusher_client(
 #[cfg(target_os = "android")]
 #[derive(serde::Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case")]
-pub enum BackgroundPush {
+pub(crate) enum BackgroundPush {
     Rotate {
         user_id: String,
         device_id: String,
@@ -182,7 +182,7 @@ pub enum BackgroundPush {
 }
 
 #[cfg(target_os = "android")]
-pub async fn maintain_background_push(
+pub(crate) async fn maintain_background_push(
     root: &std::path::Path,
     operation: BackgroundPush,
 ) -> Result<(), RpcError> {
@@ -581,7 +581,7 @@ fn test_view(sequence: u32) -> NotificationView {
 }
 
 #[cfg(target_os = "android")]
-pub async fn set_open_conversation<R: Runtime>(
+pub(crate) async fn set_open_conversation<R: Runtime>(
     app: &AppHandle<R>,
     user_id: Option<&str>,
     room_id: Option<&str>,
@@ -597,7 +597,10 @@ pub async fn set_open_conversation<R: Runtime>(
 }
 
 #[cfg(target_os = "android")]
-pub async fn forget_left_conversations<R: Runtime>(app: &AppHandle<R>, core: &sable_core::Core) {
+pub(crate) async fn forget_left_conversations<R: Runtime>(
+    app: &AppHandle<R>,
+    core: &sable_core::Core,
+) {
     use tauri_plugin_sable_push::SablePushExt;
     let Ok((user_id, room_ids)) = core.left_rooms().await else {
         return;
@@ -963,7 +966,7 @@ async fn register_with_distributor<R: Runtime>(
 /// When the platform refuses a push registration, or the homeserver rejects the
 /// pusher the distributor asked for.
 #[cfg(mobile)]
-pub async fn register_push<R: Runtime>(
+pub(crate) async fn register_push<R: Runtime>(
     app: &AppHandle<R>,
     core: &Arc<sable_core::Core>,
     config: PushConfig,

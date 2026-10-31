@@ -23,7 +23,7 @@ pub(crate) fn attach_activity(core: &Arc<sable_core::Core>) {
 
 #[unsafe(no_mangle)]
 #[expect(unsafe_code, reason = "JNI entry point")]
-pub extern "system" fn Java_moe_sable_client_AppLifecycle_nativeActivityChanged(
+pub(crate) extern "system" fn Java_moe_sable_client_AppLifecycle_nativeActivityChanged(
     _env: EnvUnowned,
     _this: JObject,
     active: jni::sys::jboolean,
@@ -41,7 +41,7 @@ pub extern "system" fn Java_moe_sable_client_AppLifecycle_nativeActivityChanged(
 }
 
 #[tauri::command]
-pub async fn open_in_app_auth_url(id: String, url: String) -> Result<(), String> {
+pub(crate) async fn open_in_app_auth_url(id: String, url: String) -> Result<(), String> {
     let parsed = tauri::Url::parse(&url).map_err(|_| "invalid authentication URL")?;
     if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
         return Err("authentication requires an HTTP or HTTPS URL".into());
@@ -72,7 +72,7 @@ pub async fn open_in_app_auth_url(id: String, url: String) -> Result<(), String>
 }
 
 #[tauri::command]
-pub async fn close_in_app_auth_window(id: String) -> Result<(), String> {
+pub(crate) async fn close_in_app_auth_window(id: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let vm = JAVA_VM.get().ok_or("java vm not initialized")?;
         let class = MAIN_ACTIVITY
@@ -98,7 +98,7 @@ pub async fn close_in_app_auth_window(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn copy_image_to_clipboard(image: String) -> Result<(), String> {
+pub(crate) async fn copy_image_to_clipboard(image: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let vm = JAVA_VM.get().ok_or("java vm not initialized")?;
         let class = MAIN_ACTIVITY
@@ -128,7 +128,7 @@ pub async fn copy_image_to_clipboard(image: String) -> Result<(), String> {
     unsafe_code,
     reason = "the export symbol is fixed by the JNI naming convention"
 )]
-pub extern "system" fn Java_moe_sable_client_MainActivity_nativeNetworkChanged(
+pub(crate) extern "system" fn Java_moe_sable_client_MainActivity_nativeNetworkChanged(
     _env: EnvUnowned,
     _this: JObject,
     unmetered: jni::sys::jboolean,
@@ -141,7 +141,7 @@ pub extern "system" fn Java_moe_sable_client_MainActivity_nativeNetworkChanged(
     unsafe_code,
     reason = "the export symbol is fixed by the JNI naming convention"
 )]
-pub extern "system" fn Java_moe_sable_client_MainActivity_nativeInitSystemBars(
+pub(crate) extern "system" fn Java_moe_sable_client_MainActivity_nativeInitSystemBars(
     mut env: EnvUnowned,
     this: JObject,
 ) {
@@ -159,28 +159,28 @@ pub extern "system" fn Java_moe_sable_client_MainActivity_nativeInitSystemBars(
 
 /// `light` asks for the icon treatment a light background needs: dark icons.
 #[tauri::command]
-pub fn set_status_bar_light(light: bool) -> Result<(), String> {
+pub(crate) fn set_status_bar_light(light: bool) -> Result<(), String> {
     call_activity_bool("setStatusBarLightNative", light)
 }
 
 #[tauri::command]
-pub fn set_navigation_bar_light(light: bool) -> Result<(), String> {
+pub(crate) fn set_navigation_bar_light(light: bool) -> Result<(), String> {
     call_activity_bool("setNavigationBarLightNative", light)
 }
 
 #[tauri::command]
-pub fn set_system_bars_hidden(hidden: bool) -> Result<(), String> {
+pub(crate) fn set_system_bars_hidden(hidden: bool) -> Result<(), String> {
     call_activity_bool("setSystemBarsHiddenNative", hidden)
 }
 
 #[tauri::command]
-pub fn haptic_feedback(strong: bool) -> Result<(), String> {
+pub(crate) fn haptic_feedback(strong: bool) -> Result<(), String> {
     call_activity_bool("hapticFeedbackNative", strong)
 }
 
 /// `color` is an opaque ARGB value, as `android.graphics.Color` packs it.
 #[tauri::command]
-pub fn set_window_background(color: i32) -> Result<(), String> {
+pub(crate) fn set_window_background(color: i32) -> Result<(), String> {
     call_activity(
         "setWindowBackgroundNative",
         jni_sig!("(I)V"),
@@ -188,7 +188,7 @@ pub fn set_window_background(color: i32) -> Result<(), String> {
     )
 }
 
-pub fn set_sentry_enabled(enabled: bool) -> Result<(), String> {
+pub(crate) fn set_sentry_enabled(enabled: bool) -> Result<(), String> {
     call_activity_bool("setSentryEnabledNative", enabled)
 }
 

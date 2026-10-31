@@ -85,7 +85,7 @@ impl SecretBackend for KeystoreSecrets {
 
 #[unsafe(no_mangle)]
 #[expect(unsafe_code, reason = "JNI entry point")]
-pub extern "system" fn Java_moe_sable_push_Secrets_nativeInstall<'frame>(
+pub(crate) extern "system" fn Java_moe_sable_push_Secrets_nativeInstall<'frame>(
     mut unowned_env: EnvUnowned<'frame>,
     class: JClass<'frame>,
     context: JObject<'frame>,
