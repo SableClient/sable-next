@@ -611,11 +611,11 @@ struct Request {
     id: Value,
     method: Option<String>,
     #[serde(default = "empty_params")]
-    params: Value,
+    params: Box<RawValue>,
 }
 
-fn empty_params() -> Value {
-    Value::Object(serde_json::Map::new())
+fn empty_params() -> Box<RawValue> {
+    RawValue::from_string("{}".to_owned()).unwrap_or_else(|_| RawValue::NULL.to_owned())
 }
 
 #[derive(Serialize)]
@@ -1243,20 +1243,7 @@ fn spawn_rpc(
         let _permit = permit;
         let _user_permit = user_permit;
         let reply = if let Some(method) = request.method {
-            let Ok(params) = serde_json::to_string(&request.params) else {
-                send_reply(
-                    &outgoing,
-                    Reply::Error {
-                        id: request.id,
-                        error: RpcError::Failed {
-                            log_id: "invalid websocket parameters".to_owned(),
-                        },
-                    },
-                )
-                .await;
-                return;
-            };
-            match core.call(&method, &params).await {
+            match core.call(&method, request.params.get()).await {
                 Ok(ok) => Reply::Ok { id: request.id, ok },
                 Err(error) => Reply::Error {
                     id: request.id,
@@ -1676,6 +1663,17 @@ mod tests {
         );
         assert_eq!(oidc_cookie(&headers).as_deref(), Some("transaction"));
         assert_eq!(oidc_cookie(&HeaderMap::new()), None);
+    }
+
+    #[test]
+    fn request_params_default_to_an_empty_object_and_keep_explicit_null() {
+        let missing: Request = serde_json::from_str(r#"{"id":1,"method":"m"}"#).unwrap();
+        assert_eq!(missing.params.get(), "{}");
+        let null: Request = serde_json::from_str(r#"{"id":1,"method":"m","params":null}"#).unwrap();
+        assert_eq!(null.params.get(), "null");
+        let given: Request =
+            serde_json::from_str(r#"{"id":1,"method":"m","params":{"a": 1}}"#).unwrap();
+        assert_eq!(given.params.get(), r#"{"a": 1}"#);
     }
 
     #[test]
