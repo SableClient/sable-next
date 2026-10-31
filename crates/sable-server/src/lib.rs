@@ -85,6 +85,22 @@ enum SessionRevocation {
     User(String),
 }
 
+impl SessionRevocation {
+    fn ends(
+        received: &Result<Self, broadcast::error::RecvError>,
+        session_id: tower_sessions::session::Id,
+        user_id: &str,
+    ) -> bool {
+        match received {
+            Ok(Self::Session(id)) => *id == session_id,
+            Ok(Self::User(id)) => id == user_id,
+            Err(_) => true,
+        }
+    }
+}
+
+const RESET_FRAME: &str = r#"{"reset":true}"#;
+
 #[derive(Clone)]
 pub struct Server {
     runtimes: Arc<RuntimeManager>,
@@ -971,15 +987,8 @@ async fn run_protected_request(
                 return if valid_session().await { result } else { unauthorized().into_response() };
             }
             revoked = revocations.recv() => {
-                match revoked {
-                    Ok(SessionRevocation::Session(id)) if id == session_id => {
-                        return unauthorized().into_response();
-                    }
-                    Ok(SessionRevocation::User(id)) if id == user_id => {
-                        return unauthorized().into_response();
-                    }
-                    Err(_) => return unauthorized().into_response(),
-                    _ => {}
+                if SessionRevocation::ends(&revoked, session_id, user_id) {
+                    return unauthorized().into_response();
                 }
             }
         }
@@ -1111,17 +1120,9 @@ async fn handle_socket(
             tokio::select! {
                 _ = shutdown.changed() => { writer.abort(); return; }
                 revoked = revocations.recv() => {
-                    match revoked {
-                        Ok(SessionRevocation::Session(id)) if id == session_id => {
-                            writer.abort();
-                            return;
-                        }
-                        Ok(SessionRevocation::User(id)) if id == user_id => {
-                            writer.abort();
-                            return;
-                        }
-                        Err(_) => { writer.abort(); return; }
-                        _ => {}
+                    if SessionRevocation::ends(&revoked, session_id, &user_id) {
+                        writer.abort();
+                        return;
                     }
                 }
                 result = &mut greeting => {
@@ -1140,12 +1141,7 @@ async fn handle_socket(
         tokio::select! {
             _ = shutdown.changed() => break,
             revoked = revocations.recv() => {
-                match revoked {
-                    Ok(SessionRevocation::Session(id)) if id == session_id => break,
-                    Ok(SessionRevocation::User(id)) if id == user_id => break,
-                    Err(_) => break,
-                    _ => {}
-                }
+                if SessionRevocation::ends(&revoked, session_id, &user_id) { break; }
             }
             Some(_) = tasks.join_next(), if !tasks.is_empty() => {}
             message = stream.next() => {
@@ -1185,7 +1181,7 @@ async fn handle_socket(
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(_)) => {
-                        let _ = outgoing.try_send(yawc::Frame::text(r#"{"reset":true}"#));
+                        let _ = outgoing.try_send(yawc::Frame::text(RESET_FRAME));
                         break;
                     }
                     Err(broadcast::error::RecvError::Closed) => break,
@@ -1214,27 +1210,11 @@ fn spawn_rpc(
     tasks: &mut tokio::task::JoinSet<()>,
 ) {
     let Some(permit) = server.rpc_tasks.clone().try_acquire_owned().ok() else {
-        let reply = Reply::Error {
-            id: request.id,
-            error: RpcError::RateLimited {
-                retry_after_ms: Some(100),
-            },
-        };
-        if let Ok(message) = serde_json::to_string(&reply) {
-            let _ = outgoing.try_send(yawc::Frame::text(message));
-        }
+        reject_rate_limited(outgoing, request.id);
         return;
     };
     let Some(user_permit) = runtime.rpc_tasks.clone().try_acquire_owned().ok() else {
-        let reply = Reply::Error {
-            id: request.id,
-            error: RpcError::RateLimited {
-                retry_after_ms: Some(100),
-            },
-        };
-        if let Ok(message) = serde_json::to_string(&reply) {
-            let _ = outgoing.try_send(yawc::Frame::text(message));
-        }
+        reject_rate_limited(outgoing, request.id);
         return;
     };
     let core = runtime.core.clone();
@@ -1258,6 +1238,16 @@ fn spawn_rpc(
         };
         send_reply(&outgoing, reply).await;
     });
+}
+
+fn reject_rate_limited(outgoing: &mpsc::Sender<yawc::Frame>, id: Value) {
+    let reply = Reply::Error {
+        id,
+        error: RpcError::RateLimited {
+            retry_after_ms: Some(100),
+        },
+    };
+    try_send_reply(outgoing, &reply);
 }
 
 async fn write_socket(
@@ -1294,9 +1284,7 @@ async fn greet(
         return None;
     }
     if reset {
-        return send_text(outgoing, r#"{"reset":true}"#)
-            .await
-            .then_some(receiver);
+        return send_text(outgoing, RESET_FRAME).await.then_some(receiver);
     }
     for event in replayed {
         if !send_text(outgoing, &event.message).await {
