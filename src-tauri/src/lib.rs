@@ -360,17 +360,20 @@ async fn set_notification_encrypted_content(
     Ok(())
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(target_os = "ios")]
+fn install_keyring(_app: &tauri::App<tauri::Wry>) -> Result<(), String> {
+    let group = ios::keychain_group()?;
+    sable_core::secrets::install_os_keyring(group.clone(), Some(&group))
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(desktop)]
 fn install_keyring(app: &tauri::App<tauri::Wry>) -> Result<(), String> {
-    #[cfg(target_os = "ios")]
-    let (service, group) = {
-        let _ = app;
-        let group = ios::keychain_group()?;
-        (group.clone(), Some(group))
-    };
-    #[cfg(not(target_os = "ios"))]
-    let (service, group) = (app.config().identifier.clone(), None::<String>);
-    sable_core::secrets::install_os_keyring(service, group.as_deref())
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+    sable_core::secrets::install_os_keyring_or_files(app.config().identifier.clone(), &data_dir)
         .map_err(|error| error.to_string())
 }
 

@@ -324,6 +324,76 @@ pub fn install_os_keyring(service: String, access_group: Option<&str>) -> Result
     Ok(())
 }
 
+#[cfg(not(any(target_os = "android", target_os = "ios", target_family = "wasm")))]
+struct FileSecrets(std::path::PathBuf);
+
+#[cfg(not(any(target_os = "android", target_os = "ios", target_family = "wasm")))]
+impl SecretBackend for FileSecrets {
+    fn get(&self, name: &str) -> Result<Option<Vec<u8>>, StoreError> {
+        match std::fs::read(self.0.join(name)) {
+            Ok(secret) => Ok(Some(secret)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    fn set(&self, name: &str, secret: &[u8]) -> Result<(), StoreError> {
+        std::fs::create_dir_all(&self.0)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&self.0, std::fs::Permissions::from_mode(0o700))?;
+        }
+        crate::store::write_atomic_private(&self.0.join(name), secret)?;
+        Ok(())
+    }
+
+    fn delete(&self, name: &str) -> Result<(), StoreError> {
+        match std::fs::remove_file(self.0.join(name)) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(error.into()),
+        }
+    }
+}
+
+/// Falls back to owner-only files under `directory` when the OS has no usable keyring. The first
+/// start picks the store for good: leaving a keyring would orphan the keys already in it.
+///
+/// # Errors
+/// [`StoreError::SecretsUnavailable`] when the keyring this directory uses is unavailable.
+#[cfg(not(any(target_os = "android", target_os = "ios", target_family = "wasm")))]
+pub fn install_os_keyring_or_files(service: String, directory: &Path) -> Result<(), StoreError> {
+    let choice = directory.join("secret-store");
+    let chosen = match std::fs::read_to_string(&choice) {
+        Ok(chosen) => Some(chosen),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error.into()),
+    };
+    let files = || Box::new(FileSecrets(directory.join("secrets")));
+    if chosen.as_deref() == Some("files") {
+        install(files());
+        return Ok(());
+    }
+    let keyring = match keyring::Keyring::open(service, None) {
+        Ok(keyring) => keyring,
+        Err(error) if chosen.is_none() => {
+            tracing::warn!("no usable system keyring, keeping keys in files instead: {error}");
+            std::fs::create_dir_all(directory)?;
+            crate::store::write_atomic(&choice, b"files")?;
+            install(files());
+            return Ok(());
+        }
+        Err(error) => return Err(error),
+    };
+    if chosen.is_none() {
+        std::fs::create_dir_all(directory)?;
+        crate::store::write_atomic(&choice, b"keyring")?;
+    }
+    install(Box::new(keyring));
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

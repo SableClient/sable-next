@@ -23,7 +23,7 @@ interface NativeModule {
   SableCore: new (dataDir: string, logFilter: string | null) => NativeCore;
   setLogHandler(notify: (line: string) => void): void;
   setLogCapture(enabled: boolean): void;
-  installKeyring(service: string): void;
+  installKeyring(service: string, dataDir: string): void;
 }
 
 const EVENT_BACKLOG_LIMIT = 4096;
@@ -35,9 +35,9 @@ if (!identifier) throw new Error('SABLE_IDENTIFIER is not set');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const native = require('./sable_node.node') as NativeModule;
-function keyringFailure(service: string): string | null {
+function keyringFailure(service: string, directory: string): string | null {
   try {
-    native.installKeyring(service);
+    native.installKeyring(service, directory);
     return null;
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
@@ -127,7 +127,7 @@ function serve(directory: string): void {
   });
 }
 
-const failure = keyringFailure(identifier);
+const failure = keyringFailure(identifier, dataDir);
 if (failure === null) {
   serve(dataDir);
 } else {

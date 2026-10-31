@@ -165,10 +165,10 @@ pub fn set_log_capture(enabled: bool) {
 /// Must succeed before a `SableCore` is made.
 ///
 /// # Errors
-/// When the OS has no usable credential store.
+/// When the keyring `data_dir` keeps its keys in is unavailable.
 #[napi]
-pub fn install_keyring(service: String) -> napi::Result<()> {
-    sable_core::secrets::install_os_keyring(service, None)
+pub fn install_keyring(service: String, data_dir: String) -> napi::Result<()> {
+    sable_core::secrets::install_os_keyring_or_files(service, &std::path::PathBuf::from(data_dir))
         .map_err(|error| napi::Error::new(Status::GenericFailure, error.to_string()))
 }
 
