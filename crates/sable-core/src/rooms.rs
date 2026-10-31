@@ -506,22 +506,24 @@ impl Core {
             .filter_map(|server| ServerName::parse(server).ok())
             .collect::<Vec<_>>();
 
-        let room_id = match <&RoomId>::try_from(&*address) {
-            Ok(room_id) => room_id.to_owned(),
+        let (room_id, resolved) = match <&RoomId>::try_from(&*address) {
+            Ok(room_id) => (room_id.to_owned(), Vec::new()),
             Err(alias) => {
                 let resolved = client
                     .resolve_room_alias(alias)
                     .await
                     .map_err(|error| self.room_error(context, error.into()))?;
-                servers.extend(resolved.servers);
                 servers.push(alias.server_name().to_owned());
-                resolved.room_id
+                (resolved.room_id, resolved.servers)
             }
         };
         servers.extend(room_id.server_name().map(ToOwned::to_owned));
+        servers.extend(resolved);
 
+        const MAX_JOIN_SERVERS: usize = 10;
         let mut seen = std::collections::HashSet::new();
         servers.retain(|server| seen.insert(server.clone()));
+        servers.truncate(MAX_JOIN_SERVERS);
         Ok((room_id, servers))
     }
 

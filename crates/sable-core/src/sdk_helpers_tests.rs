@@ -3462,11 +3462,51 @@ async fn join_by_alias_routes_through_the_resolved_servers_and_the_caller_via() 
         via,
         [
             "child.example",
-            "resolved.example",
             "alias.example",
-            "creator.example"
+            "creator.example",
+            "resolved.example"
         ]
     );
+}
+
+#[tokio::test]
+async fn join_by_alias_caps_the_servers_of_a_big_room() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let resolved: Vec<String> = (0..500).map(|i| format!("s{i}.example")).collect();
+    Mock::given(method("GET"))
+        .and(path_regex("^/_matrix/client/v3/directory/room/"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "room_id": "!target:creator.example",
+            "servers": resolved,
+        })))
+        .mount(server.server())
+        .await;
+    Mock::given(method("POST"))
+        .and(path_regex("^/_matrix/client/v3/join/(!|%21)target"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({"room_id": "!target:creator.example"})),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    core.join_room("#lobby:alias.example", &[]).await.unwrap();
+
+    let requests = server.server().received_requests().await.unwrap();
+    let join = requests
+        .iter()
+        .find(|request| request.method.as_str() == "POST")
+        .unwrap();
+    let via: Vec<String> = join
+        .url
+        .query_pairs()
+        .filter(|(key, _)| key == "via")
+        .map(|(_, value)| value.into_owned())
+        .collect();
+    assert_eq!(via.len(), 10);
+    assert_eq!(via[..3], ["alias.example", "creator.example", "s0.example"]);
 }
 
 #[tokio::test]
