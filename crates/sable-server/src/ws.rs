@@ -98,141 +98,186 @@ pub(crate) async fn websocket(
     let Ok((response, upgrade)) = upgrade.upgrade(options) else {
         return StatusCode::BAD_REQUEST.into_response();
     };
+    let connection = Connection {
+        server,
+        runtime,
+        session_id,
+        user_id,
+        query,
+        _permits: [connection, user_connection],
+    };
     tokio::spawn(async move {
         if let Ok(socket) = upgrade.await {
-            handle_socket(
-                socket,
-                server,
-                runtime,
-                session_id,
-                user_id,
-                revocations,
-                query,
-                connection,
-                user_connection,
-            )
-            .await;
+            connection.run(socket, revocations).await;
         }
     });
     response.into_response()
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    clippy::too_many_lines,
-    reason = "socket owns its session, revocation state, and connection permits"
-)]
-async fn handle_socket(
-    socket: yawc::HttpWebSocket,
+struct Connection {
     server: Server,
     runtime: Arc<UserRuntime>,
     session_id: tower_sessions::session::Id,
     user_id: String,
-    mut revocations: broadcast::Receiver<SessionRevocation>,
     query: ResumeQuery,
-    _connection: tokio::sync::OwnedSemaphorePermit,
-    _user_connection: tokio::sync::OwnedSemaphorePermit,
-) {
-    if server.shutdown.is_cancelled() {
-        return;
+    _permits: [tokio::sync::OwnedSemaphorePermit; 2],
+}
+
+impl Connection {
+    async fn run(
+        self,
+        socket: yawc::HttpWebSocket,
+        mut revocations: broadcast::Receiver<SessionRevocation>,
+    ) {
+        if self.server.shutdown.is_cancelled() || !self.session_valid().await {
+            return;
+        }
+        let (sink, stream) = socket.split();
+        let (outgoing, messages) = mpsc::channel(OUTGOING_BUFFER);
+        let writer = tokio::spawn(write_socket(sink, messages));
+        if let Some(receiver) = self.greet(&outgoing, &mut revocations).await {
+            self.serve(stream, receiver, &outgoing, &mut revocations)
+                .await;
+        }
+        writer.abort();
+        let _ = writer.await;
     }
-    let valid_session = || async {
-        let session = Session::new(Some(session_id), Arc::new(server.sessions.clone()), None);
-        server.auth.authenticate(&session).await.as_deref() == Some(user_id.as_str())
-    };
-    if !valid_session().await {
-        return;
+
+    async fn session_valid(&self) -> bool {
+        let session = Session::new(
+            Some(self.session_id),
+            Arc::new(self.server.sessions.clone()),
+            None,
+        );
+        self.server.auth.authenticate(&session).await.as_deref() == Some(self.user_id.as_str())
     }
-    let (sink, mut stream) = socket.split();
-    let (outgoing, messages) = mpsc::channel(OUTGOING_BUFFER);
-    let writer = tokio::spawn(write_socket(sink, messages));
-    let mut receiver = {
-        let greeting = greet(&server.version, &runtime, &user_id, &query, &outgoing);
+
+    fn revoked(&self, received: &Result<SessionRevocation, broadcast::error::RecvError>) -> bool {
+        SessionRevocation::ends(received, self.session_id, &self.user_id)
+    }
+
+    /// None when the socket closes before the greeting is sent.
+    async fn greet(
+        &self,
+        outgoing: &mpsc::Sender<yawc::Frame>,
+        revocations: &mut broadcast::Receiver<SessionRevocation>,
+    ) -> Option<broadcast::Receiver<Arc<EventRecord>>> {
+        let greeting = greet(
+            &self.server.version,
+            &self.runtime,
+            &self.user_id,
+            &self.query,
+            outgoing,
+        );
         tokio::pin!(greeting);
         loop {
             tokio::select! {
-                () = server.shutdown.cancelled() => { writer.abort(); return; }
+                () = self.server.shutdown.cancelled() => return None,
                 revoked = revocations.recv() => {
-                    if SessionRevocation::ends(&revoked, session_id, &user_id) {
-                        writer.abort();
-                        return;
+                    if self.revoked(&revoked) {
+                        return None;
                     }
                 }
-                result = &mut greeting => {
-                    let Some(receiver) = result else { writer.abort(); return; };
-                    break receiver;
-                }
-            }
-        }
-    };
-    let mut ping = tokio::time::interval(PING_INTERVAL);
-    ping.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-    ping.tick().await;
-    let mut last_received = Instant::now();
-    let mut tasks = tokio::task::JoinSet::new();
-    loop {
-        tokio::select! {
-            () = server.shutdown.cancelled() => break,
-            revoked = revocations.recv() => {
-                if SessionRevocation::ends(&revoked, session_id, &user_id) { break; }
-            }
-            Some(_) = tasks.join_next(), if !tasks.is_empty() => {}
-            message = stream.next() => {
-                let Some(message) = message else { break };
-                match message.opcode() {
-                    yawc::OpCode::Text => {
-                        if !valid_session().await { break; }
-                        last_received = Instant::now();
-                        let Ok(text) = std::str::from_utf8(message.payload()) else {
-                            break;
-                        };
-                        let Ok(request) = serde_json::from_str::<Request>(text) else {
-                            let reply = Reply::Error {
-                                id: Value::Null,
-                                error: RpcError::Failed {
-                                    log_id: "invalid websocket request".to_owned(),
-                                },
-                            };
-                            if !try_send_reply(&outgoing, &reply) {
-                                break;
-                            }
-                            continue;
-                        };
-                        spawn_rpc(&server, &runtime, request, &outgoing, &mut tasks);
-                    }
-                    yawc::OpCode::Ping | yawc::OpCode::Pong => last_received = Instant::now(),
-                    yawc::OpCode::Close => break,
-                    yawc::OpCode::Binary | yawc::OpCode::Continuation => {}
-                }
-            }
-            event = receiver.recv() => {
-                match event {
-                    Ok(event) => {
-                        if !valid_session().await { break; }
-                        if outgoing.try_send(yawc::Frame::text(event.message.to_string())).is_err() {
-                            break;
-                        }
-                    }
-                    Err(broadcast::error::RecvError::Lagged(_)) => {
-                        let _ = outgoing.try_send(yawc::Frame::text(RESET_FRAME));
-                        break;
-                    }
-                    Err(broadcast::error::RecvError::Closed) => break,
-                }
-            }
-            _ = ping.tick() => {
-                if last_received.elapsed() > PING_TIMEOUT
-                    || outgoing.try_send(yawc::Frame::ping(Bytes::new())).is_err()
-                {
-                    break;
-                }
+                result = &mut greeting => return result,
             }
         }
     }
-    writer.abort();
-    tasks.abort_all();
-    while tasks.join_next().await.is_some() {}
-    let _ = writer.await;
+
+    async fn serve(
+        &self,
+        mut stream: futures_util::stream::SplitStream<yawc::HttpWebSocket>,
+        mut receiver: broadcast::Receiver<Arc<EventRecord>>,
+        outgoing: &mpsc::Sender<yawc::Frame>,
+        revocations: &mut broadcast::Receiver<SessionRevocation>,
+    ) {
+        let mut ping = tokio::time::interval(PING_INTERVAL);
+        ping.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        ping.tick().await;
+        let mut last_received = Instant::now();
+        let mut tasks = tokio::task::JoinSet::new();
+        loop {
+            tokio::select! {
+                () = self.server.shutdown.cancelled() => break,
+                revoked = revocations.recv() => {
+                    if self.revoked(&revoked) { break; }
+                }
+                Some(_) = tasks.join_next(), if !tasks.is_empty() => {}
+                message = stream.next() => {
+                    let Some(message) = message else { break };
+                    match message.opcode() {
+                        yawc::OpCode::Text => {
+                            last_received = Instant::now();
+                            if !self.on_text(message.payload(), outgoing, &mut tasks).await {
+                                break;
+                            }
+                        }
+                        yawc::OpCode::Ping | yawc::OpCode::Pong => last_received = Instant::now(),
+                        yawc::OpCode::Close => break,
+                        yawc::OpCode::Binary | yawc::OpCode::Continuation => {}
+                    }
+                }
+                event = receiver.recv() => {
+                    if !self.forward(event, outgoing).await { break; }
+                }
+                _ = ping.tick() => {
+                    if last_received.elapsed() > PING_TIMEOUT
+                        || outgoing.try_send(yawc::Frame::ping(Bytes::new())).is_err()
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+        tasks.abort_all();
+        while tasks.join_next().await.is_some() {}
+    }
+
+    /// False when the socket should close.
+    async fn on_text(
+        &self,
+        payload: &[u8],
+        outgoing: &mpsc::Sender<yawc::Frame>,
+        tasks: &mut tokio::task::JoinSet<()>,
+    ) -> bool {
+        if !self.session_valid().await {
+            return false;
+        }
+        let Ok(text) = std::str::from_utf8(payload) else {
+            return false;
+        };
+        let Ok(request) = serde_json::from_str::<Request>(text) else {
+            let reply = Reply::Error {
+                id: Value::Null,
+                error: RpcError::Failed {
+                    log_id: "invalid websocket request".to_owned(),
+                },
+            };
+            return try_send_reply(outgoing, &reply);
+        };
+        spawn_rpc(&self.server, &self.runtime, request, outgoing, tasks);
+        true
+    }
+
+    /// False when the socket should close.
+    async fn forward(
+        &self,
+        event: Result<Arc<EventRecord>, broadcast::error::RecvError>,
+        outgoing: &mpsc::Sender<yawc::Frame>,
+    ) -> bool {
+        match event {
+            Ok(event) => {
+                self.session_valid().await
+                    && outgoing
+                        .try_send(yawc::Frame::text(event.message.to_string()))
+                        .is_ok()
+            }
+            Err(broadcast::error::RecvError::Lagged(_)) => {
+                let _ = outgoing.try_send(yawc::Frame::text(RESET_FRAME));
+                false
+            }
+            Err(broadcast::error::RecvError::Closed) => false,
+        }
+    }
 }
 
 fn spawn_rpc(
