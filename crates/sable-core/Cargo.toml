@@ -73,7 +73,7 @@ hmac = "0.13"
 reqwest = { version = "0.13", default-features = false, features = ["socks", "gzip"] }
 matrix-sdk = { workspace = true, features = ["bundled-sqlite", "automatic-room-key-forwarding"] }
 tempfile = { workspace = true }
-rusqlite = { version = "0.40.2", default-features = false, features = ["backup"] }
+rusqlite = { version = "0.41.0", default-features = false, features = ["backup"] }
 rmp-serde = "1.3.1"
 tokio = { workspace = true }
 
