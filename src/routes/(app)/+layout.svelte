@@ -42,7 +42,7 @@
   import {
     alertsNatively,
     forgetLeftNativeConversations,
-    setNativeEncryptedContentAllowed,
+    setNativeNotificationPolicy,
     watchNativePushTokens,
     watchNativeNotificationActions,
     watchNativeNotificationClicks,
@@ -484,16 +484,16 @@
         console.warn('[sable notifications] enabled setting not applied', error);
       });
 
-    void setNativeEncryptedContentAllowed(
-      preferences.notificationContent && preferences.notificationEncryptedContent,
-      preferences.notificationContent,
-      preferences.systemNotifications,
-      preferences.notificationSounds,
-      preferences.notifyOnce,
-      preferences.clearNotificationsOnRead,
-      readReceiptIsPrivate(),
-      quietWhenActiveElsewhere
-    ).catch((error: unknown) => {
+    void setNativeNotificationPolicy({
+      enabled: preferences.systemNotifications,
+      content: preferences.notificationContent,
+      encryptedContent: preferences.notificationContent && preferences.notificationEncryptedContent,
+      sounds: preferences.notificationSounds,
+      notifyOnce: preferences.notifyOnce,
+      clearOnRead: preferences.clearNotificationsOnRead,
+      privateReceipts: readReceiptIsPrivate(),
+      quietWhenActiveElsewhere,
+    }).catch((error: unknown) => {
       console.debug('[sable notifications] native content policy not applied', error);
     });
 

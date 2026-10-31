@@ -71,27 +71,20 @@ export async function dismissNativeReadRoomNotifications(
   await invoke('dismiss_read_room_notifications', { userId, roomIds });
 }
 
-export async function setNativeEncryptedContentAllowed(
-  allowed: boolean,
-  content = false,
-  enabled = true,
-  sounds = true,
-  notifyOnce = true,
-  clearOnRead = true,
-  privateReceipts = false,
-  quietWhenActiveElsewhere = false
-): Promise<void> {
+export interface NativeNotificationPolicy {
+  enabled: boolean;
+  content: boolean;
+  encryptedContent: boolean;
+  sounds: boolean;
+  notifyOnce: boolean;
+  clearOnRead: boolean;
+  privateReceipts: boolean;
+  quietWhenActiveElsewhere: boolean;
+}
+
+export async function setNativeNotificationPolicy(policy: NativeNotificationPolicy): Promise<void> {
   if (!isTauri()) return;
-  await invoke('set_notification_encrypted_content', {
-    allowed,
-    content,
-    enabled,
-    sounds,
-    notifyOnce,
-    clearOnRead,
-    privateReceipts,
-    quietWhenActiveElsewhere,
-  });
+  await invoke('set_notification_policy', { policy });
 }
 
 export async function sendNativeTestNotification(sequence: number): Promise<void> {

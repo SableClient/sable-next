@@ -300,31 +300,47 @@ async fn test_notification(
     Ok(())
 }
 
-#[tauri::command]
+/// The webview sends `camelCase`, the iOS push extension reads the `snake_case` file.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all(serialize = "snake_case", deserialize = "camelCase"))]
 #[expect(
-    clippy::fn_params_excessive_bools,
-    clippy::too_many_arguments,
-    reason = "notification preference command arguments"
+    clippy::struct_excessive_bools,
+    reason = "independent notification switches"
 )]
-async fn set_notification_encrypted_content(
-    app: AppHandle<tauri::Wry>,
-    allowed: bool,
-    content: bool,
+struct NotificationPolicy {
     enabled: bool,
+    content: bool,
+    encrypted_content: bool,
     sounds: bool,
     notify_once: bool,
     clear_on_read: bool,
     private_receipts: bool,
     quiet_when_active_elsewhere: bool,
+}
+
+#[tauri::command]
+async fn set_notification_policy(
+    app: AppHandle<tauri::Wry>,
+    policy: NotificationPolicy,
 ) -> Result<(), RpcError> {
     #[cfg(target_os = "android")]
     {
         use tauri_plugin_sable_push::SablePushExt;
+        let NotificationPolicy {
+            enabled,
+            content,
+            encrypted_content,
+            sounds,
+            notify_once,
+            clear_on_read,
+            private_receipts,
+            quiet_when_active_elsewhere,
+        } = policy;
         app.sable_push()
             .set_policy(tauri_plugin_sable_push::Policy {
                 enabled,
                 content,
-                encrypted_content: allowed,
+                encrypted_content,
                 sounds,
                 notify_once,
                 clear_on_read,
@@ -335,28 +351,11 @@ async fn set_notification_encrypted_content(
             .map_err(|_| RpcError::Unavailable)?;
     }
     #[cfg(target_os = "ios")]
-    ios::write_push_policy(
-        enabled,
-        content,
-        allowed,
-        sounds,
-        notify_once,
-        clear_on_read,
-        quiet_when_active_elsewhere,
-    )
-    .map_err(|_| RpcError::Unavailable)?;
+    ios::write_push_policy(policy).map_err(|_| RpcError::Unavailable)?;
     #[cfg(not(target_os = "android"))]
-    let _ = (&app, private_receipts);
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    let _ = (
-        allowed,
-        content,
-        enabled,
-        sounds,
-        notify_once,
-        clear_on_read,
-        quiet_when_active_elsewhere,
-    );
+    let _ = &app;
+    #[cfg(desktop)]
+    let _ = policy;
     Ok(())
 }
 
@@ -758,7 +757,7 @@ pub fn run() {
             notification_permission,
             request_notification_permission,
             test_notification,
-            set_notification_encrypted_content,
+            set_notification_policy,
             share_inbox::share_inbox_drain,
             share_inbox::share_inbox_read,
             share_inbox::share_inbox_clear,

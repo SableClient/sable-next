@@ -19,7 +19,7 @@ use objc2_photos::{
 };
 
 #[tauri::command]
-pub async fn open_in_app_auth_url(
+pub(crate) async fn open_in_app_auth_url(
     window: tauri::WebviewWindow,
     id: String,
     url: String,
@@ -70,7 +70,7 @@ pub async fn open_in_app_auth_url(
 }
 
 #[tauri::command]
-pub async fn close_in_app_auth_window(
+pub(crate) async fn close_in_app_auth_window(
     window: tauri::WebviewWindow,
     id: String,
 ) -> Result<(), String> {
@@ -101,7 +101,7 @@ pub(crate) fn watch_network(core: &std::sync::Arc<sable_core::Core>) -> Result<(
 }
 
 /// Synchronizes the native SDK with the webview's telemetry preference.
-pub fn set_sentry_enabled(enabled: bool) -> Result<(), String> {
+pub(crate) fn set_sentry_enabled(enabled: bool) -> Result<(), String> {
     let class = AnyClass::get(c"SableSentry").ok_or("Sentry Cocoa bridge is unavailable")?;
     let dsn = NSString::from_str(option_env!("SENTRY_DSN").unwrap_or_default());
     let environment = NSString::from_str(option_env!("SENTRY_ENVIRONMENT").unwrap_or_default());
@@ -136,7 +136,7 @@ fn share_sentry_consent(enabled: bool) -> Result<(), String> {
 
 /// # Errors
 /// When the Info.plist lacks `SableKeychainGroup`.
-pub fn keychain_group() -> Result<String, String> {
+pub(crate) fn keychain_group() -> Result<String, String> {
     use objc2_foundation::NSBundle;
     NSBundle::mainBundle()
         .objectForInfoDictionaryKey(&NSString::from_str("SableKeychainGroup"))
@@ -147,7 +147,7 @@ pub fn keychain_group() -> Result<String, String> {
 
 /// # Errors
 /// When the signed app has no accessible App Group container.
-pub fn shared_store_dir() -> Result<std::path::PathBuf, String> {
+pub(crate) fn shared_store_dir() -> Result<std::path::PathBuf, String> {
     use objc2_foundation::{NSBundle, NSFileManager};
     let bundle = NSBundle::mainBundle();
     let identifier = bundle
@@ -167,22 +167,10 @@ pub fn shared_store_dir() -> Result<std::path::PathBuf, String> {
 
 /// # Errors
 /// When the shared policy cannot be written.
-#[expect(
-    clippy::fn_params_excessive_bools,
-    reason = "persisted notification preferences"
-)]
-pub fn write_push_policy(
-    enabled: bool,
-    content: bool,
-    encrypted_content: bool,
-    sounds: bool,
-    notify_once: bool,
-    clear_on_read: bool,
-    quiet_when_active_elsewhere: bool,
-) -> Result<(), String> {
+pub(crate) fn write_push_policy(policy: crate::NotificationPolicy) -> Result<(), String> {
     let root = shared_store_dir()?;
-    let value = serde_json::json!({"enabled":enabled,"content":content,"encrypted_content":encrypted_content,"sounds":sounds,"notify_once":notify_once,"clear_on_read":clear_on_read,"quiet_when_active_elsewhere":quiet_when_active_elsewhere});
-    sable_core::store::write_atomic(&root.join("push-policy.json"), value.to_string().as_bytes())
+    let value = serde_json::to_vec(&policy).map_err(|error| error.to_string())?;
+    sable_core::store::write_atomic(&root.join("push-policy.json"), &value)
         .map_err(|error| error.to_string())
 }
 
@@ -272,7 +260,7 @@ fn write_to_photos(
 }
 
 #[tauri::command]
-pub async fn save_media_to_photos(request: tauri::ipc::Request<'_>) -> Result<(), String> {
+pub(crate) async fn save_media_to_photos(request: tauri::ipc::Request<'_>) -> Result<(), String> {
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
         return Err("the media bytes must ride the request body".into());
     };
@@ -293,11 +281,14 @@ pub async fn save_media_to_photos(request: tauri::ipc::Request<'_>) -> Result<()
 }
 
 // WKWebView cannot hide the form accessory bar, so swap WKContentView's class for a subclass whose inputAccessoryView is nil.
-extern "C-unwind" fn input_accessory_view_nil(_this: &AnyObject, _cmd: Sel) -> *mut AnyObject {
+const extern "C-unwind" fn input_accessory_view_nil(
+    _this: &AnyObject,
+    _cmd: Sel,
+) -> *mut AnyObject {
     std::ptr::null_mut()
 }
 
-pub fn hide_form_accessory_bar(window: &tauri::WebviewWindow) {
+pub(crate) fn hide_form_accessory_bar(window: &tauri::WebviewWindow) {
     let _ = window.with_webview(|webview| unsafe {
         let webview: *mut AnyObject = webview.inner().cast();
         let scroll_view: *mut AnyObject = msg_send![&*webview, scrollView];
@@ -315,18 +306,17 @@ pub fn hide_form_accessory_bar(window: &tauri::WebviewWindow) {
                 continue;
             };
             // Registered once per process; a second window finds it by name.
-            let subclass = match AnyClass::get(&name) {
-                Some(subclass) => subclass,
-                None => {
-                    let Some(mut builder) = ClassBuilder::new(&name, class) else {
-                        continue;
-                    };
-                    builder.add_method(
-                        sel!(inputAccessoryView),
-                        input_accessory_view_nil as extern "C-unwind" fn(_, _) -> _,
-                    );
-                    builder.register()
-                }
+            let subclass = if let Some(subclass) = AnyClass::get(&name) {
+                subclass
+            } else {
+                let Some(mut builder) = ClassBuilder::new(&name, class) else {
+                    continue;
+                };
+                builder.add_method(
+                    sel!(inputAccessoryView),
+                    input_accessory_view_nil as extern "C-unwind" fn(_, _) -> _,
+                );
+                builder.register()
             };
             AnyObject::set_class(&*subview, subclass);
         }
@@ -334,7 +324,10 @@ pub fn hide_form_accessory_bar(window: &tauri::WebviewWindow) {
 }
 
 #[tauri::command]
-pub fn set_system_bars_hidden(window: tauri::WebviewWindow, hidden: bool) -> Result<(), String> {
+pub(crate) fn set_system_bars_hidden(
+    window: tauri::WebviewWindow,
+    hidden: bool,
+) -> Result<(), String> {
     window
         .with_webview(move |webview| unsafe {
             let controller: *mut AnyObject = webview.view_controller().cast();
@@ -452,7 +445,7 @@ fn end_background_task(task: &AtomicUsize) {
 }
 
 #[tauri::command]
-pub fn haptic_feedback(app: tauri::AppHandle, strong: bool) -> Result<(), String> {
+pub(crate) fn haptic_feedback(app: tauri::AppHandle, strong: bool) -> Result<(), String> {
     app.run_on_main_thread(move || unsafe {
         let allocated: objc2::rc::Allocated<AnyObject> =
             msg_send![objc2::class!(UIImpactFeedbackGenerator), alloc];
