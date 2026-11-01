@@ -1,12 +1,10 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
-  import { onMount } from 'svelte';
   import { uint8ArrayToBase64 } from 'uint8array-extras';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { verificationErrorMessage } from '#lib/core/verification-errors.js';
   import { i18n } from '#lib/i18n.js';
-  import { isNativeMobile } from '#lib/platform/os.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
@@ -23,15 +21,14 @@
     void activeFlow;
     return null;
   });
-  let scanning = $derived.by<boolean | null>(() => {
+  let scanning = $derived.by(() => {
     void activeFlow;
-    return null;
+    return false;
   });
   let noReply = $derived.by(() => {
     void activeFlow;
     return false;
   });
-  let prefersScan = $state(isNativeMobile());
   let choosing = $derived(core.verification?.state.phase === 'choose');
   let processingScan = $derived.by(() => {
     void activeFlow;
@@ -39,9 +36,7 @@
     return false;
   });
   let scanMode = $derived(
-    core.verification?.state.phase === 'choose' &&
-      core.verification.state.can_scan &&
-      (scanning ?? prefersScan)
+    core.verification?.state.phase === 'choose' && core.verification.state.can_scan && scanning
   );
   let selfVerification = $derived(core.verification?.userId === core.session?.user_id);
 
@@ -55,18 +50,6 @@
     void activeFlow;
     const timer = setTimeout(() => (noReply = true), NO_REPLY_DELAY_MS);
     return () => clearTimeout(timer);
-  });
-
-  onMount(() => {
-    if (prefersScan || !window.matchMedia('(pointer: coarse)').matches) return;
-    void navigator.mediaDevices?.enumerateDevices().then(
-      (devices) => {
-        prefersScan = devices.some((device) => device.kind === 'videoinput');
-      },
-      (error: unknown) => {
-        console.debug('[sable settings] media devices unavailable', error);
-      }
-    );
   });
 
   async function accept(): Promise<void> {
@@ -203,22 +186,30 @@
       {@const choice = core.verification.state}
       <Dialog.Description class="verification-description">
         {i18n.t(
-          scanMode || !choice.qr
+          scanMode
             ? 'settings.verificationScanTheirs'
-            : 'settings.verificationShowOurs'
+            : choice.qr
+              ? 'settings.verificationShowOurs'
+              : 'settings.chooseVerificationMethod'
         )}
       </Dialog.Description>
-      <div class="verification-code">
-        {#if scanMode || !choice.qr}
-          <VerificationQrScanner onScan={(data: Uint8Array) => void scanned(data)} />
-        {:else}
-          <VerificationQrCode code={choice.qr} label={i18n.t('settings.verificationQrLabel')} />
-        {/if}
-      </div>
+      {#if scanMode || choice.qr}
+        <div class="verification-code">
+          {#if scanMode}
+            <VerificationQrScanner onScan={(data: Uint8Array) => void scanned(data)} />
+          {:else if choice.qr}
+            <VerificationQrCode code={choice.qr} label={i18n.t('settings.verificationQrLabel')} />
+          {/if}
+        </div>
+      {/if}
       <div class="verification-actions">
         {#if choice.can_scan && choice.qr}
           <Button class="verification-action" onclick={() => (scanning = !scanMode)}>
             {i18n.t(scanMode ? 'settings.showOurCode' : 'settings.scanTheirCode')}
+          </Button>
+        {:else if choice.can_scan && !scanMode}
+          <Button class="verification-action" onclick={() => (scanning = true)}>
+            {i18n.t('settings.scanWithCamera')}
           </Button>
         {/if}
         {#if choice.can_compare}

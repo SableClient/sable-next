@@ -10,13 +10,11 @@ import { CoreError } from '#src/transport';
 vi.mock('#lib/core/context.js');
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
-vi.mock('#lib/platform/os.js', () => ({ isNativeMobile: vi.fn(() => false) }));
 vi.mock('./VerificationQrScanner.svelte', async () => ({
   default: (await import('./ScannerStub.test.svelte')).default,
 }));
 
 import { core } from '#lib/core/__mocks__/context.js';
-import { isNativeMobile } from '#lib/platform/os.js';
 
 const encryption = {
   scanVerificationQr: vi.fn<() => Promise<void>>(() => Promise.resolve()),
@@ -44,7 +42,6 @@ const qr = () => screen.queryByRole('img', { name: 'Verification code' });
 afterEach(() => {
   vi.clearAllMocks();
   encryption.scanVerificationQr.mockReset().mockResolvedValue();
-  vi.mocked(isNativeMobile).mockReturnValue(false);
 });
 
 test('shows this device’s code with the logo, and offers the other ways', async () => {
@@ -113,25 +110,28 @@ test('shows scan errors and allows retry', async () => {
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
-test('without a code of our own, the scanner opens straight away', () => {
-  setup({ phase: 'choose', qr: null, can_scan: true, can_compare: true });
+test('without our own code, the scanner waits for a tap', async () => {
+  const user = setup({ phase: 'choose', qr: null, can_scan: true, can_compare: true });
 
+  expect(screen.getByText('How would you like to verify?')).toBeInTheDocument();
+  expect(button(/scan stub/)).not.toBeInTheDocument();
+  expect(button(/Compare emoji instead/)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Scan their code with the camera' }));
   expect(button(/scan stub/)).toBeInTheDocument();
-  expect(button(/Scan their code instead/)).not.toBeInTheDocument();
+  expect(button(/Scan their code with the camera/)).not.toBeInTheDocument();
 });
 
-test('defaults to scanning on mobile and allows switching to display', async () => {
-  vi.mocked(isNativeMobile).mockReturnValue(true);
+test('shows our code first', async () => {
   const user = setup({ phase: 'choose', qr: code, can_scan: true, can_compare: true });
 
-  expect(button(/scan stub/)).toBeInTheDocument();
+  expect(button(/scan stub/)).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /Scan their code instead/ }));
   expect(qr()).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Show this device’s code' }));
   expect(qr()).toBeInTheDocument();
 });
 
 test('defaults to display when scanning is unsupported', () => {
-  vi.mocked(isNativeMobile).mockReturnValue(true);
   setup({ phase: 'choose', qr: code, can_scan: false, can_compare: true });
 
   expect(qr()).toBeInTheDocument();

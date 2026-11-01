@@ -1874,6 +1874,7 @@
     "verificationScanTheirs": "Point this device’s camera at the code on your other device.",
     "verificationQrLabel": "Verification code",
     "scanTheirCode": "Scan their code instead",
+    "scanWithCamera": "Scan their code with the camera",
     "showOurCode": "Show this device’s code",
     "compareEmojiInstead": "Compare emoji instead",
     "scanningQr": "Looking for a code…",
