@@ -3829,7 +3829,7 @@
       "wrong_code": "That isn’t a sign-in code for this. On the other device, choose Show a QR code."
     },
     "syncingGrant": "Sending your keys to the new device…",
-    "linkDeviceAction": "Link",
+    "linkDeviceAction": "Link device",
     "checkCodeLabel": "Two-digit number",
     "announceCheckCode": "Your number is {{code}}. Enter it on the other device.",
     "announceUserCode": "The other device shows {{code}}. Approve the sign-in there."

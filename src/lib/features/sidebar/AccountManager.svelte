@@ -48,6 +48,8 @@
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { AccountDirectory } from './account-directory.svelte.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import { QrCodeIcon } from 'phosphor-svelte';
+  import QrLinkDialog from '../qr-login/QrLinkDialog.svelte';
 
   const core = useCoreClient();
   const presenceStore = usePresenceStore();
@@ -57,6 +59,7 @@
   let accountSwitching = $state(true);
   let removing = $state(false);
   let removeAccountId = $state<string | null>(null);
+  let linkingDevice = $state(false);
   let error = $state<string | null>(null);
   let profile = $state.raw<ProfileView | null>(null);
   let activeAccountId = $derived(core.session?.account_id);
@@ -197,12 +200,6 @@
   </button>
 {/snippet}
 
-{#snippet editProfile()}
-  <Button variant="secondary" onclick={() => void goto(resolve('settings/account'))}
-    ><PencilSimpleIcon aria-hidden="true" />{i18n.t('nav.editProfile')}</Button
-  >
-{/snippet}
-
 <main class="account-manager" aria-label={i18n.t('nav.profile')} {@attach scrollHint}>
   <div class="account-profile">
     <ProfileCard
@@ -219,18 +216,50 @@
       nameColorLight={profile?.name_color_light}
       nameColorDark={profile?.name_color_dark}
       crest={preferences.sendPresence ? statusBubble : undefined}
-      actions={editProfile}
-    />
-    <Button variant="secondary" block onclick={() => void goto(resolve('settings'))}
-      ><GearIcon aria-hidden="true" />{i18n.t('nav.settings')}</Button
     >
+      {#snippet actions()}
+        <div class="account-buttons">
+          <Button
+            size="small"
+            variant="primary"
+            class="account-edit"
+            onclick={() => void goto(resolve('settings/account'))}
+          >
+            <PencilSimpleIcon aria-hidden="true" />{i18n.t('nav.editProfile')}</Button
+          >
+          <Button
+            size="small"
+            variant="secondary"
+            class="account-settings"
+            onclick={() => void goto(resolve('settings'))}
+          >
+            <GearIcon aria-hidden="true" />{i18n.t('nav.settings')}</Button
+          >
+          {#if core.oauthMetadata !== null}
+            <Button
+              size="small"
+              variant="secondary"
+              class="account-link"
+              onclick={() => {
+                linkingDevice = true;
+              }}
+            >
+              <QrCodeIcon aria-hidden="true" />{i18n.t('qrLogin.linkDeviceAction')}</Button
+            >
+          {/if}
+        </div>
+      {/snippet}
+    </ProfileCard>
   </div>
 
   <section class="account-list" aria-labelledby="account-list-title">
     <header class="account-list-heading">
       <h2 id="account-list-title">{i18n.t('nav.accounts')}</h2>
       {#if accountSwitching}
-        <Button variant="secondary" onclick={() => void goto(resolve('login?addAccount=1'))}
+        <Button
+          size="small"
+          variant="secondary"
+          onclick={() => void goto(resolve('login?addAccount=1'))}
           ><PlusIcon aria-hidden="true" />{i18n.t('common.addAccount')}</Button
         >
       {/if}
@@ -316,6 +345,7 @@
   <Button
     variant="secondary"
     class="sign-out"
+    block
     loading={signOut.checking}
     onclick={() => void signOut.request(() => logoutWithPush(core, pushOverride()))}
     ><SignOutIcon aria-hidden="true" />{i18n.t('settings.logout')}</Button
@@ -368,6 +398,8 @@
 
 <SignOutWarningDialog guard={signOut} />
 
+<QrLinkDialog bind:open={linkingDevice} mode="grant" />
+
 <DialogFrame
   open={accountToRemove !== null}
   variant="verification"
@@ -418,6 +450,9 @@
 
   .account-profile :global(.profile-card) {
     --profile-avatar-size: 5rem;
+
+    border: var(--border-width) solid var(--surface-container-line);
+    border-radius: var(--radius);
   }
 
   .account-profile :global(.profile-card .profile-card-cover) {
@@ -455,6 +490,32 @@
 
   .account-profile :global(.profile-card-user-id svg) {
     margin-top: var(--space-100);
+  }
+
+  .account-buttons {
+    display: grid;
+    gap: var(--space-200);
+    grid-template-areas:
+      'edit edit'
+      'settings link';
+    grid-template-columns: 1fr auto;
+    width: 100%;
+
+    :global(.account-edit) {
+      grid-area: edit;
+    }
+
+    :global(.account-settings) {
+      grid-area: settings;
+    }
+
+    :global(.account-settings:last-child) {
+      grid-column-end: link;
+    }
+
+    :global(.account-link) {
+      grid-area: link;
+    }
   }
 
   .account-list {
@@ -645,7 +706,7 @@
       grid-column: 1 / -1;
     }
 
-    .account-row :global(.account-select > svg) {
+    .account-row :global(.account-select > .status-icon) {
       grid-column: 3;
       grid-row: 1;
       justify-self: center;
