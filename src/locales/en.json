@@ -3355,6 +3355,7 @@
     "pickerOff": "No profile in this room",
     "pickerOffSpace": "No profile in this space",
     "pickerOffGlobal": "No profile",
+    "pickerAccount": "{{name}} (account)",
     "scopeSpace": "This space",
     "scopeAccount": "Global",
     "scopeLatchRoom": "Room",

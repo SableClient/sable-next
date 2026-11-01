@@ -43,6 +43,7 @@
       persona: PersonaView
     ) => void;
     onDisable: () => void;
+    account?: { id: string; name: string; avatarUrl: string | null } | null;
   }
 
   let {
@@ -55,7 +56,13 @@
     onChoose,
     onAlternateAvatarChoose,
     onDisable,
+    account = null,
   }: Props = $props();
+  let accountLabel = $derived(
+    account
+      ? i18n.t('personas.pickerAccount', { name: account.name })
+      : i18n.t('personas.pickerOffGlobal')
+  );
   let query = $state('');
   let grid = $derived(preferences.personaGrid && !query);
   let alternateAvatarAvailable = $derived(
@@ -115,8 +122,12 @@
         >
         {#if disabled}<CheckIcon />{/if}
       {:else if kind === 'offGlobal'}
-        <Avatar size="small"><ProhibitIcon /></Avatar>
-        <span class="persona-option-name">{i18n.t('personas.pickerOffGlobal')}</span>
+        {#if account}
+          <Avatar id={account.id} src={account.avatarUrl} name={account.name} size="small" />
+        {:else}
+          <Avatar size="small"><ProhibitIcon /></Avatar>
+        {/if}
+        <span class="persona-option-name">{accountLabel}</span>
         {#if !selected && !disabled}<CheckIcon />{/if}
       {:else}
         <Avatar size="small"><SyncIcon /></Avatar>
@@ -136,13 +147,11 @@
     ? persona.display_name
     : kind === 'disable'
       ? i18n.t(scope === 'room' ? 'personas.pickerOff' : 'personas.pickerOffSpace')
-      : i18n.t(
-          scope === 'account'
-            ? 'personas.pickerOffGlobal'
-            : scope === 'room' && hasSpace
-              ? 'personas.pickerSyncSpace'
-              : 'personas.pickerSyncAccount'
-        )}
+      : kind === 'offGlobal'
+        ? accountLabel
+        : i18n.t(
+            scope === 'room' && hasSpace ? 'personas.pickerSyncSpace' : 'personas.pickerSyncAccount'
+          )}
 
   <li>
     <button
@@ -173,6 +182,8 @@
                 name={persona.display_name}
                 size="medium"
               />
+            {:else if kind === 'offGlobal' && account}
+              <Avatar id={account.id} src={account.avatarUrl} name={account.name} size="medium" />
             {:else if kind === 'disable' || kind === 'offGlobal'}
               <Avatar id={null} size="medium" name={label}><ProhibitIcon /></Avatar>
             {:else}

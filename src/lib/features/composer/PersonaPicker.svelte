@@ -9,6 +9,7 @@
   } from '#src/generated/protocol';
 
   import { page } from '$app/state';
+  import { useCoreClient } from '#lib/core/context.js';
   import MessageReproxyDialog from '#lib/features/room/messages/MessageReproxyDialog.svelte';
   import { i18n } from '#lib/i18n.js';
   import {
@@ -18,6 +19,7 @@
     type ProxyMatch,
   } from '#lib/personas/persona.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
+  import { UserProfile } from '#lib/profile/user-profile.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -44,6 +46,14 @@
 
   let { roomId, onBeforeOpen, edit, shorthandHint }: Props = $props();
   const personas = usePersonaStore();
+  const core = useCoreClient();
+  const ownProfile = new UserProfile(core, () => core.session?.user_id);
+  let account = $derived.by(() => {
+    const id = core.session?.user_id;
+    if (!id) return null;
+    const profile = ownProfile.current;
+    return { id, name: profile?.display_name ?? id, avatarUrl: profile?.avatar_url ?? null };
+  });
   const roomList = useRoomList();
   const appLayout = new AppLayout();
 
@@ -225,6 +235,7 @@
           onChoose={choose}
           onAlternateAvatarChoose={alternateAvatarChoose}
           onDisable={disable}
+          {account}
         />
       </Popover.Content>
     </Popover.Portal>
@@ -267,6 +278,7 @@
       onChoose={choose}
       onAlternateAvatarChoose={alternateAvatarChoose}
       onDisable={disable}
+      {account}
     />
   </BottomSheet>
 {/if}

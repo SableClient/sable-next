@@ -136,3 +136,19 @@ test('a saved alternate-avatar view falls back to the profile picker when no alt
     preferences.personaAlternateAvatar = previousMode;
   }
 });
+
+test('the global option shows the account profile messages will be sent as', () => {
+  renderWithTooltips(PersonaMenu, {
+    personas: [],
+    selected: null,
+    disabled: false,
+    scope: 'account',
+    onScope: vi.fn(),
+    onChoose: vi.fn(),
+    onDisable: vi.fn(),
+    account: { id: '@alice:example.org', name: 'Alice', avatarUrl: null },
+  });
+
+  expect(screen.getByRole('button', { name: 'personas.pickerAccount:Alice' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'personas.pickerOffGlobal' })).toBeNull();
+});
