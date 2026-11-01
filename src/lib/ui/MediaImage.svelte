@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { devicePixelRatio } from 'svelte/reactivity/window';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -33,6 +34,7 @@
 
   const BLURHASH_DECODE_WIDTH = 32;
   const ORIENTATION_TOLERANCE = 0.05;
+  const THUMBNAIL_MIN_SOURCE_BYTES = 1024 * 1024;
   const ANIMATED_MIMES = ['image/gif', 'image/apng', 'image/avif', 'image/webp'];
   const ANIMATED_EXTENSIONS = ['.gif', '.apng', '.avif', '.webp'];
 
@@ -144,8 +146,19 @@
   let servedSideways = $derived(
     sidewaysSource === source || sideways(mediaAspectRatio(core, source, width, height))
   );
+  let thumbnailWorthIt = $derived(
+    eventRatio === null ||
+      intrinsicWidth === null ||
+      intrinsicHeight === null ||
+      ((intrinsicWidth > width || intrinsicHeight > height) &&
+        ((devicePixelRatio.current ?? 1) <= 1 ||
+          size === null ||
+          size <= 0 ||
+          size > THUMBNAIL_MIN_SOURCE_BYTES))
+  );
   let asIs = $derived(
     original ||
+      !thumbnailWorthIt ||
       mime === 'image/svg+xml' ||
       animated ||
       servedSideways ||

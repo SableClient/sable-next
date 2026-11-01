@@ -1521,3 +1521,49 @@ test('an automatic retry falling due while an outro holds the media reads no sta
   instance.unmount();
   vi.useRealTimers();
 });
+
+test('fetches the original when the image already fits the box', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  render(MediaImage, {
+    source: 'mxc://example.org/small',
+    alt: 'Small',
+    width: 800,
+    height: 600,
+    intrinsicWidth: 640,
+    intrinsicHeight: 480,
+  });
+  render(MediaImage, {
+    source: 'mxc://example.org/large',
+    alt: 'Large',
+    width: 800,
+    height: 600,
+    intrinsicWidth: 4000,
+    intrinsicHeight: 3000,
+  });
+  await settle();
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/small', 0, 0);
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/large', 800, 600);
+});
+
+test('keeps the original of a small file on a dense screen', async () => {
+  vi.spyOn(window, 'devicePixelRatio', 'get').mockReturnValue(2);
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  const large = { width: 800, height: 600, intrinsicWidth: 4000, intrinsicHeight: 3000 };
+  render(MediaImage, {
+    ...large,
+    source: 'mxc://example.org/dense-light',
+    alt: 'Light',
+    size: 500_000,
+  });
+  render(MediaImage, {
+    ...large,
+    source: 'mxc://example.org/dense-heavy',
+    alt: 'Heavy',
+    size: 5_000_000,
+  });
+  render(MediaImage, { ...large, source: 'mxc://example.org/dense-unsized', alt: 'Unsized' });
+  await settle();
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/dense-light', 0, 0);
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/dense-heavy', 800, 600);
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/dense-unsized', 800, 600);
+});

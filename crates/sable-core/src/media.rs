@@ -262,7 +262,7 @@ impl Core {
         .await;
         match thumbnail {
             Ok(bytes) => Ok(bytes),
-            Err(error) if answered_by_server(&error) => {
+            Err(error) if answered_by_server(&error) || maybe_hidden_by_browser(&error) => {
                 tracing::warn!(%media, "thumbnail refused, falling back to the original: {error}");
                 self.original_media(client, key, source, true)
                     .await
@@ -1003,6 +1003,17 @@ fn transport_failure_blames_remote(error: &reqwest::Error) -> bool {
 
 #[cfg(target_family = "wasm")]
 const fn transport_failure_blames_remote(_: &reqwest::Error) -> bool {
+    false
+}
+
+#[cfg(target_family = "wasm")]
+fn maybe_hidden_by_browser(error: &matrix_sdk::Error) -> bool {
+    matches!(error, matrix_sdk::Error::Http(http)
+        if matches!(http.as_ref(), HttpError::Reqwest(error) if error.status().is_none()))
+}
+
+#[cfg(not(target_family = "wasm"))]
+const fn maybe_hidden_by_browser(_: &matrix_sdk::Error) -> bool {
     false
 }
 
