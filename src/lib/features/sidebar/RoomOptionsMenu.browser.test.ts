@@ -13,6 +13,7 @@ const currentRoom = withCounts({
   canonical_alias: null,
   name: 'Room',
   topic: null,
+  topic_html: null,
   avatar_url: null,
   is_direct: false,
   direct_targets: [],
