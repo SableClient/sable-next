@@ -787,7 +787,10 @@
                     </div>
                   </div>
                 {:else}
-                  <ul {@attach measureImageRow}>
+                  <ul
+                    style={`grid-template-columns: repeat(${String(emojiColumns)}, minmax(0, var(--emote-cell)))`}
+                    {@attach measureImageRow}
+                  >
                     {#each row.images as image, column (column)}
                       {@const imageLabel = `:${image.shortcode}:`}
                       <li>
@@ -1060,8 +1063,7 @@
   }
 
   .grids ul {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
     justify-content: center;
     list-style: none;
     margin: 0;
