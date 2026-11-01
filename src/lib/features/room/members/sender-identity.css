@@ -77,6 +77,10 @@
   min-width: 0;
 }
 
+.sender-identity-pronouns.empty {
+  margin-inline-start: calc(-1 * var(--space-100));
+}
+
 :root[data-high-contrast='off'] .sender-identity-via {
   color: var(--primary-on-container);
 

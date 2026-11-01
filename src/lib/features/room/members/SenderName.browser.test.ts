@@ -85,6 +85,15 @@ test('never overflows or clips a pill at any width, and never truncates the name
   }
 });
 
+test('hidden pills leave no gap that truncates a name that exactly fits', async () => {
+  const container = await mount(600);
+  await settle();
+  container.style.width = `${String(name(container).scrollWidth)}px`;
+  await settle();
+  expect(visiblePills(container)).toHaveLength(0);
+  expect(name(container).scrollWidth).toBeLessThanOrEqual(name(container).clientWidth);
+});
+
 test('shows no pills when not even one fits next to the name', async () => {
   const container = await mount(600);
   await settle();
