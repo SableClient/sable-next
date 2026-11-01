@@ -5,6 +5,7 @@ import type { PushDetails } from '#lib/config/runtime-config.js';
 import {
   hasCompleteOverride,
   hasPartialOverride,
+  isEmbeddedServerUrl,
   overrideProblem,
   type PushOverride,
   resolvePushConfig,
@@ -98,4 +99,13 @@ test('surrounding whitespace never reaches the gateway check', () => {
   );
 
   expect(padded).toEqual(resolvePushConfig(COMPLETE, details));
+});
+
+test('a built-in server must be a bare https address', () => {
+  expect(isEmbeddedServerUrl('https://ntfy.example.org')).toBe(true);
+  expect(isEmbeddedServerUrl(' https://ntfy.example.org/push/ ')).toBe(true);
+  expect(isEmbeddedServerUrl('http://ntfy.example.org')).toBe(false);
+  expect(isEmbeddedServerUrl('https://user:pass@ntfy.example.org')).toBe(false);
+  expect(isEmbeddedServerUrl('https://ntfy.example.org?up=1')).toBe(false);
+  expect(isEmbeddedServerUrl('ntfy.example.org')).toBe(false);
 });

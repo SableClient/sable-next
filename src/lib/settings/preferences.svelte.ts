@@ -379,6 +379,8 @@ export interface Preferences {
   pushGatewayUrl: string;
   pushVapidKey: string;
   pushAppId: string;
+  /** Empty falls back to `unifiedPushEmbeddedServerUrl` in `config.json`. */
+  pushEmbeddedServerUrl: string;
 
   errorReporting: boolean;
   sessionReplay: boolean;
@@ -527,6 +529,7 @@ const FREE_TEXT = [
   'pushGatewayUrl',
   'pushVapidKey',
   'pushAppId',
+  'pushEmbeddedServerUrl',
 ] as const satisfies readonly (keyof Preferences)[];
 
 export type FreeTextPreference = (typeof FREE_TEXT)[number];
@@ -736,6 +739,7 @@ const DEFAULTS: Preferences = {
   pushGatewayUrl: '',
   pushVapidKey: '',
   pushAppId: '',
+  pushEmbeddedServerUrl: '',
 
   soundsNotificationVolume: 1,
   soundsCameraOnVolume: 1,

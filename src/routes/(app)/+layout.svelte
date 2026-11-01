@@ -583,6 +583,7 @@
     void core.accountRevision;
     void pushDeviceName;
     void preferences.richPushPayloads;
+    void preferences.pushEmbeddedServerUrl;
     if (core.status !== 'ready') return;
     void unregisterVoipPusher(core);
 

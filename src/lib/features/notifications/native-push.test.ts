@@ -18,7 +18,7 @@ vi.mock('#lib/platform/push.js', () => ({
   setPushDistributor: mocks.select,
 }));
 vi.mock('#lib/platform/notifications.js', () => ({ deliversNativePush: mocks.native }));
-const preferences = vi.hoisted(() => ({ richPushPayloads: true }));
+const preferences = vi.hoisted(() => ({ richPushPayloads: true, pushEmbeddedServerUrl: '' }));
 vi.mock('#lib/settings/preferences.svelte.js', () => ({ preferences }));
 vi.mock('#lib/notifications/push-config.js', async (original) => ({
   ...(await original<typeof import('#lib/notifications/push-config.js')>()),
@@ -192,6 +192,26 @@ test('uses a deployment-provided built-in server', async () => {
   });
   await registerNativePush(override, session, accounts);
   expect(mocks.register.mock.calls[0][0].embeddedGatewayUrl).toBe('https://ntfy.example');
+});
+
+test('a server picked in settings wins over the deployment one', async () => {
+  mocks.config.mockResolvedValue({
+    ...config,
+    details: { ...config.details, unifiedPushEmbeddedServerUrl: 'https://ntfy.example' },
+  });
+  preferences.pushEmbeddedServerUrl = 'https://ntfy.mine.example';
+  await registerNativePush(override, session, accounts);
+  preferences.pushEmbeddedServerUrl = '';
+  expect(mocks.register.mock.calls[0][0].embeddedGatewayUrl).toBe('https://ntfy.mine.example');
+});
+
+test('registers again when the built-in server changes', async () => {
+  await registerNativePush(override, session, accounts);
+  preferences.pushEmbeddedServerUrl = 'https://ntfy.mine.example';
+  await registerNativePush(override, session, accounts);
+  preferences.pushEmbeddedServerUrl = '';
+  expect(mocks.register).toHaveBeenCalledTimes(2);
+  expect(mocks.register.mock.lastCall?.[0].embeddedGatewayUrl).toBe('https://ntfy.mine.example');
 });
 
 test.each(['embedded-websocket', 'io.heckel.ntfy', 'org.example.sunup'])(

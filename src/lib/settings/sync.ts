@@ -49,6 +49,7 @@ export const NON_SYNCABLE_KEYS = new Set<keyof Preferences>([
   'pushGatewayUrl',
   'pushVapidKey',
   'pushAppId',
+  'pushEmbeddedServerUrl',
   'errorReporting',
   'sessionReplay',
   'telemetryAsked',

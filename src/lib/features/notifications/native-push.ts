@@ -10,6 +10,7 @@ import {
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import {
+  embeddedServer,
   hasCompleteOverride,
   pushConfig,
   type PushOverride,
@@ -55,7 +56,7 @@ async function register(
         ? (details.iosPushAppID ?? null)
         : null,
     unifiedPushGatewayUrl: details?.unifiedPushGatewayUrl ?? null,
-    embeddedGatewayUrl: details?.unifiedPushEmbeddedServerUrl ?? 'https://ntfy.sh',
+    embeddedGatewayUrl: preferences.pushEmbeddedServerUrl.trim() || embeddedServer(details),
     provider,
     eventIdOnly: !preferences.richPushPayloads,
     userId: session?.user_id ?? null,
@@ -139,6 +140,7 @@ export function registerNativePush(
     accounts.map((account) => [account.user_id, account.device_id, account.needs_reauth]),
     selectedPushProvider(),
     preferences.richPushPayloads,
+    preferences.pushEmbeddedServerUrl,
   ]);
   if (queuedRegistration?.key === key) return queuedRegistration.result;
   const result = enqueue(async () => {
