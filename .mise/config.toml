@@ -132,7 +132,13 @@ run = [
 
 [tasks.ci]
 description = "Full local CI: strict checks, tests, and documentation"
-run = [{ task = "check" }, { task = "check:android" }, { task = "check:ios" }, { task = "test" }, { task = "doc" }]
+run = [
+  { task = "check" },
+  { task = "check:android" },
+  { task = "check:ios" },
+  { task = "test" },
+  { task = "doc" },
+]
 
 [tasks.fix]
 description = "Apply safe frontend fixes and Rust formatting"
