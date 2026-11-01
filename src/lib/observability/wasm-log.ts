@@ -47,15 +47,31 @@ export function isExpectedCoreFailure(line: string): boolean {
   );
 }
 
+function withoutSpans(line: string): string {
+  let depth = 0;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (char === '{') depth += 1;
+    else if (char === '}') depth -= 1;
+    else if (depth === 0 && char === ':' && line[index + 1] === ' ') {
+      const prefix = line.slice(0, index);
+      return prefix.includes('{') ? line.slice(index + 2) : line;
+    }
+  }
+  return line;
+}
+
 export function wasmErrorTitle(line: string): string {
   const message = scrubMatrixIds(
-    line
-      .replace(/^\s*(?:ERROR|WARN)\s+/, '')
-      .replace(REPORTED_FIELD, '')
-      .replace(/"?JsValue\([^]*$/, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-  );
+    withoutSpans(
+      line
+        .replace(/^\s*(?:ERROR|WARN)\s+/, '')
+        .replace(REPORTED_FIELD, '')
+        .replace(/"?JsValue\([^]*$/, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+    )
+  ).replace(/[A-Za-z0-9+/]{40,}/g, '[KEY]');
   return message.length > TITLE_LIMIT ? `${message.slice(0, TITLE_LIMIT)}…` : message;
 }
 

@@ -55,6 +55,7 @@ fn scrub_text(value: &str) -> String {
             (r"(?i)/%23[^/?#\s]+", "/[ROOM_ALIAS]"),
             (r"(?i)/%24[^/?#\s]+", "/[EVENT_ID]"),
             (r"(?i)([?&#](?:code|state|loginToken)=)[^&#\s]+", "$1[REDACTED]"),
+            (r"[A-Za-z0-9+/]{40,}", "[KEY]"),
         ]
         .into_iter()
         .filter_map(|(pattern, replacement)| Regex::new(pattern).ok().map(|regex| (regex, replacement)))
@@ -115,6 +116,7 @@ fn scrub_fields(fields: &mut std::collections::BTreeMap<String, serde_json::Valu
                 | "backup"
                 | "account_cross_signed"
                 | "device_cross_signed"
+                | "errors_by_olm_session"
         )
     });
     for value in fields.values_mut() {
@@ -333,6 +335,7 @@ mod tests {
         let transport = record(|| {
             tracing::warn!(
                 target: "matrix_sdk_crypto::olm::account",
+                errors_by_olm_session = ?[("Xc2bUfTFHxJ0Ycs5kd8CmWyDJM5aRjMTXCVqU7yjNmE", "Decryption(InvalidMAC(MacError))")],
                 "Failed to decrypt a non-pre-key message with all available sessions"
             );
             tracing::warn!(
@@ -361,6 +364,12 @@ mod tests {
                 Some("Failed to decrypt a non-pre-key message with all available sessions"),
                 Some("unable to decrypt a message"),
             ]
+        );
+        let olm = serde_json::to_string(&events[0]).unwrap();
+        assert!(olm.contains("InvalidMAC"), "{olm}");
+        assert!(
+            !olm.contains("Xc2bUfTFHxJ0Ycs5kd8CmWyDJM5aRjMTXCVqU7yjNmE"),
+            "{olm}"
         );
         let utd = serde_json::to_string(&events[1]).unwrap();
         for field in ["WithheldBySender", "later", "Enabled"] {

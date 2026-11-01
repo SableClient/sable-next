@@ -42,6 +42,15 @@ describe('wasmErrorTitle', () => {
       'matrix_sdk_ui::sync_service: Error while processing room list: Some( Http( Timeout, ), )'
     );
   });
+
+  test('drops the span chain so the message and its fields fit', () => {
+    const title = wasmErrorTitle(
+      'WARN next_sync_with_lock:sync_once{conn_id="encryption" timeout=30000}:handle_response:receive_to_device_event{sender="@a:b.org"}: matrix_sdk_crypto::olm::account: Failed to decrypt a non-pre-key message with all available sessions errors_by_olm_session=[("Xc2bUfTFHxJ0Ycs5kd8CmWyDJM5aRjMTXCVqU7yjNmE", Decryption(InvalidMAC(MacError)))]'
+    );
+    expect(title).toBe(
+      'matrix_sdk_crypto::olm::account: Failed to decrypt a non-pre-key message with all available sessions errors_by_olm_session=[("[KEY]", Decryption(InvalidMAC(MacError)))]'
+    );
+  });
 });
 
 describe('wasmErrorTitle on a fetch failure', () => {
