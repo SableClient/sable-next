@@ -166,6 +166,18 @@ pub(crate) fn shared_store_dir() -> Result<std::path::PathBuf, String> {
 }
 
 /// # Errors
+/// When the attribute cannot be set.
+pub(crate) fn exclude_from_backup(path: &std::path::Path) -> Result<(), String> {
+    use objc2_foundation::{NSNumber, NSURL, NSURLIsExcludedFromBackupKey};
+    let url =
+        NSURL::fileURLWithPath_isDirectory(&NSString::from_str(&path.to_string_lossy()), true);
+    let excluded = NSNumber::numberWithBool(true);
+    // SAFETY: the backup exclusion key takes an NSNumber holding a boolean.
+    unsafe { url.setResourceValue_forKey_error(Some(&excluded), NSURLIsExcludedFromBackupKey) }
+        .map_err(|error| error.to_string())
+}
+
+/// # Errors
 /// When the shared policy cannot be written.
 pub(crate) fn write_push_policy(policy: crate::NotificationPolicy) -> Result<(), String> {
     let root = shared_store_dir()?;

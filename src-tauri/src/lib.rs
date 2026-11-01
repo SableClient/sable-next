@@ -427,6 +427,10 @@ fn setup(app: &mut tauri::App<tauri::Wry>) -> Result<(), Box<dyn std::error::Err
             shared
         }
     };
+    #[cfg(target_os = "ios")]
+    if let Err(error) = ios::exclude_from_backup(&data_dir) {
+        log::warn!("could not exclude the store from iCloud backup: {error}");
+    }
     app.manage(notifications::PushStore(data_dir.clone()));
     let (core, events) = Core::new(
         data_dir.to_string_lossy().into_owned(),
