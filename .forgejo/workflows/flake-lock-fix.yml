@@ -7,6 +7,7 @@ on:
       - 'pnpm-lock.yaml'
       - '**/Cargo.lock'
       - 'scripts/build/fetch-deepfilternet.mjs'
+      - 'packaging/nix/wasm-bindgen-cli.nix'
   workflow_dispatch:
 
 jobs:
@@ -30,18 +31,25 @@ jobs:
           extra_nix_config: experimental-features = nix-command flakes
 
       # Only the fixed-output derivations carry hashes, so there's no need to build the app.
+      # A second pass fixes the wasm-bindgen-cli vendor hash after its crate hash.
       - name: Fix hash mismatches
         run: |
           set +o pipefail
-          nix build -L --keep-going --no-link \
-            .#sable-unwrapped.pnpmDeps \
-            .#sable-unwrapped.cargoDeps \
-            .#sable-deepfilternet-assets 2>&1 |
-            tee /dev/stderr |
-            grep -E '(specified|got):' | grep -oE 'sha256-\S+' | paste - - |
+          for attempt in 1 2; do
+            nix build -L --keep-going --no-link \
+              .#sable-unwrapped.pnpmDeps \
+              .#sable-unwrapped.cargoDeps \
+              .#sable-deepfilternet-assets \
+              .#sable-wasm-bindgen-cli.src \
+              .#sable-wasm-bindgen-cli.cargoDeps 2>&1 |
+              tee /dev/stderr |
+              grep -E '(specified|got):' | grep -oE 'sha256-\S+' | paste - - > mismatches
+            [ -s mismatches ] || break
             while read -r old new; do
               sed -i "s|$old|$new|" packaging/nix/*.nix
-            done
+            done < mismatches
+          done
+          rm -f mismatches
 
       - name: Commit and push if changed
         run: |

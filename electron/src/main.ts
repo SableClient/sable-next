@@ -22,7 +22,7 @@ import {
 import { createReadStream, existsSync } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { basename, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import mime from 'mime';
@@ -79,6 +79,8 @@ app.userAgentFallback = `${USER_AGENT} ${app.userAgentFallback}`;
 
 const devUrl = process.env.SABLE_DEV_URL;
 const distDir = resolve(app.getAppPath(), process.env.SABLE_DIST ?? '../dist');
+// Not process.resourcesPath: Nix runs app.asar with the shared nixpkgs Electron.
+const resourcesDir = dirname(app.getAppPath());
 const isLinux = process.platform === 'linux';
 const isWayland =
   isLinux && (process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY);
@@ -249,7 +251,7 @@ function showMainWindow(): void {
 function trayIconPath(): string {
   const extension = process.platform === 'win32' ? 'ico' : 'png';
   return app.isPackaged
-    ? join(process.resourcesPath, `sable-tray.${extension}`)
+    ? join(resourcesDir, `sable-tray.${extension}`)
     : join(app.getAppPath(), `../src-tauri/icons/icon.${extension}`);
 }
 
@@ -779,8 +781,8 @@ function registerScreenShare(): void {
 
 function registerDeepLinks(): void {
   if (isLinux) {
-    // Flatpak, deb and rpm install a desktop entry that declares the schemes.
-    if (process.env.FLATPAK_ID || existsSync(join(process.resourcesPath, 'package-type'))) return;
+    // Flatpak, deb, rpm and Nix install a desktop entry that declares the schemes.
+    if (process.env.FLATPAK_ID || existsSync(join(resourcesDir, 'package-type'))) return;
     void claimSchemes(join(xdgDataHome(), 'applications'), IDENTIFIER, DEEP_LINK_SCHEMES);
   } else if (app.isPackaged) {
     for (const scheme of DEEP_LINK_SCHEMES) {

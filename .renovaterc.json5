@@ -15,6 +15,15 @@
   lockFileMaintenance: {
     enabled: true,
   },
+  customManagers: [
+    {
+      customType: 'regex',
+      managerFilePatterns: ['/\\.nix$/'],
+      matchStrings: [
+        'datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\s*\\S+\\s*=\\s*"(?<currentValue>[^"]+)";',
+      ],
+    },
+  ],
   packageRules: [
     {
       matchManagers: ['github-actions'],
@@ -26,6 +35,11 @@
     },
     {
       matchManagers: ['cargo', 'rust-toolchain'],
+      groupName: 'cargo',
+    },
+    {
+      description: 'wasm-bindgen-cli must match the wasm-bindgen version in Cargo.lock',
+      matchPackageNames: ['wasm-bindgen-cli'],
       groupName: 'cargo',
     },
     {

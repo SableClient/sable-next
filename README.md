@@ -101,6 +101,12 @@ paru -S sable-bin
 Use `sable-nightly-bin` for nightly builds. See the
 [AUR upgrade notes](packaging/aur/README.md) when upgrading older packages.
 
+#### Nix
+
+```bash
+nix run git+https://git.sable.moe/SableClient/sable-next#sable-desktop
+```
+
 #### Using Forgejo Repositories
 
 Packages are published to the Forgejo repositories at `git.sable.moe`. Use `nightly` instead of `stable` for nightly builds; the package is then `sable-nightly`.

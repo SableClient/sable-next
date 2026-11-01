@@ -7,7 +7,7 @@
   pnpm_12,
   pnpmConfigHook,
   nodejs_26,
-  wasm-bindgen-cli_0_2_129,
+  sable-wasm-bindgen-cli,
   binaryen,
   lld,
   sable-deepfilternet-assets,
@@ -44,7 +44,7 @@ stdenv.mkDerivation (finalAttrs: {
     pnpm
     (pnpmConfigHook.override { inherit pnpm; })
     nodejs_26
-    wasm-bindgen-cli_0_2_129
+    sable-wasm-bindgen-cli
     binaryen
     lld
     rustPlatform.rust.rustc

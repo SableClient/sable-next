@@ -17,7 +17,13 @@ function git(...args) {
 }
 
 function releaseTags() {
-  return git('tag', '--list', 'v*')
+  let list;
+  try {
+    list = git('tag', '--list', 'v*');
+  } catch {
+    return [];
+  }
+  return list
     .split('\n')
     .filter((tag) => /^v\d+\.\d+\.\d+$/.test(tag))
     .sort((a, b) => {
