@@ -29,6 +29,7 @@ import SyncEncryption from '#lib/features/settings/SyncEncryption.svelte';
 import StateEventTool from '#lib/features/settings/StateEventTool.svelte';
 import DeveloperAccessToken from '#lib/features/settings/DeveloperAccessToken.svelte';
 import DeveloperAccountData from '#lib/features/settings/DeveloperAccountData.svelte';
+import DeveloperPushRules from '#lib/features/settings/DeveloperPushRules.svelte';
 import DeveloperDebugLogs from '#lib/features/settings/DeveloperDebugLogs.svelte';
 import DeveloperNotifications from '#lib/features/settings/DeveloperNotifications.svelte';
 import DeveloperPushHistory from '#lib/features/settings/DeveloperPushHistory.svelte';
@@ -118,6 +119,11 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     {
       component: DeveloperAccountData,
       section: 'developer-account-data',
+      when: () => preferences.developerTools,
+    },
+    {
+      component: DeveloperPushRules,
+      section: 'developer-push-rules',
       when: () => preferences.developerTools,
     },
     {

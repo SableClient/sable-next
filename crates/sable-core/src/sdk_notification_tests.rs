@@ -918,3 +918,23 @@ async fn resetting_a_bridged_dm_to_default_does_not_create_a_room_push_rule() {
     }
     core.session_tasks.lock().clear();
 }
+
+#[tokio::test]
+async fn push_rules_are_not_written_as_account_data() {
+    use crate::api::account::SetDataParams;
+    use crate::protocol::RpcError;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let (core, _events) = watching(&server, &client).await;
+
+    for event_type in ["m.push_rules", "m.fully_read"] {
+        let result = core
+            .run(SetDataParams {
+                event_type: event_type.to_owned(),
+                content: serde_json::json!({}),
+            })
+            .await;
+        assert!(matches!(result, Err(RpcError::Unsupported)), "{event_type}");
+    }
+}

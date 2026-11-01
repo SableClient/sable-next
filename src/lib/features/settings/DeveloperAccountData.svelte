@@ -20,6 +20,7 @@
   let saving = $state(false);
   let error = $state<'json' | 'failed' | null>(null);
   let saved = $state(false);
+  const serverManaged = $derived(['m.push_rules', 'm.fully_read'].includes(eventType.trim()));
 
   async function refresh(): Promise<void> {
     if (!core.session) return;
@@ -63,7 +64,7 @@
   async function save(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     const type = eventType.trim();
-    if (!type || saving) return;
+    if (!type || saving || serverManaged) return;
     const parsed = parseJsonObject(content);
     if (!parsed) {
       error = 'json';
@@ -144,12 +145,15 @@
             id="developer-account-data-content"
             bind:value={content}
             disabled={loading}
+            readonly={serverManaged}
             error={error === 'json'}
             spellcheck={false}
             class="account-data-content"
           />
         </FormField>
-        {#if error === 'json'}
+        {#if serverManaged}
+          <Alert variant="info">{i18n.t('settings.developerAccountDataServerManaged')}</Alert>
+        {:else if error === 'json'}
           <Alert variant="critical">{i18n.t('settings.developerAccountDataInvalidJson')}</Alert>
         {:else if error === 'failed'}
           <Alert variant="critical">{i18n.t('settings.developerAccountDataFailed')}</Alert>
@@ -160,9 +164,11 @@
           <Button variant="ghost" size="small" onclick={() => (selected = undefined)}>
             {i18n.t('common.close')}
           </Button>
-          <Button type="submit" variant="primary" size="small" loading={saving}>
-            {i18n.t('common.save')}
-          </Button>
+          {#if !serverManaged}
+            <Button type="submit" variant="primary" size="small" loading={saving}>
+              {i18n.t('common.save')}
+            </Button>
+          {/if}
         </div>
       </form>
     {/if}

@@ -1,11 +1,12 @@
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
+use matrix_sdk::ruma::push::{Action, RuleKind};
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 use serde::{Deserialize, Serialize};
 
-use super::Handler;
+use super::{Handler, Json};
 use crate::protocol::{RpcError, DefaultNotificationModesView, EventNotificationView, EventNotificationsView, InboxItemView, KeywordNotificationView, MentionNotificationModeView, MentionNotificationsView, MentionRuleView, NotificationModeView, NotificationSettingsView, NotificationView, PushFetchView};
 use crate::{Core, ResultExt, notifications, push_rules};
 
@@ -32,6 +33,10 @@ domain! {
     set_sounds,
     set_notify_once,
     set_enabled,
+    push_rules,
+    set_push_rule_enabled,
+    set_push_rule_actions,
+    delete_push_rule,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -492,5 +497,94 @@ impl Handler for SetEnabledParams {
             .store(self.enabled, Ordering::Relaxed);
 
         std::future::ready(Ok(()))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PushRulesParams {}
+
+impl Handler for PushRulesParams {
+    type Ok = Json;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Json, RpcError> {
+        let rules = core.push_rules().await?.snapshot().await;
+        serde_json::to_value(rules)
+            .map(Json)
+            .or_failed(core, "push_rules")
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetPushRuleEnabledParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub kind: RuleKind,
+    pub rule_id: String,
+    pub enabled: bool,
+}
+
+impl Handler for SetPushRuleEnabledParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.push_rules()
+            .await?
+            .apply(vec![push_rules::RuleWrite::Enabled {
+                kind: self.kind,
+                rule_id: self.rule_id,
+                enabled: self.enabled,
+            }])
+            .await
+            .or_failed(core, "set_push_rule_enabled")
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetPushRuleActionsParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub kind: RuleKind,
+    pub rule_id: String,
+    #[cfg_attr(feature = "typegen", specta(type = Vec<specta_typescript::Unknown>))]
+    pub actions: Vec<Action>,
+}
+
+impl Handler for SetPushRuleActionsParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.push_rules()
+            .await?
+            .apply(vec![push_rules::RuleWrite::Actions {
+                kind: self.kind,
+                rule_id: self.rule_id,
+                actions: self.actions,
+            }])
+            .await
+            .or_failed(core, "set_push_rule_actions")
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct DeletePushRuleParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub kind: RuleKind,
+    pub rule_id: String,
+}
+
+impl Handler for DeletePushRuleParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.push_rules()
+            .await?
+            .apply(vec![push_rules::RuleWrite::Delete {
+                kind: self.kind,
+                rule_id: self.rule_id,
+            }])
+            .await
+            .or_failed(core, "delete_push_rule")
     }
 }

@@ -187,6 +187,7 @@ export const panelTargets: Record<string, PanelTarget[]> = {
       ['developer-sync-diagnostics', 'settings.developerSyncTitle'],
       ['developer-server-features', 'settings.developerServerFeaturesTitle'],
       ['developer-account-data', 'settings.developerAccountDataTitle'],
+      ['developer-push-rules', 'settings.developerPushRulesTitle'],
       ['developer-notifications', 'settings.developerNotificationsTitle'],
       ['developer-debug-logs', 'settings.developerLogsTitle'],
       ['developer-sentry', 'settings.developerSentryTitle'],

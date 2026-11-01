@@ -19,6 +19,7 @@ export const developerCategory: SettingsCategory = {
     { id: 'developer-sync-diagnostics', name: 'settings.developerSyncTitle' },
     { id: 'developer-server-features', name: 'settings.developerServerFeaturesTitle' },
     { id: 'developer-account-data', name: 'settings.developerAccountDataTitle' },
+    { id: 'developer-push-rules', name: 'settings.developerPushRulesTitle' },
     { id: 'developer-notifications', name: 'settings.developerNotificationsTitle' },
     { id: 'developer-debug-logs', name: 'settings.developerLogsTitle' },
     { id: 'developer-sentry', name: 'settings.developerSentryTitle' },

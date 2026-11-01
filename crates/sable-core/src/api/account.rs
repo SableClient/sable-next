@@ -224,6 +224,10 @@ impl Handler for SetDataParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        // Server-managed since MSC4010.
+        if matches!(self.event_type.as_str(), "m.push_rules" | "m.fully_read") {
+            return Err(RpcError::Unsupported);
+        }
         core.set_account_data(&self.event_type, &self.content).await
     }
 }
