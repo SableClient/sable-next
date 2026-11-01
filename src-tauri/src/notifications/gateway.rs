@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Runtime};
 #[cfg(mobile)]
 use tauri_plugin_notifications::NotificationsExt;
+use tauri_plugin_notifications::PushProvider;
 
 pub(super) struct Registration {
     pub(super) token: String,
@@ -71,11 +72,11 @@ pub(super) fn server_web_pusher(
 }
 
 /// Let the platform resolve Auto using its installed distributors and services.
-fn provider_for_server_delivery(
+const fn provider_for_server_delivery(
     _server_vapid: Option<&str>,
-    provider: Option<&str>,
-) -> Option<String> {
-    provider.map(str::to_owned)
+    provider: Option<PushProvider>,
+) -> Option<PushProvider> {
+    provider
 }
 
 pub(super) fn is_unified_push_endpoint(token: &str) -> bool {
@@ -148,7 +149,7 @@ fn prefers_distributor_gateway(
     registration: &Registration,
     active_provider: Option<&str>,
 ) -> bool {
-    (config.provider.as_deref() == Some("unifiedpush") || active_provider == Some("unifiedpush"))
+    (config.provider == Some(PushProvider::UnifiedPush) || active_provider == Some("unifiedpush"))
         && !config.gateway_override
         && is_unified_push_endpoint(&registration.token)
 }
@@ -187,13 +188,13 @@ pub(super) async fn register_with_distributor<R: Runtime>(
     config: &PushConfig,
     server_vapid: Option<&str>,
 ) -> Result<(Registration, Option<String>), PushRegistrationError> {
-    let provider = provider_for_server_delivery(server_vapid, config.provider.as_deref());
+    let provider = provider_for_server_delivery(server_vapid, config.provider);
     let register = |vapid: Option<String>| async {
         let registered = app
             .notifications()
             .register_for_push_notifications(
                 vapid,
-                provider.clone(),
+                provider,
                 config.embedded_gateway_url.clone(),
                 config.user_id.clone(),
                 config.device_id.clone(),
@@ -225,7 +226,8 @@ pub(super) async fn register_with_distributor<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::{
-        PushConfig, Registration, provider_for_server_delivery, pusher, server_web_pusher,
+        PushConfig, PushProvider, Registration, provider_for_server_delivery, pusher,
+        server_web_pusher,
     };
 
     #[test]
@@ -271,13 +273,13 @@ mod tests {
             &registration,
             None
         ));
-        config.provider = Some("embedded".to_owned());
+        config.provider = Some(PushProvider::Embedded);
         assert!(!super::prefers_distributor_gateway(
             &config,
             &registration,
             None
         ));
-        config.provider = Some("auto".to_owned());
+        config.provider = Some(PushProvider::Auto);
         assert!(!super::prefers_distributor_gateway(
             &config,
             &registration,
@@ -298,7 +300,7 @@ mod tests {
             &registration,
             Some("unifiedpush")
         ));
-        config.provider = Some("unifiedpush".to_owned());
+        config.provider = Some(PushProvider::UnifiedPush);
         config.gateway_override = true;
         assert!(!super::prefers_distributor_gateway(
             &config,
@@ -332,7 +334,7 @@ mod tests {
             Some("server-key"),
             None
         ));
-        config.provider = Some("embedded".to_owned());
+        config.provider = Some(PushProvider::Embedded);
         assert!(!super::asks_distributor_for_gateway(
             &config,
             &registration,
@@ -536,17 +538,14 @@ mod tests {
 
     #[test]
     fn msc4174_auto_preserves_platform_provider_selection() {
+        assert_eq!(provider_for_server_delivery(Some("server-key"), None), None);
         assert_eq!(
-            provider_for_server_delivery(Some("server-key"), None).as_deref(),
-            None
+            provider_for_server_delivery(Some("server-key"), Some(PushProvider::Auto)),
+            Some(PushProvider::Auto)
         );
         assert_eq!(
-            provider_for_server_delivery(Some("server-key"), Some("auto")).as_deref(),
-            Some("auto")
-        );
-        assert_eq!(
-            provider_for_server_delivery(Some("server-key"), Some("unifiedpush")).as_deref(),
-            Some("unifiedpush")
+            provider_for_server_delivery(Some("server-key"), Some(PushProvider::UnifiedPush)),
+            Some(PushProvider::UnifiedPush)
         );
         assert_eq!(provider_for_server_delivery(None, None), None);
     }

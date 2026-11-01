@@ -2820,8 +2820,8 @@ dependencies = [
  "libc",
  "log",
  "rustversion",
- "windows-link 0.1.3",
- "windows-result 0.3.4",
+ "windows-link 0.2.1",
+ "windows-result 0.4.1",
 ]
 
 [[package]]
@@ -3528,7 +3528,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.61.2",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -9278,7 +9278,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-notifications"
 version = "0.5.0"
-source = "git+https://github.com/SableClient/tauri-plugin-notifications.git?rev=8097a87cb78cc4bf47c819ed59be4080db319a97#8097a87cb78cc4bf47c819ed59be4080db319a97"
+source = "git+https://github.com/SableClient/tauri-plugin-notifications.git?rev=b396c62eaaa7f1902a3fec751d14268aee393a86#b396c62eaaa7f1902a3fec751d14268aee393a86"
 dependencies = [
  "log",
  "notify-rust",

@@ -168,7 +168,7 @@ pub(crate) struct PushConfig {
     #[serde(default)]
     pub embedded_gateway_url: Option<String>,
     #[serde(default)]
-    pub provider: Option<String>,
+    pub provider: Option<tauri_plugin_notifications::PushProvider>,
 }
 
 /// # Errors
