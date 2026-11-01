@@ -20,6 +20,7 @@ function image(width: number | null, height: number | null) {
     caption: null,
     html: null,
     source: 'mxc://example.org/picture',
+    external_url: null,
     mime: 'image/png',
     width,
     height,

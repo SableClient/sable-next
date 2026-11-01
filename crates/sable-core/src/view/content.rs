@@ -203,6 +203,7 @@ fn message_type_content(
                 caption,
                 html: caption_html,
                 source: media_source(&image.source),
+                external_url: raw.external_url(),
                 mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
                 width: dimension(image.info.as_ref().and_then(|info| info.width)),
                 height: dimension(image.info.as_ref().and_then(|info| info.height)),
@@ -221,6 +222,7 @@ fn message_type_content(
                 caption,
                 html: caption_html,
                 source: media_source(&video.source),
+                external_url: raw.external_url(),
                 mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
                 width: dimension(video.info.as_ref().and_then(|info| info.width)),
                 height: dimension(video.info.as_ref().and_then(|info| info.height)),
@@ -238,6 +240,7 @@ fn message_type_content(
                 caption,
                 html: caption_html,
                 source: media_source(&audio.source),
+                external_url: raw.external_url(),
                 mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
                 duration_ms: audio_duration_ms(audio),
                 waveform: audio_waveform(audio),
@@ -253,6 +256,7 @@ fn message_type_content(
                 caption,
                 html: caption_html,
                 source: media_source(&file.source),
+                external_url: raw.external_url(),
                 mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
                 size: file.info.as_ref().and_then(|info| info.size).map(u64::from),
             }
@@ -619,6 +623,26 @@ mod tests {
         .unwrap();
 
         assert_eq!(raw.spoiler_reason().as_deref(), Some(""));
+    }
+
+    #[test]
+    fn bridged_media_keeps_the_link_it_came_from() {
+        let content = json!({
+            "msgtype": "m.video",
+            "body": "https://www.instagram.com/reel/a/",
+            "filename": "reel.mp4",
+            "url": "mxc://example.org/reel",
+            "external_url": "https://www.instagram.com/reel/a/?id=1",
+        });
+        let raw = serde_json::from_value::<RawFields>(json!({ "content": content })).unwrap();
+        let msgtype = serde_json::from_value::<MessageType>(content).unwrap();
+        let serialized =
+            serde_json::to_value(message_type_content(&msgtype, false, None, &raw)).unwrap();
+
+        assert_eq!(
+            serialized["external_url"],
+            "https://www.instagram.com/reel/a/?id=1"
+        );
     }
 
     #[test]

@@ -1739,13 +1739,13 @@ msgtype: MessageKind; edited: boolean;
  */
 jumbo: number | null } | { kind: "image"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
-html: string | null; source: string; mime: string | null; width: number | null; height: number | null; size: number | null; blurhash: string | null; thumbnail: string | null; spoiler: string | null; animated: boolean | null } | { kind: "video"; filename: string; caption: string | null;
+html: string | null; source: string; external_url: string | null; mime: string | null; width: number | null; height: number | null; size: number | null; blurhash: string | null; thumbnail: string | null; spoiler: string | null; animated: boolean | null } | { kind: "video"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
-html: string | null; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; thumbnail: string | null; spoiler: string | null; playback: VideoPlaybackView | null } | { kind: "audio"; filename: string; caption: string | null;
+html: string | null; source: string; external_url: string | null; mime: string | null; width: number | null; height: number | null; blurhash: string | null; thumbnail: string | null; spoiler: string | null; playback: VideoPlaybackView | null } | { kind: "audio"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
-html: string | null; source: string; mime: string | null; duration_ms: number | null; waveform: number[] | null; voice: boolean; metadata: AudioMetadataView | null } | { kind: "file"; filename: string; caption: string | null;
+html: string | null; source: string; external_url: string | null; mime: string | null; duration_ms: number | null; waveform: number[] | null; voice: boolean; metadata: AudioMetadataView | null } | { kind: "file"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
-html: string | null; source: string; mime: string | null; size: number | null } | { kind: "sticker"; body: string; source: string; mime: string | null; width: number | null; height: number | null } |
+html: string | null; source: string; external_url: string | null; mime: string | null; size: number | null } | { kind: "sticker"; body: string; source: string; mime: string | null; width: number | null; height: number | null } |
 /**
  *  The coordinates are absent for a `geo:` URI we cannot read; `geo_uri` is
  *  passed through as sent either way.

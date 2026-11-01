@@ -45,6 +45,7 @@ function image(eventId: string, filename: string): TimelineItemView {
       filename,
       caption: null,
       source: `mxc://example.org/${filename}`,
+      external_url: null,
       mime: 'image/png',
       width: 800,
       height: 600,

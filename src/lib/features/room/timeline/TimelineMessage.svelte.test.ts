@@ -596,6 +596,32 @@ test('renders a link preview for every link in a message', async () => {
   setPreference('urlPreviews', false);
 });
 
+test('a bridged attachment does not preview the link it came from', async () => {
+  setPreference('urlPreviews', true);
+  const base = imageItem();
+  const media: TimelineItemView = {
+    ...base,
+    content: {
+      ...(base.content as Extract<TimelineItemView['content'], { kind: 'image' }>),
+      caption: 'https://example.org/source https://example.org/other',
+      html: '<a href="https://example.org/source">source</a> <a href="https://example.org/other">other</a>',
+      external_url: 'https://example.org/source',
+    },
+  };
+  const instance = render(TimelineItemHarness, {
+    props: { core, item: { item: media, collapsed: false, encrypted: false } },
+  });
+  await vi.waitFor(() => {
+    expect(
+      [...document.querySelectorAll<HTMLAnchorElement>('.link-preview > a.link-preview-text')].map(
+        (link) => link.href
+      )
+    ).toEqual(['https://example.org/other']);
+  });
+  instance.unmount();
+  setPreference('urlPreviews', false);
+});
+
 test('a message whose embeds were removed renders none, bundled or found', async () => {
   setPreference('urlPreviews', true);
   const message: TimelineItemView = withRowFields({

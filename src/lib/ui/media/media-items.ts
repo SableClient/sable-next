@@ -24,6 +24,7 @@ export function timelineMediaItems(entries: readonly TimelineItemView[]): MediaI
           caption: item.caption,
           html: null,
           source: item.source,
+          external_url: null,
           mime: item.mime,
           eventId: galleryItemId(eventId, index),
           sender,

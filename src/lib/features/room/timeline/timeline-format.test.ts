@@ -715,6 +715,7 @@ test('anything you sent is yours to redact, not only your text', () => {
     kind: 'image',
     html: null,
     source: 'mxc://example.org/p',
+    external_url: null,
     filename: 'photo.png',
     caption: null,
     mime: null,

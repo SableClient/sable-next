@@ -81,6 +81,7 @@ test('an own attachment post is edited through its caption', () => {
       caption: 'the code',
       html: null,
       source: 'mxc://example.org/code',
+      external_url: null,
       mime: 'text/plain',
       size: 128,
     },

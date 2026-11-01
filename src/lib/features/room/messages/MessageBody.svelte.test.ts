@@ -69,6 +69,7 @@ function attachment(kind: 'image' | 'video' | 'audio' | 'file'): TimelineItemCon
     caption: 'caption',
     html,
     source: 'mxc://example.org/media',
+    external_url: null,
     mime: null,
   };
 
@@ -341,6 +342,7 @@ test('keeps an image filename hidden without the alt-text preference', async () 
         caption: null,
         html: null,
         source: 'mxc://example.org/photo',
+        external_url: null,
         mime: 'image/png',
         width: null,
         height: null,

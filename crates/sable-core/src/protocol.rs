@@ -1679,6 +1679,7 @@ pub enum TimelineItemContentView {
         /// Sanitised display HTML for a formatted caption, when present.
         html: Option<String>,
         source: String,
+        external_url: Option<String>,
         mime: Option<String>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         width: Option<u64>,
@@ -1698,6 +1699,7 @@ pub enum TimelineItemContentView {
         /// Sanitised display HTML for a formatted caption, when present.
         html: Option<String>,
         source: String,
+        external_url: Option<String>,
         mime: Option<String>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         width: Option<u64>,
@@ -1714,6 +1716,7 @@ pub enum TimelineItemContentView {
         /// Sanitised display HTML for a formatted caption, when present.
         html: Option<String>,
         source: String,
+        external_url: Option<String>,
         mime: Option<String>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         duration_ms: Option<u64>,
@@ -1728,6 +1731,7 @@ pub enum TimelineItemContentView {
         /// Sanitised display HTML for a formatted caption, when present.
         html: Option<String>,
         source: String,
+        external_url: Option<String>,
         mime: Option<String>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         size: Option<u64>,

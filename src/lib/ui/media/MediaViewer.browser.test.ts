@@ -24,6 +24,7 @@ const item: MediaItem = {
   filename: 'shot.png',
   caption: null,
   source: 'mxc://example.test/history-image',
+  external_url: null,
   mime: 'image/png',
   width: 800,
   height: 600,

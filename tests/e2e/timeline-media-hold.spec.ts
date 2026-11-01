@@ -16,6 +16,7 @@ function voiceMessage(id: string): TimelineItemView {
       caption: null,
       html: null,
       source: JSON.stringify({ Plain: `mxc://example.test/${id}` }),
+      external_url: null,
       mime: 'audio/ogg',
       duration_ms: 4000,
       waveform: [1, 2, 3, 4],

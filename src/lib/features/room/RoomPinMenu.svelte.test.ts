@@ -55,6 +55,7 @@ const image = {
     filename: 'photo.png',
     caption: null,
     source: 'mxc://example.org/photo',
+    external_url: null,
     mime: 'image/png',
     width: 800,
     height: 600,

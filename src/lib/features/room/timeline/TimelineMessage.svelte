@@ -196,7 +196,9 @@
     if (content.kind === 'message' || content.kind === 'gallery')
       return previewableLinks(content.html, content.body);
     if (isMediaCaptionContent(content) && content.caption !== null)
-      return previewableLinks(content.html ?? '', content.caption);
+      return previewableLinks(content.html ?? '', content.caption).filter(
+        (url) => url !== content.external_url
+      );
     return [];
   });
   let receiptWidth = $state(0);

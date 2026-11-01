@@ -79,6 +79,13 @@ impl RawFields {
         raw_formatted_body(self.message()).or(self.echo_formatted_body.as_deref())
     }
 
+    pub(super) fn external_url(&self) -> Option<String> {
+        self.message()?
+            .get("external_url")?
+            .as_str()
+            .map(str::to_owned)
+    }
+
     pub(super) fn spoiler_reason(&self) -> Option<String> {
         spoiler_reason(self.message()).or_else(|| self.echo_spoiler.clone())
     }

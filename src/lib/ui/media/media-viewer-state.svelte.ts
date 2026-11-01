@@ -48,6 +48,7 @@ class MediaViewerState {
       caption: null,
       html: null,
       source,
+      external_url: null,
       mime: mime ?? null,
       width: width ?? null,
       height: height ?? null,

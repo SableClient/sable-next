@@ -9,6 +9,7 @@ const video: TimelineItemContentView = {
   filename: 'clip.mp4',
   caption: null,
   source: '{}',
+  external_url: null,
   mime: 'video/mp4',
   width: null,
   height: null,
@@ -63,6 +64,7 @@ test('every renderable message kind yields a preview', () => {
       filename: 'voice.ogg',
       caption: null,
       source: '{}',
+      external_url: null,
       mime: null,
       duration_ms: null,
       waveform: null,
@@ -77,6 +79,7 @@ test('every renderable message kind yields a preview', () => {
       caption: null,
       html: null,
       source: '{}',
+      external_url: null,
       mime: null,
       size: null,
     })

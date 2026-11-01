@@ -154,6 +154,7 @@
       sender: senderOf(item),
       caption: null,
       html: null,
+      external_url: null,
     };
     switch (content.kind) {
       case 'image':

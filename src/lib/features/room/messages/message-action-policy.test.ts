@@ -101,6 +101,7 @@ function mediaContent(
     caption,
     html,
     source: 'mxc://example.org/x',
+    external_url: null,
     mime: 'text/x',
   };
   if (kind === 'image') {
@@ -185,6 +186,7 @@ test('media and threaded events expose their respective actions', () => {
       filename: 'photo.png',
       caption: null,
       source: 'mxc://example.org/photo',
+      external_url: null,
       mime: 'image/png',
       width: null,
       height: null,
