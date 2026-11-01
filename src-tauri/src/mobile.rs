@@ -41,7 +41,11 @@ pub(crate) extern "system" fn Java_moe_sable_client_AppLifecycle_nativeActivityC
 }
 
 #[tauri::command]
-pub(crate) async fn open_in_app_auth_url(id: String, url: String) -> Result<(), String> {
+pub(crate) async fn open_in_app_auth_url(
+    id: String,
+    url: String,
+    sheet: bool,
+) -> Result<bool, String> {
     let parsed = tauri::Url::parse(&url).map_err(|_| "invalid authentication URL")?;
     if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
         return Err("authentication requires an HTTP or HTTPS URL".into());
@@ -54,16 +58,22 @@ pub(crate) async fn open_in_app_auth_url(id: String, url: String) -> Result<(), 
         vm.attach_current_thread(|env| {
             let id = env.new_string(id)?;
             let url = env.new_string(parsed.as_str())?;
-            let result = env.call_static_method(
-                class,
-                jni_str!("openAuthUrlNative"),
-                jni_sig!("(Ljava/lang/String;Ljava/lang/String;)V"),
-                &[JValue::Object(&id), JValue::Object(&url)],
-            );
+            let result = env
+                .call_static_method(
+                    class,
+                    jni_str!("openAuthUrlNative"),
+                    jni_sig!("(Ljava/lang/String;Ljava/lang/String;Z)Z"),
+                    &[
+                        JValue::Object(&id),
+                        JValue::Object(&url),
+                        JValue::Bool(sheet),
+                    ],
+                )
+                .and_then(|value| value.z());
             if result.is_err() {
                 env.exception_clear();
             }
-            result.map(|_| ())
+            result
         })
         .map_err(|error| error.to_string())
     })

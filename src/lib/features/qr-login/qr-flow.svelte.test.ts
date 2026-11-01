@@ -140,6 +140,34 @@ test('waits for the user to come back from the approval browser before continuin
   stop();
 });
 
+test('continues at once when the approval page opens beside the app', () => {
+  const { core, emit } = fakeCore();
+  const flow = new QrFlow(
+    core,
+    () => 'grant',
+    undefined,
+    undefined,
+    () => true
+  );
+  const stop = flow.listen();
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+
+  flow.approvalBesideApp();
+  expect(core.qrGrantContinue).not.toHaveBeenCalled();
+
+  emit({
+    type: 'qr_login',
+    grant: true,
+    progress: { stage: 'waiting_for_auth', verification_uri: 'https://auth.example/approve' },
+  });
+  flow.approvalBesideApp();
+  flow.approvalBesideApp();
+  document.dispatchEvent(new Event('visibilitychange'));
+
+  expect(core.qrGrantContinue).toHaveBeenCalledExactlyOnceWith(true);
+  stop();
+});
+
 test('a refused step is reported as a failure', async () => {
   const { core } = fakeCore();
   core.startQrGrant.mockRejectedValue(new Error('no session'));

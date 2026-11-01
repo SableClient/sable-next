@@ -148,11 +148,11 @@
     approvalError = false;
     try {
       const previous = approvalBrowser;
-      const browser = openExternalAuthWindow(`sable-qr-${crypto.randomUUID()}`);
+      const browser = openExternalAuthWindow(`sable-qr-${crypto.randomUUID()}`, { sheet: true });
       if (!browser) throw new Error('Authentication popup was blocked');
       approvalBrowser = browser;
       await previous?.close();
-      await browser.navigate(url);
+      if (await browser.navigate(url)) flow.approvalBesideApp();
     } catch (error) {
       closeApproval();
       console.warn('[sable qr] approval browser failed', error);

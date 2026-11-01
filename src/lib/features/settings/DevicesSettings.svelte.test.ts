@@ -137,7 +137,7 @@ test('opens the server devices dashboard', async () => {
 
 test('device removal opens account management without asking for a password', async () => {
   const url = 'https://id.example.org/account?action=org.matrix.session_end&device_id=DEV1';
-  const navigate = vi.fn(() => Promise.resolve());
+  const navigate = vi.fn(() => Promise.resolve(false));
   vi.mocked(openExternalAuthWindow).mockReturnValue({ navigate, close: vi.fn() });
   encryption.deleteDevice.mockResolvedValue(url);
   const user = await renderDevices([own, other1], 'https://id.example.org/account');

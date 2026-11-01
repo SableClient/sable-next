@@ -10,7 +10,10 @@ import type { CoreEvent } from '#src/generated/protocol';
 vi.mock('#lib/core/context.js');
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
-const browser = vi.hoisted(() => ({ navigate: vi.fn(() => Promise.resolve()), close: vi.fn() }));
+const browser = vi.hoisted(() => ({
+  navigate: vi.fn(() => Promise.resolve(false)),
+  close: vi.fn(),
+}));
 vi.mock('#lib/platform/external-auth.js', () => ({
   isDesktopAuthClient: vi.fn(() => true),
   openSystemAuthUrl: vi.fn(() => Promise.resolve()),
@@ -43,7 +46,7 @@ import QrLinkDialog from './QrLinkDialog.svelte';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  browser.navigate.mockResolvedValue(undefined);
+  browser.navigate.mockResolvedValue(false);
   vi.mocked(openExternalAuthWindow).mockReturnValue(browser);
   vi.mocked(isDesktopAuthClient).mockReturnValue(true);
   vi.mocked(openSystemAuthUrl).mockResolvedValue(undefined);
@@ -62,6 +65,9 @@ test('opens device approval through the authentication browser', async () => {
   await emit({ stage: 'waiting_for_auth', verification_uri: uri });
   await user.click(screen.getByRole('button', { name: 'Open the approval page' }));
 
+  expect(openExternalAuthWindow).toHaveBeenCalledWith(expect.stringMatching(/^sable-qr-/), {
+    sheet: true,
+  });
   expect(browser.navigate).toHaveBeenCalledExactlyOnceWith(uri);
   expect(core.cancelQr).not.toHaveBeenCalled();
 });
@@ -171,7 +177,7 @@ test('offers a retry when the popup is blocked', async () => {
 test('finishes closing the previous browser before reopening approval', async () => {
   let finishClosing: () => void = () => {};
   const first = {
-    navigate: vi.fn().mockResolvedValue(undefined),
+    navigate: vi.fn().mockResolvedValue(false),
     close: vi.fn(
       () =>
         new Promise<void>((resolve) => {
@@ -179,7 +185,7 @@ test('finishes closing the previous browser before reopening approval', async ()
         })
     ),
   };
-  const second = { navigate: vi.fn().mockResolvedValue(undefined), close: vi.fn() };
+  const second = { navigate: vi.fn().mockResolvedValue(false), close: vi.fn() };
   vi.mocked(openExternalAuthWindow).mockReturnValueOnce(first).mockReturnValueOnce(second);
   const user = userEvent.setup();
   render(QrLinkDialog, { open: true, mode: 'grant' });

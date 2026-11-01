@@ -64,6 +64,21 @@ describe('authentication browsers', () => {
       id: expect.stringMatching(/^sable-auth-/) as unknown,
       url: 'https://matrix.example.org/register',
       callbackUri: undefined,
+      sheet: false,
+    });
+  });
+
+  test('reports when Android opened the page as a sheet beside the app', async () => {
+    native.platform.mockReturnValue('android');
+    native.invoke.mockResolvedValueOnce(true);
+    const browser = openExternalAuthWindow('approval', { sheet: true });
+    if (!browser) throw new Error('Browser was not created');
+    await expect(browser.navigate('https://auth.example.org/device')).resolves.toBe(true);
+    expect(native.invoke).toHaveBeenCalledExactlyOnceWith('open_in_app_auth_url', {
+      id: 'approval',
+      url: 'https://auth.example.org/device',
+      callbackUri: undefined,
+      sheet: true,
     });
   });
 

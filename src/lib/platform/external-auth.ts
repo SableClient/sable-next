@@ -28,28 +28,37 @@ export async function closeAuthLoopback(): Promise<void> {
 
 export interface ExternalAuthWindow {
   window?: Window;
-  navigate: (url: string, callbackUri?: string) => Promise<void>;
+  navigate: (url: string, callbackUri?: string) => Promise<boolean>;
   close: () => void | Promise<void>;
 }
 
-export function openExternalAuthWindow(name: string): ExternalAuthWindow | null {
+export function openExternalAuthWindow(
+  name: string,
+  { sheet = false }: { sheet?: boolean } = {}
+): ExternalAuthWindow | null {
   const electron = electronBridge();
   if (isTauri() || electron) {
     let closed = false;
     let closing: Promise<void> | undefined;
-    let opening: Promise<void> = Promise.resolve();
+    let opening: Promise<boolean> = Promise.resolve(false);
     let closeBrowser: (() => Promise<void>) | undefined;
     return {
       navigate: (url, callbackUri) => {
         opening = (async () => {
-          if (closed) return;
+          if (closed) return false;
           if (electron) {
             closeBrowser = () => electron.closeAuthWindow(name);
             await electron.openAuthWindow(name, url);
-          } else {
-            closeBrowser = () => invoke('close_in_app_auth_window', { id: name });
-            await invoke('open_in_app_auth_url', { id: name, url, callbackUri });
+            return false;
           }
+          closeBrowser = () => invoke('close_in_app_auth_window', { id: name });
+          const opened = await invoke<boolean | null>('open_in_app_auth_url', {
+            id: name,
+            url,
+            callbackUri,
+            sheet,
+          });
+          return opened === true;
         })();
         return opening;
       },
@@ -75,7 +84,7 @@ export function openExternalAuthWindow(name: string): ExternalAuthWindow | null 
     navigate: (url) => {
       popup.location.replace(url);
 
-      return Promise.resolve();
+      return Promise.resolve(false);
     },
     close: () => {
       popup.close();

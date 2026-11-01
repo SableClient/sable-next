@@ -37,7 +37,7 @@ export class QrFlow {
   pending = $state(false);
 
   private stopEvents: (() => void) | null = null;
-  private stopWaitingForReturn: () => void = () => {};
+  private stopWaitingForReturn: (() => void) | null = null;
 
   constructor(
     private readonly core: QrFlowCore,
@@ -59,7 +59,7 @@ export class QrFlow {
     return () => {
       this.stopEvents?.();
       this.stopEvents = null;
-      this.stopWaitingForReturn();
+      this.endWaitingForReturn();
       void this.cancel();
     };
   }
@@ -96,15 +96,21 @@ export class QrFlow {
   }
 
   reset(): void {
-    this.stopWaitingForReturn();
+    this.endWaitingForReturn();
     this.progress = null;
     this.scanning = false;
     this.pending = false;
   }
 
+  approvalBesideApp(): void {
+    if (!this.stopWaitingForReturn) return;
+    this.endWaitingForReturn();
+    void this.continueGrant(true);
+  }
+
   // Android stops the app behind the approval browser, so the SDK must not poll until the user is back.
   private continueAfterApproval(): void {
-    this.stopWaitingForReturn();
+    this.endWaitingForReturn();
     if (!this.continueOnReturn()) {
       void this.continueGrant(true);
       return;
@@ -116,9 +122,14 @@ export class QrFlow {
         return;
       }
       if (!left) return;
-      this.stopWaitingForReturn();
+      this.endWaitingForReturn();
       void this.continueGrant(true);
     });
+  }
+
+  private endWaitingForReturn(): void {
+    this.stopWaitingForReturn?.();
+    this.stopWaitingForReturn = null;
   }
 
   private async start(scanned: string | null): Promise<void> {
