@@ -5,3 +5,7 @@ import { MatrixKeyProvider } from './key-provider';
 test('failed decryptions never mark a participant key invalid', () => {
   expect(new MatrixKeyProvider().getOptions().failureTolerance).toBe(-1);
 });
+
+test('keys are never ratcheted', () => {
+  expect(new MatrixKeyProvider().getOptions().ratchetWindowSize).toBe(0);
+});
