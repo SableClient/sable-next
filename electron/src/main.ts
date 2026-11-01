@@ -143,6 +143,7 @@ setFeatures(enabledFeatures, [
 ]);
 if (!settings.smoothScrolling) app.commandLine.appendSwitch('disable-smooth-scrolling');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+if (process.platform === 'win32') app.commandLine.appendSwitch('force-color-profile', 'srgb');
 
 if (process.platform !== 'darwin') Menu.setApplicationMenu(null);
 if (process.platform === 'win32') {
