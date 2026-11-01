@@ -12,6 +12,7 @@ on:
       - '.cargo/**'
       - '.clippy.toml'
       - '.forgejo/workflows/rust-quality.yml'
+      - '.mise/config.toml'
       - '.forgejo/actions/rust/**'
       - '.forgejo/webdriver.json'
   push:
@@ -26,6 +27,7 @@ on:
       - '.cargo/**'
       - '.clippy.toml'
       - '.forgejo/workflows/rust-quality.yml'
+      - '.mise/config.toml'
       - '.forgejo/actions/rust/**'
       - '.forgejo/webdriver.json'
 
@@ -88,7 +90,7 @@ jobs:
         run: cargo run --locked -p sable-core --example generate-types --features typegen -- --check
 
   # The app crate is the Android and iOS shell. This job lints and tests it on
-  # the Linux host. The mobile release jobs compile the real targets.
+  # the Linux host. The android and ios jobs lint the real targets.
   app:
     name: App crate
     runs-on: ubuntu-latest
@@ -179,6 +181,67 @@ jobs:
           CHROMEDRIVER: ${{ steps.drivers.outputs.chromedriver }}
           WASM_BINDGEN_TEST_WEBDRIVER_JSON: ${{ github.workspace }}/.forgejo/webdriver.json
         run: cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-test
+
+  android:
+    name: Android target
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_AWS_SECRET_ACCESS_KEY }}
+      MISE_ENV: tauri
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up the Rust workspace
+        uses: ./.forgejo/actions/rust
+        with:
+          components: clippy
+          targets: aarch64-linux-android
+          mise: 'true'
+          cache-key: android
+
+      - name: Install the Android SDK and NDK
+        run: |
+          sudo_cmd=()
+          [ "$(id -u)" -eq 0 ] || sudo_cmd=(sudo)
+          "${sudo_cmd[@]}" apt-get update
+          "${sudo_cmd[@]}" apt-get install --no-install-recommends -y build-essential libclang-dev unzip
+          mise install
+          mise run --skip-deps tauri:setup:android
+
+      - name: Run Clippy
+        run: mise run check:android
+
+  ios:
+    name: iOS target
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up the Rust workspace
+        uses: ./.forgejo/actions/rust
+        with:
+          components: clippy
+          targets: aarch64-apple-ios
+          cache-key: ios
+
+      - name: Run Clippy
+        run: cargo clippy --locked -p app --target aarch64-apple-ios -- -D warnings
 
   policy:
     name: Format and dependency policy

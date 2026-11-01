@@ -80,6 +80,25 @@ run = [
 ]
 tools = { "github:bnjbvr/cargo-machete" = "0.9.2", "aqua:EmbarkStudios/cargo-deny" = "0.20.2" }
 
+[tasks."check:android"]
+description = "Lint the app crate for Android, with the NDK from tauri:setup:android"
+run = """
+bin="${ANDROID_HOME:?ANDROID_HOME is not set}/ndk/$ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/$(uname -s | tr '[:upper:]' '[:lower:]')-x86_64/bin"
+rustup target add aarch64-linux-android
+CC_aarch64_linux_android="$bin/aarch64-linux-android24-clang" \
+AR_aarch64_linux_android="$bin/llvm-ar" \
+CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$bin/aarch64-linux-android24-clang" \
+cargo clippy --locked -p app --target aarch64-linux-android --all-targets -- -D warnings
+"""
+
+[tasks."check:ios"]
+description = "Lint the app crate for iOS, skipped off macOS"
+run = """
+if [ "$(uname -s)" != Darwin ]; then echo "check:ios needs macOS, skipped"; exit 0; fi
+rustup target add aarch64-apple-ios
+cargo clippy --locked -p app --target aarch64-apple-ios -- -D warnings
+"""
+
 [tasks."check:frontend"]
 description = "Run formatter and frontend checks only"
 run = ["pnpm fmt:check", "pnpm lint", "pnpm stylelint", "pnpm check", "pnpm knip"]
@@ -113,7 +132,7 @@ run = [
 
 [tasks.ci]
 description = "Full local CI: strict checks, tests, and documentation"
-run = [{ task = "check" }, { task = "test" }, { task = "doc" }]
+run = [{ task = "check" }, { task = "check:android" }, { task = "check:ios" }, { task = "test" }, { task = "doc" }]
 
 [tasks.fix]
 description = "Apply safe frontend fixes and Rust formatting"
