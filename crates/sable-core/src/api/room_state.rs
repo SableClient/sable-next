@@ -3,6 +3,7 @@ use std::sync::Arc;
 use matrix_sdk::ruma::OwnedRoomId;
 use matrix_sdk::ruma::api::client::state::get_state_events;
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
+use matrix_sdk::ruma::events::room::topic::RoomTopicEventContent;
 use matrix_sdk::ruma::serde::Raw;
 use serde::{Deserialize, Serialize};
 use sable_model::bot_commands::BotCommand;
@@ -73,13 +74,20 @@ pub struct SetTopicParams {
     pub topic: String,
 }
 
+pub(crate) fn topic_content(topic: &str) -> RoomTopicEventContent {
+    match sable_model::markdown::markdown_to_content(topic, &[]).formatted_body {
+        Some(html) => RoomTopicEventContent::html(topic, html),
+        None => RoomTopicEventContent::new(topic.to_owned()),
+    }
+}
+
 impl Handler for SetTopicParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         core.room(&self.room_id)
             .await?
-            .set_room_topic(&self.topic)
+            .send_state_event(topic_content(&self.topic))
             .await
             .map_err(|error| core.room_error("set_room_topic", error))?;
         Ok(())
@@ -566,5 +574,34 @@ impl Handler for BotCommandsParams {
         core.bot_commands_for(&client, &room)
             .await
             .map_err(|error| core.room_error("bot_commands", error))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::topic_content;
+
+    #[test]
+    fn a_formatted_topic_carries_html_beside_its_plain_text() {
+        assert_eq!(
+            serde_json::to_value(topic_content("**Rules** at https://example.org")).unwrap(),
+            json!({
+                "topic": "**Rules** at https://example.org",
+                "m.topic": { "m.text": [
+                    { "mimetype": "text/html", "body": "<strong>Rules</strong> at https://example.org" },
+                    { "body": "**Rules** at https://example.org" },
+                ] },
+            })
+        );
+    }
+
+    #[test]
+    fn a_plain_topic_carries_only_plain_text() {
+        assert_eq!(
+            serde_json::to_value(topic_content("Chat")).unwrap(),
+            json!({ "topic": "Chat", "m.topic": { "m.text": [{ "body": "Chat" }] } })
+        );
     }
 }

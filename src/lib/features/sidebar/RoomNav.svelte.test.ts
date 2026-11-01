@@ -71,6 +71,7 @@ function makeRoom(overrides: Partial<RoomListItemView>): RoomListItemView {
     canonical_alias: null,
     name: null,
     topic: null,
+    topic_html: null,
     avatar_url: null,
     is_direct: false,
     direct_targets: [],

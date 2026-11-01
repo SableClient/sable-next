@@ -30,6 +30,7 @@ function preview(join_rule: RoomPreviewView['join_rule']): RoomPreviewView {
     canonical_alias: '#knock:example.org',
     name: 'Knock room',
     topic: null,
+    topic_html: null,
     avatar_url: null,
     room_kind: 'text',
     num_joined_members: 3,

@@ -13,18 +13,19 @@
     open: boolean;
     roomName: string;
     topic: string;
+    topicHtml: string | null;
     onOpenChange: (open: boolean) => void;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
   }
 
-  let { open, roomName, topic, onOpenChange, onMatrixLink }: Props = $props();
+  let { open, roomName, topic, topicHtml, onOpenChange, onMatrixLink }: Props = $props();
 </script>
 
 <DialogFrame {open} {onOpenChange} variant="verification" label={i18n.t('room.topicTitle')}>
   <div class="topic-dialog">
     <h2>{roomName}</h2>
     <div class="topic-full" {@attach scrollHint}>
-      <FormattedBody html={topicToHtml(topic)} {onMatrixLink} />
+      <FormattedBody html={topicHtml ?? topicToHtml(topic)} {onMatrixLink} />
     </div>
     <DialogActions>
       <Button

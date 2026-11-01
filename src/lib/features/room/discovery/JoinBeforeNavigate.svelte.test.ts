@@ -31,6 +31,7 @@ function preview(overrides: Partial<RoomPreviewView> = {}): RoomPreviewView {
     canonical_alias: null,
     name: 'Knock room',
     topic: null,
+    topic_html: null,
     avatar_url: null,
     room_kind: 'text',
     num_joined_members: 3,
@@ -62,6 +63,24 @@ test('sends the optional message with the request to join', async () => {
     reason: 'a friend of Ana',
   });
   expect(screen.getByRole('status')).toHaveTextContent(t('join.knockSent'));
+});
+
+test('a topic shows its rich text over the plain fallback', async () => {
+  core.rpc.rooms.preview.mockResolvedValue(
+    preview({ topic: '**Rules** apply', topic_html: '<strong>Rules</strong> apply' })
+  );
+  render(JoinBeforeNavigate, { roomId: '!room:example.org' });
+
+  expect((await screen.findByText('Rules')).tagName).toBe('STRONG');
+  expect(screen.queryByText(/\*\*Rules\*\*/)).not.toBeInTheDocument();
+});
+
+test('a plain topic is not read as markdown', async () => {
+  core.rpc.rooms.preview.mockResolvedValue(preview({ topic: '**Rules** apply' }));
+  render(JoinBeforeNavigate, { roomId: '!room:example.org' });
+
+  expect(await screen.findByText(/apply/)).toBeInTheDocument();
+  expect(document.querySelector('.join-topic strong')).toBeNull();
 });
 
 test('a blank message sends no reason', async () => {

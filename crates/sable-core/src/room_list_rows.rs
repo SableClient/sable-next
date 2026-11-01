@@ -97,6 +97,7 @@ mod tests {
             canonical_alias: None,
             name: None,
             topic: None,
+            topic_html: None,
             avatar_url: None,
             is_direct: false,
             direct_targets: Vec::new(),

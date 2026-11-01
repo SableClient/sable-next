@@ -16,6 +16,7 @@ function room(overrides: Partial<RoomListItemView> & { room_id: string }): RoomL
     canonical_alias: null,
     name: null,
     topic: null,
+    topic_html: null,
     avatar_url: null,
     is_direct: false,
     direct_targets: [],

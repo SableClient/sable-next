@@ -97,6 +97,7 @@ pub fn room_preview_view(preview: &RoomPreview) -> RoomPreviewView {
         canonical_alias: preview.canonical_alias.clone(),
         name: preview.name.clone(),
         topic: preview.topic.clone(),
+        topic_html: None,
         avatar_url: preview.avatar_url.clone(),
         room_kind: RoomKind::from_room_type(preview.room_type.as_ref()),
         num_joined_members: Some(u32::try_from(preview.num_joined_members).unwrap_or(u32::MAX)),
@@ -122,6 +123,7 @@ pub fn room_preview_from_stripped_state(
         canonical_alias: None,
         name: None,
         topic: None,
+        topic_html: None,
         avatar_url: None,
         room_kind: None,
         num_joined_members,
@@ -139,7 +141,15 @@ pub fn room_preview_from_stripped_state(
                 view.canonical_alias = event.content.alias;
             }
             AnyStrippedStateEvent::RoomName(event) => view.name = event.content.name,
-            AnyStrippedStateEvent::RoomTopic(event) => view.topic = event.content.topic,
+            AnyStrippedStateEvent::RoomTopic(event) => {
+                view.topic_html = event.content.topic_block.text.find_html().map(|html| {
+                    crate::matrix_html::display_html(
+                        event.content.topic.as_deref().unwrap_or_default(),
+                        Some(html),
+                    )
+                });
+                view.topic = event.content.topic;
+            }
             AnyStrippedStateEvent::RoomAvatar(event) => view.avatar_url = event.content.url,
             AnyStrippedStateEvent::RoomCreate(event) => {
                 view.room_kind = RoomKind::from_room_type(event.content.room_type.as_ref());
@@ -276,7 +286,10 @@ mod tests {
             Some(7),
             vec![
                 stripped("m.room.name", r#"{"name":"Lounge"}"#),
-                stripped("m.room.topic", r#"{"topic":"Chat"}"#),
+                stripped(
+                    "m.room.topic",
+                    r#"{"topic":"**Chat**","m.topic":{"m.text":[{"mimetype":"text/html","body":"<strong>Chat</strong>"},{"body":"**Chat**"}]}}"#,
+                ),
                 stripped("m.room.create", r#"{"type":"m.space"}"#),
                 stripped("m.room.join_rules", r#"{"join_rule":"knock"}"#),
             ],
@@ -284,7 +297,19 @@ mod tests {
         );
 
         assert_eq!(preview.name.as_deref(), Some("Lounge"));
-        assert_eq!(preview.topic.as_deref(), Some("Chat"));
+        assert_eq!(preview.topic.as_deref(), Some("**Chat**"));
+        assert_eq!(preview.topic_html.as_deref(), Some("<strong>Chat</strong>"));
+        let hostile = room_preview_from_stripped_state(
+            matrix_sdk::ruma::owned_room_id!("!room:example.org"),
+            RoomStrippedStateVia::Client,
+            None,
+            vec![stripped(
+                "m.room.topic",
+                r#"{"topic":"x","m.topic":{"m.text":[{"mimetype":"text/html","body":"<img src=x onerror=alert(1)>x"}]}}"#,
+            )],
+            None,
+        );
+        assert!(!hostile.topic_html.unwrap_or_default().contains("onerror"));
         assert_eq!(preview.room_kind, Some(RoomKind::Space));
         assert_eq!(preview.join_rule, RoomJoinRuleView::Knock);
         assert_eq!(preview.num_joined_members, Some(7));

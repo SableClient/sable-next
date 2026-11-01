@@ -60,6 +60,7 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomListItemView 
     canonical_alias: null,
     name,
     topic: null,
+    topic_html: null,
     avatar_url: null,
     is_direct: false,
     direct_targets: [],

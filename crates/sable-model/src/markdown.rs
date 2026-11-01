@@ -290,19 +290,14 @@ fn bare_href(address: &str, kind: &LinkKind) -> Option<String> {
     known.then(|| format!("http://{address}"))
 }
 
-/// A topic shows an image as its description and links the bare addresses in its text.
+/// A topic is plain text, so only the bare addresses in it become links.
 fn topic_inlines(nodes: Vec<Inline>) -> Vec<Inline> {
     let mut finder = LinkFinder::new();
     finder.url_must_have_scheme(false);
     let mut out = Vec::with_capacity(nodes.len());
     for node in nodes {
         match node {
-            Inline::Image { alt, marks, .. } => out.push(Inline::Text(alt, marks)),
-            Inline::Text(text, marks)
-                if !marks
-                    .iter()
-                    .any(|mark| matches!(mark, Mark::Link(_) | Mark::Code)) =>
-            {
+            Inline::Text(text, marks) => {
                 for piece in finder.spans(&text) {
                     let href = piece
                         .kind()
@@ -414,11 +409,18 @@ pub fn markdown_to_content(markdown: &str, pills: &[ComposerPill]) -> ComposerCo
 
 #[must_use]
 pub fn topic_to_html(topic: &str) -> String {
-    let linked: Vec<Block<Vec<Inline>>> = parse(&typed_source(&line_feeds(topic)), &[])
-        .into_iter()
-        .map(|block| block.map(&mut topic_inlines))
-        .collect();
-    html::html(&linked, &[], receiver_formats)
+    let mut nodes = Vec::new();
+    for (index, line) in line_feeds(topic).split('\n').enumerate() {
+        if index > 0 {
+            nodes.push(Inline::Break(Vec::new()));
+        }
+        nodes.push(Inline::Text(line.to_owned(), Vec::new()));
+    }
+    html::html(
+        &[Block::Paragraph(topic_inlines(nodes))],
+        &[],
+        receiver_formats,
+    )
 }
 
 #[must_use]
@@ -483,12 +485,13 @@ mod tests {
     }
 
     #[test]
-    fn a_topic_links_addresses_and_drops_images() {
+    fn a_topic_links_addresses_and_keeps_markdown_as_text() {
         assert_eq!(
             topic_to_html("Rules at https://example.org/coc"),
             "Rules at <a href=\"https://example.org/coc\">https://example.org/coc</a>"
         );
-        assert_eq!(topic_to_html("![y](https://example.org/y.png)"), "y");
+        let html = topic_to_html("**bold** _em_ `code`");
+        assert!(!html.contains("<strong>") && !html.contains("<em>") && !html.contains("<code>"));
         assert!(!topic_to_html("[x](javascript:alert(1))").contains("href"));
     }
 

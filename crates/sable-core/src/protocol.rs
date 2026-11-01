@@ -677,6 +677,8 @@ pub struct RoomListItemView {
     pub canonical_alias: Option<String>,
     pub name: Option<String>,
     pub topic: Option<String>,
+    /// The topic's `text/html` representation, sanitised.
+    pub topic_html: Option<String>,
     pub avatar_url: Option<String>,
     pub is_direct: bool,
     #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
@@ -1000,6 +1002,8 @@ pub struct RoomPreviewView {
     pub canonical_alias: Option<OwnedRoomAliasId>,
     pub name: Option<String>,
     pub topic: Option<String>,
+    /// The topic's `text/html` representation, sanitised.
+    pub topic_html: Option<String>,
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
     pub avatar_url: Option<OwnedMxcUri>,
     pub room_kind: Option<RoomKind>,

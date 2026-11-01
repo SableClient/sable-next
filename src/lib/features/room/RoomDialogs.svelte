@@ -48,6 +48,7 @@
   open={topicOpen}
   {roomName}
   topic={topic ?? ''}
+  topicHtml={room?.topic_html ?? null}
   onOpenChange={(open: boolean) => {
     topicOpen = open;
   }}

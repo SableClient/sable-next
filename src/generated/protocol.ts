@@ -1203,6 +1203,8 @@ export type RoomListItemView = {
 	canonical_alias: string | null,
 	name: string | null,
 	topic: string | null,
+	/**  The topic's `text/html` representation, sanitised. */
+	topic_html: string | null,
 	avatar_url: string | null,
 	is_direct: boolean,
 	direct_targets: string[],
@@ -1289,6 +1291,8 @@ export type RoomPreviewView = {
 	canonical_alias: string | null,
 	name: string | null,
 	topic: string | null,
+	/**  The topic's `text/html` representation, sanitised. */
+	topic_html: string | null,
 	avatar_url: string | null,
 	room_kind: RoomKind | null,
 	/**  `null` when the server did not say. */

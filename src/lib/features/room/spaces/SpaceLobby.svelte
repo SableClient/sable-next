@@ -932,7 +932,9 @@
     {/if}
     <div class="topic-full" {@attach scrollHint}>
       <FormattedBody
-        html={topicToHtml((topicRoom ? topicRoom.topic : space?.topic) ?? '')}
+        html={topicRoom
+          ? topicToHtml(topicRoom.topic ?? '')
+          : (space?.topic_html ?? topicToHtml(space?.topic ?? ''))}
         onMatrixLink={openTopicLink}
       />
     </div>

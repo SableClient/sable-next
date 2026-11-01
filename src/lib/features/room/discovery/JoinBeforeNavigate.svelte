@@ -258,7 +258,7 @@
         {/if}
         {#if preview?.topic}
           <div class="join-topic" {@attach scrollHint}>
-            <FormattedBody html={topicToHtml(preview.topic)} />
+            <FormattedBody html={preview.topic_html ?? topicToHtml(preview.topic)} />
           </div>
         {/if}
         {#if failedAction}

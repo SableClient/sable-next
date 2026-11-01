@@ -22,6 +22,7 @@ function room(roomId: string, overrides: Partial<RoomListItemView> = {}): RoomLi
     canonical_alias: null,
     name: roomId,
     topic: null,
+    topic_html: null,
     avatar_url: null,
     is_direct: false,
     direct_targets: [],

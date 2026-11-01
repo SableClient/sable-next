@@ -40,6 +40,7 @@ const room: RoomListItemView = withCounts({
   canonical_alias: null,
   name: 'Example room',
   topic: null,
+  topic_html: null,
   avatar_url: null,
   is_direct: false,
   direct_targets: [],

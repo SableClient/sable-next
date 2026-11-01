@@ -362,7 +362,12 @@ impl Handler for CreateParams {
         let client = core.client().await?;
         let mut request = create_room::v3::Request::new();
         request.name = self.name;
-        request.topic = self.topic;
+        if let Some(topic) = self.topic.as_deref() {
+            request.initial_state.push(
+                InitialStateEvent::with_empty_state_key(super::room_state::topic_content(topic))
+                    .to_raw_any(),
+            );
+        }
         request.invite = self.invite;
         request.room_alias_name = self.alias;
         request.room_version = self.room_version

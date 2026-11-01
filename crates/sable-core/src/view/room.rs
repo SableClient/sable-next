@@ -8,6 +8,7 @@ use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 use matrix_sdk::ruma::events::room::member::MembershipState;
 use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
+use matrix_sdk::ruma::events::room::topic::PossiblyRedactedRoomTopicEventContent;
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::{
     AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
@@ -73,6 +74,7 @@ pub fn room_list_item<S: BuildHasher>(
             .name()
             .or_else(|| item.cached_display_name().map(|name| name.to_string())),
         topic: item.topic(),
+        topic_html: item.topic_content().as_ref().and_then(topic_html),
         avatar_url: info.map_or_else(
             || item.avatar_url().map(|url| url.to_string()),
             |info| info.avatar_url.clone(),
@@ -467,6 +469,14 @@ fn room_tags(room: &Room) -> Vec<RoomTag> {
         tags.push(RoomTag::Favourite);
     }
     tags
+}
+
+fn topic_html(content: &PossiblyRedactedRoomTopicEventContent) -> Option<String> {
+    let html = content.topic_block.text.find_html()?;
+    Some(crate::matrix_html::display_html(
+        content.topic.as_deref().unwrap_or_default(),
+        Some(html),
+    ))
 }
 
 #[cfg(test)]
