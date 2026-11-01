@@ -29,9 +29,10 @@ interface Options<T> {
   onInteraction?: () => void;
   isAnchor?: (value: T) => boolean;
   estimateSize?: (value: T) => number | undefined;
+  sizes?: Map<string, Measured>;
 }
 
-interface Measured {
+export interface Measured {
   height: number;
   bucket: string;
 }
@@ -69,6 +70,20 @@ const PAGE = 40;
 const BUCKET_STEP = 40;
 const QUIET_MS = 150;
 const EPSILON = 0.5;
+const SIZE_SCOPES = 20;
+
+const scopedSizes = new Map<string, Map<string, Measured>>();
+
+export function timelineSizes(scope: string): Map<string, Measured> {
+  const sizes = scopedSizes.get(scope) ?? new Map<string, Measured>();
+  scopedSizes.delete(scope);
+  scopedSizes.set(scope, sizes);
+  for (const oldest of scopedSizes.keys()) {
+    if (scopedSizes.size <= SIZE_SCOPES) break;
+    scopedSizes.delete(oldest);
+  }
+  return sizes;
+}
 
 export class TimelineWindow<T> {
   private items: readonly TimelineEntry<T>[] = [];
@@ -87,7 +102,7 @@ export class TimelineWindow<T> {
   private disposed = false;
   private height = 0;
   private top = 0;
-  private readonly sizes = new Map<string, Measured>();
+  private readonly sizes: Map<string, Measured>;
   private readonly buckets = new Map<string, BucketSizes>();
   private rowBuckets = new Map<string, string>();
   private sizeTotal = 0;
@@ -108,6 +123,11 @@ export class TimelineWindow<T> {
 
   constructor(private readonly options: Options<T>) {
     this.pinned = options.canFollowLatest?.() ?? true;
+    this.sizes = options.sizes ?? new Map<string, Measured>();
+    for (const { height, bucket } of this.sizes.values()) {
+      this.sizeTotal += height;
+      this.countBucket(bucket, height);
+    }
     const { viewport, canvas, content } = options;
     canvas.style.position = 'relative';
     content.style.position = 'absolute';
@@ -353,9 +373,10 @@ export class TimelineWindow<T> {
         this.countBucket(size.bucket, -size.height);
       }
       if (this.pinned || !this.ready || (first < 0 && anchorIndex === undefined)) {
-        const latest = Math.max(0, next.length - PAGE * 2);
         this.start =
-          this.pinned && this.ready && first === this.start ? Math.max(latest, first) : latest;
+          this.pinned && this.ready && first === this.start
+            ? Math.max(next.length - PAGE * 2, first)
+            : this.latestStart();
         this.end = next.length;
       } else {
         this.start = Math.max(0, anchorIndex !== undefined ? anchorIndex - PAGE : first);
@@ -376,12 +397,36 @@ export class TimelineWindow<T> {
     }
   }
 
+  private latestStart(): number {
+    const budget = this.options.viewport.clientHeight * 2;
+    const items = this.items;
+    const floor = Math.max(0, items.length - PAGE * 2);
+    if (budget <= 0) return floor;
+    let index = items.length;
+    let height = 0;
+    while (index > floor && (height < budget || items.length - index < PAGE / 2)) {
+      index -= 1;
+      height += this.sizeOf(items[index]);
+    }
+    return index;
+  }
+
+  private sizeOf(entry: TimelineEntry<T>): number {
+    return (
+      this.sizes.get(entry.key)?.height ??
+      this.estimatedSize(this.bucketOf(entry.value), this.options.estimateSize?.(entry.value))
+    );
+  }
+
   private async renderRange(start: number, end: number): Promise<void> {
     this.start = start;
     this.end = end;
-    this.rows = this.items
-      .slice(start, end)
-      .map((entry, index) => ({ ...entry, index: start + index }));
+    const previous = new Map(this.rows.map((row) => [row.key, row]));
+    this.rows = this.items.slice(start, end).map((entry, offset) => {
+      const index = start + offset;
+      const row = previous.get(entry.key);
+      return row?.value === entry.value && row.index === index ? row : { ...entry, index };
+    });
     this.rowBuckets = new Map(this.rows.map((row) => [row.key, this.bucketOf(row.value)]));
     this.rendering = true;
     try {
@@ -737,10 +782,7 @@ export class TimelineWindow<T> {
       let index = 0;
       const offset = this.options.viewport.scrollTop;
       while (index < this.items.length - 1) {
-        const entry = this.items[index];
-        const size =
-          this.sizes.get(entry.key)?.height ??
-          this.estimatedSize(this.bucketOf(entry.value), this.options.estimateSize?.(entry.value));
+        const size = this.sizeOf(this.items[index]);
         if (top + size > offset) break;
         top += size;
         index++;

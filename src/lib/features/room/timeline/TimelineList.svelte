@@ -21,6 +21,7 @@
   import { MOTION_MS, motionMs, shouldReduceMotion } from '#lib/ui/motion.js';
   import {
     TimelineWindow,
+    timelineSizes,
     type TimelineEntry,
     type TimelineRow,
     type TimelineWindowState,
@@ -244,17 +245,38 @@
         ? allItems.filter((item) => item.content.kind !== 'read_marker')
         : allItems
   );
+  function sameRow(next: RowValue, previous: RowValue): boolean {
+    const sameItem =
+      next.item === previous.item ||
+      (next.item.event_id === null &&
+        next.item.id === previous.item.id &&
+        next.item.timestamp === previous.item.timestamp);
+    const sameGroup =
+      next.group === previous.group ||
+      (next.group !== null &&
+        previous.group !== null &&
+        next.group.length === previous.group.length &&
+        next.group.every((member, index) => member === previous.group?.[index]));
+    return (
+      sameItem &&
+      sameGroup &&
+      next.collapsed === previous.collapsed &&
+      next.groupStart === previous.groupStart &&
+      next.unreadCount === previous.unreadCount
+    );
+  }
+  let previousEntries = new Map<string, TimelineEntry<RowValue>>();
   let entries = $derived.by((): readonly TimelineEntry<RowValue>[] => {
     identity.reconcile(visibleItems);
     const units = groupMemberEvents(visibleItems);
     const unitItems = units.map((unit) => unit.item);
-    return units.map(({ item, index: source, group }, index) => {
+    const next = units.map(({ item, index: source, group }, index) => {
       const collapsed =
         !(
           threadRootId &&
           (item.event_id === threadRootId || unitItems[index - 1]?.event_id === threadRootId)
         ) && isCollapsed(unitItems, index, preferences.replyPreviewStyle);
-      return {
+      const entry = {
         key: identity.key(visibleItems, source),
         value: {
           item,
@@ -265,7 +287,11 @@
             item.content.kind === 'read_marker' ? unreadCountAfter(visibleItems, source) : 0,
         },
       };
+      const previous = previousEntries.get(entry.key);
+      return previous && sameRow(entry.value, previous.value) ? previous : entry;
     });
+    previousEntries = new Map(next.map((entry) => [entry.key, entry]));
+    return next;
   });
   let events = $derived(new TimelineEventIndex(timeline.items, timeline.aggregations));
   function holdsEvent({ item, group }: RowValue, eventId: string | null): boolean {
@@ -530,6 +556,9 @@
       },
       isAnchor: ({ item }) => item.event_id !== null,
       estimateSize: ({ item }) => estimateRowSize(item.content, mediaColumn),
+      sizes: readRoomId
+        ? timelineSizes(`${readRoomId}:${untrack(() => threadRootId) ?? ''}`)
+        : undefined,
       canFollowLatest: () => untrack(() => timeline.reachesLatest),
     });
     controller = engine;
