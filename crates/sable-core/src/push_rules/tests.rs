@@ -1,6 +1,6 @@
 use matrix_sdk::ruma::push::{
-    ConditionalPushRule, NewPushRule, PredefinedOverrideRuleId, PredefinedUnderrideRuleId,
-    RuleKind, Ruleset,
+    ConditionalPushRule, NewConditionalPushRule, NewPushRule, PredefinedOverrideRuleId,
+    PredefinedUnderrideRuleId, RuleKind, Ruleset,
 };
 use matrix_sdk::ruma::{RoomId, room_id, user_id};
 use serde_json::json;
@@ -10,7 +10,7 @@ use super::{
     RuleWrite, default_modes, event_notifications, event_notifies, keywords, level_actions,
     master_muted, mention_notifications, plan_add_keyword, plan_alignment, plan_default_mode,
     plan_event, plan_keyword_mode, plan_master, plan_mention, plan_remove_keyword, plan_room_mode,
-    plan_room_shapes, pushes_every_encrypted_event, room_mode, rule_notifies,
+    pushes_every_encrypted_event, room_mode, rule_notifies,
 };
 use crate::protocol::{
     EventNotificationView, MentionNotificationModeView, MentionRuleView, NotificationModeView,
@@ -334,25 +334,6 @@ async fn a_room_set_to_all_messages_ignores_room_changes_but_not_messages() {
     assert!(plan_alignment(&rules).is_empty());
 }
 
-async fn notifies_in(rules: &Ruleset, room: &RoomId, members: u8) -> bool {
-    use matrix_sdk::ruma::push::PushConditionRoomCtx;
-    use matrix_sdk::ruma::serde::Raw;
-
-    let context = PushConditionRoomCtx::new(
-        room.to_owned(),
-        members.into(),
-        me().to_owned(),
-        "me".to_owned(),
-    );
-    let event = Raw::new(&json!({
-        "type": "m.room.message", "event_id": "$e", "room_id": room,
-        "sender": "@them:example.org", "origin_server_ts": 0,
-        "content": {"msgtype": "m.text", "body": "hi"},
-    }))
-    .unwrap();
-    super::notifies(rules.get_actions(&event, &context).await)
-}
-
 async fn rings_in(rules: &Ruleset, room: &RoomId, members: u8) -> bool {
     use matrix_sdk::ruma::power_levels::NotificationPowerLevels;
     use matrix_sdk::ruma::push::{PushConditionPowerLevelsCtx, PushConditionRoomCtx};
@@ -433,88 +414,31 @@ async fn a_room_muted_before_the_ring_rule_existed_stays_muted() {
     assert!(rings_in(&rules, room_id!("!other:example.org"), 2).await);
 }
 
-fn mentions_for_direct_only() -> Ruleset {
+#[test]
+fn per_room_direct_copies_are_removed() {
     let defaults = Ruleset::server_default(me());
-    let rules = applied(defaults.clone(), plan_alignment(&defaults));
-    applied(
-        rules.clone(),
-        plan_default_mode(&rules, true, NotificationModeView::Mentions).unwrap(),
-    )
-}
+    let mut rules = applied(defaults.clone(), plan_alignment(&defaults));
+    rules
+        .insert(
+            NewPushRule::Underride(NewConditionalPushRule::new(
+                "moe.sable.shape.message.!pair:example.org".to_owned(),
+                vec![],
+                vec![],
+            )),
+            None,
+            None,
+        )
+        .unwrap();
 
-#[tokio::test]
-async fn a_flagged_room_with_three_members_follows_the_direct_default() {
-    let room = room_id!("!bridged:example.org");
-    let rules = mentions_for_direct_only();
-    assert!(notifies_in(&rules, room, 3).await);
+    let cleaned = applied(rules.clone(), plan_alignment(&rules));
 
-    let shaped = applied(
-        rules.clone(),
-        plan_room_shapes(&rules, &[(room.to_owned(), true)]),
-    );
-
-    assert!(!notifies_in(&shaped, room, 3).await);
-    assert!(notifies_in(&shaped, room_id!("!other:example.org"), 3).await);
-    assert!(plan_room_shapes(&shaped, &[(room.to_owned(), true)]).is_empty());
-}
-
-#[tokio::test]
-async fn an_unflagged_pair_follows_the_group_default() {
-    let room = room_id!("!pair:example.org");
-    let rules = mentions_for_direct_only();
-    assert!(!notifies_in(&rules, room, 2).await);
-
-    let shaped = applied(
-        rules.clone(),
-        plan_room_shapes(&rules, &[(room.to_owned(), false)]),
-    );
-
-    assert!(notifies_in(&shaped, room, 2).await);
-}
-
-#[tokio::test]
-async fn room_copies_follow_the_default_and_go_with_the_room() {
-    let room = room_id!("!bridged:example.org");
-    let rules = mentions_for_direct_only();
-    let shaped = applied(
-        rules.clone(),
-        plan_room_shapes(&rules, &[(room.to_owned(), true)]),
-    );
-
-    let louder = applied(
-        shaped.clone(),
-        plan_default_mode(&shaped, true, NotificationModeView::All).unwrap(),
-    );
-    let followed = applied(
-        louder.clone(),
-        plan_room_shapes(&louder, &[(room.to_owned(), true)]),
-    );
-    assert!(notifies_in(&followed, room, 3).await);
-
-    let gone = applied(followed.clone(), plan_room_shapes(&followed, &[]));
     assert!(
-        gone.underride
+        cleaned
+            .underride
             .iter()
-            .all(|rule| !rule.rule_id.starts_with(super::alignment::SHAPE_PREFIX))
+            .all(|rule| !rule.rule_id.starts_with("moe.sable.shape."))
     );
-}
-
-#[tokio::test]
-async fn a_room_mode_survives_and_keeps_the_room_copies() {
-    let room = room_id!("!bridged:example.org");
-    let rules = mentions_for_direct_only();
-    let shaped = applied(
-        rules.clone(),
-        plan_room_shapes(&rules, &[(room.to_owned(), true)]),
-    );
-
-    let chosen = applied(
-        shaped.clone(),
-        plan_room_mode(&shaped, room, true, Some(NotificationModeView::All)),
-    );
-
-    assert!(notifies_in(&chosen, room, 3).await);
-    assert!(plan_room_shapes(&chosen, &[(room.to_owned(), true)]).is_empty());
+    assert!(plan_alignment(&cleaned).is_empty());
 }
 
 #[test]

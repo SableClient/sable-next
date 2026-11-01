@@ -162,13 +162,6 @@ impl Core {
                         == generation
                     {
                         let event_type = event.event_type().to_string();
-                        if matches!(event, AnyGlobalAccountDataEvent::Direct(_)) {
-                            let aligning = core.clone();
-                            core.track_session_task(
-                                spawn(async move { aligning.align_notification_rules().await })
-                                    .abort_on_drop(),
-                            );
-                        }
                         core.remember_account_data_type(event_type.clone()).await;
                         if crate::personas::is_persona_event(&event_type) {
                             core.emit(CoreEvent::PersonasChanged);

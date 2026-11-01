@@ -16,8 +16,8 @@ mod categories;
 mod keywords;
 mod store;
 
-use alignment::{SHAPE_PREFIX, STICKER, STICKER_DIRECT};
-pub use alignment::{plan_alignment, plan_room_shapes};
+pub use alignment::plan_alignment;
+use alignment::{STICKER, STICKER_DIRECT};
 use categories::{event_actions, event_notifies};
 pub use categories::{
     event_notifications, master_muted, mention_notifications, plan_event, plan_master,
@@ -281,11 +281,7 @@ pub fn plan_room_mode(
         rules
             .underride
             .iter()
-            .filter(|rule| {
-                !rule.default
-                    && !rule.rule_id.starts_with(SHAPE_PREFIX)
-                    && targets_room(&rule.conditions, room_id)
-            })
+            .filter(|rule| !rule.default && targets_room(&rule.conditions, room_id))
             .map(|rule| (RuleKind::Underride, rule.rule_id.clone())),
     );
     let mut seen = std::collections::HashSet::new();

@@ -277,27 +277,12 @@ impl Core {
     }
 
     pub(crate) async fn align_notification_rules(&self) {
-        let (Ok(client), Ok(rules)) = (self.client().await, self.push_rules().await) else {
+        let Ok(rules) = self.push_rules().await else {
             return;
         };
         let writes = crate::push_rules::plan_alignment(&rules.snapshot().await);
         if let Err(error) = rules.apply(writes).await {
             tracing::warn!("could not align notification rules: {error}");
-            return;
-        }
-        let shaped: Vec<_> = client
-            .joined_rooms()
-            .iter()
-            .filter_map(|room| {
-                let direct = crate::notifications::uses_direct_push_rules(room);
-                let joined = room.joined_members_count();
-                ((direct && joined > 2) || (!direct && joined == 2))
-                    .then(|| (room.room_id().to_owned(), direct))
-            })
-            .collect();
-        let writes = crate::push_rules::plan_room_shapes(&rules.snapshot().await, &shaped);
-        if let Err(error) = rules.apply(writes).await {
-            tracing::warn!("could not align notification rules to the direct chats: {error}");
         }
     }
 

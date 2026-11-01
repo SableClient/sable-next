@@ -1,4 +1,3 @@
-use matrix_sdk::ruma::OwnedRoomId;
 use matrix_sdk::ruma::push::{
     EventMatchConditionData, EventPropertyIsConditionData, NewConditionalPushRule, NewPushRule,
     PredefinedOverrideRuleId, PushCondition, RoomMemberCountConditionData, RuleKind, Ruleset,
@@ -7,11 +6,12 @@ use matrix_sdk::ruma::push::{
 
 use super::{
     RuleWrite, encrypted_rule, event_actions, event_notifies, message_rule, notifies,
-    rule_notifies, sound, spec_actions,
+    rule_notifies, spec_actions,
 };
 use crate::protocol::EventNotificationView;
 
-pub(super) const SHAPE_PREFIX: &str = "moe.sable.shape.";
+/// Per-room DM copies written by older versions, removed on alignment.
+const SHAPE_PREFIX: &str = "moe.sable.shape.";
 pub(super) const STICKER: &str = "moe.sable.sticker";
 pub(super) const STICKER_DIRECT: &str = "moe.sable.sticker_one_to_one";
 pub(super) const RING_ONE_TO_ONE: &str = "moe.sable.ring_one_to_one";
@@ -119,92 +119,11 @@ pub fn plan_alignment(rules: &Ruleset) -> Vec<RuleWrite> {
             None,
         )
     }));
-    writes
-}
-/// direct flag disagrees gets its own copies of the rules of the kind it is flagged as.
-/// `rooms` holds those rooms with their flag; every other room's copies are removed.
-#[must_use]
-pub fn plan_room_shapes(rules: &Ruleset, rooms: &[(OwnedRoomId, bool)]) -> Vec<RuleWrite> {
-    let kinds = [
-        (
-            "message",
-            ".m.rule.room_one_to_one",
-            ".m.rule.message",
-            "m.room.message",
-        ),
-        (
-            "encrypted",
-            ".m.rule.encrypted_room_one_to_one",
-            ".m.rule.encrypted",
-            "m.room.encrypted",
-        ),
-        ("sticker", STICKER_DIRECT, STICKER, "m.sticker"),
-    ];
-    let mut wanted = std::collections::BTreeMap::new();
-    for (room_id, direct) in rooms {
-        for (kind, one_to_one, group, event_type) in kinds {
-            let Some(source) = rules.get(
-                RuleKind::Underride,
-                if *direct { one_to_one } else { group },
-            ) else {
-                continue;
-            };
-            let actions = if rule_notifies(source) {
-                source.actions().to_vec()
-            } else {
-                vec![]
-            };
-            wanted.insert(
-                format!("{SHAPE_PREFIX}{kind}.{room_id}"),
-                (room_id, event_type, actions),
-            );
-        }
-    }
-
-    let mut writes = Vec::new();
-    for (rule_id, (room_id, event_type, actions)) in &wanted {
-        match rules.underride.iter().find(|rule| rule.rule_id == *rule_id) {
-            Some(rule)
-                if rule.enabled
-                    && notifies(&rule.actions) == notifies(actions)
-                    && sound(&rule.actions) == sound(actions) => {}
-            Some(_) => writes.extend([
-                RuleWrite::Actions {
-                    kind: RuleKind::Underride,
-                    rule_id: rule_id.clone(),
-                    actions: actions.clone(),
-                },
-                RuleWrite::Enabled {
-                    kind: RuleKind::Underride,
-                    rule_id: rule_id.clone(),
-                    enabled: true,
-                },
-            ]),
-            None => writes.push(RuleWrite::Put(NewPushRule::Underride(
-                NewConditionalPushRule::new(
-                    rule_id.clone(),
-                    vec![
-                        PushCondition::EventMatch(EventMatchConditionData::new(
-                            "room_id".to_owned(),
-                            room_id.to_string(),
-                        )),
-                        PushCondition::EventMatch(EventMatchConditionData::new(
-                            "type".to_owned(),
-                            (*event_type).to_owned(),
-                        )),
-                    ],
-                    actions.clone(),
-                ),
-            ))),
-        }
-    }
     writes.extend(
         rules
             .underride
             .iter()
-            .filter(|rule| {
-                rule.rule_id.starts_with(SHAPE_PREFIX) && !wanted.contains_key(&rule.rule_id)
-            })
+            .filter(|rule| rule.rule_id.starts_with(SHAPE_PREFIX))
             .map(|rule| RuleWrite::Delete {
                 kind: RuleKind::Underride,
                 rule_id: rule.rule_id.clone(),

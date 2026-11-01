@@ -750,7 +750,7 @@ async fn a_missing_rule_on_delete_is_not_a_failure() {
 }
 
 #[tokio::test]
-async fn a_bridged_dm_uses_the_direct_defaults() {
+async fn a_bridged_dm_uses_the_group_defaults_like_the_server() {
     use std::collections::BTreeSet;
 
     let server = MatrixMockServer::new().await;
@@ -787,11 +787,11 @@ async fn a_bridged_dm_uses_the_direct_defaults() {
         .await;
     let room = client.get_room(room_id).unwrap();
 
-    assert!(notifications::uses_direct_push_rules(&room));
+    assert!(!notifications::uses_direct_push_rules(&room));
 }
 
 #[tokio::test]
-async fn a_two_member_room_not_marked_direct_uses_the_group_defaults() {
+async fn a_two_member_room_not_marked_direct_uses_the_direct_defaults() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!pair:example.org");
@@ -803,71 +803,7 @@ async fn a_two_member_room_not_marked_direct_uses_the_group_defaults() {
         .await;
     let room = client.get_room(room_id).unwrap();
 
-    assert!(!notifications::uses_direct_push_rules(&room));
-}
-
-#[tokio::test]
-async fn rooms_whose_flag_disagrees_with_their_member_count_get_their_own_rules() {
-    let server = MatrixMockServer::new().await;
-    let client = server.client_builder().build().await;
-    let flagged = room_id!("!flagged:example.org");
-    let pair = room_id!("!pair:example.org");
-    let factory = EventFactory::new().room(flagged);
-    let rules = matrix_sdk::ruma::push::Ruleset::server_default(client.user_id().unwrap());
-    for verb in ["PUT", "DELETE"] {
-        Mock::given(method(verb))
-            .and(path_regex(r"/_matrix/client/v3/pushrules/global/.*"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
-            .mount(server.server())
-            .await;
-    }
-    server
-        .mock_sync()
-        .ok_and_run(&client, |builder| {
-            builder.add_global_account_data(factory.push_rules(rules));
-            builder.add_global_account_data(factory.direct().add_user(User::Alice, flagged));
-            builder.add_joined_room(JoinedRoomBuilder::new(flagged).set_joined_members_count(3));
-            builder.add_joined_room(JoinedRoomBuilder::new(pair).set_joined_members_count(2));
-        })
-        .await;
-    let (core, _events) = watching(&server, &client).await;
-    let shaped = |mut ids: Vec<String>| {
-        ids.retain(|id| id.starts_with("moe.sable.shape.message."));
-        ids.sort();
-        ids
-    };
-    let rule_ids = || async {
-        core.push_rules()
-            .await
-            .unwrap()
-            .snapshot()
-            .await
-            .underride
-            .iter()
-            .map(|rule| rule.rule_id.clone())
-            .collect::<Vec<_>>()
-    };
-
-    core.align_notification_rules().await;
-    assert_eq!(
-        shaped(rule_ids().await),
-        [
-            format!("moe.sable.shape.message.{flagged}"),
-            format!("moe.sable.shape.message.{pair}"),
-        ]
-    );
-
-    server
-        .mock_sync()
-        .ok_and_run(&client, |builder| {
-            builder.add_global_account_data(factory.direct());
-        })
-        .await;
-    core.align_notification_rules().await;
-    assert_eq!(
-        shaped(rule_ids().await),
-        [format!("moe.sable.shape.message.{pair}")]
-    );
+    assert!(notifications::uses_direct_push_rules(&room));
 }
 
 #[tokio::test]
