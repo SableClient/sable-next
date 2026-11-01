@@ -704,7 +704,7 @@ impl Core {
             .send(request)
             .with_request_config(RequestConfig::short_retry())
             .await
-            .or_failed(self, "space_hierarchy")?;
+            .map_err(|error| self.room_error("space_hierarchy", error.into()))?;
 
         // Ordering lives on each parent's `m.space.child` edges, so the chunks
         // are passed through unsorted.

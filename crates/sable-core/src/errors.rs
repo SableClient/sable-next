@@ -185,7 +185,10 @@ impl Core {
     }
 
     pub(crate) fn profile_error(&self, error: matrix_sdk::Error) -> RpcError {
-        if error.client_api_error_kind() == Some(&ErrorKind::NotFound) {
+        if error
+            .as_client_api_error()
+            .is_some_and(|api_error| api_error.status_code.as_u16() == 404)
+        {
             tracing::debug!(context = "user_profile", "the user has no profile");
             return RpcError::Unavailable;
         }

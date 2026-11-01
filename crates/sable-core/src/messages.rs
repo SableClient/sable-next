@@ -738,7 +738,7 @@ impl Core {
             .await?
             .event(event_id, None)
             .await
-            .or_failed(self, "event_source")?;
+            .map_err(|error| self.room_error("event_source", error))?;
 
         let encrypted = event.encryption_info().is_some();
         let original = if encrypted && include_original {

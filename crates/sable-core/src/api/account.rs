@@ -618,7 +618,7 @@ impl Handler for SetPresenceParams {
         client
             .set_presence(presence::state(self.presence), self.status_message, true)
             .await
-            .or_failed(core, "set_presence")?;
+            .map_err(|error| core.room_error("set_presence", error))?;
 
         if let Some(user_id) = client.user_id() {
             core.fetch_presence(vec![user_id.to_owned()]).await;

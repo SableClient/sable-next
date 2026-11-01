@@ -98,6 +98,14 @@ describe('isReportableCoreWarning', () => {
 });
 
 describe('isExpectedCoreFailure', () => {
+  test('recognizes a latest event update for a room the client dropped', () => {
+    expect(
+      isExpectedCoreFailure(
+        'ERROR matrix_sdk::latest_events::room_latest_events: Room is unknown room=WeakRoom { client: WeakClient { client: (Weak) }, room_id: "!a:b.org" }'
+      )
+    ).toBe(true);
+  });
+
   test('recognizes a sync request that never reached the server', () => {
     expect(
       isExpectedCoreFailure(
@@ -116,6 +124,7 @@ describe('isExpectedCoreFailure', () => {
   test('recognizes native connection failures, rate limits and unavailable servers', () => {
     for (const line of [
       'ERROR sable_core::errors: error sending request for url (https://hs.example/_matrix/client/v3/room_keys/version) log_id="e3"',
+      'ERROR sable_core::errors: error sending request log_id="e1" context="sealed_account_data"',
       'ERROR sync: Http( Reqwest( reqwest::Error { kind: Request, source: hyper_util::client::legacy::Error(Connect, ConnectError("tcp connect error", 1.2.3.4:443)) } ) )',
       'ERROR sync: MatrixError( Error { status_code: 429, body: Standard( StandardErrorBody { kind: Unknown } ) } )',
       'ERROR sable_core::errors: the server returned an error: [503] <non-json bytes> log_id="e1" context="room_members"',

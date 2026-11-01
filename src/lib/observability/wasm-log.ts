@@ -32,7 +32,7 @@ export function isReportableCoreWarning(line: string): boolean {
 }
 
 const UNREACHABLE =
-  /Failed to fetch|Load failed|NetworkError|error sending request for url|tcp connect error|dns error|connection (?:refused|reset|closed)|operation timed out/i;
+  /Failed to fetch|Load failed|NetworkError|error sending request\b|tcp connect error|dns error|connection (?:refused|reset|closed)|operation timed out/i;
 const SERVER_UNAVAILABLE = /status_code:\s*(?:429|5\d\d)\b|returned an error: \[(?:429|5\d\d)\b/;
 
 export function isExpectedCoreFailure(line: string): boolean {
@@ -42,7 +42,8 @@ export function isExpectedCoreFailure(line: string): boolean {
     /invalid_grant|refresh token was rejected/.test(line) ||
     line.includes('Failed to return /publicRooms') ||
     line.includes('The store is closed') ||
-    line.includes('the signed one-time key was missing')
+    line.includes('the signed one-time key was missing') ||
+    line.includes('room_latest_events: Room is unknown')
   );
 }
 
