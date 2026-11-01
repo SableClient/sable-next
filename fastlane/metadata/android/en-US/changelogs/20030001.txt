@@ -1,0 +1,2 @@
+- Add a Push rules section to the developer settings to turn rules on or off, edit their actions and delete custom ones. The account data editor now shows `m.push_rules` as read-only, since the homeserver manages it.
+- Pick your own ntfy server for the built-in Android notification connection in Settings → Notifications.

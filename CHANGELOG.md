@@ -1,5 +1,84 @@
 # Sable Changelog
 
+## 2.3.0 (2026-11-01)
+
+### Features
+
+* Add a Push rules section to the developer settings to turn rules on or off, edit their actions and delete custom ones. The account data editor now shows `m.push_rules` as read-only, since the homeserver manages it.
+* Pick your own ntfy server for the built-in Android notification connection in Settings → Notifications.
+* Encrypt the local message and key stores with a key from the system keyring. Existing stores are encrypted on the first start without signing in again, and the room list is fetched again once. Notification previews show a generic alert until the app has been opened after the update.
+* Send spoilered images and videos as part of a gallery instead of splitting them into separate messages.
+* The Linux desktop app can be installed with Nix from the flake as `sable-desktop`.
+* Send and show rich room topics (MSC3765). Plain topics are no longer read as markdown (#1398).
+* Seal saved logins with a key kept in the system keyring, the Android Keystore or the iOS Keychain. On a desktop without a usable keyring, such as Linux with no Secret Service, the key is kept in a file only you can read instead.
+* Search finds messages with small typos, so searching delegate also finds deligate (#1420).
+* On desktop, themes and tweaks imported from a file reload when the file changes (#1440).
+* Accept ISO 8601 dates in `$[unixtime …]`, like `$[unixtime 2026-11-01T14:30+01:00]` (#1070).
+
+### Fixes
+
+* Settings › About shows the folder the desktop app keeps its data in (#1302).
+* Add a setting to show the time on every message, including grouped ones (#1434).
+* Fix linking a new device from Android failing while the approval page is open.
+* Keep the tall composer layout while the Android keyboard is open (#1460).
+* Keep saving images on Android once many share the same name (#1441).
+* Shared audio files have a volume control that remembers its level (#1432).
+* Say that you are banned, with the reason given, when joining a room you were banned from (#1458).
+* Stop embedding a bridged video or image a second time from the link in its caption.
+* Stop the app from freezing when rejoining a call with incoming voice isolation on, and play a voice at its own volume when its audio element was last used for a screen share.
+* Fix someone in a call staying silent until you rejoin.
+* End the call when you sign out or switch accounts, close the screen sound picker when a call ends, and stop device errors from a finished call showing up afterwards.
+* Close the open chat from the room menu or with Alt+W (#1433).
+* The Replaced rooms list in the sidebar can be collapsed (#1281).
+* Desktop sign-in opens your browser and returns to Sable through a local loopback redirect, so SSO no longer lands in another app or a second Sable window (#1312).
+* Add open at sign-in, start hidden, native unread badges, taskbar flashing and zoom shortcuts to the desktop app.
+* Stop the draft sync setting from claiming drafts are always unencrypted (#1486).
+* Stop writing per-room push rules for direct chats and remove the ones already on the account, so notifications follow the standard two-member rule like other Matrix clients.
+* Keep Linux screen share audio out of the mic when EasyEffects is running (#1447).
+* Fix screen share audio and device lists hanging in the Linux Flatpak when camera access was denied (#1491).
+* Show a forum topic's title at the top of the topic instead of its first message (#1476).
+* Default screen sharing to H.264 and enable hardware video encoding and decoding in the desktop app.
+* Open Home on launch when it is enabled in the sidebar (#1488).
+* Add a Threads filter to the inbox, mark thread replies, and count a reply as read once you read its thread (#1451).
+* Play the notification sound on iOS for messages that ask for one (#1443).
+* Fix joining big spaces by alias failing with a URL too long error.
+* Click the message shown above the composer while replying or editing to jump back to it (#1246).
+* Keep GIF thumbnails on video link previews still when GIF autoplay is off (#1493).
+* Include core log lines and event details in debug log exports from the Android and iOS apps, and send Android core logs to logcat.
+* Keep the encryption store out of Android and iOS backups, as restoring one broke decryption. You now sign in again after a restore.
+* Bind numpad keys separately from the main keyboard row (#1426).
+* Keep the Apply bar of your own emoji packs in view while you edit them (#1464).
+* The profile picker shows your account name and avatar instead of "No profile" (#1116).
+* Keep the persona name, pronouns and account name from leaving a gap or running into the timestamp on narrow screens (#1461, #1462).
+* Settings › Per-message profiles can be searched (#1487).
+* Add direct messages to spaces privately. Only you see the link, no space admin rights are needed, and the chat uses the space's emoji and abbreviations (#1384).
+* Disable the profile change propagation setting on homeservers without MSC4466, which apply name and avatar changes to every room (#1425).
+* Open device approval on Android as a sheet over Sable, so it closes on its own once the new device is linked.
+* Fix the login screen staying up after signing in with a QR code.
+* Drop the automatic migration from Sable v1, so v1 accounts now sign in again.
+* Make the FOSS Android APK reproducible again.
+* The forward and add-existing-room dialogs show each room's published address, so rooms with the same name can be told apart (#1287).
+* Choose whether a room loads media for you from its appearance settings, synced with other clients through MSC4278 (#1346).
+* Seal the saved web session with a browser key that page scripts cannot export. The browser keeps that key in its profile, so the web app still relies on the device being protected. Safari cannot keep such a key in the background worker, so there the session stays unsealed.
+* Keep keys in files instead of the system keyring with `--password-store=basic` or `SABLE_SECRET_STORE=files`. Logins saved in the keyring need signing in again.
+* Stop hidden pronoun pills from cutting a few pixels off a sender name that just fits.
+* Stop a sent message from coming back as a draft when the app is closed right after sending (#638).
+* List new settings and changed defaults on the home page (#1478).
+* Keep the short composer on one row on narrow phones until the text wraps.
+* Show unjoined subspaces in the space lobby so they can be joined (#1211).
+* Publish a GPG-signed `SHA256SUMS` file with every release.
+* Add a setting to hide the count on reactions only one person sent (#1471).
+* Add a setting to open the member list when swiping left on a message, as in Sable 1 (#1437).
+* Load the original image when a thumbnail would not help or the homeserver cannot serve one, so images stop failing on servers without thumbnails.
+* Keep tooltips, menus and popovers from opening behind the custom title bar.
+* Device verification opens the camera only when you choose to scan (#1356).
+* Use a reverse-domain Wayland app id on Linux, `moe.sable.client` and `moe.sable.next.electron.Nightly` for nightly (#1453). Launchers pinned to the old entry need pinning again.
+* Fix the desktop app looking overbright on SDR monitors on Windows when an HDR monitor is connected (#1367).
+
+* Account settings layout adjustment
+
+* Emoteboard custom emotes layout adjustment
+
 ## 2.2.3 (2026-10-30)
 
 ### Fixes
