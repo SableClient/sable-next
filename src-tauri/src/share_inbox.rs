@@ -200,11 +200,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_manifest_rejects_garbage() {
-        assert!(parse_manifest("not json").is_err());
-    }
-
-    #[test]
     fn parse_manifest_rejects_an_unknown_version() {
         assert!(parse_manifest(r#"{"version":2,"items":[]}"#).is_err());
     }

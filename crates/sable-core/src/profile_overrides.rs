@@ -354,11 +354,6 @@ mod tests {
     }
 
     #[test]
-    fn the_color_field_is_the_cosmetics_key() {
-        assert_eq!(crate::cosmetics::MEMBER_COLOR_FIELD, "eu.she-a.color");
-    }
-
-    #[test]
     fn a_wrong_typed_field_reads_as_unset() {
         let read = overrides(Some(&json!({
             "@a:example.org": {

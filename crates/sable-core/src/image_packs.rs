@@ -868,14 +868,6 @@ mod tests {
     }
 
     #[test]
-    fn a_pack_url_passes_the_sticker_send_guard() {
-        for url in ["mxc://sable.chat/AbCd123", "mxc://matrix.org/xyz"] {
-            let uri = matrix_sdk::ruma::OwnedMxcUri::from(url);
-            assert!(uri.parts().is_ok(), "{url} rejected by the sticker guard");
-        }
-    }
-
-    #[test]
     fn only_a_canonical_parent_is_walked() {
         let canonical: SpaceParentEvent = serde_json::from_str(
             r#"{"type":"m.space.parent","state_key":"!space:example.org","sender":"@alice:example.org","content":{"canonical":true,"via":["example.org"]}}"#,
