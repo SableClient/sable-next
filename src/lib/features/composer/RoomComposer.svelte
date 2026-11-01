@@ -191,6 +191,7 @@
     onCancelContext?: () => void;
     onEditPersona?: (persona: PersonaView | null) => void;
     onToggleSilentReply?: () => void;
+    onJumpToContext?: (eventId: string) => void;
     onDeleteEdited?: (eventId: string, reason: string | null) => void;
     onEditLast?: (before?: string) => void;
     onEditNext?: (after: string) => void;
@@ -223,6 +224,7 @@
     onCancelContext,
     onEditPersona,
     onToggleSilentReply,
+    onJumpToContext,
     onDeleteEdited,
     onEditLast,
     onEditNext,
@@ -1343,7 +1345,12 @@
     <div class="composer-shell">
       <div class="composer" role="group" aria-label={i18n.t('timeline.messagePlaceholder')}>
         {#if context}
-          <ComposerContextBanner {context} onCancel={cancelContext} {onToggleSilentReply} />
+          <ComposerContextBanner
+            {context}
+            onCancel={cancelContext}
+            {onToggleSilentReply}
+            onJump={onJumpToContext}
+          />
         {/if}
         {#if activeBotCommand}
           {#key activeBotCommand}

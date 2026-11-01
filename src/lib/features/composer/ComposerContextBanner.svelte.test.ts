@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -47,4 +48,28 @@ test('an edit context offers no reply controls', () => {
 
   expect(screen.queryByText(/Replying to/)).not.toBeInTheDocument();
   expect(screen.getAllByRole('button')).toHaveLength(1);
+});
+
+test('clicking the quoted message jumps to it', async () => {
+  const onJump = vi.fn();
+  render(ComposerContextBanner, {
+    props: {
+      context: { kind: 'reply', eventId: '$one:example.org', sender: 'Alice', body: 'Hello' },
+      onJump,
+    },
+  });
+
+  await userEvent.click(screen.getByRole('button', { name: 'Hello' }));
+  expect(onJump).toHaveBeenCalledWith('$one:example.org');
+});
+
+test('a scheduled message context has nothing to jump to', () => {
+  render(ComposerContextBanner, {
+    props: {
+      context: { kind: 'schedule', eventId: 'queued', body: 'later' },
+      onJump: vi.fn(),
+    },
+  });
+
+  expect(screen.queryByRole('button', { name: 'later' })).not.toBeInTheDocument();
 });

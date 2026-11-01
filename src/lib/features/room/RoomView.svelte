@@ -880,6 +880,7 @@
           onEditNext={conversation.editNext}
           onReplyStep={(direction) =>
             conversation.moveReply(timelineList?.stepReply(direction) ?? null)}
+          onJumpToContext={jumpToEvent}
         />
       {/if}
     {/if}

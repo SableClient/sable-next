@@ -13,9 +13,10 @@
     context: ComposerContext;
     onCancel?: () => void;
     onToggleSilentReply?: () => void;
+    onJump?: (eventId: string) => void;
   }
 
-  let { context, onCancel, onToggleSilentReply }: Props = $props();
+  let { context, onCancel, onToggleSilentReply, onJump }: Props = $props();
   let silent = $derived(context.silentReply === true);
 </script>
 
@@ -33,9 +34,20 @@
       >
     </span>
   {/if}
-  <div class="context-body">
-    {context.body}
-  </div>
+  {#if onJump && context.kind !== 'schedule'}
+    <button
+      type="button"
+      class="context-body context-jump"
+      title={i18n.t('common.jumpToMessage')}
+      onclick={() => onJump(context.eventId)}
+    >
+      {context.body}
+    </button>
+  {:else}
+    <div class="context-body">
+      {context.body}
+    </div>
+  {/if}
   {#if context.kind === 'reply'}
     <IconButton
       size="small"
@@ -112,5 +124,20 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .context-jump {
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    padding: 0;
+    text-align: left;
+  }
+
+  .context-jump:hover,
+  .context-jump:focus-visible {
+    color: var(--surface-on-container);
   }
 </style>
