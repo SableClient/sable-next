@@ -15,6 +15,7 @@ const avatar = {
   caption: null,
   html: null,
   source: 'mxc://example.org/alice',
+  external_url: null,
   mime: null,
   width: null,
   height: null,
