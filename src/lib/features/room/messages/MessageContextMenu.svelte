@@ -5,6 +5,7 @@
   import { i18n } from '#lib/i18n.js';
   import '#lib/ui/primitives/menu.css';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
 
   import { messageMenuRows } from './message-menu-items';
   import type { OpenMessageMenu } from './message-menu-open.svelte.js';
@@ -35,7 +36,7 @@
         class="menu-surface message-menu"
         {...overlayLayer()}
         loop
-        collisionPadding={8}
+        collisionPadding={collisionPadding(8)}
         customAnchor={anchor}
         preventScroll={false}
       >

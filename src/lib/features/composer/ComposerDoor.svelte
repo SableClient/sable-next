@@ -16,6 +16,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
   import type { Snippet } from 'svelte';
 
   interface Props {
@@ -75,6 +76,7 @@
         side="top"
         align="start"
         sideOffset={8}
+        collisionPadding={collisionPadding()}
       >
         <DropdownMenu.Item
           class="menu-item"

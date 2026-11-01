@@ -3,6 +3,8 @@
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
 
+  import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
+
   import TooltipProvider, { tooltipProvided } from './TooltipProvider.svelte';
   import './tooltip.css';
 
@@ -65,6 +67,7 @@
         {side}
         {align}
         sideOffset={8}
+        collisionPadding={collisionPadding()}
         {customAnchor}
       >
         {#if content}{@render content()}{:else}{label}{/if}

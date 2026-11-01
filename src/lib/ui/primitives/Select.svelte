@@ -6,6 +6,7 @@
   import { i18n } from '#lib/i18n.js';
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
   import BottomSheet from './BottomSheet.svelte';
   import Switcher, { getSettingsChoices, hasSettingsChoices } from './Switcher.svelte';
   import './form-control.css';
@@ -150,7 +151,12 @@
       <CaretDownIcon class="select-caret" aria-hidden="true" />
     </BitsSelect.Trigger>
     <BitsSelect.Portal>
-      <BitsSelect.Content sideOffset={4} class="menu-surface select-content" {...overlayLayer()}>
+      <BitsSelect.Content
+        sideOffset={4}
+        collisionPadding={collisionPadding()}
+        class="menu-surface select-content"
+        {...overlayLayer()}
+      >
         <BitsSelect.Viewport class="menu-scroll-content" {@attach scrollHint}>
           {#each items as item (item.value)}
             <BitsSelect.Item

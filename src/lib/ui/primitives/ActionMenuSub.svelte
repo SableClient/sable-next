@@ -5,6 +5,7 @@
 
   import { i18n } from '#lib/i18n.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
 
   import BottomSheet from './BottomSheet.svelte';
   import { setActionMenuSurface, useActionMenuSurface } from './action-menu.js';
@@ -63,6 +64,7 @@
         class={['menu-surface', surfaceClass]}
         {...overlayLayer()}
         sideOffset={4}
+        collisionPadding={collisionPadding()}
       >
         <div class="menu-scroll-content" {@attach scrollHint}>
           {@render children()}

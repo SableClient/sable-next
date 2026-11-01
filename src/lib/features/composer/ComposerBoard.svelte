@@ -24,6 +24,7 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
 
   interface Props {
     roomId: string;
@@ -348,6 +349,7 @@
         side="top"
         align="end"
         sideOffset={10}
+        collisionPadding={collisionPadding()}
         customAnchor={anchor}
       >
         <EmoteBoard

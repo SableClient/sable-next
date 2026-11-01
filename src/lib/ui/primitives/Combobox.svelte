@@ -2,6 +2,7 @@
   import { Combobox as BitsCombobox } from 'bits-ui';
   import { i18n } from '#lib/i18n.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import TextInput from './TextInput.svelte';
   import './menu.css';
@@ -112,7 +113,7 @@
   </div>
 
   <BitsCombobox.Portal>
-    <BitsCombobox.Content sideOffset={4}>
+    <BitsCombobox.Content sideOffset={4} collisionPadding={collisionPadding()}>
       {#snippet child({ wrapperProps, props, open })}
         {#if open && filteredItems.length > 0}
           <div {...wrapperProps} {...overlayLayer()} class="combobox-positioner">

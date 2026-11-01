@@ -7,6 +7,7 @@
     watchMaximized,
     type TitleBarKind,
   } from '#lib/platform/window-decorations.js';
+  import { trackTitlebarHeight } from '#lib/ui/titlebar-inset.svelte.js';
 
   interface Props {
     kind: TitleBarKind;
@@ -37,7 +38,7 @@
   });
 </script>
 
-<div class={['titlebar', kind === 'mac' && 'titlebar-mac']}>
+<div class={['titlebar', kind === 'mac' && 'titlebar-mac']} {@attach trackTitlebarHeight}>
   <div class="drag" data-tauri-drag-region>
     <span class="title">Sable</span>
   </div>

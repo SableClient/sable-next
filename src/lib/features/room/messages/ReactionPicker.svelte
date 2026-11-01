@@ -5,6 +5,7 @@
 
   import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
   import EmoteBoard from '#lib/ui/primitives/EmoteBoard.svelte';
 
   interface Props {
@@ -77,7 +78,7 @@
       {...overlayLayer()}
       side="top"
       align="end"
-      collisionPadding={12}
+      collisionPadding={collisionPadding(12)}
       customAnchor={frozen ?? anchor}
       aria-label={label}
     >

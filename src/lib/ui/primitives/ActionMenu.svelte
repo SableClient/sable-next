@@ -6,6 +6,7 @@
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
 
   import BottomSheet from './BottomSheet.svelte';
   import { setActionMenuSurface } from './action-menu.js';
@@ -88,6 +89,7 @@
         {side}
         {align}
         {sideOffset}
+        collisionPadding={collisionPadding()}
         {preventScroll}
       >
         <div class="menu-scroll-content" {@attach scrollHint}>

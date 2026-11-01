@@ -6,6 +6,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { i18n } from '#lib/i18n.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
   import { isHexColor } from '#lib/ui/hex-color.js';
 
   interface Props {
@@ -90,6 +91,7 @@
           side="bottom"
           align="start"
           sideOffset={8}
+          collisionPadding={collisionPadding()}
         >
           <button
             type="button"

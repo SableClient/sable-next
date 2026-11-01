@@ -25,6 +25,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import PersonaMenu, { type PersonaScope } from './PersonaMenu.svelte';
@@ -204,7 +205,7 @@
         side="top"
         align="start"
         sideOffset={10}
-        collisionPadding={12}
+        collisionPadding={collisionPadding(12)}
         onOpenAutoFocus={(e) => {
           e.preventDefault();
           const searchInput = document.getElementById('persona-search');

@@ -4,6 +4,7 @@
 
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { collisionPadding as insetCollisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
 
   import BottomSheet from './BottomSheet.svelte';
 
@@ -93,7 +94,7 @@
         {side}
         {align}
         {sideOffset}
-        {collisionPadding}
+        collisionPadding={insetCollisionPadding(collisionPadding)}
         {sticky}
         {onCloseAutoFocus}
       >

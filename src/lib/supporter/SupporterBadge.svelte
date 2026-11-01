@@ -7,6 +7,7 @@
   import { graphemes } from '#lib/graphemes.js';
   import { i18n } from '#lib/i18n.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
 
   import SupporterMark from './SupporterMark.svelte';
@@ -197,7 +198,7 @@
       side="bottom"
       align="end"
       sideOffset={10}
-      collisionPadding={12}
+      collisionPadding={collisionPadding(12)}
       trapFocus={false}
       role="dialog"
       aria-labelledby={`${id}-heading`}
