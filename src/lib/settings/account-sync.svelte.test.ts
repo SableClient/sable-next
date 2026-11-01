@@ -78,6 +78,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   clearDrafts();
   vi.useRealTimers();
@@ -116,6 +117,51 @@ describe('AccountSync', () => {
         v: 1,
         drafts: {},
       },
+    });
+  });
+
+  it('uploads a cleared draft as soon as the app is hidden', async () => {
+    const roomId = '!room:example.org';
+    const document = draftsDocumentFor('');
+    const remote = { [document.eventType]: { v: 1, drafts: { [roomId]: { type: 'doc' } } } };
+    const { core, commands } = stubCore(remote, {
+      canSeal: true,
+      states: { [document.eventType]: 'sealed' },
+    });
+    const sync = new AccountSync();
+    const stop = sync.start(core, [document]);
+    await vi.runAllTimersAsync();
+
+    clearDraft(roomId);
+    sync.push(document);
+    vi.spyOn(globalThis.document, 'visibilityState', 'get').mockReturnValue('hidden');
+    globalThis.document.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(0);
+    stop();
+
+    expect(commands.setSealedData).toHaveBeenCalledWith({
+      event_type: document.eventType,
+      content: { v: 1, drafts: {} },
+    });
+  });
+
+  it('skips the debounce while the app is hidden', async () => {
+    const local = { value: 'local' };
+    const document = stubDocument(local);
+    const { core, commands } = stubCore({ [document.eventType]: { v: 1, value: 'local' } });
+    const sync = new AccountSync();
+    const stop = sync.start(core, [document]);
+    await vi.runAllTimersAsync();
+
+    vi.spyOn(globalThis.document, 'visibilityState', 'get').mockReturnValue('hidden');
+    local.value = 'edited';
+    sync.push(document);
+    await vi.advanceTimersByTimeAsync(0);
+    stop();
+
+    expect(commands.setData).toHaveBeenCalledWith({
+      event_type: document.eventType,
+      content: { v: 1, value: 'edited' },
     });
   });
 

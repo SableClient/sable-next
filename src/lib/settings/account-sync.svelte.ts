@@ -1,3 +1,5 @@
+import { on } from 'svelte/events';
+
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { readJson, removeLocalValue, writeJson } from '#lib/platform/local-json.js';
@@ -39,6 +41,10 @@ interface DocumentState {
 const DEFAULT_DEBOUNCE_MS = 2000;
 const BASE_KEY_PREFIX = 'sable-sync-base';
 
+function pageHidden(): boolean {
+  return globalThis.document.visibilityState === 'hidden';
+}
+
 function detach(snapshot: SyncedSnapshot): SyncedSnapshot {
   return { ...snapshot, content: $state.snapshot(snapshot.content) };
 }
@@ -51,6 +57,7 @@ export class AccountSync {
   #core: CoreClient | null = null;
   #generation = 0;
   #accountId: string | undefined;
+  #documents: readonly SyncedDocument[] = [];
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- not a render source
   readonly #states = new Map<string, DocumentState>();
 
@@ -63,6 +70,7 @@ export class AccountSync {
       this.#accountId = accountId;
     }
     this.#core = core;
+    this.#documents = documents;
 
     for (const document of documents) {
       const state = this.#stateFor(document.eventType);
@@ -88,9 +96,13 @@ export class AccountSync {
       if (document) void this.#pull(document, generation);
     });
     for (const document of documents) void this.#pull(document, generation);
+    const stopHidden = on(globalThis.document, 'visibilitychange', () => {
+      if (pageHidden()) this.#flush();
+    });
 
     return () => {
       stopEvents();
+      stopHidden();
       if (generation !== this.#generation) return;
 
       this.#generation += 1;
@@ -134,10 +146,21 @@ export class AccountSync {
     if (state.pending === null || fingerprint(state.pending.content) === state.remote) return;
 
     const generation = this.#generation;
-    state.timer = setTimeout(
-      () => void this.#upload(document, generation),
-      document.debounceMs ?? DEFAULT_DEBOUNCE_MS
-    );
+    if (pageHidden()) {
+      void this.#upload(document, generation);
+      return;
+    }
+    state.timer = setTimeout(() => {
+      state.timer = undefined;
+      void this.#upload(document, generation);
+    }, document.debounceMs ?? DEFAULT_DEBOUNCE_MS);
+  }
+
+  #flush(): void {
+    for (const document of this.#documents) {
+      const state = this.#states.get(document.eventType);
+      if (state?.timer !== undefined) this.#schedule(document, state);
+    }
   }
 
   async #pull(document: SyncedDocument, generation: number): Promise<void> {

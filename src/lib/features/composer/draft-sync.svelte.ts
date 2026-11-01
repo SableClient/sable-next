@@ -50,6 +50,13 @@ export class DraftSync {
     }, DRAFT_PERSIST_MS);
   }
 
+  flush(): void {
+    if (this.#timeout === undefined) return;
+    clearTimeout(this.#timeout);
+    this.#timeout = undefined;
+    if (this.#activeKey !== null) this.persist(this.#activeKey);
+  }
+
   open(key: string, accountId: string, roomId: string): void {
     if (this.#activeKey === key && this.#account === accountId) return;
     const { editor, setFiles, onLeave } = this.options;

@@ -28,6 +28,8 @@ const HAPPY_DOM_TESTS = [
   'src/lib/ui/double-tap.test.ts',
   'src/lib/ui/trailing-click.test.ts',
   'src/lib/platform/devtools.test.ts',
+  'src/lib/settings/account-sync.svelte.test.ts',
+  'src/lib/features/composer/account-isolation.svelte.test.ts',
   'src/lib/platform/keyboard.test.ts',
   'src/lib/settings/theme-styles.test.ts',
   'src/lib/features/room/messages/reply-preview.test.ts',

@@ -1328,6 +1328,12 @@
   }}
 />
 
+<svelte:document
+  onvisibilitychange={() => {
+    if (document.visibilityState === 'hidden') draft.flush();
+  }}
+/>
+
 <ComposerDropZone {roomName} {readOnly} onFiles={stage} />
 
 <div
