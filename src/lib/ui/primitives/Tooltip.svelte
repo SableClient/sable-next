@@ -5,19 +5,19 @@
 
   import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
 
+  import { tooltipHost, type TooltipPayload } from './TooltipHost.svelte';
   import TooltipProvider, { tooltipProvided } from './TooltipProvider.svelte';
   import './tooltip.css';
 
   export type TooltipVariant = 'icon' | 'inline';
-  type TooltipSide = 'top' | 'right' | 'bottom' | 'left';
   type TriggerSnippet = Snippet<[{ props: Record<string, unknown> }]>;
 
   interface Props {
-    label: string;
+    label?: string;
     multiline?: boolean;
     variant?: TooltipVariant;
-    side?: TooltipSide;
-    align?: 'start' | 'center' | 'end';
+    side?: TooltipPayload['side'];
+    align?: TooltipPayload['align'];
     class?: ClassValue;
     customAnchor?: HTMLElement | null;
     open?: boolean;
@@ -28,7 +28,7 @@
   }
 
   let {
-    label,
+    label = '',
     multiline = false,
     variant = 'icon',
     side = 'top',
@@ -43,6 +43,7 @@
   }: Props = $props();
 
   const provided = tooltipProvided();
+  const host = tooltipHost();
 </script>
 
 {#snippet defaultTrigger({ props }: { props: Record<string, unknown> })}
@@ -50,7 +51,7 @@
     {...props}
     class={['tooltip-trigger', `tooltip-trigger-${variant}`, className]}
     type="button"
-    aria-label={variant === 'icon' ? label : undefined}
+    aria-label={variant === 'icon' ? label || undefined : undefined}
   >
     {@render children?.()}
   </button>
@@ -76,7 +77,14 @@
   </BitsTooltip.Root>
 {/snippet}
 
-{#if provided}
+{#if host && open === undefined && customAnchor === undefined}
+  <BitsTooltip.Trigger
+    tether={host}
+    payload={{ label, multiline, side, align, content }}
+    {disabled}
+    child={trigger ?? defaultTrigger}
+  />
+{:else if provided}
   {@render tooltip()}
 {:else}
   <TooltipProvider>{@render tooltip()}</TooltipProvider>

@@ -15,6 +15,19 @@ interface Day {
 
 let dayFormat: { zone: string; format: Intl.DateTimeFormat } | undefined;
 
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+function localFormatter(options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const locale = currentLocale();
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let format = formatters.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, options);
+    formatters.set(key, format);
+  }
+  return format;
+}
+
 function dayFormatter(): Intl.DateTimeFormat {
   const zoneName = preferences.timeZone;
   if (dayFormat?.zone !== zoneName) {
@@ -56,12 +69,12 @@ function isSameDay(a: Day, b: Day): boolean {
 }
 
 export function formatTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString(currentLocale(), {
+  return localFormatter({
     ...zone(),
     hour: '2-digit',
     minute: '2-digit',
     ...(preferences.hour24Clock ? { hour12: false } : {}),
-  });
+  }).format(timestamp);
 }
 
 function pad(value: number): string {
@@ -69,12 +82,12 @@ function pad(value: number): string {
 }
 
 function formatMessageDatePart(date: Date, includeYear: boolean): string {
-  return date.toLocaleDateString(currentLocale(), {
+  return localFormatter({
     ...zone(),
     day: 'numeric',
     month: 'long',
     ...(includeYear ? { year: 'numeric' } : {}),
-  });
+  }).format(date);
 }
 
 export function formatMessageTimestamp(timestamp: number): string {
@@ -94,12 +107,12 @@ export function formatMessageTimestamp(timestamp: number): string {
 }
 
 export function formatFullTimestamp(timestamp: number): string {
-  return new Date(timestamp).toLocaleString(currentLocale(), {
+  return localFormatter({
     ...zone(),
     dateStyle: 'full',
     timeStyle: 'medium',
     ...(preferences.hour24Clock ? { hour12: false } : {}),
-  });
+  }).format(timestamp);
 }
 
 export function formatDate(timestamp: number): string {
@@ -117,11 +130,11 @@ export function formatDate(timestamp: number): string {
     case 'ymd':
       return `${String(day.year)}-${pad(day.month)}-${pad(day.day)}`;
     default:
-      return date.toLocaleDateString(currentLocale(), {
+      return localFormatter({
         ...zone(),
         day: 'numeric',
         month: 'long',
         year: 'numeric',
-      });
+      }).format(date);
   }
 }

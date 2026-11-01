@@ -302,7 +302,8 @@
   {#if row.pending}
     <Spinner small label={i18n.t('timeline.sending')} />
   {:else}
-    <Tooltip label={formatFullTimestamp(item.timestamp)}>
+    <Tooltip>
+      {#snippet content()}{formatFullTimestamp(item.timestamp)}{/snippet}
       {#snippet trigger({ props })}
         <time {...props} datetime={new Date(item.timestamp).toISOString()}>
           {format(item.timestamp)}

@@ -27,6 +27,7 @@
     type TimelineWindowState,
   } from '#lib/timeline/timeline-window.js';
   import { flushed } from '#lib/ui/flushed.js';
+  import TooltipHost, { provideTooltipHost } from '#lib/ui/primitives/TooltipHost.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
@@ -192,6 +193,7 @@
 
   const dialogs = provideMessageDialogs(new MessageDialogs());
   const messageMenu = provideMessageMenu(new OpenMessageMenu());
+  const tooltips = provideTooltipHost();
 
   interface RowValue {
     item: TimelineItemView;
@@ -1079,6 +1081,7 @@
 />
 <TimelineAnnouncements {timeline} {visibleItems} />
 <MessageContextMenu menu={messageMenu} />
+<TooltipHost tether={tooltips} />
 <MessageDialogHost
   {dialogs}
   {events}
