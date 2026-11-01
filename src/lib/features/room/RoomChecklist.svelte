@@ -38,6 +38,7 @@
       >
         <Avatar size="small" id={room.room_id} src={room.avatar_url} name={room.name} />
         <span class="name">{label(room)}</span>
+        {#if room.canonical_alias}<span class="alias">{room.canonical_alias}</span>{/if}
         <span class="tick" aria-hidden="true">
           {#if checked}<CheckIcon size={14} weight="bold" />{/if}
         </span>
@@ -62,6 +63,16 @@
 
   .name {
     flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .alias {
+    color: var(--surface-var-on-container);
+    flex: 0 1 auto;
+    font-size: var(--font-size-small);
+    max-width: 50%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
