@@ -1,3 +1,12 @@
+<script module lang="ts">
+  // iOS ignores volume changes.
+  const volumeAdjustable = (() => {
+    const probe = new Audio();
+    probe.volume = 0.5;
+    return probe.volume === 0.5;
+  })();
+</script>
+
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import FileAudioIcon from 'phosphor-svelte/lib/FileAudioIcon';
@@ -38,7 +47,6 @@
   let seekPosition = $state(0);
   let seekUserIsInteracting = $state(false);
   let animationId: number | null;
-  let volumeOpen = $state(false);
 
   let { src, label, filename, attachedTop = false }: Props = $props();
 
@@ -134,43 +142,44 @@
         }
       }}
     />
-    <ResponsivePopover
-      bind:open={volumeOpen}
-      side="top"
-      align="center"
-      class="audio-volume-popover"
-      label={i18n.t('timeline.audioVolume')}
-      closeLabel={i18n.t('common.dismiss')}
-    >
-      {#snippet trigger({ props })}
-        <IconButton
-          {...props}
-          variant="ghost"
-          size="small"
-          class="audio-volume"
-          label={i18n.t('timeline.audioVolume')}
-        >
-          {#if voicePlayback.volume === 0}
-            <SpeakerXIcon />
-          {:else if voicePlayback.volume < 0.5}
-            <SpeakerLowIcon />
-          {:else}
-            <SpeakerHighIcon />
-          {/if}
-        </IconButton>
-      {/snippet}
-      <div class="audio-volume-content">
-        <Slider
-          min={0}
-          max={1}
-          step={0.05}
-          label={i18n.t('timeline.audioVolume')}
-          value={voicePlayback.volume}
-          oninput={voicePlayback.setVolume}
-        />
-        <span class="audio-volume-reading">{Math.round(voicePlayback.volume * 100)}%</span>
-      </div>
-    </ResponsivePopover>
+    {#if volumeAdjustable}
+      <ResponsivePopover
+        side="top"
+        align="center"
+        class="audio-volume-popover"
+        label={i18n.t('timeline.audioVolume')}
+        closeLabel={i18n.t('common.dismiss')}
+      >
+        {#snippet trigger({ props })}
+          <IconButton
+            {...props}
+            variant="ghost"
+            size="small"
+            class="audio-volume"
+            label={i18n.t('timeline.audioVolume')}
+          >
+            {#if voicePlayback.volume === 0}
+              <SpeakerXIcon />
+            {:else if voicePlayback.volume < 0.5}
+              <SpeakerLowIcon />
+            {:else}
+              <SpeakerHighIcon />
+            {/if}
+          </IconButton>
+        {/snippet}
+        <div class="audio-volume-content">
+          <Slider
+            min={0}
+            max={1}
+            step={0.05}
+            label={i18n.t('timeline.audioVolume')}
+            value={voicePlayback.volume}
+            oninput={voicePlayback.setVolume}
+          />
+          <span class="audio-volume-reading">{Math.round(voicePlayback.volume * 100)}%</span>
+        </div>
+      </ResponsivePopover>
+    {/if}
   </div>
 </div>
 
@@ -201,19 +210,13 @@
     display: flex;
     gap: var(--space-200);
 
-    > input {
+    input {
       width: 100%;
     }
   }
 
   .audio-controls :global(.audio-volume) {
     flex: none;
-  }
-
-  @media (pointer: coarse) {
-    .audio-controls :global(.audio-volume) {
-      display: none;
-    }
   }
 
   :global(.responsive-popover.audio-volume-popover) {

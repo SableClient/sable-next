@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Shared audio files have a volume slider that remembers its level, shared with voice messages (#1432).
+Shared audio files have a volume control that remembers its level (#1432).
