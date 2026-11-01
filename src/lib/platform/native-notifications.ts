@@ -174,6 +174,27 @@ export async function nativePushTransport(): Promise<NativePushTransport | null>
   }
 }
 
+async function androidFlag(command: string): Promise<boolean | null> {
+  if (!isTauri()) return null;
+  try {
+    return await invoke<boolean>(`plugin:notifications|${command}`);
+  } catch {
+    return null;
+  }
+}
+
+export const ignoringBatteryOptimizations = () => androidFlag('is_ignoring_battery_optimizations');
+
+export const canScheduleExactAlarms = () => androidFlag('can_schedule_exact_alarms');
+
+export async function requestIgnoreBatteryOptimizations(): Promise<void> {
+  await invoke('plugin:notifications|request_ignore_battery_optimizations');
+}
+
+export async function requestScheduleExactAlarms(): Promise<void> {
+  await invoke('plugin:notifications|request_schedule_exact_alarms');
+}
+
 export async function watchNativeNotificationActions(
   handler: (action: NativeNotificationAction) => void
 ): Promise<() => void> {

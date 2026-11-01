@@ -30,6 +30,8 @@ function deps(overrides: Partial<TroubleshootDeps> = {}): TroubleshootDeps {
     permissionGranted: () => Promise.resolve(true),
     alertsEnabled: () => true,
     nativeTransport: () => Promise.resolve(null),
+    ignoringBatteryOptimizations: () => Promise.resolve(true),
+    canScheduleExactAlarms: () => Promise.resolve(true),
     ownPushkey: () => Promise.resolve('key'),
     pushers: () => Promise.resolve([gatewayPusher]),
     pingGateway: () => Promise.resolve(true),
@@ -69,6 +71,8 @@ test('a working browser passes every check, the loopback included', async () => 
     permission: 'pass',
     alerts: 'pass',
     transport: 'pass',
+    background: 'skip',
+    alarms: 'skip',
     pusher: 'pass',
     gateway: 'pass',
     loopback: 'pass',
@@ -302,4 +306,83 @@ test('a passing pusher carries no failure detail', async () => {
   );
 
   expect(results.pusher?.detail).toBeUndefined();
+});
+
+function android(provider: string, overrides: Partial<TroubleshootDeps> = {}): TroubleshootDeps {
+  return deps({
+    platform: 'android',
+    nativeTransport: () => Promise.resolve({ provider, distributor: provider }),
+    ...overrides,
+  });
+}
+
+test('background activity passes when battery optimizations are ignored', async () => {
+  const results = await run(android('fcm'));
+
+  expect(results.background).toMatchObject({ state: 'pass' });
+  expect(results.background?.action).toBeUndefined();
+});
+
+test('the built-in connection fails without background activity and offers a fix', async () => {
+  const results = await run(
+    android('embedded', { ignoringBatteryOptimizations: () => Promise.resolve(false) })
+  );
+
+  expect(results.background).toMatchObject({
+    state: 'fail',
+    message: 'settings.troubleshootBackgroundRequired',
+    action: 'allowBackground',
+  });
+});
+
+test('other providers only warn without background activity', async () => {
+  const results = await run(
+    android('unifiedpush', { ignoringBatteryOptimizations: () => Promise.resolve(false) })
+  );
+
+  expect(results.background).toMatchObject({ state: 'warn', action: 'allowBackground' });
+});
+
+test('background and alarms are skipped off Android', async () => {
+  const results = await run(deps({ platform: 'ios', ownPushkey: () => Promise.resolve('key') }));
+
+  expect(results.background?.state).toBe('skip');
+  expect(results.alarms?.state).toBe('skip');
+});
+
+test('alarms are skipped unless the built-in connection is used', async () => {
+  const results = await run(
+    android('fcm', { canScheduleExactAlarms: () => Promise.resolve(false) })
+  );
+
+  expect(results.alarms).toMatchObject({
+    state: 'skip',
+    message: 'settings.troubleshootAlarmsEmbeddedOnly',
+  });
+});
+
+test('the built-in connection warns when exact alarms are denied', async () => {
+  const results = await run(
+    android('embedded', { canScheduleExactAlarms: () => Promise.resolve(false) })
+  );
+
+  expect(results.alarms).toMatchObject({ state: 'warn', action: 'allowAlarms' });
+});
+
+test('the built-in connection passes with exact alarms allowed', async () => {
+  const results = await run(android('embedded'));
+
+  expect(results.alarms?.state).toBe('pass');
+});
+
+test('an unreadable setting is skipped', async () => {
+  const results = await run(
+    android('embedded', {
+      ignoringBatteryOptimizations: () => Promise.resolve(null),
+      canScheduleExactAlarms: () => Promise.resolve(null),
+    })
+  );
+
+  expect(results.background?.state).toBe('skip');
+  expect(results.alarms?.state).toBe('skip');
 });

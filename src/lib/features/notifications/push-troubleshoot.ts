@@ -8,17 +8,22 @@ export type TroubleshootCheck =
   | 'permission'
   | 'alerts'
   | 'transport'
+  | 'background'
+  | 'alarms'
   | 'pusher'
   | 'gateway'
   | 'loopback';
 
 export type TroubleshootState = 'pass' | 'fail' | 'warn' | 'skip';
 
+export type TroubleshootAction = 'allowBackground' | 'allowAlarms';
+
 export interface TroubleshootResult {
   check: TroubleshootCheck;
   state: TroubleshootState;
   message: string;
   params?: Record<string, string>;
+  action?: TroubleshootAction;
   detail?: { message: string; params: Record<string, string> };
 }
 
@@ -33,6 +38,8 @@ export interface TroubleshootDeps {
   permissionGranted: () => Promise<boolean>;
   alertsEnabled: () => boolean;
   nativeTransport: () => Promise<PushTransportInfo | null>;
+  ignoringBatteryOptimizations: () => Promise<boolean | null>;
+  canScheduleExactAlarms: () => Promise<boolean | null>;
   ownPushkey: () => Promise<string | null>;
   pushers: () => Promise<RegisteredPusherView[]>;
   pingGateway: (url: string) => Promise<boolean | null>;
@@ -95,6 +102,62 @@ async function transport(deps: TroubleshootDeps): Promise<TroubleshootResult> {
     message: 'settings.troubleshootTransportNative',
     params: { provider: native.provider, distributor: native.distributor ?? native.provider },
   };
+}
+
+async function background(deps: TroubleshootDeps, embedded: boolean): Promise<TroubleshootResult> {
+  const ignoring = await deps.ignoringBatteryOptimizations();
+  if (ignoring === null) {
+    return {
+      check: 'background',
+      state: 'skip',
+      message: 'settings.troubleshootBackgroundUnknown',
+    };
+  }
+  if (ignoring) {
+    return {
+      check: 'background',
+      state: 'pass',
+      message: 'settings.troubleshootBackgroundAllowed',
+    };
+  }
+  return {
+    check: 'background',
+    state: embedded ? 'fail' : 'warn',
+    message: embedded
+      ? 'settings.troubleshootBackgroundRequired'
+      : 'settings.troubleshootBackgroundRecommended',
+    action: 'allowBackground',
+  };
+}
+
+async function alarms(deps: TroubleshootDeps): Promise<TroubleshootResult> {
+  const allowed = await deps.canScheduleExactAlarms();
+  if (allowed === null) {
+    return { check: 'alarms', state: 'skip', message: 'settings.troubleshootAlarmsUnknown' };
+  }
+  return allowed
+    ? { check: 'alarms', state: 'pass', message: 'settings.troubleshootAlarmsAllowed' }
+    : {
+        check: 'alarms',
+        state: 'warn',
+        message: 'settings.troubleshootAlarmsDenied',
+        action: 'allowAlarms',
+      };
+}
+
+export async function* troubleshootBackground(
+  deps: TroubleshootDeps
+): AsyncGenerator<TroubleshootResult> {
+  if (deps.platform !== 'android') {
+    yield { check: 'background', state: 'skip', message: 'settings.troubleshootAndroidOnly' };
+    yield { check: 'alarms', state: 'skip', message: 'settings.troubleshootAndroidOnly' };
+    return;
+  }
+  const embedded = (await deps.nativeTransport())?.provider === 'embedded';
+  yield await background(deps, embedded);
+  yield embedded
+    ? await alarms(deps)
+    : { check: 'alarms', state: 'skip', message: 'settings.troubleshootAlarmsEmbeddedOnly' };
 }
 
 async function awaitDiagnostic(deps: TroubleshootDeps, eventId: string): Promise<boolean> {
@@ -185,6 +248,7 @@ export async function* troubleshoot(deps: TroubleshootDeps): AsyncGenerator<Trou
 
   const carried = await transport(deps);
   yield carried;
+  yield* troubleshootBackground(deps);
   if (carried.state === 'fail') {
     yield* skipped('pusher', 'settings.troubleshootNotApplicable');
     return;

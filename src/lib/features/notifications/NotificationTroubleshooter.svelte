@@ -6,7 +6,14 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { nativeDevicePusher, nativePushTransport } from '#lib/platform/native-notifications.js';
+  import {
+    canScheduleExactAlarms,
+    ignoringBatteryOptimizations,
+    nativeDevicePusher,
+    nativePushTransport,
+    requestIgnoreBatteryOptimizations,
+    requestScheduleExactAlarms,
+  } from '#lib/platform/native-notifications.js';
   import { pushOverride } from '#lib/notifications/push-config.js';
   import { deliversWebPush, pushPlatform } from '#lib/platform/notifications.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
@@ -22,6 +29,7 @@
     type TroubleshootDeps,
     type TroubleshootResult,
     troubleshoot,
+    troubleshootBackground,
   } from './push-troubleshoot';
   import { clearPushFailure, lastPushFailure, recordPushFailure } from './push-failure';
   import { currentPushKey, syncPushSubscription } from './web-push';
@@ -32,10 +40,14 @@
     { check: 'permission', label: 'settings.troubleshootCheckPermission' },
     { check: 'alerts', label: 'settings.troubleshootCheckAlerts' },
     { check: 'transport', label: 'settings.troubleshootCheckTransport' },
+    { check: 'background', label: 'settings.troubleshootCheckBackground' },
+    { check: 'alarms', label: 'settings.troubleshootCheckAlarms' },
     { check: 'pusher', label: 'settings.troubleshootCheckPusher' },
     { check: 'gateway', label: 'settings.troubleshootCheckGateway' },
     { check: 'loopback', label: 'settings.troubleshootCheckLoopback' },
   ];
+
+  const androidOnly: TroubleshootCheck[] = ['background', 'alarms'];
 
   let results = $state.raw<Partial<Record<TroubleshootCheck, TroubleshootResult>>>({});
   let running = $state(false);
@@ -49,6 +61,8 @@
       permissionGranted,
       alertsEnabled: () => preferences.systemNotifications,
       nativeTransport: nativePushTransport,
+      ignoringBatteryOptimizations,
+      canScheduleExactAlarms,
       ownPushkey: async () => {
         if (platform === 'web') return currentPushKey();
         const session = core.session;
@@ -91,6 +105,21 @@
     }
   }
 
+  async function refreshBackground(): Promise<void> {
+    if (!started || running || pushPlatform() !== 'android') return;
+    for await (const result of troubleshootBackground(deps())) {
+      results = { ...results, [result.check]: result };
+    }
+  }
+
+  async function allowBackground(): Promise<void> {
+    await requestIgnoreBatteryOptimizations();
+  }
+
+  async function allowAlarms(): Promise<void> {
+    await requestScheduleExactAlarms();
+  }
+
   async function allow(): Promise<void> {
     await grantPermission();
     await run();
@@ -101,6 +130,8 @@
     await run();
   }
 </script>
+
+<svelte:window onfocus={() => void refreshBackground()} />
 
 <section class="troubleshoot settings-form" aria-labelledby="notification-troubleshoot">
   <div class="settings-heading-row">
@@ -115,49 +146,61 @@
     <ol class="checks">
       {#each checks as { check, label } (check)}
         {@const result = results[check]}
-        <li class={['check', result?.state]}>
-          <span class="state" aria-hidden="true">
-            {#if result === undefined}
-              {#if running}<Spinner small />{:else}<MinusCircleIcon />{/if}
-            {:else if result.state === 'pass'}
-              <CheckCircleIcon weight="fill" />
-            {:else if result.state === 'fail'}
-              <XCircleIcon weight="fill" />
-            {:else if result.state === 'warn'}
-              <WarningCircleIcon weight="fill" />
-            {:else}
-              <MinusCircleIcon />
-            {/if}
-          </span>
-          <span class="copy">
-            <span class="label">{i18n.t(label)}</span>
-            {#if result}
-              <span class="message">{i18n.t(result.message, result.params ?? {})}</span>
-              {#if result.detail}
-                <span class="message">{i18n.t(result.detail.message, result.detail.params)}</span>
+        {#if !androidOnly.includes(check) || (pushPlatform() === 'android' && result?.state !== 'skip')}
+          <li class={['check', result?.state]}>
+            <span class="state" aria-hidden="true">
+              {#if result === undefined}
+                {#if running}<Spinner small />{:else}<MinusCircleIcon />{/if}
+              {:else if result.state === 'pass'}
+                <CheckCircleIcon weight="fill" />
+              {:else if result.state === 'fail'}
+                <XCircleIcon weight="fill" />
+              {:else if result.state === 'warn'}
+                <WarningCircleIcon weight="fill" />
+              {:else}
+                <MinusCircleIcon />
               {/if}
+            </span>
+            <span class="copy">
+              <span class="label">{i18n.t(label)}</span>
+              {#if result}
+                <span class="message">{i18n.t(result.message, result.params ?? {})}</span>
+                {#if result.detail}
+                  <span class="message">{i18n.t(result.detail.message, result.detail.params)}</span>
+                {/if}
+              {/if}
+            </span>
+            {#if result?.state === 'fail' && check === 'permission'}
+              <Button
+                variant="secondary"
+                size="small"
+                disabled={running}
+                onclick={() => void allow()}
+              >
+                {i18n.t('settings.troubleshootAllow')}
+              </Button>
+            {:else if result?.state === 'fail' && check === 'alerts'}
+              <Button
+                variant="secondary"
+                size="small"
+                disabled={running}
+                onclick={() => void enableAlerts()}
+              >
+                {i18n.t('settings.troubleshootEnable')}
+              </Button>
+            {:else if result?.action}
+              <Button
+                variant="secondary"
+                size="small"
+                disabled={running}
+                onclick={() =>
+                  void (result.action === 'allowBackground' ? allowBackground() : allowAlarms())}
+              >
+                {i18n.t('settings.troubleshootAllow')}
+              </Button>
             {/if}
-          </span>
-          {#if result?.state === 'fail' && check === 'permission'}
-            <Button
-              variant="secondary"
-              size="small"
-              disabled={running}
-              onclick={() => void allow()}
-            >
-              {i18n.t('settings.troubleshootAllow')}
-            </Button>
-          {:else if result?.state === 'fail' && check === 'alerts'}
-            <Button
-              variant="secondary"
-              size="small"
-              disabled={running}
-              onclick={() => void enableAlerts()}
-            >
-              {i18n.t('settings.troubleshootEnable')}
-            </Button>
-          {/if}
-        </li>
+          </li>
+        {/if}
       {/each}
     </ol>
   {/if}
