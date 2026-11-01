@@ -1359,14 +1359,11 @@
     "withdrawFailed": "无法撤回加入申请。"
   },
   "app": {
-    "skipMigration": "不迁移 v1 数据，继续",
     "accountLocked": "账户已锁定",
     "accountLockedDetail": "你的家服务器已锁定此账户。Sable 将保留此会话并检查访问权限是否恢复。",
     "pettingAnimal": "正在抚摸 {{animal}}",
     "unableToStart": "无法恢复你的会话。",
     "startFailed": "请检查你的网络连接和设备存储，然后重试。",
-    "migrationFailed": "无法迁移你的 v1 数据，你的原始数据仍已保存，重试前请关闭其他 Sable 窗口。",
-    "skipMigrationHint": "你的 v1 数据将保留在原处，但 Sable 不会再尝试迁移它，之后你可以重新登录。",
     "signInRecoveryHint": "登录会创建一个新设备，并保留你已保存的账户数据。"
   },
   "userLink": {

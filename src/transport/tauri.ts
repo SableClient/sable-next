@@ -8,7 +8,6 @@ import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { wasmLogLevel } from '#lib/observability/wasm-log.js';
 import { rawInvoke } from '#lib/platform/raw-invoke.js';
 import { resetWebStorage } from '#lib/platform/session-storage.js';
-import { migrateV1 } from '#lib/migrations/v1/migration.js';
 
 async function carry<T>(
   command: string,
@@ -57,7 +56,6 @@ export function createTauriTransport(): Transport {
   return {
     async call(method, params) {
       await ready;
-      await migrateV1();
       try {
         return await invoke<unknown>('call', { method, params });
       } catch (error) {

@@ -24,7 +24,6 @@ import { invalidatePacks, isPackAccountDataEvent } from '#lib/emoji/load-packs.j
 import { createTransport } from '#src/transport/create';
 import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
-import { V1MigrationError } from '#lib/migrations/v1/migration.js';
 import QuickLRU from 'quick-lru';
 import { on } from 'svelte/events';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
@@ -166,8 +165,6 @@ export class CoreClient {
   superseded = $state(false);
   restoreFailed = $state(false);
   slowStart = $state(false);
-  migrationFailed = $state(false);
-  migrationError = $state<string | null>(null);
   sync = $state<SyncStatus | null>(null);
   /** This device's own verification and recovery state, pushed on change. */
   encryption = $state<EncryptionStatusView | null>(null);
@@ -989,8 +986,6 @@ export class CoreClient {
     const generation = ++this.generation;
     this.status = 'starting';
     this.slowStart = false;
-    this.migrationFailed = false;
-    this.migrationError = null;
     const slow = setTimeout(() => {
       if (generation !== this.generation || this.status !== 'starting') return;
       this.slowStart = true;
@@ -1027,12 +1022,8 @@ export class CoreClient {
     } catch (error) {
       if (generation !== this.generation) return;
 
-      if (error instanceof V1MigrationError) {
-        console.warn('[sable core] restore failed', error);
-      } else {
-        console.error('[sable core] restore failed', error);
-        reportSessionFailure('restore', error);
-      }
+      console.error('[sable core] restore failed', error);
+      reportSessionFailure('restore', error);
       if (error instanceof CoreError) {
         try {
           await this.refreshAccounts();
@@ -1043,8 +1034,6 @@ export class CoreClient {
         if (generation !== this.generation) return;
       }
       this.restoreFailed = true;
-      this.migrationFailed = error instanceof V1MigrationError;
-      this.migrationError = error instanceof V1MigrationError ? error.message : null;
       this.status = 'error';
       this.cleanupTransport();
     } finally {

@@ -3,7 +3,6 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { skipV1Migration } from '#lib/migrations/v1/migration.js';
   import Button from './primitives/Button.svelte';
 
   const core = useCoreClient();
@@ -19,20 +18,6 @@
       await goto(resolve('/(app)/rooms'));
     } catch (error) {
       console.warn('[sable auth] switching account failed', error);
-      switchFailed = true;
-    } finally {
-      switching = false;
-    }
-  }
-
-  async function skipMigration(): Promise<void> {
-    switching = true;
-    switchFailed = false;
-    try {
-      await skipV1Migration();
-      await core.start();
-    } catch (error) {
-      console.warn('[sable auth] skipping the migration failed', error);
       switchFailed = true;
     } finally {
       switching = false;
@@ -57,8 +42,7 @@
 <main class="restore-error" aria-labelledby="restore-error-title">
   <div class="restore-card" role="alert">
     <h1 id="restore-error-title">{i18n.t('app.unableToStart')}</h1>
-    <p>{i18n.t(core.migrationFailed ? 'app.migrationFailed' : 'app.startFailed')}</p>
-    {#if core.migrationError}<p>{core.migrationError}</p>{/if}
+    <p>{i18n.t('app.startFailed')}</p>
     <Button disabled={busy} onclick={() => void core.start()}>
       {i18n.t('common.tryAgain')}
     </Button>
@@ -68,15 +52,8 @@
       </Button>
     {/each}
     {#if switchFailed}<p role="alert">{i18n.t('app.unableToStart')}</p>{/if}
-    {#if core.migrationFailed}
-      <p>{i18n.t('app.skipMigrationHint')}</p>
-      <Button disabled={busy} onclick={() => void skipMigration()}>
-        {i18n.t('app.skipMigration')}
-      </Button>
-    {:else}
-      <p>{i18n.t('app.signInRecoveryHint')}</p>
-      <Button disabled={busy} onclick={() => void signIn()}>{i18n.t('auth.signInTitle')}</Button>
-    {/if}
+    <p>{i18n.t('app.signInRecoveryHint')}</p>
+    <Button disabled={busy} onclick={() => void signIn()}>{i18n.t('auth.signInTitle')}</Button>
   </div>
 </main>
 

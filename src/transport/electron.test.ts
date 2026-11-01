@@ -2,7 +2,6 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 vi.mock('../worker/core.worker.ts?sharedworker&url', () => ({ default: 'core.worker.js' }));
 vi.mock('#src/generated/wasm/sable_wasm_version.js', () => ({ default: 'test-wasm-version' }));
-vi.mock('#lib/migrations/v1/migration.js', () => ({ migrateV1: () => undefined }));
 
 const { resetWebStorage } = vi.hoisted(() => ({
   resetWebStorage: vi.fn<(accountIds: readonly string[]) => Promise<void>>(),

@@ -16,7 +16,6 @@ import {
 } from '../lib/observability/wasm-log.js';
 import { readText, writeText } from '../lib/platform/local-json.js';
 import { deleteAccountWebStorage, resetWebStorage } from '../lib/platform/session-storage.js';
-import { migrateV1 } from '#lib/migrations/v1/migration.js';
 
 const QUIET_COMMAND_FAILURES = new Set([
   'media:unavailable',
@@ -404,8 +403,6 @@ export function createWebTransport(open: () => CoreConnection = openSharedWorker
     transfers: Transferable[] = []
   ): Promise<T> {
     return (async () => {
-      const migration = migrateV1();
-      if (migration) await migration;
       if (closed) throw new CoreError({ code: 'failed', log_id: 'transport closed' });
       const id = nextId++;
       const activeWorker = connect();

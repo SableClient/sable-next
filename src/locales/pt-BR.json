@@ -216,10 +216,7 @@
     "getSupport": "Suporte"
   },
   "app": {
-    "migrationFailed": "Seus dados v1 não puderam ser migrados. Seus dados originais ainda estão salvos. Feche outras janelas do Sable antes de tentar novamente.",
     "unableToStart": "O Sable não conseguiu iniciar.",
-    "skipMigration": "Continuar sem seus dados v1",
-    "skipMigrationHint": "Seus dados v1 permanecem onde estão, mas o Sable não tentará migrar novamente. Você pode logar novamente depois.",
     "startFailed": "Verifique sua conexão e o armazenamento do seu dispositivo."
   },
   "settings": {

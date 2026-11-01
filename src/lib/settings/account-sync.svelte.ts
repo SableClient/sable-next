@@ -24,7 +24,6 @@ export interface SyncedDocument {
   /** `firstSync` is true while no merge base exists yet, so local-only entries should survive the pull. */
   adopt: (content: unknown, firstSync?: boolean) => boolean;
   merge?: (base: unknown, local: unknown, remote: unknown) => unknown;
-  legacy?: { eventType: string; convert: (content: unknown) => unknown };
 }
 
 interface DocumentState {
@@ -148,7 +147,6 @@ export class AccountSync {
     const state = this.#stateFor(document.eventType);
     let content: unknown;
     let unsealed = false;
-    let migrated = false;
     try {
       if (document.sealed) {
         const sealed = await core.rpc.account.sealedData({ event_type: document.eventType });
@@ -164,14 +162,6 @@ export class AccountSync {
         unsealed = sealed.state === 'plain' && sealed.can_seal && sealed.content !== null;
       } else {
         content = await core.rpc.account.data({ event_type: document.eventType });
-        if (content === null && document.legacy) {
-          const legacy = await core.rpc.account.data({
-            event_type: document.legacy.eventType,
-          });
-          if (generation !== this.#generation) return;
-          content = document.legacy.convert(legacy);
-          migrated = content !== null;
-        }
       }
     } catch (error) {
       if (generation !== this.#generation) return;
@@ -206,7 +196,7 @@ export class AccountSync {
     const next = detach(document.snapshot());
     state.pending = next;
     this.#rebase(document, state, next.content);
-    state.remote = unsealed || migrated ? null : fingerprint(content ?? next.content);
+    state.remote = unsealed ? null : fingerprint(content ?? next.content);
     state.status = next.partial === true ? 'partial' : 'idle';
     this.lastSyncedAt = Date.now();
     this.#refresh();

@@ -189,9 +189,6 @@ impl SableCore {
         // Keep JS-owned borrows on this thread: pending futures are dropped by Tokio at shutdown.
         let core = self.core.clone();
         env.spawn_future(async move {
-            if !matches!(core.v1_migration_complete().await, Ok(true)) {
-                return Ok(());
-            }
             if let Err(error) = Box::pin(core.run(sable_core::api::session::RestoreParams {})).await
             {
                 tracing::warn!(?error, "early session restore failed");

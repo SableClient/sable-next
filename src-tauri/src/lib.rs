@@ -20,7 +20,6 @@ mod network;
 mod notifications;
 mod sentry;
 mod share_inbox;
-mod v1_migration;
 
 use std::{
     collections::HashMap,
@@ -594,9 +593,6 @@ fn open_external_url(app: AppHandle<tauri::Wry>, url: String) -> Result<(), RpcE
 }
 
 async fn restore_ahead_of_webview(core: Arc<Core>) {
-    if !matches!(core.v1_migration_complete().await, Ok(true)) {
-        return;
-    }
     if let Err(error) = Box::pin(core.run(sable_core::api::session::RestoreParams {})).await {
         log::warn!("Early session restore failed: {error:?}");
     }
@@ -734,11 +730,6 @@ pub fn run() {
 
     let app = match app_builder(sentry_guard.as_deref())
         .invoke_handler(tauri::generate_handler![
-            v1_migration::v1_migration_complete,
-            v1_migration::begin_v1_migration,
-            v1_migration::import_v1_crypto_batch,
-            v1_migration::finish_v1_migration,
-            v1_migration::skip_v1_migration,
             call,
             subscribe_events,
             fetch_media,

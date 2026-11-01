@@ -13,7 +13,6 @@ import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
 import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
 import type { BadgeNotificationMode } from '#lib/rooms/unread.js';
-import { readV1Preferences } from '#lib/migrations/v1/preferences.js';
 import { migrateSettings, SETTINGS_SCHEMA } from './migrations.js';
 
 export type { BadgeNotificationMode };
@@ -843,21 +842,12 @@ function load(): Preferences {
   if (typeof localStorage === 'undefined') return { ...DEFAULTS };
 
   const current = read(STORAGE_KEY) ?? read(LEGACY_STORAGE_KEY);
-  const migrated = current === null ? readV1Preferences() : null;
-  const raw = current ?? migrated;
-  if (!raw) return { ...DEFAULTS };
+  if (!current) return { ...DEFAULTS };
 
-  const stored = migrateSettings(raw, raw.schema);
+  const stored = migrateSettings(current, current.schema);
   const loaded = sanitize(stored, DEFAULTS);
   for (const key of PREFERENCE_KEYS) {
     if (key in stored || loaded[key] !== DEFAULTS[key]) explicit.add(key);
-  }
-  if (migrated !== null) {
-    writeJson(
-      STORAGE_KEY,
-      { ...stored, schema: SETTINGS_SCHEMA },
-      '[sable settings] migrated preferences not persisted'
-    );
   }
   return loaded;
 }

@@ -78,8 +78,6 @@ mod timeline_overlay;
 mod timelines;
 pub mod tls;
 mod utd;
-#[cfg(not(target_family = "wasm"))]
-pub mod v1_migration;
 mod verification;
 pub mod view;
 mod watchers;
@@ -134,8 +132,6 @@ pub struct Core {
     session_attempt_generation: AtomicU64,
     session_activation_lock: Mutex<()>,
     session_store_lock: Mutex<()>,
-    #[cfg(not(target_family = "wasm"))]
-    v1_migration: Mutex<Option<v1_migration::Import>>,
     credential_writers: Mutex<HashMap<String, u64>>,
     next_credential_writer: AtomicU64,
     account_clients: Mutex<HashMap<String, matrix_sdk::Client>>,
@@ -323,8 +319,6 @@ impl Core {
             session_attempt_generation: AtomicU64::new(1),
             session_activation_lock: Mutex::new(()),
             session_store_lock: Mutex::new(()),
-            #[cfg(not(target_family = "wasm"))]
-            v1_migration: Mutex::new(None),
             credential_writers: Mutex::new(HashMap::new()),
             next_credential_writer: AtomicU64::new(1),
             account_clients: Mutex::new(HashMap::new()),

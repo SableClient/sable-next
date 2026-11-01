@@ -5,7 +5,6 @@ const DATABASE_VERSION = 1;
 const STORE_NAME = 'session';
 const SESSION_KEY = 'current';
 const SEALING_KEY = 'sealing-key';
-const V1_MIGRATION_KEY = 'v1-migrated';
 
 const APP_DATABASE_PREFIX = 'sable-next';
 const ACCOUNT_STORE_INFIX = '-account-';
@@ -140,24 +139,6 @@ export async function saveSession(bytes: Uint8Array): Promise<void> {
 
 export async function clearSession(): Promise<void> {
   await (await openDatabase()).delete(STORE_NAME, SESSION_KEY);
-}
-
-export async function v1MigrationComplete(): Promise<boolean> {
-  return (await readRecord(V1_MIGRATION_KEY)) === true;
-}
-
-export async function markV1MigrationComplete(): Promise<void> {
-  await (await openDatabase()).put(STORE_NAME, true, V1_MIGRATION_KEY);
-}
-
-export async function saveV1Session(bytes: Uint8Array): Promise<void> {
-  const value = await seal(Uint8Array.from(bytes));
-  const tx = (await openDatabase()).transaction(STORE_NAME, 'readwrite');
-  await Promise.all([
-    tx.store.put(value, SESSION_KEY),
-    tx.store.put(true, V1_MIGRATION_KEY),
-    tx.done,
-  ]);
 }
 
 function deleteDatabase(name: string): Promise<void> {
