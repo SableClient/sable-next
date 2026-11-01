@@ -1,6 +1,7 @@
 <script module lang="ts">
   // iOS ignores volume changes.
   const volumeAdjustable = (() => {
+    if (typeof Audio === 'undefined') return false;
     const probe = new Audio();
     probe.volume = 0.5;
     return probe.volume === 0.5;
