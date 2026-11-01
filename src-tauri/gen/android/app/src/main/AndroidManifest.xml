@@ -98,11 +98,18 @@
                 
                 
             </intent-filter>
-            <intent-filter>
+            <intent-filter >
                 <action android:name="android.intent.action.VIEW" />
+                <!-- ChromeOS ARC++ uses a different action for deep links -->
+                <action android:name="org.chromium.arc.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="matrix.to" />
+                <data android:scheme="https" />
+                <data android:host="matrix.to" />
+                
+                
+                
+                
             </intent-filter>
             <!-- DEEP LINK PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
         </activity>
@@ -384,6 +391,9 @@
             </intent-filter>
         </activity-alias>
         <!-- APP-ICON ALIASES END -->
+        <!-- PROVIDERS FOR ANDROID FS PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
+        
+        <!-- PROVIDERS FOR ANDROID FS PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
     </application>
     <!-- ANDROID FS PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
     
