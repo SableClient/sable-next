@@ -33,6 +33,7 @@
   import { homeservers } from '../shared/homeservers.svelte.js';
   import { takeAfterLogin } from '#lib/auth/after-login.js';
   import { readText, writeJson, writeText } from '#lib/platform/local-json.js';
+  import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
 
   const core = useCoreClient();
   const isAddingAccount = page.url.searchParams.has('addAccount');
@@ -225,7 +226,7 @@
   $effect(() => {
     if (core.status !== 'ready' || !userId || pendingOnboardingTransition || isAddingAccount)
       return;
-    if (isSetupRoute || loginPending) return;
+    if (isSetupRoute || loginPending || qrLoginOpen) return;
     if (redirect.pendingIntent === 'login' && redirect.isCompleting) return;
     if (readText(profileOnboardingMarker(userId))) void openSetup();
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- takeAfterLogin() returns a resolved path
@@ -524,10 +525,13 @@
     homeserver: () => flow.homeserver.trim() || null,
     redirectUri: () => redirect.qrRedirectUri(),
   }}
-  onSignedIn={() => {
+  onSignedIn={async () => {
+    loginPending = true;
     qrLoginOpen = false;
     markLoggedIn();
-    void openSetup();
+    await afterOverlayPops();
+    await openSetup();
+    loginPending = false;
   }}
 />
 
