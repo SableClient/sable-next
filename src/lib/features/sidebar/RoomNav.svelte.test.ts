@@ -1170,3 +1170,27 @@ test('closing the rooms section hides read rows without unmounting them', async 
   expect(row('Read')).toBe(readRow);
   expect(readRow.closest('.room-row-wrap')).not.toHaveClass('closed-row');
 });
+
+test('the replaced rooms section collapses and stays collapsed', async () => {
+  visit('/rooms');
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!old:example.org', name: 'Old room', is_tombstoned: true }),
+  ];
+
+  const nav = await mountNav();
+  const heading = screen.getByRole('button', { name: 'room.replacedTitle 1' });
+  expect(heading).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByText('Old room', { selector: '.replaced-name' })).toBeInTheDocument();
+
+  await user.click(heading);
+  expect(heading).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByText('Old room', { selector: '.replaced-name' })).toBeNull();
+  nav.unmount();
+
+  await mountNav();
+  expect(screen.getByRole('button', { name: 'room.replacedTitle 1' })).toHaveAttribute(
+    'aria-expanded',
+    'false'
+  );
+  await user.click(screen.getByRole('button', { name: 'room.replacedTitle 1' }));
+});

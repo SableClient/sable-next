@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
@@ -16,6 +17,8 @@
   import {
     dismissReplacedRoom,
     isReplacedRoomDismissed,
+    replacedRoomsClosed,
+    toggleReplacedRoomsClosed,
   } from './dismissed-replaced-rooms.svelte.js';
 
   interface Props {
@@ -26,6 +29,7 @@
   const core = useCoreClient();
   const roomList = useRoomList();
   const headingId = $props.id();
+  const listId = `${headingId}-list`;
 
   let replaced = $derived(
     roomList.rooms.filter((room) => room.state === 'joined' && room.is_tombstoned)
@@ -63,69 +67,81 @@
 {:else if replaced.length > 0}
   <section class="replaced" aria-labelledby={headingId}>
     <h3 id={headingId}>
-      {i18n.t('room.replacedTitle')}
-      {#if pendingCount > 0}<span class="count">{pendingCount}</span>{/if}
+      <button
+        type="button"
+        aria-expanded={!replacedRoomsClosed()}
+        aria-controls={listId}
+        onclick={toggleReplacedRoomsClosed}
+      >
+        {i18n.t('room.replacedTitle')}
+        {#if pendingCount > 0}<span class="count">{pendingCount}</span>{/if}
+        <span class={['caret', { closed: replacedRoomsClosed() }]} aria-hidden="true"
+          ><CaretDownIcon /></span
+        >
+      </button>
     </h3>
-    <ul>
-      {#each replaced as room (room.room_id)}
-        {@const name = room.name ?? room.room_id}
-        {@const handled = isReplacedRoomDismissed(room.room_id)}
-        <li class={{ handled }}>
-          <!-- eslint-disable svelte/no-navigation-without-resolve -- roomSectionPath() resolves the route itself -->
-          <a
-            class="replaced-link"
-            href={roomSectionPath(roomList.rooms, room.room_id)}
-            draggable="false"
-          >
-            <Avatar
-              class="replaced-icon"
-              size="small"
-              id={room.room_id}
-              src={room.avatar_url}
-              {name}
-            />
-            <Tooltip label={name}>
-              {#snippet trigger({ props })}
-                <span {...props} class="replaced-name">{name}</span>
-              {/snippet}
-            </Tooltip>
-          </a>
-          <!-- eslint-enable svelte/no-navigation-without-resolve -->
-          <Tooltip label={i18n.t('room.replacedLeaveLabel', { room: name })}>
-            {#snippet trigger({ props })}
-              <IconButton
-                {...props}
-                variant="ghost"
+    {#if !replacedRoomsClosed()}
+      <ul id={listId}>
+        {#each replaced as room (room.room_id)}
+          {@const name = room.name ?? room.room_id}
+          {@const handled = isReplacedRoomDismissed(room.room_id)}
+          <li class={{ handled }}>
+            <!-- eslint-disable svelte/no-navigation-without-resolve -- roomSectionPath() resolves the route itself -->
+            <a
+              class="replaced-link"
+              href={roomSectionPath(roomList.rooms, room.room_id)}
+              draggable="false"
+            >
+              <Avatar
+                class="replaced-icon"
                 size="small"
-                label={i18n.t('room.replacedLeaveLabel', { room: name })}
-                onclick={() => {
-                  void leave(room);
-                }}
-              >
-                <SignOutIcon />
-              </IconButton>
-            {/snippet}
-          </Tooltip>
-          {#if !handled}
-            <Tooltip label={i18n.t('room.replacedDismissLabel', { room: name })}>
+                id={room.room_id}
+                src={room.avatar_url}
+                {name}
+              />
+              <Tooltip label={name}>
+                {#snippet trigger({ props })}
+                  <span {...props} class="replaced-name">{name}</span>
+                {/snippet}
+              </Tooltip>
+            </a>
+            <!-- eslint-enable svelte/no-navigation-without-resolve -->
+            <Tooltip label={i18n.t('room.replacedLeaveLabel', { room: name })}>
               {#snippet trigger({ props })}
                 <IconButton
                   {...props}
                   variant="ghost"
                   size="small"
-                  label={i18n.t('room.replacedDismissLabel', { room: name })}
+                  label={i18n.t('room.replacedLeaveLabel', { room: name })}
                   onclick={() => {
-                    dismissReplacedRoom(room.room_id);
+                    void leave(room);
                   }}
                 >
-                  <XIcon />
+                  <SignOutIcon />
                 </IconButton>
               {/snippet}
             </Tooltip>
-          {/if}
-        </li>
-      {/each}
-    </ul>
+            {#if !handled}
+              <Tooltip label={i18n.t('room.replacedDismissLabel', { room: name })}>
+                {#snippet trigger({ props })}
+                  <IconButton
+                    {...props}
+                    variant="ghost"
+                    size="small"
+                    label={i18n.t('room.replacedDismissLabel', { room: name })}
+                    onclick={() => {
+                      dismissReplacedRoom(room.room_id);
+                    }}
+                  >
+                    <XIcon />
+                  </IconButton>
+                {/snippet}
+              </Tooltip>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
   </section>
 {/if}
 
@@ -135,15 +151,56 @@
   }
 
   h3 {
+    margin: 0;
+  }
+
+  h3 button {
     align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius);
     color: var(--bg-on-container);
+    cursor: pointer;
     display: flex;
+    font: inherit;
     font-size: var(--font-size-label);
     font-weight: var(--font-weight-500);
     gap: var(--space-200);
-    margin: 0;
+    height: var(--control-height-medium);
     opacity: var(--opacity-p300);
     padding: 0 var(--space-200);
+    text-align: left;
+    width: 100%;
+  }
+
+  h3 button:focus-visible {
+    background: var(--bg-container-hover);
+  }
+
+  @media (any-hover: hover) and (any-pointer: fine) {
+    h3 button:hover {
+      background: var(--bg-container-hover);
+    }
+  }
+
+  .caret {
+    display: inline-flex;
+    line-height: 0;
+  }
+
+  .caret.closed {
+    transform: rotate(-90deg);
+  }
+
+  .caret :global(svg) {
+    height: 1rem;
+    width: 1rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .caret {
+      transition: transform var(--duration-fast) var(--ease-smooth-out);
+    }
   }
 
   .count {
