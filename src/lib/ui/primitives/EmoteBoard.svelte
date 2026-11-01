@@ -788,7 +788,7 @@
                   </div>
                 {:else}
                   <ul
-                    style={`grid-template-columns: repeat(${String(emojiColumns)}, minmax(0, var(--emote-cell)))`}
+                    style={`grid-template-columns: repeat(${String(imageColumns)}, var(--emote-cell))`}
                     {@attach measureImageRow}
                   >
                     {#each row.images as image, column (column)}

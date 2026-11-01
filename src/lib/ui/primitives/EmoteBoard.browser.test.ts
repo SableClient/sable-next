@@ -148,14 +148,19 @@ test('sticker rows keep every cell whole on one line', async () => {
   await expect.element(screen.getByRole('button', { name: ':alpha0:', exact: true })).toBeVisible();
 
   const rows = [...document.querySelectorAll('.grids ul')].map((list) =>
-    [...list.children].map((cell) => {
+    [...list.querySelectorAll('button')].map((cell) => {
       const box = cell.getBoundingClientRect();
-      return { top: box.top, bottom: box.bottom };
+      return { top: box.top, bottom: box.bottom, left: box.left, right: box.right };
     })
   );
   expect(rows.length).toBeGreaterThan(1);
   for (const [index, cells] of rows.entries()) {
     expect(new Set(cells.map((cell) => cell.top)).size, `row ${String(index)}`).toBe(1);
+    for (let column = 1; column < cells.length; column += 1) {
+      expect(cells[column - 1]?.right, `row ${String(index)}`).toBeLessThanOrEqual(
+        cells[column]?.left ?? 0
+      );
+    }
   }
   for (let index = 1; index < rows.length; index += 1) {
     const bottom = Math.max(...(rows[index - 1] ?? []).map((cell) => cell.bottom));
