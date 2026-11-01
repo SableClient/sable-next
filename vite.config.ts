@@ -85,6 +85,8 @@ export default defineConfig({
     }),
     sveltekit({
       csp: serverMode ? { mode: 'hash' } : undefined,
+      // Defaults to the build time, which breaks reproducible APKs.
+      version: { name: process.env.VITE_APP_VERSION },
       preprocess: vitePreprocess(),
       compilerOptions: {
         // Force runes mode for the project, except for libraries. Can be removed in svelte 6.
