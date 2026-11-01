@@ -56,11 +56,12 @@ function isSealed(value: unknown): value is Sealed {
   );
 }
 
-let sealingKey: Promise<CryptoKey> | undefined;
+let sealingKey: Promise<CryptoKey | null> | undefined;
 
 // Only keeps the raw key from being exported. Same-origin scripts can still use it, and the
 // browser keeps it beside the data it seals, so anyone holding the profile can read both.
-function loadSealingKey(): Promise<CryptoKey> {
+// Null when WebKit's shared worker cannot store a CryptoKey: Safari keeps the session unsealed.
+function loadSealingKey(): Promise<CryptoKey | null> {
   sealingKey ??= (async () => {
     const saved = await readRecord(SEALING_KEY);
     if (saved instanceof CryptoKey) return saved;
@@ -70,9 +71,13 @@ function loadSealingKey(): Promise<CryptoKey> {
       ['encrypt', 'decrypt']
     );
     // Another context may have saved its key first: theirs wins.
-    await (await openDatabase()).add(STORE_NAME, key, SEALING_KEY).catch((error: unknown) => {
-      if (!(error instanceof DOMException && error.name === 'ConstraintError')) throw error;
-    });
+    try {
+      await (await openDatabase()).add(STORE_NAME, key, SEALING_KEY);
+    } catch (error) {
+      if (!(error instanceof DOMException)) throw error;
+      if (error.name === 'DataCloneError') return null;
+      if (error.name !== 'ConstraintError') throw error;
+    }
     const kept = await readRecord(SEALING_KEY);
     if (!(kept instanceof CryptoKey)) throw new Error('Could not keep the session sealing key');
     return kept;
@@ -83,13 +88,11 @@ function loadSealingKey(): Promise<CryptoKey> {
   return sealingKey;
 }
 
-async function seal(bytes: Uint8Array<ArrayBuffer>): Promise<Sealed> {
+async function seal(bytes: Uint8Array<ArrayBuffer>): Promise<Sealed | Uint8Array> {
+  const key = await loadSealingKey();
+  if (!key) return bytes;
   const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
-  const data = await globalThis.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    await loadSealingKey(),
-    bytes
-  );
+  const data = await globalThis.crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes);
   return { iv, data };
 }
 
@@ -108,12 +111,13 @@ export async function loadSession(): Promise<Uint8Array | null> {
   const value = await readRecord(SESSION_KEY);
   if (isSealed(value)) {
     try {
+      const key = await loadSealingKey();
+      if (!key) {
+        console.warn('The saved session can no longer be opened; signing out');
+        return null;
+      }
       return new Uint8Array(
-        await globalThis.crypto.subtle.decrypt(
-          { name: 'AES-GCM', iv: value.iv },
-          await loadSealingKey(),
-          value.data
-        )
+        await globalThis.crypto.subtle.decrypt({ name: 'AES-GCM', iv: value.iv }, key, value.data)
       );
     } catch (error) {
       if (error instanceof DOMException && error.name === 'OperationError') {
