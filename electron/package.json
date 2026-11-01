@@ -21,7 +21,7 @@
     "package": "node package.mjs"
   },
   "optionalDependencies": {
-    "@vencord/venmic": "7.2.3"
+    "@vencord/venmic": "7.2.5"
   },
   "devDependencies": {
     "@sentry/electron": "8.3.0",
