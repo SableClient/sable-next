@@ -34,6 +34,52 @@ function sharesStem(word: string, term: string): boolean {
   );
 }
 
+// Keep in sync with allowed_typos in crates/sable-core/src/search/inverted.rs.
+function allowedTypos(term: readonly string[]): number {
+  if (term.some((character) => /\p{N}/u.test(character)) || term.length < 5) return 0;
+  return term.length < 9 ? 1 : 2;
+}
+
+function osaDistance(left: readonly string[], right: readonly string[]): number {
+  const rows = Array.from({ length: left.length + 1 }, (_, row) =>
+    Array.from({ length: right.length + 1 }, (_, column) => (row === 0 ? column : row))
+  );
+  for (let row = 1; row <= left.length; row++) {
+    for (let column = 1; column <= right.length; column++) {
+      const cost = left[row - 1] === right[column - 1] ? 0 : 1;
+      rows[row][column] = Math.min(
+        rows[row - 1][column] + 1,
+        rows[row][column - 1] + 1,
+        rows[row - 1][column - 1] + cost
+      );
+      if (
+        row > 1 &&
+        column > 1 &&
+        left[row - 1] === right[column - 2] &&
+        left[row - 2] === right[column - 1]
+      ) {
+        rows[row][column] = Math.min(rows[row][column], rows[row - 2][column - 2] + 1);
+      }
+    }
+  }
+  return rows[left.length][right.length];
+}
+
+function nearlyMatches(word: string, term: string): boolean {
+  const left = Array.from(word.toLocaleLowerCase());
+  const right = Array.from(term.toLocaleLowerCase());
+  const budget = allowedTypos(right);
+  if (budget === 0 || left[0] !== right[0]) return false;
+  if (osaDistance(left, right) <= budget) return true;
+
+  const [low, high] = MIN_STEM_RATIO;
+  return (
+    left.length > right.length &&
+    right.length * high >= left.length * low &&
+    osaDistance(left.slice(0, right.length), right) <= budget
+  );
+}
+
 function phraseRanges(body: string, phrase: string): Range[] {
   const escaped = escapeStringRegexp(phrase.trim());
   if (escaped === '') return [];
@@ -48,7 +94,7 @@ function matchRanges(body: string, terms: readonly string[]): Range[] {
   const ranges = phrases.flatMap((phrase) => phraseRanges(body, phrase));
 
   for (const match of body.matchAll(WORD)) {
-    if (words.some((term) => sharesStem(match[0], term))) {
+    if (words.some((term) => sharesStem(match[0], term) || nearlyMatches(match[0], term))) {
       ranges.push([match.index, match.index + match[0].length]);
     }
   }

@@ -91,7 +91,7 @@ async fn test_pending_chinese_reindex() {
         Vec::new(),
     ));
     // Simulate indexing before the dictionary is available.
-    room_index.index = probly_search::Index::new(crate::search::BODY_FIELD_COUNT);
+    room_index.index = crate::search::inverted::InvertedIndex::with_capacity(0);
     room_index
         .chinese_pending
         .extend(room_index.documents.keys().copied());

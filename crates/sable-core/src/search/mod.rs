@@ -3,6 +3,7 @@ mod core_api;
 mod crawl;
 mod document;
 mod index;
+mod inverted;
 mod network;
 pub(crate) use network::CrawlNetwork;
 mod dictionary;
@@ -37,8 +38,6 @@ use self::index::RoomIndex;
 pub(crate) use self::index::{ContextLine, Hit, MessageIndex};
 use crate::messages::valid_replacements;
 
-const BODY_FIELD_COUNT: usize = 1;
-const BODY_FIELD_BOOST: [f64; BODY_FIELD_COUNT] = [1.0];
 const EVENTS_PER_INGEST_YIELD: usize = 16;
 const DOCUMENTS_PER_RESTORE_YIELD: usize = 256;
 const INGEST_WAIT: Duration = Duration::from_millis(25);

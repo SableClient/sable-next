@@ -2,6 +2,21 @@ use crate::api::search::SearchOrder;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::time::Duration;
 
+use super::chunks::{Saved, document_bytes, split_chunk};
+use super::document::{
+    Document, FoldedTerms, adopt_edit, document_of, latest_content, poll_start_document,
+    provisional_edit, replacement_of, state_document, sticker_document, with_edit,
+};
+use super::inverted::InvertedIndex;
+use super::persist::{self, ChunkId};
+use super::{
+    CHANGES_BEFORE_FLUSH, CLASSIFIED_OVERHEAD, DISK_BUDGET, DOCUMENT_OVERHEAD,
+    DOCUMENTS_PER_RESTORE_YIELD, EVENTS_PER_INGEST_YIELD, HYDRATE_BATCH, INITIAL_DOCUMENTS,
+    IndexFilter, MEMORY_BUDGET, RETIRED_KEYS_BEFORE_VACUUM, TICKS_BEFORE_FLUSH, crawl,
+    edit_is_valid, edited_or_own_event_id, now_ms, redacted_event_id, tokenize,
+};
+use crate::messages::raw_content;
+use crate::protocol::{RoomAttachmentContentView, RoomAttachmentKind, RoomAttachmentView};
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::event_cache::RoomEventCache;
 use matrix_sdk::ruma::events::room::message::SyncRoomMessageEvent;
@@ -11,33 +26,11 @@ use matrix_sdk::ruma::events::{
 };
 use matrix_sdk::ruma::room_version_rules::RedactionRules;
 use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId, RoomId};
-use probly_search::{Index, score::bm25};
-
-use super::chunks::{Saved, document_bytes, split_chunk};
-use super::document::{
-    Document, FoldedTerms, adopt_edit, document_of, latest_content, poll_start_document,
-    provisional_edit, replacement_of, state_document, sticker_document, with_edit,
-};
-use super::persist::{self, ChunkId};
-use super::{
-    BODY_FIELD_BOOST, BODY_FIELD_COUNT, CHANGES_BEFORE_FLUSH, CLASSIFIED_OVERHEAD, DISK_BUDGET,
-    DOCUMENT_OVERHEAD, DOCUMENTS_PER_RESTORE_YIELD, EVENTS_PER_INGEST_YIELD, HYDRATE_BATCH,
-    INITIAL_DOCUMENTS, IndexFilter, MEMORY_BUDGET, RETIRED_KEYS_BEFORE_VACUUM, TICKS_BEFORE_FLUSH,
-    crawl, edit_is_valid, edited_or_own_event_id, now_ms, redacted_event_id, tokenize,
-};
-use crate::messages::raw_content;
-use crate::protocol::{RoomAttachmentContentView, RoomAttachmentKind, RoomAttachmentView};
 
 type DocKey = u32;
 
-struct Body(String);
-
-fn body_field(body: &Body) -> Vec<&str> {
-    vec![body.0.as_str()]
-}
-
 pub(super) struct RoomIndex {
-    pub(super) index: Index<DocKey>,
+    pub(super) index: InvertedIndex<DocKey>,
     pub(super) documents: HashMap<DocKey, Document>,
     pub(super) key_of: HashMap<OwnedEventId, DocKey>,
     pub(super) classified: HashMap<OwnedEventId, u64>,
@@ -74,7 +67,7 @@ impl RoomIndex {
 
     fn sized(documents: usize) -> Self {
         Self {
-            index: Index::new_with_capacity(BODY_FIELD_COUNT, documents, documents),
+            index: InvertedIndex::with_capacity(documents),
             documents: HashMap::new(),
             key_of: HashMap::new(),
             classified: HashMap::new(),
@@ -505,19 +498,13 @@ impl RoomIndex {
 
         let key = self.take_unused_key();
         let folded = document.body.to_lowercase();
-        let body = Body(document.body);
-        self.index
-            .add_document(&[body_field], tokenize::tokenize, key, &body);
+        self.index.add_document(key, &document.body);
         self.key_of.insert(document.event_id.clone(), key);
         if chinese_pending {
             self.chinese_pending.insert(key);
         }
         self.by_age.insert((document.origin_server_ts, key));
-        let document = Document {
-            body: body.0,
-            folded,
-            ..document
-        };
+        let document = Document { folded, ..document };
         self.bytes += document_bytes(&document);
         self.documents.insert(key, document);
     }
@@ -582,18 +569,13 @@ impl RoomIndex {
         }
 
         self.index
-            .query(
-                query,
-                &mut bm25::new(),
-                tokenize::tokenize,
-                &BODY_FIELD_BOOST,
-            )
+            .query(query)
             .into_iter()
-            .filter_map(|result| {
-                let document = self.documents.get(&result.key)?;
+            .filter_map(|(key, score)| {
+                let document = self.documents.get(&key)?;
                 document
                     .matches(filter, terms)
-                    .then(|| Ranked::from_document(room_id, document, result.score))
+                    .then(|| Ranked::from_document(room_id, document, score))
             })
             .collect()
     }
@@ -661,17 +643,12 @@ impl MessageIndex {
             .filter(|room| !room.chinese_pending.is_empty())
         {
             let count = room.documents.len();
-            let mut index = Index::new_with_capacity(BODY_FIELD_COUNT, count, count);
+            let mut index = InvertedIndex::with_capacity(count);
             for (position, (&key, document)) in room.documents.iter().enumerate() {
                 if position > 0 && position.is_multiple_of(DOCUMENTS_PER_RESTORE_YIELD) {
                     matrix_sdk::sleep::sleep(Duration::ZERO).await;
                 }
-                index.add_document(
-                    &[|body: &String| vec![body.as_str()]],
-                    tokenize::tokenize,
-                    key,
-                    &document.body,
-                );
+                index.add_document(key, &document.body);
             }
             room.index = index;
             room.retired_keys = 0;
@@ -1381,30 +1358,18 @@ fn rank_cold_documents(
             .map(|(position, _)| (position, 0.0))
             .collect()
     } else {
-        let mut scratch: Index<usize> =
-            Index::new_with_capacity(BODY_FIELD_COUNT, documents.len(), documents.len());
+        let mut scratch = InvertedIndex::with_capacity(documents.len());
         for (position, document) in documents.iter().enumerate() {
-            scratch.add_document(
-                &[body_field],
-                tokenize::tokenize,
-                position,
-                &Body(document.body.clone()),
-            );
+            scratch.add_document(position, &document.body);
         }
         scratch
-            .query(
-                query,
-                &mut bm25::new(),
-                tokenize::tokenize,
-                &BODY_FIELD_BOOST,
-            )
+            .query(query)
             .into_iter()
-            .filter(|result| {
+            .filter(|(position, _)| {
                 documents
-                    .get(result.key)
+                    .get(*position)
                     .is_some_and(|document| document.matches(filter, terms))
             })
-            .map(|result| (result.key, result.score))
             .collect()
     };
 
