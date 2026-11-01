@@ -204,12 +204,12 @@ export class MessageActionExecutor {
 
     async function openSource(eventId: string): Promise<void> {
       try {
-        const { source, encrypted, original } = await core.rpc.timeline.eventSource({
+        const { source, encrypted, original, encryption } = await core.rpc.timeline.eventSource({
           room_id: roomId,
           event_id: eventId,
           include_original: true,
         });
-        dialogs.open(item, { kind: 'source', source, encrypted, original });
+        dialogs.open(item, { kind: 'source', source, encrypted, original, encryption });
       } catch (error) {
         console.warn('[sable timeline] source unavailable', error);
         toasts.error(t('errors.actionFailed'));

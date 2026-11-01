@@ -180,7 +180,9 @@ function timelineViewport(): HTMLElement {
 test('expanding a member group exposes the original event source', async () => {
   const roomTimeline = timeline();
   const source = JSON.stringify({ event_id: '$first' });
-  const eventSource = vi.fn(() => Promise.resolve({ source, encrypted: false, original: null }));
+  const eventSource = vi.fn(() =>
+    Promise.resolve({ source, encrypted: false, original: null, encryption: null })
+  );
   Object.assign(core.rpc.timeline, { eventSource });
   roomTimeline.items = ['first', 'last'].map((id): TimelineItemView =>
     withRowFields({

@@ -12,9 +12,16 @@
     source: string;
     encrypted?: boolean;
     original?: string | null;
+    encryption?: string | null;
   }
 
-  let { open = $bindable(false), source, encrypted = false, original = null }: Props = $props();
+  let {
+    open = $bindable(false),
+    source,
+    encrypted = false,
+    original = null,
+    encryption = null,
+  }: Props = $props();
   let copied = $state(false);
 
   async function copy(): Promise<void> {
@@ -37,6 +44,10 @@
   {#if original}
     <h3>{i18n.t('timeline.sourceOriginal')}</h3>
     <pre class="source" {@attach scrollHint}>{original}</pre>
+  {/if}
+  {#if encryption}
+    <h3>{i18n.t('timeline.sourceEncryption')}</h3>
+    <pre class="source" {@attach scrollHint}>{encryption}</pre>
   {/if}
   <FormActions>
     <Button variant="secondary" onclick={copy}>

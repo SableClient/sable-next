@@ -382,19 +382,21 @@ pub struct EventSourceOk {
     pub source: String,
     pub encrypted: bool,
     pub original: Option<String>,
+    pub encryption: Option<String>,
 }
 
 impl Handler for EventSourceParams {
     type Ok = EventSourceOk;
 
     async fn run(self, core: &Arc<Core>) -> Result<EventSourceOk, RpcError> {
-        let (source, encrypted, original) = core
+        let (source, encrypted, original, encryption) = core
             .event_source(&self.room_id, &self.event_id, self.include_original)
             .await?;
         Ok(EventSourceOk {
             source,
             encrypted,
             original,
+            encryption,
         })
     }
 }

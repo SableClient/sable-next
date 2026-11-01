@@ -1543,6 +1543,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               : '{}',
         encrypted: false,
         original: null,
+        encryption: null,
       }),
       'timeline.edit_history': () => [],
       'timeline.read_marker': (params) => fullyReadEventId(params.room_id),

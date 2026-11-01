@@ -732,7 +732,7 @@ impl Core {
         room_id: &OwnedRoomId,
         event_id: &OwnedEventId,
         include_original: bool,
-    ) -> Result<(String, bool, Option<String>), RpcError> {
+    ) -> Result<(String, bool, Option<String>, Option<String>), RpcError> {
         let event = self
             .room(room_id)
             .await?
@@ -760,7 +760,16 @@ impl Core {
         } else {
             None
         };
-        Ok((pretty_json(event.raw().json().get()), encrypted, original))
+        let encryption = match event.encryption_info() {
+            Some(info) if include_original => self.encryption_details(room_id, info).await,
+            _ => None,
+        };
+        Ok((
+            pretty_json(event.raw().json().get()),
+            encrypted,
+            original,
+            encryption,
+        ))
     }
 
     pub(crate) async fn forward_message(

@@ -59,6 +59,7 @@ function fixture() {
     source: string;
     encrypted: boolean;
     original: string | null;
+    encryption: string | null;
   }>();
   const removeLinkPreviews = vi.fn(() => Promise.resolve());
   const deps = {
@@ -125,6 +126,7 @@ test('source lookup keeps the event selected when the action began', async () =>
     source: '{"event_id":"$item"}',
     encrypted: true,
     original: '{"type":"m.room.encrypted"}',
+    encryption: '{"session":null}',
   });
   await source.promise;
   await Promise.resolve();
@@ -133,6 +135,7 @@ test('source lookup keeps the event selected when the action began', async () =>
     source: '{"event_id":"$item"}',
     encrypted: true,
     original: '{"type":"m.room.encrypted"}',
+    encryption: '{"session":null}',
   });
 });
 

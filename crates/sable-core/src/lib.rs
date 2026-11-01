@@ -16,6 +16,7 @@ mod cosmetics;
 #[cfg(not(target_family = "wasm"))]
 mod credentials;
 mod delayed_events;
+mod encryption_details;
 mod errors;
 mod gestures;
 pub use errors::CoreError;

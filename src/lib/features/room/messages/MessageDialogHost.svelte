@@ -189,6 +189,7 @@
       source={entry.source}
       encrypted={entry.encrypted}
       original={entry.original}
+      encryption={entry.encryption}
     />
   {:else if entry.kind === 'edit-history'}
     <EditHistoryDialog

@@ -3259,6 +3259,7 @@ export type Rpc = {
 	source: string,
 	encrypted: boolean,
 	original: string | null,
+	encryption: string | null,
 }>;
     editHistory: (params: {
 	room_id: string,
