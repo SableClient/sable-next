@@ -3,10 +3,11 @@ use matrix_sdk::ruma::push::{
     Ruleset, SoundTweakValue, Tweak,
 };
 
-use super::{
-    RING_ONE_TO_ONE, RTC_INVITE_TYPES, RTC_SERVER_ROOM_RULES, RTC_SERVER_USER_RULES, RuleWrite,
-    SUPPRESS_REACTIONS, is_rtc_rule, level, notifies, plan_level, rule_notifies,
+use super::alignment::{
+    RING_ONE_TO_ONE, RTC_INVITE_TYPES, RTC_SERVER_ROOM_RULES, RTC_SERVER_USER_RULES,
+    SUPPRESS_REACTIONS, is_rtc_rule,
 };
+use super::{RuleWrite, level, notifies, plan_level, rule_notifies};
 use crate::errors::CoreError;
 use crate::protocol::{
     EventNotificationView, EventNotificationsView, MentionNotificationModeView,
