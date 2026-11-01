@@ -33,6 +33,7 @@
     hydrateCatalogThemes,
     updateCatalogThemes,
     themePreview,
+    watchThemeFiles,
   } from '#lib/settings/custom-themes.svelte.js';
   import {
     applyCustomTheme,
@@ -68,6 +69,8 @@
   const alertProviders = ALERT_MODULES.map((component) => component.priorityProvider());
   provideAlertProviders(alertProviders);
   let titlebar = $derived(titleBarKind(preferences.useCustomTitleBar));
+
+  onMount(watchThemeFiles);
 
   onMount(() => {
     mounted = true;

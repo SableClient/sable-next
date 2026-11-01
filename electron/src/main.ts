@@ -16,6 +16,7 @@ import {
   type DesktopCapturerSource,
   type IpcMainEvent,
   type IpcMainInvokeEvent,
+  type OpenDialogOptions,
   type UtilityProcess,
   type WebFrameMain,
 } from 'electron';
@@ -32,6 +33,7 @@ import type {
   PickedFile,
   PickFilesRequest,
   SaveFileRequest,
+  ThemeFileSnapshot,
 } from '../../src/lib/platform/file-dialog-types';
 
 import { deepLinksIn, deepLinkSchemes } from './deep-links';
@@ -45,6 +47,7 @@ import { enforcePermissions } from './permissions';
 import { flushWritesBeforeQuit, writeJson } from './persistence';
 import { writeDownload } from './downloads';
 import { shareFile } from './share';
+import { readThemeFile } from './theme-files';
 import * as screenAudio from './screen-audio';
 import { available as screenAudioAvailable } from './audiofox';
 import { screenShareStreams } from './screen-share';
@@ -683,6 +686,31 @@ ipcMain.handle('sable-pick-files', async (event, request: unknown) => {
     picked.push({ name: basename(filePath), bytes: new Uint8Array(await readFile(filePath)) });
   }
   return picked;
+});
+
+ipcMain.handle('sable-pick-theme-files', async (event) => {
+  if (!isAppFrame(event.senderFrame)) return [];
+  const window = BrowserWindow.fromWebContents(event.sender);
+  const options: OpenDialogOptions = {
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'CSS', extensions: ['css'] }],
+  };
+  const { canceled, filePaths } = window
+    ? await dialog.showOpenDialog(window, options)
+    : await dialog.showOpenDialog(options);
+  if (canceled) return [];
+
+  const picked: ThemeFileSnapshot[] = [];
+  for (const filePath of filePaths) {
+    const file = await readThemeFile(filePath, null);
+    if (file) picked.push(file);
+  }
+  return picked;
+});
+
+ipcMain.handle('sable-read-theme-file', (event, path: unknown, since: unknown) => {
+  if (!isAppFrame(event.senderFrame) || typeof path !== 'string') return null;
+  return readThemeFile(path, typeof since === 'number' ? since : null);
 });
 
 ipcMain.handle('sable-save-file', async (event, request: unknown) => {

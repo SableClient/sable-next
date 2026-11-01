@@ -2,18 +2,27 @@
 
 import { afterEach, expect, test, vi } from 'vitest';
 
+const themeFiles = vi.hoisted(() => ({
+  watchesThemeFiles: vi.fn(() => true),
+  readThemeFile: vi.fn(),
+}));
+vi.mock('#lib/platform/theme-files.js', () => themeFiles);
+
 import {
   customThemes,
   hydrateCatalogThemes,
   installCustomTheme,
   installCustomTweak,
+  linkThemeFile,
   removeCustomTheme,
   removeCustomTweak,
   replaceCustomThemes,
   updateCatalogThemes,
+  watchThemeFiles,
 } from './custom-themes.svelte.js';
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   replaceCustomThemes({
     themes: [],
@@ -159,4 +168,58 @@ test('a failed refresh keeps the installed css and is retried at once', async ()
   } finally {
     vi.useRealTimers();
   }
+});
+
+const night = '/* @sable-theme\nname: Night\nkind: dark\n*/ :root { --bg: #000; }';
+const dusk = '/* @sable-theme\nname: Dusk\nkind: dark\n*/ :root { --bg: #111; }';
+
+async function poll(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(1000);
+}
+
+function watch(): () => void {
+  vi.useFakeTimers();
+  return watchThemeFiles();
+}
+
+test('a linked theme file reloads when it changes on disk', async () => {
+  installCustomTheme({ id: 'night', name: 'Night', kind: 'dark', css: night });
+  linkThemeFile('night', { path: '/home/me/night.sable.css', modified: 1, css: night });
+  themeFiles.readThemeFile.mockResolvedValueOnce({ path: '', modified: 2, css: dusk });
+  const stop = watch();
+
+  await poll();
+  expect(themeFiles.readThemeFile).toHaveBeenCalledWith('/home/me/night.sable.css', 1);
+  expect(customThemes.themes[0]).toMatchObject({ id: 'night', name: 'Dusk', css: dusk });
+  expect(customThemes.darkThemeId).toBe('night');
+
+  await poll();
+  expect(themeFiles.readThemeFile).toHaveBeenLastCalledWith('/home/me/night.sable.css', 2);
+  stop();
+});
+
+test('a linked file that turns into another kind of theme is ignored', async () => {
+  installCustomTheme({ id: 'night', name: 'Night', kind: 'dark', css: night });
+  linkThemeFile('night', { path: '/home/me/night.sable.css', modified: 1, css: night });
+  themeFiles.readThemeFile.mockResolvedValueOnce({
+    path: '',
+    modified: 2,
+    css: night.replace('kind: dark', 'kind: light'),
+  });
+  const stop = watch();
+
+  await poll();
+  expect(customThemes.themes[0].css).toBe(night);
+  stop();
+});
+
+test('removing a linked theme stops watching its file', async () => {
+  installCustomTheme({ id: 'night', name: 'Night', kind: 'dark', css: night });
+  linkThemeFile('night', { path: '/home/me/night.sable.css', modified: 1, css: night });
+  removeCustomTheme('night');
+  const stop = watch();
+
+  await poll();
+  expect(themeFiles.readThemeFile).not.toHaveBeenCalled();
+  stop();
 });

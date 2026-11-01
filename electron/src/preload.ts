@@ -3,6 +3,7 @@ import type {
   PickedFile,
   PickFilesRequest,
   SaveFileRequest,
+  ThemeFileSnapshot,
 } from '../../src/lib/platform/file-dialog-types';
 import type { ScreenAudioListing } from '../../src/lib/platform/screen-audio-types';
 
@@ -119,6 +120,10 @@ contextBridge.exposeInMainWorld('sableElectron', {
   unmuteScreenAudio: () => ipcRenderer.invoke('sable-screen-audio-unmute') as Promise<void>,
   pickFiles: (request: PickFilesRequest) =>
     ipcRenderer.invoke('sable-pick-files', request) as Promise<PickedFile[] | null>,
+  pickThemeFiles: () =>
+    ipcRenderer.invoke('sable-pick-theme-files') as Promise<ThemeFileSnapshot[]>,
+  readThemeFile: (path: string, since: number | null) =>
+    ipcRenderer.invoke('sable-read-theme-file', path, since) as Promise<ThemeFileSnapshot | null>,
   saveFile: (request: SaveFileRequest) =>
     ipcRenderer.invoke('sable-save-file', request) as Promise<{ path: string } | null>,
   shareFile: (request: PickedFile) =>

@@ -1,9 +1,15 @@
 import { catalogFileUrl, fetchCatalogFile } from '#lib/settings/theme-catalog.js';
+import type { ThemeFileSnapshot } from '#lib/platform/file-dialog-types.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
+import { readThemeFile, watchesThemeFiles } from '#lib/platform/theme-files.js';
+
+import { parseThemeFile } from './theme-file.js';
 
 import type { ResolvedTheme } from './theme.js';
 
 const STORAGE_KEY = 'sable-custom-themes';
+const FILE_LINKS_KEY = 'sable-theme-files';
+const FILE_POLL_MS = 1000;
 
 export type CustomTheme = {
   id: string;
@@ -84,8 +90,91 @@ function load(): StoredThemes {
 
 export const customThemes = $state<StoredThemes>(load());
 
+type ThemeFileLink = { path: string; modified: number };
+
+function isFileLink(value: unknown): value is ThemeFileLink {
+  const link = value as Partial<ThemeFileLink> | null;
+  return typeof link?.path === 'string' && typeof link.modified === 'number';
+}
+
+function readFileLinks(value: unknown): Record<string, ThemeFileLink> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter(([, link]) => isFileLink(link)));
+}
+
+let fileLinks = readJson(FILE_LINKS_KEY, readFileLinks, {});
+
+function persistFileLinks(): void {
+  writeJson(FILE_LINKS_KEY, fileLinks, '[sable themes] theme files not persisted');
+}
+
+function pruneFileLinks(): void {
+  const held = new Set([...customThemes.themes, ...customThemes.tweaks].map((entry) => entry.id));
+  const kept = Object.entries(fileLinks).filter(([id]) => held.has(id));
+  if (kept.length === Object.keys(fileLinks).length) return;
+  fileLinks = Object.fromEntries(kept);
+  persistFileLinks();
+}
+
 function persist(): void {
   writeJson(STORAGE_KEY, customThemes, '[sable themes] themes not persisted');
+  pruneFileLinks();
+}
+
+export function linkThemeFile(id: string, file: ThemeFileSnapshot): void {
+  fileLinks = { ...fileLinks, [id]: { path: file.path, modified: file.modified } };
+  persistFileLinks();
+}
+
+function reloadThemeFile(id: string, css: string): void {
+  const theme = customThemes.themes.find((entry) => entry.id === id);
+  const tweak = customThemes.tweaks.find((entry) => entry.id === id);
+  const current = theme ?? tweak;
+  if (!current || current.css === css) return;
+  const parsed = parseThemeFile(css, current.name);
+  if (typeof parsed === 'string') return;
+  if (theme && parsed.kind === 'theme' && parsed.theme.kind === theme.kind) {
+    customThemes.themes = customThemes.themes.map((entry) =>
+      entry.id === id ? { ...entry, name: parsed.theme.name, css } : entry
+    );
+    persist();
+  } else if (tweak && parsed.kind === 'tweak') {
+    customThemes.tweaks = customThemes.tweaks.map((entry) =>
+      entry.id === id ? { ...entry, name: parsed.tweak.name, css } : entry
+    );
+    persist();
+  }
+}
+
+async function pollThemeFiles(): Promise<void> {
+  await Promise.all(
+    Object.entries(fileLinks).map(async ([id, { path, modified }]) => {
+      try {
+        const file = await readThemeFile(path, modified);
+        if (!file || !(id in fileLinks)) return;
+        fileLinks = { ...fileLinks, [id]: { path, modified: file.modified } };
+        persistFileLinks();
+        reloadThemeFile(id, file.css);
+      } catch (error) {
+        console.debug('[sable themes] theme file not read', path, error);
+      }
+    })
+  );
+}
+
+export function watchThemeFiles(): () => void {
+  if (!watchesThemeFiles()) return () => {};
+  let polling = false;
+  const timer = setInterval(() => {
+    if (polling || Object.keys(fileLinks).length === 0) return;
+    polling = true;
+    void pollThemeFiles().finally(() => {
+      polling = false;
+    });
+  }, FILE_POLL_MS);
+  return () => {
+    clearInterval(timer);
+  };
 }
 
 export function installCustomTheme(theme: CustomTheme, activate = true): void {

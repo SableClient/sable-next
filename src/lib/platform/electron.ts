@@ -1,5 +1,10 @@
 import type { UpdateChannel, WebRtcIpPolicy } from '#lib/settings/preferences.svelte.js';
-import type { PickedFile, PickFilesRequest, SaveFileRequest } from './file-dialog-types';
+import type {
+  PickedFile,
+  PickFilesRequest,
+  SaveFileRequest,
+  ThemeFileSnapshot,
+} from './file-dialog-types';
 import type { ScreenAudioChoice } from './screen-audio-stream';
 import type { ScreenAudioListing } from './screen-audio-types';
 import type { DesktopWindowSettings, DesktopWindowState } from './window-decorations';
@@ -52,6 +57,8 @@ export interface ElectronBridge {
   stopScreenAudio(): Promise<void>;
   unmuteScreenAudio(): Promise<void>;
   pickFiles(request: PickFilesRequest): Promise<PickedFile[] | null>;
+  pickThemeFiles(): Promise<ThemeFileSnapshot[]>;
+  readThemeFile(path: string, since: number | null): Promise<ThemeFileSnapshot | null>;
   saveFile(request: SaveFileRequest): Promise<{ path: string } | null>;
   shareFile(request: PickedFile): Promise<void>;
   checkForUpdate(): Promise<{ version: string; notes: string | undefined } | null>;

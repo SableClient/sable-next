@@ -20,6 +20,8 @@ mod network;
 mod notifications;
 mod sentry;
 mod share_inbox;
+#[cfg(desktop)]
+mod theme_files;
 
 use std::{
     collections::HashMap,
@@ -759,6 +761,10 @@ pub fn run() {
             sentry::set_native_sentry_enabled,
             debug_log::set_debug_logs,
             has_geolocation,
+            #[cfg(desktop)]
+            theme_files::pick_theme_files,
+            #[cfg(desktop)]
+            theme_files::read_theme_file,
             #[cfg(target_os = "ios")]
             ios::save_media_to_photos,
             #[cfg(target_os = "ios")]

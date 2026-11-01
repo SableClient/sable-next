@@ -19,3 +19,9 @@ export interface SaveFileRequest {
   filters: FileFilter[];
   askLocation: boolean;
 }
+
+export interface ThemeFileSnapshot {
+  path: string;
+  modified: number;
+  css: string;
+}
