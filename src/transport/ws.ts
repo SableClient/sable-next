@@ -313,11 +313,14 @@ export function createWsTransport(options: WsTransportOptions): Transport {
         '/_sable/send-gallery',
         {
           room_id: gallery.roomId,
-          attachments: gallery.attachments.map(({ filename, mime, info = null }) => ({
-            filename,
-            mime,
-            info,
-          })),
+          attachments: gallery.attachments.map(
+            ({ filename, mime, info = null, spoiler = false }) => ({
+              filename,
+              mime,
+              info,
+              spoiler,
+            })
+          ),
           caption: gallery.caption ?? null,
           formatted_caption: gallery.formattedCaption ?? null,
           mentions: gallery.mentions ?? [],

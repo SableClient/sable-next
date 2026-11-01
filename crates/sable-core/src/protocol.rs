@@ -80,6 +80,8 @@ pub struct GalleryAttachmentView {
     pub mime: String,
     #[serde(default)]
     pub info: Option<AttachmentInfoView>,
+    #[serde(default)]
+    pub spoiler: bool,
 }
 
 /// Stable serialized codes. Source chains, inputs and bodies stay native-side

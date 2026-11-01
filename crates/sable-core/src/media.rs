@@ -583,7 +583,7 @@ impl Core {
                 attachment_info: info,
                 caption: None,
                 thumbnail,
-                extra_content: None,
+                extra_content: attachment_extra_content(None, item.spoiler, None),
             });
         }
 

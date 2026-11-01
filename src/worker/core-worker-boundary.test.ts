@@ -189,6 +189,7 @@ test('passes gallery items and shared metadata to the WASM core', async () => {
           mime: 'image/png',
           bytes: new Uint8Array([1]),
           thumbnail,
+          spoiler: true,
         },
         {
           filename: 'two.pdf',
@@ -211,8 +212,8 @@ test('passes gallery items and shared metadata to the WASM core', async () => {
     JSON.stringify({
       room_id: '!room:example.org',
       attachments: [
-        { filename: 'one.png', mime: 'image/png', info: null },
-        { filename: 'two.pdf', mime: 'application/pdf', info: null },
+        { filename: 'one.png', mime: 'image/png', info: null, spoiler: true },
+        { filename: 'two.pdf', mime: 'application/pdf', info: null, spoiler: false },
       ],
       caption: 'Weekend',
       in_reply_to: '$reply',

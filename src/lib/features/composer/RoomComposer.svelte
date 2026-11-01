@@ -838,13 +838,14 @@
           preferences.sendAttachmentsAsGallery &&
           onSendGallery !== undefined &&
           unsent.length > 1 &&
-          unsent.every((item) => !item.spoiler && previewKind(item.file) !== null);
+          unsent.every((item) => previewKind(item.file) !== null);
 
         if (gallery) {
           await onSendGallery(roomId, await Promise.all(unsent.map(outgoingFile)), {
             caption: message.body || null,
             formattedCaption: message.formatted,
             mentions: message.mentions,
+            spoilers: unsent.map((item) => item.spoiler),
           });
           unsent = [];
           return;

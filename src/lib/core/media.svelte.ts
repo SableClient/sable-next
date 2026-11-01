@@ -16,7 +16,9 @@ export type SendAttachmentOptions = {
   spoiler?: boolean;
 };
 
-export type SendGalleryOptions = Omit<SendAttachmentOptions, 'spoiler'>;
+export type SendGalleryOptions = Omit<SendAttachmentOptions, 'spoiler'> & {
+  spoilers?: readonly boolean[];
+};
 
 /** Moves bytes: uploads, attachments and media reads, which the RPC router does not carry. */
 export function createMedia(transport: () => Transport) {
@@ -95,7 +97,7 @@ export function createMedia(transport: () => Transport) {
       if (files.length < 2) throw new Error('A gallery needs at least two attachments');
       await validateAttachments(files);
       const attachments = await Promise.all(
-        files.map(withResolvedMime).map(async (file) => {
+        files.map(withResolvedMime).map(async (file, index) => {
           const measured = await measureAttachment(file);
           return {
             filename: file.name,
@@ -103,6 +105,7 @@ export function createMedia(transport: () => Transport) {
             bytes: new Uint8Array(await file.arrayBuffer()),
             info: measured.info,
             thumbnail: measured.thumbnail,
+            spoiler: options.spoilers?.[index] ?? false,
           };
         })
       );

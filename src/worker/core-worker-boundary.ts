@@ -294,10 +294,11 @@ export function createCoreWorkerBoundary(
           await instance.sendGallery(
             JSON.stringify({
               room_id: roomId,
-              attachments: attachments.map(({ filename, mime, info = null }) => ({
+              attachments: attachments.map(({ filename, mime, info = null, spoiler = false }) => ({
                 filename,
                 mime,
                 info,
+                spoiler,
               })),
               caption,
               in_reply_to: inReplyTo,

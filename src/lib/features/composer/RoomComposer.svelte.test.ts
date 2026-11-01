@@ -395,6 +395,33 @@ test('sends multiple staged files as one gallery', async () => {
     caption: null,
     formattedCaption: null,
     mentions: { user_ids: [], room: false },
+    spoilers: [false, false],
+  });
+  expect(attachment).not.toHaveBeenCalled();
+});
+
+test('keeps spoilered files in the gallery', async () => {
+  const gallery = vi.fn(async () => {});
+  const attachment = vi.fn(async () => {});
+  setup({
+    roomId: '!room:example.org',
+    onSendAttachment: attachment,
+    onSendGallery: gallery,
+  });
+  const first = new File(['one'], 'one.png', { type: 'image/png' });
+  const second = new File(['two'], 'two.png', { type: 'image/png' });
+
+  await pick(first, second);
+  await user.click(screen.getByRole('button', { name: 'Mark two.png as a spoiler' }));
+  submit();
+  await flushed();
+
+  await vi.waitFor(() => {
+    expect(gallery).toHaveBeenCalledWith(
+      '!room:example.org',
+      [first, second],
+      expect.objectContaining({ spoilers: [false, true] })
+    );
   });
   expect(attachment).not.toHaveBeenCalled();
 });

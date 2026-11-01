@@ -807,13 +807,14 @@ test('sending a gallery forwards shared metadata and every attachment', async ()
     inReplyTo: '$reply',
     threadRoot: '$thread',
     persona,
+    spoilers: [true],
   });
 
   expect(sendGallery).toHaveBeenCalledWith({
     roomId: '!room:example.org',
     attachments: [
-      expect.objectContaining({ filename: 'one.png', mime: 'image/png' }),
-      expect.objectContaining({ filename: 'two.pdf', mime: 'application/pdf' }),
+      expect.objectContaining({ filename: 'one.png', mime: 'image/png', spoiler: true }),
+      expect.objectContaining({ filename: 'two.pdf', mime: 'application/pdf', spoiler: false }),
     ],
     caption: 'Weekend',
     formattedCaption: '<strong>Weekend</strong>',

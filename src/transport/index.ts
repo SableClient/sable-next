@@ -44,7 +44,7 @@ export type Gallery = {
 
 export type GalleryAttachment = Pick<
   Attachment,
-  'filename' | 'mime' | 'bytes' | 'info' | 'thumbnail'
+  'filename' | 'mime' | 'bytes' | 'info' | 'thumbnail' | 'spoiler'
 >;
 
 export class CoreError extends Error {

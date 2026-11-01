@@ -1687,6 +1687,7 @@ async fn send_media_reply(
                 filename: "picture.png".to_owned(),
                 mime: "image/png".to_owned(),
                 info: None,
+                spoiler: false,
             };
             core.send_gallery(
                 SendGalleryRequest {
@@ -1988,11 +1989,13 @@ async fn a_gallery_mixing_a_picture_and_a_pdf_sends_each_as_its_own_itemtype() {
                     filename: "beach.png".to_owned(),
                     mime: "image/png".to_owned(),
                     info: None,
+                    spoiler: true,
                 },
                 crate::protocol::GalleryAttachmentView {
                     filename: "report.pdf".to_owned(),
                     mime: "application/pdf".to_owned(),
                     info: None,
+                    spoiler: false,
                 },
             ],
             caption: None,
@@ -2037,6 +2040,12 @@ async fn a_gallery_mixing_a_picture_and_a_pdf_sends_each_as_its_own_itemtype() {
     .expect("the send queue flushed the gallery");
 
     assert_eq!(sent["itemtypes"][0]["itemtype"], "m.image");
+    assert_eq!(sent["itemtypes"][0][crate::view::SPOILER_PROPERTY], true);
+    assert!(
+        sent["itemtypes"][1]
+            .get(crate::view::SPOILER_PROPERTY)
+            .is_none()
+    );
     assert_eq!(sent["itemtypes"][1]["itemtype"], "m.file");
     assert_eq!(sent["itemtypes"][1]["body"], "report.pdf");
     assert_eq!(sent["itemtypes"][1]["info"]["mimetype"], "application/pdf");
