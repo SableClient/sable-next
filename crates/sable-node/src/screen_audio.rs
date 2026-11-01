@@ -14,7 +14,7 @@ type Frames = ThreadsafeFunction<Buffer, (), Buffer, Status, false, true, 8>;
 static SESSION: Mutex<Option<Capture>> = Mutex::new(None);
 
 #[napi]
-pub fn start_screen_audio(audio_pid: u32, frames: Frames) -> napi::Result<()> {
+pub(crate) fn start_screen_audio(audio_pid: u32, frames: Frames) -> napi::Result<()> {
     if audio_pid == 0 {
         return Err(napi::Error::from_reason("invalid audio process"));
     }
@@ -39,7 +39,7 @@ pub fn start_screen_audio(audio_pid: u32, frames: Frames) -> napi::Result<()> {
 }
 
 #[napi]
-pub fn stop_screen_audio() {
+pub(crate) fn stop_screen_audio() {
     let capture = SESSION
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
