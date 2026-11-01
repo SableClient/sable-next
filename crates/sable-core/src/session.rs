@@ -792,30 +792,16 @@ pub fn qr_client_metadata(redirect_uri: &Url) -> Raw<ClientMetadata> {
     reason = "metadata serialization is an invariant of this typed value"
 )]
 fn metadata_with(redirect_uri: &Url, device_code: bool) -> Raw<ClientMetadata> {
-    let loopback = matches!(
-        redirect_uri.host_str(),
-        Some("localhost" | "127.0.0.1" | "[::1]")
-    );
-
     let client_uri = Url::parse("https://sable.moe").expect("this is a valid URL");
 
     let application_type = match redirect_uri.scheme() {
-        "http" if loopback => ApplicationType::Native,
+        _ if is_loopback_redirect(redirect_uri) => ApplicationType::Native,
         "https" | "http" => ApplicationType::Web,
         _ => ApplicationType::Native,
     };
 
-    // RFC 8252 §7.3: a loopback redirect registers without its port; authorization uses the real URI.
-    let mut registered_uri = redirect_uri.clone();
-    if redirect_uri.scheme() == "http"
-        && loopback
-        && let Err(error) = registered_uri.set_port(None)
-    {
-        tracing::warn!("loopback redirect URI kept its port: {error:?}");
-    }
-
     let mut grant_types = vec![OAuthGrantType::AuthorizationCode {
-        redirect_uris: vec![registered_uri],
+        redirect_uris: vec![registration_redirect_uri(redirect_uri)],
     }];
     if device_code {
         grant_types.push(OAuthGrantType::DeviceCode);
@@ -837,12 +823,33 @@ fn metadata_with(redirect_uri: &Url, device_code: bool) -> Raw<ClientMetadata> {
 }
 
 #[must_use]
+pub fn is_loopback_redirect(redirect_uri: &Url) -> bool {
+    redirect_uri.scheme() == "http"
+        && matches!(
+            redirect_uri.host_str(),
+            Some("localhost" | "127.0.0.1" | "[::1]")
+        )
+}
+
+/// RFC 8252 §7.3: a loopback redirect registers without its port, and authorization may use any port.
+#[must_use]
+pub fn registration_redirect_uri(redirect_uri: &Url) -> Url {
+    let mut registered = redirect_uri.clone();
+    if is_loopback_redirect(redirect_uri)
+        && let Err(error) = registered.set_port(None)
+    {
+        tracing::warn!("loopback redirect URI kept its port: {error:?}");
+    }
+    registered
+}
+
+#[must_use]
 pub fn registered_redirect_uri(session: &PersistedSession, requested: &Url) -> Url {
     if let Some(uri) = &session.oauth_redirect_uri {
         return uri.clone();
     }
     if matches!(requested.scheme(), "http" | "https") {
-        return requested.clone();
+        return registration_redirect_uri(requested);
     }
     let legacy = if session.oauth_issuer.is_some() {
         "moe.sable.app:/login"
@@ -926,8 +933,8 @@ mod tests {
 
     use super::{
         AccountRegistry, PROXIED_SESSION_TIMEOUT, SESSION_TIMEOUT, account_store_id,
-        build_account_client, registered_redirect_uri, removable_account_store,
-        repair_room_key_sharing, session_timeout,
+        build_account_client, registered_redirect_uri, registration_redirect_uri,
+        removable_account_store, repair_room_key_sharing, session_timeout,
     };
 
     #[cfg(not(target_family = "wasm"))]
@@ -969,6 +976,14 @@ mod tests {
         assert_eq!(registered_redirect_uri(&session, &next), app);
         session.oauth_redirect_uri = Some(next.clone());
         assert_eq!(registered_redirect_uri(&session, &app), next);
+
+        let loopback = url::Url::parse("http://127.0.0.1:41000/callback").unwrap();
+        session.oauth_redirect_uri = Some(registration_redirect_uri(&loopback));
+        assert_eq!(
+            registered_redirect_uri(&session, &loopback),
+            url::Url::parse("http://127.0.0.1/callback").unwrap()
+        );
+        session.oauth_redirect_uri = Some(next.clone());
 
         let mut refreshed = session.clone();
         refreshed.oauth_redirect_uri = None;

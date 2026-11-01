@@ -139,11 +139,10 @@ describe('authentication browsers', () => {
     native.electronBridge.mockReturnValue(bridge);
     const browser = openExternalAuthWindow('approval');
     if (!browser) throw new Error('Browser was not created');
-    await browser.navigate('https://auth.example.org/device', 'moe.sable.next:/login');
+    await browser.navigate('https://auth.example.org/device');
     expect(bridge.openAuthWindow).toHaveBeenCalledWith(
       'approval',
-      'https://auth.example.org/device',
-      'moe.sable.next:/login'
+      'https://auth.example.org/device'
     );
     await browser.close();
     expect(bridge.closeAuthWindow).toHaveBeenCalledWith('approval');

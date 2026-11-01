@@ -12,8 +12,8 @@ pass `-c.mac.identity=YOUR_TEAM_ID` to use another team.
 
 Packages are written to `electron/release/sandboxed`. The app stores data in its own
 `moe.sable.client.sandboxed` container and requires a fresh login. Update by installing
-a new DMG. It shares stable's login callback schemes; macOS must route callbacks to
-the app you are using.
+a new DMG. It shares stable's link schemes; macOS must route links to the app you are
+using.
 
 `package.mjs` picks `electron-builder.stable.yml` or `electron-builder.nightly.yml`, both
 extending `electron-builder.yml`, from `SABLE_BUILD_FLAVOR`: only `stable` builds the stable
@@ -23,8 +23,13 @@ stable as `Sable Nightly`.
 On first launch the app copies the Tauri app's permission grants, telemetry consent and
 smooth-scrolling choice (`src/tauri-import.ts`).
 
-Login callback schemes are unchanged by app renames: stable uses `moe.sable.app` and
-`sable`; nightly uses `moe.sable.next`, not `moe.sable.next.nightly`.
+Sign-in opens the system browser and returns to a one-shot listener on `127.0.0.1`
+(RFC 8252 loopback redirect).
+
+Link schemes are unchanged by app renames: stable uses `moe.sable.app` and `sable`;
+nightly uses `moe.sable.next`, not `moe.sable.next.nightly`.
+Flatpak, deb and rpm declare them in their desktop entry. Only AppImage, tarball and
+development runs register a handler in `~/.local/share/applications` at startup.
 
 Update feeds:
 

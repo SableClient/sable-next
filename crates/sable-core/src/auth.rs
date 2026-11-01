@@ -325,7 +325,8 @@ impl Core {
                 return Err(RpcError::Denied);
             }
             if let Credentials::OAuth { client_id, .. } = &account.session.credentials
-                && session::registered_redirect_uri(&account.session, &redirect_uri) == redirect_uri
+                && session::registered_redirect_uri(&account.session, &redirect_uri)
+                    == session::registration_redirect_uri(&redirect_uri)
             {
                 client.oauth().restore_registered_client(
                     matrix_sdk::authentication::oauth::ClientId::new(client_id.clone()),
@@ -457,7 +458,7 @@ impl Core {
                 &account_store_id,
                 PersistedSession {
                     oauth_issuer: None,
-                    oauth_redirect_uri: Some(redirect_uri),
+                    oauth_redirect_uri: Some(session::registration_redirect_uri(&redirect_uri)),
                     resolved_homeserver: Some(endpoint),
                     homeserver,
                     credentials: Credentials::oauth(full),
@@ -628,8 +629,10 @@ impl Core {
     }
 }
 
+// Browsers never send the fragment to a loopback listener.
 fn response_mode(redirect_uri: &Url) -> &'static str {
     match redirect_uri.scheme() {
+        _ if session::is_loopback_redirect(redirect_uri) => "query",
         "http" | "https" => "fragment",
         _ => "query",
     }
@@ -1196,8 +1199,8 @@ mod tests {
             "query"
         );
         assert_eq!(
-            response_mode(&Url::parse("http://localhost:5173/login")?),
-            "fragment"
+            response_mode(&Url::parse("http://127.0.0.1:41000/callback")?),
+            "query"
         );
         Ok(())
     }

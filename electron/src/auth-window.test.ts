@@ -33,57 +33,15 @@ vi.mock('electron', async () => {
   };
 });
 
-import { AuthWindows, matchesAuthCallback } from './auth-window';
+import { AuthWindows } from './auth-window';
 
 beforeEach(() => {
   created.length = 0;
 });
 
-test.each([
-  ['moe.sable.next:/login?code=code&state=state', 'moe.sable.next:/login', true],
-  ['moe.sable.next:/room?code=code', 'moe.sable.next:/login', false],
-  ['https://login?code=code', 'moe.sable.next:/login', false],
-  [
-    'moe.sable.next://login?sable_sso_state=other',
-    'moe.sable.next://login?sable_sso_state=nonce',
-    false,
-  ],
-  [
-    'moe.sable.next://login?sable_sso_state=nonce&loginToken=token',
-    'moe.sable.next://login?sable_sso_state=nonce',
-    true,
-  ],
-])('checks the authentication redirect target %s', (candidate, expected, matches) => {
-  expect(matchesAuthCallback(candidate, expected)).toBe(matches);
-});
-
-test.each(['will-navigate', 'will-redirect'])(
-  'captures OAuth callbacks through %s and closes only that popup',
-  async (event) => {
-    const parent = new EventEmitter() as unknown as BrowserWindow;
-    const callback = vi.fn();
-    const windows = new AuthWindows(callback);
-    await windows.open(parent, 'oauth', 'https://auth.example.org/', 'moe.sable.next:/login');
-    await windows.open(parent, 'approval', 'https://auth.example.org/device');
-    const preventDefault = vi.fn();
-    created[0].webContents.emit(
-      event,
-      { preventDefault },
-      'moe.sable.next:/login?code=code&state=state'
-    );
-    expect(preventDefault).toHaveBeenCalledOnce();
-    expect(callback).toHaveBeenCalledExactlyOnceWith('moe.sable.next:/login?code=code&state=state');
-    expect(created[0].destroy).toHaveBeenCalledOnce();
-    expect(created[1].destroy).not.toHaveBeenCalled();
-    windows.close('approval');
-    expect(created[1].destroy).toHaveBeenCalledOnce();
-    expect(parent.listenerCount('closed')).toBe(0);
-  }
-);
-
 test('disables Node, blocks file navigation and closes with the parent', async () => {
   const parent = new EventEmitter() as unknown as BrowserWindow;
-  const windows = new AuthWindows(vi.fn());
+  const windows = new AuthWindows();
   await windows.open(parent, 'approval', 'https://auth.example.org/device');
   expect(created[0].options.webPreferences).toEqual({
     nodeIntegration: false,
@@ -100,7 +58,7 @@ test('disables Node, blocks file navigation and closes with the parent', async (
 test.each(['javascript:alert(1)', 'file:///etc/passwd', 'invalid'])(
   'rejects invalid auth URL %s before creating a popup',
   async (url) => {
-    const windows = new AuthWindows(vi.fn());
+    const windows = new AuthWindows();
     await expect(windows.open({} as BrowserWindow, 'approval', url)).rejects.toThrow('HTTP');
     expect(created).toHaveLength(0);
   }

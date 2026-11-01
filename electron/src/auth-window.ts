@@ -1,24 +1,9 @@
 import { BrowserWindow } from 'electron';
 
-export function matchesAuthCallback(url: string, callbackUri: string): boolean {
-  const candidate = URL.parse(url);
-  const expected = URL.parse(callbackUri);
-  return !!(
-    candidate &&
-    expected &&
-    candidate.protocol === expected.protocol &&
-    candidate.host === expected.host &&
-    candidate.pathname === expected.pathname &&
-    [...expected.searchParams].every(([key, value]) => candidate.searchParams.get(key) === value)
-  );
-}
-
 export class AuthWindows {
   private readonly windows = new Map<string, BrowserWindow>();
 
-  constructor(private readonly onCallback: (url: string) => void) {}
-
-  async open(parent: BrowserWindow, id: string, url: string, callbackUri?: string): Promise<void> {
+  async open(parent: BrowserWindow, id: string, url: string): Promise<void> {
     const parsed = URL.parse(url);
     if (!parsed || !['https:', 'http:'].includes(parsed.protocol)) {
       throw new Error('Authentication requires an HTTP or HTTPS URL');
@@ -42,12 +27,6 @@ export class AuthWindows {
     });
     parent.once('closed', closeWithParent);
     const navigate = (event: { preventDefault(): void }, target: string) => {
-      if (callbackUri && matchesAuthCallback(target, callbackUri)) {
-        event.preventDefault();
-        this.onCallback(target);
-        this.close(id);
-        return;
-      }
       const destination = URL.parse(target);
       if (!destination || !['https:', 'http:'].includes(destination.protocol)) {
         event.preventDefault();
@@ -59,7 +38,7 @@ export class AuthWindows {
     try {
       await popup.loadURL(url);
     } catch (error) {
-      // Intercepting the callback aborts the pending navigation.
+      // Closing the popup or blocking a redirect aborts the pending navigation.
       if (!popup.isDestroyed()) {
         this.close(id);
         throw error;

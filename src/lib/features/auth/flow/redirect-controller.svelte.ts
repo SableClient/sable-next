@@ -10,10 +10,12 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 import { t } from '#lib/i18n.js';
 import { deliversDeepLinks } from '#lib/platform/deep-links.js';
 import {
+  closeAuthLoopback,
   openExternalAuthUrl,
   openExternalAuthWindow,
   isDesktopAuthClient,
   openSystemAuthUrl,
+  startAuthLoopback,
   startInAppAuthSession,
   type ExternalAuthWindow,
 } from '#lib/platform/external-auth.js';
@@ -88,6 +90,19 @@ export class RedirectController {
     this.registrationError = null;
     this.pendingIntent = intent;
     this.isLaunching = true;
+    if (isDesktopAuthClient()) {
+      try {
+        await this.launchInSystemBrowser(type, id, intent);
+      } catch (value) {
+        this.systemBrowserUrl = null;
+        void closeAuthLoopback();
+        logAuthenticationFailure(`${type}_${intent}_start`, value);
+        this.setError(intent, value);
+      } finally {
+        this.isLaunching = false;
+      }
+      return;
+    }
     const closingPrevious = this.popup?.close();
     for (const channel of this.authChannels) channel.close();
     this.authChannels.clear();
@@ -108,23 +123,8 @@ export class RedirectController {
         return;
       }
       const callbackUri = this.redirectUri(type);
-      const authorizationUrl =
-        type === 'oidc'
-          ? await this.options.core.startOidcLogin(
-              this.options.getHomeserver().trim(),
-              callbackUri,
-              intent,
-              intent === 'login' ? this.options.getReauthAccountId?.() : undefined
-            )
-          : await this.options.core.startSsoLogin(
-              this.options.getHomeserver().trim(),
-              callbackUri,
-              id,
-              intent,
-              intent === 'login' ? this.options.getReauthAccountId?.() : undefined
-            );
+      const authorizationUrl = await this.startLogin(type, id, intent, callbackUri);
       if (deliversDeepLinks()) {
-        if (isDesktopAuthClient()) this.systemBrowserUrl = authorizationUrl;
         const callbackUrl = await startInAppAuthSession(authorizationUrl, callbackUri);
         if (callbackUrl === null) {
           navigationStarted = true;
@@ -157,6 +157,35 @@ export class RedirectController {
       }
       this.isLaunching = false;
     }
+  }
+
+  private async launchInSystemBrowser(
+    type: RedirectType,
+    id: string | undefined,
+    intent: RedirectIntent
+  ): Promise<void> {
+    const flows = await this.options.validateHomeserver();
+    if (!flows) {
+      this.setError(intent, this.options.getValidationError() ?? t('errors.homeserverNotFound'));
+      return;
+    }
+    const callbackUri = createRedirectUri(type, await startAuthLoopback(), crypto.randomUUID());
+    const authorizationUrl = await this.startLogin(type, id, intent, callbackUri);
+    this.systemBrowserUrl = authorizationUrl;
+    await openSystemAuthUrl(authorizationUrl);
+  }
+
+  private startLogin(
+    type: RedirectType,
+    id: string | undefined,
+    intent: RedirectIntent,
+    callbackUri: string
+  ): Promise<string> {
+    const homeserver = this.options.getHomeserver().trim();
+    const reauthAccountId = intent === 'login' ? this.options.getReauthAccountId?.() : undefined;
+    return type === 'oidc'
+      ? this.options.core.startOidcLogin(homeserver, callbackUri, intent, reauthAccountId)
+      : this.options.core.startSsoLogin(homeserver, callbackUri, id, intent, reauthAccountId);
   }
 
   async complete(callbackUrl: string): Promise<void> {
@@ -237,8 +266,6 @@ export class RedirectController {
     this.isOpeningSystemBrowser = true;
     try {
       await openSystemAuthUrl(url);
-      await this.popup?.close();
-      this.popup = null;
     } catch (value) {
       logAuthenticationFailure('system_browser_open', value);
       this.setError(this.pendingIntent, value);
@@ -252,6 +279,7 @@ export class RedirectController {
   }
 
   cleanup(): void {
+    if (isDesktopAuthClient()) void closeAuthLoopback();
     this.systemBrowserUrl = null;
     for (const channel of this.authChannels) channel.close();
     this.authChannels.clear();

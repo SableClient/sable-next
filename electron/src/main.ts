@@ -19,7 +19,7 @@ import {
   type UtilityProcess,
   type WebFrameMain,
 } from 'electron';
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
@@ -35,6 +35,7 @@ import type {
 } from '../../src/lib/platform/file-dialog-types';
 
 import { deepLinksIn, deepLinkSchemes } from './deep-links';
+import { AuthLoopback } from './auth-loopback';
 import { AuthWindows } from './auth-window';
 import { autostartAvailable, setLaunchAtLogin } from './autostart';
 import { registerContextMenu } from './context-menu';
@@ -295,22 +296,21 @@ function deliverDeepLinks(urls: string[]): void {
   else pendingDeepLinks.push(...urls);
 }
 
-const authWindows = new AuthWindows((url) => {
+const authWindows = new AuthWindows();
+
+const authLoopback = new AuthLoopback((url) => {
   deliverDeepLinks([url]);
+  showMainWindow();
 });
 
-ipcMain.handle('sable-auth-open', async (event, id: string, url: string, callbackUri?: string) => {
+ipcMain.handle('sable-auth-open', async (event, id: string, url: string) => {
   if (!isAppFrame(event.senderFrame) || event.sender !== mainWindow?.webContents) {
     throw new Error('Invalid authentication origin');
   }
-  if (
-    typeof id !== 'string' ||
-    typeof url !== 'string' ||
-    (callbackUri !== undefined && typeof callbackUri !== 'string')
-  ) {
+  if (typeof id !== 'string' || typeof url !== 'string') {
     throw new Error('Invalid authentication request');
   }
-  await authWindows.open(mainWindow, id, url, callbackUri);
+  await authWindows.open(mainWindow, id, url);
 });
 
 ipcMain.handle('sable-auth-close', (event, id: string) => {
@@ -332,6 +332,19 @@ ipcMain.handle('sable-auth-external', async (event, url: string) => {
     throw new Error('Authentication requires an HTTP or HTTPS URL');
   }
   await shell.openExternal(url);
+});
+
+ipcMain.handle('sable-auth-loopback-start', (event) => {
+  if (!isAppFrame(event.senderFrame) || event.sender !== mainWindow?.webContents) {
+    throw new Error('Invalid authentication origin');
+  }
+  return authLoopback.start();
+});
+
+ipcMain.handle('sable-auth-loopback-close', (event) => {
+  if (isAppFrame(event.senderFrame) && event.sender === mainWindow?.webContents) {
+    authLoopback.close();
+  }
 });
 
 ipcMain.handle('sable-take-deep-links', (event) =>
@@ -762,8 +775,9 @@ function registerScreenShare(): void {
 }
 
 function registerDeepLinks(): void {
-  if (isLinux && process.env.FLATPAK_ID) return;
   if (isLinux) {
+    // Flatpak, deb and rpm install a desktop entry that declares the schemes.
+    if (process.env.FLATPAK_ID || existsSync(join(process.resourcesPath, 'package-type'))) return;
     void claimSchemes(join(xdgDataHome(), 'applications'), IDENTIFIER, DEEP_LINK_SCHEMES);
   } else if (app.isPackaged) {
     for (const scheme of DEEP_LINK_SCHEMES) {

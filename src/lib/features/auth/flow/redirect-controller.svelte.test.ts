@@ -8,7 +8,11 @@ vi.mock('#lib/platform/deep-links.js', () => ({
 
 const browser = vi.hoisted(() => ({ navigate: vi.fn(() => Promise.resolve()), close: vi.fn() }));
 
+const LOOPBACK = 'http://127.0.0.1:41000/callback';
+
 vi.mock('#lib/platform/external-auth.js', () => ({
+  closeAuthLoopback: vi.fn(() => Promise.resolve()),
+  startAuthLoopback: vi.fn(() => Promise.resolve(LOOPBACK)),
   isDesktopAuthClient: vi.fn(() => true),
   openSystemAuthUrl: vi.fn(() => Promise.resolve()),
   openExternalAuthWindow: vi.fn(() => browser),
@@ -17,6 +21,7 @@ vi.mock('#lib/platform/external-auth.js', () => ({
 }));
 
 import {
+  closeAuthLoopback,
   startInAppAuthSession,
   openSystemAuthUrl,
   isDesktopAuthClient,
@@ -131,6 +136,7 @@ describe('RedirectController', () => {
 });
 
 test('keeps the native popup until OAuth returns and then closes it', async () => {
+  vi.mocked(isDesktopAuthClient).mockReturnValue(false);
   const controller = new RedirectController({
     core: {
       startOidcLogin: vi.fn().mockResolvedValue('https://auth.example.org/authorize'),
@@ -156,10 +162,11 @@ test('keeps the native popup until OAuth returns and then closes it', async () =
   expect(browser.close).toHaveBeenCalledOnce();
 });
 
-function fallbackController() {
+function desktopController() {
   const core = {
     startOidcLogin: vi.fn().mockResolvedValue('https://auth.example.org/authorize?state=original'),
     completeOidcLogin: vi.fn().mockResolvedValue(undefined),
+    startSsoLogin: vi.fn().mockResolvedValue('https://matrix.example.org/sso'),
   };
   const controller = new RedirectController({
     core: core as never,
@@ -174,46 +181,60 @@ function fallbackController() {
   return { controller, core };
 }
 
-test('continues the same OAuth transaction in the system browser', async () => {
-  const { controller, core } = fallbackController();
+test('signs in on desktop through the system browser and a loopback redirect', async () => {
+  const { controller, core } = desktopController();
   await controller.launch('oidc', undefined, 'login');
-  await controller.openInBrowser();
+  expect(core.startOidcLogin).toHaveBeenCalledExactlyOnceWith(
+    'matrix.example.org',
+    LOOPBACK,
+    'login',
+    undefined
+  );
   expect(openSystemAuthUrl).toHaveBeenCalledExactlyOnceWith(
     'https://auth.example.org/authorize?state=original'
   );
-  expect(browser.close).toHaveBeenCalledOnce();
-  expect(core.startOidcLogin).toHaveBeenCalledOnce();
-  const callback = 'moe.sable.next:/login?code=example&state=original';
+  expect(browser.navigate).not.toHaveBeenCalled();
+  const callback = `${LOOPBACK}?code=example&state=original`;
   await controller.complete(callback);
   expect(core.completeOidcLogin).toHaveBeenCalledExactlyOnceWith(callback);
   expect(controller.systemBrowserUrl).toBeNull();
 });
 
-test('keeps the popup if the system browser fails to open', async () => {
-  const { controller } = fallbackController();
-  await controller.launch('oidc', undefined, 'login');
-  vi.mocked(openSystemAuthUrl).mockRejectedValueOnce('Browser unavailable');
-  await controller.openInBrowser();
-  expect(controller.loginError).toBe('Browser unavailable');
-  expect(browser.close).not.toHaveBeenCalled();
-  expect(controller.isOpeningSystemBrowser).toBe(false);
-  await controller.openInBrowser();
-  expect(browser.close).toHaveBeenCalledOnce();
+test('binds desktop SSO to a loopback redirect with its own state', async () => {
+  const { controller, core } = desktopController();
+  await controller.launch('sso', 'oidc-github', 'login');
+  const redirect = new URL(core.startSsoLogin.mock.calls[0][1] as string);
+  expect(`${redirect.origin}${redirect.pathname}`).toBe(LOOPBACK);
+  expect(redirect.searchParams.get('sable_sso_state')).toBeTruthy();
+  expect(openSystemAuthUrl).toHaveBeenCalledExactlyOnceWith('https://matrix.example.org/sso');
 });
 
-test('offers the system browser when desktop popup creation fails', async () => {
-  browser.navigate.mockRejectedValueOnce('Window creation failed');
-  const { controller, core } = fallbackController();
+test('reopens the same OAuth transaction in the system browser', async () => {
+  const { controller, core } = desktopController();
   await controller.launch('oidc', undefined, 'login');
   await controller.openInBrowser();
-  expect(openSystemAuthUrl).toHaveBeenCalledOnce();
+  expect(openSystemAuthUrl).toHaveBeenCalledTimes(2);
+  expect(openSystemAuthUrl).toHaveBeenLastCalledWith(
+    'https://auth.example.org/authorize?state=original'
+  );
   expect(core.startOidcLogin).toHaveBeenCalledOnce();
 });
 
-test('removes the system browser action when the flow is disposed', async () => {
-  const { controller } = fallbackController();
+test('stops the loopback listener when the system browser fails to open', async () => {
+  vi.mocked(openSystemAuthUrl).mockRejectedValueOnce('Browser unavailable');
+  const { controller } = desktopController();
+  await controller.launch('oidc', undefined, 'login');
+  expect(controller.loginError).toBe('Browser unavailable');
+  expect(controller.systemBrowserUrl).toBeNull();
+  expect(controller.isLaunching).toBe(false);
+  expect(closeAuthLoopback).toHaveBeenCalledOnce();
+});
+
+test('stops the loopback listener when the flow is disposed', async () => {
+  const { controller } = desktopController();
   await controller.launch('oidc', undefined, 'login');
   controller.cleanup();
+  expect(closeAuthLoopback).toHaveBeenCalledOnce();
   await controller.openInBrowser();
-  expect(openSystemAuthUrl).not.toHaveBeenCalled();
+  expect(openSystemAuthUrl).toHaveBeenCalledOnce();
 });

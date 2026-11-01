@@ -367,7 +367,7 @@
 
 {#snippet browserFallback()}
   {#if redirect.systemBrowserUrl}
-    <p class="browser-fallback">{i18n.t('auth.browserFallbackHint')}</p>
+    <p class="browser-fallback">{i18n.t('auth.continueInBrowserHint')}</p>
     <Button
       block
       loading={redirect.isOpeningSystemBrowser}

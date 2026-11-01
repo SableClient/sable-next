@@ -16,6 +16,16 @@ export async function openSystemAuthUrl(url: string): Promise<void> {
   await electron.openAuthInSystemBrowser(url);
 }
 
+export async function startAuthLoopback(): Promise<string> {
+  const electron = electronBridge();
+  if (!electron) throw new Error('Loopback redirects require a desktop app');
+  return electron.startAuthLoopback();
+}
+
+export async function closeAuthLoopback(): Promise<void> {
+  await electronBridge()?.closeAuthLoopback();
+}
+
 export interface ExternalAuthWindow {
   window?: Window;
   navigate: (url: string, callbackUri?: string) => Promise<void>;
@@ -35,7 +45,7 @@ export function openExternalAuthWindow(name: string): ExternalAuthWindow | null 
           if (closed) return;
           if (electron) {
             closeBrowser = () => electron.closeAuthWindow(name);
-            await electron.openAuthWindow(name, url, callbackUri);
+            await electron.openAuthWindow(name, url);
           } else {
             closeBrowser = () => invoke('close_in_app_auth_window', { id: name });
             await invoke('open_in_app_auth_url', { id: name, url, callbackUri });
