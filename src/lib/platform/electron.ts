@@ -27,6 +27,7 @@ export interface ElectronBridge {
   setBadge(count: number, overlay: string | null): Promise<void>;
   requestAttention(): void;
   clearWebCaches(): Promise<void>;
+  dataDir(): Promise<string | null>;
   applyWindowSettings(settings: DesktopWindowSettings): Promise<DesktopWindowState | null>;
   minimizeWindow(): void;
   showWindow(): void;

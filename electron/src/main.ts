@@ -467,6 +467,8 @@ ipcMain.handle('sable-clear-web-caches', async (event) => {
   await event.sender.session.clearCodeCaches({});
 });
 
+ipcMain.handle('sable-data-dir', (event) => (isAppFrame(event.senderFrame) ? dataDir : null));
+
 ipcMain.handle('sable-apply-window-settings', (event, value: unknown) => {
   if (!isAppFrame(event.senderFrame)) return null;
   desktopWindowSettings = sanitizeDesktopWindowSettings(value);

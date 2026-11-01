@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('sableElectron', {
     ipcRenderer.send('sable-request-attention');
   },
   clearWebCaches: () => ipcRenderer.invoke('sable-clear-web-caches') as Promise<void>,
+  dataDir: () => ipcRenderer.invoke('sable-data-dir') as Promise<string | null>,
   applyWindowSettings: (settings: unknown) =>
     ipcRenderer.invoke('sable-apply-window-settings', settings) as Promise<{
       trayAvailable: boolean;

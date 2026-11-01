@@ -16,6 +16,7 @@
     supportsAutoUpdate,
     updatePlatform,
   } from '#lib/platform/updates.js';
+  import { desktopDataDir } from '#lib/platform/data-dir.js';
   import { electronBridge, isElectron } from '#lib/platform/electron.js';
   import { hostsServiceWorker } from '#lib/platform/service-worker.js';
   import { checkForWebUpdate } from '#lib/platform/web-updates.svelte.js';
@@ -56,6 +57,7 @@
   const pendingStage = $derived(desktopUpdate.stage);
 
   let versionCopied = $state(false);
+  const dataDir = desktopDataDir().catch(() => null);
   async function copyVersion(): Promise<void> {
     await copyText(version);
     versionCopied = true;
@@ -176,6 +178,19 @@
           {i18n.t('settings.aboutReport')}
         </LinkButton>
       </SettingsRow>
+      {#await dataDir then dir}
+        {#if dir}
+          <SettingsRow
+            id="data-folder"
+            title={i18n.t('settings.aboutDataFolder')}
+            description={dir}
+          >
+            <Button size="small" onclick={() => void copyText(dir)}>
+              {i18n.t('common.copy')}
+            </Button>
+          </SettingsRow>
+        {/if}
+      {/await}
       {#if automaticUpdateChecksSupported}
         <SettingsRow
           id="auto-update-check"

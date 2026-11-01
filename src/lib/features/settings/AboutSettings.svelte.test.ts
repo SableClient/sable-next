@@ -7,6 +7,8 @@ import type { HomeserverSoftwareView } from '#src/generated/protocol';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('#lib/core/context.js');
+const desktopDataDir = vi.hoisted(() => vi.fn(() => Promise.resolve<string | null>(null)));
+vi.mock('#lib/platform/data-dir.js', () => ({ desktopDataDir }));
 
 import { core } from '#lib/core/__mocks__/context.js';
 
@@ -47,4 +49,12 @@ test('adds the homeserver once it is known, or leaves it out when it cannot be r
   expect(screen.getByRole('heading', { name: 'Options' })).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'Homeserver' })).not.toBeInTheDocument();
   debug.mockRestore();
+});
+
+test('desktop builds show the folder Sable keeps its data in', async () => {
+  desktopDataDir.mockResolvedValueOnce('/home/me/.local/share/moe.sable.next');
+  render(AboutSettings);
+
+  expect(await screen.findByText('/home/me/.local/share/moe.sable.next')).toBeInTheDocument();
+  expect(screen.getByText('Data folder')).toBeInTheDocument();
 });
