@@ -306,7 +306,8 @@ impl Walk<'_> {
         let described = self.described(space_id);
         let failed = self.inputs.failed.contains(space_id);
         let kept = space.is_some() && self.inputs.keep_empty.contains(space_id);
-        if !own_rooms.is_empty() || !described || failed || kept {
+        let unjoined = space.is_some() && !self.inputs.joined.contains(space_id);
+        if !own_rooms.is_empty() || !described || failed || kept || unjoined {
             let owner_id = ancestry
                 .len()
                 .checked_sub(2)
@@ -346,7 +347,7 @@ impl Walk<'_> {
     }
 }
 
-/// The root's rooms, then each subspace depth first; empty sections are left out unless loading, failed or in `keep_empty`.
+/// The root's rooms, then each subspace depth first; empty sections are left out unless loading, failed, unjoined or in `keep_empty`.
 #[must_use]
 pub fn build_hierarchy_sections(
     rooms: &[HierarchyRoomView],
@@ -491,6 +492,7 @@ mod tests {
 
         let loaded = SectionInputs {
             loaded: Some(["!root".to_owned(), "!space1".to_owned()].into()),
+            joined: ["!space1".to_owned()].into(),
             ..SectionInputs::default()
         };
         assert_eq!(
@@ -502,6 +504,24 @@ mod tests {
             ..loaded
         };
         assert_eq!(build_hierarchy_sections(&rooms, "!root", &kept).len(), 1);
+    }
+
+    #[test]
+    fn an_unjoined_subspace_without_visible_rooms_stays_joinable() {
+        let mut restricted = room("!space1", &[]);
+        restricted.join_rule = RoomJoinRuleView::Restricted;
+        let rooms = [room("!root", &["!space1"]), restricted];
+        let inputs = SectionInputs {
+            loaded: Some(["!root".to_owned(), "!space1".to_owned()].into()),
+            joined: ["!root".to_owned()].into(),
+            ..SectionInputs::default()
+        };
+        let sections = build_hierarchy_sections(&rooms, "!root", &inputs);
+        assert_eq!(
+            keys(&sections),
+            [("!root/!space1".to_owned(), Vec::new(), 0)]
+        );
+        assert_eq!(sections[0].space_action, Some(LobbyAction::Join));
     }
 
     #[test]

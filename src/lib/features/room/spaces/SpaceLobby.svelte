@@ -190,7 +190,8 @@
           section.rooms.length > 0 ||
           !section.loaded ||
           section.failed ||
-          (section.space !== null && canManageIn(section.parent_id))
+          (section.space !== null &&
+            (canManageIn(section.parent_id) || !joinedIds.has(section.parent_id)))
       );
   });
   let moveTargets = $derived(
@@ -435,7 +436,9 @@
     joining.add(child.room_id);
     joinErrors.delete(child.room_id);
     try {
-      return await attemptJoin(child, via, parentId, action);
+      const joined = await attemptJoin(child, via, parentId, action);
+      if (joined && child.is_space) hierarchy.retry(child.room_id);
+      return joined;
     } finally {
       joining.delete(child.room_id);
     }
