@@ -68,6 +68,8 @@ jobs:
       SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
       SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
       VITE_SENTRY_ENVIRONMENT: production
+      TAURI_VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      TAURI_VITE_SENTRY_ENVIRONMENT: production
       SABLE_BUILD_FLAVOR: stable
     steps:
       - name: Check out repository
@@ -83,6 +85,7 @@ jobs:
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
           echo "VITE_APP_VERSION=$version" >> "$GITHUB_ENV"
+          echo "TAURI_VITE_APP_VERSION=$version" >> "$GITHUB_ENV"
       - name: Download web assets
         uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
         with:

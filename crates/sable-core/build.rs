@@ -2,7 +2,9 @@ fn main() {
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-changed=../../package.json");
     println!("cargo::rerun-if-env-changed=VITE_APP_VERSION");
+    println!("cargo::rerun-if-env-changed=TAURI_VITE_APP_VERSION");
     let version = std::env::var("VITE_APP_VERSION")
+        .or_else(|_| std::env::var("TAURI_VITE_APP_VERSION"))
         .ok()
         .filter(|version| !version.is_empty())
         .or_else(|| {
