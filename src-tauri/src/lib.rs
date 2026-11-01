@@ -385,7 +385,7 @@ fn refuse_without_keyring(app: &tauri::App<tauri::Wry>, error: &str) {
         .message(format!(
             "Sable keeps your login and message keys in the system keyring, and none is available.\n\n\
              On Linux, install and unlock a Secret Service provider such as GNOME Keyring or KWallet, \
-             then start Sable again.\n\n{error}"
+             then start Sable again, or start it with SABLE_SECRET_STORE=files to keep them in files.\n\n{error}"
         ))
         .title("No system keyring")
         .kind(MessageDialogKind::Error)

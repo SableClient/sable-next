@@ -391,6 +391,7 @@ impl SecretBackend for FileSecrets {
 
 /// Falls back to owner-only files under `directory` when the OS has no usable keyring. The first
 /// start picks the store for good: leaving a keyring would orphan the keys already in it.
+/// `SABLE_SECRET_STORE=files` overrides that.
 ///
 /// # Errors
 /// [`StoreError::SecretsUnavailable`] when the keyring this directory uses is unavailable.
@@ -404,6 +405,15 @@ pub fn install_os_keyring_or_files(service: String, directory: &Path) -> Result<
     };
     let files = || Box::new(FileSecrets(directory.join("secrets")));
     if chosen.as_deref() == Some("files") {
+        install(files());
+        return Ok(());
+    }
+    if std::env::var_os("SABLE_SECRET_STORE").is_some_and(|store| store == "files") {
+        if chosen.is_some() {
+            tracing::warn!("leaving the system keyring for SABLE_SECRET_STORE=files");
+        }
+        std::fs::create_dir_all(directory)?;
+        crate::store::write_atomic(&choice, b"files")?;
         install(files());
         return Ok(());
     }

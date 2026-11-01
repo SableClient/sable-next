@@ -372,6 +372,9 @@ function startCore(): UtilityProcess {
       SABLE_PROXY: app.commandLine.hasSwitch('no-proxy-server')
         ? ''
         : app.commandLine.getSwitchValue('proxy-server'),
+      ...(app.commandLine.getSwitchValue('password-store') === 'basic' && {
+        SABLE_SECRET_STORE: 'files',
+      }),
     },
   });
 
@@ -383,7 +386,8 @@ function startCore(): UtilityProcess {
       'No system keyring',
       'Sable keeps your login and message keys in the system keyring, and none is available.\n\n' +
         'On Linux, install and unlock a Secret Service provider such as GNOME Keyring or KWallet, ' +
-        `then start Sable again.\n\n${String(message.keyringUnavailable)}`
+        'then start Sable again, or start it with --password-store=basic to keep them in files.\n\n' +
+        String(message.keyringUnavailable)
     );
     app.exit(1);
   });
