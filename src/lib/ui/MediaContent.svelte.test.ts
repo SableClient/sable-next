@@ -194,6 +194,31 @@ test('falls back to the plain audio player when there is no waveform', async () 
   expect(document.querySelector('.audio-container')).not.toBeNull();
 });
 
+test('audio file volume popover sets and remembers the volume', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const props = {
+    kind: 'audio' as const,
+    source: 'mxc://example.org/audio-volume',
+    mime: 'audio/ogg',
+    filename: 'clip.ogg',
+    waveform: null,
+  };
+  const first = render(MediaContent, { props });
+  await settle();
+
+  await userEvent.click(screen.getByRole('button', { name: 'Volume' }));
+  const slider = await screen.findByRole('slider', { name: 'Volume' });
+  slider.focus();
+  await userEvent.keyboard('{ArrowLeft}');
+  expect(document.querySelector('audio')?.volume).toBe(0.95);
+
+  first.unmount();
+  render(MediaContent, { props: { ...props, source: 'mxc://example.org/audio-volume-2' } });
+  await settle();
+
+  expect(document.querySelector('audio')?.volume).toBe(0.95);
+});
+
 test('labels unavailable attachments', async () => {
   core.fetchMedia
     .mockRejectedValueOnce(new Error('media unavailable'))

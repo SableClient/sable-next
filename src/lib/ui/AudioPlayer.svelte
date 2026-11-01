@@ -3,7 +3,15 @@
   import FileAudioIcon from 'phosphor-svelte/lib/FileAudioIcon';
   import PauseIcon from 'phosphor-svelte/lib/PauseIcon';
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
+  import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
+  import SpeakerLowIcon from 'phosphor-svelte/lib/SpeakerLowIcon';
+  import SpeakerXIcon from 'phosphor-svelte/lib/SpeakerXIcon';
   import { onDestroy, onMount } from 'svelte';
+
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import ResponsivePopover from '#lib/ui/primitives/ResponsivePopover.svelte';
+  import Slider from '#lib/ui/primitives/Slider.svelte';
+  import { voicePlayback } from '#lib/ui/voice-playback.svelte.js';
 
   interface Props {
     src: string;
@@ -30,6 +38,7 @@
   let seekPosition = $state(0);
   let seekUserIsInteracting = $state(false);
   let animationId: number | null;
+  let volumeOpen = $state(false);
 
   let { src, label, filename, attachedTop = false }: Props = $props();
 
@@ -39,6 +48,10 @@
     }
     animationId = requestAnimationFrame(updateTime);
   };
+
+  $effect(() => {
+    if (player) player.volume = voicePlayback.volume;
+  });
 
   onMount(() => {
     animationId = requestAnimationFrame(updateTime);
@@ -121,6 +134,43 @@
         }
       }}
     />
+    <ResponsivePopover
+      bind:open={volumeOpen}
+      side="top"
+      align="center"
+      class="audio-volume-popover"
+      label={i18n.t('timeline.audioVolume')}
+      closeLabel={i18n.t('common.dismiss')}
+    >
+      {#snippet trigger({ props })}
+        <IconButton
+          {...props}
+          variant="ghost"
+          size="small"
+          class="audio-volume"
+          label={i18n.t('timeline.audioVolume')}
+        >
+          {#if voicePlayback.volume === 0}
+            <SpeakerXIcon />
+          {:else if voicePlayback.volume < 0.5}
+            <SpeakerLowIcon />
+          {:else}
+            <SpeakerHighIcon />
+          {/if}
+        </IconButton>
+      {/snippet}
+      <div class="audio-volume-content">
+        <Slider
+          min={0}
+          max={1}
+          step={0.05}
+          label={i18n.t('timeline.audioVolume')}
+          value={voicePlayback.volume}
+          oninput={voicePlayback.setVolume}
+        />
+        <span class="audio-volume-reading">{Math.round(voicePlayback.volume * 100)}%</span>
+      </div>
+    </ResponsivePopover>
   </div>
 </div>
 
@@ -151,9 +201,43 @@
     display: flex;
     gap: var(--space-200);
 
-    input {
+    > input {
       width: 100%;
     }
+  }
+
+  .audio-controls :global(.audio-volume) {
+    flex: none;
+  }
+
+  @media (pointer: coarse) {
+    .audio-controls :global(.audio-volume) {
+      display: none;
+    }
+  }
+
+  :global(.responsive-popover.audio-volume-popover) {
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
+    border-radius: var(--radius);
+    color: var(--surface-on-container);
+    width: auto;
+  }
+
+  .audio-volume-content {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
+    inline-size: min(12rem, calc(100vw - 2rem));
+    padding: var(--space-200) var(--space-300);
+  }
+
+  .audio-volume-reading {
+    flex: none;
+    font-size: var(--font-size-small);
+    font-variant-numeric: tabular-nums;
+    inline-size: 2.5rem;
+    text-align: end;
   }
 
   .audio-filename {

@@ -1060,6 +1060,7 @@
     "playVideo": "Play {{name}}",
     "playAudio": "Play {{name}}",
     "audioSeek": "Seek",
+    "audioVolume": "Volume",
     "showEmbed": "Show {{name}}",
     "audioAttachment": "Audio attachment",
     "fileAttachment": "File attachment",
