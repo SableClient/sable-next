@@ -195,6 +195,8 @@ pub fn parse_mfm_color(src: &str) -> Option<MfmColor> {
     })
 }
 
+const UNIXTIME_ARG_SCAN: usize = 40;
+
 #[must_use]
 pub fn parse_mfm_unixtime(src: &str) -> Option<MfmUnixtime> {
     let rest = src.strip_prefix("$[unixtime")?;
@@ -206,14 +208,20 @@ pub fn parse_mfm_unixtime(src: &str) -> Option<MfmUnixtime> {
         return None;
     }
     let rest = rest.get(digits_at..)?;
-    let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
-    if digits == 0 || rest.as_bytes().get(digits) != Some(&b']') {
-        return None;
-    }
-    let raw_len = "$[unixtime".len() + digits_at + digits + 1;
+    let arg_len = rest
+        .bytes()
+        .take(UNIXTIME_ARG_SCAN)
+        .position(|byte| byte == b']')?;
+    let arg = rest.get(..arg_len)?;
+    let datetime = if arg.bytes().all(|byte| byte.is_ascii_digit()) {
+        unixtime_datetime(arg)?
+    } else {
+        unixtime_datetime(&unix_seconds_of(arg)?)?
+    };
+    let raw_len = "$[unixtime".len() + digits_at + arg_len + 1;
     Some(MfmUnixtime {
         raw: src.get(..raw_len)?.to_owned(),
-        datetime: unixtime_datetime(rest.get(..digits)?)?,
+        datetime,
     })
 }
 
@@ -388,6 +396,27 @@ mod tests {
         assert_eq!(unixtime_datetime("253402300800"), None);
         assert_eq!(parse_mfm_unixtime("$[unixtime1]"), None);
         assert_eq!(parse_mfm_unixtime("$[unixtime 1x]"), None);
+        assert_eq!(parse_mfm_unixtime("$[unixtime ]"), None);
+    }
+
+    #[test]
+    fn unixtime_accepts_an_iso_datetime() {
+        let parsed =
+            parse_mfm_unixtime("$[unixtime 2026-11-01T14:30+01:00] later").expect("a time");
+        assert_eq!(parsed.raw, "$[unixtime 2026-11-01T14:30+01:00]");
+        assert_eq!(parsed.datetime, "2026-11-01T13:30:00Z");
+        assert_eq!(
+            parse_mfm_unixtime("$[unixtime 2026-11-01T14:30:15Z]").map(|unix| unix.datetime),
+            Some("2026-11-01T14:30:15Z".to_owned())
+        );
+        for invalid in [
+            "$[unixtime 2026-11-01T14:30]",
+            "$[unixtime 2026-02-30T14:30Z]",
+            "$[unixtime 1969-12-31T23:59Z]",
+            "$[unixtime 2026-11-01 14:30Z]",
+        ] {
+            assert_eq!(parse_mfm_unixtime(invalid), None, "{invalid}");
+        }
     }
 
     #[test]
