@@ -31,7 +31,9 @@ export class MatrixKeyProvider extends BaseKeyProvider {
   readonly #listeners = new Set<(state: KeyProviderState) => void>();
 
   constructor() {
-    super({ ratchetWindowSize: 10, keyringSize: 256, sharedKey: false });
+    // A key index marked invalid drops every later frame until that index is set again,
+    // which never happens for a key we already hold, so a participant would stay silent (#1446).
+    super({ ratchetWindowSize: 10, keyringSize: 256, sharedKey: false, failureTolerance: -1 });
   }
 
   reset(): void {
