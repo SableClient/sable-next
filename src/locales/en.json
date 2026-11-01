@@ -1029,13 +1029,24 @@
     "forwardedFromAnotherRoom": "Forwarded from another room",
     "forwardedFromEarlier": "Forwarded from earlier",
     "shield": {
-      "authenticityNotGuaranteed": "The authenticity of this encrypted message can't be guaranteed on this device.",
-      "unknownDevice": "Encrypted by an unknown or deleted device.",
-      "unsignedDevice": "Encrypted by a device not verified by its owner.",
-      "unverifiedIdentity": "Encrypted by an unverified user.",
-      "verificationViolation": "The sender's verified identity was reset.",
-      "mismatchedSender": "The sender of this message doesn't match the device that encrypted it.",
-      "sentInClear": "Not encrypted."
+      "title": {
+        "authenticityNotGuaranteed": "Authenticity not guaranteed",
+        "unknownDevice": "Unknown device",
+        "unsignedDevice": "Unverified device",
+        "unverifiedIdentity": "User unverified",
+        "verificationViolation": "Identity reset",
+        "mismatchedSender": "Sender mismatch",
+        "sentInClear": "Not encrypted"
+      },
+      "body": {
+        "authenticityNotGuaranteed": "The authenticity of this encrypted message can't be guaranteed on this device. The message key used to unlock it was downloaded from another device or imported from a backup.",
+        "unknownDevice": "This message was encrypted by an unknown or deleted device.",
+        "unsignedDevice": "This message was encrypted by a device that has not been verified by its owner.",
+        "unverifiedIdentity": "This message was encrypted by an unverified user.",
+        "verificationViolation": "The sender's verified identity was reset.",
+        "mismatchedSender": "The sender of this message doesn't match the device that encrypted it. The message may have been tampered with.",
+        "sentInClear": "This message is not encrypted. Anyone can read it, including your homeserver administrators."
+      }
     },
     "morePronouns": "+{{count, number}}",
     "sending": "Sending…",

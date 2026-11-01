@@ -25,7 +25,6 @@
   import SenderName from '../members/SenderName.svelte';
   import RoleTagIcon from '../members/RoleTagIcon.svelte';
   import ForwardedLine from '../messages/ForwardedLine.svelte';
-  import MessageShieldLine from './MessageShieldLine.svelte';
   import '../members/sender-identity.css';
   import { formatFullTimestamp, formatMessageTimestamp, formatTime } from '#lib/ui/date-time.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -38,6 +37,7 @@
   import TimelineThreadSummary from './TimelineThreadSummary.svelte';
   import TimelineTransfer from './TimelineTransfer.svelte';
   import UndecryptableNotice from './UndecryptableNotice.svelte';
+  import MessageShieldNotice from './MessageCryptoStatus.svelte';
 
   let {
     item,
@@ -285,6 +285,19 @@
   {/if}
 {/snippet}
 
+{#snippet actions()}
+  {#if row.showActions}
+    <MessageActions
+      onPickerOpenChange={row.pinActions}
+      onOverflowOpenChange={row.pinActions}
+      {...row.actions}
+    />
+  {/if}
+  {#if !row.actionable && editable && item.transaction_id && row.engagement.engaged}
+    <MessageActions {roomId} onEdit={row.actions.onEdit} />
+  {/if}
+{/snippet}
+
 {#snippet messageTime(format: (timestamp: number) => string)}
   {#if row.pending}
     <Spinner small label={i18n.t('timeline.sending')} />
@@ -378,18 +391,9 @@
         members={row.swipeOpensMembers}
       />
     {/if}
-    {#if row.showActions}
-      <MessageActions
-        onPickerOpenChange={row.pinActions}
-        onOverflowOpenChange={row.pinActions}
-        {...row.actions}
-      />
-    {/if}
-    {#if !row.actionable && editable && item.transaction_id && row.engagement.engaged}
-      <MessageActions {roomId} onEdit={row.actions.onEdit} />
-    {/if}
     {#if layout !== 'compact' && !collapsed}
       {@render senderAvatarButton('small')}
+      {@render actions()}
     {:else if layout !== 'compact' && row.pending}
       <span class="collapsed-pending">
         <Spinner small label={i18n.t('timeline.sending')} />
@@ -474,6 +478,9 @@
         </header>
       {/if}
       <div class="message-main">
+        {#if layout === 'compact' || collapsed}
+          {@render actions()}
+        {/if}
         {#if item.in_reply_to && preferences.replyPreviewStyle !== 'connected' && layout !== 'compact'}
           {@render replyPreview(item.in_reply_to)}
         {/if}
@@ -567,9 +574,6 @@
             <LinkEmbed {url} {encrypted} />
           {/each}
         {/if}
-        {#if item.shield}
-          <MessageShieldLine shield={item.shield} />
-        {/if}
         {#if threadTarget && onOpenThread}
           {@const target = threadTarget}
           <TimelineThreadSummary
@@ -611,6 +615,9 @@
           <span class="receipt-tail" aria-hidden="true"></span>
         {/if}
       </div>
+      {#if item.shield}
+        <MessageShieldNotice shield={item.shield} />
+      {/if}
       {#if trailingReceiptBadge}
         {@render receiptSlot()}
       {/if}
@@ -778,6 +785,10 @@
     inset-inline-start: var(--space-200);
   }
 
+  .message.collapsed :global(.message-actions) {
+    inset-inline-end: 0;
+  }
+
   .message.layout-bubble.own.align-own > .collapsed-pending {
     inset-inline: auto var(--page-gutter);
   }
@@ -913,9 +924,8 @@
   .message-content {
     display: grid;
     flex: 1;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     min-width: 0;
-    position: relative;
   }
 
   .message-content > header {
@@ -926,6 +936,7 @@
     font-size: var(--font-size-editor);
     grid-column: 1;
     min-width: 0;
+    position: relative;
   }
 
   .receipt-slot {
@@ -1118,16 +1129,10 @@
     color: var(--warn-on-container);
   }
 
-  .message[data-selected='true'] .body,
-  .message[data-selected='true'] time {
-    color: var(--surface-on-container);
-  }
-
   /* Layout modes stay in one block at the end: each overrides a base rule
      above, and a second copy elsewhere would drift out of sync. */
   .message.layout-compact .message-content {
-    column-gap: var(--space-300);
-    grid-template-columns: clamp(7.5rem, 20%, 10.625rem) minmax(0, 1fr);
+    grid-template-columns: clamp(7.5rem, 20%, 10.625rem) minmax(0, 1fr) auto;
   }
 
   .message.layout-compact .message-content > :global(.reply-preview) {
@@ -1138,6 +1143,15 @@
   .message.layout-compact .message-main {
     grid-column: 2;
     grid-row: 2;
+  }
+
+  .message.layout-compact :global(.message-crypto-status) {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  .message.layout-compact :global(.message-actions) {
+    inset-inline-end: 0;
   }
 
   .message.layout-compact.collapsed {
@@ -1152,6 +1166,7 @@
     grid-row: 2;
     height: fit-content;
     justify-content: space-between;
+    margin-inline-end: var(--space-300);
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;
