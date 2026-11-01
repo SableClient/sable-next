@@ -15,12 +15,13 @@ import { desktopCategories } from './registry/desktop';
 import { developerCategory } from './registry/developer';
 import { mediaCategory } from './registry/media';
 import { notificationsCategory } from './registry/notifications';
-import { panelTargets } from './registry/panels';
+import { settingsPanels } from './registry/panels';
 import { personasCategory } from './registry/personas';
 import { privacyCategory } from './registry/privacy';
 import { timelineCategory } from './registry/timeline';
 
 export { enterSettingLabels } from './registry/composer';
+export { settingsPanels, type SettingsPanelDefinition } from './registry/panels';
 
 export type BooleanPreference = {
   [K in keyof Preferences]: Preferences[K] extends boolean ? K : never;
@@ -39,6 +40,16 @@ export interface SettingOption {
   literal?: true;
 }
 
+export interface SettingsContext {
+  oauth: boolean;
+}
+
+export type SettingsGate = (context: SettingsContext) => boolean;
+
+export function settingsContext(core: { oauthMetadata: unknown }): SettingsContext {
+  return { oauth: core.oauthMetadata !== null };
+}
+
 export interface SettingsTargetDefinition {
   key: string;
   /** Preserve a custom panel's existing anchor. */
@@ -47,7 +58,7 @@ export interface SettingsTargetDefinition {
   icon: Component;
   description?: string;
   /** Left out entirely where the platform has nothing for it to show. */
-  supported?: () => boolean;
+  supported?: SettingsGate;
   terms?: readonly string[];
 }
 
@@ -60,7 +71,7 @@ interface BaseSetting extends SettingsTargetDefinition {
   /** Rendered disabled unless the homeserver advertises this unstable feature. */
   serverFeature?: string;
   requiresReload?: true;
-  panel?: true;
+  panel?: string;
 }
 
 export interface BooleanSetting extends BaseSetting {
@@ -174,6 +185,7 @@ const categories: SettingsCategory[] = [
     name: 'settings.account',
     icon: CloudArrowUpIcon,
     sections: [
+      { id: 'account-devices', name: 'settings.signedInDevices' },
       { id: 'profile-changes', name: 'settings.profileChangesTitle' },
       { id: 'sync', name: 'settings.syncTitle' },
     ],
@@ -274,7 +286,30 @@ const categories: SettingsCategory[] = [
   developerCategory,
 ];
 
-export const settingsCategories: SettingsCategory[] = categories.map((category) => ({
-  ...category,
-  targets: (panelTargets[category.id] ?? []).map((target) => ({ icon: category.icon, ...target })),
-}));
+function allOf(...gates: (SettingsGate | undefined)[]): SettingsGate | undefined {
+  const defined = gates.filter((gate) => gate !== undefined);
+  if (defined.length < 2) return defined[0];
+  return (context) => defined.every((gate) => gate(context));
+}
+
+export const settingsCategories: SettingsCategory[] = categories.map((category) => {
+  const panels = settingsPanels[category.id] ?? [];
+  const panelGate = (id: string | undefined) => panels.find((panel) => panel.id === id)?.supported;
+  return {
+    ...category,
+    items: category.items.map((item) => {
+      const gate = panelGate(item.panel);
+      if (!gate) return item;
+      // Copy descriptors so getter-backed labels stay live.
+      const gated = Object.defineProperties({}, Object.getOwnPropertyDescriptors(item));
+      return Object.assign(gated, { supported: allOf(gate, item.supported) }) as typeof item;
+    }),
+    targets: panels.flatMap((panel) =>
+      (panel.targets ?? []).map((target) => ({
+        icon: category.icon,
+        ...target,
+        supported: allOf(panel.supported, target.supported),
+      }))
+    ),
+  };
+});

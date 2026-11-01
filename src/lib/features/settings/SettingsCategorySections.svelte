@@ -11,7 +11,7 @@
   import { panelsFor } from './category-panels.js';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
-  import { settingFocusId, settingsCategories } from '#lib/settings/registry.js';
+  import { settingFocusId, settingsCategories, settingsContext } from '#lib/settings/registry.js';
   import type { SettingDefinition, SettingsCategory } from '#lib/settings/registry.js';
   import {
     PREFERENCE_RANGES,
@@ -28,19 +28,22 @@
   let { category, onRangeDraft }: Props = $props();
 
   const core = useCoreClient();
+  const context = $derived(settingsContext(core));
 
   const items = $derived(
-    category.items.filter((setting) => setting.supported?.() !== false && setting.panel !== true)
+    category.items.filter(
+      (setting) => setting.supported?.(context) !== false && setting.panel === undefined
+    )
   );
 
   const supportedSettings = $derived(
     settingsCategories.flatMap((entry) =>
-      entry.items.filter((setting) => setting.supported?.() !== false)
+      entry.items.filter((setting) => setting.supported?.(context) !== false)
     )
   );
   const shown = $derived(new Set(supportedSettings.map((setting) => setting.key)));
 
-  const panels = $derived(panelsFor(category.id).filter((panel) => panel.when?.() !== false));
+  const panels = $derived(panelsFor(category.id, context));
   const sections = $derived(
     category.sections
       .map((section) => ({

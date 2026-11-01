@@ -1,11 +1,13 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
 
+  import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { readJson, writeJson } from '#lib/platform/local-json.js';
   import {
     settingFocusId,
     settingsCategories,
+    settingsContext,
     settingsTargets,
     type SettingsTargetDefinition,
   } from '#lib/settings/registry.js';
@@ -26,6 +28,7 @@
 
   let { changes = settingsChanges, version = import.meta.env.VITE_APP_VERSION ?? '' }: Props =
     $props();
+  const core = useCoreClient();
 
   const section = $derived(!version || version.includes('-nightly.') ? 'upcoming' : `v${version}`);
 
@@ -34,7 +37,8 @@
   ): { categoryId: string; setting: SettingsTargetDefinition } | undefined {
     for (const category of settingsCategories) {
       const setting = settingsTargets(category).find((target) => target.key === key);
-      if (setting && (setting.supported?.() ?? true)) return { categoryId: category.id, setting };
+      if (setting && (setting.supported?.(settingsContext(core)) ?? true))
+        return { categoryId: category.id, setting };
     }
     return undefined;
   }

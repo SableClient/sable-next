@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
 
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import { LOGGED_IN_MARKER } from '#lib/features/auth/flow/auth-flow.svelte.js';
 import HomeLanding from './HomeLanding.svelte';
 import SettingsChangesCard from './SettingsChangesCard.svelte';
+
+vi.mock('#lib/core/context.js');
 
 afterEach(() => {
   localStorage.removeItem(LOGGED_IN_MARKER);

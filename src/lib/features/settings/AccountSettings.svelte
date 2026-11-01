@@ -10,7 +10,6 @@
   import { findCategory, SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
   import ExtendedProfileSettings from './ExtendedProfileSettings.svelte';
   import DeleteAccountSetting from './DeleteAccountSetting.svelte';
-  import LinkDeviceSetting from './LinkDeviceSetting.svelte';
   import ProfileEditor from './ProfileEditor.svelte';
   import SettingsCategorySections from './SettingsCategorySections.svelte';
   import { supporter } from '#lib/supporter/supporter.svelte.js';
@@ -72,7 +71,6 @@
     {:else}
       {#if profile}<ProfileEditor {profile} {userId} onSaved={refreshProfile} />{/if}
       {#if profile}<ExtendedProfileSettings {profile} />{/if}
-      <LinkDeviceSetting />
       {#if category}<SettingsCategorySections {category} />{/if}
 
       {#if supporter.enabled && badge}

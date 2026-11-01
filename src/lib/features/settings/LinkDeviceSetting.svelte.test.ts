@@ -1,33 +1,14 @@
 // @vitest-environment happy-dom
 
 import { render, screen } from '@testing-library/svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
 
-import { core } from '#lib/core/__mocks__/context.js';
 import LinkDeviceSetting from './LinkDeviceSetting.svelte';
 
-afterEach(() => {
-  vi.clearAllMocks();
-});
-
-test('shows QR device linking in Account when the homeserver supports OAuth', async () => {
-  Object.assign(core.rpc.encryption, {
-    devices: vi.fn(() => Promise.resolve({ devices: [], account_management: false, oauth: true })),
-  });
+test('offers QR device linking', () => {
   render(LinkDeviceSetting);
 
-  expect(await screen.findByRole('button', { name: 'Link' })).toBeInTheDocument();
-});
-
-test('hides QR device linking when the homeserver does not support OAuth', async () => {
-  Object.assign(core.rpc.encryption, {
-    devices: vi.fn(() => Promise.resolve({ devices: [], account_management: false, oauth: false })),
-  });
-  render(LinkDeviceSetting);
-
-  await vi.waitFor(() => {
-    expect(screen.queryByRole('button', { name: 'Link' })).not.toBeInTheDocument();
-  });
+  expect(screen.getByRole('button', { name: 'Link device' })).toBeInTheDocument();
 });

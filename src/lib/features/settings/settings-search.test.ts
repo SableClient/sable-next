@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { SettingsCategory } from '#lib/settings/registry.js';
+import type { SettingsCategory, SettingsContext } from '#lib/settings/registry.js';
 import { searchSettings } from './settings-search.js';
+
+const context: SettingsContext = { oauth: false };
 
 const translations: Record<string, string> = {
   'category.notifications': 'Notifications',
@@ -61,28 +63,28 @@ const categories: SettingsCategory[] = [
 
 describe('searchSettings', () => {
   it('returns nothing for a blank query', () => {
-    expect(searchSettings('  ', categories, translate)).toEqual([]);
+    expect(searchSettings('  ', categories, translate, context)).toEqual([]);
   });
 
   it('matches on the translated setting name', () => {
-    const hits = searchSettings('autoplay', categories, translate);
+    const hits = searchSettings('autoplay', categories, translate, context);
     expect(hits).toHaveLength(1);
     expect(hits[0]?.setting.key).toBe('autoplayGifs');
     expect(hits[0]?.category.id).toBe('media');
   });
 
   it('matches on the translated description, case-insensitively', () => {
-    const hits = searchSettings('OPERATING SYSTEM', categories, translate);
+    const hits = searchSettings('OPERATING SYSTEM', categories, translate, context);
     expect(hits.map((hit) => hit.setting.key)).toEqual(['systemNotifications']);
   });
 
   it('matches a setting whose own name does not mention the category', () => {
-    const hits = searchSettings('notification', categories, translate);
+    const hits = searchSettings('notification', categories, translate, context);
     expect(hits.map((hit) => hit.setting.key)).toEqual(['systemNotifications']);
   });
 
   it('excludes settings the platform does not support', () => {
-    const hits = searchSettings('hidden', categories, translate);
+    const hits = searchSettings('hidden', categories, translate, context);
     expect(hits).toEqual([]);
   });
 });
@@ -107,7 +109,7 @@ describe('enter setting search', () => {
     const previousNewline = preferences.enterForNewline;
 
     function hit() {
-      return searchSettings('Enter sends', settingsCategories, translateEnter).find(
+      return searchSettings('Enter sends', settingsCategories, translateEnter, context).find(
         (entry) => entry.setting.key === 'enterForNewline'
       )?.setting;
     }
@@ -117,7 +119,7 @@ describe('enter setting search', () => {
       expect(hit()?.name).toBe('settings.enterSends');
       expect(hit()?.description).toBeUndefined();
       expect(
-        searchSettings('starts a new line', settingsCategories, translateEnter).some(
+        searchSettings('starts a new line', settingsCategories, translateEnter, context).some(
           (entry) => entry.setting.key === 'enterForNewline'
         )
       ).toBe(true);
@@ -130,7 +132,7 @@ describe('enter setting search', () => {
       expect(hit()?.name).toBe('settings.enterForNewlineAdaptive');
       expect(hit()?.description).toBeUndefined();
       expect(
-        searchSettings('Enter sends', settingsCategories, translateEnter).some(
+        searchSettings('Enter sends', settingsCategories, translateEnter, context).some(
           (entry) => entry.setting.key === 'enterForNewline'
         )
       ).toBe(true);
@@ -147,7 +149,7 @@ describe('alt text setting search', () => {
       'settings.alwaysShowAltText': 'Always show image descriptions',
       'settings.terms.altText': 'Alt text',
     };
-    const hits = searchSettings('alt text', settingsCategories, (key) => copy[key] ?? key);
+    const hits = searchSettings('alt text', settingsCategories, (key) => copy[key] ?? key, context);
     expect(hits.some((entry) => entry.setting.key === 'alwaysShowAltText')).toBe(true);
   }, 10_000);
 });
@@ -168,7 +170,7 @@ describe('custom panel search', () => {
   ])('finds %s in %s', async (query, categoryId, focusId) => {
     const { settingsCategories } = await import('#lib/settings/registry.js');
     const { t } = await import('#lib/i18n.js');
-    const hits = searchSettings(query, settingsCategories, t);
+    const hits = searchSettings(query, settingsCategories, t, context);
     expect(
       hits.some((hit) => hit.category.id === categoryId && hit.setting.focusId === focusId)
     ).toBe(true);
@@ -176,8 +178,11 @@ describe('custom panel search', () => {
 
   it('finds a panel by its translated description', async () => {
     const { settingsCategories } = await import('#lib/settings/registry.js');
-    const hits = searchSettings('custom appearance rules', settingsCategories, (key) =>
-      key === 'settings.quickCssHint' ? 'Custom appearance rules' : key
+    const hits = searchSettings(
+      'custom appearance rules',
+      settingsCategories,
+      (key) => (key === 'settings.quickCssHint' ? 'Custom appearance rules' : key),
+      context
     );
     expect(hits.map((hit) => hit.setting.focusId)).toEqual(['quick-css']);
   });
@@ -189,15 +194,26 @@ describe('custom panel search', () => {
     const previous = preferences.developerTools;
     try {
       preferences.developerTools = false;
-      expect(searchSettings('access token', settingsCategories, t)).toEqual([]);
+      expect(searchSettings('access token', settingsCategories, t, context)).toEqual([]);
       preferences.developerTools = true;
       expect(
-        searchSettings('access token', settingsCategories, t).some(
+        searchSettings('access token', settingsCategories, t, context).some(
           (hit) => hit.setting.focusId === 'access-token'
         )
       ).toBe(true);
     } finally {
       preferences.developerTools = previous;
     }
+  });
+
+  it('hides device linking unless the server uses OAuth', async () => {
+    const { settingsCategories } = await import('#lib/settings/registry.js');
+    const translateLink = (key: string) => (key === 'qrLogin.titleGrant' ? 'Link a device' : key);
+    const linked = (oauth: boolean) =>
+      searchSettings('link a device', settingsCategories, translateLink, { oauth }).some(
+        (hit) => hit.setting.focusId === 'link-device'
+      );
+    expect(linked(false)).toBe(false);
+    expect(linked(true)).toBe(true);
   });
 });
