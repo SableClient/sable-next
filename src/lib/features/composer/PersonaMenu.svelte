@@ -23,6 +23,7 @@
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 
   import { i18n } from '#lib/i18n.js';
+  import { filterPersonas } from '#lib/personas/persona.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -73,16 +74,7 @@
   let alternateAvatarMode = $derived(
     preferences.personaAlternateAvatar && alternateAvatarAvailable
   );
-  let filteredPersonas = $derived(
-    personas.filter((persona) => {
-      const needle = query.trim().toLocaleLowerCase();
-      return (
-        needle === '' ||
-        persona.display_name.toLocaleLowerCase().includes(needle) ||
-        persona.id.toLocaleLowerCase().includes(needle)
-      );
-    })
-  );
+  let filteredPersonas = $derived(filterPersonas(personas, query));
 
   let scopes = $derived(
     (

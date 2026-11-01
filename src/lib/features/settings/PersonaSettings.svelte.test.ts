@@ -203,3 +203,21 @@ test('offers no bulk delete without profiles', () => {
 
   expect(screen.getByRole('button', { name: 'Delete all profiles' })).toBeDisabled();
 });
+
+test('search filters profiles and hides reordering', async () => {
+  mocks.load.mockResolvedValue();
+  mocks.list = ['Kris', 'Wren', 'Rook'].map(
+    (name) => ({ id: name.toLowerCase(), display_name: name, pronouns: [], triggers: [] }) as never
+  );
+  const user = userEvent.setup();
+  render(PersonaSettings);
+
+  await user.type(screen.getByRole('searchbox', { name: 'Search profiles' }), 'wr');
+  expect(screen.getByRole('button', { name: 'Edit Wren' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Edit Kris' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Move Wren up' })).not.toBeInTheDocument();
+
+  await user.clear(screen.getByRole('searchbox', { name: 'Search profiles' }));
+  await user.type(screen.getByRole('searchbox', { name: 'Search profiles' }), 'zz');
+  expect(screen.getByText('No profiles match that search.')).toBeInTheDocument();
+});

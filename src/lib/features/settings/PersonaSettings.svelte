@@ -22,7 +22,7 @@
     type PluralkitImportOptions,
     type PluralkitMember,
   } from '#lib/personas/pluralkit.js';
-  import { triggerLabel } from '#lib/personas/persona.js';
+  import { filterPersonas, triggerLabel } from '#lib/personas/persona.js';
   import { formatPronouns } from '#lib/personas/pronouns.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -47,6 +47,9 @@
   let confirmingRemoveAll = $state(false);
   let removingAll = $state(false);
   let error = $state<string | null>(null);
+  let query = $state('');
+  let shownPersonas = $derived(filterPersonas(personas.personas, query));
+  let searching = $derived(query.trim() !== '');
 
   let systemInput = $state('');
   let token = $state('');
@@ -259,69 +262,82 @@
       {:else if personas.personas.length === 0}
         <p class="persona-empty">{i18n.t('personas.empty')}</p>
       {:else}
-        <ul class="persona-list">
-          {#each personas.personas as persona (persona.id)}
-            {@const index = personas.personas.indexOf(persona)}
-            <li>
-              <Avatar
-                id={persona.id}
-                src={persona.avatar_url}
-                name={persona.display_name}
-                size="small"
-              />
-              <div class="persona-copy">
-                <span class="persona-name">{persona.display_name}</span>
-                {#if persona.pronouns.length > 0}
-                  <span class="persona-meta">{formatPronouns(persona.pronouns)}</span>
+        <TextInput
+          bind:value={query}
+          type="search"
+          autocomplete="off"
+          placeholder={i18n.t('personas.search')}
+          aria-label={i18n.t('personas.search')}
+        />
+        {#if shownPersonas.length === 0}
+          <p class="persona-empty">{i18n.t('personas.noMatches')}</p>
+        {:else}
+          <ul class="persona-list">
+            {#each shownPersonas as persona (persona.id)}
+              {@const index = personas.personas.indexOf(persona)}
+              <li>
+                <Avatar
+                  id={persona.id}
+                  src={persona.avatar_url}
+                  name={persona.display_name}
+                  size="small"
+                />
+                <div class="persona-copy">
+                  <span class="persona-name">{persona.display_name}</span>
+                  {#if persona.pronouns.length > 0}
+                    <span class="persona-meta">{formatPronouns(persona.pronouns)}</span>
+                  {/if}
+                  {#if persona.triggers.length > 0}
+                    <span class="persona-meta">
+                      {persona.triggers.map(triggerLabel).join(' · ')}
+                    </span>
+                  {/if}
+                </div>
+                <IconButton
+                  variant="subtle"
+                  size="small"
+                  label={i18n.t('personas.edit', { name: persona.display_name })}
+                  onclick={() => {
+                    openEditor(persona);
+                  }}
+                >
+                  <PencilSimpleIcon />
+                </IconButton>
+                {#if !searching}
+                  <IconButton
+                    variant="subtle"
+                    size="small"
+                    disabled={index === 0}
+                    label={i18n.t('personas.moveUp', { name: persona.display_name })}
+                    onclick={() => void personas.reorder(index, index - 1)}
+                  >
+                    <ArrowUpIcon />
+                  </IconButton>
+                  <IconButton
+                    variant="subtle"
+                    size="small"
+                    disabled={index === personas.personas.length - 1}
+                    label={i18n.t('personas.moveDown', { name: persona.display_name })}
+                    onclick={() => void personas.reorder(index, index + 1)}
+                  >
+                    <ArrowDownIcon />
+                  </IconButton>
                 {/if}
-                {#if persona.triggers.length > 0}
-                  <span class="persona-meta">
-                    {persona.triggers.map(triggerLabel).join(' · ')}
-                  </span>
-                {/if}
-              </div>
-              <IconButton
-                variant="subtle"
-                size="small"
-                label={i18n.t('personas.edit', { name: persona.display_name })}
-                onclick={() => {
-                  openEditor(persona);
-                }}
-              >
-                <PencilSimpleIcon />
-              </IconButton>
-              <IconButton
-                variant="subtle"
-                size="small"
-                disabled={index === 0}
-                label={i18n.t('personas.moveUp', { name: persona.display_name })}
-                onclick={() => void personas.reorder(index, index - 1)}
-              >
-                <ArrowUpIcon />
-              </IconButton>
-              <IconButton
-                variant="subtle"
-                size="small"
-                disabled={index === personas.personas.length - 1}
-                label={i18n.t('personas.moveDown', { name: persona.display_name })}
-                onclick={() => void personas.reorder(index, index + 1)}
-              >
-                <ArrowDownIcon />
-              </IconButton>
-              <IconButton
-                variant="subtle"
-                size="small"
-                disabled={removing === persona.id}
-                label={i18n.t('personas.remove', { name: persona.display_name })}
-                onclick={() => {
-                  personaToRemove = persona;
-                }}
-              >
-                <TrashIcon />
-              </IconButton>
-            </li>
-          {/each}
-        </ul>
+                <IconButton
+                  variant="subtle"
+                  size="small"
+                  disabled={removing === persona.id}
+                  label={i18n.t('personas.remove', { name: persona.display_name })}
+                  onclick={() => {
+                    personaToRemove = persona;
+                  }}
+                >
+                  <TrashIcon />
+                </IconButton>
+              </li>
+            {/each}
+          </ul>
+        {/if}
       {/if}
 
       <div class="persona-actions">

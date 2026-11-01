@@ -5,6 +5,7 @@
   import type { PerMessageProfileView, PersonaView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
+  import { filterPersonas } from '#lib/personas/persona.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import ResponsiveDialog from '#lib/ui/primitives/ResponsiveDialog.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -19,14 +20,7 @@
 
   let { open = $bindable(false), personas, current, onChoose }: Props = $props();
   let query = $state('');
-  let filteredPersonas = $derived.by(() => {
-    const needle = query.trim().toLocaleLowerCase();
-    return personas.filter(
-      (persona) =>
-        persona.display_name.toLocaleLowerCase().includes(needle) ||
-        persona.id.toLocaleLowerCase().includes(needle)
-    );
-  });
+  let filteredPersonas = $derived(filterPersonas(personas, query));
 
   function choose(persona: PersonaView | null): void {
     open = false;

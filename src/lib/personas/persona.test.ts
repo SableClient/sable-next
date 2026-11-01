@@ -6,6 +6,7 @@ import type { PersonaTriggerView, PersonaView } from '#src/generated/protocol';
 
 import {
   alternateAvatarId,
+  filterPersonas,
   projectPersona,
   reorderPersonas,
   resolvePersona,
@@ -96,6 +97,19 @@ describe('reorderPersonas', () => {
   it('moves one profile while preserving the rest', () => {
     const profiles = [persona('A'), persona('B'), persona('C')];
     expect(reorderPersonas(profiles, 2, 0).map(({ id }) => id)).toEqual(['C', 'A', 'B']);
+  });
+});
+
+describe('filterPersonas', () => {
+  const profiles = [persona('Kestrel'), persona('wren'), persona('Rook')];
+
+  it('matches names and ids ignoring case and surrounding spaces', () => {
+    expect(filterPersonas(profiles, '  WR ').map(({ id }) => id)).toEqual(['wren']);
+    expect(filterPersonas(profiles, 'r').map(({ id }) => id)).toEqual(['Kestrel', 'wren', 'Rook']);
+  });
+
+  it('keeps every profile for an empty query', () => {
+    expect(filterPersonas(profiles, ' ')).toEqual(profiles);
   });
 });
 

@@ -30,6 +30,15 @@ export function personaById(
   return personas.find((persona) => persona.id === id);
 }
 
+export function filterPersonas(personas: readonly PersonaView[], query: string): PersonaView[] {
+  const needle = query.trim().toLocaleLowerCase();
+  return personas.filter(
+    (persona) =>
+      persona.display_name.toLocaleLowerCase().includes(needle) ||
+      persona.id.toLocaleLowerCase().includes(needle)
+  );
+}
+
 export function reorderPersonas(
   personas: readonly PersonaView[],
   from: number,
