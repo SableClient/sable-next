@@ -67,6 +67,7 @@ skip = [
   { crate = "sha2@0.10.9", reason = "oauth2 and tauri-codegen require sha2 0.10 while the Matrix crypto stack uses 0.11" },
   { crate = "gloo-timers@0.3.0", reason = "backon requires gloo-timers 0.3 while matrix-sdk uses 0.4" },
   { crate = "itertools@0.13.0", reason = "bindgen, via PipeWire's libspa-sys, requires itertools 0.13" },
+  { crate = "ndk-sys@0.5.0+25.2.9519653", reason = "paranoid-android 0.2.2, the latest release, requires ndk-sys 0.5 while tauri's ndk uses 0.6" },
   { crate = "libloading@0.8.9", reason = "clang-sys, via bindgen for PipeWire, requires libloading 0.8" },
   { crate = "base64@0.21.7", reason = "swift-rs has not adopted base64 0.22 yet" },
   { crate = "jni@0.21.1", reason = "Tauri and reqwest require jni 0.21 while the Android app uses jni 0.22" },
