@@ -90,10 +90,10 @@ tauri-plugin-geolocation = { version = "2.3.3", optional = true }
 tauri-plugin-notifications = { version = "0.5.0", git = "https://github.com/SableClient/tauri-plugin-notifications.git", rev = "8097a87cb78cc4bf47c819ed59be4080db319a97", default-features = false, features = [
   "push-notifications",
 ] }
-tauri-plugin-livekit-mobile = { version = "0.2.0", git = "https://github.com/SableClient/tauri-plugin-livekit-mobile.git", rev = "13fbdc08bebe035065a05cd7a99041422cf38960" }
+tauri-plugin-livekit-mobile = { version = "0.2.0", git = "https://github.com/SableClient/tauri-plugin-livekit-mobile.git", rev = "a50cb0db7e812367cbf4be65fe049ae73a0a8d23" }
 # Injects the --safe-area-inset-* custom properties: Android reports the system
 # bars to nobody, and `env()` there only covers a display cutout.
-tauri-plugin-edge-to-edge = { version = "0.3.3", git = "https://github.com/SableClient/tauri-plugin-edge-to-edge.git", rev = "33c6116c27be28c06df5a9d02231ecc5fdeb93c5" }
+tauri-plugin-edge-to-edge = { version = "0.3.3", git = "https://github.com/SableClient/tauri-plugin-edge-to-edge.git", rev = "45a98971fc4957db32cb5f5985a8d8687eb3dc15" }
 # `navigator.share` reaches no webview we ship, so the system share sheet only
 # comes from the native side.
 tauri-plugin-sharekit = { version = "=0.4.0-rc.7", git = "https://github.com/Choochmeque/tauri-plugin-sharekit", rev = "455a166070626bae1da4cf3c471d4d3a40d33d6d" }

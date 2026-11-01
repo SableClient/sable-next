@@ -1,6 +1,6 @@
 [workspace]
 members = ["crates/*", "plugins/*", "src-tauri"]
-exclude = ["vendor/tauri-plugin-edge-to-edge", "vendor/tauri-plugin-livekit-mobile", "vendor/wry"]
+exclude = ["vendor/wry"]
 # sable-wasm only compiles for wasm32 - its session store holds JS functions,
 # which are not Send. Build it with `-p sable-wasm --target wasm32-unknown-unknown`.
 default-members = ["crates/sable-core", "src-tauri"]
@@ -10,12 +10,6 @@ resolver = "3"
 # bytecount 0.6.9 emits wasm SIMD even when simd128 is disabled.
 bytecount = { path = "vendor/bytecount" }
 wry = { path = "vendor/wry" }
-
-[patch."https://github.com/SableClient/tauri-plugin-edge-to-edge.git"]
-tauri-plugin-edge-to-edge = { path = "vendor/tauri-plugin-edge-to-edge" }
-
-[patch."https://github.com/SableClient/tauri-plugin-livekit-mobile.git"]
-tauri-plugin-livekit-mobile = { path = "vendor/tauri-plugin-livekit-mobile" }
 
 [workspace.package]
 edition = "2024"

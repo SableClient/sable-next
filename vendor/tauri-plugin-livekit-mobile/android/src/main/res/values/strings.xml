@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="livekit_incoming_call">Incoming call</string>
-    <string name="livekit_answering">Answering…</string>
-    <string name="livekit_answer">Answer</string>
-    <string name="livekit_decline">Decline</string>
-    <string name="livekit_end_call">End call</string>
-    <string name="livekit_call_in_progress">Call in progress</string>
-</resources>
