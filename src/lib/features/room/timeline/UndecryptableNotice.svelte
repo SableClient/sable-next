@@ -3,22 +3,16 @@
   import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
   import ShieldWarningIcon from 'phosphor-svelte/lib/ShieldWarningIcon';
   import type { Component } from 'svelte';
-  import {
-    ClockCounterClockwiseIcon,
-    DevicesIcon,
-    XIcon,
-    type IconComponentProps,
-  } from 'phosphor-svelte';
+  import { ClockCounterClockwiseIcon, DevicesIcon, type IconComponentProps } from 'phosphor-svelte';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
   import type { UtdCauseView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
-  import ResponsiveDialog from '#lib/ui/primitives/ResponsiveDialog.svelte';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import UserSecurityDialog from '../members/UserSecurityDialog.svelte';
   import { openSettingsOver } from '#lib/features/settings/settings-navigation.ts';
   import { SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.ts';
+  import ResponsiveInfoDialog from '#lib/ui/primitives/ResponsiveInfoDialog.svelte';
 
   const KEYS: Record<UtdCauseView, string> = {
     unknown: 'waiting',
@@ -71,66 +65,53 @@
   <span>{i18n.t(`timeline.utd.title.${KEYS[cause]}`, { name: displayName })}</span>
 </button>
 
-<ResponsiveDialog
+<ResponsiveInfoDialog
   bind:open={detailsOpen}
   label={i18n.t('timeline.utd.detailsTitle')}
   closeLabel={i18n.t('common.close')}
 >
-  {#snippet children(desktop)}
-    <div class={[{ sheet: !desktop }]}>
-      <div class="details-title">
-        <Icon class="details-icon" />
-        <h2>{i18n.t(`timeline.utd.title.${KEYS[cause]}`, { name: displayName })}</h2>
-        {#if desktop}
-          <IconButton
-            variant="ghost"
-            size="small"
-            label={i18n.t('common.close')}
-            onclick={() => {
-              detailsOpen = false;
-            }}
-          >
-            <XIcon />
-          </IconButton>
-        {/if}
-      </div>
-      <p>{i18n.t(`timeline.utd.details.${KEYS[cause]}`, { name: displayName })}</p>
-      {#if i18n.exists(`timeline.utd.cause.${KEYS[cause]}`)}
-        <h3>{i18n.t('timeline.utd.causeHeader')}</h3>
-        <p>{i18n.t(`timeline.utd.cause.${KEYS[cause]}`, { name: displayName })}</p>
-      {/if}
-      {#if cause === 'verification_violation'}
-        <Button
-          variant="primary"
-          size="small"
-          block={!desktop}
-          onclick={() => {
-            detailsOpen = false;
-            securityOpen = true;
-          }}
-        >
-          {i18n.t('timeline.utd.openIdentitySettings')}
-        </Button>
-      {:else if cause === 'historical_message_backup_disabled' || cause === 'historical_message_device_unverified' || cause === 'withheld_for_unverified_or_insecure_device'}
-        <Button
-          variant="primary"
-          size="small"
-          block={!desktop}
-          onclick={(event) => {
-            detailsOpen = false;
-            openSettingsOver(event, SETTINGS_DEVICES_SECTION);
-          }}
-        >
-          {i18n.t(
-            cause === 'historical_message_backup_disabled'
-              ? 'timeline.utd.enableKeyBackup'
-              : 'timeline.utd.confirmThisDevice'
-          )}
-        </Button>
-      {/if}
-    </div>
+  {#snippet header()}
+    <Icon />
+    <h2>{i18n.t(`timeline.utd.title.${KEYS[cause]}`, { name: displayName })}</h2>
   {/snippet}
-</ResponsiveDialog>
+
+  {#snippet body(desktop)}
+    <p>{i18n.t(`timeline.utd.details.${KEYS[cause]}`, { name: displayName })}</p>
+    {#if i18n.exists(`timeline.utd.cause.${KEYS[cause]}`)}
+      <h3>{i18n.t('timeline.utd.causeHeader')}</h3>
+      <p>{i18n.t(`timeline.utd.cause.${KEYS[cause]}`, { name: displayName })}</p>
+    {/if}
+    {#if cause === 'verification_violation'}
+      <Button
+        variant="primary"
+        size="small"
+        block={!desktop}
+        onclick={() => {
+          detailsOpen = false;
+          securityOpen = true;
+        }}
+      >
+        {i18n.t('timeline.utd.openIdentitySettings')}
+      </Button>
+    {:else if cause === 'historical_message_backup_disabled' || cause === 'historical_message_device_unverified' || cause === 'withheld_for_unverified_or_insecure_device'}
+      <Button
+        variant="primary"
+        size="small"
+        block={!desktop}
+        onclick={(event) => {
+          detailsOpen = false;
+          openSettingsOver(event, SETTINGS_DEVICES_SECTION);
+        }}
+      >
+        {i18n.t(
+          cause === 'historical_message_backup_disabled'
+            ? 'timeline.utd.enableKeyBackup'
+            : 'timeline.utd.confirmThisDevice'
+        )}
+      </Button>
+    {/if}
+  {/snippet}
+</ResponsiveInfoDialog>
 
 <UserSecurityDialog
   open={securityOpen}
@@ -179,25 +160,5 @@
   h3 {
     font-size: var(--font-size-label);
     margin: 0;
-  }
-
-  .details-title {
-    align-items: center;
-    display: flex;
-
-    :global(svg.details-icon) {
-      height: var(--icon-size-medium);
-      margin-right: var(--space-200);
-      width: var(--icon-size-medium);
-    }
-
-    h2 {
-      margin-right: auto;
-    }
-  }
-
-  .sheet {
-    padding: 0 var(--space-400);
-    width: auto;
   }
 </style>
