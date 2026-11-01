@@ -682,6 +682,21 @@ mod tests {
     }
 
     #[test]
+    fn a_link_wraps_its_coloured_letters_once() {
+        assert_eq!(
+            markdown_to_content(
+                "[$[fg.color=f00 a]$[fg.color=0f0 b]c](https://example.org)",
+                &[]
+            )
+            .formatted_body
+            .as_deref(),
+            Some(
+                "<a href=\"https://example.org\"><span data-mx-color=\"#ff0000\">a</span><span data-mx-color=\"#00ff00\">b</span>c</a>"
+            )
+        );
+    }
+
+    #[test]
     fn functions_take_the_dollar_signs_math_would_pair() {
         let content = markdown_to_content("$[fg.color=f00 a]$[bg.color=000 b] $x$", &[]);
         let html = content.formatted_body.unwrap_or_default();

@@ -358,6 +358,17 @@ export const composerSchema = new Schema({
     },
   },
   marks: {
+    link: {
+      attrs: { href: {} },
+      inclusive: false,
+      parseDOM: [{ tag: 'a[href]', getAttrs: (dom) => ({ href: dom.getAttribute('href') }) }],
+      toDOM: (mark) => {
+        const href = mark.attrs.href as string;
+        return parseMatrixLink(href)
+          ? ['a', { href, 'data-org.matrix.msc4550.link': '' }, 0]
+          : ['a', { href }, 0];
+      },
+    },
     strong: {
       parseDOM: [
         { tag: 'strong' },
@@ -434,17 +445,6 @@ export const composerSchema = new Schema({
         },
       ],
       toDOM: (mark) => ['span', { 'data-mx-spoiler': mark.attrs.reason as string }, 0],
-    },
-    link: {
-      attrs: { href: {} },
-      inclusive: false,
-      parseDOM: [{ tag: 'a[href]', getAttrs: (dom) => ({ href: dom.getAttribute('href') }) }],
-      toDOM: (mark) => {
-        const href = mark.attrs.href as string;
-        return parseMatrixLink(href)
-          ? ['a', { href, 'data-org.matrix.msc4550.link': '' }, 0]
-          : ['a', { href }, 0];
-      },
     },
   },
 });

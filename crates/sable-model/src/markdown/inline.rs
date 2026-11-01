@@ -22,19 +22,22 @@ pub(super) enum Mark {
     Link(String),
 }
 
-pub(super) const LINK: u8 = 10;
-const CODE: u8 = 3;
-const SPOILER: u8 = 9;
-const COLOR: u8 = 7;
-const BG_COLOR: u8 = 8;
+pub(super) const LINK: u8 = 0;
+pub(super) const STRONG: u8 = 1;
+pub(super) const EM: u8 = 2;
+pub(super) const STRIKE: u8 = 3;
+const CODE: u8 = 4;
+const SPOILER: u8 = 10;
+const COLOR: u8 = 8;
+const BG_COLOR: u8 = 9;
 
 impl Mark {
     /// The composer schema's mark order, which is also the order marks nest in.
     pub(super) const fn rank(&self) -> u8 {
         match self {
-            Self::Strong => 0,
-            Self::Em => 1,
-            Self::Strike => 2,
+            Self::Strong => STRONG,
+            Self::Em => EM,
+            Self::Strike => STRIKE,
             Self::Code => CODE,
             Self::Color(_) => COLOR,
             Self::BgColor(_) => BG_COLOR,
@@ -527,10 +530,10 @@ mod tests {
 
     #[test]
     fn code_keeps_other_marks_but_drops_colours() {
-        let strong = vec![Mark::Strong, Mark::Link("u".to_owned())];
+        let strong = vec![Mark::Link("u".to_owned()), Mark::Strong];
         assert_eq!(
             add_mark(&strong, Mark::Code),
-            vec![Mark::Strong, Mark::Code, Mark::Link("u".to_owned())]
+            vec![Mark::Link("u".to_owned()), Mark::Strong, Mark::Code]
         );
         assert_eq!(
             add_mark(&[Mark::Color("#000000".to_owned())], Mark::Code),
@@ -545,7 +548,7 @@ mod tests {
     #[test]
     fn a_mark_takes_its_rank_and_replaces_its_own_type() {
         let set = add_mark(&[Mark::Link("u".to_owned())], Mark::Strong);
-        assert_eq!(set, vec![Mark::Strong, Mark::Link("u".to_owned())]);
+        assert_eq!(set, vec![Mark::Link("u".to_owned()), Mark::Strong]);
         let recolored = add_mark(
             &[Mark::Color("#000000".to_owned())],
             Mark::Color("#ffffff".to_owned()),

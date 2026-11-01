@@ -8,7 +8,7 @@ use pulldown_cmark::{
     CodeBlockKind, Event, HeadingLevel, LinkType, OffsetIter, Options, Parser, Tag, TagEnd,
 };
 
-use super::inline::{Glyph, Mark, Token};
+use super::inline::{EM, Glyph, Mark, STRIKE, STRONG, Token};
 use super::links::{normalize_link, valid_link};
 use super::source::{content_of, flanking_chars, prepare};
 use crate::text::{head, span, tail};
@@ -254,9 +254,9 @@ impl Inlines {
             Event::InlineHtml(html) | Event::Html(html) => self.text(&html, false),
             Event::SoftBreak | Event::HardBreak => line_break(&mut self.tokens, source, range),
             Event::Start(Tag::Emphasis) => self.tokens.push(Token::Open(Mark::Em)),
-            Event::End(TagEnd::Emphasis) => self.tokens.push(Token::Close(1)),
+            Event::End(TagEnd::Emphasis) => self.tokens.push(Token::Close(EM)),
             Event::Start(Tag::Strong) => self.tokens.push(Token::Open(Mark::Strong)),
-            Event::End(TagEnd::Strong) => self.tokens.push(Token::Close(0)),
+            Event::End(TagEnd::Strong) => self.tokens.push(Token::Close(STRONG)),
             Event::Start(Tag::Strikethrough) => {
                 let double = source
                     .get(range.start..)
@@ -274,7 +274,7 @@ impl Inlines {
             }
             Event::End(TagEnd::Strikethrough) => match self.strikes.pop().flatten() {
                 Some(refused) => self.text(refused, false),
-                None => self.tokens.push(Token::Close(2)),
+                None => self.tokens.push(Token::Close(STRIKE)),
             },
             Event::Start(Tag::Link {
                 link_type,

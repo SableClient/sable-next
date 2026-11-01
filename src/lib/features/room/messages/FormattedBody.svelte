@@ -829,6 +829,10 @@
     text-decoration: underline;
   }
 
+  .formatted-body :global([data-mx-color] a) {
+    color: inherit;
+  }
+
   .formatted-body :global(a[data-matrix-link]),
   .formatted-body :global([data-mx-room-mention]),
   .formatted-body :global(a[data-settings-link]) {

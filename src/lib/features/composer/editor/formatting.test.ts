@@ -511,7 +511,7 @@ describe('typed Markdown', () => {
     ['[label](https://example.org)', '<a href="https://example.org">label</a>'],
     [
       '[**label**](https://example.org)',
-      '<strong><a href="https://example.org">label</a></strong>',
+      '<a href="https://example.org"><strong>label</strong></a>',
     ],
     ['`code` next', '<code>code</code> next'],
     ['``code ` tick`` next', '<code>code ` tick</code> next'],

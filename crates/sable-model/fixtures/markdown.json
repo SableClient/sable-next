@@ -897,7 +897,7 @@
     "markdown": "[`x`](https://example.org)",
     "pills": [],
     "body": "[`x`](https://example.org)",
-    "formatted_body": "<code><a href=\"https://example.org\">x</a></code>",
+    "formatted_body": "<a href=\"https://example.org\"><code>x</code></a>",
     "mentions": {
       "user_ids": [],
       "room": false
