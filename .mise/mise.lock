@@ -311,50 +311,50 @@ url_api = "https://api.github.com/repos/nextest-rs/nextest/releases/assets/62060
 provenance = "github-attestations"
 
 [[tools."github:wasm-bindgen/wasm-bindgen"]]
-version = "0.2.129"
+version = "0.2.130"
 backend = "github:wasm-bindgen/wasm-bindgen"
-specifiers = ["0.2.129"]
+specifiers = ["0.2.130"]
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.linux-arm64"]
-checksum = "sha256:1797c349a0f45d30946e8986b184135e12839ab576c9a04203e85febfc5dcb35"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769532"
+checksum = "sha256:cc8dd8e90aa9111758168d30c63a14b7f0276997d9d60d3e160a1fb5e7d3b919"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.130/wasm-bindgen-0.2.130-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/691140661"
 provenance = "github-attestations"
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.linux-arm64-musl"]
-checksum = "sha256:2ed4351c35dd9440308bbb02767d47ea278efe851a52465300f3c94f5b6c2a87"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-aarch64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769523"
+checksum = "sha256:99ffc93ce80081b91632e2b539b782821a8f3439ab0fddc645287462b2f55d3d"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.130/wasm-bindgen-0.2.130-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/691140664"
 provenance = "github-attestations"
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.linux-x64"]
-checksum = "sha256:82d12bb940e2d4e72e0d5605387fc1b8ca179044e012b620f0ce4e7440e8320e"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769529"
+checksum = "sha256:9687f3bb551b9f66f37ed32a40d7913a00f7962db653054e56857bc306c3227f"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.130/wasm-bindgen-0.2.130-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/691140647"
 provenance = "github-attestations"
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.linux-x64-musl"]
-checksum = "sha256:82d12bb940e2d4e72e0d5605387fc1b8ca179044e012b620f0ce4e7440e8320e"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769529"
+checksum = "sha256:9687f3bb551b9f66f37ed32a40d7913a00f7962db653054e56857bc306c3227f"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.130/wasm-bindgen-0.2.130-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/691140647"
 provenance = "github-attestations"
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.macos-arm64"]
-checksum = "sha256:81d4a23d56b3c3eb8187658329116d50e0b228a93b343825fb71f70179051cd1"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769526"
+checksum = "sha256:b90ddb9357f584b1af897d58ad77e4cce2b48fc17e2a967bc249a87f72809444"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.130/wasm-bindgen-0.2.130-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/691140655"
 provenance = "github-attestations"
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.macos-x64"]
-checksum = "sha256:7e028879a68ec53dae14048b55cc5215f6df75b17a9c1426fac8fa086d3202fd"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-x86_64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769520"
+checksum = "sha256:eb209c115b7cb95832423c1aa3f4d06d6c53f63ef74fc4b6fb79ef0b2eea5f10"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.130/wasm-bindgen-0.2.130-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/691140663"
 provenance = "github-attestations"
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.windows-x64"]
-checksum = "sha256:79e348c169d0c10c0b287647f1e753d0985353ca96800bc29be8f4261baf13e6"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-x86_64-pc-windows-msvc.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769522"
+checksum = "sha256:844d23f1b56097549b936dd2e0d561fadebc1e8c9e985d5068b6b919654104ad"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.130/wasm-bindgen-0.2.130-x86_64-pc-windows-msvc.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/691140662"
 provenance = "github-attestations"
 
 [[tools.node]]

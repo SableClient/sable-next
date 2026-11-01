@@ -19,7 +19,7 @@ RUN apt-get update \
        | tar -xz -C /tmp \
     && install "/tmp/binaryen-version_133/bin/wasm-opt" /usr/local/bin/wasm-opt \
     && rustup target add wasm32-unknown-unknown \
-    && cargo install wasm-bindgen-cli --version 0.2.129 --locked \
+    && cargo install wasm-bindgen-cli --version 0.2.130 --locked \
     && corepack enable pnpm \
     && corepack prepare pnpm@12.14.0 --activate
 RUN pnpm install --frozen-lockfile --ignore-scripts

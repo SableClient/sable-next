@@ -19,7 +19,7 @@ excludes = ["scripts/ci"]
 
 [tools]
 node = "24.22.0"
-"github:wasm-bindgen/wasm-bindgen" = { version = "0.2.129" }
+"github:wasm-bindgen/wasm-bindgen" = { version = "0.2.130" }
 "github:WebAssembly/binaryen" = { version = "133", version_prefix = "version_" }
 "aqua:watchexec/watchexec" = "2.8.0"
 "aqua:evilmartians/lefthook" = "2.2.2"
