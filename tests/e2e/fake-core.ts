@@ -911,9 +911,6 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         has_encrypted_rooms: true,
       }),
       'encryption.devices': () => ({
-        account_management: false,
-        account_management_url: null,
-        oauth: false,
         devices: [
           {
             device_id: session.device_id,

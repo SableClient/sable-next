@@ -41,9 +41,8 @@
   import KeyBackupSettings from './KeyBackupSettings.svelte';
 
   const core = useCoreClient();
+  const accountManagementUrl = core.oauthMetadata?.account_management_uri;
   let devices = $state.raw<DeviceView[]>([]);
-  let accountManagement = $state(false);
-  let accountManagementUrl = $state<string | null>(null);
   let status = $state<EncryptionStatusView | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
@@ -118,8 +117,6 @@
       if (cancelled) return;
       if (requestedStatus === statusRevision) status = nextStatus;
       if (requestedDevices === devicesRevision) devices = nextDevices.devices;
-      accountManagement = nextDevices.account_management;
-      accountManagementUrl = nextDevices.account_management_url;
     } catch (cause) {
       if (!cancelled) error = messageFor(cause);
     } finally {
@@ -224,7 +221,7 @@
       try {
         const managementUrl = await core.rpc.encryption.deleteDevice({
           device_id: deviceId,
-          password: accountManagement ? null : bulkPassword || null,
+          password: accountManagementUrl ? null : bulkPassword || null,
         });
         if (managementUrl) await openExternalAuthUrl(managementUrl);
       } catch (cause) {
@@ -244,7 +241,7 @@
   }
 
   function beginRemoval(deviceId: string): void {
-    if (!accountManagement) {
+    if (!accountManagementUrl) {
       deleting = deviceId;
       return;
     }
@@ -517,7 +514,7 @@
               >
               <p>{i18n.t('settings.removeDeviceDescription')}</p>
             </div>
-            {#if !accountManagement}
+            {#if !accountManagementUrl}
               <Label for="bulk-device-password">{i18n.t('settings.password')}</Label>
               <TextInput
                 id="bulk-device-password"
@@ -668,7 +665,7 @@
                 <DeviceActionForm
                   mode="remove"
                   deviceId={device.device_id}
-                  {accountManagement}
+                  accountManagement={accountManagementUrl !== undefined}
                   bind:password
                   busy={removing === device.device_id}
                   onSubmit={() => void removeDevice(device.device_id)}

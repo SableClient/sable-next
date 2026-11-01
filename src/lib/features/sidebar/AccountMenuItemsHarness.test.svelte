@@ -34,6 +34,7 @@
     switching={false}
     {onSwitch}
     onProfile={() => {}}
+    onLinkDevice={() => {}}
     {onLogoutAccount}
     {onReauth}
     onLogout={() => {}}

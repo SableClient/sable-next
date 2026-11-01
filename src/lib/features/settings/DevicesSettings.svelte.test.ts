@@ -4,7 +4,12 @@ import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 
-import type { CoreEvent, DeviceView, EncryptionStatusView, Rpc } from '#src/generated/protocol';
+import {
+  type CoreEvent,
+  type DeviceView,
+  type EncryptionStatusView,
+  type Rpc,
+} from '#src/generated/protocol';
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
@@ -90,10 +95,12 @@ async function renderDevices(devices: DeviceView[], managementUrl: string | null
   encryption.status.mockResolvedValue(status);
   encryption.devices.mockResolvedValue({
     devices,
-    account_management: managementUrl !== null,
-    account_management_url: managementUrl,
-    oauth: false,
   });
+  vi.spyOn(baseCore, 'oauthMetadata', 'get').mockImplementation(() => ({
+    account_management_uri: managementUrl,
+    account_management_actions_supported: [],
+  }));
+
   render(DevicesSettings);
   await vi.waitFor(() => {
     expect(screen.getAllByText(/^(This device|Phone|Tablet)$/).length).toBeGreaterThanOrEqual(
@@ -248,9 +255,6 @@ test('keeps live trust updates when an older settings refresh finishes', async (
   finishStatus({ ...status, verification: 'unverified' });
   finishDevices({
     devices: [{ ...own, is_verified: false, cross_signed: false }],
-    account_management: false,
-    account_management_url: null,
-    oauth: false,
   });
 
   await vi.waitFor(() => {
@@ -286,9 +290,6 @@ test('removing one device shows it is in progress until the list no longer has i
 
   encryption.devices.mockResolvedValue({
     devices: [own],
-    account_management: false,
-    account_management_url: null,
-    oauth: false,
   });
   answer(null);
   await vi.waitFor(() => {
@@ -305,9 +306,6 @@ test('a verified session missing its master key explains it instead of asking to
   });
   encryption.devices.mockResolvedValue({
     devices: [own],
-    account_management: false,
-    account_management_url: null,
-    oauth: false,
   });
   render(DevicesSettings);
 
@@ -327,9 +325,6 @@ test('a verified session whose key backup is still locked keeps the unlock actio
   });
   encryption.devices.mockResolvedValue({
     devices: [own],
-    account_management: false,
-    account_management_url: null,
-    oauth: false,
   });
   render(DevicesSettings);
 

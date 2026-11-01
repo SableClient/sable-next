@@ -1,5 +1,5 @@
 import { vi, type Mock } from 'vitest';
-import { createRpc, type Rpc } from '#src/generated/protocol';
+import { createRpc, type OAuthMetadataView, type Rpc } from '#src/generated/protocol';
 
 const pending = () => new Promise<never>(() => {});
 
@@ -45,6 +45,7 @@ export function createCoreStub<T extends Record<string, unknown> & { rpc?: RpcOv
     ),
     subscribeEvents: vi.fn(() => () => {}),
     onProfileChanged: vi.fn(() => () => {}),
+    oauthMetadata: null as OAuthMetadataView | null,
     rpc: mockRpc(
       {
         members: { powerLevelTags: vi.fn(() => Promise.resolve({})) },

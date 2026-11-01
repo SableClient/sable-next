@@ -10,22 +10,10 @@
   import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
-  let oauth = $state(false);
   let linkingDevice = $state(false);
-
-  $effect(() => {
-    void core.rpc.encryption.devices().then(
-      ({ oauth: supported }) => {
-        oauth = supported;
-      },
-      (error: unknown) => {
-        console.debug('[sable settings] device list unavailable', error);
-      }
-    );
-  });
 </script>
 
-{#if oauth}
+{#if core.oauthMetadata !== null}
   <SettingsSection headingId="account-devices" title={i18n.t('settings.signedInDevices')}>
     <ul class="settings-rows">
       <SettingsRow

@@ -98,10 +98,6 @@ pub struct DevicesParams {}
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct DevicesOk {
     pub devices: Vec<DeviceView>,
-    pub account_management: bool,
-    pub account_management_url: Option<String>,
-    /// Signed in with OAuth, which is what linking a device by QR code needs.
-    pub oauth: bool,
 }
 
 impl Handler for DevicesParams {
@@ -109,27 +105,9 @@ impl Handler for DevicesParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<DevicesOk, RpcError> {
         let client = core.client().await?;
-        let oauth = client.oauth().full_session().is_some();
-        let metadata = core.oauth_metadata(&client, "account_management_metadata").await?;
-        let account_management_url = metadata.as_ref().and_then(|metadata| {
-            use matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::{
-                AccountManagementAction, AccountManagementActionData,
-            };
-            let url = if metadata
-                .is_account_management_action_supported(&AccountManagementAction::DevicesList)
-            {
-                metadata.account_management_url_with_action(AccountManagementActionData::DevicesList)
-            } else {
-                metadata.account_management_uri.clone()
-            };
-            url.map(|url| url.to_string())
-        });
 
         Ok(DevicesOk {
             devices: verification::own_devices(&client).await,
-            account_management: metadata.is_some(),
-            account_management_url,
-            oauth,
         })
     }
 }

@@ -16,6 +16,8 @@
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import { useActionMenuSurface } from '#lib/ui/primitives/action-menu.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { QrCodeIcon } from 'phosphor-svelte';
 
   const PRESENCE_OPTIONS: readonly PresenceView[] = ['online', 'unavailable', 'offline'];
 
@@ -26,6 +28,7 @@
     switching: boolean;
     onSwitch: (accountId: string) => void;
     onProfile: () => void;
+    onLinkDevice: () => void;
     onLogoutAccount: (accountId: string) => void;
     onReauth: (account: SessionInfo) => void;
     onLogout: () => void;
@@ -40,12 +43,15 @@
     switching,
     onSwitch,
     onProfile,
+    onLinkDevice,
     onLogoutAccount,
     onReauth,
     onLogout,
     onAddAccount,
     accountSwitching = true,
   }: Props = $props();
+
+  const core = useCoreClient();
   let presence = $derived(preferences.presence);
   const surface = useActionMenuSurface();
 
@@ -84,6 +90,12 @@
   <span>{i18n.t('nav.editProfile')}</span>
 </ActionMenuItem>
 <ActionMenuSeparator />
+{#if core.oauthMetadata !== null}
+  <ActionMenuItem onSelect={onLinkDevice}>
+    <QrCodeIcon aria-hidden="true" />
+    <span>{i18n.t('qrLogin.titleGrant')}</span>
+  </ActionMenuItem>
+{/if}
 {#if accountSwitching}
   <ActionMenuSub label={i18n.t('nav.switchAccount')} class="account-switcher-popover">
     {#snippet trigger()}

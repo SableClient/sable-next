@@ -12,23 +12,11 @@
   import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
-  let oauth = $state(false);
   let open = $state(false);
   let password = $state('');
   let typedUserId = $state('');
   let busy = $state(false);
   let error = $state<string | null>(null);
-
-  $effect(() => {
-    void core.rpc.encryption.devices().then(
-      ({ oauth: supported }) => {
-        oauth = supported;
-      },
-      (cause: unknown) => {
-        console.debug('[sable settings] device list unavailable', cause);
-      }
-    );
-  });
 
   function messageFor(cause: unknown): string {
     if (cause instanceof CoreError) {
@@ -101,7 +89,7 @@
     {i18n.t('settings.deleteAccountTypeUserId', { userId })}
   </Label>
   <TextInput id="delete-account-confirm" bind:value={typedUserId} autocomplete="off" />
-  {#if !oauth}
+  {#if core.oauthMetadata === null}
     <Label for="delete-account-password">{i18n.t('settings.password')}</Label>
     <TextInput
       id="delete-account-password"
