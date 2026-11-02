@@ -57,7 +57,7 @@
     "@tauri-apps/plugin-geolocation": "2.5.0",
     "@tauri-apps/plugin-os": "2.4.0",
     "badwords-list": "2.0.1-4",
-    "bits-ui": "^2.19.2",
+    "bits-ui": "^2.20.3",
     "blurhash": "2.0.5",
     "container-query-polyfill": "^1.0.2",
     "core-js": "^3.51.0",
