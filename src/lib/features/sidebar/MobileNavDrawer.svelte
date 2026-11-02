@@ -366,6 +366,12 @@
     overflow: hidden;
   }
 
+  @media (prefers-reduced-motion: no-preference) {
+    .content {
+      view-transition-name: tab-page;
+    }
+  }
+
   .mobile-quick-tools {
     flex: 0 0 auto;
     height: 0;

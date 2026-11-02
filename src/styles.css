@@ -852,6 +852,61 @@ label[for],
   }
 }
 
+/* Phone tabs: the page slides toward the picked tab, the root stays still. */
+::view-transition-group(root) {
+  animation: none;
+}
+
+::view-transition-old(tab-page),
+::view-transition-new(tab-page) {
+  animation-duration: var(--duration-fast);
+  animation-timing-function: var(--ease-smooth-out);
+}
+
+:root[data-tab-direction='forward']::view-transition-old(tab-page) {
+  animation-name: tab-out-start;
+}
+
+:root[data-tab-direction='forward']::view-transition-new(tab-page) {
+  animation-name: tab-in-end;
+}
+
+:root[data-tab-direction='back']::view-transition-old(tab-page) {
+  animation-name: tab-out-end;
+}
+
+:root[data-tab-direction='back']::view-transition-new(tab-page) {
+  animation-name: tab-in-start;
+}
+
+@keyframes tab-out-start {
+  to {
+    opacity: 0;
+    translate: -12% 0;
+  }
+}
+
+@keyframes tab-out-end {
+  to {
+    opacity: 0;
+    translate: 12% 0;
+  }
+}
+
+@keyframes tab-in-end {
+  from {
+    opacity: 0;
+    translate: 12% 0;
+  }
+}
+
+@keyframes tab-in-start {
+  from {
+    opacity: 0;
+    translate: -12% 0;
+  }
+}
+
 a:not([class]) {
   color: var(--tc-link, var(--primary-main));
   text-underline-offset: 0.15em;

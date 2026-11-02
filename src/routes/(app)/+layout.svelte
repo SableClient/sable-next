@@ -28,7 +28,8 @@
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { supporter } from '#lib/supporter/supporter.svelte.js';
   import { PresenceStore, providePresenceStore } from '#lib/rooms/presence.svelte.js';
-  import { goto } from '$app/navigation';
+  import { goto, onNavigate } from '$app/navigation';
+  import { tabTransition } from '#lib/ui/tab-transition.js';
   import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import { resolve } from '$app/paths';
   import { i18n } from '#lib/i18n.js';
@@ -295,6 +296,7 @@
     void callSession.join(roomId, { microphone: !preferences.callMicrophoneMuted, camera: false });
   }
   const appLayout = new AppLayout();
+  onNavigate((navigation) => tabTransition(navigation, !appLayout.current));
 
   let wasSignedIn = false;
 
