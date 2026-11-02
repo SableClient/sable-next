@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { i18n } from '#lib/i18n.js';
   import AuthPage from '#lib/features/auth/shared/AuthPage.svelte';
   import AuthStatusSlot from '#lib/features/auth/shared/AuthStatusSlot.svelte';
   import '#lib/features/auth/shared/auth-card.css';
@@ -50,21 +51,21 @@
       if (!response.ok) {
         error =
           response.status === 429
-            ? 'Too many attempts. Try again shortly.'
-            : 'Invalid username or password.';
+            ? i18n.t('auth.serverTooManyAttempts')
+            : i18n.t('auth.serverInvalidCredentials');
         return;
       }
       password = '';
       onAuthenticated();
     } catch {
-      error = 'The server could not be reached.';
+      error = i18n.t('auth.serverUnreachable');
     } finally {
       submitting = false;
     }
   }
 </script>
 
-<AuthPage hasLoggedInBefore={false} title="Sign in to Sable">
+<AuthPage hasLoggedInBefore={false} title={i18n.t('auth.serverSignInTitle')}>
   <form
     class="server-login auth-card-surface login-form"
     novalidate
@@ -73,13 +74,13 @@
       void submit();
     }}
   >
-    <p>Sign in to this Sable server before connecting your Matrix account.</p>
+    <p>{i18n.t('auth.serverSignInIntro')}</p>
     {#if oidcAvailable}
       <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- OIDC uses the server origin -->
-      <a href={oidcStart}>Sign in with your identity provider</a>
+      <a href={oidcStart}>{i18n.t('auth.signInWithIdentityProvider')}</a>
     {/if}
     {#if localAvailable}
-      <FormField dense fieldId="username" label="Username">
+      <FormField dense fieldId="username" label={i18n.t('auth.username')}>
         <TextInput
           id="username"
           bind:value={username}
@@ -88,13 +89,13 @@
           disabled={submitting}
         />
       </FormField>
-      <FormField dense fieldId="password" label="Password">
+      <FormField dense fieldId="password" label={i18n.t('auth.password')}>
         <PasswordField bind:value={password} disabled={submitting} />
       </FormField>
       <AuthStatusSlot message={error} />
       <FormActions>
         <Button type="submit" variant="primary" loading={submitting}>
-          {submitting ? 'Signing in…' : 'Sign in'}
+          {submitting ? i18n.t('auth.signingIn') : i18n.t('auth.signInTitle')}
         </Button>
       </FormActions>
     {/if}
