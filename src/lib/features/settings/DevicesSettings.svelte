@@ -668,7 +668,7 @@
                 <DeviceActionForm
                   mode="remove"
                   deviceId={device.device_id}
-                  accountManagement={accountManagementUrl !== undefined}
+                  accountManagement={!!accountManagementUrl}
                   bind:password
                   busy={removing === device.device_id}
                   onSubmit={() => void removeDevice(device.device_id)}
