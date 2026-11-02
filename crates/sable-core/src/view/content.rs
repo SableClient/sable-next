@@ -366,6 +366,32 @@ fn unparsed(event_type: &str, raw: &RawFields) -> TimelineItemContentView {
     }
 }
 
+fn unparsed_message_like(event_type: &str, raw: &RawFields) -> TimelineItemContentView {
+    // MSC4075 withdraws an invite with a content that holds only its sticky key.
+    let withdrawal = matches!(
+        event_type,
+        "m.rtc.invite" | "m.rtc.notification" | "org.matrix.msc4075.rtc.notification"
+    ) && raw
+        .content
+        .as_ref()
+        .and_then(serde_json::Value::as_object)
+        .is_some_and(|content| {
+            !content.is_empty()
+                && content
+                    .keys()
+                    .all(|key| matches!(key.as_str(), "sticky_key" | "msc4354_sticky_key"))
+        });
+    if withdrawal {
+        TimelineItemContentView::HiddenEvent {
+            event_type: event_type.to_owned(),
+            content: raw.content.clone(),
+            redacts: None,
+        }
+    } else {
+        unparsed(event_type, raw)
+    }
+}
+
 pub(super) fn content(
     content: &TimelineItemContent,
     profile: Option<&PerMessageProfileView>,
@@ -449,7 +475,7 @@ pub(super) fn content(
             TimelineItemContentView::CallInvite
         }
         TimelineItemContent::FailedToParseMessageLike { event_type, .. } => {
-            unparsed(&event_type.to_string(), raw)
+            unparsed_message_like(&event_type.to_string(), raw)
         }
         TimelineItemContent::FailedToParseState {
             event_type,
@@ -492,8 +518,11 @@ pub(super) fn raw_formatted_body(content: Option<&serde_json::Value>) -> Option<
 mod tests {
     use super::*;
 
+    use std::sync::Arc;
+
     use serde_json::json;
 
+    use crate::protocol::TimelineVisibility;
     use crate::view::raw::RawFields;
 
     #[test]
@@ -551,6 +580,23 @@ mod tests {
         );
         let serialized = serde_json::to_value(view).unwrap();
         assert_eq!(serialized["kind"], "call_invite");
+    }
+
+    #[test]
+    fn an_invite_withdrawal_is_hidden_but_a_broken_notification_is_malformed() {
+        let view = |content| {
+            let raw = serde_json::from_value::<RawFields>(json!({ "content": content })).unwrap();
+            let unparsed = TimelineItemContent::FailedToParseMessageLike {
+                event_type: "org.matrix.msc4075.rtc.notification".into(),
+                error: Arc::new(serde_json::from_str::<u8>("x").unwrap_err()),
+            };
+            super::content(&unparsed, None, &raw, None)
+        };
+
+        let withdrawal = view(json!({ "msc4354_sticky_key": "m.call#ROOM" }));
+        assert_eq!(withdrawal.visibility(), TimelineVisibility::Hidden);
+        let broken = view(json!({ "msc4354_sticky_key": "m.call#ROOM", "lifetime": "soon" }));
+        assert_eq!(serde_json::to_value(broken).unwrap()["kind"], "malformed");
     }
 
     #[test]
