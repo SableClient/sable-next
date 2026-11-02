@@ -36,6 +36,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   }),
 }));
 vi.mock('#lib/core/context.js');
+vi.mock('#lib/ui/MediaImage.svelte', () => import('./MediaImageProbe.test.svelte'));
 
 import { core } from '#lib/core/__mocks__/context.js';
 import type { SidebarFolder } from '#lib/spaces/sidebar-layout.js';
@@ -51,6 +52,7 @@ import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 import { savedSpacePaths, spaceNavigationHref } from './space-paths.js';
+import { reads as mediaImageReads } from './MediaImageProbe.test.svelte';
 
 beforeEach(() => {
   visit('/home');
@@ -257,6 +259,31 @@ test('badges a space with its mentions and dots one with only unread messages', 
   expect(tab('Beta').querySelector('.unread-badge-dot')).toBeInTheDocument();
   expect(tab('Beta')).toHaveAccessibleDescription('nav.unreadMessages:4');
   expect(tab('nav.unspaced')).toHaveAccessibleDescription('');
+});
+
+test('a space badge follows unread changes without re-running its avatar', async () => {
+  const alpha = { ...space('!a:example.org', 'Alpha'), avatar_url: 'mxc://example.org/alpha' };
+  const { rerender } = renderRail({
+    props: {
+      spaces: [alpha],
+      spaceUnread: new Map([['!a:example.org', { unread: 1, highlight: 0 }]]),
+      mobile: true,
+    },
+  });
+  await tick();
+  const reads = mediaImageReads.count;
+
+  await rerender({
+    spaces: [alpha],
+    spaceUnread: new Map([['!a:example.org', { unread: 2, highlight: 1 }]]),
+    mobile: true,
+  });
+  await tick();
+
+  expect(within(tab('Alpha')).getByText('1').closest('.unread-badge')).toHaveClass(
+    'unread-badge-count'
+  );
+  expect(mediaImageReads.count).toBe(reads);
 });
 
 test('outlines every tab but a space avatar', async () => {

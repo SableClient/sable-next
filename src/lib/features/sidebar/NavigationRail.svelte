@@ -75,6 +75,8 @@
     section?: RailSection;
     badge?: boolean;
     inCall?: boolean;
+    /** Read live by room id, so a space's avatar does not re-run on every unread change. */
+    space?: boolean;
   };
 
   interface Props {
@@ -417,10 +419,8 @@
       roomId: space.room_id,
       navigateHref: tabHref(href, savedPath, lobby),
       initial: toInitials(name),
-      avatar: space.avatar_url,
       label: name,
-      unread: spaceUnread.get(space.room_id),
-      inCall: callSpaces.has(space.room_id),
+      space: true,
     };
   }
 
@@ -559,18 +559,24 @@
   {#if item.icon}
     <span class="icon" aria-hidden="true"><item.icon weight={active ? 'fill' : 'regular'} /></span>
   {:else}
+    {@const avatar =
+      item.space && item.roomId ? spacesById.get(item.roomId)?.avatar_url : item.avatar}
     <Avatar
       class="space-initial"
       id={item.roomId ?? null}
-      src={item.avatar}
+      src={avatar}
       initials={item.initial}
       uniform
     />
   {/if}
   {#if item.badge !== false}
-    {@render unreadMark(item.unread, item.dm ?? false, unreadId(item.roomId ?? item.href))}
+    {@render unreadMark(
+      item.space && item.roomId ? spaceUnread.get(item.roomId) : item.unread,
+      item.dm ?? false,
+      unreadId(item.roomId ?? item.href)
+    )}
   {/if}
-  {#if item.inCall}
+  {#if item.space && item.roomId ? callSpaces.has(item.roomId) : item.inCall}
     <span class="call-mark" aria-hidden="true"><SpeakerHighIcon weight="fill" /></span>
   {/if}
 {/snippet}
