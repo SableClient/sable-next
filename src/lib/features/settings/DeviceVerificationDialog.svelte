@@ -27,6 +27,7 @@
   });
   let noReply = $derived.by(() => {
     void activeFlow;
+    void core.verification?.state.phase;
     return false;
   });
   let choosing = $derived(core.verification?.state.phase === 'choose');
@@ -39,6 +40,29 @@
     core.verification?.state.phase === 'choose' && core.verification.state.can_scan && scanning
   );
   let selfVerification = $derived(core.verification?.userId === core.session?.user_id);
+  let title = $state<HTMLElement | null>(null);
+  let shownPhase: string | undefined;
+  const liveMessage = $derived.by(() => {
+    const state = core.verification?.state;
+    switch (state?.phase) {
+      case 'requested':
+        return state.initiated_by_us ? i18n.t('settings.waiting') : '';
+      case 'reciprocated':
+      case 'waiting':
+      case 'confirmed':
+        return i18n.t('settings.waiting');
+      case 'choose':
+        return processingScan ? i18n.t('settings.waiting') : '';
+      case 'done':
+        return i18n.t(
+          selfVerification ? 'settings.verificationComplete' : 'settings.userVerificationComplete'
+        );
+      case 'cancelled':
+        return i18n.t('settings.verificationCancelled', { reason: state.reason });
+      default:
+        return '';
+    }
+  });
 
   // This app-level component keeps verification events flowing even when no
   // route-specific feature currently subscribes to the core transport.
@@ -46,10 +70,18 @@
 
   $effect(() => {
     const state = core.verification?.state;
-    if (state?.phase !== 'requested' || !state.initiated_by_us) return;
+    const waitingOnThem =
+      state?.phase === 'waiting' || (state?.phase === 'requested' && state.initiated_by_us);
+    if (!waitingOnThem) return;
     void activeFlow;
     const timer = setTimeout(() => (noReply = true), NO_REPLY_DELAY_MS);
     return () => clearTimeout(timer);
+  });
+
+  $effect(() => {
+    const phase = core.verification?.state.phase;
+    if (phase && shownPhase && phase !== shownPhase) title?.focus();
+    shownPhase = phase;
   });
 
   async function accept(): Promise<void> {
@@ -150,16 +182,17 @@
   onOpenChange={handleOpenChange}
   variant="verification"
 >
-  <Dialog.Title class="verification-title">
+  <Dialog.Title class="verification-title" tabindex={-1} bind:ref={title}>
     {i18n.t(selfVerification ? 'settings.verification' : 'settings.userVerification')}
   </Dialog.Title>
+  <p class="visually-hidden" role="status">{liveMessage}</p>
   {#if core.verification}
     {#if core.verification.state.phase === 'requested'}
       {#if core.verification.state.initiated_by_us}
         <Dialog.Description class="verification-description">
           {i18n.t(selfVerification ? 'settings.acceptOtherDevice' : 'settings.acceptOtherUser')}
         </Dialog.Description>
-        <p class="verification-wait" role="status">{i18n.t('settings.waiting')}</p>
+        <p class="verification-wait" aria-hidden="true">{i18n.t('settings.waiting')}</p>
         {#if noReply}
           <Button class="verification-action" onclick={() => void retry()}
             >{i18n.t('settings.verificationRetry')}</Button
@@ -181,7 +214,7 @@
       <Dialog.Description class="verification-description">
         {i18n.t('settings.finishing')}
       </Dialog.Description>
-      <p class="verification-wait" role="status">{i18n.t('settings.waiting')}</p>
+      <p class="verification-wait" aria-hidden="true">{i18n.t('settings.waiting')}</p>
     {:else if core.verification.state.phase === 'choose'}
       {@const choice = core.verification.state}
       <Dialog.Description class="verification-description">
@@ -237,21 +270,26 @@
       <Dialog.Description class="verification-description">
         {i18n.t('settings.verificationScanSucceeded')}
       </Dialog.Description>
-      <p class="verification-wait" role="status">{i18n.t('settings.waiting')}</p>
+      <p class="verification-wait" aria-hidden="true">{i18n.t('settings.waiting')}</p>
     {:else if core.verification.state.phase === 'waiting'}
       <Dialog.Description class="verification-description">
         {i18n.t('settings.startingEmojiComparison')}
       </Dialog.Description>
-      <p class="verification-wait" role="status">{i18n.t('settings.waiting')}</p>
+      <p class="verification-wait" aria-hidden="true">{i18n.t('settings.waiting')}</p>
+      {#if noReply}
+        <Button class="verification-action" onclick={() => void retry()}
+          >{i18n.t('settings.verificationRetry')}</Button
+        >
+      {/if}
     {:else if core.verification.state.phase === 'compare'}
       <Dialog.Description class="verification-description">
         {i18n.t('settings.compareEmoji')}
       </Dialog.Description>
-      <div class="emoji" aria-label={i18n.t('settings.verificationEmoji')}>
+      <div class="emoji" role="group" aria-label={i18n.t('settings.verificationEmoji')}>
         {#each core.verification.state.emojis as emoji, index (index)}
-          <div class="emoji-item">
-            <span>{emoji.symbol}</span>
-            <small>{emoji.description}</small>
+          <div class="emoji-item" role="group" aria-label={emoji.description}>
+            <span aria-hidden="true">{emoji.symbol}</span>
+            <small aria-hidden="true">{emoji.description}</small>
           </div>
         {/each}
       </div>
@@ -271,7 +309,7 @@
       <Dialog.Description class="verification-description">
         {i18n.t('settings.finishing')}
       </Dialog.Description>
-      <p class="verification-wait" role="status">{i18n.t('settings.waiting')}</p>
+      <p class="verification-wait" aria-hidden="true">{i18n.t('settings.waiting')}</p>
     {:else if core.verification.state.phase === 'done'}
       <Dialog.Description class="verification-description">
         {i18n.t(
@@ -314,6 +352,15 @@
 
   :global(.verification-description) {
     margin-bottom: var(--space-300);
+  }
+
+  .visually-hidden {
+    block-size: 1px;
+    clip-path: inset(50%);
+    inline-size: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
   }
 
   .emoji {

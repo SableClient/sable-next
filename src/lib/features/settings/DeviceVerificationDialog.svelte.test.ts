@@ -48,6 +48,59 @@ test('renders every SAS emoji slot when a symbol repeats', () => {
   expect(screen.getByText('Dog again')).toBeInTheDocument();
 });
 
+test('each emoji is one labelled group so nothing is read twice', () => {
+  render(DeviceVerificationDialog);
+
+  const dog = screen.getByRole('group', { name: 'Dog' });
+  expect(dog.querySelectorAll('[aria-hidden="true"]')).toHaveLength(2);
+});
+
+test('the status region stays mounted and announces the current phase', async () => {
+  const active = $state<{ current: unknown }>({
+    current: {
+      userId: '@alice:example.org',
+      flowId: 'flow',
+      state: { phase: 'waiting' as const },
+    },
+  });
+  Object.defineProperty(core, 'verification', {
+    configurable: true,
+    get: () => active.current,
+    set: (next: unknown) => {
+      active.current = next;
+    },
+  });
+  render(DeviceVerificationDialog);
+
+  const region = await screen.findByRole('status');
+  expect(region).toHaveTextContent('Waiting for the other device');
+
+  active.current = {
+    userId: '@alice:example.org',
+    flowId: 'flow',
+    state: { phase: 'done' as const },
+  };
+  await flushed();
+  expect(screen.getByRole('status')).toBe(region);
+  expect(region).toHaveTextContent('verified');
+  expect(document.querySelector('.verification-title')).toHaveFocus();
+});
+
+test('a silent emoji comparison can be cancelled and requested again', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  core.verification = {
+    userId: '@alice:example.org',
+    flowId: 'flow',
+    state: { phase: 'waiting' as const },
+  };
+  render(DeviceVerificationDialog);
+  await screen.findByRole('dialog');
+  expect(screen.queryByRole('button', { name: 'Send the request again' })).toBeNull();
+
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(await screen.findByRole('button', { name: 'Send the request again' })).toBeInTheDocument();
+});
+
 test('dismissing an active flow cancels it and clears it so a new request can reopen the panel', async () => {
   core.verification = {
     userId: '@alice:example.org',
