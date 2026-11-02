@@ -6,6 +6,7 @@
 </script>
 
 <script lang="ts">
+  import type { Attachment } from 'svelte/attachments';
   import type { ClassValue } from 'svelte/elements';
 
   interface Props {
@@ -31,36 +32,29 @@
   }: Props = $props();
   const uid = $props.id();
   const index = $derived(items.findIndex((item) => item.value === value));
-  let switcherElement: HTMLDivElement;
   const optionElements = $state<HTMLLabelElement[]>([]);
   let optionBounds = $state<Array<{ left: number; width: number }>>([]);
   const thumb = $derived(optionBounds[index]);
 
-  $effect(() => {
-    const root = switcherElement;
+  const trackOptions: Attachment<HTMLDivElement> = (root) => {
     const options = optionElements.slice(0, items.length);
-    if (!root || options.length !== items.length) return;
+    if (options.length !== items.length) return;
 
-    const measure = () => {
+    const observer = new ResizeObserver(() => {
       optionBounds = options.map((option) => ({
         left: option.offsetLeft,
         width: option.offsetWidth,
       }));
-    };
-
-    measure();
-    if (typeof ResizeObserver === 'undefined') return;
-
-    const observer = new ResizeObserver(measure);
+    });
     observer.observe(root);
     for (const option of options) observer.observe(option);
     return () => observer.disconnect();
-  });
+  };
 </script>
 
 <div
   {id}
-  bind:this={switcherElement}
+  {@attach trackOptions}
   class="switcher"
   role="radiogroup"
   aria-label={label}

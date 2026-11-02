@@ -38,11 +38,7 @@ export class OutlineTracker {
     observer.observe(scroller, { childList: true, subtree: true, characterData: true });
 
     const onScroll = (): void => {
-      if (this.#frame) return;
-      this.#frame = requestAnimationFrame(() => {
-        this.#frame = 0;
-        this.#spy();
-      });
+      this.#scheduleSpy();
     };
     const release = (): void => {
       this.#pinned = null;
@@ -103,7 +99,15 @@ export class OutlineTracker {
         this.#pinned = null;
       }
     }
-    this.#spy();
+    this.#scheduleSpy();
+  }
+
+  #scheduleSpy(): void {
+    if (this.#frame) return;
+    this.#frame = requestAnimationFrame(() => {
+      this.#frame = 0;
+      this.#spy();
+    });
   }
 
   #spy(): void {

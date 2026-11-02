@@ -44,9 +44,7 @@ function mountScroller(): HTMLElement {
   return scroller;
 }
 
-function scrollTo(scroller: HTMLElement, top: number): Promise<void> {
-  scroller.scrollTop = top;
-  scroller.dispatchEvent(new Event('scroll'));
+function nextFrame(): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => {
       resolve();
@@ -54,13 +52,20 @@ function scrollTo(scroller: HTMLElement, top: number): Promise<void> {
   });
 }
 
+function scrollTo(scroller: HTMLElement, top: number): Promise<void> {
+  scroller.scrollTop = top;
+  scroller.dispatchEvent(new Event('scroll'));
+  return nextFrame();
+}
+
 afterEach(() => {
   document.body.replaceChildren();
 });
 
-test('lists only the headings marked for the outline', () => {
+test('lists only the headings marked for the outline', async () => {
   const outline = new OutlineTracker();
   const release = outline.track(mountScroller());
+  await nextFrame();
 
   expect(outline.entries).toEqual([
     { id: 'one', label: 'One' },
