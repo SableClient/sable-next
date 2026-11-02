@@ -17,6 +17,7 @@ function item(eventId: string): InboxItemView {
     encrypted: false,
     read: false,
     thread_root: null,
+    reply: false,
   };
 }
 

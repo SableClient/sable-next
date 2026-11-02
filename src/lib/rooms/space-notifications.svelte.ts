@@ -1,21 +1,22 @@
 import type {
   NotificationModeView,
   RoomListItemView,
-  SpaceNotificationView,
+  SpaceNotificationsView,
 } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { AccountDataSync } from '#lib/core/account-data-sync.js';
 
+import { i18n } from '#lib/i18n.js';
+import { toasts } from '#lib/ui/toasts.svelte.js';
+import { roomDisplayName } from '#lib/ui/shortcuts/room-jump.js';
+
+import { notificationModeLabels } from './notification-modes.js';
 import { inheritedNotificationModes } from './spaces.js';
 
 export const SPACE_NOTIFICATIONS_EVENT = 'moe.sable.space_notifications';
 
 type Modes = ReadonlyMap<string, NotificationModeView>;
-
-function toModes(views: readonly SpaceNotificationView[]): Modes {
-  return new Map(views.map((view) => [view.space_id, view.mode]));
-}
 
 function byMode(
   entries: readonly [string, NotificationModeView | null][]
@@ -29,6 +30,8 @@ function byMode(
 
 class SpaceNotifications {
   modes = $state.raw<Modes>(new Map());
+  exempt = $state.raw<ReadonlySet<string>>(new Set());
+  loaded = $state(false);
 
   /** Not cleared on failure, so a rejected write is not retried on every list change. */
   readonly #tried = new Set<string>();
@@ -45,6 +48,13 @@ class SpaceNotifications {
   stop(): void {
     this.sync.stop();
     this.modes = new Map();
+    this.exempt = new Set();
+    this.loaded = false;
+  }
+
+  #adopt(view: SpaceNotificationsView): void {
+    this.modes = new Map(view.spaces.map((space) => [space.space_id, space.mode]));
+    this.exempt = new Set(view.exempt_rooms);
   }
 
   modeOf(spaceId: string): NotificationModeView | null {
@@ -52,7 +62,36 @@ class SpaceNotifications {
   }
 
   inherited(rooms: readonly RoomListItemView[]): Map<string, NotificationModeView> {
+    return inheritedNotificationModes(rooms, this.modes, this.exempt);
+  }
+
+  /** The mode each room's space sets, whether or not the room follows it. */
+  spaceModes(rooms: readonly RoomListItemView[]): Map<string, NotificationModeView> {
     return inheritedNotificationModes(rooms, this.modes);
+  }
+
+  async setExempt(room: RoomListItemView, exempt: boolean): Promise<void> {
+    const core = this.sync.core;
+    if (core === null) return;
+    const generation = this.sync.generation;
+    const previous = this.exempt;
+    const next: ReadonlySet<string> = new Set([
+      ...[...previous].filter((id) => id !== room.room_id),
+      ...(exempt ? [room.room_id] : []),
+    ]);
+    this.exempt = next;
+    try {
+      const stored = await core.rpc.account.setSpaceNotificationExempt({
+        room_id: room.room_id,
+        exempt,
+      });
+      if (generation === this.sync.generation) this.#adopt(stored);
+    } catch (error) {
+      if (this.exempt === next) this.exempt = previous;
+      throw error;
+    }
+    this.#tried.delete(room.room_id);
+    await core.rpc.notifications.setRoomNotificationMode({ room_id: room.room_id, mode: null });
   }
 
   custom(
@@ -95,9 +134,9 @@ class SpaceNotifications {
     spaceId: string,
     mode: NotificationModeView | null,
     rooms: readonly RoomListItemView[]
-  ): Promise<void> {
+  ): Promise<number> {
     const core = this.sync.core;
-    if (core === null) return;
+    if (core === null) return 0;
     const generation = this.sync.generation;
     const previous = this.modes;
     const next: Modes = new Map([
@@ -105,9 +144,10 @@ class SpaceNotifications {
       ...(mode === null ? [] : [[spaceId, mode] as const]),
     ]);
 
-    const before = inheritedNotificationModes(rooms, previous);
-    const after = inheritedNotificationModes(rooms, next);
+    const before = inheritedNotificationModes(rooms, previous, this.exempt);
+    const after = inheritedNotificationModes(rooms, next, this.exempt);
     const moved: [string, NotificationModeView | null][] = [];
+    let changed = 0;
     for (const room of rooms) {
       if (room.room_id === spaceId) {
         if (room.notification.room !== mode) moved.push([spaceId, mode]);
@@ -115,14 +155,16 @@ class SpaceNotifications {
       }
       const was = before.get(room.room_id);
       const now = after.get(room.room_id);
-      if (was === undefined || was === now || room.notification.room !== was) continue;
-      moved.push([room.room_id, now ?? null]);
+      const rule = room.notification.room;
+      if (was === now || (rule !== null && rule !== was)) continue;
+      if (room.room_kind !== 'space') changed += 1;
+      if (rule !== null) moved.push([room.room_id, now ?? null]);
     }
 
     this.modes = next;
     try {
       const stored = await core.rpc.account.setSpaceNotification({ space_id: spaceId, mode });
-      if (generation === this.sync.generation) this.modes = toModes(stored);
+      if (generation === this.sync.generation) this.#adopt(stored);
     } catch (error) {
       if (this.modes === next) this.modes = previous;
       throw error;
@@ -132,29 +174,51 @@ class SpaceNotifications {
         core.rpc.notifications.setRoomsNotificationMode({ room_ids: roomIds, mode: target })
       )
     );
+    return changed;
   }
 
   private async pull(generation: number): Promise<void> {
     try {
       const core = this.sync.core;
       if (core === null) return;
-      const views = await core.rpc.account.spaceNotifications();
-      if (generation === this.sync.generation) this.modes = toModes(views);
+      const view = await core.rpc.account.spaceNotifications();
+      if (generation === this.sync.generation) this.#adopt(view);
     } catch (error) {
       console.debug('[sable rooms] space notification modes unavailable', error);
+    } finally {
+      if (generation === this.sync.generation) this.loaded = true;
     }
   }
 }
 
 export const spaceNotifications = new SpaceNotifications();
 
-export function setNotificationMode(
+export async function setNotificationMode(
   core: CoreClient,
-  rooms: readonly RoomListItemView[],
+  roomList: { readonly rooms: readonly RoomListItemView[] },
   room: RoomListItemView,
   mode: NotificationModeView | null
-): Promise<unknown> {
-  return room.room_kind === 'space'
-    ? spaceNotifications.set(room.room_id, mode, rooms)
-    : core.rpc.notifications.setRoomNotificationMode({ room_id: room.room_id, mode });
+): Promise<void> {
+  if (room.room_kind !== 'space') {
+    await core.rpc.notifications.setRoomNotificationMode({ room_id: room.room_id, mode });
+    return;
+  }
+  const previous = spaceNotifications.modeOf(room.room_id);
+  const count = await spaceNotifications.set(room.room_id, mode, roomList.rooms);
+  toasts.undoable(
+    i18n.t('room.spaceModeApplied', {
+      count,
+      space: roomDisplayName(room),
+      mode: i18n.t(mode === null ? 'room.spaceModeDefault' : notificationModeLabels[mode]),
+    }),
+    {
+      label: i18n.t('common.undo'),
+      onUndo: () => {
+        spaceNotifications.set(room.room_id, previous, roomList.rooms).catch((error: unknown) => {
+          console.warn('[sable rooms] undoing the space notification mode failed', error);
+          toasts.error(i18n.t('errors.actionFailed'));
+        });
+      },
+    }
+  );
 }

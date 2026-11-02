@@ -7,6 +7,7 @@
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
@@ -38,9 +39,11 @@
   let actions = $state('[]');
   let busy = $state(false);
   let error = $state<'json' | 'failed' | null>(null);
+  let problem = $state<string | null>(null);
   let saved = $state(false);
   let confirmingDelete = $state(false);
   let draft = $state<{ kind: string; rule: string } | null>(null);
+  let loaded = $state(false);
 
   const current = $derived(
     selected === null
@@ -60,6 +63,8 @@
       entries = KINDS.flatMap((kind) => (ruleset[kind] ?? []).map((rule) => ({ kind, rule })));
     } catch {
       entries = [];
+    } finally {
+      loaded = true;
     }
   }
 
@@ -84,6 +89,20 @@
     saved = false;
   }
 
+  function ruleProblem(kind: string, rule: Record<string, unknown>): string | null {
+    const ruleId = rule.rule_id;
+    if (typeof ruleId !== 'string' || ruleId.trim() === '') return 'developerPushRulesNeedsId';
+    if (kind === 'room' && !ruleId.startsWith('!')) return 'developerPushRulesNeedsRoomId';
+    if (kind === 'sender' && !ruleId.startsWith('@')) return 'developerPushRulesNeedsUserId';
+    if (kind === 'content' && typeof rule.pattern !== 'string')
+      return 'developerPushRulesNeedsPattern';
+    if ('conditions' in rule && !Array.isArray(rule.conditions)) {
+      return 'developerPushRulesNeedsConditions';
+    }
+    if (!Array.isArray(rule.actions)) return 'developerPushRulesInvalidActions';
+    return null;
+  }
+
   async function create(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     if (draft === null || busy) return;
@@ -95,9 +114,15 @@
     }
     if (typeof rule !== 'object' || rule === null || Array.isArray(rule)) {
       error = 'json';
+      problem = 'developerPushRulesInvalidRule';
       return;
     }
     const { kind } = draft;
+    problem = ruleProblem(kind, rule as Record<string, unknown>);
+    if (problem !== null) {
+      error = 'json';
+      return;
+    }
     busy = true;
     error = null;
     try {
@@ -180,7 +205,13 @@
       {i18n.t('settings.developerPushRulesNew')}
     </Button>
   </div>
-  {#if entries.length === 0}
+  {#if !loaded}
+    <ul class="rule-list" aria-busy="true" aria-label={i18n.t('settings.developerPushRulesTitle')}>
+      {#each { length: 6 }, index (index)}
+        <li><Skeleton class="rule-loading" /></li>
+      {/each}
+    </ul>
+  {:else if entries.length === 0}
     <p class="empty">{i18n.t('settings.developerPushRulesEmpty')}</p>
   {:else}
     <ul class="rule-list" {@attach scrollHint}>
@@ -225,8 +256,8 @@
           class="push-rule-json"
         />
       </FormField>
-      {#if error === 'json'}
-        <Alert variant="critical">{i18n.t('settings.developerPushRulesInvalidRule')}</Alert>
+      {#if error === 'json' && problem !== null}
+        <Alert variant="critical">{i18n.t(`settings.${problem}`)}</Alert>
       {:else if error === 'failed'}
         <Alert variant="critical">{i18n.t('settings.developerPushRulesFailed')}</Alert>
       {/if}
@@ -337,6 +368,10 @@
     font-family: var(--font-family-mono);
     font-size: var(--font-size-small);
     margin-inline-end: var(--space-200);
+  }
+
+  .rule-list :global(.rule-loading) {
+    height: 2rem;
   }
 
   :global(.disabled-rule) {

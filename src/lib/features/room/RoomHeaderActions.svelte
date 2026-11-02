@@ -1,5 +1,5 @@
 <script lang="ts">
-  import BellIcon from 'phosphor-svelte/lib/BellIcon';
+  import TrayIcon from 'phosphor-svelte/lib/TrayIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
@@ -10,12 +10,13 @@
   interface Props {
     panels: RoomPanels;
     voiceView: boolean;
+    direct: boolean;
     desktop: boolean;
     widgetCount: number;
     canManageWidgets: boolean;
   }
 
-  let { panels, voiceView, desktop, widgetCount, canManageWidgets }: Props = $props();
+  let { panels, voiceView, direct, desktop, widgetCount, canManageWidgets }: Props = $props();
 </script>
 
 {#if !voiceView}
@@ -26,13 +27,15 @@
   >
     <ChatsIcon weight={panels.threadsOpen ? 'fill' : 'regular'} />
   </PanelHeaderButton>
-  <PanelHeaderButton
-    label={i18n.t('room.notificationsOpen')}
-    aria-pressed={panels.notificationsOpen}
-    onclick={() => panels.toggleNotifications()}
-  >
-    <BellIcon weight={panels.notificationsOpen ? 'fill' : 'regular'} />
-  </PanelHeaderButton>
+  {#if !direct}
+    <PanelHeaderButton
+      label={i18n.t('room.notificationsOpen')}
+      aria-pressed={panels.notificationsOpen}
+      onclick={() => panels.toggleNotifications()}
+    >
+      <TrayIcon weight={panels.notificationsOpen ? 'fill' : 'regular'} />
+    </PanelHeaderButton>
+  {/if}
   {#if desktop}
     <PanelHeaderButton
       label={i18n.t('timeline.attachmentsTitle')}

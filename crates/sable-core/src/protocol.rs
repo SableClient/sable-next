@@ -2743,6 +2743,7 @@ pub struct InboxItemView {
     pub encrypted: bool,
     pub read: bool,
     pub thread_root: Option<String>,
+    pub reply: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

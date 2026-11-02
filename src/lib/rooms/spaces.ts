@@ -129,7 +129,8 @@ export function descendantRoomIds(rooms: readonly RoomListItemView[], spaceId: s
 
 export function inheritedNotificationModes(
   rooms: readonly RoomListItemView[],
-  modes: ReadonlyMap<string, NotificationModeView>
+  modes: ReadonlyMap<string, NotificationModeView>,
+  exempt: ReadonlySet<string> = new Set()
 ): Map<string, NotificationModeView> {
   const joined = new Set(
     rooms.filter((room) => room.state === 'joined').map((room) => room.room_id)
@@ -141,6 +142,7 @@ export function inheritedNotificationModes(
   );
   const inherited = new Map<string, NotificationModeView>();
   for (const roomId of covered) {
+    if (exempt.has(roomId)) continue;
     const levels = [[roomId], ...ancestorSpaceLevels(rooms, roomId)];
     for (const level of levels) {
       const mode = level.map((id) => modes.get(id)).find((entry) => entry !== undefined);

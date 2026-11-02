@@ -47,6 +47,7 @@ domain! {
     set_dm_spaces,
     space_notifications,
     set_space_notification,
+    set_space_notification_exempt,
     profile_overrides,
     set_profile_override,
 }
@@ -764,16 +765,27 @@ pub struct SpaceNotificationView {
     pub mode: NotificationModeView,
 }
 
-fn space_notification_views(
-    modes: std::collections::BTreeMap<OwnedRoomId, NotificationModeView>,
-) -> Vec<SpaceNotificationView> {
-    modes
-        .into_iter()
-        .map(|(space_id, mode)| SpaceNotificationView {
-            space_id: space_id.into(),
-            mode,
-        })
-        .collect()
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SpaceNotificationsView {
+    pub spaces: Vec<SpaceNotificationView>,
+    pub exempt_rooms: Vec<String>,
+}
+
+fn space_notifications_view(
+    notifications: crate::account_documents::SpaceNotifications,
+) -> SpaceNotificationsView {
+    SpaceNotificationsView {
+        spaces: notifications
+            .modes
+            .into_iter()
+            .map(|(space_id, mode)| SpaceNotificationView {
+                space_id: space_id.into(),
+                mode,
+            })
+            .collect(),
+        exempt_rooms: notifications.exempt.into_iter().map(String::from).collect(),
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -781,10 +793,10 @@ fn space_notification_views(
 pub struct SpaceNotificationsParams {}
 
 impl Handler for SpaceNotificationsParams {
-    type Ok = Vec<SpaceNotificationView>;
+    type Ok = SpaceNotificationsView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<SpaceNotificationView>, RpcError> {
-        Ok(space_notification_views(core.space_notifications().await?))
+    async fn run(self, core: &Arc<Core>) -> Result<SpaceNotificationsView, RpcError> {
+        Ok(space_notifications_view(core.space_notifications().await?))
     }
 }
 
@@ -798,12 +810,45 @@ pub struct SetSpaceNotificationParams {
 }
 
 impl Handler for SetSpaceNotificationParams {
-    type Ok = Vec<SpaceNotificationView>;
+    type Ok = SpaceNotificationsView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<SpaceNotificationView>, RpcError> {
-        Ok(space_notification_views(
-            core.set_space_notification(self.space_id, self.mode).await?,
-        ))
+    async fn run(self, core: &Arc<Core>) -> Result<SpaceNotificationsView, RpcError> {
+        let notifications = core
+            .update_space_notifications(|notifications| match self.mode {
+                Some(mode) => {
+                    notifications.modes.insert(self.space_id, mode);
+                }
+                None => {
+                    notifications.modes.remove(&self.space_id);
+                }
+            })
+            .await?;
+        Ok(space_notifications_view(notifications))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetSpaceNotificationExemptParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub exempt: bool,
+}
+
+impl Handler for SetSpaceNotificationExemptParams {
+    type Ok = SpaceNotificationsView;
+
+    async fn run(self, core: &Arc<Core>) -> Result<SpaceNotificationsView, RpcError> {
+        let notifications = core
+            .update_space_notifications(|notifications| {
+                if self.exempt {
+                    notifications.exempt.insert(self.room_id);
+                } else {
+                    notifications.exempt.remove(&self.room_id);
+                }
+            })
+            .await?;
+        Ok(space_notifications_view(notifications))
     }
 }
 

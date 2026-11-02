@@ -10,6 +10,7 @@ export class InboxFeed {
   loaded = $state(false);
   backfilling = $state(false);
   checked = $state(false);
+  olderHistory = $state(true);
   #loadFailed = $state(false);
   #backfillFailed = $state(false);
   failed = $derived(this.#loadFailed || this.#backfillFailed);
@@ -90,6 +91,7 @@ export class InboxFeed {
           include_read: includeRead,
           room_id: this.roomId,
         });
+        if (includeRead) this.olderHistory = page.has_more;
         more = !includeRead && page.has_more;
       } while (more && !this.#disposed);
     } catch (error) {

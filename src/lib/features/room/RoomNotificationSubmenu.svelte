@@ -27,39 +27,58 @@
   const core = useCoreClient();
   const roomList = useRoomList();
 
-  const modes: readonly { mode: NotificationModeView | null; label: string; quiet?: boolean }[] = [
-    { mode: null, label: 'room.notifyDefault' },
-    { mode: 'all', label: 'room.notifyAll' },
-    { mode: 'mentions', label: 'room.notifyMentions' },
-    { mode: 'mentions', label: 'room.notifyMentionsQuiet', quiet: true },
-    { mode: 'mute', label: 'room.notifyMute' },
+  interface Option {
+    key: string;
+    mode: NotificationModeView | null;
+    label: string;
+    quiet?: boolean;
+    exempt?: boolean;
+  }
+
+  const explicit: readonly Option[] = [
+    { key: 'all', mode: 'all', label: 'room.notifyAll' },
+    { key: 'mentions', mode: 'mentions', label: 'room.notifyMentions' },
+    { key: 'quiet', mode: 'mentions', label: 'room.notifyMentionsQuiet', quiet: true },
+    { key: 'mute', mode: 'mute', label: 'room.notifyMute' },
   ];
   let roomMode = $state<NotificationModeView | null | undefined>();
   let roomFallback = $state<NotificationModeView>('mentions');
-  let isSpace = $derived(roomList.byId(roomId)?.room_kind === 'space');
-  let inherited = $derived(
-    isSpace ? undefined : spaceNotifications.inherited(roomList.rooms).get(roomId)
+  let row = $derived(roomList.byId(roomId));
+  let isSpace = $derived(row?.room_kind === 'space');
+  let spaceMode = $derived(
+    isSpace ? undefined : spaceNotifications.spaceModes(roomList.rooms).get(roomId)
+  );
+  let exempt = $derived(spaceNotifications.exempt.has(roomId));
+  let following = $derived(
+    spaceMode !== undefined && !exempt && (roomMode === null || roomMode === spaceMode)
   );
   let mode = $derived.by(() => {
-    if (isSpace) {
-      return spaceNotifications.modeOf(roomId) ?? roomList.byId(roomId)?.notification.room ?? null;
-    }
-    return inherited !== undefined && roomMode === inherited ? null : roomMode;
+    if (isSpace) return spaceNotifications.modeOf(roomId) ?? row?.notification.room ?? null;
+    return following ? null : roomMode;
   });
-  let fallback = $derived(
-    isSpace
-      ? (roomList.byId(roomId)?.notification.default ?? 'mentions')
-      : (inherited ?? roomFallback)
-  );
+  let options = $derived<Option[]>([
+    ...(spaceMode === undefined ? [] : [{ key: 'space', mode: null, label: 'room.notifySpace' }]),
+    { key: 'default', mode: null, label: 'room.notifyDefault', exempt: spaceMode !== undefined },
+    ...explicit,
+  ]);
+  let fallback = $derived(isSpace ? (row?.notification.default ?? 'mentions') : roomFallback);
   let defaultQuiet = $derived(
     fallback === 'mentions' &&
-      (roomList.byId(roomId)?.is_direct
-        ? preferences.badgeDefaultDirect
-        : preferences.badgeDefaultGroup) === 'quiet'
+      (row?.is_direct ? preferences.badgeDefaultDirect : preferences.badgeDefaultGroup) === 'quiet'
   );
   let defaultLabel = $derived(
     i18n.t(defaultQuiet ? 'room.notifyMentionsQuiet' : notificationModeLabels[fallback])
   );
+  let spaceLabel = $derived(
+    spaceMode === undefined ? '' : i18n.t(notificationModeLabels[spaceMode])
+  );
+
+  function isSelected(option: Option): boolean {
+    if (option.key === 'space') return following;
+    if (following) return false;
+    if (option.mode === null) return mode === null;
+    return mode === option.mode && (mode !== 'mentions' || !!option.quiet === isQuiet(roomId));
+  }
 
   $effect(() => {
     void settingsChanges.version;
@@ -76,13 +95,17 @@
     }
   }
 
-  function select(next: NotificationModeView | null, quiet = false): void {
-    const room = roomList.byId(roomId);
+  function select(option: Option): void {
+    const room = row;
     if (room === undefined) return;
-    if (quiet) setQuiet(roomId, true);
+    if (option.quiet) setQuiet(roomId, true);
     else if (mode === 'mentions' && isQuiet(roomId)) setQuiet(roomId, false);
-    if (!isSpace) roomMode = next;
-    setNotificationMode(core, roomList.rooms, room, next).catch((error: unknown) => {
+    if (!isSpace) roomMode = option.mode;
+    const change =
+      option.key === 'space' || option.exempt
+        ? spaceNotifications.setExempt(room, option.exempt === true)
+        : setNotificationMode(core, roomList, room, option.mode);
+    change.catch((error: unknown) => {
       console.warn('[sable room] notification mode failed', error);
       toasts.error(i18n.t('errors.actionFailed'));
       if (!isSpace) void read();
@@ -96,19 +119,18 @@
     {i18n.t('room.menuNotifications')}
   {/snippet}
   <IconContext values={{ 'aria-hidden': 'true' }}>
-    {#each modes as option (option.label)}
-      {@const label =
-        option.mode === null && inherited !== undefined ? 'room.notifySpace' : option.label}
-      {@const selected =
-        mode === option.mode && (mode !== 'mentions' || !!option.quiet === isQuiet(roomId))}
+    {#each options as option (option.key)}
+      {@const selected = isSelected(option)}
       <ActionMenuItem
         checked={selected}
         onSelect={() => {
-          select(option.mode, option.quiet);
+          select(option);
         }}
       >
         <span class="menu-check" aria-hidden="true">{selected ? '✓' : ''}</span>
-        <span>{i18n.t(label, { mode: defaultLabel })}</span>
+        <span>
+          {i18n.t(option.label, { mode: option.key === 'space' ? spaceLabel : defaultLabel })}
+        </span>
       </ActionMenuItem>
     {/each}
   </IconContext>

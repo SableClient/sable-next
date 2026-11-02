@@ -160,3 +160,10 @@ test('a new rule that is not a JSON object is refused locally', async () => {
   expect(addPushRule).not.toHaveBeenCalled();
   expect(screen.getByText('The rule must be a JSON object.')).toBeTruthy();
 });
+
+test('a new rule without a rule id is refused with a reason', async () => {
+  await drafting('{"rule_id": "", "conditions": [], "actions": []}');
+
+  expect(addPushRule).not.toHaveBeenCalled();
+  expect(screen.getByText('The rule needs a "rule_id".')).toBeTruthy();
+});

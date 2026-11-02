@@ -49,6 +49,8 @@ pub(crate) struct Entry {
     undecryptable: bool,
     #[serde(default)]
     thread_root: Option<OwnedEventId>,
+    #[serde(default)]
+    reply: bool,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -151,6 +153,18 @@ fn contains_query(entry: &Entry, query: &str, body_shown: bool) -> bool {
     contains(entry.sender.as_str())
         || entry.sender_name.as_deref().is_some_and(contains)
         || (body_shown && entry.body.as_deref().is_some_and(contains))
+}
+
+/// A thread message's `m.in_reply_to` is only a fallback for clients without threads.
+fn is_reply(raw: &Raw<AnySyncTimelineEvent>) -> bool {
+    let Ok(Some(relation)) = raw
+        .get_field::<serde_json::Value>("content")
+        .map(|content| content.and_then(|content| content.get("m.relates_to").cloned()))
+    else {
+        return false;
+    };
+    relation.pointer("/m.in_reply_to/event_id").is_some()
+        && relation.get("is_falling_back") != Some(&serde_json::Value::Bool(true))
 }
 
 const fn matches(entry: &Entry, filter: InboxFilter) -> bool {
@@ -477,6 +491,7 @@ impl Core {
             encrypted,
             undecryptable: notifications::raw_is_encrypted(raw),
             thread_root: extract_thread_root(raw),
+            reply: is_reply(raw),
         })
     }
 
@@ -651,6 +666,7 @@ impl Core {
                 encrypted: entry.encrypted,
                 read: !unread,
                 thread_root: entry.thread_root.as_ref().map(ToString::to_string),
+                reply: entry.reply,
             });
         }
 
@@ -788,7 +804,8 @@ mod tests {
     };
 
     use super::{
-        Entry, InboxScope, MAX_ENTRIES, RoomReadState, UnreadScan, is_unread, merge, preview,
+        Entry, InboxScope, MAX_ENTRIES, RoomReadState, UnreadScan, is_reply, is_unread, merge,
+        preview,
     };
     use crate::{
         Core, api::notifications::InboxFilter, session::Session, store::MemorySessionStore,
@@ -1432,7 +1449,42 @@ mod tests {
             encrypted: false,
             undecryptable: false,
             thread_root: None,
+            reply: false,
         }
+    }
+
+    #[test]
+    fn only_real_replies_count_as_replies() {
+        let event = |relation: serde_json::Value| {
+            Raw::<AnySyncTimelineEvent>::from_json_string(
+                json!({
+                    "type": "m.room.message",
+                    "event_id": "$e",
+                    "sender": "@a:example.org",
+                    "origin_server_ts": 1,
+                    "content": { "msgtype": "m.text", "body": "hi", "m.relates_to": relation },
+                })
+                .to_string(),
+            )
+            .unwrap()
+        };
+
+        assert!(is_reply(&event(
+            json!({ "m.in_reply_to": { "event_id": "$p" } })
+        )));
+        assert!(!is_reply(&event(json!({
+            "rel_type": "m.thread",
+            "event_id": "$root",
+            "is_falling_back": true,
+            "m.in_reply_to": { "event_id": "$p" },
+        }))));
+        assert!(is_reply(&event(json!({
+            "rel_type": "m.thread",
+            "event_id": "$root",
+            "is_falling_back": false,
+            "m.in_reply_to": { "event_id": "$p" },
+        }))));
+        assert!(!is_reply(&event(json!({}))));
     }
 
     #[test]

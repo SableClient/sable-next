@@ -1,5 +1,5 @@
 use crate::api::account::SetMediaPreviewConfigParams;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use matrix_sdk::ruma::OwnedRoomId;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -198,37 +198,50 @@ fn dm_spaces_content(
     Value::Object(content)
 }
 
-pub(crate) fn space_notifications(
-    content: Option<&Value>,
-) -> BTreeMap<OwnedRoomId, NotificationModeView> {
-    let Some(Value::Object(spaces)) = content.and_then(|content| content.get("spaces")) else {
-        return BTreeMap::new();
+/// `exempt` rooms keep the account default instead of their space's mode.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(crate) struct SpaceNotifications {
+    pub(crate) modes: BTreeMap<OwnedRoomId, NotificationModeView>,
+    pub(crate) exempt: BTreeSet<OwnedRoomId>,
+}
+
+pub(crate) fn space_notifications(content: Option<&Value>) -> SpaceNotifications {
+    let modes = match content.and_then(|content| content.get("spaces")) {
+        Some(Value::Object(spaces)) => spaces
+            .iter()
+            .filter_map(|(space_id, mode)| {
+                Some((
+                    OwnedRoomId::try_from(space_id.as_str()).ok()?,
+                    NotificationModeView::deserialize(mode).ok()?,
+                ))
+            })
+            .collect(),
+        _ => BTreeMap::new(),
     };
-    spaces
-        .iter()
-        .filter_map(|(space_id, mode)| {
-            Some((
-                OwnedRoomId::try_from(space_id.as_str()).ok()?,
-                NotificationModeView::deserialize(mode).ok()?,
-            ))
-        })
-        .collect()
+    let exempt = match content.and_then(|content| content.get("exempt")) {
+        Some(Value::Array(rooms)) => rooms
+            .iter()
+            .filter_map(|room| OwnedRoomId::try_from(room.as_str()?).ok())
+            .collect(),
+        _ => BTreeSet::new(),
+    };
+    SpaceNotifications { modes, exempt }
 }
 
 fn space_notifications_content(
     stored: Option<Value>,
-    space_id: OwnedRoomId,
-    mode: Option<NotificationModeView>,
+    update: impl FnOnce(&mut SpaceNotifications),
 ) -> Value {
-    let mut modes = space_notifications(stored.as_ref());
-    match mode {
-        Some(mode) => modes.insert(space_id, mode),
-        None => modes.remove(&space_id),
-    };
+    let mut notifications = space_notifications(stored.as_ref());
+    update(&mut notifications);
     let mut content = stored_object(stored);
     content.insert(
         "spaces".to_owned(),
-        serde_json::to_value(modes).unwrap_or_default(),
+        serde_json::to_value(notifications.modes).unwrap_or_default(),
+    );
+    content.insert(
+        "exempt".to_owned(),
+        serde_json::to_value(notifications.exempt).unwrap_or_default(),
     );
     Value::Object(content)
 }
@@ -364,9 +377,7 @@ impl Core {
         Ok(dm_spaces(Some(&content)))
     }
 
-    pub(crate) async fn space_notifications(
-        &self,
-    ) -> Result<BTreeMap<OwnedRoomId, NotificationModeView>, RpcError> {
+    pub(crate) async fn space_notifications(&self) -> Result<SpaceNotifications, RpcError> {
         Ok(space_notifications(
             self.account_document(SPACE_NOTIFICATIONS_EVENT)
                 .await?
@@ -374,16 +385,14 @@ impl Core {
         ))
     }
 
-    pub(crate) async fn set_space_notification(
+    pub(crate) async fn update_space_notifications(
         &self,
-        space_id: OwnedRoomId,
-        mode: Option<NotificationModeView>,
-    ) -> Result<BTreeMap<OwnedRoomId, NotificationModeView>, RpcError> {
+        update: impl FnOnce(&mut SpaceNotifications),
+    ) -> Result<SpaceNotifications, RpcError> {
         let _guard = self.account_data_lock.lock().await;
         let content = space_notifications_content(
             self.account_document(SPACE_NOTIFICATIONS_EVENT).await?,
-            space_id,
-            mode,
+            update,
         );
         self.set_account_data(SPACE_NOTIFICATIONS_EVENT, &content)
             .await?;
@@ -429,28 +438,36 @@ mod tests {
     };
 
     #[test]
-    fn a_space_mode_is_stored_and_cleared() {
+    fn a_space_mode_and_an_exempt_room_are_stored_and_cleared() {
         let stored = json!({ "spaces": { "!old:a.org": "all", "!bad:a.org": "loud" }, "kept": 1 });
         let space = matrix_sdk::ruma::owned_room_id!("!space:a.org");
+        let room = matrix_sdk::ruma::owned_room_id!("!room:a.org");
 
-        let set = space_notifications_content(
-            Some(stored),
-            space.clone(),
-            Some(NotificationModeView::Mute),
-        );
+        let set = space_notifications_content(Some(stored), |notifications| {
+            notifications
+                .modes
+                .insert(space.clone(), NotificationModeView::Mute);
+            notifications.exempt.insert(room.clone());
+        });
         assert_eq!(
             set,
-            json!({ "spaces": { "!old:a.org": "all", "!space:a.org": "mute" }, "kept": 1 })
+            json!({
+                "spaces": { "!old:a.org": "all", "!space:a.org": "mute" },
+                "exempt": ["!room:a.org"],
+                "kept": 1
+            })
         );
-        assert_eq!(
-            space_notifications(Some(&set)).get(&space),
-            Some(&NotificationModeView::Mute)
-        );
+        let read = space_notifications(Some(&set));
+        assert_eq!(read.modes.get(&space), Some(&NotificationModeView::Mute));
+        assert!(read.exempt.contains(&room));
 
-        let cleared = space_notifications_content(Some(set), space, None);
+        let cleared = space_notifications_content(Some(set), |notifications| {
+            notifications.modes.remove(&space);
+            notifications.exempt.remove(&room);
+        });
         assert_eq!(
             cleared,
-            json!({ "spaces": { "!old:a.org": "all" }, "kept": 1 })
+            json!({ "spaces": { "!old:a.org": "all" }, "exempt": [], "kept": 1 })
         );
     }
 

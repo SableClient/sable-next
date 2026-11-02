@@ -1109,6 +1109,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             encrypted: true,
             read: false,
             thread_root: null,
+            reply: false,
           },
           {
             room_id: secondRoom.room_id,
@@ -1122,6 +1123,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             encrypted: true,
             read: true,
             thread_root: null,
+            reply: false,
           },
         ].filter(
           (item) =>

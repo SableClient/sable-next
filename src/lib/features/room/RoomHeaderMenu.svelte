@@ -8,7 +8,7 @@
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
-  import BellIcon from 'phosphor-svelte/lib/BellIcon';
+  import TrayIcon from 'phosphor-svelte/lib/TrayIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
   import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
@@ -138,7 +138,7 @@
       {/if}
       {#if onNotifications}
         <ActionMenuItem onSelect={onNotifications}>
-          <BellIcon />
+          <TrayIcon />
           {i18n.t('room.notificationsOpen')}
         </ActionMenuItem>
       {/if}

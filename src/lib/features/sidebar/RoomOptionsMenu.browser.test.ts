@@ -113,11 +113,15 @@ test('sets the space notification mode and moves the rooms that followed it', as
   });
   const settings = vi.fn();
   const setRoomsNotificationMode = vi.fn().mockResolvedValue(null);
-  const setSpaceNotification = vi.fn().mockResolvedValue([{ space_id: '!space', mode: 'mute' }]);
+  const setSpaceNotification = vi
+    .fn()
+    .mockResolvedValue({ spaces: [{ space_id: '!space', mode: 'mute' }], exempt_rooms: [] });
   const core = createCoreStub({
     rpc: {
       account: {
-        spaceNotifications: vi.fn().mockResolvedValue([{ space_id: '!space', mode: 'all' }]),
+        spaceNotifications: vi
+          .fn()
+          .mockResolvedValue({ spaces: [{ space_id: '!space', mode: 'all' }], exempt_rooms: [] }),
         setSpaceNotification,
       },
       notifications: { settings, setRoomsNotificationMode },
@@ -166,10 +170,16 @@ test('a room carrying its space mode shows it as following the space', async () 
     ],
   });
   const setRoomNotificationMode = vi.fn().mockResolvedValue(null);
+  const setSpaceNotificationExempt = vi
+    .fn()
+    .mockResolvedValue({ spaces: [{ space_id: '!space', mode: 'mute' }], exempt_rooms: ['!room'] });
   const core = createCoreStub({
     rpc: {
       account: {
-        spaceNotifications: vi.fn().mockResolvedValue([{ space_id: '!space', mode: 'mute' }]),
+        spaceNotifications: vi
+          .fn()
+          .mockResolvedValue({ spaces: [{ space_id: '!space', mode: 'mute' }], exempt_rooms: [] }),
+        setSpaceNotificationExempt,
       },
       notifications: {
         settings: vi.fn().mockResolvedValue({ room: 'mute', default: 'mentions' }),
@@ -198,6 +208,14 @@ test('a room carrying its space mode shows it as following the space', async () 
   await expect
     .element(page.getByRole('menuitem', { name: 'Mute', exact: true }))
     .toHaveAttribute('aria-checked', 'false');
+  await page
+    .getByRole('menuitem', { name: 'Default (Mentions and keywords)', exact: true })
+    .click();
+
+  await vi.waitFor(() => {
+    expect(setSpaceNotificationExempt).toHaveBeenCalledWith({ room_id: '!room', exempt: true });
+  });
+  expect(setRoomNotificationMode).toHaveBeenCalledWith({ room_id: '!room', mode: null });
   spaceNotifications.stop();
 });
 
@@ -211,7 +229,7 @@ test('a muted space without a space mode shows as muted', async () => {
   });
   const core = createCoreStub({
     rpc: {
-      account: { spaceNotifications: vi.fn().mockResolvedValue([]) },
+      account: { spaceNotifications: vi.fn().mockResolvedValue({ spaces: [], exempt_rooms: [] }) },
       members: { permissions: vi.fn().mockResolvedValue({ can_manage_children: false }) },
     },
   }) as unknown as CoreClient;

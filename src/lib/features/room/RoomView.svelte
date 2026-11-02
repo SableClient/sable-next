@@ -903,6 +903,7 @@
       <RoomHeaderActions
         {panels}
         {voiceView}
+        direct={resolvedRoom?.is_direct ?? false}
         {desktop}
         widgetCount={roomSession.widgets.length}
         {canManageWidgets}
@@ -955,7 +956,9 @@
           onClose={desktop ? backToRoomList : undefined}
           onAttachments={voiceView ? undefined : toggleAttachments}
           onThreads={phone && !voiceView ? toggleThreads : undefined}
-          onNotifications={phone && !voiceView ? () => panels.toggleNotifications() : undefined}
+          onNotifications={phone && !voiceView && !resolvedRoom?.is_direct
+            ? () => panels.toggleNotifications()
+            : undefined}
           onPins={phone ? () => (pinsOpen = true) : undefined}
           {pinsUnread}
           onWidgets={phone && (roomSession.widgets.length > 0 || canManageWidgets)

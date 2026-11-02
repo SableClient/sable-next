@@ -21,6 +21,7 @@
   } from './inbox';
   import { InboxFeed } from './inbox-feed.svelte';
   import InboxFeedRow from './InboxFeedRow.svelte';
+  import NotificationReason from './NotificationReason.svelte';
   import MessagePreview from '#lib/features/room/messages/MessagePreview.svelte';
   import MentionProfile from '#lib/features/room/members/MentionProfile.svelte';
   import { MemberProfile } from '#lib/features/room/members/member-profile.svelte.js';
@@ -328,9 +329,7 @@
           </span>
           {#snippet message()}
             {#each group.items as item, index (item.event_id)}
-              {#if item.thread_root}
-                <p class="thread-label">{i18n.t('inbox.inThread')}</p>
-              {/if}
+              <NotificationReason {item} />
               <MessagePreview
                 timeline
                 roomId={group.roomId}
@@ -443,12 +442,6 @@
 <style>
   section {
     display: grid;
-  }
-
-  .thread-label {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
   }
 
   .filters {

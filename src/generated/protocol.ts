@@ -486,6 +486,7 @@ export type InboxItemView = {
 	encrypted: boolean,
 	read: boolean,
 	thread_root: string | null,
+	reply: boolean,
 };
 
 export type InviteAvatarsView = "on" | "off";
@@ -1683,6 +1684,11 @@ export type SpaceNotificationView = {
 	mode: NotificationModeView,
 };
 
+export type SpaceNotificationsView = {
+	spaces: SpaceNotificationView[],
+	exempt_rooms: string[],
+};
+
 export type SpaceParentView = {
 	room_id: string,
 	via: string[],
@@ -2145,11 +2151,15 @@ export type Rpc = {
 	room_id: string,
 	space_ids: string[],
 }) => Promise<DmSpaceLink[]>;
-    spaceNotifications: (params?: Record<string, never>) => Promise<SpaceNotificationView[]>;
+    spaceNotifications: (params?: Record<string, never>) => Promise<SpaceNotificationsView>;
     setSpaceNotification: (params: {
 	space_id: string,
 	mode?: NotificationModeView | null,
-}) => Promise<SpaceNotificationView[]>;
+}) => Promise<SpaceNotificationsView>;
+    setSpaceNotificationExempt: (params: {
+	room_id: string,
+	exempt: boolean,
+}) => Promise<SpaceNotificationsView>;
     profileOverrides: (params?: Record<string, never>) => Promise<ProfileOverridesView>;
     setProfileOverride: (params: {
 	user_id: string,
@@ -3444,6 +3454,7 @@ export type RpcMethods = {
   'account.set_dm_spaces': Rpc['account']['setDmSpaces'];
   'account.space_notifications': Rpc['account']['spaceNotifications'];
   'account.set_space_notification': Rpc['account']['setSpaceNotification'];
+  'account.set_space_notification_exempt': Rpc['account']['setSpaceNotificationExempt'];
   'account.profile_overrides': Rpc['account']['profileOverrides'];
   'account.set_profile_override': Rpc['account']['setProfileOverride'];
   'auth.discover_homeserver': Rpc['auth']['discoverHomeserver'];
@@ -3764,6 +3775,7 @@ export function createRpc(call: RpcCall): Rpc {
       setDmSpaces: (params) => call('account.set_dm_spaces', params) as ReturnType<Rpc['account']['setDmSpaces']>,
       spaceNotifications: (params = {}) => call('account.space_notifications', params) as ReturnType<Rpc['account']['spaceNotifications']>,
       setSpaceNotification: (params) => call('account.set_space_notification', params) as ReturnType<Rpc['account']['setSpaceNotification']>,
+      setSpaceNotificationExempt: (params) => call('account.set_space_notification_exempt', params) as ReturnType<Rpc['account']['setSpaceNotificationExempt']>,
       profileOverrides: (params = {}) => call('account.profile_overrides', params) as ReturnType<Rpc['account']['profileOverrides']>,
       setProfileOverride: (params) => call('account.set_profile_override', params) as ReturnType<Rpc['account']['setProfileOverride']>,
     },

@@ -10,9 +10,12 @@
     setNotificationMode,
     spaceNotifications,
   } from '#lib/rooms/space-notifications.svelte.js';
+  import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { roomDisplayName } from '#lib/ui/shortcuts/room-jump.js';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import SettingsAnchorLink from '#lib/ui/primitives/SettingsAnchorLink.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import '#lib/ui/primitives/settings-row.css';
@@ -21,10 +24,19 @@
   const roomList = useRoomList();
   const modes: NotificationModeView[] = ['all', 'mentions', 'mute'];
 
-  let custom = $derived(spaceNotifications.custom(roomList.rooms));
+  let custom = $derived(
+    spaceNotifications
+      .custom(roomList.rooms)
+      .map((entry) => ({ ...entry, name: roomDisplayName(entry.room) }))
+      .sort(
+        (left, right) =>
+          Number(right.room.room_kind === 'space') - Number(left.room.room_kind === 'space') ||
+          left.name.localeCompare(right.name)
+      )
+  );
 
   function change(room: RoomListItemView, mode: NotificationModeView | null): void {
-    setNotificationMode(core, roomList.rooms, room, mode).catch((error: unknown) => {
+    setNotificationMode(core, roomList, room, mode).catch((error: unknown) => {
       console.warn('[sable notifications] room mode failed', error);
       toasts.error(i18n.t('errors.actionFailed'));
     });
@@ -38,14 +50,30 @@
   </div>
   <p class="hint settings-description">{i18n.t('settings.notificationRoomsHint')}</p>
 
-  {#if custom.length === 0}
+  {#if !spaceNotifications.loaded || !roomList.settled}
+    <ul
+      class="settings-item-list"
+      aria-busy="true"
+      aria-label={i18n.t('settings.notificationRooms')}
+    >
+      {#each { length: 3 }, index (index)}
+        <li><Skeleton class="room-loading" /></li>
+      {/each}
+    </ul>
+  {:else if custom.length === 0}
     <p class="settings-empty">{i18n.t('settings.notificationRoomsEmpty')}</p>
   {:else}
     <ul class="settings-item-list">
-      {#each custom as { room, mode } (room.room_id)}
-        {@const name = roomDisplayName(room)}
+      {#each custom as { room, mode, name } (room.room_id)}
         <li>
-          <span class="settings-item-text">{name}</span>
+          <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath resolves the route itself -->
+          <a class="settings-item-text room" href={roomSectionPath(roomList.rooms, room.room_id)}>
+            <Avatar id={room.room_id} src={room.avatar_url} {name} size="small" decorative />
+            <span class="name">{name}</span>
+            {#if room.room_kind === 'space'}
+              <span class="kind">{i18n.t('nav.space')}</span>
+            {/if}
+          </a>
           <Select
             class="settings-item-control"
             aria-label={i18n.t('settings.notificationRoomsMode', { room: name })}
@@ -73,3 +101,33 @@
     </ul>
   {/if}
 </section>
+
+<style>
+  .room {
+    align-items: center;
+    color: inherit;
+    display: flex;
+    gap: var(--space-200);
+    text-decoration: none;
+  }
+
+  .name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .room:hover .name {
+    text-decoration: underline;
+  }
+
+  .settings-item-list :global(.room-loading) {
+    flex: 1;
+    height: 2.5rem;
+  }
+
+  .kind {
+    color: var(--surface-var-on-container);
+    flex: none;
+    font-size: var(--font-size-small);
+  }
+</style>

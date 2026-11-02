@@ -14,7 +14,7 @@ function fields(page: Page) {
 }
 
 function keyword(page: Page, text: string) {
-  return page.locator('.keyword-list li').filter({ hasText: text });
+  return page.locator('.keywords .settings-item-list li').filter({ hasText: text });
 }
 
 function removeButton(page: Page, text: string) {
@@ -153,7 +153,7 @@ test.describe('with the fake core', () => {
     await add.click();
 
     await expect(keyword(page, word)).toBeVisible();
-    const text = keyword(page, word).locator('.keyword-text');
+    const text = keyword(page, word).locator('.settings-item-text');
     const box = await text.evaluate((node) => ({
       height: node.getBoundingClientRect().height,
       lineHeight: parseFloat(getComputedStyle(node).lineHeight),
