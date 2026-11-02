@@ -96,28 +96,35 @@ fn scrub_event(mut event: Event<'static>) -> Event<'static> {
     event
 }
 
+const REPORTED_FIELDS: &[&str] = &[
+    "error",
+    "code",
+    "source",
+    "cause",
+    "age",
+    "delay",
+    "own_identity_trusted",
+    "same_homeserver",
+    "backup",
+    "account_cross_signed",
+    "device_cross_signed",
+    "megolm_session",
+    "sender_device",
+    "errors_by_olm_session",
+];
+
 fn scrub_fields(fields: &mut std::collections::BTreeMap<String, serde_json::Value>) {
     fields.retain(|key, _| {
-        matches!(
-            key.as_str(),
-            "error"
-                | "code"
-                | "source"
-                | "tracing.target"
-                | "tracing.filename"
-                | "tracing.lineno"
-                | "module_path"
-                | "file"
-                | "line"
-                | "cause"
-                | "age"
-                | "own_identity_trusted"
-                | "same_homeserver"
-                | "backup"
-                | "account_cross_signed"
-                | "device_cross_signed"
-                | "errors_by_olm_session"
-        )
+        REPORTED_FIELDS.contains(&key.as_str())
+            || matches!(
+                key.as_str(),
+                "tracing.target"
+                    | "tracing.filename"
+                    | "tracing.lineno"
+                    | "module_path"
+                    | "file"
+                    | "line"
+            )
     });
     for value in fields.values_mut() {
         scrub_value(value);
@@ -156,7 +163,8 @@ fn scrub_value(value: &mut serde_json::Value) {
 fn scrub_log(mut log: sentry::protocol::Log) -> sentry::protocol::Log {
     log.body = scrub_text(&log.body);
     log.attributes.retain(|key, _| {
-        matches!(key.as_str(), "error" | "code" | "source" | "sentry.origin")
+        REPORTED_FIELDS.contains(&key.as_str())
+            || key == "sentry.origin"
             || key.starts_with("code.")
     });
     for attribute in log.attributes.values_mut() {
@@ -415,5 +423,28 @@ mod tests {
         assert!(!sent.contains("private"));
         assert!(!sent.contains("secret"));
         assert!(sent.contains("permission denied"));
+    }
+
+    #[test]
+    fn a_native_log_keeps_the_utd_fields_and_drops_the_rest() {
+        let log = scrub_log(sentry::protocol::Log {
+            level: sentry::protocol::LogLevel::Warn,
+            body: "unable to decrypt a message".to_owned(),
+            trace_id: None,
+            timestamp: std::time::SystemTime::now(),
+            severity_number: None,
+            attributes: [
+                ("cause", "Unknown"),
+                ("age", "later"),
+                ("megolm_session", "0a1b2c3d4e5f"),
+                ("room_id", "!private:example.org"),
+            ]
+            .into_iter()
+            .map(|(key, value)| (key.to_owned(), value.into()))
+            .collect(),
+        });
+        let mut kept: Vec<_> = log.attributes.keys().map(String::as_str).collect();
+        kept.sort_unstable();
+        assert_eq!(kept, ["age", "cause", "megolm_session"]);
     }
 }

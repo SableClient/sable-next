@@ -44,9 +44,11 @@ function reportCoreError(line: string, onStorageFailure: () => void): void {
     return;
   }
   const fingerprint = wasmErrorFingerprint(line);
-  if (fingerprint === '' || reportedCoreErrors.has(fingerprint)) return;
-  reportedCoreErrors.add(fingerprint);
-  Sentry.captureException(Object.assign(new Error(wasmErrorTitle(line)), { name: 'CoreLog' }), {
+  const title = wasmErrorTitle(line);
+  const seen = isReportableCoreWarning(line) ? title : fingerprint;
+  if (fingerprint === '' || reportedCoreErrors.has(seen)) return;
+  reportedCoreErrors.add(seen);
+  Sentry.captureException(Object.assign(new Error(title), { name: 'CoreLog' }), {
     level: storage ? 'warning' : 'error',
     fingerprint: ['wasm-core-error', fingerprint],
     tags: { source: 'wasm-core' },

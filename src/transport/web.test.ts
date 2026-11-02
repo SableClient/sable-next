@@ -474,6 +474,23 @@ test('reports new core errors after twenty distinct failures', async () => {
   await restored;
 });
 
+test('reports an undecryptable message once per megolm session, grouped together', async () => {
+  const transport = await load();
+  const restored = transport.call('session.restore', {}).catch(() => undefined);
+  captureException.mockClear();
+  const utd = (session: string) =>
+    `WARN sable_core::utd: unable to decrypt a message reported=true cause=Unknown megolm_session="${session}"`;
+  FakeSharedWorker.last?.port.receive({ logs: [utd('0a1b2c3d4e5f'), utd('0a1b2c3d4e5f')] });
+  FakeSharedWorker.last?.port.receive({ logs: [utd('ffeeddccbbaa')] });
+  expect(captureException).toHaveBeenCalledTimes(2);
+  const [first, second] = captureException.mock.calls.map(
+    ([, context]) => (context as { fingerprint: string[] }).fingerprint
+  );
+  expect(first).toEqual(second);
+  transport.close();
+  await restored;
+});
+
 test('tells the worker whether the page is visible, on connect and on every change', async () => {
   const page = Object.assign(new EventTarget(), { visibilityState: 'hidden' });
   vi.stubGlobal('document', page);

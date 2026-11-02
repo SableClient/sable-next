@@ -1,29 +1,38 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use matrix_sdk::Client;
+use matrix_sdk::Room;
 use matrix_sdk::executor::spawn;
+use matrix_sdk::ruma::EventId;
 use matrix_sdk_ui::unable_to_decrypt_hook::{
     UnableToDecryptHook, UnableToDecryptInfo, UtdHookManager,
 };
+use sha2::{Digest, Sha256};
 
-const GRACE_PERIOD: Duration = Duration::from_secs(10);
+const GRACE_PERIOD: Duration = Duration::from_secs(60);
 
 #[derive(Debug)]
 struct UtdReporter {
-    client: Client,
+    room: Room,
 }
 
 impl UnableToDecryptHook for UtdReporter {
     fn on_utd(&self, info: UnableToDecryptInfo) {
-        if info.time_to_decrypt.is_none() {
-            drop(spawn(report(self.client.clone(), info)));
+        match info.time_to_decrypt {
+            None => drop(spawn(report(self.room.clone(), info))),
+            Some(delay) => tracing::warn!(
+                cause = ?info.cause,
+                age = event_age(info.event_local_age_millis),
+                delay = decrypt_delay(delay),
+                "decrypted a message late"
+            ),
         }
     }
 }
 
-async fn report(client: Client, info: UnableToDecryptInfo) {
-    let encryption = client.encryption();
+async fn report(room: Room, info: UnableToDecryptInfo) {
+    let (megolm_session, sender_device) = megolm_ids(&room, &info.event_id).await;
+    let encryption = room.client().encryption();
     let device_cross_signed = encryption
         .get_own_device()
         .await
@@ -43,8 +52,57 @@ async fn report(client: Client, info: UnableToDecryptInfo) {
         backup = ?encryption.backups().state(),
         account_cross_signed,
         device_cross_signed,
+        megolm_session,
+        sender_device,
         "unable to decrypt a message"
     );
+}
+
+#[derive(serde::Deserialize)]
+struct MegolmContent {
+    session_id: Option<String>,
+    device_id: Option<String>,
+}
+
+async fn megolm_ids(room: &Room, event_id: &EventId) -> (Option<String>, Option<String>) {
+    let client = room.client();
+    let Some(event_cache) = client.event_cache() else {
+        return (None, None);
+    };
+    let Ok((cache, _handles)) = event_cache.room(room.room_id()).await else {
+        return (None, None);
+    };
+    let Some(content) = cache
+        .find_event(event_id)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|event| {
+            event
+                .raw()
+                .get_field::<MegolmContent>("content")
+                .ok()
+                .flatten()
+        })
+    else {
+        return (None, None);
+    };
+    (
+        content.session_id.as_deref().map(short_hash),
+        content.device_id.as_deref().map(short_hash),
+    )
+}
+
+fn short_hash(value: &str) -> String {
+    use std::fmt::Write;
+
+    Sha256::digest(value.as_bytes()).iter().take(6).fold(
+        String::with_capacity(12),
+        |mut hash, byte| {
+            let _ = write!(hash, "{byte:02x}");
+            hash
+        },
+    )
 }
 
 const fn event_age(millis_since_device_created: i64) -> &'static str {
@@ -58,6 +116,14 @@ const fn event_age(millis_since_device_created: i64) -> &'static str {
     }
 }
 
+const fn decrypt_delay(delay: Duration) -> &'static str {
+    match delay.as_secs() {
+        0..2 => "under_2s",
+        2..10 => "under_10s",
+        _ => "under_60s",
+    }
+}
+
 #[cfg_attr(
     target_family = "wasm",
     expect(
@@ -65,21 +131,18 @@ const fn event_age(millis_since_device_created: i64) -> &'static str {
         reason = "the WASM core is single-threaded"
     )
 )]
-pub(crate) fn hook(client: &Client) -> Arc<UtdHookManager> {
+pub(crate) fn hook(room: &Room) -> Arc<UtdHookManager> {
     Arc::new(
-        UtdHookManager::new(
-            Arc::new(UtdReporter {
-                client: client.clone(),
-            }),
-            client.clone(),
-        )
-        .with_max_delay(GRACE_PERIOD),
+        UtdHookManager::new(Arc::new(UtdReporter { room: room.clone() }), room.client())
+            .with_max_delay(GRACE_PERIOD),
     )
 }
 
 #[cfg(test)]
 mod tests {
-    use super::event_age;
+    use std::time::Duration;
+
+    use super::{decrypt_delay, event_age, short_hash};
 
     #[test]
     fn an_event_age_falls_into_one_coarse_bucket() {
@@ -87,5 +150,23 @@ mod tests {
         assert_eq!(event_age(0), "first_hour");
         assert_eq!(event_age(3_600_000), "first_day");
         assert_eq!(event_age(86_400_000), "later");
+    }
+
+    #[test]
+    fn a_late_decryption_falls_into_one_coarse_bucket() {
+        assert_eq!(decrypt_delay(Duration::from_millis(1_999)), "under_2s");
+        assert_eq!(decrypt_delay(Duration::from_secs(2)), "under_10s");
+        assert_eq!(decrypt_delay(Duration::from_secs(10)), "under_60s");
+    }
+
+    #[test]
+    fn a_short_hash_is_stable_and_too_short_to_be_scrubbed_as_a_key() {
+        let hash = short_hash("rIatPKL0yVALedn6jJBOGi55vRkgXUCDcUzqJCHIINU");
+        assert_eq!(
+            hash,
+            short_hash("rIatPKL0yVALedn6jJBOGi55vRkgXUCDcUzqJCHIINU")
+        );
+        assert_eq!(hash.len(), 12);
+        assert_ne!(hash, short_hash("another session"));
     }
 }

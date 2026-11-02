@@ -450,7 +450,7 @@ pub(crate) async fn build_room_timeline(
 ) -> Result<Timeline, matrix_sdk_ui::timeline::Error> {
     let builder = room
         .timeline_builder()
-        .with_unable_to_decrypt_hook(crate::utd::hook(&room.client()))
+        .with_unable_to_decrypt_hook(crate::utd::hook(room))
         .with_focus(match focus {
             TimelineFocusView::Live => TimelineFocus::Live {
                 hide_threaded_events: true,
