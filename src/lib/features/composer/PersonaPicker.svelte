@@ -214,6 +214,7 @@
           {scope}
           {scopeChoice}
           {hasSpace}
+          variant="popover"
           onScope={setScope}
           onChoose={choose}
           onAlternateAvatarChoose={alternateAvatarChoose}
@@ -256,6 +257,7 @@
       {scope}
       {scopeChoice}
       {hasSpace}
+      variant="sheet"
       onScope={setScope}
       onChoose={choose}
       onAlternateAvatarChoose={alternateAvatarChoose}
@@ -272,7 +274,7 @@
     box-shadow: var(--shadow-float);
     color: var(--surface-on-container);
     padding: var(--space-200);
-    width: min(18rem, calc(100vw - 2rem));
+    width: min(19rem, calc(100vw - 2rem));
   }
 
   :global(.persona-button-format) {
