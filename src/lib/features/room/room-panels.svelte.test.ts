@@ -72,3 +72,13 @@ test('the desktop member list preference survives a reload', async () => {
   expect(new again.RoomPanels().desktopMembersOpen).toBe(true);
   vi.unstubAllGlobals();
 });
+
+test('the notifications panel replaces any other open panel', () => {
+  const panels = new RoomPanels();
+  panels.toggleSearch();
+  panels.toggleNotifications();
+  expect(panels.searchOpen).toBe(false);
+  expect(panels.notificationsOpen).toBe(true);
+  panels.toggleNotifications();
+  expect(panels.notificationsOpen).toBe(false);
+});

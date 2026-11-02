@@ -160,3 +160,28 @@ test('a queued history request cannot hide an unread catch-up failure', async ()
   await feed.backfill(false);
   expect(feed.failed).toBe(false);
 });
+
+test('a feed for one room asks the core for that room once', async () => {
+  const inboxNotifications = vi
+    .fn<InboxFeedCommands['inbox']>()
+    .mockResolvedValue({ items: [item('$a')], has_more: true });
+  const backfillInbox = vi
+    .fn<InboxFeedCommands['backfillInbox']>()
+    .mockResolvedValue({ recorded: 0, has_more: false });
+  const feed = new InboxFeed({ inbox: inboxNotifications, backfillInbox }, '!room');
+
+  await feed.load('all', true, 30, 'alice');
+  await feed.backfill(true);
+
+  expect(inboxNotifications).toHaveBeenCalledOnce();
+  expect(inboxNotifications).toHaveBeenCalledWith({
+    filter: 'all',
+    include_read: true,
+    limit: 30,
+    before_ts: null,
+    room_id: '!room',
+    query: 'alice',
+  });
+  expect(feed.hasMore).toBe(true);
+  expect(backfillInbox).toHaveBeenCalledWith({ include_read: true, room_id: '!room' });
+});

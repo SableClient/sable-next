@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { matrixLinkPath } from '#lib/rooms/permalink.js';
-  import { onDestroy, onMount, type Component } from 'svelte';
+  import { onDestroy, type Component } from 'svelte';
   import type {
     MemberView,
     RoomAttachmentContentView,
@@ -19,7 +19,6 @@
   import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
   import ChatCenteredTextIcon from 'phosphor-svelte/lib/ChatCenteredTextIcon';
-  import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -27,12 +26,7 @@
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
-  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
-  import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
-  import { PanelWidth, remFromPixels } from '#lib/ui/panel-width.svelte.js';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -43,6 +37,7 @@
   import type { MediaItem } from '#lib/ui/media/media-viewer-types.js';
   import { galleryItemId } from '#lib/ui/media/media-items.js';
   import { memberName } from '../members/members';
+  import RoomSidePanel from '../RoomSidePanel.svelte';
   import { formatDate } from '#lib/ui/date-time.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
   import { mediaViewerState } from '#lib/ui/media/media-viewer-state.svelte.ts';
@@ -318,9 +313,6 @@
       return { host: url, rest: '' };
     }
   }
-
-  const panelWidth = new PanelWidth('sable-attachments-width', 22, 16, 40);
-  onMount(() => panelWidth.restore());
 </script>
 
 {#snippet skeleton()}
@@ -477,158 +469,99 @@
   {/if}
 {/snippet}
 
-{#snippet body()}
-  <aside
-    class={['attachments', { modal }]}
-    aria-label={i18n.t('timeline.attachmentsTitle')}
-    style:width={modal ? null : `${panelWidth.width}rem`}
-  >
-    {#if !modal}
-      <ResizeHandle
-        value={panelWidth.width}
-        min={panelWidth.min}
-        max={panelWidth.max}
-        label={i18n.t('timeline.attachmentsResize')}
-        grow="left"
-        step={1}
-        fromPixels={remFromPixels}
-        onResize={(next) => panelWidth.resize(next)}
-        onCommit={() => panelWidth.commit()}
-      />
-    {/if}
-    <PanelHeader class="attachments-header" title={i18n.t('timeline.attachmentsTitle')}>
-      {#snippet prefix()}
-        <ImagesIcon aria-hidden="true" />
-      {/snippet}
-      {#snippet suffix()}
-        <PanelHeaderButton label={i18n.t('timeline.attachmentsClose')} onclick={onClose}>
-          <XIcon />
-        </PanelHeaderButton>
-      {/snippet}
-    </PanelHeader>
+<RoomSidePanel
+  title={i18n.t('timeline.attachmentsTitle')}
+  closeLabel={i18n.t('timeline.attachmentsClose')}
+  resizeLabel={i18n.t('timeline.attachmentsResize')}
+  widthKey="sable-attachments-width"
+  width={22}
+  body="none"
+  {modal}
+  {onClose}
+>
+  {#snippet icon()}
+    <ImagesIcon aria-hidden="true" />
+  {/snippet}
+  <div class="tabs" role="tablist" aria-label={i18n.t('timeline.attachmentsTitle')}>
+    {#each tabs as tab (tab.id)}
+      <Button
+        size="small"
+        variant="ghost"
+        class="attachments-tab choice"
+        role="tab"
+        id={`attachments-tab-${tab.id}`}
+        aria-controls="attachments-panel"
+        aria-selected={kind === tab.id}
+        tabindex={kind === tab.id ? 0 : -1}
+        onkeydown={tabKeydown}
+        onclick={() => {
+          selectTab(tab.id, false);
+        }}
+      >
+        {i18n.t(tab.label)}
+      </Button>
+    {/each}
+  </div>
+  {#if !showEmpty}
+    <p class="attachments-scope">{i18n.t('timeline.attachmentsIndexed')}</p>
+  {/if}
+  <p class="screen-reader-only" aria-live="polite">
+    {items.length > 0 ? i18n.t('timeline.attachmentsLoaded', { count: items.length }) : ''}
+  </p>
 
-    <div class="tabs" role="tablist" aria-label={i18n.t('timeline.attachmentsTitle')}>
-      {#each tabs as tab (tab.id)}
-        <Button
-          size="small"
-          variant="ghost"
-          class="attachments-tab choice"
-          role="tab"
-          id={`attachments-tab-${tab.id}`}
-          aria-controls="attachments-panel"
-          aria-selected={kind === tab.id}
-          tabindex={kind === tab.id ? 0 : -1}
-          onkeydown={tabKeydown}
-          onclick={() => {
-            selectTab(tab.id, false);
-          }}
-        >
-          {i18n.t(tab.label)}
-        </Button>
+  <div
+    class="attachments-body"
+    role="tabpanel"
+    id="attachments-panel"
+    aria-labelledby={`attachments-tab-${kind}`}
+    aria-busy={loading}
+    {@attach scrollHint}
+  >
+    {#if items.length > 0}
+      {#each groups as group (group.key)}
+        <section aria-labelledby={`attachments-month-${group.key}`}>
+          <h3 class="group-heading" id={`attachments-month-${group.key}`}>{group.label}</h3>
+          {#if kind === 'media'}
+            <ul class="media-grid">
+              {#each group.items as item (attachmentKey(item))}
+                <li>{@render mediaTile(item)}</li>
+              {/each}
+            </ul>
+          {:else}
+            <ul class="attachment-list">
+              {#each group.items as item (attachmentKey(item))}
+                <li>{@render row(item)}</li>
+              {/each}
+            </ul>
+          {/if}
+        </section>
       {/each}
-    </div>
-    {#if !showEmpty}
-      <p class="attachments-scope">{i18n.t('timeline.attachmentsIndexed')}</p>
+    {:else if loading}
+      {@render skeleton()}
+    {:else if showEmpty}
+      <p class="attachments-status">{i18n.t(emptyLabel)}</p>
     {/if}
-    <p class="screen-reader-only" aria-live="polite">
-      {items.length > 0 ? i18n.t('timeline.attachmentsLoaded', { count: items.length }) : ''}
-    </p>
 
-    <div
-      class="attachments-body"
-      role="tabpanel"
-      id="attachments-panel"
-      aria-labelledby={`attachments-tab-${kind}`}
-      aria-busy={loading}
-      {@attach scrollHint}
-    >
-      {#if items.length > 0}
-        {#each groups as group (group.key)}
-          <section aria-labelledby={`attachments-month-${group.key}`}>
-            <h3 class="group-heading" id={`attachments-month-${group.key}`}>{group.label}</h3>
-            {#if kind === 'media'}
-              <ul class="media-grid">
-                {#each group.items as item (attachmentKey(item))}
-                  <li>{@render mediaTile(item)}</li>
-                {/each}
-              </ul>
-            {:else}
-              <ul class="attachment-list">
-                {#each group.items as item (attachmentKey(item))}
-                  <li>{@render row(item)}</li>
-                {/each}
-              </ul>
-            {/if}
-          </section>
-        {/each}
-      {:else if loading}
-        {@render skeleton()}
-      {:else if showEmpty}
-        <p class="attachments-status">{i18n.t(emptyLabel)}</p>
-      {/if}
-
-      {#if failed}
-        <div class="attachments-failure" role="alert">
-          <p>{i18n.t('timeline.attachmentsFailed')}</p>
-          <Button size="small" variant="secondary" onclick={() => pager.retry()}>
-            {i18n.t('common.tryAgain')}
-          </Button>
-        </div>
-      {:else if loading && items.length > 0}
-        <div class="attachments-more"><Spinner small /></div>
-      {:else if !exhausted && !loading}
-        <div class="attachments-more" {@attach nearEnd}>
-          <Button size="small" variant="secondary" onclick={loadMore}>
-            {i18n.t('common.loadMore')}
-          </Button>
-        </div>
-      {/if}
-    </div>
-  </aside>
-{/snippet}
-
-{#if modal}
-  <DialogFrame
-    open
-    onOpenChange={(open: boolean) => {
-      if (!open) onClose();
-    }}
-    variant="drawer"
-    label={i18n.t('timeline.attachmentsTitle')}
-  >
-    {@render body()}
-  </DialogFrame>
-{:else}
-  {@render body()}
-{/if}
+    {#if failed}
+      <div class="attachments-failure" role="alert">
+        <p>{i18n.t('timeline.attachmentsFailed')}</p>
+        <Button size="small" variant="secondary" onclick={() => pager.retry()}>
+          {i18n.t('common.tryAgain')}
+        </Button>
+      </div>
+    {:else if loading && items.length > 0}
+      <div class="attachments-more"><Spinner small /></div>
+    {:else if !exhausted && !loading}
+      <div class="attachments-more" {@attach nearEnd}>
+        <Button size="small" variant="secondary" onclick={loadMore}>
+          {i18n.t('common.loadMore')}
+        </Button>
+      </div>
+    {/if}
+  </div>
+</RoomSidePanel>
 
 <style>
-  .attachments {
-    --ghost-hover: var(--bg-container-hover);
-    --ghost-active: var(--bg-container-active);
-
-    background: var(--bg-container);
-    border-left: var(--border-width) solid var(--bg-container-line);
-    color: var(--bg-on-container);
-    display: grid;
-    flex: 0 0 auto;
-    grid-template-rows: auto auto auto minmax(0, 1fr);
-    min-height: 0;
-    position: relative;
-    width: 22rem;
-  }
-
-  .attachments :global(.resize-handle) {
-    left: -0.25rem;
-    z-index: 1;
-  }
-
-  .attachments.modal {
-    border-left: none;
-    height: 100%;
-    width: 100%;
-  }
-
   .tabs {
     display: flex;
     gap: var(--space-100);
@@ -654,6 +587,7 @@
   }
 
   .attachments-body {
+    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;

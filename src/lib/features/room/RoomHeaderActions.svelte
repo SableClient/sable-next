@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
@@ -24,6 +25,13 @@
     onclick={() => panels.toggleThreads()}
   >
     <ChatsIcon weight={panels.threadsOpen ? 'fill' : 'regular'} />
+  </PanelHeaderButton>
+  <PanelHeaderButton
+    label={i18n.t('room.notificationsOpen')}
+    aria-pressed={panels.notificationsOpen}
+    onclick={() => panels.toggleNotifications()}
+  >
+    <BellIcon weight={panels.notificationsOpen ? 'fill' : 'regular'} />
   </PanelHeaderButton>
   {#if desktop}
     <PanelHeaderButton

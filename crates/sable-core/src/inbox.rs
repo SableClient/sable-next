@@ -11,7 +11,7 @@ use matrix_sdk::ruma::events::receipt::{ReceiptThread, ReceiptType};
 use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, AnySyncTimelineEvent};
 use matrix_sdk::ruma::push::Action;
 use matrix_sdk::ruma::serde::Raw;
-use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, OwnedUserId, UInt};
+use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, OwnedUserId, RoomId, UInt};
 use matrix_sdk_common::serde_helpers::extract_thread_root;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
@@ -137,6 +137,20 @@ const fn is_unread(entry: &Entry, state: &mut RoomReadState) -> bool {
     }
     state.remaining -= 1;
     true
+}
+
+/// Narrows the inbox to one room and to entries whose sender or shown text contains `query`.
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct InboxScope<'a> {
+    pub(crate) room_id: Option<&'a RoomId>,
+    pub(crate) query: Option<&'a str>,
+}
+
+fn contains_query(entry: &Entry, query: &str, body_shown: bool) -> bool {
+    let contains = |text: &str| text.to_lowercase().contains(query);
+    contains(entry.sender.as_str())
+        || entry.sender_name.as_deref().is_some_and(contains)
+        || (body_shown && entry.body.as_deref().is_some_and(contains))
 }
 
 const fn matches(entry: &Entry, filter: InboxFilter) -> bool {
@@ -355,10 +369,11 @@ async fn backfill_candidates(
     client: &matrix_sdk::Client,
     stored: &Stored,
     include_read: bool,
+    room_id: Option<&RoomId>,
 ) -> Result<Vec<(Room, UnreadScan)>, RpcError> {
     let mut candidates = Vec::new();
     for room in client.joined_rooms() {
-        if room.is_space() {
+        if room.is_space() || room_id.is_some_and(|room_id| room.room_id() != room_id) {
             continue;
         }
         if include_read {
@@ -544,6 +559,7 @@ impl Core {
         include_read: bool,
         limit: u32,
         before_ts: Option<u64>,
+        scope: InboxScope<'_>,
     ) -> Result<(Vec<InboxItemView>, bool), RpcError> {
         let client = self.client().await?;
         let stored = self.with_open_stores(async || load(&client).await).await?;
@@ -553,7 +569,23 @@ impl Core {
         let mut items = Vec::new();
         let mut has_more = false;
 
+        let query = scope
+            .query
+            .map(str::to_lowercase)
+            .filter(|query| !query.is_empty());
+
         for mut entry in stored.entries {
+            if scope
+                .room_id
+                .is_some_and(|room_id| entry.room_id != room_id)
+            {
+                continue;
+            }
+            if let Some(query) = &query
+                && !contains_query(&entry, query, self.shows_inbox_body(entry.encrypted))
+            {
+                continue;
+            }
             if !rooms.contains_key(&entry.room_id) {
                 let joined = client
                     .get_room(&entry.room_id)
@@ -625,14 +657,18 @@ impl Core {
         Ok((items, has_more))
     }
 
-    pub(crate) async fn backfill_inbox(&self, include_read: bool) -> Result<(u32, bool), RpcError> {
+    pub(crate) async fn backfill_inbox(
+        &self,
+        include_read: bool,
+        room_id: Option<&RoomId>,
+    ) -> Result<(u32, bool), RpcError> {
         let client = self.client().await?;
         crate::rooms::fill_own_members(&client)
             .await
             .or_failed(self, "inbox_memberships")?;
         let stored = self.with_open_stores(async || load(&client).await).await?;
         let every_encrypted = self.every_encrypted_event_pushed().await;
-        let candidates = backfill_candidates(self, &client, &stored, include_read).await?;
+        let candidates = backfill_candidates(self, &client, &stored, include_read, room_id).await?;
         drop(stored);
 
         let mut fresh = Vec::new();
@@ -751,7 +787,9 @@ mod tests {
         matchers::{method, path_regex, query_param, query_param_is_missing},
     };
 
-    use super::{Entry, MAX_ENTRIES, RoomReadState, UnreadScan, is_unread, merge, preview};
+    use super::{
+        Entry, InboxScope, MAX_ENTRIES, RoomReadState, UnreadScan, is_unread, merge, preview,
+    };
     use crate::{
         Core, api::notifications::InboxFilter, session::Session, store::MemorySessionStore,
     };
@@ -812,6 +850,80 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_inbox_can_be_limited_to_one_room() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, room) = setup(&server, 1).await;
+        core.record_inbox(
+            &client,
+            vec![entry("here", 200)],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+
+        let (here, _) = core
+            .inbox_notifications(
+                InboxFilter::All,
+                true,
+                30,
+                None,
+                InboxScope {
+                    room_id: Some(room.room_id()),
+                    ..InboxScope::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(here.len(), 1);
+        let (elsewhere, _) = core
+            .inbox_notifications(
+                InboxFilter::All,
+                true,
+                30,
+                None,
+                InboxScope {
+                    room_id: Some(room_id!("!other:example.org")),
+                    ..InboxScope::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert!(elsewhere.is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_inbox_can_be_searched_by_sender() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, _) = setup(&server, 1).await;
+        core.record_inbox(
+            &client,
+            vec![entry("from-alice", 200)],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+
+        for (query, found) in [("ALICE", 1), ("bob", 0), ("", 1)] {
+            let (items, _) = core
+                .inbox_notifications(
+                    InboxFilter::All,
+                    true,
+                    30,
+                    None,
+                    InboxScope {
+                        query: Some(query),
+                        ..InboxScope::default()
+                    },
+                )
+                .await
+                .unwrap();
+            assert_eq!(items.len(), found, "{query}");
+        }
+    }
+
+    #[tokio::test]
     async fn highlights_keep_inbox_notifications_unread() {
         let server = MatrixMockServer::new().await;
         let (core, client, room) = setup(&server, 1).await;
@@ -832,7 +944,7 @@ mod tests {
             )
             .await;
         let (items, _) = core
-            .inbox_notifications(InboxFilter::All, false, 30, None)
+            .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
             .await
             .unwrap();
         assert_eq!(items.len(), 1);
@@ -857,7 +969,7 @@ mod tests {
         core.notification_encrypted_content
             .store(true, std::sync::atomic::Ordering::Relaxed);
         let (items, _) = core
-            .inbox_notifications(InboxFilter::All, false, 30, None)
+            .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
             .await
             .unwrap();
         assert_eq!(items[0].body.as_deref(), Some("secret"));
@@ -865,7 +977,7 @@ mod tests {
         core.notification_encrypted_content
             .store(false, std::sync::atomic::Ordering::Relaxed);
         let (items, _) = core
-            .inbox_notifications(InboxFilter::All, false, 30, None)
+            .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
             .await
             .unwrap();
         assert_eq!(items[0].body, None);
@@ -894,7 +1006,7 @@ mod tests {
             .await;
         assert!(room.is_direct().await.unwrap());
         let (items, _) = core
-            .inbox_notifications(InboxFilter::Direct, false, 30, None)
+            .inbox_notifications(InboxFilter::Direct, false, 30, None, InboxScope::default())
             .await
             .unwrap();
         assert_eq!(items.len(), 1);
@@ -968,7 +1080,7 @@ mod tests {
         .unwrap();
 
         let (items, _) = core
-            .inbox_notifications(InboxFilter::Threads, true, 30, None)
+            .inbox_notifications(InboxFilter::Threads, true, 30, None, InboxScope::default())
             .await
             .unwrap();
         let read: Vec<_> = items
@@ -1036,7 +1148,7 @@ mod tests {
 
         for _ in 0..2 {
             let (items, _) = core
-                .inbox_notifications(InboxFilter::All, false, 30, None)
+                .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
                 .await
                 .unwrap();
             assert_eq!(items.len(), 1);
@@ -1064,7 +1176,7 @@ mod tests {
             )
             .await;
         let (items, _) = core
-            .inbox_notifications(InboxFilter::All, true, 30, None)
+            .inbox_notifications(InboxFilter::All, true, 30, None, InboxScope::default())
             .await
             .unwrap();
         assert_eq!(items.len(), 1);
@@ -1115,7 +1227,7 @@ mod tests {
         .unwrap();
 
         let (items, _) = core
-            .inbox_notifications(InboxFilter::All, false, 30, None)
+            .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
             .await
             .unwrap();
 
@@ -1152,11 +1264,11 @@ mod tests {
             }))).expect(1).mount(server.server()).await;
         }
 
-        assert_eq!(core.backfill_inbox(false).await.unwrap(), (0, true));
-        assert_eq!(core.backfill_inbox(false).await.unwrap(), (1, false));
-        assert_eq!(core.backfill_inbox(false).await.unwrap(), (0, false));
+        assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (0, true));
+        assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (1, false));
+        assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (0, false));
         let (items, _) = core
-            .inbox_notifications(InboxFilter::All, false, 30, None)
+            .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
             .await
             .unwrap();
         assert_eq!(items.len(), 1);
@@ -1175,12 +1287,12 @@ mod tests {
             )
             .mount_as_scoped(server.server())
             .await;
-        core.backfill_inbox(false).await.unwrap_err();
+        core.backfill_inbox(false, None).await.unwrap_err();
         drop(failure);
         Mock::given(method("GET")).and(path_regex("/messages$"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({"start": "p0", "chunk": [message("$retry", 100, client.user_id())], "state": []})))
             .mount(server.server()).await;
-        assert_eq!(core.backfill_inbox(false).await.unwrap(), (1, false));
+        assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (1, false));
     }
 
     #[tokio::test]
@@ -1214,15 +1326,47 @@ mod tests {
                 .respond_with(ResponseTemplate::new(200).set_body_json(json!({"start": "p0", "chunk": [message(&format!("${name}"), 100, client.user_id())], "state": []})))
                 .expect(1).mount(server.server()).await;
         }
-        assert_eq!(core.backfill_inbox(false).await.unwrap(), (5, true));
-        assert_eq!(core.backfill_inbox(false).await.unwrap(), (1, false));
+        assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (5, true));
+        assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (1, false));
         assert_eq!(
-            core.inbox_notifications(InboxFilter::All, false, 30, None)
+            core.inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
                 .await
                 .unwrap()
                 .0
                 .len(),
             6
+        );
+    }
+
+    #[tokio::test]
+    async fn backfill_can_be_limited_to_one_room() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, room) = setup(&server, 1).await;
+        let other = matrix_sdk::ruma::room_id!("!other:example.org");
+        let factory = EventFactory::new().room(other).sender(User::Alice);
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(other)
+                    .add_state_event(factory.member(client.user_id().unwrap()))
+                    .add_state_event(factory.member(User::Alice))
+                    .add_state_event(factory.power_levels())
+                    .set_unread_notifications_count(
+                        json!({"notification_count": 1, "highlight_count": 1}),
+                    ),
+            )
+            .await;
+        for (name, calls) in [("room", 1), ("other", 0)] {
+            Mock::given(method("GET")).and(path_regex(format!("/rooms/.*{name}.*?/messages$")))
+                .respond_with(ResponseTemplate::new(200).set_body_json(json!({"start": "p0", "chunk": [message(&format!("${name}"), 100, client.user_id())], "state": []})))
+                .expect(calls).mount(server.server()).await;
+        }
+
+        assert_eq!(
+            core.backfill_inbox(false, Some(room.room_id()))
+                .await
+                .unwrap(),
+            (1, false)
         );
     }
 
@@ -1251,9 +1395,9 @@ mod tests {
             mock.respond_with(ResponseTemplate::new(200).set_body_json(json!({"start": "p0", "end": end, "chunk": [message(id, ts, client.user_id())], "state": []})))
                 .expect(1).mount(server.server()).await;
         }
-        assert_eq!(core.backfill_inbox(false).await.unwrap(), (1, false));
+        assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (1, false));
         assert_eq!(
-            core.inbox_notifications(InboxFilter::All, false, 30, None)
+            core.inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
                 .await
                 .unwrap()
                 .0

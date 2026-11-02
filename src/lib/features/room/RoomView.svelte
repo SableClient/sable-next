@@ -953,6 +953,7 @@
           onClose={desktop ? backToRoomList : undefined}
           onAttachments={voiceView ? undefined : toggleAttachments}
           onThreads={phone && !voiceView ? toggleThreads : undefined}
+          onNotifications={phone && !voiceView ? () => panels.toggleNotifications() : undefined}
           onPins={phone ? () => (pinsOpen = true) : undefined}
           {pinsUnread}
           onWidgets={phone && (roomSession.widgets.length > 0 || canManageWidgets)

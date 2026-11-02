@@ -8,6 +8,7 @@
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
+  import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
   import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
@@ -41,6 +42,7 @@
     onClose?: () => void;
     onAttachments?: () => void;
     onThreads?: () => void;
+    onNotifications?: () => void;
     onPins?: () => void;
     pinsUnread?: number;
     onWidgets?: () => void;
@@ -61,6 +63,7 @@
     onClose,
     onAttachments,
     onThreads,
+    onNotifications,
     onPins,
     pinsUnread = 0,
     onWidgets,
@@ -131,6 +134,12 @@
         <ActionMenuItem onSelect={onThreads}>
           <ChatsIcon />
           {i18n.t('timeline.threadsOpen')}
+        </ActionMenuItem>
+      {/if}
+      {#if onNotifications}
+        <ActionMenuItem onSelect={onNotifications}>
+          <BellIcon />
+          {i18n.t('room.notificationsOpen')}
         </ActionMenuItem>
       {/if}
       {#if onPins}

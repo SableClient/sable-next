@@ -419,6 +419,11 @@ pub struct InboxParams {
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     #[serde(default)]
     pub before_ts: Option<u64>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    #[serde(default)]
+    pub room_id: Option<OwnedRoomId>,
+    #[serde(default)]
+    pub query: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -433,7 +438,16 @@ impl Handler for InboxParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<InboxOk, RpcError> {
         let (items, has_more) = core
-            .inbox_notifications(self.filter, self.include_read, self.limit, self.before_ts)
+            .inbox_notifications(
+                self.filter,
+                self.include_read,
+                self.limit,
+                self.before_ts,
+                crate::inbox::InboxScope {
+                    room_id: self.room_id.as_deref(),
+                    query: self.query.as_deref(),
+                },
+            )
             .await?;
         Ok(InboxOk { items, has_more })
     }
@@ -443,6 +457,9 @@ impl Handler for InboxParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct BackfillInboxParams {
     pub include_read: bool,
+    #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    #[serde(default)]
+    pub room_id: Option<OwnedRoomId>,
 }
 
 #[derive(Debug, Serialize)]
@@ -456,7 +473,9 @@ impl Handler for BackfillInboxParams {
     type Ok = BackfillInboxOk;
 
     async fn run(self, core: &Arc<Core>) -> Result<BackfillInboxOk, RpcError> {
-        let (recorded, has_more) = core.backfill_inbox(self.include_read).await?;
+        let (recorded, has_more) = core
+            .backfill_inbox(self.include_read, self.room_id.as_deref())
+            .await?;
         Ok(BackfillInboxOk { recorded, has_more })
     }
 }

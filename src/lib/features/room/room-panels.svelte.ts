@@ -13,6 +13,7 @@ export class RoomPanels {
   threadsOpen = $state(false);
   attachmentsOpen = $state(false);
   searchOpen = $state(false);
+  notificationsOpen = $state(false);
   membersOpen = $state(false);
   desktopMembersOpen = $state(desktopMembersPreferred);
   widgetsOpen = $state(false);
@@ -22,6 +23,7 @@ export class RoomPanels {
     this.threadsOpen = false;
     this.attachmentsOpen = false;
     this.searchOpen = false;
+    this.notificationsOpen = false;
   }
 
   openThread(rootEventId: string): void {
@@ -54,6 +56,12 @@ export class RoomPanels {
     const open = !this.searchOpen;
     this.#closeAll();
     this.searchOpen = open;
+  }
+
+  toggleNotifications(): void {
+    const open = !this.notificationsOpen;
+    this.#closeAll();
+    this.notificationsOpen = open;
   }
 
   toggleWidgets(): void {

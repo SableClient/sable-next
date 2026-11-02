@@ -10,6 +10,7 @@
   import ThreadList from './conversation/ThreadList.svelte';
   import RoomAttachments from './media/RoomAttachments.svelte';
   import MembersDrawer from './members/MembersDrawer.svelte';
+  import RoomNotificationsPanel from './RoomNotificationsPanel.svelte';
   import RoomSearchPanel from './RoomSearchPanel.svelte';
   import type { RoomPanels } from './room-panels.svelte.js';
   import type { RoomSession } from './room-session.svelte.js';
@@ -95,6 +96,18 @@
       query={scopedSearchQuery('in', room, roomId)}
       modal={!desktop}
       onClose={() => (panels.searchOpen = false)}
+    />
+  {/key}
+{/if}
+
+{#if panels.notificationsOpen}
+  {#key roomId}
+    <RoomNotificationsPanel
+      {roomId}
+      members={memberLoader.members}
+      modal={!desktop}
+      {onJump}
+      onClose={() => (panels.notificationsOpen = false)}
     />
   {/key}
 {/if}

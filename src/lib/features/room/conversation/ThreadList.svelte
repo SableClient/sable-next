@@ -1,28 +1,22 @@
 <script lang="ts">
-  import { onMount, untrack } from 'svelte';
+  import { untrack } from 'svelte';
   import { ThreadRoots } from '#lib/rooms/thread-roots.svelte.js';
   import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import type { MemberView } from '#src/generated/protocol';
   import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
-  import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
-  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
-  import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
-  import { PanelWidth, remFromPixels } from '#lib/ui/panel-width.svelte.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import { fallbackText } from '../messages/reply-fallback.js';
   import { stripReplyFallback } from '../members/members.js';
   import MessagePreview from '../messages/MessagePreview.svelte';
+  import RoomSidePanel from '../RoomSidePanel.svelte';
   import { opensFrom } from '../messages/message-preview';
-  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     roomId: string;
@@ -47,169 +41,99 @@
       void timeline.stop();
     };
   });
-
-  const panelWidth = new PanelWidth('sable-thread-list-width', 22, 16, 40);
-  onMount(() => panelWidth.restore());
 </script>
 
-{#snippet body()}
-  <aside
-    class={['thread-list', { modal }]}
-    aria-label={i18n.t('timeline.threadsTitle')}
-    style:width={modal ? null : `${panelWidth.width}rem`}
-  >
-    {#if !modal}
-      <ResizeHandle
-        value={panelWidth.width}
-        min={panelWidth.min}
-        max={panelWidth.max}
-        label={i18n.t('timeline.threadsResize')}
-        grow="left"
-        step={1}
-        fromPixels={remFromPixels}
-        onResize={(next) => panelWidth.resize(next)}
-        onCommit={() => panelWidth.commit()}
-      />
-    {/if}
-    <PanelHeader class="thread-list-header" title={i18n.t('timeline.threadsTitle')}>
-      {#snippet prefix()}
-        <ChatsIcon aria-hidden="true" />
-      {/snippet}
-      {#snippet suffix()}
-        <PanelHeaderButton label={i18n.t('timeline.threadsClose')} onclick={onClose}>
-          <XIcon />
-        </PanelHeaderButton>
-      {/snippet}
-    </PanelHeader>
-
-    <div class="thread-list-body" {@attach scrollHint}>
-      {#if threads.items.length > 0}
-        <ul>
-          {#each threads.items as root (root.id)}
-            {@const rootId = root.event_id ?? root.id}
-            {@const threadOpenLabel = i18n.t('timeline.threadOpen')}
-            <li>
-              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-              <div
-                class="thread-root"
-                onclick={(event) => {
-                  if (opensFrom(event)) onOpenThread(rootId);
+<RoomSidePanel
+  title={i18n.t('timeline.threadsTitle')}
+  closeLabel={i18n.t('timeline.threadsClose')}
+  resizeLabel={i18n.t('timeline.threadsResize')}
+  widthKey="sable-thread-list-width"
+  width={22}
+  body="flush"
+  {modal}
+  {onClose}
+>
+  {#snippet icon()}
+    <ChatsIcon aria-hidden="true" />
+  {/snippet}
+  {#if threads.items.length > 0}
+    <ul>
+      {#each threads.items as root (root.id)}
+        {@const rootId = root.event_id ?? root.id}
+        {@const threadOpenLabel = i18n.t('timeline.threadOpen')}
+        <li>
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <div
+            class="thread-root"
+            onclick={(event) => {
+              if (opensFrom(event)) onOpenThread(rootId);
+            }}
+          >
+            <MessagePreview {roomId} eventId={rootId} item={root} {members} loadPreviewProfile>
+              {#snippet fallback()}{/snippet}
+            </MessagePreview>
+          </div>
+          <Tooltip label={threadOpenLabel} disabled={!!root.thread_summary}>
+            {#snippet trigger({ props })}
+              <button
+                {...props}
+                type="button"
+                class={['thread-summary', { 'no-summary': !root.thread_summary }]}
+                aria-label={root.thread_summary ? undefined : threadOpenLabel}
+                onclick={() => {
+                  onOpenThread(rootId);
                 }}
               >
-                <MessagePreview {roomId} eventId={rootId} item={root} {members} loadPreviewProfile>
-                  {#snippet fallback()}{/snippet}
-                </MessagePreview>
-              </div>
-              <Tooltip label={threadOpenLabel} disabled={!!root.thread_summary}>
-                {#snippet trigger({ props })}
-                  <button
-                    {...props}
-                    type="button"
-                    class={['thread-summary', { 'no-summary': !root.thread_summary }]}
-                    aria-label={root.thread_summary ? undefined : threadOpenLabel}
-                    onclick={() => {
-                      onOpenThread(rootId);
-                    }}
-                  >
-                    <ThreadIcon size={14} aria-hidden="true" />
-                    {#if root.thread_summary}
-                      <span class="thread-count">
-                        {i18n.t('timeline.threadReplies', {
-                          count: root.thread_summary.num_replies,
-                        })}
-                      </span>
-                    {/if}
-                    {#if root.thread_summary}
-                      {@const latest = stripReplyFallback(
-                        fallbackText(
-                          root.thread_summary.latest_body,
-                          root.thread_summary.latest_fallback,
-                          i18n.t
-                        ),
-                        null
-                      )}
-                      {#if latest}
-                        <span class="thread-latest">{latest}</span>
-                      {/if}
-                    {/if}
-                  </button>
-                {/snippet}
-              </Tooltip>
-            </li>
-          {/each}
-        </ul>
-      {:else if !threads.loading && !threads.error}
-        <p class="thread-list-status">{i18n.t('timeline.threadsEmpty')}</p>
-      {/if}
+                <ThreadIcon size={14} aria-hidden="true" />
+                {#if root.thread_summary}
+                  <span class="thread-count">
+                    {i18n.t('timeline.threadReplies', {
+                      count: root.thread_summary.num_replies,
+                    })}
+                  </span>
+                {/if}
+                {#if root.thread_summary}
+                  {@const latest = stripReplyFallback(
+                    fallbackText(
+                      root.thread_summary.latest_body,
+                      root.thread_summary.latest_fallback,
+                      i18n.t
+                    ),
+                    null
+                  )}
+                  {#if latest}
+                    <span class="thread-latest">{latest}</span>
+                  {/if}
+                {/if}
+              </button>
+            {/snippet}
+          </Tooltip>
+        </li>
+      {/each}
+    </ul>
+  {:else if !threads.loading && !threads.error}
+    <p class="thread-list-status">{i18n.t('timeline.threadsEmpty')}</p>
+  {/if}
 
-      {#if threads.error}
-        <p class="thread-list-status" role="alert">{i18n.t('timeline.threadsFailed')}</p>
-      {/if}
-      {#if threads.loading}
-        <div class="thread-list-loading"><Spinner small /></div>
-      {:else if threads.nextBatch !== null || threads.error}
-        <div class="thread-list-more">
-          <Button
-            size="small"
-            variant="secondary"
-            onclick={() => void (threads.error ? threads.retry() : threads.loadMore())}
-          >
-            {threads.error ? i18n.t('common.tryAgain') : i18n.t('timeline.threadsLoadMore')}
-          </Button>
-        </div>
-      {/if}
+  {#if threads.error}
+    <p class="thread-list-status" role="alert">{i18n.t('timeline.threadsFailed')}</p>
+  {/if}
+  {#if threads.loading}
+    <div class="thread-list-loading"><Spinner small /></div>
+  {:else if threads.nextBatch !== null || threads.error}
+    <div class="thread-list-more">
+      <Button
+        size="small"
+        variant="secondary"
+        onclick={() => void (threads.error ? threads.retry() : threads.loadMore())}
+      >
+        {threads.error ? i18n.t('common.tryAgain') : i18n.t('timeline.threadsLoadMore')}
+      </Button>
     </div>
-  </aside>
-{/snippet}
-
-{#if modal}
-  <DialogFrame
-    open
-    onOpenChange={(open: boolean) => {
-      if (!open) onClose();
-    }}
-    variant="drawer"
-    label={i18n.t('timeline.threadsTitle')}
-  >
-    {@render body()}
-  </DialogFrame>
-{:else}
-  {@render body()}
-{/if}
+  {/if}
+</RoomSidePanel>
 
 <style>
-  .thread-list {
-    --ghost-hover: var(--bg-container-hover);
-    --ghost-active: var(--bg-container-active);
-
-    background: var(--bg-container);
-    border-left: var(--border-width) solid var(--bg-container-line);
-    color: var(--bg-on-container);
-    display: grid;
-    flex: 0 0 auto;
-    grid-template-rows: auto minmax(0, 1fr);
-    min-height: 0;
-    position: relative;
-    width: 22rem;
-  }
-
-  .thread-list :global(.resize-handle) {
-    left: -0.25rem;
-    z-index: 1;
-  }
-
-  .thread-list.modal {
-    border-left: none;
-    height: 100%;
-    width: 100%;
-  }
-
-  .thread-list-body {
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
   ul {
     display: grid;
     gap: var(--space-200);

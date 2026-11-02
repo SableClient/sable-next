@@ -2756,12 +2756,15 @@ export type Rpc = {
 	include_read: boolean,
 	limit: number,
 	before_ts?: number | null,
+	room_id?: string | null,
+	query?: string | null,
 }) => Promise<{
 	items: InboxItemView[],
 	has_more: boolean,
 }>;
     backfillInbox: (params: {
 	include_read: boolean,
+	room_id?: string | null,
 }) => Promise<{
 	recorded: number,
 	has_more: boolean,
