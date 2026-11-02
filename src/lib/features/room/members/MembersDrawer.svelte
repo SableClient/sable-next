@@ -26,6 +26,7 @@
     DEFAULT_ALWAYS_LISTED_FROM,
     INITIAL_MEMBER_ROWS,
     MEMBERSHIP_FILTERS,
+    MEMBERSHIP_FILTER_EMPTY_MESSAGES,
     MEMBERSHIP_FILTER_LABELS,
     MEMBER_ROWS_STEP,
     MEMBER_SORTS,
@@ -289,9 +290,7 @@
       <p class="status">{i18n.t('timeline.noMembersFound')}</p>
     {:else}
       <p class="status">
-        {i18n.t('timeline.noMembersForFilter', {
-          filter: i18n.t(MEMBERSHIP_FILTER_LABELS[filter]),
-        })}
+        {i18n.t(MEMBERSHIP_FILTER_EMPTY_MESSAGES[filter])}
       </p>
     {/if}
   {/if}

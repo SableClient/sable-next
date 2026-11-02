@@ -35,6 +35,15 @@ export const MEMBERSHIP_FILTER_LABELS: Record<MembershipFilter, string> = {
   ban: 'timeline.memberFilterBanned',
 };
 
+export const MEMBERSHIP_FILTER_EMPTY_MESSAGES: Record<MembershipFilter, string> = {
+  join: 'timeline.noJoinedMembers',
+  invite: 'timeline.noInvitedMembers',
+  knock: 'timeline.noJoinRequests',
+  leave: 'timeline.noLeftMembers',
+  kick: 'timeline.noKickedMembers',
+  ban: 'timeline.noBannedMembers',
+};
+
 export function membershipFor(filter: MembershipFilter): MembershipView {
   return filter === 'kick' ? 'leave' : filter;
 }
