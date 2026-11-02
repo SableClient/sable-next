@@ -42,7 +42,7 @@ import { AuthWindows } from './auth-window';
 import { autostartAvailable, setLaunchAtLogin } from './autostart';
 import { registerContextMenu } from './context-menu';
 import { claimSchemes } from './linux-schemes';
-import { openExternal, originOf } from './navigation';
+import { historyDirection, openExternal, originOf } from './navigation';
 import { enforcePermissions } from './permissions';
 import { flushWritesBeforeQuit, writeJson } from './persistence';
 import { writeDownload } from './downloads';
@@ -595,6 +595,14 @@ function createWindow(): BrowserWindow {
       }
     }
     if (input.isAutoRepeat) return;
+    const direction = historyDirection(input, process.platform);
+    if (direction) {
+      event.preventDefault();
+      const history = window.webContents.navigationHistory;
+      if (direction === 'back' && history.canGoBack()) history.goBack();
+      if (direction === 'forward' && history.canGoForward()) history.goForward();
+      return;
+    }
     const f12 = input.key === 'F12' && !input.control && !input.shift && !input.alt && !input.meta;
     const inspect =
       input.key.toLowerCase() === 'i' &&

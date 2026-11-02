@@ -3,7 +3,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 const { openExternal } = vi.hoisted(() => ({ openExternal: vi.fn(() => Promise.resolve()) }));
 vi.mock('electron', () => ({ shell: { openExternal } }));
 
-import { openExternal as openLink, originOf } from './navigation';
+import { historyDirection, openExternal as openLink, originOf } from './navigation';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -46,4 +46,19 @@ test('handles OS link-opening failures', async () => {
   await Promise.resolve();
   expect(warn).toHaveBeenCalledOnce();
   warn.mockRestore();
+});
+
+const keys = { alt: false, control: false, meta: false, shift: false };
+
+test.each([
+  ['linux', { ...keys, key: 'ArrowLeft', alt: true }, 'back'],
+  ['win32', { ...keys, key: 'ArrowRight', alt: true }, 'forward'],
+  ['linux', { ...keys, key: 'ArrowLeft', alt: true, shift: true }, null],
+  ['linux', { ...keys, key: 'ArrowLeft', alt: true, control: true }, null],
+  ['linux', { ...keys, key: 'ArrowLeft' }, null],
+  ['darwin', { ...keys, key: '[', meta: true }, 'back'],
+  ['darwin', { ...keys, key: ']', meta: true }, 'forward'],
+  ['darwin', { ...keys, key: 'ArrowLeft', alt: true }, null],
+] as const)('maps %s %o to %s', (platform, input, direction) => {
+  expect(historyDirection(input, platform)).toBe(direction);
 });
