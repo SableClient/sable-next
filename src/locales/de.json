@@ -989,7 +989,19 @@
     "replyToReaction": "Reagiert mit {{key}}",
     "label": "Nachrichtenverlauf",
     "loadingNewer": "Neuere Nachrichten werden geladen…",
-    "hiddenRedaction": "{{user}} hat eine Nachricht gelöscht"
+    "hiddenRedaction": "{{user}} hat eine Nachricht gelöscht",
+    "powerLevelMember": "",
+    "thread": "",
+    "threadsResize": "",
+    "powerLevelModerator": "",
+    "noMembersForFilter": "",
+    "threadsEmpty": "",
+    "threadsOpen": "",
+    "threadsClose": "",
+    "reactions": "",
+    "threadsFailed": "",
+    "reply": "",
+    "replyInThread": ""
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden."
