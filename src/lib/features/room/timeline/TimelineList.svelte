@@ -1155,7 +1155,7 @@
     {/if}
   {/if}
 
-  <div class="timeline-stage">
+  <div class="timeline-stage" in:fade|global={{ duration: motionMs(MOTION_MS.quick) }}>
     {#if historyLoadingVisible}
       <div
         class="timeline-loading history-loading"
