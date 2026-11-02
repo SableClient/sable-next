@@ -7,7 +7,7 @@
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
-  import { panelIn } from '#lib/ui/motion.js';
+  import { panelIn, panelOut } from '#lib/ui/motion.js';
   import { readText, writeText } from '#lib/platform/local-json.js';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
@@ -147,6 +147,7 @@
 
 <aside
   in:panelIn|global={{ modal }}
+  out:panelOut|global={{ modal }}
   class={['members-drawer', { compact }]}
   aria-label={title}
   style:width={width === null ? undefined : `${width}px`}

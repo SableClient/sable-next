@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { panelIn } from '#lib/ui/motion.js';
+  import { panelIn, panelOut } from '#lib/ui/motion.js';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
@@ -154,6 +154,7 @@
 
 <aside
   in:panelIn|global={{ modal }}
+  out:panelOut|global={{ modal }}
   class={['widgets-panel', { modal }]}
   aria-label={i18n.t('widgets.label')}
   style:width={modal ? null : `${width}rem`}

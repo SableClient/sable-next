@@ -1023,7 +1023,7 @@
     }
 
     .room-row-wrap {
-      transition: background-color var(--motion-normal) var(--motion-easing-standard);
+      transition: background-color var(--motion-fast) var(--motion-easing-standard);
     }
   }
 

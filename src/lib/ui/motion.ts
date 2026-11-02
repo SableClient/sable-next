@@ -1,4 +1,4 @@
-import { cubicOut } from 'svelte/easing';
+import { cubicIn, cubicOut } from 'svelte/easing';
 import { prefersReducedMotion } from 'svelte/motion';
 import { fly, type FlyParams } from 'svelte/transition';
 
@@ -25,19 +25,27 @@ export function scrollBehavior(): ScrollBehavior {
   return shouldReduceMotion() ? 'auto' : 'smooth';
 }
 
+type PanelMotion = { modal?: boolean; cover?: boolean };
+
+function panelFly(node: Element, { modal = false, cover = false }: PanelMotion, leaving: boolean) {
+  const params: FlyParams = {
+    x: cover ? '100%' : 24,
+    opacity: cover ? 1 : 0,
+    duration: modal ? 0 : motionMs(leaving ? MOTION_MS.quick : MOTION_MS.fast),
+    easing: leaving ? cubicIn : cubicOut,
+  };
+  return fly(node, params);
+}
+
 /**
  * A panel arriving from the trailing edge: a short slide beside the conversation, a full push when it
  * covers it. A modal one already has the drawer's motion.
  */
-export function panelIn(
-  node: Element,
-  { modal = false, cover = false }: { modal?: boolean; cover?: boolean } = {}
-) {
-  const params: FlyParams = {
-    x: cover ? '100%' : 24,
-    opacity: cover ? 1 : 0,
-    duration: modal ? 0 : motionMs(cover ? MOTION_MS.medium : MOTION_MS.fast),
-    easing: cubicOut,
-  };
-  return fly(node, params);
+export function panelIn(node: Element, motion: PanelMotion = {}) {
+  return panelFly(node, motion, false);
+}
+
+/** The same path out, faster. */
+export function panelOut(node: Element, motion: PanelMotion = {}) {
+  return panelFly(node, motion, true);
 }
