@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/sveltekit';
 
 vi.mock('@sentry/sveltekit', () => ({
   captureException: vi.fn(),
+  browserApiErrorsIntegration: vi.fn(),
   consoleLoggingIntegration: vi.fn(),
   captureConsoleIntegration: vi.fn(() => ({ name: 'CaptureConsole' })),
   init: vi.fn(),
@@ -100,6 +101,14 @@ test('captures handled console errors as issues', async () => {
   await import('./hooks.client.js');
 
   expect(Sentry.captureConsoleIntegration).toHaveBeenCalledWith({ levels: ['error'] });
+});
+
+test('leaves event listeners unwrapped, which every row mount would pay for', async () => {
+  preferences.errorReporting = true;
+  vi.stubEnv('VITE_SENTRY_DSN', 'https://public@example.invalid/1');
+  await import('./hooks.client.js');
+
+  expect(Sentry.browserApiErrorsIntegration).toHaveBeenCalledWith({ eventTarget: false });
 });
 
 test('continues reporting new errors after fifty events', async () => {

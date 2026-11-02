@@ -44,6 +44,9 @@ if (dsn && preferences.errorReporting) {
     },
 
     integrations: [
+      // Wrapping every listener costs more than the handler name it adds to a report, and
+      // listener errors still reach the global error handler.
+      Sentry.browserApiErrorsIntegration({ eventTarget: false }),
       Sentry.consoleLoggingIntegration({ levels: ['error', 'warn'] }),
       Sentry.captureConsoleIntegration({ levels: ['error'] }),
       ...(preferences.sessionReplay
