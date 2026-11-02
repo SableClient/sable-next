@@ -5,6 +5,7 @@
   import { untrack } from 'svelte';
   import { Tabs } from 'bits-ui';
   import BookmarkSimpleIcon from 'phosphor-svelte/lib/BookmarkSimpleIcon';
+  import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
   import { i18n } from '#lib/i18n.js';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
@@ -69,10 +70,10 @@
 
 <AppPageShell title={i18n.t('nav.inbox')} density="compact">
   {#snippet actions()}
-    <a class="bookmarks-link" href={resolve('bookmarks')} draggable="false">
+    <LinkButton href={resolve('bookmarks')} variant="ghost" size="small" draggable="false">
       <BookmarkSimpleIcon aria-hidden="true" />
       {i18n.t('inbox.bookmarks')}
-    </a>
+    </LinkButton>
   {/snippet}
   <Tabs.Root bind:value={tab} onValueChange={selectTab} class="inbox">
     <Tabs.List class="inbox-tabs" aria-label={i18n.t('nav.inbox')}>
@@ -144,17 +145,6 @@
     color: var(--surface-var-on-container);
     margin: 0;
     text-align: center;
-  }
-
-  .bookmarks-link {
-    align-items: center;
-    display: inline-flex;
-    gap: var(--space-200);
-  }
-
-  .bookmarks-link :global(svg) {
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
   }
 
   @media (pointer: coarse) {
