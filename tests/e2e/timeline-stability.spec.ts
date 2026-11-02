@@ -1286,7 +1286,7 @@ test('a message the reader sends from the bottom is followed on every frame', as
   timeline,
   core,
   installRoomCore,
-  isMobile,
+  hasTouch,
 }) => {
   await installRoomCore('ready');
   await page.setViewportSize({ width: 900, height: 420 });
@@ -1316,7 +1316,8 @@ test('a message the reader sends from the bottom is followed on every frame', as
         .poll(() => app.composer.evaluate((node) => node.getBoundingClientRect().height))
         .toBeGreaterThan(initialComposerHeight);
     }
-    if (send.method === 'button' || isMobile) await app.sendMessage.click();
+    // Enter adds a line on touch screens, so only a keyboard-first browser sends with it.
+    if (send.method === 'button' || hasTouch) await app.sendMessage.click();
     else await app.composer.press('Enter');
     await expect
       .poll(
