@@ -45,18 +45,6 @@
     type SetupRecord,
   } from './setup-record';
 
-  const STAGE_LABELS: Record<SetupStep, string> = {
-    device: 'setup.stageDeviceLabel',
-    recovery: 'auth.stageRecoveryLabel',
-    profile: 'auth.stageProfileLabel',
-    notifications: 'setup.stageNotificationsLabel',
-    appearance: 'setup.stageAppearanceLabel',
-    layout: 'setup.stageLayoutLabel',
-    sync: 'setup.stageSyncLabel',
-    done: 'setup.stageDoneLabel',
-    consent: 'auth.stageConsentLabel',
-  };
-
   const core = useCoreClient();
   let record = $state<SetupRecord | null>(null);
   let accountFinished = $state.raw<AccountStep[]>([]);
@@ -247,7 +235,6 @@
         reachable={index <= pendingIndex || (index === pendingIndex + 1 && canSkipAhead)}
         before={index < activeIndex}
         after={index > activeIndex}
-        accessibilityLabel={i18n.t(STAGE_LABELS[step])}
         unavailableLabel={i18n.t('setup.finishCurrentStep')}
         onActivate={() => {
           activate(index);

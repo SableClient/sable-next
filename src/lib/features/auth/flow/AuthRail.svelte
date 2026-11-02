@@ -301,7 +301,7 @@
     {@render children()}
   </div>
   {#if total > 1 && (canBack || canForward)}
-    <div class="mobile-nav" role="group" aria-label={i18n.t('auth.stageNavigation')}>
+    <div class="mobile-nav">
       {#if canBack}
         <button
           class="panel-nav previous"

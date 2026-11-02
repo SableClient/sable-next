@@ -5,22 +5,18 @@ const stages: readonly AuthStage[] = [
   {
     route: '/login',
     completed: true,
-    accessibilityLabel: 'Login',
   },
   {
     route: '/register',
     completed: false,
-    accessibilityLabel: 'Register',
   },
   {
     route: '/register/recovery',
     completed: false,
-    accessibilityLabel: 'Recovery',
   },
   {
     route: '/register/profile',
     completed: false,
-    accessibilityLabel: 'Profile',
   },
 ];
 

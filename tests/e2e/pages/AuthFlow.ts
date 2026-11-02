@@ -24,7 +24,7 @@ export class AuthFlow {
     this.moreMethodsButton = page.getByRole('button', { name: 'More ways to sign in' });
     this.passwordSignInButton = page.getByRole('button', { name: 'Sign in with password' });
     this.setupCard = page.locator('.auth-card.active');
-    const stages = page.getByRole('group', { name: en.auth.stageNavigation });
+    const stages = page.locator('.mobile-nav');
     this.previousStageButton = stages.getByRole('button', { name: en.common.back, exact: true });
     this.nextStageButton = stages.getByRole('button', { name: en.auth.next, exact: true });
   }

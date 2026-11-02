@@ -92,7 +92,7 @@ test('mobile hides neighboring cards and card navigation preserves page scroll',
   await expect(adjacent).toBeVisible();
   const appearance = page.locator('.rail > .auth-card.after').first();
   await expect(appearance).toBeVisible();
-  await expect(appearance.locator('.stage-activation')).toBeDisabled();
+  await expect(appearance.locator('.stage-activation')).toHaveCount(0);
   await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '2');
   for (const card of [adjacent, appearance]) {
     const { opacity, visibleWidth } = await card.evaluate((element) => {

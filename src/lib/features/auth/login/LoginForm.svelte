@@ -165,7 +165,6 @@
 <form
   class="login-form auth-card-surface"
   out:fade={{ duration: motionMs(MOTION_MS.quick) }}
-  aria-labelledby={titleId}
   novalidate
   onsubmit={(event) => {
     event.preventDefault();
@@ -314,9 +313,10 @@
       {i18n.t('auth.cancelAddingAccount')}
     </Button>
   {:else if onCreateAccount}
-    <span>{i18n.t('auth.noAccountYet')}</span>
+    <span id="login-no-account">{i18n.t('auth.noAccountYet')}</span>
     <Button
       variant="ghost"
+      aria-describedby="login-no-account"
       type="button"
       disabled={isLoginControlsDisabled}
       onclick={onCreateAccount}

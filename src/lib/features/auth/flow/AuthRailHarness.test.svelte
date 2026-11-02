@@ -17,20 +17,12 @@
       onBack={() => (activeIndex = 0)}
       onForward={() => (activeIndex = 1)}
     >
-      <AuthStageCard
-        active={activeIndex === 0}
-        accessibilityLabel="Sign in"
-        onActivate={() => (activeIndex = 0)}
-      >
+      <AuthStageCard active={activeIndex === 0} onActivate={() => (activeIndex = 0)}>
         <h2>Sign in</h2>
         <label for="provider">Account provider</label>
         <input id="provider" />
       </AuthStageCard>
-      <AuthStageCard
-        active={activeIndex === 1}
-        accessibilityLabel="Create account"
-        onActivate={() => (activeIndex = 1)}
-      >
+      <AuthStageCard active={activeIndex === 1} onActivate={() => (activeIndex = 1)}>
         <h2>Create account</h2>
         <label for="new-username">New username</label>
         <input id="new-username" />

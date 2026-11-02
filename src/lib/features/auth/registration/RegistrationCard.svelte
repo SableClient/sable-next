@@ -96,7 +96,7 @@
   <Tooltip variant="icon" label={i18n.t('auth.accountProviderHint')}><InfoIcon /></Tooltip>
 {/snippet}
 
-<section class="registration-card auth-card-surface" aria-labelledby="registration-title">
+<div class="registration-card auth-card-surface">
   <AuthField labelId="registration-title" label={i18n.t('auth.createAccount')}>
     {#if !fallback && !emailStep}
       <AuthInfoBox trailing={accountProviderInfo}>
@@ -177,7 +177,7 @@
       {onConfirmPasswordInput}
     />
   {/if}
-</section>
+</div>
 
 <style>
   .provider-name {

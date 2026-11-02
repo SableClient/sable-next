@@ -41,12 +41,10 @@
     {
       route: resolve('login'),
       completed: true,
-      accessibilityLabel: 'auth.stageSignInLabel',
     },
     {
       route: resolve('register'),
       completed: false,
-      accessibilityLabel: 'auth.stageCreateAccountLabel',
     },
   ];
 
@@ -419,7 +417,6 @@
       <AuthStageCard
         active={displayedStage === 0}
         before={displayedStage > 0}
-        accessibilityLabel={i18n.t(stages[0].accessibilityLabel)}
         onActivate={() => {
           activateStage(0);
         }}
@@ -434,7 +431,6 @@
           after={displayedStage < 1}
           entering={enteringStage === 1}
           removing={retiringAfter === 0}
-          accessibilityLabel={i18n.t(stages[1].accessibilityLabel)}
           onActivate={() => {
             activateStage(1);
           }}

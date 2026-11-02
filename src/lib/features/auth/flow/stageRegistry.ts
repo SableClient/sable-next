@@ -1,7 +1,6 @@
 export interface AuthStage {
   route: string;
   completed: boolean;
-  accessibilityLabel: string;
 }
 
 export function stageIndexForPath(pathname: string, stages: readonly AuthStage[]): number {
