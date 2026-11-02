@@ -306,8 +306,8 @@ export class SableWidgetDriver extends WidgetDriver {
       limited,
       results: results.map((user) => ({
         userId: user.user_id,
-        displayName: user.display_name ?? undefined,
-        avatarUrl: user.avatar_url ?? undefined,
+        displayName: user.real_name ?? undefined,
+        avatarUrl: user.real_avatar_url ?? undefined,
       })),
     };
   }

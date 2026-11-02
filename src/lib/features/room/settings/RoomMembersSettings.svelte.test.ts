@@ -167,8 +167,20 @@ test('searches the directory and invites from the members list', async () => {
   searchUserDirectory.mockResolvedValue({
     limited: false,
     results: [
-      { user_id: '@alice:example.org', display_name: 'Alice', avatar_url: null },
-      { user_id: '@bob:example.org', display_name: 'Bob', avatar_url: null },
+      {
+        user_id: '@alice:example.org',
+        display_name: 'Alice',
+        avatar_url: null,
+        real_name: 'Alice',
+        real_avatar_url: null,
+      },
+      {
+        user_id: '@bob:example.org',
+        display_name: 'Bob',
+        avatar_url: null,
+        real_name: 'Bob',
+        real_avatar_url: null,
+      },
     ],
   });
   core.rpc.rooms.invite.mockResolvedValue(null);

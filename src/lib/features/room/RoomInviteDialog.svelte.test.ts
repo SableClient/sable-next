@@ -34,7 +34,15 @@ test('suggests people from the directory and fills the picked one into the field
   }));
   searchUserDirectory.mockResolvedValue({
     limited: false,
-    results: [{ user_id: '@bob:example.org', display_name: 'Bob', avatar_url: null }],
+    results: [
+      {
+        user_id: '@bob:example.org',
+        display_name: 'Bob',
+        avatar_url: null,
+        real_name: 'Bob',
+        real_avatar_url: null,
+      },
+    ],
   });
   core.rpc.rooms.invite.mockResolvedValue(null);
   const user = userEvent.setup();

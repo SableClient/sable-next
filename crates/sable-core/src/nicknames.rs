@@ -155,8 +155,8 @@ impl Nicknames {
 
     pub(crate) fn apply_directory_entry(&self, entry: &mut UserDirectoryEntryView) {
         if let Ok(user_id) = UserId::parse(&entry.user_id) {
-            entry.display_name = self.name(&user_id, entry.display_name.as_deref());
-            entry.avatar_url = self.avatar(&user_id, entry.avatar_url.as_deref());
+            entry.display_name = self.name(&user_id, entry.real_name.as_deref());
+            entry.avatar_url = self.avatar(&user_id, entry.real_avatar_url.as_deref());
         }
     }
 

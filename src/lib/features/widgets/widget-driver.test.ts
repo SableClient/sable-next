@@ -329,3 +329,29 @@ test('offers no TURN servers when the homeserver has none', async () => {
     value: undefined,
   });
 });
+
+test('a widget searching the directory sees real names, never nicknames', async () => {
+  const driver = driverWithRpc({
+    account: {
+      searchUserDirectory: vi.fn().mockResolvedValue({
+        limited: false,
+        results: [
+          {
+            user_id: '@bob:example.org',
+            display_name: 'Bobby',
+            avatar_url: 'mxc://example.org/nick',
+            real_name: 'Bob',
+            real_avatar_url: 'mxc://example.org/real',
+          },
+        ],
+      }),
+    },
+  });
+
+  await expect(driver.searchUserDirectory('bob')).resolves.toEqual({
+    limited: false,
+    results: [
+      { userId: '@bob:example.org', displayName: 'Bob', avatarUrl: 'mxc://example.org/real' },
+    ],
+  });
+});

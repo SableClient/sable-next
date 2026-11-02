@@ -1999,6 +1999,9 @@ pub struct UserDirectoryEntryView {
     pub user_id: String,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
+    /// For widgets and anything else that leaves this device.
+    pub real_name: Option<String>,
+    pub real_avatar_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

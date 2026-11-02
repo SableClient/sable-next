@@ -401,10 +401,16 @@ impl Core {
             response
                 .results
                 .into_iter()
-                .map(|user| UserDirectoryEntryView {
-                    user_id: user.user_id.to_string(),
-                    display_name: user.display_name.and_then(visible_name),
-                    avatar_url: user.avatar_url.map(|url| url.to_string()),
+                .map(|user| {
+                    let real_name = user.display_name.and_then(visible_name);
+                    let real_avatar_url = user.avatar_url.map(|url| url.to_string());
+                    UserDirectoryEntryView {
+                        user_id: user.user_id.to_string(),
+                        display_name: real_name.clone(),
+                        avatar_url: real_avatar_url.clone(),
+                        real_name,
+                        real_avatar_url,
+                    }
                 })
                 .collect(),
         ))

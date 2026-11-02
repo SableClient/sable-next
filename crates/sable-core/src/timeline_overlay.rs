@@ -159,7 +159,20 @@ impl TimelineOverlay {
             },
             other => other,
         };
+        let removes = matches!(
+            diff,
+            VectorDiff::Remove { .. }
+                | VectorDiff::PopFront
+                | VectorDiff::PopBack
+                | VectorDiff::Truncate { .. }
+                | VectorDiff::Clear
+        );
         apply_diff(&mut self.items, &diff);
+        if removes {
+            let held: std::collections::HashSet<&str> =
+                self.items.iter().map(|item| item.id.as_str()).collect();
+            self.real_names.retain(|id, _| held.contains(id.as_str()));
+        }
         diff
     }
 
@@ -476,6 +489,17 @@ mod tests {
                 .and_then(|reply| reply.sender_name.as_deref()),
             Some("Old")
         );
+    }
+
+    #[test]
+    fn real_names_are_forgotten_with_the_rows_that_leave() {
+        let mut overlay = TimelineOverlay::new(bobby());
+        overlay.reset(vec![item("a", "@bob:x", None), item("b", "@bob:x", None)]);
+
+        overlay.apply(VectorDiff::PopFront);
+        assert_eq!(overlay.real_names.len(), 1);
+        overlay.apply(VectorDiff::Clear);
+        assert!(overlay.real_names.is_empty());
     }
 
     #[test]

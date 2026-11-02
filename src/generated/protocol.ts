@@ -1965,6 +1965,9 @@ export type UserDirectoryEntryView = {
 	user_id: string,
 	display_name: string | null,
 	avatar_url: string | null,
+	/**  For widgets and anything else that leaves this device. */
+	real_name: string | null,
+	real_avatar_url: string | null,
 };
 
 export type UserSecurityView = {
