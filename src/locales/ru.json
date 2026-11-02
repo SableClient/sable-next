@@ -3063,13 +3063,6 @@
     "restoreConfirm": "Это заменит все профили на вашем аккаунте профилями из резервной копии.",
     "restoreInvalid": "Этот файл не является резервной копией профилей сообщений.",
     "restoreFailed": "Не удалось восстановить ваши профили.",
-    "pickerSyncSpace": "Как в пространстве",
-    "pickerOff": "Без профиля в этой комнате",
-    "pickerOffSpace": "Без профиля в этом пространстве",
-    "scopeSpace": "В этом пространстве",
-    "scopeAccount": "Везде",
-    "scopeLatchRoom": "Комната",
-    "scopeLatchAccount": "Везде",
     "sendingAs": "Отправка от имени {{name}}",
     "pickerLeftSide": "Закрепить выбор слева от поля ввода",
     "pickerSortOrder": "Порядок сортировки профилей",
@@ -3082,8 +3075,7 @@
     "empty": "Профилей пока нет.",
     "removeTitle": "Удалить {{name}}?",
     "importSystem": "ID системы",
-    "importFailed": "Не удалось прочитать эту систему из PluralKit.",
-    "pickerSyncAccount": "Как в аккаунте"
+    "importFailed": "Не удалось прочитать эту систему из PluralKit."
   },
   "search": {
     "clear": "Очистить поиск",

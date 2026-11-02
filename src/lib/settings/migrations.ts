@@ -28,6 +28,14 @@ const MIGRATIONS: readonly Migration[] = [
         : stored;
     },
   },
+  {
+    version: 3,
+    run(stored) {
+      if (stored.personaLatching === undefined) return stored;
+      const { personaLatching, ...rest } = stored;
+      return { ...rest, personaKeepAfterShorthand: personaLatching !== 'off' };
+    },
+  },
 ];
 
 export const SETTINGS_SCHEMA = Math.max(...MIGRATIONS.map((migration) => migration.version));

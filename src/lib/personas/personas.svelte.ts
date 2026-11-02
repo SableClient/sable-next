@@ -9,7 +9,14 @@ import type {
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
-import { reorderPersonas, type PersonaAssociation } from './persona.js';
+import type { PersonaSelectionScope } from '#lib/settings/preferences.svelte.js';
+
+import { reorderPersonas, type PersonaAssociation, type SelectionScope } from './persona.js';
+
+export interface PersonaSpaces {
+  target: string | null;
+  order: readonly string[];
+}
 
 export class PersonaStore {
   private catalog = $state.raw<PersonaCatalogView>({
@@ -174,6 +181,40 @@ export class PersonaStore {
       disabled_rooms: this.disabledRooms.filter((key) => key !== roomId),
       rooms: selection === null ? rest : { ...rest, [roomId]: selection },
     };
+  }
+
+  scopeFor(mode: PersonaSelectionScope, roomId: string, spaces: PersonaSpaces): SelectionScope {
+    if (mode === 'picker') {
+      if (this.associationFor(roomId) !== undefined) return 'room';
+      if (spaces.target !== null && this.associationFor(spaces.target) !== undefined) {
+        return 'space';
+      }
+      return 'account';
+    }
+    if (mode === 'space' && spaces.target === null) return 'account';
+    return mode;
+  }
+
+  async remember(
+    scope: SelectionScope,
+    roomId: string,
+    spaces: PersonaSpaces,
+    personaId: string | null,
+    alternateAvatarId: string | null = null
+  ): Promise<void> {
+    const target = scope === 'room' ? roomId : scope === 'space' ? spaces.target : null;
+    const overriding =
+      scope === 'room'
+        ? []
+        : target === null
+          ? [roomId, ...spaces.order]
+          : [roomId, ...spaces.order.slice(0, spaces.order.indexOf(target))];
+
+    if (target !== null && personaId === null) await this.disable(target);
+    else await this.select(target, personaId, null, alternateAvatarId);
+    for (const id of overriding) {
+      if (this.associationFor(id) !== undefined) await this.select(id, null);
+    }
   }
 
   private repoint(from: string, to: string | null): void {

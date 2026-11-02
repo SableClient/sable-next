@@ -60,6 +60,8 @@ function live(selection: PersonaSelectionView | undefined, now: number): boolean
 
 export type PersonaAssociation = PersonaSelectionView | false | undefined;
 
+export type SelectionScope = 'room' | 'space' | 'account';
+
 interface PersonaScope {
   personas: readonly PersonaView[];
   room?: PersonaAssociation;

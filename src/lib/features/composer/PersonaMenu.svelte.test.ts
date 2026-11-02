@@ -35,11 +35,9 @@ test('a persona with a name colour is listed in that colour', async () => {
   renderWithTooltips(PersonaMenu, {
     personas: [persona('Tinted', '#c04040'), persona('Plain', null)],
     selected: null,
-    disabled: false,
     scope: 'account',
     onScope: vi.fn(),
     onChoose: vi.fn(),
-    onDisable: vi.fn(),
   });
   const search = screen.getByRole('searchbox');
   await fireEvent.input(search, { target: { value: 'tinted' } });
@@ -56,57 +54,58 @@ test('lists personas with duplicate IDs without crashing', () => {
   renderWithTooltips(PersonaMenu, {
     personas: [persona('duplicate', null), persona('duplicate', null)],
     selected: null,
-    disabled: false,
     scope: 'account',
     onScope: vi.fn(),
     onChoose: vi.fn(),
-    onDisable: vi.fn(),
   });
 
   expect(screen.getAllByRole('button', { name: 'duplicate' })).toHaveLength(2);
 });
 
-test('offers the space tab only when the room is in a space', () => {
+test('the scope button cycles through the space only when the room is in one', async () => {
+  const onScope = vi.fn();
   const props = {
     personas: [],
     selected: null,
-    disabled: false,
-    scope: 'space' as const,
-    onScope: vi.fn(),
+    scope: 'room' as const,
+    scopeChoice: true,
+    onScope,
     onChoose: vi.fn(),
-    onDisable: vi.fn(),
   };
   const { unmount } = renderWithTooltips(PersonaMenu, props);
-  expect(screen.queryByRole('tab', { name: 'personas.scopeSpace' })).toBeNull();
+  await fireEvent.click(screen.getByRole('button', { name: 'personas.rememberedRoom' }));
+  expect(onScope).toHaveBeenLastCalledWith('account');
   unmount();
 
   renderWithTooltips(PersonaMenu, { ...props, hasSpace: true });
-  expect(screen.getByRole('tab', { name: 'personas.scopeSpace' })).toHaveAttribute(
-    'aria-selected',
-    'true'
-  );
-  expect(screen.getByRole('button', { name: 'personas.pickerSyncAccount' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'personas.pickerOffSpace' })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'personas.pickerOff' })).toBeNull();
+  await fireEvent.click(screen.getByRole('button', { name: 'personas.rememberedRoom' }));
+  expect(onScope).toHaveBeenLastCalledWith('space');
 });
 
-test('a space that is off marks its off option and not the default', () => {
+test('the scope button is hidden unless scope is chosen in the picker', () => {
   renderWithTooltips(PersonaMenu, {
     personas: [],
     selected: null,
-    disabled: true,
+    scope: 'room',
+    onScope: vi.fn(),
+    onChoose: vi.fn(),
+  });
+
+  expect(screen.queryByRole('button', { name: 'personas.rememberedRoom' })).toBeNull();
+});
+
+test('the account profile is marked when no profile is held', () => {
+  renderWithTooltips(PersonaMenu, {
+    personas: [persona('Other', null)],
+    selected: null,
     scope: 'space',
     hasSpace: true,
     onScope: vi.fn(),
     onChoose: vi.fn(),
-    onDisable: vi.fn(),
   });
 
-  const off = screen.getByRole('button', { name: 'personas.pickerOffSpace' });
-  expect(off).toHaveClass('selected');
-  expect(screen.getByRole('button', { name: 'personas.pickerSyncAccount' })).not.toHaveClass(
-    'selected'
-  );
+  expect(screen.getByRole('button', { name: 'personas.pickerOffGlobal' })).toHaveClass('selected');
+  expect(screen.getByRole('button', { name: 'Other' })).not.toHaveClass('selected');
 });
 
 test('a saved alternate-avatar view falls back to the profile picker when no alternates exist', async () => {
@@ -120,16 +119,13 @@ test('a saved alternate-avatar view falls back to the profile picker when no alt
     renderWithTooltips(PersonaMenu, {
       personas: [selected, other],
       selected: { persona_id: selected.id, alternate_avatar_id: null, valid_until: null },
-      disabled: false,
       scope: 'account',
       onScope: vi.fn(),
       onChoose,
       onAlternateAvatarChoose: vi.fn(),
-      onDisable: vi.fn(),
     });
 
     expect(screen.getByRole('searchbox')).toBeVisible();
-    expect(screen.getByRole('tablist')).toBeVisible();
     await fireEvent.click(screen.getByRole('button', { name: other.display_name }));
     expect(onChoose).toHaveBeenCalledWith(other);
   } finally {
@@ -141,11 +137,9 @@ test('the global option shows the account profile messages will be sent as', () 
   renderWithTooltips(PersonaMenu, {
     personas: [],
     selected: null,
-    disabled: false,
     scope: 'account',
     onScope: vi.fn(),
     onChoose: vi.fn(),
-    onDisable: vi.fn(),
     account: { id: '@alice:example.org', name: 'Alice', avatarUrl: null },
   });
 

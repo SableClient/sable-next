@@ -198,25 +198,25 @@ describe('applySettings', () => {
     expect(applied?.preferences.pronounPillLimit).toBe(base.pronounPillLimit);
   });
 
-  it('carries the latching scope across devices', () => {
-    const { content } = prepareSettings({ ...base, personaLatching: 'room' }, noThemes);
+  it('carries the profile selection scope across devices', () => {
+    const { content } = prepareSettings({ ...base, personaSelectionScope: 'room' }, noThemes);
 
-    expect(content.settings.personaLatching).toBe('room');
+    expect(content.settings.personaSelectionScope).toBe('room');
 
     const applied = applySettings(content, base, noThemes, []);
 
-    expect(applied?.preferences.personaLatching).toBe('room');
+    expect(applied?.preferences.personaSelectionScope).toBe('room');
   });
 
-  it('ignores a latching scope outside the accepted set', () => {
+  it('ignores a profile selection scope outside the accepted set', () => {
     const applied = applySettings(
-      { v: 1, settings: { personaLatching: 'everywhere' }, themes: noThemes },
+      { v: 1, settings: { personaSelectionScope: 'everywhere' }, themes: noThemes },
       base,
       noThemes,
       []
     );
 
-    expect(applied?.preferences.personaLatching).toBe(base.personaLatching);
+    expect(applied?.preferences.personaSelectionScope).toBe(base.personaSelectionScope);
   });
 
   it('refuses content from another schema version', () => {

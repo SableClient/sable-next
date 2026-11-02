@@ -113,3 +113,48 @@ test('a delayed load error cannot mark a successful save as failed', async () =>
   expect(store.error).toBeNull();
   expect(store.loading).toBe(false);
 });
+
+const sel = (persona_id: string) => ({ persona_id, valid_until: null, alternate_avatar_id: null });
+
+test('choosing globally clears the room and space overrides that would win', async () => {
+  const { rpc, store } = setup();
+  rpc.list.mockResolvedValue({
+    ...catalog([persona('a'), persona('b')]),
+    rooms: { '!space': sel('a') },
+    disabled_rooms: ['!room'],
+  });
+  await store.load();
+  const spaces = { target: '!space', order: ['!space', '!other'] };
+
+  await store.remember('account', '!room', spaces, 'b');
+
+  expect(rpc.setSelection).toHaveBeenCalledWith(
+    expect.objectContaining({ room_id: null, persona_id: 'b' })
+  );
+  expect(store.associationFor('!room')).toBeUndefined();
+  expect(store.associationFor('!space')).toBeUndefined();
+  expect(rpc.setSelection).not.toHaveBeenCalledWith(expect.objectContaining({ room_id: '!other' }));
+});
+
+test('the account profile in a space turns profiles off there and drops the room override', async () => {
+  const { rpc, store } = setup();
+  rpc.list.mockResolvedValue({ ...catalog([persona('a')]), rooms: { '!room': sel('a') } });
+  await store.load();
+
+  await store.remember('space', '!room', { target: '!space', order: ['!space'] }, null);
+
+  expect(rpc.disableRoom).toHaveBeenCalledWith({ room_id: '!space' });
+  expect(store.associationFor('!space')).toBe(false);
+  expect(store.associationFor('!room')).toBeUndefined();
+});
+
+test('the picker opens on the closest scope holding a selection', async () => {
+  const { rpc, store } = setup();
+  rpc.list.mockResolvedValue({ ...catalog([persona('a')]), rooms: { '!space': sel('a') } });
+  await store.load();
+  const spaces = { target: '!space', order: ['!space'] };
+
+  expect(store.scopeFor('picker', '!room', spaces)).toBe('space');
+  expect(store.scopeFor('room', '!room', spaces)).toBe('room');
+  expect(store.scopeFor('space', '!room', { target: null, order: [] })).toBe('account');
+});

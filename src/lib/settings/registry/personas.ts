@@ -1,4 +1,5 @@
 import ChatTextIcon from 'phosphor-svelte/lib/ChatTextIcon';
+import GlobeSimpleIcon from 'phosphor-svelte/lib/GlobeSimpleIcon';
 import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
 import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
 import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
@@ -11,6 +12,19 @@ export const personasCategory: SettingsCategory = {
   icon: UserSwitchIcon,
   sections: [{ id: 'persona-sending', name: 'settings.groups.sending' }],
   items: [
+    {
+      key: 'personaSelectionScope',
+      section: 'persona-sending',
+      icon: GlobeSimpleIcon,
+      name: 'personas.selectionScope',
+      type: 'select',
+      options: [
+        { value: 'account', label: 'personas.selectionScopeAccount' },
+        { value: 'space', label: 'personas.selectionScopeSpace' },
+        { value: 'room', label: 'personas.selectionScopeRoom' },
+        { value: 'picker', label: 'personas.selectionScopePicker' },
+      ],
+    },
     {
       key: 'personaPicker',
       section: 'persona-sending',
@@ -49,16 +63,11 @@ export const personasCategory: SettingsCategory = {
       type: 'boolean',
     },
     {
-      key: 'personaLatching',
+      key: 'personaKeepAfterShorthand',
       section: 'persona-sending',
       icon: PushPinIcon,
       name: 'personas.latching',
-      type: 'select',
-      options: [
-        { value: 'off', label: 'common.never' },
-        { value: 'room', label: 'personas.scopeLatchRoom' },
-        { value: 'account', label: 'personas.scopeLatchAccount' },
-      ],
+      type: 'boolean',
       gatedBy: 'personaProxying',
     },
     {

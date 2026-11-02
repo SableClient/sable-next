@@ -29,12 +29,14 @@ export function outgoingPersona(
 
   if (!persona) return { body, formatted, persona: null };
   const alternate_avatar_id = alternateAvatarId(persona, proxied?.trigger, heldSelection(scope));
-  if (proxied && preferences.personaLatching !== 'off') {
+  if (proxied && preferences.personaKeepAfterShorthand) {
+    const spaces = { target: spaceIds[0] ?? null, order: spaceIds };
     void personas
-      .select(
-        preferences.personaLatching === 'room' ? targetRoomId : null,
+      .remember(
+        personas.scopeFor(preferences.personaSelectionScope, targetRoomId, spaces),
+        targetRoomId,
+        spaces,
         proxied.persona.id,
-        null,
         alternate_avatar_id
       )
       .catch((error: unknown) => {

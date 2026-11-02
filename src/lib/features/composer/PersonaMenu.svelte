@@ -1,13 +1,8 @@
-<script lang="ts" module>
-  import { scrollHint } from '#lib/ui/scroll-hint.js';
-  export type PersonaScope = 'room' | 'space' | 'account';
-</script>
-
 <script lang="ts">
+  import { scrollHint } from '#lib/ui/scroll-hint.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
-  import SyncIcon from 'phosphor-svelte/lib/ArrowsClockwiseIcon';
   import ListIcon from 'phosphor-svelte/lib/ListBulletsIcon';
   import GridIcon from 'phosphor-svelte/lib/SquaresFourIcon';
   import RoomIcon from 'phosphor-svelte/lib/HashStraightIcon';
@@ -23,7 +18,7 @@
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 
   import { i18n } from '#lib/i18n.js';
-  import { filterPersonas } from '#lib/personas/persona.js';
+  import { filterPersonas, type SelectionScope } from '#lib/personas/persona.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -34,29 +29,27 @@
   interface Props {
     personas: readonly PersonaView[];
     selected: PersonaSelectionView | null;
-    disabled: boolean;
-    scope: PersonaScope;
+    scope: SelectionScope;
+    scopeChoice?: boolean;
     hasSpace?: boolean;
-    onScope: (scope: PersonaScope) => void;
+    onScope: (scope: SelectionScope) => void;
     onChoose: (persona: PersonaView | null) => void;
     onAlternateAvatarChoose: (
       alternateAvatar: PersonaAlternateAvatarView | null,
       persona: PersonaView
     ) => void;
-    onDisable: () => void;
     account?: { id: string; name: string; avatarUrl: string | null } | null;
   }
 
   let {
     personas,
     selected,
-    disabled,
     scope,
+    scopeChoice = false,
     hasSpace = false,
     onScope,
     onChoose,
     onAlternateAvatarChoose,
-    onDisable,
     account = null,
   }: Props = $props();
   let accountLabel = $derived(
@@ -76,24 +69,29 @@
   );
   let filteredPersonas = $derived(filterPersonas(personas, query));
 
-  let scopes = $derived(
-    (
-      [
-        { id: 'room', label: 'common.thisRoom', icon: RoomIcon },
-        { id: 'space', label: 'personas.scopeSpace', icon: SpaceIcon },
-        { id: 'account', label: 'personas.scopeAccount', icon: GlobalIcon },
-      ] as const
-    ).filter((tab) => hasSpace || tab.id !== 'space')
+  const SCOPES = {
+    room: { label: 'personas.rememberedRoom', icon: RoomIcon },
+    space: { label: 'personas.rememberedSpace', icon: SpaceIcon },
+    account: { label: 'personas.rememberedAccount', icon: GlobalIcon },
+  } as const;
+  let scopeOrder = $derived<SelectionScope[]>(
+    hasSpace ? ['room', 'space', 'account'] : ['room', 'account']
   );
+  let scopeLabel = $derived(i18n.t(SCOPES[scope].label));
+  let ScopeIcon = $derived(SCOPES[scope].icon);
+
+  function cycleScope(): void {
+    onScope(scopeOrder[(scopeOrder.indexOf(scope) + 1) % scopeOrder.length]);
+  }
 </script>
 
-{#snippet listItem(persona: PersonaView | null, kind: 'default' | 'disable' | 'offGlobal' | 'off')}
+{#snippet listItem(persona: PersonaView | null)}
   <li>
     <button
       type="button"
       class="persona-option"
       onclick={() => {
-        (kind === 'disable' ? onDisable : onChoose)(persona);
+        onChoose(persona);
       }}
     >
       {#if persona}
@@ -107,60 +105,31 @@
           >{persona.display_name}</span
         >
         {#if selected?.persona_id === persona.id}<CheckIcon />{/if}
-      {:else if kind === 'disable'}
-        <Avatar size="small"><ProhibitIcon /></Avatar>
-        <span class="persona-option-name"
-          >{i18n.t(scope === 'room' ? 'personas.pickerOff' : 'personas.pickerOffSpace')}</span
-        >
-        {#if disabled}<CheckIcon />{/if}
-      {:else if kind === 'offGlobal'}
+      {:else}
         {#if account}
           <Avatar id={account.id} src={account.avatarUrl} name={account.name} size="small" />
         {:else}
           <Avatar size="small"><ProhibitIcon /></Avatar>
         {/if}
         <span class="persona-option-name">{accountLabel}</span>
-        {#if !selected && !disabled}<CheckIcon />{/if}
-      {:else}
-        <Avatar size="small"><SyncIcon /></Avatar>
-        <span class="persona-option-name"
-          >{i18n.t(
-            scope === 'room' && hasSpace ? 'personas.pickerSyncSpace' : 'personas.pickerSyncAccount'
-          )}</span
-        >
-        {#if !selected && !disabled}<CheckIcon />{/if}
+        {#if !selected}<CheckIcon />{/if}
       {/if}
     </button>
   </li>
 {/snippet}
 
-{#snippet gridItem(persona: PersonaView | null, kind: 'default' | 'disable' | 'offGlobal' | 'off')}
-  {@const label = persona
-    ? persona.display_name
-    : kind === 'disable'
-      ? i18n.t(scope === 'room' ? 'personas.pickerOff' : 'personas.pickerOffSpace')
-      : kind === 'offGlobal'
-        ? accountLabel
-        : i18n.t(
-            scope === 'room' && hasSpace ? 'personas.pickerSyncSpace' : 'personas.pickerSyncAccount'
-          )}
+{#snippet gridItem(persona: PersonaView | null)}
+  {@const label = persona ? persona.display_name : accountLabel}
 
   <li>
     <button
       type="button"
       class={[
         'persona-grid-option',
-        {
-          selected:
-            kind === 'disable'
-              ? disabled
-              : kind === 'default'
-                ? !!persona && selected?.persona_id === persona.id
-                : !selected && !disabled,
-        },
+        { selected: persona ? selected?.persona_id === persona.id : !selected },
       ]}
       onclick={() => {
-        (kind === 'disable' ? onDisable : onChoose)(persona);
+        onChoose(persona);
       }}
       aria-label={label}
     >
@@ -174,12 +143,10 @@
                 name={persona.display_name}
                 size="medium"
               />
-            {:else if kind === 'offGlobal' && account}
+            {:else if account}
               <Avatar id={account.id} src={account.avatarUrl} name={account.name} size="medium" />
-            {:else if kind === 'disable' || kind === 'offGlobal'}
-              <Avatar id={null} size="medium" name={label}><ProhibitIcon /></Avatar>
             {:else}
-              <Avatar id={null} size="medium" name={label}><SyncIcon /></Avatar>
+              <Avatar id={null} size="medium" name={label}><ProhibitIcon /></Avatar>
             {/if}
           </div>
         {/snippet}
@@ -246,41 +213,25 @@
       </ul>
     {/if}
   {:else}
-    <div class="persona-scopes" role="tablist" aria-label={i18n.t('personas.pickerLabel')}>
-      {#each scopes as tab (tab.id)}
-        <button
-          type="button"
-          role="tab"
-          class="persona-scope choice"
-          aria-selected={scope === tab.id}
-          onclick={() => {
-            onScope(tab.id);
-          }}
-        >
-          <tab.icon />
-          {i18n.t(tab.label)}
-        </button>
-      {/each}
-    </div>
-
     <ul class={['persona-options', { grid }]} {@attach scrollHint}>
-      {#if scope === 'account'}
-        {@render (grid ? gridItem : listItem)(null, 'offGlobal')}
-      {/if}
-      {#if scope === 'room' || scope === 'space'}
-        {@render (grid ? gridItem : listItem)(null, 'off')}
-      {/if}
-      {#if scope === 'room' || scope === 'space'}
-        {@render (grid ? gridItem : listItem)(null, 'disable')}
-      {/if}
+      {@render (grid ? gridItem : listItem)(null)}
       {#each filteredPersonas as persona, index (`${index}:${persona.id}`)}
-        {@render (grid ? gridItem : listItem)(persona, 'default')}
+        {@render (grid ? gridItem : listItem)(persona)}
       {/each}
     </ul>
   {/if}
 
   <div class="persona-toolbar" class:alternate-avatar={alternateAvatarMode}>
     {#if !alternateAvatarMode}
+      {#if scopeChoice}
+        <Tooltip label={scopeLabel}>
+          {#snippet trigger({ props })}
+            <IconButton {...props} size="small" label={scopeLabel} onclick={cycleScope}>
+              <ScopeIcon />
+            </IconButton>
+          {/snippet}
+        </Tooltip>
+      {/if}
       <TextInput
         id="persona-search"
         bind:value={query}
@@ -342,28 +293,6 @@
   .persona-menu {
     display: grid;
     gap: var(--space-200);
-  }
-
-  .persona-scopes {
-    display: flex;
-    gap: var(--space-200);
-    padding: var(--space-200);
-  }
-
-  .persona-scope {
-    align-items: center;
-    background: none;
-    border: var(--border-width) solid transparent;
-    border-radius: var(--radius);
-    color: var(--surface-var-on-container);
-    cursor: pointer;
-    display: flex;
-    flex: 1;
-    flex-flow: column nowrap;
-    font: inherit;
-    font-size: var(--font-size-small);
-    justify-content: center;
-    padding: var(--space-200);
   }
 
   .persona-toolbar {

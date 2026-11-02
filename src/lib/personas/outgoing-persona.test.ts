@@ -22,14 +22,15 @@ function store(
   rooms: Record<string, PersonaSelectionView>,
   account: PersonaSelectionView | null = null
 ) {
-  const select = vi.fn(() => Promise.resolve());
+  const remember = vi.fn(() => Promise.resolve());
   return {
     personas,
-    select,
+    remember,
+    scopeFor: (mode: string) => mode,
     selectionFor: (id: string | null) => (id === null ? account : (rooms[id] ?? null)),
     associationFor: (id: string) => rooms[id],
     save: vi.fn(() => Promise.resolve()),
-  } as unknown as PersonaStore & { select: typeof select };
+  } as unknown as PersonaStore & { remember: typeof remember };
 }
 
 const selection = (alt: string | null): PersonaSelectionView => ({
@@ -41,7 +42,8 @@ const selection = (alt: string | null): PersonaSelectionView => ({
 describe('outgoingPersona alternate avatars', () => {
   beforeEach(() => {
     preferences.personaProxying = true;
-    preferences.personaLatching = 'room';
+    preferences.personaKeepAfterShorthand = true;
+    preferences.personaSelectionScope = 'room';
   });
 
   it('sends the alternate avatar picked for the room', () => {
@@ -63,6 +65,12 @@ describe('outgoingPersona alternate avatars', () => {
     );
     const { persona: sent } = outgoingPersona(personas, '!r', [], 'a:hello');
     expect(sent?.avatar_url).toBe('mxc://alt');
-    expect(personas.select).toHaveBeenCalledWith('!r', 'p1', null, 'alt');
+    expect(personas.remember).toHaveBeenCalledWith(
+      'room',
+      '!r',
+      { target: null, order: [] },
+      'p1',
+      'alt'
+    );
   });
 });

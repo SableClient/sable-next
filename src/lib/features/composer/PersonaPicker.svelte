@@ -17,6 +17,7 @@
     heldSelection,
     resolvePersona,
     type ProxyMatch,
+    type SelectionScope,
   } from '#lib/personas/persona.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { UserProfile } from '#lib/profile/user-profile.svelte.js';
@@ -30,7 +31,7 @@
   import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
-  import PersonaMenu, { type PersonaScope } from './PersonaMenu.svelte';
+  import PersonaMenu from './PersonaMenu.svelte';
   import { personaSpaces } from './persona-spaces.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
@@ -62,20 +63,9 @@
   let spaces = $derived(personaSpaces(roomList.rooms, roomId, page.params.spaceId));
   let hasSpace = $derived(spaces.target !== null);
 
-  function getScopeToOpen() {
-    if (personas.associationFor(roomId) !== undefined) {
-      return 'room';
-    } else if (hasSpace && spaces?.target && personas.associationFor(spaces.target) !== undefined) {
-      return 'space';
-    } else {
-      return 'account';
-    }
-  }
+  let scopeChoice = $derived(preferences.personaSelectionScope === 'picker');
 
-  let scope = $state<PersonaScope>(getScopeToOpen());
-  let scopeTarget = $derived(scope === 'room' ? roomId : scope === 'space' ? spaces.target : null);
-  let selected = $derived(personas.selectionFor(scopeTarget));
-  let disabled = $derived(scopeTarget !== null && personas.disabledIn(scopeTarget));
+  let scope = $state<SelectionScope>('account');
   let scopeSelections = $derived({
     personas: personas.personas,
     room: personas.associationFor(roomId),
@@ -83,6 +73,8 @@
     account: personas.selectionFor(null) ?? undefined,
     now: Date.now(),
   });
+  let held = $derived(heldSelection(scopeSelections));
+  let selected = $derived(held || null);
   let active = $derived(shorthandHint?.persona ?? resolvePersona(scopeSelections) ?? null);
   let sortedPersonas = $derived(
     preferences.personaPickerSortOrder === 'recent'
@@ -100,9 +92,7 @@
       : i18n.t('personas.pickerLabel')
   );
   let editOpen = $state(false);
-  let activeAvatarId = $derived(
-    active && alternateAvatarId(active, shorthandHint?.trigger, heldSelection(scopeSelections))
-  );
+  let activeAvatarId = $derived(active && alternateAvatarId(active, shorthandHint?.trigger, held));
   let activeAvatarUrl = $derived(
     active?.alternate_avatars?.find((avatar) => avatar.id === activeAvatarId)?.avatar_url ??
       active?.avatar_url
@@ -111,7 +101,7 @@
   function handleOpenChange(next: boolean): void {
     open = next;
     if (next) {
-      scope = getScopeToOpen();
+      scope = personas.scopeFor(preferences.personaSelectionScope, roomId, spaces);
       void personas.load();
     }
   }
@@ -121,36 +111,29 @@
     handleOpenChange(true);
   }
 
-  function setScope(next: PersonaScope): void {
+  function setScope(next: SelectionScope): void {
     scope = next;
   }
 
-  function choose(persona: PersonaView | null): void {
+  function remember(personaId: string | null, alternateAvatarId: string | null = null): void {
     open = false;
-    personas.select(scopeTarget, persona?.id ?? null).catch((cause: unknown) => {
-      console.warn('[sable personas] the selection could not be saved', cause);
-      toasts.error(i18n.t('errors.actionFailed'));
-    });
+    personas
+      .remember(scope, roomId, spaces, personaId, alternateAvatarId)
+      .catch((cause: unknown) => {
+        console.warn('[sable personas] the selection could not be saved', cause);
+        toasts.error(i18n.t('errors.actionFailed'));
+      });
+  }
+
+  function choose(persona: PersonaView | null): void {
+    remember(persona?.id ?? null);
   }
 
   function alternateAvatarChoose(
     avatar: PersonaAlternateAvatarView | null,
     persona: PersonaView
   ): void {
-    open = false;
-    personas.select(scopeTarget, persona.id, null, avatar?.id).catch((cause: unknown) => {
-      console.warn('[sable personas] the selection could not be saved', cause);
-      toasts.error(i18n.t('errors.actionFailed'));
-    });
-  }
-
-  function disable(): void {
-    open = false;
-    if (scopeTarget === null) return;
-    personas.disable(scopeTarget).catch((cause: unknown) => {
-      console.warn('[sable personas] the selection could not be saved', cause);
-      toasts.error(i18n.t('errors.actionFailed'));
-    });
+    remember(persona.id, avatar?.id ?? null);
   }
 </script>
 
@@ -228,13 +211,12 @@
         <PersonaMenu
           personas={sortedPersonas}
           {selected}
-          {disabled}
           {scope}
+          {scopeChoice}
           {hasSpace}
           onScope={setScope}
           onChoose={choose}
           onAlternateAvatarChoose={alternateAvatarChoose}
-          onDisable={disable}
           {account}
         />
       </Popover.Content>
@@ -271,13 +253,12 @@
     <PersonaMenu
       personas={sortedPersonas}
       {selected}
-      {disabled}
       {scope}
+      {scopeChoice}
       {hasSpace}
       onScope={setScope}
       onChoose={choose}
       onAlternateAvatarChoose={alternateAvatarChoose}
-      onDisable={disable}
       {account}
     />
   </BottomSheet>

@@ -62,7 +62,7 @@ export type NameColorCorrection = 'strong' | 'weak' | 'off';
 export type PronounPillLimit = '1' | '2' | '3' | 'all';
 export type PronounPillLength = '12' | '16' | '24' | 'all';
 export type ReadReceiptPlacement = 'message' | 'room';
-export type LatchScope = 'off' | 'room' | 'account';
+export type PersonaSelectionScope = 'account' | 'space' | 'room' | 'picker';
 export type ReplyPreviewStyle = 'connected' | 'compact' | 'expanded';
 export type CaptionPosition = 'above' | 'below' | 'inline' | 'hidden';
 export type UsernameClick = 'mention' | 'profile';
@@ -305,7 +305,8 @@ export interface Preferences {
   personaPickerSortOrder: PersonaPickerSortOrder;
   personaPickerLeftSide: boolean;
   personaProxying: boolean;
-  personaLatching: LatchScope;
+  personaSelectionScope: PersonaSelectionScope;
+  personaKeepAfterShorthand: boolean;
   personaFallback: boolean;
   personaGrid: boolean;
   personaAlternateAvatar: boolean;
@@ -508,7 +509,7 @@ const ENUMS = {
   memberSort: ['name-asc', 'name-desc', 'newest', 'oldest'],
   roomSort: ['recent', 'name-asc', 'name-desc'],
   directSort: ['recent', 'name-asc', 'name-desc'],
-  personaLatching: ['off', 'room', 'account'],
+  personaSelectionScope: ['account', 'space', 'room', 'picker'],
   personaPickerSortOrder: ['manual', 'alphabetical-asc', 'alphabetical-desc', 'recent'],
   presence: ['online', 'unavailable', 'offline'],
   profileChangePropagation: ['all', 'unchanged', 'none'],
@@ -666,7 +667,8 @@ const DEFAULTS: Preferences = {
   personaPickerSortOrder: 'recent',
   personaPickerLeftSide: false,
   personaProxying: false,
-  personaLatching: 'off',
+  personaSelectionScope: 'picker',
+  personaKeepAfterShorthand: false,
   personaFallback: true,
   personaGrid: true,
   personaAlternateAvatar: false,
