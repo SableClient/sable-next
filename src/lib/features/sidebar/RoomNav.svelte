@@ -1024,6 +1024,10 @@
     .category-caret {
       transition: transform var(--duration-fast) var(--ease-smooth-out);
     }
+
+    .room-row-wrap {
+      transition: background-color var(--motion-normal) var(--motion-easing-standard);
+    }
   }
 
   .rooms-heading :global(svg) {
