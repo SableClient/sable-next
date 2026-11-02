@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use matrix_sdk::Room;
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{event_id, room_id, user_id};
 use matrix_sdk::test_utils::mocks::MatrixMockServer;
 use matrix_sdk_test::{JoinedRoomBuilder, event_factory::EventFactory};
@@ -19,6 +20,15 @@ async fn setup(
     wire: RtcWire,
     sticky: bool,
     direct: bool,
+) -> (MatrixMockServer, Arc<Core>, Room, CallMember) {
+    setup_room(wire, sticky, direct, false).await
+}
+
+async fn setup_room(
+    wire: RtcWire,
+    sticky: bool,
+    direct: bool,
+    voice: bool,
 ) -> (MatrixMockServer, Arc<Core>, Room, CallMember) {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().no_server_versions().build().await;
@@ -45,7 +55,16 @@ async fn setup(
             builder.add_joined_room(
                 JoinedRoomBuilder::new(room_id)
                     .add_state_event(
-                        factory.create(client.user_id().unwrap(), "10".try_into().unwrap()),
+                        Raw::new(&json!({
+                            "type": "m.room.create", "state_key": "", "event_id": "$create",
+                            "origin_server_ts": 1, "sender": client.user_id().unwrap(),
+                            "content": {
+                                "room_version": "10",
+                                "type": voice.then_some("org.matrix.msc3417.call"),
+                            },
+                        }))
+                        .unwrap()
+                        .cast_unchecked(),
                     )
                     .add_state_event(factory.member(client.user_id().unwrap()))
                     .add_state_event(factory.member(user_id!("@peer:example.org")))
@@ -254,6 +273,14 @@ async fn room_invitations_need_permission_to_notify_the_room() {
             );
         })
         .await;
+    core.announce_call(&room, event_id!("$membership"), &own)
+        .await;
+    assert!(sends(&server).await.is_empty());
+}
+
+#[tokio::test]
+async fn joining_a_voice_room_does_not_notify_the_room() {
+    let (server, core, room, own) = setup_room(RtcWire::Stable, true, false, true).await;
     core.announce_call(&room, event_id!("$membership"), &own)
         .await;
     assert!(sends(&server).await.is_empty());

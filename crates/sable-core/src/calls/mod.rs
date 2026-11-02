@@ -40,6 +40,7 @@ use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::call::member::{CallMemberEventContent, CallMemberStateKey};
+use matrix_sdk::ruma::room::RoomType;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{DeviceId, EventId, OwnedRoomId, OwnedUserId, UserId};
 use matrix_sdk::{Client, Room};
@@ -649,6 +650,9 @@ impl Core {
         membership_event_id: &EventId,
         own: &CallMember,
     ) {
+        if room.room_type() == Some(RoomType::Call) {
+            return;
+        }
         let direct = room.is_direct().await.unwrap_or(false);
         let mut users: Vec<String> = room
             .joined_user_ids()
