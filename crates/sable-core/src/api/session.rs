@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use super::Handler;
 use crate::protocol::{
-    HomeserverSoftwareView, OAuthMetadataView, OpenIdTokenView, RpcError, SessionInfo, SyncStatus, TermsPolicyView,
+    HomeserverSoftwareView, OAuthMetadataView, OpenIdTokenView, RpcError, SessionInfo, SyncStatus,
+    TermsPolicyView,
 };
 use crate::{Core, ResultExt};
 
@@ -176,22 +177,50 @@ async fn delegated_server_software(client: &matrix_sdk::Client) -> Option<Homese
         server: Option<get_server_version::v1::Server>,
     }
 
-    async fn get_json<T: serde::de::DeserializeOwned>(client: &matrix_sdk::Client, url: &str) -> Option<T> {
-        let response = client.http_client().get(url).send().await.ok()?.error_for_status().ok()?;
+    async fn get_json<T: serde::de::DeserializeOwned>(
+        client: &matrix_sdk::Client,
+        url: &str,
+    ) -> Option<T> {
+        let response = client
+            .http_client()
+            .get(url)
+            .send()
+            .await
+            .ok()?
+            .error_for_status()
+            .ok()?;
         serde_json::from_slice(&response.bytes().await.ok()?).ok()
     }
 
     let server_name = client.user_id()?.server_name();
-    let well_known = get_json::<WellKnown>(client, &format!("https://{server_name}/.well-known/matrix/server")).await;
-    let host = federation_host(server_name.as_str(), well_known.as_ref().map(|known| known.server.as_str()));
-    let version = get_json::<Version>(client, &format!("https://{host}/_matrix/federation/v1/version")).await;
+    let well_known = get_json::<WellKnown>(
+        client,
+        &format!("https://{server_name}/.well-known/matrix/server"),
+    )
+    .await;
+    let host = federation_host(
+        server_name.as_str(),
+        well_known.as_ref().map(|known| known.server.as_str()),
+    );
+    let version = get_json::<Version>(
+        client,
+        &format!("https://{host}/_matrix/federation/v1/version"),
+    )
+    .await;
     version?.server.map(software_view)
 }
 
 fn federation_host(server_name: &str, delegated: Option<&str>) -> String {
     let host = delegated.unwrap_or(server_name);
-    let has_port = host.rsplit(']').next().is_some_and(|tail| tail.contains(':'));
-    if has_port { host.to_owned() } else { format!("{host}:8448") }
+    let has_port = host
+        .rsplit(']')
+        .next()
+        .is_some_and(|tail| tail.contains(':'));
+    if has_port {
+        host.to_owned()
+    } else {
+        format!("{host}:8448")
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -328,8 +357,7 @@ impl Handler for SetSearchOptionsParams {
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         core.search_foreground
             .store(self.foreground, Ordering::Relaxed);
-        core.search_network
-            .set_unmetered_only(self.unmetered_only);
+        core.search_network.set_unmetered_only(self.unmetered_only);
         core.search_crawl.lock().await.tuning = self.tuning.clamped();
         core.search_crawler_enabled
             .store(self.crawler, Ordering::Relaxed);
@@ -430,8 +458,14 @@ mod tests {
 
     #[test]
     fn federation_host_follows_delegation_and_defaults_to_8448() {
-        assert_eq!(federation_host("example.org", Some("fed.example.org")), "fed.example.org:8448");
-        assert_eq!(federation_host("example.org", Some("fed.example.org:443")), "fed.example.org:443");
+        assert_eq!(
+            federation_host("example.org", Some("fed.example.org")),
+            "fed.example.org:8448"
+        );
+        assert_eq!(
+            federation_host("example.org", Some("fed.example.org:443")),
+            "fed.example.org:443"
+        );
         assert_eq!(federation_host("example.org", None), "example.org:8448");
         assert_eq!(federation_host("[::1]", None), "[::1]:8448");
         assert_eq!(federation_host("[::1]:8008", None), "[::1]:8008");
