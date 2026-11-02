@@ -78,7 +78,7 @@
   import RoomVoiceChat from './RoomVoiceChat.svelte';
   import RoomSidePanels from './RoomSidePanels.svelte';
   import RoomDialogs from './RoomDialogs.svelte';
-  import { RoomCallSupport } from './room-call-support.svelte.js';
+  import { offersCall, RoomCallSupport } from './room-call-support.svelte.js';
   import { refreshRoomMembers } from './room-member-refresh.svelte.js';
   import { mediaViewerState } from '#lib/ui/media/media-viewer-state.svelte.js';
 
@@ -285,10 +285,12 @@
   );
   let callOffered = $derived(
     callable &&
-      ((resolvedRoom?.is_direct ?? false) ||
-        callParticipants.length > 0 ||
-        preferences.alwaysShowCallButton ||
-        memberLoader.members.length <= 10)
+      offersCall({
+        direct: resolvedRoom?.is_direct ?? false,
+        participants: callParticipants.length,
+        members: memberLoader.members.length,
+        alwaysShow: preferences.alwaysShowCallButton,
+      })
   );
 
   let composerMounted = $state(false);
