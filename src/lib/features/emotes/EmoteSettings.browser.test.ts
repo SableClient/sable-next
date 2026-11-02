@@ -7,7 +7,8 @@ vi.mock('#lib/core/context.js', async () => {
 });
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
-vi.mock('#lib/rooms/room-list.svelte.js', () => ({
+vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/rooms/room-list.svelte.js')>()),
   useRoomList: () => ({ labelFor: () => 'Emoji room' }),
 }));
 

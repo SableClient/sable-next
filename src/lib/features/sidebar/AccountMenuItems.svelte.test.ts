@@ -6,6 +6,7 @@ import { expect, test, vi } from 'vitest';
 
 vi.mock('#lib/notifications/room-names.js', () => ({ boundServerIdentity: () => 'legacy' }));
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
+vi.mock('#lib/core/context.js');
 vi.mock('#lib/settings/preferences.svelte.js', () => ({
   preferences: { sendPresence: false, presence: 'online' },
   setPreference: vi.fn(),
