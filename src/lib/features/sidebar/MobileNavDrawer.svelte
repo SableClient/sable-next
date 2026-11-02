@@ -209,7 +209,7 @@
   }
 
   function revealCurrentPage(event: MouseEvent) {
-    if (appLayout.current || !(event.target instanceof Element)) return;
+    if (event.defaultPrevented || appLayout.current || !(event.target instanceof Element)) return;
     const link = event.target.closest('a[href]');
     if (!(link instanceof HTMLAnchorElement)) return;
     if (link.pathname === pathname) {

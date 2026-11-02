@@ -4,7 +4,8 @@ import type { RoomPermissionsView } from '#src/generated/protocol';
 import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { tick, type ComponentProps } from 'svelte';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import type { Window as HappyDOMWindow } from 'happy-dom';
+import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 
 import type { RoomListItemView } from '#src/generated/protocol';
 
@@ -13,7 +14,7 @@ vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 import { visit } from '#lib/test-support/app-state.js';
-import { navigated } from '#lib/test-support/app-navigation.js';
+import { goto, navigated } from '#lib/test-support/app-navigation.js';
 vi.mock('$app/paths', () => ({
   resolve: (path: string, params: Record<string, string> = {}) => {
     const resolved = (path.startsWith('/') ? path : `/${path}`).replace(
@@ -53,6 +54,8 @@ beforeEach(() => {
 
 afterEach(() => {
   localStorage.clear();
+  listed.length = 0;
+  goto.mockClear();
   setPreference('showHome', false);
   setPreference('showSearch', true);
 });
@@ -265,7 +268,6 @@ test('opens a space on its lobby when there is nothing to restore', () => {
     spaceNavigationHref(
       '/space/!space%3Aexample.org',
       undefined,
-      false,
       '/space/!space%3Aexample.org/lobby'
     )
   ).toBe('/space/!space%3Aexample.org/lobby');
@@ -273,7 +275,6 @@ test('opens a space on its lobby when there is nothing to restore', () => {
     spaceNavigationHref(
       '/space/!space%3Aexample.org',
       '/home/!room%3Aexample.org',
-      false,
       '/space/!space%3Aexample.org/lobby'
     )
   ).toBe('/space/!space%3Aexample.org/lobby');
@@ -331,7 +332,6 @@ test('restores a space to its last desktop route', () => {
     spaceNavigationHref(
       '/space/!space%3Aexample.org',
       '/space/!space%3Aexample.org/!room%3Aexample.org?event=%24event',
-      false,
       '/space/!space%3Aexample.org/lobby'
     )
   ).toBe('/space/!space%3Aexample.org/!room%3Aexample.org?event=%24event');
@@ -339,7 +339,6 @@ test('restores a space to its last desktop route', () => {
     spaceNavigationHref(
       '/space/!space%3Aexample.org',
       '/home/!room%3Aexample.org',
-      false,
       '/space/!space%3Aexample.org/lobby'
     )
   ).toBe('/space/!space%3Aexample.org/lobby');
@@ -395,15 +394,109 @@ test('opens the lobby when a search route was saved by an older client', async (
   expect(tab('Space')).toHaveAttribute('href', '/space/!space%3Aexample.org/lobby');
 });
 
-test('opens a space root on mobile even when it has a saved route', async () => {
-  localStorage.setItem(
-    'sable-space-paths',
-    JSON.stringify({ '!space:example.org': '/space/!space%3Aexample.org/!room%3Aexample.org' })
-  );
+function onPhone(): void {
+  const happyDOM = (window as unknown as HappyDOMWindow).happyDOM;
+  const size = { width: window.innerWidth, height: window.innerHeight };
+  happyDOM.setViewport({ width: 390, height: 844 });
+  onTestFinished(() => {
+    happyDOM.setViewport(size);
+  });
+}
+
+const spaceRoom = '/space/!space%3Aexample.org/!room%3Aexample.org';
+
+function rememberSpaceRoom(): void {
+  listed.push(space('!room:example.org', 'Room'));
+  localStorage.setItem('sable-space-paths', JSON.stringify({ '!space:example.org': spaceRoom }));
+}
+
+test('opens the last room of a space behind the open drawer on mobile', async () => {
+  onPhone();
+  rememberSpaceRoom();
+  renderRail({ spaces: [space()], mobile: true });
+  await tick();
+
+  expect(tab('Space')).toHaveAttribute('href', spaceRoom);
+  await user.click(tab('Space'));
+
+  expect(goto).toHaveBeenCalledWith(spaceRoom, { replace: false, state: { mobileDrawer: 'open' } });
+});
+
+test('replaces the room behind the drawer when switching tabs from a room on mobile', async () => {
+  onPhone();
+  rememberSpaceRoom();
+  visit('/rooms/!other%3Aexample.org', { roomId: '!other:example.org' });
+  renderRail({ spaces: [space()], mobile: true });
+  await tick();
+
+  await user.click(tab('Space'));
+
+  expect(goto).toHaveBeenCalledWith(spaceRoom, { replace: true, state: { mobileDrawer: 'open' } });
+});
+
+test('does not navigate again when the remembered room is already behind the drawer', async () => {
+  onPhone();
+  rememberSpaceRoom();
+  visit(spaceRoom, { spaceId: '!space:example.org', roomId: '!room:example.org' });
+  renderRail({ spaces: [space()], mobile: true });
+  await tick();
+
+  await user.click(tab('Space'));
+
+  expect(goto).not.toHaveBeenCalled();
+});
+
+test('leaves modified clicks on a remembered room to the browser on mobile', async () => {
+  rememberSpaceRoom();
+  renderRail({ spaces: [space()], mobile: true });
+  await tick();
+  const link = tab('Space');
+  const click = new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true });
+
+  link.dispatchEvent(click);
+
+  expect(click.defaultPrevented).toBe(false);
+  expect(goto).not.toHaveBeenCalled();
+});
+
+test('opens a space root on mobile when its remembered room was left', async () => {
+  listed.push({ ...space('!room:example.org', 'Room'), state: 'left' });
+  localStorage.setItem('sable-space-paths', JSON.stringify({ '!space:example.org': spaceRoom }));
   renderRail({ spaces: [space()], mobile: true });
   await tick();
 
   expect(tab('Space')).toHaveAttribute('href', '/space/!space%3Aexample.org');
+});
+
+test.each(['lobby', 'create-room'])(
+  'opens a space root on mobile when its saved route is the %s page',
+  async (view) => {
+    localStorage.setItem(
+      'sable-space-paths',
+      JSON.stringify({ '!space:example.org': `/space/!space%3Aexample.org/${view}` })
+    );
+    renderRail({ spaces: [space()], mobile: true });
+    await tick();
+
+    expect(tab('Space')).toHaveAttribute('href', '/space/!space%3Aexample.org');
+  }
+);
+
+test('records only room routes on mobile', async () => {
+  renderRail({ spaces: [space()], mobile: true });
+  await tick();
+
+  visit('/space/!space%3Aexample.org/!room%3Aexample.org', {
+    spaceId: '!space:example.org',
+    roomId: '!room:example.org',
+  });
+  navigated();
+  visit('/space/!space%3Aexample.org', { spaceId: '!space:example.org' });
+  navigated();
+
+  expect(savedSpacePaths()).toEqual({
+    '!space:example.org': '/space/!space%3Aexample.org/!room%3Aexample.org',
+  });
 });
 
 test('orders spaces by the stored layout and appends unplaced ones', async () => {
@@ -601,15 +694,14 @@ test('long-pressing a top-level space opens its options menu', async () => {
 });
 
 test('restores the direct tab to its last desktop chat', () => {
-  expect(spaceNavigationHref('/direct', '/direct/!dm%3Aexample.org', false, '/direct')).toBe(
+  expect(spaceNavigationHref('/direct', '/direct/!dm%3Aexample.org', '/direct')).toBe(
     '/direct/!dm%3Aexample.org'
   );
-  expect(spaceNavigationHref('/direct', '/home/!room%3Aexample.org', false, '/direct')).toBe(
-    '/direct'
-  );
+  expect(spaceNavigationHref('/direct', '/home/!room%3Aexample.org', '/direct')).toBe('/direct');
 });
 
-test('opens the direct root on mobile even when it has a saved chat', async () => {
+test('restores the direct tab to its last chat on mobile', async () => {
+  listed.push(space('!dm:example.org', 'DM'));
   localStorage.setItem(
     'sable-space-paths',
     JSON.stringify({ direct: '/direct/!dm%3Aexample.org' })
@@ -617,8 +709,7 @@ test('opens the direct root on mobile even when it has a saved chat', async () =
   renderRail({ spaces: [], mobile: true });
   await tick();
 
-  expect(tab('common.directMessages')).toHaveAttribute('href', '/direct');
-  expect(linkTo('/direct/!dm%3Aexample.org')).not.toBeInTheDocument();
+  expect(tab('common.directMessages')).toHaveAttribute('href', '/direct/!dm%3Aexample.org');
 });
 
 test('records the active desktop direct chat', async () => {
@@ -669,6 +760,21 @@ test('a space opened through the rooms tab does not become the rooms tab target'
   navigated();
   visit('/rooms');
   navigated();
+
+  expect(tab('nav.unspaced')).toHaveAttribute('href', '/rooms');
+  expect(savedSpacePaths().rooms).toBe('/rooms');
+});
+
+test('a space opened through the rooms tab on mobile does not become the rooms tab target', async () => {
+  listed.push(space('!space:example.org'));
+  renderRail({ spaces: [], mobile: true });
+  await tick();
+
+  visit('/rooms/!space%3Aexample.org', { roomId: '!space:example.org' });
+  navigated();
+  visit('/space/!space%3Aexample.org/lobby', { spaceId: '!space:example.org' });
+  navigated();
+  await tick();
 
   expect(tab('nav.unspaced')).toHaveAttribute('href', '/rooms');
   expect(savedSpacePaths().rooms).toBe('/rooms');

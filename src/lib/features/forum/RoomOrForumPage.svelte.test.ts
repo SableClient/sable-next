@@ -2,7 +2,8 @@
 
 import { render } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import type { Window as HappyDOMWindow } from 'happy-dom';
+import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 
 import type { RoomListItemView } from '#src/generated/protocol';
 
@@ -20,6 +21,10 @@ vi.mock('#lib/features/room/RoomPage.svelte', () => ({
 }));
 vi.mock('./ForumPage.svelte', () => ({
   default: () => rendered.push('forum'),
+}));
+const openConversation = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock('#lib/platform/native-notifications.js', () => ({
+  setNativeOpenConversation: openConversation,
 }));
 vi.mock('#lib/features/calendar/CalendarPage.svelte', () => ({
   default: () => rendered.push('calendar'),
@@ -74,4 +79,27 @@ test('landing on a notification keeps the room mounted when its state is cleared
   await tick();
 
   expect(rendered).toEqual(['room']);
+});
+
+test('a room behind the open mobile drawer is not the open conversation until the drawer closes', async () => {
+  const happyDOM = (window as unknown as HappyDOMWindow).happyDOM;
+  const size = { width: window.innerWidth, height: window.innerHeight };
+  happyDOM.setViewport({ width: 390, height: 844 });
+  onTestFinished(() => {
+    happyDOM.setViewport(size);
+  });
+  const pageState = $state<App.PageState>({ mobileDrawer: 'open' });
+  Object.defineProperty(page, 'state', { configurable: true, get: () => pageState });
+  state.rooms = [
+    { room_id: '!room:example.org', room_kind: 'text' } as unknown as RoomListItemView,
+  ];
+  visit('/rooms/!room:example.org', { roomId: '!room:example.org' });
+  render(RoomOrForumPage);
+  await tick();
+  expect(openConversation).toHaveBeenLastCalledWith(null, null);
+
+  pageState.mobileDrawer = 'closed';
+  await tick();
+
+  expect(openConversation).toHaveBeenLastCalledWith(null, '!room:example.org');
 });

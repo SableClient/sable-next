@@ -3,7 +3,8 @@
 import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { createRawSnippet } from 'svelte';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import type { Window as HappyDOMWindow } from 'happy-dom';
+import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 import { flushed } from '#lib/ui/flushed.js';
 
 import type { TimelineItemView } from '#src/generated/protocol';
@@ -3012,8 +3013,8 @@ test.each(['scrolling', 'settled'])(
   }
 );
 
-async function readsWhileSettings(open: boolean): Promise<ReturnType<typeof vi.fn>> {
-  if (open) page.state.settings = { section: 'account' };
+async function readsUnder(state: App.PageState): Promise<ReturnType<typeof vi.fn>> {
+  Object.assign(page.state, state);
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const read = vi.fn((_eventId: string, _fullyRead: boolean) => Promise.resolve());
@@ -3035,11 +3036,26 @@ async function readsWhileSettings(open: boolean): Promise<ReturnType<typeof vi.f
 }
 
 test('a room with no settings over it is read', async () => {
-  expect(await readsWhileSettings(false)).toHaveBeenCalled();
+  expect(await readsUnder({})).toHaveBeenCalled();
 });
 
 test('a room covered by the settings dialog is not read', async () => {
-  expect(await readsWhileSettings(true)).not.toHaveBeenCalled();
+  expect(await readsUnder({ settings: { section: 'account' } })).not.toHaveBeenCalled();
+});
+
+test.each([
+  [390, 'open', false],
+  [390, 'closed', true],
+  [1280, 'open', true],
+] as const)('a %ipx wide room with the drawer %s is read: %s', async (width, drawer, read) => {
+  const happyDOM = (window as unknown as HappyDOMWindow).happyDOM;
+  const size = { width: window.innerWidth, height: window.innerHeight };
+  happyDOM.setViewport({ width, height: 844 });
+  onTestFinished(() => {
+    happyDOM.setViewport(size);
+  });
+
+  expect((await readsUnder({ mobileDrawer: drawer })).mock.calls.length > 0).toBe(read);
 });
 
 test('a timeline that falls back from an unread context to live opens at the latest message', async () => {

@@ -18,6 +18,7 @@
   import { windowActivity } from '#lib/platform/window-activity.js';
   import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import { MOTION_MS, motionMs, shouldReduceMotion } from '#lib/ui/motion.js';
   import {
     TimelineWindow,
@@ -204,6 +205,7 @@
   }
   const identity = new TimelineIdentityTracker();
   const unread = new TimelineUnread();
+  const appLayout = new AppLayout();
   let unreadNavigation: AbortController | null = null;
   let jumpingUnread = $state(false);
   let markingRead = $state(false);
@@ -211,7 +213,9 @@
   let switchingToUnread = false;
   let resumeTask: Promise<void> | null = null;
   let resumeFailed = $state(false);
-  let reading = $derived(active && page.state.settings === undefined);
+  let reading = $derived(
+    active && page.state.settings === undefined && !appLayout.drawerCovers(page.state)
+  );
   const readRoomId = untrack(() => roomId);
   let readUpTo: string | null = null;
   let fullyReadAt: string | null = null;

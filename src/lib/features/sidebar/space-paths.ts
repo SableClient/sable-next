@@ -31,10 +31,8 @@ export function saveSpacePath(spaceId: string, path: string): void {
 export function spaceNavigationHref(
   root: string,
   savedPath: string | undefined,
-  mobile: boolean,
   fallback: string
 ): string {
-  if (mobile) return root;
   if (!savedPath || (savedPath !== root && !savedPath.startsWith(`${root}/`))) {
     return fallback;
   }
@@ -44,24 +42,34 @@ export function spaceNavigationHref(
 
 const SPACE_PAGES = new Set(['create-room', 'create-space']);
 
+function segmentUnder(root: string, path: string): string | null {
+  if (!path.startsWith(`${root}/`)) return null;
+  return path.slice(root.length + 1).split(/[/?#]/, 1)[0];
+}
+
+export function isJoinedRoomPath(
+  root: string,
+  path: string,
+  isJoinedRoom: (pathId: string) => boolean
+): boolean {
+  const segment = segmentUnder(root, path);
+  if (segment === null || segment === '' || segment === 'lobby' || SPACE_PAGES.has(segment)) {
+    return false;
+  }
+  try {
+    return isJoinedRoom(decodeURIComponent(segment));
+  } catch {
+    return false;
+  }
+}
+
 export function spaceIndexRedirect(
   root: string,
   savedPath: string | undefined,
   lobby: string,
   isJoinedRoom: (pathId: string) => boolean
 ): string {
-  if (!savedPath?.startsWith(`${root}/`)) return lobby;
-
-  const segment = savedPath.slice(root.length + 1).split(/[/?#]/, 1)[0];
-  if (segment === 'lobby') return savedPath;
-  if (segment === '' || SPACE_PAGES.has(segment)) return lobby;
-
-  let pathId: string;
-  try {
-    pathId = decodeURIComponent(segment);
-  } catch {
-    return lobby;
-  }
-
-  return isJoinedRoom(pathId) ? savedPath : lobby;
+  if (savedPath === undefined) return lobby;
+  if (segmentUnder(root, savedPath) === 'lobby') return savedPath;
+  return isJoinedRoomPath(root, savedPath, isJoinedRoom) ? savedPath : lobby;
 }

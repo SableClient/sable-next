@@ -16,6 +16,10 @@ export class AppLayout {
   get compactHeight() {
     return this.#compactHeight.current;
   }
+
+  drawerCovers(state: App.PageState): boolean {
+    return !this.current && state.mobileDrawer === 'open';
+  }
 }
 
 export function matchesAppLayout(): boolean {

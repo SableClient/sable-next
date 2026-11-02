@@ -9,6 +9,7 @@
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
+  import { isRoomSwitch } from '#lib/features/room/room-navigation.js';
   import { findRoomByPathId, roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { addUnread } from '#lib/rooms/spaces.js';
   import type { UnreadCount } from '#lib/rooms/unread.js';
@@ -28,6 +29,7 @@
     ROOMS_PATHS_KEY,
     saveSpacePath,
     savedSpacePaths,
+    isJoinedRoomPath,
     spaceNavigationHref,
   } from './space-paths.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
@@ -275,8 +277,14 @@
     return idOf(previous) === idOf(current);
   }
 
+  function tabHref(root: string, savedPath: string | undefined, fallback: string): string {
+    if (!mobile) return spaceNavigationHref(root, savedPath, fallback);
+    const joined = (pathId: string) => findRoomByPathId(roomList.rooms, pathId)?.state === 'joined';
+    return savedPath !== undefined && isJoinedRoomPath(root, savedPath, joined) ? savedPath : root;
+  }
+
   function sectionHref(key: string, root: string): string {
-    return spaceNavigationHref(root, spacePaths[key], mobile, root);
+    return tabHref(root, spacePaths[key], root);
   }
 
   function spaceName(name: string | null, roomId: string): string {
@@ -407,7 +415,7 @@
       href,
       activePrefix: href,
       roomId: space.room_id,
-      navigateHref: spaceNavigationHref(href, savedPath, mobile, lobby),
+      navigateHref: tabHref(href, savedPath, lobby),
       initial: toInitials(name),
       avatar: space.avatar_url,
       label: name,
@@ -452,8 +460,19 @@
     return pathname.startsWith(item.activePrefix);
   }
 
-  function navigate(item: RailItem): void {
-    onNavigate?.(item.navigateHref ?? item.href);
+  function navigate(item: RailItem, event: MouseEvent): void {
+    const href = item.navigateHref ?? item.href;
+    if (onNavigate) {
+      onNavigate(href);
+      return;
+    }
+    const plain =
+      event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+    if (href === item.href || !plain) return;
+    event.preventDefault();
+    if (new URL(href, page.url.href).pathname === page.url.pathname) return;
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- every rail href is built with resolve()
+    void goto(href, { replace: isRoomSwitch(href), state: { mobileDrawer: 'open' } });
   }
 
   function dropping(ref: LayoutRef, instruction: DropInstruction): boolean {
@@ -495,8 +514,6 @@
   let previousPath = '';
 
   afterNavigate(() => {
-    if (mobile) return;
-
     const kept = [...new URLSearchParams(page.url.search)].filter(([key]) => key !== 'event');
     const search = new URLSearchParams(kept).toString();
     const path = `${page.url.pathname}${search ? `?${search}` : ''}${page.url.hash}`;
@@ -519,6 +536,7 @@
       spacePaths = { ...spacePaths, [bounced[0]]: bounced[1] };
       saveSpacePath(bounced[0], bounced[1]);
     }
+    if (mobile && page.params.roomId === undefined) return;
     if (key === undefined || spacePaths[key] === path) return;
 
     spacePaths = { ...spacePaths, [key]: path };
@@ -568,8 +586,8 @@
     href={item.navigateHref ?? item.href}
     draggable={held ? 'false' : undefined}
     onclick={mobile
-      ? () => {
-          navigate(item);
+      ? (event) => {
+          navigate(item, event);
         }
       : undefined}
     aria-label={i18n.t(item.label)}

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { spaceIndexRedirect, spaceNavigationHref } from './space-paths.js';
+import { isJoinedRoomPath, spaceIndexRedirect, spaceNavigationHref } from './space-paths.js';
 
 const root = '/space/!space%3Aexample.org';
 const lobby = `${root}/lobby`;
@@ -34,6 +34,19 @@ test.each(['/search', '/search?q=hello&space=!space%3Aexample.org'])(
   'falls back to the lobby for an old saved search route: %s',
   (savedPath) => {
     expect(spaceIndexRedirect(root, savedPath, lobby, joined)).toBe(lobby);
-    expect(spaceNavigationHref(root, savedPath, false, lobby)).toBe(lobby);
+    expect(spaceNavigationHref(root, savedPath, lobby)).toBe(lobby);
   }
 );
+
+test.each([
+  [`${root}/!room%3Aexample.org`, true],
+  [`${root}/!room%3Aexample.org?thread=%24t`, true],
+  [`${root}/!left%3Aexample.org`, false],
+  [lobby, false],
+  [`${root}/create-space`, false],
+  [root, false],
+  ['/rooms/!room%3Aexample.org', false],
+  [`${root}/%E0%A4%A`, false],
+])('treats %s as a joined room path: %s', (path, expected) => {
+  expect(isJoinedRoomPath(root, path, joined)).toBe(expected);
+});

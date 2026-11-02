@@ -6,11 +6,13 @@
   import RoomPage from '#lib/features/room/RoomPage.svelte';
   import { setNativeOpenConversation } from '#lib/platform/native-notifications.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { AppLayout } from '#lib/ui/app-layout.svelte.js';
 
   import ForumPage from './ForumPage.svelte';
 
   const core = useCoreClient();
   const roomList = useRoomList();
+  const appLayout = new AppLayout();
 
   let roomId = $derived(page.params.roomId ?? '');
   let room = $derived(findRoomByPathId(roomList.rooms, roomId));
@@ -19,7 +21,7 @@
     eventTimeline || page.url.searchParams.has('event') || Boolean(page.state.notified)
   );
   let userId = $derived(core.session?.user_id ?? null);
-  let openRoomId = $derived(room?.room_id ?? null);
+  let openRoomId = $derived(appLayout.drawerCovers(page.state) ? null : (room?.room_id ?? null));
 
   $effect(() => {
     void setNativeOpenConversation(userId, openRoomId).catch(conversationNotSet);
