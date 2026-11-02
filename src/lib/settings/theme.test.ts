@@ -2,7 +2,13 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { applyTheme, renameLegacyThemeIdentifiers, resolveTheme } from './theme';
+import {
+  applyCustomTheme,
+  applyQuickCss,
+  applyTheme,
+  renameLegacyThemeIdentifiers,
+  resolveTheme,
+} from './theme';
 
 describe('resolveTheme', () => {
   it.each([
@@ -22,6 +28,19 @@ describe('applyTheme', () => {
   ] as const)('sets data-theme for %s with system dark %s', (mode, systemPrefersDark, expected) => {
     applyTheme(mode, systemPrefersDark);
     expect(document.documentElement.dataset.theme).toBe(expected);
+  });
+});
+
+describe('custom CSS', () => {
+  it.each([
+    ['theme', applyCustomTheme, 'sable-custom-theme'],
+    ['quick CSS', applyQuickCss, 'sable-quick-css'],
+  ] as const)('leaves the %s sheet alone when the CSS is unchanged', (_, apply, id) => {
+    apply('body { color: red; }');
+    const text = document.getElementById(id)?.firstChild;
+    apply('body { color: red; }');
+    expect(document.getElementById(id)?.firstChild).toBe(text);
+    apply('');
   });
 });
 

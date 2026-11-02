@@ -58,7 +58,7 @@ export function applyCustomTheme(css: string | undefined): void {
       THEME_STYLE_ID,
       document.getElementById(TWEAK_STYLE_ID) ?? document.getElementById(QUICK_CSS_STYLE_ID)
     );
-  style.textContent = renameLegacyThemeIdentifiers(css);
+  setCss(style, renameLegacyThemeIdentifiers(css));
 }
 
 export function applyCustomTweaks(css: readonly string[]): void {
@@ -70,7 +70,7 @@ export function applyCustomTweaks(css: readonly string[]): void {
 
   const style =
     existing ?? createStyle(TWEAK_STYLE_ID, document.getElementById(QUICK_CSS_STYLE_ID));
-  style.textContent = css.map(renameLegacyThemeIdentifiers).join('\n');
+  setCss(style, css.map(renameLegacyThemeIdentifiers).join('\n'));
 }
 
 export function applyFontFamily(family: string): void {
@@ -101,7 +101,7 @@ export function applyQuickCss(css: string): void {
   }
 
   const style = existing ?? createStyle(QUICK_CSS_STYLE_ID, null);
-  style.textContent = css;
+  setCss(style, css);
   keepQuickCssLast();
 }
 
@@ -114,6 +114,11 @@ function keepQuickCssLast(): void {
     if (style && document.head.lastElementChild !== style) document.head.append(style);
   });
   headObserver.observe(document.head, { childList: true });
+}
+
+// Rewriting identical text still makes the browser reparse the sheet and restyle the whole page.
+function setCss(style: HTMLElement, css: string): void {
+  if (style.textContent !== css) style.textContent = css;
 }
 
 function createStyle(id: string, anchor: Element | null): HTMLStyleElement {
