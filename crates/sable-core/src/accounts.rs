@@ -1000,6 +1000,9 @@ impl Core {
             }
             return Err(RpcError::SlidingSyncUnsupported);
         }
+        session::enable_crypto_store_lock(&client)
+            .await
+            .or_failed(self, "enable_crypto_store_lock")?;
         // Pushes can find the login once it is persisted.
         let lease = session::store_lease(store_id).await;
         let generation = self.claim_session_generation().await;

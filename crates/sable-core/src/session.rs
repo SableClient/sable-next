@@ -416,8 +416,23 @@ async fn restore_credentials_with(
             .await
             .map_err(CoreError::backend)?,
     }
+    enable_crypto_store_lock(client).await
+}
 
-    Ok(())
+pub(crate) async fn enable_crypto_store_lock(client: &Client) -> Result<(), CoreError> {
+    let matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::MultiProcess { holder_name } =
+        client.cross_process_lock_config()
+    else {
+        return Ok(());
+    };
+    match client
+        .encryption()
+        .enable_cross_process_store_lock(holder_name.clone())
+        .await
+    {
+        Ok(()) | Err(matrix_sdk::Error::BadCryptoStoreState) => Ok(()),
+        Err(error) => Err(CoreError::backend(error)),
+    }
 }
 
 pub(crate) async fn validate_saved_crypto_store(
@@ -1227,6 +1242,46 @@ mod tests {
             .await
             .unwrap();
         client
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    async fn multi_process_client(store_id: &str) -> matrix_sdk::Client {
+        let lock = matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::multi_process(
+            "push".to_owned(),
+        );
+        let key = crate::store_encryption::saved_key(store_id).unwrap();
+        let store = crate::store_encryption::config(
+            std::path::Path::new(store_id).join("store"),
+            key.as_ref(),
+        );
+        matrix_sdk::Client::builder()
+            .homeserver_url("https://endpoint.invalid")
+            .sqlite_store_with_config_and_cache_path(store, None::<std::path::PathBuf>)
+            .cross_process_store_config(lock)
+            .build()
+            .await
+            .unwrap()
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn a_restored_multi_process_client_takes_the_crypto_store_lock() {
+        let root = tempfile::tempdir().unwrap();
+        let store_id = root.path().to_str().unwrap();
+        drop(seed_crypto(store_id, &offline_session()).await);
+        let persisted = offline_session();
+
+        let push = multi_process_client(store_id).await;
+        super::restore_credentials(&push, &persisted).await.unwrap();
+
+        assert!(
+            push.encryption()
+                .try_lock_store_once()
+                .await
+                .unwrap()
+                .is_some(),
+            "a send from this client would write Olm sessions without the lock"
+        );
     }
 
     #[cfg(not(any(target_family = "wasm", target_os = "android", target_os = "ios")))]
