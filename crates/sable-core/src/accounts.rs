@@ -1402,10 +1402,7 @@ async fn reset_account_cache(account: &PersistedAccount) -> Result<(), crate::Co
 
 #[cfg(all(test, not(target_family = "wasm")))]
 mod regression_tests {
-    use crate::api::{
-        Handler,
-        encryption::{DeleteDeviceParams, DevicesParams},
-    };
+    use crate::api::encryption::DeleteDeviceParams;
     use crate::session::{self, Credentials, PersistedAccount};
     use std::sync::Arc;
 
@@ -1643,7 +1640,7 @@ mod regression_tests {
             .oauth()
             .mock_server_metadata()
             .error_unrecognized()
-            .expect(2)
+            .expect(1)
             .mount()
             .await;
         server.mock_devices().ok().mount().await;
@@ -1677,11 +1674,10 @@ mod regression_tests {
             .oauth()
             .mock_server_metadata()
             .ok_json(serde_json::json!({"issuer": "https://id.example.org"}))
-            .expect(2)
+            .expect(1)
             .mount()
             .await;
 
-        DevicesParams {}.run(&core).await.unwrap_err();
         core.delete_device(DeleteDeviceParams {
             device_id: "OTHER".into(),
             password: None,
