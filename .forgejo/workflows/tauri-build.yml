@@ -1148,6 +1148,7 @@ jobs:
       TAG: ${{ needs.setup-release.outputs.tag }}
       RELEASE_GPG_KEY: ${{ secrets.RELEASE_GPG_KEY }}
       RELEASE_GPG_KEY_ID: ${{ secrets.RELEASE_GPG_KEY_ID }}
+      RELEASE_GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
     steps:
       - name: Check out repository
         if: ${{ env.RELEASE_GPG_KEY != '' && env.RELEASE_GPG_KEY_ID != '' }}
@@ -1168,7 +1169,9 @@ jobs:
           export GNUPGHOME
           printf '%s\n' "$RELEASE_GPG_KEY" | gpg --batch --import
           (cd assets && sha256sum -- *) > SHA256SUMS
-          gpg --batch --yes --local-user "$RELEASE_GPG_KEY_ID" \
+          printf '%s' "$RELEASE_GPG_PASSPHRASE" | gpg --batch --yes \
+            --pinentry-mode loopback --passphrase-fd 0 \
+            --local-user "$RELEASE_GPG_KEY_ID" \
             --armor --detach-sign --output SHA256SUMS.asc SHA256SUMS
           node scripts/ci/forgejo-release.mjs upload SHA256SUMS SHA256SUMS.asc
       - name: Report the skipped signing
