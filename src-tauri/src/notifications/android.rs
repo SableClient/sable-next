@@ -86,7 +86,7 @@ async fn rotate_pusher(
     use sable_core::protocol::WebPushKeys;
     let client = pusher_client(root, pusher).await?;
     let registration = &rotated_registration(&pusher.app_id, registration);
-    let pushkey = if let Some(gateway) = &pusher.gateway {
+    let (pushkey, app_id) = if let Some(gateway) = &pusher.gateway {
         let key = registration
             .p256dh
             .clone()
@@ -117,23 +117,24 @@ async fn rotate_pusher(
             })
             .await
             .map_err(|_| RpcError::Unavailable)?;
-        key
+        (key, pusher.app_id.clone())
     } else {
-        let rotated = server_web_pusher(registration, &pusher.app_id, pusher.event_id_only)
-            .ok_or(RpcError::Unavailable)?;
+        let rotated =
+            server_web_pusher(registration, pusher.event_id_only).ok_or(RpcError::Unavailable)?;
         let key = rotated.pushkey.clone();
+        let app_id = rotated.app_id.clone();
         client
             .retry(|| sable_core::webpush::set_pusher(&client, rotated.clone()))
             .await
             .map_err(|_| RpcError::Unavailable)?;
-        key
+        (key, app_id)
     };
     let identity = (pusher.user_id.clone(), pusher.device_id.clone());
     remember_pusher(
         root,
         &identity,
         pushkey,
-        pusher.app_id.clone(),
+        app_id,
         pusher.gateway.clone(),
         pusher.event_id_only,
     )?;

@@ -1,6 +1,5 @@
 import { base64ToUint8Array, uint8ArrayToBase64 } from 'uint8array-extras';
 
-import { runtimeConfig } from '#lib/config/runtime-config.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { readText, removeLocalValue, writeText } from '#lib/platform/local-json.js';
 import { deliversWebPush } from '#lib/platform/notifications.js';
@@ -25,7 +24,6 @@ function fallback<T>(value: T, what: string): (error: unknown) => T {
   };
 }
 
-/** For a deployment that ships no gateway configuration at all. */
 export const WEBPUSH_APP_ID = 'moe.sable.webpush';
 
 /** The pusher kind the MSC4174 handshake lives under. */
@@ -106,10 +104,7 @@ async function pushTarget(core: CoreClient, override: PushOverride): Promise<Pus
   const vapid = await core.rpc.push
     .webPusherSupport()
     .catch(fallback(null, 'server push support unavailable'));
-  const { push } = await runtimeConfig();
-  if (vapid !== null) {
-    return { gateway: null, appId: push?.webPushAppID ?? WEBPUSH_APP_ID, vapid };
-  }
+  if (vapid !== null) return { gateway: null, appId: WEBPUSH_APP_ID, vapid };
 
   const { resolved: settings } = await pushConfig(override);
   return settings ?? null;
@@ -133,16 +128,15 @@ async function serverPusherActivated(
 /** A gateway pusher left beside the server delivery doubles every alert. */
 async function removeStaleGatewayPushers(
   core: CoreClient,
-  appId: string,
   pushkey: string,
   rekeyed: string | null
 ): Promise<void> {
   const pushers = await core.rpc.push.webPushers().catch(fallback([], 'listing pushers failed'));
   for (const pusher of pushers) {
-    if (pusher.app_id !== appId || pusher.kind !== GATEWAY_PUSHER_KIND) continue;
+    if (pusher.kind !== GATEWAY_PUSHER_KIND) continue;
     if (pusher.pushkey !== pushkey && pusher.pushkey !== rekeyed) continue;
     await core.rpc.push
-      .removePusher({ pushkey: pusher.pushkey, app_id: appId })
+      .removePusher({ pushkey: pusher.pushkey, app_id: pusher.app_id })
       .catch(fallback(undefined, 'removing stale pusher failed'));
   }
 }
@@ -230,7 +224,7 @@ async function sync(core: CoreClient, override: PushOverride): Promise<void> {
     if (activated === true) return;
   }
 
-  await removeStaleGatewayPushers(core, target.appId, keys.p256dh, rekeyed);
+  await removeStaleGatewayPushers(core, keys.p256dh, rekeyed);
   await expectPushActivation(userId);
   await core.rpc.push.setWebPusher({
     pusher: {

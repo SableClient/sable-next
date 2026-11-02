@@ -210,8 +210,7 @@ pub(crate) async fn register_push<R: Runtime>(
     let (registration, distributor_gateway) =
         register_with_distributor(app, core, &config, server_vapid.as_deref()).await?;
     if server_vapid.is_some()
-        && let Some(pusher) =
-            server_web_pusher(&registration, &config.web_app_id, config.event_id_only)
+        && let Some(pusher) = server_web_pusher(&registration, config.event_id_only)
     {
         return Box::pin(register_server_pusher(
             core,

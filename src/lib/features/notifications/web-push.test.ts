@@ -36,7 +36,9 @@ import {
   registrationMarker,
   syncPushSubscription,
   vapidBytes,
+  WEBPUSH_APP_ID,
 } from './web-push';
+import { writeText } from '#lib/platform/local-json.js';
 
 const shipped = {
   gateway: 'https://sygnal.sable.moe/_matrix/push/v1/notify',
@@ -46,7 +48,7 @@ const shipped = {
 
 const server = {
   gateway: null,
-  appId: 'moe.sable.app.sygnal',
+  appId: WEBPUSH_APP_ID,
   vapid: 'server-key',
 };
 
@@ -188,7 +190,7 @@ test('a web push capability has the homeserver deliver, not the gateway', async 
   await syncPushSubscription(client, NONE);
 
   expect(commandsOf.setWebPusher).toHaveBeenCalledWith({
-    pusher: expect.objectContaining({ pushkey: 'keys-p256dh', app_id: shipped.appId }) as unknown,
+    pusher: expect.objectContaining({ pushkey: 'keys-p256dh', app_id: WEBPUSH_APP_ID }) as unknown,
   });
   expect(commandsOf.setPusher).not.toHaveBeenCalled();
 });
@@ -252,7 +254,7 @@ test('re-keying to the homeserver retires the gateway pusher under the old key',
     app_id: shipped.appId,
   });
   expect(commandsOf.setWebPusher).toHaveBeenCalledWith({
-    pusher: expect.objectContaining({ pushkey: 'keys-p256dh', app_id: shipped.appId }) as unknown,
+    pusher: expect.objectContaining({ pushkey: 'keys-p256dh', app_id: WEBPUSH_APP_ID }) as unknown,
   });
 });
 
@@ -269,7 +271,26 @@ test('taking over the delivery retires the gateway pusher left behind', async ()
     app_id: shipped.appId,
   });
   expect(commandsOf.setWebPusher).toHaveBeenCalledWith({
-    pusher: expect.objectContaining({ pushkey: 'keys-p256dh', app_id: shipped.appId }) as unknown,
+    pusher: expect.objectContaining({ pushkey: 'keys-p256dh', app_id: WEBPUSH_APP_ID }) as unknown,
+  });
+});
+
+test('a server pusher left under the gateway app id is replaced', async () => {
+  mocks.activeServiceWorker.mockResolvedValue(registration(SERVER_KEY));
+  const legacy = { gateway: null, appId: shipped.appId, vapid: SERVER_KEY };
+  writeText(
+    'sable-push-endpoint',
+    registrationMarker('account-a', ENDPOINT, legacy, false, 'Sable')
+  );
+
+  await syncPushSubscription(client, NONE);
+
+  expect(commandsOf.removePusher).toHaveBeenCalledWith({
+    pushkey: 'keys-p256dh',
+    app_id: shipped.appId,
+  });
+  expect(commandsOf.setWebPusher).toHaveBeenCalledWith({
+    pusher: expect.objectContaining({ pushkey: 'keys-p256dh', app_id: WEBPUSH_APP_ID }) as unknown,
   });
 });
 

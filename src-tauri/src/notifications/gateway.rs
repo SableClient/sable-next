@@ -18,6 +18,7 @@ pub(super) struct Registration {
 }
 
 const DIRECT_PUSH_APP_ID: &str = "moe.sable.up";
+const SERVER_PUSH_APP_ID: &str = "moe.sable.webpush";
 
 #[cfg(any(target_os = "android", test))]
 pub(super) fn rotated_registration(app_id: &str, registration: &Registration) -> Registration {
@@ -58,12 +59,11 @@ pub(super) fn pusher(
 /// subscription, never an HTTP push gateway.
 pub(super) fn server_web_pusher(
     registration: &Registration,
-    app_id: &str,
     event_id_only: bool,
 ) -> Option<WebPusherView> {
     Some(WebPusherView {
         pushkey: registration.p256dh.clone()?,
-        app_id: app_id.to_owned(),
+        app_id: SERVER_PUSH_APP_ID.to_owned(),
         device_display_name: format!("Sable on {}", std::env::consts::OS),
         endpoint: registration.token.clone(),
         auth: registration.auth.clone()?,
@@ -527,12 +527,12 @@ mod tests {
             auth: Some("auth-secret".to_owned()),
         };
 
-        let pusher = server_web_pusher(&registration, "org.example.sable", true)
-            .expect("web push keys create an MSC4174 pusher");
+        let pusher =
+            server_web_pusher(&registration, true).expect("web push keys create an MSC4174 pusher");
         assert_eq!(pusher.pushkey, "public-key");
         assert_eq!(pusher.endpoint, registration.token);
         assert_eq!(pusher.auth, "auth-secret");
-        assert_eq!(pusher.app_id, "org.example.sable");
+        assert_eq!(pusher.app_id, super::SERVER_PUSH_APP_ID);
         assert!(pusher.event_id_only);
     }
 
