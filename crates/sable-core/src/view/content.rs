@@ -174,14 +174,7 @@ fn gallery_content(
             .itemtypes
             .iter()
             .enumerate()
-            .filter_map(|(index, item)| {
-                let raw = raw
-                    .content
-                    .as_ref()
-                    .and_then(|content| content.get("itemtypes"))
-                    .and_then(|items| items.get(index));
-                gallery_item(item, raw)
-            })
+            .filter_map(|(index, item)| gallery_item(item, raw.gallery_spoiler_reason(index)))
             .collect(),
     }
 }

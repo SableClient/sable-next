@@ -35,7 +35,7 @@ pub(crate) fn video_thumbnail(info: &VideoInfo) -> Option<String> {
 
 pub(super) fn gallery_item(
     item: &GalleryItemType,
-    raw: Option<&serde_json::Value>,
+    spoiler: Option<String>,
 ) -> Option<GalleryItemView> {
     let dimension = |value: Option<UInt>| value.map(u64::from);
     let caption = |caption: Option<&str>| caption.map(ToOwned::to_owned);
@@ -51,7 +51,7 @@ pub(super) fn gallery_item(
             size: dimension(image.info.as_ref().and_then(|info| info.size)),
             blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
             thumbnail: image.info.as_deref().and_then(image_thumbnail),
-            spoiler: spoiler_reason(raw),
+            spoiler,
         },
         GalleryItemType::Video(video) => GalleryItemView::Video {
             filename: video.filename().to_owned(),
@@ -62,7 +62,7 @@ pub(super) fn gallery_item(
             height: dimension(video.info.as_ref().and_then(|info| info.height)),
             blurhash: video.info.as_ref().and_then(|info| info.blurhash.clone()),
             thumbnail: video.info.as_deref().and_then(video_thumbnail),
-            spoiler: spoiler_reason(raw),
+            spoiler,
         },
         GalleryItemType::Audio(audio) => GalleryItemView::Audio {
             filename: audio.filename().to_owned(),

@@ -92,6 +92,7 @@ struct LocalFields {
     profile: Option<PerMessageProfileView>,
     formatted_body: Option<String>,
     spoiler: Option<String>,
+    gallery_spoilers: Vec<Option<String>>,
 }
 
 #[derive(Default)]
@@ -192,11 +193,22 @@ impl LocalContent {
                 profile: per_message_profile(Some(&content)),
                 formatted_body: raw_formatted_body(Some(&content)).map(ToOwned::to_owned),
                 spoiler: spoiler_reason(Some(&content)),
+                gallery_spoilers: content
+                    .get("itemtypes")
+                    .and_then(serde_json::Value::as_array)
+                    .map(|items| {
+                        items
+                            .iter()
+                            .map(|item| spoiler_reason(Some(item)))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
             })
             .filter(|fields| {
                 fields.profile.is_some()
                     || fields.formatted_body.is_some()
                     || fields.spoiler.is_some()
+                    || fields.gallery_spoilers.iter().any(Option::is_some)
             });
         match fields {
             Some(fields) => {
@@ -555,6 +567,9 @@ pub fn timeline_item(
                 .and_then(|transaction_id| local_content.get(transaction_id));
             raw.echo_formatted_body = local.and_then(|fields| fields.formatted_body.clone());
             raw.echo_spoiler = local.and_then(|fields| fields.spoiler.clone());
+            raw.echo_gallery_spoilers = local
+                .map(|fields| fields.gallery_spoilers.clone())
+                .unwrap_or_default();
             let message_profile = message_profile(event, &raw, local, local_content);
 
             let mention = mention(event, own_user_id, highlights.holds(&id, event));
