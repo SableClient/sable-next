@@ -6,7 +6,7 @@ use matrix_sdk::ruma::{OwnedDeviceId, OwnedRoomId, OwnedUserId};
 use serde::{Deserialize, Serialize};
 
 use super::Handler;
-use crate::protocol::{RpcError, DeviceView, EncryptionStatusView, IdentityResetStep, KeyBackupDownloadView, KeyBackupStatusView, ShareHistoryView, SignOutSafetyView, UserSecurityView};
+use crate::protocol::{RpcError, DehydratedDeviceView, DeviceView, EncryptionStatusView, IdentityResetStep, KeyBackupDownloadView, KeyBackupStatusView, ShareHistoryView, SignOutSafetyView, UserSecurityView};
 use crate::verification::{self, VERIFICATION_METHODS, encryption_status, sign_out_safety};
 use crate::{Core, ResultExt};
 
@@ -29,6 +29,8 @@ domain! {
     rename_device,
     discard_room_key,
     share_history,
+    dehydrated_device,
+    set_dehydrated_device,
     request_verification,
     withdraw_verification,
     set_device_blocked,
@@ -394,6 +396,32 @@ impl Handler for ShareHistoryParams {
             .await
             .or_failed(core, "share_history")?;
         Ok(ShareHistoryView::Shared)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct DehydratedDeviceParams {}
+
+impl Handler for DehydratedDeviceParams {
+    type Ok = DehydratedDeviceView;
+
+    async fn run(self, core: &Arc<Core>) -> Result<DehydratedDeviceView, RpcError> {
+        core.dehydrated_device().await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetDehydratedDeviceParams {
+    pub enabled: bool,
+}
+
+impl Handler for SetDehydratedDeviceParams {
+    type Ok = DehydratedDeviceView;
+
+    async fn run(self, core: &Arc<Core>) -> Result<DehydratedDeviceView, RpcError> {
+        core.set_dehydrated_device(self.enabled).await
     }
 }
 

@@ -15,6 +15,7 @@ mod calls;
 mod cosmetics;
 #[cfg(not(target_family = "wasm"))]
 mod credentials;
+mod dehydrated_device;
 mod delayed_events;
 mod encryption_details;
 mod errors;

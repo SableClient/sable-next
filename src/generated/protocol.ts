@@ -242,6 +242,8 @@ export type DefaultNotificationModesView = {
 	group: NotificationModeView,
 };
 
+export type DehydratedDeviceView = "unsupported" | "disabled" | "active" | "needs_recovery_key";
+
 export type DeviceView = {
 	device_id: string,
 	display_name: string | null,
@@ -2342,6 +2344,10 @@ export type Rpc = {
 	room_id: string,
 	user_id: string,
 }) => Promise<ShareHistoryView>;
+    dehydratedDevice: (params?: Record<string, never>) => Promise<DehydratedDeviceView>;
+    setDehydratedDevice: (params: {
+	enabled: boolean,
+}) => Promise<DehydratedDeviceView>;
     requestVerification: (params: {
 	user_id: string,
 	device_id?: string | null,
@@ -3467,6 +3473,8 @@ export type RpcMethods = {
   'encryption.rename_device': Rpc['encryption']['renameDevice'];
   'encryption.discard_room_key': Rpc['encryption']['discardRoomKey'];
   'encryption.share_history': Rpc['encryption']['shareHistory'];
+  'encryption.dehydrated_device': Rpc['encryption']['dehydratedDevice'];
+  'encryption.set_dehydrated_device': Rpc['encryption']['setDehydratedDevice'];
   'encryption.request_verification': Rpc['encryption']['requestVerification'];
   'encryption.withdraw_verification': Rpc['encryption']['withdrawVerification'];
   'encryption.set_device_blocked': Rpc['encryption']['setDeviceBlocked'];
@@ -3789,6 +3797,8 @@ export function createRpc(call: RpcCall): Rpc {
       renameDevice: (params) => call('encryption.rename_device', params) as ReturnType<Rpc['encryption']['renameDevice']>,
       discardRoomKey: (params) => call('encryption.discard_room_key', params) as ReturnType<Rpc['encryption']['discardRoomKey']>,
       shareHistory: (params) => call('encryption.share_history', params) as ReturnType<Rpc['encryption']['shareHistory']>,
+      dehydratedDevice: (params = {}) => call('encryption.dehydrated_device', params) as ReturnType<Rpc['encryption']['dehydratedDevice']>,
+      setDehydratedDevice: (params) => call('encryption.set_dehydrated_device', params) as ReturnType<Rpc['encryption']['setDehydratedDevice']>,
       requestVerification: (params) => call('encryption.request_verification', params) as ReturnType<Rpc['encryption']['requestVerification']>,
       withdrawVerification: (params) => call('encryption.withdraw_verification', params) as ReturnType<Rpc['encryption']['withdrawVerification']>,
       setDeviceBlocked: (params) => call('encryption.set_device_blocked', params) as ReturnType<Rpc['encryption']['setDeviceBlocked']>,

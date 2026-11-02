@@ -153,7 +153,7 @@ impl Core {
     ) {
         let handle = client.add_event_handler({
             let core = self.clone();
-            move |event: AnyGlobalAccountDataEvent| {
+            move |event: AnyGlobalAccountDataEvent, client: matrix_sdk::Client| {
                 let core = core.clone();
                 async move {
                     if core
@@ -162,6 +162,7 @@ impl Core {
                         == generation
                     {
                         let event_type = event.event_type().to_string();
+                        crate::dehydrated_device::on_account_data(&client, &event).await;
                         core.remember_account_data_type(event_type.clone()).await;
                         if crate::personas::is_persona_event(&event_type) {
                             core.emit(CoreEvent::PersonasChanged);

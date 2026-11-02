@@ -38,6 +38,7 @@
   import VerifyDeviceDialog from './VerifyDeviceDialog.svelte';
   import DeviceActionForm from './DeviceActionForm.svelte';
   import RoomKeyFile from './RoomKeyFile.svelte';
+  import DehydratedDeviceSettings from './DehydratedDeviceSettings.svelte';
   import KeyBackupSettings from './KeyBackupSettings.svelte';
 
   const core = useCoreClient();
@@ -415,6 +416,8 @@
             </Button>
           </div>
         {/if}
+
+        <DehydratedDeviceSettings />
 
         <div class="setting-row">
           <span class="row-icon" aria-hidden="true"><WarningCircleIcon /></span>

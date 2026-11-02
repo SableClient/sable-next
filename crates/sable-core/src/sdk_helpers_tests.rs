@@ -3562,3 +3562,96 @@ async fn knock_by_alias_targets_the_resolved_room_id() {
 
     assert_eq!(room_id, "!target:creator.example");
 }
+
+#[tokio::test]
+async fn dehydrated_device_reports_the_server_and_the_preference() {
+    use matrix_sdk::ruma::owned_device_id;
+
+    use crate::api::encryption::{DehydratedDeviceParams, SetDehydratedDeviceParams};
+    use crate::dehydrated_device::PREFERENCE_EVENT;
+    use crate::protocol::DehydratedDeviceView;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let core = core(&server, client).await;
+    let preference = format!(r"/account_data/{}$", regex_lite::escape(PREFERENCE_EVENT));
+    let not_found = ResponseTemplate::new(404).set_body_json(json!({
+        "errcode": "M_NOT_FOUND",
+        "error": "not found",
+    }));
+
+    {
+        let _device = server
+            .mock_get_dehydrated_device()
+            .error_unrecognized()
+            .mount_as_scoped()
+            .await;
+        assert_eq!(
+            core.run(DehydratedDeviceParams {}).await.unwrap(),
+            DehydratedDeviceView::Unsupported
+        );
+    }
+
+    let unset = Mock::given(method("GET"))
+        .and(path_regex(&preference))
+        .respond_with(not_found)
+        .mount_as_scoped(server.server())
+        .await;
+    {
+        let _device = server
+            .mock_get_dehydrated_device()
+            .not_found()
+            .mount_as_scoped()
+            .await;
+        assert_eq!(
+            core.run(DehydratedDeviceParams {}).await.unwrap(),
+            DehydratedDeviceView::NeedsRecoveryKey
+        );
+    }
+    {
+        let _device = server
+            .mock_get_dehydrated_device()
+            .ok(&owned_device_id!("DEHYDRATED"), json!({}))
+            .mount_as_scoped()
+            .await;
+        assert_eq!(
+            core.run(DehydratedDeviceParams {}).await.unwrap(),
+            DehydratedDeviceView::Active
+        );
+    }
+    drop(unset);
+
+    Mock::given(method("PUT"))
+        .and(path_regex(&preference))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(preference))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "enabled": false })))
+        .mount(server.server())
+        .await;
+    server
+        .mock_delete_dehydrated_device()
+        .ok(&owned_device_id!("DEHYDRATED"))
+        .mock_once()
+        .mount()
+        .await;
+    server
+        .mock_get_dehydrated_device()
+        .not_found()
+        .mount()
+        .await;
+
+    assert_eq!(
+        core.run(SetDehydratedDeviceParams { enabled: false })
+            .await
+            .unwrap(),
+        DehydratedDeviceView::Disabled
+    );
+    assert_eq!(
+        last_put_body(&server, PREFERENCE_EVENT).await,
+        json!({ "enabled": false })
+    );
+}

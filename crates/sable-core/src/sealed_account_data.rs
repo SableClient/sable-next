@@ -330,7 +330,9 @@ impl Core {
                 return;
             }
         };
-        if let Err(error) = adopt_key(self, client, &store).await {
+        let adopted = adopt_key(self, client, &store).await;
+        self.start_dehydrated_device(client, store);
+        if let Err(error) = adopted {
             tracing::warn!("adopting the account data key failed: {error}");
             return;
         }

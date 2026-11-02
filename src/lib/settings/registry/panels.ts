@@ -293,6 +293,7 @@ export const settingsPanels: Record<string, SettingsPanelDefinition[]> = {
           }
         ),
         ...targets([
+          ['dehydrated-device', 'settings.dehydratedDevice', 'settings.dehydratedDeviceHint'],
           ['key-backup-heading', 'settings.keyBackupTitle'],
           ['devices-heading', 'settings.signedInDevices'],
           ['room-keys-heading', 'settings.roomKeys'],

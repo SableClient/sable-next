@@ -2144,6 +2144,16 @@ pub struct RegisteredPusherView {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
+pub enum DehydratedDeviceView {
+    Unsupported,
+    Disabled,
+    Active,
+    NeedsRecoveryKey,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
 pub enum ShareHistoryView {
     Shared,
     Unencrypted,

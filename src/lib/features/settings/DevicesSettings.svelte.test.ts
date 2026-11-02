@@ -35,6 +35,7 @@ const encryption = {
     can_restore: true,
     download: null,
   }),
+  dehydratedDevice: vi.fn<Rpc['encryption']['dehydratedDevice']>().mockResolvedValue('unsupported'),
 };
 Object.assign(baseCore, { rpc: { encryption } });
 
