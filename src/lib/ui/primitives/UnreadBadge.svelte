@@ -1,7 +1,11 @@
 <script lang="ts">
   import type { ClassValue, HTMLAttributes } from 'svelte/elements';
 
+  import { cubicOut } from 'svelte/easing';
+  import { scale } from 'svelte/transition';
+
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
 
   import {
     formatUnreadCount,
@@ -27,6 +31,7 @@
 {#if badge}
   <span
     {...rest}
+    in:scale={{ start: 0.6, duration: motionMs(MOTION_MS.quick), easing: cubicOut }}
     class={[
       'unread-badge',
       `unread-badge-${badge.mode}`,

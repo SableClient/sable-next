@@ -118,6 +118,9 @@ export default mergeConfig(
                     emulateColorScheme: async (context, scheme: 'light' | 'dark') => {
                       await context.page.emulateMedia({ colorScheme: scheme });
                     },
+                    emulateReducedMotion: async (context, motion: 'reduce' | 'no-preference') => {
+                      await context.page.emulateMedia({ reducedMotion: motion });
+                    },
                   },
                 },
               },
