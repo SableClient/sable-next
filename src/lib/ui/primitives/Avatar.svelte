@@ -3,7 +3,6 @@
 </script>
 
 <script lang="ts">
-  import { Avatar } from 'bits-ui';
   import type { Snippet } from 'svelte';
   import { on } from 'svelte/events';
   import type { ClassValue } from 'svelte/elements';
@@ -59,12 +58,9 @@
   let fallback = $derived(initials ?? toInitials(name));
   let accessibleLabel = $derived(alt ?? name ?? fallback);
   let isMxc = $derived((src?.startsWith('mxc://') || src?.startsWith('{')) ?? false);
-  let imageStatus = $state<Avatar.RootProps['loadingStatus']>('loading');
   let paintedSrc = $state<string | null>(null);
   let failedSrc = $state<string | null>(null);
-  let loadingStatus = $derived<Avatar.RootProps['loadingStatus']>(
-    !src ? 'error' : isMxc ? (failedSrc === src ? 'error' : 'loaded') : imageStatus
-  );
+  let pictureShown = $derived(!!src && failedSrc !== src && (isMxc || paintedSrc === src));
   let plate = $derived(color ?? (id === null ? undefined : identityColor(id)));
   let tint = $derived(paintedSrc === src ? undefined : plate);
   let hovered = $state(false);
@@ -97,9 +93,8 @@
 </script>
 
 {#snippet avatar()}
-  <Avatar.Root
+  <div
     {@attach isMxc && !original ? playOnHover : undefined}
-    bind:loadingStatus={() => loadingStatus, (value) => (imageStatus = value)}
     class={['avatar-root', `avatar-${size}`, className]}
     aria-hidden={decorative ? 'true' : undefined}
     role={decorative ? undefined : 'img'}
@@ -138,17 +133,25 @@
         />
       {/if}
     {:else if src}
-      <Avatar.Image {src} alt="" class="avatar-image" />
+      <img
+        {src}
+        alt=""
+        class="avatar-image"
+        style:display={paintedSrc === src ? undefined : 'none'}
+        onload={() => (paintedSrc = src)}
+        onerror={() => (failedSrc = src)}
+      />
     {/if}
 
-    <Avatar.Fallback
+    <span
       class="avatar-fallback"
       data-decorative-initials={initialsAsDecoration && !children ? fallback : undefined}
       style={plate ? `background: ${plate}; color: var(--avatar-identity-on-plate)` : undefined}
+      style:display={pictureShown ? 'none' : undefined}
     >
       {#if children}{@render children()}{:else if !initialsAsDecoration}{fallback}{/if}
-    </Avatar.Fallback>
-  </Avatar.Root>
+    </span>
+  </div>
 {/snippet}
 
 {#if openable && src && name}

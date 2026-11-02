@@ -101,6 +101,27 @@ test('an undecodable picture falls back to the initials', async () => {
   expect(fallback()?.style.display).toBe('');
 });
 
+test('a plain image url shows the initials until it loads, and again if it fails', async () => {
+  const { rerender } = render(Avatar, {
+    props: { src: 'https://example.org/a.png', name: 'Sable' },
+  });
+  const image = () => root().querySelector<HTMLImageElement>('img.avatar-image');
+
+  expect(fallback()?.style.display).toBe('');
+  expect(image()?.style.display).toBe('none');
+
+  image()?.dispatchEvent(new Event('load'));
+  await tick();
+  expect(fallback()?.style.display).toBe('none');
+  expect(image()?.style.display).toBe('');
+
+  await rerender({ src: 'https://example.org/broken.png', name: 'Sable' });
+  image()?.dispatchEvent(new Event('error'));
+  await tick();
+  expect(fallback()?.style.display).toBe('');
+  expect(image()?.style.display).toBe('none');
+});
+
 test('leaves a picture on a transparent box, so a transparent png keeps its own shape', () => {
   render(Avatar, {
     props: { src: 'https://example.org/avatar.png', name: 'Sable', color: 'rgb(1, 2, 3)' },
