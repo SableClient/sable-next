@@ -1875,6 +1875,36 @@ mod regression_tests {
     }
 
     #[tokio::test]
+    async fn resuming_without_a_network_waits_for_one_to_start_sync() {
+        use matrix_sdk_ui::sync_service::State;
+
+        let (_store, _server, core, _room) = core_with_room().await;
+        let sync_service = core.sync_service().await.unwrap();
+        core.set_network_available(false).await;
+
+        core.set_app_active(true);
+        core.apply_app_activity(true).await;
+        assert!(matches!(sync_service.state().get(), State::Idle));
+
+        core.set_network_available(true).await;
+        assert!(!matches!(sync_service.state().get(), State::Idle));
+    }
+
+    #[tokio::test]
+    async fn a_network_coming_back_in_the_background_does_not_start_sync() {
+        use matrix_sdk_ui::sync_service::State;
+
+        let (_store, _server, core, _room) = core_with_room().await;
+        let sync_service = core.sync_service().await.unwrap();
+        core.set_app_active(false);
+        core.apply_app_activity(false).await;
+        core.set_network_available(false).await;
+
+        core.set_network_available(true).await;
+        assert!(matches!(sync_service.state().get(), State::Idle));
+    }
+
+    #[tokio::test]
     async fn a_stale_pause_cannot_stop_a_new_background_interval() {
         use matrix_sdk_ui::sync_service::State;
 

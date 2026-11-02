@@ -86,15 +86,14 @@ pub(crate) async fn close_in_app_auth_window(
         .map_err(|error| error.to_string())
 }
 
-pub(crate) fn watch_network(core: &std::sync::Arc<sable_core::Core>) -> Result<(), String> {
+pub(crate) fn watch_network() -> Result<(), String> {
     let class = AnyClass::get(c"SableNetwork").ok_or("network monitor bridge is unavailable")?;
-    let core = std::sync::Arc::downgrade(core);
-    let handler = RcBlock::new(move |unmetered: objc2::runtime::Bool| {
-        if let Some(core) = core.upgrade() {
-            core.set_search_network_unmetered(unmetered.as_bool());
-        }
-    });
-    // SAFETY: SableNetwork declares startWithHandler: taking a (BOOL) block and returning void, and the callee copies the block
+    let handler = RcBlock::new(
+        |available: objc2::runtime::Bool, unmetered: objc2::runtime::Bool| {
+            crate::network::set_state(available.as_bool(), unmetered.as_bool());
+        },
+    );
+    // SAFETY: SableNetwork declares startWithHandler: taking a (BOOL, BOOL) block and returning void, and the callee copies the block
     let _: () = unsafe { msg_send![class, startWithHandler: &*handler] };
     Ok(())
 }

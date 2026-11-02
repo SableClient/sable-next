@@ -141,9 +141,10 @@ pub(crate) async fn copy_image_to_clipboard(image: String) -> Result<(), String>
 pub(crate) extern "system" fn Java_moe_sable_client_MainActivity_nativeNetworkChanged(
     _env: EnvUnowned,
     _this: JObject,
+    available: jni::sys::jboolean,
     unmetered: jni::sys::jboolean,
 ) {
-    crate::network::set_unmetered(unmetered);
+    crate::network::set_state(available, unmetered);
 }
 
 #[unsafe(no_mangle)]

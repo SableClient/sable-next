@@ -194,6 +194,7 @@ pub struct Core {
     app_activity_revision: AtomicU64,
     app_wake: tokio::sync::Notify,
     sync_suspended: AtomicBool,
+    network_available: AtomicBool,
     shut_down: AtomicBool,
     activity_lock: Mutex<()>,
     stores_open: watch::Sender<bool>,
@@ -308,6 +309,7 @@ impl Core {
             app_activity_revision: AtomicU64::new(0),
             app_wake: tokio::sync::Notify::new(),
             sync_suspended: AtomicBool::new(false),
+            network_available: AtomicBool::new(true),
             shut_down: AtomicBool::new(false),
             activity_lock: Mutex::new(()),
             stores_open: watch::Sender::new(true),
@@ -494,7 +496,9 @@ impl Core {
             self.sync_suspended.store(false, Ordering::SeqCst);
             self.set_sync_presence(presence::state(self.desired_presence()))
                 .await;
-            if !self.account_locked.load(Ordering::SeqCst) {
+            if !self.account_locked.load(Ordering::SeqCst)
+                && self.network_available.load(Ordering::SeqCst)
+            {
                 sync_service.start().await;
             }
         } else if self.call_sessions.lock().await.is_empty() {
@@ -505,6 +509,13 @@ impl Core {
             sync_service.stop().await;
             #[cfg(target_os = "ios")]
             self.close_stores().await;
+        }
+    }
+
+    pub async fn set_network_available(self: &Arc<Self>, available: bool) {
+        let was_available = self.network_available.swap(available, Ordering::SeqCst);
+        if available && !was_available && self.app_active.load(Ordering::Relaxed) {
+            self.apply_activity(true, None).await;
         }
     }
 

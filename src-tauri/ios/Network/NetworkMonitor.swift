@@ -6,12 +6,13 @@ final class SableNetwork: NSObject {
   private static var monitor: NWPathMonitor?
 
   @objc(startWithHandler:)
-  static func start(handler: @escaping (Bool) -> Void) {
+  static func start(handler: @escaping (Bool, Bool) -> Void) {
     DispatchQueue.main.async {
       monitor?.cancel()
       let next = NWPathMonitor()
       next.pathUpdateHandler = { path in
         handler(
+          path.status == .satisfied,
           path.status == .satisfied &&
           !path.usesInterfaceType(.cellular) &&
           !path.isExpensive &&

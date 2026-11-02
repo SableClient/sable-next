@@ -35,7 +35,7 @@ import org.json.JSONObject
 
 class MainActivity : TauriActivity() {
   private external fun nativeInitSystemBars()
-  private external fun nativeNetworkChanged(unmetered: Boolean)
+  private external fun nativeNetworkChanged(available: Boolean, unmetered: Boolean)
   private var networkCallback: ConnectivityManager.NetworkCallback? = null
   private var fullscreenClient: FullscreenChromeClient? = null
   private val authBrowser = AuthBrowser(this)
@@ -69,13 +69,14 @@ class MainActivity : TauriActivity() {
       override fun onAvailable(network: Network) {
         if (instance !== this@MainActivity) return
         current = network
-        nativeNetworkChanged(false)
+        nativeNetworkChanged(true, false)
       }
 
       override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
         if (instance !== this@MainActivity) return
         if (network != current) return
         nativeNetworkChanged(
+          true,
           capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
           capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) &&
           !capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
@@ -86,11 +87,11 @@ class MainActivity : TauriActivity() {
         if (instance !== this@MainActivity) return
         if (network != current) return
         current = null
-        nativeNetworkChanged(false)
+        nativeNetworkChanged(false, false)
       }
     }
     runCatching {
-      nativeNetworkChanged(false)
+      nativeNetworkChanged(connectivity.activeNetwork != null, false)
       connectivity.registerDefaultNetworkCallback(callback)
       networkCallback = callback
     }.onFailure { error ->
@@ -231,7 +232,7 @@ class MainActivity : TauriActivity() {
     networkCallback = null
     if (instance === this) {
       instance = null
-      nativeNetworkChanged(false)
+      nativeNetworkChanged(true, false)
     }
     super.onDestroy()
   }
