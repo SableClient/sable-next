@@ -227,7 +227,12 @@
 </script>
 
 {#snippet receiptSlot()}
-  <span class="receipt-slot" bind:clientWidth={receiptWidth}>
+  <span
+    class="receipt-slot"
+    bind:borderBoxSize={
+      null, (box: ResizeObserverSize[]) => (receiptWidth = box[0]?.inlineSize ?? 0)
+    }
+  >
     <ReadReceiptStack
       readers={receiptReaders}
       timestamps={item.read_timestamps}

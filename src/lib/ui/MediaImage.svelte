@@ -546,8 +546,13 @@
   <img
     {...withoutTabindex(props)}
     bind:this={imageElement}
-    bind:clientWidth={renderedWidth}
-    bind:clientHeight={renderedHeight}
+    bind:borderBoxSize={
+      null,
+      (box: ResizeObserverSize[]) => {
+        renderedWidth = box[0]?.inlineSize ?? 0;
+        renderedHeight = box[0]?.blockSize ?? 0;
+      }
+    }
     class={['media-image-content', { tinted }]}
     style:background-color={plate ?? undefined}
     src={heldUrl}
