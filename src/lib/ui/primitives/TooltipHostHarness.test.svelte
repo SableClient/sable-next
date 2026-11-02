@@ -1,11 +1,8 @@
 <script lang="ts">
   import Tooltip from './Tooltip.svelte';
-  import TooltipHost, { provideTooltipHost } from './TooltipHost.svelte';
   import TooltipProvider from './TooltipProvider.svelte';
 
-  let { format }: { format: () => string } = $props();
-
-  const tether = provideTooltipHost();
+  let { format, onclick }: { format: () => string; onclick?: () => void } = $props();
 </script>
 
 <TooltipProvider>
@@ -14,5 +11,7 @@
     {#snippet content()}{format()}{/snippet}
     Two
   </Tooltip>
-  <TooltipHost {tether} />
+  <Tooltip label="Off" disabled>
+    {#snippet trigger({ props })}<button {...props} type="button" {onclick}>Three</button>{/snippet}
+  </Tooltip>
 </TooltipProvider>

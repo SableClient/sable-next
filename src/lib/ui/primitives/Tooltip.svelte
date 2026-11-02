@@ -78,12 +78,16 @@
 {/snippet}
 
 {#if host && open === undefined && customAnchor === undefined}
-  <BitsTooltip.Trigger
-    tether={host}
-    payload={{ label, multiline, side, align, content }}
-    {disabled}
-    child={trigger ?? defaultTrigger}
-  />
+  <!-- A tethered trigger's `disabled` disables the element itself, not only its tooltip. -->
+  {#if disabled}
+    {@render (trigger ?? defaultTrigger)({ props: {} })}
+  {:else}
+    <BitsTooltip.Trigger
+      tether={host}
+      payload={{ label, multiline, side, align, content }}
+      child={trigger ?? defaultTrigger}
+    />
+  {/if}
 {:else if provided}
   {@render tooltip()}
 {:else}

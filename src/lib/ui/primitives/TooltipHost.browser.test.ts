@@ -22,3 +22,11 @@ test('triggers below a host open the shared tooltip with their own content, buil
   });
   expect(contents()).toHaveLength(1);
 });
+
+test('a trigger whose tooltip is disabled stays clickable', async () => {
+  const onclick = vi.fn();
+  await render(TooltipHostHarness, { format: () => '', onclick });
+
+  await userEvent.click(page.getByRole('button', { name: 'Three' }));
+  expect(onclick).toHaveBeenCalledOnce();
+});

@@ -12,6 +12,8 @@
   import type { Snippet } from 'svelte';
   import { Tooltip as BitsTooltip } from 'bits-ui';
 
+  import TooltipHost, { provideTooltipHost } from './TooltipHost.svelte';
+
   interface Props {
     children: Snippet;
   }
@@ -19,6 +21,7 @@
   let { children }: Props = $props();
 
   setProvided(true);
+  const tether = provideTooltipHost();
 </script>
 
 <BitsTooltip.Provider
@@ -28,4 +31,5 @@
   disableHoverableContent
 >
   {@render children()}
+  <TooltipHost {tether} />
 </BitsTooltip.Provider>

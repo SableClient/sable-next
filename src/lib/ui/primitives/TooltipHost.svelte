@@ -28,8 +28,6 @@
 <script lang="ts">
   import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
 
-  import TooltipProvider, { tooltipProvided } from './TooltipProvider.svelte';
-
   import './tooltip.css';
 
   interface Props {
@@ -38,31 +36,22 @@
 
   let { tether }: Props = $props();
 
-  const provided = tooltipProvided();
   // Tooltips inside the shared content would otherwise retarget the tooltip that shows them.
   setHost(null);
 </script>
 
-{#snippet root()}
-  <BitsTooltip.Root {tether}>
-    {#snippet children({ payload })}
-      <BitsTooltip.Portal>
-        <BitsTooltip.Content
-          class={payload?.multiline ? 'tooltip tooltip-multiline' : 'tooltip'}
-          side={payload?.side ?? 'top'}
-          align={payload?.align ?? 'center'}
-          sideOffset={8}
-          collisionPadding={collisionPadding()}
-        >
-          {#if payload?.content}{@render payload.content()}{:else}{payload?.label}{/if}
-        </BitsTooltip.Content>
-      </BitsTooltip.Portal>
-    {/snippet}
-  </BitsTooltip.Root>
-{/snippet}
-
-{#if provided}
-  {@render root()}
-{:else}
-  <TooltipProvider>{@render root()}</TooltipProvider>
-{/if}
+<BitsTooltip.Root {tether}>
+  {#snippet children({ payload })}
+    <BitsTooltip.Portal>
+      <BitsTooltip.Content
+        class={payload?.multiline ? 'tooltip tooltip-multiline' : 'tooltip'}
+        side={payload?.side ?? 'top'}
+        align={payload?.align ?? 'center'}
+        sideOffset={8}
+        collisionPadding={collisionPadding()}
+      >
+        {#if payload?.content}{@render payload.content()}{:else}{payload?.label}{/if}
+      </BitsTooltip.Content>
+    </BitsTooltip.Portal>
+  {/snippet}
+</BitsTooltip.Root>
