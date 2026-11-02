@@ -85,6 +85,8 @@ export default defineConfig({
     cwd: '../..',
     command: 'pnpm exec vite dev --host 127.0.0.1 --port 4175 --strictPort',
     url: 'http://127.0.0.1:4175',
+    // The inspector rides on Vite's client, so it also loads in the PDF worker and throws there.
+    env: { SVELTE_INSPECTOR_OPTIONS: 'false' },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
