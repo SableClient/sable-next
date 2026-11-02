@@ -5,6 +5,8 @@
   import SubtitlesIcon from 'phosphor-svelte/lib/SubtitlesIcon';
   import SubtitlesSlashIcon from 'phosphor-svelte/lib/SubtitlesSlashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
+  import { cubicOut } from 'svelte/easing';
+  import { scale, slide } from 'svelte/transition';
 
   import { i18n } from '#lib/i18n.js';
   import {
@@ -13,6 +15,7 @@
     type ImageMetadata,
   } from '#lib/settings/preferences.svelte.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
+  import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
 
@@ -36,11 +39,14 @@
   let media = $derived(files.filter((item) => previewKind(item.file) !== null));
 </script>
 
-<div class="attachments">
+<div class="attachments" in:slide={{ duration: motionMs(MOTION_MS.quick), easing: cubicOut }}>
   <ul class="staged" aria-label={i18n.t('composer.stagedFiles')}>
     {#each files as item (item.id)}
       {@const kind = previewKind(item.file)}
-      <li class={['staged-item', kind ? 'staged-media' : 'staged-file']}>
+      <li
+        class={['staged-item', kind ? 'staged-media' : 'staged-file']}
+        in:scale={{ start: 0.9, duration: motionMs(MOTION_MS.quick), easing: cubicOut }}
+      >
         {#if kind}
           <StagedThumbnail
             file={item.file}
