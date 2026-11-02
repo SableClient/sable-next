@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount, untrack, type Snippet } from 'svelte';
+  import { cubicOut } from 'svelte/easing';
+  import { fly } from 'svelte/transition';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
@@ -8,6 +10,7 @@
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import { PanelWidth, remFromPixels } from '#lib/ui/panel-width.svelte.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
 
   interface Props {
     title: string;
@@ -45,6 +48,7 @@
     class={['side-panel', { modal }]}
     aria-label={title}
     style:width={modal ? null : `${panelWidth.width}rem`}
+    in:fly={{ x: modal ? 0 : 24, duration: modal ? 0 : motionMs(MOTION_MS.fast), easing: cubicOut }}
   >
     {#if !modal}
       <ResizeHandle
