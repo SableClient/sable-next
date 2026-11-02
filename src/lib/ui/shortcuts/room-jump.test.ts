@@ -6,7 +6,6 @@ import {
   filterRoomsByQuery,
   parentSpaceNames,
   parseJumpQuery,
-  roomDisplayName,
   unreadRoomsByPriority,
 } from './room-jump';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
@@ -44,16 +43,6 @@ function room(overrides: Partial<RoomListItemView> & { room_id: string }): RoomL
 function latest(timestamp: number): RoomListItemView['latest_event'] {
   return { sender: null, body: '', timestamp, sending: false, event_id: null };
 }
-
-test('roomDisplayName prefers the name, then the alias, then the id', () => {
-  expect(roomDisplayName(room({ room_id: '!a:example.org', name: 'Engineering' }))).toBe(
-    'Engineering'
-  );
-  expect(
-    roomDisplayName(room({ room_id: '!a:example.org', canonical_alias: '#eng:example.org' }))
-  ).toBe('#eng:example.org');
-  expect(roomDisplayName(room({ room_id: '!a:example.org' }))).toBe('!a:example.org');
-});
 
 test('filterRoomsByQuery excludes rooms that are not joined', () => {
   const rooms = [

@@ -6,7 +6,8 @@
   import type { RoomListItemView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import { inviter, senderLabel } from '#lib/features/inbox/inbox.js';
+  import { DisplayNames } from '#lib/features/inbox/display-names.svelte.js';
+  import { inviter } from '#lib/features/inbox/inbox.js';
   import { i18n } from '#lib/i18n.js';
   import { InviteActions } from '#lib/rooms/invites.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -19,7 +20,10 @@
   }
 
   let { invites, collapsed = false }: Props = $props();
-  const answers = new InviteActions(useCoreClient());
+  const core = useCoreClient();
+  const answers = new InviteActions(core);
+  const names = new DisplayNames(core);
+  $effect(() => core.onProfileChanged(names.forget));
   const headingId = $props.id();
 </script>
 
@@ -48,7 +52,7 @@
               {/snippet}
             </Tooltip>
             {#if from}
-              {@const invitedBy = i18n.t('inbox.invitedBy', { name: senderLabel(from) })}
+              {@const invitedBy = i18n.t('inbox.invitedBy', { name: names.name(from) })}
               <Tooltip label={from}>
                 {#snippet trigger({ props })}
                   <span {...props} class="invite-from">{invitedBy}</span>

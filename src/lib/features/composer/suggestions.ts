@@ -8,7 +8,6 @@ import type {
 import { REACTION_EMOJI, searchReactionEmoji } from '#lib/emoji/emoji.js';
 import { packName } from '#lib/emoji/pack-name.js';
 import { t } from '#lib/i18n.js';
-import { roomAvatarUrl, roomLabel } from '#lib/rooms/room-list.svelte.js';
 
 import { adminSuggestions, type AdminCommand, type AdminScope } from './admin-commands';
 import type { AutocompleteQuery, Suggestion } from './autocomplete';
@@ -41,25 +40,16 @@ function roomMention(needle: string, translate: Translate): Suggestion[] {
   ];
 }
 
-export type DisplayName = (userId: string, fallback: string) => string;
-
 const atName = (name: string): string => (name.startsWith('@') ? name : `@${name}`);
 
-function memberSuggestions(
-  needle: string,
-  members: readonly MemberView[],
-  displayName: DisplayName
-): Suggestion[] {
+function memberSuggestions(needle: string, members: readonly MemberView[]): Suggestion[] {
   return members
-    .map((member) => {
-      const name = member.display_name ?? member.user_id;
-      return {
-        member,
-        name,
-        shown: displayName(member.user_id, name),
-        localpart: localpartOf(member.user_id),
-      };
-    })
+    .map((member) => ({
+      member,
+      name: member.real_name ?? member.user_id,
+      shown: member.display_name ?? member.user_id,
+      localpart: localpartOf(member.user_id),
+    }))
     .map((entry) => ({
       ...entry,
       keys: [entry.shown, entry.name, entry.localpart].map((key) => key.toLowerCase()),
@@ -164,7 +154,7 @@ function roomSuggestions(needle: string, rooms: readonly RoomListItemView[]): Su
       return {
         room,
         name,
-        label: roomLabel(room),
+        label: room.display_name,
         searchName: normalized(name),
         searchAlias: normalized(room.canonical_alias ?? ''),
       };
@@ -192,7 +182,7 @@ function roomSuggestions(needle: string, rooms: readonly RoomListItemView[]): Su
       insert: name.startsWith('#') ? name : `#${name}`,
       label: label.startsWith('#') ? label : `#${label}`,
       detail: room.canonical_alias,
-      avatarUrl: roomAvatarUrl(room),
+      avatarUrl: room.display_avatar_url,
     }))
     .filter(({ id }) => {
       if (seen.has(id)) return false;
@@ -205,8 +195,7 @@ function roomSuggestions(needle: string, rooms: readonly RoomListItemView[]): Su
 function commandSuggestions(
   needle: string,
   translate: Translate,
-  botCommands: readonly BotCommand[],
-  displayName: DisplayName
+  botCommands: readonly BotCommand[]
 ): Suggestion[] {
   const names = slashCommandNames();
   const builtIn = new Set(names);
@@ -223,7 +212,7 @@ function commandSuggestions(
   const bots = botCommands
     .filter((command) => !builtIn.has(command.command.toLowerCase()))
     .map((command) => {
-      const bot = displayName(command.sender, command.sender_name ?? command.sender);
+      const bot = command.sender_name ?? command.sender;
       return {
         name: command.command.toLowerCase(),
         names: botCommandNames(command).map((name) => name.toLowerCase()),
@@ -264,19 +253,18 @@ export function suggestionsFor(
   translate: Translate = t,
   admin: AdminScope = null,
   adminCommands: readonly AdminCommand[] | null = null,
-  botCommands: readonly BotCommand[] = [],
-  displayName: DisplayName = (_userId, fallback) => fallback
+  botCommands: readonly BotCommand[] = []
 ): Suggestion[] {
   if (!query) return [];
   if (query.sigil === '!') return adminSuggestions(query.query, admin, adminCommands);
   const needle = query.query.toLowerCase();
 
-  if (query.sigil === '/') return commandSuggestions(needle, translate, botCommands, displayName);
+  if (query.sigil === '/') return commandSuggestions(needle, translate, botCommands);
   if (query.sigil === '@') {
-    return [
-      ...roomMention(needle, translate),
-      ...memberSuggestions(needle, members, displayName),
-    ].slice(0, limit);
+    return [...roomMention(needle, translate), ...memberSuggestions(needle, members)].slice(
+      0,
+      limit
+    );
   }
   if (query.sigil === '#') return roomSuggestions(needle, rooms);
   return emoteSuggestions(needle, emotes, translate);

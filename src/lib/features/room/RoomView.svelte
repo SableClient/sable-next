@@ -32,8 +32,7 @@
   import { afterOverlayPops, holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { matrixLinkPath, copyRoomLink, roomSectionPath } from '#lib/rooms/permalink.js';
   import { backToRoomList, searchInRoom, trackRoomEntry } from './room-navigation.js';
-  import { findRoomByPathId, roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
+  import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { provideRoomCosmetics, RoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import { activeRoomTimeline } from '#lib/rooms/timeline.svelte.js';
@@ -326,7 +325,7 @@
   const voiceChatWidth = new PanelWidth('sable-voice-chat-width', 400, 300, 1000);
   voiceChatWidth.restore();
   let callShown = $derived(call.roomId === resolvedRoomId && (call.active || call.failure));
-  let roomName = $derived(resolvedRoom ? roomLabel(resolvedRoom) : roomId);
+  let roomName = $derived(resolvedRoom ? resolvedRoom.display_name : roomId);
   let roomAvatar = $derived(resolvedRoom?.avatar_url ?? null);
   let roomTopic = $derived(resolvedRoom?.topic ?? null);
   let isTombstoned = $derived(resolvedRoom?.is_tombstoned ?? false);
@@ -593,10 +592,7 @@
   }
 
   function memberDisplayName(userId: string): string | null {
-    const known = memberLoader.members.find((member) => member.user_id === userId)?.display_name;
-    return profileOverrides.of(userId)
-      ? profileOverrides.name(userId, known ?? userId)
-      : (known ?? null);
+    return memberLoader.members.find((member) => member.user_id === userId)?.display_name ?? null;
   }
   /** RoomPage is mounted by the home, direct and space routes alike, so the
       current path has to survive the rewrite. */

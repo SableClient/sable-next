@@ -7,7 +7,6 @@ import type {
 
 import { i18n } from '#lib/i18n.js';
 import { splitDisplayNamePronouns, withDisplayNamePronouns } from '#lib/personas/pronouns.js';
-import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 import type { SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
@@ -44,12 +43,11 @@ export class MessageSender {
   readonly accountName = $derived.by(() => {
     const { item, profile } = this.#options();
     const member = this.#member;
-    return profileOverrides.name(
-      item.sender ?? '',
+    return (
       (member ? member.display_name : item.sender_name) ??
-        (member ? null : profile?.display_name) ??
-        item.sender ??
-        i18n.t('timeline.unknownSender')
+      (member ? null : profile?.display_name) ??
+      item.sender ??
+      i18n.t('timeline.unknownSender')
     );
   });
 
@@ -66,11 +64,7 @@ export class MessageSender {
     const { item } = this.#options();
     if (this.persona?.avatar_url === '') return null;
     return (
-      this.persona?.avatar_url ??
-      profileOverrides.avatar(
-        item.sender ?? '',
-        this.#member ? this.#member.avatar_url : item.sender_avatar
-      )
+      this.persona?.avatar_url ?? (this.#member ? this.#member.avatar_url : item.sender_avatar)
     );
   });
 

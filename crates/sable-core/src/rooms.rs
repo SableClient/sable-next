@@ -836,6 +836,7 @@ mod tests {
         let row = crate::view::listless_room_list_item(
             room,
             &matrix_sdk::ruma::push::Ruleset::server_default(client.user_id().unwrap()),
+            &crate::nicknames::Nicknames::default(),
         )
         .await;
         assert!(row.is_tombstoned);

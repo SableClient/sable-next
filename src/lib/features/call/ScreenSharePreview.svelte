@@ -8,7 +8,6 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { UserProfile } from '#lib/profile/user-profile.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -60,9 +59,7 @@
     return session.members.find((member) => member.identity === identity)?.user_id ?? identity;
   });
   const sharerProfile = new UserProfile(core, () => sharerId);
-  let sharerName = $derived(
-    sharerId ? profileOverrides.name(sharerId, sharerProfile.current?.display_name ?? sharerId) : ''
-  );
+  let sharerName = $derived(sharerId ? (sharerProfile.current?.display_name ?? sharerId) : '');
   let label = $derived(i18n.t('call.screenOf', { name: sharerName }));
 
   let video = $state<HTMLVideoElement | null>(null);

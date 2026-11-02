@@ -18,6 +18,7 @@ function room(
     is_tombstoned: false,
     space_children: [],
     ...extra,
+    display_name: name,
   } as unknown as RoomListItemView;
 }
 

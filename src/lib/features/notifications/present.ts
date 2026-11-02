@@ -7,7 +7,6 @@ import {
   requestNativeNotificationPermission,
 } from '#lib/platform/native-notifications.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
-import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 export function enabled(): boolean {
@@ -55,7 +54,7 @@ export async function grantPermission(): Promise<boolean> {
 }
 
 export function title(view: NotificationView): string {
-  return view.is_direct ? profileOverrides.name(view.sender, view.room_name) : view.room_name;
+  return view.room_name;
 }
 
 function showsContent(view: NotificationView): boolean {
@@ -72,5 +71,5 @@ export function body(view: NotificationView): string {
 }
 
 function sender(view: NotificationView): string {
-  return profileOverrides.name(view.sender, view.sender_name);
+  return view.sender_name ?? view.sender;
 }

@@ -320,6 +320,8 @@ for (const device of ['desktop', 'mobile']) {
           user_id: `@${name}:example.test`,
           display_name: name,
           avatar_url: `mxc://example.test/${name}`,
+          real_name: name,
+          real_avatar_url: `mxc://example.test/${name}`,
           power_level: 0,
           membership: 'join',
           member_ts: null,

@@ -973,6 +973,8 @@ impl Core {
         self.probed_pinned_rooms.lock().clear();
         self.pinned_caches.lock().clear();
         *self.cosmetics.lock() = cosmetics::CosmeticsCache::default();
+        self.nicknames
+            .send_replace(crate::nicknames::Nicknames::default());
         *self.probed_state() = crate::probed_state::ProbedState::default();
         *self.recent_state.lock() = crate::probed_state::RecentState::default();
         *self.search_index.lock().await = search::MessageIndex::new();
@@ -1087,6 +1089,7 @@ impl Core {
         self.watch_room_state(&client);
         self.watch_cosmetics(&client, generation);
         self.watch_profile_changes(&client, generation);
+        self.watch_nicknames();
         self.watch_redactions(&client);
         let repair_client = client.clone();
         self.track_session_task(

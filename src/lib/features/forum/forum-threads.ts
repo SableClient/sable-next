@@ -1,6 +1,5 @@
 import type { TimelineItemContentView, TimelineItemView } from '#src/generated/protocol';
 import { isMediaCaptionContent } from '#lib/features/room/messages/media-caption.js';
-import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 
 export interface ForumThread {
   id: string;
@@ -98,7 +97,7 @@ export function collectForumThreads(
       eventId: rootId,
       title: root.forum_title,
       sender: root.sender,
-      senderName: root.sender && profileOverrides.name(root.sender, root.sender_name),
+      senderName: root.sender_name,
       senderAvatar: root.sender_avatar,
       isOwn: root.is_own,
       editable:
@@ -111,9 +110,7 @@ export function collectForumThreads(
       lastActivityAt: latest.timestamp,
       lastBody:
         root.thread_summary?.latest_body ?? (latestReply ? bodyOf(latestReply.content) : null),
-      lastSenderName: latestReply?.sender
-        ? profileOverrides.name(latestReply.sender, latestReply.sender_name)
-        : null,
+      lastSenderName: latestReply?.sender_name ?? latestReply?.sender ?? null,
       unread: unreadByRoot.get(rootId) ?? isUnread(latest, currentUserId),
     });
   }

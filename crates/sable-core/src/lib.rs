@@ -32,6 +32,7 @@ mod media;
 mod media_health;
 mod member_look;
 mod messages;
+pub mod nicknames;
 pub mod notifications;
 mod oauth_metadata;
 mod outgoing;
@@ -151,6 +152,8 @@ pub struct Core {
         >,
     >,
     cosmetics: parking_lot::Mutex<cosmetics::CosmeticsCache>,
+    nicknames: watch::Sender<nicknames::Nicknames>,
+    nicknames_stale: tokio::sync::Notify,
     cosmetics_fetches: parking_lot::Mutex<HashMap<matrix_sdk::ruma::OwnedRoomId, Arc<Mutex<()>>>>,
     probed_state: parking_lot::Mutex<probed_state::ProbedState>,
     recent_state: parking_lot::Mutex<probed_state::RecentState>,
@@ -332,6 +335,8 @@ impl Core {
             probed_pinned_rooms: parking_lot::Mutex::new(HashMap::new()),
             pinned_caches: parking_lot::Mutex::new(HashMap::new()),
             cosmetics: parking_lot::Mutex::new(cosmetics::CosmeticsCache::default()),
+            nicknames: watch::Sender::new(nicknames::Nicknames::default()),
+            nicknames_stale: tokio::sync::Notify::new(),
             cosmetics_fetches: parking_lot::Mutex::new(HashMap::new()),
             probed_state: parking_lot::Mutex::new(probed_state::ProbedState::default()),
             recent_state: parking_lot::Mutex::new(probed_state::RecentState::default()),
@@ -429,6 +434,11 @@ impl Core {
 
     /// No carrier means no UI, and syncing continues, so a drop is not an error.
     pub fn emit(&self, event: CoreEvent) {
+        if let CoreEvent::AccountDataChanged { event_type } = &event
+            && nicknames::reads_from(event_type)
+        {
+            self.nicknames_stale.notify_one();
+        }
         let _ = self.events.send(event);
     }
 

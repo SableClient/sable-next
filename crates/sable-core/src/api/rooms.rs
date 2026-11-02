@@ -178,7 +178,8 @@ impl Handler for ListItemParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<RoomListItemView, RpcError> {
         let room = core.room(&self.room_id).await?;
-        Ok(view::listless_room_list_item(room, &core.push_rules().await?.snapshot().await).await)
+        let rules = core.push_rules().await?.snapshot().await;
+        Ok(view::listless_room_list_item(room, &rules, &core.nicknames()).await)
     }
 }
 
@@ -771,10 +772,11 @@ impl Handler for ReplacedRoomsParams {
     async fn run(self, core: &Arc<Core>) -> Result<Vec<RoomListItemView>, RpcError> {
         let client = core.client().await?;
         let rules = core.push_rules().await?.snapshot().await;
+        let nicknames = core.nicknames();
         let mut rooms = Vec::new();
         for room in client.joined_rooms() {
             if room.is_tombstoned() {
-                rooms.push(view::listless_room_list_item(room, &rules).await);
+                rooms.push(view::listless_room_list_item(room, &rules, &nicknames).await);
             }
         }
         Ok(rooms)

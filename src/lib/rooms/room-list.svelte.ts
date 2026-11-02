@@ -10,7 +10,6 @@ import { applyDiffs } from '#src/transport';
 
 import { bufferSubscription } from '#lib/core/buffered-subscription.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { quietTargets } from './quiet-rooms.svelte.js';
@@ -64,21 +63,6 @@ export function roomPathParamFromId(roomId: string): string {
 
 export function roomPathParam(room: RoomListItemView, rooms: readonly RoomListItemView[]): string {
   return roomPathParamFromId(roomPathId(room, rooms));
-}
-
-function directPeer(room: RoomListItemView): string | null {
-  return room.is_direct && room.direct_targets.length === 1 ? room.direct_targets[0] : null;
-}
-
-export function roomLabel(room: RoomListItemView): string {
-  const label = room.name ?? room.canonical_alias ?? room.room_id;
-  const peer = directPeer(room);
-  return peer === null ? label : profileOverrides.name(peer, label);
-}
-
-export function roomAvatarUrl(room: RoomListItemView): string | null {
-  const peer = directPeer(room);
-  return peer === null ? room.avatar_url : profileOverrides.avatar(peer, room.avatar_url);
 }
 
 export function hasDirectRoom(rooms: readonly RoomListItemView[], userId: string): boolean {
@@ -152,7 +136,7 @@ export class RoomList {
 
   labelFor(roomId: string): string {
     const room = this.byId(roomId);
-    return room ? roomLabel(room) : roomId;
+    return room ? room.display_name : roomId;
   }
 
   warm(roomId: string): void {

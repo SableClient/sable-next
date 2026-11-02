@@ -34,7 +34,11 @@ test("reads a room's mode off its summary", async () => {
       room_id: '!muted:example.org',
       notification: { room: 'mute', default: 'all' },
     } as RoomListItemView),
-    withCounts({ room_id: '!plain:example.org', is_direct: false } as RoomListItemView),
+    withCounts({
+      room_id: '!plain:example.org',
+      is_direct: false,
+      display_name: '!plain:example.org',
+    } as RoomListItemView),
   ];
   const core = {
     subscribeEvents: vi.fn(() => () => {}),
@@ -110,6 +114,7 @@ test('clears a room avatar when a room-list diff supplies null', async () => {
   const room = {
     room_id: '!room:example.org',
     avatar_url: 'mxc://example.org/avatar',
+    display_name: '!room:example.org',
   } as RoomListItemView;
   const clearedRoom = { ...room, avatar_url: null };
   const eventListeners: ((event: unknown) => void)[] = [];
@@ -139,7 +144,10 @@ test('clears a room avatar when a room-list diff supplies null', async () => {
 });
 
 test('holds the typing user ids so a room opened later reads them', async () => {
-  const room = { room_id: '!room:example.org' } as RoomListItemView;
+  const room = {
+    room_id: '!room:example.org',
+    display_name: '!room:example.org',
+  } as RoomListItemView;
   const eventListeners: ((event: unknown) => void)[] = [];
   const core = {
     subscribeEvents: vi.fn((listener: (event: unknown) => void) => {
@@ -179,6 +187,7 @@ test('paints the persisted room list before the subscription answers', async () 
     notifying: 0,
     highlight: 0,
     marked_unread: false,
+    display_name: 'Persisted',
   } as RoomListItemView);
   stubLocalStorage().set('sable.room-list.acct', JSON.stringify([room]));
   let resolveSubscription: (value: {
@@ -235,7 +244,10 @@ test('a snapshot from a build before resolved counts paints nothing', () => {
 });
 
 test('is not settled on a painted snapshot', async () => {
-  const room = withCounts({ room_id: '!room:example.org' } as RoomListItemView);
+  const room = withCounts({
+    room_id: '!room:example.org',
+    display_name: '!room:example.org',
+  } as RoomListItemView);
   stubLocalStorage().set('sable.room-list.acct', JSON.stringify([room]));
   let resolveSubscription: (value: {
     subscription: number;
@@ -268,8 +280,14 @@ test('is not settled on a painted snapshot', async () => {
 });
 
 test('a diff after an empty first answer replaces the painted snapshot rather than joining it', async () => {
-  const first = withCounts({ room_id: '!first:example.org' } as RoomListItemView);
-  const second = withCounts({ room_id: '!second:example.org' } as RoomListItemView);
+  const first = withCounts({
+    room_id: '!first:example.org',
+    display_name: '!first:example.org',
+  } as RoomListItemView);
+  const second = withCounts({
+    room_id: '!second:example.org',
+    display_name: '!second:example.org',
+  } as RoomListItemView);
   stubLocalStorage().set('sable.room-list.acct', JSON.stringify([first, second]));
   const eventListeners: ((event: unknown) => void)[] = [];
   const core = {
@@ -301,8 +319,14 @@ test('a diff after an empty first answer replaces the painted snapshot rather th
 });
 
 test('waits for a room to be listed, and gives up after the timeout', async () => {
-  const listed = { room_id: '!listed:example.org' } as RoomListItemView;
-  const late = { room_id: '!late:example.org' } as RoomListItemView;
+  const listed = {
+    room_id: '!listed:example.org',
+    display_name: '!listed:example.org',
+  } as RoomListItemView;
+  const late = {
+    room_id: '!late:example.org',
+    display_name: '!late:example.org',
+  } as RoomListItemView;
   const eventListeners: ((event: unknown) => void)[] = [];
   const core = {
     subscribeEvents: vi.fn((listener: (event: unknown) => void) => {
@@ -348,7 +372,11 @@ test('waits for a room to be listed, and gives up after the timeout', async () =
 test('persists the live room list for the next launch', async () => {
   vi.useFakeTimers();
   const stored = stubLocalStorage();
-  const room = { room_id: '!live:example.org', name: 'Live' } as RoomListItemView;
+  const room = {
+    room_id: '!live:example.org',
+    name: 'Live',
+    display_name: 'Live',
+  } as RoomListItemView;
   const core = {
     session: { account_id: 'acct' },
     subscribeEvents: vi.fn(() => () => {}),
@@ -373,7 +401,11 @@ test('persists the live room list for the next launch', async () => {
 test('defers room-list snapshot writes until presentation resumes', async () => {
   vi.useFakeTimers();
   const stored = stubLocalStorage();
-  const room = { room_id: '!live:example.org', name: 'Live' } as RoomListItemView;
+  const room = {
+    room_id: '!live:example.org',
+    name: 'Live',
+    display_name: 'Live',
+  } as RoomListItemView;
   const core = {
     session: { account_id: 'acct' },
     subscribeEvents: vi.fn(() => () => {}),
@@ -398,12 +430,12 @@ test('defers room-list snapshot writes until presentation resumes', async () => 
   vi.useRealTimers();
 });
 
-test('looks rooms up by id and labels them by name, then alias, then id', () => {
+test('looks rooms up by id and labels them by what the core shows', () => {
   const roomList = new RoomList({} as CoreClient);
   roomList.rooms = [
-    { room_id: '!named:example.org', name: 'Named', canonical_alias: '#named:example.org' },
-    { room_id: '!aliased:example.org', name: null, canonical_alias: '#aliased:example.org' },
-    { room_id: '!bare:example.org', name: null, canonical_alias: null },
+    { room_id: '!named:example.org', display_name: 'Named' },
+    { room_id: '!aliased:example.org', display_name: '#aliased:example.org' },
+    { room_id: '!bare:example.org', display_name: '!bare:example.org' },
   ] as RoomListItemView[];
 
   expect(roomList.byId('!aliased:example.org')).toBe(roomList.rooms[1]);
@@ -414,7 +446,9 @@ test('looks rooms up by id and labels them by name, then alias, then id', () => 
   expect(roomList.labelFor('!bare:example.org')).toBe('!bare:example.org');
   expect(roomList.labelFor('!missing:example.org')).toBe('!missing:example.org');
 
-  roomList.rooms = [{ room_id: '!missing:example.org', name: 'Arrived' }] as RoomListItemView[];
+  roomList.rooms = [
+    { room_id: '!missing:example.org', display_name: 'Arrived' },
+  ] as RoomListItemView[];
   expect(roomList.labelFor('!missing:example.org')).toBe('Arrived');
 });
 

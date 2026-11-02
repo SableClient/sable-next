@@ -2,7 +2,6 @@
   import type { RoomListItemView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import MicrophoneSlashIcon from 'phosphor-svelte/lib/MicrophoneSlashIcon';
   import SpeakerSlashIcon from 'phosphor-svelte/lib/SpeakerSlashIcon';
   import VideoCameraIcon from 'phosphor-svelte/lib/VideoCameraIcon';
@@ -38,7 +37,7 @@
     {@const profile = profiles.get(userId)}
     {@const voice = voiceStates?.get(rowKeys[index] ?? userId)}
     {@const sharing = voice ? voice.screen : room.screen_sharers.includes(userId)}
-    {@const name = profileOverrides.name(userId, profile?.display_name ?? userId)}
+    {@const name = profile?.display_name ?? userId}
     {@const displayName = numberedName(name, rowKeys[index] ?? userId)}
     <li
       class={{ speaking: voice?.speaking && !voice.muted }}
@@ -57,7 +56,7 @@
         }}
       >
         <Avatar
-          src={profileOverrides.avatar(userId, profile?.avatar_url ?? null)}
+          src={profile?.avatar_url ?? null}
           {name}
           id={userId}
           size="small"

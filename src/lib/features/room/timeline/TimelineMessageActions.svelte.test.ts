@@ -208,6 +208,8 @@ test('provides a formatted reaction attribution tooltip', async () => {
           {
             user_id: '@alice:example.org',
             display_name: 'Alice',
+            real_name: 'Alice',
+            real_avatar_url: null,
             avatar_url: null,
             power_level: 0,
             membership: 'join',
@@ -424,6 +426,8 @@ test('long pressing a reaction opens its people list without toggling it', async
           {
             user_id: '@alice:example.org',
             display_name: 'Alice',
+            real_name: 'Alice',
+            real_avatar_url: null,
             avatar_url: null,
             power_level: 0,
             membership: 'join',

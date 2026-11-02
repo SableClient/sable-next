@@ -373,8 +373,8 @@ async fn present_invite(core: &Core, room: &Room, invite: &Invite, generation: u
         CoreEvent::IncomingCall {
             room_id: room.room_id().to_owned(),
             notification_event_id: invite.id.clone(),
+            sender_name: core.nicknames().name(&sender, sender_name.as_deref()),
             sender,
-            sender_name,
             room_name: room.cached_display_name().map(|name| name.to_string()),
             ring,
             has_video,

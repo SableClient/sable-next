@@ -780,10 +780,11 @@ impl ForegroundNotifier {
             Some(sent) => notifications::is_read(room, sent).await,
             None => false,
         };
-        if let Some(notification) = notification
+        if let Some(mut notification) = notification
             && !self.core.is_read_room(room.room_id())
             && !read
         {
+            self.core.nicknames().apply_notification(&mut notification);
             self.core
                 .emit_if_current(self.generation, CoreEvent::Notification { notification });
         }

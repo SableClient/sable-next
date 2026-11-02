@@ -48,7 +48,10 @@ export function createCoreStub<T extends Record<string, unknown> & { rpc?: RpcOv
     oauthMetadata: null as OAuthMetadataView | null,
     rpc: mockRpc(
       {
-        members: { powerLevelTags: vi.fn(() => Promise.resolve({})) },
+        members: {
+          powerLevelTags: vi.fn(() => Promise.resolve({})),
+          member: vi.fn(() => Promise.resolve(null)),
+        },
         messages: {
           reactionShortcodes: vi.fn(() => Promise.resolve([])),
           frequentReactions: vi.fn(() => Promise.resolve([])),

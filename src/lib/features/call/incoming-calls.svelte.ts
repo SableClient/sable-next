@@ -8,7 +8,6 @@ import {
   systemCallKey,
 } from '#lib/platform/calls.js';
 import { isAndroid } from '#lib/platform/os.js';
-import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { type NotificationSound } from '../notifications/sound';
 import { playSound } from '../notifications/sound';
@@ -189,7 +188,7 @@ export class IncomingCalls {
     const taken = await reportIncomingSystemCall({
       callId: call.notificationEventId,
       uuid,
-      callerName: profileOverrides.name(call.sender, call.senderName ?? call.roomName),
+      callerName: call.senderName ?? call.roomName ?? call.sender,
       hasVideo: call.hasVideo,
       roomId: call.roomId,
     });

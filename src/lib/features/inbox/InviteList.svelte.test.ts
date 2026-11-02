@@ -15,7 +15,6 @@ const rooms = vi.hoisted(() => [] as RoomListItemView[]);
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({ rooms, byId: () => undefined }),
   roomPathParamFromId: (roomId: string) => roomId,
-  roomLabel: (room: RoomListItemView) => room.name ?? room.room_id,
 }));
 
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
@@ -44,6 +43,7 @@ function invite(roomId: string, name: string): RoomListItemView {
     name,
     state: 'invited',
     latest_event: null,
+    display_name: name,
   } as unknown as RoomListItemView;
 }
 

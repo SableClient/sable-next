@@ -11,7 +11,7 @@
   import { UserProfile } from '#lib/profile/user-profile.svelte.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
   import { InviteActions, isDeclining } from '#lib/rooms/invites.svelte.js';
-  import { roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
@@ -43,6 +43,7 @@
   const core = useCoreClient();
   const answers = new InviteActions(core);
   const names = new DisplayNames(core);
+  $effect(() => core.onProfileChanged(names.forget));
   const triage = new InviteTriage(core);
   const headingId = $props.id();
 
@@ -251,7 +252,7 @@
 
 {#snippet card(invite: TriagedInvite)}
   {@const room = invite.room}
-  {@const name = roomLabel(room)}
+  {@const name = room.display_name}
   {@const from = invite.inviter}
   {@const fromName = from ? names.name(from) : null}
   {@const busy = answers.isAnswering(room.room_id)}

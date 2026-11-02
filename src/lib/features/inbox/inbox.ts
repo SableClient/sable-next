@@ -6,7 +6,6 @@ import type {
 } from '#src/generated/protocol';
 
 import { formatTime } from '#lib/ui/date-time.js';
-import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 import { currentLocale } from '#lib/i18n.js';
 import { hasUnread, type RoomUnread, roomUnread } from '#lib/rooms/unread.js';
 import type { UnreadCount } from '#lib/rooms/unread.js';
@@ -153,10 +152,6 @@ export function inviter(room: RoomListItemView): string | null {
 
 export function senderName(userId: string): string {
   return userId.startsWith('@') ? (userId.slice(1).split(':')[0] ?? userId) : userId;
-}
-
-export function senderLabel(userId: string, name: string | null = null): string {
-  return profileOverrides.name(userId, name ?? senderName(userId));
 }
 
 function matchesBookmarkQuery(bookmark: BookmarkView, needle: string): boolean {

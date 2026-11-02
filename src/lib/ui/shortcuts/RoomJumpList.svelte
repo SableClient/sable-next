@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { RoomListItemView } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
-  import { roomAvatarUrl, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import RoomIcon from '#lib/ui/primitives/RoomIcon.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -9,12 +9,7 @@
   import '#lib/ui/primitives/menu.css';
 
   import { fuzzyMatchParts } from './fuzzy.js';
-  import {
-    filterRoomsByQuery,
-    parentSpaceNames,
-    parseJumpQuery,
-    roomDisplayName,
-  } from './room-jump.js';
+  import { filterRoomsByQuery, parentSpaceNames, parseJumpQuery } from './room-jump.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
@@ -89,8 +84,8 @@
       {@attach scrollHint}
     >
       {#each results as room, index (room.room_id)}
-        {@const name = roomDisplayName(room)}
-        {@const avatar = roomAvatarUrl(room)}
+        {@const name = room.display_name}
+        {@const avatar = room.display_avatar_url}
         {@const parent = parents.get(room.room_id)}
         <li role="presentation">
           <button

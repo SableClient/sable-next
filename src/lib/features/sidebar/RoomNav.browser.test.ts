@@ -33,8 +33,6 @@ vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('#lib/rooms/room-list.svelte.js')>()),
   useRoomList: () => roomsFixture,
-  roomLabel: (room: RoomListItemView) => room.name ?? room.canonical_alias ?? room.room_id,
-  roomAvatarUrl: (room: RoomListItemView) => room.avatar_url,
 }));
 vi.mock('#lib/rooms/presence.svelte.js', async () => {
   const actual = await vi.importActual<typeof import('#lib/rooms/presence.svelte.js')>(

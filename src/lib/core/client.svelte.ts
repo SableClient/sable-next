@@ -1178,6 +1178,9 @@ export class CoreClient {
       case 'profile_changed':
         this.invalidateProfile(event.user_id);
         return;
+      case 'nicknames_changed':
+        for (const userId of event.user_ids) this.invalidateProfile(userId);
+        return;
       case 'search_coverage':
         this.searchCoverage = event.coverage;
         this.searchCoverageUnavailable = false;

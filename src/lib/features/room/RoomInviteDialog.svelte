@@ -5,7 +5,6 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { isUserId } from '#lib/guards.js';
-  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -150,10 +149,7 @@
       {#if suggestions.length > 0}
         <ul class="suggestions" {@attach scrollHint}>
           {#each suggestions as entry (entry.user_id)}
-            {@const name = profileOverrides.name(
-              entry.user_id,
-              entry.display_name ?? entry.user_id
-            )}
+            {@const name = entry.display_name ?? entry.user_id}
             <li>
               <button
                 type="button"
@@ -163,12 +159,7 @@
                   document.getElementById('room-invite-user')?.focus();
                 }}
               >
-                <Avatar
-                  size="small"
-                  id={entry.user_id}
-                  src={profileOverrides.avatar(entry.user_id, entry.avatar_url)}
-                  {name}
-                />
+                <Avatar size="small" id={entry.user_id} src={entry.avatar_url} {name} />
                 <span class="identity">
                   <span class="name">{name}</span>
                   <span class="user-id">{entry.user_id}</span>

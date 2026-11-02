@@ -5,7 +5,6 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { UserProfile } from '#lib/profile/user-profile.svelte.js';
   import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
@@ -45,12 +44,9 @@
   const roomCosmetics = useRoomCosmetics();
   const profile = new UserProfile(core, () => userId);
   let member = $derived(findMember(members, userId));
-  let ownIdentity = $derived({
-    name: member ? member.display_name : (profile.current?.display_name ?? null),
-    avatar: member ? member.avatar_url : (profile.current?.avatar_url ?? null),
-  });
-  let displayName = $derived(profileOverrides.name(userId, ownIdentity.name ?? userId));
-  let avatarUrl = $derived(profileOverrides.avatar(userId, ownIdentity.avatar));
+  let shown = $derived(member ?? profile.current);
+  let displayName = $derived(shown?.display_name ?? userId);
+  let avatarUrl = $derived(shown?.avatar_url ?? null);
   let cosmetics = $derived(roomCosmetics?.for(userId) ?? null);
   let colors = $derived(
     senderDisplayColors(userId, profile.current, null, false, cosmetics, powerTag?.color ?? null)

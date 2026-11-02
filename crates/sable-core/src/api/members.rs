@@ -14,6 +14,7 @@ use crate::{Core, ResultExt, view};
 
 domain! {
     list,
+    member,
     permissions,
     power_levels,
     set_power_level,
@@ -38,6 +39,29 @@ fn tags_ok(tags: PowerLevelTagsView) -> PowerLevelTagsOk {
     tags.into_iter()
         .map(|(level, tag)| (level.to_string(), tag))
         .collect()
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct MemberParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub user_id: OwnedUserId,
+}
+
+impl Handler for MemberParams {
+    /// `null` when the user has no member event in the room.
+    type Ok = Option<MemberView>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Option<MemberView>, RpcError> {
+        let room = core.room(&self.room_id).await?;
+        let member = room
+            .get_member(&self.user_id)
+            .await
+            .or_failed(core, "room_member")?;
+        Ok(member.map(|member| view::member_view(&member, &core.nicknames())))
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,10 +115,11 @@ impl Handler for ListParams {
             None
         };
 
+        let nicknames = core.nicknames();
         Ok(members
             .iter()
             .map(|member| {
-                let mut member = view::member_view(member);
+                let mut member = view::member_view(member, &nicknames);
                 if let Some(levels) = &power_levels {
                     member.power_level = view::clamp_power_level(levels.for_user(&member.user_id));
                 }

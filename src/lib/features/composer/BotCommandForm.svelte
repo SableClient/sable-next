@@ -5,9 +5,7 @@
   import type { MemberView, RoomListItemView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
-  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { memberName } from '#lib/rooms/member-listing.js';
-  import { roomLabel } from '#lib/rooms/room-list.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -52,7 +50,7 @@
     onCancel,
   }: Props = $props();
 
-  let botName = $derived(profileOverrides.name(command.sender, command.sender_name));
+  let botName = $derived(command.sender_name ?? command.sender);
   const uid = $props.id();
   const fieldId = (key: string): string => `bot-command-${uid}-${key}`;
   const labelOf = (key: string): string => key.replaceAll('_', ' ');
@@ -99,7 +97,7 @@
       }
     }
     for (const room of rooms) {
-      const name = roomLabel(room);
+      const name = room.display_name;
       if (acceptsType(parameter.schema, 'room_id')) {
         options.push({ value: room.room_id, label: name });
       }
@@ -187,12 +185,7 @@
   {@attach focusFirstField}
 >
   <div class="bot-command-header">
-    <Avatar
-      size="small"
-      src={profileOverrides.avatar(command.sender, command.sender_avatar)}
-      id={command.sender}
-      name={botName}
-    />
+    <Avatar size="small" src={command.sender_avatar} id={command.sender} name={botName} />
     <span class="bot-command-name">{prefix}{command.command}</span>
     <span class="bot-command-bot">{botName}</span>
     {#if command.description}

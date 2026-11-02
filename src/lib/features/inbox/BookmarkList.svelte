@@ -7,7 +7,7 @@
   import { i18n } from '#lib/i18n.js';
   import { formatMessageTimestamp } from '#lib/ui/date-time.js';
   import { useBookmarks } from '#lib/rooms/bookmarks.svelte.js';
-  import { roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -23,7 +23,9 @@
   let { standalone = false }: { standalone?: boolean } = $props();
   const bookmarks = useBookmarks();
   const roomList = useRoomList();
-  const names = new DisplayNames(useCoreClient());
+  const core = useCoreClient();
+  const names = new DisplayNames(core);
+  $effect(() => core.onProfileChanged(names.forget));
   const headingId = $props.id();
 
   let query = $state('');
@@ -38,7 +40,7 @@
 
   function roomName(roomId: string, fallback: string | null): string {
     const room = roomList.byId(roomId);
-    return room ? roomLabel(room) : (fallback ?? roomId);
+    return room ? room.display_name : (fallback ?? roomId);
   }
 
   async function toggle(bookmark: BookmarkView): Promise<boolean> {

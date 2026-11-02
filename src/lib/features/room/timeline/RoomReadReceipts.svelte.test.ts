@@ -23,6 +23,8 @@ function member(user_id: string, display_name = user_id) {
     user_id,
     display_name,
     avatar_url: null,
+    real_name: display_name,
+    real_avatar_url: null,
     power_level: 0,
     membership: 'join' as const,
     member_ts: null,

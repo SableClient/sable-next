@@ -2179,6 +2179,7 @@ async fn a_room_read_elsewhere_reports_the_server_unread_count() {
         &item,
         &std::collections::HashMap::new(),
         &matrix_sdk::ruma::push::Ruleset::new(),
+        &crate::nicknames::Nicknames::default(),
     );
 
     assert_eq!(item.num_unread_messages(), 2);
@@ -3379,7 +3380,10 @@ async fn invisible_member_names_use_the_user_id() {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(crate::view::member_view(&member).display_name, None);
+        assert_eq!(
+            crate::view::member_view(&member, &crate::nicknames::Nicknames::default()).display_name,
+            None
+        );
 
         let timeline = Arc::new(
             build_room_timeline(&room, &TimelineFocusView::Live, false)
@@ -3925,8 +3929,7 @@ async fn invited_direct_room_summary_is_direct() {
             &mut cache,
         )
         .await;
-        let summary =
-            super::view::room_list_item(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new());
+        let summary = room_row(&item, &cache);
 
         assert_eq!(
             summary.direct_targets,
@@ -3972,8 +3975,7 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
         &mut cache,
     )
     .await;
-    let summary =
-        super::view::room_list_item(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new());
+    let summary = room_row(&item, &cache);
     assert!(summary.is_direct);
     assert_eq!(summary.avatar_url.as_deref(), Some(avatar.as_str()));
 
@@ -4007,12 +4009,7 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
             &mut cache,
         )
         .await;
-        assert_eq!(
-            super::view::room_list_item(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new())
-                .avatar_url
-                .as_deref(),
-            expected
-        );
+        assert_eq!(room_row(&item, &cache).avatar_url.as_deref(), expected);
     }
 
     server
@@ -4033,8 +4030,7 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
         &mut cache,
     )
     .await;
-    let summary =
-        super::view::room_list_item(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new());
+    let summary = room_row(&item, &cache);
     assert!(!summary.is_direct);
     assert_eq!(summary.avatar_url, None);
 }
@@ -4065,9 +4061,7 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
     )
     .await;
     assert_eq!(
-        super::view::room_list_item(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new())
-            .avatar_url
-            .as_deref(),
+        room_row(&item, &cache).avatar_url.as_deref(),
         Some(avatar.as_str())
     );
 
@@ -4098,8 +4092,7 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
     )
     .await;
 
-    let summary =
-        super::view::room_list_item(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new());
+    let summary = room_row(&item, &cache);
     assert!(!summary.is_direct);
     assert_eq!(summary.avatar_url, None);
 }
@@ -4195,9 +4188,7 @@ async fn sliding_sync_room_summary_prefers_avatar_state_over_the_avatar_property
         )
         .await;
         assert_eq!(
-            super::view::room_list_item(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new())
-                .avatar_url
-                .as_deref(),
+            room_row(&item, &cache).avatar_url.as_deref(),
             expected_avatar,
             "{name} room summary"
         );
@@ -4258,8 +4249,7 @@ async fn sliding_sync_hero_avatar_is_not_the_avatar_of_a_room_that_is_not_direct
         &mut cache,
     )
     .await;
-    let summary =
-        super::view::room_list_item(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new());
+    let summary = room_row(&item, &cache);
     assert!(!summary.is_direct);
     assert_eq!(summary.avatar_url, None);
 }
@@ -5624,4 +5614,16 @@ async fn redacting_a_topic_the_server_already_stripped_leaves_the_room_without_t
             .get("redacted_because")
             .is_some()
     );
+}
+
+fn room_row(
+    item: &matrix_sdk_ui::room_list_service::RoomListItem,
+    cache: &std::collections::HashMap<matrix_sdk::ruma::OwnedRoomId, super::view::RoomInfo>,
+) -> crate::protocol::RoomListItemView {
+    super::view::room_list_item(
+        item,
+        cache,
+        &matrix_sdk::ruma::push::Ruleset::new(),
+        &crate::nicknames::Nicknames::default(),
+    )
 }

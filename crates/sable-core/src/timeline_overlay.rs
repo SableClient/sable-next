@@ -7,6 +7,7 @@ use matrix_sdk::ruma::{OwnedEventId, OwnedUserId};
 use sable_model::event_preview::event_preview;
 use serde_json::Value;
 
+use crate::nicknames::{Nicknames, RealNames};
 use crate::protocol::{
     MessageShieldCode, ReplyFallbackView, TimelineItemContentView, TimelineItemView, VectorDiff,
 };
@@ -48,10 +49,27 @@ pub(crate) struct TimelineOverlay {
     replies: HashMap<OwnedEventId, ReplyFallback>,
     redactions: HashMap<OwnedEventId, String>,
     bridged: bool,
+    nicknames: Nicknames,
+    real_names: HashMap<String, RealNames>,
 }
 
 impl TimelineOverlay {
-    fn overlaid(&self, mut item: TimelineItemView) -> TimelineItemView {
+    pub(crate) fn new(nicknames: Nicknames) -> Self {
+        Self {
+            nicknames,
+            ..Self::default()
+        }
+    }
+
+    fn overlaid(&mut self, item: TimelineItemView) -> TimelineItemView {
+        let mut item = self.with_profiles(item);
+        self.real_names
+            .insert(item.id.clone(), RealNames::of(&item));
+        self.nicknames.apply_item(&mut item);
+        item
+    }
+
+    fn with_profiles(&self, mut item: TimelineItemView) -> TimelineItemView {
         if let Some(reply) = item.in_reply_to.as_mut()
             && reply.body.is_none()
             && reply.fallback.is_none()
@@ -105,6 +123,7 @@ impl TimelineOverlay {
 
     /// The items to send for a fresh snapshot.
     pub(crate) fn reset(&mut self, items: Vec<TimelineItemView>) -> Vec<TimelineItemView> {
+        self.real_names.clear();
         self.items = items.into_iter().map(|item| self.overlaid(item)).collect();
         self.items.clone()
     }
@@ -118,9 +137,12 @@ impl TimelineOverlay {
             VectorDiff::Append { values } => VectorDiff::Append {
                 values: values.into_iter().map(|item| self.overlaid(item)).collect(),
             },
-            VectorDiff::Reset { values } => VectorDiff::Reset {
-                values: values.into_iter().map(|item| self.overlaid(item)).collect(),
-            },
+            VectorDiff::Reset { values } => {
+                self.real_names.clear();
+                VectorDiff::Reset {
+                    values: values.into_iter().map(|item| self.overlaid(item)).collect(),
+                }
+            }
             VectorDiff::PushFront { value } => VectorDiff::PushFront {
                 value: self.overlaid(value),
             },
@@ -147,11 +169,13 @@ impl TimelineOverlay {
     ) -> Vec<VectorDiff<TimelineItemView>> {
         let mut diffs = Vec::new();
         for index in 0..self.items.len() {
-            let Some(item) = self.items.get(index).filter(|item| touched(item)) else {
+            let Some(item) = self.items.get(index).filter(|item| touched(item)).cloned() else {
                 continue;
             };
-            let next = self.overlaid(item.clone());
+            let item = &item;
+            let next = self.reoverlaid(item.clone());
             let unchanged = next.sender_name == item.sender_name
+                && subject_name(&next) == subject_name(item)
                 && next.sender_avatar == item.sender_avatar
                 && next.in_reply_to == item.in_reply_to
                 && redaction_reason(&next) == redaction_reason(item)
@@ -165,6 +189,22 @@ impl TimelineOverlay {
             diffs.push(VectorDiff::Set { index, value: next });
         }
         diffs
+    }
+
+    fn reoverlaid(&mut self, mut item: TimelineItemView) -> TimelineItemView {
+        if let Some(real) = self.real_names.get(&item.id) {
+            real.restore(&mut item);
+        }
+        self.overlaid(item)
+    }
+
+    pub(crate) fn set_nicknames(
+        &mut self,
+        nicknames: Nicknames,
+        users: &[OwnedUserId],
+    ) -> Vec<VectorDiff<TimelineItemView>> {
+        self.nicknames = nicknames;
+        self.refresh(|item| RealNames::mentions(item, users))
     }
 
     /// The `Set` diffs that show `user_id`'s new profile.
@@ -222,6 +262,17 @@ impl TimelineOverlay {
 fn mismatched_sender(item: &TimelineItemView) -> bool {
     item.shield
         .is_some_and(|shield| shield.code == MessageShieldCode::MismatchedSender)
+}
+
+fn subject_name(item: &TimelineItemView) -> Option<&str> {
+    match &item.content {
+        TimelineItemContentView::Membership { display_name, .. } => display_name.as_deref(),
+        TimelineItemContentView::ProfileChange {
+            display_name: Some(change),
+            ..
+        } => change.old.as_deref(),
+        _ => None,
+    }
 }
 
 fn redaction_reason(item: &TimelineItemView) -> Option<&str> {
@@ -377,6 +428,70 @@ mod tests {
         };
         assert_eq!(value.sender_name.as_deref(), Some("Alicia"));
         assert_eq!(overlay.items.len(), 4);
+    }
+
+    fn bobby() -> Nicknames {
+        Nicknames::from_overrides(
+            vec![crate::protocol::ProfileOverrideView {
+                user_id: user_id!("@bob:x").to_owned(),
+                display_name: crate::protocol::OverrideTextView::Set {
+                    value: "Bobby".to_owned(),
+                },
+                avatar: crate::protocol::OverrideTextView::Unset,
+                color: crate::protocol::OverrideColorView::Unset,
+            }],
+            None,
+        )
+    }
+
+    #[test]
+    fn a_nickname_covers_senders_and_replies_and_lifts_when_removed() {
+        let mut overlay = TimelineOverlay::new(bobby());
+        let items = overlay.reset(vec![
+            item("a", "@bob:x", None),
+            item(
+                "b",
+                "@carol:x",
+                Some(reply_to(event_id!("$a"), Some("@bob:x"), Some("a"))),
+            ),
+        ]);
+        assert_eq!(items[0].sender_name.as_deref(), Some("Bobby"));
+        assert_eq!(
+            items[1]
+                .in_reply_to
+                .as_ref()
+                .and_then(|reply| reply.sender_name.as_deref()),
+            Some("Bobby")
+        );
+        assert_eq!(items[1].sender_name.as_deref(), Some("Old"));
+
+        let diffs = overlay.set_nicknames(Nicknames::default(), &[user_id!("@bob:x").to_owned()]);
+
+        assert_eq!(diffs.len(), 2);
+        assert_eq!(overlay.items[0].sender_name.as_deref(), Some("Old"));
+        assert_eq!(
+            overlay.items[1]
+                .in_reply_to
+                .as_ref()
+                .and_then(|reply| reply.sender_name.as_deref()),
+            Some("Old")
+        );
+    }
+
+    #[test]
+    fn a_nickname_survives_a_profile_change_underneath() {
+        let mut overlay = TimelineOverlay::new(bobby());
+        overlay.reset(vec![item("a", "@bob:x", None)]);
+
+        overlay.set_profile(
+            user_id!("@bob:x").to_owned(),
+            Some("Robert".to_owned()),
+            None,
+        );
+        assert_eq!(overlay.items[0].sender_name.as_deref(), Some("Bobby"));
+
+        overlay.set_nicknames(Nicknames::default(), &[user_id!("@bob:x").to_owned()]);
+        assert_eq!(overlay.items[0].sender_name.as_deref(), Some("Robert"));
     }
 
     #[test]

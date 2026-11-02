@@ -3,7 +3,7 @@
   import type { RoomListItemView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { roomLabel, roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { formatTime } from '#lib/ui/date-time.js';
   import CalendarBlankIcon from 'phosphor-svelte/lib/CalendarBlankIcon';
   import {
@@ -95,7 +95,7 @@
               {occurrence.item.title || i18n.t('calendar.untitled')}
             </span>
             {#if rooms.length > 1}
-              <span class="space-event-room">{roomLabel(room)}</span>
+              <span class="space-event-room">{room.display_name}</span>
             {/if}
           </a>
         </li>

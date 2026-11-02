@@ -19,6 +19,8 @@ const members = [
   {
     user_id: '@bob:example.org',
     display_name: 'Bob',
+    real_name: 'Bob',
+    real_avatar_url: null,
     avatar_url: null,
     power_level: 0,
     membership: 'join' as const,
@@ -29,6 +31,8 @@ const members = [
   {
     user_id: '@carol:example.org',
     display_name: 'Carol',
+    real_name: 'Carol',
+    real_avatar_url: null,
     avatar_url: null,
     power_level: 0,
     membership: 'join' as const,

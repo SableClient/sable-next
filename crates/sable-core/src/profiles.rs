@@ -293,18 +293,22 @@ fn profile_extra(response: &ProfileResponse) -> Vec<ProfileFieldView> {
 pub(crate) fn profile_view(user_id: OwnedUserId, response: &ProfileResponse) -> ProfileView {
     let (name_color_light, name_color_dark) = profile_name_colors(response);
 
+    let real_name = response
+        .get_static::<DisplayName>()
+        .ok()
+        .flatten()
+        .and_then(visible_name);
+    let real_avatar_url = response
+        .get_static::<AvatarUrl>()
+        .ok()
+        .flatten()
+        .map(|url| url.to_string());
     ProfileView {
         user_id,
-        display_name: response
-            .get_static::<DisplayName>()
-            .ok()
-            .flatten()
-            .and_then(visible_name),
-        avatar_url: response
-            .get_static::<AvatarUrl>()
-            .ok()
-            .flatten()
-            .map(|url| url.to_string()),
+        display_name: real_name.clone(),
+        avatar_url: real_avatar_url.clone(),
+        real_name,
+        real_avatar_url,
         bio: profile_bio(response),
         hero_color: profile_hero_color(response),
         hero_brightness: profile_hero_brightness(response),

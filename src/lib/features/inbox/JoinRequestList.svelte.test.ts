@@ -29,16 +29,20 @@ const room = {
   name: 'Room',
   state: 'joined',
   join_rule: 'knock',
+  display_name: 'Room',
 } as RoomListItemView;
 const space: RoomListItemView = {
   ...room,
   room_id: '!space:example.org',
   name: 'Space',
+  display_name: 'Space',
   room_kind: 'space',
 };
 const alice: MemberView = {
   user_id: '@alice:example.org',
   display_name: 'Alice',
+  real_name: 'Alice',
+  real_avatar_url: null,
   avatar_url: null,
   power_level: 0,
   membership: 'knock',

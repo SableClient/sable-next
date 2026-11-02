@@ -1,6 +1,4 @@
 import type { RoomListItemView } from '#src/generated/protocol';
-
-import { roomLabel } from '#lib/rooms/room-list.svelte.js';
 import { type RoomUnread, roomUnread } from '#lib/rooms/unread.js';
 
 import { fuzzyFilter } from './fuzzy.js';
@@ -14,10 +12,6 @@ const PREFIXES = new Map<string, JumpKind>([
   ['*', 'space'],
   ['@', 'direct'],
 ]);
-
-export function roomDisplayName(room: RoomListItemView): string {
-  return roomLabel(room);
-}
 
 export function jumpKind(room: RoomListItemView): JumpKind {
   if (room.room_kind === 'space') return 'space';
@@ -53,7 +47,7 @@ export function filterRoomsByQuery(
     return byActivity(recents).slice(0, limit);
   }
 
-  return fuzzyFilter(candidates, text, roomDisplayName, limit);
+  return fuzzyFilter(candidates, text, (room) => room.display_name, limit);
 }
 
 export function parentSpaceNames(rooms: readonly RoomListItemView[]): Map<string, string> {
@@ -63,7 +57,7 @@ export function parentSpaceNames(rooms: readonly RoomListItemView[]): Map<string
     if (space.room_kind !== 'space') continue;
 
     for (const child of space.space_children) {
-      if (!parents.has(child.room_id)) parents.set(child.room_id, roomDisplayName(space));
+      if (!parents.has(child.room_id)) parents.set(child.room_id, space.display_name);
     }
   }
 

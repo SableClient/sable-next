@@ -884,6 +884,8 @@ function member(userId: string, membership: MemberView['membership'] = 'join'): 
   return {
     user_id: userId,
     display_name: null,
+    real_name: null,
+    real_avatar_url: null,
     avatar_url: null,
     power_level: 0,
     membership,

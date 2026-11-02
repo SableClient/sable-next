@@ -11,7 +11,6 @@
     spaceNotifications,
   } from '#lib/rooms/space-notifications.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
-  import { roomDisplayName } from '#lib/ui/shortcuts/room-jump.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
@@ -27,7 +26,7 @@
   let custom = $derived(
     spaceNotifications
       .custom(roomList.rooms)
-      .map((entry) => ({ ...entry, name: roomDisplayName(entry.room) }))
+      .map((entry) => ({ ...entry, name: entry.room.display_name }))
       .sort(
         (left, right) =>
           Number(right.room.room_kind === 'space') - Number(left.room.room_kind === 'space') ||

@@ -1,9 +1,6 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import { useCoreClient } from '#lib/core/context.js';
-  import { isRecord } from '#lib/guards.js';
-  import { visibleName } from '#lib/model/model.js';
-  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
   import PhoneDisconnectIcon from 'phosphor-svelte/lib/PhoneDisconnectIcon';
   import VideoCameraIcon from 'phosphor-svelte/lib/VideoCameraIcon';
@@ -26,37 +23,30 @@
 
   const core = useCoreClient();
   let profile = $state.raw<{ name: string; avatar: string | null } | null>(null);
-  let senderName = $derived(
-    call ? profileOverrides.name(call.sender, profile?.name ?? call.senderName) : ''
-  );
-  let senderAvatar = $derived(
-    call ? profileOverrides.avatar(call.sender, profile?.avatar ?? null) : null
+  let senderName = $derived(profile?.name ?? call?.senderName ?? call?.sender ?? '');
+  let senderAvatar = $derived(profile?.avatar ?? null);
+  let revision = $state(0);
+
+  $effect(() =>
+    core.onProfileChanged((userId) => {
+      if (userId === call?.sender) revision += 1;
+    })
   );
 
   $effect(() => {
     const incoming = call;
+    void revision;
     profile = null;
     if (!incoming) return;
 
     let current = true;
-    void core.rpc.room_state
-      .event({
-        room_id: incoming.roomId,
-        event_type: 'm.room.member',
-        state_key: incoming.sender,
-      })
-      .then(
-        (content) => {
-          if (!current || !isRecord(content)) return;
-          profile = {
-            name:
-              (typeof content.displayname === 'string' ? visibleName(content.displayname) : null) ??
-              incoming.sender,
-            avatar: typeof content.avatar_url === 'string' ? content.avatar_url : null,
-          };
-        },
-        (error: unknown) => console.debug('[sable call] caller profile unavailable', error)
-      );
+    void core.rpc.members.member({ room_id: incoming.roomId, user_id: incoming.sender }).then(
+      (member) => {
+        if (!current || !member) return;
+        profile = { name: member.display_name ?? incoming.sender, avatar: member.avatar_url };
+      },
+      (error: unknown) => console.debug('[sable call] caller profile unavailable', error)
+    );
     return () => {
       current = false;
     };

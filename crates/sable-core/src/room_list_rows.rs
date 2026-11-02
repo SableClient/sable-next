@@ -8,6 +8,7 @@ use matrix_sdk::ruma::push::Ruleset;
 use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 use matrix_sdk_ui::room_list_service::RoomListItem;
 
+use crate::nicknames::Nicknames;
 use crate::protocol::{RoomListItemView, VectorDiff};
 use crate::push_rules::room_settings;
 use crate::view::{RoomInfo, apply_diff, room_counts, room_list_item};
@@ -58,18 +59,34 @@ impl RoomListRows {
         diffs
     }
 
+    pub(crate) fn rename(&mut self, nicknames: &Nicknames) -> Vec<VectorDiff<RoomListItemView>> {
+        let mut diffs = Vec::new();
+        for (index, row) in self.rows.iter_mut().enumerate() {
+            let (name, avatar) = (row.display_name.clone(), row.display_avatar_url.clone());
+            nicknames.apply_room(row);
+            if row.display_name != name || row.display_avatar_url != avatar {
+                diffs.push(VectorDiff::Set {
+                    index,
+                    value: row.clone(),
+                });
+            }
+        }
+        diffs
+    }
+
     pub(crate) fn refresh<S: BuildHasher>(
         &mut self,
         rooms: &[RoomListItem],
         cache: &HashMap<OwnedRoomId, RoomInfo, S>,
         rules: &Ruleset,
+        nicknames: &Nicknames,
     ) -> Vec<VectorDiff<RoomListItemView>> {
         let mut diffs = Vec::new();
         for (index, row) in self.rows.iter_mut().enumerate() {
             let Some(room) = rooms.iter().find(|room| room.room_id() == row.room_id) else {
                 continue;
             };
-            *row = room_list_item(room, cache, rules);
+            *row = room_list_item(room, cache, rules, nicknames);
             diffs.push(VectorDiff::Set {
                 index,
                 value: row.clone(),
@@ -99,6 +116,8 @@ mod tests {
             topic: None,
             topic_html: None,
             avatar_url: None,
+            display_name: room_id.to_string(),
+            display_avatar_url: None,
             is_direct: false,
             direct_targets: Vec::new(),
             join_rule: RoomJoinRuleView::Invite,
@@ -190,5 +209,41 @@ mod tests {
         assert_eq!(value.notification.room, Some(NotificationModeView::Mute));
         assert_eq!((value.counts.unread, value.counts.highlight), (0, 0));
         assert!(rows.renotify(&rules, |_| false).is_empty());
+    }
+
+    #[test]
+    fn a_nickname_renames_only_the_one_to_one_room_with_that_person() {
+        let rules = Ruleset::new();
+        let mut direct = summary(room_id!("!dm:x"), &rules);
+        direct.name = Some("Bob".to_owned());
+        direct.is_direct = true;
+        direct.direct_targets = vec![user_id!("@bob:x").to_owned()];
+        let mut group = summary(room_id!("!group:x"), &rules);
+        group.name = Some("Bob and friends".to_owned());
+        let mut rows = RoomListRows::default();
+        for mut row in [direct, group] {
+            Nicknames::default().apply_room(&mut row);
+            rows.apply(&VectorDiff::PushBack { value: row });
+        }
+        let nicknames = Nicknames::from_overrides(
+            vec![crate::protocol::ProfileOverrideView {
+                user_id: user_id!("@bob:x").to_owned(),
+                display_name: crate::protocol::OverrideTextView::Set {
+                    value: "Bobby".to_owned(),
+                },
+                avatar: crate::protocol::OverrideTextView::Unset,
+                color: crate::protocol::OverrideColorView::Unset,
+            }],
+            None,
+        );
+
+        let diffs = rows.rename(&nicknames);
+
+        let [VectorDiff::Set { index: 0, value }] = diffs.as_slice() else {
+            panic!("one set, got {diffs:?}");
+        };
+        assert_eq!(value.display_name, "Bobby");
+        assert_eq!(value.name.as_deref(), Some("Bob"));
+        assert!(rows.rename(&nicknames).is_empty());
     }
 }

@@ -15,6 +15,8 @@ const members = [
   {
     user_id: '@bob:example.org',
     display_name: 'Bob',
+    real_name: 'Bob',
+    real_avatar_url: null,
     avatar_url: null,
     power_level: 0,
     membership: 'join' as const,
@@ -25,6 +27,8 @@ const members = [
   {
     user_id: '@carol:example.org',
     display_name: 'Carol',
+    real_name: 'Carol',
+    real_avatar_url: null,
     avatar_url: null,
     power_level: 0,
     membership: 'join' as const,
@@ -94,6 +98,8 @@ test('caps faces and opens the list from overflow', async () => {
       members: many.map((user_id) => ({
         user_id,
         display_name: user_id,
+        real_name: user_id,
+        real_avatar_url: null,
         avatar_url: null,
         power_level: 0,
         membership: 'join' as const,

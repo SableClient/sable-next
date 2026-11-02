@@ -50,6 +50,7 @@ function joined(roomId: string, name: string): void {
     name,
     state: 'joined',
     latest_event: null,
+    display_name: name,
   } as unknown as RoomListItemView);
 }
 
@@ -110,6 +111,7 @@ test('picking a room navigates there only once the sheet has popped its history 
     name: 'Alpha',
     state: 'joined',
     latest_event: null,
+    display_name: 'Alpha',
   } as unknown as RoomListItemView);
   let popped!: () => void;
   mocks.afterOverlayPops.mockReturnValue(

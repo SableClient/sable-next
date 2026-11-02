@@ -5,7 +5,7 @@
 
   import { i18n } from '#lib/i18n.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
-  import { roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { memberName } from '../members/members';
 
   import { formatDate } from '#lib/ui/date-time.js';
@@ -33,7 +33,7 @@
       });
     }
     if (sameRoom) return i18n.t('timeline.forwardedFromEarlier');
-    if (origin) return i18n.t('timeline.forwardedFromRoom', { room: roomLabel(origin) });
+    if (origin) return i18n.t('timeline.forwardedFromRoom', { room: origin.display_name });
     if (forwarded.room_id !== null) return i18n.t('timeline.forwardedFromAnotherRoom');
     return i18n.t('timeline.forwarded');
   });

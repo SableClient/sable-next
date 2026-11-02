@@ -68,6 +68,8 @@ for (const theme of ['light', 'dark'] as const) {
         {
           user_id: '@alice:example.test',
           display_name: 'Alice',
+          real_name: 'Alice',
+          real_avatar_url: null,
           avatar_url: null,
           power_level: 0,
           membership: 'join',

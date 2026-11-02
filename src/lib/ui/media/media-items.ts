@@ -1,6 +1,5 @@
 import type { TimelineItemView } from '#src/generated/protocol';
 import { isPdfAttachment } from '#lib/ui/pdf-attachment.js';
-import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 
 import type { MediaItem } from '#lib/ui/media/media-viewer-types.js';
 
@@ -17,9 +16,7 @@ export function timelineMediaItems(entries: readonly TimelineItemView[]): MediaI
     const eventId = entry.event_id;
     if (eventId === null) return [];
     const content = entry.content;
-    const sender = entry.sender
-      ? profileOverrides.name(entry.sender, entry.sender_name)
-      : 'Unknown sender';
+    const sender = entry.sender_name ?? entry.sender ?? 'Unknown sender';
     if (content.kind === 'gallery') {
       return content.items.flatMap((item, index): MediaItem[] => {
         const shared = {

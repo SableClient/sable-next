@@ -49,8 +49,6 @@ vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useRoomList: () => roomsFixture,
-  roomLabel: (room: RoomListItemView) => room.name ?? room.canonical_alias ?? room.room_id,
-  roomAvatarUrl: (room: RoomListItemView) => room.avatar_url,
 }));
 const presenceFixture = vi.hoisted(() => ({
   entry: null as { statusMessage: string | null } | null,

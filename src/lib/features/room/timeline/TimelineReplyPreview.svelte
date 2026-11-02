@@ -10,7 +10,6 @@
   } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
-  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { findMember, senderDisplayColors, stripReplyFallback } from '../members/members.js';
@@ -41,8 +40,7 @@
     return member ? member.display_name : (reply.sender_name ?? target?.sender_name ?? null);
   });
   let nameBase = $derived(
-    persona?.display_name ??
-      profileOverrides.name(sender ?? '', roomName ?? sender ?? i18n.t('timeline.unknownSender'))
+    persona?.display_name ?? roomName ?? sender ?? i18n.t('timeline.unknownSender')
   );
   let name = $derived(
     reply.sender_mentioned && !nameBase.startsWith('@') ? `@${nameBase}` : nameBase

@@ -48,18 +48,6 @@ class ProfileOverrides {
     return this.entries.get(userId);
   }
 
-  name(userId: string, fallback: string | null): string {
-    const name = this.entries.get(userId)?.display_name;
-    if (name === undefined || name.kind === 'unset') return fallback ?? userId;
-    return name.kind === 'set' ? name.value : userId;
-  }
-
-  avatar(userId: string, fallback: string | null): string | null {
-    const avatar = this.entries.get(userId)?.avatar;
-    if (avatar === undefined || avatar.kind === 'unset') return fallback;
-    return avatar.kind === 'set' ? avatar.value : null;
-  }
-
   colors(userId: string): OverrideColors | null | undefined {
     const color = this.entries.get(userId)?.color;
     if (color === undefined || color.kind === 'unset') return undefined;

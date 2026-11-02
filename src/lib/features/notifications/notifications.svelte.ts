@@ -5,7 +5,6 @@ import { createContext } from 'svelte';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { electronBridge } from '#lib/platform/electron.js';
-import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 import { watchNativePushMessages } from '#lib/platform/native-notifications.js';
 import { hasUnread, roomNotifications, type RoomUnread } from '#lib/rooms/unread.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -125,7 +124,7 @@ export class NotificationCenter {
       },
     };
     const name = preferences.notificationContent
-      ? profileOverrides.name(event.sender, event.sender_name ?? event.room_name)
+      ? (event.sender_name ?? event.room_name ?? event.sender)
       : 'Sable';
     const shown = callBanner(name, options, () => {
       const electron = electronBridge();

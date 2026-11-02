@@ -42,19 +42,14 @@ afterEach(() => {
   profileOverrides.stop();
 });
 
-test('an override replaces a field, and a cleared one shows it as absent', async () => {
+test('an override exposes its colours and the document protection', async () => {
   profileOverrides.start(core(overrides).client);
   await vi.waitFor(() => {
     expect(profileOverrides.of('@sarah:example.org')).toBeDefined();
   });
 
-  expect(profileOverrides.name('@sarah:example.org', 'Sarah')).toBe('Mum');
-  expect(profileOverrides.avatar('@sarah:example.org', null)).toBe('mxc://example.org/mum');
   expect(profileOverrides.colors('@sarah:example.org')).toBeUndefined();
-  expect(profileOverrides.name('@alex:example.com', 'Alex')).toBe('@alex:example.com');
-  expect(profileOverrides.avatar('@alex:example.com', 'mxc://example.org/real')).toBeNull();
   expect(profileOverrides.colors('@alex:example.com')).toEqual({ light: '#112233', dark: null });
-  expect(profileOverrides.name('@nobody:example.org', 'Nobody')).toBe('Nobody');
   expect(profileOverrides.protection).toBe('sealed');
   expect(profileOverrides.canSeal).toBe(true);
 });

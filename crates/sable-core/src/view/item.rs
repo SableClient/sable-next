@@ -510,7 +510,7 @@ pub async fn standalone_item(
         *edited = true;
     }
 
-    Some(TimelineItemView {
+    let mut item = TimelineItemView {
         event_id: Some(event_id.clone()),
         is_own,
         sender_name,
@@ -525,7 +525,9 @@ pub async fn standalone_item(
         per_message_profile: message_profile,
         forwarded: original.content.as_ref().and_then(forward_meta),
         ..TimelineItemView::bare(event_id.to_string(), timestamp.0.into(), view_content)
-    })
+    };
+    core.nicknames().apply_item(&mut item);
+    Some(item)
 }
 
 fn message_profile(

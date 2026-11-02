@@ -164,14 +164,11 @@
     }
   });
 
-  let ownIdentity = $derived({
-    name: roomMember ? roomMember.display_name : (currentProfile?.display_name ?? null),
-    avatar: roomMember ? roomMember.avatar_url : (currentProfile?.avatar_url ?? null),
-  });
-  let realName = $derived(ownIdentity.name ?? userId);
-  let realAvatar = $derived(ownIdentity.avatar);
-  let displayName = $derived(profileOverrides.name(userId, realName));
-  let avatarUrl = $derived(profileOverrides.avatar(userId, realAvatar));
+  let shown = $derived(roomMember ?? currentProfile);
+  let realName = $derived(shown?.real_name ?? userId);
+  let realAvatar = $derived(shown?.real_avatar_url ?? null);
+  let displayName = $derived(shown?.display_name ?? userId);
+  let avatarUrl = $derived(shown?.avatar_url ?? null);
   let overrideColors = $derived(profileOverrides.colors(userId));
   let overrideOpen = $state(false);
   let reportOpen = $state(false);

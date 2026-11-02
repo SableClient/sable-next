@@ -29,7 +29,7 @@
   import TextItalicIcon from 'phosphor-svelte/lib/TextItalicIcon';
   import TextStrikethroughIcon from 'phosphor-svelte/lib/TextStrikethroughIcon';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import { roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import { senderColor } from '../room/timeline/timeline-format';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -133,7 +133,7 @@
     { value: 'default', label: t('settings.profileScopeDefault') },
     ...roomList.rooms
       .filter(isActiveSpace)
-      .map((room) => ({ value: room.room_id, label: roomLabel(room) }))
+      .map((room) => ({ value: room.room_id, label: room.display_name }))
       .sort((a, b) => a.label.localeCompare(b.label)),
   ]);
   let formEl = $state<HTMLFormElement>();

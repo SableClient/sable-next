@@ -110,7 +110,9 @@ impl Handler for UserProfileParams {
             .fetch_user_profile_of(&self.user_id)
             .await
             .map_err(|error| core.profile_error(error))?;
-        Ok(profile_view(self.user_id, &response))
+        let mut profile = profile_view(self.user_id, &response);
+        core.nicknames().apply_profile(&mut profile);
+        Ok(profile)
     }
 }
 
@@ -671,7 +673,11 @@ impl Handler for SearchUserDirectoryParams {
     type Ok = SearchUserDirectoryOk;
 
     async fn run(self, core: &Arc<Core>) -> Result<SearchUserDirectoryOk, RpcError> {
-        let (limited, results) = core.search_user_directory(&self.term, self.limit).await?;
+        let (limited, mut results) = core.search_user_directory(&self.term, self.limit).await?;
+        let nicknames = core.nicknames();
+        for entry in &mut results {
+            nicknames.apply_directory_entry(entry);
+        }
         Ok(SearchUserDirectoryOk { limited, results })
     }
 }

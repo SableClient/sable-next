@@ -52,6 +52,7 @@ pub fn room_list_item<S: BuildHasher>(
     item: &RoomListItem,
     room_cache: &HashMap<OwnedRoomId, RoomInfo, S>,
     rules: &Ruleset,
+    nicknames: &crate::nicknames::Nicknames,
 ) -> RoomListItemView {
     let info = room_cache.get(item.room_id());
     let latest_event = latest_event(item);
@@ -67,7 +68,7 @@ pub fn room_list_item<S: BuildHasher>(
         item.room_id(),
         crate::notifications::uses_direct_push_rules(item),
     );
-    RoomListItemView {
+    let mut view = RoomListItemView {
         room_id: item.room_id().to_owned(),
         canonical_alias: info.and_then(|info| info.canonical_alias.clone()),
         name: item
@@ -109,7 +110,11 @@ pub fn room_list_item<S: BuildHasher>(
         notification,
         counts: room_counts(notification, unread, notifying, highlight, marked_unread),
         latest_event,
-    }
+        display_name: String::new(),
+        display_avatar_url: None,
+    };
+    nicknames.apply_room(&mut view);
+    view
 }
 
 /// What a room's counts show under its mode: only `mute` clears them, and a
@@ -343,13 +348,17 @@ pub(super) fn latest_items(diffs: &[eyeball_im::VectorDiff<RoomListItem>]) -> Ve
     latest.into_values().collect()
 }
 
-pub async fn listless_room_list_item(room: Room, rules: &Ruleset) -> RoomListItemView {
+pub async fn listless_room_list_item(
+    room: Room,
+    rules: &Ruleset,
+    nicknames: &crate::nicknames::Nicknames,
+) -> RoomListItemView {
     if room.cached_display_name().is_none() {
         let _ = room.display_name().await;
     }
     let item = RoomListItem::from(room);
     let cache = HashMap::from([(item.room_id().to_owned(), room_info(&item, None).await)]);
-    room_list_item(&item, &cache, rules)
+    room_list_item(&item, &cache, rules, nicknames)
 }
 
 #[must_use]

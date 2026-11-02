@@ -132,6 +132,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     const profile: ProfileView = {
       user_id: session.user_id,
       display_name: 'E2E User',
+      real_name: 'E2E User',
+      real_avatar_url: null,
       avatar_url: null,
       bio: null,
       hero_color: null,
@@ -147,8 +149,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       supporter_awards: null,
       legacy_fields: [],
     };
-    const summary = (raw: Omit<RoomListItemView, 'notification' | 'counts'>): RoomListItemView => ({
+    const summary = (
+      raw: Omit<RoomListItemView, 'notification' | 'counts' | 'display_name' | 'display_avatar_url'>
+    ): RoomListItemView => ({
       ...raw,
+      display_name: raw.name ?? raw.canonical_alias ?? raw.room_id,
+      display_avatar_url: raw.avatar_url,
       notification: { room: null, default: raw.is_direct ? 'all' : 'mentions' },
       counts: {
         unread: Math.max(raw.unread, raw.highlight),
@@ -1643,6 +1649,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             avatar_url:
               (window as { __e2eProfilePatch?: Partial<ProfileView> }).__e2eProfilePatch
                 ?.avatar_url ?? null,
+            real_name: 'Alice',
+            real_avatar_url: null,
             power_level: 100,
             membership: 'join',
             member_ts: null,

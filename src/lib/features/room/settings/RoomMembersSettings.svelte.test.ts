@@ -43,6 +43,8 @@ import RoomMembersSettings from './RoomMembersSettings.svelte';
 const alice: MemberView = {
   user_id: '@alice:example.org',
   display_name: 'Alice',
+  real_name: 'Alice',
+  real_avatar_url: null,
   avatar_url: null,
   power_level: 0,
   membership: 'join',
@@ -266,6 +268,8 @@ test('offers no role above your own and asks before lowering your own', async ()
     ...alice,
     user_id: '@me:example.org',
     display_name: 'Me',
+    real_name: 'Me',
+    real_avatar_url: null,
     power_level: 50,
   };
   core.session = { user_id: '@me:example.org' };

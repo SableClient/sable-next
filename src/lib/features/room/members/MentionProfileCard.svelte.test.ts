@@ -72,6 +72,8 @@ import { mediaViewerState } from '#lib/ui/media/media-viewer-state.svelte.ts';
 const emptyProfile: ProfileView = {
   user_id: '@alice:example.org',
   display_name: null,
+  real_name: null,
+  real_avatar_url: null,
   avatar_url: null,
   bio: null,
   hero_color: null,
@@ -139,6 +141,8 @@ test('keeps the clicked room member identity when the global profile loads', asy
       member: {
         user_id: '@alice:example.org',
         display_name: 'Room Alice',
+        real_name: 'Room Alice',
+        real_avatar_url: null,
         avatar_url: null,
         power_level: 0,
         membership: 'join',
@@ -166,6 +170,8 @@ test.each(['New Alice', null])(
       user_id: emptyProfile.user_id,
       display_name,
       avatar_url: null,
+      real_name: display_name,
+      real_avatar_url: null,
       power_level: 0,
       membership: 'join',
       member_ts: null,
@@ -212,6 +218,8 @@ test('uses the room role name, emoji and colour when the profile has no name col
       member: {
         user_id: '@alice:example.org',
         display_name: 'Room Alice',
+        real_name: 'Room Alice',
+        real_avatar_url: null,
         avatar_url: null,
         power_level: 50,
         membership: 'join',
@@ -518,6 +526,8 @@ test('keeps a failed profile silent when the room member still names the user', 
       member: {
         user_id: '@alice:example.org',
         display_name: 'Room Alice',
+        real_name: 'Room Alice',
+        real_avatar_url: null,
         avatar_url: null,
         power_level: 0,
         membership: 'join',
@@ -560,6 +570,8 @@ test('collects an optional reason before kicking a member', async () => {
       member: {
         user_id: '@alice:example.org',
         display_name: 'Alice',
+        real_name: 'Alice',
+        real_avatar_url: null,
         avatar_url: null,
         power_level: 0,
         membership: 'join',
@@ -614,6 +626,8 @@ test('sends no reason when the moderation reason is left blank', async () => {
       member: {
         user_id: '@alice:example.org',
         display_name: 'Alice',
+        real_name: 'Alice',
+        real_avatar_url: null,
         avatar_url: null,
         power_level: 0,
         membership: 'join',
@@ -676,6 +690,8 @@ test('offers to remove a user whose pending invite is loaded from the room', asy
     {
       user_id: '@alice:example.org',
       display_name: 'Alice',
+      real_name: 'Alice',
+      real_avatar_url: null,
       avatar_url: null,
       power_level: 0,
       membership: 'invite',
@@ -758,6 +774,8 @@ test('shows a permission message when the kick is refused', async () => {
       member: {
         user_id: '@alice:example.org',
         display_name: 'Alice',
+        real_name: 'Alice',
+        real_avatar_url: null,
         avatar_url: null,
         power_level: 0,
         membership: 'join',
@@ -804,6 +822,8 @@ test('shows a generic message when the kick fails for another reason', async () 
       member: {
         user_id: '@alice:example.org',
         display_name: 'Alice',
+        real_name: 'Alice',
+        real_avatar_url: null,
         avatar_url: null,
         power_level: 0,
         membership: 'join',
@@ -853,6 +873,8 @@ async function openRoleMenu(
       member: {
         user_id: '@alice:example.org',
         display_name: 'Alice',
+        real_name: 'Alice',
+        real_avatar_url: null,
         avatar_url: null,
         power_level: 0,
         membership: 'join',
@@ -932,6 +954,8 @@ test('asks before lowering your own role', async () => {
       member: {
         user_id: '@me:example.org',
         display_name: 'Me',
+        real_name: 'Me',
+        real_avatar_url: null,
         avatar_url: null,
         power_level: 100,
         membership: 'join',
@@ -1040,6 +1064,8 @@ describe('invite and unban follow the membership', () => {
   const memberWith = (membership: 'join' | 'leave' | 'ban') => ({
     user_id: '@alice:example.org',
     display_name: 'Alice',
+    real_name: 'Alice',
+    real_avatar_url: null,
     avatar_url: null,
     power_level: 0,
     membership,

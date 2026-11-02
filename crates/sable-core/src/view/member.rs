@@ -10,21 +10,27 @@ use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventType};
 use crate::protocol::{MemberView, MembershipView, RoomPermissionsView, RoomPowerLevelsView};
 
 #[must_use]
-pub fn member_view(member: &RoomMember) -> MemberView {
-    MemberView {
+pub fn member_view(member: &RoomMember, nicknames: &crate::nicknames::Nicknames) -> MemberView {
+    let real_name = member
+        .display_name()
+        .and_then(visible_name)
+        .map(str::to_owned);
+    let real_avatar_url = member.avatar_url().map(ToString::to_string);
+    let mut view = MemberView {
         user_id: member.user_id().to_owned(),
-        display_name: member
-            .display_name()
-            .and_then(visible_name)
-            .map(str::to_owned),
-        avatar_url: member.avatar_url().map(ToString::to_string),
+        display_name: None,
+        avatar_url: None,
+        real_name,
+        real_avatar_url,
         power_level: clamp_power_level(member.power_level()),
         membership: membership_view(member.membership()),
         member_ts: member.event().timestamp().map(u64::from),
         kicked: matches!(member.membership(), MembershipState::Leave)
             && member.event().sender() != member.user_id(),
         service: member.is_service_member(),
-    }
+    };
+    nicknames.apply_member(&mut view);
+    view
 }
 
 const fn membership_view(state: &MembershipState) -> MembershipView {

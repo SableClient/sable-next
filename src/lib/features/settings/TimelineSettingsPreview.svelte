@@ -34,7 +34,9 @@
     { user_id: previewUserId, display_name: 'You' },
   ].map((member) => ({
     ...member,
+    real_name: member.display_name,
     avatar_url: null,
+    real_avatar_url: null,
     power_level: 0,
     membership: 'join',
     member_ts: null,

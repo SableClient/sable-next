@@ -9,7 +9,6 @@ import { AccountDataSync } from '#lib/core/account-data-sync.js';
 
 import { i18n } from '#lib/i18n.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
-import { roomDisplayName } from '#lib/ui/shortcuts/room-jump.js';
 
 import { notificationModeLabels } from './notification-modes.js';
 import { inheritedNotificationModes } from './spaces.js';
@@ -208,7 +207,7 @@ export async function setNotificationMode(
   toasts.undoable(
     i18n.t('room.spaceModeApplied', {
       count,
-      space: roomDisplayName(room),
+      space: room.display_name,
       mode: i18n.t(mode === null ? 'room.spaceModeDefault' : notificationModeLabels[mode]),
     }),
     {

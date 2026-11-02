@@ -5,7 +5,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { memberName } from '#lib/rooms/member-listing.js';
-  import { roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -113,7 +113,7 @@
         <div class="identity">
           <span class="name">{memberName(member)}</span>
           <span class="user-id">{member.user_id}</span>
-          <span class="room">{roomLabel(request.room)}</span>
+          <span class="room">{request.room.display_name}</span>
         </div>
         <div class="actions">
           {#if request.permissions.can_invite}

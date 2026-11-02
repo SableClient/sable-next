@@ -6,7 +6,6 @@ import type { NotificationView } from '#src/generated/protocol';
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }));
 
-import { giveNickname } from '#lib/profile/profile-override-fixtures.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { body, title } from './present';
@@ -57,11 +56,4 @@ test('an encrypted room keeps its content back until it is allowed', () => {
 
   preferences.notificationEncryptedContent = true;
   expect(body(view({ encrypted: true }))).toBe('Ada: shipped the patch');
-});
-
-test('an alert names the sender by the nickname given to them', async () => {
-  await giveNickname('@ada:example.org', 'Ada L.');
-
-  expect(body(view())).toBe('Ada L.: shipped the patch');
-  expect(title(view({ is_direct: true, room_name: 'Ada' }))).toBe('Ada L.');
 });

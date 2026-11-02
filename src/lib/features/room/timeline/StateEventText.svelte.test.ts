@@ -7,7 +7,6 @@ import { afterEach, expect, test, vi } from 'vitest';
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
-import { giveNickname } from '#lib/profile/profile-override-fixtures.js';
 
 import type { TimelineItemView } from '#src/generated/protocol';
 
@@ -100,34 +99,4 @@ test('tints a clickable state-event name from the sender profile', async () => {
   expect(container).toHaveTextContent('Bob left');
   await user.click(name);
   expect(onSenderProfile).toHaveBeenCalledWith('@bob:example.org', name);
-});
-
-test('a state-event name shows the local nickname', async () => {
-  await giveNickname('@bob:example.org', 'Bobby');
-
-  const { container } = render(StateEventText, {
-    item: membership('left', '@bob:example.org', 'Bob'),
-    onSenderProfile: vi.fn(),
-  });
-
-  expect(container).toHaveTextContent('Bobby left');
-});
-
-test('notice text without a clickable name still uses the nickname', async () => {
-  await giveNickname('@bob:example.org', 'Bobby');
-
-  const pinned = {
-    ...membership('joined', '@bob:example.org', 'Bob'),
-    content: {
-      kind: 'state_event',
-      event_type: 'm.room.pinned_events',
-      state_key: '',
-      content: null,
-      prev_content: null,
-      change: { kind: 'pinned_events', added: ['$x'], removed: [], total: 1 },
-    },
-  } as TimelineItemView;
-  const { container } = render(StateEventText, { item: pinned });
-
-  expect(container).toHaveTextContent('Bobby pinned a message');
 });

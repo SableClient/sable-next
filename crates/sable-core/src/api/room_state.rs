@@ -571,9 +571,15 @@ impl Handler for BotCommandsParams {
     async fn run(self, core: &Arc<Core>) -> Result<Vec<BotCommand>, RpcError> {
         let client = core.client().await?;
         let room = core.room(&self.room_id).await?;
-        core.bot_commands_for(&client, &room)
+        let mut commands = core
+            .bot_commands_for(&client, &room)
             .await
-            .map_err(|error| core.room_error("bot_commands", error))
+            .map_err(|error| core.room_error("bot_commands", error))?;
+        let nicknames = core.nicknames();
+        for command in &mut commands {
+            nicknames.apply_bot(command);
+        }
+        Ok(commands)
     }
 }
 

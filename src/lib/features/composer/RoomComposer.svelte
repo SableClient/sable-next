@@ -34,7 +34,6 @@
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { outgoingPersona } from '#lib/personas/outgoing-persona.js';
   import { personaSpaces } from './persona-spaces.js';
-  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { enterInsertsNewline } from '#lib/settings/enter-key.svelte.js';
   import {
@@ -412,8 +411,7 @@
       advertisedAdminCommands.length > 0
         ? adminCommandTree(advertisedAdminCommands)
         : sources.adminCommands,
-      slashBotCommands,
-      (userId, fallback) => profileOverrides.name(userId, fallback)
+      slashBotCommands
     )
   );
 
@@ -461,8 +459,7 @@
 
   const editor = new ComposerEditor({
     media,
-    mentionName: (userId) =>
-      members.find((member) => member.user_id === userId)?.display_name ?? null,
+    mentionName: (userId) => members.find((member) => member.user_id === userId)?.real_name ?? null,
     emotes: () => sources.emotes,
     label: () => i18n.t('timeline.messagePlaceholder'),
     describedBy: hintId,

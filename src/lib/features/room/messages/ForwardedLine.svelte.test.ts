@@ -9,7 +9,6 @@ import type { RoomListItemView } from '#src/generated/protocol';
 const rooms = vi.hoisted(() => [] as RoomListItemView[]);
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({ rooms }),
-  roomLabel: (room: RoomListItemView) => room.name ?? room.room_id,
 }));
 vi.mock('#lib/rooms/permalink.js', () => ({
   roomSectionPath: (_rooms: unknown, roomId: string, eventId: string) =>
@@ -23,7 +22,11 @@ afterEach(() => {
 });
 
 test('a forward from a joined room links to the original', () => {
-  rooms.push({ room_id: '!origin:example.org', name: 'Origin' } as RoomListItemView);
+  rooms.push({
+    room_id: '!origin:example.org',
+    name: 'Origin',
+    display_name: 'Origin',
+  } as RoomListItemView);
   render(ForwardedLine, {
     forwarded: {
       sender: null,

@@ -96,6 +96,7 @@ struct RoomListWorker {
     /// Refreshed from each diff before constructing synchronous summaries.
     room_cache: HashMap<OwnedRoomId, view::RoomInfo>,
     rows: RoomListRows,
+    nicknames: watch::Receiver<crate::nicknames::Nicknames>,
     controller: RoomListDynamicEntriesController,
     grown_to: u32,
     core: Arc<Core>,
@@ -134,6 +135,17 @@ impl RoomListWorker {
                     let Some(diffs) = diffs else { break };
                     self.on_entries(diffs, loading()).await
                 }
+                changed = self.nicknames.changed() => {
+                    if changed.is_err() {
+                        break;
+                    }
+                    let nicknames = self.nicknames.borrow_and_update().clone();
+                    let diffs = self.rows.rename(&nicknames);
+                    if diffs.is_empty() {
+                        continue;
+                    }
+                    diffs
+                }
                 changed = rule_changes.recv() => {
                     if matches!(changed, Err(RecvError::Closed)) {
                         break;
@@ -164,7 +176,12 @@ impl RoomListWorker {
             .map(RoomListItem::from)
             .collect();
         view::enrich_rooms(&rooms, &mut self.room_cache).await;
-        let diffs = self.rows.refresh(&rooms, &self.room_cache, &self.rules);
+        let diffs = self.rows.refresh(
+            &rooms,
+            &self.room_cache,
+            &self.rules,
+            &self.nicknames.borrow(),
+        );
         (!diffs.is_empty()).then_some(diffs)
     }
 
@@ -190,7 +207,12 @@ impl RoomListWorker {
             .into_iter()
             .map(|diff| {
                 view::map_diff(diff, |item| {
-                    view::room_list_item(item, &self.room_cache, &self.rules)
+                    view::room_list_item(
+                        item,
+                        &self.room_cache,
+                        &self.rules,
+                        &self.nicknames.borrow(),
+                    )
                 })
             })
             .collect();
@@ -341,12 +363,14 @@ impl Core {
 
             let rule_changes = push_rules.subscribe();
             let rules = push_rules.snapshot().await;
+            let nicknames = core.nickname_changes();
             let worker = RoomListWorker {
                 client,
                 push_rules,
                 rules,
                 room_cache: HashMap::new(),
                 rows: RoomListRows::default(),
+                nicknames,
                 controller,
                 grown_to: 0,
                 core,
@@ -396,7 +420,7 @@ impl Core {
             .open_timeline(&room, &room_id, &focus, hidden_events)
             .await?;
         fill_sender_profiles(&room, &timeline);
-        let overlay = Arc::new(parking_lot::Mutex::new(TimelineOverlay::default()));
+        let overlay = self.new_overlay();
 
         let _subscribed = self
             .register_timeline(subscription, &room_id, &focus, &timeline, &overlay)
@@ -650,6 +674,32 @@ impl Core {
             overlay.set_profile(user_id.to_owned(), name.clone(), avatar.clone())
         })
         .await;
+    }
+
+    fn new_overlay(&self) -> Arc<parking_lot::Mutex<TimelineOverlay>> {
+        Arc::new(parking_lot::Mutex::new(TimelineOverlay::new(
+            self.nicknames(),
+        )))
+    }
+
+    pub(crate) async fn overlay_timeline_nicknames(
+        &self,
+        nicknames: &crate::nicknames::Nicknames,
+        users: &[matrix_sdk::ruma::OwnedUserId],
+    ) {
+        let subscriptions = self.subscriptions.lock().await;
+        for (subscription, entry) in subscriptions.iter() {
+            let Some(overlay) = entry.overlay.as_ref() else {
+                continue;
+            };
+            let diffs = overlay.lock().set_nicknames(nicknames.clone(), users);
+            if !diffs.is_empty() {
+                self.emit(CoreEvent::TimelineDiff {
+                    subscription: *subscription,
+                    diffs,
+                });
+            }
+        }
     }
 
     /// Shows why `redacted` was deleted in every open timeline of the room.

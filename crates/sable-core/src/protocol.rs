@@ -327,6 +327,11 @@ pub enum CoreEvent {
         room_id: OwnedRoomId,
     },
 
+    NicknamesChanged {
+        #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+        user_ids: Vec<OwnedUserId>,
+    },
+
     ProfileChanged {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -709,6 +714,9 @@ pub struct RoomListItemView {
     /// The topic's `text/html` representation, sanitised.
     pub topic_html: Option<String>,
     pub avatar_url: Option<String>,
+    /// The name, alias or id, or the nickname of a one-to-one room's other person.
+    pub display_name: String,
+    pub display_avatar_url: Option<String>,
     pub is_direct: bool,
     #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
     pub direct_targets: Vec<OwnedUserId>,
@@ -2317,6 +2325,9 @@ pub struct MemberView {
     pub user_id: OwnedUserId,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
+    /// For mentions and anything else that leaves this device.
+    pub real_name: Option<String>,
+    pub real_avatar_url: Option<String>,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub power_level: i64,
     pub membership: MembershipView,
@@ -2387,6 +2398,8 @@ pub struct ProfileView {
     pub user_id: OwnedUserId,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
+    pub real_name: Option<String>,
+    pub real_avatar_url: Option<String>,
     /// Sanitised display HTML, safe to inject as-is.
     pub bio: Option<String>,
     pub hero_color: Option<String>,

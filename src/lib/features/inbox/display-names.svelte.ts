@@ -1,7 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 import { senderName } from './inbox';
 
 const MAX_ATTEMPTS = 3;
@@ -14,6 +13,11 @@ export class DisplayNames {
   readonly #failures = new Map<string, number>();
 
   constructor(private readonly core: Pick<CoreClient, 'userProfile'>) {}
+
+  forget = (userId: string): void => {
+    this.#requested.delete(userId);
+    this.#names.delete(userId);
+  };
 
   name(userId: string): string {
     if (!this.#requested.has(userId)) {
@@ -30,6 +34,6 @@ export class DisplayNames {
         }
       );
     }
-    return profileOverrides.name(userId, this.#names.get(userId) ?? senderName(userId));
+    return this.#names.get(userId) ?? senderName(userId);
   }
 }

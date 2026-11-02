@@ -9,12 +9,16 @@ use serde_with::{DefaultOnError, serde_as};
 use crate::Core;
 use crate::cosmetics::MEMBER_COLOR_FIELD;
 use crate::protocol::{
-    FieldEdit, OverrideColorView, OverrideTextView, ProfileOverrideView, ProfileOverridesView,
-    RpcError, SealStateView,
+    CoreEvent, FieldEdit, OverrideColorView, OverrideTextView, ProfileOverrideView,
+    ProfileOverridesView, RpcError, SealStateView,
 };
 
 const PROFILE_OVERRIDES_EVENT: &str = "m.profile_overrides";
 const UNSTABLE_PROFILE_OVERRIDES_EVENT: &str = "org.matrix.msc4529.profile_overrides";
+
+pub(crate) fn is_override_event(event_type: &str) -> bool {
+    event_type == PROFILE_OVERRIDES_EVENT || event_type == UNSTABLE_PROFILE_OVERRIDES_EVENT
+}
 
 #[serde_as]
 #[derive(Deserialize)]
@@ -294,6 +298,10 @@ impl Core {
         }
     }
 
+    pub(crate) async fn profile_overrides_view(&self) -> Result<ProfileOverridesView, RpcError> {
+        Ok(Self::overrides_view(&self.stored_overrides().await?))
+    }
+
     /// A plaintext unstable document read while the key is at hand is sealed.
     pub(crate) async fn profile_overrides(&self) -> Result<ProfileOverridesView, RpcError> {
         let stored = self.stored_overrides().await?;
@@ -323,13 +331,18 @@ impl Core {
             return Err(RpcError::DocumentLocked);
         }
         let content = edited_overrides(stored.content, user_id.as_str(), edit);
-        if stored.sealed_type {
+        let event_type = if stored.sealed_type {
             self.set_sealed_account_data(UNSTABLE_PROFILE_OVERRIDES_EVENT, &content)
                 .await?;
+            UNSTABLE_PROFILE_OVERRIDES_EVENT
         } else {
             self.set_account_data(PROFILE_OVERRIDES_EVENT, &content)
                 .await?;
-        }
+            PROFILE_OVERRIDES_EVENT
+        };
+        self.emit(CoreEvent::AccountDataChanged {
+            event_type: event_type.to_owned(),
+        });
         Ok(Self::overrides_view(&StoredOverrides {
             content: Some(content),
             ..stored

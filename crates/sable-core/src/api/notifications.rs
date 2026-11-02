@@ -148,7 +148,12 @@ impl Handler for NotificationParams {
             sync_service: core.sync_service().await?,
         };
 
-        Ok(notifications::notification(&client, setup, &self.room_id, &self.event_id).await)
+        let mut notification =
+            notifications::notification(&client, setup, &self.room_id, &self.event_id).await;
+        if let Some(notification) = notification.as_mut() {
+            core.nicknames().apply_notification(notification);
+        }
+        Ok(notification)
     }
 }
 
@@ -449,6 +454,14 @@ impl Handler for InboxParams {
                 },
             )
             .await?;
+        let nicknames = core.nicknames();
+        let items = items
+            .into_iter()
+            .map(|mut item| {
+                nicknames.apply_inbox(&mut item);
+                item
+            })
+            .collect();
         Ok(InboxOk { items, has_more })
     }
 }

@@ -179,6 +179,8 @@ test('badges a message with its own readers, and only in that placement', async 
     {
       user_id: '@bob:example.org',
       display_name: 'Bob',
+      real_name: 'Bob',
+      real_avatar_url: null,
       avatar_url: null,
       power_level: 0,
       membership: 'join' as const,
@@ -236,6 +238,8 @@ test('the receipt dialog lists readers of later messages, not only the badge', a
     {
       user_id: '@bob:example.org',
       display_name: 'Bob',
+      real_name: 'Bob',
+      real_avatar_url: null,
       avatar_url: null,
       power_level: 0,
       membership: 'join' as const,
@@ -246,6 +250,8 @@ test('the receipt dialog lists readers of later messages, not only the badge', a
     {
       user_id: '@carol:example.org',
       display_name: 'Carol',
+      real_name: 'Carol',
+      real_avatar_url: null,
       avatar_url: null,
       power_level: 0,
       membership: 'join' as const,

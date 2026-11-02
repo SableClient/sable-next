@@ -8,8 +8,6 @@
   import { voiceChat } from '#lib/features/room/voice-chat.svelte.js';
   import {
     findRoomByPathId,
-    roomAvatarUrl,
-    roomLabel,
     roomPathParam,
     roomPathParamFromId,
     useRoomList,
@@ -24,7 +22,6 @@
   import HashIcon from 'phosphor-svelte/lib/HashIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
-  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { longPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import { isDeclining } from '#lib/rooms/invites.svelte.js';
@@ -521,8 +518,8 @@
 
   {#snippet navRoom(item: RoomNavRow, sectionClosed: boolean)}
     {@const room = item.room}
-    {@const name = room ? roomLabel(room) : item.roomId}
-    {@const avatarUrl = room ? roomAvatarUrl(room) : null}
+    {@const name = room ? room.display_name : item.roomId}
+    {@const avatarUrl = room ? room.display_avatar_url : null}
     {@const href = roomHref(item)}
     {@const active = pathname === href}
     {@const counts = room ? roomList.badgeUnreadFor(room) : NO_UNREAD}
@@ -670,8 +667,8 @@
                     {@const profile = peerProfiles.get(userId)}
                     <Avatar
                       class="voice-face"
-                      src={profileOverrides.avatar(userId, profile?.avatar_url ?? null)}
-                      name={profileOverrides.name(userId, profile?.display_name ?? userId)}
+                      src={profile?.avatar_url ?? null}
+                      name={profile?.display_name ?? userId}
                       id={userId}
                     />
                   {/each}
@@ -759,7 +756,7 @@
 
   {#snippet navLink(item: SpaceTreeSpace)}
     {@const room = item.room}
-    {@const name = roomLabel(room)}
+    {@const name = room.display_name}
     {@const href = resolve('/(app)/space/[spaceId]/lobby', {
       spaceId: roomPathParam(room, roomList.rooms),
     })}
@@ -787,9 +784,9 @@
         >
           <span class="room-avatar">
             <Avatar
-              class={['room-avatar-icon', { glyph: !roomAvatarUrl(room) }]}
-              id={roomAvatarUrl(room) ? room.room_id : null}
-              src={roomAvatarUrl(room)}
+              class={['room-avatar-icon', { glyph: !room.display_avatar_url }]}
+              id={room.display_avatar_url ? room.room_id : null}
+              src={room.display_avatar_url}
               size="small"
               uniform
             >
@@ -887,7 +884,7 @@
           {/each}
           {#each visibleSubspaces as item (item.key)}
             {#if item.kind === 'category'}
-              {@const name = roomLabel(item.room)}
+              {@const name = item.room.display_name}
               {@const isClosed = closedCategories.has(item.key)}
               <div class="room-row-wrap">
                 {@render threadLines(item.threads)}

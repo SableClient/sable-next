@@ -10,6 +10,8 @@ function member(userId: string, displayName: string | null): MemberView {
   return {
     user_id: userId,
     display_name: displayName,
+    real_name: displayName,
+    real_avatar_url: null,
     avatar_url: null,
     power_level: 0,
     membership: 'join' as const,
@@ -52,7 +54,13 @@ function room(
   name: string,
   canonical_alias: string | null = null
 ): RoomListItemView {
-  return { room_id, name, canonical_alias, avatar_url: null } as RoomListItemView;
+  return {
+    room_id,
+    name,
+    canonical_alias,
+    avatar_url: null,
+    display_name: name,
+  } as RoomListItemView;
 }
 
 test('a member matches on display name or localpart, never on the homeserver', () => {
@@ -69,20 +77,12 @@ test('a member matches on display name or localpart, never on the homeserver', (
 });
 
 test('a nickname is matched and listed, and the real name is what gets inserted', () => {
-  const members = [member('@rob:example.org', 'Rob'), member('@ann:example.org', 'Ann')];
-  const nicknames = new Map([['@rob:example.org', 'Bobby']]);
+  const members = [
+    { ...member('@rob:example.org', 'Bobby'), real_name: 'Rob' },
+    member('@ann:example.org', 'Ann'),
+  ];
 
-  const [match] = suggestionsFor(
-    mentionQuery('bob'),
-    members,
-    [],
-    [],
-    undefined,
-    null,
-    null,
-    [],
-    (userId, fallback) => nicknames.get(userId) ?? fallback
-  );
+  const [match] = suggestionsFor(mentionQuery('bob'), members, [], []);
 
   expect(match).toMatchObject({ id: '@rob:example.org', label: '@Bobby', insert: '@Rob' });
 });

@@ -1,6 +1,5 @@
 import { isRecord } from '#lib/guards.js';
 import { reactionKey } from '#lib/model/model.js';
-import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 import type { StateChangeView, TimelineItemView } from '#src/generated/protocol';
 
 import { isCustomReaction } from '../messages/reaction-emote-label';
@@ -9,9 +8,7 @@ import { relationOf } from './timeline-event-index';
 export type Translate = (key: string, values?: Record<string, unknown>) => string;
 
 function senderLabel(item: TimelineItemView, t: Translate): string {
-  return item.sender
-    ? profileOverrides.name(item.sender, item.sender_name)
-    : t('timeline.unknownSender');
+  return item.sender_name ?? item.sender ?? t('timeline.unknownSender');
 }
 
 function stateChangeText(change: StateChangeView, user: string, t: Translate): string {
@@ -106,8 +103,8 @@ function membershipText(
   item: TimelineItemView,
   t: Translate
 ): string {
-  const user = profileOverrides.name(content.user_id, content.display_name);
-  const actor = item.sender && profileOverrides.name(item.sender, item.sender_name);
+  const user = content.display_name ?? content.user_id;
+  const actor = item.sender_name ?? item.sender;
   const attributed =
     MODERATED.has(content.change) && actor !== null && item.sender !== content.user_id;
 
@@ -143,7 +140,7 @@ export function stateEventText(item: TimelineItemView, t: Translate): string {
     case 'membership':
       return membershipText(content, item, t);
     case 'profile_change': {
-      const user = profileOverrides.name(content.user_id, content.display_name?.old ?? null);
+      const user = content.display_name?.old ?? content.user_id;
       if (content.display_name?.new) {
         const key = content.display_name.old ? 'profileNameChanged' : 'profileNameSet';
         return t(`timeline.${key}`, { user, name: content.display_name.new });
@@ -194,7 +191,6 @@ export function stateEventSubject(
       return null;
   }
   if (!userId || !name) return null;
-  name = profileOverrides.name(userId, name);
 
   const text = stateEventText(item, (key, values) =>
     values && 'user' in values ? t(key, { ...values, user: SUBJECT_MARKER }) : t(key, values)

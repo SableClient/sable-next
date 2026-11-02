@@ -578,7 +578,12 @@ async fn room_members_use_cached_or_fetched_power_levels() {
                 .members_no_sync(matrix_sdk::RoomMemberships::JOIN)
                 .await
                 .unwrap();
-            let expected: Vec<_> = expected.iter().map(crate::view::member_view).collect();
+            let expected: Vec<_> = expected
+                .iter()
+                .map(|member| {
+                    crate::view::member_view(member, &crate::nicknames::Nicknames::default())
+                })
+                .collect();
             assert_eq!(
                 serde_json::to_value(members).unwrap(),
                 serde_json::to_value(expected).unwrap()
@@ -740,8 +745,12 @@ async fn healthy_space_summary_does_not_fetch_missing_tombstone_state() {
         &mut cache,
     )
     .await;
-    let summary =
-        crate::view::room_list_item(&item, &cache, &matrix_sdk::ruma::push::Ruleset::new());
+    let summary = crate::view::room_list_item(
+        &item,
+        &cache,
+        &matrix_sdk::ruma::push::Ruleset::new(),
+        &crate::nicknames::Nicknames::default(),
+    );
     assert_eq!(summary.room_kind, Some(RoomKind::Space));
     assert!(!summary.is_tombstoned);
 }

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { groupMembers, limitGroups, matchesFilter, membershipFor } from './member-listing';
 
 function member(overrides: Partial<MemberView> & { user_id: string }): MemberView {
-  return {
+  const view = {
     display_name: null,
     avatar_url: null,
     power_level: 0,
@@ -13,12 +13,20 @@ function member(overrides: Partial<MemberView> & { user_id: string }): MemberVie
     kicked: false,
     service: false,
     ...overrides,
-  };
+  } as const;
+  return { ...view, real_name: view.display_name, real_avatar_url: view.avatar_url };
 }
 
 const amy = member({ user_id: '@amy:e.org', display_name: 'Amy', member_ts: 3 });
 const bob = member({ user_id: '@bob:e.org', display_name: 'Bob', member_ts: 1 });
-const cid = member({ user_id: '@cid:e.org', display_name: 'Cid', power_level: 100, member_ts: 2 });
+const cid = member({
+  user_id: '@cid:e.org',
+  display_name: 'Cid',
+  real_name: 'Cid',
+  real_avatar_url: null,
+  power_level: 100,
+  member_ts: 2,
+});
 
 const allOnline = (): boolean => true;
 
@@ -44,7 +52,13 @@ describe('groupMembers', () => {
 
   it('sinks members without presence under one offline group', () => {
     const online = (userId: string): boolean => userId === amy.user_id;
-    const dee = member({ user_id: '@dee:e.org', display_name: 'Dee', power_level: -1 });
+    const dee = member({
+      user_id: '@dee:e.org',
+      display_name: 'Dee',
+      real_name: 'Dee',
+      real_avatar_url: null,
+      power_level: -1,
+    });
 
     expect(groupMembers([amy, bob, dee], 'name-asc', online)).toEqual([
       { key: '0', level: 0, members: [amy] },

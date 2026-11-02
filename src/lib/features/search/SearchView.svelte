@@ -10,9 +10,8 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { splitDisplayNamePronouns, withDisplayNamePronouns } from '#lib/personas/pronouns.js';
-  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
-  import { roomAvatarUrl, roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
@@ -128,8 +127,8 @@
               rooms: roomList.rooms.map((room) => ({
                 id: room.room_id,
                 alias: room.canonical_alias,
-                name: roomLabel(room),
-                avatarUrl: roomAvatarUrl(room),
+                name: room.display_name,
+                avatarUrl: room.display_avatar_url,
               })),
               senders: knownSenders(),
               spaces: spaces.map((space) => ({
@@ -506,9 +505,7 @@
 
 {#snippet contextLine(line: SearchContextView)}
   <span class="hit-context" hidden={line.body.startsWith('mxc://')}>
-    <span class="hit-context-sender"
-      >{profileOverrides.name(line.sender, senders.identity(line.sender).displayName)}</span
-    >
+    <span class="hit-context-sender">{senders.identity(line.sender).displayName}</span>
     {line.body}
   </span>
 {/snippet}
@@ -740,10 +737,7 @@
               {#each group.hits as hit (hit.event_id)}
                 {@const snippet = snippetAround(hit.body, terms)}
                 {@const openLabel = i18n.t('search.openResultFrom', {
-                  sender: profileOverrides.name(
-                    hit.sender,
-                    senders.identity(hit.sender).displayName
-                  ),
+                  sender: senders.identity(hit.sender).displayName,
                   room: roomList.labelFor(hit.room_id),
                   time: formatFullTimestamp(hit.origin_server_ts),
                 })}
@@ -778,18 +772,13 @@
                         {#snippet fallback()}
                           {@const sender = senders.identity(hit.sender)}
                           {@const profile = senders.profile(hit.sender)}
-                          {@const name = profileOverrides.name(hit.sender, sender.displayName)}
+                          {@const name = sender.displayName}
                           {@const parsedName =
                             preferences.showPronouns && preferences.showPronounPills
                               ? splitDisplayNamePronouns(name)
                               : { name, pronouns: [] }}
                           <span class="hit-fallback">
-                            <Avatar
-                              id={hit.sender}
-                              src={profileOverrides.avatar(hit.sender, sender.avatarUrl)}
-                              {name}
-                              size="small"
-                            />
+                            <Avatar id={hit.sender} src={sender.avatarUrl} {name} size="small" />
                             <span class="hit-text">
                               <span class="hit-meta">
                                 <SenderName

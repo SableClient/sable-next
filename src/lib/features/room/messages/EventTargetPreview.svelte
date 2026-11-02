@@ -6,7 +6,6 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { UserProfile } from '#lib/profile/user-profile.svelte.js';
   import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -58,9 +57,7 @@
   let preview = $derived(loaded ? previewOf(loaded, i18n.t) : fetched);
   let name = $derived.by(() => {
     if (!preview?.sender) return i18n.t('timeline.unknownSender');
-    return loaded?.sender_name
-      ? profileOverrides.name(preview.sender, loaded.sender_name)
-      : memberName(members, preview.sender);
+    return (loaded?.sender_name ?? null) || memberName(members, preview.sender);
   });
 
   let persona = $derived(loaded?.per_message_profile ?? null);

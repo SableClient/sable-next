@@ -28,6 +28,7 @@ function room(
   return {
     room_id: roomId,
     name,
+    display_name: name,
     canonical_alias: null,
     avatar_url: null,
     room_kind: kind,
