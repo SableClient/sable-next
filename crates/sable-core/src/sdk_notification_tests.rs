@@ -2,7 +2,11 @@ use std::{sync::Arc, time::Duration};
 
 use matrix_sdk::{
     Client,
-    ruma::{MilliSecondsSinceUnixEpoch, room_id, user_id},
+    ruma::{
+        MilliSecondsSinceUnixEpoch,
+        push::{Action, PredefinedOverrideRuleId, RuleKind, Ruleset, Tweak},
+        room_id, user_id,
+    },
     test_utils::mocks::MatrixMockServer,
 };
 use matrix_sdk_test::{
@@ -937,4 +941,78 @@ async fn push_rules_are_not_written_as_account_data() {
             .await;
         assert!(matches!(result, Err(RpcError::Unsupported)), "{event_type}");
     }
+}
+
+#[tokio::test]
+async fn a_knock_alerts_like_a_join() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!space:example.org");
+    server.mock_room_state_encryption().plain().mount().await;
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(factory.member(client.user_id().unwrap()))
+                .add_state_event(factory.power_levels()),
+        )
+        .await;
+    let (core, mut events) = watching(&server, &client).await;
+    let mut rules = Ruleset::server_default(client.user_id().unwrap());
+    rules
+        .set_actions(
+            RuleKind::Override,
+            PredefinedOverrideRuleId::MemberEvent.as_str(),
+            vec![
+                Action::Notify,
+                Action::SetTweak(Tweak::Sound("default".into())),
+            ],
+        )
+        .unwrap();
+
+    let member = |event_id: &str, user: &str, membership: &str| {
+        json!({
+            "type": "m.room.member", "event_id": event_id, "room_id": room_id,
+            "sender": user, "state_key": user,
+            "origin_server_ts": MilliSecondsSinceUnixEpoch::now(),
+            "content": { "membership": membership }
+        })
+    };
+    for (event_id, user, membership) in [
+        ("$join", "@bob:example.org", "join"),
+        ("$knock", "@carol:example.org", "knock"),
+    ] {
+        Mock::given(method("GET"))
+            .and(path_regex(format!(
+                r"/context/.*{}$",
+                event_id.trim_start_matches('$')
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "event": member(event_id, user, membership), "events_before": [],
+                "events_after": [], "state": [], "start": "s", "end": "e"
+            })))
+            .mount(server.server())
+            .await;
+        let event = member(event_id, user, membership);
+        server
+            .mock_sync()
+            .ok_and_run(&client, |builder| {
+                builder.add_global_account_data(factory.push_rules(rules.clone()));
+                builder.add_joined_room(
+                    JoinedRoomBuilder::new(room_id).add_timeline_event(
+                        matrix_sdk::ruma::serde::Raw::new(&event)
+                            .unwrap()
+                            .cast_unchecked::<matrix_sdk::ruma::events::AnySyncTimelineEvent>(),
+                    ),
+                );
+            })
+            .await;
+        let view = next_notification(&mut events).await;
+        assert_eq!(
+            view.event_id.map(|id| id.to_string()).as_deref(),
+            Some(event_id)
+        );
+    }
+    core.session_tasks.lock().clear();
 }
