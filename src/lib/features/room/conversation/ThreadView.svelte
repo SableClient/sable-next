@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { panelIn } from '#lib/ui/motion.js';
   import type { MemberView, TimelineItemView } from '#src/generated/protocol';
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -195,6 +196,7 @@
 
 <section
   bind:this={panel}
+  in:panelIn|global={{ cover: !sidePanel }}
   class={['thread-view', { 'side-panel': sidePanel, swiping: swipe.swiping }]}
   style:width={sidePanel ? `${width}rem` : undefined}
   style:transform={swipe.transform}
