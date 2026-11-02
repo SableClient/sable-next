@@ -228,6 +228,11 @@ jobs:
             echo "SIZE=$(stat -c %s "tarball/$tarball")"
           } >> "$GITHUB_ENV"
           echo 'built=true' >> "$GITHUB_OUTPUT"
+      - name: Set up app
+        if: ${{ steps.tarball.outputs.built == 'true' }}
+        uses: ./.github/actions/setup
+        with:
+          install-mise-tools: 'false'
       - name: Install flatpak-builder
         if: ${{ steps.tarball.outputs.built == 'true' }}
         shell: bash
