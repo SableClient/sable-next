@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { RoomListItemView } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
-  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { roomAvatarUrl, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import RoomIcon from '#lib/ui/primitives/RoomIcon.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -90,6 +90,7 @@
     >
       {#each results as room, index (room.room_id)}
         {@const name = roomDisplayName(room)}
+        {@const avatar = roomAvatarUrl(room)}
         {@const parent = parents.get(room.room_id)}
         <li role="presentation">
           <button
@@ -103,10 +104,10 @@
             onclick={() => onSelect(room)}
           >
             <Avatar
-              class={['jump-avatar', { glyph: !room.avatar_url }]}
+              class={['jump-avatar', { glyph: !avatar }]}
               size="small"
-              id={room.avatar_url ? room.room_id : null}
-              src={room.avatar_url}
+              id={avatar ? room.room_id : null}
+              src={avatar}
               {name}
               uniform
             >

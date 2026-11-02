@@ -1,4 +1,5 @@
 import type { MembershipChangeView, TimelineItemView } from '#src/generated/protocol';
+import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 
 import type { Translate } from '../timeline/state-event-text';
 
@@ -77,10 +78,16 @@ export interface MemberGroupSegment {
 function groupUser(item: TimelineItemView): MemberGroupUser | null {
   const content = item.content;
   if (content.kind === 'membership') {
-    return { userId: content.user_id, name: content.display_name ?? content.user_id };
+    return {
+      userId: content.user_id,
+      name: profileOverrides.name(content.user_id, content.display_name),
+    };
   }
   if (content.kind === 'profile_change') {
-    return { userId: content.user_id, name: item.sender_name ?? content.user_id };
+    return {
+      userId: content.user_id,
+      name: profileOverrides.name(content.user_id, item.sender_name),
+    };
   }
   return null;
 }

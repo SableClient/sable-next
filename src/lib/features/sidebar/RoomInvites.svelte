@@ -6,7 +6,7 @@
   import type { RoomListItemView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import { inviter, senderName } from '#lib/features/inbox/inbox.js';
+  import { inviter, senderLabel } from '#lib/features/inbox/inbox.js';
   import { i18n } from '#lib/i18n.js';
   import { InviteActions } from '#lib/rooms/invites.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -48,7 +48,7 @@
               {/snippet}
             </Tooltip>
             {#if from}
-              {@const invitedBy = i18n.t('inbox.invitedBy', { name: senderName(from) })}
+              {@const invitedBy = i18n.t('inbox.invitedBy', { name: senderLabel(from) })}
               <Tooltip label={from}>
                 {#snippet trigger({ props })}
                   <span {...props} class="invite-from">{invitedBy}</span>

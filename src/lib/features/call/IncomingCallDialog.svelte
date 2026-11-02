@@ -3,6 +3,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { isRecord } from '#lib/guards.js';
   import { visibleName } from '#lib/model/model.js';
+  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
   import PhoneDisconnectIcon from 'phosphor-svelte/lib/PhoneDisconnectIcon';
   import VideoCameraIcon from 'phosphor-svelte/lib/VideoCameraIcon';
@@ -25,8 +26,12 @@
 
   const core = useCoreClient();
   let profile = $state.raw<{ name: string; avatar: string | null } | null>(null);
-  let senderName = $derived(profile?.name ?? call?.senderName ?? call?.sender ?? '');
-  let senderAvatar = $derived(profile?.avatar ?? null);
+  let senderName = $derived(
+    call ? profileOverrides.name(call.sender, profile?.name ?? call.senderName) : ''
+  );
+  let senderAvatar = $derived(
+    call ? profileOverrides.avatar(call.sender, profile?.avatar ?? null) : null
+  );
 
   $effect(() => {
     const incoming = call;

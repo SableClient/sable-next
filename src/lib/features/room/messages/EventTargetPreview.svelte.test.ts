@@ -9,6 +9,7 @@ import type { TimelineItemView } from '#src/generated/protocol';
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { giveNickname } from '#lib/profile/profile-override-fixtures.js';
 
 import EventTargetPreview from './EventTargetPreview.svelte';
 import { TimelineEventIndex } from '../timeline/timeline-event-index';
@@ -38,4 +39,21 @@ test('a target names its sender in the colour of their profile', async () => {
   expect(name?.style.getPropertyValue('--name-color-on-light')).toBe('#2244aa');
   expect(name?.style.getPropertyValue('--name-color-on-dark')).toBe('#88aaff');
   expect(name?.style.color).toBe('');
+});
+
+test('a target names its sender by their local nickname', async () => {
+  await giveNickname('@bob:example.org', 'Bobby');
+  const target = {
+    id: 'pinned',
+    event_id: '$pinned:example.org',
+    sender: '@bob:example.org',
+    sender_name: 'Bob',
+    timestamp: 0,
+    content: { kind: 'message', body: 'Pinned', html: null, msgtype: 'text' },
+  } as unknown as TimelineItemView;
+  const { container } = render(EventTargetPreview, {
+    props: { eventId: '$pinned:example.org', events: new TimelineEventIndex([target], []) },
+  });
+
+  expect(container.querySelector('.target-name')).toHaveTextContent('Bobby');
 });

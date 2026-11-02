@@ -15,7 +15,7 @@
     focusRowAt,
     groupNotifications,
     notificationCount,
-    senderName,
+    senderLabel,
     unlistedNotifications,
     type NotificationFilter,
   } from './inbox';
@@ -348,7 +348,7 @@
               >
                 {#snippet fallback()}
                   <p class="preview">
-                    <strong>{item.sender_name ?? senderName(item.sender)}</strong>
+                    <strong>{senderLabel(item.sender, item.sender_name)}</strong>
                     {item.body ??
                       i18n.t(item.encrypted ? 'inbox.encryptedMessage' : 'inbox.noPreview')}
                   </p>

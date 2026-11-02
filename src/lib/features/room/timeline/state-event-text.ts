@@ -1,11 +1,18 @@
 import { isRecord } from '#lib/guards.js';
 import { reactionKey } from '#lib/model/model.js';
+import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 import type { StateChangeView, TimelineItemView } from '#src/generated/protocol';
 
 import { isCustomReaction } from '../messages/reaction-emote-label';
 import { relationOf } from './timeline-event-index';
 
 export type Translate = (key: string, values?: Record<string, unknown>) => string;
+
+function senderLabel(item: TimelineItemView, t: Translate): string {
+  return item.sender
+    ? profileOverrides.name(item.sender, item.sender_name)
+    : t('timeline.unknownSender');
+}
 
 function stateChangeText(change: StateChangeView, user: string, t: Translate): string {
   switch (change.kind) {
@@ -99,8 +106,8 @@ function membershipText(
   item: TimelineItemView,
   t: Translate
 ): string {
-  const user = content.display_name ?? content.user_id;
-  const actor = item.sender_name ?? item.sender;
+  const user = profileOverrides.name(content.user_id, content.display_name);
+  const actor = item.sender && profileOverrides.name(item.sender, item.sender_name);
   const attributed =
     MODERATED.has(content.change) && actor !== null && item.sender !== content.user_id;
 
@@ -117,17 +124,17 @@ export function stateEventText(item: TimelineItemView, t: Translate): string {
   switch (content.kind) {
     case 'call_invite':
       return t('timeline.callInvite', {
-        user: item.sender_name ?? item.sender ?? t('timeline.unknownSender'),
+        user: senderLabel(item, t),
       });
     case 'verification_request':
       return t('timeline.verificationRequest', {
-        user: item.sender_name ?? item.sender ?? t('timeline.unknownSender'),
+        user: senderLabel(item, t),
       });
     case 'cute': {
       const type =
         content.cute_type && CUTE_TYPES.has(content.cute_type) ? content.cute_type : 'other';
       return t(`timeline.cute.${type}`, {
-        user: item.sender_name ?? item.sender ?? t('timeline.unknownSender'),
+        user: senderLabel(item, t),
         body: content.body,
       });
     }
@@ -136,7 +143,7 @@ export function stateEventText(item: TimelineItemView, t: Translate): string {
     case 'membership':
       return membershipText(content, item, t);
     case 'profile_change': {
-      const user = content.display_name?.old ?? content.user_id;
+      const user = profileOverrides.name(content.user_id, content.display_name?.old ?? null);
       if (content.display_name?.new) {
         const key = content.display_name.old ? 'profileNameChanged' : 'profileNameSet';
         return t(`timeline.${key}`, { user, name: content.display_name.new });
@@ -147,16 +154,12 @@ export function stateEventText(item: TimelineItemView, t: Translate): string {
         : t('timeline.profileAvatarChanged', { user });
     }
     case 'state_event': {
-      const user = item.sender_name ?? item.sender ?? t('timeline.unknownSender');
+      const user = senderLabel(item, t);
       if (content.change) return stateChangeText(content.change, user, t);
       return t('timeline.hiddenStateEvent', { user, type: content.event_type });
     }
     case 'hidden_event':
-      return hiddenEventText(
-        content,
-        item.sender_name ?? item.sender ?? t('timeline.unknownSender'),
-        t
-      );
+      return hiddenEventText(content, senderLabel(item, t), t);
     case 'unsupported':
       return t('timeline.unsupported', { description: content.description });
     default:
@@ -191,6 +194,7 @@ export function stateEventSubject(
       return null;
   }
   if (!userId || !name) return null;
+  name = profileOverrides.name(userId, name);
 
   const text = stateEventText(item, (key, values) =>
     values && 'user' in values ? t(key, { ...values, user: SUBJECT_MARKER }) : t(key, values)

@@ -8,6 +8,7 @@ import type {
 import { REACTION_EMOJI, searchReactionEmoji } from '#lib/emoji/emoji.js';
 import { packName } from '#lib/emoji/pack-name.js';
 import { t } from '#lib/i18n.js';
+import { roomAvatarUrl, roomLabel } from '#lib/rooms/room-list.svelte.js';
 
 import { adminSuggestions, type AdminCommand, type AdminScope } from './admin-commands';
 import type { AutocompleteQuery, Suggestion } from './autocomplete';
@@ -163,6 +164,7 @@ function roomSuggestions(needle: string, rooms: readonly RoomListItemView[]): Su
       return {
         room,
         name,
+        label: roomLabel(room),
         searchName: normalized(name),
         searchAlias: normalized(room.canonical_alias ?? ''),
       };
@@ -185,12 +187,12 @@ function roomSuggestions(needle: string, rooms: readonly RoomListItemView[]): Su
         left.name.localeCompare(right.name)
       );
     })
-    .map(({ room, name }) => ({
+    .map(({ room, name, label }) => ({
       id: room.canonical_alias ?? room.room_id,
       insert: name.startsWith('#') ? name : `#${name}`,
-      label: name.startsWith('#') ? name : `#${name}`,
+      label: label.startsWith('#') ? label : `#${label}`,
       detail: room.canonical_alias,
-      avatarUrl: room.avatar_url,
+      avatarUrl: roomAvatarUrl(room),
     }))
     .filter(({ id }) => {
       if (seen.has(id)) return false;
@@ -203,7 +205,8 @@ function roomSuggestions(needle: string, rooms: readonly RoomListItemView[]): Su
 function commandSuggestions(
   needle: string,
   translate: Translate,
-  botCommands: readonly BotCommand[]
+  botCommands: readonly BotCommand[],
+  displayName: DisplayName
 ): Suggestion[] {
   const names = slashCommandNames();
   const builtIn = new Set(names);
@@ -220,7 +223,7 @@ function commandSuggestions(
   const bots = botCommands
     .filter((command) => !builtIn.has(command.command.toLowerCase()))
     .map((command) => {
-      const bot = command.sender_name ?? command.sender;
+      const bot = displayName(command.sender, command.sender_name ?? command.sender);
       return {
         name: command.command.toLowerCase(),
         names: botCommandNames(command).map((name) => name.toLowerCase()),
@@ -268,7 +271,7 @@ export function suggestionsFor(
   if (query.sigil === '!') return adminSuggestions(query.query, admin, adminCommands);
   const needle = query.query.toLowerCase();
 
-  if (query.sigil === '/') return commandSuggestions(needle, translate, botCommands);
+  if (query.sigil === '/') return commandSuggestions(needle, translate, botCommands, displayName);
   if (query.sigil === '@') {
     return [
       ...roomMention(needle, translate),

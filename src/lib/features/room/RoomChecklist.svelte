@@ -3,6 +3,7 @@
 
   import type { RoomListItemView } from '#src/generated/protocol';
 
+  import { roomAvatarUrl } from '#lib/rooms/room-list.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import '#lib/ui/primitives/menu.css';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
@@ -36,7 +37,7 @@
           toggle(room.room_id);
         }}
       >
-        <Avatar size="small" id={room.room_id} src={room.avatar_url} name={room.name} />
+        <Avatar size="small" id={room.room_id} src={roomAvatarUrl(room)} name={label(room)} />
         <span class="name">{label(room)}</span>
         {#if room.canonical_alias}<span class="alias">{room.canonical_alias}</span>{/if}
         <span class="tick" aria-hidden="true">

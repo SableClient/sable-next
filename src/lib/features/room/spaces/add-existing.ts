@@ -1,4 +1,5 @@
 import type { DirectoryRoomType, RoomListItemView } from '#src/generated/protocol';
+import { roomLabel } from '#lib/rooms/room-list.svelte.js';
 
 export type AddExistingKind = DirectoryRoomType;
 
@@ -30,9 +31,9 @@ export function addableChildren(
     .filter(
       (room) =>
         needle === '' ||
-        [room.name, room.canonical_alias, room.room_id].some((field) =>
+        [roomLabel(room), room.canonical_alias, room.room_id].some((field) =>
           field?.toLowerCase().includes(needle)
         )
     )
-    .sort((left, right) => (left.name ?? left.room_id).localeCompare(right.name ?? right.room_id));
+    .sort((left, right) => roomLabel(left).localeCompare(roomLabel(right)));
 }

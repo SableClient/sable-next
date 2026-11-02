@@ -5,7 +5,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { InboxFeed } from '#lib/features/inbox/inbox-feed.svelte.js';
-  import { senderName } from '#lib/features/inbox/inbox.js';
+  import { senderLabel } from '#lib/features/inbox/inbox.js';
   import NotificationReason from '#lib/features/inbox/NotificationReason.svelte';
   import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -151,7 +151,7 @@
               {/snippet}
               {#snippet fallback()}
                 <p class="preview">
-                  <strong>{item.sender_name ?? senderName(item.sender)}</strong>
+                  <strong>{senderLabel(item.sender, item.sender_name)}</strong>
                   {item.body ??
                     i18n.t(item.encrypted ? 'inbox.encryptedMessage' : 'inbox.noPreview')}
                 </p>

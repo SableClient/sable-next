@@ -1,5 +1,6 @@
 import type { RoomListItemView } from '#src/generated/protocol';
 
+import { roomLabel } from '#lib/rooms/room-list.svelte.js';
 import { type RoomUnread, roomUnread } from '#lib/rooms/unread.js';
 
 import { fuzzyFilter } from './fuzzy.js';
@@ -15,7 +16,7 @@ const PREFIXES = new Map<string, JumpKind>([
 ]);
 
 export function roomDisplayName(room: RoomListItemView): string {
-  return room.name ?? room.canonical_alias ?? room.room_id;
+  return roomLabel(room);
 }
 
 export function jumpKind(room: RoomListItemView): JumpKind {

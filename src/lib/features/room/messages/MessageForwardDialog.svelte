@@ -1,6 +1,6 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
-  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
@@ -28,9 +28,7 @@
         (room) =>
           room.state === 'joined' && room.room_kind !== 'space' && room.room_id !== fromRoomId
       )
-      .filter((room) =>
-        (room.name ?? room.room_id).toLowerCase().includes(search.trim().toLowerCase())
-      )
+      .filter((room) => roomLabel(room).toLowerCase().includes(search.trim().toLowerCase()))
   );
 
   function send(): void {
@@ -61,12 +59,7 @@
     {#if targets.length === 0}
       <p class="empty">{i18n.t('common.noRoomsMatch')}</p>
     {:else}
-      <RoomChecklist
-        class="targets"
-        rooms={targets}
-        bind:selected
-        label={(room) => room.name ?? room.room_id}
-      />
+      <RoomChecklist class="targets" rooms={targets} bind:selected label={roomLabel} />
     {/if}
 
     <div class="metadata">

@@ -48,9 +48,9 @@ class ProfileOverrides {
     return this.entries.get(userId);
   }
 
-  name(userId: string, fallback: string): string {
+  name(userId: string, fallback: string | null): string {
     const name = this.entries.get(userId)?.display_name;
-    if (name === undefined || name.kind === 'unset') return fallback;
+    if (name === undefined || name.kind === 'unset') return fallback ?? userId;
     return name.kind === 'set' ? name.value : userId;
   }
 

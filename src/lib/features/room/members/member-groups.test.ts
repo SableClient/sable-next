@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest';
 
+import { giveNickname } from '#lib/profile/profile-override-fixtures.js';
+
 import type { MembershipChangeView, TimelineItemView } from '#src/generated/protocol';
 
 import {
@@ -152,4 +154,11 @@ test('an invitation collapses with the join that answers it', () => {
   expect(text(memberGroupSummary(memberGroupSegments(items), t, 'en'))).toBe(
     '[A] invited, [A] joined, and [B] left'
   );
+});
+
+test('a grouped member is listed by the nickname given to them', async () => {
+  await giveNickname('@ann:x', 'Annie');
+
+  const [segment] = memberGroupSegments([member('ann', 'joined')]);
+  expect(segment.users).toEqual([{ userId: '@ann:x', name: 'Annie' }]);
 });

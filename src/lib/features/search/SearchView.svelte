@@ -12,7 +12,7 @@
   import { splitDisplayNamePronouns, withDisplayNamePronouns } from '#lib/personas/pronouns.js';
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
-  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { roomAvatarUrl, roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
@@ -128,8 +128,8 @@
               rooms: roomList.rooms.map((room) => ({
                 id: room.room_id,
                 alias: room.canonical_alias,
-                name: room.name,
-                avatarUrl: room.avatar_url,
+                name: roomLabel(room),
+                avatarUrl: roomAvatarUrl(room),
               })),
               senders: knownSenders(),
               spaces: spaces.map((space) => ({
