@@ -1,7 +1,7 @@
 #[cfg(not(feature = "runtime-dispatch-simd"))]
-use core::{mem, ptr, usize};
+use core::{mem, ptr};
 #[cfg(feature = "runtime-dispatch-simd")]
-use std::{mem, ptr, usize};
+use std::{mem, ptr};
 
 fn splat(byte: u8) -> usize {
     let lo = usize::MAX / 0xFF;
