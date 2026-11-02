@@ -361,7 +361,8 @@
     "removeBookmark": "Прибрати збереження в {{room}}",
     "inviteDeclined": "Запрошення до {{room}} відхилено",
     "bookmarks": "Збережені",
-    "noPreview": "Повідомлення"
+    "noPreview": "Повідомлення",
+    "invitesEmpty": "Немає запрошень, що очікують відповіді."
   },
   "common": {
     "decline": "Відхилити",
