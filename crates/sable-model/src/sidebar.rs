@@ -143,12 +143,11 @@ pub fn without_space(items: &[SidebarItemView], room_id: &str) -> Items {
 #[must_use]
 pub fn remember_space_ids(known: &[String], current: &[String]) -> Vec<String> {
     let mut remembered = known.to_vec();
-    remembered.extend(
-        current
-            .iter()
-            .filter(|room_id| !known.contains(room_id))
-            .cloned(),
-    );
+    for room_id in current {
+        if !remembered.contains(room_id) {
+            remembered.push(room_id.clone());
+        }
+    }
     remembered
 }
 
@@ -510,5 +509,12 @@ mod tests {
             ordered_known_space_ids(&ids(&["!b", "!a", "!x"]), &ids(&["!a", "!c", "!b"])),
             ids(&["!b", "!a", "!c"])
         );
+    }
+
+    #[test]
+    fn a_space_listed_twice_is_remembered_once() {
+        let known = remember_space_ids(&[], &ids(&["!a", "!b", "!a"]));
+        assert_eq!(known, ids(&["!a", "!b"]));
+        assert_eq!(remember_space_ids(&known, &ids(&["!a", "!b", "!a"])), known);
     }
 }
