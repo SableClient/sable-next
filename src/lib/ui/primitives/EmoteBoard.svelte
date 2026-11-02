@@ -233,7 +233,7 @@
   );
   const emojiColumns = $derived(
     Math.max(
-      narrowSheet ? 6 : 8,
+      narrowSheet ? 6 : 7,
       Math.floor((emojiRowWidth + imageCell.gap) / (imageCell.width + imageCell.gap))
     )
   );
