@@ -3,7 +3,10 @@ import { expect, test } from 'vitest';
 import type { RoomListItemView } from '#src/generated/protocol';
 
 import {
+  ancestorSpaceIds,
   childRouting,
+  descendantRoomIds,
+  inheritedNotificationModes,
   joinedSpaceRooms,
   quietRoomIds,
   spacesContainingRoom,
@@ -304,4 +307,101 @@ test('collects joined rooms from nested spaces once, skipping unjoined children'
 
   expect(joinedSpaceRooms(rooms[0], byId)).toEqual(['!a:x', '!b:x']);
   expect(joinedSpaceRooms(undefined, byId)).toEqual([]);
+});
+
+test('a room takes the mode of its nearest space that sets one', () => {
+  const root = room({
+    room_id: '!root:example.org',
+    room_kind: 'space',
+    space_children: [child('!sub:example.org'), child('!top:example.org')],
+  });
+  const sub = room({
+    room_id: '!sub:example.org',
+    room_kind: 'space',
+    space_children: [child('!deep:example.org'), child('!root:example.org')],
+  });
+  const other = room({
+    room_id: '!other:example.org',
+    room_kind: 'space',
+    space_children: [child('!top:example.org'), child('!invited:example.org')],
+  });
+  const rooms = [
+    root,
+    sub,
+    other,
+    room({ room_id: '!top:example.org' }),
+    room({ room_id: '!deep:example.org' }),
+    room({ room_id: '!invited:example.org', state: 'invited' }),
+  ];
+
+  expect(
+    inheritedNotificationModes(
+      rooms,
+      new Map([
+        ['!root:example.org', 'mute'],
+        ['!sub:example.org', 'all'],
+        ['!other:example.org', 'mentions'],
+      ])
+    )
+  ).toEqual(
+    new Map([
+      ['!root:example.org', 'mute'],
+      ['!sub:example.org', 'all'],
+      ['!other:example.org', 'mentions'],
+      ['!top:example.org', 'mute'],
+      ['!deep:example.org', 'all'],
+    ])
+  );
+  expect(inheritedNotificationModes(rooms, new Map([['!root:example.org', 'mute']]))).toEqual(
+    new Map([
+      ['!root:example.org', 'mute'],
+      ['!sub:example.org', 'mute'],
+      ['!top:example.org', 'mute'],
+      ['!deep:example.org', 'mute'],
+    ])
+  );
+});
+
+function bareSpace(roomId: string, children: string[]): RoomListItemView {
+  return {
+    room_id: roomId,
+    room_kind: 'space',
+    state: 'joined',
+    space_children: children.map((child) => ({ room_id: child })),
+  } as unknown as RoomListItemView;
+}
+
+test('walks every joined space above the room, farthest first', () => {
+  const rooms = [
+    bareSpace('!root:example.org', ['!mid:example.org']),
+    bareSpace('!mid:example.org', ['!room:example.org']),
+  ];
+  expect(ancestorSpaceIds(rooms, '!room:example.org')).toEqual([
+    '!root:example.org',
+    '!mid:example.org',
+  ]);
+});
+
+test('stops on a cycle', () => {
+  const rooms = [
+    bareSpace('!a:example.org', ['!b:example.org']),
+    bareSpace('!b:example.org', ['!a:example.org']),
+  ];
+  expect(ancestorSpaceIds(rooms, '!a:example.org')).toEqual(['!b:example.org']);
+});
+
+test('walks every joined room and subspace below a space, nearest first', () => {
+  const room = (roomId: string) =>
+    ({ room_id: roomId, state: 'joined', space_children: [] }) as unknown as RoomListItemView;
+  const rooms = [
+    bareSpace('!root:example.org', ['!mid:example.org', '!a:example.org', '!gone:example.org']),
+    bareSpace('!mid:example.org', ['!b:example.org', '!root:example.org']),
+    room('!a:example.org'),
+    room('!b:example.org'),
+  ];
+  expect(descendantRoomIds(rooms, '!root:example.org')).toEqual([
+    '!mid:example.org',
+    '!a:example.org',
+    '!b:example.org',
+  ]);
 });

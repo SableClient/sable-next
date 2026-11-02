@@ -21,7 +21,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import { abbreviationsChanged, abbreviationChanges } from '../room-abbreviations.svelte.js';
-  import { ancestorSpaceIds } from '../abbreviations.js';
+  import { ancestorSpaceIds } from '#lib/rooms/spaces.js';
   import { canSendState } from './permission-groups';
   import {
     ABBREVIATIONS_EVENT_TYPE,

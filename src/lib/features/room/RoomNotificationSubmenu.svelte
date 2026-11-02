@@ -8,6 +8,7 @@
   import { i18n } from '#lib/i18n.js';
   import { isQuiet, setQuiet } from '#lib/rooms/quiet-rooms.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { spaceNotifications } from '#lib/rooms/space-notifications.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSub from '#lib/ui/primitives/ActionMenuSub.svelte';
@@ -35,8 +36,23 @@
     mute: 'room.notifyMute',
   };
 
-  let mode = $state<NotificationModeView | null | undefined>();
-  let fallback = $state<NotificationModeView>('mentions');
+  let roomMode = $state<NotificationModeView | null | undefined>();
+  let roomFallback = $state<NotificationModeView>('mentions');
+  let isSpace = $derived(roomList.byId(roomId)?.room_kind === 'space');
+  let inherited = $derived(
+    isSpace ? undefined : spaceNotifications.inherited(roomList.rooms).get(roomId)
+  );
+  let mode = $derived.by(() => {
+    if (isSpace) {
+      return spaceNotifications.modeOf(roomId) ?? roomList.byId(roomId)?.notification.room ?? null;
+    }
+    return inherited !== undefined && roomMode === inherited ? null : roomMode;
+  });
+  let fallback = $derived(
+    isSpace
+      ? (roomList.byId(roomId)?.notification.default ?? 'mentions')
+      : (inherited ?? roomFallback)
+  );
   let defaultQuiet = $derived(
     fallback === 'mentions' &&
       (roomList.byId(roomId)?.is_direct
@@ -49,14 +65,14 @@
 
   $effect(() => {
     void settingsChanges.version;
-    if (active) void read();
+    if (active && !isSpace) void read();
   });
 
   async function read(): Promise<void> {
     try {
       const settings = await core.rpc.notifications.settings({ room_id: roomId });
-      mode = settings.room;
-      fallback = settings.default ?? 'mentions';
+      roomMode = settings.room;
+      roomFallback = settings.default ?? 'mentions';
     } catch (error) {
       console.warn('[sable room] notification settings unavailable', error);
     }
@@ -65,14 +81,22 @@
   function select(next: NotificationModeView | null, quiet = false): void {
     if (quiet) setQuiet(roomId, true);
     else if (mode === 'mentions' && isQuiet(roomId)) setQuiet(roomId, false);
-    mode = next;
+    if (isSpace) {
+      spaceNotifications.set(roomId, next, roomList.rooms).catch(report);
+      return;
+    }
+    roomMode = next;
     core.rpc.notifications
       .setRoomNotificationMode({ room_id: roomId, mode: next })
       .catch((error: unknown) => {
-        console.warn('[sable room] notification mode failed', error);
-        toasts.error(i18n.t('errors.actionFailed'));
+        report(error);
         void read();
       });
+  }
+
+  function report(error: unknown): void {
+    console.warn('[sable room] notification mode failed', error);
+    toasts.error(i18n.t('errors.actionFailed'));
   }
 </script>
 
@@ -83,6 +107,8 @@
   {/snippet}
   <IconContext values={{ 'aria-hidden': 'true' }}>
     {#each modes as option (option.label)}
+      {@const label =
+        option.mode === null && inherited !== undefined ? 'room.notifySpace' : option.label}
       {@const selected =
         mode === option.mode && (mode !== 'mentions' || !!option.quiet === isQuiet(roomId))}
       <ActionMenuItem
@@ -92,7 +118,7 @@
         }}
       >
         <span class="menu-check" aria-hidden="true">{selected ? '✓' : ''}</span>
-        <span>{i18n.t(option.label, { mode: defaultLabel })}</span>
+        <span>{i18n.t(label, { mode: defaultLabel })}</span>
       </ActionMenuItem>
     {/each}
   </IconContext>

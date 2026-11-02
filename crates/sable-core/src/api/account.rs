@@ -10,7 +10,7 @@ use super::{Handler, Json};
 use crate::media::mxc_uri;
 use crate::profile_overrides::OverrideEdit;
 use crate::profiles::profile_view;
-use crate::protocol::{BookmarkView, RpcError, FieldEdit, InviteTriageView, MediaPreviewConfigView, MediaPreviewsView, MutualRoomView, PresenceView, ProfileOverridesView, ProfileView, SealedAccountDataView, UserDirectoryEntryView};
+use crate::protocol::{BookmarkView, NotificationModeView, RpcError, FieldEdit, InviteTriageView, MediaPreviewConfigView, MediaPreviewsView, MutualRoomView, PresenceView, ProfileOverridesView, ProfileView, SealedAccountDataView, UserDirectoryEntryView};
 use crate::{Core, ResultExt, presence};
 
 domain! {
@@ -45,6 +45,8 @@ domain! {
     set_room_media_previews,
     dm_spaces,
     set_dm_spaces,
+    space_notifications,
+    set_space_notification,
     profile_overrides,
     set_profile_override,
 }
@@ -751,6 +753,56 @@ impl Handler for SetDmSpacesParams {
     async fn run(self, core: &Arc<Core>) -> Result<Vec<DmSpaceLink>, RpcError> {
         Ok(dm_space_links(
             core.set_dm_spaces(self.room_id, self.space_ids).await?,
+        ))
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SpaceNotificationView {
+    pub space_id: String,
+    pub mode: NotificationModeView,
+}
+
+fn space_notification_views(
+    modes: std::collections::BTreeMap<OwnedRoomId, NotificationModeView>,
+) -> Vec<SpaceNotificationView> {
+    modes
+        .into_iter()
+        .map(|(space_id, mode)| SpaceNotificationView {
+            space_id: space_id.into(),
+            mode,
+        })
+        .collect()
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SpaceNotificationsParams {}
+
+impl Handler for SpaceNotificationsParams {
+    type Ok = Vec<SpaceNotificationView>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Vec<SpaceNotificationView>, RpcError> {
+        Ok(space_notification_views(core.space_notifications().await?))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetSpaceNotificationParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub space_id: OwnedRoomId,
+    #[serde(default)]
+    pub mode: Option<NotificationModeView>,
+}
+
+impl Handler for SetSpaceNotificationParams {
+    type Ok = Vec<SpaceNotificationView>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Vec<SpaceNotificationView>, RpcError> {
+        Ok(space_notification_views(
+            core.set_space_notification(self.space_id, self.mode).await?,
         ))
     }
 }

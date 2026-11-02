@@ -2,15 +2,7 @@
 
 import { expect, test } from 'vitest';
 
-import type { RoomListItemView } from '#src/generated/protocol';
-
-import {
-  abbreviationPattern,
-  ancestorSpaceIds,
-  buildAbbreviationMap,
-  descendantRoomIds,
-  markAbbreviations,
-} from './abbreviations';
+import { abbreviationPattern, buildAbbreviationMap, markAbbreviations } from './abbreviations';
 import type { AbbreviationEntry } from './settings/abbreviations';
 
 function mark(html: string, entries: [string, string][]): string {
@@ -27,15 +19,6 @@ function markEntries(html: string, entries: AbbreviationEntry[]): string {
   root.innerHTML = html;
   if (pattern) markAbbreviations(root, map, pattern);
   return root.innerHTML;
-}
-
-function space(roomId: string, children: string[]): RoomListItemView {
-  return {
-    room_id: roomId,
-    room_kind: 'space',
-    state: 'joined',
-    space_children: children.map((child) => ({ room_id: child })),
-  } as unknown as RoomListItemView;
 }
 
 test('marks a term whole-word and case-insensitively, keeping its casing', () => {
@@ -94,39 +77,4 @@ test('prefers the longest term', () => {
 test('never marks inside a link, code or an existing abbreviation', () => {
   const html = '<a href="https://pr.example.org">PR</a><code>PR</code><abbr title="x">PR</abbr>';
   expect(mark(html, [['pr', 'Pull request']])).toBe(html);
-});
-
-test('walks every joined space above the room, farthest first', () => {
-  const rooms = [
-    space('!root:example.org', ['!mid:example.org']),
-    space('!mid:example.org', ['!room:example.org']),
-  ];
-  expect(ancestorSpaceIds(rooms, '!room:example.org')).toEqual([
-    '!root:example.org',
-    '!mid:example.org',
-  ]);
-});
-
-test('stops on a cycle', () => {
-  const rooms = [
-    space('!a:example.org', ['!b:example.org']),
-    space('!b:example.org', ['!a:example.org']),
-  ];
-  expect(ancestorSpaceIds(rooms, '!a:example.org')).toEqual(['!b:example.org']);
-});
-
-test('walks every joined room and subspace below a space, nearest first', () => {
-  const room = (roomId: string) =>
-    ({ room_id: roomId, state: 'joined', space_children: [] }) as unknown as RoomListItemView;
-  const rooms = [
-    space('!root:example.org', ['!mid:example.org', '!a:example.org', '!gone:example.org']),
-    space('!mid:example.org', ['!b:example.org', '!root:example.org']),
-    room('!a:example.org'),
-    room('!b:example.org'),
-  ];
-  expect(descendantRoomIds(rooms, '!root:example.org')).toEqual([
-    '!mid:example.org',
-    '!a:example.org',
-    '!b:example.org',
-  ]);
 });

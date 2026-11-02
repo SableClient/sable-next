@@ -5,6 +5,7 @@ import { expect, test, vi } from 'vitest';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { createCoreStub } from '#lib/core/__mocks__/context.js';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
+import { spaceNotifications } from '#lib/rooms/space-notifications.svelte.js';
 
 import RoomOptionsMenuHarness from './RoomOptionsMenuHarness.test.svelte';
 
@@ -83,3 +84,150 @@ test.each([1280, 390])(
     });
   }
 );
+
+test('sets the space notification mode and moves the rooms that followed it', async () => {
+  await page.viewport(1280, 900);
+  const edge = (room_id: string) => ({
+    room_id,
+    via: [],
+    order: null,
+    origin_server_ts: 0,
+    suggested: false,
+  });
+  const following = withCounts({
+    ...currentRoom,
+    room_id: '!following',
+    notification: { room: 'all', default: 'mentions' },
+  });
+  const own = withCounts({
+    ...currentRoom,
+    room_id: '!own',
+    notification: { room: 'mentions', default: 'mentions' },
+  });
+  const space = withCounts({
+    ...currentRoom,
+    room_id: '!space',
+    name: 'Space',
+    room_kind: 'space',
+    space_children: [edge(following.room_id), edge(own.room_id)],
+  });
+  const settings = vi.fn();
+  const setRoomsNotificationMode = vi.fn().mockResolvedValue(null);
+  const setSpaceNotification = vi.fn().mockResolvedValue([{ space_id: '!space', mode: 'mute' }]);
+  const core = createCoreStub({
+    rpc: {
+      account: {
+        spaceNotifications: vi.fn().mockResolvedValue([{ space_id: '!space', mode: 'all' }]),
+        setSpaceNotification,
+      },
+      notifications: { settings, setRoomsNotificationMode },
+      members: { permissions: vi.fn().mockResolvedValue({ can_manage_children: false }) },
+    },
+  }) as unknown as CoreClient;
+  spaceNotifications.start(core);
+  await vi.waitFor(() => {
+    expect(spaceNotifications.modeOf('!space')).toBe('all');
+  });
+
+  await render(RoomOptionsMenuHarness, {
+    core,
+    room: space,
+    rooms: [space, following, own],
+    registerRefresh: () => {},
+  });
+
+  await page.getByRole('button', { name: 'Room options' }).click();
+  await page.getByRole('menuitem', { name: 'Notifications', exact: true }).hover();
+  await expect
+    .element(page.getByRole('menuitem', { name: 'All messages', exact: true }))
+    .toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('menuitem', { name: 'Mute', exact: true }).click();
+
+  await vi.waitFor(() => {
+    expect(setRoomsNotificationMode).toHaveBeenCalledWith({
+      room_ids: ['!space', '!following'],
+      mode: 'mute',
+    });
+  });
+  expect(setSpaceNotification).toHaveBeenCalledWith({ space_id: '!space', mode: 'mute' });
+  expect(settings).not.toHaveBeenCalled();
+  spaceNotifications.stop();
+});
+
+test('a room carrying its space mode shows it as following the space', async () => {
+  await page.viewport(1280, 900);
+  const muted = withCounts({ ...currentRoom, notification: { room: 'mute', default: 'mentions' } });
+  const space = withCounts({
+    ...currentRoom,
+    room_id: '!space',
+    room_kind: 'space',
+    space_children: [
+      { room_id: muted.room_id, via: [], order: null, origin_server_ts: 0, suggested: false },
+    ],
+  });
+  const setRoomNotificationMode = vi.fn().mockResolvedValue(null);
+  const core = createCoreStub({
+    rpc: {
+      account: {
+        spaceNotifications: vi.fn().mockResolvedValue([{ space_id: '!space', mode: 'mute' }]),
+      },
+      notifications: {
+        settings: vi.fn().mockResolvedValue({ room: 'mute', default: 'mentions' }),
+        setRoomNotificationMode,
+      },
+      members: { permissions: vi.fn().mockResolvedValue({ can_manage_children: false }) },
+    },
+  }) as unknown as CoreClient;
+  spaceNotifications.start(core);
+  await vi.waitFor(() => {
+    expect(spaceNotifications.modeOf('!space')).toBe('mute');
+  });
+
+  await render(RoomOptionsMenuHarness, {
+    core,
+    room: muted,
+    rooms: [space, muted],
+    registerRefresh: () => {},
+  });
+
+  await page.getByRole('button', { name: 'Room options' }).click();
+  await page.getByRole('menuitem', { name: 'Notifications', exact: true }).hover();
+  await expect
+    .element(page.getByRole('menuitem', { name: 'Space (Mute)', exact: true }))
+    .toHaveAttribute('aria-checked', 'true');
+  await expect
+    .element(page.getByRole('menuitem', { name: 'Mute', exact: true }))
+    .toHaveAttribute('aria-checked', 'false');
+  spaceNotifications.stop();
+});
+
+test('a muted space without a space mode shows as muted', async () => {
+  await page.viewport(1280, 900);
+  const space = withCounts({
+    ...currentRoom,
+    room_id: '!space',
+    room_kind: 'space',
+    notification: { room: 'mute', default: 'mentions' },
+  });
+  const core = createCoreStub({
+    rpc: {
+      account: { spaceNotifications: vi.fn().mockResolvedValue([]) },
+      members: { permissions: vi.fn().mockResolvedValue({ can_manage_children: false }) },
+    },
+  }) as unknown as CoreClient;
+  spaceNotifications.start(core);
+
+  await render(RoomOptionsMenuHarness, {
+    core,
+    room: space,
+    rooms: [space],
+    registerRefresh: () => {},
+  });
+
+  await page.getByRole('button', { name: 'Room options' }).click();
+  await page.getByRole('menuitem', { name: 'Notifications', exact: true }).hover();
+  await expect
+    .element(page.getByRole('menuitem', { name: 'Mute', exact: true }))
+    .toHaveAttribute('aria-checked', 'true');
+  spaceNotifications.stop();
+});

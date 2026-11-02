@@ -924,6 +924,59 @@ async fn resetting_a_bridged_dm_to_default_does_not_create_a_room_push_rule() {
 }
 
 #[tokio::test]
+async fn setting_many_rooms_sets_each_of_them() {
+    use crate::api::notifications::{SetRoomsNotificationModeParams, SettingsParams};
+    use crate::protocol::NotificationModeView;
+    use matrix_sdk::ruma::push::{NewPushRule, NewSimplePushRule, Ruleset};
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let loud = room_id!("!loud:example.org");
+    let quiet = room_id!("!quiet:example.org");
+    let mut rules = Ruleset::server_default(client.user_id().unwrap());
+    rules
+        .insert(
+            NewPushRule::Room(NewSimplePushRule::new(quiet.to_owned(), vec![])),
+            None,
+            None,
+        )
+        .unwrap();
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_global_account_data(EventFactory::new().push_rules(rules.clone()));
+            builder.add_joined_room(JoinedRoomBuilder::new(loud));
+            builder.add_joined_room(JoinedRoomBuilder::new(quiet));
+        })
+        .await;
+    for verb in ["PUT", "DELETE"] {
+        Mock::given(method(verb))
+            .and(path_regex(r"/_matrix/client/v3/pushrules/global/.*"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .mount(server.server())
+            .await;
+    }
+    let (core, _events) = watching(&server, &client).await;
+    core.run(SetRoomsNotificationModeParams {
+        room_ids: vec![loud.to_owned(), quiet.to_owned()],
+        mode: Some(NotificationModeView::Mute),
+    })
+    .await
+    .unwrap();
+
+    for room_id in [loud, quiet] {
+        let settings = core
+            .run(SettingsParams {
+                room_id: room_id.to_owned(),
+            })
+            .await
+            .unwrap();
+        assert_eq!(settings.room, Some(NotificationModeView::Mute));
+    }
+    core.session_tasks.lock().clear();
+}
+
+#[tokio::test]
 async fn push_rules_are_not_written_as_account_data() {
     use crate::api::account::SetDataParams;
     use crate::protocol::RpcError;

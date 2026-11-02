@@ -28,7 +28,7 @@
 
   import '#lib/ui/primitives/settings-row.css';
 
-  import { ancestorSpaceIds, descendantRoomIds } from '../abbreviations.js';
+  import { ancestorSpaceIds, descendantRoomIds } from '#lib/rooms/spaces.js';
   import MemberIdentityRow from '../members/MemberIdentityRow.svelte';
   import { FOUNDER_POWER_LEVEL } from '../members/power-tags';
   import ReactionPicker from '../messages/ReactionPicker.svelte';

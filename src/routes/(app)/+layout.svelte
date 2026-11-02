@@ -24,6 +24,7 @@
   import { InviteActions } from '#lib/rooms/invites.svelte.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
   import { dmSpaces } from '#lib/rooms/dm-spaces.svelte.js';
+  import { spaceNotifications } from '#lib/rooms/space-notifications.svelte.js';
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { supporter } from '#lib/supporter/supporter.svelte.js';
   import { PresenceStore, providePresenceStore } from '#lib/rooms/presence.svelte.js';
@@ -889,6 +890,7 @@
     presence.start(core);
     dismissedInvites.start(core);
     dmSpaces.start(core);
+    spaceNotifications.start(core);
     mediaPreviewSettings.start(core);
     profileOverrides.start(core);
     supporter.start(core);
@@ -899,10 +901,15 @@
       presence.stop();
       dismissedInvites.stop();
       dmSpaces.stop();
+      spaceNotifications.stop();
       mediaPreviewSettings.stop();
       profileOverrides.stop();
       supporter.stop();
     };
+  });
+
+  $effect(() => {
+    if (roomList.settled) spaceNotifications.apply(roomList.rooms);
   });
 
   const LEFT_CONVERSATIONS_SETTLE_MS = 2_000;

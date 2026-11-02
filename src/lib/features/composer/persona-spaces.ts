@@ -1,6 +1,6 @@
 import type { RoomListItemView } from '#src/generated/protocol';
 
-import { ancestorSpaceLevels } from '#lib/features/room/abbreviations.js';
+import { ancestorSpaceLevels } from '#lib/rooms/spaces.js';
 import { findRoomByPathId } from '#lib/rooms/room-list.svelte.js';
 
 export function personaSpaces(

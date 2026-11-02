@@ -29,7 +29,11 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   roomPathParam: (room: RoomListItemView) => encodeURIComponent(room.room_id),
   findRoomByPathId: (rooms: RoomListItemView[], pathId: string) =>
     rooms.find((room) => room.room_id === pathId || room.canonical_alias === pathId),
-  useRoomList: () => ({ rooms: listed, quietRoomIds: new Set() }),
+  useRoomList: () => ({
+    rooms: listed,
+    quietRoomIds: new Set(),
+    byId: (roomId: string) => listed.find((room) => room.room_id === roomId),
+  }),
 }));
 vi.mock('#lib/core/context.js');
 

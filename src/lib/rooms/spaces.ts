@@ -1,4 +1,4 @@
-import type { RoomListItemView } from '#src/generated/protocol';
+import type { NotificationModeView, RoomListItemView } from '#src/generated/protocol';
 
 import type { RoomUnread, UnreadCount } from './unread.js';
 
@@ -71,6 +71,85 @@ export function quietRoomIds(
 
   for (const roomId of targets) walk(roomId);
   return quiet;
+}
+
+const MAX_SPACE_DEPTH = 4;
+
+export function ancestorSpaceIds(rooms: readonly RoomListItemView[], roomId: string): string[] {
+  return ancestorSpaceLevels(rooms, roomId).reverse().flat();
+}
+
+export function ancestorSpaceLevels(
+  rooms: readonly RoomListItemView[],
+  roomId: string
+): string[][] {
+  const levels: string[][] = [];
+  const seen = new Set([roomId]);
+  let frontier = [roomId];
+
+  for (let depth = 0; depth < MAX_SPACE_DEPTH && frontier.length > 0; depth += 1) {
+    const parents = rooms.filter(
+      (space) =>
+        space.room_kind === 'space' &&
+        space.state === 'joined' &&
+        !seen.has(space.room_id) &&
+        space.space_children.some((child) => frontier.includes(child.room_id))
+    );
+    for (const parent of parents) seen.add(parent.room_id);
+    frontier = parents.map((parent) => parent.room_id);
+    if (frontier.length > 0) levels.push(frontier);
+  }
+
+  return levels;
+}
+
+export function descendantRoomIds(rooms: readonly RoomListItemView[], spaceId: string): string[] {
+  const joined = new Map(
+    rooms.filter((room) => room.state === 'joined').map((room) => [room.room_id, room])
+  );
+  const seen = new Set([spaceId]);
+  const found: string[] = [];
+  let frontier = [spaceId];
+
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const id of frontier) {
+      for (const child of joined.get(id)?.space_children ?? []) {
+        if (seen.has(child.room_id) || !joined.has(child.room_id)) continue;
+        seen.add(child.room_id);
+        found.push(child.room_id);
+        next.push(child.room_id);
+      }
+    }
+    frontier = next;
+  }
+
+  return found;
+}
+
+export function inheritedNotificationModes(
+  rooms: readonly RoomListItemView[],
+  modes: ReadonlyMap<string, NotificationModeView>
+): Map<string, NotificationModeView> {
+  const joined = new Set(
+    rooms.filter((room) => room.state === 'joined').map((room) => room.room_id)
+  );
+  const covered = new Set(
+    [...modes.keys()]
+      .filter((spaceId) => joined.has(spaceId))
+      .flatMap((spaceId) => [spaceId, ...descendantRoomIds(rooms, spaceId)])
+  );
+  const inherited = new Map<string, NotificationModeView>();
+  for (const roomId of covered) {
+    const levels = [[roomId], ...ancestorSpaceLevels(rooms, roomId)];
+    for (const level of levels) {
+      const mode = level.map((id) => modes.get(id)).find((entry) => entry !== undefined);
+      if (mode === undefined) continue;
+      inherited.set(roomId, mode);
+      break;
+    }
+  }
+  return inherited;
 }
 
 export type ChildRouting = { via: string[]; parentId: string | null };

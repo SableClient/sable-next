@@ -23,6 +23,7 @@ domain! {
     remove_keyword,
     set_keyword_mode,
     set_room_notification_mode,
+    set_rooms_notification_mode,
     set_default_mode,
     set_mention_notifications,
     set_event_notification,
@@ -274,15 +275,42 @@ impl Handler for SetRoomNotificationModeParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        let room = core.room(&self.room_id).await?;
+        SetRoomsNotificationModeParams {
+            room_ids: vec![self.room_id],
+            mode: self.mode,
+        }
+        .run(core)
+        .await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetRoomsNotificationModeParams {
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub room_ids: Vec<OwnedRoomId>,
+    #[serde(default)]
+    pub mode: Option<NotificationModeView>,
+}
+
+impl Handler for SetRoomsNotificationModeParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         let rules = core.push_rules().await?;
-        let direct = notifications::uses_direct_push_rules(&room);
-        let writes =
-            push_rules::plan_room_mode(&rules.snapshot().await, &self.room_id, direct, self.mode);
+        let snapshot = rules.snapshot().await;
+        let mut writes = Vec::new();
+        for room_id in &self.room_ids {
+            let room = core.room(room_id).await?;
+            let direct = notifications::uses_direct_push_rules(&room);
+            writes.extend(push_rules::plan_room_mode(
+                &snapshot, room_id, direct, self.mode,
+            ));
+        }
         rules
             .apply(writes)
             .await
-            .or_failed(core, "set_room_notification_mode")?;
+            .or_failed(core, "set_rooms_notification_mode")?;
 
         Ok(())
     }

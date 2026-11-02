@@ -1678,6 +1678,11 @@ export type SpaceHierarchyRoomView = {
 	children: SpaceChildEdge[],
 };
 
+export type SpaceNotificationView = {
+	space_id: string,
+	mode: NotificationModeView,
+};
+
 export type SpaceParentView = {
 	room_id: string,
 	via: string[],
@@ -2140,6 +2145,11 @@ export type Rpc = {
 	room_id: string,
 	space_ids: string[],
 }) => Promise<DmSpaceLink[]>;
+    spaceNotifications: (params?: Record<string, never>) => Promise<SpaceNotificationView[]>;
+    setSpaceNotification: (params: {
+	space_id: string,
+	mode?: NotificationModeView | null,
+}) => Promise<SpaceNotificationView[]>;
     profileOverrides: (params?: Record<string, never>) => Promise<ProfileOverridesView>;
     setProfileOverride: (params: {
 	user_id: string,
@@ -2720,6 +2730,10 @@ export type Rpc = {
     setRoomNotificationMode: (params: {
 	room_id: string,
 	/**  `null` drops the room's own rules so it follows the default again. */
+	mode?: NotificationModeView | null,
+}) => Promise<null>;
+    setRoomsNotificationMode: (params: {
+	room_ids: string[],
 	mode?: NotificationModeView | null,
 }) => Promise<null>;
     setDefaultMode: (params: {
@@ -3421,6 +3435,8 @@ export type RpcMethods = {
   'account.set_room_media_previews': Rpc['account']['setRoomMediaPreviews'];
   'account.dm_spaces': Rpc['account']['dmSpaces'];
   'account.set_dm_spaces': Rpc['account']['setDmSpaces'];
+  'account.space_notifications': Rpc['account']['spaceNotifications'];
+  'account.set_space_notification': Rpc['account']['setSpaceNotification'];
   'account.profile_overrides': Rpc['account']['profileOverrides'];
   'account.set_profile_override': Rpc['account']['setProfileOverride'];
   'auth.discover_homeserver': Rpc['auth']['discoverHomeserver'];
@@ -3543,6 +3559,7 @@ export type RpcMethods = {
   'notifications.remove_keyword': Rpc['notifications']['removeKeyword'];
   'notifications.set_keyword_mode': Rpc['notifications']['setKeywordMode'];
   'notifications.set_room_notification_mode': Rpc['notifications']['setRoomNotificationMode'];
+  'notifications.set_rooms_notification_mode': Rpc['notifications']['setRoomsNotificationMode'];
   'notifications.set_default_mode': Rpc['notifications']['setDefaultMode'];
   'notifications.set_mention_notifications': Rpc['notifications']['setMentionNotifications'];
   'notifications.set_event_notification': Rpc['notifications']['setEventNotification'];
@@ -3737,6 +3754,8 @@ export function createRpc(call: RpcCall): Rpc {
       setRoomMediaPreviews: (params) => call('account.set_room_media_previews', params) as ReturnType<Rpc['account']['setRoomMediaPreviews']>,
       dmSpaces: (params = {}) => call('account.dm_spaces', params) as ReturnType<Rpc['account']['dmSpaces']>,
       setDmSpaces: (params) => call('account.set_dm_spaces', params) as ReturnType<Rpc['account']['setDmSpaces']>,
+      spaceNotifications: (params = {}) => call('account.space_notifications', params) as ReturnType<Rpc['account']['spaceNotifications']>,
+      setSpaceNotification: (params) => call('account.set_space_notification', params) as ReturnType<Rpc['account']['setSpaceNotification']>,
       profileOverrides: (params = {}) => call('account.profile_overrides', params) as ReturnType<Rpc['account']['profileOverrides']>,
       setProfileOverride: (params) => call('account.set_profile_override', params) as ReturnType<Rpc['account']['setProfileOverride']>,
     },
@@ -3873,6 +3892,7 @@ export function createRpc(call: RpcCall): Rpc {
       removeKeyword: (params) => call('notifications.remove_keyword', params) as ReturnType<Rpc['notifications']['removeKeyword']>,
       setKeywordMode: (params) => call('notifications.set_keyword_mode', params) as ReturnType<Rpc['notifications']['setKeywordMode']>,
       setRoomNotificationMode: (params) => call('notifications.set_room_notification_mode', params) as ReturnType<Rpc['notifications']['setRoomNotificationMode']>,
+      setRoomsNotificationMode: (params) => call('notifications.set_rooms_notification_mode', params) as ReturnType<Rpc['notifications']['setRoomsNotificationMode']>,
       setDefaultMode: (params) => call('notifications.set_default_mode', params) as ReturnType<Rpc['notifications']['setDefaultMode']>,
       setMentionNotifications: (params) => call('notifications.set_mention_notifications', params) as ReturnType<Rpc['notifications']['setMentionNotifications']>,
       setEventNotification: (params) => call('notifications.set_event_notification', params) as ReturnType<Rpc['notifications']['setEventNotification']>,

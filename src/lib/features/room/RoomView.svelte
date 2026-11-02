@@ -12,7 +12,7 @@
   import { voiceChat } from '#lib/features/room/voice-chat.svelte.js';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import { ancestorSpaceIds } from './abbreviations';
+  import { ancestorSpaceIds } from '#lib/rooms/spaces.js';
   import {
     abbreviationChanges,
     provideRoomAbbreviations,

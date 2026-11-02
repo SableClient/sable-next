@@ -6,13 +6,16 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 use serde_with::{DefaultOnError, VecSkipError, serde_as};
 
-use crate::protocol::{InviteAvatarsView, MediaPreviewConfigView, MediaPreviewsView, RpcError};
+use crate::protocol::{
+    InviteAvatarsView, MediaPreviewConfigView, MediaPreviewsView, NotificationModeView, RpcError,
+};
 use crate::{Core, ResultExt};
 
 const MEDIA_PREVIEW_EVENT: &str = "m.media_preview_config";
 const UNSTABLE_MEDIA_PREVIEW_EVENT: &str = "io.element.msc4278.media_preview_config";
 const DISMISSED_INVITES_EVENT: &str = "moe.sable.dismissed_invites";
 const DM_SPACES_EVENT: &str = "moe.sable.dm_spaces";
+const SPACE_NOTIFICATIONS_EVENT: &str = "moe.sable.space_notifications";
 
 #[derive(Default, Deserialize)]
 struct MediaPreviewIn {
@@ -112,14 +115,18 @@ fn room_media_previews_content(
     content
 }
 
+fn stored_object(stored: Option<Value>) -> Map<String, Value> {
+    match stored {
+        Some(Value::Object(map)) => map,
+        _ => Map::new(),
+    }
+}
+
 pub(crate) fn media_preview_content(
     stored: Option<Value>,
     update: MediaPreviewConfigView,
 ) -> Value {
-    let mut content = match stored {
-        Some(Value::Object(map)) => map,
-        _ => Map::new(),
-    };
+    let mut content = stored_object(stored);
     if let Some(previews) = update.media_previews {
         let value = match previews {
             MediaPreviewsView::On => "on",
@@ -183,13 +190,45 @@ fn dm_spaces_content(
     } else {
         links.insert(room_id, space_ids);
     }
-    let mut content = match stored {
-        Some(Value::Object(map)) => map,
-        _ => Map::new(),
-    };
+    let mut content = stored_object(stored);
     content.insert(
         "rooms".to_owned(),
         serde_json::to_value(links).unwrap_or_default(),
+    );
+    Value::Object(content)
+}
+
+pub(crate) fn space_notifications(
+    content: Option<&Value>,
+) -> BTreeMap<OwnedRoomId, NotificationModeView> {
+    let Some(Value::Object(spaces)) = content.and_then(|content| content.get("spaces")) else {
+        return BTreeMap::new();
+    };
+    spaces
+        .iter()
+        .filter_map(|(space_id, mode)| {
+            Some((
+                OwnedRoomId::try_from(space_id.as_str()).ok()?,
+                NotificationModeView::deserialize(mode).ok()?,
+            ))
+        })
+        .collect()
+}
+
+fn space_notifications_content(
+    stored: Option<Value>,
+    space_id: OwnedRoomId,
+    mode: Option<NotificationModeView>,
+) -> Value {
+    let mut modes = space_notifications(stored.as_ref());
+    match mode {
+        Some(mode) => modes.insert(space_id, mode),
+        None => modes.remove(&space_id),
+    };
+    let mut content = stored_object(stored);
+    content.insert(
+        "spaces".to_owned(),
+        serde_json::to_value(modes).unwrap_or_default(),
     );
     Value::Object(content)
 }
@@ -325,6 +364,32 @@ impl Core {
         Ok(dm_spaces(Some(&content)))
     }
 
+    pub(crate) async fn space_notifications(
+        &self,
+    ) -> Result<BTreeMap<OwnedRoomId, NotificationModeView>, RpcError> {
+        Ok(space_notifications(
+            self.account_document(SPACE_NOTIFICATIONS_EVENT)
+                .await?
+                .as_ref(),
+        ))
+    }
+
+    pub(crate) async fn set_space_notification(
+        &self,
+        space_id: OwnedRoomId,
+        mode: Option<NotificationModeView>,
+    ) -> Result<BTreeMap<OwnedRoomId, NotificationModeView>, RpcError> {
+        let _guard = self.account_data_lock.lock().await;
+        let content = space_notifications_content(
+            self.account_document(SPACE_NOTIFICATIONS_EVENT).await?,
+            space_id,
+            mode,
+        );
+        self.set_account_data(SPACE_NOTIFICATIONS_EVENT, &content)
+            .await?;
+        Ok(space_notifications(Some(&content)))
+    }
+
     pub(crate) async fn dismissed_invites(&self) -> Result<Vec<OwnedRoomId>, RpcError> {
         Ok(dismissed_invites(
             self.account_document(DISMISSED_INVITES_EVENT)
@@ -356,9 +421,38 @@ mod tests {
 
     use super::{
         dismissed_invites, dm_spaces, dm_spaces_content, media_preview_config,
-        media_preview_content, room_media_previews_content,
+        media_preview_content, room_media_previews_content, space_notifications,
+        space_notifications_content,
     };
-    use crate::protocol::{InviteAvatarsView, MediaPreviewConfigView, MediaPreviewsView};
+    use crate::protocol::{
+        InviteAvatarsView, MediaPreviewConfigView, MediaPreviewsView, NotificationModeView,
+    };
+
+    #[test]
+    fn a_space_mode_is_stored_and_cleared() {
+        let stored = json!({ "spaces": { "!old:a.org": "all", "!bad:a.org": "loud" }, "kept": 1 });
+        let space = matrix_sdk::ruma::owned_room_id!("!space:a.org");
+
+        let set = space_notifications_content(
+            Some(stored),
+            space.clone(),
+            Some(NotificationModeView::Mute),
+        );
+        assert_eq!(
+            set,
+            json!({ "spaces": { "!old:a.org": "all", "!space:a.org": "mute" }, "kept": 1 })
+        );
+        assert_eq!(
+            space_notifications(Some(&set)).get(&space),
+            Some(&NotificationModeView::Mute)
+        );
+
+        let cleared = space_notifications_content(Some(set), space, None);
+        assert_eq!(
+            cleared,
+            json!({ "spaces": { "!old:a.org": "all" }, "kept": 1 })
+        );
+    }
 
     #[test]
     fn a_dm_is_linked_to_spaces_and_unlinked_when_none_are_left() {
