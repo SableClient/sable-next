@@ -113,17 +113,18 @@ test('with no other device and no recovery, reset is the one way forward', () =>
   expect(button(/Can't confirm/)).not.toBeInTheDocument();
 });
 
-test('a device confirmed elsewhere shows it and waits for Continue', async () => {
+test('a device confirmed elsewhere moves on without a second Continue', async () => {
   live.encryption = status('unverified');
-  const { user, onComplete } = setup();
+  const { onComplete } = setup();
 
   live.encryption = status('verified');
   flushSync();
 
   expect(screen.getByText(/Device confirmed/)).toBeInTheDocument();
-  expect(onComplete).not.toHaveBeenCalled();
-  await press(user, /Continue/);
-  expect(onComplete).toHaveBeenCalledOnce();
+  expect(button(/Continue/)).not.toBeInTheDocument();
+  await vi.waitFor(() => {
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
 });
 
 test('skipping asks first, and only the second tap skips', async () => {

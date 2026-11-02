@@ -32,6 +32,7 @@
   let view = $state<'choices' | 'recovery' | 'reset' | 'skip'>('choices');
   let understood = $state(false);
   let prompted = $state(false);
+  let completing = false;
 
   const status = $derived(core.encryption);
   const verified = $derived(status?.verification === 'verified');
@@ -51,9 +52,15 @@
 
   $effect(() => {
     if (!status || status.verification === 'unknown') return;
-    if (status.verification === 'verified' && !reset.busy) {
-      untrack(leaveView);
-      if (!untrack(() => prompted)) void afterOverlayPops().then(onComplete);
+    if (status.verification === 'verified') {
+      if (reset.busy) completing = true;
+      else {
+        untrack(leaveView);
+        if (!completing) {
+          completing = true;
+          void afterOverlayPops().then(onComplete);
+        }
+      }
     }
     prompted = true;
   });
@@ -106,8 +113,6 @@
     <AuthField labelId="confirm-device-title" label={i18n.t('setup.confirmedTitle')}>
       <AuthInfoBox>{i18n.t('setup.confirmedDescription')}</AuthInfoBox>
     </AuthField>
-    <AuthStatusSlot />
-    <Button variant="primary" block onclick={onComplete}>{i18n.t('auth.continue')}</Button>
   {:else if view === 'recovery'}
     {@render backButton()}
     <form
