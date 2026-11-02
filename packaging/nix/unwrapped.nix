@@ -52,7 +52,11 @@ stdenv.mkDerivation (finalAttrs: {
     rustPlatform.cargoSetupHook
   ];
 
-  env.VITE_BUILD_HASH = src.shortRev or src.dirtyShortRev or "";
+  env = {
+    SABLE_FOSS = "1";
+    VITE_APP_VERSION = finalAttrs.version;
+    VITE_BUILD_HASH = src.shortRev or src.dirtyShortRev or "";
+  };
 
   buildPhase = ''
     runHook preBuild
