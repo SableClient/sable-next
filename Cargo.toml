@@ -156,6 +156,8 @@ opt-level = 1
 [profile.wasm-release]
 inherits = "release"
 lto = true
+# CI's CARGO_PROFILE_RELEASE_DEBUG would otherwise change the codegen.
+debug = false
 strip = "debuginfo"
 
 # An unoptimised `dev` build is ~100 MB, which the browser recompiles on every
