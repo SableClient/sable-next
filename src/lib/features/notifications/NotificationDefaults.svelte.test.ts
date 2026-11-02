@@ -38,7 +38,7 @@ test('shows each event kind at its account state', async () => {
   render(NotificationDefaults);
 
   await vi.waitFor(() => {
-    expect(screen.getByLabelText('Reactions')).toHaveTextContent('Off');
+    expect(screen.getByLabelText('Reactions to your messages')).toHaveTextContent('Off');
   });
   expect(screen.getByLabelText('Invitations to you')).toHaveTextContent('Notify');
   expect(screen.getByLabelText('Incoming calls')).toHaveTextContent('Notify');
@@ -50,7 +50,7 @@ test('hides an event kind the server has no rule for', async () => {
   render(NotificationDefaults);
 
   await vi.waitFor(() => {
-    expect(screen.getByLabelText('Reactions')).toBeInTheDocument();
+    expect(screen.getByLabelText('Reactions to your messages')).toBeInTheDocument();
   });
   expect(screen.queryByLabelText('Message edits')).not.toBeInTheDocument();
 });
@@ -62,7 +62,7 @@ test('turning reactions on saves that one event', async () => {
 
   render(NotificationDefaults);
 
-  await user.click(await screen.findByLabelText('Reactions'));
+  await user.click(await screen.findByLabelText('Reactions to your messages'));
   await user.click(await screen.findByRole('option', { name: 'Notify' }));
 
   expect(core.rpc.notifications.setEventNotification).toHaveBeenCalledWith({

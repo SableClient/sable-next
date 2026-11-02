@@ -34,7 +34,7 @@ pub(super) async fn fetch_push_event_with(
     let Ok(notifications) = NotificationClient::new(client.clone(), setup).await else {
         return PushFetchView::Unavailable;
     };
-    match notifications.get_notification(room_id, event_id).await {
+    match related_notification(&notifications, client, room_id, event_id).await {
         Ok(NotificationStatus::Event(item))
             if item
                 .actions
@@ -84,6 +84,25 @@ pub(super) async fn fetch_push_event_with(
         }
         Ok(NotificationStatus::EventNotFound) | Err(_) => PushFetchView::Unavailable,
     }
+}
+
+pub(super) async fn related_notification(
+    notifications: &NotificationClient,
+    client: &Client,
+    room_id: &RoomId,
+    event_id: &EventId,
+) -> Result<NotificationStatus, matrix_sdk_ui::notification_client::Error> {
+    let mut status = notifications.get_notification(room_id, event_id).await;
+    if let Ok(NotificationStatus::Event(item)) = &mut status
+        && let (Some(actions), RawNotificationEvent::Timeline(raw), Some(room)) = (
+            item.actions.take(),
+            &item.raw_event,
+            client.get_room(room_id),
+        )
+    {
+        item.actions = Some(crate::push_rules::related_actions(&room, raw, actions).await);
+    }
+    status
 }
 
 async fn sender_name(client: &Client, room_id: &RoomId, sender: &str) -> String {
@@ -150,7 +169,7 @@ pub async fn notification(
 ) -> Option<NotificationView> {
     let notifications = NotificationClient::new(client.clone(), setup).await.ok()?;
 
-    match notifications.get_notification(room_id, event_id).await {
+    match related_notification(&notifications, client, room_id, event_id).await {
         Ok(NotificationStatus::Event(item)) if item.actions.as_deref().is_some_and(notifies) => {
             Some(view(client.user_id()?.to_owned(), room_id, event_id, *item))
         }

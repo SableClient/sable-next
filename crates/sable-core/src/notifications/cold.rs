@@ -407,18 +407,13 @@ pub(super) async fn decrypt_push_event(
 
     match &decrypted.kind {
         matrix_sdk::deserialized_responses::TimelineEventKind::Decrypted(clear) => {
-            let actions = decrypted.push_actions();
-            return match actions {
-                None if every_encrypted => ColdPush::Unevaluated,
-                None => prepared_push_event(&room, clear.event.json().get(), false).await,
-                Some(actions) if notifies(actions) => {
-                    let noisy = actions
-                        .iter()
-                        .any(|action| action.sound().is_some() || action.is_highlight());
-                    prepared_push_event(&room, clear.event.json().get(), noisy).await
-                }
-                Some(_) => ColdPush::Discard,
-            };
+            return decrypted_push(
+                &room,
+                &clear.event,
+                decrypted.push_actions(),
+                every_encrypted,
+            )
+            .await;
         }
         matrix_sdk::deserialized_responses::TimelineEventKind::UnableToDecrypt {
             utd_info, ..
@@ -448,7 +443,7 @@ pub(super) async fn decrypt_push_event(
     let Ok(notifications) = NotificationClient::new(client.clone(), setup).await else {
         return undecryptable;
     };
-    match notifications.get_notification(&room_id, &event_id).await {
+    match super::view::related_notification(&notifications, client, &room_id, &event_id).await {
         Ok(NotificationStatus::Event(item)) if item.actions.is_none() && every_encrypted => {
             ColdPush::Unevaluated
         }
@@ -474,6 +469,31 @@ pub(super) async fn decrypt_push_event(
             ColdPush::Discard
         }
         Ok(NotificationStatus::EventNotFound) | Err(_) => undecryptable,
+    }
+}
+
+async fn decrypted_push(
+    room: &matrix_sdk::Room,
+    clear: &Raw<matrix_sdk::ruma::events::AnyTimelineEvent>,
+    actions: Option<&[matrix_sdk::ruma::push::Action]>,
+    every_encrypted: bool,
+) -> ColdPush {
+    let actions = match actions {
+        Some(actions) => {
+            Some(crate::push_rules::related_actions(room, clear, actions.to_vec()).await)
+        }
+        None => None,
+    };
+    match actions.as_deref() {
+        None if every_encrypted => ColdPush::Unevaluated,
+        None => prepared_push_event(room, clear.json().get(), false).await,
+        Some(actions) if notifies(actions) => {
+            let noisy = actions
+                .iter()
+                .any(|action| action.sound().is_some() || action.is_highlight());
+            prepared_push_event(room, clear.json().get(), noisy).await
+        }
+        Some(_) => ColdPush::Discard,
     }
 }
 

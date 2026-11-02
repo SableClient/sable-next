@@ -1,9 +1,11 @@
+use matrix_sdk::ruma::UserId;
 use matrix_sdk::ruma::push::{
-    EventMatchConditionData, EventPropertyIsConditionData, NewConditionalPushRule, NewPushRule,
-    PredefinedOverrideRuleId, PushCondition, RoomMemberCountConditionData, RuleKind, Ruleset,
-    ScalarJsonValue, SenderNotificationPermissionConditionData,
+    Action, EventMatchConditionData, EventPropertyIsConditionData, NewConditionalPushRule,
+    NewPushRule, PredefinedOverrideRuleId, PushCondition, RoomMemberCountConditionData, RuleKind,
+    Ruleset, ScalarJsonValue, SenderNotificationPermissionConditionData,
 };
 
+use super::related::related_condition;
 use super::{
     RuleWrite, encrypted_rule, event_actions, event_notifies, message_rule, notifies,
     rule_notifies, spec_actions,
@@ -50,6 +52,7 @@ pub(super) const RTC_SERVER_ROOM_RULES: [&str; 2] = [
 ];
 pub(super) const SUPPRESS_BRIDGE_STATUS: &str = "moe.sable.suppress_bridge_status";
 pub(super) const SUPPRESS_REACTIONS: &str = "moe.sable.suppress_reactions";
+pub(super) const REACTION_TO_ME: &str = "moe.sable.reaction_to_me";
 /// A room rule matches every event, so these would notify in a room set to all messages.
 pub(super) const SUPPRESSED_ROOM_EVENTS: [&str; 15] = [
     "m.room.name",
@@ -70,7 +73,7 @@ pub(super) const SUPPRESSED_ROOM_EVENTS: [&str; 15] = [
 ];
 
 #[must_use]
-pub fn plan_alignment(rules: &Ruleset) -> Vec<RuleWrite> {
+pub fn plan_alignment(rules: &Ruleset, user_id: &UserId) -> Vec<RuleWrite> {
     let mut writes: Vec<_> = [true, false]
         .into_iter()
         .filter_map(|direct| {
@@ -111,6 +114,7 @@ pub fn plan_alignment(rules: &Ruleset) -> Vec<RuleWrite> {
         "m.reaction",
         Some(PredefinedOverrideRuleId::Reaction.as_str()),
     ));
+    writes.extend(align_reactions(rules, user_id));
     writes.extend(SUPPRESSED_ROOM_EVENTS.iter().filter_map(|event_type| {
         silence_event_type(
             rules,
@@ -129,6 +133,40 @@ pub fn plan_alignment(rules: &Ruleset) -> Vec<RuleWrite> {
                 rule_id: rule.rule_id.clone(),
             }),
     );
+    writes
+}
+
+pub(super) fn reaction_to_me(user_id: &UserId) -> RuleWrite {
+    RuleWrite::Put(NewPushRule::Override(NewConditionalPushRule::new(
+        REACTION_TO_ME.to_owned(),
+        vec![
+            PushCondition::EventMatch(EventMatchConditionData::new(
+                "type".to_owned(),
+                "m.reaction".to_owned(),
+            )),
+            related_condition("m.annotation", "sender", user_id.as_str()),
+        ],
+        vec![Action::Notify],
+    )))
+}
+
+/// Older versions turned reactions on by making every reaction notify.
+fn align_reactions(rules: &Ruleset, user_id: &UserId) -> Vec<RuleWrite> {
+    let mut writes: Vec<_> = [
+        PredefinedOverrideRuleId::Reaction.as_str(),
+        SUPPRESS_REACTIONS,
+    ]
+    .into_iter()
+    .filter(|id| rules.get(RuleKind::Override, id).is_some_and(rule_notifies))
+    .map(|id| RuleWrite::Actions {
+        kind: RuleKind::Override,
+        rule_id: id.to_owned(),
+        actions: vec![],
+    })
+    .collect();
+    if !writes.is_empty() && rules.get(RuleKind::Override, REACTION_TO_ME).is_none() {
+        writes.push(reaction_to_me(user_id));
+    }
     writes
 }
 

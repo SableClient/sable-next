@@ -277,10 +277,16 @@ impl Core {
     }
 
     pub(crate) async fn align_notification_rules(&self) {
+        let Ok(client) = self.client().await else {
+            return;
+        };
+        let Some(user_id) = client.user_id() else {
+            return;
+        };
         let Ok(rules) = self.push_rules().await else {
             return;
         };
-        let writes = crate::push_rules::plan_alignment(&rules.snapshot().await);
+        let writes = crate::push_rules::plan_alignment(&rules.snapshot().await, user_id);
         if let Err(error) = rules.apply(writes).await {
             tracing::warn!("could not align notification rules: {error}");
         }

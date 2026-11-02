@@ -578,6 +578,68 @@ async fn a_cold_push_the_push_rules_silence_is_discarded() {
     remove_data_dir(&fixture.data_dir).await;
 }
 
+#[tokio::test]
+async fn a_cold_push_notifies_only_for_reactions_to_our_own_events() {
+    use matrix_sdk::ruma::push::{
+        Action, EventMatchConditionData, NewConditionalPushRule, NewPushRule, PushCondition,
+    };
+
+    let mut rules = Ruleset::server_default(user_id!("@alice:example.org"));
+    rules
+        .insert(
+            NewPushRule::Override(NewConditionalPushRule::new(
+                "moe.sable.reaction_to_me".to_owned(),
+                vec![
+                    PushCondition::EventMatch(EventMatchConditionData::new(
+                        "type".to_owned(),
+                        "m.reaction".to_owned(),
+                    )),
+                    serde_json::from_value(json!({
+                        "kind": "im.nheko.msc3664.related_event_match",
+                        "rel_type": "m.annotation",
+                        "key": "sender",
+                        "pattern": "@alice:example.org"
+                    }))
+                    .unwrap(),
+                ],
+                vec![Action::Notify],
+            )),
+            None,
+            None,
+        )
+        .unwrap();
+    let fixture = ColdFixture::new("reaction-to-me", cold_room_with_members(), Some(rules)).await;
+    let factory =
+        matrix_sdk_test::event_factory::EventFactory::new().room(room_id!("!cold:example.org"));
+    for (id, sender) in [
+        (event_id!("$mine"), user_id!("@alice:example.org")),
+        (event_id!("$theirs"), user_id!("@sender:example.org")),
+    ] {
+        fixture
+            .server
+            .mock_room_event()
+            .expect_access_token("test-token")
+            .match_event_id()
+            .ok(factory
+                .text_msg("hi")
+                .sender(sender)
+                .event_id(id)
+                .into_event())
+            .mount()
+            .await;
+    }
+    let reaction = |target: &str| json!({"m.relates_to": {"rel_type": "m.annotation", "event_id": target, "key": "👍"}});
+    let to_mine = fixture.push("m.reaction", reaction("$mine")).await;
+    let to_theirs = fixture.push("m.reaction", reaction("$theirs")).await;
+
+    assert!(matches!(
+        fixture.decrypt("A", &to_mine).await,
+        ColdPush::Clear(_)
+    ));
+    assert_eq!(fixture.decrypt("A", &to_theirs).await, ColdPush::Discard);
+    remove_data_dir(&fixture.data_dir).await;
+}
+
 fn cold_room_without_me() -> JoinedRoomBuilder {
     let factory = matrix_sdk_test::event_factory::EventFactory::new()
         .room(room_id!("!cold:example.org"))

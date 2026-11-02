@@ -14,6 +14,7 @@ use crate::protocol::{
 mod alignment;
 mod categories;
 mod keywords;
+mod related;
 mod store;
 
 pub use alignment::plan_alignment;
@@ -24,6 +25,7 @@ pub use categories::{
     plan_membership, plan_mention, pushes_every_encrypted_event,
 };
 pub use keywords::{keywords, plan_add_keyword, plan_keyword_mode, plan_remove_keyword};
+pub use related::related_actions;
 pub use store::{PushRules, RuleWrite};
 
 #[must_use]

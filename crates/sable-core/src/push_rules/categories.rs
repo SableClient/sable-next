@@ -3,9 +3,11 @@ use matrix_sdk::ruma::push::{
     Ruleset, SoundTweakValue, Tweak,
 };
 
+use matrix_sdk::ruma::UserId;
+
 use super::alignment::{
-    RING_ONE_TO_ONE, RTC_INVITE_TYPES, RTC_SERVER_ROOM_RULES, RTC_SERVER_USER_RULES,
-    SUPPRESS_REACTIONS, is_rtc_rule,
+    REACTION_TO_ME, RING_ONE_TO_ONE, RTC_INVITE_TYPES, RTC_SERVER_ROOM_RULES,
+    RTC_SERVER_USER_RULES, SUPPRESS_REACTIONS, is_rtc_rule, reaction_to_me,
 };
 use super::{RuleWrite, level, notifies, plan_level, rule_notifies};
 use crate::errors::CoreError;
@@ -166,6 +168,11 @@ pub(super) fn event_actions(event: EventNotificationView) -> Vec<Action> {
 }
 
 pub(super) fn event_notifies(rules: &Ruleset, event: EventNotificationView) -> Option<bool> {
+    if matches!(event, EventNotificationView::Reactions)
+        && let Some(rule) = rules.get(RuleKind::Override, REACTION_TO_ME)
+    {
+        return Some(rule_notifies(rule));
+    }
     let (kind, rule_id) = event_rule(rules, event)?;
     rules.get(kind, &rule_id).map(rule_notifies)
 }
@@ -189,9 +196,33 @@ pub fn plan_event(
     rules: &Ruleset,
     event: EventNotificationView,
     enabled: bool,
+    user_id: &UserId,
 ) -> Result<Vec<RuleWrite>, CoreError> {
     let (kind, rule_id) =
         event_rule(rules, event).ok_or("the server has no rule for this kind of event")?;
+    if matches!(event, EventNotificationView::Reactions) {
+        let mut writes = vec![
+            RuleWrite::Actions {
+                kind: kind.clone(),
+                rule_id: rule_id.clone(),
+                actions: vec![],
+            },
+            RuleWrite::Enabled {
+                kind,
+                rule_id,
+                enabled: true,
+            },
+        ];
+        if enabled {
+            writes.push(reaction_to_me(user_id));
+        } else if rules.get(RuleKind::Override, REACTION_TO_ME).is_some() {
+            writes.push(RuleWrite::Delete {
+                kind: RuleKind::Override,
+                rule_id: REACTION_TO_ME.to_owned(),
+            });
+        }
+        return Ok(writes);
+    }
     let mut targets = vec![(kind, rule_id)];
     if matches!(event, EventNotificationView::Calls) {
         for rule in rules

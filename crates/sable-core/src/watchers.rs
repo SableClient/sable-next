@@ -305,6 +305,8 @@ impl Core {
                                 .flatten()
                                 .unwrap_or_default(),
                         };
+                        let actions =
+                            crate::push_rules::related_actions(&room, event.raw(), actions).await;
                         core.refresh_undecryptable_inbox_entry(&room, &event, &actions, generation)
                             .await;
                         if let Some(notification) = redecrypted_notification(
@@ -726,6 +728,12 @@ impl ForegroundNotifier {
 
     async fn handle(&mut self, notification: Notification, room: &matrix_sdk::Room) {
         let Notification { event, actions } = notification;
+        let actions = match &event {
+            RawAnySyncOrStrippedTimelineEvent::Sync(raw) => {
+                crate::push_rules::related_actions(room, raw, actions).await
+            }
+            RawAnySyncOrStrippedTimelineEvent::Stripped(_) => actions,
+        };
         let every_encrypted = self.core.every_encrypted_event_pushed().await;
         if let RawAnySyncOrStrippedTimelineEvent::Sync(raw) = &event
             && !(every_encrypted && notifications::raw_is_encrypted(raw))

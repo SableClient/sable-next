@@ -665,11 +665,16 @@ impl Core {
                         reached_read = true;
                         break;
                     }
-                    let actions = event.push_actions().unwrap_or_default();
                     if every_encrypted && notifications::raw_is_encrypted(event.raw()) {
                         continue;
                     }
-                    if let Some(entry) = self.inbox_entry(&room, event.raw(), actions).await {
+                    let actions = crate::push_rules::related_actions(
+                        &room,
+                        event.raw(),
+                        event.push_actions().unwrap_or_default().to_vec(),
+                    )
+                    .await;
+                    if let Some(entry) = self.inbox_entry(&room, event.raw(), &actions).await {
                         fresh.push(entry);
                         scan.found = scan.found.saturating_add(1);
                     }

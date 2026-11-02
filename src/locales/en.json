@@ -2380,7 +2380,7 @@
     "notificationPushHint": "Alerts and push for rooms with no per-room override. Saved to your account.",
     "notificationDefaultGroup": "Rooms",
     "notificationMembership": "Joins, leaves and profile changes",
-    "notificationReactions": "Reactions",
+    "notificationReactions": "Reactions to your messages",
     "notificationEdits": "Message edits",
     "notificationNotices": "Bot notices",
     "notificationInvites": "Invitations to you",

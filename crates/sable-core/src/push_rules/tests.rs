@@ -236,8 +236,8 @@ fn a_default_is_refused_where_the_server_has_no_rule() {
 #[test]
 fn a_default_left_notifying_for_encrypted_rooms_is_aligned() {
     let defaults = Ruleset::server_default(me());
-    let mut rules = applied(defaults.clone(), plan_alignment(&defaults));
-    assert!(plan_alignment(&rules).is_empty());
+    let mut rules = applied(defaults.clone(), plan_alignment(&defaults, me()));
+    assert!(plan_alignment(&rules, me()).is_empty());
 
     rules
         .set_actions(
@@ -255,7 +255,7 @@ fn a_default_left_notifying_for_encrypted_rooms_is_aligned() {
         .unwrap();
 
     assert_eq!(
-        describe(&plan_alignment(&rules)),
+        describe(&plan_alignment(&rules, me())),
         vec![
             r#"actions underride .m.rule.encrypted_room_one_to_one ["notify",{"set_tweak":"sound","value":"default"}]"#,
             "enabled underride .m.rule.encrypted_room_one_to_one true",
@@ -265,14 +265,14 @@ fn a_default_left_notifying_for_encrypted_rooms_is_aligned() {
             "enabled underride moe.sable.sticker true",
         ]
     );
-    let aligned = applied(rules.clone(), plan_alignment(&rules));
-    assert!(plan_alignment(&aligned).is_empty());
+    let aligned = applied(rules.clone(), plan_alignment(&rules, me()));
+    assert!(plan_alignment(&aligned, me()).is_empty());
 }
 
 #[test]
 fn stickers_notify_exactly_where_messages_do() {
     let defaults = Ruleset::server_default(me());
-    let mut rules = applied(defaults.clone(), plan_alignment(&defaults));
+    let mut rules = applied(defaults.clone(), plan_alignment(&defaults, me()));
     for mode in [NotificationModeView::Mentions, NotificationModeView::All] {
         for direct in [false, true] {
             rules = applied(
@@ -288,13 +288,13 @@ fn stickers_notify_exactly_where_messages_do() {
             assert_eq!(rule_notifies(sticker), mode == NotificationModeView::All);
         }
     }
-    assert!(plan_alignment(&rules).is_empty());
+    assert!(plan_alignment(&rules, me()).is_empty());
 }
 
 #[test]
 fn a_direct_sticker_rule_ranks_above_the_group_one() {
     let defaults = Ruleset::server_default(me());
-    let rules = applied(defaults.clone(), plan_alignment(&defaults));
+    let rules = applied(defaults.clone(), plan_alignment(&defaults, me()));
     let position = |id: &str| rules.underride.iter().position(|rule| rule.rule_id == id);
 
     assert!(position(STICKER_DIRECT) < position(STICKER));
@@ -307,7 +307,7 @@ async fn a_room_set_to_all_messages_ignores_room_changes_but_not_messages() {
 
     let room = room_id!("!ann:example.org");
     let defaults = Ruleset::server_default(me());
-    let mut rules = applied(defaults.clone(), plan_alignment(&defaults));
+    let mut rules = applied(defaults.clone(), plan_alignment(&defaults, me()));
     rules = applied(
         rules.clone(),
         plan_room_mode(&rules, room, false, Some(NotificationModeView::All)),
@@ -331,7 +331,7 @@ async fn a_room_set_to_all_messages_ignores_room_changes_but_not_messages() {
     for event_type in super::alignment::SUPPRESSED_ROOM_EVENTS {
         assert!(!notifies_for(event_type, json!({})).await, "{event_type}");
     }
-    assert!(plan_alignment(&rules).is_empty());
+    assert!(plan_alignment(&rules, me()).is_empty());
 }
 
 async fn rings_in(rules: &Ruleset, room: &RoomId, members: u8) -> bool {
@@ -363,7 +363,7 @@ async fn rings_in(rules: &Ruleset, room: &RoomId, members: u8) -> bool {
 
 fn aligned() -> Ruleset {
     let defaults = Ruleset::server_default(me());
-    applied(defaults.clone(), plan_alignment(&defaults))
+    applied(defaults.clone(), plan_alignment(&defaults, me()))
 }
 
 #[tokio::test]
@@ -372,7 +372,7 @@ async fn a_named_invitation_does_not_depend_on_room_size() {
     let rules = aligned();
     assert!(rings_in(&rules, room, 2).await);
     assert!(rings_in(&rules, room, 5).await);
-    assert!(plan_alignment(&rules).is_empty());
+    assert!(plan_alignment(&rules, me()).is_empty());
 }
 
 #[tokio::test]
@@ -394,10 +394,10 @@ async fn a_one_to_one_ring_follows_the_room_and_calls_settings() {
 
     let off = applied(
         rules.clone(),
-        plan_event(&rules, EventNotificationView::Calls, false).unwrap(),
+        plan_event(&rules, EventNotificationView::Calls, false, me()).unwrap(),
     );
     assert!(!rings_in(&off, room, 2).await);
-    assert!(plan_alignment(&off).is_empty());
+    assert!(plan_alignment(&off, me()).is_empty());
 }
 
 #[tokio::test]
@@ -409,7 +409,7 @@ async fn a_room_muted_before_the_ring_rule_existed_stays_muted() {
         plan_room_mode(&defaults, room, true, Some(NotificationModeView::Mute)),
     );
 
-    let rules = applied(muted.clone(), plan_alignment(&muted));
+    let rules = applied(muted.clone(), plan_alignment(&muted, me()));
     assert!(!rings_in(&rules, room, 2).await);
     assert!(rings_in(&rules, room_id!("!other:example.org"), 2).await);
 }
@@ -417,7 +417,7 @@ async fn a_room_muted_before_the_ring_rule_existed_stays_muted() {
 #[test]
 fn per_room_direct_copies_are_removed() {
     let defaults = Ruleset::server_default(me());
-    let mut rules = applied(defaults.clone(), plan_alignment(&defaults));
+    let mut rules = applied(defaults.clone(), plan_alignment(&defaults, me()));
     rules
         .insert(
             NewPushRule::Underride(NewConditionalPushRule::new(
@@ -430,7 +430,7 @@ fn per_room_direct_copies_are_removed() {
         )
         .unwrap();
 
-    let cleaned = applied(rules.clone(), plan_alignment(&rules));
+    let cleaned = applied(rules.clone(), plan_alignment(&rules, me()));
 
     assert!(
         cleaned
@@ -438,44 +438,44 @@ fn per_room_direct_copies_are_removed() {
             .iter()
             .all(|rule| !rule.rule_id.starts_with("moe.sable.shape."))
     );
-    assert!(plan_alignment(&cleaned).is_empty());
+    assert!(plan_alignment(&cleaned, me()).is_empty());
 }
 
 #[test]
 fn bridge_status_rule_is_enabled_without_rewriting() {
     let defaults = Ruleset::server_default(me());
-    let mut rules = applied(defaults.clone(), plan_alignment(&defaults));
-    assert!(plan_alignment(&rules).is_empty());
+    let mut rules = applied(defaults.clone(), plan_alignment(&defaults, me()));
+    assert!(plan_alignment(&rules, me()).is_empty());
 
     rules
         .set_enabled(RuleKind::Override, SUPPRESS_BRIDGE_STATUS, false)
         .unwrap();
-    let aligned = applied(rules.clone(), plan_alignment(&rules));
+    let aligned = applied(rules.clone(), plan_alignment(&rules, me()));
     assert!(
         aligned
             .get(RuleKind::Override, SUPPRESS_BRIDGE_STATUS)
             .unwrap()
             .enabled()
     );
-    assert!(plan_alignment(&aligned).is_empty());
+    assert!(plan_alignment(&aligned, me()).is_empty());
 }
 
 #[test]
 fn reactions_are_silenced_only_when_the_account_lacks_the_default_rule() {
     let defaults = Ruleset::server_default(me());
-    let kept = applied(defaults.clone(), plan_alignment(&defaults));
+    let kept = applied(defaults.clone(), plan_alignment(&defaults, me()));
     assert!(kept.get(RuleKind::Override, SUPPRESS_REACTIONS).is_none());
 
     let mut old = defaults;
     old.override_
         .retain(|rule| rule.rule_id != PredefinedOverrideRuleId::Reaction.as_str());
-    let aligned = applied(old.clone(), plan_alignment(&old));
+    let aligned = applied(old.clone(), plan_alignment(&old, me()));
     assert!(
         aligned
             .get(RuleKind::Override, SUPPRESS_REACTIONS)
             .is_some()
     );
-    assert!(plan_alignment(&aligned).is_empty());
+    assert!(plan_alignment(&aligned, me()).is_empty());
 }
 
 #[test]
@@ -628,10 +628,10 @@ fn each_event_rule_reads_as_on_only_while_it_notifies() {
     for event in [Membership, Reactions, Edits, Notices, Invites, Calls] {
         let on = applied(
             defaults.clone(),
-            plan_event(&defaults, event, true).unwrap(),
+            plan_event(&defaults, event, true, me()).unwrap(),
         );
         assert_eq!(event_notifies(&on, event), Some(true));
-        let off = applied(on.clone(), plan_event(&on, event, false).unwrap());
+        let off = applied(on.clone(), plan_event(&on, event, false, me()).unwrap());
         assert_eq!(event_notifies(&off, event), Some(false));
     }
 }
@@ -641,11 +641,11 @@ fn turning_an_event_back_on_restores_the_spec_actions() {
     let defaults = Ruleset::server_default(me());
     let off = applied(
         defaults.clone(),
-        plan_event(&defaults, EventNotificationView::Calls, false).unwrap(),
+        plan_event(&defaults, EventNotificationView::Calls, false, me()).unwrap(),
     );
     let on = applied(
         off.clone(),
-        plan_event(&off, EventNotificationView::Calls, true).unwrap(),
+        plan_event(&off, EventNotificationView::Calls, true, me()).unwrap(),
     );
     let actions = |rules: &Ruleset| {
         serde_json::to_value(
@@ -670,14 +670,14 @@ fn a_reaction_toggle_falls_back_to_the_rule_alignment_added() {
         .retain(|rule| rule.rule_id != PredefinedOverrideRuleId::Reaction.as_str());
     assert_eq!(event_notifications(&rules).reactions, None);
 
-    let aligned = applied(rules.clone(), plan_alignment(&rules));
+    let aligned = applied(rules.clone(), plan_alignment(&rules, me()));
     assert_eq!(event_notifications(&aligned).reactions, Some(false));
     let on = applied(
         aligned.clone(),
-        plan_event(&aligned, EventNotificationView::Reactions, true).unwrap(),
+        plan_event(&aligned, EventNotificationView::Reactions, true, me()).unwrap(),
     );
     assert_eq!(event_notifications(&on).reactions, Some(true));
-    assert!(plan_alignment(&on).is_empty());
+    assert!(plan_alignment(&on, me()).is_empty());
 }
 
 #[test]
@@ -685,7 +685,7 @@ fn a_missing_event_rule_has_no_state_and_no_plan() {
     let mut rules = Ruleset::server_default(me());
     rules.override_.clear();
     assert_eq!(event_notifications(&rules).membership, None);
-    plan_event(&rules, EventNotificationView::Membership, true).unwrap_err();
+    plan_event(&rules, EventNotificationView::Membership, true, me()).unwrap_err();
 }
 
 #[test]
@@ -938,7 +938,7 @@ async fn invitation_rules_respect_mentions_only_mute_and_call_settings() {
     );
     let off = applied(
         rules.clone(),
-        plan_event(&rules, EventNotificationView::Calls, false).unwrap(),
+        plan_event(&rules, EventNotificationView::Calls, false, me()).unwrap(),
     );
     for (event_type, _, _) in super::alignment::RTC_INVITE_TYPES {
         for target in [json!({"room": true}), json!({"user_ids": [me()]})] {
@@ -953,7 +953,7 @@ async fn invitation_rules_respect_mentions_only_mute_and_call_settings() {
             ));
         }
     }
-    assert!(plan_alignment(&off).is_empty());
+    assert!(plan_alignment(&off, me()).is_empty());
 }
 
 #[test]
@@ -983,7 +983,7 @@ fn invitation_alignment_preserves_server_rules_and_other_overrides() {
     let custom_json = serde_json::to_value(&custom).unwrap();
     rules.override_.insert(custom);
     rules.override_.move_index(rules.override_.len() - 1, 1);
-    let aligned = applied(rules.clone(), plan_alignment(&rules));
+    let aligned = applied(rules.clone(), plan_alignment(&rules, me()));
     assert_eq!(
         serde_json::to_value(aligned.override_.get(".m.rule.rtc.invite_for_me").unwrap()).unwrap(),
         server_json
@@ -1008,7 +1008,7 @@ fn invitation_alignment_preserves_server_rules_and_other_overrides() {
             .actions
             .is_empty()
     );
-    assert!(plan_alignment(&aligned).is_empty());
+    assert!(plan_alignment(&aligned, me()).is_empty());
 }
 
 #[test]
@@ -1025,14 +1025,14 @@ fn invitation_alignment_removes_the_old_room_size_bypass() {
             None,
         )
         .unwrap();
-    let rules = applied(rules.clone(), plan_alignment(&rules));
+    let rules = applied(rules.clone(), plan_alignment(&rules, me()));
     assert!(
         rules
             .override_
             .get(super::alignment::RING_ONE_TO_ONE)
             .is_none()
     );
-    assert!(plan_alignment(&rules).is_empty());
+    assert!(plan_alignment(&rules, me()).is_empty());
 }
 
 #[tokio::test]
@@ -1107,7 +1107,7 @@ async fn server_invitation_settings_are_mirrored_without_reenabling_disabled_rul
         rules.override_.insert(rule);
         rules.override_.move_index(rules.override_.len() - 1, index);
     }
-    let rules = applied(rules.clone(), plan_alignment(&rules));
+    let rules = applied(rules.clone(), plan_alignment(&rules, me()));
     assert!(
         !rules
             .override_
@@ -1127,13 +1127,13 @@ async fn server_invitation_settings_are_mirrored_without_reenabling_disabled_rul
     changed
         .set_actions(RuleKind::Override, ".m.rule.rtc.invite_for_room", vec![])
         .unwrap();
-    let changed = applied(changed.clone(), plan_alignment(&changed));
+    let changed = applied(changed.clone(), plan_alignment(&changed, me()));
     for (event_type, _, _) in super::alignment::RTC_INVITE_TYPES {
         assert!(!super::notifies(
             &invite_actions(&changed, event_type, json!({"room": true}), 100).await
         ));
     }
-    assert!(plan_alignment(&changed).is_empty());
+    assert!(plan_alignment(&changed, me()).is_empty());
 }
 
 #[test]
@@ -1144,7 +1144,7 @@ fn calls_can_be_configured_without_the_legacy_call_rule() {
         .shift_remove(PredefinedUnderrideRuleId::Call.as_str());
     let rules = applied(
         rules.clone(),
-        plan_event(&rules, EventNotificationView::Calls, false).unwrap(),
+        plan_event(&rules, EventNotificationView::Calls, false, me()).unwrap(),
     );
     for rule in rules
         .override_
@@ -1153,5 +1153,70 @@ fn calls_can_be_configured_without_the_legacy_call_rule() {
     {
         assert!(rule.actions.is_empty());
     }
-    assert!(plan_alignment(&rules).is_empty());
+    assert!(plan_alignment(&rules, me()).is_empty());
+}
+
+#[test]
+fn reactions_notify_through_an_msc3664_rule_for_our_own_events() {
+    let defaults = Ruleset::server_default(me());
+    let on = applied(
+        defaults.clone(),
+        plan_event(&defaults, EventNotificationView::Reactions, true, me()).unwrap(),
+    );
+    let rule = on
+        .override_
+        .iter()
+        .find(|rule| rule.rule_id == "moe.sable.reaction_to_me")
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(&rule.conditions).unwrap(),
+        json!([
+            {"kind": "event_match", "key": "type", "pattern": "m.reaction"},
+            {
+                "kind": "im.nheko.msc3664.related_event_match",
+                "rel_type": "m.annotation",
+                "key": "sender",
+                "pattern": "@me:example.org"
+            }
+        ])
+    );
+    assert!(!rule_notifies(
+        on.get(
+            RuleKind::Override,
+            PredefinedOverrideRuleId::Reaction.as_str()
+        )
+        .unwrap()
+    ));
+
+    let off = applied(
+        on.clone(),
+        plan_event(&on, EventNotificationView::Reactions, false, me()).unwrap(),
+    );
+    assert!(
+        off.get(RuleKind::Override, "moe.sable.reaction_to_me")
+            .is_none()
+    );
+    assert_eq!(event_notifications(&off).reactions, Some(false));
+}
+
+#[test]
+fn every_reaction_notifying_is_narrowed_to_reactions_to_our_events() {
+    let mut legacy = Ruleset::server_default(me());
+    legacy
+        .set_actions(
+            RuleKind::Override,
+            PredefinedOverrideRuleId::Reaction.as_str(),
+            vec![matrix_sdk::ruma::push::Action::Notify],
+        )
+        .unwrap();
+    assert_eq!(event_notifications(&legacy).reactions, Some(true));
+
+    let aligned = applied(legacy.clone(), plan_alignment(&legacy, me()));
+    assert!(
+        aligned
+            .get(RuleKind::Override, "moe.sable.reaction_to_me")
+            .is_some_and(rule_notifies)
+    );
+    assert_eq!(event_notifications(&aligned).reactions, Some(true));
+    assert!(plan_alignment(&aligned, me()).is_empty());
 }

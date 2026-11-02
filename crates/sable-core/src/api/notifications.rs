@@ -346,9 +346,12 @@ impl Handler for SetEventNotificationParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        let client = core.client().await?;
+        let user_id = client.user_id().ok_or(RpcError::NotLoggedIn)?;
         let rules = core.push_rules().await?;
-        let writes = push_rules::plan_event(&rules.snapshot().await, self.event, self.enabled)
-            .or_failed(core, "set_event_notification")?;
+        let writes =
+            push_rules::plan_event(&rules.snapshot().await, self.event, self.enabled, user_id)
+                .or_failed(core, "set_event_notification")?;
         rules
             .apply(writes)
             .await
