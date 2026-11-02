@@ -484,6 +484,62 @@ async fn the_requester_accepts_an_emoji_start_from_the_other_device() {
 }
 
 #[tokio::test]
+async fn a_failed_emoji_accept_cancels_instead_of_waiting() {
+    let server = MatrixMockServer::new().await;
+    let (mut old, mut new, queue) = two_devices(&server, true).await;
+    let user_id = old.client.user_id().unwrap().to_owned();
+    let _traffic = server
+        .capture_put_to_device_traffic(&user_id, queue.clone())
+        .await;
+
+    new.core
+        .run(RequestVerificationParams {
+            user_id: user_id.clone(),
+            device_id: Some(device_id!("AAAAAAAA").to_owned()),
+        })
+        .await
+        .unwrap();
+    deliver(&server, &queue, &mut [&mut old, &mut new]).await;
+
+    let (flow_id, _) = old.last_live().unwrap().clone();
+    old.core
+        .run(AcceptVerificationParams {
+            user_id: user_id.clone(),
+            flow_id: flow_id.clone(),
+        })
+        .await
+        .unwrap();
+    deliver(&server, &queue, &mut [&mut old, &mut new]).await;
+
+    wiremock::Mock::given(wiremock::matchers::method("PUT"))
+        .and(wiremock::matchers::path_regex(
+            "/sendToDevice/m.key.verification.accept/",
+        ))
+        .respond_with(
+            wiremock::ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "errcode": "M_UNKNOWN",
+                "error": "rejected"
+            })),
+        )
+        .with_priority(1)
+        .mount(server.server())
+        .await;
+
+    new.core
+        .run(StartSasVerificationParams { user_id, flow_id })
+        .await
+        .unwrap();
+    deliver(&server, &queue, &mut [&mut old, &mut new]).await;
+
+    let last = old.states.last().unwrap();
+    assert!(
+        matches!(last.1, VerificationView::Cancelled { .. }),
+        "{:?}",
+        old.states
+    );
+}
+
+#[tokio::test]
 async fn both_devices_choosing_emoji_at_once_converge_on_one_comparison() {
     let server = MatrixMockServer::new().await;
     let (mut old, mut new, queue) = two_devices(&server, true).await;

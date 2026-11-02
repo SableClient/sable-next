@@ -314,6 +314,17 @@ impl Core {
 
             if let Err(error) = sas.accept().await {
                 core.failed("verification_accept_sas", error);
+                if let Err(error) = sas.cancel().await {
+                    core.failed("verification_cancel_sas", error);
+                }
+                core.emit_verification(
+                    &user_id,
+                    &flow_id,
+                    VerificationView::Cancelled {
+                        reason: "The emoji comparison could not be started".to_owned(),
+                    },
+                );
+                return;
             }
 
             while let Some(state) = changes.next().await {
