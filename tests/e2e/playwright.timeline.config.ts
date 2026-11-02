@@ -49,20 +49,34 @@ export default defineConfig({
   timeout: 60_000,
   use: { baseURL: 'http://127.0.0.1:4175', contextOptions: { reducedMotion: 'reduce' } },
   projects: [
-    { name: 'chromium', grepInvert: /mobile/, use: devices['Desktop Chrome'] },
+    { name: 'warmup', testMatch: 'dev-server.warmup.ts', use: devices['Desktop Chrome'] },
+    {
+      name: 'chromium',
+      dependencies: ['warmup'],
+      grepInvert: /mobile/,
+      use: devices['Desktop Chrome'],
+    },
     {
       name: 'firefox',
+      dependencies: ['warmup'],
       grepInvert: /mobile/,
       use: { ...devices['Desktop Firefox'], hasTouch: true },
     },
-    { name: 'webkit', grepInvert: /mobile/, use: devices['Desktop Safari'] },
+    {
+      name: 'webkit',
+      dependencies: ['warmup'],
+      grepInvert: /mobile/,
+      use: devices['Desktop Safari'],
+    },
     {
       name: 'android',
+      dependencies: ['warmup'],
       grep: /mobile|touch|the reveal/,
       use: devices['Pixel 7'],
     },
     {
       name: 'ios',
+      dependencies: ['warmup'],
       grep: /mobile|touch|the reveal/,
       use: devices['iPhone 13'],
     },
