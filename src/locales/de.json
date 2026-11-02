@@ -994,7 +994,6 @@
     "thread": "Thread",
     "threadsResize": "Größe von Threads ändern",
     "powerLevelModerator": "Moderator",
-    "noMembersForFilter": "Keine {{filter}} Mitglieder",
     "threadsEmpty": "Noch keine Threads in diesem Raum.",
     "threadsOpen": "Threads",
     "threadsClose": "Threads schließen",

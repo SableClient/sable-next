@@ -768,7 +768,6 @@
     "memberFilterKicked": "Expulsés",
     "memberFilterBanned": "Bannis",
     "memberGroupOffline": "Hors ligne",
-    "noMembersForFilter": "Aucun membre {{filter}}",
     "powerLevelModerator": "Modérateur",
     "powerLevelMember": "Membre",
     "reactions": "Réactions",
@@ -2154,10 +2153,6 @@
     "restoreInvalid": "Ce fichier n’est pas une sauvegarde de profils par message.",
     "restoreFailed": "Impossible de restaurer vos profils.",
     "pickerLabel": "Envoyer sous le nom de",
-    "pickerOff": "Aucun profil dans ce salon",
-    "scopeAccount": "Partout",
-    "scopeLatchRoom": "Conserver dans ce salon",
-    "scopeLatchAccount": "Conserver partout",
     "sendingAs": "Envoi sous le nom de {{name}}",
     "removeTitle": "Supprimer {{name}} ?"
   },

@@ -2032,7 +2032,6 @@
     "memberSortOldest": "Сначала старые",
     "memberFilterJoined": "В комнате",
     "reproxyFailed": "Не удалось отправить сообщение от этого профиля.",
-    "noMembersForFilter": "Нет участников со статусом: {{filter}}",
     "attachmentsFilesEmpty": "На этом устройстве пока нет проиндексированных файлов.",
     "attachmentsMoreLinks_one": "+ещё {{count}} ссылка",
     "attachmentsMoreLinks_few": "+ещё {{count}} ссылки",

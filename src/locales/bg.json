@@ -2514,7 +2514,6 @@
     "memberFilterKicked": "Премахнати",
     "memberFilterBanned": "Блокирани",
     "memberGroupOffline": "Офлайн",
-    "noMembersForFilter": "Няма {{filter}} членове",
     "powerLevelModerator": "Модератор",
     "powerLevelMember": "Член",
     "reactions": "Реакции",

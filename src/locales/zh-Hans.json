@@ -988,7 +988,6 @@
     "memberFilterJoined": "已加入",
     "memberFilterLeft": "已离开",
     "memberGroupOffline": "离线",
-    "noMembersForFilter": "没有{{filter}}成员",
     "powerLevelModerator": "协管员",
     "reactions": "回应",
     "replyInThread": "在消息列中回复",
