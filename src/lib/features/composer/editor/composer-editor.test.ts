@@ -2258,7 +2258,9 @@ describe('the editor api the composer component drives', () => {
     const onFiles = vi.fn();
     const editor = openWith({ onFiles });
     const file = new File(['x'], 'x.png', { type: 'image/png' });
-    const event = { dataTransfer: { files: [file], items: [] } } as unknown as DragEvent;
+    const event = {
+      dataTransfer: { files: [file], items: [], getData: () => '' },
+    } as unknown as DragEvent;
     const handled = view(editor).someProp('handleDrop', (handler) =>
       handler(view(editor), event, Slice.empty, false)
     );

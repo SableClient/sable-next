@@ -558,7 +558,9 @@ test('a file dropped outside the composer is staged', async () => {
   setup({ roomId: '!room:example.org' });
   const file = new File(['one'], 'one.png', { type: 'image/png' });
   const drop = new Event('drop', { bubbles: true, cancelable: true });
-  Object.defineProperty(drop, 'dataTransfer', { value: { files: [file], types: ['Files'] } });
+  Object.defineProperty(drop, 'dataTransfer', {
+    value: { files: [file], types: ['Files'], getData: () => '' },
+  });
 
   window.dispatchEvent(drop);
   await flushed();

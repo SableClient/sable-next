@@ -9,12 +9,40 @@ export interface StagedFile {
 
 export function filesFrom(transfer: DataTransfer | null): File[] {
   if (!transfer) return [];
+  return withSourceName(transferFiles(transfer), transfer);
+}
+
+function transferFiles(transfer: DataTransfer): File[] {
   const files = Array.from(transfer.files).filter((file): file is File => file instanceof File);
   if (files.length > 0) return files;
   return Array.from(transfer.items)
     .filter((item) => item.kind === 'file')
     .map((item) => item.getAsFile())
     .filter((file): file is File => file !== null);
+}
+
+function withSourceName(files: File[], transfer: DataTransfer): File[] {
+  const [file] = files;
+  if (files.length !== 1 || !file.type.startsWith('image/')) return files;
+  const stem = sourceStem(transfer.getData('text/html'));
+  if (!stem) return files;
+  const extension = /\.[^.]+$/.exec(file.name)?.[0] ?? '';
+  return [new File([file], stem + extension, { type: file.type, lastModified: file.lastModified })];
+}
+
+function sourceStem(html: string): string | null {
+  if (!html) return null;
+  const images = new DOMParser().parseFromString(html, 'text/html').querySelectorAll('img');
+  if (images.length !== 1) return null;
+  try {
+    const url = new URL(images[0].getAttribute('src') ?? '');
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    const name = decodeURIComponent(url.pathname.slice(url.pathname.lastIndexOf('/') + 1));
+    const stem = name.replace(/\.[^.]*$/, '').trim();
+    return /^[^\\/:*?"<>|\p{Cc}]{1,100}$/u.test(stem) ? stem : null;
+  } catch {
+    return null;
+  }
 }
 
 export function stageFiles(

@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+
 import { expect, test } from 'vitest';
 
 import {
@@ -22,6 +24,7 @@ test('an item list stands in for an empty file list', () => {
   const pasted = file('pasted.png');
   const transfer = {
     files: [],
+    getData: () => '',
     items: [
       { kind: 'string', getAsFile: () => null },
       { kind: 'file', getAsFile: () => pasted },
@@ -29,6 +32,32 @@ test('an item list stands in for an empty file list', () => {
   } as unknown as DataTransfer;
 
   expect(filesFrom(transfer)).toEqual([pasted]);
+});
+
+function copied(name: string, html: string): DataTransfer {
+  const data = new DataTransfer();
+  data.items.add(file(name));
+  data.setData('text/html', html);
+  return data;
+}
+
+test('a copied image takes its name from the source URL', () => {
+  const transfer = copied(
+    'image.png',
+    '<meta charset="utf-8"><img src="https://example.org/media/Sunset%20Beach.jpg?w=800">'
+  );
+
+  expect(filesFrom(transfer).map((item) => item.name)).toEqual(['Sunset Beach.png']);
+});
+
+test.each([
+  ['no markup', ''],
+  ['a non-http source', '<img src="data:image/png;base64,AAAA">'],
+  ['a path without a name', '<img src="https://example.org/">'],
+  ['several images', '<img src="https://example.org/a.png"><img src="https://example.org/b.png">'],
+  ['a malformed escape', '<img src="https://example.org/%E0%A4%A.png">'],
+])('a copied image keeps its name with %s', (_case, html) => {
+  expect(filesFrom(copied('image.png', html)).map((item) => item.name)).toEqual(['image.png']);
 });
 
 test('staging appends and keeps every entry addressable', () => {
