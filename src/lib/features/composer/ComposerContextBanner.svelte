@@ -3,9 +3,12 @@
   import BellSlashIcon from 'phosphor-svelte/lib/BellSlashIcon';
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpRightIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
+  import { cubicOut } from 'svelte/easing';
+  import { slide } from 'svelte/transition';
 
   import { i18n } from '#lib/i18n.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
 
   import type { ComposerContext } from '#lib/composer/composer-context.js';
 
@@ -20,7 +23,7 @@
   let silent = $derived(context.silentReply === true);
 </script>
 
-<div class="context">
+<div class="context" transition:slide={{ duration: motionMs(MOTION_MS.quick), easing: cubicOut }}>
   {#if context.kind === 'edit'}
     <span class="context-kind">{i18n.t('composer.editing')}</span>
   {:else if context.kind === 'schedule'}
