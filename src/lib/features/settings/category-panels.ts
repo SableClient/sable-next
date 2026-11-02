@@ -22,6 +22,7 @@ import NotificationTroubleshooter from '#lib/features/notifications/Notification
 import NotificationDefaults from '#lib/features/notifications/NotificationDefaults.svelte';
 import NotificationPermission from '#lib/features/notifications/NotificationPermission.svelte';
 import NotificationKeywords from '#lib/features/settings/NotificationKeywords.svelte';
+import NotificationRoomModes from '#lib/features/notifications/NotificationRoomModes.svelte';
 import PersonaSettings from '#lib/features/settings/PersonaSettings.svelte';
 import PushGateway from '#lib/features/notifications/PushGateway.svelte';
 import PushersSettings from '#lib/features/notifications/PushersSettings.svelte';
@@ -60,6 +61,7 @@ export const panelComponents: Partial<Record<string, Component>> = {
   'notification-defaults': NotificationDefaults,
   'mention-notifications': MentionNotifications,
   'notification-keywords': NotificationKeywords,
+  'notification-rooms': NotificationRoomModes,
   pushers: PushersSettings,
   'push-gateway': PushGateway,
   'notification-troubleshoot': NotificationTroubleshooter,

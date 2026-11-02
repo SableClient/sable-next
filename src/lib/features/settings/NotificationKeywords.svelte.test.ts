@@ -31,7 +31,9 @@ afterEach(() => {
 });
 
 const keywords = () =>
-  screen.queryAllByRole('listitem').map((item) => item.querySelector('.keyword-text')?.textContent);
+  screen
+    .queryAllByRole('listitem')
+    .map((item) => item.querySelector('.settings-item-text')?.textContent);
 const input = () => screen.getByRole('textbox', { name: 'Add a keyword' });
 
 async function confirmRemoval(user: ReturnType<typeof userEvent.setup>, keyword: string) {

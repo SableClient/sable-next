@@ -8,9 +8,9 @@ use serde_json::json;
 use super::alignment::{STICKER, STICKER_DIRECT, SUPPRESS_BRIDGE_STATUS, SUPPRESS_REACTIONS};
 use super::{
     RuleWrite, default_modes, event_notifications, event_notifies, keywords, level_actions,
-    master_muted, mention_notifications, plan_add_keyword, plan_alignment, plan_default_mode,
-    plan_event, plan_keyword_mode, plan_master, plan_mention, plan_remove_keyword, plan_room_mode,
-    pushes_every_encrypted_event, room_mode, rule_notifies,
+    master_muted, mention_notifications, new_rule, plan_add_keyword, plan_alignment,
+    plan_default_mode, plan_event, plan_keyword_mode, plan_master, plan_mention,
+    plan_remove_keyword, plan_room_mode, pushes_every_encrypted_event, room_mode, rule_notifies,
 };
 use crate::protocol::{
     EventNotificationView, MentionNotificationModeView, MentionRuleView, NotificationModeView,
@@ -1219,4 +1219,28 @@ fn every_reaction_notifying_is_narrowed_to_reactions_to_our_events() {
     );
     assert_eq!(event_notifications(&aligned).reactions, Some(true));
     assert!(plan_alignment(&aligned, me()).is_empty());
+}
+
+#[test]
+fn a_new_rule_is_read_for_its_kind() {
+    let rule = new_rule(
+        &RuleKind::Override,
+        json!({ "rule_id": "bots", "conditions": [], "actions": [] }),
+    )
+    .unwrap();
+    assert!(matches!(rule, NewPushRule::Override(rule) if rule.rule_id == "bots"));
+
+    let room = new_rule(
+        &RuleKind::Room,
+        json!({ "rule_id": "!room:example.org", "actions": ["notify"] }),
+    )
+    .unwrap();
+    assert!(matches!(room, NewPushRule::Room(_)));
+
+    new_rule(
+        &RuleKind::Room,
+        json!({ "rule_id": "not a room", "actions": [] }),
+    )
+    .unwrap_err();
+    new_rule(&RuleKind::Content, json!({ "rule_id": "x", "actions": [] })).unwrap_err();
 }

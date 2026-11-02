@@ -13,9 +13,16 @@ const pushRules = vi.fn<() => Promise<unknown>>();
 const setPushRuleEnabled = vi.fn<(params: unknown) => Promise<void>>();
 const setPushRuleActions = vi.fn<(params: unknown) => Promise<void>>();
 const deletePushRule = vi.fn<(params: unknown) => Promise<void>>();
+const addPushRule = vi.fn<(params: unknown) => Promise<void>>();
 const core = Object.assign(baseCore, {
   rpc: {
-    notifications: { pushRules, setPushRuleEnabled, setPushRuleActions, deletePushRule },
+    notifications: {
+      pushRules,
+      setPushRuleEnabled,
+      setPushRuleActions,
+      deletePushRule,
+      addPushRule,
+    },
   },
 });
 
@@ -31,7 +38,13 @@ const ruleset = {
 };
 
 afterEach(() => {
-  for (const mock of [pushRules, setPushRuleEnabled, setPushRuleActions, deletePushRule]) {
+  for (const mock of [
+    pushRules,
+    setPushRuleEnabled,
+    setPushRuleActions,
+    deletePushRule,
+    addPushRule,
+  ]) {
     mock.mockReset();
   }
   core.session = null;
@@ -115,4 +128,35 @@ test('a rule change from elsewhere reloads the list', async () => {
   await settle();
 
   expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('false');
+});
+
+async function drafting(rule: string): Promise<HTMLTextAreaElement> {
+  core.session = { account_id: 'account' };
+  pushRules.mockResolvedValue(ruleset);
+  render(DeveloperPushRules);
+  await settle();
+  await fireEvent.click(screen.getByRole('button', { name: 'New rule' }));
+  await settle();
+  const field = document.getElementById('developer-push-rule-new') as HTMLTextAreaElement;
+  await fireEvent.input(field, { target: { value: rule } });
+  await fireEvent.submit(field.closest('form') as HTMLFormElement);
+  await settle();
+  return field;
+}
+
+test('a new rule is created through the push rules API', async () => {
+  addPushRule.mockResolvedValue();
+  await drafting('{"rule_id": "bots", "conditions": [], "actions": []}');
+
+  expect(addPushRule).toHaveBeenCalledWith({
+    kind: 'override',
+    rule: { rule_id: 'bots', conditions: [], actions: [] },
+  });
+});
+
+test('a new rule that is not a JSON object is refused locally', async () => {
+  await drafting('["notify"]');
+
+  expect(addPushRule).not.toHaveBeenCalled();
+  expect(screen.getByText('The rule must be a JSON object.')).toBeTruthy();
 });

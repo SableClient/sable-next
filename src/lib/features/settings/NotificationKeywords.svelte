@@ -157,16 +157,16 @@
   {/if}
 
   {#if loading}
-    <p class="keywords-empty"><Spinner small label={i18n.t('a11y.loading')} /></p>
+    <p class="settings-empty"><Spinner small label={i18n.t('a11y.loading')} /></p>
   {:else if keywords.length === 0 && error !== 'settings.notificationKeywordsLoadFailed'}
-    <p class="keywords-empty">{i18n.t('settings.notificationKeywordsEmpty')}</p>
+    <p class="settings-empty">{i18n.t('settings.notificationKeywordsEmpty')}</p>
   {:else}
-    <ul class="keyword-list">
+    <ul class="settings-item-list">
       {#each keywords as { keyword, mode } (keyword)}
         <li>
-          <span class="keyword-text">{keyword}</span>
+          <span class="settings-item-text">{keyword}</span>
           <Select
-            class="keyword-mode"
+            class="settings-item-control"
             aria-label={i18n.t('settings.notificationKeywordsMode', { keyword })}
             value={mode}
             items={modes.map((option) => ({ value: option, label: i18n.t(modeLabels[option]) }))}
@@ -228,41 +228,6 @@
 />
 
 <style>
-  .keywords-empty {
-    color: var(--surface-var-on-container);
-    margin: 0;
-  }
-
-  .keyword-list {
-    display: grid;
-    gap: var(--space-200);
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .keyword-list li {
-    align-items: center;
-    background: var(--surface-container);
-    border-radius: var(--radius);
-    color: var(--surface-on-container);
-    display: flex;
-    gap: var(--space-300);
-    padding: var(--space-200) var(--space-300);
-  }
-
-  .keyword-text {
-    flex: 1;
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-
-  .keyword-list li :global(.keyword-mode) {
-    flex: none;
-    max-width: min(100%, 11rem);
-    width: auto;
-  }
-
   .field {
     display: grid;
     gap: var(--space-200);

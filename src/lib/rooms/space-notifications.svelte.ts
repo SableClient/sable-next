@@ -55,6 +55,20 @@ class SpaceNotifications {
     return inheritedNotificationModes(rooms, this.modes);
   }
 
+  custom(
+    rooms: readonly RoomListItemView[]
+  ): { room: RoomListItemView; mode: NotificationModeView }[] {
+    const inherited = this.inherited(rooms);
+    return rooms.flatMap((room) => {
+      if (room.state !== 'joined') return [];
+      const own = this.modes.get(room.room_id);
+      if (own !== undefined) return [{ room, mode: own }];
+      const rule = room.notification.room;
+      if (rule === null || inherited.get(room.room_id) === rule) return [];
+      return [{ room, mode: rule }];
+    });
+  }
+
   apply(rooms: readonly RoomListItemView[]): void {
     const core = this.sync.core;
     if (core === null) return;
@@ -133,3 +147,14 @@ class SpaceNotifications {
 }
 
 export const spaceNotifications = new SpaceNotifications();
+
+export function setNotificationMode(
+  core: CoreClient,
+  rooms: readonly RoomListItemView[],
+  room: RoomListItemView,
+  mode: NotificationModeView | null
+): Promise<unknown> {
+  return room.room_kind === 'space'
+    ? spaceNotifications.set(room.room_id, mode, rooms)
+    : core.rpc.notifications.setRoomNotificationMode({ room_id: room.room_id, mode });
+}

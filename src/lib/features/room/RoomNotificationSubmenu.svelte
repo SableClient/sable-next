@@ -8,7 +8,11 @@
   import { i18n } from '#lib/i18n.js';
   import { isQuiet, setQuiet } from '#lib/rooms/quiet-rooms.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { spaceNotifications } from '#lib/rooms/space-notifications.svelte.js';
+  import { notificationModeLabels } from '#lib/rooms/notification-modes.js';
+  import {
+    setNotificationMode,
+    spaceNotifications,
+  } from '#lib/rooms/space-notifications.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSub from '#lib/ui/primitives/ActionMenuSub.svelte';
@@ -30,12 +34,6 @@
     { mode: 'mentions', label: 'room.notifyMentionsQuiet', quiet: true },
     { mode: 'mute', label: 'room.notifyMute' },
   ];
-  const modeLabels: Record<NotificationModeView, string> = {
-    all: 'room.notifyAll',
-    mentions: 'room.notifyMentions',
-    mute: 'room.notifyMute',
-  };
-
   let roomMode = $state<NotificationModeView | null | undefined>();
   let roomFallback = $state<NotificationModeView>('mentions');
   let isSpace = $derived(roomList.byId(roomId)?.room_kind === 'space');
@@ -60,7 +58,7 @@
         : preferences.badgeDefaultGroup) === 'quiet'
   );
   let defaultLabel = $derived(
-    i18n.t(defaultQuiet ? 'room.notifyMentionsQuiet' : modeLabels[fallback])
+    i18n.t(defaultQuiet ? 'room.notifyMentionsQuiet' : notificationModeLabels[fallback])
   );
 
   $effect(() => {
@@ -79,24 +77,16 @@
   }
 
   function select(next: NotificationModeView | null, quiet = false): void {
+    const room = roomList.byId(roomId);
+    if (room === undefined) return;
     if (quiet) setQuiet(roomId, true);
     else if (mode === 'mentions' && isQuiet(roomId)) setQuiet(roomId, false);
-    if (isSpace) {
-      spaceNotifications.set(roomId, next, roomList.rooms).catch(report);
-      return;
-    }
-    roomMode = next;
-    core.rpc.notifications
-      .setRoomNotificationMode({ room_id: roomId, mode: next })
-      .catch((error: unknown) => {
-        report(error);
-        void read();
-      });
-  }
-
-  function report(error: unknown): void {
-    console.warn('[sable room] notification mode failed', error);
-    toasts.error(i18n.t('errors.actionFailed'));
+    if (!isSpace) roomMode = next;
+    setNotificationMode(core, roomList.rooms, room, next).catch((error: unknown) => {
+      console.warn('[sable room] notification mode failed', error);
+      toasts.error(i18n.t('errors.actionFailed'));
+      if (!isSpace) void read();
+    });
   }
 </script>
 

@@ -157,6 +157,12 @@ export const settingsPanels: Record<string, SettingsPanelDefinition[]> = {
         ],
       ]),
     },
+    {
+      id: 'notification-rooms',
+      targets: targets([
+        ['notification-rooms', 'settings.notificationRooms', 'settings.notificationRoomsHint'],
+      ]),
+    },
     { id: 'pushers', targets: targets([['pushers-heading', 'settings.pushers']]) },
     {
       id: 'push-gateway',

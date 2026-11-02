@@ -6,6 +6,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
+  import Select from '#lib/ui/primitives/Select.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
@@ -23,6 +24,13 @@
   }
 
   const KINDS = ['override', 'content', 'postcontent', 'room', 'sender', 'underride'];
+  const NEW_RULE_TEMPLATES: Record<string, object> = {
+    override: { rule_id: '', conditions: [], actions: ['notify'] },
+    content: { rule_id: '', pattern: '', actions: ['notify'] },
+    room: { rule_id: '!room:example.org', actions: ['notify'] },
+    sender: { rule_id: '@user:example.org', actions: ['notify'] },
+    underride: { rule_id: '', conditions: [], actions: ['notify'] },
+  };
 
   const core = useCoreClient();
   let entries = $state.raw<Entry[]>([]);
@@ -32,6 +40,7 @@
   let error = $state<'json' | 'failed' | null>(null);
   let saved = $state(false);
   let confirmingDelete = $state(false);
+  let draft = $state<{ kind: string; rule: string } | null>(null);
 
   const current = $derived(
     selected === null
@@ -64,7 +73,49 @@
     void refresh();
   });
 
+  function template(kind: string): string {
+    return JSON.stringify(NEW_RULE_TEMPLATES[kind], null, 2);
+  }
+
+  function startDraft(): void {
+    selected = null;
+    draft = { kind: 'override', rule: template('override') };
+    error = null;
+    saved = false;
+  }
+
+  async function create(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    if (draft === null || busy) return;
+    let rule: unknown;
+    try {
+      rule = JSON.parse(draft.rule);
+    } catch {
+      rule = null;
+    }
+    if (typeof rule !== 'object' || rule === null || Array.isArray(rule)) {
+      error = 'json';
+      return;
+    }
+    const { kind } = draft;
+    busy = true;
+    error = null;
+    try {
+      await core.rpc.notifications.addPushRule({ kind, rule });
+      draft = null;
+      await refresh();
+      const ruleId = (rule as { rule_id?: unknown }).rule_id;
+      if (typeof ruleId === 'string') selected = { kind, ruleId };
+      saved = true;
+    } catch {
+      error = 'failed';
+    } finally {
+      busy = false;
+    }
+  }
+
   function open(entry: Entry): void {
+    draft = null;
     selected = { kind: entry.kind, ruleId: entry.rule.rule_id };
     actions = JSON.stringify(entry.rule.actions, null, 2);
     error = null;
@@ -124,6 +175,11 @@
 
 <div class="settings-form push-rules">
   <p class="description">{i18n.t('settings.developerPushRulesDescription')}</p>
+  <div class="editor-actions">
+    <Button size="small" disabled={draft !== null} onclick={startDraft}>
+      {i18n.t('settings.developerPushRulesNew')}
+    </Button>
+  </div>
   {#if entries.length === 0}
     <p class="empty">{i18n.t('settings.developerPushRulesEmpty')}</p>
   {:else}
@@ -147,7 +203,43 @@
     </ul>
   {/if}
 
-  {#if current}
+  {#if draft}
+    <form class="editor" onsubmit={(event) => void create(event)}>
+      <Select
+        aria-label={i18n.t('settings.developerPushRulesKind')}
+        value={draft.kind}
+        items={Object.keys(NEW_RULE_TEMPLATES).map((kind) => ({ value: kind, label: kind }))}
+        onValueChange={(kind) => {
+          draft = { kind, rule: template(kind) };
+        }}
+      />
+      <FormField
+        fieldId="developer-push-rule-new"
+        label={i18n.t('settings.developerPushRulesRule')}
+      >
+        <TextArea
+          id="developer-push-rule-new"
+          bind:value={draft.rule}
+          error={error === 'json'}
+          spellcheck={false}
+          class="push-rule-json"
+        />
+      </FormField>
+      {#if error === 'json'}
+        <Alert variant="critical">{i18n.t('settings.developerPushRulesInvalidRule')}</Alert>
+      {:else if error === 'failed'}
+        <Alert variant="critical">{i18n.t('settings.developerPushRulesFailed')}</Alert>
+      {/if}
+      <div class="editor-actions">
+        <Button variant="ghost" size="small" onclick={() => (draft = null)}>
+          {i18n.t('common.cancel')}
+        </Button>
+        <Button type="submit" variant="primary" size="small" loading={busy}>
+          {i18n.t('settings.developerPushRulesCreate')}
+        </Button>
+      </div>
+    </form>
+  {:else if current}
     <form class="editor" onsubmit={saveActions}>
       <div class="enabled">
         <span>{i18n.t('settings.developerPushRulesEnabled')}</span>

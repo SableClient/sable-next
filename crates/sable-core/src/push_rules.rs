@@ -220,6 +220,27 @@ pub fn room_settings(rules: &Ruleset, room_id: &RoomId, direct: bool) -> Notific
     }
 }
 
+/// # Errors
+///
+/// When `rule` does not fit `kind`, or `kind` is one the server does not accept new rules for.
+pub fn new_rule(
+    kind: &RuleKind,
+    rule: serde_json::Value,
+) -> Result<NewPushRule, serde_json::Error> {
+    Ok(match kind {
+        RuleKind::Override => NewPushRule::Override(serde_json::from_value(rule)?),
+        RuleKind::Content => NewPushRule::Content(serde_json::from_value(rule)?),
+        RuleKind::Room => NewPushRule::Room(serde_json::from_value(rule)?),
+        RuleKind::Sender => NewPushRule::Sender(serde_json::from_value(rule)?),
+        RuleKind::Underride => NewPushRule::Underride(serde_json::from_value(rule)?),
+        _ => {
+            return Err(serde::de::Error::custom(format!(
+                "no new {kind} push rules"
+            )));
+        }
+    })
+}
+
 #[must_use]
 pub fn plan_room_mode(
     rules: &Ruleset,

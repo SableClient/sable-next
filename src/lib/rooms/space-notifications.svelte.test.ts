@@ -142,3 +142,26 @@ test('changing a space mode moves the rooms that carried the old one', async () 
     mode: null,
   });
 });
+
+test('custom rooms are the spaces with a mode and the rooms that differ from theirs', async () => {
+  const fake = fakeCore([{ space_id: '!space', mode: 'mute' }]);
+  spaceNotifications.start(fake.core);
+  await vi.waitFor(() => {
+    expect(spaceNotifications.modeOf('!space')).toBe('mute');
+  });
+
+  const custom = spaceNotifications.custom([
+    space('!space', ['!following', '!own']),
+    room('!following', 'mute'),
+    room('!own', 'all'),
+    room('!alone', 'mentions'),
+    room('!default', null),
+    room('!left', 'all', { state: 'left' }),
+  ]);
+
+  expect(custom.map(({ room, mode }) => [room.room_id, mode])).toEqual([
+    ['!space', 'mute'],
+    ['!own', 'all'],
+    ['!alone', 'mentions'],
+  ]);
+});

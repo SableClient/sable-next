@@ -37,6 +37,7 @@ domain! {
     push_rules,
     set_push_rule_enabled,
     set_push_rule_actions,
+    add_push_rule,
     delete_push_rule,
 }
 
@@ -594,6 +595,28 @@ impl Handler for SetPushRuleActionsParams {
             }])
             .await
             .or_failed(core, "set_push_rule_actions")
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct AddPushRuleParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub kind: RuleKind,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+    pub rule: serde_json::Value,
+}
+
+impl Handler for AddPushRuleParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        let rule = push_rules::new_rule(&self.kind, self.rule).or_failed(core, "add_push_rule")?;
+        core.push_rules()
+            .await?
+            .apply(vec![push_rules::RuleWrite::Put(rule)])
+            .await
+            .or_failed(core, "add_push_rule")
     }
 }
 

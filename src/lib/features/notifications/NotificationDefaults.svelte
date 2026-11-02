@@ -19,19 +19,17 @@
   import Select from '#lib/ui/primitives/Select.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
 
+  import { notificationModeLabels } from '#lib/rooms/notification-modes.js';
+
   import { settingsChanges } from './notifications.svelte';
   import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
-  const modeLabels: Record<Exclude<NotificationModeView, 'mute'>, string> = {
-    all: 'room.notifyAll',
-    mentions: 'room.notifyMentions',
-  };
-
   const modes: Exclude<NotificationModeView, 'mute'>[] = ['all', 'mentions'];
   const badgeModes: BadgeNotificationMode[] = ['all', 'mentions', 'quiet'];
   const badgeModeLabels: Record<BadgeNotificationMode, string> = {
-    ...modeLabels,
+    all: notificationModeLabels.all,
+    mentions: notificationModeLabels.mentions,
     quiet: 'room.notifyMentionsQuiet',
   };
 
@@ -203,7 +201,10 @@
           <Select
             aria-label={`${i18n.t('settings.notificationPush')}: ${i18n.t(label)}`}
             value={current[key]}
-            items={modes.map((mode) => ({ value: mode, label: i18n.t(modeLabels[mode]) }))}
+            items={modes.map((mode) => ({
+              value: mode,
+              label: i18n.t(notificationModeLabels[mode]),
+            }))}
             onValueChange={(value) => {
               savePush(key, direct, value as NotificationModeView);
             }}

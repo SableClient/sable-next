@@ -2790,6 +2790,10 @@ export type Rpc = {
 	rule_id: string,
 	actions: unknown[],
 }) => Promise<null>;
+    addPushRule: (params: {
+	kind: string,
+	rule: unknown,
+}) => Promise<null>;
     deletePushRule: (params: {
 	kind: string,
 	rule_id: string,
@@ -3573,6 +3577,7 @@ export type RpcMethods = {
   'notifications.push_rules': Rpc['notifications']['pushRules'];
   'notifications.set_push_rule_enabled': Rpc['notifications']['setPushRuleEnabled'];
   'notifications.set_push_rule_actions': Rpc['notifications']['setPushRuleActions'];
+  'notifications.add_push_rule': Rpc['notifications']['addPushRule'];
   'notifications.delete_push_rule': Rpc['notifications']['deletePushRule'];
   'packs.list': Rpc['packs']['list'];
   'packs.list_all': Rpc['packs']['listAll'];
@@ -3906,6 +3911,7 @@ export function createRpc(call: RpcCall): Rpc {
       pushRules: (params = {}) => call('notifications.push_rules', params) as ReturnType<Rpc['notifications']['pushRules']>,
       setPushRuleEnabled: (params) => call('notifications.set_push_rule_enabled', params) as ReturnType<Rpc['notifications']['setPushRuleEnabled']>,
       setPushRuleActions: (params) => call('notifications.set_push_rule_actions', params) as ReturnType<Rpc['notifications']['setPushRuleActions']>,
+      addPushRule: (params) => call('notifications.add_push_rule', params) as ReturnType<Rpc['notifications']['addPushRule']>,
       deletePushRule: (params) => call('notifications.delete_push_rule', params) as ReturnType<Rpc['notifications']['deletePushRule']>,
     },
     packs: {
