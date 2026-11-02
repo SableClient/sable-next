@@ -126,7 +126,8 @@
     "viewSource": "Переглянути джерело",
     "sortNameDesc": "Від Я до А",
     "userIdFormatHint": "Ідентифікатор облікового запису виглядає як @someone:server.",
-    "addAccount": "Додати обліковий запис"
+    "addAccount": "Додати обліковий запис",
+    "unsavedChangesNotice": "Ви маєте не збережені зміни."
   },
   "nav": {
     "newChat": "Новий чат",
