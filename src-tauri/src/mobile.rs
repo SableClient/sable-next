@@ -69,7 +69,7 @@ pub(crate) async fn open_in_app_auth_url(
                         JValue::Bool(sheet),
                     ],
                 )
-                .and_then(|value| value.z());
+                .and_then(jni::JValueOwned::z);
             if result.is_err() {
                 env.exception_clear();
             }
