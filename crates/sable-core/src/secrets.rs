@@ -412,8 +412,7 @@ pub fn install_os_keyring_or_files(service: String, directory: &Path) -> Result<
         if chosen.is_some() {
             tracing::warn!("leaving the system keyring for SABLE_SECRET_STORE=files");
         }
-        std::fs::create_dir_all(directory)?;
-        crate::store::write_atomic(&choice, b"files")?;
+        keep_secrets_in_files(directory)?;
         install(files());
         return Ok(());
     }
@@ -421,8 +420,7 @@ pub fn install_os_keyring_or_files(service: String, directory: &Path) -> Result<
         Ok(keyring) => keyring,
         Err(error) if chosen.is_none() => {
             tracing::warn!("no usable system keyring, keeping keys in files instead: {error}");
-            std::fs::create_dir_all(directory)?;
-            crate::store::write_atomic(&choice, b"files")?;
+            keep_secrets_in_files(directory)?;
             install(files());
             return Ok(());
         }
@@ -433,6 +431,17 @@ pub fn install_os_keyring_or_files(service: String, directory: &Path) -> Result<
         crate::store::write_atomic(&choice, b"keyring")?;
     }
     install(Box::new(keyring));
+    Ok(())
+}
+
+/// Makes [`install_os_keyring_or_files`] keep the keys under `directory` in files from now on.
+///
+/// # Errors
+/// When the choice cannot be written.
+#[cfg(not(any(target_os = "android", target_os = "ios", target_family = "wasm")))]
+pub fn keep_secrets_in_files(directory: &Path) -> Result<(), StoreError> {
+    std::fs::create_dir_all(directory)?;
+    crate::store::write_atomic(&directory.join("secret-store"), b"files")?;
     Ok(())
 }
 

@@ -377,7 +377,7 @@ fn install_keyring(app: &tauri::App<tauri::Wry>) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(target_os = "ios")]
 fn refuse_without_keyring(app: &tauri::App<tauri::Wry>, error: &str) {
     use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
@@ -385,13 +385,52 @@ fn refuse_without_keyring(app: &tauri::App<tauri::Wry>, error: &str) {
     let handle = app.handle().clone();
     app.dialog()
         .message(format!(
-            "Sable keeps your login and message keys in the system keyring, and none is available.\n\n\
-             On Linux, install and unlock a Secret Service provider such as GNOME Keyring or KWallet, \
-             then start Sable again, or start it with SABLE_SECRET_STORE=files to keep them in files.\n\n{error}"
+            "Sable keeps your login and message keys in the system keyring, and none is available.\n\n{error}"
         ))
         .title("No system keyring")
         .kind(MessageDialogKind::Error)
         .show(move |_| handle.exit(1));
+}
+
+#[cfg(desktop)]
+fn refuse_without_keyring(app: &tauri::App<tauri::Wry>, error: &str) {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+
+    log::error!("no usable credential store: {error}");
+    let handle = app.handle().clone();
+    app.dialog()
+        .message(format!(
+            "Sable keeps your login and message keys in the system keyring, and none is available.\n\n\
+             On Linux, install and unlock a Secret Service provider such as GNOME Keyring or KWallet, \
+             then start Sable again. Or keep the keys in files readable only by your user, and sign in again.\n\n{error}"
+        ))
+        .title("No system keyring")
+        .kind(MessageDialogKind::Error)
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "Keep keys in files".to_owned(),
+            "Quit".to_owned(),
+        ))
+        .show(move |files| {
+            if !files {
+                handle.exit(1);
+                return;
+            }
+            let kept = handle
+                .path()
+                .app_data_dir()
+                .map_err(|error| error.to_string())
+                .and_then(|directory| {
+                    sable_core::secrets::keep_secrets_in_files(&directory)
+                        .map_err(|error| error.to_string())
+                });
+            match kept {
+                Ok(()) => handle.restart(),
+                Err(error) => {
+                    log::error!("could not keep keys in files: {error}");
+                    handle.exit(1);
+                }
+            }
+        });
 }
 
 fn setup(app: &mut tauri::App<tauri::Wry>) -> Result<(), Box<dyn std::error::Error>> {

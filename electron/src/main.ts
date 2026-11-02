@@ -385,14 +385,24 @@ function startCore(): UtilityProcess {
     if (typeof message !== 'object' || message === null || !('keyringUnavailable' in message))
       return;
     quitting = true;
-    dialog.showErrorBox(
-      'No system keyring',
-      'Sable keeps your login and message keys in the system keyring, and none is available.\n\n' +
+    const choice = dialog.showMessageBoxSync({
+      type: 'error',
+      message: 'No system keyring',
+      detail:
+        'Sable keeps your login and message keys in the system keyring, and none is available.\n\n' +
         'On Linux, install and unlock a Secret Service provider such as GNOME Keyring or KWallet, ' +
-        'then start Sable again, or start it with --password-store=basic to keep them in files.\n\n' +
-        String(message.keyringUnavailable)
-    );
-    app.exit(1);
+        'then start Sable again. Or keep the keys in files readable only by your user, and sign in again.\n\n' +
+        String(message.keyringUnavailable),
+      buttons: ['Keep keys in files', 'Quit'],
+      defaultId: 1,
+      cancelId: 1,
+    });
+    if (choice !== 0) {
+      app.exit(1);
+      return;
+    }
+    app.relaunch({ args: [...process.argv.slice(1), '--password-store=basic'] });
+    app.exit(0);
   });
 
   child.stdout?.on('data', (chunk: Buffer) => {
