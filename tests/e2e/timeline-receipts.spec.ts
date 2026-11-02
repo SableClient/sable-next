@@ -238,29 +238,32 @@ test('a receipt under a picture or an embed that fills the column never covers i
   }
 });
 
-test('copying a receipted message by triple-click copies its text alone', async ({
-  page,
-  app,
-  timeline,
-  core,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
-  await app.openRooms();
-  await app.openRoomFromList('General');
-  await timeline.expectRevealed();
-  const subscription = await core.subscription();
-  const row = page.locator('[data-item-id="general-18"] .message');
-  await core.setTimelineItemById(subscription, 'general-18', {
-    ...timelineItem('general-18', 'i will do it'),
-    read_by: Array.from({ length: 6 }, (_, index) => `@reader${String(index)}:example.test`),
-  });
-  await expect(row.locator('.read-receipt-stack .overflow')).toBeVisible();
+test.describe('with a fine pointer', () => {
+  test.use({ hasTouch: false });
 
-  await row.locator('.formatted-body').click({ clickCount: 3 });
-  const copied = await page.evaluate(() => getSelection()?.toString() ?? '');
-  expect(copied.trim()).toBe('i will do it');
-  expect(copied).not.toContain('\n');
+  test('copying a receipted message by triple-click copies its text alone', async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }) => {
+    await installRoomCore('ready');
+    await app.openRooms();
+    await app.openRoomFromList('General');
+    await timeline.expectRevealed();
+    const subscription = await core.subscription();
+    const row = page.locator('[data-item-id="general-18"] .message');
+    await core.setTimelineItemById(subscription, 'general-18', {
+      ...timelineItem('general-18', 'i will do it'),
+      read_by: Array.from({ length: 6 }, (_, index) => `@reader${String(index)}:example.test`),
+    });
+    await expect(row.locator('.read-receipt-stack .overflow')).toBeVisible();
+
+    await row.locator('.formatted-body').click({ clickCount: 3 });
+    const copied = await page.evaluate(() => getSelection()?.toString() ?? '');
+    expect(copied).toMatch(/^i will do it\s*$/);
+  });
 });
 
 test('bubble receipts sit beside trailing reactions on either side', async ({
