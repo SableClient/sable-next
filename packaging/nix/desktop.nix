@@ -12,12 +12,12 @@
   libpulseaudio,
   autoPatchelfHook,
   makeWrapper,
-  electron_44,
+  electron_45,
 }:
 
 let
   pnpm = pnpm_12;
-  electron = electron_44;
+  electron = electron_45;
   web = sable-unwrapped.overrideAttrs (old: {
     env = old.env // {
       SABLE_BUILD_FLAVOR = "stable";
