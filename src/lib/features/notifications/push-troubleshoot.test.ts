@@ -80,6 +80,17 @@ test('a working browser passes every check, the loopback included', async () => 
   expect(results.gateway?.params).toEqual({ host: 'push.example' });
 });
 
+test('the desktop app has no push to check', async () => {
+  expect(states(await run(deps({ platform: 'desktop' })))).toEqual({
+    permission: 'pass',
+    alerts: 'pass',
+    transport: 'skip',
+    pusher: 'skip',
+    gateway: 'skip',
+    loopback: 'skip',
+  });
+});
+
 test('a device the homeserver has no pusher for stops at the pusher', async () => {
   const results = await run(deps({ pushers: () => Promise.resolve([]) }));
 

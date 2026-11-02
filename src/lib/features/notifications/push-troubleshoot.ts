@@ -246,6 +246,11 @@ export async function* troubleshoot(deps: TroubleshootDeps): AsyncGenerator<Trou
     ? { check: 'alerts', state: 'pass', message: 'settings.troubleshootAlertsOn' }
     : { check: 'alerts', state: 'fail', message: 'settings.troubleshootAlertsOff' };
 
+  if (deps.platform === 'desktop') {
+    yield* skipped('transport', 'settings.troubleshootDesktop');
+    return;
+  }
+
   const carried = await transport(deps);
   yield carried;
   yield* troubleshootBackground(deps);

@@ -2504,6 +2504,7 @@
     "troubleshootAlarmsAllowed": "Android lets Sable restart its connection on time.",
     "troubleshootAlarmsDenied": "Without this, Android may not let the built-in connection restart after it is stopped.",
     "troubleshootAlarmsUnknown": "Could not read this setting.",
+    "troubleshootDesktop": "The desktop app alerts while it is running and uses no push service.",
     "troubleshootAlarmsEmbeddedOnly": "Only needed for the built-in connection.",
     "troubleshootPusherNone": "This device has no push registration.",
     "troubleshootPusherUnreadable": "Your homeserver’s push registrations could not be read.",

@@ -9,7 +9,7 @@ vi.mock('@tauri-apps/plugin-os', () => ({ type: mocks.osType }));
 
 import { listPushDistributors, registerNativePushConfig } from './push';
 
-import { deliversNativePush, deliversWebPush, presentsInApp } from './notifications';
+import { deliversNativePush, deliversWebPush, presentsInApp, pushPlatform } from './notifications';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -51,6 +51,16 @@ test('a Tauri shell takes no web push even with the APIs present', () => {
   vi.stubGlobal('PushManager', function PushManager() {});
 
   expect(deliversWebPush()).toBe(false);
+});
+
+test('Electron takes no web push even with the APIs present', () => {
+  mocks.isTauri.mockReturnValue(false);
+  vi.stubGlobal('navigator', { serviceWorker: {} });
+  vi.stubGlobal('PushManager', function PushManager() {});
+  vi.stubGlobal('sableElectron', {});
+
+  expect(deliversWebPush()).toBe(false);
+  expect(pushPlatform()).toBe('desktop');
 });
 
 test('a mobile build registers a native pusher and a plain browser does not', () => {
