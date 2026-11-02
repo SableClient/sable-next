@@ -1426,6 +1426,16 @@ export type SealedAccountDataView = {
 
 export type SearchAttachment = "image" | "video" | "audio" | "file" | "link" | "poll";
 
+export type SearchBackupState = "off" | "waiting_for_wifi" | "locked" | "working" | "idle" | "limit_reached" | "refused";
+
+export type SearchBackupView = {
+	state: SearchBackupState,
+	published_bytes: number,
+	limit_bytes: number,
+	rooms_published: number,
+	rooms_imported: number,
+};
+
 export type SearchContextView = {
 	event_id: string,
 	body: string,
@@ -1503,6 +1513,7 @@ export type SearchMetricsView = {
 	last_request_ms: number | null,
 	average_request_ms: number | null,
 	running_ms: number | null,
+	backup: SearchBackupView,
 };
 
 export type SearchOperator = "in" | "space" | "from" | "mentions" | "has" | "before" | "after" | "during" | "on" | "with" | "is" | "pinned" | "regex";
@@ -3144,6 +3155,8 @@ export type Rpc = {
     setSearchOptions: (params: {
 	disk_budget_mb: number,
 	crawler: boolean,
+	backup: boolean,
+	backup_limit_mb: number,
 	unmetered_only: boolean,
 	server_search: boolean,
 	tuning: SearchTuning,

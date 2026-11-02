@@ -36,6 +36,7 @@ import DeveloperDebugLogs from '#lib/features/settings/DeveloperDebugLogs.svelte
 import DeveloperNotifications from '#lib/features/settings/DeveloperNotifications.svelte';
 import DeveloperPushHistory from '#lib/features/settings/DeveloperPushHistory.svelte';
 import DeveloperSearchMetrics from '#lib/features/settings/DeveloperSearchMetrics.svelte';
+import SearchBackupStatus from '#lib/features/settings/SearchBackupStatus.svelte';
 import DeveloperSentry from '#lib/features/settings/DeveloperSentry.svelte';
 import DeveloperServerFeatures from '#lib/features/settings/DeveloperServerFeatures.svelte';
 import DeveloperSyncDiagnostics from '#lib/features/settings/DeveloperSyncDiagnostics.svelte';
@@ -54,6 +55,7 @@ export const panelComponents: Partial<Record<string, Component>> = {
   'composer-buttons': ComposerButtons,
   'double-tap-reaction': DoubleTapReaction,
   'developer-search-metrics': DeveloperSearchMetrics,
+  'search-backup-status': SearchBackupStatus,
   'notification-permission': NotificationPermission,
   'notification-defaults': NotificationDefaults,
   'mention-notifications': MentionNotifications,

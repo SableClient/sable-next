@@ -70,6 +70,11 @@ export const settingsPanels: Record<string, SettingsPanelDefinition[]> = {
   timeline: [
     { id: 'double-tap-reaction', section: 'messages', supported: supportsTouch },
     {
+      id: 'search-backup-status',
+      section: 'message-search',
+      supported: () => preferences.searchBackup,
+    },
+    {
       id: 'developer-search-metrics',
       section: 'developer-search-metrics',
       supported: developerTools,

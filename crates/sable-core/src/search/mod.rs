@@ -1,3 +1,4 @@
+mod backup;
 mod chunks;
 mod core_api;
 mod crawl;
@@ -16,6 +17,7 @@ mod tokenize;
 
 pub(crate) const MAX_SEARCH_RESULTS: usize = 200;
 
+pub(crate) use backup::SearchBackup;
 pub(crate) use crawl::CrawlProgress;
 pub(crate) use filter::IndexFilter;
 #[cfg(not(target_family = "wasm"))]

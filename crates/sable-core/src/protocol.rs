@@ -570,6 +570,35 @@ pub struct SearchMetricsView {
     pub average_request_ms: Option<u64>,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub running_ms: Option<u64>,
+    pub backup: SearchBackupView,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum SearchBackupState {
+    #[default]
+    Off,
+    WaitingForWifi,
+    Locked,
+    Working,
+    Idle,
+    LimitReached,
+    Refused,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SearchBackupView {
+    pub state: SearchBackupState,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub published_bytes: u64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub limit_bytes: u64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub rooms_published: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub rooms_imported: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

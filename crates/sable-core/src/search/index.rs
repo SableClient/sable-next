@@ -854,6 +854,11 @@ impl MessageIndex {
             .map(|(_, room_id, chunk, next)| (room_id.clone(), chunk, next))
     }
 
+    pub(super) fn settled(&self, room_id: &RoomId) -> bool {
+        !self.unreadable.contains(room_id)
+            && self.rooms.get(room_id).is_some_and(|index| !index.dirty)
+    }
+
     pub(crate) fn floor_of(&self, room_id: &RoomId) -> u64 {
         self.rooms.get(room_id).map_or(0, |index| index.floor)
     }
@@ -1145,6 +1150,40 @@ impl MessageIndex {
         rules: &RedactionRules,
     ) -> usize {
         self.ingest_with(room_id, events, cache, rules, false).await
+    }
+
+    pub(super) async fn import(
+        &mut self,
+        room_id: &OwnedRoomId,
+        documents: Vec<Document>,
+        classified: Vec<(OwnedEventId, u64)>,
+        edits: Vec<(OwnedEventId, OwnedEventId)>,
+    ) {
+        let index = self
+            .rooms
+            .entry(room_id.clone())
+            .or_insert_with(RoomIndex::new);
+        for (event_id, ts) in classified {
+            if ts >= index.floor {
+                index.mark_classified(event_id, ts);
+            }
+        }
+        for (edit, target) in edits {
+            index.edits.entry(edit).or_insert(target);
+        }
+        for (position, document) in documents.into_iter().enumerate() {
+            if position > 0 && position.is_multiple_of(DOCUMENTS_PER_RESTORE_YIELD) {
+                matrix_sdk::sleep::sleep(Duration::ZERO).await;
+            }
+            if document.origin_server_ts < index.floor
+                || index.redacted.contains(&document.event_id)
+            {
+                continue;
+            }
+            let existing = index.document(&document.event_id).cloned();
+            index.upsert(adopt_edit(document, existing.as_ref()));
+        }
+        self.unload_to_budget();
     }
 
     pub(super) fn finish_rederive(&mut self, room_id: &OwnedRoomId) {

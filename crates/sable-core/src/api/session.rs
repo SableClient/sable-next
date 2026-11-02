@@ -314,6 +314,8 @@ impl Handler for DelayedEventsSupportedParams {
 pub struct SetSearchOptionsParams {
     pub disk_budget_mb: u32,
     pub crawler: bool,
+    pub backup: bool,
+    pub backup_limit_mb: u32,
     pub unmetered_only: bool,
     pub server_search: bool,
     pub tuning: SearchTuning,
@@ -331,6 +333,12 @@ impl Handler for SetSearchOptionsParams {
         core.search_crawl.lock().await.tuning = self.tuning.clamped();
         core.search_crawler_enabled
             .store(self.crawler, Ordering::Relaxed);
+        core.search_backup
+            .enabled
+            .store(self.backup, Ordering::Relaxed);
+        core.search_backup
+            .limit_mb
+            .store(self.backup_limit_mb, Ordering::Relaxed);
         core.server_search_enabled
             .store(self.server_search, Ordering::Relaxed);
         core.search_index

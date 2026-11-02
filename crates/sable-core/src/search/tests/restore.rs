@@ -365,6 +365,7 @@ async fn test_a_stale_derivation_keeps_documents_and_opens_a_rederive_window() {
         crate::search::persist::StoredCrawlRoom {
             token: None,
             reached_start: true,
+            cover: None,
         },
     )]));
     assert!(!progress.checkpoints().contains_key(&room_id));

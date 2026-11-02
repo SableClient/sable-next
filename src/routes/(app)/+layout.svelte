@@ -514,6 +514,8 @@
       .setSearchOptions({
         disk_budget_mb: Number(preferences.searchIndexLimit),
         crawler: preferences.searchCrawler,
+        backup: preferences.searchBackup,
+        backup_limit_mb: Number(preferences.searchBackupLimit),
         unmetered_only: preferences.searchUnmeteredOnly,
         server_search: preferences.serverSearch,
         tuning: {

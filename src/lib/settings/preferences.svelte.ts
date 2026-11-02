@@ -40,6 +40,7 @@ export const SEARCH_INDEX_LIMITS: readonly SearchIndexLimit[] = [
 ];
 export const CORE_LOG_LEVELS = ['default', 'debug'] as const;
 export const SEARCH_CRAWL_PAUSES = ['1', '2', '3', '5', '10', '30'] as const;
+export const SEARCH_BACKUP_LIMITS = ['50', '100', '250', '500'] as const;
 export const SEARCH_TRICKLE_PAUSES = ['5', '10', '30', '60'] as const;
 export const SEARCH_FLUSH_INTERVALS = ['20', '60', '120', '300'] as const;
 export const SEARCH_BATCH_SIZES = ['25', '50', '100'] as const;
@@ -233,6 +234,8 @@ export interface Preferences {
   searchMaxEvents: (typeof SEARCH_MAX_EVENTS)[number];
   searchCrawler: boolean;
   searchUnmeteredOnly: boolean;
+  searchBackup: boolean;
+  searchBackupLimit: (typeof SEARCH_BACKUP_LIMITS)[number];
   serverSearch: boolean;
   showHome: boolean;
   restoreLastRoom: boolean;
@@ -478,6 +481,7 @@ const ENUMS = {
   searchIndexLimit: SEARCH_INDEX_LIMITS,
   coreLogLevel: CORE_LOG_LEVELS,
   searchCrawlPause: SEARCH_CRAWL_PAUSES,
+  searchBackupLimit: SEARCH_BACKUP_LIMITS,
   searchTricklePause: SEARCH_TRICKLE_PAUSES,
   searchFlushInterval: SEARCH_FLUSH_INTERVALS,
   searchBatchSize: SEARCH_BATCH_SIZES,
@@ -595,6 +599,8 @@ const DEFAULTS: Preferences = {
   searchMaxEvents: '50000',
   searchCrawler: true,
   searchUnmeteredOnly: true,
+  searchBackup: false,
+  searchBackupLimit: '100',
   serverSearch: true,
   showHome: false,
   restoreLastRoom: true,

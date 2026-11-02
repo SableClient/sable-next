@@ -42,11 +42,30 @@ impl CrawlNetwork {
         self.0.borrow().allows_crawl()
     }
 
-    pub(crate) async fn run<F: Future>(&self, request: F) -> Option<F::Output> {
+    pub(crate) fn allows_backup(&self) -> bool {
+        self.0.borrow().unmetered
+    }
+
+    pub(crate) fn run<F: Future>(&self, request: F) -> impl Future<Output = Option<F::Output>> {
+        self.run_while(request, Policy::allows_crawl)
+    }
+
+    pub(crate) fn run_unmetered<F: Future>(
+        &self,
+        request: F,
+    ) -> impl Future<Output = Option<F::Output>> {
+        self.run_while(request, |policy| policy.unmetered)
+    }
+
+    async fn run_while<F: Future>(
+        &self,
+        request: F,
+        allows: fn(Policy) -> bool,
+    ) -> Option<F::Output> {
         let mut policy = self.0.subscribe();
         tokio::select! {
             biased;
-            _ = policy.wait_for(|policy| !policy.allows_crawl()) => None,
+            _ = policy.wait_for(|policy| !allows(*policy)) => None,
             result = request => Some(result),
         }
     }

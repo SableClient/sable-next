@@ -596,6 +596,7 @@ impl Core {
                 core.prime_persisted_rooms(&client).await;
 
                 core.watch_search_crawl(&client);
+                core.watch_search_backup(&client);
                 core.watch_search_persist(&client);
                 core.watch_search_dictionary();
 

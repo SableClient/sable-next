@@ -8,7 +8,7 @@ use tracing::{info, warn};
 use super::Document;
 use crate::store::StoreError;
 
-const SCHEMA: u32 = 5;
+pub(super) const SCHEMA: u32 = 5;
 pub(super) const DERIVATION: u32 = 1;
 const LEGACY_SCHEMAS: [u32; 2] = [3, 4];
 
@@ -149,11 +149,11 @@ enum Read<T> {
 const ZLIB_HEADER: u8 = 0x78;
 const COMPRESSION_LEVEL: u8 = 6;
 
-fn encode(json: &[u8]) -> Vec<u8> {
+pub(super) fn encode(json: &[u8]) -> Vec<u8> {
     miniz_oxide::deflate::compress_to_vec_zlib(json, COMPRESSION_LEVEL)
 }
 
-fn decode(bytes: Vec<u8>) -> Result<Vec<u8>, StoreError> {
+pub(super) fn decode(bytes: Vec<u8>) -> Result<Vec<u8>, StoreError> {
     if bytes.first() == Some(&ZLIB_HEADER) {
         miniz_oxide::inflate::decompress_to_vec_zlib(&bytes)
             .map_err(|error| StoreError::Message(format!("{error:?}")))
@@ -374,6 +374,16 @@ pub(super) async fn open(client: &matrix_sdk::Client, room_id: &OwnedRoomId) -> 
     }
 }
 
+pub(super) async fn read_manifest(
+    client: &matrix_sdk::Client,
+    room_id: &OwnedRoomId,
+) -> Option<Manifest> {
+    match read::<Manifest>(client, &manifest_key(room_id)).await {
+        Read::Found(manifest) if manifest.version == SCHEMA => Some(manifest),
+        _ => None,
+    }
+}
+
 pub(super) async fn load_chunk(
     client: &matrix_sdk::Client,
     room_id: &OwnedRoomId,
@@ -500,6 +510,16 @@ pub(super) struct StoredCrawl {
 pub(super) struct StoredCrawlRoom {
     pub(super) token: Option<String>,
     pub(super) reached_start: bool,
+    #[serde(default)]
+    pub(super) cover: Option<Cover>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(super) struct Cover {
+    pub(super) from: u64,
+    pub(super) until: u64,
+    pub(super) resume: Option<String>,
+    pub(super) stops: bool,
 }
 
 pub(super) async fn load_crawl(client: &matrix_sdk::Client) -> StoredCrawl {
