@@ -66,7 +66,7 @@ default: patch
 Short user-facing summary of the change.
 ```
 
-Use `major`, `minor`, `patch`, `docs` or `note`. The `internal` label skips the check for maintenance work with no user-facing impact.
+Use `major`, `minor`, `feature` (listed under Features, released as a patch), `patch`, `docs` or `note`. The `internal` label skips the check for maintenance work with no user-facing impact.
 
 ### Release flow
 

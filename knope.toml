@@ -15,6 +15,7 @@ extra_changelog_sections = [
   ] },
   { name = "Features", types = [
     "minor",
+    "feature",
   ] },
   { name = "Fixes", types = [
     "patch",
