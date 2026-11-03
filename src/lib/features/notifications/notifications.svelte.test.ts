@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   ackWebPusher: vi.fn().mockResolvedValue(undefined),
   watchNativePushMessages: vi.fn().mockResolvedValue(() => {}),
   sound: vi.fn().mockResolvedValue(undefined),
+  faviconUrl: vi.fn<() => string | null>(() => null),
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }));
@@ -20,6 +21,10 @@ vi.mock('#lib/platform/native-notifications.js', () => ({
 vi.mock('./retire', () => ({
   retireRoomAlerts: mocks.retire,
   retireReadAlerts: mocks.retireRead,
+}));
+vi.mock('#lib/deployment/brand.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/deployment/brand.js')>()),
+  faviconUrl: mocks.faviconUrl,
 }));
 vi.mock('./sound', () => ({ playNotificationSound: mocks.sound }));
 
@@ -577,4 +582,30 @@ test('a first sweep retires every read room in one call', () => {
     '@me:example.org',
     rooms.map((read) => read.room_id)
   );
+});
+
+test.each([
+  [null, '/favicon.png'],
+  ['https://cdn.example/icon.png', 'https://cdn.example/icon.png'],
+])('a message without an avatar shows the %s favicon as its icon', async (configured, icon) => {
+  const show = vi.fn();
+  class BrowserNotification {
+    static permission = 'granted';
+    constructor(title: string, options: NotificationOptions) {
+      show(title, options);
+    }
+    addEventListener() {}
+    close() {}
+  }
+  vi.stubGlobal('Notification', BrowserNotification);
+  mocks.faviconUrl.mockReturnValue(configured);
+  preferences.systemNotifications = true;
+  preferences.notificationContent = true;
+  const notifications = center();
+  notifications.present({ ...invite(), event_id: '$message' });
+  await vi.waitFor(() => {
+    expect(show).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ icon }));
+  });
+  mocks.faviconUrl.mockReturnValue(null);
+  notifications.stop();
 });

@@ -61,6 +61,7 @@
   import { keepStorage } from '#lib/platform/persistent-storage.js';
   import { electronBridge, type ScreenShareCandidate } from '#lib/platform/electron.js';
   import { type FaviconState, faviconState, setFavicon } from '#lib/ui/favicon.js';
+  import { faviconUrl } from '#lib/deployment/brand.js';
   import idleFavicon from '#lib/assets/favicon.png';
   import unreadFavicon from '#lib/assets/res/svg/unread.svg';
   import highlightFavicon from '#lib/assets/res/svg/highlight.svg';
@@ -358,7 +359,7 @@
   }
 
   const FAVICONS: Record<FaviconState, string> = {
-    idle: idleFavicon,
+    idle: faviconUrl() ?? idleFavicon,
     unread: unreadFavicon,
     highlight: highlightFavicon,
   };

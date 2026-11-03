@@ -40,6 +40,7 @@ export function renameLegacyThemeIdentifiers(css: string): string {
     });
 }
 
+const DEPLOYMENT_STYLE_ID = 'sable-deployment-theme';
 const THEME_STYLE_ID = 'sable-custom-theme';
 const TWEAK_STYLE_ID = 'sable-custom-tweaks';
 const QUICK_CSS_STYLE_ID = 'sable-quick-css';
@@ -57,6 +58,18 @@ export function applyCustomTheme(css: string | undefined): void {
     createStyle(
       THEME_STYLE_ID,
       document.getElementById(TWEAK_STYLE_ID) ?? document.getElementById(QUICK_CSS_STYLE_ID)
+    );
+  setCss(style, renameLegacyThemeIdentifiers(css));
+}
+
+export function applyDeploymentTheme(css: string): void {
+  const style =
+    document.getElementById(DEPLOYMENT_STYLE_ID) ??
+    createStyle(
+      DEPLOYMENT_STYLE_ID,
+      document.getElementById(THEME_STYLE_ID) ??
+        document.getElementById(TWEAK_STYLE_ID) ??
+        document.getElementById(QUICK_CSS_STYLE_ID)
     );
   setCss(style, renameLegacyThemeIdentifiers(css));
 }

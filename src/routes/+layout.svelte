@@ -17,6 +17,7 @@
   import SessionRestoreError from '#lib/ui/SessionRestoreError.svelte';
   import AccountLocked from '#lib/features/sidebar/AccountLocked.svelte';
   import favicon from '#lib/assets/favicon.png';
+  import { appName, faviconUrl } from '#lib/deployment/brand.js';
   import { trackKeyboardInset } from '#lib/platform/keyboard.js';
   import { blockEdgeNavigation } from '#lib/platform/edge-navigation.js';
   import { systemDark } from '#lib/platform/system-theme.js';
@@ -253,7 +254,7 @@
 <PageTitle title={appName()} />
 
 <svelte:head>
-  <link rel="icon" href={favicon} />
+  <link rel="icon" href={faviconUrl() ?? favicon} />
 </svelte:head>
 
 <!-- Icons ride along with a labelled control, so `role="img"` would only add a

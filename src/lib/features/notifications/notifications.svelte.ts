@@ -3,7 +3,7 @@ import type { CoreEvent, NotificationView, RoomListItemView } from '#src/generat
 import { createContext } from 'svelte';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { appName } from '#lib/deployment/brand.js';
+import { appName, faviconUrl } from '#lib/deployment/brand.js';
 import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { electronBridge } from '#lib/platform/electron.js';
 import { watchNativePushMessages } from '#lib/platform/native-notifications.js';
@@ -366,11 +366,11 @@ export class NotificationCenter {
 
 async function avatar(core: CoreClient, view: NotificationView): Promise<string> {
   const source = view.room_avatar_url ?? view.sender_avatar_url;
-  if (source === null) return FALLBACK_ICON;
+  if (source === null) return fallbackIcon();
 
   return loadMediaUrl(core, source, AVATAR_SIZE, AVATAR_SIZE).catch((error: unknown) => {
     failed('loading notification avatar')(error);
-    return FALLBACK_ICON;
+    return fallbackIcon();
   });
 }
 
@@ -415,7 +415,7 @@ async function showFromWorker(title: string, options: NotificationOptions): Prom
   await registration?.showNotification(title, options);
 }
 
-const FALLBACK_ICON = '/favicon.png';
+const fallbackIcon = (): string => faviconUrl() ?? '/favicon.png';
 
 function failed(what: string): (error: unknown) => void {
   return (error) => {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ClassValue } from 'svelte/elements';
 
+  import { logoUrl } from '#lib/deployment/brand.js';
   import logo from '#lib/assets/res/svg/logo.svg';
 
   interface Props {
@@ -10,7 +11,7 @@
   let { class: className = '' }: Props = $props();
 </script>
 
-<img class={['brand-mark', className]} src={logo} alt="" />
+<img class={['brand-mark', className]} src={logoUrl() ?? logo} alt="" />
 
 <style>
   .brand-mark {
