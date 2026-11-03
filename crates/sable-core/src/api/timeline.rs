@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use super::{Handler, Json};
 use crate::protocol::{
     EditVersionView, PaginationDirection, PinReadStateView, RelationsView, RoomListItemView,
-    RpcError, SubscriptionId, TimelineItemView,
+    RoomListOptionsView, RpcError, SubscriptionId, TimelineItemView,
 };
 use crate::thread_receipts::thread_receipts;
 use crate::timelines::receipt_thread_root;
@@ -23,6 +23,7 @@ use crate::{Core, ResultExt, SubscriptionKind, view};
 
 domain! {
     subscribe_room_list,
+    set_room_list_options,
     subscribe,
     unsubscribe,
     warm_rooms,
@@ -63,9 +64,12 @@ pub enum TimelineFocusView {
     },
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
-pub struct SubscribeRoomListParams {}
+pub struct SubscribeRoomListParams {
+    #[serde(default)]
+    pub options: RoomListOptionsView,
+}
 
 /// The snapshot. Everything after it carries the same `subscription`.
 #[derive(Debug, Serialize)]
@@ -79,7 +83,22 @@ impl Handler for SubscribeRoomListParams {
     type Ok = SubscribeRoomListOk;
 
     async fn run(self, core: &Arc<Core>) -> Result<SubscribeRoomListOk, RpcError> {
-        core.subscribe_room_list().await
+        core.subscribe_room_list(self.options).await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetRoomListOptionsParams {
+    pub options: RoomListOptionsView,
+}
+
+impl Handler for SetRoomListOptionsParams {
+    type Ok = ();
+
+    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
+        core.room_list_options.send_replace(self.options);
+        std::future::ready(Ok(()))
     }
 }
 

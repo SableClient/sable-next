@@ -401,12 +401,13 @@ async fn room_list_keeps_joined_rooms_redirected_to_a_joined_successor() {
         .await;
     let (core, mut events) = core_with_events(&server, client).await;
     let SubscribeRoomListOk { subscription, .. } =
-        core.run(SubscribeRoomListParams {}).await.unwrap();
+        core.run(SubscribeRoomListParams::default()).await.unwrap();
     let diffs = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
             if let Some(CoreEvent::RoomListDiff {
                 subscription: current,
                 diffs,
+                ..
             }) = events.recv().await
                 && current == subscription
             {
@@ -441,13 +442,14 @@ async fn a_synced_room_rule_reaches_the_listed_room() {
     server.sync_joined_room(&client, room_id).await;
     let (core, mut events) = core_with_events(&server, client.clone()).await;
     let SubscribeRoomListOk { subscription, .. } =
-        core.run(SubscribeRoomListParams {}).await.unwrap();
+        core.run(SubscribeRoomListParams::default()).await.unwrap();
     let mut next_room = async || {
         tokio::time::timeout(std::time::Duration::from_secs(5), async {
             loop {
                 if let Some(CoreEvent::RoomListDiff {
                     subscription: current,
                     diffs,
+                    ..
                 }) = events.recv().await
                     && current == subscription
                     && let Some(room) = diffs.into_iter().find_map(|diff| match diff {
@@ -858,6 +860,7 @@ async fn next_room_list_diff(
             if let Some(CoreEvent::RoomListDiff {
                 subscription: current,
                 diffs,
+                ..
             }) = events.recv().await
                 && current == subscription
             {
@@ -975,7 +978,7 @@ async fn room_list_waits_for_stores_to_open() {
 
     let subscribing = tokio::spawn({
         let core = core.clone();
-        async move { core.run(SubscribeRoomListParams {}).await }
+        async move { core.run(SubscribeRoomListParams::default()).await }
     });
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     assert!(!subscribing.is_finished());
@@ -1036,7 +1039,7 @@ async fn room_list_retries_stale_spaces_when_stores_reopen() {
         .unwrap();
 
     let SubscribeRoomListOk { subscription, .. } =
-        core.run(SubscribeRoomListParams {}).await.unwrap();
+        core.run(SubscribeRoomListParams::default()).await.unwrap();
     let diffs = next_room_list_diff(&mut events, subscription).await;
     let [crate::protocol::VectorDiff::Reset { values }] = diffs.as_slice() else {
         panic!("expected initial room list, got {diffs:?}");

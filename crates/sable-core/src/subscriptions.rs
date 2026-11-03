@@ -26,10 +26,13 @@ use web_time::Instant;
 use crate::ResultExt;
 use crate::api::timeline::{SubscribeOk, SubscribeRoomListOk};
 use crate::notifications;
-use crate::protocol::{CoreEvent, RoomListItemView, RpcError, SubscriptionId, TimelineItemView};
+use crate::protocol::{
+    CoreEvent, RoomListItemView, RoomListOptionsView, RpcError, SubscriptionId, TimelineItemView,
+};
 use crate::push_rules::PushRules;
 use crate::room_list_batch::DiffBatch;
-use crate::room_list_rows::RoomListRows;
+use crate::room_list_rows::{DmSpaceLinks, RoomListRows};
+use crate::room_sections::RoomSections;
 use crate::timeline_overlay::{ReplyFallback, TimelineOverlay};
 use crate::timelines::{
     AggregationScope, aggregation_items, build_room_timeline, fill_sender_profiles,
@@ -96,6 +99,10 @@ struct RoomListWorker {
     /// Refreshed from each diff before constructing synchronous summaries.
     room_cache: HashMap<OwnedRoomId, view::RoomInfo>,
     rows: RoomListRows,
+    sections: RoomSections,
+    options: watch::Receiver<RoomListOptionsView>,
+    dm_spaces: DmSpaceLinks,
+    dm_spaces_changed: watch::Receiver<()>,
     nicknames: watch::Receiver<crate::nicknames::Nicknames>,
     controller: RoomListDynamicEntriesController,
     grown_to: u32,
@@ -112,6 +119,7 @@ impl RoomListWorker {
         mut rule_changes: broadcast::Receiver<()>,
     ) {
         let mut batch = DiffBatch::new(ROOM_LIST_BATCH_INTERVAL);
+        self.dm_spaces = self.load_dm_spaces().await;
         loop {
             let held = batch.wait(Instant::now());
             let diffs = tokio::select! {
@@ -125,11 +133,24 @@ impl RoomListWorker {
                     diffs
                 }
                 () = due(held) => {
-                    self.core.emit(CoreEvent::RoomListDiff {
-                        subscription: self.subscription,
-                        diffs: batch.take(Instant::now()),
-                    });
+                    self.emit(batch.take(Instant::now()));
                     continue;
+                }
+                changed = self.options.changed() => {
+                    if changed.is_err() {
+                        break;
+                    }
+                    if held.is_none() {
+                        self.emit(Vec::new());
+                    }
+                    continue;
+                }
+                changed = self.dm_spaces_changed.changed() => {
+                    if changed.is_err() {
+                        break;
+                    }
+                    self.dm_spaces = self.load_dm_spaces().await;
+                    self.rows.relink(&self.room_cache, &self.dm_spaces)
                 }
                 diffs = stream.next() => {
                     let Some(diffs) = diffs else { break };
@@ -157,12 +178,26 @@ impl RoomListWorker {
                 }
             };
             if let Some(diffs) = batch.push(diffs, Instant::now()) {
-                self.core.emit(CoreEvent::RoomListDiff {
-                    subscription: self.subscription,
-                    diffs,
-                });
+                self.emit(diffs);
             }
         }
+    }
+
+    fn emit(&mut self, diffs: Vec<crate::protocol::VectorDiff<RoomListItemView>>) {
+        let next = RoomSections::build(self.rows.rows(), &self.options.borrow_and_update());
+        let sections = self.sections.update(next);
+        if diffs.is_empty() && sections.is_none() {
+            return;
+        }
+        self.core.emit(CoreEvent::RoomListDiff {
+            subscription: self.subscription,
+            diffs,
+            sections,
+        });
+    }
+
+    async fn load_dm_spaces(&self) -> DmSpaceLinks {
+        crate::account_documents::synced_dm_spaces(&self.client).await
     }
 
     async fn on_stores_reopened(
@@ -176,12 +211,13 @@ impl RoomListWorker {
             .map(RoomListItem::from)
             .collect();
         view::enrich_rooms(&rooms, &mut self.room_cache).await;
-        let diffs = self.rows.refresh(
+        let mut diffs = self.rows.refresh(
             &rooms,
             &self.room_cache,
             &self.rules,
             &self.nicknames.borrow(),
         );
+        diffs.extend(self.rows.relink(&self.room_cache, &self.dm_spaces));
         (!diffs.is_empty()).then_some(diffs)
     }
 
@@ -203,7 +239,7 @@ impl RoomListWorker {
 
         view::prime_display_names(&diffs).await;
         view::enrich_room_batch(&diffs, &mut self.room_cache).await;
-        let diffs: Vec<_> = diffs
+        let mut diffs: Vec<_> = diffs
             .into_iter()
             .map(|diff| {
                 view::map_diff(diff, |item| {
@@ -220,6 +256,7 @@ impl RoomListWorker {
             self.rows.apply(diff);
         }
         self.rows.evict(&mut self.room_cache);
+        diffs.extend(self.rows.relink(&self.room_cache, &self.dm_spaces));
         diffs
     }
 
@@ -332,7 +369,9 @@ impl TimelineWorker {
 impl Core {
     pub(crate) async fn subscribe_room_list(
         self: &Arc<Self>,
+        options: RoomListOptionsView,
     ) -> Result<SubscribeRoomListOk, RpcError> {
+        self.room_list_options.send_replace(options);
         let sync_service = {
             let guard = self.session.read().await;
             guard
@@ -370,6 +409,10 @@ impl Core {
                 rules,
                 room_cache: HashMap::new(),
                 rows: RoomListRows::default(),
+                sections: RoomSections::default(),
+                options: core.room_list_options.subscribe(),
+                dm_spaces: DmSpaceLinks::default(),
+                dm_spaces_changed: core.dm_spaces_changed.subscribe(),
                 nicknames,
                 controller,
                 grown_to: 0,

@@ -57,6 +57,7 @@ mod registration;
 mod room_keys;
 mod room_list_batch;
 mod room_list_rows;
+mod room_sections;
 mod room_settings;
 mod room_widgets;
 mod rooms;
@@ -154,6 +155,8 @@ pub struct Core {
     cosmetics: parking_lot::Mutex<cosmetics::CosmeticsCache>,
     nicknames: watch::Sender<nicknames::Nicknames>,
     nicknames_stale: tokio::sync::Notify,
+    room_list_options: watch::Sender<protocol::RoomListOptionsView>,
+    dm_spaces_changed: watch::Sender<()>,
     cosmetics_fetches: parking_lot::Mutex<HashMap<matrix_sdk::ruma::OwnedRoomId, Arc<Mutex<()>>>>,
     probed_state: parking_lot::Mutex<probed_state::ProbedState>,
     recent_state: parking_lot::Mutex<probed_state::RecentState>,
@@ -337,6 +340,8 @@ impl Core {
             cosmetics: parking_lot::Mutex::new(cosmetics::CosmeticsCache::default()),
             nicknames: watch::Sender::new(nicknames::Nicknames::default()),
             nicknames_stale: tokio::sync::Notify::new(),
+            room_list_options: watch::Sender::new(protocol::RoomListOptionsView::default()),
+            dm_spaces_changed: watch::Sender::new(()),
             cosmetics_fetches: parking_lot::Mutex::new(HashMap::new()),
             probed_state: parking_lot::Mutex::new(probed_state::ProbedState::default()),
             recent_state: parking_lot::Mutex::new(probed_state::RecentState::default()),
@@ -434,10 +439,13 @@ impl Core {
 
     /// No carrier means no UI, and syncing continues, so a drop is not an error.
     pub fn emit(&self, event: CoreEvent) {
-        if let CoreEvent::AccountDataChanged { event_type } = &event
-            && nicknames::reads_from(event_type)
-        {
-            self.nicknames_stale.notify_one();
+        if let CoreEvent::AccountDataChanged { event_type } = &event {
+            if nicknames::reads_from(event_type) {
+                self.nicknames_stale.notify_one();
+            }
+            if event_type == account_documents::DM_SPACES_EVENT {
+                self.dm_spaces_changed.send_replace(());
+            }
         }
         let _ = self.events.send(event);
     }
@@ -921,7 +929,7 @@ mod tests {
     async fn commands_before_login_are_rejected() {
         let (core, _rx) = Core::new("test", Box::new(store::MemorySessionStore::default()));
         assert!(matches!(
-            core.run(crate::api::timeline::SubscribeRoomListParams {})
+            core.run(crate::api::timeline::SubscribeRoomListParams::default())
                 .await,
             Err(RpcError::NotLoggedIn)
         ));

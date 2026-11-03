@@ -2,13 +2,7 @@ import { expect, test, vi } from 'vitest';
 
 import type { RoomListItemView, RpcParams, Rpc } from '#src/generated/protocol';
 
-import {
-  claimedRoomIds,
-  isActiveSpace,
-  markRoomUnread,
-  markRoomsRead,
-  spacesDescendantRooms,
-} from './nav-rooms.js';
+import { claimedRoomIds, isActiveSpace, markRoomUnread, markRoomsRead } from './nav-rooms.js';
 
 function room(overrides: Partial<RoomListItemView>): RoomListItemView {
   return {
@@ -163,34 +157,4 @@ test('a failed mark does not stop the rest', () => {
   );
 
   expect(markRead).toHaveBeenCalledTimes(2);
-});
-
-test('collects unique descendant rooms from several spaces', () => {
-  const shared = room({ room_id: '!shared' });
-  const nestedRoom = room({ room_id: '!nested-room' });
-  const nested = room({
-    room_id: '!nested',
-    room_kind: 'space',
-    space_children: [{ room_id: nestedRoom.room_id }] as RoomListItemView['space_children'],
-  });
-  const alpha = room({
-    room_id: '!alpha',
-    room_kind: 'space',
-    space_children: [
-      { room_id: shared.room_id },
-      { room_id: nested.room_id },
-    ] as RoomListItemView['space_children'],
-  });
-  const beta = room({
-    room_id: '!beta',
-    room_kind: 'space',
-    space_children: [{ room_id: shared.room_id }] as RoomListItemView['space_children'],
-  });
-
-  expect(
-    spacesDescendantRooms(
-      [alpha, beta, nested, shared, nestedRoom],
-      [alpha.room_id, beta.room_id]
-    ).map((entry) => entry.room_id)
-  ).toEqual(['!shared', '!nested-room']);
 });

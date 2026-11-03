@@ -5,7 +5,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 
-import type { CoreEvent, RoomListItemView } from '#src/generated/protocol';
+import type { CoreEvent, RoomListItemView, RoomSectionsUpdate } from '#src/generated/protocol';
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
@@ -44,6 +44,7 @@ import SidebarNav from './SidebarNavHarness.test.svelte';
 import { RoomList } from '#lib/rooms/room-list.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
+import { badgeView, sectionsUpdate, sectionView } from '#lib/test-support/room-sections.js';
 
 beforeEach(() => {
   visit('/rooms');
@@ -95,6 +96,32 @@ async function startRoomList(core: CoreClient): Promise<RoomList> {
   return roomList;
 }
 
+function fixtureCore(rooms: RoomListItemView[]) {
+  const listeners = new Set<(event: CoreEvent) => void>();
+  const client = {
+    subscribeEvents: (listener: (event: CoreEvent) => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    rpc: {
+      timeline: {
+        subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms }),
+        unsubscribe: () => Promise.resolve(),
+      },
+      notifications: {
+        settings: () => Promise.resolve({ room: null, default: 'all' }),
+      },
+    },
+  } as unknown as CoreClient;
+  const emit = (sections: RoomSectionsUpdate | null, diffs: object[] = []) => {
+    for (const listener of listeners)
+      listener({ type: 'room_list_diff', subscription: 1, diffs, sections } as CoreEvent);
+  };
+  return { client, emit };
+}
+
 function railOrder(names: readonly string[]): (string | null)[] {
   return screen
     .getAllByRole('treeitem')
@@ -141,16 +168,16 @@ test.each([
       { ...space('!unspaced:example.org', 'Unspaced'), room_kind: 'text' },
       { ...space('!dm:example.org', 'Alice'), room_kind: 'text', is_direct: true },
     ];
-    const client = {
-      subscribeEvents: () => () => {},
-      rpc: {
-        timeline: {
-          subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms }),
-          unsubscribe: () => Promise.resolve(),
-        },
-      },
-    } as unknown as CoreClient;
+    const { client, emit } = fixtureCore(rooms as RoomListItemView[]);
     await startRoomList(client);
+    emit(
+      sectionsUpdate([
+        sectionView('home', { rooms: [child.room_id, '!unspaced:example.org', '!dm:example.org'] }),
+        sectionView('unspaced', { rooms: ['!unspaced:example.org'] }),
+        sectionView('direct', { rooms: ['!dm:example.org'] }),
+        sectionView(parent.room_id, { rooms: [child.room_id] }),
+      ])
+    );
     visit(path, params);
     render(SidebarNav);
     await tick();
@@ -180,24 +207,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
     is_direct: true,
     direct_targets: ['@alice:example.org'],
   };
-  const listeners = new Set<(event: CoreEvent) => void>();
-  const core = {
-    subscribeEvents: (listener: (event: CoreEvent) => void) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    rpc: {
-      timeline: {
-        subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
-        unsubscribe: () => Promise.resolve(),
-      },
-      notifications: {
-        settings: () => Promise.resolve({ room: null, default: 'all' }),
-      },
-    },
-  } as unknown as CoreClient;
+  const { client: core, emit } = fixtureCore([room]);
   await startRoomList(core);
   render(SidebarNav, { mobile: true });
   await tick();
@@ -216,12 +226,19 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
       event_id: '$message',
     },
   });
-  for (const listener of listeners)
-    listener({
-      type: 'room_list_diff',
-      subscription: 1,
-      diffs: [{ op: 'set', index: 0, value: incoming }],
-    });
+  emit(
+    sectionsUpdate(
+      [
+        sectionView('direct', {
+          rooms: [room.room_id],
+          unread_rooms: [room.room_id],
+          unread: { unread: 1, notifying: 1, highlight: 0, marked: false },
+        }),
+      ],
+      { badges: [badgeView(room.room_id, { unread: 1, notifying: 1 })] }
+    ),
+    [{ op: 'set', index: 0, value: incoming }]
+  );
   await tick();
 
   const dm = screen.getByRole('treeitem', { name: 'Alice' });
@@ -242,12 +259,9 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
   await tick();
   expect(screen.getByRole('treeitem', { name: 'Alice' })).toBeInTheDocument();
 
-  for (const listener of listeners)
-    listener({
-      type: 'room_list_diff',
-      subscription: 1,
-      diffs: [{ op: 'set', index: 0, value: withCounts({ ...incoming, unread: 0 }) }],
-    });
+  emit(sectionsUpdate([sectionView('direct', { rooms: [room.room_id] })], { badges: [] }), [
+    { op: 'set', index: 0, value: withCounts({ ...incoming, unread: 0 }) },
+  ]);
   await tick();
 
   expect(screen.queryByRole('treeitem', { name: 'Alice' })).not.toBeInTheDocument();
@@ -256,34 +270,14 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
 test('keeps the rail order when a room-list reset reorders spaces', async () => {
   const alpha = space('!alpha:example.org', 'Alpha');
   const beta = space('!beta:example.org', 'Beta');
-  const listeners = new Set<(event: CoreEvent) => void>();
-  const core = {
-    subscribeEvents: (listener: (event: CoreEvent) => void) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    rpc: {
-      timeline: {
-        subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [alpha, beta] }),
-        unsubscribe: () => Promise.resolve(),
-      },
-    },
-  } as unknown as CoreClient;
+  const { client: core, emit } = fixtureCore([alpha, beta]);
   await startRoomList(core);
   render(SidebarNav, { mobile: true });
   await tick();
 
   expect(railOrder(['Alpha', 'Beta'])).toEqual(['Alpha', 'Beta']);
 
-  for (const listener of listeners) {
-    listener({
-      type: 'room_list_diff',
-      subscription: 1,
-      diffs: [{ op: 'reset', values: [beta, alpha] }],
-    });
-  }
+  emit(null, [{ op: 'reset', values: [beta, alpha] }]);
   await tick();
 
   expect(railOrder(['Alpha', 'Beta'])).toEqual(['Alpha', 'Beta']);
@@ -328,16 +322,20 @@ test('a muted direct chat marked unread by hand still reaches the navbar', async
     marked_unread: true,
     notification: { room: 'mute', default: 'all' },
   });
-  const core = {
-    subscribeEvents: () => () => {},
-    rpc: {
-      timeline: {
-        subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
-        unsubscribe: () => Promise.resolve(),
-      },
-    },
-  } as unknown as CoreClient;
+  const { client: core, emit } = fixtureCore([room]);
   await startRoomList(core);
+  emit(
+    sectionsUpdate(
+      [
+        sectionView('direct', {
+          rooms: [room.room_id],
+          unread_rooms: [room.room_id],
+          unread: { unread: 0, notifying: 0, highlight: 0, marked: true },
+        }),
+      ],
+      { badges: [badgeView(room.room_id, { marked: true })] }
+    )
+  );
 
   render(SidebarNav, { mobile: true });
   await tick();
@@ -355,16 +353,17 @@ test('a muted room marked unread by hand still marks its section as unread', asy
     marked_unread: true,
     notification: { room: 'mute', default: 'all' },
   });
-  const core = {
-    subscribeEvents: () => () => {},
-    rpc: {
-      timeline: {
-        subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
-        unsubscribe: () => Promise.resolve(),
-      },
-    },
-  } as unknown as CoreClient;
+  const { client: core, emit } = fixtureCore([room]);
   await startRoomList(core);
+  emit(
+    sectionsUpdate([
+      sectionView('unspaced', {
+        rooms: [room.room_id],
+        unread_rooms: [room.room_id],
+        unread: { unread: 0, notifying: 0, highlight: 0, marked: true },
+      }),
+    ])
+  );
 
   render(SidebarNav, { mobile: true });
   await tick();
@@ -385,16 +384,17 @@ test('a section totals its notifying rooms in green', async () => {
     notifying: 4,
     notification: { room: 'all', default: 'all' },
   });
-  const core = {
-    subscribeEvents: () => () => {},
-    rpc: {
-      timeline: {
-        subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
-        unsubscribe: () => Promise.resolve(),
-      },
-    },
-  } as unknown as CoreClient;
+  const { client: core, emit } = fixtureCore([room]);
   await startRoomList(core);
+  emit(
+    sectionsUpdate([
+      sectionView('unspaced', {
+        rooms: [room.room_id],
+        unread_rooms: [room.room_id],
+        unread: { unread: 4, notifying: 4, highlight: 0, marked: false },
+      }),
+    ])
+  );
 
   render(SidebarNav, { mobile: true });
   await tick();

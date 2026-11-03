@@ -3,7 +3,12 @@ import { createContext, untrack } from 'svelte';
 import type {
   CoreEvent,
   NotificationModeView,
+  RoomBadgeView,
   RoomListItemView,
+  RoomListOptionsView,
+  RoomSectionView,
+  RoomSectionsUpdate,
+  RoomUnreadView,
   SubscriptionId,
 } from '#src/generated/protocol';
 import { applyDiffs } from '#src/transport';
@@ -12,20 +17,52 @@ import { bufferSubscription } from '#lib/core/buffered-subscription.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
-import { quietTargets } from './quiet-rooms.svelte.js';
-import { dmSpaces } from './dm-spaces.svelte.js';
-import { readRoomListSnapshot, writeRoomListSnapshot } from './room-list-snapshot.js';
-import { quietRoomIds, withDmSpaceChildren } from './spaces.js';
+import { ungroupedFavourites } from './favourite-grouping.svelte.js';
+import { quietRooms } from './quiet-rooms.svelte.js';
 import {
-  applyBadgeMode,
-  badgeModeFor,
-  quietUnread,
-  roomNotifications,
-  type RoomUnread,
-  roomUnread,
-} from './unread.js';
+  readRoomListSnapshot,
+  type RoomListSnapshot,
+  writeRoomListSnapshot,
+} from './room-list-snapshot.js';
+import { NO_UNREAD, roomNotifications, type RoomUnread, roomUnread } from './unread.js';
 
-type RoomListDiffs = Extract<CoreEvent, { type: 'room_list_diff' }>['diffs'];
+type RoomListBatch = Extract<CoreEvent, { type: 'room_list_diff' }>;
+
+export function roomListOptions(): RoomListOptionsView {
+  return {
+    room_sort: preferences.roomSort,
+    direct_sort: preferences.directSort,
+    ungrouped_favourites: ungroupedFavourites(),
+    subspace_depth: Number(preferences.subspaceHierarchyLimit),
+    badge_default_direct: preferences.badgeDefaultDirect,
+    badge_default_group: preferences.badgeDefaultGroup,
+    quiet_rooms: quietRooms(),
+  };
+}
+
+function sectionsOf(sections: readonly RoomSectionView[]): ReadonlyMap<string, RoomSectionView> {
+  return new Map(sections.map((section) => [section.key, section]));
+}
+
+function badgesOf(badges: readonly RoomBadgeView[]): ReadonlyMap<string, RoomUnreadView> {
+  return new Map(badges.map((badge) => [badge.room_id, badge.counts]));
+}
+
+function quietOf(roomIds: readonly string[]): ReadonlySet<string> {
+  return new Set(roomIds);
+}
+
+function applySections(
+  sections: ReadonlyMap<string, RoomSectionView>,
+  update: RoomSectionsUpdate
+): ReadonlyMap<string, RoomSectionView> {
+  if (update.sections.length === 0 && update.removed.length === 0) return sections;
+  const removed = new Set(update.removed);
+  return sectionsOf([
+    ...[...sections.values()].filter((section) => !removed.has(section.key)),
+    ...update.sections,
+  ]);
+}
 
 const SNAPSHOT_WRITE_DELAY_MS = 1_000;
 const WARM_ROOM_LIMIT = 32;
@@ -85,12 +122,16 @@ const NOBODY_TYPING: readonly string[] = [];
 
 export class RoomList {
   #source = $state.raw<RoomListItemView[]>([]);
+  #sections = $state.raw(sectionsOf([]));
+  #badges = $state.raw(badgesOf([]));
   /** In the core's recency order, so a filtered view needs no recency sort of its own. */
-  rooms = $derived(withDmSpaceChildren(this.#source, dmSpaces.links));
+  rooms = $derived(this.#source);
+  quietRoomIds = $state.raw(quietOf([]));
   // eslint-disable-next-line svelte/prefer-svelte-reactivity
   typingUsers = $state.raw<ReadonlyMap<string, readonly string[]>>(new Map());
 
   private subscription: SubscriptionId | null = null;
+  private sentOptions: string | null = null;
   private unsubscribeEvents: (() => void) | null = null;
   private unsubscribeTyping: (() => void) | null = null;
   private startPromise: Promise<void> | null = null;
@@ -108,7 +149,6 @@ export class RoomList {
 
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt wholesale, never mutated
   private readonly roomsById = $derived(new Map(this.rooms.map((room) => [room.room_id, room])));
-  readonly quietRoomIds = $derived(quietRoomIds(this.rooms, quietTargets()));
 
   constructor(private readonly core: CoreClient) {}
 
@@ -175,17 +215,20 @@ export class RoomList {
 
   readonly unreadFor: RoomUnread = roomUnread;
 
-  readonly badgeUnreadFor: RoomUnread = (room) => {
-    const counts = roomUnread(room);
-    if (this.quietRoomIds.has(room.room_id)) return quietUnread(counts);
-    return applyBadgeMode(
-      counts,
-      badgeModeFor(room, room.notification.room, {
-        direct: preferences.badgeDefaultDirect,
-        group: preferences.badgeDefaultGroup,
-      })
-    );
-  };
+  readonly badgeUnreadFor: RoomUnread = (room) => this.#badges.get(room.room_id) ?? NO_UNREAD;
+
+  section(key: string): RoomSectionView | undefined {
+    return this.#sections.get(key);
+  }
+
+  setOptions(options: RoomListOptionsView): void {
+    const sent = JSON.stringify(options);
+    if (this.subscription === null || sent === this.sentOptions) return;
+    this.sentOptions = sent;
+    this.core.rpc.timeline.setRoomListOptions({ options }).catch((error: unknown) => {
+      console.debug('[sable rooms] room list options not sent', error);
+    });
+  }
 
   readonly notificationsFor: RoomUnread = roomNotifications;
 
@@ -219,6 +262,9 @@ export class RoomList {
     this.warmed = [];
     this.pendingWarm = [];
     this.#source = [];
+    this.#sections = sectionsOf([]);
+    this.#badges = badgesOf([]);
+    this.quietRoomIds = quietOf([]);
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     this.typingUsers = new Map();
     this.unsubscribeEvents?.();
@@ -237,18 +283,23 @@ export class RoomList {
 
   private async startSubscription(): Promise<void> {
     const generation = this.generation;
-    const buffered = bufferSubscription<CoreEvent, RoomListDiffs[number], RoomListItemView>(
+    const buffered = bufferSubscription<CoreEvent, RoomListBatch, RoomListBatch>(
       (listener) => this.core.subscribeEvents(listener),
-      (event) => (event.type === 'room_list_diff' ? event : null),
-      applyDiffs,
-      (diffs) => {
-        this.setRooms(applyDiffs(this.live ? this.#source : [], diffs));
+      (event) =>
+        event.type === 'room_list_diff'
+          ? { subscription: event.subscription, diffs: [event] }
+          : null,
+      (held, batches) => [...held, ...batches],
+      (batches) => {
+        this.applyBatches(batches, []);
       }
     );
 
     let response;
     try {
-      response = await this.core.rpc.timeline.subscribeRoomList();
+      const options = roomListOptions();
+      this.sentOptions = JSON.stringify(options);
+      response = await this.core.rpc.timeline.subscribeRoomList({ options });
     } catch (error) {
       buffered.stop();
       throw error;
@@ -265,8 +316,10 @@ export class RoomList {
     }
 
     this.subscription = response.subscription;
-    const rooms = buffered.activate(response.subscription, response.rooms);
-    if (rooms.length > 0 || !this.snapshotPainted()) this.setRooms(rooms);
+    this.setOptions(roomListOptions());
+    const batches = buffered.activate(response.subscription, []);
+    const listed = response.rooms.length > 0 || batches.some((batch) => batch.diffs.length > 0);
+    if (listed || !this.snapshotPainted()) this.applyBatches(batches, response.rooms);
     this.unsubscribeEvents = buffered.stop;
     this.unsubscribeTyping = this.core.subscribeEvents((event) => {
       if (event.type !== 'typing') return;
@@ -284,7 +337,43 @@ export class RoomList {
     this.snapshotAccountId = accountId;
     if (accountId === null || this.rooms.length > 0) return;
     const snapshot = readRoomListSnapshot(accountId);
-    if (snapshot && snapshot.length > 0) this.#source = snapshot;
+    if (!snapshot || snapshot.rooms.length === 0) return;
+    this.#source = snapshot.rooms;
+    this.#sections = sectionsOf(snapshot.sections);
+    this.#badges = badgesOf(snapshot.badges);
+    this.quietRoomIds = quietOf(snapshot.quiet_rooms);
+  }
+
+  /** A painted snapshot is replaced, not patched, by the first live batch. */
+  private applyBatches(batches: readonly RoomListBatch[], initial: RoomListItemView[]): void {
+    const fresh = !this.live;
+    let sections = fresh ? sectionsOf([]) : this.#sections;
+    let badges = fresh ? badgesOf([]) : this.#badges;
+    let quiet = fresh ? quietOf([]) : this.quietRoomIds;
+    for (const { sections: update } of batches) {
+      if (!update) continue;
+      sections = applySections(sections, update);
+      if (update.badges) badges = badgesOf(update.badges);
+      if (update.quiet_rooms) quiet = quietOf(update.quiet_rooms);
+    }
+    this.#sections = sections;
+    this.#badges = badges;
+    this.quietRoomIds = quiet;
+    this.setRooms(
+      applyDiffs(
+        fresh ? initial : this.#source,
+        batches.flatMap((batch) => batch.diffs)
+      )
+    );
+  }
+
+  private snapshot(): RoomListSnapshot {
+    return {
+      rooms: this.#source,
+      sections: [...this.#sections.values()],
+      badges: [...this.#badges].map(([room_id, counts]) => ({ room_id, counts })),
+      quiet_rooms: [...this.quietRoomIds],
+    };
   }
 
   private snapshotPainted(): boolean {
@@ -314,7 +403,7 @@ export class RoomList {
       (!force && !this.presentationActive)
     )
       return;
-    writeRoomListSnapshot(this.snapshotAccountId, this.#source);
+    writeRoomListSnapshot(this.snapshotAccountId, this.snapshot());
     this.snapshotDirty = false;
   }
 

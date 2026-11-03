@@ -12,6 +12,7 @@ import type {
   ProfileView,
   MemberView,
   RoomListItemView,
+  RoomSectionsUpdate,
   RpcMethods,
   TimelineFocusView,
   RpcParams,
@@ -606,6 +607,58 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       username: 'loud',
     };
     let activePort: FakePort | null = null;
+
+    function fakeSections(rooms: readonly RoomListItemView[]): RoomSectionsUpdate {
+      const listed = rooms.filter(
+        (entry) => entry.state === 'joined' && !entry.is_tombstoned && entry.room_kind !== 'space'
+      );
+      const invited = rooms.filter((entry) => entry.state === 'invited');
+      const section = (
+        key: string,
+        members: readonly RoomListItemView[],
+        invites: readonly RoomListItemView[]
+      ) => ({
+        key,
+        favourites: [],
+        rooms: members.map((entry) => entry.room_id),
+        subspaces: [],
+        calendars: [],
+        invites: invites.map((entry) => entry.room_id),
+        unread: members.reduce(
+          (total, entry) => ({
+            unread: total.unread + entry.counts.unread,
+            notifying: total.notifying + entry.counts.notifying,
+            highlight: total.highlight + entry.counts.highlight,
+            marked: total.marked || entry.counts.marked,
+          }),
+          { unread: 0, notifying: 0, highlight: 0, marked: false }
+        ),
+        unread_rooms: members
+          .filter((entry) => entry.counts.unread > 0 || entry.counts.highlight > 0)
+          .map((entry) => entry.room_id),
+        descendants: [],
+      });
+      const direct = (entry: RoomListItemView) => entry.is_direct;
+      return {
+        sections: [
+          section('home', listed, invited),
+          section(
+            'unspaced',
+            listed.filter((entry) => !direct(entry)),
+            invited.filter((entry) => !direct(entry))
+          ),
+          section('direct', listed.filter(direct), invited.filter(direct)),
+          ...rooms
+            .filter((entry) => entry.room_kind === 'space')
+            .map((space) => section(space.room_id, [], [])),
+        ],
+        removed: [],
+        badges: rooms
+          .filter((entry) => entry.counts.unread > 0 || entry.counts.highlight > 0)
+          .map((entry) => ({ room_id: entry.room_id, counts: entry.counts })),
+        quiet_rooms: [],
+      };
+    }
 
     const servedBytes = new Map<string, Promise<Uint8Array>>();
     function servedPng(source: string): Promise<Uint8Array> {
@@ -1291,10 +1344,18 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'widgets.send_delayed_event': () => 'e2e-widget-delay',
       'widgets.send_sticky_event': () => '$e2e-widget-sticky',
       'widgets.room_sticky_events': () => [],
-      'timeline.subscribe_room_list': () => ({
-        subscription: 1,
-        rooms: joinedRooms,
-      }),
+      'timeline.subscribe_room_list': () => {
+        queueMicrotask(() =>
+          activePort?.emit({
+            type: 'room_list_diff',
+            subscription: 1,
+            diffs: [],
+            sections: fakeSections(joinedRooms),
+          })
+        );
+        return { subscription: 1, rooms: joinedRooms };
+      },
+      'timeline.set_room_list_options': () => null,
       'timeline.subscribe': (params) => {
         const focus = params.focus ?? { kind: 'live' };
         window.__e2eTimelineFocus.push(focus);
@@ -1940,6 +2001,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           type: 'room_list_diff',
           subscription: 1,
           diffs: [{ op: 'set', index: 0, value: summary({ ...room, unread: room.unread + 1 }) }],
+          sections: fakeSections([
+            summary({ ...room, unread: room.unread + 1 }),
+            ...joinedRooms.slice(1),
+          ]),
         }),
     });
 

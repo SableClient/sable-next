@@ -77,21 +77,15 @@ function matchesFilter(
   }
 }
 
-function byRecency(left: RoomListItemView, right: RoomListItemView): number {
-  return (right.latest_event?.timestamp ?? 0) - (left.latest_event?.timestamp ?? 0);
-}
-
 export function notifications(
   rooms: readonly RoomListItemView[],
   filter: NotificationFilter,
   unreadFor: RoomUnread = roomUnread
 ): RoomListItemView[] {
-  return rooms
-    .filter((room) => {
-      if (room.state !== 'joined' || room.room_kind === 'space') return false;
-      return matchesFilter(room, filter, unreadFor(room));
-    })
-    .sort(byRecency);
+  return rooms.filter((room) => {
+    if (room.state !== 'joined' || room.room_kind === 'space') return false;
+    return matchesFilter(room, filter, unreadFor(room));
+  });
 }
 
 export function countNotifications(
@@ -139,7 +133,7 @@ export function backfillSignal(rooms: readonly RoomListItemView[]): string {
 }
 
 export function pendingInvites(rooms: readonly RoomListItemView[]): RoomListItemView[] {
-  return rooms.filter((room) => room.state === 'invited').sort(byRecency);
+  return rooms.filter((room) => room.state === 'invited');
 }
 
 export function countInvites(rooms: readonly RoomListItemView[]): number {

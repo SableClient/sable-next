@@ -63,6 +63,7 @@ regex-lite = "0.1"
 unicode-segmentation = "1.13"
 idna = "1.1"
 icu_properties = "2.3"
+icu_normalizer = { version = "2.4", default-features = false, features = ["compiled_data"] }
 form_urlencoded = "1.2"
 percent-encoding = "2.3"
 time = { version = "0.3", default-features = false }

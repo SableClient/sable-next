@@ -14,7 +14,7 @@ use crate::{Core, ResultExt};
 const MEDIA_PREVIEW_EVENT: &str = "m.media_preview_config";
 const UNSTABLE_MEDIA_PREVIEW_EVENT: &str = "io.element.msc4278.media_preview_config";
 const DISMISSED_INVITES_EVENT: &str = "moe.sable.dismissed_invites";
-const DM_SPACES_EVENT: &str = "moe.sable.dm_spaces";
+pub(crate) const DM_SPACES_EVENT: &str = "moe.sable.dm_spaces";
 const SPACE_NOTIFICATIONS_EVENT: &str = "moe.sable.space_notifications";
 
 #[derive(Default, Deserialize)]
@@ -158,6 +158,20 @@ pub(crate) fn dismissed_invites(content: Option<&Value>) -> Vec<OwnedRoomId> {
         .and_then(|content| DismissedInvitesIn::deserialize(content).ok())
         .unwrap_or_default()
         .room_ids
+}
+
+/// From the synced copy, for reads too frequent to fetch the server each time.
+pub(crate) async fn synced_dm_spaces(
+    client: &matrix_sdk::Client,
+) -> BTreeMap<OwnedRoomId, Vec<OwnedRoomId>> {
+    let content = client
+        .account()
+        .account_data_raw(DM_SPACES_EVENT.into())
+        .await
+        .ok()
+        .flatten()
+        .and_then(|raw| raw.deserialize_as::<Value>().ok());
+    dm_spaces(content.as_ref())
 }
 
 /// Direct chats placed in spaces only for this account, keyed by chat.
@@ -345,19 +359,12 @@ impl Core {
         ))
     }
 
-    /// From the synced copy, for reads too frequent to fetch the server each time.
     pub(crate) async fn synced_dm_spaces_of(
         client: &matrix_sdk::Client,
         room_id: &matrix_sdk::ruma::RoomId,
     ) -> Vec<OwnedRoomId> {
-        let content = client
-            .account()
-            .account_data_raw(DM_SPACES_EVENT.into())
+        synced_dm_spaces(client)
             .await
-            .ok()
-            .flatten()
-            .and_then(|raw| raw.deserialize_as::<Value>().ok());
-        dm_spaces(content.as_ref())
             .remove(room_id)
             .unwrap_or_default()
     }

@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { BookmarkView, RoomListItemView } from '#src/generated/protocol';
 
-import { applyBadgeMode, badgeModeFor, roomUnread, type RoomUnread } from '#lib/rooms/unread.js';
+import { NO_UNREAD, type RoomUnread } from '#lib/rooms/unread.js';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 import {
@@ -52,11 +52,9 @@ function room(overrides: Partial<RoomListItemView>): RoomListItemView {
   });
 }
 
-const badgeFor: RoomUnread = (summary) =>
-  applyBadgeMode(
-    roomUnread(summary),
-    badgeModeFor(summary, summary.notification.room, { direct: 'all', group: 'mentions' })
-  );
+function badgesOf(entries: Record<string, Partial<ReturnType<RoomUnread>>>): RoomUnread {
+  return (summary) => ({ ...NO_UNREAD, ...entries[summary.room_id] });
+}
 
 test('an unknown filter falls back to showing everything', () => {
   expect(parseFilter(null)).toBe('all');
@@ -71,6 +69,12 @@ test('the inbox badge counts DMs and mentions, not ordinary room messages', () =
     room({ room_id: '!quiet-room', unread: 7, notifying: 7 }),
     room({ room_id: '!loud-room', unread: 7, notifying: 7, highlight: 2 }),
   ];
+
+  const badgeFor = badgesOf({
+    '!chat': { unread: 3, notifying: 3 },
+    '!quiet-room': { unread: 7 },
+    '!loud-room': { unread: 7, highlight: 2 },
+  });
 
   expect(countNotifications(rooms, badgeFor)).toBe(5);
   expect(notifications(rooms, 'all', badgeFor).map((each) => each.room_id)).toEqual([
@@ -91,6 +95,12 @@ test('a room the badge counts but the list does not show is unlisted', () => {
     room({ room_id: '!quiet-room', unread: 7, notifying: 7 }),
   ];
 
+  const badgeFor = badgesOf({
+    '!listed': { unread: 1, notifying: 1 },
+    '!stale': { unread: 2, notifying: 2 },
+    '!quiet-room': { unread: 7 },
+  });
+
   expect(
     unlistedNotifications(rooms, 'all', badgeFor, ['!listed']).map((each) => each.room_id)
   ).toEqual(['!stale']);
@@ -102,11 +112,10 @@ test('rooms set to badge every message also count toward the inbox badge', () =>
     room({ room_id: '!chat', is_direct: true, unread: 3, notifying: 3 }),
     room({ room_id: '!channel', unread: 7, notifying: 7 }),
   ];
-  const unreadFor: RoomUnread = (summary) =>
-    applyBadgeMode(
-      roomUnread(summary),
-      badgeModeFor(summary, null, { direct: 'all', group: 'all' })
-    );
+  const unreadFor = badgesOf({
+    '!chat': { unread: 3, notifying: 3 },
+    '!channel': { unread: 7, notifying: 7 },
+  });
 
   expect(countNotifications(rooms, unreadFor)).toBe(10);
 });
@@ -124,6 +133,11 @@ test('a muted room does not contribute ordinary unread or mentions to the badge'
     }),
   ];
 
+  const badgeFor = badgesOf({
+    '!mentions': { unread: 7, highlight: 2 },
+    '!dm': { unread: 3, notifying: 3 },
+  });
+
   expect(countNotifications(rooms, badgeFor)).toBe(5);
   expect(notifications(rooms, 'mentions', badgeFor).map((each) => each.room_id)).toEqual([
     '!mentions',
@@ -136,6 +150,10 @@ test('filters narrow to mentions or to DMs', () => {
     room({ room_id: '!chat', is_direct: true, unread: 1, notifying: 1 }),
     room({ room_id: '!mention', highlight: 1 }),
   ];
+  const badgeFor = badgesOf({
+    '!chat': { unread: 1, notifying: 1 },
+    '!mention': { highlight: 1 },
+  });
 
   expect(notifications(rooms, 'direct', badgeFor).map((each) => each.room_id)).toEqual(['!chat']);
   expect(notifications(rooms, 'mentions', badgeFor).map((each) => each.room_id)).toEqual([
@@ -153,7 +171,7 @@ test('a space never notifies, and neither does a room we have left', () => {
   expect(countNotifications(rooms)).toBe(0);
 });
 
-test('notifications are ordered by the latest event, undated last', () => {
+test('notifications keep the order of the rooms they are given', () => {
   const dated = (id: string, timestamp: number | null): RoomListItemView =>
     room({
       room_id: id,
@@ -168,7 +186,7 @@ test('notifications are ordered by the latest event, undated last', () => {
     [dated('!old', 10), dated('!none', null), dated('!new', 20)],
     'all'
   );
-  expect(ordered.map((each) => each.room_id)).toEqual(['!new', '!old', '!none']);
+  expect(ordered.map((each) => each.room_id)).toEqual(['!old', '!none', '!new']);
 });
 
 test('notificationCount prefers the counted badge over the raw unread total', () => {
@@ -273,6 +291,7 @@ test('a marked direct chat shows under the direct filter', () => {
 
 test('a channel on the mentions default still shows unread in All, but not the badge', () => {
   const channel = room({ room_id: '!channel', unread: 4, notifying: 4 });
+  const badgeFor = badgesOf({ '!channel': { unread: 4 } });
 
   expect(notifications([channel], 'all', badgeFor).map((entry) => entry.room_id)).toEqual([
     '!channel',
@@ -287,6 +306,8 @@ test('a muted room that was marked unread by hand still reaches the inbox', () =
     marked_unread: true,
     notification: { room: 'mute', default: 'all' },
   });
+
+  const badgeFor = badgesOf({ '!muted': { marked: true } });
 
   expect(notifications([marked], 'all', badgeFor).map((entry) => entry.room_id)).toEqual([
     '!muted',

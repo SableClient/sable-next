@@ -8,7 +8,12 @@
   import { followSettingsLink } from '#lib/features/settings/settings-navigation.js';
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
-  import { findRoomByPathId, provideRoomList, RoomList } from '#lib/rooms/room-list.svelte.js';
+  import {
+    findRoomByPathId,
+    provideRoomList,
+    RoomList,
+    roomListOptions,
+  } from '#lib/rooms/room-list.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { rememberLastRoom } from '#lib/rooms/last-room.js';
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
@@ -150,6 +155,9 @@
   const core = useCoreClient();
   const roomList = new RoomList(core);
   provideRoomList(roomList);
+  $effect(() => {
+    roomList.setOptions(roomListOptions());
+  });
   const spaceSidebar = new SpaceSidebar();
   provideSpaceSidebar(spaceSidebar);
   providePersonaStore(new PersonaStore(core));

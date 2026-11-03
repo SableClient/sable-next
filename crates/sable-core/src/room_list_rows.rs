@@ -1,17 +1,20 @@
 //! The host's copy of the room list, kept so that a push-rule change can resend
 //! only the rows whose notification mode it changed.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::BuildHasher;
 
 use matrix_sdk::ruma::push::Ruleset;
 use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 use matrix_sdk_ui::room_list_service::RoomListItem;
 
+use crate::api::rooms::RoomKind;
 use crate::nicknames::Nicknames;
-use crate::protocol::{RoomListItemView, VectorDiff};
+use crate::protocol::{RoomListItemView, SpaceChildEdge, VectorDiff};
 use crate::push_rules::room_settings;
 use crate::view::{RoomInfo, apply_diff, room_counts, room_list_item};
+
+pub(crate) type DmSpaceLinks = BTreeMap<OwnedRoomId, Vec<OwnedRoomId>>;
 
 #[derive(Debug, Default)]
 pub(crate) struct RoomListRows {
@@ -19,6 +22,65 @@ pub(crate) struct RoomListRows {
 }
 
 impl RoomListRows {
+    pub(crate) fn rows(&self) -> &[RoomListItemView] {
+        &self.rows
+    }
+
+    pub(crate) fn relink<S: BuildHasher>(
+        &mut self,
+        cache: &HashMap<OwnedRoomId, RoomInfo, S>,
+        links: &DmSpaceLinks,
+    ) -> Vec<VectorDiff<RoomListItemView>> {
+        let listed: HashSet<&RoomId> = self.rows.iter().map(|row| &*row.room_id).collect();
+        let mut linked: HashMap<OwnedRoomId, Vec<OwnedRoomId>> = HashMap::new();
+        for (room_id, space_ids) in links {
+            if !listed.contains(&**room_id) {
+                continue;
+            }
+            for space_id in space_ids {
+                linked
+                    .entry(space_id.clone())
+                    .or_default()
+                    .push(room_id.clone());
+            }
+        }
+
+        let mut diffs = Vec::new();
+        for (index, row) in self.rows.iter_mut().enumerate() {
+            if row.room_kind != Some(RoomKind::Space) {
+                continue;
+            }
+            let Some(info) = cache.get(&row.room_id) else {
+                continue;
+            };
+            let mut children = info.children.clone();
+            for room_id in linked.get(&row.room_id).into_iter().flatten() {
+                if children.iter().any(|edge| edge.room_id == room_id.as_str()) {
+                    continue;
+                }
+                children.push(SpaceChildEdge {
+                    room_id: room_id.to_string(),
+                    via: room_id
+                        .server_name()
+                        .map(|server| vec![server.to_string()])
+                        .unwrap_or_default(),
+                    order: None,
+                    origin_server_ts: 0,
+                    suggested: false,
+                });
+            }
+            if children == row.space_children {
+                continue;
+            }
+            row.space_children = children;
+            diffs.push(VectorDiff::Set {
+                index,
+                value: row.clone(),
+            });
+        }
+        diffs
+    }
+
     pub(crate) fn apply(&mut self, diff: &VectorDiff<RoomListItemView>) {
         apply_diff(&mut self.rows, diff);
     }
@@ -186,6 +248,82 @@ mod tests {
         rows.evict(&mut cache);
 
         assert_eq!(cache.keys().collect::<Vec<_>>(), [kept]);
+    }
+
+    fn space_info(children: Vec<SpaceChildEdge>) -> RoomInfo {
+        RoomInfo {
+            room_kind: Some(RoomKind::Space),
+            is_direct: false,
+            is_tombstoned: false,
+            supports_knock: false,
+            supports_restricted: false,
+            supports_knock_restricted: false,
+            canonical_alias: None,
+            avatar_url: None,
+            children,
+            children_stale: false,
+            tags: Vec::new(),
+            screen_sharers: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn relink_leaves_a_chat_the_space_already_lists_as_a_child() {
+        let rules = Ruleset::server_default(user_id!("@me:example.org"));
+        let space = room_id!("!space:example.org");
+        let chat = room_id!("!chat:example.org");
+        let edge = SpaceChildEdge {
+            room_id: chat.to_string(),
+            via: vec!["example.org".to_owned()],
+            order: None,
+            origin_server_ts: 7,
+            suggested: false,
+        };
+        let cache = HashMap::from([(space.to_owned(), space_info(vec![edge.clone()]))]);
+        let mut space_row = summary(space, &rules);
+        space_row.room_kind = Some(RoomKind::Space);
+        space_row.space_children = vec![edge.clone()];
+        let mut rows = RoomListRows::default();
+        rows.apply(&VectorDiff::Reset {
+            values: vec![space_row, summary(chat, &rules)],
+        });
+        let links = DmSpaceLinks::from([(chat.to_owned(), vec![space.to_owned()])]);
+
+        assert!(rows.relink(&cache, &links).is_empty());
+        assert_eq!(rows.rows[0].space_children, [edge]);
+    }
+
+    #[test]
+    fn relink_lists_a_listed_chat_under_its_private_spaces_once() {
+        let rules = Ruleset::server_default(user_id!("@me:example.org"));
+        let space = room_id!("!space:example.org");
+        let chat = room_id!("!chat:other.org");
+        let away = room_id!("!away:example.org");
+        let info = space_info(Vec::new());
+        let cache = HashMap::from([(space.to_owned(), info)]);
+        let mut space_row = summary(space, &rules);
+        space_row.room_kind = Some(RoomKind::Space);
+        let mut rows = RoomListRows::default();
+        rows.apply(&VectorDiff::Reset {
+            values: vec![space_row, summary(chat, &rules)],
+        });
+        let links = DmSpaceLinks::from([
+            (chat.to_owned(), vec![space.to_owned()]),
+            (away.to_owned(), vec![space.to_owned()]),
+        ]);
+
+        let diffs = rows.relink(&cache, &links);
+
+        let [VectorDiff::Set { index: 0, value }] = diffs.as_slice() else {
+            panic!("expected the space's row to change, got {diffs:?}");
+        };
+        let children: Vec<_> = value
+            .space_children
+            .iter()
+            .map(|edge| (edge.room_id.as_str(), edge.via.clone()))
+            .collect();
+        assert_eq!(children, [(chat.as_str(), vec!["other.org".to_owned()])]);
+        assert!(rows.relink(&cache, &links).is_empty());
     }
 
     #[test]

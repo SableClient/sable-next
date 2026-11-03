@@ -10,9 +10,8 @@
   import { useCallSession } from '#lib/features/call/call-session.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { addUnread, spacesContainingRoom, spaceUnreadTotals } from '#lib/rooms/spaces.js';
-  import type { UnreadCount } from '#lib/rooms/unread.js';
-  import { hasUnread } from '#lib/rooms/unread.js';
+  import { addUnread, spacesContainingRoom } from '#lib/rooms/spaces.js';
+  import { hasUnread, NO_UNREAD } from '#lib/rooms/unread.js';
   import {
     applyDrop,
     folderName,
@@ -35,12 +34,7 @@
   import NavigationRail from './NavigationRail.svelte';
   import RoomNav from './RoomNav.svelte';
   import UserQuickTools from './UserQuickTools.svelte';
-  import {
-    claimedRoomIds,
-    isActiveSpace,
-    markRoomsRead,
-    spacesDescendantRooms,
-  } from './nav-rooms.js';
+  import { isActiveSpace, markRoomsRead } from './nav-rooms.js';
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
 
   interface Props {
@@ -101,7 +95,6 @@
     ...orphanSpaces,
     ...joinedSpaces.filter((space) => pinnedSpaceIds.has(space.room_id)),
   ]);
-  let claimed = $derived(claimedRoomIds(roomList.rooms));
   let orderedSpaceIds = $derived(
     orderedKnownSpaceIds(
       knownSpaceIds,
@@ -109,50 +102,52 @@
     )
   );
   let callRoom = $derived(roomList.byId(call.roomId));
-  let spaceUnread = $derived(spaceUnreadTotals(spaces, roomList.rooms, roomList.badgeUnreadFor));
+  let spaceUnread = $derived(
+    new Map(
+      spaces.flatMap((space) => {
+        const unread = roomList.section(space.room_id)?.unread;
+        return unread && hasUnread(unread) ? [[space.room_id, unread] as const] : [];
+      })
+    )
+  );
   let callSpaces = $derived(
     call.active ? spacesContainingRoom(spaces, roomList.rooms, call.roomId) : new Set<string>()
   );
   let entries = $derived(mergeSpaces(spaceSidebar.items, orderedSpaceIds));
-  let homeRooms = $derived(
-    roomList.rooms.filter((room) => room.state === 'joined' && room.room_kind !== 'space')
-  );
-  let homeUnread = $derived(unreadCounts(homeRooms));
-  let unspacedRooms = $derived(
-    homeRooms.filter((room) => !room.is_direct && !claimed.has(room.room_id))
-  );
-  let unspacedUnread = $derived(unreadCounts(unspacedRooms));
-  let allDirectRooms = $derived(
-    roomList.rooms.filter((room) => room.state === 'joined' && room.is_direct)
-  );
+  let homeUnread = $derived(roomList.section('home')?.unread ?? NO_UNREAD);
+  let unspacedUnread = $derived(roomList.section('unspaced')?.unread ?? NO_UNREAD);
   let openRoomId = $derived(findRoomByPathId(roomList.rooms, roomId)?.room_id);
-  let otherDirectRooms = $derived(allDirectRooms.filter((room) => room.room_id !== openRoomId));
-  let directRooms = $derived(
-    otherDirectRooms.filter((room) => hasUnread(roomList.badgeUnreadFor(room))).slice(0, 3)
-  );
-  let directUnread = $derived(
-    unreadCounts(
-      otherDirectRooms.filter(
-        (room) => !directRooms.some((directRoom) => directRoom.room_id === room.room_id)
-      )
+  let unreadDirectRooms = $derived(
+    (roomList.section('direct')?.unread_rooms ?? []).flatMap((id) =>
+      id === openRoomId ? [] : (roomList.byId(id) ?? [])
     )
   );
+  let directRooms = $derived(unreadDirectRooms.slice(0, 3));
+  let directUnread = $derived(
+    unreadDirectRooms
+      .slice(3)
+      .reduce((total, room) => addUnread(total, roomList.badgeUnreadFor(room)), NO_UNREAD)
+  );
 
-  function unreadCounts(rooms: readonly RoomListItemView[]): UnreadCount {
-    return rooms.reduce((total, room) => addUnread(total, roomList.badgeUnreadFor(room)), {
-      unread: 0,
-      highlight: 0,
-    });
+  function sectionRooms(roomIds: readonly string[]): RoomListItemView[] {
+    return roomIds.flatMap((id) => roomList.byId(id) ?? []);
   }
 
-  function markSectionRead(section: 'home' | 'unspaced' | 'direct'): void {
-    const rooms = { home: homeRooms, unspaced: unspacedRooms, direct: allDirectRooms }[section];
-    markRoomsRead(rooms, core.rpc.timeline, readReceiptIsPrivate());
+  function markSectionRead(key: 'home' | 'unspaced' | 'direct'): void {
+    const section = roomList.section(key);
+    if (!section) return;
+    markRoomsRead(
+      sectionRooms([...section.favourites, ...section.rooms]),
+      core.rpc.timeline,
+      readReceiptIsPrivate()
+    );
   }
 
   function markFolderRead(folder: SidebarFolder): void {
     markRoomsRead(
-      spacesDescendantRooms(roomList.rooms, folder.content),
+      sectionRooms(
+        folder.content.flatMap((spaceId) => roomList.section(spaceId)?.descendants ?? [])
+      ),
       core.rpc.timeline,
       readReceiptIsPrivate()
     );

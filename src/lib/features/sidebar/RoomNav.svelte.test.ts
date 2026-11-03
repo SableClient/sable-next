@@ -6,7 +6,12 @@ import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 
-import type { NotificationSettingsView, RoomListItemView } from '#src/generated/protocol';
+import type {
+  NotificationSettingsView,
+  RoomListItemView,
+  RoomSectionView,
+  RoomUnreadView,
+} from '#src/generated/protocol';
 
 import { roomNotifications, roomUnread } from '#lib/rooms/unread.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
@@ -18,7 +23,22 @@ const roomsFixture = vi.hoisted(() => {
     byId: (roomId: string | null) => fixture.rooms.find((room) => room.room_id === roomId),
     notificationOverride: () => null,
     unreadFor: (room: RoomListItemView) => roomUnread(room),
-    badgeUnreadFor: (room: RoomListItemView) => roomUnread(room),
+    sections: new Map<string, RoomSectionView>(),
+    badges: new Map<string, RoomUnreadView>(),
+    section: (key: string): RoomSectionView =>
+      fixture.sections.get(key) ?? {
+        key,
+        favourites: [],
+        rooms: fixture.rooms.map((room) => room.room_id),
+        subspaces: [],
+        calendars: [],
+        invites: [],
+        unread: { unread: 0, notifying: 0, highlight: 0, marked: false },
+        unread_rooms: [],
+        descendants: [],
+      },
+    badgeUnreadFor: (room: RoomListItemView): RoomUnreadView =>
+      fixture.badges.get(room.room_id) ?? { unread: 0, notifying: 0, highlight: 0, marked: false },
     quietRoomIds: new Set<string>(),
     notificationsFor: (room: RoomListItemView) => roomNotifications(room),
   };
@@ -58,7 +78,13 @@ vi.mock('#lib/rooms/presence.svelte.js', () => ({
   usePresenceStore: () => ({ get: () => presenceFixture.entry, peek: () => presenceFixture.entry }),
 }));
 
-import { setGroupsFavourites } from '#lib/rooms/favourite-grouping.svelte.js';
+import {
+  badgeView,
+  sectionView,
+  treeCategory,
+  treeLink,
+  treeRoom,
+} from '#lib/test-support/room-sections.js';
 import RoomNavHarness from './RoomNavHarness.test.svelte';
 
 const realObserver = globalThis.IntersectionObserver;
@@ -94,8 +120,17 @@ function makeRoom(overrides: Partial<RoomListItemView>): RoomListItemView {
   });
 }
 
-function latestAt(timestamp: number): RoomListItemView['latest_event'] {
-  return { sender: null, body: 'hi', timestamp, sending: false, event_id: null };
+function listSections(...sections: RoomSectionView[]): void {
+  roomsFixture.sections = new Map(sections.map((section) => [section.key, section]));
+}
+
+function listBadges(entries: Record<string, Partial<RoomUnreadView>>): void {
+  roomsFixture.badges = new Map(
+    Object.entries(entries).map(([id, counts]) => {
+      const { counts: full } = badgeView(id, counts);
+      return [id, full];
+    })
+  );
 }
 
 function roomNames(): string[] {
@@ -121,6 +156,8 @@ beforeEach(() => {
   visit('/home', {});
   core.session = { user_id: '@me:example.org' };
   roomsFixture.rooms = [];
+  roomsFixture.sections = new Map();
+  roomsFixture.badges = new Map();
   presenceFixture.entry = null;
   core.userProfile.mockReset();
   core.userProfile.mockRejectedValue(new Error('no profile'));
@@ -180,6 +217,11 @@ test.each([
     : [target];
   if (isSpace) {
     visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
+    listSections(
+      sectionView('!root:example.org', {
+        subspaces: [treeCategory(target.room_id, 0, [treeRoom(leaf.room_id, 1)])],
+      })
+    );
   }
   core.rpc.members.permissions.mockResolvedValue({
     can_invite: true,
@@ -231,6 +273,11 @@ test('a subspace context menu opens its lobby', async () => {
     }),
     makeRoom({ room_id: '!leaf:example.org', name: 'Leaf' }),
   ];
+  listSections(
+    sectionView('!root:example.org', {
+      subspaces: [treeCategory('!nested:example.org', 0, [treeRoom('!leaf:example.org', 1)])],
+    })
+  );
   const onNavigate = vi.fn();
   await mountNav({ onNavigate });
 
@@ -278,6 +325,18 @@ test('nests subspaces with thread lines and links past the depth limit to the lo
     makeRoom({ room_id: '!deepest:example.org', name: 'Deepest' }),
   ];
 
+  listSections(
+    sectionView('!root:example.org', {
+      subspaces: [
+        treeCategory('!one:example.org', 0, [
+          treeCategory('!two:example.org', 0, [
+            treeRoom('!deep:example.org', 1),
+            treeLink('!three:example.org', 1),
+          ]),
+        ]),
+      ],
+    })
+  );
   await mountNav();
   const deep = row('Deep');
   expect(deep.style.getPropertyValue('--room-depth')).toBe('1');
@@ -290,98 +349,49 @@ test('nests subspaces with thread lines and links past the depth limit to the lo
   expect(roomNames()).not.toContain('Deepest');
 });
 
-test('home lists every joined room, including the children of joined spaces', async () => {
+test('each page renders its section in the order the core lists it', async () => {
   roomsFixture.rooms = [
-    makeRoom({ room_id: '!plain:example.org', name: 'Plain' }),
-    makeRoom({ room_id: '!direct:example.org', name: 'Direct', is_direct: true }),
-    makeRoom({ room_id: '!space:example.org', name: 'Space', room_kind: 'space' }),
-    makeRoom({ room_id: '!child:example.org', name: 'Child' }),
-    makeRoom({
-      room_id: '!parent-space:example.org',
-      name: 'Parent space',
-      room_kind: 'space',
-      space_children: [
-        {
-          room_id: '!child:example.org',
-          via: [],
-          order: null,
-          origin_server_ts: 1,
-          suggested: false,
-        },
-      ],
-    }),
+    makeRoom({ room_id: '!a:example.org', name: 'A' }),
+    makeRoom({ room_id: '!b:example.org', name: 'B' }),
+    makeRoom({ room_id: '!c:example.org', name: 'C', is_direct: true }),
+    makeRoom({ room_id: '!d:example.org', name: 'D', is_direct: true }),
   ];
+  listSections(
+    sectionView('home', { rooms: ['!d:example.org', '!b:example.org', '!c:example.org'] }),
+    sectionView('unspaced', { rooms: ['!b:example.org', '!a:example.org'] }),
+    sectionView('direct', { rooms: ['!d:example.org', '!c:example.org'] })
+  );
 
-  await mountNav();
-  expect(roomNames()).toEqual(['Plain', 'Direct', 'Child']);
-});
-
-test('home keeps the core order while latest events are still loading', async () => {
-  roomsFixture.rooms = [
-    makeRoom({ room_id: '!silent:example.org', name: 'Silent' }),
-    makeRoom({ room_id: '!busy:example.org', name: 'Busy', latest_event: latestAt(30) }),
-    makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', latest_event: latestAt(10) }),
-  ];
-
-  await mountNav();
-  expect(roomNames()).toEqual(['Silent', 'Busy', 'Quiet']);
-});
-
-test('unspaced rooms and direct messages keep the core order while latest events load', async () => {
-  roomsFixture.rooms = [
-    makeRoom({ room_id: '!dm-pending:example.org', name: 'Pending DM', is_direct: true }),
-    makeRoom({ room_id: '!pending:example.org', name: 'Pending' }),
-    makeRoom({ room_id: '!busy:example.org', name: 'Busy', latest_event: latestAt(30) }),
-    makeRoom({
-      room_id: '!dm-busy:example.org',
-      name: 'Busy DM',
-      is_direct: true,
-      latest_event: latestAt(20),
-    }),
-  ];
+  const home = await mountNav();
+  expect(roomNames()).toEqual(['D', 'B', 'C']);
+  home.unmount();
 
   visit('/rooms');
   const unspaced = await mountNav();
-  expect(roomNames()).toEqual(['Pending', 'Busy']);
+  expect(roomNames()).toEqual(['B', 'A']);
   unspaced.unmount();
 
   visit('/direct');
   await mountNav();
-  expect(roomNames()).toEqual(['Pending DM', 'Busy DM']);
-});
-
-test('home and the direct page keep their own sort order', async () => {
-  setPreference('roomSort', 'name-asc');
-  setPreference('directSort', 'recent');
-  const dm = (id: string, name: string, at: number) =>
-    makeRoom({ room_id: id, name, is_direct: true, latest_event: latestAt(at) });
-  roomsFixture.rooms = [
-    makeRoom({ room_id: '!b:example.org', name: 'B', latest_event: latestAt(30) }),
-    makeRoom({ room_id: '!a:example.org', name: 'A', latest_event: latestAt(10) }),
-    dm('!z:example.org', 'Z', 30),
-    dm('!y:example.org', 'Y', 10),
-  ];
-
-  const home = await mountNav();
-  expect(roomNames()).toEqual(['A', 'B', 'Y', 'Z']);
-  home.unmount();
-
-  visit('/direct');
-  await mountNav();
-  expect(roomNames()).toEqual(['Z', 'Y']);
+  expect(roomNames()).toEqual(['D', 'C']);
 });
 
 test('favourites sit in their own section above the rest of the list', async () => {
   roomsFixture.rooms = [
-    makeRoom({ room_id: '!busy:example.org', name: 'Busy', latest_event: latestAt(30) }),
+    makeRoom({ room_id: '!busy:example.org', name: 'Busy' }),
     makeRoom({
       room_id: '!starred:example.org',
       name: 'Starred',
       tags: ['favourite'],
-      latest_event: latestAt(10),
     }),
-    makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', latest_event: latestAt(20) }),
+    makeRoom({ room_id: '!quiet:example.org', name: 'Quiet' }),
   ];
+  listSections(
+    sectionView('home', {
+      favourites: ['!starred:example.org'],
+      rooms: ['!busy:example.org', '!quiet:example.org'],
+    })
+  );
 
   await mountNav();
   const favourites = Array.from(
@@ -395,51 +405,19 @@ test('favourites sit in their own section above the rest of the list', async () 
   ).toEqual(['nav.favourites', 'nav.rooms']);
 });
 
-test('a view that stops grouping favourites keeps them in recency order', async () => {
-  visit('/rooms');
-  roomsFixture.rooms = [
-    makeRoom({ room_id: '!busy:example.org', name: 'Busy', latest_event: latestAt(30) }),
-    makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', latest_event: latestAt(20) }),
-    makeRoom({
-      room_id: '!starred:example.org',
-      name: 'Starred',
-      tags: ['favourite'],
-      latest_event: latestAt(10),
-    }),
-  ];
-  setGroupsFavourites('unspaced', false);
-
-  await mountNav();
-  expect(document.querySelector('.room-list.favourites')).not.toBeInTheDocument();
-  expect(roomNames()).toEqual(['Busy', 'Quiet', 'Starred']);
-  setGroupsFavourites('unspaced', true);
-});
-
-test('a space lifts a favourite out of its subspace', async () => {
+test('a space lists the favourite the core lifted out of its subspace', async () => {
   visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
-  const edge = (roomId: string) => ({
-    room_id: roomId,
-    via: [],
-    order: null,
-    origin_server_ts: 1,
-    suggested: false,
-  });
   roomsFixture.rooms = [
-    makeRoom({
-      room_id: '!root:example.org',
-      name: 'Root',
-      room_kind: 'space',
-      space_children: [edge('!top:example.org'), edge('!nested:example.org')],
-    }),
-    makeRoom({
-      room_id: '!nested:example.org',
-      name: 'Nested',
-      room_kind: 'space',
-      space_children: [edge('!deep:example.org')],
-    }),
+    makeRoom({ room_id: '!root:example.org', name: 'Root', room_kind: 'space' }),
     makeRoom({ room_id: '!top:example.org', name: 'Top' }),
     makeRoom({ room_id: '!deep:example.org', name: 'Deep', tags: ['favourite'] }),
   ];
+  listSections(
+    sectionView('!root:example.org', {
+      favourites: ['!deep:example.org'],
+      rooms: ['!top:example.org'],
+    })
+  );
 
   await mountNav();
   expect(roomNames()).toEqual(['Deep', 'Top']);
@@ -453,25 +431,13 @@ test('home links a room to its own section', async () => {
   expect(row('Plain')).toHaveAttribute('href', '/home/!plain%3Aexample.org');
 });
 
-test('a joined tombstoned room remains visible in the space that contains it', async () => {
+test('a room listed by a space section links through that space', async () => {
   visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
   roomsFixture.rooms = [
-    makeRoom({
-      room_id: '!root:example.org',
-      name: 'Root',
-      room_kind: 'space',
-      space_children: [
-        {
-          room_id: '!old:example.org',
-          via: [],
-          order: null,
-          origin_server_ts: 1,
-          suggested: false,
-        },
-      ],
-    }),
+    makeRoom({ room_id: '!root:example.org', name: 'Root', room_kind: 'space' }),
     makeRoom({ room_id: '!old:example.org', name: 'Old room', is_tombstoned: true }),
   ];
+  listSections(sectionView('!root:example.org', { rooms: ['!old:example.org'] }));
 
   await mountNav();
 
@@ -512,6 +478,11 @@ test('expanded room disclosures do not use the active-route surface', async () =
     }),
     makeRoom({ room_id: '!room:example.org', name: 'Current room' }),
   ];
+  listSections(
+    sectionView('!root:example.org', {
+      subspaces: [treeCategory('!nested:example.org', 0, [treeRoom('!room:example.org', 1)])],
+    })
+  );
 
   await mountNav();
   const current = screen.getAllByRole('treeitem', { current: 'page' });
@@ -523,86 +494,6 @@ test('expanded room disclosures do not use the active-route surface', async () =
   expect(
     Array.from(expandedDisclosures).every((node) => !node.classList.contains('selection-open'))
   ).toBe(true);
-});
-
-test('home leaves out invited and knocked rooms', async () => {
-  roomsFixture.rooms = [
-    makeRoom({ room_id: '!joined:example.org', name: 'Joined' }),
-    makeRoom({ room_id: '!invited:example.org', name: 'Invited', state: 'invited' }),
-    makeRoom({ room_id: '!knocked:example.org', name: 'Knocked', state: 'knocked' }),
-  ];
-
-  await mountNav();
-  expect(roomNames()).toEqual(['Joined']);
-});
-
-test('the unspaced section leaves out rooms a joined space claims', async () => {
-  visit('/rooms');
-  roomsFixture.rooms = [
-    makeRoom({ room_id: '!loose:example.org', name: 'Loose' }),
-    makeRoom({ room_id: '!claimed:example.org', name: 'Claimed' }),
-    makeRoom({
-      room_id: '!space:example.org',
-      name: 'Space',
-      room_kind: 'space',
-      space_children: [
-        {
-          room_id: '!claimed:example.org',
-          via: ['example.org'],
-          order: null,
-          origin_server_ts: 1,
-          suggested: false,
-        },
-      ],
-    }),
-  ];
-
-  await mountNav();
-  expect(roomNames()).toEqual(['Loose']);
-  expect(row('Loose')).toHaveAttribute('href', '/rooms/!loose%3Aexample.org');
-});
-
-test('a claim from a space that is not joined keeps the room in the unspaced section', async () => {
-  visit('/rooms');
-  roomsFixture.rooms = [
-    makeRoom({ room_id: '!claimed:example.org', name: 'Claimed' }),
-    makeRoom({
-      room_id: '!space:example.org',
-      name: 'Space',
-      room_kind: 'space',
-      state: 'invited',
-      space_children: [
-        {
-          room_id: '!claimed:example.org',
-          via: ['example.org'],
-          order: null,
-          origin_server_ts: 1,
-          suggested: false,
-        },
-      ],
-    }),
-  ];
-
-  await mountNav();
-  expect(roomNames()).toEqual(['Claimed']);
-});
-
-test('direct page lists joined direct rooms only', async () => {
-  visit('/direct');
-  roomsFixture.rooms = [
-    makeRoom({ room_id: '!dm:example.org', name: 'DM', is_direct: true }),
-    makeRoom({
-      room_id: '!invited-dm:example.org',
-      name: 'Invited DM',
-      is_direct: true,
-      direct_targets: [],
-      state: 'invited',
-    }),
-    makeRoom({ room_id: '!plain:example.org', name: 'Plain' }),
-  ];
-
-  await mountNav();
-  expect(roomNames()).toEqual(['DM']);
 });
 
 test('direct page offers starting a chat and searching instead of creating or browsing rooms', async () => {
@@ -618,41 +509,22 @@ test('direct page offers starting a chat and searching instead of creating or br
   expect(document.querySelector('.empty-rooms p')?.textContent).toBe('nav.chatsEmpty');
 });
 
-test('does not show a badge for a muted room', async () => {
+test('a row shows the badge the core gives it and none otherwise', async () => {
   roomsFixture.rooms = [
-    makeRoom({
-      room_id: '!muted:example.org',
-      name: 'Muted',
-      unread: 3,
-      notification: { room: 'mute', default: 'all' },
-    }),
-  ];
-
-  await mountNav();
-  expect(row('Muted').querySelector('.unread-badge')).not.toBeInTheDocument();
-});
-
-test('a mentions-only room keeps its unread marker and badges its mentions', async () => {
-  roomsFixture.rooms = [
+    makeRoom({ room_id: '!silent:example.org', name: 'Silent', unread: 3 }),
     makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', unread: 6 }),
     makeRoom({ room_id: '!pinged:example.org', name: 'Pinged', unread: 6, highlight: 2 }),
   ];
+  listBadges({
+    '!quiet:example.org': { unread: 6 },
+    '!pinged:example.org': { unread: 2, highlight: 2 },
+  });
 
   await mountNav();
+  expect(row('Silent').querySelector('.unread-badge')).not.toBeInTheDocument();
   expect(row('Quiet').querySelector('.unread-badge-dot')).toBeInTheDocument();
+  expect(row('Quiet').querySelector('.unread-badge-count')).not.toBeInTheDocument();
   expect(within(row('Pinged')).getByText('2')).toHaveClass('unread-badge-count');
-});
-
-test('counts mentions in the badge, and quiet traffic only dots', async () => {
-  roomsFixture.rooms = [
-    makeRoom({ room_id: '!mention:example.org', name: 'Mentioned', unread: 9, highlight: 2 }),
-    makeRoom({ room_id: '!plain:example.org', name: 'Plain', unread: 5 }),
-  ];
-
-  await mountNav();
-  expect(within(row('Mentioned')).getByText('2')).toHaveClass('unread-badge-count');
-  expect(row('Plain').querySelector('.unread-badge-count')).not.toBeInTheDocument();
-  expect(row('Plain').querySelector('.unread-badge-dot')).toBeInTheDocument();
 });
 
 test('message search from a space is scoped to that space', async () => {
@@ -777,6 +649,7 @@ test('a collapsed row carries the unread badge of its room', async () => {
     makeRoom({ room_id: '!unread:example.org', name: 'Unread', unread: 4 }),
     makeRoom({ room_id: '!read:example.org', name: 'Read' }),
   ];
+  listBadges({ '!unread:example.org': { unread: 4 } });
 
   await mountNav({ collapsed: true });
   const rows = Array.from(document.querySelectorAll('.room-row'));
@@ -805,6 +678,7 @@ test('direct messages and unspaced rooms without an avatar show their initial', 
     makeRoom({ room_id: '!dm:example.org', name: 'alice', is_direct: true }),
     makeRoom({ room_id: '!room:example.org', name: 'Garden' }),
   ];
+  listSections(sectionView('unspaced', { rooms: ['!room:example.org'] }));
 
   const home = await mountNav({ collapsed: true });
   const homeIcons = Array.from(document.querySelectorAll('.room-row .room-avatar-icon'));
@@ -1085,6 +959,7 @@ test('a muted room marked unread by hand keeps its dot and no count', async () =
       notification: { room: 'mute', default: 'all' },
     }),
   ];
+  listBadges({ '!muted:example.org': { marked: true } });
 
   await mountNav();
   expect(row('Muted').querySelector('.unread-badge-dot')).toBeInTheDocument();
@@ -1100,6 +975,10 @@ test('a room set to all messages badges its unread messages in green', async () 
     makeRoom({ room_id: '!loud:example.org', name: 'Loud', unread: 6, notifying: 6 }),
     makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', unread: 6 }),
   ];
+  listBadges({
+    '!loud:example.org': { unread: 6, notifying: 6 },
+    '!quiet:example.org': { unread: 6 },
+  });
 
   await mountNav();
   expect(within(row('Loud')).getByText('6')).toHaveClass(
@@ -1168,14 +1047,14 @@ test('a row options button opens the shared room menu and closes it again', asyn
 
 test('closing the rooms section hides read rows without unmounting them', async () => {
   roomsFixture.rooms = [
-    makeRoom({ room_id: '!read:example.org', name: 'Read', latest_event: latestAt(2) }),
+    makeRoom({ room_id: '!read:example.org', name: 'Read' }),
     makeRoom({
       room_id: '!unread:example.org',
       name: 'Unread',
       unread: 3,
-      latest_event: latestAt(1),
     }),
   ];
+  listBadges({ '!unread:example.org': { unread: 3 } });
   await mountNav();
   const readRow = row('Read');
   const heading = screen.getByRole('treeitem', { name: 'nav.rooms' });
@@ -1218,8 +1097,8 @@ test('the replaced rooms section collapses and stays collapsed', async () => {
 
 test('the room list is one tree with a single tab stop and the row actions out of the tab order', async () => {
   roomsFixture.rooms = [
-    makeRoom({ room_id: '!a:example.org', name: 'Alpha', latest_event: latestAt(2) }),
-    makeRoom({ room_id: '!b:example.org', name: 'Beta', latest_event: latestAt(1) }),
+    makeRoom({ room_id: '!a:example.org', name: 'Alpha' }),
+    makeRoom({ room_id: '!b:example.org', name: 'Beta' }),
   ];
   await mountNav();
 

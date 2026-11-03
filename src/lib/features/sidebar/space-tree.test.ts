@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 
-import type { RoomListItemView } from '#src/generated/protocol';
+import type { RoomListItemView, SpaceTreeNodeView } from '#src/generated/protocol';
 
-import { flattenSpaceTree, spaceTree, type SpaceTreeNode } from './space-tree';
+import { flattenSpaceTree, spaceTreeNodes, type SpaceTreeNode } from './space-tree';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 function room(roomId: string, overrides: Partial<RoomListItemView> = {}): RoomListItemView {
@@ -49,8 +49,20 @@ function space(roomId: string, children: string[]): RoomListItemView {
   });
 }
 
-function byId(rooms: RoomListItemView[]): Map<string, RoomListItemView> {
-  return new Map(rooms.map((entry) => [entry.room_id, entry]));
+function byId(rooms: RoomListItemView[]): (roomId: string) => RoomListItemView | undefined {
+  const rows = new Map(rooms.map((entry) => [entry.room_id, entry]));
+  return (roomId) => rows.get(roomId);
+}
+
+function node(path: string, depth: number, children?: SpaceTreeNodeView[]): SpaceTreeNodeView {
+  const room_id = path.split('/').at(-1) ?? path;
+  const key = `root/${path}`;
+  if (children === undefined) return { kind: 'room', room_id, key, depth };
+  return { kind: 'category', room_id, key, depth, children };
+}
+
+function link(path: string, depth: number): SpaceTreeNodeView {
+  return { kind: 'link', room_id: path.split('/').at(-1) ?? path, key: `root/${path}`, depth };
 }
 
 function describe(rows: readonly SpaceTreeNode[]): string[] {
@@ -76,8 +88,31 @@ const rooms = [
   room('f'),
 ];
 
-test('nests subspaces as v1 does and threads the children of a second-level subspace', () => {
-  const tree = spaceTree(rooms[0], byId(rooms), 3);
+const shallow = [
+  node('a', 0),
+  node('s1', 0, [
+    node('s1/b', 0),
+    node('s1/s2', 0, [node('s1/s2/c', 1), node('s1/s2/d', 1), link('s1/s2/s3', 1)]),
+  ]),
+];
+
+const deep = [
+  node('a', 0),
+  node('s1', 0, [
+    node('s1/b', 0),
+    node('s1/s2', 0, [
+      node('s1/s2/c', 1),
+      node('s1/s2/d', 1),
+      node('s1/s2/s3', 1, [
+        node('s1/s2/s3/e', 2),
+        node('s1/s2/s3/s4', 2, [node('s1/s2/s3/s4/f', 3)]),
+      ]),
+    ]),
+  ]),
+];
+
+test('threads the children of a second-level subspace and ends at a link', () => {
+  const tree = spaceTreeNodes(shallow, 'root', byId(rooms));
 
   expect(describe(flattenSpaceTree(tree, open))).toEqual([
     'room a 0',
@@ -90,8 +125,8 @@ test('nests subspaces as v1 does and threads the children of a second-level subs
   ]);
 });
 
-test('a deeper limit keeps nesting and carries the thread through the grandchildren', () => {
-  const tree = spaceTree(rooms[0], byId(rooms), 5);
+test('a deeper tree carries the thread through the grandchildren', () => {
+  const tree = spaceTreeNodes(deep, 'root', byId(rooms));
 
   expect(describe(flattenSpaceTree(tree, open))).toEqual([
     'room a 0',
@@ -116,9 +151,13 @@ test('a thread keeps running past a sibling subspace that has children of its ow
     room('x'),
     room('y'),
   ];
-  const tree = spaceTree(nested[0], byId(nested), 6);
+  const view = [
+    node('s1', 0, [
+      node('s1/s2', 0, [node('s1/s2/x', 1), node('s1/s2/s3', 1, [node('s1/s2/s3/y', 2)])]),
+    ]),
+  ];
 
-  expect(describe(flattenSpaceTree(tree, open))).toEqual([
+  expect(describe(flattenSpaceTree(spaceTreeNodes(view, 'root', byId(nested)), open))).toEqual([
     'category s1 0',
     'category s2 0',
     'room x 1 branch@0',
@@ -127,22 +166,8 @@ test('a thread keeps running past a sibling subspace that has children of its ow
   ]);
 });
 
-test('a subspace holding no joined room is left out', () => {
-  const sparse = [
-    space('root', ['empty', 'full']),
-    space('empty', []),
-    space('full', ['r']),
-    room('r'),
-  ];
-
-  expect(describe(flattenSpaceTree(spaceTree(sparse[0], byId(sparse), 3), open))).toEqual([
-    'category full 0',
-    'room r 0',
-  ]);
-});
-
 test('a closed subspace still shows the rooms it keeps, and the subspaces leading to them', () => {
-  const tree = spaceTree(rooms[0], byId(rooms), 5);
+  const tree = spaceTreeNodes(deep, 'root', byId(rooms));
   const rows = flattenSpaceTree(tree, {
     closed: (key) => key === 'root/s1',
     keep: (row) => row.roomId === 'e',
@@ -157,11 +182,12 @@ test('a closed subspace still shows the rooms it keeps, and the subspaces leadin
   ]);
 });
 
-test('a cycle between spaces does not recurse forever', () => {
-  const cyclic = [space('root', ['s1']), space('s1', ['root', 'r']), room('r')];
+test('nodes whose room left the list are dropped with their children', () => {
+  const tree = spaceTreeNodes(
+    shallow,
+    'root',
+    byId(rooms.filter((entry) => entry.room_id !== 's1'))
+  );
 
-  expect(describe(flattenSpaceTree(spaceTree(cyclic[0], byId(cyclic), 3), open))).toEqual([
-    'category s1 0',
-    'room r 0',
-  ]);
+  expect(describe(flattenSpaceTree(tree, open))).toEqual(['room a 0']);
 });

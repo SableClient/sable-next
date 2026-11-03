@@ -32,6 +32,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({
     rooms: listed,
     quietRoomIds: new Set(),
+    section: () => undefined,
     byId: (roomId: string) => listed.find((room) => room.room_id === roomId),
   }),
 }));

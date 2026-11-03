@@ -69,21 +69,13 @@
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import { claimedRoomIds, markRoomsRead } from './nav-rooms.js';
-  import {
-    isFavourite,
-    roomComparator,
-    roomRow,
-    treeRows,
-    withoutFavourites,
-    type RoomNavRow,
-  } from './nav-rows.js';
+  import { roomRow, type RoomNavRow } from './nav-rows.js';
   import { PeerProfiles } from './peer-profiles.svelte.js';
   import { publishVisibleRoomOrder } from './visible-rooms.svelte.js';
   import { navSectionKind, navSectionLabels, type NavSectionKind } from './nav-section.js';
   import {
     flattenSpaceTree,
-    spaceTree as buildSpaceTree,
-    type SpaceTreeNode,
+    spaceTreeNodes,
     type SpaceTreeRoom,
     type SpaceTreeSpace,
     type Thread,
@@ -243,109 +235,50 @@
     return space?.name ?? i18n.t(labels.title);
   });
   let TitleIcon = $derived(SECTION_ICONS[section]);
-  let spaceTree = $derived.by<SpaceTreeNode[]>(() => {
-    if (!pathname.startsWith('/space')) return [];
-
-    const space = findRoomByPathId(roomList.rooms, spaceId);
-    if (space?.room_kind !== 'space') return [];
-
-    const roomsById = new Map(
-      roomList.rooms
-        .filter(
-          (room) => room.state === 'joined' && !(room.room_kind === 'space' && room.is_tombstoned)
-        )
-        .map((room) => [room.room_id, room])
-    );
-    return buildSpaceTree(space, roomsById, Number(preferences.subspaceHierarchyLimit));
-  });
   let spacedRoomIds = $derived(claimedRoomIds(roomList.rooms));
   let sortKey = $derived<'directSort' | 'roomSort'>(directSection ? 'directSort' : 'roomSort');
-  let listOrder = $derived(new Map(roomList.rooms.map((room, index) => [room.room_id, index])));
-  let compareRooms = $derived(roomComparator(preferences[sortKey], listOrder));
   let favouriteView = $derived(activeSpaceId ?? section);
   let groupFavourites = $derived(groupsFavourites(favouriteView));
-  let spaceRootItems = $derived(groupFavourites ? withoutFavourites(spaceTree) : spaceTree);
-  let listedRooms = $derived.by<RoomNavRow[]>(() => {
-    if (directSection) {
-      return roomList.rooms
-        .filter((room) => room.state === 'joined' && room.is_direct && !room.is_tombstoned)
-        .map(roomRow)
-        .sort(compareRooms);
-    }
+  let navSection = $derived(roomList.section(favouriteView));
 
-    if (pathname.startsWith('/space')) {
-      return spaceTree.filter((item): item is SpaceTreeRoom => item.kind === 'room');
-    }
+  function listedRooms(roomIds: readonly string[] | undefined): RoomListItemView[] {
+    return (roomIds ?? []).flatMap((roomId) => roomList.byId(roomId) ?? []);
+  }
 
-    const claimedByJoinedSpace = unspacedSection
-      ? claimedRoomIds(roomList.rooms)
-      : new Set<string>();
+  function sectionRows(roomIds: readonly string[] | undefined, keyed: boolean): RoomNavRow[] {
+    const listed = listedRooms(roomIds);
+    if (activeSpaceId === null) return listed.map(roomRow);
+    const spaceId = activeSpaceId;
+    return listed.map((room): SpaceTreeRoom => ({
+      kind: 'room',
+      room,
+      roomId: room.room_id,
+      parentSpaceId: spaceId,
+      depth: 0,
+      key: keyed ? `${spaceId}/${room.room_id}` : room.room_id,
+      threads: [],
+    }));
+  }
 
-    return roomList.rooms
-      .filter(
-        (room) =>
-          room.state === 'joined' &&
-          !room.is_tombstoned &&
-          room.room_kind !== 'space' &&
-          !(unspacedSection && room.is_direct) &&
-          !claimedByJoinedSpace.has(room.room_id)
-      )
-      .map(roomRow)
-      .sort(compareRooms);
-  });
-  let favourites = $derived.by<RoomNavRow[]>(() => {
-    if (!groupFavourites) return [];
-    const rows = pathname.startsWith('/space') ? treeRows(spaceTree) : listedRooms;
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local to this derivation
-    const seen = new Set<string>();
-    return rows
-      .filter((row) => {
-        if (!isFavourite(row) || seen.has(row.roomId)) return false;
-        seen.add(row.roomId);
-        return true;
-      })
-      .map((row) => ({ ...row, depth: 0, key: row.roomId }))
-      .sort(compareRooms);
-  });
-  let rooms = $derived(
-    groupFavourites ? listedRooms.filter((row) => !isFavourite(row)) : listedRooms
-  );
+  let favourites = $derived(sectionRows(navSection?.favourites, false));
+  let rooms = $derived(sectionRows(navSection?.rooms, true));
   let sectionRooms = $derived([...favourites, ...rooms]);
-  let invites = $derived.by<RoomListItemView[]>(() => {
-    const pending = roomList.rooms.filter(
-      (room) =>
-        room.state === 'invited' &&
-        !isDeclining(room.room_id) &&
-        !dismissedInvites.has(room.room_id)
-    );
-
-    if (directSection) {
-      return pending.filter((room) => room.is_direct);
-    }
-
-    if (pathname.startsWith('/space')) {
-      const children = new Set(activeSpace?.space_children.map((child) => child.room_id) ?? []);
-      return pending.filter((room) => children.has(room.room_id));
-    }
-
-    const claimedByJoinedSpace = unspacedSection
-      ? claimedRoomIds(roomList.rooms)
-      : new Set<string>();
-
-    return pending.filter(
-      (room) => !(unspacedSection && room.is_direct) && !claimedByJoinedSpace.has(room.room_id)
-    );
-  });
+  let invites = $derived(
+    listedRooms(navSection?.invites).filter(
+      (room) => !isDeclining(room.room_id) && !dismissedInvites.has(room.room_id)
+    )
+  );
   $effect(() => {
     publishVisibleRoomOrder(sectionRooms.map((row) => row.roomId));
   });
-  let calendarRooms = $derived(
-    spaceTree
-      .filter((item): item is SpaceTreeRoom => item.kind === 'room')
-      .map((item) => item.room)
-      .filter((room) => room.room_kind === 'calendar')
+  let calendarRooms = $derived(listedRooms(navSection?.calendars));
+  let subspaces = $derived(
+    activeSpaceId === null
+      ? []
+      : spaceTreeNodes(navSection?.subspaces ?? [], activeSpaceId, (roomId) =>
+          roomList.byId(roomId)
+        )
   );
-  let subspaces = $derived(spaceRootItems.filter((item) => item.kind !== 'room'));
   let visibleSubspaces = $derived<RoomNavItem[]>(
     flattenSpaceTree(subspaces, {
       closed: (key) => closedCategories.has(key),

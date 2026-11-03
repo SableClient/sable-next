@@ -1,4 +1,4 @@
-import type { RoomListItemView } from '#src/generated/protocol';
+import type { RoomListItemView, SpaceTreeNodeView } from '#src/generated/protocol';
 
 export type ThreadKind = 'through' | 'branch' | 'last';
 
@@ -25,74 +25,31 @@ export type SpaceTreeSpace = {
 
 export type SpaceTreeNode = SpaceTreeRoom | SpaceTreeSpace;
 
-export function indentFor(parentDepth: number): number {
-  return Math.max(0, parentDepth - 1);
-}
-
-export function spaceTree(
-  root: RoomListItemView,
-  roomsById: ReadonlyMap<string, RoomListItemView>,
-  limit: number
+export function spaceTreeNodes(
+  nodes: readonly SpaceTreeNodeView[],
+  parentSpaceId: string,
+  byId: (roomId: string) => RoomListItemView | undefined
 ): SpaceTreeNode[] {
-  const holding = new Map<string, boolean>();
-
-  function holdsRoom(space: RoomListItemView, seen: Set<string>): boolean {
-    const known = holding.get(space.room_id);
-    if (known !== undefined) return known;
-    if (seen.has(space.room_id)) return false;
-    seen.add(space.room_id);
-
-    const holds = space.space_children.some((edge) => {
-      const child = roomsById.get(edge.room_id);
-      if (!child) return false;
-      return child.room_kind !== 'space' || holdsRoom(child, seen);
-    });
-    seen.delete(space.room_id);
-    holding.set(space.room_id, holds);
-    return holds;
-  }
-
-  function walk(space: RoomListItemView, depth: number, ancestry: string[]): SpaceTreeNode[] {
-    const indent = indentFor(depth);
-    const nodes: SpaceTreeNode[] = [];
-
-    for (const edge of space.space_children) {
-      const room = roomsById.get(edge.room_id);
-      if (!room || room.room_kind === 'space') continue;
-
-      nodes.push({
-        kind: 'room',
-        room,
-        roomId: room.room_id,
-        parentSpaceId: root.room_id,
-        depth: indent,
-        key: [...ancestry, room.room_id].join('/'),
-        threads: [],
-      });
+  return nodes.flatMap<SpaceTreeNode>((node) => {
+    const room = byId(node.room_id);
+    if (!room) return [];
+    if (node.kind === 'room') {
+      return [
+        {
+          kind: 'room',
+          room,
+          roomId: node.room_id,
+          parentSpaceId,
+          depth: node.depth,
+          key: node.key,
+          threads: [],
+        },
+      ];
     }
-
-    for (const edge of space.space_children) {
-      const room = roomsById.get(edge.room_id);
-      if (room?.room_kind !== 'space' || ancestry.includes(room.room_id)) continue;
-      if (!holdsRoom(room, new Set())) continue;
-
-      const childDepth = depth + 1;
-      const path = [...ancestry, room.room_id];
-      const link = childDepth >= limit;
-      nodes.push({
-        kind: link ? 'link' : 'category',
-        room,
-        depth: indent,
-        key: path.join('/'),
-        threads: [],
-        children: link ? [] : walk(room, childDepth, path),
-      });
-    }
-
-    return nodes;
-  }
-
-  return walk(root, 0, [root.room_id]);
+    const children =
+      node.kind === 'category' ? spaceTreeNodes(node.children, parentSpaceId, byId) : [];
+    return [{ kind: node.kind, room, depth: node.depth, key: node.key, threads: [], children }];
+  });
 }
 
 export interface FlattenOptions {

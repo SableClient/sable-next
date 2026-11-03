@@ -47,39 +47,3 @@ export function markRoomUnread(
     console.warn('[sable nav] mark as unread failed', error);
   });
 }
-
-export function spaceDescendantRooms(
-  rooms: readonly RoomListItemView[],
-  spaceId: string
-): RoomListItemView[] {
-  return spacesDescendantRooms(rooms, [spaceId]);
-}
-
-export function spacesDescendantRooms(
-  rooms: readonly RoomListItemView[],
-  spaceIds: Iterable<string>
-): RoomListItemView[] {
-  const byId = new Map(rooms.map((room) => [room.room_id, room]));
-  const seen = new Set<string>();
-  const found: RoomListItemView[] = [];
-
-  const walk = (id: string): void => {
-    if (seen.has(id)) return;
-    seen.add(id);
-    const space = byId.get(id);
-    if (!space) return;
-    for (const child of space.space_children) {
-      const room = byId.get(child.room_id);
-      if (!room || seen.has(room.room_id)) continue;
-      if (room.room_kind === 'space') {
-        walk(room.room_id);
-        continue;
-      }
-      seen.add(room.room_id);
-      found.push(room);
-    }
-  };
-
-  for (const spaceId of spaceIds) walk(spaceId);
-  return found;
-}

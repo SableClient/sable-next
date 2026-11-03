@@ -148,6 +148,9 @@ test('a room behind the badge with nothing in the feed still gets a row', async 
       notification: { room: null, default: 'all' },
     }),
   ];
+  Object.assign(roomList, {
+    badgeUnreadFor: () => ({ unread: 2, notifying: 2, highlight: 0, marked: false }),
+  });
   render(InboxView);
   const user = userEvent.setup();
 

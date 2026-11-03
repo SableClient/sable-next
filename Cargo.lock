@@ -7536,6 +7536,7 @@ dependencies = [
  "html-escape",
  "html5ever 0.39.0",
  "http",
+ "icu_normalizer",
  "jieba-rs",
  "js-sys",
  "keyring-core",

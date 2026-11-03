@@ -27,6 +27,7 @@ matrix-sdk-common = { workspace = true }
 ruma.workspace = true
 mime = "0.3"
 hashlink = "0.12"
+icu_normalizer = { workspace = true }
 backon = { version = "1.6", default-features = false }
 pastey = "0.2.3"
 http = "1.5"

@@ -235,6 +235,8 @@ pub enum CoreEvent {
     RoomListDiff {
         subscription: SubscriptionId,
         diffs: Vec<VectorDiff<RoomListItemView>>,
+        /// Built from the rows after `diffs`.
+        sections: Option<RoomSectionsUpdate>,
     },
     TimelineDiff {
         subscription: SubscriptionId,
@@ -749,7 +751,7 @@ pub struct RoomListItemView {
     pub latest_event: Option<LatestEventView>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct RoomUnreadView {
     pub unread: u32,
@@ -758,6 +760,122 @@ pub struct RoomUnreadView {
     pub highlight: u32,
     /// Set by hand, so it survives a mute.
     pub marked: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "kebab-case")]
+pub enum RoomSortView {
+    #[default]
+    Recent,
+    NameAsc,
+    NameDesc,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum BadgeModeView {
+    #[default]
+    All,
+    Mentions,
+    Quiet,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(default)]
+pub struct RoomListOptionsView {
+    pub room_sort: RoomSortView,
+    pub direct_sort: RoomSortView,
+    pub ungrouped_favourites: Vec<String>,
+    pub subspace_depth: u32,
+    pub badge_default_direct: BadgeModeView,
+    pub badge_default_group: BadgeModeView,
+    /// A quiet space quiets everything under it.
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub quiet_rooms: Vec<OwnedRoomId>,
+}
+
+impl Default for RoomListOptionsView {
+    fn default() -> Self {
+        Self {
+            room_sort: RoomSortView::Recent,
+            direct_sort: RoomSortView::Recent,
+            ungrouped_favourites: Vec::new(),
+            subspace_depth: 3,
+            badge_default_direct: BadgeModeView::All,
+            badge_default_group: BadgeModeView::Mentions,
+            quiet_rooms: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SpaceTreeNodeView {
+    Room {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        key: String,
+        depth: u32,
+    },
+    Category {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        key: String,
+        depth: u32,
+        children: Vec<SpaceTreeNodeView>,
+    },
+    Link {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        key: String,
+        depth: u32,
+    },
+}
+
+/// `key` is `home`, `unspaced`, `direct` or a space's room id.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RoomSectionView {
+    pub key: String,
+    /// Empty when the section does not group its favourites.
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub favourites: Vec<OwnedRoomId>,
+    /// For a space, only its own rooms.
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub rooms: Vec<OwnedRoomId>,
+    pub subspaces: Vec<SpaceTreeNodeView>,
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub calendars: Vec<OwnedRoomId>,
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub invites: Vec<OwnedRoomId>,
+    pub unread: RoomUnreadView,
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub unread_rooms: Vec<OwnedRoomId>,
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub descendants: Vec<OwnedRoomId>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RoomBadgeView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub counts: RoomUnreadView,
+}
+
+/// Changed sections only. `badges` and `quiet_rooms` are whole when present.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RoomSectionsUpdate {
+    pub sections: Vec<RoomSectionView>,
+    pub removed: Vec<String>,
+    pub badges: Option<Vec<RoomBadgeView>>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<Vec<String>>))]
+    pub quiet_rooms: Option<Vec<OwnedRoomId>>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

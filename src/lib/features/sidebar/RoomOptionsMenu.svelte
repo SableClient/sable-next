@@ -47,7 +47,7 @@
   import AddToSpaceDialog from './AddToSpaceDialog.svelte';
   import { dmSpaces } from '#lib/rooms/dm-spaces.svelte.js';
   import { wouldCreateCycle } from './add-to-space.js';
-  import { markRoomUnread, markRoomsRead, spaceDescendantRooms } from './nav-rooms.js';
+  import { markRoomUnread, markRoomsRead } from './nav-rooms.js';
 
   interface Props {
     room: RoomListItemView;
@@ -101,7 +101,11 @@
   );
 
   let readable = $derived(
-    room.room_kind === 'space' ? spaceDescendantRooms(roomList.rooms, room.room_id) : [room]
+    room.room_kind === 'space'
+      ? (roomList.section(room.room_id)?.descendants ?? []).flatMap(
+          (roomId) => roomList.byId(roomId) ?? []
+        )
+      : [room]
   );
   let unread = $derived(
     readable.some((entry) => entry.unread > 0 || entry.highlight > 0 || entry.marked_unread)
