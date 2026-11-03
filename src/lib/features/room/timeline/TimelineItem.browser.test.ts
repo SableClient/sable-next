@@ -25,6 +25,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
 });
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { expectNoA11yViolations, ICONS_HIDDEN_BY_LAYOUT } from '#lib/test-support/a11y.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
@@ -266,6 +267,8 @@ test('right-clicking the same message again reopens the menu at the pointer', as
   if (!row) throw new Error('the message row is not rendered');
   const box = row.getBoundingClientRect();
   const menu = () => document.querySelectorAll('.message-menu');
+  row.focus();
+  await expectNoA11yViolations(document.body, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
   const menuLeft = () => document.querySelector('.message-menu')?.getBoundingClientRect().x ?? 0;
 
   await userEvent.click(screen.getByRole('article').first(), {
@@ -273,6 +276,7 @@ test('right-clicking the same message again reopens the menu at the pointer', as
     position: { x: 20, y: box.height / 2 },
   });
   await expect.poll(() => menu().length).toBe(1);
+  await expectNoA11yViolations(document.body, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
   const first = menuLeft();
 
   await userEvent.click(screen.getByRole('article').first(), {

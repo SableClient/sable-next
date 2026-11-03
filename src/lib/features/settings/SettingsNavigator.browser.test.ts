@@ -10,6 +10,7 @@ vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { expectNoA11yViolations, ICONS_HIDDEN_BY_LAYOUT } from '#lib/test-support/a11y.js';
 
 import SettingsNavigator from './SettingsNavigator.svelte';
 import SettingsNavigatorHarness from './SettingsNavigatorHarness.test.svelte';
@@ -49,6 +50,7 @@ test('mobile settings clear asymmetric safe areas', async () => {
       expect(rect.top).toBeGreaterThanOrEqual(32);
     }
   }
+  await expectNoA11yViolations(screen.container, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
 });
 
 async function mount() {
@@ -89,6 +91,7 @@ test('the summary reports how many results there are', async () => {
 
   await userEvent.fill(field.element(), 'autoplay gifs');
   await expect.element(screen.getByText('1 result', { exact: true })).toBeVisible();
+  await expectNoA11yViolations(screen.container);
 });
 
 test('a query matching nothing says so', async () => {
@@ -133,4 +136,5 @@ test('mobile: log out is the last row of the section list', async () => {
   const row = logout.element().getBoundingClientRect();
 
   expect(row.y).toBeGreaterThan(about.y);
+  await expectNoA11yViolations(screen.container, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
 });

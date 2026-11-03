@@ -5,6 +5,7 @@ import { render } from 'vitest-browser-svelte';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 import { roomUnread } from '#lib/rooms/unread.js';
 import { goto } from '#lib/test-support/app-navigation.js';
+import { expectNoA11yViolations } from '#lib/test-support/a11y.js';
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
@@ -85,6 +86,7 @@ test.each(['light', 'dark'] as const)(
     expectHighlight(alpha.element(), beta.element());
     await userEvent.keyboard('{ArrowDown}');
     expectHighlight(beta.element(), alpha.element());
+    await expectNoA11yViolations(document.body);
     await userEvent.keyboard('{ArrowUp}');
     expectHighlight(alpha.element(), beta.element());
     await userEvent.keyboard('{ArrowUp}');

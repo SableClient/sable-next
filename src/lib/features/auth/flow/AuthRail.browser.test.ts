@@ -72,6 +72,7 @@ test('Next and Back focus the active heading', async () => {
   const screen = await render(AuthRailHarness);
   await userEvent.click(screen.getByRole('button', { name: 'Next', exact: true }));
   await expect.element(screen.getByRole('heading', { name: 'Create account' })).toHaveFocus();
+  await expectNoA11yViolations(screen.container);
   await userEvent.tab();
   await expect.element(screen.getByRole('textbox', { name: 'New username' })).toHaveFocus();
   await userEvent.click(screen.getByRole('button', { name: 'Back', exact: true }));

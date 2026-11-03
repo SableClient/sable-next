@@ -18,6 +18,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async (importOriginal) => ({
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { core } from '#lib/core/__mocks__/context.js';
+import { expectNoA11yViolations, ICONS_HIDDEN_BY_LAYOUT } from '#lib/test-support/a11y.js';
 import { visit } from '#lib/test-support/app-state.js';
 import { matchesAppLayout } from '#lib/ui/app-layout.svelte.js';
 import Harness from './AppShellHarness.test.svelte';
@@ -69,6 +70,7 @@ test('phone landscape keeps compact navigation and clears the safe areas', async
   ).getBoundingClientRect();
   expect(inboxBox.height).toBeGreaterThanOrEqual(44);
   expect(inboxBox.bottom).toBeLessThanOrEqual(369);
+  await expectNoA11yViolations(screen.container, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
 });
 
 test('tablet shows fixed desktop navigation with room for the drawer', async () => {
@@ -84,4 +86,11 @@ test('tablet shows fixed desktop navigation with room for the drawer', async () 
   expect(getComputedStyle(sidebar).position).toBe('fixed');
   const drawer = document.querySelector('.drawer-viewport') as HTMLElement;
   expect(Number.parseFloat(getComputedStyle(drawer).marginLeft)).toBeGreaterThan(0);
+  await expectNoA11yViolations(screen.container, {
+    disableRules: {
+      ...ICONS_HIDDEN_BY_LAYOUT,
+      'target-size':
+        'the sidebar resize handle is a thin drag edge that the arrow, Home and End keys also operate',
+    },
+  });
 });

@@ -10,6 +10,7 @@ vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 import { clearThemePreview, replaceCustomThemes } from '#lib/settings/custom-themes.svelte.js';
+import { expectNoA11yViolations } from '#lib/test-support/a11y.js';
 
 import CustomThemes from './CustomThemes.svelte';
 import { CATALOG_URL, resetCatalog } from '#lib/settings/theme-catalog.js';
@@ -239,6 +240,7 @@ test('filters and keyboard tab navigation work after scrolling', async () => {
   await userEvent.keyboard('{ArrowRight}');
   await expect.element(tweaks).toHaveFocus();
   await expect.poll(() => installs().length).toBe(30);
+  await expectNoA11yViolations(document.body);
   panel().scrollTop = 500;
   await stableScroll(panel(), panel().scrollTop);
   const row = () =>
@@ -253,6 +255,7 @@ test('filters and keyboard tab navigation work after scrolling', async () => {
   await userEvent.keyboard('{Home}');
   await expect.element(themes).toHaveFocus();
   await expect.poll(() => installs().length).toBe(60);
+  await expectNoA11yViolations(document.body);
 });
 
 test('preview can be reverted, kept, and cleared when the catalogue reopens', async () => {
