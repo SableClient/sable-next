@@ -45,7 +45,7 @@ export function providePanelStage(): void {
     };
   });
   beforeNavigate(({ from, to, complete }) => {
-    if (from?.route.id === to?.route.id) return;
+    if (from?.url.pathname === to?.url.pathname) return;
     stage.live = false;
     const settle = () => {
       stage.live = true;
