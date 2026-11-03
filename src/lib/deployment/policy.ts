@@ -1,5 +1,8 @@
 import type { RuntimeConfig } from '#lib/config/runtime-config.js';
 
+import { devicePlatformLabel } from '#lib/platform/diagnostics.js';
+import { isNightlyBuild } from '#lib/platform/build-channel.js';
+
 import { appName } from './brand.js';
 import { deployment } from './deployment.js';
 
@@ -18,5 +21,6 @@ export function logoutRedirectUrl(config: RuntimeConfig = deployment()): string 
 }
 
 export function deviceDisplayName(config: RuntimeConfig = deployment()): string {
-  return config.auth.deviceDisplayName ?? appName(config);
+  const name = config.auth.deviceDisplayName ?? appName(config);
+  return `${name}${isNightlyBuild() ? ' (Nightly)' : ''} on ${devicePlatformLabel()}`;
 }

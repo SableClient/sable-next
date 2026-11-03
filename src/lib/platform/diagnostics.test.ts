@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { issuePlatformOption, webPlatformLabel } from './diagnostics.js';
+import { issuePlatformOption, webDeviceLabel, webPlatformLabel } from './diagnostics.js';
 
 const MAC_FIREFOX =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:142.0) Gecko/20100101 Firefox/142.0';
@@ -38,5 +38,16 @@ describe('issuePlatformOption', () => {
 
   it('leaves an unknown native platform unset', () => {
     expect(issuePlatformOption('freebsd')).toBe('');
+  });
+});
+
+describe('webDeviceLabel', () => {
+  it('names the browser and its system', () => {
+    expect(webDeviceLabel(MAC_FIREFOX)).toBe('Firefox for macOS');
+    expect(webDeviceLabel(ANDROID_CHROME)).toBe('Chrome for Android');
+  });
+
+  it('falls back to Web for an unknown agent', () => {
+    expect(webDeviceLabel('Mozilla/5.0 (Unknown)')).toBe('Web');
   });
 });

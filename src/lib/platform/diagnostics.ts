@@ -1,4 +1,7 @@
 import { isTauri } from '@tauri-apps/api/core';
+import { platform } from '@tauri-apps/plugin-os';
+
+import { isElectron } from './electron.js';
 
 export interface DiagnosticsSystemInfo {
   appVersion: string;
@@ -34,6 +37,25 @@ const WEB_OS_NAMES: readonly (readonly [RegExp, string])[] = [
   [/Linux|X11/, 'Linux'],
 ];
 
+const WEB_BROWSER_NAMES: readonly (readonly [RegExp, string])[] = [
+  [/Edg\//, 'Edge'],
+  [/OPR\//, 'Opera'],
+  [/Firefox\/|FxiOS\//, 'Firefox'],
+  [/Chrome\/|CriOS\//, 'Chrome'],
+  [/Safari\//, 'Safari'],
+];
+
+function webOsName(userAgent: string): string | undefined {
+  return WEB_OS_NAMES.find(([pattern]) => pattern.test(userAgent))?.[1];
+}
+
+export function webDeviceLabel(userAgent: string): string {
+  const os = webOsName(userAgent);
+  const browser = WEB_BROWSER_NAMES.find(([pattern]) => pattern.test(userAgent))?.[1];
+  if (browser && os) return `${browser} for ${os}`;
+  return browser ?? os ?? 'Web';
+}
+
 interface HighEntropyValues {
   architecture?: string;
   bitness?: string;
@@ -58,7 +80,7 @@ async function webArchitecture(): Promise<string | undefined> {
 }
 
 export function webPlatformLabel(userAgent: string, architecture: string | undefined): string {
-  const name = WEB_OS_NAMES.find(([pattern]) => pattern.test(userAgent))?.[1] ?? 'unknown';
+  const name = webOsName(userAgent) ?? 'unknown';
   return architecture === undefined ? name : `${name} (${architecture})`;
 }
 
@@ -80,6 +102,15 @@ const ISSUE_PLATFORMS: Record<string, string> = {
 
 export function issuePlatformOption(nativePlatform: string | undefined): string {
   return nativePlatform === undefined ? 'Web' : (ISSUE_PLATFORMS[nativePlatform] ?? '');
+}
+
+export function devicePlatformLabel(): string {
+  if (isTauri()) {
+    const native = platform();
+    return ISSUE_PLATFORMS[native] ?? native;
+  }
+  if (isElectron()) return webOsName(navigator.userAgent) ?? 'Desktop';
+  return webDeviceLabel(navigator.userAgent);
 }
 
 export async function issuePlatform(): Promise<string> {

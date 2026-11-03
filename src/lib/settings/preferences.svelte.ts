@@ -11,6 +11,7 @@ import type { RoomSort } from '#lib/rooms/room-sort.js';
 import { SYSTEM_TIME_ZONE, timeZoneValues } from '#lib/ui/time-zones.js';
 import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
+import { isNightlyBuild } from '#lib/platform/build-channel.js';
 import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
 import type { BadgeNotificationMode } from '#lib/rooms/unread.js';
 import { migrateSettings, SETTINGS_SCHEMA } from './migrations.js';
@@ -768,7 +769,7 @@ const DEFAULTS: Preferences = {
   telemetryAsked: false,
 
   autoUpdateCheck: true,
-  updateChannel: import.meta.env.VITE_APP_VERSION?.includes('-nightly.') ? 'nightly' : 'stable',
+  updateChannel: isNightlyBuild() ? 'nightly' : 'stable',
   closeToTray: false,
   askDownloadLocation: true,
   minimizeToTray: false,
