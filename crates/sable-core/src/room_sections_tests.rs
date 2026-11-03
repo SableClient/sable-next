@@ -667,3 +667,58 @@ fn spaces_that_are_invited_or_whose_edges_lack_servers_do_not_claim_their_childr
         ids(&["from_invite", "removed_child"])
     );
 }
+
+#[test]
+fn a_nickname_renames_and_re_sorts_a_direct_message() {
+    use matrix_sdk::ruma::OwnedUserId;
+
+    use crate::nicknames::Nicknames;
+    use crate::protocol::{OverrideColorView, OverrideTextView, ProfileOverrideView, VectorDiff};
+    use crate::room_list_rows::RoomListRows;
+
+    let peer = |room_id: &str, name: &str, user: &str| {
+        let mut row = Row {
+            name: Some(name.to_owned()),
+            direct_targets: vec![OwnedUserId::try_from(user).expect("a user id")],
+            ..direct(room_id)
+        };
+        Nicknames::default().apply_room(&mut row);
+        row
+    };
+    let mut rows = RoomListRows::default();
+    rows.apply(&VectorDiff::Reset {
+        values: vec![
+            peer("bob", "Bob", "@bob:example.org"),
+            peer("carol", "Carol", "@carol:example.org"),
+        ],
+    });
+    let options = RoomListOptionsView {
+        direct_sort: RoomSortView::NameAsc,
+        ..RoomListOptionsView::default()
+    };
+    let mut sections = RoomSections::default();
+    sections.update(RoomSections::build(rows.rows(), &options));
+
+    let nicknames = Nicknames::from_overrides(
+        vec![ProfileOverrideView {
+            user_id: OwnedUserId::try_from("@bob:example.org").expect("a user id"),
+            display_name: OverrideTextView::Set {
+                value: "Zed".to_owned(),
+            },
+            avatar: OverrideTextView::Unset,
+            color: OverrideColorView::Unset,
+        }],
+        None,
+    );
+    assert_eq!(rows.rename(&nicknames).len(), 1);
+    let update = sections
+        .update(RoomSections::build(rows.rows(), &options))
+        .expect("the direct section changed");
+
+    let direct = update
+        .sections
+        .iter()
+        .find(|section| section.key == DIRECT)
+        .expect("the direct section is resent");
+    assert_eq!(direct.rooms, ids(&["carol", "bob"]));
+}

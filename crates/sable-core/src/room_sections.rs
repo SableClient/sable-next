@@ -38,12 +38,12 @@ impl RoomSections {
             sections.insert(section.key.clone(), section);
         }
 
-        let mut quiet_rooms: Vec<_> = lists.quiet.iter().map(|id| (*id).to_owned()).collect();
-        quiet_rooms.sort_unstable();
-        let quiet_rooms = quiet_rooms
-            .into_iter()
-            .filter_map(|id| OwnedRoomId::try_from(id).ok())
+        let mut quiet_rooms: Vec<_> = lists
+            .quiet
+            .iter()
+            .filter_map(|id| OwnedRoomId::try_from(*id).ok())
             .collect();
+        quiet_rooms.sort_unstable();
         let badges = rows
             .iter()
             .filter_map(|row| {
@@ -283,11 +283,10 @@ impl<'a> Lists<'a> {
         invites: Vec<OwnedRoomId>,
     ) -> RoomSectionView {
         self.sort(&mut listed, sort);
-        let (favourites, rooms): (Vec<_>, Vec<_>) = if self.grouped(key) {
-            listed.iter().partition(|row| favourite(row))
-        } else {
-            (Vec::new(), listed.clone())
-        };
+        let grouped = self.grouped(key);
+        let (favourites, rooms): (Vec<_>, Vec<_>) = listed
+            .into_iter()
+            .partition(|row| grouped && favourite(row));
 
         let mut unread = RoomUnreadView::default();
         let mut unread_rooms = Vec::new();
