@@ -64,6 +64,7 @@ export type ConversationDeps = {
   spaceIds?: (roomId: string) => readonly string[];
   encrypted?: () => boolean | null;
   beforeSend?: () => Promise<void>;
+  afterSend?: (roomId: string) => void;
   threadRoot?: string | null;
 };
 
@@ -88,6 +89,7 @@ export class Conversation {
   readonly #encrypted: () => boolean | null;
   readonly #threadRoot: string | null;
   readonly #beforeSend: () => Promise<void>;
+  readonly #afterSend: (roomId: string) => void;
   /* eslint-disable-next-line svelte/prefer-svelte-reactivity */
   readonly #requestedDetails = new Set<string>();
 
@@ -99,6 +101,7 @@ export class Conversation {
     spaceIds = () => [],
     encrypted,
     beforeSend = () => Promise.resolve(),
+    afterSend = () => {},
     threadRoot = null,
   }: ConversationDeps) {
     this.#core = core;
@@ -109,6 +112,7 @@ export class Conversation {
     this.#encrypted = encrypted ?? (() => null);
     this.#threadRoot = threadRoot;
     this.#beforeSend = beforeSend;
+    this.#afterSend = afterSend;
     this.restored = readReply(this.#replyKey(), this.#accountId()) ?? null;
     this.#context = this.restored;
   }
@@ -281,6 +285,7 @@ export class Conversation {
       image_source_packs: imageSourcePacks,
       forum_title: this.#threadRoot === null && !pending?.eventId ? this.forumTitle : null,
     });
+    this.#afterSend(targetRoomId);
     this.forumTitle = '';
     this.context = null;
   };
@@ -327,6 +332,7 @@ export class Conversation {
       threadRoot: this.#threadRoot,
       persona: outgoing.persona,
     });
+    this.#afterSend(targetRoomId);
   };
 
   readonly sendGallery = async (
@@ -350,6 +356,7 @@ export class Conversation {
       silentReply: reply?.silentReply ?? options.silentReply ?? false,
       threadRoot: this.#threadRoot,
     });
+    this.#afterSend(targetRoomId);
   };
 
   readonly sendSticker = async (

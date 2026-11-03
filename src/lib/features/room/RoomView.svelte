@@ -26,6 +26,7 @@
   import ConversationComposer from './conversation/ConversationComposer.svelte';
   import InlineEdit from './conversation/InlineEdit.svelte';
   import { Conversation } from './conversation/conversation.svelte.js';
+  import { donateSentMessage } from '#lib/features/share/donate-sent-message.js';
   import { personaSpaces } from '#lib/features/composer/persona-spaces.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { i18n } from '#lib/i18n.js';
@@ -119,6 +120,7 @@
     spaceIds: (id) => personaSpaces(roomList.rooms, id, page.params.spaceId).order,
     encrypted: () => resolvedRoom?.encrypted ?? null,
     beforeSend: () => timelineList?.resumeLive() ?? resumeLive(),
+    afterSend: (id) => donateSentMessage(core, roomList.byId(id)),
   });
   let settingsOpen = $state(false);
   let topicOpen = $state(false);

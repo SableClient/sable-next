@@ -24,6 +24,7 @@
   import ConversationComposer from './ConversationComposer.svelte';
   import InlineEdit from './InlineEdit.svelte';
   import { Conversation } from './conversation.svelte.js';
+  import { donateSentMessage } from '#lib/features/share/donate-sent-message.js';
   import { timelineMediaItems } from '#lib/ui/media/media-items.js';
   import { mediaViewerState } from '#lib/ui/media/media-viewer-state.svelte.js';
   import { replyPreviewBody } from '../messages/reply-preview.js';
@@ -103,6 +104,7 @@
     encrypted: () => encrypted,
     threadRoot: untrack(() => rootEventId),
     beforeSend: () => returnToThread(),
+    afterSend: (id) => donateSentMessage(core, roomList.byId(id)),
   });
 
   function returnToThread(): Promise<void> {

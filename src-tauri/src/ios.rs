@@ -295,6 +295,41 @@ pub(crate) async fn save_media_to_photos(request: tauri::ipc::Request<'_>) -> Re
         .map_err(|error| error.to_string())?
 }
 
+#[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "tauri extracts command arguments by value"
+)]
+pub(crate) fn donate_sent_message(
+    app: tauri::AppHandle,
+    request: tauri::ipc::Request<'_>,
+) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(avatar) = request.body() else {
+        return Err("the avatar bytes must ride the request body".into());
+    };
+    let user = crate::decode_header(&request, "user-id").ok_or("missing user-id")?;
+    let room = crate::decode_header(&request, "room-id").ok_or("missing room-id")?;
+    let name = crate::decode_header(&request, "name").ok_or("missing name")?;
+    let avatar = avatar.clone();
+    app.run_on_main_thread(move || {
+        let Some(class) = AnyClass::get(c"SableConversations") else {
+            log::warn!("conversation donation bridge is unavailable");
+            return;
+        };
+        let avatar = (!avatar.is_empty()).then(|| objc2_foundation::NSData::with_bytes(&avatar));
+        let (user, room, name) = (
+            NSString::from_str(&user),
+            NSString::from_str(&room),
+            NSString::from_str(&name),
+        );
+        // SAFETY: SableConversations declares donateSentByUser:room:name:avatar: taking three NSStrings and a nullable NSData and returning void
+        unsafe {
+            let _: () = msg_send![class, donateSentByUser: &*user, room: &*room, name: &*name, avatar: avatar.as_deref()];
+        }
+    })
+    .map_err(|error| error.to_string())
+}
+
 // WKWebView cannot hide the form accessory bar, so swap WKContentView's class for a subclass whose inputAccessoryView is nil.
 const extern "C-unwind" fn input_accessory_view_nil(
     _this: &AnyObject,

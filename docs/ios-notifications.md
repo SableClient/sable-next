@@ -82,4 +82,5 @@ Swift compilation, signing, memory use and APNs delivery remain unverified on Li
 `SableShareExtension` copies what another app shares into
 `group.<bundle identifier>/Sable/share_inbox`, in the manifest format
 `MainActivity.kt` writes on Android, then opens Sable with `<scheme>://share`.
-Its share sheet suggestions are the conversations `SableNotificationService` donates.
+The share sheet suggests the conversations the app donates after each send and
+`SableNotificationService` donates for each message received.

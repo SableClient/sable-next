@@ -12,6 +12,7 @@
   import ConversationComposer from '#lib/features/room/conversation/ConversationComposer.svelte';
   import ThreadView from '#lib/features/room/conversation/ThreadView.svelte';
   import { Conversation } from '#lib/features/room/conversation/conversation.svelte.js';
+  import { donateSentMessage } from '#lib/features/share/donate-sent-message.js';
   import {
     PinnedEvents,
     pinErrorMessage,
@@ -91,6 +92,7 @@
     roomId: () => resolvedRoomId,
     spaceIds: (id) => personaSpaces(roomList.rooms, id, page.params.spaceId).order,
     encrypted: () => resolvedRoom?.encrypted ?? null,
+    afterSend: (id) => donateSentMessage(core, roomList.byId(id)),
   });
 
   $effect(() => {

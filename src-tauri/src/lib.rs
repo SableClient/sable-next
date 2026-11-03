@@ -815,6 +815,8 @@ pub fn run() {
             #[cfg(target_os = "android")]
             mobile::close_in_app_auth_window,
             #[cfg(target_os = "ios")]
+            ios::donate_sent_message,
+            #[cfg(target_os = "ios")]
             ios::haptic_feedback,
             #[cfg(target_os = "ios")]
             ios::set_system_bars_hidden,

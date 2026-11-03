@@ -130,6 +130,7 @@ targets:
       - path: Sources
       - path: ../../ios/Network
       - path: ../../ios/Auth
+      - path: ../../ios/Conversations
       - path: ../../ios/Localization
       - path: Assets.xcassets
       - path: ../../icons/ios/AppIcons.xcassets
@@ -263,6 +264,7 @@ targets:
       - sdk: UIKit.framework
       - sdk: SafariServices.framework
       - sdk: CallKit.framework
+      - sdk: Intents.framework
       - sdk: AVFoundation.framework{{#if this.ios-frameworks}}{{~#each ios-frameworks}}
       - sdk: {{this}}.framework{{/each}}{{/if}}
       - sdk: WebKit.framework
