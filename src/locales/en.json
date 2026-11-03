@@ -1738,6 +1738,7 @@
     "aboutUpToDate": "{{appName}} is up to date.",
     "aboutUpdateAvailable": "A new update is available.",
     "aboutMobileUpdateAvailable": "A newer version is available. Update {{appName}} through your app store.",
+    "aboutPackageUpdateAvailable": "A newer version is available. Update {{appName}} through your package manager.",
     "aboutUpdateCheckFailed": "Could not check for updates. Try again.",
     "aboutHomeserver": "Homeserver",
     "aboutHomeserverUrl": "Address",

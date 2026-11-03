@@ -15,6 +15,7 @@ const FEEDS = {
   nightly: 'https://git.sable.moe/SableClient/sable-next/releases/download/nightly/',
 };
 const builtChannel = app.getVersion().includes('-nightly.') ? 'nightly' : 'stable';
+const feedChannel = (channel: keyof typeof FEEDS) => (channel === 'stable' ? 'latest' : 'nightly');
 
 export function supportsAutoUpdate(): boolean {
   return (
@@ -32,7 +33,7 @@ export function setUpdateChannel(channel: keyof typeof FEEDS): void {
   autoUpdater.setFeedURL({
     provider: 'generic',
     url: FEEDS[channel],
-    channel: channel === 'stable' ? 'latest' : 'nightly',
+    channel: feedChannel(channel),
   });
   // Moving from nightly to an older stable is a downgrade to the updater.
   autoUpdater.allowDowngrade = channel !== builtChannel;
@@ -48,6 +49,14 @@ export function registerUpdater(isAppFrame: IsAppFrame): void {
     const result = await autoUpdater.checkForUpdates();
     if (!result?.isUpdateAvailable) return null;
     return { version: result.updateInfo.version, notes: notesOf(result.updateInfo) };
+  });
+
+  ipcMain.handle('sable-update-latest-version', async (event) => {
+    if (enabled || !app.isPackaged || !isAppFrame(event.senderFrame)) return null;
+    const feed = `${FEEDS[builtChannel]}${feedChannel(builtChannel)}-linux.yml`;
+    const response = await fetch(feed, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Update feed request failed: ${String(response.status)}`);
+    return /^version:\s*(\S+)$/m.exec(await response.text())?.[1] ?? null;
   });
 
   ipcMain.handle('sable-update-download', async (event) => {

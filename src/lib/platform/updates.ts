@@ -50,6 +50,13 @@ export async function checkForMobileUpdate(): Promise<boolean> {
       : undefined;
   return typeof latest === 'string' && isNewerVersion(latest, current);
 }
+
+export async function checkForPackagedUpdate(): Promise<boolean> {
+  const current = import.meta.env.VITE_APP_VERSION;
+  const latest = await electronBridge()?.latestVersion();
+  return Boolean(current && latest && isNewerVersion(latest, current));
+}
+
 export async function checkForUpdate(): Promise<AvailableUpdate | null> {
   if (!supportsAutoUpdate()) return null;
 

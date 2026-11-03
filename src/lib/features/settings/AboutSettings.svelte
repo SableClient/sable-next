@@ -13,13 +13,14 @@
   import { desktopUpdate, installPendingUpdate } from '#lib/platform/desktop-update.svelte.js';
   import {
     checkForMobileUpdate,
+    checkForPackagedUpdate,
     checkForUpdate,
     relaunchApp,
     supportsAutoUpdate,
     updatePlatform,
   } from '#lib/platform/updates.js';
   import { desktopDataDir } from '#lib/platform/data-dir.js';
-  import { electronBridge, isElectron } from '#lib/platform/electron.js';
+  import { electronBridge } from '#lib/platform/electron.js';
   import { hostsServiceWorker } from '#lib/platform/service-worker.js';
   import { checkForWebUpdate } from '#lib/platform/web-updates.svelte.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
@@ -53,9 +54,9 @@
   let restarting = $state(false);
   let restartFailed = $state(false);
   let checkingForUpdate = $state(false);
-  let updateCheckResult = $state<'available' | 'current' | 'mobile-available' | 'failed' | null>(
-    null
-  );
+  let updateCheckResult = $state<
+    'available' | 'current' | 'mobile-available' | 'package-available' | 'failed' | null
+  >(null);
 
   const pendingUpdate = $derived(supportsAutoUpdate() ? desktopUpdate.update : null);
   const pendingStage = $derived(desktopUpdate.stage);
@@ -104,6 +105,10 @@
     updateCheckResult = null;
     try {
       const platform = updatePlatform();
+      if (platform === 'desktop' && !supportsAutoUpdate()) {
+        updateCheckResult = (await checkForPackagedUpdate()) ? 'package-available' : 'current';
+        return;
+      }
       const available =
         platform === 'desktop'
           ? Boolean(await checkForUpdate())
@@ -219,7 +224,7 @@
           />
         </SettingsRow>
       {/if}
-      {#if isElectron()}
+      {#if supportsAutoUpdate()}
         <SettingsRow
           id="update-channel"
           key="updateChannel"
@@ -287,6 +292,10 @@
       {:else if updateCheckResult === 'mobile-available'}
         <li class="settings-form status" aria-live="polite">
           {i18n.t('settings.aboutMobileUpdateAvailable')}
+        </li>
+      {:else if updateCheckResult === 'package-available'}
+        <li class="settings-form status" aria-live="polite">
+          {i18n.t('settings.aboutPackageUpdateAvailable')}
         </li>
       {:else if updateCheckResult === 'failed'}
         <li class="settings-form error" role="alert">

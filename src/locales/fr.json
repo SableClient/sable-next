@@ -1074,6 +1074,7 @@
     "aboutUpToDate": "{{appName}} est à jour.",
     "aboutUpdateAvailable": "Une mise à jour est disponible.",
     "aboutMobileUpdateAvailable": "Une version plus récente est disponible. Mettez à jour {{appName}} depuis votre boutique d’applications.",
+    "aboutPackageUpdateAvailable": "Une version plus récente est disponible. Mettez à jour {{appName}} avec votre gestionnaire de paquets.",
     "aboutUpdateCheckFailed": "Impossible de rechercher les mises à jour. Réessayez.",
     "aboutHomeserver": "Serveur d’accueil",
     "aboutHomeserverUrl": "Adresse",

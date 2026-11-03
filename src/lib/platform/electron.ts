@@ -62,6 +62,7 @@ export interface ElectronBridge {
   saveFile(request: SaveFileRequest): Promise<{ path: string } | null>;
   shareFile(request: PickedFile): Promise<void>;
   checkForUpdate(): Promise<{ version: string; notes: string | undefined } | null>;
+  latestVersion(): Promise<string | null>;
   downloadUpdate(onProgress: (percent: number) => void): Promise<void>;
   installUpdate(): Promise<void>;
   onScreenSharePick(pick: (sources: ScreenShareCandidate[]) => Promise<string | null>): () => void;

@@ -76,3 +76,17 @@ test.each([
   const { checkForMobileUpdate } = await load();
   await expect(checkForMobileUpdate()).resolves.toBe(newer);
 });
+
+test.each([
+  ['1.2.3', '1.2.4', true],
+  ['1.2.3', '1.2.3', false],
+  ['1.2.3-nightly.261102101830.g1f8e484fbccb', '1.2.3-nightly.261102225045.g31a82d40d5f4', true],
+  ['1.2.3', null, false],
+])('a packaged desktop build on %s compares against %s', async (current, latest, newer) => {
+  vi.stubEnv('VITE_APP_VERSION', current);
+  vi.stubGlobal('sableElectron', { latestVersion: () => Promise.resolve(latest) });
+
+  const { checkForPackagedUpdate } = await load();
+
+  await expect(checkForPackagedUpdate()).resolves.toBe(newer);
+});

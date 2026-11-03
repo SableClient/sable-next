@@ -133,6 +133,7 @@ contextBridge.exposeInMainWorld('sableElectron', {
       version: string;
       notes: string | undefined;
     } | null>,
+  latestVersion: () => ipcRenderer.invoke('sable-update-latest-version') as Promise<string | null>,
   downloadUpdate: async (onProgress: (percent: number) => void) => {
     const listener = (_event: IpcRendererEvent, percent: number) => {
       onProgress(percent);
