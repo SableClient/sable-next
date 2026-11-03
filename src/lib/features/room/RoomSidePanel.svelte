@@ -8,7 +8,7 @@
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import { PanelWidth, remFromPixels } from '#lib/ui/panel-width.svelte.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
-  import { panelIn, panelOut } from '#lib/ui/motion.js';
+  import { panelIn, panelOut, usePanelStage } from '#lib/ui/motion.js';
 
   interface Props {
     title: string;
@@ -36,6 +36,7 @@
     children,
     onClose,
   }: Props = $props();
+  const stage = usePanelStage();
 
   const panelWidth = untrack(() => new PanelWidth(widthKey, width, 16, 40));
   onMount(() => panelWidth.restore());
@@ -47,8 +48,8 @@
     aria-label={title}
     data-focus-region="panel"
     style:width={modal ? null : `${panelWidth.width}rem`}
-    in:panelIn|global={{ modal }}
-    out:panelOut|global={{ modal }}
+    in:panelIn|global={{ modal, stage }}
+    out:panelOut|global={{ modal, stage }}
   >
     {#if !modal}
       <ResizeHandle

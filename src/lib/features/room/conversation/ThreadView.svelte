@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { panelIn, panelOut } from '#lib/ui/motion.js';
+  import { panelIn, panelOut, usePanelStage } from '#lib/ui/motion.js';
   import type { MemberView, TimelineItemView } from '#src/generated/protocol';
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -77,6 +77,7 @@
     onMatrixLink,
     onCopyLink,
   }: Props = $props();
+  const stage = usePanelStage();
 
   let composer = $state<ConversationComposer>();
   let timelineList = $state<TimelineList>();
@@ -196,8 +197,8 @@
 
 <section
   bind:this={panel}
-  in:panelIn|global={{ cover: !sidePanel }}
-  out:panelOut|global={{ cover: !sidePanel }}
+  in:panelIn|global={{ cover: !sidePanel, stage }}
+  out:panelOut|global={{ cover: !sidePanel, stage }}
   class={['thread-view', { 'side-panel': sidePanel, swiping: swipe.swiping }]}
   style:width={sidePanel ? `${width}rem` : undefined}
   style:transform={swipe.transform}

@@ -41,6 +41,7 @@
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { composerClearance } from '#lib/ui/composer-clearance.svelte.js';
   import { PanelWidth } from '#lib/ui/panel-width.svelte.js';
+  import { providePanelStage } from '#lib/ui/motion.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
@@ -146,6 +147,7 @@
   const pinnedEvents = new PinnedEvents(core.rpc.timeline);
   const roomSession = new RoomSession(core.rpc, pinnedEvents);
   providePinnedEvents(pinnedEvents);
+  providePanelStage();
   onDestroy(() => roomSession.dispose());
   const tombstoneJoin = new TombstoneJoin(
     core.rpc,

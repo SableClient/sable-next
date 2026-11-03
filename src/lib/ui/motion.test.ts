@@ -1,8 +1,9 @@
+// @vitest-environment happy-dom
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
-import { motionMs, scrollBehavior, shouldReduceMotion } from './motion.js';
+import { motionMs, panelIn, panelOut, scrollBehavior, shouldReduceMotion } from './motion.js';
 
 const systemMotionPreference = vi.hoisted(() => ({ current: false }));
 
@@ -36,4 +37,13 @@ test('motion is preserved when neither setting requests a reduction', () => {
   expect(shouldReduceMotion()).toBe(false);
   expect(motionMs(250)).toBe(250);
   expect(scrollBehavior()).toBe('smooth');
+});
+
+test('a panel holds still while its stage is not live', () => {
+  preferences.reducedMotion = false;
+  const node = document.createElement('aside');
+  expect(panelIn(node, { stage: { live: false } }).duration).toBe(0);
+  expect(panelOut(node, { stage: { live: false } }).duration).toBe(0);
+  expect(panelIn(node, { stage: { live: true } }).duration).toBe(250);
+  expect(panelIn(node).duration).toBe(250);
 });

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { panelIn, panelOut } from '#lib/ui/motion.js';
+  import { panelIn, panelOut, usePanelStage } from '#lib/ui/motion.js';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
@@ -53,6 +53,7 @@
     onAdd,
     onRemove,
   }: Props = $props();
+  const stage = usePanelStage();
 
   const WIDTH_STORAGE_KEY = 'sable-widgets-panel-width';
   const MIN_WIDTH = 18;
@@ -153,8 +154,8 @@
 </script>
 
 <aside
-  in:panelIn|global={{ modal }}
-  out:panelOut|global={{ modal }}
+  in:panelIn|global={{ modal, stage }}
+  out:panelOut|global={{ modal, stage }}
   class={['widgets-panel', { modal }]}
   aria-label={i18n.t('widgets.label')}
   data-focus-region="panel"
