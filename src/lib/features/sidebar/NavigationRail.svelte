@@ -80,6 +80,8 @@
     space?: boolean;
   };
 
+  type SpaceRailItem = RailItem & { roomId: string };
+
   interface Props {
     pathname?: string;
     spaces: readonly RoomListItemView[];
@@ -401,7 +403,7 @@
     contextOpen = true;
   }
 
-  function spaceItem(roomId: string): RailItem | null {
+  function spaceItem(roomId: string): SpaceRailItem | null {
     const space = spacesById.get(roomId);
     if (space === undefined) return null;
 
@@ -423,6 +425,10 @@
       label: name,
       space: true,
     };
+  }
+
+  function spaceItems(roomIds: readonly string[]): SpaceRailItem[] {
+    return roomIds.flatMap((roomId) => spaceItem(roomId) ?? []);
   }
 
   function folderLabel(folder: SidebarFolder): string {
@@ -684,45 +690,42 @@
   </div>
 {/snippet}
 
-{#snippet spaceSlot(roomId: string, folderId?: string)}
-  {@const item = spaceItem(roomId)}
-  {#if item !== null}
-    {@const ref = stableRef({
-      kind: 'space',
-      room_id: roomId,
-      folder_id: folderId ?? null,
-    })}
-    {#if folderId === undefined}
-      <div
-        class="rail-menu-anchor"
-        oncontextmenu={mouseContextMenu((event) => {
-          openSpaceContextMenu(event, roomId);
-        })}
-        role="presentation"
-        {@attach longPress({
-          onPress: (event) => {
-            openSpaceContextMenu(event, roomId);
-          },
-        })}
-      >
-        {@render spaceSlotBody(item, ref)}
-      </div>
-    {:else}
-      <div
-        class="rail-menu-anchor"
-        role="presentation"
-        oncontextmenu={mouseContextMenu((event) => {
-          openRemoveMenu(event, roomId, folderId);
-        })}
-        {@attach longPress({
-          onPress: (event) => {
-            openRemoveMenu(event, roomId, folderId);
-          },
-        })}
-      >
-        {@render spaceSlotBody(item, ref, folderId)}
-      </div>
-    {/if}
+{#snippet spaceSlot(item: SpaceRailItem, folderId?: string)}
+  {@const ref = stableRef({
+    kind: 'space',
+    room_id: item.roomId,
+    folder_id: folderId ?? null,
+  })}
+  {#if folderId === undefined}
+    <div
+      class="rail-menu-anchor"
+      oncontextmenu={mouseContextMenu((event) => {
+        openSpaceContextMenu(event, item.roomId);
+      })}
+      role="presentation"
+      {@attach longPress({
+        onPress: (event) => {
+          openSpaceContextMenu(event, item.roomId);
+        },
+      })}
+    >
+      {@render spaceSlotBody(item, ref)}
+    </div>
+  {:else}
+    <div
+      class="rail-menu-anchor"
+      role="presentation"
+      oncontextmenu={mouseContextMenu((event) => {
+        openRemoveMenu(event, item.roomId, folderId);
+      })}
+      {@attach longPress({
+        onPress: (event) => {
+          openRemoveMenu(event, item.roomId, folderId);
+        },
+      })}
+    >
+      {@render spaceSlotBody(item, ref, folderId)}
+    </div>
   {/if}
 {/snippet}
 
@@ -833,8 +836,8 @@
         <CaretUpIcon weight="fill" />
       </button>
       <div class="folder-children" id={`folder-children-${folder.id}`} role="group">
-        {#each folder.content as roomId (roomId)}
-          {@render spaceSlot(roomId, folder.id)}
+        {#each spaceItems(folder.content) as item (item.roomId)}
+          {@render spaceSlot(item, folder.id)}
         {/each}
       </div>
     </div>
@@ -872,7 +875,9 @@
         {#each entries as entry (entry.kind === 'space' ? entry.room_id : entry.id)}
           <li role="presentation">
             {#if entry.kind === 'space'}
-              {@render spaceSlot(entry.room_id)}
+              {#each spaceItems([entry.room_id]) as item (item.roomId)}
+                {@render spaceSlot(item)}
+              {/each}
             {:else if knownContent(entry).length === 0}
               {@render nothing()}
             {:else if folderOpen(entry)}
