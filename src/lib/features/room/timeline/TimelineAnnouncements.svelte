@@ -4,13 +4,19 @@
   import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { TimelineArrivals } from '#lib/timeline/timeline-arrivals.js';
+  import { arrivalAnnouncement } from '#lib/timeline/timeline-announcement.js';
 
   let {
     timeline,
     visibleItems,
-  }: { timeline: RoomTimeline; visibleItems: readonly TimelineItemView[] } = $props();
+    atLiveEdge = false,
+  }: {
+    timeline: RoomTimeline;
+    visibleItems: readonly TimelineItemView[];
+    atLiveEdge?: boolean;
+  } = $props();
   const arrivals = new TimelineArrivals();
-  let count = $state(0);
+  let text = $state('');
   let sequence = $state(0);
 
   $effect(() => {
@@ -20,20 +26,20 @@
     untrack(() => {
       if (!enabled) {
         arrivals.reset();
-        count = 0;
+        text = '';
         return;
       }
       const visible = new Set(visibleItems.map((item) => item.id));
       const incoming = arrivals.update(items).filter((item) => visible.has(item.id));
       if (incoming.length === 0 || paginating) return;
-      count = incoming.length;
+      text = arrivalAnnouncement(incoming, atLiveEdge, i18n.t);
       sequence += 1;
     });
   });
 </script>
 
 <div class="announcements" data-timeline-announcements aria-live="polite" aria-atomic="true">
-  {#key sequence}{#if count > 0}{i18n.t('timeline.newMessages', { count })}{/if}{/key}
+  {#key sequence}{text}{/key}
 </div>
 
 <style>

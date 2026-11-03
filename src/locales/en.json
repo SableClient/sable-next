@@ -993,6 +993,7 @@
     "newMessages_one": "{{count, number}} new message",
     "newMessages_other": "{{count, number}} new messages",
     "newMessagesUnknown": "New messages",
+    "newMessagePreview": "{{sender}}: {{preview}}",
     "callInvite": "{{user}} sent a call invitation",
     "verificationRequest": "{{user}} requested verification",
     "cute": {
