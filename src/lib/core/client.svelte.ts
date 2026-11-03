@@ -34,6 +34,7 @@ import {
 } from '#lib/deployment/e2ee-policy.js';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { clearRoomListSnapshot } from '#lib/rooms/room-list-snapshot.js';
+import { clearRoomTimelines } from '#lib/rooms/timeline.svelte.js';
 import { clearRecentSearches } from '#lib/search/recent-searches.svelte.js';
 import { reportSessionFailure } from '#lib/observability/session-telemetry.js';
 import {
@@ -945,6 +946,7 @@ export class CoreClient {
   }
 
   private resetCachedState(): void {
+    clearRoomTimelines(this);
     this.profileCache.clear();
     this.profileRequests.clear();
     this.profileFailures.clear();

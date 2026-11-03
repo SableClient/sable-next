@@ -323,6 +323,7 @@
   let mediaColumn = mediaColumnPx(0);
   let viewport = $state<HTMLDivElement | null>(null);
   let revealed = $state(false);
+  let preview = $state(false);
   let jumpToLatestVisible = $state(false);
   let opening = false;
   let filling = $state(false);
@@ -578,10 +579,14 @@
   $effect(() => {
     const engine = controller;
     const next = entries;
-    const loading = timeline.loading || (!timeline.hasSnapshot && !timeline.error);
+    const error = timeline.error;
+    const loading = timeline.loading || (!timeline.hasSnapshot && !error);
+    const cached = timeline.loading && timeline.hasSnapshot;
     if (!engine) return;
     void engine.update(next).then(() => {
-      if (!loading && !disposed) void openTimeline(engine);
+      if (disposed) return;
+      if (cached) preview = true;
+      if (!loading && (!preview || error === null)) void openTimeline(engine);
     });
   });
   $effect(() => {
@@ -1253,7 +1258,7 @@
     {/if}
   {/if}
 
-  <div class="timeline-stage" in:fade|global={{ duration: motionMs(MOTION_MS.quick) }}>
+  <div class="timeline-stage">
     {#if historyLoadingVisible}
       <div
         class="timeline-loading history-loading"
@@ -1278,7 +1283,7 @@
         <span class="screen-reader-only">{i18n.t('timeline.loadingNewer')}</span>
       </div>
     {/if}
-    <div class={['timeline-viewport', { initial: !revealed }]}>
+    <div class={['timeline-viewport', { initial: !revealed && !preview }]}>
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div
         bind:this={viewport}
@@ -1327,7 +1332,7 @@
       </div>
     </div>
 
-    {#if (!revealed || (awaitingContent && rows.length === 0)) && !noHistory}
+    {#if ((!revealed && !preview) || (awaitingContent && rows.length === 0)) && !noHistory}
       <TimelineSkeleton layout={preferences.layout} />
     {:else if emptyFailure && timeline.mode.kind === 'focused'}
       <EmptyState

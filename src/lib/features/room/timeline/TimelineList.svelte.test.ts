@@ -9,6 +9,7 @@ import { flushed } from '#lib/ui/flushed.js';
 
 import type { TimelineItemView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { timelineItem as item } from '#lib/features/room/timeline/test-items.js';
 import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
 import { TimelineWindow } from '#lib/timeline/timeline-window.js';
@@ -39,7 +40,7 @@ let animationFrames: FrameRequestCallback[];
 
 beforeEach(() => {
   resetPage();
-  // happy-dom ships no Web Animations API, and the skeleton fades out through it.
+  // happy-dom has no Web Animations API.
   Element.prototype.animate = () =>
     ({
       cancel: () => {},
@@ -93,41 +94,6 @@ async function finishWheelGesture(element?: HTMLElement): Promise<void> {
   element?.dispatchEvent(new Event('scrollend'));
   await new Promise((resolve) => setTimeout(resolve, 160));
   await flushed();
-}
-
-function item(id: string): TimelineItemView {
-  return withRowFields({
-    id,
-    event_id: `$${id}`,
-    transaction_id: null,
-    send_state: null,
-    sender: '@alice:example.org',
-    sender_name: 'Alice',
-    sender_avatar: null,
-    timestamp: 0,
-    content: {
-      kind: 'message',
-      body: id,
-      html: id,
-      msgtype: 'text',
-      edited: false,
-      jumbo: null,
-    },
-    in_reply_to: null,
-    thread_root: null,
-    thread_summary: null,
-    reactions: [],
-    is_own: false,
-    read_by: [],
-    read_timestamps: {},
-    per_message_profile: null,
-    bundled_link_previews: [],
-    link_previews_removed: null,
-    mention: 'none',
-    forwarded: null,
-    forum_title: null,
-    shield: null,
-  });
 }
 
 function readMarker(id: string): TimelineItemView {
@@ -740,8 +706,10 @@ test('a live timeline that fails to load does not read as an empty room', async 
   expect(document.querySelector('.timeline-error')).toBeNull();
 });
 
-test('reveals a short timeline at once and pads it out behind the reader', async () => {
+test.each(['loaded', 'cached'])('shows %s messages before loading more', async (source) => {
+  const cached = source === 'cached';
   const roomTimeline = timeline();
+  roomTimeline.loading = cached;
   roomTimeline.items = [item('latest')];
   let releaseHistory = (): void => {};
   const history = vi.fn(
@@ -752,13 +720,14 @@ test('reveals a short timeline at once and pads it out behind the reader', async
         };
       })
   );
+  const read = vi.fn();
   render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
         onRequestHistory: history,
         onRequestFuture: async () => {},
-        onRead: async () => {},
+        onRead: read,
       },
     },
   });
@@ -767,8 +736,18 @@ test('reveals a short timeline at once and pads it out behind the reader', async
   await flushed();
   await runAnimationFrames();
 
-  // Nothing to land on, so the reader sees the latest message while the fill runs.
   expect(timelineViewport().classList.contains('initial')).toBe(false);
+  if (cached) {
+    expect(read).not.toHaveBeenCalled();
+    expect(history).not.toHaveBeenCalled();
+    roomTimeline.error = 'load_failed';
+    roomTimeline.loading = false;
+    await runAnimationFrames();
+    expect(read).not.toHaveBeenCalled();
+    expect(history).not.toHaveBeenCalled();
+    roomTimeline.error = null;
+    await runAnimationFrames();
+  }
   expect(history).toHaveBeenCalledTimes(1);
 
   releaseHistory();

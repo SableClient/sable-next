@@ -7,6 +7,7 @@ import type { AttachmentInfoView, CoreEvent, SessionInfo } from '#src/generated/
 import { CoreError, type GalleryAttachment, type Transport } from '#src/transport';
 
 import { recentSearches, rememberSearch } from '#lib/search/recent-searches.svelte.js';
+import { activeRoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
 import { joinRoom } from './api/rooms.js';
 import { createCoreClient } from './client.svelte.js';
@@ -51,7 +52,9 @@ test('a locked account keeps its session and clears the lock after switching acc
   fake.emit({ type: 'account_lock_changed', account_id: session.account_id, locked: false });
   expect(core.accountLocked).toBe(false);
   fake.emit({ type: 'account_lock_changed', account_id: session.account_id, locked: true });
+  const previousTimeline = activeRoomTimeline(core);
   await core.switchAccount(otherSession.account_id);
+  expect(activeRoomTimeline(core)).not.toBe(previousTimeline);
   expect(core.accountLocked).toBe(false);
   expect(core.session).toEqual(otherSession);
   expect(fake.deleteAccountStore).not.toHaveBeenCalled();
@@ -854,7 +857,9 @@ test('stopping clears the session and closes the transport', async () => {
   const core = createCoreClient(() => fake.transport);
 
   await core.start();
+  const previousTimeline = activeRoomTimeline(core);
   core.stop();
+  expect(activeRoomTimeline(core)).not.toBe(previousTimeline);
 
   expect(core.status).toBe('idle');
   expect(core.session).toBeNull();

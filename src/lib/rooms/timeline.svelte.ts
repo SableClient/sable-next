@@ -17,7 +17,7 @@ export type TimelineMode =
   | { kind: 'unread'; eventId: string }
   | { kind: 'focused'; eventId: string }
   | { kind: 'thread'; rootEventId: string };
-type SubscriptionState = 'pending' | 'active' | 'stopped';
+type TimelineSnapshot = Pick<RoomTimeline, 'items' | 'aggregations' | 'readMarkerEventId'>;
 
 const sharedTimelines = new WeakMap<CoreClient, ActiveRoomTimeline>();
 
@@ -48,10 +48,11 @@ export class ActiveRoomTimeline {
   private owner: symbol | null = null;
 
   constructor(core: CoreClient) {
-    this.timeline = new RoomTimeline(core);
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- inactive snapshots are not rendered
+    this.timeline = new RoomTimeline(core, new Map());
   }
 
-  async start(
+  start(
     owner: symbol,
     roomId: string,
     eventId: string | null,
@@ -60,12 +61,7 @@ export class ActiveRoomTimeline {
     landing: string | null = null
   ): Promise<void> {
     this.owner = owner;
-    await this.timeline.start(roomId, eventId, hiddenEvents, unread, landing);
-  }
-
-  async startThread(owner: symbol, roomId: string, rootEventId: string): Promise<void> {
-    this.owner = owner;
-    await this.timeline.startThread(roomId, rootEventId);
+    return this.timeline.start(roomId, eventId, hiddenEvents, unread, landing);
   }
 
   resumeLive(owner: symbol): Promise<void> {
@@ -73,14 +69,9 @@ export class ActiveRoomTimeline {
     return this.timeline.resumeLive();
   }
 
-  async startUnread(
-    owner: symbol,
-    roomId: string,
-    eventId: string,
-    hiddenEvents = false
-  ): Promise<void> {
+  startUnread(owner: symbol, roomId: string, eventId: string, hiddenEvents = false): Promise<void> {
     this.owner = owner;
-    await this.timeline.startUnread(roomId, eventId, hiddenEvents);
+    return this.timeline.startUnread(roomId, eventId, hiddenEvents);
   }
 
   stop(owner: symbol): Promise<void> {
@@ -97,6 +88,11 @@ export function activeRoomTimeline(core: CoreClient): ActiveRoomTimeline {
     sharedTimelines.set(core, active);
   }
   return active;
+}
+
+export function clearRoomTimelines(core: CoreClient): void {
+  sharedTimelines.get(core)?.timeline.clearCache();
+  sharedTimelines.delete(core);
 }
 
 export class RoomTimeline {
@@ -128,14 +124,17 @@ export class RoomTimeline {
   private target: { roomId: string; mode: TimelineMode; hiddenEvents: boolean } | null = null;
   private unsubscribeEvents: (() => void) | null = null;
   private startPromise: Promise<void> | null = null;
-  private unsubscribePromise = Promise.resolve();
-  private hasPendingUnsubscribe = false;
-  private startRequest = 0;
   private session = 0;
-  private state: SubscriptionState = 'stopped';
   private paginationGeneration = 0;
   private resumePromise: Promise<void> | null = null;
-  constructor(private readonly core: CoreClient) {}
+  constructor(
+    private readonly core: CoreClient,
+    private readonly snapshots?: Map<string, TimelineSnapshot>
+  ) {}
+
+  clearCache(): void {
+    this.snapshots?.clear();
+  }
 
   start(
     roomId: string,
@@ -212,12 +211,21 @@ export class RoomTimeline {
       if (this.startPromise) return this.startPromise.catch(() => {});
     }
 
-    const request = ++this.startRequest;
-    if (this.target !== null || this.resumingLive) {
-      await this.stopCurrent(false, force);
+    if (this.target !== null || this.resumingLive) void this.stopCurrent(force);
+
+    const key = `${roomId}/${hiddenEvents}`;
+    const snapshot =
+      !force && mode.kind === 'live' && landing === null ? this.snapshots?.get(key) : undefined;
+    this.snapshots?.delete(key);
+    if (
+      snapshot &&
+      (!unread ||
+        (snapshot.readMarkerEventId !== null &&
+          snapshot.readMarkerEventId === snapshot.items.at(-1)?.event_id))
+    ) {
+      Object.assign(this, snapshot);
+      this.hasSnapshot = true;
     }
-    if (this.hasPendingUnsubscribe) await this.unsubscribePromise;
-    if (request !== this.startRequest) return;
 
     const session = this.session;
     this.target = target;
@@ -296,7 +304,7 @@ export class RoomTimeline {
   }
 
   stop(): Promise<void> {
-    return this.stopCurrent(true);
+    return this.stopCurrent();
   }
 
   private clearContent(): void {
@@ -305,10 +313,25 @@ export class RoomTimeline {
     this.hasSnapshot = false;
   }
 
-  private stopCurrent(invalidateStart: boolean, keepContent = false): Promise<void> {
-    if (invalidateStart) this.startRequest += 1;
+  private async stopCurrent(keepContent = false): Promise<void> {
+    if (
+      this.snapshots &&
+      this.target &&
+      this.mode.kind === 'live' &&
+      this.hasSnapshot &&
+      !this.resumingLive
+    ) {
+      const key = `${this.target.roomId}/${this.target.hiddenEvents}`;
+      this.snapshots.delete(key);
+      this.snapshots.set(key, {
+        items: this.items.slice(-80),
+        aggregations: this.aggregations.slice(-80),
+        readMarkerEventId: this.readMarkerEventId,
+      });
+      const oldest = this.snapshots.keys().next().value;
+      if (this.snapshots.size > 8 && oldest !== undefined) this.snapshots.delete(oldest);
+    }
     this.session += 1;
-    this.state = 'stopped';
     this.startPromise = null;
     if (!keepContent) this.clearContent();
     this.readMarkerEventId = null;
@@ -326,19 +349,10 @@ export class RoomTimeline {
     this.subscription = null;
     this.target = null;
     if (subscription !== null) {
-      this.hasPendingUnsubscribe = true;
-      this.unsubscribePromise = this.unsubscribePromise
-        .then(async () => {
-          await this.core.rpc.timeline.unsubscribe({ subscription });
-        })
-        .catch((error: unknown) => {
-          console.debug('[sable timeline] timeline not unsubscribed', error);
-        })
-        .finally(() => {
-          this.hasPendingUnsubscribe = false;
-        });
+      await this.core.rpc.timeline.unsubscribe({ subscription }).catch((error: unknown) => {
+        console.debug('[sable timeline] timeline not unsubscribed', error);
+      });
     }
-    return this.unsubscribePromise;
   }
 
   private async startSubscription(
@@ -349,7 +363,6 @@ export class RoomTimeline {
     landing: string | null = null
   ): Promise<void> {
     const session = this.session;
-    this.state = 'pending';
     const pending: Extract<CoreEvent, { type: 'timeline_diff' }>[] = [];
     const stopEvents = this.core.subscribeEvents((event) => {
       if (
@@ -358,16 +371,15 @@ export class RoomTimeline {
         event.type !== 'timeline_aggregations'
       )
         return;
-      if (event.type === 'timeline_diff' && session === this.session && this.state === 'pending') {
+      if (
+        event.type === 'timeline_diff' &&
+        session === this.session &&
+        this.subscription === null
+      ) {
         pending.push(event);
         return;
       }
-      if (
-        session !== this.session ||
-        this.state !== 'active' ||
-        event.subscription !== this.subscription
-      )
-        return;
+      if (session !== this.session || event.subscription !== this.subscription) return;
       if (event.type === 'timeline_diff') {
         const before = this.items;
         const items = applyDiffs(before, event.diffs);
@@ -446,7 +458,6 @@ export class RoomTimeline {
       }
     } catch (error) {
       stopEvents();
-      if (session === this.session) this.state = 'stopped';
       throw error;
     }
 
@@ -469,7 +480,6 @@ export class RoomTimeline {
     );
     this.aggregations = response.aggregations;
     this.hasSnapshot = true;
-    this.state = 'active';
     this.unsubscribeEvents = stopEvents;
   }
 

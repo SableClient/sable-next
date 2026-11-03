@@ -3,6 +3,20 @@ import { historyItems, timelineItem } from './fixtures/timeline-items';
 
 test.use({ storageState: SIGNED_OUT, hasTouch: true });
 
+test('shows cached messages while the timeline loads', async ({
+  app,
+  timeline,
+  installRoomCore,
+}) => {
+  await installRoomCore('delayed_snapshot');
+  await app.openRoom('!room:example.test');
+  await app.openRoomFromList('Random');
+  await expect(timeline.message('Random message 19')).toBeVisible();
+  await app.openRoomFromList('General');
+  await expect(timeline.message('General message 19')).toBeVisible({ timeout: 500 });
+  await expect(timeline.skeleton).toHaveCount(0);
+});
+
 test('backgrounding an interrupted touch settles queued history without moving the reader', async ({
   app,
   timeline,
