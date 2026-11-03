@@ -528,6 +528,14 @@
     {@const mentions = counts.highlight}
     {@const unread = counts.unread}
     {@const marked = counts.marked ?? false}
+    {@const unreadLabel =
+      mentions > 0
+        ? i18n.t('nav.unreadMentions', { count: mentions })
+        : unread > 0
+          ? i18n.t('nav.unreadMessages', { count: unread })
+          : marked
+            ? i18n.t('nav.markedUnread')
+            : null}
     {@const live = room?.call_participants.length ?? 0}
     {@const notifyMode = room ? roomList.notificationOverride(room.room_id) : null}
     {@const typing =
@@ -566,7 +574,7 @@
           {href}
           style:--room-depth={collapsed ? 0 : item.depth}
           onclick={() => onNavigate?.(href)}
-          aria-label={collapsed ? name : undefined}
+          aria-label={collapsed ? (unreadLabel ? `${name}, ${unreadLabel}` : name) : undefined}
           aria-current={active ? 'page' : undefined}
           {@attach peerId !== null && !collapsed
             ? whenVisible(() => {
