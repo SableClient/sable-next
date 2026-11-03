@@ -599,7 +599,10 @@
   function endPan(event: PointerEvent): void {
     if (backdropPress?.pointerId === event.pointerId) {
       backdropPress = null;
-      if (event.type === 'pointerup' && event.target === stageEl) onClose();
+      if (event.type === 'pointerup' && event.target === stageEl) {
+        onClose();
+        return;
+      }
     }
     if (lens?.pointerId === event.pointerId) lens = null;
     if (!isImage) return;

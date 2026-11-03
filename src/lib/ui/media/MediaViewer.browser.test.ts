@@ -13,9 +13,11 @@ vi.mock('#lib/platform/overlay-back.svelte.js', async (importOriginal) => ({
 vi.mock('#lib/platform/system-bars.js', () => ({ setSystemBarsHidden: vi.fn() }));
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { imageItem } from '#lib/features/room/timeline/timeline-item-fixtures.js';
 
 import type { MediaItem } from './media-viewer-types';
 import MediaViewer from './MediaViewer.svelte';
+import MediaViewerHostHarness from './MediaViewerHostHarness.test.svelte';
 import { mediaViewerState } from './media-viewer-state.svelte';
 
 const item: MediaItem = {
@@ -294,4 +296,21 @@ test('viewer refits a fitted image when the stage resizes', async () => {
 
   await page.viewport(390, 800);
   await expect.poll(() => Number(scale())).toBeLessThan(1);
+});
+
+test('timeline media opens after a standalone image closed from the backdrop', async () => {
+  await page.viewport(1280, 900);
+  const screen = await render(MediaViewerHostHarness);
+  mediaViewerState.openStandalone('mxc://example.test/avatar', 'Alice');
+  await expect.poll(() => document.querySelector('.stage img')).not.toBeNull();
+  const stage = document.querySelector('.stage');
+  if (!stage) throw new Error('the viewer stage is missing');
+  await userEvent.click(stage, { position: { x: 30, y: 600 } });
+  await expect.poll(() => mediaViewerState.eventId).toBeNull();
+
+  mediaViewerState.open('$item', () => [imageItem()]);
+  expect(mediaViewerState.items.map((media) => media.eventId)).toEqual(['$item']);
+  await expect
+    .element(screen.getByRole('dialog', { name: 'Media viewer', exact: true }))
+    .toBeVisible();
 });
