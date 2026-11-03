@@ -6,8 +6,11 @@ export interface ShareFileRef {
   mime: string | undefined;
 }
 
+// The iOS share extension opens the app with its own scheme, which differs between builds.
+const SHARE_DEEP_LINK = /^(?:sable|moe\.sable\.next|moe\.sable\.app):\/\/share(?:[/?#]|$)/;
+
 export function isShareDeepLink(url: string): boolean {
-  return url.startsWith('sable://share');
+  return SHARE_DEEP_LINK.test(url);
 }
 
 export function mergeShareBatches(

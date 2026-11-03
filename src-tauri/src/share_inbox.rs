@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Response;
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Runtime};
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +32,7 @@ pub(crate) struct ShareBatch {
     pub target: Option<ShareTarget>,
 }
 
-/// Written by `MainActivity.kt`.
+/// Written by `MainActivity.kt` and the iOS `ShareViewController.swift`.
 const SHARE_MANIFEST_VERSION: u32 = 1;
 
 #[derive(Deserialize)]
@@ -61,7 +61,15 @@ fn parse_manifest(json: &str) -> Result<ShareManifest, String> {
     Ok(manifest)
 }
 
+/// The share extension writes into the App Group container, the only directory both can reach.
+#[cfg(target_os = "ios")]
+fn inbox_root<R: Runtime>(_app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(crate::ios::shared_store_dir()?.join("share_inbox"))
+}
+
+#[cfg(not(target_os = "ios"))]
 fn inbox_root<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    use tauri::Manager as _;
     Ok(app
         .path()
         .app_data_dir()

@@ -54,7 +54,10 @@ test('the staging index prefix is stripped for display', () => {
 
 test('only the share scheme counts as a share deep link', () => {
   expect(isShareDeepLink('sable://share/abc')).toBe(true);
+  expect(isShareDeepLink('moe.sable.next://share')).toBe(true);
+  expect(isShareDeepLink('moe.sable.app://share')).toBe(true);
   expect(isShareDeepLink('sable://room/abc')).toBe(false);
+  expect(isShareDeepLink('moe.sable.app:/login')).toBe(false);
 });
 
 test('a plain-text doc keeps blank lines as empty paragraphs', () => {

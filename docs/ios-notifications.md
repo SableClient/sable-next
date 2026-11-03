@@ -26,8 +26,9 @@ read" is on.
 
 1. Register both bundle IDs with one team; enable app Push Notifications and a
    shared App Group. iOS builds use `moe.sable.app` (`src-tauri/tauri.ios.conf.json`),
-   so the IDs are `moe.sable.app` and `moe.sable.app.notifications`, and the group is
-   `group.moe.sable.app`. Android and desktop keep `moe.sable.next`.
+   so the IDs are `moe.sable.app`, `moe.sable.app.notifications` and
+   `moe.sable.app.share`, and the group is `group.moe.sable.app`. Android and
+   desktop keep `moe.sable.next`.
 2. Configure gateway APNs credentials and `pushNotificationDetails.iosPushAppID`.
    Match the signing environment: TestFlight uses production, development uses sandbox.
    Pushkeys are hex, so a Sygnal app needs `convert_device_token_to_hex: false`;
@@ -75,3 +76,10 @@ replacements are silent. Cross-process deduplication is not atomic.
   hidden previews, logout, account switching, token rotation and duplicate alerts.
 
 Swift compilation, signing, memory use and APNs delivery remain unverified on Linux.
+
+## Share extension
+
+`SableShareExtension` copies what another app shares into
+`group.<bundle identifier>/Sable/share_inbox`, in the manifest format
+`MainActivity.kt` writes on Android, then opens Sable with `<scheme>://share`.
+Its share sheet suggestions are the conversations `SableNotificationService` donates.
