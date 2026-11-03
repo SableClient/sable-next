@@ -22,9 +22,7 @@ export function reactionShortcode(
   if (sentName !== undefined) return `${sentName}`;
 
   for (const pack of imagePacks)
-    for (const image of pack.images)
-      if (image.url === key)
-        return `:${image.shortcode}`;
+    for (const image of pack.images) if (image.url === key) return `:${image.shortcode}`;
 
   return null;
 }
