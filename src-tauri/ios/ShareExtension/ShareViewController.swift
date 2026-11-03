@@ -9,25 +9,34 @@ final class ShareViewController: UIViewController {
         let context = extensionContext
         Task {
             let providers = (context?.inputItems as? [NSExtensionItem] ?? []).flatMap { $0.attachments ?? [] }
-            if await ShareStaging.stage(providers, target: ShareStaging.target(context?.intent)),
-               let url = ShareStaging.appURL() {
-                await open(url)
+            guard await ShareStaging.stage(providers, target: ShareStaging.target(context?.intent)) else {
+                context?.completeRequest(returningItems: nil)
+                return
             }
-            context?.completeRequest(returningItems: nil)
+            if let url = ShareStaging.appURL(), await open(url) {
+                context?.completeRequest(returningItems: nil)
+                return
+            }
+            let alert = UIAlertController(title: nil, message: "Saved. Open Sable to send it.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+                context?.completeRequest(returningItems: nil)
+            })
+            present(alert, animated: true)
         }
     }
 
-    /// Extensions cannot reach `UIApplication.shared`, so the app is opened through the responder chain.
-    private func open(_ url: URL) async {
+    /// Only Today and iMessage extensions may open URLs, so this walks the responder chain
+    /// to the host's `UIApplication`, as Element X does. iOS may stop allowing it.
+    private func open(_ url: URL) async -> Bool {
         var responder: UIResponder? = self
         while let current = responder {
             if let application = current as? UIApplication {
-                await application.open(url)
-                return
+                return await application.open(url)
             }
             responder = current.next
         }
         ShareStaging.log.error("no application in the responder chain to open Sable")
+        return false
     }
 }
 
