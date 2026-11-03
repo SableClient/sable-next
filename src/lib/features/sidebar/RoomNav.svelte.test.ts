@@ -1121,7 +1121,7 @@ test('a row options button opens the shared room menu and closes it again', asyn
   ];
   await mountNav();
 
-  const triggers = screen.getAllByRole('button', { name: 'room.menuLabel' });
+  const triggers = screen.getAllByLabelText('room.menuLabel');
   expect(triggers).toHaveLength(2);
   expect(screen.queryByRole('menu')).toBeNull();
 
@@ -1207,7 +1207,7 @@ test('the room list is one tree with a single tab stop and the row actions out o
       .filter((item) => item.tabIndex === 0)
   ).toHaveLength(1);
   expect(row('Alpha')).toHaveAttribute('aria-level', '2');
-  for (const trigger of screen.getAllByRole('button', { name: 'room.menuLabel' })) {
+  for (const trigger of screen.getAllByLabelText('room.menuLabel')) {
     expect(trigger).toHaveAttribute('tabindex', '-1');
   }
 

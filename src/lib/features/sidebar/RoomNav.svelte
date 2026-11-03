@@ -506,6 +506,7 @@
       type="button"
       class="room-options-trigger selection-open"
       tabindex="-1"
+      aria-hidden="true"
       aria-label={i18n.t('room.menuLabel')}
       aria-haspopup="menu"
       aria-expanded={open}
@@ -737,6 +738,7 @@
                 class="room-options-trigger"
                 type="button"
                 tabindex="-1"
+                aria-hidden="true"
                 aria-label={i18n.t(active && voiceChat.open ? 'call.hideChat' : 'call.showChat')}
                 aria-pressed={active && voiceChat.open}
                 onclick={() => {

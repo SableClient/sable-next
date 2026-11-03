@@ -82,12 +82,6 @@ function room(overrides: Partial<RoomListItemView>): RoomListItemView {
   });
 }
 
-const ROW_ACTIONS_IN_TREE = {
-  ...ICONS_HIDDEN_BY_LAYOUT,
-  'aria-required-children':
-    'the room options button is a focusable sibling of each treeitem and cannot be a treeitem child',
-};
-
 async function mountNav(props: { collapsed?: boolean; width?: number } = {}) {
   Object.assign(core.rpc.notifications, {
     settings: vi.fn().mockResolvedValue({ mode: 'all', default: 'all' }),
@@ -130,7 +124,7 @@ test('the row options button toggles the shared menu and returns focus', async (
   };
   await expect.poll(() => document.querySelector('.room-row-wrap')).not.toBeNull();
   await userEvent.hover(wrap());
-  const trigger = screen.getByRole('button', { name: 'Room options' });
+  const trigger = screen.getByRole('button', { name: 'Room options', includeHidden: true });
 
   await userEvent.click(trigger);
   await expect.element(screen.getByRole('menu')).toBeVisible();
