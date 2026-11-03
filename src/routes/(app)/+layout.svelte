@@ -19,7 +19,11 @@
     provideRoomScopes,
     RoomScopes,
   } from '#lib/features/room/messages/message-scope.svelte.js';
-  import { backToRoomList, contextSearchPath } from '#lib/features/room/room-navigation.js';
+  import {
+    backToRoomList,
+    contextSearchPath,
+    trackRouteFocus,
+  } from '#lib/features/room/room-navigation.js';
   import { MESSAGE_SEARCH_FIELD_ID } from '#lib/features/search/message-search.svelte.js';
   import { InviteActions } from '#lib/rooms/invites.svelte.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
@@ -1026,6 +1030,8 @@
       stop?.();
     };
   });
+
+  trackRouteFocus();
 
   let unreadCycleIndex = 0;
 

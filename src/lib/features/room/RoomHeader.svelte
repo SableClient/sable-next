@@ -95,7 +95,7 @@
 
   {#snippet main()}
     <div class={['room-identity', { 'with-topic': topicShown }]}>
-      <h1>{roomName}</h1>
+      <h1 tabindex="-1" data-room-heading>{roomName}</h1>
       {#if topicShown}
         <button class="room-topic" type="button" onclick={onTopic}>{topic}</button>
       {/if}
@@ -207,6 +207,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  h1:focus {
+    outline: none;
   }
 
   .room-identity.with-topic h1 {

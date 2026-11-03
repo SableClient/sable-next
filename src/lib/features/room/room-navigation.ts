@@ -1,4 +1,4 @@
-import { afterNavigate, goto } from '$app/navigation';
+import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
 import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
 import { setPageState } from '#lib/platform/page-state.js';
 import { resolve } from '$app/paths';
@@ -7,6 +7,7 @@ import { page } from '$app/state';
 import type { RoomListItemView } from '#src/generated/protocol';
 
 import { findRoomByPathId, roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
+import { isEditableTarget } from '#lib/ui/shortcuts/binding.js';
 import { matchesAppLayout } from '#lib/ui/app-layout.svelte.js';
 
 let enteredFrom: string | null = null;
@@ -49,8 +50,40 @@ export function backToRoomList(): void {
   void setPageState({ ...page.state, mobileDrawer: 'open' }, true);
 }
 
+const TREE_REGIONS = '[data-focus-region="rooms"], [data-focus-region="spaces"]';
+
 const ROOM_PATH =
   /^\/(?:(?:rooms|direct)\/[^/]+|space\/[^/]+\/(?!lobby$|create-room$|create-space$)[^/]+)$/;
+
+const COMPOSER_REGION = '[data-focus-region="composer"]';
+const HEADING_ATTEMPTS = 10;
+
+export function trackRouteFocus(): void {
+  let origin: Element | null = null;
+  beforeNavigate(() => {
+    origin = document.activeElement;
+  });
+  afterNavigate((navigation) => {
+    const from = origin;
+    origin = null;
+    if (from?.isConnected && from.closest(TREE_REGIONS)) {
+      if (document.activeElement === document.body && from instanceof HTMLElement) from.focus();
+      return;
+    }
+    if (from instanceof HTMLElement && (isEditableTarget(from) || from.closest(COMPOSER_REGION))) {
+      return;
+    }
+    if (!navigation.to || !ROOM_PATH.test(navigation.to.url.pathname)) return;
+    let attempts = HEADING_ATTEMPTS;
+    const focusHeading = () => {
+      if (document.activeElement !== document.body) return;
+      const heading = document.querySelector<HTMLElement>('[data-room-heading]');
+      if (heading) heading.focus({ preventScroll: true });
+      else if (--attempts > 0) requestAnimationFrame(focusHeading);
+    };
+    focusHeading();
+  });
+}
 
 export function isRoomSwitch(href: string): boolean {
   const target = new URL(href, page.url.href).pathname;
