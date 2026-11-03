@@ -560,6 +560,46 @@ impl ClientRole {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
+async fn native_store_config(
+    store_id: &str,
+    role: ClientRole,
+    lock: matrix_sdk_common::cross_process_lock::CrossProcessLockConfig,
+) -> Result<matrix_sdk_base::store::StoreConfig, BuildError> {
+    let key = role.store_key(store_id).await?;
+    let store = role
+        .store_config(std::path::Path::new(store_id).join("store"))
+        .key(key.as_ref().map(|key| key.as_slice()));
+    let cache = store
+        .clone()
+        .path(std::path::Path::new(store_id).join("cache"));
+    // The iOS extension taking the event cache lock makes the app reset its open timelines.
+    let caches = async {
+        if role.is_account() {
+            futures_util::try_join!(
+                matrix_sdk::SqliteEventCacheStore::open_with_config(&cache),
+                matrix_sdk::SqliteMediaStore::open_with_config(&cache),
+            )
+            .map(Some)
+        } else {
+            Ok(None)
+        }
+    };
+    let (state, crypto, caches) = futures_util::try_join!(
+        matrix_sdk::SqliteStateStore::open_with_config(&store),
+        matrix_sdk::SqliteCryptoStore::open_with_config(&store),
+        caches,
+    )
+    .map_err(matrix_sdk::ClientBuildError::from)?;
+    let config = matrix_sdk_base::store::StoreConfig::new(lock)
+        .state_store(state)
+        .crypto_store(crypto);
+    Ok(match caches {
+        Some((event_cache, media)) => config.event_cache_store(event_cache).media_store(media),
+        None => config,
+    })
+}
+
 /// Also names the client in the OAuth refresh lock, so no two clients share a holder.
 #[cfg(not(target_family = "wasm"))]
 fn lock_holder() -> String {
@@ -609,8 +649,6 @@ async fn build_account_client(
         )
         .with_threading_support(THREADING_SUPPORT)
         .with_encryption_settings(role.encryption_settings())
-        // In the iOS extension, an event cache takes the shared store lock, which makes the
-        // app reload its rooms' event caches and reset their open timelines.
         .with_event_cache(role.is_account());
 
     #[cfg(not(target_family = "wasm"))]
@@ -619,25 +657,7 @@ async fn build_account_client(
         let holder = lock_holder();
         let lock = store_lock(&holder);
 
-        let key = role.store_key(store_id).await?;
-        let store = role
-            .store_config(std::path::Path::new(store_id).join("store"))
-            .key(key.as_ref().map(|key| key.as_slice()));
-        let cache = store
-            .clone()
-            .path(std::path::Path::new(store_id).join("cache"));
-        let (state, event_cache, media, crypto) = futures_util::try_join!(
-            matrix_sdk::SqliteStateStore::open_with_config(&store),
-            matrix_sdk::SqliteEventCacheStore::open_with_config(&cache),
-            matrix_sdk::SqliteMediaStore::open_with_config(&cache),
-            matrix_sdk::SqliteCryptoStore::open_with_config(&store),
-        )
-        .map_err(matrix_sdk::ClientBuildError::from)?;
-        let config = matrix_sdk_base::store::StoreConfig::new(lock.clone())
-            .state_store(state)
-            .event_cache_store(event_cache)
-            .media_store(media)
-            .crypto_store(crypto);
+        let config = native_store_config(store_id, role, lock.clone()).await?;
         let base = std::sync::Arc::new(matrix_sdk_base::BaseClient::new(
             config,
             THREADING_SUPPORT,
@@ -1152,7 +1172,7 @@ mod tests {
 
     #[cfg(not(target_family = "wasm"))]
     #[tokio::test]
-    async fn only_account_clients_keep_an_event_cache() {
+    async fn only_account_clients_open_the_shared_caches() {
         let store = tempfile::tempdir().unwrap();
         let store_id = store.path().to_str().unwrap();
         crate::store_encryption::account_key(store_id)
@@ -1169,9 +1189,11 @@ mod tests {
 
         let notification = build(super::ClientRole::Notification).await.unwrap();
         assert!(notification.event_cache().is_none());
+        assert!(!store.path().join("cache").exists());
         drop(notification);
         let account = build(super::ClientRole::Account).await.unwrap();
         assert!(account.event_cache().is_some());
+        assert!(store.path().join("cache").exists());
     }
 
     #[tokio::test]
