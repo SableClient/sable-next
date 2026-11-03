@@ -122,12 +122,14 @@
   let dragging = $state<string | null>(null);
   let dropState = $state<DropState<LobbyDragItem> | null>(null);
   let headerDrop = $state(false);
+  let parentId = $derived(section.parent_id);
+  let unloaded = $derived(section.space !== null && !section.loaded && !section.failed);
 
   function dropTarget(roomId: string | null) {
     return dragList.dropTarget(
-      { parentId: section.parent_id, roomId },
+      { parentId, roomId },
       {
-        accepts: (source) => canDropInto(source, section.parent_id),
+        accepts: (source) => canDropInto(source, parentId),
         onState: (next) => {
           if (roomId === null) headerDrop = next !== null;
           else dropState = next;
@@ -152,7 +154,7 @@
 
 <div
   class="section"
-  {@attach section.space && !closed && !section.loaded && !section.failed
+  {@attach unloaded && !closed
     ? whenVisible(() => {
         onVisible(section.key);
       })
@@ -312,6 +314,7 @@
       <ul class="rooms">
         {#each section.rooms as entry (entry.key)}
           {@const child = entry.room}
+          {@const roomId = child.room_id}
           {@const joined = joinedIds.has(child.room_id)}
           {@const action = entry.action}
           <li
@@ -326,14 +329,11 @@
               },
             ]}
             {@attach canManage
-              ? dragList.draggable(
-                  { parentId: section.parent_id, roomId: child.room_id },
-                  (next) => {
-                    dragging = next?.roomId ?? null;
-                  }
-                )
+              ? dragList.draggable({ parentId, roomId }, (next) => {
+                  dragging = next?.roomId ?? null;
+                })
               : undefined}
-            {@attach canManage ? dropTarget(child.room_id) : undefined}
+            {@attach canManage ? dropTarget(roomId) : undefined}
           >
             {#if canManage}
               <span class="drag-handle" aria-hidden="true"><DotsSixVerticalIcon /></span>

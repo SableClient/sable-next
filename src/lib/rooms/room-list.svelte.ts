@@ -359,12 +359,12 @@ export class RoomList {
     this.#sections = sections;
     this.#badges = badges;
     this.quietRoomIds = quiet;
-    this.setRooms(
-      applyDiffs(
-        fresh ? initial : this.#source,
-        batches.flatMap((batch) => batch.diffs)
-      )
-    );
+    const diffs = batches.flatMap((batch) => batch.diffs);
+    if (!fresh && diffs.length === 0) {
+      this.scheduleSnapshotWrite();
+      return;
+    }
+    this.setRooms(applyDiffs(fresh ? initial : this.#source, diffs));
   }
 
   private snapshot(): RoomListSnapshot {

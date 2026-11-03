@@ -489,6 +489,16 @@
   const noAttachment = (): undefined => undefined;
   const dragList = createDragList<LayoutRef>(refsEqual);
 
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- never read reactively
+  const layoutRefs = new Map<string, LayoutRef>();
+  function stableRef(ref: LayoutRef): LayoutRef {
+    const key = JSON.stringify(ref);
+    const known = layoutRefs.get(key);
+    if (known) return known;
+    layoutRefs.set(key, ref);
+    return ref;
+  }
+
   function dragSource(ref: LayoutRef) {
     return mobile
       ? noAttachment
@@ -677,11 +687,11 @@
 {#snippet spaceSlot(roomId: string, folderId?: string)}
   {@const item = spaceItem(roomId)}
   {#if item !== null}
-    {@const ref = {
+    {@const ref = stableRef({
       kind: 'space',
       room_id: roomId,
       folder_id: folderId ?? null,
-    } satisfies LayoutRef}
+    })}
     {#if folderId === undefined}
       <div
         class="rail-menu-anchor"
@@ -754,7 +764,7 @@
 {/snippet}
 
 {#snippet closedFolder(folder: SidebarFolder)}
-  {@const ref = { kind: 'folder', folder_id: folder.id } satisfies LayoutRef}
+  {@const ref = stableRef({ kind: 'folder', folder_id: folder.id })}
   <div
     class={[
       'rail-slot',
@@ -790,7 +800,7 @@
 {/snippet}
 
 {#snippet openFolder(folder: SidebarFolder)}
-  {@const ref = { kind: 'folder', folder_id: folder.id } satisfies LayoutRef}
+  {@const ref = stableRef({ kind: 'folder', folder_id: folder.id })}
   <div
     class={[
       'folder-open',
