@@ -1,6 +1,6 @@
 import parseVersion from 'semver/functions/parse.js';
 
-import { SABLE_UPDATE_MANIFEST_URL } from '#lib/config/links.js';
+import { SABLE_UPDATE_MANIFEST_URL } from '#lib/deployment/links.js';
 
 import { electronBridge } from './electron.js';
 import { isNativeMobile } from './os.js';

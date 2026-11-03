@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SABLE_SOURCE_URL } from '#lib/config/links.js';
+  import { SABLE_SOURCE_URL } from '#lib/deployment/links.js';
   import { i18n } from '#lib/i18n.js';
 </script>
 

@@ -4,7 +4,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
 
-  import { SABLE_DONATE_URL, SABLE_SOURCE_URL } from '#lib/config/links.js';
+  import { SABLE_DONATE_URL, SABLE_SOURCE_URL } from '#lib/deployment/links.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { restartSetup } from '#lib/features/auth/setup/setup-record.js';
   import { writeText } from '#lib/platform/local-json.js';

@@ -10,7 +10,8 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('#lib/rooms/room-list.svelte.js')>()),
   useRoomList: () => ({ rooms: [] }),
 }));
-vi.mock('#lib/config/runtime-config.js', () => ({
+vi.mock('#lib/config/runtime-config.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/config/runtime-config.js')>()),
   runtimeConfig: () => Promise.resolve({ exploreServers: [] }),
 }));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));

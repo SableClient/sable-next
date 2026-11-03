@@ -16,6 +16,9 @@ export type HomeserversConfig = {
 export type CallsConfig = v.InferOutput<typeof CallsSchema>;
 export type SupporterConfig = v.InferOutput<typeof SupporterSchema>;
 export type EmbedsConfig = v.InferOutput<typeof EmbedsSchema>;
+export type BrandingConfig = v.InferOutput<typeof BrandingSchema>;
+export type LinksConfig = v.InferOutput<typeof LinksSchema>;
+export type AuthPolicyConfig = v.InferOutput<typeof AuthSchema>;
 export type RuntimeConfig = v.InferOutput<typeof RuntimeSchema>;
 
 export const BUILT_IN_HOMESERVERS: HomeserversConfig = {
@@ -86,7 +89,30 @@ const GifsSchema = v.object({
   tenorApiKey: Text,
   giphyApiKey: Text,
 });
-const EmbedsSchema = v.object({ serviceUrl: v.fallback(v.nullable(HttpService), null) });
+const OptionalHttpService = v.fallback(v.nullable(HttpService), null);
+const AssetUrl = v.fallback(v.nullable(v.pipe(NonBlankText, v.regex(/^(https?:\/\/|\/)/))), null);
+
+const BrandingSchema = v.object({
+  appName: Text,
+  logoUrl: AssetUrl,
+  faviconUrl: AssetUrl,
+  themeUrl: AssetUrl,
+});
+const LinksSchema = v.object({
+  help: OptionalHttpService,
+  privacy: OptionalHttpService,
+  bugReport: OptionalHttpService,
+  supportRoom: Text,
+  terms: v.fallback(v.array(v.object({ text: NonBlankText, url: HttpService })), []),
+});
+const AuthSchema = v.object({
+  ssoRedirect: v.fallback(v.nullable(v.picklist(['immediate', 'loginPage'])), null),
+  disableRegistration: v.fallback(v.boolean(), false),
+  logoutRedirectUrl: OptionalHttpService,
+  deviceDisplayName: Text,
+});
+
+const EmbedsSchema = v.object({ serviceUrl: OptionalHttpService });
 const CallsSchema = v.object({ livekitServiceUrl: Text });
 const RuntimeSchema = v.pipe(
   v.object({
@@ -102,6 +128,11 @@ const RuntimeSchema = v.pipe(
     disableAccountSwitcher: v.fallback(v.boolean(), false),
     settingsDefaults: v.fallback(RecordValue, {}),
     hideUsernamePasswordFields: v.fallback(v.boolean(), false),
+    branding: v.fallback(BrandingSchema, v.parse(BrandingSchema, {})),
+    links: v.fallback(LinksSchema, v.parse(LinksSchema, {})),
+    hideCommunityLinks: v.fallback(v.boolean(), false),
+    auth: v.fallback(AuthSchema, v.parse(AuthSchema, {})),
+    settingsLocked: v.fallback(RecordValue, {}),
   }),
   v.transform((source) => {
     const list = source.homeserverList;
@@ -119,10 +150,15 @@ const RuntimeSchema = v.pipe(
       disableAccountSwitcher: source.disableAccountSwitcher,
       settingsDefaults: source.settingsDefaults,
       hideUsernamePasswordFields: source.hideUsernamePasswordFields,
+      branding: source.branding,
+      links: source.links,
+      hideCommunityLinks: source.hideCommunityLinks,
+      auth: source.auth,
+      settingsLocked: source.settingsLocked,
     };
   })
 );
-const EMPTY = v.parse(RuntimeSchema, {});
+export const EMPTY_RUNTIME_CONFIG = v.parse(RuntimeSchema, {});
 
 function withDefaultAt(homeservers: HomeserversConfig, index: unknown): HomeserversConfig {
   if (index === null) return { ...homeservers, default: '' };
@@ -134,7 +170,7 @@ function withDefaultAt(homeservers: HomeserversConfig, index: unknown): Homeserv
 
 export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
   const result = v.safeParse(RuntimeSchema, raw);
-  return result.success ? result.output : EMPTY;
+  return result.success ? result.output : EMPTY_RUNTIME_CONFIG;
 }
 
 let loading: Promise<RuntimeConfig> | null = null;
@@ -148,7 +184,7 @@ export function runtimeConfig(): Promise<RuntimeConfig> {
     .catch((error: unknown) => {
       console.debug('[sable config] runtime config unavailable', error);
       loading = null;
-      return EMPTY;
+      return EMPTY_RUNTIME_CONFIG;
     });
 
   return loading;

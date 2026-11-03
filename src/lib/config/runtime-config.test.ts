@@ -271,3 +271,75 @@ test('featured explore servers are read from v1 featuredCommunities', () => {
   ).toEqual(['a.org', 'b.org']);
   expect(parseRuntimeConfig({}).exploreServers).toEqual([]);
 });
+
+test('a config with no branding keeps every brand field unset', () => {
+  expect(parseRuntimeConfig({}).branding).toEqual({
+    appName: null,
+    logoUrl: null,
+    faviconUrl: null,
+    themeUrl: null,
+  });
+});
+
+test('brand assets accept site paths and http urls, nothing else', () => {
+  const { branding } = parseRuntimeConfig({
+    branding: {
+      appName: ' Acme Chat ',
+      logoUrl: '/branding/logo.svg',
+      faviconUrl: 'https://cdn.example/favicon.png',
+      themeUrl: 'javascript:alert(1)',
+    },
+  });
+
+  expect(branding).toEqual({
+    appName: 'Acme Chat',
+    logoUrl: '/branding/logo.svg',
+    faviconUrl: 'https://cdn.example/favicon.png',
+    themeUrl: null,
+  });
+});
+
+test('a broken links block does not discard the branding next to it', () => {
+  const parsed = parseRuntimeConfig({ links: 'no', branding: { appName: 'Acme' } });
+
+  expect(parsed.branding.appName).toBe('Acme');
+  expect(parsed.links).toEqual({
+    help: null,
+    privacy: null,
+    bugReport: null,
+    supportRoom: null,
+    terms: [],
+  });
+});
+
+test('links are read with trailing slashes trimmed', () => {
+  const { links } = parseRuntimeConfig({
+    links: {
+      help: 'https://help.example/',
+      privacy: 'ftp://privacy.example',
+      terms: [{ text: 'Terms', url: 'https://terms.example' }],
+      supportRoom: '#help:example.org',
+    },
+  });
+
+  expect(links).toEqual({
+    help: 'https://help.example',
+    privacy: null,
+    bugReport: null,
+    supportRoom: '#help:example.org',
+    terms: [{ text: 'Terms', url: 'https://terms.example' }],
+  });
+});
+
+test('auth policy falls back field by field', () => {
+  expect(
+    parseRuntimeConfig({
+      auth: { ssoRedirect: 'always', disableRegistration: true, deviceDisplayName: 'Acme web' },
+    }).auth
+  ).toEqual({
+    ssoRedirect: null,
+    disableRegistration: true,
+    logoutRedirectUrl: null,
+    deviceDisplayName: 'Acme web',
+  });
+});

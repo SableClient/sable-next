@@ -12,7 +12,8 @@ vi.mock('#lib/core/context.js');
 vi.mock('#lib/rooms/presence.svelte.js', () => ({
   usePresenceStore: () => ({ get: () => null }),
 }));
-vi.mock('#lib/config/runtime-config.js', () => ({
+vi.mock('#lib/config/runtime-config.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/config/runtime-config.js')>()),
   runtimeConfig: () => Promise.resolve({ disableAccountSwitcher: false, push: null }),
 }));
 vi.mock('#lib/settings/preferences.svelte.js', async (importOriginal) => ({

@@ -7,7 +7,7 @@
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
   import PlusCircleIcon from 'phosphor-svelte/lib/PlusCircleIcon';
 
-  import { SABLE_DONATE_URL, SABLE_SOURCE_URL, SABLE_SUPPORT_ROOM } from '#lib/config/links.js';
+  import { SABLE_DONATE_URL, SABLE_SOURCE_URL, SABLE_SUPPORT_ROOM } from '#lib/deployment/links.js';
   import { readReturningUser } from '#lib/features/auth/flow/auth-flow.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
