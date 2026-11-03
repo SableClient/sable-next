@@ -576,6 +576,22 @@ fn lock_holder() -> String {
     )
 }
 
+/// Android runs in one process with one client per store, so it needs neither SDK lock.
+/// The iOS notification extension shares the stores from another process.
+#[cfg(not(target_family = "wasm"))]
+fn store_lock(holder: &str) -> matrix_sdk_common::cross_process_lock::CrossProcessLockConfig {
+    if cfg!(target_os = "ios") {
+        matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::multi_process(
+            holder.to_owned(),
+        )
+    } else {
+        matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::SingleProcess
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+const OAUTH_REFRESH_LOCK: bool = !cfg!(target_os = "android");
+
 async fn build_account_client(
     builder: ClientBuilder,
     store_id: &str,
@@ -598,12 +614,7 @@ async fn build_account_client(
     {
         let _ = persistent_event_cache;
         let holder = lock_holder();
-        #[cfg(any(target_os = "android", target_os = "ios"))]
-        let lock = matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::multi_process(
-            holder.clone(),
-        );
-        #[cfg(not(any(target_os = "android", target_os = "ios")))]
-        let lock = matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::SingleProcess;
+        let lock = store_lock(&holder);
 
         let key = role.store_key(store_id).await?;
         let store = role
@@ -635,10 +646,11 @@ async fn build_account_client(
             .build()
             .await?;
         // Before any restore or login, which is when the SDK sets the lock up.
-        if let Err(error) = client
-            .oauth()
-            .enable_cross_process_refresh_lock(holder)
-            .await
+        if OAUTH_REFRESH_LOCK
+            && let Err(error) = client
+                .oauth()
+                .enable_cross_process_refresh_lock(holder)
+                .await
         {
             tracing::error!("could not enable the OAuth refresh lock: {error}");
         }

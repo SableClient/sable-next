@@ -190,6 +190,8 @@ pub(super) async fn open_push_client(
 ) -> Option<PushClient> {
     let account = saved_push_account(store_dir, user_id, device_id).await?;
     let base_store = store_dir.to_str()?;
+    // Held while the client lives, so a core opening this store waits for it to be dropped.
+    let lease = crate::session::store_lease(&account.store_id).await;
     let client = crate::session::restore_notification_client(
         &account.store_id,
         &account.session,
@@ -201,7 +203,7 @@ pub(super) async fn open_push_client(
     Some(PushClient {
         client,
         refreshes: true,
-        _lease: None,
+        _lease: Some(lease),
     })
 }
 

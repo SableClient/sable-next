@@ -358,7 +358,7 @@ async fn pusher_upkeep_uses_the_client_of_the_core_in_the_process() {
 }
 
 #[tokio::test]
-async fn a_core_does_not_wait_for_a_push_that_opened_the_store_before_it() {
+async fn a_core_opens_a_store_only_once_the_push_that_opened_it_is_done() {
     let data_dir = tempfile::tempdir().unwrap();
     let server = MatrixMockServer::new().await;
     server.mock_versions().ok().mount().await;
@@ -375,7 +375,42 @@ async fn a_core_does_not_wait_for_a_push_that_opened_the_store_before_it() {
         base.to_str().unwrap(),
         Box::new(crate::store::ExclusiveFileSessionStore::new(&base)),
     );
+    let open = async {
+        let accounts = core.accounts().await.unwrap();
+        let lease = crate::session::store_lease(&account.store_id).await;
+        core.saved_account_client(&accounts.accounts[0], &lease)
+            .await
+            .unwrap();
+    };
+    tokio::pin!(open);
 
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(200), &mut open)
+            .await
+            .is_err(),
+        "two clients on one crypto store overwrite each other's Olm sessions"
+    );
+    drop(cold);
+    tokio::time::timeout(std::time::Duration::from_secs(5), open)
+        .await
+        .expect("the core opens once the push is done");
+}
+
+#[tokio::test]
+async fn a_core_drops_an_idle_cached_push_client_before_opening_its_store() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let server = MatrixMockServer::new().await;
+    server.mock_versions().ok().mount().await;
+    let account = saved_login(&server, data_dir.path()).await;
+    let base = cold_push_store_dir(data_dir.path());
+    let cached = cold_host(&base, "@alice:example.org", "A").await.unwrap();
+    assert!(matches!(*cached, PushHost::Own(_)));
+    drop(cached);
+
+    let (core, _) = crate::Core::new(
+        base.to_str().unwrap(),
+        Box::new(crate::store::ExclusiveFileSessionStore::new(&base)),
+    );
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         let accounts = core.accounts().await.unwrap();
         let lease = crate::session::store_lease(&account.store_id).await;
@@ -384,8 +419,7 @@ async fn a_core_does_not_wait_for_a_push_that_opened_the_store_before_it() {
             .unwrap();
     })
     .await
-    .expect("the core opens beside a running push");
-    drop(cold);
+    .expect("the core evicts the idle push client instead of waiting on it");
 }
 
 #[tokio::test]
