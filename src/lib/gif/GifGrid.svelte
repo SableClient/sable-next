@@ -144,7 +144,7 @@
 
   .gif-grid ul {
     column-gap: var(--space-100);
-    columns: 2;
+    columns: 9rem;
     list-style: none;
     margin: 0;
     padding: 0;
