@@ -260,7 +260,8 @@
   });
   let spacedRoomIds = $derived(claimedRoomIds(roomList.rooms));
   let sortKey = $derived<'directSort' | 'roomSort'>(directSection ? 'directSort' : 'roomSort');
-  let compareRooms = $derived(roomComparator(preferences[sortKey]));
+  let listOrder = $derived(new Map(roomList.rooms.map((room, index) => [room.room_id, index])));
+  let compareRooms = $derived(roomComparator(preferences[sortKey], listOrder));
   let favouriteView = $derived(activeSpaceId ?? section);
   let groupFavourites = $derived(groupsFavourites(favouriteView));
   let spaceRootItems = $derived(groupFavourites ? withoutFavourites(spaceTree) : spaceTree);

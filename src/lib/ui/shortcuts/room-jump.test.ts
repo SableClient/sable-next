@@ -128,12 +128,12 @@ test('filterRoomsByQuery keeps only the prefixed kind', () => {
   expect(filterRoomsByQuery(rooms, '@desi').map((r) => r.room_id)).toEqual(['!c:example.org']);
 });
 
-test('an empty query lists recent rooms, newest first, without spaces', () => {
+test('an empty query keeps the room list order, without spaces', () => {
   const rooms = [
-    room({ room_id: '!a:example.org', latest_event: latest(10) }),
-    room({ room_id: '!b:example.org', latest_event: latest(30) }),
-    room({ room_id: '!c:example.org', room_kind: 'space', latest_event: latest(40) }),
+    room({ room_id: '!b:example.org' }),
+    room({ room_id: '!c:example.org', room_kind: 'space' }),
     room({ room_id: '!d:example.org', latest_event: latest(20) }),
+    room({ room_id: '!a:example.org', latest_event: latest(30) }),
   ];
 
   expect(filterRoomsByQuery(rooms, '').map((r) => r.room_id)).toEqual([

@@ -316,15 +316,38 @@ test('home lists every joined room, including the children of joined spaces', as
   expect(roomNames()).toEqual(['Plain', 'Direct', 'Child']);
 });
 
-test('home orders rooms by their latest event', async () => {
+test('home keeps the core order while latest events are still loading', async () => {
   roomsFixture.rooms = [
-    makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', latest_event: latestAt(10) }),
     makeRoom({ room_id: '!silent:example.org', name: 'Silent' }),
     makeRoom({ room_id: '!busy:example.org', name: 'Busy', latest_event: latestAt(30) }),
+    makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', latest_event: latestAt(10) }),
   ];
 
   await mountNav();
-  expect(roomNames()).toEqual(['Busy', 'Quiet', 'Silent']);
+  expect(roomNames()).toEqual(['Silent', 'Busy', 'Quiet']);
+});
+
+test('unspaced rooms and direct messages keep the core order while latest events load', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!dm-pending:example.org', name: 'Pending DM', is_direct: true }),
+    makeRoom({ room_id: '!pending:example.org', name: 'Pending' }),
+    makeRoom({ room_id: '!busy:example.org', name: 'Busy', latest_event: latestAt(30) }),
+    makeRoom({
+      room_id: '!dm-busy:example.org',
+      name: 'Busy DM',
+      is_direct: true,
+      latest_event: latestAt(20),
+    }),
+  ];
+
+  visit('/rooms');
+  const unspaced = await mountNav();
+  expect(roomNames()).toEqual(['Pending', 'Busy']);
+  unspaced.unmount();
+
+  visit('/direct');
+  await mountNav();
+  expect(roomNames()).toEqual(['Pending DM', 'Busy DM']);
 });
 
 test('home and the direct page keep their own sort order', async () => {
@@ -335,8 +358,8 @@ test('home and the direct page keep their own sort order', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!b:example.org', name: 'B', latest_event: latestAt(30) }),
     makeRoom({ room_id: '!a:example.org', name: 'A', latest_event: latestAt(10) }),
-    dm('!y:example.org', 'Y', 10),
     dm('!z:example.org', 'Z', 30),
+    dm('!y:example.org', 'Y', 10),
   ];
 
   const home = await mountNav();
@@ -376,13 +399,13 @@ test('a view that stops grouping favourites keeps them in recency order', async 
   visit('/rooms');
   roomsFixture.rooms = [
     makeRoom({ room_id: '!busy:example.org', name: 'Busy', latest_event: latestAt(30) }),
+    makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', latest_event: latestAt(20) }),
     makeRoom({
       room_id: '!starred:example.org',
       name: 'Starred',
       tags: ['favourite'],
       latest_event: latestAt(10),
     }),
-    makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', latest_event: latestAt(20) }),
   ];
   setGroupsFavourites('unspaced', false);
 

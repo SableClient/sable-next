@@ -85,6 +85,7 @@ const NOBODY_TYPING: readonly string[] = [];
 
 export class RoomList {
   #source = $state.raw<RoomListItemView[]>([]);
+  /** In the core's recency order, so a filtered view needs no recency sort of its own. */
   rooms = $derived(withDmSpaceChildren(this.#source, dmSpaces.links));
   // eslint-disable-next-line svelte/prefer-svelte-reactivity
   typingUsers = $state.raw<ReadonlyMap<string, readonly string[]>>(new Map());

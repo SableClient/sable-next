@@ -26,12 +26,6 @@ export function parseJumpQuery(query: string): { kind: JumpKind | null; text: st
   return { kind, text: (kind === null ? trimmed : trimmed.slice(1)).trim() };
 }
 
-function byActivity(rooms: readonly RoomListItemView[]): RoomListItemView[] {
-  return rooms
-    .slice()
-    .sort((a, b) => (b.latest_event?.timestamp ?? 0) - (a.latest_event?.timestamp ?? 0));
-}
-
 export function filterRoomsByQuery(
   rooms: readonly RoomListItemView[],
   query: string,
@@ -44,7 +38,7 @@ export function filterRoomsByQuery(
   if (text === '') {
     const recents =
       kind === null ? candidates.filter((room) => room.room_kind !== 'space') : candidates;
-    return byActivity(recents).slice(0, limit);
+    return recents.slice(0, limit);
   }
 
   return fuzzyFilter(candidates, text, (room) => room.display_name, limit);

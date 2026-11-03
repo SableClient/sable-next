@@ -30,8 +30,8 @@ export function roomRow(room: RoomListItemView): RoomNavRow {
   return row;
 }
 
-export function byRecency(left: RoomNavRow, right: RoomNavRow): number {
-  return (right.room?.latest_event?.timestamp ?? 0) - (left.room?.latest_event?.timestamp ?? 0);
+function listPosition(listOrder: ReadonlyMap<string, number>, row: RoomNavRow): number {
+  return listOrder.get(row.roomId) ?? Number.MAX_SAFE_INTEGER;
 }
 
 function byName(left: RoomNavRow, right: RoomNavRow): number {
@@ -40,10 +40,15 @@ function byName(left: RoomNavRow, right: RoomNavRow): number {
   });
 }
 
-export function roomComparator(sort: RoomSort): (left: RoomNavRow, right: RoomNavRow) => number {
+/** `recent` keeps the core's room list order, which falls back to the recency stamp
+ * while a room's latest event is still unknown. */
+export function roomComparator(
+  sort: RoomSort,
+  listOrder: ReadonlyMap<string, number>
+): (left: RoomNavRow, right: RoomNavRow) => number {
   if (sort === 'name-asc') return byName;
   if (sort === 'name-desc') return (left, right) => byName(right, left);
-  return byRecency;
+  return (left, right) => listPosition(listOrder, left) - listPosition(listOrder, right);
 }
 
 export function isFavourite(row: RoomNavRow): boolean {

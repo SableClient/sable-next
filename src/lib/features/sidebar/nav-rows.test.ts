@@ -2,14 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { RoomListItemView, RoomTag } from '#src/generated/protocol';
 
-import {
-  byRecency,
-  isFavourite,
-  roomComparator,
-  roomRow,
-  treeRows,
-  withoutFavourites,
-} from './nav-rows.js';
+import { isFavourite, roomComparator, roomRow, treeRows, withoutFavourites } from './nav-rows.js';
 import type { SpaceTreeNode, SpaceTreeRoom, SpaceTreeSpace } from './space-tree.js';
 
 function room(roomId: string, overrides: Partial<RoomListItemView> = {}): RoomListItemView {
@@ -55,14 +48,25 @@ test('a room keeps the same row while its summary object is unchanged', () => {
   expect(roomRow(room('!a'))).not.toBe(roomRow(summary));
 });
 
-test('rows sort newest first, rooms without events last', () => {
+test('recent follows the core list order, not the latest event', () => {
   const rows = [
     roomRow(room('!old', { latest_event: { timestamp: 1 } as RoomListItemView['latest_event'] })),
+    roomRow(room('!unlisted')),
     roomRow(room('!none')),
     roomRow(room('!new', { latest_event: { timestamp: 5 } as RoomListItemView['latest_event'] })),
   ];
+  const listOrder = new Map([
+    ['!none', 0],
+    ['!new', 1],
+    ['!old', 2],
+  ]);
 
-  expect(rows.sort(byRecency).map((row) => row.roomId)).toEqual(['!new', '!old', '!none']);
+  expect(rows.sort(roomComparator('recent', listOrder)).map((row) => row.roomId)).toEqual([
+    '!none',
+    '!new',
+    '!old',
+    '!unlisted',
+  ]);
 });
 
 test('a row is a favourite only when its room carries the tag', () => {
@@ -95,12 +99,17 @@ test('removing favourites drops emptied categories but keeps links', () => {
 
 test('rooms sort by name ignoring case, or by recency', () => {
   const rows = [
-    roomRow(room('!b', { name: 'bravo', latest_event: { timestamp: 3 } as never })),
-    roomRow(room('!a', { name: 'Alpha', latest_event: { timestamp: 1 } as never })),
-    roomRow(room('!c', { name: 'charlie', latest_event: { timestamp: 2 } as never })),
+    roomRow(room('!b', { name: 'bravo' })),
+    roomRow(room('!a', { name: 'Alpha' })),
+    roomRow(room('!c', { name: 'charlie' })),
   ];
+  const listOrder = new Map([
+    ['!b', 0],
+    ['!c', 1],
+    ['!a', 2],
+  ]);
   const order = (sort: Parameters<typeof roomComparator>[0]): string[] =>
-    [...rows].sort(roomComparator(sort)).map((row) => row.roomId);
+    [...rows].sort(roomComparator(sort, listOrder)).map((row) => row.roomId);
 
   expect(order('name-asc')).toEqual(['!a', '!b', '!c']);
   expect(order('name-desc')).toEqual(['!c', '!b', '!a']);

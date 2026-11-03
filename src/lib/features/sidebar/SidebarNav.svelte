@@ -128,12 +128,7 @@
   let openRoomId = $derived(findRoomByPathId(roomList.rooms, roomId)?.room_id);
   let otherDirectRooms = $derived(allDirectRooms.filter((room) => room.room_id !== openRoomId));
   let directRooms = $derived(
-    otherDirectRooms
-      .filter((room) => hasUnread(roomList.badgeUnreadFor(room)))
-      .sort(
-        (left, right) => (right.latest_event?.timestamp ?? 0) - (left.latest_event?.timestamp ?? 0)
-      )
-      .slice(0, 3)
+    otherDirectRooms.filter((room) => hasUnread(roomList.badgeUnreadFor(room))).slice(0, 3)
   );
   let directUnread = $derived(
     unreadCounts(
