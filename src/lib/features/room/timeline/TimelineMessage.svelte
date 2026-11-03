@@ -87,6 +87,9 @@
     onSwipeMembers,
   }: TimelineItemProps = $props();
 
+  const labelId = $props.id();
+  const named = $derived(layout === 'compact' || !collapsed);
+
   const row = new TimelineRow(() => ({
     item,
     roomId,
@@ -333,7 +336,7 @@
     {/if}
     <div class="message-content">
       {#if !collapsed && layout !== 'compact'}
-        <header>
+        <header id={`${labelId}-head`}>
           <Skeleton class="sender placeholder-name" />
           <div class="message-details">
             <time><Skeleton class="placeholder-time" /></time>
@@ -367,6 +370,8 @@
       },
     ]}
     data-selected={selected ? 'true' : undefined}
+    aria-labelledby={named ? `${labelId}-head` : undefined}
+    aria-describedby={`${labelId}-body`}
     style:--pmp-on-light={nameColorOnLight(sender.tint?.color_on_light) ?? undefined}
     style:--pmp-on-dark={nameColorOnDark(sender.tint?.color_on_dark) ?? undefined}
     style:--sender-name-color={row.senderColors.nameColor}
@@ -412,7 +417,7 @@
       style:--receipt-reserve={trailingReceiptBadge ? `${String(receiptWidth)}px` : undefined}
     >
       {#if layout === 'compact'}
-        <div class="compact-gutter">
+        <div class="compact-gutter" id={`${labelId}-head`}>
           {@render messageTime(formatTime)}
           <div class="compact-user">
             {#if avatarsInHeaders}
@@ -483,7 +488,7 @@
           </div>
         </header>
       {/if}
-      <div class="message-main">
+      <div class="message-main" id={`${labelId}-body`}>
         {#if layout === 'compact' || collapsed}
           {@render actions()}
         {/if}
@@ -745,6 +750,11 @@
     background: var(--surface-container-active);
     border-radius: var(--radius);
     box-shadow: inset 0 0 0 var(--border-width) var(--surface-container-line);
+  }
+
+  .message:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: calc(-1 * var(--focus-ring-offset));
   }
 
   .message:has(:focus-visible):not([data-selected='true'], :has(.reply-preview:focus-visible)) {

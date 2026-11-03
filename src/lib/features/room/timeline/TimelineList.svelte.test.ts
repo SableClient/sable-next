@@ -275,7 +275,7 @@ test('announces new arrivals separately from virtualized history', async () => {
   });
   viewport();
   await runAnimationFrames();
-  expect(document.querySelector('[role="log"]')?.getAttribute('aria-live')).toBe('off');
+  expect(document.querySelector('[role="feed"]')?.getAttribute('aria-busy')).toBe('false');
   const announcement = () =>
     document.querySelector('[data-timeline-announcements]')?.textContent.trim();
   expect(announcement()).toBe('');
@@ -284,10 +284,10 @@ test('announces new arrivals separately from virtualized history', async () => {
   expect(announcement()).toBe('');
   roomTimeline.items = [...roomTimeline.items, item('new')];
   await runAnimationFrames();
-  expect(announcement()).toBe('1 new message');
+  expect(announcement()).toBe('Alice: new');
   roomTimeline.items = [...roomTimeline.items, { ...item('own'), is_own: true }];
   await runAnimationFrames();
-  expect(announcement()).toBe('1 new message');
+  expect(announcement()).toBe('Alice: new');
 });
 
 test('a permalink whose context does not fill the viewport paginates on its own', async () => {
@@ -1116,7 +1116,7 @@ test('does not eagerly paginate a scrollable initial timeline', async () => {
   });
 
   const element = viewport();
-  expect(element.getAttribute('tabindex')).toBe('0');
+  expect(element.getAttribute('tabindex')).toBe('-1');
   Object.defineProperties(element, {
     scrollHeight: { configurable: true, value: 1_000 },
     scrollTop: { configurable: true, writable: true, value: 0 },
@@ -3088,4 +3088,93 @@ test('a timeline that falls back from an unread context to live opens at the lat
   await vi.waitFor(() => {
     expect(jumps).toHaveBeenCalledWith(null, 'start');
   });
+});
+
+test('the feed is one tab stop and arrows, Home and End move between messages', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = Array.from({ length: 5 }, (_, index) => item(String(index)));
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+  const element = viewport();
+  await runAnimationFrames();
+
+  const feed = document.querySelector('[role="feed"]');
+  expect(feed).toBe(element);
+  const articles = [...element.querySelectorAll<HTMLElement>('article.message')];
+  expect(articles.length).toBe(5);
+  expect(articles.filter((article) => article.tabIndex === 0)).toHaveLength(1);
+  const rowIndex = Number(articles[0].closest<HTMLElement>('[data-index]')?.dataset.index);
+  expect(articles[0].getAttribute('aria-posinset')).toBe(String(rowIndex + 1));
+  expect(articles[0].getAttribute('aria-setsize')).toBe('-1');
+  expect(articles[0].getAttribute('aria-labelledby')).not.toBeNull();
+
+  articles[1].focus();
+  await userEvent.keyboard('{ArrowDown}');
+  expect(document.activeElement).toBe(articles[2]);
+  await userEvent.keyboard('{Home}');
+  expect(document.activeElement).toBe(articles[0]);
+  await userEvent.keyboard('{End}');
+  expect(document.activeElement).toBe(articles[4]);
+});
+
+test('Enter moves into a message and Escape returns to it', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('a'), item('b')];
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+        onReply: () => {},
+      },
+    },
+  });
+  const element = viewport();
+  await runAnimationFrames();
+  const article = element.querySelector<HTMLElement>('article.message');
+  if (!article) throw new Error('message not rendered');
+  article.focus();
+  const link = document.createElement('a');
+  link.href = 'https://example.org';
+  article.querySelector('.message-main')?.append(link);
+  await Promise.resolve();
+  await userEvent.keyboard('{Enter}');
+  expect(article.contains(document.activeElement) && document.activeElement !== article).toBe(true);
+  await userEvent.keyboard('{Escape}');
+  expect(document.activeElement).toBe(article);
+});
+
+test('Shift+F10 and the ContextMenu key raise the message context menu', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('a')];
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+  const element = viewport();
+  await runAnimationFrames();
+  const article = element.querySelector<HTMLElement>('article.message');
+  if (!article) throw new Error('message not rendered');
+  const raised = vi.fn();
+  article.addEventListener('contextmenu', raised);
+  article.focus();
+  await userEvent.keyboard('{Shift>}{F10}{/Shift}');
+  await userEvent.keyboard('{ContextMenu}');
+  expect(raised).toHaveBeenCalledTimes(2);
 });

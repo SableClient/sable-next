@@ -34,6 +34,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import { rovingFocus } from '#lib/ui/roving-focus.js';
   import { isEditableTarget } from '#lib/ui/shortcuts/binding.js';
 
   import MessageContextMenu from '../messages/MessageContextMenu.svelte';
@@ -729,6 +730,99 @@
     if (!controller || !revealed || !isEditableTarget(event.target)) return;
     if (nearLatest && !windowState.pinned) void controller.jumpTo(null, 'start');
   }
+  const ARTICLE = 'article.message:not([aria-hidden="true"])';
+  const KEY_PAGE_ITEMS = 8;
+  const FOCUSABLE = 'button, a[href], input, textarea, select, [tabindex]';
+  const feedItems = rovingFocus({
+    orientation: 'vertical',
+    selector: ARTICLE,
+    page: KEY_PAGE_ITEMS,
+    contain: FOCUSABLE,
+    initial: (items) => items.at(-1),
+    restoreFocus: false,
+    onBoundary: (move, from, distance) => void moveFocus(move, from, distance),
+    annotate: (item) => {
+      const row = item.closest<HTMLElement>('[data-index]');
+      const position = row ? String(Number(row.dataset.index) + 1) : null;
+      if (position && item.getAttribute('aria-posinset') !== position) {
+        item.setAttribute('aria-posinset', position);
+        item.setAttribute('aria-setsize', '-1');
+      }
+    },
+  });
+  function isArticleEntry({ group, item }: RowValue): boolean {
+    return group === null && item.row !== 'annotation';
+  }
+  function articleFor(key: string): HTMLElement | null | undefined {
+    return viewport?.querySelector<HTMLElement>(
+      `[data-timeline-key="${CSS.escape(key)}"] ${ARTICLE}`
+    );
+  }
+  async function moveFocus(move: 'start' | 'end', from: HTMLElement, distance: number) {
+    const engine = controller;
+    const key = from.closest<HTMLElement>('[data-timeline-key]')?.dataset.timelineKey;
+    const at = entries.findIndex((entry) => entry.key === key);
+    if (!engine || at < 0) return;
+    const ahead = move === 'end' ? entries.slice(at + 1) : entries.slice(0, at).reverse();
+    const candidates = ahead.filter((entry) => isArticleEntry(entry.value));
+    const target =
+      distance === Infinity
+        ? candidates.at(-1)
+        : candidates[Math.min(distance, candidates.length) - 1];
+    if (!target) {
+      if (move === 'start' && !pagination.exhausted && timeline.backwardPagination !== 'end') {
+        void requestHistory()
+          .then((end) => {
+            pagination.exhausted = end;
+          })
+          .catch((error: unknown) => {
+            console.warn('[sable timeline] loading history from the keyboard failed', error);
+          });
+      }
+      return;
+    }
+    let article = articleFor(target.key);
+    if (!article) {
+      focus.cancel();
+      if (!(await engine.jumpTo(target.key, 'center'))) return;
+      await flushed();
+      article = articleFor(target.key);
+    }
+    article?.focus();
+  }
+  function openMenuFromKeyboard(article: HTMLElement): void {
+    const rect = article.getBoundingClientRect();
+    const top = Math.max(rect.top, viewport?.getBoundingClientRect().top ?? rect.top);
+    article.dispatchEvent(
+      new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.left + Math.min(rect.width / 2, 48),
+        clientY: top + Math.min(rect.height / 2, 24),
+      })
+    );
+  }
+  function feedKeydown(event: KeyboardEvent): void {
+    const target = event.target;
+    if (!(target instanceof HTMLElement) || event.defaultPrevented) return;
+    const article = target.closest<HTMLElement>(ARTICLE);
+    if (!article) return;
+    const plain = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
+    if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+      event.preventDefault();
+      openMenuFromKeyboard(article);
+    } else if (target === article && plain && (event.key === 'Enter' || event.key === 'F2')) {
+      const control =
+        article.querySelector<HTMLElement>('.message-actions button') ??
+        article.querySelector<HTMLElement>(FOCUSABLE);
+      if (!control) return;
+      event.preventDefault();
+      control.focus();
+    } else if (target !== article && plain && event.key === 'Escape' && !isEditableTarget(target)) {
+      event.preventDefault();
+      article.focus();
+    }
+  }
   let handledFocus: string | null = null;
   let heldContext = $state<string | null>(null);
   $effect(() => {
@@ -1081,7 +1175,11 @@
   atLatest={windowState.pinned && timeline.forwardPagination === 'end'}
   onRead={markRead}
 />
-<TimelineAnnouncements {timeline} {visibleItems} />
+<TimelineAnnouncements
+  {timeline}
+  {visibleItems}
+  atLiveEdge={windowState.pinned && timeline.reachesLatest}
+/>
 <MessageContextMenu menu={messageMenu} />
 <MessageDialogHost
   {dialogs}
@@ -1181,18 +1279,20 @@
       </div>
     {/if}
     <div class={['timeline-viewport', { initial: !revealed }]}>
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div
         bind:this={viewport}
         class="viewport"
         aria-label={i18n.t('timeline.label')}
-        tabindex="0"
+        aria-busy={timeline.backwardPagination === 'loading' || futureLoading}
+        tabindex="-1"
+        onkeydown={feedKeydown}
         {@attach mountWindow}
+        {@attach feedItems}
         {@attach userScrollMarker}
         {@attach scrollLock(scrollLocked || menuOpen)}
         {@attach dismissKeyboardOnScroll}
-        role="log"
-        aria-live="off"
+        role="feed"
       >
         <div class={['items', `layout-${preferences.layout}`]}>
           <div class="window-rows">
