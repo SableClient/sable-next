@@ -664,12 +664,12 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends ca-certificates git
-          git init -q /home/runner/work/Sable/Sable
-          cd /home/runner/work/Sable/Sable
+          git init -q /shared/workdir/SableClient/sable-next
+          cd /shared/workdir/SableClient/sable-next
           git fetch -q --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "refs/tags/$TAG"
           git checkout -q FETCH_HEAD
       - name: Rebuild and compare
-        working-directory: /home/runner/work/Sable/Sable
+        working-directory: /shared/workdir/SableClient/sable-next
         run: scripts/ci/reproduce-android.sh "$VERSION"
   electron-linux:
     name: Linux x86_64 (Electron)

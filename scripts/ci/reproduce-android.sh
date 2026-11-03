@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Rebuilds a released FOSS APK the way IzzyOnDroid does and checks it against the
-# published one. Runs as root in a fresh ubuntu:noble, from the tag's checkout:
+# published one. Runs as root in a fresh ubuntu:noble, from the tag's checkout, and
+# builds as the runner user:
 #
-#   docker run --rm -v "$PWD:/home/runner/work/Sable/Sable" -w /home/runner/work/Sable/Sable \
+#   docker run --rm -v "$PWD:/shared/workdir/SableClient/sable-next" -w /shared/workdir/SableClient/sable-next \
 #     ubuntu:noble@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac \
 #     scripts/ci/reproduce-android.sh 2.1.7
 set -euo pipefail
@@ -26,21 +27,28 @@ curl -fsSLo "$downloads/node.tar.xz" \
 echo "$node_sha256  $downloads/node.tar.xz" | sha256sum -c
 tar -xJf "$downloads/node.tar.xz" -C /opt
 
-export ANDROID_HOME=/opt/android-sdk
+export ANDROID_HOME=/usr/local/lib/android/sdk
 curl -fsSLo "$downloads/tools.zip" "$tools_url"
 echo "$tools_sha256  $downloads/tools.zip" | sha256sum -c
 mkdir -p "$ANDROID_HOME/cmdline-tools"
 unzip -q "$downloads/tools.zip" -d "$ANDROID_HOME/cmdline-tools"
 mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
-export PATH="/opt/node-v$node_version-linux-x64/bin:$HOME/.cargo/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/$build_tools:$PATH"
+export PATH="/opt/node-v$node_version-linux-x64/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/$build_tools:$PATH"
 (yes || true) | sdkmanager --licenses >/dev/null
-sdkmanager "platforms;android-36" "build-tools;$build_tools" "ndk;$ndk_version"
+sdkmanager "platforms;android-35" "platforms;android-36" "build-tools;$build_tools" "ndk;$ndk_version"
 export NDK_HOME="$ANDROID_HOME/ndk/$ndk_version"
 
-# IzzyOnDroid builds unsigned, then copies the signature over from our APK.
+npm install --global corepack@latest
 corepack enable pnpm
-COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile
-pnpm android:build --version "$version"
+
+useradd --home-dir /shared/workdir --no-create-home runner
+chown runner: /shared/workdir
+chown -R runner: "$PWD"
+
+# IzzyOnDroid builds unsigned, then copies the signature over from our APK.
+runuser -u runner -- env HOME=/shared/workdir PATH="/shared/workdir/.cargo/bin:$PATH" \
+  ANDROID_HOME="$ANDROID_HOME" NDK_HOME="$NDK_HOME" COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+  bash -c 'pnpm install --frozen-lockfile && pnpm android:build --version "$1"' _ "$version"
 
 curl -fsSLo "$downloads/released.apk" \
   "https://git.sable.moe/SableClient/sable-next/releases/download/v$version/sable-$version-android-aarch64-foss.apk"
