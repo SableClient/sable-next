@@ -18,7 +18,7 @@ includes = ["scripts"]
 excludes = ["scripts/ci"]
 
 [tools]
-node = "24.22.0"
+node = "24.22.2"
 "github:wasm-bindgen/wasm-bindgen" = { version = "0.2.130" }
 "github:WebAssembly/binaryen" = { version = "133", version_prefix = "version_" }
 "aqua:watchexec/watchexec" = "2.8.0"
@@ -33,7 +33,7 @@ outputs = ['node_modules/.pnpm/lock.yaml']
 [tasks.knope]
 description = "Run Knope, the changelog and release tool"
 run = "knope"
-tools = { "github:knope-dev/knope" = { version = "0.23.0", version_prefix = "knope/v" } }
+tools = { "github:knope-dev/knope" = { version = "0.23.2", version_prefix = "knope/v" } }
 
 [tasks."knope:document-change"]
 description = "Document a change with Knope"
@@ -114,13 +114,13 @@ run = [
   "cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-test",
 ]
 raw = true
-tools = { "github:nextest-rs/nextest" = { version = "0.9.148", version_prefix = "cargo-nextest-" } }
+tools = { "github:nextest-rs/nextest" = { version = "0.9.150", version_prefix = "cargo-nextest-" } }
 
 [tasks.mutants]
 description = "Mutation-test Rust code, e.g. `mise run mutants -- --file crates/sable-core/src/messages.rs`"
 run = "cargo mutants --test-tool nextest --all-features"
 raw = true
-tools = { "cargo:cargo-mutants" = "27.1.0", "github:nextest-rs/nextest" = { version = "0.9.148", version_prefix = "cargo-nextest-" } }
+tools = { "cargo:cargo-mutants" = "27.1.0", "github:nextest-rs/nextest" = { version = "0.9.150", version_prefix = "cargo-nextest-" } }
 
 [tasks.doc]
 description = "Build Rust documentation with warnings denied"
@@ -222,7 +222,7 @@ run = "tofu"
 dir = "infra/web"
 raw_args = true
 hide = true
-tools = { "opentofu" = "1.13.1" }
+tools = { "opentofu" = "1.13.2" }
 
 [tasks."check:settings-changes"]
 description = "Check that the generated settings changes match the release tags"
