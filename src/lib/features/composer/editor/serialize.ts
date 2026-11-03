@@ -361,8 +361,11 @@ function expandMfm(node: ProseMirrorNode): ProseMirrorNode {
 }
 
 function html(doc: ProseMirrorNode): string {
-  const holder = document.createElement('div');
-  holder.append(DOMSerializer.fromSchema(composerSchema).serializeFragment(doc.content));
+  const inert = document.implementation.createHTMLDocument('');
+  const holder = inert.createElement('div');
+  holder.append(
+    DOMSerializer.fromSchema(composerSchema).serializeFragment(doc.content, { document: inert })
+  );
   for (const paragraph of holder.querySelectorAll('li > p:only-child, dd > p:only-child')) {
     paragraph.replaceWith(...paragraph.childNodes);
   }

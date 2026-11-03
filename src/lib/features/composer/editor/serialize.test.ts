@@ -2,7 +2,7 @@
 
 import { Fragment, Slice, type Mark, type Node as ProseMirrorNode } from 'prosemirror-model';
 import { EditorState } from 'prosemirror-state';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, onTestFinished, test, vi } from 'vitest';
 
 import { composerSchema, parseMatrixHtml } from './schema';
 import {
@@ -559,6 +559,19 @@ test('an emote keeps its shortcode in the body and an image in the formatted bod
   expect(message.formatted).toBe(
     '<img data-mx-emoticon="" src="mxc://example.org/wave" alt="wave" title="wave" height="32">'
   );
+});
+
+test('serializing an emote never asks the page to load its mxc image', () => {
+  const createElement = vi.spyOn(document, 'createElement');
+  onTestFinished(() => {
+    createElement.mockRestore();
+  });
+
+  serializeComposer(
+    docOf(para(emoticon.create({ url: 'mxc://example.org/wave', shortcode: 'wave' })))
+  );
+
+  expect(createElement.mock.calls.map(([tag]) => tag)).not.toContain('img');
 });
 
 test('several paragraphs stay several paragraphs', () => {
