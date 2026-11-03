@@ -608,7 +608,10 @@ async fn build_account_client(
             RequestConfig::new().timeout(session_timeout(crate::tls::proxy_configured())),
         )
         .with_threading_support(THREADING_SUPPORT)
-        .with_encryption_settings(role.encryption_settings());
+        .with_encryption_settings(role.encryption_settings())
+        // In the iOS extension, an event cache takes the shared store lock, which makes the
+        // app reload its rooms' event caches and reset their open timelines.
+        .with_event_cache(role.is_account());
 
     #[cfg(not(target_family = "wasm"))]
     {
@@ -1145,6 +1148,30 @@ mod tests {
             client.decryption_settings().sender_device_trust_requirement,
             TrustRequirement::Untrusted
         ));
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn only_account_clients_keep_an_event_cache() {
+        let store = tempfile::tempdir().unwrap();
+        let store_id = store.path().to_str().unwrap();
+        crate::store_encryption::account_key(store_id)
+            .await
+            .unwrap();
+        let build = |role| {
+            build_account_client(
+                matrix_sdk::Client::builder().homeserver_url("https://example.org"),
+                store_id,
+                role,
+                true,
+            )
+        };
+
+        let notification = build(super::ClientRole::Notification).await.unwrap();
+        assert!(notification.event_cache().is_none());
+        drop(notification);
+        let account = build(super::ClientRole::Account).await.unwrap();
+        assert!(account.event_cache().is_some());
     }
 
     #[tokio::test]
