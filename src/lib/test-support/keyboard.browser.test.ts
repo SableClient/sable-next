@@ -21,6 +21,9 @@ test('axe passes a labelled control and flags an unlabelled one', async () => {
   await expectNoA11yViolations(good);
   const bad = mount('<button type="button"></button>');
   expect(await a11yViolations(bad)).toEqual([expect.stringContaining('button-name')]);
+  await expectNoA11yViolations(bad, {
+    disableRules: { 'button-name': 'fixture is intentionally bare' },
+  });
 });
 
 test('tabStops skips negative tabindex, disabled and hidden elements', () => {
