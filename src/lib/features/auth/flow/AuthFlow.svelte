@@ -320,9 +320,9 @@
 </script>
 
 <PageTitle
-  title={`${i18n.t(
+  title={i18n.t(
     isSetupRoute ? 'setup.title' : displayedStage === 0 ? 'auth.signInTitle' : 'auth.createAccount'
-  )} - Sable`}
+  )}
 />
 
 {#snippet loginStageContent(showCreateAccount: boolean)}

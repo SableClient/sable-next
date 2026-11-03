@@ -173,7 +173,7 @@
   }
 </script>
 
-<PageTitle title={`${i18n.t('nav.manageAccounts')} - Sable`} />
+<PageTitle title={i18n.t('nav.manageAccounts')} />
 
 {#snippet statusBubble()}
   <button

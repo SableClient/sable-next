@@ -48,7 +48,7 @@
   ];
 </script>
 
-<PageTitle title={`${i18n.t(titleKey)} - Sable`} />
+<PageTitle title={i18n.t(titleKey)} />
 
 <main class="home-page" aria-labelledby="home-title">
   <section class="hero">

@@ -65,7 +65,7 @@
   }
 </script>
 
-<PageTitle title={`${page.status} - Sable`} />
+<PageTitle title={String(page.status)} />
 
 <main class="error-page" aria-labelledby="error-title">
   <div class="error-content">

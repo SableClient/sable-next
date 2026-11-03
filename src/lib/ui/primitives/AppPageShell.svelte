@@ -36,7 +36,7 @@
   });
 </script>
 
-<PageTitle title={`${title} - Sable`} />
+<PageTitle {title} />
 
 <main
   class={['app-page-shell', `app-page-shell-${density}`, className]}

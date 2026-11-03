@@ -4,7 +4,7 @@ import i18next from 'i18next';
 import { flushSync } from 'svelte';
 import { expect, test } from 'vitest';
 
-import { currentLocale, i18n, setLanguage, t } from './i18n.js';
+import { currentLocale, i18n, setAppName, setLanguage, t } from './i18n.js';
 
 test('a language change re-runs t() and currentLocale() reads', async () => {
   const seen: string[] = [];
@@ -51,5 +51,26 @@ test('i18n.t reads re-run when a bundle adds a translation', () => {
   } finally {
     stop();
     i18next.removeResourceBundle('en', 'zz');
+  }
+});
+
+test('setAppName re-runs t() reads that use {{appName}}', () => {
+  const seen: string[] = [];
+  const stop = $effect.root(() => {
+    $effect(() => {
+      seen.push(t('auth.welcome'));
+    });
+  });
+
+  try {
+    flushSync();
+    expect(seen.at(-1)).toBe('Welcome to Sable');
+
+    setAppName('Acme');
+    flushSync();
+    expect(seen.at(-1)).toBe('Welcome to Acme');
+  } finally {
+    stop();
+    setAppName('Sable');
   }
 });

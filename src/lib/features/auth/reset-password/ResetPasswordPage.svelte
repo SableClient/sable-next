@@ -69,7 +69,7 @@
   }
 </script>
 
-<PageTitle title={`${i18n.t('auth.resetPasswordTitle')} - Sable`} />
+<PageTitle title={i18n.t('auth.resetPasswordTitle')} />
 
 <AuthPage
   {hasLoggedInBefore}

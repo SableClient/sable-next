@@ -12,7 +12,7 @@
   let space = $derived(findRoomByPathId(roomList.rooms, spaceId) ?? null);
 </script>
 
-<PageTitle title={`${space?.name ?? i18n.t('nav.lobby')} - Sable`} />
+<PageTitle title={space?.name ?? i18n.t('nav.lobby')} />
 
 <main class="lobby-page">
   <div class="lobby-column">

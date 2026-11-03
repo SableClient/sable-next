@@ -250,7 +250,7 @@
   }}
 />
 
-<PageTitle title="Sable" />
+<PageTitle title={appName()} />
 
 <svelte:head>
   <link rel="icon" href={favicon} />

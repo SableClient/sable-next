@@ -4,6 +4,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
 
+  import { appName } from '#lib/deployment/brand.js';
   import { SABLE_DONATE_URL, SABLE_SOURCE_URL } from '#lib/deployment/links.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { restartSetup } from '#lib/features/auth/setup/setup-record.js';
@@ -120,14 +121,14 @@
   }
 </script>
 
-<PageTitle title={`${i18n.t('settings.about')} - Sable`} />
+<PageTitle title={i18n.t('settings.about')} />
 
 <div class="about-page">
   <header class="product">
     <SableBrandMark class="about-logo" />
     <div>
       <div class="product-name">
-        <h1>Sable</h1>
+        <h1>{appName()}</h1>
         <Tooltip label={i18n.t(versionCopied ? 'common.copied' : 'common.copy')}>
           {#snippet trigger({ props })}
             <button

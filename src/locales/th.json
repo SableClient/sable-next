@@ -23,7 +23,7 @@
     "joinConversationDescription": "ระบุที่อยู่ของห้องหรือ ID ผู้ใช้ Matrix เพื่อเริ่มแชท"
   },
   "auth": {
-    "welcome": "ยินดีต้อนรับสู่ Sable",
+    "welcome": "ยินดีต้อนรับสู่ {{appName}}",
     "welcomeBack": "ยินดีต้อนรับกลับ",
     "accountProvider": "ผู้ให้บริการบัญชี",
     "checkingProvider": "กำลังตรวจสอบผู้ให้บริการ…",
@@ -240,7 +240,7 @@
     "directMessages": "ข้อความส่วนตัว",
     "markAsRead": "ทำเครื่องหมายว่าอ่านแล้ว",
     "viewSource": "ดูซอร์สโค้ด",
-    "startingSable": "กำลังเริ่ม Sable…",
+    "startingSable": "กำลังเริ่ม {{appName}}…",
     "sourceCode": "ซอร์สโค้ด",
     "searchMessages": "ค้นหาข้อความ",
     "searchRooms": "ค้นหาห้อง",

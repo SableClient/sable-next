@@ -4,5 +4,5 @@
   import PageTitle from '#lib/ui/primitives/PageTitle.svelte';
 </script>
 
-<PageTitle title={`${i18n.t('nav.alerts')} - Sable`} />
+<PageTitle title={i18n.t('nav.alerts')} />
 <AlertList />

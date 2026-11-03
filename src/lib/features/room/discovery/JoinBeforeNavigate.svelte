@@ -166,7 +166,7 @@
   }
 </script>
 
-<PageTitle title={`${preview?.name ?? i18n.t('a11y.loading')} - Sable`} />
+<PageTitle title={preview?.name ?? i18n.t('a11y.loading')} />
 
 <div class="wrapper" data-inset-owner="top">
   {#if !appLayout.current}

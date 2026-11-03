@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { appName } from '#lib/deployment/brand.js';
   import { copyText } from '#lib/platform/clipboard.js';
   import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
@@ -256,7 +257,7 @@
                 {#if pusher.pushkey === ownKey}
                   <StatusBadge variant="primary" label={i18n.t('settings.currentDevice')} />
                 {:else if ownApps.includes(pusher.app_id)}
-                  <StatusBadge variant="neutral" label="Sable" />
+                  <StatusBadge variant="neutral" label={appName()} />
                 {/if}
                 {#if pusher.activated !== null}
                   {@const activationLabel = i18n.t(

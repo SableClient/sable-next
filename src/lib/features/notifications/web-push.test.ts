@@ -17,7 +17,8 @@ vi.mock('#lib/platform/notifications.js', () => ({
 vi.mock('#lib/platform/service-worker.js', () => ({
   activeServiceWorker: mocks.activeServiceWorker,
 }));
-vi.mock('#lib/config/runtime-config.js', () => ({
+vi.mock('#lib/config/runtime-config.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/config/runtime-config.js')>()),
   runtimeConfig: mocks.runtimeConfig,
 }));
 vi.mock('#lib/notifications/room-names.js', () => ({

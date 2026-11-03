@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { appName } from '#lib/deployment/brand.js';
   import { i18n } from '#lib/i18n.js';
   import {
     closeWindow,
@@ -40,7 +41,7 @@
 
 <div class={['titlebar', kind === 'mac' && 'titlebar-mac']} {@attach trackTitlebarHeight}>
   <div class="drag" data-tauri-drag-region>
-    <span class="title">Sable</span>
+    <span class="title">{appName()}</span>
   </div>
   {#if kind === 'desktop'}
     <div class="controls">

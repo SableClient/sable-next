@@ -1,8 +1,7 @@
 import type { RuntimeConfig } from '#lib/config/runtime-config.js';
 
+import { DEFAULT_APP_NAME } from './default-app-name.js';
 import { deployment } from './deployment.js';
-
-export const DEFAULT_APP_NAME = 'Sable';
 
 export function appName(config: RuntimeConfig = deployment()): string {
   return config.branding.appName ?? DEFAULT_APP_NAME;

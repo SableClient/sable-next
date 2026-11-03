@@ -99,7 +99,7 @@
     "install": "Yükle",
     "sortNameAsc": "A'dan Z'ye",
     "sortNameDesc": "Z'den A'ya",
-    "startingSable": "Sable başlatılıyor…",
+    "startingSable": "{{appName}} başlatılıyor…",
     "stopTest": "Testi durdur",
     "supportSable": "Sable'ı Destekle",
     "homeserverUnavailable": "Ana sunucuya geçici olarak ulaşılamıyor. Tekrar dene.",

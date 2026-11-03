@@ -12,4 +12,4 @@
   let pageTitle = $derived(title ?? (titleKey ? i18n.t(titleKey) : ''));
 </script>
 
-<PageTitle title={`${pageTitle} - Sable`} />
+<PageTitle title={pageTitle} />

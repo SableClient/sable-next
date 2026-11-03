@@ -2,7 +2,7 @@
   import PageTitle from '#lib/ui/primitives/PageTitle.svelte';
 </script>
 
-<PageTitle title="Privacy Policy - Sable" />
+<PageTitle title="Privacy Policy" />
 
 <main class="privacy-page">
   <article class="privacy-content">

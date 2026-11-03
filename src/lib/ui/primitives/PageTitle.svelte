@@ -4,6 +4,8 @@
 </script>
 
 <script lang="ts">
+  import { pageTitle } from '#lib/deployment/brand.js';
+
   let { title }: { title: string } = $props();
   const entry = { title: '' };
 
@@ -19,7 +21,7 @@
   });
 
   $effect.pre(() => {
-    entry.title = title;
-    if (titles.at(-1) === entry) document.title = title;
+    entry.title = pageTitle(title);
+    if (titles.at(-1) === entry) document.title = entry.title;
   });
 </script>

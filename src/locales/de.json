@@ -504,7 +504,7 @@
     "inviteDeclineLabel": "Einladung zu „{{room}}“ ablehnen",
     "replacedTitle": "Ersetzte Räume",
     "replacedLeaveLabel": "Ersetzten Raum „{{room}}“ verlassen",
-    "settingsJoinRuleUnsettable": "Dieser Raum ist auf „{{rule}}“ gesetzt. Sable kennt diese Regel nicht, daher wird sie bei einer neuen Auswahl ersetzt.",
+    "settingsJoinRuleUnsettable": "Dieser Raum ist auf „{{rule}}“ gesetzt. {{appName}} kennt diese Regel nicht, daher wird sie bei einer neuen Auswahl ersetzt.",
     "menuConvertToGroup": "In eine Gruppe umwandeln",
     "lobbyJoinAll_one": "Einem Raum beitreten",
     "lobbyJoinAll_other": "Allen {{count, number}} Räumen beitreten",
@@ -762,7 +762,7 @@
     "setUpRecovery": "Wiederherstellung einrichten",
     "sourceCode": "Quellcode",
     "sortNameDesc": "Z bis A",
-    "startingSable": "Sable wird gestartet…",
+    "startingSable": "{{appName}} wird gestartet…",
     "system": "System",
     "thisRoom": "Dieser Raum",
     "today": "Heute",
@@ -1035,7 +1035,7 @@
     "restrictedFailed": "Du erfüllst nicht den Beitrittsbedingungen für diesen Raum.",
     "restrictedKnockAvailable": "Du musst vielleicht eine Beitrittsanfrage stellen, wenn du die Bedingungen nicht erfüllst.",
     "knockSent": "Deine Beitrittsanfrage wurde versendet. Du wirst eine Einladung zu dem Raum erhalten, sobald ein Mitglied die Anfrage genehmigt.",
-    "unavailable": "Sable konnte diesen Raum nicht finden. Er könnte privat sein oder nicht existieren.",
+    "unavailable": "{{appName}} konnte diesen Raum nicht finden. Er könnte privat sein oder nicht existieren.",
     "uncertainProvenanceTooltip": "Diese Raumvorschau könnte von einem anderen Server bereitgestellt und inkorrekt oder veraltet sein.",
     "trustedProvenanceTooltip": "Diese Raumvorschau wurde von deinem Server bereitgestellt.",
     "members_one": "{{count, number}} Mitglied",
@@ -1066,12 +1066,12 @@
   },
   "permalink": {
     "opening": "Link wird geöffnet…",
-    "unresolved": "Sable kann nicht erkennen, wohin dieser Link führt."
+    "unresolved": "{{appName}} kann nicht erkennen, wohin dieser Link führt."
   },
   "app": {
     "accountLocked": "Konto gesperrt",
     "signInRecoveryHint": "Durch die Anmeldung wird ein neues Gerät erstellt. Die gespeicherten Kontodaten werden beibehalten.",
-    "accountLockedDetail": "Dein Homeserver hat dieses Konto gesperrt. Sable wird die Sitzung weiterhin speichern und regelmäßig überprüfen, ob das Konto wieder verwendet werden kann.",
+    "accountLockedDetail": "Dein Homeserver hat dieses Konto gesperrt. {{appName}} wird die Sitzung weiterhin speichern und regelmäßig überprüfen, ob das Konto wieder verwendet werden kann.",
     "startSlow": "Das scheint länger als sonst zu dauern.",
     "startFailed": "Überprüfe deine Netzwerkverbindung und ob auf dem Gerät genug Speicherplatz frei ist. Versuche es dann erneut.",
     "unableToStart": "Deine Sitzung konnte nicht wiederhergestellt werden."

@@ -368,7 +368,7 @@
     "decline": "Відхилити",
     "refresh": "Оновити",
     "reload": "Перезавантажити",
-    "startingSable": "Запуск Sable…",
+    "startingSable": "Запуск {{appName}}…",
     "sortNameAsc": "Від А до Я",
     "close": "Закрити",
     "accept": "Прийняти",

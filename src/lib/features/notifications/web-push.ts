@@ -1,6 +1,7 @@
 import { base64ToUint8Array, uint8ArrayToBase64 } from 'uint8array-extras';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { appName } from '#lib/deployment/brand.js';
 import { readText, removeLocalValue, writeText } from '#lib/platform/local-json.js';
 import { deliversWebPush } from '#lib/platform/notifications.js';
 import { activeServiceWorker } from '#lib/platform/service-worker.js';
@@ -80,7 +81,7 @@ export function registrationMarker(
 
 export function pusherDisplayName(core: Pick<CoreClient, 'deviceList'>): string {
   const deviceName = core.deviceList.find((device) => device.is_own)?.display_name?.trim();
-  return deviceName || 'Sable';
+  return deviceName || appName();
 }
 
 export function needsRegistering(marker: string, registered: string | null): boolean {

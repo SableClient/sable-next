@@ -7,7 +7,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { RegisteredPusherView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
-vi.mock('#lib/config/runtime-config.js', () => ({
+vi.mock('#lib/config/runtime-config.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/config/runtime-config.js')>()),
   runtimeConfig: vi.fn(() =>
     Promise.resolve({
       push: {

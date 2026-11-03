@@ -21,7 +21,7 @@
     "dark": "Escuro",
     "retry": "Tentar novamente",
     "sourceCode": "Código fonte",
-    "startingSable": "Iniciando o Sable…",
+    "startingSable": "Iniciando o {{appName}}…",
     "today": "Hoje",
     "searchMessages": "Procurar mensagens",
     "searchRooms": "Procurar salas",
@@ -216,7 +216,7 @@
     "getSupport": "Suporte"
   },
   "app": {
-    "unableToStart": "O Sable não conseguiu iniciar.",
+    "unableToStart": "O {{appName}} não conseguiu iniciar.",
     "startFailed": "Verifique sua conexão e o armazenamento do seu dispositivo."
   },
   "settings": {
@@ -243,7 +243,7 @@
     "animalIdentityWhatHasPlaceholder": "gatos",
     "otherProfileFields": "Outros campos de perfil",
     "closeToTrayHint": "Fechar a janela esconde o app. Para fechar use o ícone da bandeja do sistema.",
-    "useCustomTitleBar": "Usar barra de título do Sable",
+    "useCustomTitleBar": "Usar barra de título do {{appName}}",
     "pronouns": "Pronomes",
     "animalIdentity": "Identidade animal",
     "animalIdentityWhatNeedsPlaceholder": "abraços"
@@ -253,7 +253,7 @@
     "browseThemes": "Navegar por mais temas"
   },
   "auth": {
-    "welcome": "Bem vindo ao Sable"
+    "welcome": "Bem vindo ao {{appName}}"
   },
   "composer": {
     "slash": {
@@ -270,7 +270,7 @@
     "gifSearchFailed": "Não foi possível procurar por GIFs."
   },
   "errors": {
-    "coreUnresponsive": "Sable não está respondendo."
+    "coreUnresponsive": "{{appName}} não está respondendo."
   },
   "personas": {
     "pronouns": "Pronomes"

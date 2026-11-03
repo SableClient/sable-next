@@ -379,9 +379,7 @@
       .filter((room) => room.state === 'joined' && room.room_kind !== 'space')
       .reduce((total, room) => total + roomList.notificationsFor(room).highlight, 0)
   );
-  let pageTitle = $derived(
-    mentionCount > 0 ? `(${mentionCount}) ${roomName} - Sable` : `${roomName} - Sable`
-  );
+  let pageTitle = $derived(mentionCount > 0 ? `(${mentionCount}) ${roomName}` : roomName);
   const appLayout = new AppLayout();
   let phone = $derived(!appLayout.current);
   let pinsOpen = $state(false);

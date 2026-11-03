@@ -3,6 +3,7 @@ import type { CoreEvent, NotificationView, RoomListItemView } from '#src/generat
 import { createContext } from 'svelte';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { appName } from '#lib/deployment/brand.js';
 import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { electronBridge } from '#lib/platform/electron.js';
 import { watchNativePushMessages } from '#lib/platform/native-notifications.js';
@@ -125,7 +126,7 @@ export class NotificationCenter {
     };
     const name = preferences.notificationContent
       ? (event.sender_name ?? event.room_name ?? event.sender)
-      : 'Sable';
+      : appName();
     const shown = callBanner(name, options, () => {
       const electron = electronBridge();
       if (electron) electron.showWindow();

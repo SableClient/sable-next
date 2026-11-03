@@ -6,6 +6,8 @@
 import { version } from '$app/env';
 import { resolve } from '$app/paths';
 
+import { runtimeConfig } from '#lib/config/runtime-config.js';
+import { DEFAULT_APP_NAME } from '#lib/deployment/default-app-name.js';
 import favicon from '#lib/assets/favicon.png';
 import { alertCooling } from '#lib/features/notifications/alert-cooldown.js';
 import { notificationPermalink } from '#lib/features/notifications/notification-link.js';
@@ -100,10 +102,17 @@ worker.addEventListener('push', (event) => {
   );
 });
 
+let workerName: Promise<string> | null = null;
+
+function workerAppName(): Promise<string> {
+  workerName ??= runtimeConfig().then((config) => config.branding.appName ?? DEFAULT_APP_NAME);
+  return workerName;
+}
+
 /** Safari revokes the subscription of a push that shows nothing. */
 async function showFallback(): Promise<void> {
   await record('FALLBACK_SHOWN');
-  await worker.registration.showNotification('Sable', {
+  await worker.registration.showNotification(await workerAppName(), {
     body: 'New message',
     tag: 'sable-fallback',
     icon: favicon,
