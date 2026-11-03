@@ -1,6 +1,15 @@
 {
   "upcoming": {
     "added": [
+      "personaSelectionScope",
+      "personaKeepAfterShorthand",
+      "searchBackup",
+      "searchBackupLimit"
+    ],
+    "changed": []
+  },
+  "v2.3.0": {
+    "added": [
       "launchAtLogin",
       "startMinimized",
       "showAllTimestamps",
@@ -14,21 +23,5 @@
         "to": "'h264'"
       }
     ]
-  },
-  "v2.2.3": {
-    "added": [],
-    "changed": [
-      {
-        "key": "emoticonToEmoji",
-        "from": "true",
-        "to": "false"
-      }
-    ]
-  },
-  "v2.2.2": {
-    "added": [
-      "emoticonToEmoji"
-    ],
-    "changed": []
   }
 }

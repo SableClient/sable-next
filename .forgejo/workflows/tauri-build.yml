@@ -128,6 +128,8 @@ jobs:
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.setup-release.outputs.ref }}
+          # The settings changes are generated from the release tags.
+          fetch-depth: 0
           persist-credentials: false
       - name: Set up app and build
         uses: ./.forgejo/actions/setup
@@ -666,8 +668,8 @@ jobs:
           apt-get install -y --no-install-recommends ca-certificates git
           git init -q /shared/workdir/SableClient/sable-next
           cd /shared/workdir/SableClient/sable-next
-          git fetch -q --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "refs/tags/$TAG"
-          git checkout -q FETCH_HEAD
+          git fetch -q --tags "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          git checkout -q "refs/tags/$TAG"
       - name: Rebuild and compare
         working-directory: /shared/workdir/SableClient/sable-next
         run: scripts/ci/reproduce-android.sh "$VERSION"

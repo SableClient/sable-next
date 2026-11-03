@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Rebuilds a released FOSS APK the way IzzyOnDroid does and checks it against the
-# published one. Runs as root in a fresh ubuntu:noble, from the tag's checkout, and
-# builds as the runner user:
+# published one. Runs as root in a fresh ubuntu:noble, from a full clone checked out
+# at the tag, and builds as the runner user:
 #
 #   docker run --rm -v "$PWD:/shared/workdir/SableClient/sable-next" -w /shared/workdir/SableClient/sable-next \
 #     ubuntu:noble@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac \

@@ -19,7 +19,7 @@ function git(...args) {
 function releaseTags() {
   let list;
   try {
-    list = git('tag', '--list', 'v*');
+    list = git('tag', '--list', '--merged', 'HEAD', 'v*');
   } catch {
     return [];
   }
