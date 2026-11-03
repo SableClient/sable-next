@@ -1,3 +1,4 @@
+import type { E2eePolicy } from '#lib/deployment/e2ee-policy.js';
 import type { Rpc, RpcParams } from '#src/generated/protocol';
 
 type CreateParams = RpcParams<Rpc['rooms']['create']>;
@@ -39,5 +40,18 @@ export function knockRoom(
     address,
     via: [...via],
     reason: reason ?? null,
+  });
+}
+
+export async function openDirectMessage(
+  core: { rpc: Pick<Rpc, 'rooms'>; e2eePolicy(): Promise<E2eePolicy> },
+  userId: string,
+  encrypted?: boolean
+): Promise<string> {
+  const policy = await core.e2eePolicy();
+  return core.rpc.rooms.createDm({
+    user_id: userId,
+    encrypted: encrypted === undefined ? null : encrypted && !policy.forceDisabled,
+    encrypt_new: policy.defaultEncrypted && !policy.forceDisabled,
   });
 }

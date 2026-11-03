@@ -10,6 +10,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { createRoom } from '#lib/core/api/rooms.js';
+  import { loadE2eePolicy } from '#lib/deployment/e2ee-policy.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { isUserId } from '#lib/guards.js';
   import { roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
@@ -54,6 +55,7 @@
   let target = $state('');
   let mode = $state<'server' | 'custom' | 'redirect'>('server');
   let encrypted = $state(true);
+  const policy = loadE2eePolicy(core);
   let replacementDraft = $state('');
   let messageDraft = $state('');
   let creators = $state.raw<string[]>([]);
@@ -182,7 +184,7 @@
       topic: room?.topic,
       kind,
       public: room?.join_rule === 'public',
-      encrypted,
+      encrypted: encrypted && !(await core.e2eePolicy()).forceDisabled,
       room_version: target,
       predecessor: id,
     });
@@ -339,7 +341,7 @@
       </FormField>
     {/if}
 
-    {#if mode === 'custom'}
+    {#if mode === 'custom' && !policy.current.forceDisabled}
       <div class="toggle-row">
         <div>
           <p class="toggle-label">{i18n.t('common.endToEndEncryption')}</p>

@@ -2070,6 +2070,7 @@ export type Rpc = {
 	mutual_rooms: MutualRoomView[],
 	ignored: boolean,
 }>;
+    wellKnown: (params?: Record<string, never>) => Promise<unknown | null>;
     dataTypes: (params?: Record<string, never>) => Promise<string[]>;
     data: (params: {
 	event_type: string,
@@ -3088,6 +3089,8 @@ export type Rpc = {
     createDm: (params: {
 	user_id: string,
 	encrypted?: boolean | null,
+	/**  Whether a DM created because none matched is encrypted, when `encrypted` leaves it open. */
+	encrypt_new: boolean,
 }) => Promise<string>;
     versions: (params?: Record<string, never>) => Promise<RoomVersionsView>;
     upgrade: (params: {
@@ -3442,6 +3445,7 @@ export type RpcResult<M extends RpcMethod> = Awaited<ReturnType<M>>;
 export type RpcMethods = {
   'account.user_profile': Rpc['account']['userProfile'];
   'account.user_relations': Rpc['account']['userRelations'];
+  'account.well_known': Rpc['account']['wellKnown'];
   'account.data_types': Rpc['account']['dataTypes'];
   'account.data': Rpc['account']['data'];
   'account.set_data': Rpc['account']['setData'];
@@ -3764,6 +3768,7 @@ export function createRpc(call: RpcCall): Rpc {
     account: {
       userProfile: (params) => call('account.user_profile', params) as ReturnType<Rpc['account']['userProfile']>,
       userRelations: (params) => call('account.user_relations', params) as ReturnType<Rpc['account']['userRelations']>,
+      wellKnown: (params = {}) => call('account.well_known', params) as ReturnType<Rpc['account']['wellKnown']>,
       dataTypes: (params = {}) => call('account.data_types', params) as ReturnType<Rpc['account']['dataTypes']>,
       data: (params) => call('account.data', params) as ReturnType<Rpc['account']['data']>,
       setData: (params) => call('account.set_data', params) as ReturnType<Rpc['account']['setData']>,

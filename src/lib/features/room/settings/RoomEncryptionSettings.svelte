@@ -2,6 +2,7 @@
   import type { RoomPowerLevelsView, RoomListItemView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { loadE2eePolicy } from '#lib/deployment/e2ee-policy.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
@@ -29,7 +30,10 @@
 
   let roomId = $derived(room?.room_id ?? null);
   let enabled = $derived(room?.encrypted === true);
-  let canEnable = $derived(canSendState(levels, ownPowerLevel, EVENT_TYPE));
+  const policy = loadE2eePolicy(core);
+  let canEnable = $derived(
+    canSendState(levels, ownPowerLevel, EVENT_TYPE) && !policy.current.forceDisabled
+  );
 
   async function enable(): Promise<void> {
     const target = roomId;

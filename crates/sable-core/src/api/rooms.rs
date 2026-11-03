@@ -465,13 +465,19 @@ pub struct CreateDmParams {
     pub user_id: OwnedUserId,
     #[serde(default)]
     pub encrypted: Option<bool>,
+    /// Whether a DM created because none matched is encrypted, when `encrypted` leaves it open.
+    pub encrypt_new: bool,
 }
 
 impl Handler for CreateDmParams {
     type Ok = String;
 
     async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        let Self { user_id, encrypted } = self;
+        let Self {
+            user_id,
+            encrypted,
+            encrypt_new,
+        } = self;
         let client = core.client().await?;
         let existing = client.get_dm_rooms(&user_id).find(|room| {
             !room.is_tombstoned()
@@ -479,7 +485,7 @@ impl Handler for CreateDmParams {
         });
         let room = match existing {
             Some(room) => room,
-            None if encrypted == Some(false) => {
+            None if encrypted == Some(false) || (encrypted.is_none() && !encrypt_new) => {
                 let mut request = create_room::v3::Request::new();
                 request.invite = vec![user_id];
                 request.is_direct = true;

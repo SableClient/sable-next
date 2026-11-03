@@ -109,6 +109,7 @@ function context(
     roomId: '!room:example.org',
     userId: '@me:example.org',
     developerTools: true,
+    e2eePolicy: () => Promise.resolve({ defaultEncrypted: true, forceDisabled: false }),
     rpc: {
       ...rpc,
       account: commands,

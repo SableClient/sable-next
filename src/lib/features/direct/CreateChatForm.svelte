@@ -1,7 +1,9 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import { openDirectMessage } from '#lib/core/api/rooms.js';
   import { useCoreClient } from '#lib/core/context.js';
+  import { loadE2eePolicy } from '#lib/deployment/e2ee-policy.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { isUserId } from '#lib/guards.js';
   import { parseJoinAddress } from '#lib/rooms/join-address.js';
@@ -16,7 +18,9 @@
   const core = useCoreClient();
 
   let address = $state('');
-  let encrypted = $state(true);
+  const policy = loadE2eePolicy(core);
+  let encryptedChoice = $state<boolean | null>(null);
+  let encrypted = $derived(encryptedChoice ?? policy.current.defaultEncrypted);
   let opening = $state(false);
   let invalid = $state(false);
   let failed = $state(false);
@@ -27,10 +31,7 @@
       const result = await joinOrOfferKnock(core.rpc, room.address, room.via);
       return joinOrKnockPath(result);
     }
-    const roomId = await core.rpc.rooms.createDm({
-      user_id: address.trim(),
-      encrypted: encrypted ?? null,
-    });
+    const roomId = await openDirectMessage(core, address.trim(), encrypted);
     return resolve('/(app)/direct/[roomId]', { roomId: roomPathParamFromId(roomId) });
   }
 
@@ -73,7 +74,7 @@
     />
   </FormField>
 
-  {#if !room}
+  {#if !room && !policy.current.forceDisabled}
     <div class="row">
       <div class="row-text">
         <span class="field-label">{i18n.t('common.endToEndEncryption')}</span>
@@ -83,7 +84,7 @@
         checked={encrypted}
         label={i18n.t('common.endToEndEncryption')}
         onCheckedChange={(next: boolean) => {
-          encrypted = next;
+          encryptedChoice = next;
         }}
       />
     </div>

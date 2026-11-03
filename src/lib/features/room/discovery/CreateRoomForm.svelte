@@ -12,6 +12,7 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { createRoom } from '#lib/core/api/rooms.js';
+  import { loadE2eePolicy } from '#lib/deployment/e2ee-policy.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { isUserId } from '#lib/guards.js';
   import type { CreateJoinRuleView, RoomKind, RoomVersionsView } from '#src/generated/protocol';
@@ -44,7 +45,9 @@
   let topic = $state('');
   let kind = $state<RoomKind>('text');
   let access = $state<'private' | 'public'>('private');
-  let encrypted = $state(true);
+  const policy = loadE2eePolicy(core);
+  let encryptedChoice = $state<boolean | null>(null);
+  let encrypted = $derived(encryptedChoice ?? policy.current.defaultEncrypted);
   // `parentSpaceId` arrives once the room list has loaded, so the field follows
   // it until the user picks something else.
   let parentChoice = $state<string | null>(null);
@@ -171,7 +174,7 @@
         topic: topic.trim() === '' ? null : topic.trim(),
         kind: effectiveKind,
         public: access === 'public',
-        encrypted: encryptable && encrypted,
+        encrypted: encryptable && encrypted && !(await core.e2eePolicy()).forceDisabled,
         // A `$state` array is a Proxy, which postMessage cannot clone.
         invite: [...invites],
         parent_space: parentSpace === '' ? null : parentSpace,
@@ -370,24 +373,26 @@
     </FormField>
   {/if}
 
-  <div class="row">
-    <div class="row-text">
-      <span class="field-label">{i18n.t('common.endToEndEncryption')}</span>
-      <p class="hint">
-        {encryptable
-          ? i18n.t('room.createEncryptionHint')
-          : i18n.t('room.createEncryptionUnavailable')}
-      </p>
+  {#if !policy.current.forceDisabled}
+    <div class="row">
+      <div class="row-text">
+        <span class="field-label">{i18n.t('common.endToEndEncryption')}</span>
+        <p class="hint">
+          {encryptable
+            ? i18n.t('room.createEncryptionHint')
+            : i18n.t('room.createEncryptionUnavailable')}
+        </p>
+      </div>
+      <Switch
+        checked={encryptable && encrypted}
+        disabled={!encryptable}
+        label={i18n.t('common.endToEndEncryption')}
+        onCheckedChange={(next: boolean) => {
+          encryptedChoice = next;
+        }}
+      />
     </div>
-    <Switch
-      checked={encryptable && encrypted}
-      disabled={!encryptable}
-      label={i18n.t('common.endToEndEncryption')}
-      onCheckedChange={(next: boolean) => {
-        encrypted = next;
-      }}
-    />
-  </div>
+  {/if}
 
   <details class="advanced">
     <summary>{i18n.t('room.createAdvancedLabel')}</summary>

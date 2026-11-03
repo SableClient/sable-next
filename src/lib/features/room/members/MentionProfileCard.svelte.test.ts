@@ -314,6 +314,7 @@ test('sends a direct message from the sheet composer', async () => {
   expect(core.rpc.rooms.createDm).toHaveBeenCalledWith({
     user_id: '@alice:example.org',
     encrypted: null,
+    encrypt_new: true,
   });
   await vi.waitFor(() => {
     expect(goto).toHaveBeenCalledWith(expect.stringContaining('/direct/'));
@@ -348,6 +349,7 @@ test('opens the chat without sending from the Message button', async () => {
   expect(core.rpc.rooms.createDm).toHaveBeenCalledWith({
     user_id: '@alice:example.org',
     encrypted: null,
+    encrypt_new: true,
   });
   expect(core.rpc.messages.send).not.toHaveBeenCalled();
   roomList.rooms = [];
@@ -385,6 +387,7 @@ test('asks before the Message button creates a new chat', async () => {
   expect(core.rpc.rooms.createDm).toHaveBeenCalledWith({
     user_id: '@alice:example.org',
     encrypted: null,
+    encrypt_new: true,
   });
 });
 

@@ -16,6 +16,7 @@ use crate::{Core, ResultExt, presence};
 domain! {
     user_profile,
     user_relations,
+    well_known,
     data_types,
     data,
     set_data,
@@ -182,6 +183,18 @@ async fn fetch_mutual_rooms(
         if from.is_none() {
             return Ok(rooms);
         }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct WellKnownParams {}
+
+impl Handler for WellKnownParams {
+    type Ok = Option<Json>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Option<Json>, RpcError> {
+        Ok(core.well_known().await?.map(Json))
     }
 }
 

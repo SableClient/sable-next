@@ -1447,7 +1447,8 @@ async fn messaging_a_user_reuses_the_dm_that_already_exists() {
         .await;
     let core = core(&server, client).await;
     let params: crate::api::rooms::CreateDmParams =
-        serde_json::from_value(json!({"user_id": "@bob:example.org"})).unwrap();
+        serde_json::from_value(json!({"user_id": "@bob:example.org", "encrypt_new": true}))
+            .unwrap();
     let found = core.run(params).await.unwrap();
     assert_eq!(found, room_id.as_str());
 }
@@ -1469,8 +1470,10 @@ async fn an_unencrypted_dm_request_reuses_an_unencrypted_dm() {
         })
         .await;
     let core = core(&server, client).await;
-    let params: crate::api::rooms::CreateDmParams =
-        serde_json::from_value(json!({"user_id": "@bob:example.org", "encrypted": false})).unwrap();
+    let params: crate::api::rooms::CreateDmParams = serde_json::from_value(
+        json!({"user_id": "@bob:example.org", "encrypted": false, "encrypt_new": true}),
+    )
+    .unwrap();
     let found = core.run(params).await.unwrap();
     assert_eq!(found, room_id.as_str());
 }

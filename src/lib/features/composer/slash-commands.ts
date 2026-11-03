@@ -8,7 +8,8 @@ import type {
 } from '#src/generated/protocol';
 import { CoreError } from '#src/transport';
 
-import { knockRoom } from '#lib/core/api/rooms.js';
+import { knockRoom, openDirectMessage } from '#lib/core/api/rooms.js';
+import type { E2eePolicy } from '#lib/deployment/e2ee-policy.js';
 import { setMemberLook } from '#lib/core/api/members.js';
 import { joinOrOfferKnock } from '#lib/rooms/join-or-knock.js';
 import { parseSlash } from '#lib/model/model.js';
@@ -44,6 +45,7 @@ export type SlashContext = {
   formatted?: string | null;
   developerTools?: boolean;
   rpc: SlashRpc;
+  e2eePolicy: () => Promise<E2eePolicy>;
   persona?: () => PerMessageProfileView | null;
 };
 
@@ -326,7 +328,7 @@ async function run(
   invocation: SlashInvocation,
   context: SlashContext
 ): Promise<SlashOutcome> {
-  const { roomId, userId, rpc } = context;
+  const { roomId, userId, rpc, e2eePolicy } = context;
   switch (invocation.command) {
     case 'bug_report':
       return { kind: 'bugReport' };
@@ -425,7 +427,7 @@ async function run(
       );
     case 'start_dm':
       return eachUser(invocation.user_ids, (target) =>
-        rpc.rooms.createDm({ user_id: target, encrypted: null })
+        openDirectMessage({ rpc, e2eePolicy }, target)
       );
     case 'convert_to_dm':
       await rpc.account.setDirect({

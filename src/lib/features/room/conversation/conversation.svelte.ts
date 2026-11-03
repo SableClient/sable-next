@@ -230,6 +230,7 @@ export class Conversation {
       formatted,
       developerTools: preferences.developerTools,
       rpc: this.#core.rpc,
+      e2eePolicy: () => this.#core.e2eePolicy(),
       persona: () => this.#personaFor(targetRoomId, '', null).persona,
     });
     if (outcome.kind === 'done') {

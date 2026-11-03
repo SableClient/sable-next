@@ -4,6 +4,7 @@
 
   import type { ProfileView } from '#src/generated/protocol';
 
+  import { openDirectMessage } from '#lib/core/api/rooms.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { existingChatPath, roomSectionPath } from '#lib/rooms/permalink.js';
@@ -76,7 +77,7 @@
     opening = true;
     failed = false;
     try {
-      const roomId = await core.rpc.rooms.createDm({ user_id: userId, encrypted: null });
+      const roomId = await openDirectMessage(core, userId);
       const target = roomSectionPath(roomList.rooms, roomId);
       // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath() resolves the route itself
       await goto(target, { replace: true });

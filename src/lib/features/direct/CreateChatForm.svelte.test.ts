@@ -38,6 +38,7 @@ async function submit(value: string): Promise<void> {
 beforeEach(() => {
   core.rpc.rooms.createDm.mockReset();
   core.rpc.rooms.join.mockReset();
+  core.e2eePolicy.mockResolvedValue({ defaultEncrypted: true, forceDisabled: false });
   vi.mocked(goto).mockClear();
 });
 
@@ -50,6 +51,7 @@ test('creates the chat and navigates to it under the direct section', async () =
     expect(core.rpc.rooms.createDm).toHaveBeenCalledWith({
       user_id: '@alice:example.org',
       encrypted: true,
+      encrypt_new: true,
     });
   });
 
@@ -66,6 +68,7 @@ test('creates an unencrypted chat when the switch is turned off', async () => {
     expect(core.rpc.rooms.createDm).toHaveBeenCalledWith({
       user_id: '@alice:example.org',
       encrypted: false,
+      encrypt_new: true,
     });
   });
 });
@@ -117,4 +120,40 @@ test.each([
   });
   expect(core.rpc.rooms.join).toHaveBeenCalledWith({ address, via });
   expect(core.rpc.rooms.createDm).not.toHaveBeenCalled();
+});
+
+test('a server forcing encryption off hides the switch and creates an unencrypted chat', async () => {
+  core.e2eePolicy.mockResolvedValue({ defaultEncrypted: true, forceDisabled: true });
+  core.rpc.rooms.createDm.mockResolvedValue('!dm:example.org');
+  render(CreateChatForm);
+
+  await vi.waitFor(() => {
+    expect(screen.queryByRole('switch', { name: 'common.endToEndEncryption' })).toBeNull();
+  });
+  await submit('@alice:example.org');
+  await vi.waitFor(() => {
+    expect(core.rpc.rooms.createDm).toHaveBeenCalledWith({
+      user_id: '@alice:example.org',
+      encrypted: false,
+      encrypt_new: false,
+    });
+  });
+});
+
+test('a server defaulting encryption off starts the switch off', async () => {
+  core.e2eePolicy.mockResolvedValue({ defaultEncrypted: false, forceDisabled: false });
+  core.rpc.rooms.createDm.mockResolvedValue('!dm:example.org');
+  render(CreateChatForm);
+
+  await vi.waitFor(() => {
+    expect(screen.getByRole('switch', { name: 'common.endToEndEncryption' })).not.toBeChecked();
+  });
+  await submit('@alice:example.org');
+  await vi.waitFor(() => {
+    expect(core.rpc.rooms.createDm).toHaveBeenCalledWith({
+      user_id: '@alice:example.org',
+      encrypted: false,
+      encrypt_new: false,
+    });
+  });
 });

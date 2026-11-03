@@ -157,6 +157,19 @@ struct ManagerIn {
     ui_url: String,
 }
 
+async fn fetch_well_known(client: &matrix_sdk::Client, base: &url::Url) -> Option<Value> {
+    let response = client
+        .http_client()
+        .get(base.join("/.well-known/matrix/client").ok()?)
+        .send()
+        .await
+        .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    serde_json::from_str(&response.text().await.ok()?).ok()
+}
+
 fn managers_from_well_known(well_known: &Value) -> Vec<IntegrationManager> {
     if !well_known.is_object() {
         return Vec::new();
@@ -764,22 +777,28 @@ impl Core {
             .ok_or_else(|| self.failed(LABEL, "the integration manager URL is invalid"))
     }
 
+    /// The account's `/.well-known/matrix/client`, looked up on its server
+    /// name first because the homeserver URL it delegates to rarely serves it.
+    pub(crate) async fn well_known(&self) -> Result<Option<Value>, RpcError> {
+        let client = self.client().await?;
+        let named = client
+            .user_id()
+            .and_then(|user| url::Url::parse(&format!("https://{}", user.server_name())).ok());
+        let advertised = url::Url::parse(client.homeserver().as_str()).ok();
+        for base in named.into_iter().chain(advertised) {
+            if let Some(well_known) = fetch_well_known(&client, &base).await {
+                return Ok(Some(well_known));
+            }
+        }
+        Ok(None)
+    }
+
     async fn integration_manager(&self, label: &str) -> Result<IntegrationManager, RpcError> {
         let client = self.client().await?;
 
         let mut managers = Vec::new();
         if let Ok(base) = url::Url::parse(client.homeserver().as_str())
-            && let Ok(response) = client
-                .http_client()
-                .get(
-                    base.join("/.well-known/matrix/client")
-                        .or_failed(self, label)?,
-                )
-                .send()
-                .await
-            && response.status().is_success()
-            && let Ok(text) = response.text().await
-            && let Ok(well_known) = serde_json::from_str::<Value>(&text)
+            && let Some(well_known) = fetch_well_known(&client, &base).await
         {
             managers = managers_from_well_known(&well_known);
         }

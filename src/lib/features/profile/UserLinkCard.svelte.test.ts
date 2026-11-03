@@ -48,6 +48,7 @@ test('a chat action asks before creating a DM, then navigates after confirmation
     expect(core.rpc.rooms.createDm).toHaveBeenCalledWith({
       user_id: '@alice:example.org',
       encrypted: null,
+      encrypt_new: true,
     });
   });
   await vi.waitFor(() => {

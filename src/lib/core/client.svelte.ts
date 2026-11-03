@@ -27,6 +27,11 @@ import { CoreError } from '../../transport';
 import QuickLRU from 'quick-lru';
 import { on } from 'svelte/events';
 import { deviceDisplayName } from '#lib/deployment/policy.js';
+import {
+  defaultE2eePolicy,
+  parseE2eePolicy,
+  type E2eePolicy,
+} from '#lib/deployment/e2ee-policy.js';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { clearRoomListSnapshot } from '#lib/rooms/room-list-snapshot.js';
 import { clearRecentSearches } from '#lib/search/recent-searches.svelte.js';
@@ -221,6 +226,7 @@ export class CoreClient {
     { accountId: string | null; relations: UserRelations }
   >({ maxSize: MAX_RELATIONS_CACHE_ENTRIES, maxAge: relationsCacheFreshMs });
   private readonly resolvedHomeservers = new Map<string, string>();
+  private readonly e2eePolicies = new Map<string, Promise<E2eePolicy>>();
   /* eslint-enable svelte/prefer-svelte-reactivity */
 
   private stopAccountChannel: (() => void) | null = null;
@@ -731,6 +737,20 @@ export class CoreClient {
     const relations = response;
     this.relationsCache.set(userId, { accountId, relations });
     return relations;
+  }
+
+  e2eePolicy(): Promise<E2eePolicy> {
+    const accountId = this.session?.account_id;
+    if (accountId === undefined) return Promise.resolve(defaultE2eePolicy);
+    let policy = this.e2eePolicies.get(accountId);
+    if (policy === undefined) {
+      policy = this.rpc.account.wellKnown().then(parseE2eePolicy, () => {
+        this.e2eePolicies.delete(accountId);
+        return defaultE2eePolicy;
+      });
+      this.e2eePolicies.set(accountId, policy);
+    }
+    return policy;
   }
 
   async setUserIgnored(userId: string, ignored: boolean): Promise<void> {

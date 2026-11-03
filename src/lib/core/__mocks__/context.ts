@@ -1,4 +1,5 @@
 import { vi, type Mock } from 'vitest';
+import { defaultE2eePolicy } from '#lib/deployment/e2ee-policy.js';
 import { createRpc, type OAuthMetadataView, type Rpc } from '#src/generated/protocol';
 
 const pending = () => new Promise<never>(() => {});
@@ -43,6 +44,7 @@ export function createCoreStub<T extends Record<string, unknown> & { rpc?: RpcOv
     refreshUserProfile: vi.fn<(...args: never[]) => Promise<unknown>>(() =>
       Promise.reject(new Error('profile unavailable'))
     ),
+    e2eePolicy: vi.fn(() => Promise.resolve(defaultE2eePolicy)),
     subscribeEvents: vi.fn(() => () => {}),
     onProfileChanged: vi.fn(() => () => {}),
     oauthMetadata: null as OAuthMetadataView | null,

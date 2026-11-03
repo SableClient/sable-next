@@ -40,6 +40,7 @@
   import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import { hasDirectRoom, roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { sendMessage } from '#lib/core/api/messages.svelte.js';
+  import { openDirectMessage as openDm } from '#lib/core/api/rooms.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -402,7 +403,7 @@
     sending = true;
     sendFailed = null;
     try {
-      const dmId = await core.rpc.rooms.createDm({ user_id: userId, encrypted: null });
+      const dmId = await openDm(core, userId);
       if (body) {
         step = 'send';
         await sendMessage(core.rpc, dmId, body);
