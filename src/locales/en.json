@@ -1716,6 +1716,7 @@
     },
     "account": "Account",
     "about": "About",
+    "aboutPoweredBy": "Powered by Sable.",
     "aboutTagline": "An almost stable Matrix client.",
     "supporterThanksTitle": "Thank you for donating to Sable!",
     "supporterThanksDescription": "You may customize your badge from the Account settings.",
