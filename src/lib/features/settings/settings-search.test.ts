@@ -154,6 +154,15 @@ describe('alt text setting search', () => {
   }, 10_000);
 });
 
+describe('select option search', () => {
+  it('finds a select setting by an option label', async () => {
+    const { settingsCategories } = await import('#lib/settings/registry.js');
+    const { t } = await import('#lib/i18n.js');
+    const hits = searchSettings('Roomy', settingsCategories, t, context);
+    expect(hits.some((entry) => entry.setting.key === 'messageSpacing')).toBe(true);
+  }, 10_000);
+});
+
 describe('custom panel search', () => {
   it.each([
     ['quick CSS', 'appearance', 'quick-css'],

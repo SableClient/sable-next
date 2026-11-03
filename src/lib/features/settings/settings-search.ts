@@ -3,6 +3,7 @@ import {
   type SettingsTargetDefinition,
   type SettingsCategory,
   type SettingsContext,
+  type SettingOption,
 } from '#lib/settings/registry.js';
 
 export interface SettingsSearchHit {
@@ -28,6 +29,11 @@ export function searchSettings(
       const name = translate(setting.name).toLowerCase();
       const description = setting.description ? translate(setting.description).toLowerCase() : '';
       const terms = setting.terms?.map((key) => translate(key).toLowerCase()) ?? [];
+      if ('options' in setting) {
+        for (const option of setting.options as SettingOption[]) {
+          terms.push((option.literal ? option.label : translate(option.label)).toLowerCase());
+        }
+      }
 
       if (
         name.includes(term) ||
