@@ -113,6 +113,7 @@
     "switchAccount": "Switch account",
     "switchingAccount": "Switching…",
     "switchAccountFailed": "Could not switch accounts. Try again.",
+    "notificationAccountMissing": "This notification is for an account that is no longer signed in.",
     "switch": "Switch",
     "manageAccounts": "Manage accounts",
     "activeAccount": "Active account",

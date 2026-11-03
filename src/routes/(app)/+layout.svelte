@@ -57,6 +57,7 @@
     watchNativePushTokens,
     watchNativeNotificationActions,
     watchNativeNotificationClicks,
+    type NativeNotificationTarget,
   } from '#lib/platform/native-notifications.js';
   import { deliversWebPush } from '#lib/platform/notifications.js';
   import { hostsServiceWorker } from '#lib/platform/service-worker.js';
@@ -799,8 +800,7 @@
         (message.outcome === 'answer' || message.outcome === 'decline')
       ) {
         const outcome = message.outcome;
-        void openNativeNotification(
-          core,
+        void openFromNotification(
           { userId: message.userId, roomId: message.roomId, eventId: message.eventId ?? null },
           (roomId, eventId) => {
             answerFromNotification(roomId, eventId, outcome);
@@ -828,7 +828,7 @@
     const opened =
       userId === null
         ? openNotification(roomId, eventId)
-        : openNativeNotification(core, { userId, roomId, eventId }, openNotification);
+        : openFromNotification({ userId, roomId, eventId }, openNotification);
     void opened.catch((error: unknown) => {
       console.warn('[sable notifications] notification not opened', error);
     });
@@ -973,6 +973,15 @@
     }
   });
 
+  async function openFromNotification(
+    target: NativeNotificationTarget,
+    open: (roomId: string, eventId: string | null) => void | Promise<void>
+  ): Promise<void> {
+    const opening = await openNativeNotification(core, target, open);
+    if (opening === 'unknown_account') toasts.error(i18n.t('nav.notificationAccountMissing'));
+    if (opening === 'switch_failed') toasts.error(i18n.t('nav.switchAccountFailed'));
+  }
+
   async function openNotification(roomId: string, eventId: string | null): Promise<void> {
     await tick();
     await roomList.start();
@@ -1023,7 +1032,7 @@
         }
         const call = callNotificationAction(action);
         if (call !== null) {
-          void openNativeNotification(core, action, (roomId, eventId) => {
+          void openFromNotification(action, (roomId, eventId) => {
             answerFromNotification(roomId, eventId, call);
           }).catch((error: unknown) => {
             console.debug('[sable notifications] call not answered', error);
@@ -1037,7 +1046,7 @@
         );
       }),
       watchNativeNotificationClicks((target) => {
-        void openNativeNotification(core, target, openNotification).catch((error: unknown) => {
+        void openFromNotification(target, openNotification).catch((error: unknown) => {
           console.warn('[sable notifications] notification not opened', error);
         });
       }),

@@ -16,7 +16,13 @@ const launchedAfterUpdate = (() => {
 })();
 
 export function reportSessionFailure(
-  operation: 'restore' | 'restore_fallback' | 'restore_slow' | 'session_ended',
+  operation:
+    | 'restore'
+    | 'restore_fallback'
+    | 'restore_slow'
+    | 'switch'
+    | 'switch_slow'
+    | 'session_ended',
   error?: unknown,
   reason?: string
 ): void {
@@ -29,7 +35,7 @@ export function reportSessionFailure(
         ? reason === 'soft_logout' || reason === 'token_rejected'
           ? reason
           : 'unknown'
-        : operation === 'restore_slow'
+        : operation === 'restore_slow' || operation === 'switch_slow'
           ? 'slow'
           : (detail?.code ?? 'transport_failure'),
     'session.after_update': String(launchedAfterUpdate),
@@ -37,7 +43,10 @@ export function reportSessionFailure(
   };
   const logId = detail?.code === 'failed' ? detail.log_id : undefined;
   Sentry.captureMessage(`session.${operation}`, {
-    level: operation === 'session_ended' || operation === 'restore_slow' ? 'warning' : 'error',
+    level:
+      operation === 'session_ended' || operation === 'restore_slow' || operation === 'switch_slow'
+        ? 'warning'
+        : 'error',
     fingerprint: ['session', operation, tags['session.reason']],
     tags,
     extra: logId ? { log_id: logId } : undefined,

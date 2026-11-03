@@ -114,11 +114,38 @@ test('opening an inactive account notification switches before navigating', asyn
   const { client, switchAccount } = core();
   const open = vi.fn();
 
-  await openNativeNotification(client, target({ userId: '@other:example.org' }), open);
+  await expect(
+    openNativeNotification(client, target({ userId: '@other:example.org' }), open)
+  ).resolves.toBe('opened');
 
   expect(switchAccount).toHaveBeenCalledWith('account-other');
   expect(open).toHaveBeenCalledWith('!room:example.org', '$event:example.org');
   expect(switchAccount).toHaveBeenCalledBefore(open);
+});
+
+test('a notification whose account cannot be switched to stays on the current room', async () => {
+  const { client, switchAccount } = core();
+  switchAccount.mockRejectedValue(new Error('failed'));
+  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  const open = vi.fn();
+
+  await expect(
+    openNativeNotification(client, target({ userId: '@other:example.org' }), open)
+  ).resolves.toBe('switch_failed');
+
+  expect(open).not.toHaveBeenCalled();
+});
+
+test('a notification for an account that is gone opens nothing', async () => {
+  const { client, switchAccount } = core();
+  const open = vi.fn();
+
+  await expect(
+    openNativeNotification(client, target({ userId: '@gone:example.org' }), open)
+  ).resolves.toBe('unknown_account');
+
+  expect(switchAccount).not.toHaveBeenCalled();
+  expect(open).not.toHaveBeenCalled();
 });
 
 test('the invite buttons map to an answer and nothing else does', () => {

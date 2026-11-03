@@ -44,13 +44,23 @@ export async function selectNotificationAccount(
   return true;
 }
 
+export type NotificationOpening = 'opened' | 'unknown_account' | 'switch_failed';
+
 export async function openNativeNotification(
   core: AccountSwitcher,
   target: NativeNotificationTarget,
   open: (roomId: string, eventId: string | null) => void | Promise<void>
-): Promise<void> {
-  if (!(await selectNotificationAccount(core, target.userId))) return;
+): Promise<NotificationOpening> {
+  let selected: boolean;
+  try {
+    selected = await selectNotificationAccount(core, target.userId);
+  } catch (error) {
+    console.warn('[sable notifications] account not switched', error);
+    return 'switch_failed';
+  }
+  if (!selected) return 'unknown_account';
   await open(target.roomId, target.eventId);
+  return 'opened';
 }
 
 export async function performNotificationAction(

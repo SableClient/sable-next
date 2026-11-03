@@ -783,9 +783,20 @@ export class CoreClient {
   async switchAccount(accountId: string): Promise<void> {
     const generation = this.generation;
     const transport = this.ensureTransport();
-    const session = await this.#rpcOn(transport).session.switchAccount({
-      account_id: accountId,
-    });
+    const slow = setTimeout(() => {
+      reportSessionFailure('switch_slow');
+    }, SLOW_START_MS);
+    let session: CoreSession;
+    try {
+      session = await this.#rpcOn(transport).session.switchAccount({
+        account_id: accountId,
+      });
+    } catch (error) {
+      reportSessionFailure('switch', error);
+      throw error;
+    } finally {
+      clearTimeout(slow);
+    }
     if (generation !== this.generation || transport !== this.transport) return;
     await this.refreshAccounts();
     if (generation !== this.generation || transport !== this.transport) return;
