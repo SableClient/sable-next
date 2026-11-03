@@ -488,6 +488,12 @@ ipcMain.handle('sable-clear-web-caches', async (event) => {
 
 ipcMain.handle('sable-data-dir', (event) => (isAppFrame(event.senderFrame) ? dataDir : null));
 
+ipcMain.handle('sable-gpu-video-status', (event) => {
+  if (!isAppFrame(event.senderFrame)) return null;
+  const status = app.getGPUFeatureStatus();
+  return { encode: status.video_encode, decode: status.video_decode };
+});
+
 ipcMain.handle('sable-apply-window-settings', (event, value: unknown) => {
   if (!isAppFrame(event.senderFrame)) return null;
   desktopWindowSettings = sanitizeDesktopWindowSettings(value);

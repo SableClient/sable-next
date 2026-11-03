@@ -182,17 +182,17 @@ afterEach(() => {
   preferences.callSimulcast = true;
 });
 
-test('automatic video quality leaves capture and encoding choices to LiveKit', async () => {
+test('automatic video quality picks h264 without a hardware encoder and leaves the rest to LiveKit', async () => {
   const fixture = roomFixture();
   const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
   await transport.connect({ ...connectOptions, cameraEnabled: true });
-  expect(fixture.camera).toHaveBeenCalledWith(true, {}, {});
+  expect(fixture.camera).toHaveBeenCalledWith(true, {}, { videoCodec: 'h264' });
   await transport.capabilities.screenShare?.setEnabled(true);
   const [, capture, publish] = fixture.localParticipant.setScreenShareEnabled.mock.calls[0];
   expect(capture).not.toHaveProperty('resolution');
   expect(capture).toHaveProperty('contentHint', 'motion');
   expect(publish).not.toHaveProperty('screenShareEncoding');
-  expect(publish).not.toHaveProperty('videoCodec');
+  expect(publish).toHaveProperty('videoCodec', 'h264');
   await transport.disconnect();
 });
 
@@ -202,7 +202,7 @@ test('turning simulcast off applies to camera and screen publishing', async () =
   const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
   try {
     await transport.connect({ ...connectOptions, cameraEnabled: true });
-    expect(fixture.camera).toHaveBeenCalledWith(true, {}, { simulcast: false });
+    expect(fixture.camera).toHaveBeenCalledWith(true, {}, { videoCodec: 'h264', simulcast: false });
     await transport.capabilities.screenShare?.setEnabled(true);
     expect(fixture.localParticipant.setScreenShareEnabled.mock.calls[0][2]).toMatchObject({
       simulcast: false,

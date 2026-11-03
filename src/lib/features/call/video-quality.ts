@@ -1,8 +1,11 @@
 import type {
   ScreenShareCaptureOptions,
   TrackPublishOptions,
+  VideoCodec,
   VideoResolution,
 } from 'livekit-client';
+
+import { hardwareVideoEncoders, type ProbedVideoCodec } from '#lib/platform/video-encoders.js';
 
 import type {
   CallScreenFramerate,
@@ -42,15 +45,22 @@ export function screenCaptureOptions(
   return { contentHint, resolution: { ...(size ?? displayResolution()), frameRate } };
 }
 
+const AUTO_CODECS: readonly ProbedVideoCodec[] = ['h264', 'vp9', 'av1'];
+
+export async function resolveVideoCodec(codec: CallVideoCodec): Promise<VideoCodec> {
+  if (codec !== 'auto') return codec;
+  const hardware = await hardwareVideoEncoders();
+  return AUTO_CODECS.find((candidate) => hardware.includes(candidate)) ?? 'h264';
+}
+
 export function videoPublishOptions(
   source: 'camera' | 'screen',
   bitrate: CallVideoBitrate,
-  codec: CallVideoCodec,
+  codec: VideoCodec,
   simulcast: boolean,
   framerate: CallScreenFramerate = 'auto'
 ): TrackPublishOptions {
-  const options: TrackPublishOptions = {};
-  if (codec !== 'auto') options.videoCodec = codec;
+  const options: TrackPublishOptions = { videoCodec: codec };
   if (!simulcast) options.simulcast = false;
   if (bitrate !== 'auto') {
     const encoding = { maxBitrate: Number(bitrate) * 1000 };

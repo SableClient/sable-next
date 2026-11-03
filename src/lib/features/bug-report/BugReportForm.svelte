@@ -14,6 +14,7 @@
   import { i18n } from '#lib/i18n.js';
   import { debugLog, exportDebugLogs } from '#lib/observability/debug-log.svelte.js';
   import { describePlatform, issuePlatform } from '#lib/platform/diagnostics.js';
+  import { describeVideoAcceleration } from '#lib/platform/video-encoders.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
@@ -32,6 +33,7 @@
   let { onDone }: Props = $props();
   let platform = $state('unknown');
   let platformOption = $state('');
+  let video = $state('');
   let type = $state<ReportType>('bug');
   let title = $state('');
   let description = $state('');
@@ -80,6 +82,7 @@
   onMount(() => {
     void describePlatform().then((value) => (platform = value));
     void issuePlatform().then((value) => (platformOption = value));
+    void describeVideoAcceleration().then((value) => (video = value));
   });
 
   onDestroy(() => {
@@ -96,7 +99,7 @@
               .join('\n\nExpected:\n'),
             reproduction,
             platforms: platformOption,
-            info: issueEnvironment(platform),
+            info: issueEnvironment(platform, video),
             context,
           }
         : { problem, solution, alternatives, context };
@@ -130,6 +133,7 @@
           context: context || '(not provided)',
           userAgent,
           platform,
+          video,
           version,
           ...(includeDebugLogs ? { debugLogs: exportDebugLogs(debugLog.entries.slice(-100)) } : {}),
         },

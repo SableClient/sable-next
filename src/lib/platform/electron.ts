@@ -33,6 +33,7 @@ export interface ElectronBridge {
   requestAttention(): void;
   clearWebCaches(): Promise<void>;
   dataDir(): Promise<string | null>;
+  gpuVideoStatus(): Promise<{ encode: string; decode: string } | null>;
   applyWindowSettings(settings: DesktopWindowSettings): Promise<DesktopWindowState | null>;
   minimizeWindow(): void;
   showWindow(): void;

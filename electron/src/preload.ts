@@ -42,6 +42,11 @@ contextBridge.exposeInMainWorld('sableElectron', {
   },
   clearWebCaches: () => ipcRenderer.invoke('sable-clear-web-caches') as Promise<void>,
   dataDir: () => ipcRenderer.invoke('sable-data-dir') as Promise<string | null>,
+  gpuVideoStatus: () =>
+    ipcRenderer.invoke('sable-gpu-video-status') as Promise<{
+      encode: string;
+      decode: string;
+    } | null>,
   applyWindowSettings: (settings: unknown) =>
     ipcRenderer.invoke('sable-apply-window-settings', settings) as Promise<{
       trayAvailable: boolean;
