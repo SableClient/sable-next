@@ -37,7 +37,7 @@
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { supporter } from '#lib/supporter/supporter.svelte.js';
   import { PresenceStore, providePresenceStore } from '#lib/rooms/presence.svelte.js';
-  import { goto, onNavigate } from '$app/navigation';
+  import { afterNavigate, goto, onNavigate } from '$app/navigation';
   import { tabTransition } from '#lib/ui/tab-transition.js';
   import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import { resolve } from '$app/paths';
@@ -229,6 +229,24 @@
   const shareInbox = new ShareInbox();
 
   let openRoomId = $derived(findRoomByPathId(roomList.rooms, page.params.roomId)?.room_id ?? null);
+
+  let routeAccountId = $state<string | null>(null);
+  afterNavigate(() => {
+    routeAccountId = core.session?.account_id ?? null;
+  });
+  $effect(() => {
+    if (routeAccountId === null && core.session) routeAccountId = core.session.account_id;
+  });
+  let previousAccountRoute = $derived(
+    routeAccountId !== null &&
+      core.session !== null &&
+      core.session.account_id !== routeAccountId &&
+      (page.params.roomId !== undefined || page.params.spaceId !== undefined)
+  );
+  $effect(() => {
+    if (previousAccountRoute) void goto(resolve('/(app)/rooms'), { replace: true });
+  });
+
   let incoming = $derived(incomingCalls.calls.at(0) ?? null);
   let loadingAnimal = $derived(preferences.loadingAnimal || null);
 
@@ -1162,7 +1180,9 @@
   {#key core.accountRevision}
     <a class="skip-link" href="#main-content">Skip to main content</a>
     <AppShell>
-      {@render children()}
+      {#if !previousAccountRoute}
+        {@render children()}
+      {/if}
     </AppShell>
     <MediaViewerHost />
     {#if preferences.callScreenPreview && callSession.active && callSession.views === 0 && callSession.rooms.length > 0}

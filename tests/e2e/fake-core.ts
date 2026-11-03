@@ -1243,9 +1243,13 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         return null;
       },
       'session.list_accounts': () => (signedOut ? [] : (window.__e2eAccounts ?? [session])),
-      'session.switch_account': () => {
+      'session.switch_account': (params) => {
         if (window.__e2eSwitchAccountError) throw new FakeCoreError('unavailable');
-        return session;
+        const account = window.__e2eAccounts?.find(
+          (candidate) => candidate.account_id === params.account_id
+        );
+        if (account) Object.assign(session, account);
+        return { ...session };
       },
       'session.request_open_id_token': () => ({
         access_token: 'e2e-openid-token',
@@ -1345,15 +1349,19 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'widgets.send_sticky_event': () => '$e2e-widget-sticky',
       'widgets.room_sticky_events': () => [],
       'timeline.subscribe_room_list': () => {
+        const rooms =
+          session.account_id === 'e2e-account'
+            ? joinedRooms
+            : joinedRooms.filter((room) => room.room_kind !== 'space');
         queueMicrotask(() =>
           activePort?.emit({
             type: 'room_list_diff',
             subscription: 1,
             diffs: [],
-            sections: fakeSections(joinedRooms),
+            sections: fakeSections(rooms),
           })
         );
-        return { subscription: 1, rooms: joinedRooms };
+        return { subscription: 1, rooms };
       },
       'timeline.set_room_list_options': () => null,
       'timeline.subscribe': (params) => {
