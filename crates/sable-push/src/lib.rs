@@ -901,6 +901,8 @@ enum Issue {
     Runtime,
     Timeout,
     Panic,
+    Keychain,
+    Expired,
 }
 
 impl Issue {
@@ -914,8 +916,42 @@ impl Issue {
             Self::Runtime => "runtime",
             Self::Timeout => "timeout",
             Self::Panic => "panic",
+            Self::Keychain => "keychain",
+            Self::Expired => "expired",
         }
     }
+}
+
+/// Reports a fallback the extension took outside `sable_push_render`.
+///
+/// # Safety
+/// Both arguments must be null or valid NUL-terminated UTF-8 strings for this call.
+#[expect(
+    unsafe_code,
+    reason = "C ABI used by the notification service extension"
+)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sable_push_report(root: *const c_char, issue: *const c_char) {
+    if root.is_null() || issue.is_null() {
+        return;
+    }
+    let _ = std::panic::catch_unwind(|| {
+        // SAFETY: the caller guarantees valid C strings for this call.
+        let Ok(root) = (unsafe { CStr::from_ptr(root) }).to_str() else {
+            return;
+        };
+        // SAFETY: same contract as root above.
+        let Ok(name) = (unsafe { CStr::from_ptr(issue) }).to_str() else {
+            return;
+        };
+        let issue = match name {
+            "payload" => Issue::Payload,
+            "keychain" => Issue::Keychain,
+            "expired" => Issue::Expired,
+            _ => return,
+        };
+        report(Path::new(root), issue);
+    });
 }
 
 #[derive(Deserialize)]
@@ -1602,6 +1638,8 @@ mod tests {
             (Issue::Runtime, "runtime"),
             (Issue::Timeout, "timeout"),
             (Issue::Panic, "panic"),
+            (Issue::Keychain, "keychain"),
+            (Issue::Expired, "expired"),
         ] {
             assert_eq!(issue.as_str(), name);
         }

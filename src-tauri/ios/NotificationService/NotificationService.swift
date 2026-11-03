@@ -62,6 +62,7 @@ final class NotificationService: UNNotificationServiceExtension {
             )
             guard let data = try? JSONSerialization.data(withJSONObject: userInfo),
                   let payload = String(data: data, encoding: .utf8) else {
+                Self.report("payload", root: root.path)
                 self?.finish(content)
                 return
             }
@@ -69,6 +70,7 @@ final class NotificationService: UNNotificationServiceExtension {
                 guard let keychain = Bundle.main.object(forInfoDictionaryKey: "SableKeychainGroup") as? String,
                       keychain.withCString({ sable_push_install_keychain($0) }) else {
                     Self.log.error("keychain unavailable, showing the generic alert")
+                    Self.report("keychain", root: root.path)
                     self?.finish(content)
                     return
                 }
@@ -301,6 +303,10 @@ final class NotificationService: UNNotificationServiceExtension {
                            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
     }
 
+    private static func report(_ issue: String, root: String) {
+        root.withCString { path in issue.withCString { sable_push_report(path, $0) } }
+    }
+
     private func isPending() -> Bool {
         lock.lock()
         defer { lock.unlock() }
@@ -438,8 +444,10 @@ final class NotificationService: UNNotificationServiceExtension {
         Self.log.error("time expired, showing the generic alert")
         lock.lock()
         let content = fallback
+        let root = policyRoot
         communication = nil
         lock.unlock()
+        if let root { Self.report("expired", root: root) }
         if let content { complete(content) }
     }
 }
