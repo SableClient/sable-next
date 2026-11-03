@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { privacyUrl } from '#lib/deployment/links.js';
   import { i18n } from '#lib/i18n.js';
   import { setPreference } from '#lib/settings/preferences.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -30,7 +31,8 @@
   </AuthField>
 
   <div class="telemetry-consent-policies">
-    <a href="https://sable.moe/privacy" rel="noopener noreferrer" target="_blank">
+    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external deployment URL -->
+    <a href={privacyUrl()} rel="noopener noreferrer" target="_blank">
       {i18n.t('settings.telemetryBannerSablePolicy')}
     </a>
   </div>

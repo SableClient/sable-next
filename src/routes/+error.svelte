@@ -6,9 +6,10 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import {
-    forgeIssueUrl,
     issueEnvironment,
+    issueTrackerAvailable,
     openForgeIssueUrl,
+    reportIssueUrl,
   } from '#lib/features/bug-report/forge.js';
   import { i18n } from '#lib/i18n.js';
   import { describePlatform, issuePlatform } from '#lib/platform/diagnostics.js';
@@ -43,7 +44,7 @@
     const error = page.error;
     if (!error) return;
     const [platforms, os] = await Promise.all([issuePlatform(), describePlatform()]);
-    const url = forgeIssueUrl('bug', `Crash: ${error.message}`, {
+    const url = reportIssueUrl('bug', `Crash: ${error.message}`, {
       description: error.message,
       platforms,
       info: issueEnvironment(os),
@@ -93,7 +94,9 @@
         {/if}
       {/if}
 
-      <Button size="medium" onclick={reportOnForge}>{i18n.t('errors.reportIssue')}</Button>
+      {#if issueTrackerAvailable()}
+        <Button size="medium" onclick={reportOnForge}>{i18n.t('errors.reportIssue')}</Button>
+      {/if}
       <Button size="medium" onclick={copyError}>
         {copied ? i18n.t('common.copied') : i18n.t('common.copy')}
       </Button>

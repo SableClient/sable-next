@@ -4,10 +4,12 @@
   import {
     type ForgeIssue,
     type ReportType,
-    forgeIssueUrl,
     issueEnvironment,
+    issueTrackerAvailable,
     openForgeIssueUrl,
+    reportIssueUrl,
     searchForgeIssues,
+    usesForge,
   } from '#lib/features/bug-report/forge.js';
   import { i18n } from '#lib/i18n.js';
   import { debugLog, exportDebugLogs } from '#lib/observability/debug-log.svelte.js';
@@ -41,7 +43,9 @@
   let context = $state('');
   let sendToSentry = $state(true);
   let includeDebugLogs = $state(true);
-  let openOnForge = $state(!sentryEnabled);
+  const trackerAvailable = issueTrackerAvailable();
+  const forge = usesForge();
+  let openOnForge = $state(trackerAvailable && !sentryEnabled);
   let similarIssues = $state.raw<ForgeIssue[]>([]);
   let searching = $state(false);
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -56,8 +60,8 @@
     searchController?.abort();
     if (searchTimer !== undefined) clearTimeout(searchTimer);
     similarIssues = [];
-    searching = query.length >= 3;
-    if (query.length < 3) return;
+    searching = forge && query.length >= 3;
+    if (!forge || query.length < 3) return;
 
     const controller = new AbortController();
     searchController = controller;
@@ -96,7 +100,7 @@
             context,
           }
         : { problem, solution, alternatives, context };
-    return forgeIssueUrl(type, title, fields);
+    return reportIssueUrl(type, title, fields);
   }
 
   function submit(): void {
@@ -139,7 +143,7 @@
       }
     }
 
-    if (type === 'feature' || !sentryEnabled || openOnForge) {
+    if (trackerAvailable && (type === 'feature' || !sentryEnabled || openOnForge)) {
       void openForgeIssueUrl(issueUrl());
     }
     onDone();
@@ -160,7 +164,7 @@
       value={type}
       items={[
         { value: 'bug', label: i18n.t('bugReport.bug') },
-        { value: 'feature', label: i18n.t('bugReport.feature') },
+        ...(trackerAvailable ? [{ value: 'feature', label: i18n.t('bugReport.feature') }] : []),
       ]}
       onValueChange={(value) => (type = value as ReportType)}
     />
@@ -240,10 +244,12 @@
           {i18n.t('bugReport.includeDebugLogs')}
         </label>
       {/if}
-      <label class="option">
-        <input type="checkbox" bind:checked={openOnForge} />
-        {i18n.t('bugReport.openOnForge')}
-      </label>
+      {#if trackerAvailable}
+        <label class="option">
+          <input type="checkbox" bind:checked={openOnForge} />
+          {i18n.t('bugReport.openOnForge')}
+        </label>
+      {/if}
     </fieldset>
   {/if}
 

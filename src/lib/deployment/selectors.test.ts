@@ -3,7 +3,14 @@ import { expect, test } from 'vitest';
 import { parseRuntimeConfig } from '#lib/config/runtime-config.js';
 
 import { appName, pageTitle } from './brand.js';
-import { donateUrl, privacyUrl, SABLE_PRIVACY_URL, sourceUrl, supportRoom } from './links.js';
+import {
+  communityFeatures,
+  donateUrl,
+  privacyUrl,
+  SABLE_PRIVACY_URL,
+  sourceUrl,
+  supportRoom,
+} from './links.js';
 import { deviceDisplayName, registrationEnabled } from './policy.js';
 
 const sable = parseRuntimeConfig({});
@@ -32,6 +39,8 @@ test('a branded deployment names itself everywhere', () => {
 });
 
 test('hiding community links keeps the deployment support room', () => {
+  expect(communityFeatures(acme)).toBe(false);
+  expect(communityFeatures(sable)).toBe(true);
   expect(sourceUrl(acme)).toBeNull();
   expect(donateUrl(acme)).toBeNull();
   expect(supportRoom(acme)).toBe('#help:acme.example');

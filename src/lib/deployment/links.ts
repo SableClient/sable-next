@@ -11,8 +11,12 @@ export const SABLE_UPDATE_MANIFEST_URL =
 
 export type PolicyLink = { text: string; url: string };
 
+export function communityFeatures(config: RuntimeConfig = deployment()): boolean {
+  return !config.hideCommunityLinks;
+}
+
 function community<T>(value: T, config: RuntimeConfig): T | null {
-  return config.hideCommunityLinks ? null : value;
+  return communityFeatures(config) ? value : null;
 }
 
 export function sourceUrl(config: RuntimeConfig = deployment()): string | null {

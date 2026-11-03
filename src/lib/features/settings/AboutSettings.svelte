@@ -5,7 +5,7 @@
   import { resolve } from '$app/paths';
 
   import { appName } from '#lib/deployment/brand.js';
-  import { SABLE_DONATE_URL, SABLE_SOURCE_URL } from '#lib/deployment/links.js';
+  import { donateUrl, sourceUrl } from '#lib/deployment/links.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { restartSetup } from '#lib/features/auth/setup/setup-record.js';
   import { writeText } from '#lib/platform/local-json.js';
@@ -43,6 +43,8 @@
   import { supporter } from '#lib/supporter/supporter.svelte.js';
 
   const core = useCoreClient();
+  const source = sourceUrl();
+  const donate = donateUrl();
   const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
   const automaticUpdateChecksSupported = supportsAutoUpdate() || hostsServiceWorker();
   let confirmingReset = $state(false);
@@ -148,22 +150,28 @@
         </Tooltip>
       </div>
       <p>{i18n.t('settings.aboutTagline')} 🇵🇸 🇺🇦 🏳️‍⚧️</p>
-      <div class="product-actions">
-        <LinkButton href={SABLE_SOURCE_URL} target="_blank" rel="noopener noreferrer" size="small">
-          <CodeIcon aria-hidden="true" />
-          {i18n.t('common.sourceCode')}
-        </LinkButton>
-        <LinkButton
-          href={SABLE_DONATE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          variant="primary"
-          size="small"
-        >
-          <HeartIcon aria-hidden="true" />
-          {i18n.t('common.supportSable')}
-        </LinkButton>
-      </div>
+      {#if source || donate}
+        <div class="product-actions">
+          {#if source}
+            <LinkButton href={source} target="_blank" rel="noopener noreferrer" size="small">
+              <CodeIcon aria-hidden="true" />
+              {i18n.t('common.sourceCode')}
+            </LinkButton>
+          {/if}
+          {#if donate}
+            <LinkButton
+              href={donate}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="primary"
+              size="small"
+            >
+              <HeartIcon aria-hidden="true" />
+              {i18n.t('common.supportSable')}
+            </LinkButton>
+          {/if}
+        </div>
+      {/if}
     </div>
   </header>
   {#if supporter.enabled}

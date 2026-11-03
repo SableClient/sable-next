@@ -42,6 +42,7 @@
 
   import ThemeCatalog from './ThemeCatalog.svelte';
   import ThemeTile from './ThemeTile.svelte';
+  import { communityFeatures } from '#lib/deployment/links.js';
   import { fetchCatalogFile, type CatalogEntry } from '#lib/settings/theme-catalog.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
 
@@ -57,6 +58,7 @@
     onThemeChosen,
   }: { onboarding?: boolean; onThemeChosen?: (kind: ResolvedTheme) => void } = $props();
 
+  const catalogAvailable = communityFeatures();
   let catalogOpen = $state(false);
   let installing = $state<string | null>(null);
   let error = $state<string | null>(null);
@@ -428,15 +430,17 @@
   {/if}
 
   <div class="actions">
-    <Button
-      variant={onboarding ? 'secondary' : 'primary'}
-      block={onboarding}
-      aria-haspopup="dialog"
-      aria-expanded={catalogOpen}
-      onclick={openCatalog}
-    >
-      {onboarding ? i18n.t('setup.browseThemes') : i18n.t('settings.themeCatalogTitle')}
-    </Button>
+    {#if catalogAvailable}
+      <Button
+        variant={onboarding ? 'secondary' : 'primary'}
+        block={onboarding}
+        aria-haspopup="dialog"
+        aria-expanded={catalogOpen}
+        onclick={openCatalog}
+      >
+        {onboarding ? i18n.t('setup.browseThemes') : i18n.t('settings.themeCatalogTitle')}
+      </Button>
+    {/if}
     {#if !onboarding}
       <Button variant="secondary" onclick={() => void importTheme()}>
         {i18n.t('settings.customThemesImport')}
@@ -491,7 +495,7 @@
   {/if}
 </div>
 
-{#if catalogOpen}
+{#if catalogAvailable && catalogOpen}
   <ThemeCatalog
     bind:open={() => catalogOpen, setCatalogOpen}
     {installing}

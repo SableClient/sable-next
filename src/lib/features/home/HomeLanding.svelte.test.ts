@@ -1,13 +1,23 @@
 // @vitest-environment happy-dom
 
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
+import { parseRuntimeConfig } from '#lib/config/runtime-config.js';
+import { deployment } from '#lib/deployment/deployment.js';
 import { LOGGED_IN_MARKER } from '#lib/features/auth/flow/auth-flow.svelte.js';
 import HomeLanding from './HomeLanding.svelte';
 import SettingsChangesCard from './SettingsChangesCard.svelte';
 
 vi.mock('#lib/core/context.js');
+vi.mock('#lib/deployment/deployment.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/deployment/deployment.js')>()),
+  deployment: vi.fn(),
+}));
+
+beforeEach(() => {
+  vi.mocked(deployment).mockReturnValue(parseRuntimeConfig({}));
+});
 
 afterEach(() => {
   localStorage.removeItem(LOGGED_IN_MARKER);
@@ -22,6 +32,27 @@ test('opens Get support in the Sable general room', () => {
     '/to/%23general%3Asable.moe'
   );
   expect(screen.getByRole('link', { name: 'Get support' })).not.toHaveAttribute('target');
+});
+
+test('drops the resources section when the deployment hides community links', () => {
+  vi.mocked(deployment).mockReturnValue(parseRuntimeConfig({ hideCommunityLinks: true }));
+  render(HomeLanding, { titleKey: 'nav.unspaced' });
+
+  expect(screen.queryByRole('link', { name: 'Get support' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'View source' })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Sable resources')).not.toBeInTheDocument();
+});
+
+test('keeps the deployment support room when community links are hidden', () => {
+  vi.mocked(deployment).mockReturnValue(
+    parseRuntimeConfig({ hideCommunityLinks: true, links: { supportRoom: '#help:acme.example' } })
+  );
+  render(HomeLanding, { titleKey: 'nav.unspaced' });
+
+  expect(screen.getByRole('link', { name: 'Get support' })).toHaveAttribute(
+    'href',
+    '/to/%23help%3Aacme.example'
+  );
 });
 
 test('welcomes a returning user back', () => {

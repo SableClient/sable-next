@@ -1,3 +1,4 @@
+import { bugReportUrl, communityFeatures } from '#lib/deployment/links.js';
 import { openExternalUrl, opensExternalUrls } from '#lib/platform/external-links.js';
 
 export type ReportType = 'bug' | 'feature';
@@ -34,6 +35,22 @@ export function forgeIssueUrl(
     if (value.trim() !== '') params.set(`field:${id}`, value);
   }
   return `${forgeIssuesUrl}/new?${params}`;
+}
+
+export function usesForge(): boolean {
+  return bugReportUrl() === null && communityFeatures();
+}
+
+export function issueTrackerAvailable(): boolean {
+  return bugReportUrl() !== null || communityFeatures();
+}
+
+export function reportIssueUrl(
+  type: ReportType,
+  title: string,
+  fields: Record<string, string>
+): string {
+  return bugReportUrl() ?? forgeIssueUrl(type, title, fields);
 }
 
 export async function searchForgeIssues(query: string, signal: AbortSignal): Promise<ForgeIssue[]> {

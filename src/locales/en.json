@@ -1588,7 +1588,9 @@
     "doneAction": "Go to your chats"
   },
   "footer": {
-    "poweredBy": "Powered by"
+    "poweredBy": "Powered by",
+    "help": "Help",
+    "privacy": "Privacy policy"
   },
   "combobox": {
     "showOptions": "Show options"

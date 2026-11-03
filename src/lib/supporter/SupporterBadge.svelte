@@ -3,7 +3,7 @@
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
   import type { ClassValue } from 'svelte/elements';
 
-  import { SABLE_DONATE_URL } from '#lib/deployment/links.js';
+  import { donateUrl } from '#lib/deployment/links.js';
   import { graphemes } from '#lib/graphemes.js';
   import { i18n } from '#lib/i18n.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
@@ -44,6 +44,7 @@
   let selected = $derived(supporterAppearance(appearance));
   let { variant, color, colors, customCardColors, cardColor, buttonColor } = $derived(selected);
   const id = $props.id();
+  const donateHref = donateUrl();
   let open = $state(false);
   let donorName = $derived.by(() => {
     let shortened = '';
@@ -218,17 +219,19 @@
           { name: donorName }
         )}
       </p>
-      <LinkButton
-        href={SABLE_DONATE_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        block
-        class="supporter-card-donate"
-        onclick={() => (open = false)}
-      >
-        <HeartIcon aria-hidden="true" weight="fill" />
-        {i18n.t(donated ? 'common.supportSable' : 'supporter.badgeDonate')}
-      </LinkButton>
+      {#if donateHref}
+        <LinkButton
+          href={donateHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          block
+          class="supporter-card-donate"
+          onclick={() => (open = false)}
+        >
+          <HeartIcon aria-hidden="true" weight="fill" />
+          {i18n.t(donated ? 'common.supportSable' : 'supporter.badgeDonate')}
+        </LinkButton>
+      {/if}
       <small class="supporter-card-hint"
         >{i18n.t(donated ? 'supporter.badgeDonorHint' : 'supporter.badgeHint')}</small
       >
