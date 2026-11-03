@@ -1,6 +1,7 @@
 <script lang="ts">
   import { helpUrl, privacyUrl, sourceUrl, termsLinks } from '#lib/deployment/links.js';
   import { i18n } from '#lib/i18n.js';
+  const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
 
   const links = [
     { text: i18n.t('common.sourceCode'), url: sourceUrl() },
@@ -20,6 +21,9 @@
     >{i18n.t('footer.poweredBy')}
     <a href="https://matrix.org" rel="noopener noreferrer" target="_blank">Matrix</a></span
   >
+  <span aria-hidden="true">·</span>
+  <span>{version}</span>
+  
 </footer>
 
 <style>
