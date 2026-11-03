@@ -4,6 +4,7 @@ import { expect, test, vi } from 'vitest';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { createCoreStub } from '#lib/core/__mocks__/context.js';
+import { expectNoA11yViolations, ICONS_HIDDEN_BY_LAYOUT } from '#lib/test-support/a11y.js';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 import { spaceNotifications } from '#lib/rooms/space-notifications.svelte.js';
 
@@ -64,7 +65,7 @@ test.each([1280, 390])(
     if (width >= 768) await notifications.hover();
     else await notifications.click();
 
-    const itemRole = width >= 768 ? 'menuitem' : 'menuitemradio';
+    const itemRole = 'menuitemradio';
     for (const label of [
       'Default (Mentions and keywords)',
       'All messages',
@@ -77,6 +78,7 @@ test.each([1280, 390])(
     await expect
       .element(page.getByRole(itemRole, { name: 'Default (Mentions and keywords)', exact: true }))
       .toHaveAttribute('aria-checked', 'true');
+    await expectNoA11yViolations(document.body, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
     await page.getByRole(itemRole, { name: 'All messages', exact: true }).click();
 
     await vi.waitFor(() => {
@@ -143,9 +145,9 @@ test('sets the space notification mode and moves the rooms that followed it', as
   await page.getByRole('button', { name: 'Room options' }).click();
   await page.getByRole('menuitem', { name: 'Notifications', exact: true }).hover();
   await expect
-    .element(page.getByRole('menuitem', { name: 'All messages', exact: true }))
+    .element(page.getByRole('menuitemradio', { name: 'All messages', exact: true }))
     .toHaveAttribute('aria-checked', 'true');
-  await page.getByRole('menuitem', { name: 'Mute', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: 'Mute', exact: true }).click();
 
   await vi.waitFor(() => {
     expect(setRoomsNotificationMode).toHaveBeenCalledWith({
@@ -203,13 +205,13 @@ test('a room carrying its space mode shows it as following the space', async () 
   await page.getByRole('button', { name: 'Room options' }).click();
   await page.getByRole('menuitem', { name: 'Notifications', exact: true }).hover();
   await expect
-    .element(page.getByRole('menuitem', { name: 'Space (Mute)', exact: true }))
+    .element(page.getByRole('menuitemradio', { name: 'Space (Mute)', exact: true }))
     .toHaveAttribute('aria-checked', 'true');
   await expect
-    .element(page.getByRole('menuitem', { name: 'Mute', exact: true }))
+    .element(page.getByRole('menuitemradio', { name: 'Mute', exact: true }))
     .toHaveAttribute('aria-checked', 'false');
   await page
-    .getByRole('menuitem', { name: 'Default (Mentions and keywords)', exact: true })
+    .getByRole('menuitemradio', { name: 'Default (Mentions and keywords)', exact: true })
     .click();
 
   await vi.waitFor(() => {
@@ -245,7 +247,7 @@ test('a muted space without a space mode shows as muted', async () => {
   await page.getByRole('button', { name: 'Room options' }).click();
   await page.getByRole('menuitem', { name: 'Notifications', exact: true }).hover();
   await expect
-    .element(page.getByRole('menuitem', { name: 'Mute', exact: true }))
+    .element(page.getByRole('menuitemradio', { name: 'Mute', exact: true }))
     .toHaveAttribute('aria-checked', 'true');
   spaceNotifications.stop();
 });

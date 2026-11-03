@@ -6,6 +6,7 @@ import type { NotificationModeView, RoomListItemView } from '#src/generated/prot
 
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 import { roomNotifications, roomUnread } from '#lib/rooms/unread.js';
+import { expectNoA11yViolations, ICONS_HIDDEN_BY_LAYOUT } from '#lib/test-support/a11y.js';
 
 const roomsFixture = vi.hoisted(() => {
   const fixture = {
@@ -81,6 +82,12 @@ function room(overrides: Partial<RoomListItemView>): RoomListItemView {
   });
 }
 
+const ROW_ACTIONS_IN_TREE = {
+  ...ICONS_HIDDEN_BY_LAYOUT,
+  'aria-required-children':
+    'the room options button is a focusable sibling of each treeitem and cannot be a treeitem child',
+};
+
 async function mountNav(props: { collapsed?: boolean; width?: number } = {}) {
   Object.assign(core.rpc.notifications, {
     settings: vi.fn().mockResolvedValue({ mode: 'all', default: 'all' }),
@@ -108,6 +115,7 @@ test('collapsed room rows keep their unread badges inside the row', async () => 
     return !wrap || box.left < wrap.left || box.right > wrap.right || box.top < wrap.top;
   });
   expect(outside).toHaveLength(0);
+  await expectNoA11yViolations(document.body, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
 });
 
 test('the row options button toggles the shared menu and returns focus', async () => {
@@ -127,6 +135,7 @@ test('the row options button toggles the shared menu and returns focus', async (
   await userEvent.click(trigger);
   await expect.element(screen.getByRole('menu')).toBeVisible();
   await expect.element(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expectNoA11yViolations(document.body, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
 
   await userEvent.click(trigger);
   await expect.poll(() => screen.getByRole('menu').elements().length).toBe(0);
@@ -151,6 +160,11 @@ test('the list options menu renders its checkable items (#1341)', async () => {
   roomsFixture.rooms = [room({ room_id: '!a:example.org', name: 'General' })];
   const screen = await mountNav();
   await userEvent.click(screen.getByRole('button', { name: 'List options' }));
-  await expect.element(screen.getByRole('menuitem', { name: 'Group favourites' })).toBeVisible();
-  await expect.element(screen.getByRole('menuitem', { name: 'Recent activity' })).toBeVisible();
+  await expect
+    .element(screen.getByRole('menuitemradio', { name: 'Group favourites' }))
+    .toBeVisible();
+  await expect
+    .element(screen.getByRole('menuitemradio', { name: 'Recent activity' }))
+    .toBeVisible();
+  await expectNoA11yViolations(document.body, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
 });

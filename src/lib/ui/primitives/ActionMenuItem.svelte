@@ -57,14 +57,16 @@
     {@render children()}
   </button>
 {:else}
-  <DropdownMenu.Item
-    class={classes}
-    {disabled}
-    {closeOnSelect}
-    aria-checked={checked}
-    onSelect={select}
-  >
-    {@render children()}
+  <DropdownMenu.Item class={classes} {disabled} {closeOnSelect} onSelect={select}>
+    {#snippet child({ props })}
+      <div
+        {...props}
+        role={checked === undefined ? 'menuitem' : 'menuitemradio'}
+        aria-checked={checked}
+      >
+        {@render children()}
+      </div>
+    {/snippet}
   </DropdownMenu.Item>
 {/if}
 

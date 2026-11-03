@@ -1601,7 +1601,7 @@ test('a staged picture offers a metadata choice per file', async () => {
   await press(document.querySelector('.staged-options'));
 
   await press(await screen.findByRole('menuitem', { name: 'Metadata' }));
-  const rows = await screen.findAllByRole('menuitem', { name: /location|metadata|Keep/ });
+  const rows = await screen.findAllByRole('menuitemradio', { name: /location|metadata|Keep/ });
   expect(rows.map((row) => row.textContent.trim())).toEqual([
     '✓ Remove location',
     'Remove all metadata',
@@ -1640,7 +1640,7 @@ test('the staged viewer offers the same metadata choice', async () => {
   const viewer = await screen.findByRole('dialog');
   await press(within(viewer).getByRole('button', { name: /Options for cat.png/ }));
   await press(await screen.findByRole('menuitem', { name: 'Metadata' }));
-  await press(await screen.findByRole('menuitem', { name: 'Remove all metadata' }));
+  await press(await screen.findByRole('menuitemradio', { name: 'Remove all metadata' }));
 
   await vi.waitFor(() => {
     expect(document.querySelector('.staged-options')?.className).toContain('staged-spoiler-on');

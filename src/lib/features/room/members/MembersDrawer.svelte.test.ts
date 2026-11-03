@@ -302,7 +302,7 @@ test('a membership tab loads again when the room members change', async () => {
   });
   const { rerender } = renderWithTooltips(MembersDrawer, props([]).props);
   await user.click(screen.getByRole('button', { name: 'Filter members: Joined' }));
-  await user.click(screen.getByRole('menuitem', { name: /Left/ }));
+  await user.click(screen.getByRole('menuitemradio', { name: /Left/ }));
   await tick();
   expect(loadMembership).toHaveBeenCalledTimes(1);
 
