@@ -26,8 +26,7 @@
   import { guardTouchClicks } from '#lib/ui/trailing-click.js';
   import { applyDesktopWindowSettings, titleBarKind } from '#lib/platform/window-decorations.js';
   import { electronBridge } from '#lib/platform/electron.js';
-  import { runtimeConfig } from '#lib/config/runtime-config.js';
-  import { applyDeploymentDefaults, preferences } from '#lib/settings/preferences.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import {
     activeCustomThemeCss,
     activeTweakCss,
@@ -104,9 +103,6 @@
     const stopGuardingClicks = guardTouchClicks();
     const stopBlockingEdgeNavigation = blockEdgeNavigation();
     void registerServiceWorker();
-    void runtimeConfig().then((config) => {
-      applyDeploymentDefaults(config.settingsDefaults);
-    });
     const stopMatrixLinks = watchMatrixLinks((path) => {
       // eslint-disable-next-line svelte/no-navigation-without-resolve -- matrixLinkPath resolves the permalink route
       void goto(path);

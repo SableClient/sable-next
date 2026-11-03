@@ -15,6 +15,7 @@
   import type { SettingDefinition, SettingsCategory } from '#lib/settings/registry.js';
   import {
     PREFERENCE_RANGES,
+    isLockedPreference,
     preferences,
     setPreference,
   } from '#lib/settings/preferences.svelte.js';
@@ -100,7 +101,8 @@
     {#each rows as setting (setting.key)}
       {@const gate = gated(setting)}
       {@const unsupported = missingServerFeature(setting)}
-      {@const disabled = setting.unavailable === true || gate || unsupported}
+      {@const lockedByDeployment = isLockedPreference(setting.key)}
+      {@const disabled = setting.unavailable === true || gate || unsupported || lockedByDeployment}
       {@const anchor = settingFocusId(setting.key)}
       <SettingsRow
         id={anchor}
@@ -109,13 +111,15 @@
         title={i18n.t(setting.name)}
         description={setting.description ? i18n.t(setting.description) : undefined}
         {disabled}
-        badge={setting.unavailable
-          ? i18n.t('settings.notAvailableYet')
-          : gate
-            ? i18n.t('settings.needsSetting', { name: i18n.t(gateName(setting)) })
-            : unsupported
-              ? i18n.t('settings.needsServerFeature')
-              : undefined}
+        badge={lockedByDeployment
+          ? i18n.t('settings.managedByDeployment')
+          : setting.unavailable
+            ? i18n.t('settings.notAvailableYet')
+            : gate
+              ? i18n.t('settings.needsSetting', { name: i18n.t(gateName(setting)) })
+              : unsupported
+                ? i18n.t('settings.needsServerFeature')
+                : undefined}
         wide={setting.type !== 'boolean'}
         control={setting.type === 'boolean' && !disabled ? `${anchor}-switch` : undefined}
         class={setting.gatedBy !== undefined ? 'gated' : undefined}

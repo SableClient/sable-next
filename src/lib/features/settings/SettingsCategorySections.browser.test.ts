@@ -14,7 +14,7 @@ vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 import { settingsCategories } from '#lib/settings/registry.js';
-import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { applyDeploymentLocks, setPreference } from '#lib/settings/preferences.svelte.js';
 
 import SettingsCategorySections from './SettingsCategorySections.svelte';
 
@@ -102,4 +102,16 @@ test('profile change propagation is disabled when the homeserver lacks MSC4466',
   await expect
     .element(screen.getByRole('button', { name: 'Apply name and avatar changes to' }))
     .toBeDisabled();
+});
+
+test('a setting locked by the deployment is disabled with a hint', async () => {
+  const category = settingsCategories.find((entry) => entry.id === 'appearance');
+  if (!category) throw new Error('the appearance category is missing');
+  applyDeploymentLocks({ textScale: 1.2 });
+  const screen = await render(SettingsCategorySections, { category });
+
+  await expect
+    .element(screen.getByRole('spinbutton', { name: 'Text size in percent' }))
+    .toBeDisabled();
+  await expect.element(screen.getByText('Managed by your organization').first()).toBeVisible();
 });

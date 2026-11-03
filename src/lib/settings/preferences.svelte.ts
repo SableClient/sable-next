@@ -1,5 +1,5 @@
 import { untrack } from 'svelte';
-import { SvelteSet } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type {
   MediaPreviewsView,
   PresenceView,
@@ -849,6 +849,8 @@ export function sanitize(stored: Record<string, unknown>, base: Preferences): Pr
 }
 
 const explicit = new SvelteSet<keyof Preferences>();
+const locked = new SvelteSet<keyof Preferences>();
+const lockedUserValues = new SvelteMap<keyof Preferences, unknown>();
 
 function load(): Preferences {
   if (typeof localStorage === 'undefined') return { ...DEFAULTS };
@@ -871,13 +873,22 @@ export function readReceiptIsPrivate(): boolean {
 }
 
 export function isExplicitPreference(key: keyof Preferences): boolean {
-  return explicit.has(key);
+  return explicit.has(key) && !locked.has(key);
+}
+
+export function isLockedPreference(key: keyof Preferences): boolean {
+  return locked.has(key);
 }
 
 export function setPreference<K extends keyof Preferences>(key: K, value: Preferences[K]): void {
+  if (locked.has(key)) return;
   preferences[key] = value;
   explicit.add(key);
   persist();
+}
+
+function assign<K extends keyof Preferences>(key: K, value: Preferences[K]): void {
+  preferences[key] = value;
 }
 
 export function applyPreferences(
@@ -885,9 +896,9 @@ export function applyPreferences(
   keys: readonly (keyof Preferences)[] = PREFERENCE_KEYS
 ): void {
   for (const key of PREFERENCE_KEYS) {
-    (preferences as unknown as Record<string, unknown>)[key] = next[key];
+    if (!locked.has(key)) assign(key, next[key]);
   }
-  for (const key of keys) explicit.add(key);
+  for (const key of keys) if (!locked.has(key)) explicit.add(key);
   persist();
 }
 
@@ -895,15 +906,33 @@ export function applyDeploymentDefaults(raw: Record<string, unknown>): void {
   const defaults = sanitize(raw, preferences);
   for (const key of PREFERENCE_KEYS) {
     if (key in raw && !explicit.has(key)) {
-      (preferences as unknown as Record<string, unknown>)[key] = defaults[key];
+      assign(key, defaults[key]);
     }
+  }
+}
+
+const UNSET = Object.fromEntries(
+  PREFERENCE_KEYS.map((key) => [key, undefined])
+) as unknown as Preferences;
+
+/** Locked values stay out of storage, so lifting a lock restores the reader's own choice. */
+export function applyDeploymentLocks(raw: Record<string, unknown>): void {
+  const valid: Partial<Preferences> = sanitize(raw, UNSET);
+  for (const key of PREFERENCE_KEYS) {
+    const value = valid[key];
+    if (!(key in raw) || value === undefined) continue;
+    if (!locked.has(key) && explicit.has(key)) lockedUserValues.set(key, preferences[key]);
+    locked.add(key);
+    assign(key, value);
   }
 }
 
 function persist(): void {
   untrack(() => {
     const stored: Record<string, unknown> = { schema: SETTINGS_SCHEMA };
-    for (const key of explicit) stored[key] = preferences[key];
+    for (const key of explicit) {
+      stored[key] = locked.has(key) ? lockedUserValues.get(key) : preferences[key];
+    }
     writeJson(STORAGE_KEY, stored, '[sable settings] preferences not persisted');
   });
 }

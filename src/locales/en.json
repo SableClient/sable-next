@@ -2138,6 +2138,7 @@
     "stateEventSend": "Send",
     "stateEventSent": "State event sent.",
     "notAvailableYet": "Not available yet",
+    "managedByDeployment": "Managed by your organization",
     "needsSetting": "Needs “{{name}}”",
     "needsServerFeature": "Not supported by your homeserver",
     "savedField": "{{name}} saved",
