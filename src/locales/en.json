@@ -1041,6 +1041,7 @@
     "edited": "(edited)",
     "forwarded": "Forwarded",
     "forwardedFromRoom": "Forwarded from {{room}}",
+    "forwardedFromUser": "Forwarded from {{user}}",
     "forwardedFromAnotherRoom": "Forwarded from another room",
     "forwardedFromEarlier": "Forwarded from earlier",
     "shield": {

@@ -28,8 +28,8 @@
   );
   let label = $derived.by(() => {
     if (forwarded.sender) {
-      return i18n.t('timeline.forwardedFromRoom', {
-        room: memberName(members, forwarded.sender),
+      return i18n.t('timeline.forwardedFromUser', {
+        user: memberName(members, forwarded.sender),
       });
     }
     if (sameRoom) return i18n.t('timeline.forwardedFromEarlier');
