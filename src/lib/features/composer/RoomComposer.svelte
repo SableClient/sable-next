@@ -127,6 +127,7 @@
   import { isVoiceRecordingSupported } from './voice-recorder-support';
   import './composer-chrome.css';
   import { resolveProxy, type ProxyMatch } from '#lib/personas/persona.js';
+  import { throttle } from '#lib/ui/throttle.svelte.js';
 
   interface Props {
     roomId: string;
@@ -309,7 +310,6 @@
   let empty = $state(true);
   let showPlaceholder = $state(true);
   let shorthandHint = $state<ProxyMatch | null>(null);
-  let shorthandHintTimeout: ReturnType<typeof setTimeout> | undefined;
   let activeFormats = $state.raw<FormatAction[]>([]);
   let activeColors = $state.raw<ActiveColors>({ fg: null, bg: null });
   let formattingOpen = $derived(preferences.formattingToolbar);
@@ -480,7 +480,7 @@
       if (change.docChanged) {
         typing.update(empty);
         scheduleDraftLinks();
-        scheduleShorthandHinting();
+        throttledShorthandHinting();
         scheduleLayout();
         draft.schedulePersist();
       }
@@ -574,7 +574,6 @@
   onDestroy(() => {
     if (layoutFrame !== undefined) cancelAnimationFrame(layoutFrame);
     if (draftLinksTimeout) clearTimeout(draftLinksTimeout);
-    if (shorthandHintTimeout) clearTimeout(shorthandHintTimeout);
     typing.stop();
     queue.dispose();
     draft.dispose();
@@ -751,21 +750,19 @@
     }, 300);
   }
 
-  function scheduleShorthandHinting(): void {
-    if (shorthandHintTimeout) clearTimeout(shorthandHintTimeout);
-    shorthandHintTimeout = setTimeout(() => {
-      const doc = editor.doc();
-      const message = doc ? (richSend ? serializeComposer(doc) : serializePlain(doc)) : null;
-      if (preferences.personaProxying && preferences.personaPicker) {
-        if (message?.body) {
-          const proxy = resolveProxy(personas.personas, message.body);
-          shorthandHint = proxy ?? null;
-        } else {
-          shorthandHint = null;
-        }
+  function shorthandHinting(): void {
+    const doc = editor.doc();
+    const message = doc ? (richSend ? serializeComposer(doc) : serializePlain(doc)) : null;
+    if (preferences.personaProxying && preferences.personaPicker) {
+      if (message?.body) {
+        const proxy = resolveProxy(personas.personas, message.body);
+        shorthandHint = proxy ?? null;
+      } else {
+        shorthandHint = null;
       }
-    }, 300);
+    }
   }
+  const throttledShorthandHinting = throttle(shorthandHinting, 300);
 
   function failureText(cause: unknown): string {
     const { key, values } = sendFailure(cause);
