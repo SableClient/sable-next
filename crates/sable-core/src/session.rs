@@ -397,7 +397,8 @@ pub(crate) async fn restore_credentials(
         persisted,
         matrix_sdk::store::RoomLoadSettings::default(),
     )
-    .await
+    .await?;
+    enable_crypto_store_lock(client).await
 }
 
 async fn restore_credentials_with(
@@ -416,7 +417,7 @@ async fn restore_credentials_with(
             .await
             .map_err(CoreError::backend)?,
     }
-    enable_crypto_store_lock(client).await
+    Ok(())
 }
 
 pub(crate) async fn enable_crypto_store_lock(client: &Client) -> Result<(), CoreError> {
@@ -1291,22 +1292,28 @@ mod tests {
 
     #[cfg(not(target_family = "wasm"))]
     #[tokio::test]
-    async fn a_restored_multi_process_client_takes_the_crypto_store_lock() {
+    async fn a_restored_notification_client_leaves_the_crypto_store_lock_to_the_sdk() {
         let root = tempfile::tempdir().unwrap();
         let store_id = root.path().to_str().unwrap();
         drop(seed_crypto(store_id, &offline_session()).await);
         let persisted = offline_session();
 
         let push = multi_process_client(store_id).await;
-        super::restore_credentials(&push, &persisted).await.unwrap();
+        super::restore_credentials_with(
+            &push,
+            &persisted,
+            matrix_sdk::store::RoomLoadSettings::default(),
+        )
+        .await
+        .unwrap();
 
         assert!(
             push.encryption()
                 .try_lock_store_once()
                 .await
                 .unwrap()
-                .is_some(),
-            "a send from this client would write Olm sessions without the lock"
+                .is_none(),
+            "holding the lock from restore stalls the SDK's notification encryption sync"
         );
     }
 
