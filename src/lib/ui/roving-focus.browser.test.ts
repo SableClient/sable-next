@@ -93,3 +93,60 @@ test('Tab first lands on the current item', async () => {
   expect(document.activeElement?.id).toBe('b');
   expect(tabStops(root).map((stop) => stop.id)).toEqual(['b']);
 });
+
+const TREE = `
+  <a id="a" role="treeitem" aria-level="1" href="#a">a</a>
+  <button id="f" role="treeitem" aria-level="1" aria-expanded="true">f</button>
+  <div role="group">
+    <a id="c1" role="treeitem" aria-level="2" href="#c1">c1</a>
+    <a id="c2" role="treeitem" aria-level="2" href="#c2">c2</a>
+  </div>
+  <button id="g" role="treeitem" aria-level="1" aria-expanded="false">g</button>`;
+
+function mountTree(): HTMLElement {
+  const root = mount(TREE, { tree: true });
+  for (const toggle of root.querySelectorAll<HTMLElement>('[aria-expanded]')) {
+    toggle.addEventListener('click', () => {
+      toggle.setAttribute('aria-expanded', String(toggle.ariaExpanded !== 'true'));
+    });
+  }
+  return root;
+}
+
+test('a tree is one tab stop and up and down walk the visible treeitems', async () => {
+  const root = mountTree();
+  expectSingleTabStop(root);
+  root.querySelector<HTMLElement>('#a')?.focus();
+  await userEvent.keyboard('{ArrowDown}{ArrowDown}');
+  expect(document.activeElement?.id).toBe('c1');
+  await userEvent.keyboard('{End}');
+  expect(document.activeElement?.id).toBe('g');
+  await userEvent.keyboard('{ArrowUp}{Home}');
+  expect(document.activeElement?.id).toBe('a');
+});
+
+test('right opens a closed node then enters it and left climbs back out', async () => {
+  const root = mountTree();
+  root.querySelector<HTMLElement>('#f')?.focus();
+  await userEvent.keyboard('{ArrowRight}');
+  expect(document.activeElement?.id).toBe('c1');
+  await userEvent.keyboard('{ArrowLeft}');
+  expect(document.activeElement?.id).toBe('f');
+  await userEvent.keyboard('{ArrowLeft}');
+  expect(root.querySelector('#f')?.getAttribute('aria-expanded')).toBe('false');
+
+  root.querySelector<HTMLElement>('#g')?.focus();
+  await userEvent.keyboard('{ArrowRight}');
+  expect(root.querySelector('#g')?.getAttribute('aria-expanded')).toBe('true');
+});
+
+test('space follows a treeitem link', async () => {
+  const root = mountTree();
+  const click = vi.fn((event: Event) => {
+    event.preventDefault();
+  });
+  root.querySelector<HTMLElement>('#a')?.addEventListener('click', click);
+  root.querySelector<HTMLElement>('#a')?.focus();
+  await userEvent.keyboard(' ');
+  expect(click).toHaveBeenCalledOnce();
+});
