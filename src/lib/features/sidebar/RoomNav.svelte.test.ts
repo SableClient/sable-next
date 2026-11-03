@@ -111,7 +111,7 @@ async function mountNav(props: Record<string, unknown> = {}) {
 }
 
 const user = userEvent.setup();
-const row = (name: string) => screen.getByRole('link', { name: new RegExp(`^${name}`) });
+const row = (name: string) => screen.getByRole('treeitem', { name: new RegExp(`^${name}`) });
 
 async function openMenu(name: string): Promise<void> {
   await user.pointer({ keys: '[MouseRight]', target: screen.getByText(name) });
@@ -491,8 +491,8 @@ test('expanded room disclosures do not use the active-route surface', async () =
   ];
 
   await mountNav();
-  const current = screen.getAllByRole('link', { current: 'page' });
-  const expandedDisclosures = screen.getAllByRole('button', { expanded: true });
+  const current = screen.getAllByRole('treeitem', { current: 'page' });
+  const expandedDisclosures = screen.getAllByRole('treeitem', { expanded: true });
 
   expect(current).toHaveLength(1);
   expect(current[0]).toHaveClass('room-row', 'selection-current');
@@ -1155,7 +1155,7 @@ test('closing the rooms section hides read rows without unmounting them', async 
   ];
   await mountNav();
   const readRow = row('Read');
-  const heading = screen.getByRole('button', { name: 'nav.rooms' });
+  const heading = screen.getByRole('treeitem', { name: 'nav.rooms' });
 
   await user.click(heading);
 
@@ -1191,4 +1191,34 @@ test('the replaced rooms section collapses and stays collapsed', async () => {
     'false'
   );
   await user.click(screen.getByRole('button', { name: 'room.replacedTitle 1' }));
+});
+
+test('the room list is one tree with a single tab stop and the row actions out of the tab order', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!a:example.org', name: 'Alpha', latest_event: latestAt(2) }),
+    makeRoom({ room_id: '!b:example.org', name: 'Beta', latest_event: latestAt(1) }),
+  ];
+  await mountNav();
+
+  const tree = screen.getByRole('tree', { name: 'nav.rooms' });
+  expect(
+    within(tree)
+      .getAllByRole('treeitem')
+      .filter((item) => item.tabIndex === 0)
+  ).toHaveLength(1);
+  expect(row('Alpha')).toHaveAttribute('aria-level', '2');
+  for (const trigger of screen.getAllByRole('button', { name: 'room.menuLabel' })) {
+    expect(trigger).toHaveAttribute('tabindex', '-1');
+  }
+
+  screen.getByRole('treeitem', { name: 'nav.rooms' }).focus();
+  await user.keyboard('{ArrowDown}');
+  expect(row('Alpha')).toHaveFocus();
+  await user.keyboard('{ArrowLeft}');
+  expect(screen.getByRole('treeitem', { name: 'nav.rooms' })).toHaveFocus();
+  await user.keyboard('{ArrowLeft}');
+  expect(screen.getByRole('treeitem', { name: 'nav.rooms' })).toHaveAttribute(
+    'aria-expanded',
+    'false'
+  );
 });

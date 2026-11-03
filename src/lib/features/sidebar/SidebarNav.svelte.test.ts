@@ -97,7 +97,7 @@ async function startRoomList(core: CoreClient): Promise<RoomList> {
 
 function railOrder(names: readonly string[]): (string | null)[] {
   return screen
-    .getAllByRole('link')
+    .getAllByRole('treeitem')
     .map((link) => link.getAttribute('aria-label'))
     .filter((name) => name !== null && names.includes(name));
 }
@@ -202,7 +202,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
   render(SidebarNav, { mobile: true });
   await tick();
 
-  expect(screen.queryByRole('link', { name: 'Alice' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('treeitem', { name: 'Alice' })).not.toBeInTheDocument();
 
   const incoming = withCounts({
     ...room,
@@ -224,7 +224,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
     });
   await tick();
 
-  const dm = screen.getByRole('link', { name: 'Alice' });
+  const dm = screen.getByRole('treeitem', { name: 'Alice' });
   expect(dm).toHaveAttribute('href', '/direct/!dm%3Aexample.org');
   expect(within(dm).getByText('1').closest('.unread-badge')).toBeInTheDocument();
   expect(dm).toHaveAccessibleDescription('nav.unreadMessages:1');
@@ -232,15 +232,15 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
   visit('/direct/!dm%3Aexample.org', { roomId: room.room_id });
   navigated();
   await tick();
-  expect(screen.queryByRole('link', { name: 'Alice' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('treeitem', { name: 'Alice' })).not.toBeInTheDocument();
   expect(
-    screen.getByRole('link', { name: 'common.directMessages' }).querySelector('.unread-badge')
+    screen.getByRole('treeitem', { name: 'common.directMessages' }).querySelector('.unread-badge')
   ).toBeNull();
 
   visit('/rooms');
   navigated();
   await tick();
-  expect(screen.getByRole('link', { name: 'Alice' })).toBeInTheDocument();
+  expect(screen.getByRole('treeitem', { name: 'Alice' })).toBeInTheDocument();
 
   for (const listener of listeners)
     listener({
@@ -250,7 +250,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
     });
   await tick();
 
-  expect(screen.queryByRole('link', { name: 'Alice' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('treeitem', { name: 'Alice' })).not.toBeInTheDocument();
 });
 
 test('keeps the rail order when a room-list reset reorders spaces', async () => {
@@ -342,7 +342,7 @@ test('a muted direct chat marked unread by hand still reaches the navbar', async
   render(SidebarNav, { mobile: true });
   await tick();
 
-  expect(screen.getByRole('link', { name: 'Bo' })).toHaveAttribute(
+  expect(screen.getByRole('treeitem', { name: 'Bo' })).toHaveAttribute(
     'href',
     '/direct/!muted%3Aexample.org'
   );
@@ -369,7 +369,7 @@ test('a muted room marked unread by hand still marks its section as unread', asy
   render(SidebarNav, { mobile: true });
   await tick();
 
-  const rooms = screen.getByRole('link', { name: 'nav.unspaced' });
+  const rooms = screen.getByRole('treeitem', { name: 'nav.unspaced' });
   expect(rooms.querySelector('.unread-badge-dot')).toBeInTheDocument();
 });
 
@@ -399,7 +399,7 @@ test('a section totals its notifying rooms in green', async () => {
   render(SidebarNav, { mobile: true });
   await tick();
 
-  const rooms = screen.getByRole('link', { name: 'nav.unspaced' });
+  const rooms = screen.getByRole('treeitem', { name: 'nav.unspaced' });
   expect(within(rooms).getByText('4').closest('.unread-badge')).toHaveClass(
     'unread-badge-highlight'
   );

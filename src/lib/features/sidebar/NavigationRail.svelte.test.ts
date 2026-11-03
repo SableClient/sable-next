@@ -52,7 +52,7 @@ import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 import { savedSpacePaths, spaceNavigationHref } from './space-paths.js';
-import { reads as mediaImageReads } from './MediaImageProbe.test.svelte';
+import { reads as mediaImageReads } from './media-image-reads.test-support.js';
 
 beforeEach(() => {
   visit('/home');
@@ -72,9 +72,9 @@ function renderRail(
   return render(NavigationRail, options, { wrapper: TooltipProvider });
 }
 const user = userEvent.setup();
-const tab = (name: string) => screen.getByRole('link', { name });
+const tab = (name: string) => screen.getByRole('treeitem', { name });
 const linkTo = (href: string) =>
-  screen.queryAllByRole('link').find((link) => link.getAttribute('href') === href) ?? null;
+  screen.queryAllByRole('treeitem').find((link) => link.getAttribute('href') === href) ?? null;
 const spaceOrder = () =>
   [...document.querySelectorAll('.rail-slot a')].map((link) => link.getAttribute('aria-label'));
 
@@ -187,7 +187,7 @@ test('search leaves the rail when the preference is off', async () => {
   setPreference('showSearch', false);
   await tick();
 
-  expect(screen.queryByRole('link', { name: 'common.searchMessages' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('treeitem', { name: 'common.searchMessages' })).not.toBeInTheDocument();
 });
 
 test('uses a dot for ordinary unread messages outside spaces', async () => {
@@ -559,12 +559,12 @@ test('shows a collapsed folder as one tab, with the names of the spaces inside',
   });
   await tick();
 
-  const folder = screen.getByRole('button', { name: 'nav.folderExpand:Alpha, Beta' });
+  const folder = screen.getByRole('treeitem', { name: 'nav.folderExpand:Alpha, Beta' });
   expect(folder).toHaveAttribute('aria-expanded', 'false');
   expect(folder.querySelectorAll('.folder-tile')).toHaveLength(2);
   expect(folder.querySelector('.unread-badge-dot')).toBeInTheDocument();
   expect(folder).toHaveAccessibleDescription('nav.unreadMessages:3');
-  expect(screen.queryByRole('link', { name: 'Alpha' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('treeitem', { name: 'Alpha' })).not.toBeInTheDocument();
 
   await user.click(folder);
   expect(toggled).toEqual(['f']);
@@ -585,10 +585,10 @@ test('shows the spaces of an open folder, and a way to shut it', async () => {
   });
   await tick();
 
-  expect(screen.queryByRole('button', { name: /^nav\.folderExpand/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('treeitem', { name: /^nav\.folderExpand/ })).not.toBeInTheDocument();
   expect(spaceOrder()).toEqual(['Alpha', 'Beta']);
 
-  const collapse = screen.getByRole('button', { name: 'nav.folderCollapse:Work' });
+  const collapse = screen.getByRole('treeitem', { name: 'nav.folderCollapse:Work' });
   expect(collapse).toHaveAttribute('aria-expanded', 'true');
   expect(collapse).not.toHaveClass('selection-open');
   await user.click(collapse);
@@ -609,7 +609,7 @@ test('marks every space in a folder as read even when no badge is shown', async 
   });
   await tick();
 
-  await openMenu(screen.getByRole('button', { name: 'nav.folderExpand:Alpha, Beta' }));
+  await openMenu(screen.getByRole('treeitem', { name: 'nav.folderExpand:Alpha, Beta' }));
   await user.click(screen.getByRole('menuitem', { name: 'common.markAsRead' }));
 
   expect(marked).toEqual(['!a:example.org', '!b:example.org']);
@@ -670,7 +670,7 @@ test('a folder whose spaces are all unresolved renders nothing', async () => {
   });
   await tick();
 
-  expect(screen.queryByRole('button', { name: /^nav\.folderExpand/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('treeitem', { name: /^nav\.folderExpand/ })).not.toBeInTheDocument();
   expect(spaceOrder()).toEqual(['Alpha']);
 });
 
@@ -836,7 +836,7 @@ test('offers join by address from the add button', async () => {
   });
   await tick();
 
-  await user.click(screen.getByRole('button', { name: 'nav.add' }));
+  await user.click(screen.getByRole('treeitem', { name: 'nav.add' }));
 
   await vi.waitFor(() => {
     expect(labels(screen.getAllByRole('menuitem'))).toEqual([
@@ -850,4 +850,48 @@ test('offers join by address from the add button', async () => {
   await user.click(screen.getByRole('menuitem', { name: 'nav.joinWithAddress' }));
 
   expect(visited).toEqual(['/explore#explore-join-by-address']);
+});
+
+test('the rail is a navigation landmark holding one tree with a single tab stop', async () => {
+  renderRail({
+    props: {
+      spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
+      layout: [],
+      mobile: true,
+    },
+  });
+  await tick();
+
+  const tree = within(screen.getByRole('navigation', { name: 'nav.spaces' })).getByRole('tree');
+  const stops = within(tree)
+    .getAllByRole('treeitem')
+    .filter((item) => item.tabIndex === 0);
+  expect(stops).toHaveLength(1);
+});
+
+test('arrows walk the rail and an open folder nests its spaces one level down', async () => {
+  const toggled: string[] = [];
+  renderRail({
+    props: {
+      spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
+      layout: [
+        { kind: 'folder', id: 'f', name: 'Work', content: ['!a:example.org', '!b:example.org'] },
+      ],
+      openFolders: new Set(['f']),
+      onToggleFolder: (folderId: string) => toggled.push(folderId),
+      mobile: true,
+    },
+  });
+  await tick();
+
+  expect(tab('Alpha')).toHaveAttribute('aria-level', '2');
+  expect(screen.getAllByRole('group')).toHaveLength(1);
+  const collapse = screen.getByRole('treeitem', { name: 'nav.folderCollapse:Work' });
+  collapse.focus();
+  await user.keyboard('{ArrowDown}');
+  expect(tab('Alpha')).toHaveFocus();
+  await user.keyboard('{ArrowLeft}');
+  expect(collapse).toHaveFocus();
+  await user.keyboard('{ArrowLeft}');
+  expect(toggled).toEqual(['f']);
 });

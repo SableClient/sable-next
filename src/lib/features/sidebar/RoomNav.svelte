@@ -40,6 +40,7 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import TypingDots from '#lib/ui/primitives/TypingDots.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
+  import { rovingFocus } from '#lib/ui/roving-focus.js';
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
   import {
     preferences,
@@ -504,6 +505,7 @@
     <button
       type="button"
       class="room-options-trigger selection-open"
+      tabindex="-1"
       aria-label={i18n.t('room.menuLabel')}
       aria-haspopup="menu"
       aria-expanded={open}
@@ -545,6 +547,8 @@
         <!-- eslint-disable svelte/no-navigation-without-resolve -- roomHref() resolves the route itself -->
         <a
           {...props}
+          role="treeitem"
+          aria-level={collapsed ? 1 : 2}
           draggable="false"
           oncontextmenu={mouseContextMenu((event) => {
             if (room) openContextMenu(event, room, item.parentSpaceId ?? null);
@@ -724,6 +728,7 @@
               <button
                 class="room-options-trigger"
                 type="button"
+                tabindex="-1"
                 aria-label={i18n.t(active && voiceChat.open ? 'call.hideChat' : 'call.showChat')}
                 aria-pressed={active && voiceChat.open}
                 onclick={() => {
@@ -766,6 +771,8 @@
       {#snippet linkTrigger({ props }: { props: Record<string, unknown> })}
         <a
           {...props}
+          role="treeitem"
+          aria-level={collapsed ? 1 : 2}
           draggable="false"
           oncontextmenu={mouseContextMenu((event) => {
             openContextMenu(event, room, null);
@@ -827,110 +834,120 @@
 
     <RoomInvites {collapsed} {invites} />
 
-    {#if favourites.length > 0}
+    <div role="tree" aria-label={listLabel} {@attach rovingFocus({ tree: true })}>
+      {#if favourites.length > 0}
+        {#if !collapsed}
+          <!-- svelte-ignore a11y_role_has_required_aria_props -->
+          <button
+            type="button"
+            role="treeitem"
+            aria-level="1"
+            class="rooms-heading selection-layer"
+            aria-expanded={!favouritesClosed}
+            data-state={favouritesClosed ? 'closed' : 'open'}
+            aria-controls={favouritesListId}
+            onclick={() => {
+              favouritesClosed = !favouritesClosed;
+            }}
+          >
+            <span class="rooms-heading-label">{i18n.t('nav.favourites')}</span>
+            <span class={['category-caret', { closed: favouritesClosed }]} aria-hidden="true"
+              ><CaretDownIcon /></span
+            >
+          </button>
+        {/if}
+        <div id={favouritesListId} class={['room-list favourites', { collapsed }]}>
+          {#each favourites as item (item.key)}
+            {@render navRoom(item, favouritesClosed)}
+          {/each}
+        </div>
+      {/if}
+
       {#if !collapsed}
+        <!-- svelte-ignore a11y_role_has_required_aria_props -->
         <button
           type="button"
+          role="treeitem"
+          aria-level="1"
           class="rooms-heading selection-layer"
-          aria-expanded={!favouritesClosed}
-          data-state={favouritesClosed ? 'closed' : 'open'}
-          aria-controls={favouritesListId}
+          aria-expanded={!roomsClosed}
+          data-state={roomsClosed ? 'closed' : 'open'}
+          aria-controls={roomListId}
           onclick={() => {
-            favouritesClosed = !favouritesClosed;
+            roomsClosed = !roomsClosed;
           }}
         >
-          <span class="rooms-heading-label">{i18n.t('nav.favourites')}</span>
-          <span class={['category-caret', { closed: favouritesClosed }]} aria-hidden="true"
+          <span class="rooms-heading-label">{listLabel}</span>
+          <span class={['category-caret', { closed: roomsClosed }]} aria-hidden="true"
             ><CaretDownIcon /></span
           >
         </button>
       {/if}
-      <div id={favouritesListId} class={['room-list favourites', { collapsed }]}>
-        {#each favourites as item (item.key)}
-          {@render navRoom(item, favouritesClosed)}
-        {/each}
-      </div>
-    {/if}
 
-    {#if !collapsed}
-      <button
-        type="button"
-        class="rooms-heading selection-layer"
-        aria-expanded={!roomsClosed}
-        data-state={roomsClosed ? 'closed' : 'open'}
-        aria-controls={roomListId}
-        onclick={() => {
-          roomsClosed = !roomsClosed;
-        }}
-      >
-        <span class="rooms-heading-label">{listLabel}</span>
-        <span class={['category-caret', { closed: roomsClosed }]} aria-hidden="true"
-          ><CaretDownIcon /></span
-        >
-      </button>
-    {/if}
-
-    <div id={roomListId}>
-      {#if sectionRooms.length === 0 && subspaces.length === 0}
-        {#if !collapsed && !roomsClosed}
-          <div class="empty-rooms">
-            <p>{listEmpty}</p>
+      <div id={roomListId}>
+        {#if sectionRooms.length === 0 && subspaces.length === 0}
+          {#if !collapsed && !roomsClosed}
+            <div class="empty-rooms">
+              <p>{listEmpty}</p>
+            </div>
+          {/if}
+        {:else}
+          <div class={['room-list', { collapsed }]}>
+            {#each rooms as item (item.key)}
+              {@render navRoom(item, roomsClosed)}
+            {/each}
+            {#each visibleSubspaces as item (item.key)}
+              {#if item.kind === 'category'}
+                {@const name = item.room.display_name}
+                {@const isClosed = closedCategories.has(item.key)}
+                <div class="room-row-wrap">
+                  {@render threadLines(item.threads)}
+                  {#snippet categoryTrigger({ props }: { props: Record<string, unknown> })}
+                    <button
+                      {...props}
+                      type="button"
+                      role="treeitem"
+                      aria-level="1"
+                      class={['room-category selection-layer', { collapsed }]}
+                      oncontextmenu={mouseContextMenu((event) => {
+                        openContextMenu(event, item.room, null);
+                      })}
+                      {@attach longPress({
+                        onPress: (event) => {
+                          openContextMenu(event, item.room, null);
+                        },
+                      })}
+                      style:--room-depth={collapsed ? 0 : item.depth}
+                      aria-label={collapsed ? `${name} (${i18n.t('nav.space')})` : undefined}
+                      aria-expanded={!isClosed}
+                      onclick={() => {
+                        toggleCategory(item.key);
+                      }}
+                    >
+                      {#if !collapsed}<span class="category-name">{name}</span>{/if}
+                      <span class={['category-caret', { closed: isClosed }]} aria-hidden="true"
+                        ><CaretDownIcon /></span
+                      >
+                    </button>
+                  {/snippet}
+                  {#if collapsed}
+                    <Tooltip label={name} side="right" trigger={categoryTrigger} />
+                  {:else}
+                    {@render categoryTrigger({ props: {} })}
+                    <span class="room-options-slot">
+                      {@render optionsButton(item.room, null)}
+                    </span>
+                  {/if}
+                </div>
+              {:else if item.kind === 'link'}
+                {@render navLink(item)}
+              {:else if isRoom(item)}
+                {@render navRoom(item, false)}
+              {/if}
+            {/each}
           </div>
         {/if}
-      {:else}
-        <div class={['room-list', { collapsed }]}>
-          {#each rooms as item (item.key)}
-            {@render navRoom(item, roomsClosed)}
-          {/each}
-          {#each visibleSubspaces as item (item.key)}
-            {#if item.kind === 'category'}
-              {@const name = item.room.display_name}
-              {@const isClosed = closedCategories.has(item.key)}
-              <div class="room-row-wrap">
-                {@render threadLines(item.threads)}
-                {#snippet categoryTrigger({ props }: { props: Record<string, unknown> })}
-                  <button
-                    {...props}
-                    type="button"
-                    class={['room-category selection-layer', { collapsed }]}
-                    oncontextmenu={mouseContextMenu((event) => {
-                      openContextMenu(event, item.room, null);
-                    })}
-                    {@attach longPress({
-                      onPress: (event) => {
-                        openContextMenu(event, item.room, null);
-                      },
-                    })}
-                    style:--room-depth={collapsed ? 0 : item.depth}
-                    aria-label={collapsed ? `${name} (${i18n.t('nav.space')})` : undefined}
-                    aria-expanded={!isClosed}
-                    onclick={() => {
-                      toggleCategory(item.key);
-                    }}
-                  >
-                    {#if !collapsed}<span class="category-name">{name}</span>{/if}
-                    <span class={['category-caret', { closed: isClosed }]} aria-hidden="true"
-                      ><CaretDownIcon /></span
-                    >
-                  </button>
-                {/snippet}
-                {#if collapsed}
-                  <Tooltip label={name} side="right" trigger={categoryTrigger} />
-                {:else}
-                  {@render categoryTrigger({ props: {} })}
-                  <span class="room-options-slot">
-                    {@render optionsButton(item.room, null)}
-                  </span>
-                {/if}
-              </div>
-            {:else if item.kind === 'link'}
-              {@render navLink(item)}
-            {:else if isRoom(item)}
-              {@render navRoom(item, false)}
-            {/if}
-          {/each}
-        </div>
-      {/if}
+      </div>
     </div>
     {#if unspacedSection}<ReplacedRooms {collapsed} />{/if}
   </div>

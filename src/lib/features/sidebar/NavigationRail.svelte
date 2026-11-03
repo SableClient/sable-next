@@ -44,6 +44,7 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import { resolveUnreadBadge } from '#lib/ui/primitives/unread-badge.js';
+  import { rovingFocus } from '#lib/ui/roving-focus.js';
   import '#lib/ui/primitives/nav-tab.css';
   import CaretUpIcon from 'phosphor-svelte/lib/CaretUpIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
@@ -581,10 +582,12 @@
   {/if}
 {/snippet}
 
-{#snippet itemLink(item: RailItem, props: Record<string, unknown>, held: boolean)}
+{#snippet itemLink(item: RailItem, props: Record<string, unknown>, held: boolean, level: number)}
   {@const active = isActive(item)}
   <a
     {...props}
+    role="treeitem"
+    aria-level={level}
     class={[
       'rail-item nav-tab nav-tab-side selection-layer',
       { 'nav-tab-outlined': outlined(item), 'space-item': Boolean(item.initial) },
@@ -605,13 +608,13 @@
   </a>
 {/snippet}
 
-{#snippet railItem(item: RailItem, held: boolean)}
+{#snippet railItem(item: RailItem, held: boolean, level = 1)}
   {#if mobile}
-    {@render itemLink(item, {}, held)}
+    {@render itemLink(item, {}, held, level)}
   {:else}
     {@const label = i18n.t(item.label)}
     {#snippet trigger({ props }: { props: Record<string, unknown> })}
-      {@render itemLink(item, props, held)}
+      {@render itemLink(item, props, held, level)}
     {/snippet}
     <Tooltip {label} side="right" {trigger} />
   {/if}
@@ -621,10 +624,11 @@
   <button
     {...props}
     type="button"
+    role="treeitem"
+    aria-level="1"
     class="rail-item nav-tab nav-tab-side nav-tab-outlined selection-layer"
     aria-label={i18n.t('nav.add')}
     aria-haspopup="menu"
-    aria-expanded={createOpen}
     onclick={openCreateMenu}
   >
     <span class="nav-tab-hit-area" aria-hidden="true"></span>
@@ -666,7 +670,7 @@
     {@attach dragSource(ref)}
     {@attach dropTarget(ref, folderId === undefined)}
   >
-    {@render railItem(item, !mobile)}
+    {@render railItem(item, !mobile, folderId === undefined ? 1 : 2)}
   </div>
 {/snippet}
 
@@ -732,6 +736,8 @@
   <button
     {...props}
     type="button"
+    role="treeitem"
+    aria-level="1"
     class="rail-item folder-preview nav-tab nav-tab-side selection-layer"
     data-current={folderActive(folder) ? 'true' : undefined}
     aria-expanded="false"
@@ -793,8 +799,12 @@
     {@attach dropTarget(ref, false)}
   >
     <div class="folder-card">
+      <!-- svelte-ignore a11y_role_has_required_aria_props -->
       <button
         type="button"
+        role="treeitem"
+        aria-level="1"
+        aria-owns={`folder-children-${folder.id}`}
         class="folder-collapse"
         aria-expanded="true"
         aria-label={i18n.t('nav.folderCollapse', { name: folderLabel(folder) })}
@@ -812,18 +822,31 @@
       >
         <CaretUpIcon weight="fill" />
       </button>
-      {#each folder.content as roomId (roomId)}
-        {@render spaceSlot(roomId, folder.id)}
-      {/each}
+      <div class="folder-children" id={`folder-children-${folder.id}`} role="group">
+        {#each folder.content as roomId (roomId)}
+          {@render spaceSlot(roomId, folder.id)}
+        {/each}
+      </div>
     </div>
   </div>
 {/snippet}
 
-<div class="rail" role="presentation" oncontextmenu={mouseContextMenu(openDisplayMenu)}>
-  <div class="rail-scroll" {@attach mobile ? noAttachment : monitor}>
-    <ul class="rail-stack">
+<nav
+  class="rail"
+  aria-label={i18n.t('nav.spaces')}
+  oncontextmenu={mouseContextMenu(openDisplayMenu)}
+>
+  <div
+    class="rail-scroll"
+    role="tree"
+    aria-orientation="vertical"
+    aria-label={i18n.t('nav.spaces')}
+    {@attach mobile ? noAttachment : monitor}
+    {@attach rovingFocus({ tree: true })}
+  >
+    <ul class="rail-stack" role="presentation">
       {#each [...items, ...directItems] as item (item.roomId ?? item.href)}
-        <li>
+        <li role="presentation">
           {#if item.section !== undefined}
             {@render sectionItem(item, item.section)}
           {:else}
@@ -833,10 +856,10 @@
       {/each}
     </ul>
     {#if entries.length > 0}
-      <div class="rail-separator" role="separator"></div>
-      <ul class="rail-stack">
+      <div class="rail-separator" role="presentation"></div>
+      <ul class="rail-stack" role="presentation">
         {#each entries as entry (entry.kind === 'space' ? entry.room_id : entry.id)}
-          <li>
+          <li role="presentation">
             {#if entry.kind === 'space'}
               {@render spaceSlot(entry.room_id)}
             {:else if knownContent(entry).length === 0}
@@ -850,8 +873,8 @@
         {/each}
       </ul>
     {/if}
-    <ul class="rail-stack">
-      <li>
+    <ul class="rail-stack" role="presentation">
+      <li role="presentation">
         {#if mobile}
           {@render createButton({})}
         {:else}
@@ -866,7 +889,7 @@
   {#if !mobile && compact}
     <UserQuickTools compact />
   {/if}
-</div>
+</nav>
 
 {#if !mobile}
   <ActionMenu
@@ -1203,6 +1226,13 @@
     flex-direction: column;
     gap: var(--space-100);
     padding: var(--space-100) 0;
+  }
+
+  .folder-children {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-100);
   }
 
   .folder-card .rail-slot.nested :global(.rail-item) {
