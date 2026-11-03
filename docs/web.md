@@ -119,6 +119,87 @@ This example shows the supported fields. Omit the ones you do not need.
 The shipped `config.json` includes Sable's service endpoints. Remove or replace
 them if you do not intend to use them.
 
+### Branding and organisation policy
+
+These fields rebrand the web client and enforce policy for an organisation.
+Omit any of them to keep Sable's behaviour.
+
+```json
+{
+  "branding": {
+    "appName": "Acme Chat",
+    "logoUrl": "/branding/logo.svg",
+    "faviconUrl": "/branding/favicon.png",
+    "themeUrl": "/branding/theme.css"
+  },
+  "links": {
+    "help": "https://help.example.org",
+    "privacy": "https://example.org/privacy",
+    "terms": [{ "text": "Terms of use", "url": "https://example.org/terms" }],
+    "supportRoom": "#help:example.org",
+    "bugReport": "https://example.org/report"
+  },
+  "hideCommunityLinks": true,
+  "auth": {
+    "ssoRedirect": "immediate",
+    "disableRegistration": true,
+    "logoutRedirectUrl": "https://example.org",
+    "deviceDisplayName": "Acme Chat web"
+  },
+  "settingsLocked": {
+    "errorReporting": false
+  }
+}
+```
+
+- `branding.appName` replaces "Sable" in the interface, page titles and
+  notifications. Text about the Sable project itself, such as donations and
+  the default theme name, keeps the Sable name.
+- `branding.logoUrl`, `faviconUrl` and `themeUrl` accept a path on the same
+  site or an HTTP(S) URL. Serve the files next to `config.json`, for example by
+  mounting a directory at `/app/branding`.
+- `branding.themeUrl` points at a theme file in the same format users import as
+  a custom theme. It is the base theme, so users' own themes and quick CSS still
+  apply on top. It loads after startup, so the default theme can show briefly.
+- `links.help`, `links.privacy` and `links.terms` appear in the sign-in footer.
+  `links.privacy` also replaces the telemetry policy link and the `/privacy`
+  page. `links.supportRoom` replaces the support room on the home page.
+  `links.bugReport` replaces the Sable issue tracker in bug reports.
+- `hideCommunityLinks` hides the Sable source, donation and support links,
+  supporter awards, the theme catalogue and the Sable issue tracker.
+- `auth.ssoRedirect` starts single sign-on without a click when the homeserver
+  offers exactly one SSO or OIDC provider and no password login. `immediate`
+  applies to every sign-in screen, `loginPage` only to the login screen. The
+  sign-in window opens as a popup, so a browser may block it until the user
+  allows popups for the site.
+- `auth.disableRegistration` removes account creation from the client. The
+  homeserver must also refuse registration to enforce it.
+- `auth.logoutRedirectUrl` is opened after the last account signs out.
+- `auth.deviceDisplayName` names new sessions in users' device lists. It
+  defaults to `branding.appName`.
+- `settingsLocked` uses the same names and values as `settingsDefaults`, but
+  users cannot change them. Locked settings show as managed by the
+  organisation, are not synced between devices, and a user's earlier choice
+  returns if the lock is removed.
+
+Encryption policy comes from the homeserver, not from `config.json`. The client
+reads the `io.element.e2ee` block of `/.well-known/matrix/client`, as Element
+does. `"default": false` makes new rooms and direct chats unencrypted by default,
+and `"force_disable": true` creates them unencrypted and removes the option to
+encrypt them. The older `im.vector.riot.e2ee` block is read when
+`io.element.e2ee` is absent.
+
+Some files are read before `config.json` loads, so rebranding them means
+replacing the files themselves:
+
+- `manifest.webmanifest`, which sets the installed app name, icons and colours.
+- `icons/`, which holds the install and touch icons.
+- The `theme-color` and `apple-mobile-web-app-title` tags, which colour the
+  browser chrome and name the iOS home screen icon. Every prerendered HTML page
+  carries them, so change them in `src/app.html` and rebuild.
+
+Native desktop and mobile builds keep the Sable name and icons.
+
 For non-container hosting, build with `pnpm build` and serve the `dist` directory,
 including `config.json`. Configure the web server to fall back to `index.html`
 for client routes and avoid caching `config.json` and `index.html` indefinitely.
