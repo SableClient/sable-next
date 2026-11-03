@@ -130,7 +130,7 @@ test('keeps the live subscription when another tab restores the shared session',
 
   const secondPage = await context.newPage();
   await secondPage.goto('/rooms');
-  await expect(secondPage.getByRole('link', { name: scratchRoom.name })).toBeVisible({
+  await expect(secondPage.getByRole('treeitem', { name: scratchRoom.name })).toBeVisible({
     timeout: 15_000,
   });
 

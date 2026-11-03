@@ -110,7 +110,7 @@
     "write-file-atomic": "^8.0.0"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.13.0",
+    "@axe-core/playwright": "^4.14.0",
     "@csstools/postcss-global-data": "4.0.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.0",

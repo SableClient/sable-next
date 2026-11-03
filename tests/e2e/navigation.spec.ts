@@ -13,11 +13,11 @@ for (const { link, path } of RAIL_DESTINATIONS) {
   test(`reaches ${path} from the primary navigation`, async ({ page, app }) => {
     await app.openRooms();
 
-    await app.primaryNavigation.getByRole('link', { name: link, exact: true }).click();
+    await app.primaryNavigation.getByRole('treeitem', { name: link, exact: true }).click();
 
     await expect(page).toHaveURL(new RegExp(`${path}$`));
     await expect(
-      app.primaryNavigation.getByRole('link', { name: link, exact: true })
+      app.primaryNavigation.getByRole('treeitem', { name: link, exact: true })
     ).toHaveAttribute('aria-current', 'page');
   });
 }

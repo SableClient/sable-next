@@ -16,7 +16,7 @@ for (const entry of ['lobby button', 'space menu']) {
     await page.goto(entry === 'lobby button' ? '/space/!alpha%3Aexample.test/lobby' : '/rooms');
 
     const sidebar = page.getByRole('navigation', { name: 'Primary navigation' });
-    const space = sidebar.getByRole('link', { name: 'Alpha', exact: true });
+    const space = sidebar.getByRole('treeitem', { name: 'Alpha', exact: true });
     if (entry === 'lobby button') {
       await page.getByRole('button', { name: en.room.menuShowSpaceTimeline, exact: true }).click();
     } else {
@@ -29,14 +29,14 @@ for (const entry of ['lobby button', 'space menu']) {
     );
     await expect(sidebar.getByRole('heading', { name: 'Alpha', exact: true })).toBeVisible();
     await expect(space).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('log', { name: 'Timeline' })).toContainText('Alpha message');
+    await expect(page.getByRole('feed', { name: 'Timeline' })).toContainText('Alpha message');
 
     await page.reload();
     await expect(space).toHaveAttribute('aria-current', 'page');
     await expect(sidebar.getByRole('heading', { name: 'Alpha', exact: true })).toBeVisible();
-    await expect(page.getByRole('log', { name: 'Timeline' })).toContainText('Alpha message');
+    await expect(page.getByRole('feed', { name: 'Timeline' })).toContainText('Alpha message');
 
-    await sidebar.getByRole('link', { name: en.nav.unspaced, exact: true }).click();
+    await sidebar.getByRole('treeitem', { name: en.nav.unspaced, exact: true }).click();
     await space.click();
     await expect(page).toHaveURL(
       /\/space\/!alpha%3Aexample.test\/!alpha%3Aexample.test\?timeline=events$/

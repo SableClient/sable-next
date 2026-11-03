@@ -16,14 +16,14 @@ test('reopening a space after search restores its lobby, including after a reloa
 }) => {
   await page.goto(lobby);
   const rail = page.getByRole('navigation', { name: 'Primary navigation' });
-  const space = rail.getByRole('link', { name: 'Alpha', exact: true });
+  const space = rail.getByRole('treeitem', { name: 'Alpha', exact: true });
   const rooms = page.getByRole('region', { name: 'Lobby' });
   await expect(rooms.getByRole('heading', { name: 'Alpha', exact: true })).toBeVisible();
 
   await page.getByRole('link', { name: en.nav.messageSearch }).click();
   await expect(page).toHaveURL(/\/search\?q=.+&space=/);
   await expect(page.getByRole('link', { name: en.nav.lobby, exact: true })).toBeVisible();
-  await rail.getByRole('link', { name: en.nav.unspaced, exact: true }).click();
+  await rail.getByRole('treeitem', { name: en.nav.unspaced, exact: true }).click();
   await space.click();
 
   await expect(page).toHaveURL(new RegExp(`${lobby}$`));
@@ -50,7 +50,7 @@ test('an old saved space search opens the lobby through both the rail and the sp
   await page.goto('/rooms');
   await page
     .getByRole('navigation', { name: 'Primary navigation' })
-    .getByRole('link', { name: 'Alpha', exact: true })
+    .getByRole('treeitem', { name: 'Alpha', exact: true })
     .click();
   await expect(page).toHaveURL(new RegExp(`${lobby}$`));
 

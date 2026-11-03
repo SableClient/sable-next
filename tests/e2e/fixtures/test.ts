@@ -547,7 +547,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await expect(
       page
         .getByRole('navigation', { name: 'Primary navigation' })
-        .getByRole('link', { name: 'Alpha' })
+        .getByRole('treeitem', { name: 'Alpha' })
     ).toBeVisible({ timeout: 30_000 });
     await use(tree);
   },

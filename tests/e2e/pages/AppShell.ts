@@ -118,11 +118,11 @@ export class AppShell {
   }
 
   landingLink(): Locator {
-    return this.primaryNavigation.getByRole('link', { name: 'Rooms outside spaces' });
+    return this.primaryNavigation.getByRole('treeitem', { name: 'Rooms outside spaces' });
   }
 
   roomLink(name: string): Locator {
-    return this.page.getByRole('link', { name });
+    return this.page.getByRole('treeitem', { name });
   }
 
   roomHeading(name: string): Locator {

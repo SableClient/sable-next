@@ -14,7 +14,7 @@ const historyLength = (page: Page): Promise<number> => page.evaluate(() => histo
 async function pickRoom(page: Page, name: RegExp): Promise<void> {
   await page.getByRole('button', { name: 'Back to rooms', exact: true }).click();
   await expect(page.locator('#drawer-toggle')).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('link', { name }).click();
+  await page.getByRole('treeitem', { name }).click();
   await expect(page.locator('#drawer-toggle')).toHaveAttribute('aria-pressed', 'false');
 }
 
@@ -28,7 +28,7 @@ for (const source of ['reply', 'link']) {
     }) => {
       await installRoomCore('ready');
       await page.goto('/rooms');
-      await page.getByRole('link', { name: /^General/ }).click();
+      await page.getByRole('treeitem', { name: /^General/ }).click();
       await expect(page).toHaveURL(/\/rooms\/[^/]+$/);
       await core.emitTimelineDiff(await core.subscription(), [
         {
@@ -94,7 +94,7 @@ test('mobile: switching rooms from the list replaces the entry, so back leaves t
 }) => {
   await installRoomCore('ready');
   await page.goto('/rooms');
-  await page.getByRole('link', { name: /^General/ }).click();
+  await page.getByRole('treeitem', { name: /^General/ }).click();
   await expect(page).toHaveURL(/\/rooms\/[^/]+$/);
   const general = page.url();
   const length = await historyLength(page);
@@ -115,7 +115,7 @@ test('mobile: a settings section pops to the menu, and close returns to the page
 }) => {
   await installRoomCore('ready');
   await page.goto('/rooms');
-  await page.getByRole('link', { name: /^General/ }).click();
+  await page.getByRole('treeitem', { name: /^General/ }).click();
   await expect(page).toHaveURL(/\/rooms\/[^/]+$/);
   await page.getByRole('button', { name: 'Back to rooms', exact: true }).click();
   await page.getByRole('link', { name: 'Manage accounts' }).click();

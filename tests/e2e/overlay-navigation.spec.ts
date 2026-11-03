@@ -31,7 +31,7 @@ test('leaving the room while a thread is open lands on the other section', async
   await page.locator('.thread-summary').first().click();
   await expect(page.getByRole('region', { name: 'Thread', exact: true })).toBeVisible();
 
-  await page.getByRole('link', { name: 'Direct messages' }).first().click();
+  await page.getByRole('treeitem', { name: 'Direct messages' }).first().click();
 
   await expect(page).toHaveURL(/\/direct$/);
   await quietFor(page, NEGATIVE_SETTLE_MS);
