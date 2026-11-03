@@ -9,8 +9,21 @@ interface Options {
   loop?: boolean;
   /** WAI-ARIA tree: vertical movement over treeitems, Right and Left expand, collapse or change level. */
   tree?: boolean;
+  /** Vertical only: PageUp and PageDown move this many items. */
+  page?: number;
+  /** Takes over moves the rendered items cannot satisfy, and every Home, End, PageUp and PageDown. Home and End pass an infinite distance. */
+  onBoundary?: (move: 'start' | 'end', from: HTMLElement, distance: number) => void;
+  /** Focusable descendants of items are taken out of the tab order unless focus is inside their item. */
+  contain?: string;
+  /** The item Tab lands on before any item has been focused. */
+  initial?: (items: HTMLElement[]) => HTMLElement | undefined;
+  /** Move focus to a neighbour when the focused item is removed. */
+  restoreFocus?: boolean;
+  /** Runs for every item on each sync. */
+  annotate?: (item: HTMLElement) => void;
 }
 
+const PARKED = 'data-roving-parked';
 const SELECTED = '[aria-current="page"], [aria-selected="true"]';
 
 // checkVisibility is missing before Safari 17.4
@@ -25,6 +38,12 @@ export function rovingFocus({
   selector,
   loop = false,
   tree = false,
+  page = 1,
+  onBoundary,
+  contain,
+  initial,
+  restoreFocus = true,
+  annotate,
 }: Options = {}): Attachment<HTMLElement> {
   const itemSelector = selector ?? (tree ? TREE_ITEM : ITEM);
   const [previous, next] =
@@ -47,17 +66,52 @@ export function rovingFocus({
         const removedAt = Math.min(order.indexOf(current), all.length - 1);
         const replacement = all.at(removedAt);
         current = replacement;
-        if (focusLost) replacement?.focus();
+        if (focusLost && restoreFocus) replacement?.focus();
       }
-      current ??= all.find((item) => item.matches(SELECTED)) ?? all[0];
+      current ??= all.find((item) => item.matches(SELECTED)) ?? initial?.(all) ?? all[0];
       order = all;
-      for (const item of all) item.tabIndex = item === current ? 0 : -1;
+      for (const item of all) {
+        item.tabIndex = item === current ? 0 : -1;
+        annotate?.(item);
+      }
+      if (contain) park(all, contain);
+    };
+
+    const park = (all: HTMLElement[], selector: string) => {
+      const active = document.activeElement;
+      const entered = all.find((item) => item !== active && item.contains(active));
+      for (const element of container.querySelectorAll<HTMLElement>(selector)) {
+        const owner = element.closest(itemSelector);
+        if (!owner || owner === element) continue;
+        const parked = element.hasAttribute(PARKED);
+        if (owner === entered) {
+          if (!parked) continue;
+          const previous = element.getAttribute(PARKED);
+          if (previous) element.setAttribute('tabindex', previous);
+          else element.removeAttribute('tabindex');
+          element.removeAttribute(PARKED);
+        } else if (!parked && element.tabIndex >= 0) {
+          element.setAttribute(PARKED, element.getAttribute('tabindex') ?? '');
+          element.tabIndex = -1;
+        }
+      }
+    };
+
+    let scheduled = false;
+    const syncSoon = () => {
+      if (scheduled) return;
+      scheduled = true;
+      queueMicrotask(() => {
+        scheduled = false;
+        sync();
+      });
     };
 
     const onFocusIn = (event: FocusEvent) => {
       const target = event.target;
-      if (target instanceof HTMLElement && items().includes(target)) {
-        current = target;
+      const item = target instanceof HTMLElement ? target.closest<HTMLElement>(itemSelector) : null;
+      if (item && items().includes(item)) {
+        current = item;
         sync();
       }
     };
@@ -72,7 +126,6 @@ export function rovingFocus({
         const at = index + offset;
         return loop ? all[(at + all.length) % all.length] : all[at];
       };
-      let target: HTMLElement | undefined;
       const focused = event.target;
       if (tree && event.key === 'ArrowRight') {
         const expanded = focused.getAttribute('aria-expanded');
@@ -82,24 +135,51 @@ export function rovingFocus({
           return;
         }
         const child = all.at(index + 1);
-        if (expanded === 'true' && child && level(child) > level(focused)) target = child;
-      } else if (tree && event.key === 'ArrowLeft') {
+        if (expanded === 'true' && child && level(child) > level(focused)) {
+          event.preventDefault();
+          child.focus();
+        }
+        return;
+      }
+      if (tree && event.key === 'ArrowLeft') {
         if (focused.getAttribute('aria-expanded') === 'true') {
           event.preventDefault();
           focused.click();
           return;
         }
-        for (let at = index - 1; at >= 0 && !target; at--) {
-          if (level(all[at]) < level(focused)) target = all[at];
+        const parent = all
+          .slice(0, index)
+          .reverse()
+          .find((item) => level(item) < level(focused));
+        if (parent) {
+          event.preventDefault();
+          parent.focus();
         }
-      } else if (tree && event.key === ' ' && focused instanceof HTMLAnchorElement) {
+        return;
+      }
+      if (tree && event.key === ' ' && focused instanceof HTMLAnchorElement) {
         event.preventDefault();
         focused.click();
         return;
-      } else if (event.key === next) target = step(1);
-      else if (event.key === previous) target = step(-1);
-      else if (event.key === 'Home') target = all[0];
-      else if (event.key === 'End') target = all[all.length - 1];
+      }
+      let distance: number;
+      if (event.key === next || event.key === previous) distance = 1;
+      else if (event.key === 'Home' || event.key === 'End') distance = Infinity;
+      else if (orientation === 'vertical' && (event.key === 'PageUp' || event.key === 'PageDown'))
+        distance = page;
+      else return;
+      const toEnd = event.key === next || event.key === 'End' || event.key === 'PageDown';
+      const target =
+        distance === 1
+          ? step(toEnd ? 1 : -1)
+          : all.at(
+              toEnd ? Math.min(index + distance, all.length - 1) : Math.max(index - distance, 0)
+            );
+      if (onBoundary && (distance > 1 || !target)) {
+        event.preventDefault();
+        onBoundary(toEnd ? 'end' : 'start', event.target, distance);
+        return;
+      }
       if (!target) return;
       event.preventDefault();
       target.focus();
@@ -114,10 +194,12 @@ export function rovingFocus({
       attributeFilter: ['disabled', 'hidden', 'aria-expanded'],
     });
     container.addEventListener('focusin', onFocusIn);
+    container.addEventListener('focusout', syncSoon);
     container.addEventListener('keydown', onKeyDown);
     return () => {
       observer.disconnect();
       container.removeEventListener('focusin', onFocusIn);
+      container.removeEventListener('focusout', syncSoon);
       container.removeEventListener('keydown', onKeyDown);
     };
   };

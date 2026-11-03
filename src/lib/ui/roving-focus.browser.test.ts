@@ -150,3 +150,54 @@ test('space follows a treeitem link', async () => {
   await userEvent.keyboard(' ');
   expect(click).toHaveBeenCalledOnce();
 });
+
+const feed = `<article id="a"><button id="a1">a1</button></article>
+<article id="b"><button id="b1">b1</button></article>
+<article id="c"><button id="c1">c1</button></article>
+<article id="d"><button id="d1">d1</button></article>`;
+
+test('contain parks controls inside other items and releases them with focus', async () => {
+  const root = mount(feed, { orientation: 'vertical', selector: 'article', contain: 'button' });
+  expect(tabStops(root).map((stop) => stop.id)).toEqual(['a']);
+  root.querySelector<HTMLElement>('#a')?.focus();
+  await userEvent.keyboard('{ArrowDown}');
+  expect(document.activeElement?.id).toBe('b');
+  root.querySelector<HTMLElement>('#b1')?.focus();
+  expect(tabStops(root).map((stop) => stop.id)).toEqual(['b', 'b1']);
+  root.querySelector<HTMLElement>('#b')?.focus();
+  await Promise.resolve();
+  expect(tabStops(root).map((stop) => stop.id)).toEqual(['b']);
+});
+
+test('page keys jump by the page size and clamp to the ends', async () => {
+  const root = mount(feed, { orientation: 'vertical', selector: 'article', page: 2 });
+  root.querySelector<HTMLElement>('#a')?.focus();
+  await userEvent.keyboard('{PageDown}');
+  expect(document.activeElement?.id).toBe('c');
+  await userEvent.keyboard('{PageDown}');
+  expect(document.activeElement?.id).toBe('d');
+  await userEvent.keyboard('{PageUp}');
+  expect(document.activeElement?.id).toBe('b');
+});
+
+test('onBoundary receives moves past the rendered items and Home or End', async () => {
+  const onBoundary = vi.fn();
+  const root = mount(feed, { orientation: 'vertical', selector: 'article', onBoundary });
+  root.querySelector<HTMLElement>('#a')?.focus();
+  await userEvent.keyboard('{ArrowUp}');
+  expect(onBoundary).toHaveBeenLastCalledWith('start', root.querySelector('#a'), 1);
+  await userEvent.keyboard('{End}');
+  expect(onBoundary).toHaveBeenLastCalledWith('end', root.querySelector('#a'), Infinity);
+  await userEvent.keyboard('{ArrowDown}');
+  expect(document.activeElement?.id).toBe('b');
+});
+
+test('initial picks the first tab stop', () => {
+  const root = mount(feed, {
+    orientation: 'vertical',
+    selector: 'article',
+    contain: 'button',
+    initial: (items) => items.at(-1),
+  });
+  expect(tabStops(root).map((stop) => stop.id)).toEqual(['d']);
+});
