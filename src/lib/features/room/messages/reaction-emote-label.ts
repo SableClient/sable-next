@@ -17,10 +17,16 @@ export function reactionShortcode(
   sent: ReadonlyMap<string, string> = NO_SHORTCODES
 ): string | null {
   if (!isCustomReaction(key)) return null;
-  const name =
-    sent.get(key) ??
-    imagePacks.flatMap((pack) => pack.images).find((image) => image.url === key)?.shortcode;
-  return name === undefined ? null : `:${name}:`;
+
+  const sentName = sent.get(key);
+  if (sentName !== undefined) return `${sentName}`;
+
+  for (const pack of imagePacks)
+    for (const image of pack.images)
+      if (image.url === key)
+        return `:${image.shortcode}`;
+
+  return null;
 }
 
 export function reactionEmoteLabel(
