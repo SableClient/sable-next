@@ -63,6 +63,7 @@
   } from '#lib/features/room/timeline/pinned-events.svelte.js';
   import TimelineItem from '#lib/features/room/timeline/TimelineItem.svelte';
   import { previewMessage } from '#lib/features/room/timeline/preview-message.js';
+  import { rovingFocus } from '#lib/ui/roving-focus.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
@@ -422,7 +423,12 @@
       class="scope-select"
     />
   {/snippet}
-  <div class="tabs" role="tablist" aria-label={i18n.t('settings.profile')}>
+  <div
+    class="tabs"
+    role="tablist"
+    aria-label={i18n.t('settings.profile')}
+    {@attach rovingFocus({ selector: '[role="tab"]' })}
+  >
     {#each ['edit', 'preview'] as const as id (id)}
       <button
         type="button"
@@ -431,14 +437,11 @@
         class="tab"
         aria-selected={tab === id}
         aria-controls={`profile-panel-${id}`}
-        tabindex={tab === id ? 0 : -1}
-        onclick={() => {
+        onfocus={() => {
           tab = id;
         }}
-        onkeydown={(event) => {
-          if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-          tab = id === 'edit' ? 'preview' : 'edit';
-          document.getElementById(`profile-tab-${tab}`)?.focus();
+        onclick={() => {
+          tab = id;
         }}
       >
         {i18n.t(id === 'edit' ? 'common.edit' : 'settings.profilePreviewTab')}

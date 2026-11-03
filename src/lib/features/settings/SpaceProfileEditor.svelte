@@ -257,7 +257,12 @@
 </script>
 
 {#if tab === 'preview'}
-  <div class="preview-panel" role="tabpanel" id="profile-panel-preview">
+  <div
+    class="preview-panel"
+    role="tabpanel"
+    id="profile-panel-preview"
+    aria-labelledby="profile-tab-preview"
+  >
     <MentionProfileCard {userId} member={null} roomId="" profile={previewProfile} />
     <TimelineItem
       item={previewItem}
@@ -268,7 +273,12 @@
     />
   </div>
 {:else}
-  <div role="tabpanel" id="profile-panel-edit" aria-busy={loading}>
+  <div
+    role="tabpanel"
+    id="profile-panel-edit"
+    aria-labelledby="profile-tab-edit"
+    aria-busy={loading}
+  >
     <form
       class="profile-form"
       onsubmit={(event) => {

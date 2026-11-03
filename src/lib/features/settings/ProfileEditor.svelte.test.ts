@@ -10,6 +10,8 @@ import { core } from '#lib/core/__mocks__/context.js';
 import ProfileEditor from './ProfileEditor.svelte';
 
 vi.mock('#lib/core/context.js');
+vi.mock('#lib/features/room/members/MentionProfileCard.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/features/room/timeline/TimelineItem.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('#lib/rooms/room-list.svelte.js')>()),
   useRoomList: () => ({ rooms: [], byId: () => undefined }),
@@ -136,4 +138,27 @@ test('a status over the byte limit is shown as it was saved', async () => {
   });
   expect(status).toHaveValue('🌴'.repeat(64));
   expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+});
+
+test('the tabs are one tab stop that arrow keys move and select', async () => {
+  const user = userEvent.setup();
+  mount();
+  const edit = screen.getByRole('tab', { name: 'Edit' });
+  const preview = screen.getByRole('tab', { name: 'Preview' });
+
+  expect(edit).toHaveAttribute('tabindex', '0');
+  expect(preview).toHaveAttribute('tabindex', '-1');
+  expect(edit).toHaveAttribute('aria-controls', 'profile-panel-edit');
+
+  edit.focus();
+  await user.keyboard('{ArrowRight}');
+  expect(preview).toHaveFocus();
+  expect(preview).toHaveAttribute('aria-selected', 'true');
+  expect(preview).toHaveAttribute('tabindex', '0');
+  expect(edit).toHaveAttribute('tabindex', '-1');
+  expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Preview');
+
+  await user.keyboard('{Home}');
+  expect(edit).toHaveFocus();
+  expect(edit).toHaveAttribute('aria-selected', 'true');
 });
