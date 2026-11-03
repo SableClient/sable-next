@@ -105,6 +105,19 @@
   let selectedVias = $derived(via.length > 0 ? via : parent.via);
   let listedKey = $derived(selectedVias.join(','));
 
+  let provenanceTooltip = $derived.by(() => {
+    const origin = preview?.via;
+    if (!origin || origin.type === 'client') return '';
+    return i18n.t(
+      origin.type === 'unknown'
+        ? 'join.uncertainProvenanceTooltip'
+        : localServer && origin.server === localServer
+          ? 'join.trustedProvenanceTooltip'
+          : 'join.untrustedProvenanceTooltip',
+      { server: origin.type === 'remote' ? origin.server : undefined }
+    );
+  });
+
   // The alias resolves on servers that have never seen the room id.
   let address = $derived(preview?.canonical_alias ?? roomId);
 
@@ -312,18 +325,7 @@
         {/if}
 
         {#if preview && preview.via.type !== 'client'}
-          <Tooltip
-            align="center"
-            side="bottom"
-            label={i18n.t(
-              preview.via.type === 'unknown'
-                ? 'join.uncertainProvenanceTooltip'
-                : localServer && preview.via.server === localServer
-                  ? 'join.trustedProvenanceTooltip'
-                  : 'join.untrustedProvenanceTooltip',
-              { server: preview.via.type === 'remote' ? preview.via.server : undefined }
-            )}
-          >
+          <Tooltip align="center" side="bottom" label={provenanceTooltip}>
             {#snippet trigger({ props })}
               {#if preview && preview.via.type !== 'client'}
                 <div {...props} class="provenance">
