@@ -1,0 +1,4 @@
+- Share photos, videos, files, links and text to Sable from the iOS share sheet.
+- Navigate rooms and messages with arrow keys, use F6 to switch focus, and hear new messages through screen readers.
+- Keep filenames when pasting web images, hide spoiler uploads and fit more GIFs in wider pickers.
+- Set notifications per space, manage room overrides, undo changes and create custom push rules in developer settings.

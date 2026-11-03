@@ -1,5 +1,33 @@
 # Sable Changelog
 
+## 2.3.2 (2026-11-03)
+
+### Features
+
+* Share photos, videos, files, links and text to Sable from the iOS share sheet.
+* Navigate rooms and messages with arrow keys, use F6 to switch focus, and hear new messages through screen readers.
+* Keep filenames when pasting web images, hide spoiler uploads and fit more GIFs in wider pickers.
+* Set notifications per space, manage room overrides, undo changes and create custom push rules in developer settings.
+* Open room notifications from the header bell, see why they arrived and jump to the message.
+* Recover offline messages with a dehydrated device and sync search indexes between verified devices.
+* Choose whether the selected profile is remembered globally, per space, per room or only in the picker.
+* Control hardware video encoding and decoding separately, with Auto preferring hardware encoding and falling back to H.264.
+
+### Fixes
+
+* Fix screen reader labels and page announcements, room focus, tab navigation and keyboard scrolling in shortcut help.
+* Fix messages becoming unreadable on Android when opening the app or replying from a notification.
+* Stop call buttons flickering, hide withdrawn invitations and avoid notifying everyone when someone joins an empty voice room.
+* Restore desktop history shortcuts and show available updates on Flatpak and other package-managed installs.
+* Announce verification steps, allow retrying unanswered requests, handle emoji comparison failures and continue setup once verified.
+* Decrypt iOS notification previews while the app is closed and keep the timeline in place when foreground notifications arrive.
+* Offer file storage when the previous keyring is unavailable, with sign-in required for accounts saved there.
+* Fix nickname display, forwarded sender labels, emote alignment, member filter text and closing images in the media viewer.
+* Correct session names and web push registration, disable web push on desktop and limit reaction notifications to your own messages.
+* Fix release settings notices, keep FOSS Android APKs reproducible and translate the Sable server sign-in page.
+* Fix stale rooms after account switches, remember mobile tabs' rooms, and keep room sorting and sidebar dragging stable.
+* Let slow first syncs finish and resume mobile sync as soon as the network returns.
+
 ## 2.3.1 (2026-11-02)
 
 ### Fixes
