@@ -194,7 +194,8 @@
   $effect(() => {
     electronBridge()?.applySettings({
       hardwareAcceleration: preferences.hardwareAcceleration,
-      hardwareVideoAcceleration: preferences.hardwareVideoAcceleration,
+      hardwareVideoEncode: preferences.hardwareVideoEncode,
+      hardwareVideoDecode: preferences.hardwareVideoDecode,
       smoothScrolling: preferences.smoothScrolling,
       webRtcIpPolicy: preferences.webRtcIpPolicy,
       updateChannel: preferences.updateChannel,

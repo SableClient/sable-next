@@ -13,7 +13,8 @@ const WEBRTC_IP_POLICIES: readonly WebRtcIpPolicy[] = [
 
 const DEFAULTS = {
   hardwareAcceleration: true,
-  hardwareVideoAcceleration: true,
+  hardwareVideoEncode: true,
+  hardwareVideoDecode: true,
   smoothScrolling: true,
   webRtcIpPolicy: 'default',
   updateChannel: 'stable',
@@ -24,7 +25,8 @@ const DEFAULTS = {
 
 const SettingsSchema = v.object({
   hardwareAcceleration: v.fallback(v.boolean(), DEFAULTS.hardwareAcceleration),
-  hardwareVideoAcceleration: v.fallback(v.boolean(), DEFAULTS.hardwareVideoAcceleration),
+  hardwareVideoEncode: v.fallback(v.boolean(), DEFAULTS.hardwareVideoEncode),
+  hardwareVideoDecode: v.fallback(v.boolean(), DEFAULTS.hardwareVideoDecode),
   smoothScrolling: v.fallback(v.boolean(), DEFAULTS.smoothScrolling),
   webRtcIpPolicy: v.fallback(v.picklist(WEBRTC_IP_POLICIES), DEFAULTS.webRtcIpPolicy),
   updateChannel: v.fallback(v.picklist(['stable', 'nightly']), DEFAULTS.updateChannel),
@@ -38,6 +40,10 @@ export type Settings = v.InferOutput<typeof SettingsSchema>;
 const parseSettings = v.parser(v.fallback(SettingsSchema, () => ({ ...DEFAULTS })));
 
 export function sanitize(value: unknown): Settings {
+  if (value && typeof value === 'object' && 'hardwareVideoAcceleration' in value) {
+    const { hardwareVideoAcceleration: legacy, ...rest } = value;
+    return parseSettings({ hardwareVideoEncode: legacy, hardwareVideoDecode: legacy, ...rest });
+  }
   return parseSettings(value);
 }
 

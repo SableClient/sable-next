@@ -5,7 +5,8 @@ import { sanitize } from './settings';
 test('a partial file preserves valid settings and supplies defaults', () => {
   expect(sanitize({ hardwareAcceleration: false, updateChannel: 'nightly' })).toEqual({
     hardwareAcceleration: false,
-    hardwareVideoAcceleration: true,
+    hardwareVideoEncode: true,
+    hardwareVideoDecode: true,
     smoothScrolling: true,
     webRtcIpPolicy: 'default',
     updateChannel: 'nightly',
@@ -36,4 +37,10 @@ test('non-object inputs return independent default settings', () => {
 
 test('an array is read as a file with no settings', () => {
   expect(sanitize(['updateChannel'])).toEqual(sanitize({}));
+});
+
+test('the combined video acceleration setting carries over to encode and decode', () => {
+  const settings = sanitize({ hardwareVideoAcceleration: false, hardwareVideoDecode: true });
+  expect(settings.hardwareVideoEncode).toBe(false);
+  expect(settings.hardwareVideoDecode).toBe(true);
 });

@@ -414,7 +414,8 @@ export interface Preferences {
   showSystemTrayIcon: boolean;
   useCustomTitleBar: boolean;
   hardwareAcceleration: boolean;
-  hardwareVideoAcceleration: boolean;
+  hardwareVideoEncode: boolean;
+  hardwareVideoDecode: boolean;
   smoothScrolling: boolean;
   webRtcIpPolicy: WebRtcIpPolicy;
   launchAtLogin: boolean;
@@ -776,7 +777,8 @@ const DEFAULTS: Preferences = {
   showSystemTrayIcon: true,
   useCustomTitleBar: customTitleBarDefault(),
   hardwareAcceleration: true,
-  hardwareVideoAcceleration: true,
+  hardwareVideoEncode: true,
+  hardwareVideoDecode: true,
   smoothScrolling: true,
   webRtcIpPolicy: 'default',
   launchAtLogin: false,

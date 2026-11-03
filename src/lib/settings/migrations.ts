@@ -36,6 +36,18 @@ const MIGRATIONS: readonly Migration[] = [
       return { ...rest, personaKeepAfterShorthand: personaLatching !== 'off' };
     },
   },
+  {
+    version: 4,
+    run(stored) {
+      if (stored.hardwareVideoAcceleration === undefined) return stored;
+      const { hardwareVideoAcceleration, ...rest } = stored;
+      return {
+        ...rest,
+        hardwareVideoEncode: hardwareVideoAcceleration,
+        hardwareVideoDecode: hardwareVideoAcceleration,
+      };
+    },
+  },
 ];
 
 export const SETTINGS_SCHEMA = Math.max(...MIGRATIONS.map((migration) => migration.version));
