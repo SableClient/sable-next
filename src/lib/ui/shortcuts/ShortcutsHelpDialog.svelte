@@ -19,7 +19,8 @@
 </script>
 
 <DialogFrame bind:open variant="verification" label={i18n.t('shortcuts.helpTitle')}>
-  <div class="help">
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <div class="help" tabindex="0">
     <h2>{i18n.t('shortcuts.helpTitle')}</h2>
     {#each SHORTCUT_CATEGORIES as category (category.id)}
       {@const items = shortcuts.filter((shortcut) => shortcut.category === category.id)}

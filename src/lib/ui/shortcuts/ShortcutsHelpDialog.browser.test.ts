@@ -17,10 +17,5 @@ test('the shortcuts dialog has no accessibility violations', async () => {
   await page.viewport(1280, 800);
   const screen = await render(ShortcutsHelpDialog, { open: true });
   await expect.element(screen.getByRole('dialog')).toBeVisible();
-  await expectNoA11yViolations(document.body, {
-    disableRules: {
-      'scrollable-region-focusable':
-        'the dialog takes focus when it opens, so the arrow keys scroll it',
-    },
-  });
+  await expectNoA11yViolations(document.body);
 });
