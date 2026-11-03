@@ -140,3 +140,10 @@ test('an empty provider has no Continue button', () => {
   setup(() => Promise.resolve(null), { homeserver: '', loginFlows: null });
   expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
 });
+
+test('the create-account link only shows when the caller offers it', async () => {
+  const { rerender } = setup(() => Promise.resolve(flows));
+  expect(screen.queryByRole('button', { name: 'Create account' })).toBeNull();
+  await rerender({ onCreateAccount: vi.fn() });
+  expect(screen.getByRole('button', { name: 'Create account' })).toBeTruthy();
+});

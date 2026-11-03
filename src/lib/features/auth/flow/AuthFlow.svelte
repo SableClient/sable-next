@@ -34,18 +34,26 @@
   import { takeAfterLogin } from '#lib/auth/after-login.js';
   import { readText, writeJson, writeText } from '#lib/platform/local-json.js';
   import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
+  import { registrationEnabled, ssoRedirect } from '#lib/deployment/policy.js';
+  import { passwordFields } from '../shared/password-fields.svelte.js';
+  import { shouldAutoRedirect } from './auto-redirect';
 
   const core = useCoreClient();
   const isAddingAccount = page.url.searchParams.has('addAccount');
+  const canRegister = registrationEnabled();
   const stageRegistry = [
     {
       route: resolve('login'),
       completed: true,
     },
-    {
-      route: resolve('register'),
-      completed: false,
-    },
+    ...(canRegister
+      ? [
+          {
+            route: resolve('register'),
+            completed: false,
+          },
+        ]
+      : []),
   ];
 
   function reauthAccountId(): string | undefined {
@@ -152,7 +160,7 @@
 
   let activeIndex = $derived(furthestReachableStage(requestedStage, stages));
   let hasSecondaryStage = $derived(
-    furthestReached >= 1 || core.status === 'signed-out' || isAddingAccount
+    canRegister && (furthestReached >= 1 || core.status === 'signed-out' || isAddingAccount)
   );
   let visibleFurthestStage = $derived(
     hasSecondaryStage ? Math.max(furthestReached, 1) : furthestReached
@@ -174,6 +182,35 @@
     (displayedStage === 0 && hasSecondaryStage && flow.loginProviderReady) ||
       (displayedStage === 1 && signedIn)
   );
+
+  $effect(() => {
+    if (!canRegister && page.url.pathname.startsWith(resolve('register'))) {
+      // eslint-disable-next-line svelte/no-navigation-without-resolve -- stageRoute() extends a resolved stage route
+      void goto(stageRoute(0), { replaceState: true });
+    }
+  });
+
+  let autoRedirectTried = false;
+  $effect(() => {
+    if (core.status !== 'signed-out' && !isAddingAccount) return;
+    if (!flow.loginProviderReady || redirect.isCallbackWindow) return;
+    if (redirect.isLaunching || redirect.isCompleting) return;
+    const flows =
+      flow.loginFlows && passwordFields.hidden
+        ? { ...flow.loginFlows, password: false }
+        : flow.loginFlows;
+    const target = shouldAutoRedirect(
+      ssoRedirect(),
+      flows,
+      displayedStage === 0 ? 'login' : 'registration',
+      autoRedirectTried
+    );
+    if (!target) return;
+    autoRedirectTried = true;
+    void untrack(() =>
+      redirect.launch(target.type, target.type === 'sso' ? target.id : undefined, 'login')
+    );
+  });
 
   $effect(() => {
     if (flow.shouldValidateRegistration(displayedStage, hasCompletedInitialHomeserverCheck)) {
@@ -422,10 +459,10 @@
         }}
       >
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-        {@render loginStageContent(true)}
+        {@render loginStageContent(canRegister)}
       </AuthStageCard>
 
-      {#if visibleFurthestStage >= 1}
+      {#if canRegister && visibleFurthestStage >= 1}
         <AuthStageCard
           active={displayedStage === 1}
           after={displayedStage < 1}

@@ -2,6 +2,7 @@ import { base64ToUint8Array, uint8ArrayToBase64 } from 'uint8array-extras';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { appName } from '#lib/deployment/brand.js';
+import { redirectAfterLogout } from '#lib/auth/logout-redirect.js';
 import { readText, removeLocalValue, writeText } from '#lib/platform/local-json.js';
 import { deliversWebPush } from '#lib/platform/notifications.js';
 import { activeServiceWorker } from '#lib/platform/service-worker.js';
@@ -285,4 +286,5 @@ export async function logoutWithPush(core: CoreClient, override: PushOverride): 
     userId === undefined ? undefined : forgetPushSession(userId),
   ]);
   await core.logout();
+  redirectAfterLogout(core);
 }

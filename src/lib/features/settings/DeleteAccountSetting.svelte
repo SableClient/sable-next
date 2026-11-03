@@ -1,5 +1,6 @@
 <script lang="ts">
   import { CoreError } from '#src/transport';
+  import { redirectAfterLogout } from '#lib/auth/logout-redirect.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { openExternalAuthUrl } from '#lib/platform/external-auth.js';
@@ -50,6 +51,7 @@
         return;
       }
       await core.logout();
+      redirectAfterLogout(core);
     } catch (cause) {
       error = messageFor(cause);
     } finally {
