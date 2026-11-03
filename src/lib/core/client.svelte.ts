@@ -35,6 +35,7 @@ import {
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { clearRoomListSnapshot } from '#lib/rooms/room-list-snapshot.js';
 import { clearRoomTimelines } from '#lib/rooms/timeline.svelte.js';
+import { MemberPreviews } from '#lib/rooms/member-previews.svelte.js';
 import { clearRecentSearches } from '#lib/search/recent-searches.svelte.js';
 import { reportSessionFailure } from '#lib/observability/session-telemetry.js';
 import {
@@ -158,6 +159,7 @@ function describeEvent(event: CoreEvent): string {
 }
 
 export class CoreClient {
+  readonly memberPreviews = new MemberPreviews();
   status = $state<CoreStatus>('idle');
   session = $state<CoreSession | null>(null);
   private lockedAccountId = $state<string | null>(null);
@@ -947,6 +949,7 @@ export class CoreClient {
 
   private resetCachedState(): void {
     clearRoomTimelines(this);
+    this.memberPreviews.clear();
     this.profileCache.clear();
     this.profileRequests.clear();
     this.profileFailures.clear();

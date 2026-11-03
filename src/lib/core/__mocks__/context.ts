@@ -1,5 +1,6 @@
 import { vi, type Mock } from 'vitest';
 import { defaultE2eePolicy } from '#lib/deployment/e2ee-policy.js';
+import { MemberPreviews } from '#lib/rooms/member-previews.svelte.js';
 import { createRpc, type OAuthMetadataView, type Rpc } from '#src/generated/protocol';
 
 const pending = () => new Promise<never>(() => {});
@@ -32,6 +33,7 @@ export function createCoreStub<T extends Record<string, unknown> & { rpc?: RpcOv
 ) {
   const { rpc: rpcOverrides = {}, ...rest } = overrides;
   const stub = {
+    memberPreviews: new MemberPreviews(),
     session: null as unknown,
     accounts: [] as unknown[],
     fetchMedia: vi.fn<(...args: never[]) => Promise<Uint8Array<ArrayBuffer>>>(pending),

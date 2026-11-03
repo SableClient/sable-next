@@ -70,8 +70,10 @@ function compare(sort: MemberSort): (left: MemberView, right: MemberView) => num
   }
 }
 
+const nameCollator = new Intl.Collator(undefined, { sensitivity: 'base' });
+
 function byName(left: MemberView, right: MemberView): number {
-  return memberName(left).localeCompare(memberName(right), undefined, { sensitivity: 'base' });
+  return nameCollator.compare(memberName(left), memberName(right));
 }
 
 export interface MemberGroup {
@@ -107,8 +109,8 @@ export function groupMembers(
   return groups;
 }
 
-export function limitGroups(groups: readonly MemberGroup[], limit: number): MemberGroup[] {
-  const limited: MemberGroup[] = [];
+export function limitGroups<T extends MemberGroup>(groups: readonly T[], limit: number): T[] {
+  const limited: T[] = [];
   let taken = 0;
   for (const group of groups) {
     if (taken >= limit) break;

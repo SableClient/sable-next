@@ -53,8 +53,10 @@ test('a locked account keeps its session and clears the lock after switching acc
   expect(core.accountLocked).toBe(false);
   fake.emit({ type: 'account_lock_changed', account_id: session.account_id, locked: true });
   const previousTimeline = activeRoomTimeline(core);
+  core.memberPreviews.set('room', { key: '', threshold: 1, count: 0, groups: [] });
   await core.switchAccount(otherSession.account_id);
   expect(activeRoomTimeline(core)).not.toBe(previousTimeline);
+  expect(core.memberPreviews.get('room', '', null)).toBeNull();
   expect(core.accountLocked).toBe(false);
   expect(core.session).toEqual(otherSession);
   expect(fake.deleteAccountStore).not.toHaveBeenCalled();
@@ -858,8 +860,10 @@ test('stopping clears the session and closes the transport', async () => {
 
   await core.start();
   const previousTimeline = activeRoomTimeline(core);
+  core.memberPreviews.set('room', { key: '', threshold: 1, count: 0, groups: [] });
   core.stop();
   expect(activeRoomTimeline(core)).not.toBe(previousTimeline);
+  expect(core.memberPreviews.get('room', '', null)).toBeNull();
 
   expect(core.status).toBe('idle');
   expect(core.session).toBeNull();

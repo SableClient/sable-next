@@ -22,13 +22,12 @@ const bob = member({ user_id: '@bob:e.org', display_name: 'Bob', member_ts: 1 })
 const cid = member({
   user_id: '@cid:e.org',
   display_name: 'Cid',
-  real_name: 'Cid',
-  real_avatar_url: null,
   power_level: 100,
   member_ts: 2,
 });
 
 const allOnline = (): boolean => true;
+const allOffline = (): boolean => false;
 
 describe('groupMembers', () => {
   it('groups by power level, highest first', () => {
@@ -55,8 +54,6 @@ describe('groupMembers', () => {
     const dee = member({
       user_id: '@dee:e.org',
       display_name: 'Dee',
-      real_name: 'Dee',
-      real_avatar_url: null,
       power_level: -1,
     });
 
@@ -67,9 +64,7 @@ describe('groupMembers', () => {
   });
 
   it('keeps elevated members under their role whatever their presence', () => {
-    const offline = (): boolean => false;
-
-    expect(groupMembers([amy, bob, cid], 'name-asc', offline)).toEqual([
+    expect(groupMembers([amy, bob, cid], 'name-asc', allOffline)).toEqual([
       { key: '100', level: 100, members: [cid] },
       { key: 'offline', level: null, members: [amy, bob] },
     ]);
@@ -97,12 +92,10 @@ describe('groupMembers', () => {
   });
 
   it('lists from the level the room sets, whatever their presence', () => {
-    const offline = (): boolean => false;
-
-    expect(groupMembers([amy, bob, cid], 'name-asc', offline, 101)).toEqual([
+    expect(groupMembers([amy, bob, cid], 'name-asc', allOffline, 101)).toEqual([
       { key: 'offline', level: null, members: [amy, bob, cid] },
     ]);
-    expect(groupMembers([amy, bob, cid], 'name-asc', offline, 0)).toEqual([
+    expect(groupMembers([amy, bob, cid], 'name-asc', allOffline, 0)).toEqual([
       { key: '100', level: 100, members: [cid] },
       { key: '0', level: 0, members: [amy, bob] },
     ]);

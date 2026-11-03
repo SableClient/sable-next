@@ -48,6 +48,8 @@
   let ownMember = $derived(
     memberLoader.members.find((member) => member.user_id === core.session?.user_id) ?? null
   );
+  let drawerMembers = $derived(memberLoader.roomId === roomId ? memberLoader.members : []);
+  let membersLoading = $derived(memberLoader.roomId !== roomId || memberLoader.loading);
 
   function loadMembership(membership: MembershipView): Promise<MemberView[]> {
     return core.rpc.members.list({ room_id: roomId, memberships: [membership] });
@@ -126,8 +128,9 @@
 {#if desktop}
   {#if panels.desktopMembersOpen && panels.threadRootId === null}
     <MembersDrawer
-      members={memberLoader.members}
-      loading={memberLoader.loading}
+      {roomId}
+      members={drawerMembers}
+      loading={membersLoading}
       powerTags={roomSession.powerTags}
       alwaysListedFrom={roomSession.alwaysListedFrom}
       {loadMembership}
@@ -151,8 +154,9 @@
 {:else}
   <DialogFrame bind:open={panels.membersOpen} variant="drawer">
     <MembersDrawer
-      members={memberLoader.members}
-      loading={memberLoader.loading}
+      {roomId}
+      members={drawerMembers}
+      loading={membersLoading}
       modal
       powerTags={roomSession.powerTags}
       alwaysListedFrom={roomSession.alwaysListedFrom}
