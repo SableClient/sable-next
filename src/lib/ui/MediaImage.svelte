@@ -8,6 +8,7 @@
   import { windowActivity } from '#lib/platform/window-activity.js';
   import { decodeBlurhashPixels } from '#lib/ui/blurhash.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
+  import { mediaEvents } from '#lib/ui/media-events.js';
   import { dominantColor } from '#lib/ui/dominant-color.js';
   import { DEFAULT_FRAME_MS, openGifPlayback, type GifPlayback } from '#lib/ui/gif-frames.js';
   import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
@@ -537,8 +538,7 @@
     {width}
     {height}
     aria-hidden={showCanvas ? 'true' : undefined}
-    onload={freezeFrame}
-    onerror={brokenImage}
+    {@attach mediaEvents({ load: freezeFrame, error: brokenImage })}
   />
 {/snippet}
 
@@ -560,8 +560,7 @@
     {width}
     {height}
     decoding="async"
-    onload={imageShown}
-    onerror={brokenImage}
+    {@attach mediaEvents({ load: imageShown, error: brokenImage })}
     {@attach (node) => {
       if (node instanceof HTMLImageElement && node.complete) loadedUrl = url;
     }}

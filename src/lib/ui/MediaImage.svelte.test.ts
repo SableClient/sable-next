@@ -1567,3 +1567,22 @@ test('keeps the original of a small file on a dense screen', async () => {
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/dense-heavy', 800, 600);
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/dense-unsized', 800, 600);
 });
+
+test('an image that finishes loading after its component is gone is ignored', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  const warn = vi.spyOn(console, 'warn');
+  const instance = render(MediaImage, {
+    source: 'mxc://example.org/left-before-loading',
+    alt: 'Left',
+    width: 96,
+    height: 96,
+  });
+  await settle();
+  const image = screen.getByAltText('Left');
+  instance.unmount();
+
+  image.dispatchEvent(new Event('load'));
+  image.dispatchEvent(new Event('error'));
+
+  expect(warn.mock.calls.flat().join(' ')).not.toContain('derived_inert');
+});

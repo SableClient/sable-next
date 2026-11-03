@@ -4,6 +4,7 @@
 
 <script lang="ts">
   import { matchesAppLayout } from '#lib/ui/app-layout.svelte.js';
+  import { mediaEvents } from '#lib/ui/media-events.js';
   import { Dialog } from 'bits-ui';
   import { SvelteMap } from 'svelte/reactivity';
   import { flushSync, onDestroy, tick, untrack } from 'svelte';
@@ -901,7 +902,7 @@
                 draggable="false"
                 style:opacity={imageReady ? undefined : 0}
                 style:transform={`translate(${String(pan.x + swipeX)}px, ${String(pan.y + swipeY)}px) scale(${String(zoom)}) rotate(${String(rotation)}deg)`}
-                onload={onImageLoad}
+                {@attach mediaEvents({ load: onImageLoad })}
                 oncontextmenu={mouseContextMenu(openImageMenu)}
               />
               {#if lens}
