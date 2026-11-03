@@ -1115,6 +1115,7 @@ impl Core {
         self.watch_search_index(&client, &store_id);
         self.watch_ignored_users(&client);
         self.watch_ignored_history(&client, &sync_service);
+        #[cfg(target_family = "wasm")]
         self.watch_sync_stall(&client, &sync_service, crate::sync_support::SYNC_STALL);
         self.watch_backup_preference(&client);
         sync_service.start().await;

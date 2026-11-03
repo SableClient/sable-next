@@ -645,7 +645,9 @@ async fn build_account_client(
     };
     let builder = builder
         .request_config(
-            RequestConfig::new().timeout(session_timeout(crate::tls::proxy_configured())),
+            RequestConfig::new()
+                .timeout(session_timeout(crate::tls::proxy_configured()))
+                .retry_limit(3),
         )
         .with_threading_support(THREADING_SUPPORT)
         .with_encryption_settings(role.encryption_settings())

@@ -1,6 +1,7 @@
 use sable_model::text::visible_name;
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::deserialized_responses::TimelineEvent;
@@ -16,6 +17,7 @@ use matrix_sdk::ruma::push::Action;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedEventId};
 use matrix_sdk_ui::sync_service::State as SyncState;
+use web_time::Instant;
 
 use crate::protocol::{CoreEvent, RpcError, SyncStatus};
 use matrix_sdk_base::deserialized_responses::RawAnySyncOrStrippedTimelineEvent;
@@ -83,6 +85,9 @@ impl Core {
         self.track_session_task(
             spawn(async move {
                 let mut failures = 0u32;
+                let mut running_since = None::<Instant>;
+                let rules_aligned = Arc::new(AtomicBool::new(false));
+                let mut after_running = None;
                 loop {
                     let next = if matches!(states.get(), SyncState::Offline) {
                         matrix_sdk::timeout::timeout(states.next(), OFFLINE_RECHECK).await
@@ -101,20 +106,42 @@ impl Core {
                     if core.sync_paused() {
                         continue;
                     }
-                    let stalled = matches!(
-                        state,
-                        SyncState::Error(_) | SyncState::Terminated | SyncState::Idle
-                    );
+                    let idle = matches!(state, SyncState::Idle);
+                    let failed = matches!(state, SyncState::Error(_) | SyncState::Terminated);
                     let running = matches!(state, SyncState::Running);
+                    let steady = if running {
+                        running_since.get_or_insert_with(Instant::now);
+                        false
+                    } else {
+                        running_since
+                            .take()
+                            .is_some_and(|since| since.elapsed() >= SYNC_BACKOFF_RESET)
+                    };
                     core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(state)));
                     if running {
-                        core.resubscribe_timeline_rooms().await;
-                        core.reconcile_memberships().await;
-                        core.fill_own_members().await;
-                        core.align_notification_rules().await;
+                        let core = core.clone();
+                        let rules_aligned = rules_aligned.clone();
+                        after_running = Some(
+                            spawn(async move {
+                                core.resubscribe_timeline_rooms().await;
+                                core.reconcile_memberships().await;
+                                core.fill_own_members().await;
+                                if !rules_aligned.load(Ordering::SeqCst) {
+                                    core.align_notification_rules().await;
+                                    rules_aligned.store(true, Ordering::SeqCst);
+                                }
+                            })
+                            .abort_on_drop(),
+                        );
                     }
 
-                    if stalled {
+                    if !core.network_available.load(Ordering::SeqCst) {
+                        continue;
+                    }
+                    if idle {
+                        restarted.start().await;
+                    } else if failed {
+                        after_running.take();
                         if core.detect_account_lock(&support_client, generation).await {
                             continue;
                         }
@@ -132,13 +159,14 @@ impl Core {
                             );
                             return;
                         }
-                        failures = failures.saturating_add(1);
+                        if steady {
+                            failures = 0;
+                        }
                         crate::watchers::retry_backoff(failures).await;
+                        failures = failures.saturating_add(1);
                         if !core.sync_paused() {
                             restarted.start().await;
                         }
-                    } else {
-                        failures = 0;
                     }
                 }
             })
@@ -655,6 +683,8 @@ pub(crate) fn sync_status(state: SyncState) -> SyncStatus {
         },
     }
 }
+
+const SYNC_BACKOFF_RESET: std::time::Duration = std::time::Duration::from_secs(30);
 
 pub(crate) const OFFLINE_RECHECK: std::time::Duration = std::time::Duration::from_secs(10);
 

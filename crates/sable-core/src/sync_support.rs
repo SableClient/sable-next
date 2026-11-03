@@ -8,11 +8,13 @@ use matrix_sdk_ui::sync_service::{State, SyncService};
 
 use crate::{Core, ResultExt, protocol::RpcError};
 
+#[cfg(target_family = "wasm")]
 pub(crate) const SYNC_STALL: Duration = Duration::from_secs(90);
 
 impl Core {
     /// The wasm HTTP client ignores request timeouts, so a long-poll on a connection that died
     /// during sleep never returns.
+    #[cfg(any(target_family = "wasm", test))]
     pub(crate) fn watch_sync_stall(
         self: &Arc<Self>,
         client: &Client,
