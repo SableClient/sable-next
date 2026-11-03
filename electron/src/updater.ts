@@ -34,6 +34,8 @@ export function setUpdateChannel(channel: keyof typeof FEEDS): void {
     provider: 'generic',
     url: FEEDS[channel],
     channel: feedChannel(channel),
+    // Forgejo serves multipart byteranges too slowly.
+    useMultipleRangeRequest: false,
   });
   // Moving from nightly to an older stable is a downgrade to the updater.
   autoUpdater.allowDowngrade = channel !== builtChannel;
