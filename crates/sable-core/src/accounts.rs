@@ -2130,6 +2130,62 @@ mod regression_tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_saved_session_restores_while_the_homeserver_is_down() {
+        use crate::session::{AccountRegistry, Credentials, PersistedAccount, PersistedSession};
+
+        let server = MatrixMockServer::new().await;
+        let base = std::env::temp_dir().join(format!(
+            "sable-offline-{}",
+            matrix_sdk::ruma::TransactionId::new()
+        ));
+        let base_id = base.to_str().unwrap().to_owned();
+        let (core, _events) = Core::new(base_id.clone(), Box::new(MemorySessionStore::default()));
+        let mut registry = AccountRegistry::empty();
+        let (account_id, store_id) = registry.allocate_account(&base_id);
+        registry.active_account_id = Some(account_id.clone());
+        let mut session = PersistedSession {
+            oauth_issuer: None,
+            oauth_redirect_uri: None,
+            resolved_homeserver: None,
+            homeserver: server.server().uri(),
+            credentials: Credentials::Password(
+                serde_json::from_value(serde_json::json!({
+                    "user_id": "@alice:example.org",
+                    "device_id": "DEVICE",
+                    "access_token": "token"
+                }))
+                .unwrap(),
+            ),
+        };
+        let client = session::restore_client(&store_id, &session, true)
+            .await
+            .unwrap();
+        session::restore_credentials(&client, &session)
+            .await
+            .unwrap();
+        drop(client);
+        session.homeserver = "offline.invalid".to_owned();
+        session.resolved_homeserver = Some(url::Url::parse("http://127.0.0.1:9").unwrap());
+        registry.upsert(PersistedAccount {
+            account_id,
+            store_id,
+            session,
+            needs_reauth: false,
+            device_invalidated: false,
+        });
+        core.sessions
+            .save(serde_json::to_vec(&registry).unwrap())
+            .await
+            .unwrap();
+        drop(server);
+
+        let restored = core.restore().await.unwrap().unwrap();
+        assert_eq!(restored.user_id.as_str(), "@alice:example.org");
+        drop(core);
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn a_cache_reset_keeps_the_login_keys_and_search_index_but_not_the_sync_position() {
         use crate::session::{AccountRegistry, Credentials, PersistedAccount, PersistedSession};
         use matrix_sdk_base::crypto::store::CryptoStore as _;
