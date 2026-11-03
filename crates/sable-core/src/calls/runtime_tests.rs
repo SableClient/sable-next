@@ -280,15 +280,15 @@ async fn an_element_call_peers_key_is_emitted_on_the_oldest_members_focus() {
     let now = super::keys::now_ms();
     let event = json!({
         "type": "org.matrix.msc3401.call.member",
-        "state_key": "_@genchu:federated.nexus_spDmuPm52O_m.call",
-        "sender": "@genchu:federated.nexus", "event_id": "$peer",
+        "state_key": "_@peer:remote.example.org_PEERDEVICE_m.call",
+        "sender": "@peer:remote.example.org", "event_id": "$peer",
         "origin_server_ts": now - 5_000,
         "content": {
             "application": "m.call", "call_id": "", "scope": "m.room",
-            "device_id": "spDmuPm52O", "membershipID": "@genchu:federated.nexus:spDmuPm52O",
+            "device_id": "PEERDEVICE", "membershipID": "@peer:remote.example.org:PEERDEVICE",
             "created_ts": now - 5_000, "expires": 14_400_000, "m.call.intent": "video",
             "focus_active": {"type":"livekit", "focus_selection":"oldest_membership"},
-            "foci_preferred": [{"type":"livekit", "livekit_service_url":"https://sfu.federated.nexus", "livekit_alias":parsed_room_id}]
+            "foci_preferred": [{"type":"livekit", "livekit_service_url":"https://sfu.remote.example.org", "livekit_alias":parsed_room_id}]
         }
     });
     let room = server
@@ -314,7 +314,7 @@ async fn an_element_call_peers_key_is_emitted_on_the_oldest_members_focus() {
     let content: super::keys::ToDeviceCallEncryptionKeysEventContent = serde_json::from_value(json!({
         "keys": {"index": 1, "key": "ag8zYq5ohmf0xrnZrzJ2Bw=="},
         "room_id": room_id,
-        "member": {"claimed_device_id": "spDmuPm52O", "id": "@genchu:federated.nexus:spDmuPm52O"},
+        "member": {"claimed_device_id": "PEERDEVICE", "id": "@peer:remote.example.org:PEERDEVICE"},
         "session": {"call_id": "", "application": "m.call", "scope": "m.room"},
         "sent_ts": now
     }))
@@ -330,8 +330,8 @@ async fn an_element_call_peers_key_is_emitted_on_the_oldest_members_focus() {
         silent_reported: HashSet::new(),
         rotation_due_ms: None,
         pending_keys: vec![super::PendingKey {
-            sender: owned_user_id!("@genchu:federated.nexus"),
-            device: owned_device_id!("spDmuPm52O"),
+            sender: owned_user_id!("@peer:remote.example.org"),
+            device: owned_device_id!("PEERDEVICE"),
             content,
             received: now,
             reported: false,
@@ -348,11 +348,11 @@ async fn an_element_call_peers_key_is_emitted_on_the_oldest_members_focus() {
 
     super::emit_pending(&core, 1, CallSessionId(1), &room_id, &mut state);
 
-    let expected = backend_id(&room_id, "https://sfu.federated.nexus");
+    let expected = backend_id(&room_id, "https://sfu.remote.example.org");
     assert!(matches!(
         events.try_recv(),
         Ok(crate::protocol::CoreEvent::CallEncryptionKey { identity, key_index: 1, own: false, backend_id: Some(id), .. })
-            if identity == "@genchu:federated.nexus:spDmuPm52O" && id == expected
+            if identity == "@peer:remote.example.org:PEERDEVICE" && id == expected
     ));
     assert!(state.pending_keys.is_empty());
 }
@@ -415,15 +415,15 @@ async fn an_element_call_focus_without_an_alias_still_counts() {
     let now = super::keys::now_ms();
     let event = json!({
         "type": "org.matrix.msc3401.call.member",
-        "state_key": "_@genchu:federated.nexus_spDmuPm52O_m.call",
-        "sender": "@genchu:federated.nexus", "event_id": "$peer",
+        "state_key": "_@peer:remote.example.org_PEERDEVICE_m.call",
+        "sender": "@peer:remote.example.org", "event_id": "$peer",
         "origin_server_ts": now - 5_000,
         "content": {
             "application": "m.call", "call_id": "", "scope": "m.room",
-            "device_id": "spDmuPm52O", "membershipID": "@genchu:federated.nexus:spDmuPm52O",
+            "device_id": "PEERDEVICE", "membershipID": "@peer:remote.example.org:PEERDEVICE",
             "created_ts": now - 5_000, "expires": 14_400_000, "m.call.intent": "video",
             "focus_active": {"type":"livekit", "focus_selection":"oldest_membership"},
-            "foci_preferred": [{"type":"livekit", "livekit_service_url":"https://sfu.federated.nexus"}]
+            "foci_preferred": [{"type":"livekit", "livekit_service_url":"https://sfu.remote.example.org"}]
         }
     });
     let room = server
@@ -440,7 +440,7 @@ async fn an_element_call_focus_without_an_alias_still_counts() {
     assert_eq!(members.len(), 1);
     assert_eq!(
         members[0].foci,
-        vec!["https://sfu.federated.nexus".to_owned()]
+        vec!["https://sfu.remote.example.org".to_owned()]
     );
 }
 

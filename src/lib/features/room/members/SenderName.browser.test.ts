@@ -135,8 +135,8 @@ test('caps a very long display name instead of letting it overflow', async () =>
 
 test('does not clip a short name without pronouns at fractional font sizes', async () => {
   const screen = await render(SenderName, {
-    displayName: 'Spootnik',
-    colors: senderDisplayColors('@spootnik:example.test', null),
+    displayName: 'Samantha',
+    colors: senderDisplayColors('@samantha:example.test', null),
     onMention: () => {},
   });
   screen.container.style.width = '600px';

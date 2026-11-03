@@ -35,7 +35,7 @@ fn chunked_room(count: usize) -> crate::search::RoomIndex {
         index.upsert(document(
             &format!("m{seed}"),
             &format!("message {seed}"),
-            "@erwan:localhost",
+            "@kris:localhost",
             seed as u64,
             None,
             Vec::new(),
@@ -51,7 +51,7 @@ async fn test_chinese_search_survives_restore() {
     let document = document(
         "chinese",
         "今天我们一起讨论中文搜索功能，然后测试加密房间里的消息索引。",
-        "@erwan:localhost",
+        "@kris:localhost",
         1_000,
         None,
         Vec::new(),
@@ -85,7 +85,7 @@ async fn test_pending_chinese_reindex() {
     room_index.upsert(document(
         "pending",
         "稍后搜索中文消息",
-        "@erwan:localhost",
+        "@kris:localhost",
         1_000,
         None,
         Vec::new(),
@@ -122,7 +122,7 @@ async fn test_a_restored_index_lists_media_without_the_event_cache() {
         room.clone(),
         crate::search::RoomIndex::restored(restored_from(vec![picture(
             "beach",
-            "@erwan:localhost",
+            "@kris:localhost",
             1,
         )]))
         .await,
@@ -156,7 +156,7 @@ async fn test_the_crawl_resumes_from_the_checkpoint_it_persisted() {
     let room_id = room_id!("!resume:localhost").to_owned();
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"))
+        .sender(user_id!("@kris:localhost"))
         .server_ts(crate::search::now_ms());
 
     server.mock_room_state_encryption().plain().mount().await;
@@ -273,7 +273,7 @@ fn test_a_flush_rewrites_only_the_chunk_that_changed() {
     index.upsert(document(
         "late",
         "a late message",
-        "@erwan:localhost",
+        "@kris:localhost",
         10_000,
         None,
         Vec::new(),
@@ -408,7 +408,7 @@ async fn test_only_the_crawl_rederives_classified_documents() {
                 >(serde_json::json!({
                     "type": "m.room.message",
                     "event_id": "$gallery",
-                    "sender": "@erwan:localhost",
+                    "sender": "@kris:localhost",
                     "origin_server_ts": 5_000,
                     "content": {
                         "msgtype": "dm.filament.gallery",
@@ -500,7 +500,7 @@ async fn test_a_v3_blob_from_main_is_split_into_chunks_without_a_recrawl() {
             document(
                 &format!("old{seed}"),
                 &format!("archaeology {seed}"),
-                "@erwan:localhost",
+                "@kris:localhost",
                 seed,
                 None,
                 Vec::new(),
@@ -622,7 +622,7 @@ async fn test_a_flushed_index_is_searchable_in_the_next_session() {
     let room_id = room_id!("!persisted:localhost").to_owned();
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -688,7 +688,7 @@ fn test_a_lightly_edited_room_waits_before_its_snapshot_is_rewritten() {
         .upsert(document(
             "one",
             "a single word",
-            "@erwan:localhost",
+            "@kris:localhost",
             1,
             None,
             Vec::new(),
@@ -728,7 +728,7 @@ fn test_a_busy_room_is_persisted_without_waiting_out_the_ticks() {
         room_index.upsert(document(
             &format!("busy{seed}"),
             &format!("message number {seed}"),
-            "@erwan:localhost",
+            "@kris:localhost",
             seed as u64,
             None,
             Vec::new(),
@@ -755,7 +755,7 @@ fn test_an_unreadable_room_is_never_flushed_over_its_blob() {
         room_index.upsert(document(
             &format!("shallow{seed}"),
             &format!("shallow crawl {seed}"),
-            "@erwan:localhost",
+            "@kris:localhost",
             seed as u64,
             None,
             Vec::new(),
@@ -782,7 +782,7 @@ async fn test_a_restored_room_waits_out_the_ticks_before_it_is_rewritten() {
             document(
                 &format!("kept{seed}"),
                 &format!("kept message {seed}"),
-                "@erwan:localhost",
+                "@kris:localhost",
                 seed as u64,
                 None,
                 Vec::new(),
@@ -799,7 +799,7 @@ async fn test_a_restored_room_waits_out_the_ticks_before_it_is_rewritten() {
         .upsert(document(
             "fresh",
             "one new message",
-            "@erwan:localhost",
+            "@kris:localhost",
             99,
             None,
             Vec::new(),

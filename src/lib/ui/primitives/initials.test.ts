@@ -3,11 +3,11 @@ import { expect, test } from 'vitest';
 import { toInitials } from './initials.js';
 
 test('upper-cases the first glyph', () => {
-  expect(toInitials('erwan')).toBe('E');
+  expect(toInitials('kris')).toBe('K');
 });
 
 test('skips the matrix sigil rather than rendering it', () => {
-  expect(toInitials('@erwan:sable.moe')).toBe('E');
+  expect(toInitials('@kris:example.org')).toBe('K');
   expect(toInitials('#sable:sable.moe')).toBe('S');
   expect(toInitials('!abc:sable.moe')).toBe('A');
 });

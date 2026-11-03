@@ -7,9 +7,9 @@
     "has_link": true,
     "in_thread": false,
     "media": [],
-    "mentions": ["@erwan:localhost"],
+    "mentions": ["@kris:localhost"],
     "origin_server_ts": 1000,
-    "sender": "@erwan:localhost",
+    "sender": "@kris:localhost",
     "state": false
   },
   {
@@ -37,7 +37,7 @@
     ],
     "mentions": [],
     "origin_server_ts": 1001,
-    "sender": "@erwan:localhost",
+    "sender": "@kris:localhost",
     "state": false
   },
   {
@@ -61,7 +61,7 @@
     ],
     "mentions": [],
     "origin_server_ts": 1002,
-    "sender": "@erwan:localhost",
+    "sender": "@kris:localhost",
     "state": false
   },
   {
@@ -85,7 +85,7 @@
     ],
     "mentions": [],
     "origin_server_ts": 1003,
-    "sender": "@erwan:localhost",
+    "sender": "@kris:localhost",
     "state": false
   },
   {
@@ -98,7 +98,7 @@
     "media": [],
     "mentions": [],
     "origin_server_ts": 1004,
-    "sender": "@erwan:localhost",
+    "sender": "@kris:localhost",
     "state": false
   },
   {
@@ -136,7 +136,7 @@
     ],
     "mentions": [],
     "origin_server_ts": 1005,
-    "sender": "@erwan:localhost",
+    "sender": "@kris:localhost",
     "state": false
   },
   {
@@ -149,7 +149,7 @@
     "media": [],
     "mentions": ["@alice:localhost"],
     "origin_server_ts": 1000,
-    "sender": "@erwan:localhost",
+    "sender": "@kris:localhost",
     "state": false
   },
   {
@@ -162,7 +162,7 @@
     "media": [],
     "mentions": [],
     "origin_server_ts": 1006,
-    "sender": "@erwan:localhost",
+    "sender": "@kris:localhost",
     "state": false
   },
   {
@@ -175,7 +175,7 @@
     "media": [],
     "mentions": [],
     "origin_server_ts": 1008,
-    "sender": "@erwan:localhost",
+    "sender": "@kris:localhost",
     "state": false
   },
   {
@@ -188,7 +188,7 @@
     "media": [],
     "mentions": [],
     "origin_server_ts": 1009,
-    "sender": "@erwan:localhost",
+    "sender": "@kris:localhost",
     "state": false
   },
   {
@@ -201,7 +201,7 @@
     "media": [],
     "mentions": [],
     "origin_server_ts": 1010,
-    "sender": "@erwan:localhost",
+    "sender": "@kris:localhost",
     "state": true
   }
 ]

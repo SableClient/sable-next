@@ -245,15 +245,15 @@ test.each(['hug', 'cuddle', 'wave', 'poke', 'headpat'] as const)(
 test('a mention pill stands in for the user id a command asks for', async () => {
   const commands = fakeCommands();
 
-  await runSlash('/headpat @Erwan', {
+  await runSlash('/headpat @Kris', {
     ...context(commands),
-    formatted: '/headpat <a href="https://matrix.to/#/@erwan:example.org">@Erwan</a>',
+    formatted: '/headpat <a href="https://matrix.to/#/@kris:example.org">@Kris</a>',
   });
 
   expect(commands.sendGesture).toHaveBeenCalledWith({
     room_id: '!room:example.org',
     gesture: 'headpat',
-    target: '@erwan:example.org',
+    target: '@kris:example.org',
   });
 });
 

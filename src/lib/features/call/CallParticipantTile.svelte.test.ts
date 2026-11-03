@@ -55,21 +55,21 @@ test('our own camera on a native call is a slot for the native view', () => {
   };
   const { container, unmount } = render(CallParticipantTile, {
     participant: {
-      identity: '@erwan:example.org:PHONE',
+      identity: '@kris:example.org:PHONE',
       local: true,
       camera: { id: 'camera', muted: false, subscribed: true },
     },
     source: 'camera',
     room: undefined,
     localVideo,
-    name: 'Erwan',
-    userId: '@erwan:example.org',
+    name: 'Kris',
+    userId: '@kris:example.org',
     avatar: null,
   });
 
   expect(container.querySelector('video')).not.toBeInTheDocument();
   expect(container.querySelector('div.video')).toBeInTheDocument();
-  expect(screen.getByText('Erwan')).toBeInTheDocument();
+  expect(screen.getByText('Kris')).toBeInTheDocument();
 
   unmount();
   expect(localVideo.clear).toHaveBeenCalled();

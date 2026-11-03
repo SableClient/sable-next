@@ -787,10 +787,10 @@ mod tests {
 
     fn member(device: &str, created_ts: u64, foci: &[&str]) -> CallMember {
         CallMember {
-            user_id: owned_user_id!("@erwan:localhost"),
+            user_id: owned_user_id!("@kris:localhost"),
             device_id: Some(device.into()),
             member_id: None,
-            identity: format!("@erwan:localhost:{device}"),
+            identity: format!("@kris:localhost:{device}"),
             mode: CallMode::Legacy,
             created_ts,
             joined_ts: created_ts,
@@ -813,8 +813,8 @@ mod tests {
         let laptop = member("LAPTOP", 100, &[]);
 
         assert!(!laptop.same_generation(&member("PHONE", 100, &[])));
-        assert!(laptop.is_own(user_id!("@erwan:localhost"), device_id!("LAPTOP")));
-        assert!(!laptop.is_own(user_id!("@erwan:localhost"), device_id!("PHONE")));
+        assert!(laptop.is_own(user_id!("@kris:localhost"), device_id!("LAPTOP")));
+        assert!(!laptop.is_own(user_id!("@kris:localhost"), device_id!("PHONE")));
     }
 
     #[test]
@@ -835,11 +835,11 @@ mod tests {
         let raw = |extra: &str| {
             format!(
                 r#"{{
-                    "sender":"@erwan:localhost",
+                    "sender":"@kris:localhost",
                     "content": {{
                         "slot_id":"m.call#ROOM",
                         "application":{{"type":"m.call"}},
-                        "member":{{"user_id":"@erwan:localhost","device_id":"LAPTOP","id":"member-1"}},
+                        "member":{{"user_id":"@kris:localhost","device_id":"LAPTOP","id":"member-1"}},
                         "transports":{{"published":[]}}{extra}
                     }}
                 }}"#
@@ -857,18 +857,18 @@ mod tests {
     fn test_a_sticky_member_uses_its_member_id_for_the_deployed_identity() {
         let member = sticky_member(
             r#"{
-                "sender":"@erwan:localhost",
+                "sender":"@kris:localhost",
                 "content": {
                     "slot_id":"m.call#ROOM",
                     "application":{"type":"m.call"},
-                    "member":{"user_id":"@erwan:localhost","device_id":"LAPTOP","id":"member-1"},
+                    "member":{"user_id":"@kris:localhost","device_id":"LAPTOP","id":"member-1"},
                     "transports":{"published":[{"type":"livekit","livekit_service_url":"https://focus.example.org"}]}
                 }
             }"#,
         )
         .unwrap();
 
-        assert_eq!(member.user_id, user_id!("@erwan:localhost"));
+        assert_eq!(member.user_id, user_id!("@kris:localhost"));
         assert_eq!(member.device_id.as_deref(), Some(device_id!("LAPTOP")));
         assert_eq!(member.member_id, "member-1");
         assert_eq!(member.foci, ["https://focus.example.org"]);
@@ -883,7 +883,7 @@ mod tests {
         assert!(
             sticky_member(
                 r#"{
-                "sender":"@erwan:localhost",
+                "sender":"@kris:localhost",
                 "content": {
                     "slot_id":"m.call#ROOM",
                     "application":{"type":"m.call"},
@@ -896,10 +896,10 @@ mod tests {
     }
     fn sticky_event(id: &str, origin: u64) -> serde_json::Value {
         serde_json::json!({
-            "type":"org.matrix.msc4143.rtc.member", "sender":"@erwan:localhost", "event_id":id,
+            "type":"org.matrix.msc4143.rtc.member", "sender":"@kris:localhost", "event_id":id,
             "origin_server_ts":origin,"msc4354_sticky":{"duration_ms":900_000},
             "content":{"msc4354_sticky_key":"member", "slot_id":"m.call#ROOM", "application":{"type":"m.call"},
-                "member":{"user_id":"@erwan:localhost","device_id":"PHONE","id":"member"},
+                "member":{"user_id":"@kris:localhost","device_id":"PHONE","id":"member"},
                 "transports":{"published":[{"type":"livekit","livekit_service_url":"https://sfu.example"}]}}
         })
     }
@@ -1093,7 +1093,7 @@ mod tests {
         leave["sender"] = serde_json::json!("@other:localhost");
         assert!(store.apply(&leave, 200));
         assert_eq!(store.members(200).len(), 1);
-        leave["sender"] = serde_json::json!("@erwan:localhost");
+        leave["sender"] = serde_json::json!("@kris:localhost");
         assert!(store.apply(&leave, 200));
         assert_eq!(
             store.members(200),

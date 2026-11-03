@@ -93,13 +93,13 @@ test.each([
 });
 
 test.each([
-  ['\u2190', '@ezera'],
-  ['Ana', '@ezera'],
-  ['hello', '@ezera'],
-  ['https://matrix.to/#/@ezera:example.org', '@ezera'],
+  ['\u2190', '@casey'],
+  ['Ana', '@casey'],
+  ['hello', '@casey'],
+  ['https://matrix.to/#/@casey:example.org', '@casey'],
 ])('labels a user mention %s with the member name', async (label, expected) => {
   render(FormattedBody, {
-    props: { html: `<a href="https://matrix.to/#/@ezera:example.org">${label}</a>` },
+    props: { html: `<a href="https://matrix.to/#/@casey:example.org">${label}</a>` },
   });
   await tick();
 
@@ -109,13 +109,13 @@ test.each([
 test('keeps the author text on a user mention when asked to', async () => {
   render(FormattedBody, {
     props: {
-      html: '<a href="https://matrix.to/#/@ezera:example.org">@ezera \u2192</a>',
+      html: '<a href="https://matrix.to/#/@casey:example.org">@casey \u2192</a>',
       keepMentionText: true,
     },
   });
   await tick();
 
-  expect(screen.getByRole('link', { name: '@ezera \u2192' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: '@casey \u2192' })).toHaveAttribute(
     'data-matrix-link',
     'user'
   );
@@ -813,13 +813,13 @@ test.each([
   expect(document.querySelector('pre code')?.querySelector('span')).toBeNull();
 });
 
-test.each(['https://matrix.to/#/@ezera:example.org', 'matrix:u/ezera:example.org'])(
+test.each(['https://matrix.to/#/@casey:example.org', 'matrix:u/casey:example.org'])(
   'labels a user mention the same on %s',
   async (href) => {
     render(FormattedBody, { props: { html: `<a href="${href}">hello</a>` } });
     await tick();
 
-    expect(screen.getByRole('link', { name: '@ezera' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '@casey' })).toHaveAttribute(
       'data-matrix-link',
       'user'
     );

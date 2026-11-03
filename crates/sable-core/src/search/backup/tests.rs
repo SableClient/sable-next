@@ -24,7 +24,7 @@ fn history(timestamps: impl IntoIterator<Item = u64>) -> History {
             document(
                 &format!("m{ts}"),
                 "x".repeat(400).as_str(),
-                "@erwan:localhost",
+                "@kris:localhost",
                 ts,
                 None,
                 Vec::new(),
@@ -167,7 +167,7 @@ fn test_a_small_fresh_tail_waits_until_it_is_worth_a_segment() {
     grown.push(document(
         "late",
         "late message",
-        "@erwan:localhost",
+        "@kris:localhost",
         covered + 1,
         None,
         Vec::new(),
@@ -273,7 +273,7 @@ async fn test_an_import_merges_without_undoing_a_newer_local_edit() {
     let mut edited = document(
         "shared",
         "edited locally",
-        "@erwan:localhost",
+        "@kris:localhost",
         1_000,
         None,
         Vec::new(),
@@ -286,7 +286,7 @@ async fn test_an_import_merges_without_undoing_a_newer_local_edit() {
     let mut stale = document(
         "shared",
         "original",
-        "@erwan:localhost",
+        "@kris:localhost",
         1_000,
         None,
         Vec::new(),
@@ -295,7 +295,7 @@ async fn test_an_import_merges_without_undoing_a_newer_local_edit() {
     let fresh = document(
         "fresh",
         "from the backup",
-        "@erwan:localhost",
+        "@kris:localhost",
         900,
         None,
         Vec::new(),

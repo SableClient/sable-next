@@ -74,7 +74,7 @@ fn test_a_hit_carries_its_indexed_neighbours_minus_ignored_senders() {
     };
     assert!(hits[0].before.is_empty());
     assert_eq!(ids(&hits[0].after), ["$alice"]);
-    assert_eq!(ids(&hits[1].before), ["$erwan"]);
+    assert_eq!(ids(&hits[1].before), ["$kris"]);
     assert_eq!(ids(&hits[1].after), ["$screenshot"]);
 }
 
@@ -127,7 +127,7 @@ async fn test_a_room_with_no_new_activity_is_indexed_from_its_persisted_cache() 
     let room_id = room_id!("!quiet:localhost").to_owned();
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
 
     let room = server
         .sync_room(
@@ -168,7 +168,7 @@ async fn test_an_encrypted_rooms_plaintext_is_searchable_and_edits_replace_the_b
     let room = server.sync_joined_room(&client, &room_id).await;
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
 
     server
         .sync_room(
@@ -236,7 +236,7 @@ async fn test_an_edit_crawled_before_its_original_keeps_the_new_body() {
     let room = server.sync_joined_room(&client, &room_id).await;
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
 
     let (cache, _drop) = client
         .event_cache()
@@ -290,7 +290,7 @@ async fn test_a_thread_reply_is_marked_and_keeps_the_mark_through_an_edit() {
     let room = server.sync_joined_room(&client, &room_id).await;
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
     let (cache, _drop) = client
         .event_cache()
         .unwrap()
@@ -356,7 +356,7 @@ async fn test_a_redaction_drops_the_message_from_the_index() {
     let room = server.sync_joined_room(&client, &room_id).await;
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
 
     server
         .sync_room(
@@ -406,7 +406,7 @@ async fn test_pagination_walks_one_ordering_without_repeating_a_hit() {
     let room = server.sync_joined_room(&client, &room_id).await;
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
 
     let ids = ["$page0", "$page1", "$page2", "$page3", "$page4"];
     let mut builder = JoinedRoomBuilder::new(&room_id);
@@ -464,7 +464,7 @@ async fn test_leaving_a_room_forgets_its_documents() {
     let room = server.sync_joined_room(&client, &room_id).await;
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
 
     server
         .sync_room(
@@ -619,7 +619,7 @@ async fn test_an_edit_keeps_the_originals_time_and_takes_its_new_mentions() {
     let (room, cache, _drop) = empty_cache(&server, &client, &room_id).await;
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
 
     let events = vec![
         factory
@@ -679,7 +679,7 @@ async fn test_an_edit_crawled_a_batch_before_its_original_is_fixed_up_when_it_la
     let (room, cache, _drop) = empty_cache(&server, &client, &room_id).await;
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
 
     let mut index = MessageIndex::new();
     index
@@ -731,14 +731,14 @@ async fn test_an_edit_from_someone_else_is_ignored() {
 
     let room_id = room_id!("!forged:localhost").to_owned();
     let original_id = event_id!("$original");
-    let erwan = user_id!("@erwan:localhost");
+    let kris = user_id!("@kris:localhost");
     let (room, cache, _drop) = empty_cache(&server, &client, &room_id).await;
     let factory = EventFactory::new().room(&room_id);
 
     let original = || {
         factory
             .text_msg("the deploy is green")
-            .sender(erwan)
+            .sender(kris)
             .event_id(original_id)
             .server_ts(1_000)
             .into_event()
@@ -778,7 +778,7 @@ async fn test_an_edit_from_someone_else_is_ignored() {
         assert!(in_room(index, &room_id, "red", 10, 0).is_empty());
         let hits = in_room(index, &room_id, "green", 10, 0);
         assert_eq!(hits.len(), 1);
-        assert_eq!(hits[0].sender, erwan);
+        assert_eq!(hits[0].sender, kris);
     }
 
     drop(room);
@@ -795,7 +795,7 @@ async fn test_redacting_an_edit_brings_the_previous_body_back() {
     let room = server.sync_joined_room(&client, &room_id).await;
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
 
     server
         .sync_room(

@@ -15,7 +15,7 @@ import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { nameColorOnDark, nameColorOnLight } from '#lib/ui/primitives/readable-color.js';
 
 const members = [
-  { user_id: '@erwan:example.org', display_name: 'Erwan', avatar_url: 'mxc://a' },
+  { user_id: '@kris:example.org', display_name: 'Kris', avatar_url: 'mxc://a' },
   { user_id: '@bob:example.org', display_name: null, avatar_url: null },
 ] as unknown as MemberView[];
 
@@ -30,7 +30,7 @@ const persona = (overrides: Partial<PerMessageProfileView>): PerMessageProfileVi
   }) as PerMessageProfileView;
 
 test('a missing or absent member falls back to the user id', () => {
-  expect(memberNameOf('@erwan:example.org')).toBe('Erwan');
+  expect(memberNameOf('@kris:example.org')).toBe('Kris');
   expect(memberNameOf('@bob:example.org')).toBe('@bob:example.org');
   expect(memberNameOf('@nobody:example.org')).toBe('@nobody:example.org');
 });
@@ -42,18 +42,18 @@ function memberNameOf(userId: string): string {
 test('findMember treats a null user id as no member rather than searching', () => {
   expect(findMember(members, null)).toBeUndefined();
   expect(findMember(members, undefined)).toBeUndefined();
-  expect(findMember(members, '@erwan:example.org')?.display_name).toBe('Erwan');
+  expect(findMember(members, '@kris:example.org')?.display_name).toBe('Kris');
 });
 
 test('memberAvatar returns null rather than the id when there is no avatar', () => {
-  expect(memberAvatar(members, '@erwan:example.org')).toBe('mxc://a');
+  expect(memberAvatar(members, '@kris:example.org')).toBe('mxc://a');
   expect(memberAvatar(members, '@bob:example.org')).toBeNull();
 });
 
 test('memberIdentity projects the id, name and avatar with the same fallbacks', () => {
-  expect(memberIdentity(members, '@erwan:example.org')).toEqual({
-    userId: '@erwan:example.org',
-    name: 'Erwan',
+  expect(memberIdentity(members, '@kris:example.org')).toEqual({
+    userId: '@kris:example.org',
+    name: 'Kris',
     avatar: 'mxc://a',
   });
   expect(memberIdentity(members, '@nobody:example.org')).toEqual({
@@ -97,11 +97,11 @@ test('hiding profile colours lets the role colour show, except on your own name'
 });
 
 test('a reply fallback is stripped by display name in either form', () => {
-  const erwan = persona({ display_name: 'Erwan' });
+  const kris = persona({ display_name: 'Kris' });
 
-  expect(stripReplyFallback('Erwan: hello', erwan)).toBe('hello');
-  expect(stripReplyFallback('<Erwan> hello', erwan)).toBe('hello');
-  expect(stripReplyFallback('hello', erwan)).toBe('hello');
+  expect(stripReplyFallback('Kris: hello', kris)).toBe('hello');
+  expect(stripReplyFallback('<Kris> hello', kris)).toBe('hello');
+  expect(stripReplyFallback('hello', kris)).toBe('hello');
 });
 
 test('a fallback-bearing persona strips up to the first separator', () => {
@@ -112,5 +112,5 @@ test('a fallback-bearing persona strips up to the first separator', () => {
 });
 
 test('no persona leaves the body untouched', () => {
-  expect(stripReplyFallback('Erwan: hello', null)).toBe('Erwan: hello');
+  expect(stripReplyFallback('Kris: hello', null)).toBe('Kris: hello');
 });

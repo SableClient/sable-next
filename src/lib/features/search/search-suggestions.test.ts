@@ -14,7 +14,7 @@ const sources = {
   ],
   senders: [
     { userId: '@ada:example.org', displayName: 'Ada', avatarUrl: null },
-    { userId: '@erwan:example.org', displayName: 'Erwan', avatarUrl: null },
+    { userId: '@kris:example.org', displayName: 'Kris', avatarUrl: null },
   ],
   spaces: [
     { id: '!eng:example.org', alias: '#eng:example.org', name: 'Engineering', avatarUrl: null },
@@ -104,7 +104,7 @@ test('from: and mentions: suggest senders by name and insert their id', () => {
   expect(byName.detail).toBe('@ada:example.org');
   expect(byName.insert).toBe('from:@ada:example.org ');
 
-  expect(suggestionsFor('mentions:erwan', sources).map((entry) => entry.label)).toEqual(['Erwan']);
+  expect(suggestionsFor('mentions:kris', sources).map((entry) => entry.label)).toEqual(['Kris']);
 });
 
 test('has: suggests the attachment kinds the core knows', () => {

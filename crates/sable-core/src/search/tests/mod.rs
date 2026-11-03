@@ -76,9 +76,9 @@ pub(super) fn filtered_index() -> (MessageIndex, matrix_sdk::ruma::OwnedRoomId) 
         .or_insert_with(crate::search::RoomIndex::new);
 
     room_index.upsert(document(
-        "erwan",
+        "kris",
         "the deploy pipeline is broken",
-        "@erwan:localhost",
+        "@kris:localhost",
         1_000,
         None,
         Vec::new(),
@@ -89,7 +89,7 @@ pub(super) fn filtered_index() -> (MessageIndex, matrix_sdk::ruma::OwnedRoomId) 
         "@alice:localhost",
         2_000,
         None,
-        vec![matrix_sdk::ruma::user_id!("@erwan:localhost").to_owned()],
+        vec![matrix_sdk::ruma::user_id!("@kris:localhost").to_owned()],
     ));
     room_index.upsert(document(
         "screenshot",
@@ -211,7 +211,7 @@ pub(super) fn budgeted_room(count: usize, from: u64) -> crate::search::RoomIndex
         index.upsert(document(
             &format!("d{ts}"),
             &format!("deploy note w{ts}"),
-            "@erwan:localhost",
+            "@kris:localhost",
             ts,
             None,
             Vec::new(),
@@ -226,7 +226,7 @@ pub(super) fn seed_room(index: &mut crate::search::RoomIndex, count: usize) {
         index.upsert(document(
             &format!("s{seed}"),
             &format!("message {seed}"),
-            "@erwan:localhost",
+            "@kris:localhost",
             seed as u64,
             None,
             Vec::new(),

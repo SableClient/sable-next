@@ -38,7 +38,7 @@ async fn test_search_watcher_releases_paginated_room_cache() {
     let room_id = room_id!("!retention:localhost").to_owned();
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
     server
         .sync_room(
             &client,
@@ -118,7 +118,7 @@ async fn test_back_pagination_reaches_the_index_and_notifies_it() {
     let room_id = room_id!("!backfill:localhost").to_owned();
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -202,7 +202,7 @@ async fn test_the_crawler_deepens_a_room_and_records_reaching_its_start() {
     let room_id = room_id!("!crawl:localhost").to_owned();
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"))
+        .sender(user_id!("@kris:localhost"))
         .server_ts(crate::search::now_ms());
 
     server.mock_room_state_encryption().plain().mount().await;
@@ -281,7 +281,7 @@ async fn test_a_restored_room_does_not_charge_the_crawl_budget_again() {
     let room_id = room_id!("!budget:localhost").to_owned();
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -349,7 +349,7 @@ async fn test_a_failed_room_reports_partial_not_complete() {
             JoinedRoomBuilder::new(&room_id).add_timeline_event(
                 EventFactory::new()
                     .room(&room_id)
-                    .sender(user_id!("@erwan:localhost"))
+                    .sender(user_id!("@kris:localhost"))
                     .text_msg("latest deploy")
                     .event_id(event_id!("$latest")),
             ),
@@ -383,7 +383,7 @@ async fn test_a_room_walked_to_its_start_reports_complete() {
     let room_id = room_id!("!walked:localhost").to_owned();
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"))
+        .sender(user_id!("@kris:localhost"))
         .server_ts(crate::search::now_ms());
 
     server.mock_room_state_encryption().plain().mount().await;
@@ -458,7 +458,7 @@ async fn test_a_spent_budget_reports_stopped_even_with_rooms_left() {
                 .add_timeline_event(
                     EventFactory::new()
                         .room(&room_id)
-                        .sender(user_id!("@erwan:localhost"))
+                        .sender(user_id!("@kris:localhost"))
                         .text_msg("latest deploy")
                         .event_id(event_id!("$latest")),
                 ),
@@ -506,7 +506,7 @@ async fn test_the_crawl_serves_every_room_before_deepening_one() {
                 .add_timeline_event(
                     EventFactory::new()
                         .room(&busy)
-                        .sender(user_id!("@erwan:localhost"))
+                        .sender(user_id!("@kris:localhost"))
                         .text_msg("newest deploy")
                         .event_id(event_id!("$busy"))
                         .server_ts(9_000),
@@ -522,7 +522,7 @@ async fn test_the_crawl_serves_every_room_before_deepening_one() {
                 .add_timeline_event(
                     EventFactory::new()
                         .room(&quiet)
-                        .sender(user_id!("@erwan:localhost"))
+                        .sender(user_id!("@kris:localhost"))
                         .text_msg("ancient deploy")
                         .event_id(event_id!("$quiet"))
                         .server_ts(1_000),
@@ -547,7 +547,7 @@ async fn test_the_crawl_serves_every_room_before_deepening_one() {
         .ok(RoomMessagesResponseTemplate::default().events(vec![
             EventFactory::new()
                 .room(&busy)
-                .sender(user_id!("@erwan:localhost"))
+                .sender(user_id!("@kris:localhost"))
                 .text_msg("older busy archaeology")
                 .event_id(event_id!("$busy_older")),
         ]))

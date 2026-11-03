@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn operators_are_lifted_out_of_the_free_text() {
-        let parsed = parse_search_query("deploy from:erwan in:dev has:image");
+        let parsed = parse_search_query("deploy from:kris in:dev has:image");
 
         assert_eq!(parsed.text, "deploy");
         assert_eq!(
@@ -245,7 +245,7 @@ mod tests {
                 .map(|token| (token.operator, token.value.as_str(), token.negated))
                 .collect::<Vec<_>>(),
             vec![
-                (SearchOperator::From, "erwan", false),
+                (SearchOperator::From, "kris", false),
                 (SearchOperator::In, "dev", false),
                 (SearchOperator::Has, "image", false),
             ]
@@ -286,7 +286,7 @@ mod tests {
 
     #[test]
     fn a_quoted_value_may_hold_spaces_and_a_matrix_id_keeps_its_colon() {
-        let parsed = parse_search_query("deploy in:\"Design crew\" -from:@erwan:example.org");
+        let parsed = parse_search_query("deploy in:\"Design crew\" -from:@kris:example.org");
         assert_eq!(parsed.text, "deploy");
         assert_eq!(
             parsed
@@ -294,7 +294,7 @@ mod tests {
                 .iter()
                 .map(|token| (token.value.as_str(), token.negated))
                 .collect::<Vec<_>>(),
-            vec![("Design crew", false), ("@erwan:example.org", true)]
+            vec![("Design crew", false), ("@kris:example.org", true)]
         );
     }
 

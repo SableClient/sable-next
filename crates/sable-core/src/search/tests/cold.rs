@@ -86,7 +86,7 @@ async fn test_older_pages_search_what_is_only_on_disk() {
             room_index.upsert(document(
                 &format!("o{seed}"),
                 &format!("archive entry w{seed}x"),
-                "@erwan:localhost",
+                "@kris:localhost",
                 seed,
                 None,
                 Vec::new(),
@@ -159,7 +159,7 @@ async fn test_an_older_page_is_capped_and_resumes_inside_the_chunk() {
                 room_index.upsert(document(
                     &format!("{offset}c{seed}"),
                     &format!("archive entry w{seed}x"),
-                    "@erwan:localhost",
+                    "@kris:localhost",
                     seed * 2 + offset as u64,
                     None,
                     Vec::new(),
@@ -262,7 +262,7 @@ async fn test_one_older_page_keeps_scanning_until_it_finds_something() {
             vec![document(
                 &format!("c{chunk}"),
                 body,
-                "@erwan:localhost",
+                "@kris:localhost",
                 start + 1,
                 None,
                 Vec::new(),

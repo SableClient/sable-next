@@ -4,9 +4,9 @@ import type { RoomWidget } from './widget-content.js';
 import { templateWidgetUrl, WIDGET_CLIENT_ID } from './widget-url.js';
 
 const vars = {
-  userId: '@erwan:example.org',
+  userId: '@kris:example.org',
   roomId: '!abc:example.org',
-  displayName: 'Erwan',
+  displayName: 'Kris',
   avatarUrl: 'mxc://example.org/avatar',
 };
 
@@ -86,10 +86,10 @@ test('leaves an existing widgetId query parameter alone', () => {
 test('percent-encodes a value that would otherwise inject a query parameter', () => {
   const url = templateWidgetUrl(widget('https://widget.example/app?name=$matrix_display_name'), {
     ...vars,
-    displayName: 'Erwan&admin=true',
+    displayName: 'Kris&admin=true',
   });
   const parsed = new URL(url);
-  expect(parsed.searchParams.get('name')).toBe('Erwan&admin=true');
+  expect(parsed.searchParams.get('name')).toBe('Kris&admin=true');
   expect(parsed.searchParams.has('admin')).toBe(false);
 });
 

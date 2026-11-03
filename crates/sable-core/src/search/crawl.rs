@@ -1603,7 +1603,7 @@ mod tests {
         let room_id = room();
         let factory = EventFactory::new()
             .room(&room_id)
-            .sender(user_id!("@erwan:localhost"))
+            .sender(user_id!("@kris:localhost"))
             .server_ts(super::now_ms());
         server.mock_room_state_encryption().plain().mount().await;
         let joined = server
@@ -1660,7 +1660,7 @@ mod tests {
         let room_id = room();
         let factory = EventFactory::new()
             .room(&room_id)
-            .sender(user_id!("@erwan:localhost"));
+            .sender(user_id!("@kris:localhost"));
         server.mock_room_state_encryption().plain().mount().await;
         let joined = server
             .sync_room(
@@ -1720,7 +1720,7 @@ mod tests {
         let room_id = room();
         let factory = EventFactory::new()
             .room(&room_id)
-            .sender(user_id!("@erwan:localhost"));
+            .sender(user_id!("@kris:localhost"));
         server.mock_room_state_encryption().plain().mount().await;
         let joined = server
             .sync_room(
@@ -1784,7 +1784,7 @@ mod tests {
         let room_id = room();
         let factory = EventFactory::new()
             .room(&room_id)
-            .sender(user_id!("@erwan:localhost"));
+            .sender(user_id!("@kris:localhost"));
         server.mock_room_state_encryption().plain().mount().await;
         let joined = server
             .sync_room(
@@ -1854,7 +1854,7 @@ mod tests {
         let room_id = room();
         let factory = EventFactory::new()
             .room(&room_id)
-            .sender(user_id!("@erwan:localhost"));
+            .sender(user_id!("@kris:localhost"));
         server.mock_room_state_encryption().plain().mount().await;
         let joined = server
             .sync_room(
@@ -1934,7 +1934,7 @@ mod tests {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
 
-        let sender = user_id!("@erwan:localhost");
+        let sender = user_id!("@kris:localhost");
         let plain_id = room_id!("!plain:localhost").to_owned();
         let secret_id = room_id!("!secret:localhost").to_owned();
         server.mock_room_state_encryption().plain().mount().await;

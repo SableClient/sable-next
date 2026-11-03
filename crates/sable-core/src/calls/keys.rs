@@ -523,10 +523,10 @@ mod tests {
 
     fn member(device: &str, created_ts: u64) -> CallMember {
         CallMember {
-            user_id: owned_user_id!("@erwan:localhost"),
+            user_id: owned_user_id!("@kris:localhost"),
             device_id: Some(device.into()),
             member_id: None,
-            identity: format!("@erwan:localhost:{device}"),
+            identity: format!("@kris:localhost:{device}"),
             mode: crate::protocol::CallMode::Legacy,
             created_ts,
             joined_ts: created_ts,
@@ -832,10 +832,10 @@ mod tests {
     fn test_a_sent_key_carries_both_formats_for_older_receivers() {
         let distributor = KeyDistributor::new(
             owned_room_id!("!room:example.org"),
-            owned_user_id!("@erwan:localhost"),
+            owned_user_id!("@kris:localhost"),
             "LAPTOP".into(),
             "member".to_owned(),
-            "@erwan:localhost:LAPTOP".to_owned(),
+            "@kris:localhost:LAPTOP".to_owned(),
         );
         let key = OutboundKey::generate(6, 0).unwrap();
 

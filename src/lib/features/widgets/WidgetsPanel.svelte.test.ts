@@ -28,7 +28,7 @@ vi.mock('matrix-widget-api', async (importOriginal) => {
 
 import { core } from '#lib/core/__mocks__/context.js';
 
-core.session = { account_id: 'a', user_id: '@erwan:example.org', device_id: 'DEV' };
+core.session = { account_id: 'a', user_id: '@kris:example.org', device_id: 'DEV' };
 
 import IntegrationManagerDialog from './IntegrationManagerDialog.svelte';
 import WidgetsPanel from './WidgetsPanel.svelte';
@@ -63,8 +63,8 @@ const widgets: RoomWidget[] = [
 
 const commonProps = {
   roomId: '!room:example.org',
-  userId: '@erwan:example.org',
-  displayName: 'Erwan',
+  userId: '@kris:example.org',
+  displayName: 'Kris',
   avatarUrl: 'mxc://example.org/avatar',
 };
 

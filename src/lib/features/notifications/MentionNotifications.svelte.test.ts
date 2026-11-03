@@ -11,8 +11,8 @@ import type { MentionNotificationModeView } from '#src/generated/protocol';
 type Mode = MentionNotificationModeView;
 
 const core = Object.assign(baseCore, {
-  session: { user_id: '@erwan:example.org' },
-  userProfile: vi.fn(() => Promise.resolve({ display_name: 'Erwan' })),
+  session: { user_id: '@kris:example.org' },
+  userProfile: vi.fn(() => Promise.resolve({ display_name: 'Kris' })),
 });
 Object.assign(core.rpc.notifications, {
   mentionNotifications: vi.fn<() => Promise<Record<string, Mode | null>>>(),
@@ -36,10 +36,10 @@ test('shows every mention rule at its account mode', async () => {
   render(MentionNotifications);
 
   await vi.waitFor(() => {
-    expect(selector('User ID (@erwan:example.org)')).toHaveTextContent('Loud');
+    expect(selector('User ID (@kris:example.org)')).toHaveTextContent('Loud');
   });
-  expect(selector('Display name (Erwan)')).toHaveTextContent('Off');
-  expect(selector('Username (erwan)')).toHaveTextContent('Loud');
+  expect(selector('Display name (Kris)')).toHaveTextContent('Off');
+  expect(selector('Username (kris)')).toHaveTextContent('Loud');
   expect(selector('@room')).toHaveTextContent('Notify');
 });
 

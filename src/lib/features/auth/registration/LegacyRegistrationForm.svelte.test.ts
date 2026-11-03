@@ -34,14 +34,14 @@ function setup(serverLabel: string, username: string) {
 const username = () => screen.getByRole('textbox', { name: 'Username' });
 
 test('shows the address a username becomes on a named server', () => {
-  setup('matrix.org', 'Erwan');
+  setup('example.org', 'Kris');
 
-  expect(username()).toHaveAccessibleDescription(/@Erwan:matrix\.org/);
+  expect(username()).toHaveAccessibleDescription(/@Kris:example\.org/);
 });
 
 test('does not invent a domain for a server entered as a URL', () => {
-  setup('https://matrix-client.example.org', 'erwan');
+  setup('https://matrix-client.example.org', 'kris');
 
-  expect(username()).not.toHaveAccessibleDescription(/@erwan/);
+  expect(username()).not.toHaveAccessibleDescription(/@kris/);
   expect(username()).toHaveAccessibleDescription(/becomes your Matrix address/);
 });

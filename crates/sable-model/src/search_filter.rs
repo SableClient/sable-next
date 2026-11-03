@@ -599,14 +599,14 @@ mod tests {
                 space("!new:example.org", "new", &[]),
                 SearchRoom {
                     is_direct: true,
-                    direct_targets: vec!["@erwan:example.org".to_owned()],
-                    ..room("!dm:example.org", "Erwan")
+                    direct_targets: vec!["@kris:example.org".to_owned()],
+                    ..room("!dm:example.org", "Kris")
                 },
             ],
             people: vec![
                 SearchPerson {
-                    user_id: "@erwan:example.org".to_owned(),
-                    display_name: "Erwan".to_owned(),
+                    user_id: "@kris:example.org".to_owned(),
+                    display_name: "Kris".to_owned(),
                 },
                 SearchPerson {
                     user_id: "@meow:example.org".to_owned(),
@@ -658,9 +658,9 @@ mod tests {
 
     #[test]
     fn names_resolve_to_ids_and_unknown_names_are_reported() {
-        let resolved = resolved("from:erwan from:nobody in:dev in:missing");
+        let resolved = resolved("from:kris from:nobody in:dev in:missing");
 
-        assert_eq!(resolved.filter.senders, ["@erwan:example.org"]);
+        assert_eq!(resolved.filter.senders, ["@kris:example.org"]);
         assert_eq!(resolved.filter.rooms, ["!dev:example.org"]);
         assert_eq!(
             resolved
@@ -674,10 +674,10 @@ mod tests {
 
     #[test]
     fn a_negated_sender_is_denied_by_identity() {
-        let filter = filter("deploy -from:erwan");
+        let filter = filter("deploy -from:kris");
 
         assert_eq!(filter.senders, [] as [String; 0]);
-        assert_eq!(filter.not_senders, ["@erwan:example.org"]);
+        assert_eq!(filter.not_senders, ["@kris:example.org"]);
         assert_eq!(filter.exclude, [] as [String; 0]);
         assert_eq!(unresolved("deploy -from:nobody"), ["nobody"]);
     }
@@ -754,8 +754,8 @@ mod tests {
 
     #[test]
     fn with_scopes_to_the_direct_messages_with_that_person() {
-        assert_eq!(filter("deploy with:erwan").rooms, ["!dm:example.org"]);
-        assert_eq!(filter("deploy -with:erwan").not_rooms, ["!dm:example.org"]);
+        assert_eq!(filter("deploy with:kris").rooms, ["!dm:example.org"]);
+        assert_eq!(filter("deploy -with:kris").not_rooms, ["!dm:example.org"]);
         assert_eq!(unresolved("with:nobody"), ["nobody"]);
     }
 
@@ -847,7 +847,7 @@ mod tests {
         );
         assert_eq!(
             suggest_person(&directory.people, "@erw").map(|found| found.value),
-            Some("@erwan:example.org".to_owned())
+            Some("@kris:example.org".to_owned())
         );
         assert_eq!(suggest_person(&directory.people, " "), None);
     }

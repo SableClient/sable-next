@@ -153,12 +153,12 @@ test('unlinking a mention makes its Matrix ID literal for a bot command', () => 
   editor.setDoc(
     composerSchema.node('doc', null, [
       composerSchema.nodes.paragraph.create(null, [
-        composerSchema.text('!ban sable-coc '),
+        composerSchema.text('!ban test-room '),
         composerSchema.nodes.mention.create({
-          userId: '@doesnm:doesnmlab.xyz',
-          name: 'doesnm',
+          userId: '@bob:example.org',
+          name: 'Bob',
         }),
-        composerSchema.text(' transphobic'),
+        composerSchema.text(' spam'),
       ]),
     ])
   );
@@ -170,7 +170,7 @@ test('unlinking a mention makes its Matrix ID literal for a bot command', () => 
   const doc = editor.doc();
   if (!doc) throw new Error('no document after unlinking mention');
   expect(serializeComposer(doc)).toEqual({
-    body: '!ban sable-coc @doesnm:doesnmlab.xyz transphobic',
+    body: '!ban test-room @bob:example.org spam',
     formatted: null,
     mentions: { user_ids: [], room: false },
   });

@@ -14,7 +14,7 @@ function hit(eventId: string): SearchHitView {
     room_id: '!room:example.org',
     event_id: eventId,
     body: 'the deploy pipeline is broken',
-    sender: '@erwan:example.org',
+    sender: '@kris:example.org',
     origin_server_ts: 1_700_000_000_000,
     score: 1,
     context_before: [],

@@ -312,8 +312,8 @@ mod tests {
     #[test]
     fn test_the_livekit_identity_pairs_with_the_legacy_endpoint() {
         assert_eq!(
-            livekit_identity(user_id!("@erwan:localhost"), device_id!("DEVICEID")),
-            "@erwan:localhost:DEVICEID"
+            livekit_identity(user_id!("@kris:localhost"), device_id!("DEVICEID")),
+            "@kris:localhost:DEVICEID"
         );
     }
 

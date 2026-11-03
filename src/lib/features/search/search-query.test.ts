@@ -32,10 +32,10 @@ const directory: SearchDirectory = {
       space_children: [edge('!dev:example.org'), edge('!ops:example.org')],
     }),
     room('!new:example.org', 'new', { is_space: true }),
-    room('!dm:example.org', 'Erwan', { is_direct: true, direct_targets: ['@erwan:example.org'] }),
+    room('!dm:example.org', 'Kris', { is_direct: true, direct_targets: ['@kris:example.org'] }),
   ],
   people: [
-    { user_id: '@erwan:example.org', display_name: 'Erwan' },
+    { user_id: '@kris:example.org', display_name: 'Kris' },
     { user_id: '@meow:example.org', display_name: 'Meow' },
     { user_id: '@meowmeow:example.org', display_name: 'Meow Meow' },
     { user_id: '@bark:example.org', display_name: 'Bark' },
@@ -47,20 +47,20 @@ function resolveFor(query: string) {
 }
 
 test('the wasm binding parses a query into text, tokens and phrases across JSON', () => {
-  const parsed = parseSearchQuery('deploy from:erwan "pipeline is broken" -staging');
+  const parsed = parseSearchQuery('deploy from:kris "pipeline is broken" -staging');
 
   expect(parsed.text).toBe('deploy');
   expect(parsed.phrases).toEqual(['pipeline is broken']);
   expect(parsed.exclude).toEqual(['staging']);
   expect(
     parsed.tokens.map(({ operator, value, negated }) => ({ operator, value, negated }))
-  ).toEqual([{ operator: 'from', value: 'erwan', negated: false }]);
+  ).toEqual([{ operator: 'from', value: 'kris', negated: false }]);
 });
 
 test('the wasm binding resolves names against the directory and reports the rest', () => {
-  const { filter, unresolved } = resolveFor('from:erwan in:eng from:nobody');
+  const { filter, unresolved } = resolveFor('from:kris in:eng from:nobody');
 
-  expect(filter.senders).toEqual(['@erwan:example.org']);
+  expect(filter.senders).toEqual(['@kris:example.org']);
   expect(filter.rooms).toEqual(['!dev:example.org', '!ops:example.org']);
   expect(unresolved.map((token) => token.value)).toEqual(['nobody']);
 });

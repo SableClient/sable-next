@@ -24,7 +24,7 @@ vi.mock('#lib/platform/local-network.js', async (importOriginal) => ({
 
 const session: SessionInfo = {
   account_id: 'account-a',
-  user_id: '@erwan:example.org',
+  user_id: '@kris:example.org',
   device_id: 'LAPTOP',
   homeserver: 'https://example.org',
   needs_reauth: false,
@@ -251,7 +251,7 @@ test('a restore that returns a session leaves the client ready', async () => {
   await core.start();
 
   expect(core.status).toBe('ready');
-  expect(core.session?.user_id).toBe('@erwan:example.org');
+  expect(core.session?.user_id).toBe('@kris:example.org');
   expect(core.accounts).toHaveLength(1);
 });
 

@@ -19,7 +19,7 @@ fn one_server_hit(room_id: &matrix_sdk::ruma::OwnedRoomId) -> serde_json::Value 
                         "type": "m.room.message",
                         "event_id": "$older-than-the-crawl",
                         "room_id": room_id,
-                        "sender": "@erwan:localhost",
+                        "sender": "@kris:localhost",
                         "origin_server_ts": 1_000,
                         "content": { "msgtype": "m.text", "body": "deploy notes from years ago" }
                     }
@@ -83,7 +83,7 @@ async fn test_an_encrypted_room_is_never_searched_on_the_homeserver() {
     let client = server.client_builder().build().await;
 
     let room_id = room_id!("!secret:localhost").to_owned();
-    let sender = user_id!("@erwan:localhost");
+    let sender = user_id!("@kris:localhost");
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
         .sync_room(
@@ -155,7 +155,7 @@ async fn test_a_homeserver_that_cannot_search_falls_back_to_the_local_index() {
             JoinedRoomBuilder::new(&room_id).add_timeline_event(
                 EventFactory::new()
                     .room(&room_id)
-                    .sender(user_id!("@erwan:localhost"))
+                    .sender(user_id!("@kris:localhost"))
                     .text_msg("deploy notes the crawl did reach")
                     .event_id(event_id!("$local")),
             ),
@@ -214,7 +214,7 @@ async fn test_a_dated_query_stays_local_even_for_an_unencrypted_room() {
             JoinedRoomBuilder::new(&room_id).add_timeline_event(
                 EventFactory::new()
                     .room(&room_id)
-                    .sender(user_id!("@erwan:localhost"))
+                    .sender(user_id!("@kris:localhost"))
                     .text_msg("deploy notes the crawl did reach")
                     .server_ts(5_000)
                     .event_id(event_id!("$local")),
@@ -269,7 +269,7 @@ async fn test_a_filter_only_query_stays_local_even_for_an_unencrypted_room() {
     let client = server.client_builder().build().await;
 
     let room_id = room_id!("!plain:localhost").to_owned();
-    let sender = user_id!("@erwan:localhost");
+    let sender = user_id!("@kris:localhost");
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
         .sync_room(

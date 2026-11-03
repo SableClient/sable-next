@@ -17,7 +17,7 @@ fn golden_event(position: usize, kind: &str, content: &Value) -> TimelineEvent {
     let raw: Raw<AnySyncTimelineEvent> = serde_json::from_value(json!({
         "type": kind,
         "event_id": format!("$golden{position}"),
-        "sender": "@erwan:localhost",
+        "sender": "@kris:localhost",
         "origin_server_ts": 1_000 + position,
         "content": content,
     }))
@@ -43,7 +43,7 @@ fn message_documents() -> Vec<Value> {
         json!({
             "msgtype": "m.text",
             "body": "see https://example.org/a now",
-            "m.mentions": { "user_ids": ["@erwan:localhost"] }
+            "m.mentions": { "user_ids": ["@kris:localhost"] }
         }),
         json!({
             "msgtype": "m.image",
@@ -66,7 +66,7 @@ fn message_documents() -> Vec<Value> {
         }),
         json!({
             "msgtype": "m.text",
-            "body": "> <@erwan:localhost> see https://example.org/a now\n\nreply text",
+            "body": "> <@kris:localhost> see https://example.org/a now\n\nreply text",
             "m.relates_to": {
                 "rel_type": "m.thread",
                 "event_id": "$golden0",
@@ -139,7 +139,7 @@ fn poll_document() -> Value {
     let poll: AnySyncMessageLikeEvent = serde_json::from_value(json!({
         "type": "org.matrix.msc3381.poll.start",
         "event_id": "$golden8",
-        "sender": "@erwan:localhost",
+        "sender": "@kris:localhost",
         "origin_server_ts": 1_008,
         "content": {
             "org.matrix.msc3381.poll.start": {
@@ -162,7 +162,7 @@ fn sticker_json() -> Value {
     let sticker: OriginalSyncStickerEvent = serde_json::from_value(json!({
         "type": "m.sticker",
         "event_id": "$golden9",
-        "sender": "@erwan:localhost",
+        "sender": "@kris:localhost",
         "origin_server_ts": 1_009,
         "content": { "body": "moai", "info": {}, "url": "mxc://localhost/moai" }
     }))
@@ -176,7 +176,7 @@ fn state_json() -> Value {
         "type": "m.room.topic",
         "event_id": "$golden10",
         "state_key": "",
-        "sender": "@erwan:localhost",
+        "sender": "@kris:localhost",
         "origin_server_ts": 1_010,
         "content": topic
     }))

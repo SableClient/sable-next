@@ -724,12 +724,12 @@ mod tests {
     #[test]
     fn test_a_replys_quoted_fallback_is_not_indexed() {
         let replied = super::indexable_body(
-            "> <@erwan:localhost> the deploy pipeline is broken\n\nlooking at it now",
+            "> <@kris:localhost> the deploy pipeline is broken\n\nlooking at it now",
         );
         assert_eq!(replied, "looking at it now");
 
         assert_eq!(
-            super::indexable_body("> * <@erwan:localhost> waves\n\nhello"),
+            super::indexable_body("> * <@kris:localhost> waves\n\nhello"),
             "hello"
         );
         assert_eq!(

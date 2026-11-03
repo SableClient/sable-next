@@ -1652,7 +1652,7 @@ mod tests {
         );
 
         assert_eq!(hits.len(), 2);
-        assert!(!hits.contains(&"$erwan".to_owned()));
+        assert!(!hits.contains(&"$kris".to_owned()));
     }
 
     #[test]
@@ -1663,7 +1663,7 @@ mod tests {
             &index,
             "deploy",
             &super::IndexFilter {
-                mentions: vec![matrix_sdk::ruma::user_id!("@erwan:localhost").to_owned()],
+                mentions: vec![matrix_sdk::ruma::user_id!("@kris:localhost").to_owned()],
                 ..super::IndexFilter::default()
             },
         );
@@ -1714,7 +1714,7 @@ mod tests {
         );
 
         assert_eq!(hits.len(), 2);
-        assert!(!hits.contains(&"$erwan".to_owned()));
+        assert!(!hits.contains(&"$kris".to_owned()));
     }
 
     #[test]
@@ -1730,7 +1730,7 @@ mod tests {
                     ..super::IndexFilter::default()
                 }
             ),
-            vec!["$erwan"]
+            vec!["$kris"]
         );
     }
 
@@ -1766,7 +1766,7 @@ mod tests {
             .map(|hit| hit.event_id.to_string())
             .collect();
 
-        assert_eq!(hits, vec!["$screenshot", "$alice", "$erwan"]);
+        assert_eq!(hits, vec!["$screenshot", "$alice", "$kris"]);
     }
 
     #[test]
@@ -1796,7 +1796,7 @@ mod tests {
             .upsert(document(
                 "elsewhere",
                 "deploy elsewhere",
-                "@erwan:localhost",
+                "@kris:localhost",
                 4_000,
                 None,
                 Vec::new(),
@@ -1840,7 +1840,7 @@ mod tests {
         };
 
         assert_eq!(search(true), vec!["$alice"]);
-        assert_eq!(search(false), vec!["$screenshot", "$erwan"]);
+        assert_eq!(search(false), vec!["$screenshot", "$kris"]);
     }
 
     #[test]
@@ -1859,7 +1859,7 @@ mod tests {
             .map(|hit| hit.event_id.to_string())
             .collect();
 
-        assert_eq!(hits, vec!["$erwan", "$alice", "$screenshot"]);
+        assert_eq!(hits, vec!["$kris", "$alice", "$screenshot"]);
     }
 
     #[test]
@@ -1876,7 +1876,7 @@ mod tests {
             },
         );
 
-        assert_eq!(hits, vec!["$erwan".to_owned()]);
+        assert_eq!(hits, vec!["$kris".to_owned()]);
     }
 
     #[test]
@@ -1945,7 +1945,7 @@ mod tests {
                 pattern: Some(r"pipe\w+ is".to_owned()),
                 ..super::IndexFilter::default()
             })
-            .contains(&"$erwan".to_owned())
+            .contains(&"$kris".to_owned())
         );
         assert_eq!(
             filter(super::IndexFilter {
@@ -1971,7 +1971,7 @@ mod tests {
         );
 
         assert!(!hits.contains(&"$screenshot".to_owned()));
-        assert!(hits.contains(&"$erwan".to_owned()));
+        assert!(hits.contains(&"$kris".to_owned()));
     }
 
     #[test]
@@ -1983,7 +1983,7 @@ mod tests {
             "deploy",
             &super::IndexFilter {
                 rooms: vec![room],
-                not_mentions: vec![matrix_sdk::ruma::user_id!("@erwan:localhost").to_owned()],
+                not_mentions: vec![matrix_sdk::ruma::user_id!("@kris:localhost").to_owned()],
                 ..super::IndexFilter::default()
             },
         );
@@ -2002,7 +2002,7 @@ mod tests {
             .upsert(document(
                 "elsewhere",
                 "deploy elsewhere",
-                "@erwan:localhost",
+                "@kris:localhost",
                 4_000,
                 None,
                 Vec::new(),
@@ -2018,7 +2018,7 @@ mod tests {
         );
 
         assert!(!hits.contains(&"$elsewhere".to_owned()));
-        assert!(hits.contains(&"$erwan".to_owned()));
+        assert!(hits.contains(&"$kris".to_owned()));
         drop(room);
     }
 
@@ -2031,12 +2031,12 @@ mod tests {
             .entry(room.clone())
             .or_insert_with(super::RoomIndex::new);
         for (seed, ts) in [("a", 3), ("d", 2), ("b", 2), ("c", 2), ("e", 1)] {
-            room_index.upsert(picture(seed, "@erwan:localhost", ts));
+            room_index.upsert(picture(seed, "@kris:localhost", ts));
         }
         room_index.upsert(document(
             "text",
             "no picture here",
-            "@erwan:localhost",
+            "@kris:localhost",
             2,
             None,
             Vec::new(),
@@ -2053,7 +2053,7 @@ mod tests {
         let room = matrix_sdk::ruma::RoomId::parse("!gallery:localhost").expect("room id");
         let mut room_index = super::RoomIndex::new();
         for seed in 0..2_500_u64 {
-            room_index.upsert(picture(&format!("p{seed}"), "@erwan:localhost", seed));
+            room_index.upsert(picture(&format!("p{seed}"), "@kris:localhost", seed));
         }
         let flush = room_index.take_flush();
         let mut stored: std::collections::HashMap<super::ChunkId, super::persist::StoredChunk> =
@@ -2092,7 +2092,7 @@ mod tests {
             .rooms
             .entry(room.clone())
             .or_insert_with(super::RoomIndex::new);
-        room_index.upsert(picture("kept", "@erwan:localhost", 2));
+        room_index.upsert(picture("kept", "@kris:localhost", 2));
         room_index.upsert(picture("hidden", "@troll:localhost", 1));
 
         assert_eq!(

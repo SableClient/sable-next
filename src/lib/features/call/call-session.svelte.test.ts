@@ -94,7 +94,7 @@ function harness(
       session: 7,
       url: 'wss://sfu.example.org',
       jwt: 'jwt',
-      identity: '@erwan:example.org:LAPTOP',
+      identity: '@kris:example.org:LAPTOP',
       encrypt_media: options.encryptMedia ?? false,
       mode: 'legacy',
       mode_reason: 'fresh',
@@ -139,7 +139,7 @@ function harness(
 const ownKey = (session = 7): CoreEvent => ({
   type: 'call_encryption_key',
   session,
-  identity: '@erwan:example.org:LAPTOP',
+  identity: '@kris:example.org:LAPTOP',
   key_index: 0,
   key: 'AAAAAAAAAAAAAAAAAAAAAA==',
   own: true,
@@ -374,7 +374,7 @@ test('a key emitted during the join is not lost', async () => {
             session: 7,
             url: 'wss://sfu.example.org',
             jwt: 'jwt',
-            identity: '@erwan:example.org:LAPTOP',
+            identity: '@kris:example.org:LAPTOP',
             encrypt_media: true,
             mode: 'compatibility',
             mode_reason: 'fresh',
@@ -505,7 +505,7 @@ test('a key arriving while the transport is still being built is not lost', asyn
             session: 7,
             url: 'wss://sfu.example.org',
             jwt: 'jwt',
-            identity: '@erwan:example.org:LAPTOP',
+            identity: '@kris:example.org:LAPTOP',
             encrypt_media: true,
             mode: 'compatibility',
             mode_reason: 'fresh',
@@ -594,7 +594,7 @@ function livekitHarness() {
             session: 7,
             url: 'wss://sfu.example.org',
             jwt: 'jwt',
-            identity: '@erwan:example.org:LAPTOP',
+            identity: '@kris:example.org:LAPTOP',
             encrypt_media: true,
             mode: 'compatibility',
             mode_reason: 'fresh',
@@ -674,7 +674,7 @@ test('a native call carries its own key into connect, before capture starts', as
 
   expect(connects).toHaveLength(1);
   expect(connects[0].encryptionKeys.map((key) => key.identity)).toEqual([
-    '@erwan:example.org:LAPTOP',
+    '@kris:example.org:LAPTOP',
   ]);
   expect(session.mediaReady).toBe(true);
 });
@@ -703,7 +703,7 @@ test('canceling while the grant is pending retracts the late grant and permits a
     session: 7,
     url: 'wss://sfu.example.org',
     jwt: 'jwt',
-    identity: '@erwan:example.org:LAPTOP',
+    identity: '@kris:example.org:LAPTOP',
     encrypt_media: false,
   });
   await joining;

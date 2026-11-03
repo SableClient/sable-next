@@ -45,21 +45,21 @@ async function confirmRemoval(user: ReturnType<typeof userEvent.setup>, keyword:
 
 test('lists the account keywords and lets one be removed', async () => {
   const user = userEvent.setup();
-  core.rpc.notifications.keywords.mockResolvedValueOnce(listed('erwan', 'sable'));
+  core.rpc.notifications.keywords.mockResolvedValueOnce(listed('kris', 'sable'));
   core.rpc.notifications.keywords.mockResolvedValueOnce(listed('sable'));
   core.rpc.notifications.removeKeyword.mockResolvedValue(null);
 
   render(NotificationKeywords);
   await vi.waitFor(() => {
-    expect(keywords()).toEqual(['erwan', 'sable']);
+    expect(keywords()).toEqual(['kris', 'sable']);
   });
 
-  const confirm = await confirmRemoval(user, 'erwan');
+  const confirm = await confirmRemoval(user, 'kris');
   expect(core.rpc.notifications.removeKeyword).not.toHaveBeenCalled();
   await confirm();
 
   await vi.waitFor(() => {
-    expect(core.rpc.notifications.removeKeyword).toHaveBeenCalledWith({ keyword: 'erwan' });
+    expect(core.rpc.notifications.removeKeyword).toHaveBeenCalledWith({ keyword: 'kris' });
     expect(keywords()).toEqual(['sable']);
   });
 });
@@ -114,7 +114,7 @@ test('does not leave the list showing an add the server rejected', async () => {
     expect(keywords()).toEqual(['sable']);
   });
 
-  await user.type(input(), 'erwan{Enter}');
+  await user.type(input(), 'kris{Enter}');
 
   expect(await screen.findByRole('status')).toHaveTextContent('That keyword could not be added.');
   expect(keywords()).toEqual(['sable']);

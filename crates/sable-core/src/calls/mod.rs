@@ -1122,12 +1122,12 @@ mod tests {
 
     #[test]
     fn test_a_membership_is_keyed_per_device() {
-        let user = user_id!("@erwan:localhost");
+        let user = user_id!("@kris:localhost");
 
         let first = membership_state_key(user, device_id!("AAAAAAAA"), "12");
         let second = membership_state_key(user, device_id!("BBBBBBBB"), "12");
 
-        assert_eq!(first.as_ref(), "_@erwan:localhost_AAAAAAAA_m.call");
+        assert_eq!(first.as_ref(), "_@kris:localhost_AAAAAAAA_m.call");
         assert_ne!(
             first.as_ref(),
             second.as_ref(),
@@ -1251,18 +1251,18 @@ mod tests {
 
     #[test]
     fn test_the_state_key_carries_the_users_own_id() {
-        let key = membership_state_key(user_id!("@erwan:localhost"), device_id!("DEVICEID"), "12");
+        let key = membership_state_key(user_id!("@kris:localhost"), device_id!("DEVICEID"), "12");
 
-        assert_eq!(key.user_id(), user_id!("@erwan:localhost"));
+        assert_eq!(key.user_id(), user_id!("@kris:localhost"));
     }
 
     #[test]
     fn test_a_member_view_carries_the_identity_the_sfu_granted() {
         let views = member_views(&[CallMember {
-            user_id: owned_user_id!("@erwan:localhost"),
+            user_id: owned_user_id!("@kris:localhost"),
             device_id: Some("LAPTOP".into()),
             member_id: None,
-            identity: "@erwan:localhost:LAPTOP".to_owned(),
+            identity: "@kris:localhost:LAPTOP".to_owned(),
             mode: crate::protocol::CallMode::Legacy,
             created_ts: 0,
             joined_ts: 0,
@@ -1273,7 +1273,7 @@ mod tests {
             focus_servers: std::collections::HashMap::default(),
         }]);
 
-        assert_eq!(views[0].identity, "@erwan:localhost:LAPTOP");
+        assert_eq!(views[0].identity, "@kris:localhost:LAPTOP");
         assert_eq!(views[0].device_id, "LAPTOP");
     }
 

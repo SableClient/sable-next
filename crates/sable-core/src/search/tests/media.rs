@@ -16,7 +16,7 @@ fn test_a_migrated_picture_without_media_asks_to_be_hydrated_once() {
         .upsert(document(
             "old",
             "beach.png",
-            "@erwan:localhost",
+            "@kris:localhost",
             1,
             Some(crate::protocol::SearchAttachment::Image),
             Vec::new(),
@@ -58,7 +58,7 @@ async fn test_the_gallery_fills_in_media_for_a_migrated_message() {
             JoinedRoomBuilder::new(&room_id).add_timeline_event(
                 EventFactory::new()
                     .room(&room_id)
-                    .sender(user_id!("@erwan:localhost"))
+                    .sender(user_id!("@kris:localhost"))
                     .image(
                         "beach.png".to_owned(),
                         matrix_sdk::ruma::owned_mxc_uri!("mxc://localhost/beach"),
@@ -77,7 +77,7 @@ async fn test_the_gallery_fills_in_media_for_a_migrated_message() {
         .upsert(document(
             "image",
             "beach.png",
-            "@erwan:localhost",
+            "@kris:localhost",
             1,
             Some(crate::protocol::SearchAttachment::Image),
             Vec::new(),
@@ -123,7 +123,7 @@ async fn test_room_attachments_sort_the_index_into_media_files_and_links() {
     let room_id = room_id!("!attachments:localhost").to_owned();
     let factory = EventFactory::new()
         .room(&room_id)
-        .sender(user_id!("@erwan:localhost"));
+        .sender(user_id!("@kris:localhost"));
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
         .sync_room(
@@ -229,7 +229,7 @@ async fn test_room_attachments_list_each_gallery_item_under_its_tab() {
                 >(serde_json::json!({
                     "type": "m.room.message",
                     "event_id": "$gallery",
-                    "sender": "@erwan:localhost",
+                    "sender": "@kris:localhost",
                     "origin_server_ts": 1,
                     "content": {
                         "msgtype": "dm.filament.gallery",

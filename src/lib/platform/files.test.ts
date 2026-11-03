@@ -131,8 +131,8 @@ test('the web build keeps the browser download, having no native dialog', () => 
 });
 
 test('a picked path yields its basename on either separator', () => {
-  expect(fileNameFromPath('/home/erwan/holiday.png', 0)).toBe('holiday.png');
-  expect(fileNameFromPath('C:\\Users\\erwan\\holiday.png', 0)).toBe('holiday.png');
+  expect(fileNameFromPath('/home/kris/holiday.png', 0)).toBe('holiday.png');
+  expect(fileNameFromPath('C:\\Users\\kris\\holiday.png', 0)).toBe('holiday.png');
 });
 
 test('a path with no basename still names the attachment', () => {

@@ -283,8 +283,8 @@ mod tests {
     fn test_merging_into_a_cold_chunk_keeps_one_copy_and_purges_redactions() {
         let mut stored = super::persist::StoredChunk::new(
             vec![
-                document("kept", "old body", "@erwan:localhost", 1, None, Vec::new()),
-                document("gone", "secret", "@erwan:localhost", 2, None, Vec::new()),
+                document("kept", "old body", "@kris:localhost", 1, None, Vec::new()),
+                document("gone", "secret", "@kris:localhost", 2, None, Vec::new()),
             ],
             vec![(event_id!("$kept").to_owned(), 1)],
         );
@@ -292,7 +292,7 @@ mod tests {
             vec![document(
                 "kept",
                 "old body",
-                "@erwan:localhost",
+                "@kris:localhost",
                 1,
                 None,
                 Vec::new(),
@@ -328,7 +328,7 @@ mod tests {
             vec![document(
                 "original",
                 "typo",
-                "@erwan:localhost",
+                "@kris:localhost",
                 5,
                 None,
                 Vec::new(),
@@ -338,7 +338,7 @@ mod tests {
         let mut edit = document(
             "original",
             "fixed",
-            "@erwan:localhost",
+            "@kris:localhost",
             900,
             None,
             Vec::new(),
