@@ -127,6 +127,7 @@
   import ShareTargetSheet from '#lib/features/share/ShareTargetSheet.svelte';
   import { ShareInbox, watchSharedContent } from '#lib/features/share/share-inbox.svelte.js';
   import ShortcutsHelpDialog from '#lib/ui/shortcuts/ShortcutsHelpDialog.svelte';
+  import { cycleRegion, focusRegion } from '#lib/ui/shortcuts/focus-regions.js';
   import { registerGlobalShortcuts } from '#lib/ui/shortcuts/global-shortcuts.js';
   import { paletteState, shortcutsHelpState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import { unreadRoomsByPriority } from '#lib/ui/shortcuts/room-jump.js';
@@ -1110,6 +1111,24 @@
         unreadCycleIndex = (unreadCycleIndex + 1) % unread.length;
         const target = unread[unreadCycleIndex];
         if (target) jumpToRoom(target.room_id);
+      },
+      'navigation.focusComposer': () => {
+        focusRegion('composer');
+      },
+      'navigation.focusTimeline': () => {
+        focusRegion('timeline');
+      },
+      'navigation.focusRoomList': () => {
+        focusRegion('rooms');
+      },
+      'navigation.focusSpaces': () => {
+        focusRegion('spaces');
+      },
+      'navigation.nextRegion': () => {
+        cycleRegion(1);
+      },
+      'navigation.previousRegion': () => {
+        cycleRegion(-1);
       },
       'navigation.cyclePreviousUnread': () => {
         const unread = unreadRoomsByPriority(roomList.rooms, null, roomList.unreadFor);

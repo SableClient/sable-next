@@ -839,6 +839,7 @@
   <div
     class="rail-scroll"
     role="tree"
+    data-focus-region="spaces"
     aria-orientation="vertical"
     aria-label={i18n.t('nav.spaces')}
     {@attach mobile ? noAttachment : monitor}

@@ -22,6 +22,7 @@
   inert={covered}
   style:width="{size.width}px"
   aria-label={i18n.t('call.chat')}
+  data-focus-region="panel"
 >
   <ResizeHandle
     value={size.width}

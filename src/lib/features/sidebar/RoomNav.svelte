@@ -834,7 +834,12 @@
 
     <RoomInvites {collapsed} {invites} />
 
-    <div role="tree" aria-label={listLabel} {@attach rovingFocus({ tree: true })}>
+    <div
+      role="tree"
+      data-focus-region="rooms"
+      aria-label={listLabel}
+      {@attach rovingFocus({ tree: true })}
+    >
       {#if favourites.length > 0}
         {#if !collapsed}
           <!-- svelte-ignore a11y_role_has_required_aria_props -->

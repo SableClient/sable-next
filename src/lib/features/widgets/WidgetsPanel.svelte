@@ -157,6 +157,7 @@
   out:panelOut|global={{ modal }}
   class={['widgets-panel', { modal }]}
   aria-label={i18n.t('widgets.label')}
+  data-focus-region="panel"
   style:width={modal ? null : `${width}rem`}
 >
   {#if !modal}

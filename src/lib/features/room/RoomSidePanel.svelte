@@ -45,6 +45,7 @@
   <aside
     class={['side-panel', { modal }]}
     aria-label={title}
+    data-focus-region="panel"
     style:width={modal ? null : `${panelWidth.width}rem`}
     in:panelIn|global={{ modal }}
     out:panelOut|global={{ modal }}

@@ -12,6 +12,12 @@ export type ShortcutId =
   | 'navigation.nextUnread'
   | 'navigation.cycleNextUnread'
   | 'navigation.cyclePreviousUnread'
+  | 'navigation.focusComposer'
+  | 'navigation.focusTimeline'
+  | 'navigation.focusRoomList'
+  | 'navigation.focusSpaces'
+  | 'navigation.nextRegion'
+  | 'navigation.previousRegion'
   | 'room.markRead'
   | 'room.markAllRead'
   | 'room.close'
@@ -135,6 +141,48 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     labelKey: 'shortcuts.cyclePreviousUnread',
     category: 'navigation',
     binding: 'alt+shift+up',
+  },
+  {
+    id: 'navigation.focusComposer',
+    labelKey: 'shortcuts.focusComposer',
+    category: 'navigation',
+    binding: 'alt+shift+c',
+    allowInEditable: true,
+  },
+  {
+    id: 'navigation.focusTimeline',
+    labelKey: 'shortcuts.focusTimeline',
+    category: 'navigation',
+    binding: 'alt+shift+t',
+    allowInEditable: true,
+  },
+  {
+    id: 'navigation.focusRoomList',
+    labelKey: 'shortcuts.focusRoomList',
+    category: 'navigation',
+    binding: 'alt+shift+r',
+    allowInEditable: true,
+  },
+  {
+    id: 'navigation.focusSpaces',
+    labelKey: 'shortcuts.focusSpaces',
+    category: 'navigation',
+    binding: 'alt+shift+s',
+    allowInEditable: true,
+  },
+  {
+    id: 'navigation.nextRegion',
+    labelKey: 'shortcuts.nextRegion',
+    category: 'navigation',
+    binding: 'f6',
+    allowInEditable: true,
+  },
+  {
+    id: 'navigation.previousRegion',
+    labelKey: 'shortcuts.previousRegion',
+    category: 'navigation',
+    binding: 'shift+f6',
+    allowInEditable: true,
   },
   {
     id: 'room.markRead',

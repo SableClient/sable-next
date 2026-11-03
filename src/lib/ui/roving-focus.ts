@@ -14,7 +14,7 @@ interface Options {
 const SELECTED = '[aria-current="page"], [aria-selected="true"]';
 
 // checkVisibility is missing before Safari 17.4
-const isRendered = (item: HTMLElement) =>
+export const isRendered = (item: HTMLElement) =>
   (item as Partial<HTMLElement>).checkVisibility
     ? item.checkVisibility()
     : item.getClientRects().length > 0;

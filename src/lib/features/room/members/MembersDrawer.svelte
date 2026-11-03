@@ -150,6 +150,7 @@
   out:panelOut|global={{ modal }}
   class={['members-drawer', { compact }]}
   aria-label={title}
+  data-focus-region="panel"
   style:width={width === null ? undefined : `${width}px`}
 >
   {#if !modal && !compact}

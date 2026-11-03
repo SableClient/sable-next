@@ -28,6 +28,7 @@
 <div
   class={['editor', { empty: showPlaceholder, expanded }]}
   data-placeholder={placeholder}
+  data-focus-region="composer"
   {@attach mount}
 ></div>
 

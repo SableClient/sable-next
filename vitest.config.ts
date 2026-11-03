@@ -23,6 +23,7 @@ const HAPPY_DOM_TESTS = [
   'src/lib/core/attachment-info.test.ts',
   'src/lib/ui/shortcuts/binding.test.ts',
   'src/lib/ui/shortcuts/global-shortcuts.test.ts',
+  'src/lib/ui/shortcuts/focus-regions.test.ts',
   'src/lib/ui/swipe-gesture.test.ts',
   'src/lib/ui/swipe-back.svelte.test.ts',
   'src/lib/ui/double-tap.test.ts',
