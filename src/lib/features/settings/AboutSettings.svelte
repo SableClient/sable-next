@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageTitle from '#lib/ui/primitives/PageTitle.svelte';
   import { copyText } from '#lib/platform/clipboard.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -118,6 +119,8 @@
     }
   }
 </script>
+
+<PageTitle title={`${i18n.t('settings.about')} - Sable`} />
 
 <div class="about-page">
   <header class="product">
