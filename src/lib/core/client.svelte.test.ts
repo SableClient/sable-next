@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
+import { deviceDisplayName } from '#lib/deployment/policy.js';
 import { reportSessionFailure } from '#lib/observability/session-telemetry.js';
 
 import type { AttachmentInfoView, CoreEvent, SessionInfo } from '#src/generated/protocol';
@@ -513,6 +514,27 @@ test.each(['password', 'oidc', 'sso', 'qr'])(
     core.stop();
   }
 );
+
+test('sign-in requests carry the deployment device name', async () => {
+  vi.stubGlobal('BroadcastChannel', undefined);
+  const fake = fakeTransport({
+    'session.restore': session,
+    'session.list_accounts': [session],
+    'auth.login': session.user_id,
+    'auth.complete_sso_login': session.user_id,
+  });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.login(session.homeserver, { kind: 'user', user: session.user_id }, 'password');
+  await core.completeSsoLogin('sable://sso/callback?loginToken=new');
+
+  for (const method of ['auth.login', 'auth.complete_sso_login']) {
+    expect(fake.called.find((call) => call.method === method)?.params).toMatchObject({
+      device_display_name: deviceDisplayName(),
+    });
+  }
+  core.stop();
+});
 
 test('concurrent starts share one restore', async () => {
   const fake = fakeTransport({ 'session.restore': null });

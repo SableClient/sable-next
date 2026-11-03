@@ -785,6 +785,12 @@ pub(crate) async fn store_lease(store_id: &str) -> StoreLease {
     lease.lock_owned().await
 }
 
+const DEFAULT_DEVICE_DISPLAY_NAME: &str = "Sable";
+
+pub(crate) fn device_display_name(configured: Option<&str>) -> &str {
+    configured.unwrap_or(DEFAULT_DEVICE_DISPLAY_NAME)
+}
+
 /// For dynamic client registration. The redirect URI must match `OAuth::login`'s, and a private-use
 /// scheme must be the reverse-DNS of `client_uri`'s host.
 /// # Panics
@@ -792,21 +798,25 @@ pub(crate) async fn store_lease(store_id: &str) -> StoreLease {
 /// This function relies on `ClientMetadata` being serializable because all
 /// fields are constructed from validated URLs and static protocol values.
 #[must_use]
-pub fn client_metadata(redirect_uri: &Url) -> Raw<ClientMetadata> {
-    metadata_with(redirect_uri, false)
+pub fn client_metadata(redirect_uri: &Url, client_name: Option<&str>) -> Raw<ClientMetadata> {
+    metadata_with(redirect_uri, false, client_name)
 }
 
 /// Registered only for QR login, so an ordinary login never asks for a grant type the server may lack.
 #[must_use]
 pub fn qr_client_metadata(redirect_uri: &Url) -> Raw<ClientMetadata> {
-    metadata_with(redirect_uri, true)
+    metadata_with(redirect_uri, true, None)
 }
 
 #[expect(
     clippy::expect_used,
     reason = "metadata serialization is an invariant of this typed value"
 )]
-fn metadata_with(redirect_uri: &Url, device_code: bool) -> Raw<ClientMetadata> {
+fn metadata_with(
+    redirect_uri: &Url,
+    device_code: bool,
+    client_name: Option<&str>,
+) -> Raw<ClientMetadata> {
     let client_uri = Url::parse("https://sable.moe").expect("this is a valid URL");
 
     let application_type = match redirect_uri.scheme() {
@@ -826,7 +836,10 @@ fn metadata_with(redirect_uri: &Url, device_code: bool) -> Raw<ClientMetadata> {
         grant_types,
         Localized::new(client_uri, []),
     );
-    metadata.client_name = Some(Localized::new("Sable".to_owned(), []));
+    metadata.client_name = Some(Localized::new(
+        device_display_name(client_name).to_owned(),
+        [],
+    ));
     metadata.logo_uri = Some(Localized::new(
         "https://docs.sable.moe/img/sable-logo.svg"
             .try_into()
@@ -948,9 +961,22 @@ mod tests {
 
     use super::{
         AccountRegistry, PROXIED_SESSION_TIMEOUT, SESSION_TIMEOUT, account_store_id,
-        build_account_client, registered_redirect_uri, registration_redirect_uri,
+        build_account_client, client_metadata, registered_redirect_uri, registration_redirect_uri,
         removable_account_store, repair_room_key_sharing, session_timeout,
     };
+
+    #[test]
+    fn client_metadata_carries_the_configured_name() {
+        let redirect = url::Url::parse("https://app.example/callback").unwrap();
+        let name = |configured| {
+            let raw = client_metadata(&redirect, configured);
+            let value: serde_json::Value = serde_json::from_str(raw.json().get()).unwrap();
+            value["client_name"].clone()
+        };
+
+        assert_eq!(name(Some("Acme Chat")), "Acme Chat");
+        assert_eq!(name(None), "Sable");
+    }
 
     #[cfg(not(target_family = "wasm"))]
     #[tokio::test]

@@ -59,12 +59,24 @@ pub(super) struct PendingRegistration {
     client: matrix_sdk::Client,
     username: String,
     password: String,
+    device_display_name: Option<String>,
     registration_email: Option<String>,
     registration_token: Option<String>,
     session: String,
     flows: Vec<Vec<String>>,
     completed: Vec<String>,
     email: Option<PendingEmail>,
+}
+
+impl PendingRegistration {
+    fn request(&self, auth: AuthData) -> RegistrationRequest {
+        registration_request(
+            &self.username,
+            &self.password,
+            self.device_display_name.as_deref(),
+            Some(auth),
+        )
+    }
 }
 
 #[cfg(target_os = "ios")]
@@ -97,12 +109,14 @@ enum RegistrationAction {
 pub(super) fn registration_request(
     username: &str,
     password: &str,
+    device_display_name: Option<&str>,
     auth: Option<AuthData>,
 ) -> RegistrationRequest {
     let mut request = RegistrationRequest::new();
     request.username = Some(username.to_owned());
     request.password = Some(password.to_owned());
-    request.initial_device_display_name = Some("Sable".to_owned());
+    request.initial_device_display_name =
+        Some(session::device_display_name(device_display_name).to_owned());
     request.auth = auth;
     request
 }
@@ -368,6 +382,7 @@ impl Core {
         password: String,
         registration_email: Option<String>,
         registration_token: Option<String>,
+        device_display_name: Option<String>,
     ) -> Result<RegistrationResultView, RpcError> {
         let attempt_id = self
             .next_registration_attempt
@@ -388,7 +403,8 @@ impl Core {
             .map(|token| token.trim().to_owned())
             .filter(|token| !token.is_empty());
 
-        let request = registration_request(&username, &password, None);
+        let request =
+            registration_request(&username, &password, device_display_name.as_deref(), None);
 
         match client.matrix_auth().register(request).await {
             Ok(_) => {
@@ -422,6 +438,7 @@ impl Core {
                     client,
                     username,
                     password,
+                    device_display_name,
                     registration_email,
                     registration_token,
                     session,
@@ -599,7 +616,7 @@ impl Core {
                     return Ok(result);
                 }
             };
-            let request = registration_request(&pending.username, &pending.password, Some(auth));
+            let request = pending.request(auth);
 
             match pending.client.matrix_auth().register(request).await {
                 Ok(_) => {
@@ -970,7 +987,7 @@ mod tests {
 
     #[test]
     fn registration_request_contains_account_and_device_fields() {
-        let request = registration_request("alice", "correct horse", None);
+        let request = registration_request("alice", "correct horse", None, None);
 
         assert_eq!(request.username.as_deref(), Some("alice"));
         assert_eq!(request.password.as_deref(), Some("correct horse"));
@@ -983,7 +1000,7 @@ mod tests {
 
     #[test]
     fn registration_does_not_ask_for_a_refresh_token() {
-        let request = registration_request("alice", "correct horse", None);
+        let request = registration_request("alice", "correct horse", None, None);
 
         assert!(!request.refresh_token);
     }
@@ -996,6 +1013,7 @@ mod tests {
         let request = registration_request(
             "alice",
             "correct horse",
+            None,
             Some(AuthData::RegistrationToken(token)),
         );
         let value = serde_json::to_value(request.auth)?;

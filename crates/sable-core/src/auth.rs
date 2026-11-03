@@ -128,6 +128,7 @@ impl Core {
         identifier: LoginIdentifier,
         password: String,
         reauth_account_id: Option<String>,
+        device_display_name: Option<String>,
     ) -> Result<OwnedUserId, RpcError> {
         let reauth = self.reauthentication_account(reauth_account_id).await?;
         let homeserver = reauth
@@ -157,7 +158,9 @@ impl Core {
         let mut login = client
             .matrix_auth()
             .login_identifier(user_identifier(identifier), &password)
-            .initial_device_display_name("Sable");
+            .initial_device_display_name(session::device_display_name(
+                device_display_name.as_deref(),
+            ));
         if let Some(account) = &reauth
             && !account.device_invalidated
         {
@@ -304,6 +307,7 @@ impl Core {
             redirect_uri,
             intent,
             reauth_account_id,
+            device_display_name,
         }: StartOidcLoginParams,
     ) -> Result<String, RpcError> {
         let reauth = self.reauthentication_account(reauth_account_id).await?;
@@ -319,7 +323,8 @@ impl Core {
             .login_client(&account_store_id, &homeserver, reauth.as_ref())
             .await?;
 
-        let registration = session::client_metadata(&redirect_uri).into();
+        let registration =
+            session::client_metadata(&redirect_uri, device_display_name.as_deref()).into();
         if let Some(account) = &reauth {
             if matches!(intent, AuthIntent::Register) {
                 return Err(RpcError::Denied);
@@ -542,7 +547,10 @@ impl Core {
 
     pub(crate) async fn complete_sso_login(
         self: &Arc<Self>,
-        CompleteSsoLoginParams { callback_url }: CompleteSsoLoginParams,
+        CompleteSsoLoginParams {
+            callback_url,
+            device_display_name,
+        }: CompleteSsoLoginParams,
     ) -> Result<OwnedUserId, RpcError> {
         tracing::info!(operation = "sso_login", "completing SSO login callback");
         // The login token is single-use, so keep the client that created the
@@ -591,7 +599,9 @@ impl Core {
             .matrix_auth()
             .login_with_sso_callback(callback_url.into())
             .or_failed(self, "complete_sso_login_callback_url")?
-            .initial_device_display_name("Sable");
+            .initial_device_display_name(session::device_display_name(
+                device_display_name.as_deref(),
+            ));
         if let Some(account) = &reauth
             && !account.device_invalidated
         {
@@ -755,6 +765,7 @@ mod tests {
             },
             "password".into(),
             Some("a1".into()),
+            Some("Acme Chat".into()),
         )
         .await
         .unwrap();
@@ -765,6 +776,7 @@ mod tests {
             .unwrap();
         let body: serde_json::Value = serde_json::from_slice(&login.body).unwrap();
         assert!(body.get("device_id").is_none());
+        assert_eq!(body["initial_device_display_name"], "Acme Chat");
         let accounts = core.accounts().await.unwrap();
         assert_eq!(accounts.accounts.len(), 1);
         assert_eq!(accounts.accounts[0].account_id, "a2");
@@ -880,6 +892,7 @@ mod tests {
             },
             "bad".to_owned(),
             Some("a1".to_owned()),
+            None,
         )
         .await
         .expect_err("invalid credentials reject reauthentication");
@@ -952,7 +965,13 @@ mod tests {
             },
         ] {
             let error = core
-                .login(server.server().uri(), identifier, "pw".to_owned(), None)
+                .login(
+                    server.server().uri(),
+                    identifier,
+                    "pw".to_owned(),
+                    None,
+                    None,
+                )
                 .await
                 .expect_err("the mock refuses every login");
             assert!(matches!(error, RpcError::Denied), "got {error:?}");
@@ -1002,6 +1021,7 @@ mod tests {
                 user: "alice".to_owned(),
             },
             "pw".to_owned(),
+            None,
             None,
         )
         .await
@@ -1075,6 +1095,7 @@ mod tests {
                     user: "alice".to_owned(),
                 },
                 "pw".to_owned(),
+                None,
                 None,
             )
             .await;

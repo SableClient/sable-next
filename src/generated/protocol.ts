@@ -2188,6 +2188,7 @@ export type Rpc = {
 	homeserver: string,
 	identifier: LoginIdentifier,
 	password: string,
+	device_display_name?: string | null,
 }) => Promise<string>;
     loginFlows: (params: {
 	homeserver: string,
@@ -2201,6 +2202,7 @@ export type Rpc = {
 	password: string,
 	registration_email?: string | null,
 	registration_token: string | null,
+	device_display_name?: string | null,
 }) => Promise<RegistrationResultView>;
     requestRegistrationEmail: (params: {
 	email: string,
@@ -2231,6 +2233,7 @@ export type Rpc = {
 	homeserver: string,
 	redirect_uri: string,
 	intent: AuthIntent,
+	device_display_name?: string | null,
 }) => Promise<string>;
     completeOidcLogin: (params: {
 	callback_url: string,
@@ -2244,6 +2247,7 @@ export type Rpc = {
 }) => Promise<string>;
     completeSsoLogin: (params: {
 	callback_url: string,
+	device_display_name?: string | null,
 }) => Promise<string>;
     startQrLogin: (params: {
 	homeserver?: string | null,

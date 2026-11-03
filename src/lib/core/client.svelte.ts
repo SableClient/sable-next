@@ -26,6 +26,7 @@ import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
 import QuickLRU from 'quick-lru';
 import { on } from 'svelte/events';
+import { deviceDisplayName } from '#lib/deployment/policy.js';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { clearRoomListSnapshot } from '#lib/rooms/room-list-snapshot.js';
 import { clearRecentSearches } from '#lib/search/recent-searches.svelte.js';
@@ -296,6 +297,7 @@ export class CoreClient {
           homeserver: resolvedHomeserver,
           identifier,
           password,
+          device_display_name: deviceDisplayName(),
         })
         .catch((error: unknown) => blameLocalNetwork(error, resolvedHomeserver));
 
@@ -385,6 +387,7 @@ export class CoreClient {
         password,
         registration_email: registrationEmail,
         registration_token: registrationToken,
+        device_display_name: deviceDisplayName(),
       });
       if (result.state === 'complete') {
         await this.finishAuthentication(result.user_id);
@@ -421,6 +424,7 @@ export class CoreClient {
       homeserver: resolvedHomeserver,
       redirect_uri: redirectUri,
       intent,
+      device_display_name: deviceDisplayName(),
     });
   }
 
@@ -525,6 +529,7 @@ export class CoreClient {
     try {
       const userId = await this.#rpcOn(transport).auth.completeSsoLogin({
         callback_url: callbackUrl,
+        device_display_name: deviceDisplayName(),
       });
 
       if (generation !== this.generation || transport !== this.transport) return;
