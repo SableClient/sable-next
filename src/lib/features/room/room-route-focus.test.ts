@@ -35,7 +35,8 @@ describe('focus after a route change', () => {
     document.body.innerHTML = `
       <div data-focus-region="rooms"><a href="#r" role="treeitem" id="item">Room</a></div>
       <h1 tabindex="-1" data-room-heading id="heading">Room</h1>
-      <div contenteditable="true" id="composer"></div>`;
+      <div contenteditable="true" id="composer"></div>
+      <div role="dialog"><input id="palette" /></div>`;
   });
 
   test('focus that was on a room list item returns to it after the browser blurs it', () => {
@@ -70,6 +71,18 @@ describe('focus after a route change', () => {
 
     expect(document.activeElement).toBe(document.body);
     expect(document.getElementById('heading')?.matches(':focus')).toBe(false);
+  });
+
+  test('focus in a dialog input that closes with the navigation moves to the room heading', () => {
+    const { before, after } = routeFocus();
+    const input = document.getElementById('palette') as HTMLElement;
+    input.focus();
+    before();
+    input.blur();
+
+    after('/rooms/room');
+
+    expect(document.activeElement?.id).toBe('heading');
   });
 
   test('a route that is not a room does not move focus', () => {

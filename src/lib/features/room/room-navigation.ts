@@ -70,7 +70,11 @@ export function trackRouteFocus(): void {
       if (document.activeElement === document.body && from instanceof HTMLElement) from.focus();
       return;
     }
-    if (from instanceof HTMLElement && (isEditableTarget(from) || from.closest(COMPOSER_REGION))) {
+    if (
+      from instanceof HTMLElement &&
+      !from.closest('[role="dialog"]') &&
+      (isEditableTarget(from) || from.closest(COMPOSER_REGION))
+    ) {
       return;
     }
     if (!navigation.to || !ROOM_PATH.test(navigation.to.url.pathname)) return;
