@@ -23,7 +23,6 @@
   >
   <span aria-hidden="true">·</span>
   <span>{version}</span>
-  
 </footer>
 
 <style>
