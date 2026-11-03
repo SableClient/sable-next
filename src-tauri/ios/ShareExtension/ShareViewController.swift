@@ -98,12 +98,13 @@ enum ShareStaging {
         return ["userId": String(parts[0]), "roomId": String(parts[1])]
     }
 
-    /// Read from the containing app, whose scheme differs between builds.
     static func appURL() -> URL? {
         let app = Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent()
         let types = Bundle(url: app)?.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]]
-        let schemes = types?.first { $0["CFBundleURLName"] as? String == "sable" }?["CFBundleURLSchemes"] as? [String]
-        guard let scheme = schemes?.first, let url = URL(string: "\(scheme)://share") else {
+        let scheme = types?.compactMap { $0["CFBundleURLSchemes"] as? [String] }
+            .flatMap { $0 }
+            .first { ["moe.sable.next", "moe.sable.app"].contains($0) }
+        guard let scheme, let url = URL(string: "\(scheme)://share") else {
             log.error("Sable's URL scheme is missing from the app's Info.plist")
             return nil
         }
