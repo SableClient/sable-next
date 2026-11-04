@@ -33,6 +33,9 @@ struct WatchedRoom {
     slot_checked: HashMap<String, Instant>,
     closed_slots: HashSet<String>,
     withdrawn: HashSet<String>,
+    /// Whether each sender may notify the room, until power levels change.
+    allowed: HashMap<String, bool>,
+    members_read: bool,
 }
 
 impl WatchedRoom {
@@ -43,7 +46,21 @@ impl WatchedRoom {
             slot_checked: HashMap::new(),
             closed_slots: HashSet::new(),
             withdrawn: HashSet::new(),
+            allowed: HashMap::new(),
+            members_read: false,
         }
+    }
+
+    async fn allowed(&mut self, room: &Room, event: &Value) -> bool {
+        let Some(sender) = event["sender"].as_str() else {
+            return false;
+        };
+        if let Some(allowed) = self.allowed.get(sender) {
+            return *allowed;
+        }
+        let allowed = permission(room, sender).await;
+        self.allowed.insert(sender.to_owned(), allowed);
+        allowed
     }
 
     fn set_slot(&mut self, slot: &str, content: &Value, received: Instant) {
@@ -140,7 +157,9 @@ async fn enqueue<T>(send: &UnboundedSender<Event>, room: Room, raw: &Raw<T>) {
             .ok()
             .flatten()
             .is_some_and(|kind| {
-                kind == "m.room.redaction" || super::SLOT_TYPES.contains(&kind.as_str())
+                kind == "m.room.redaction"
+                    || kind == "m.room.power_levels"
+                    || super::SLOT_TYPES.contains(&kind.as_str())
             });
     if relevant
         && let Ok(value) = serde_json::from_str(raw.json().get())
@@ -178,40 +197,82 @@ async fn run(
     generation: u64,
     mut receive: UnboundedReceiver<Event>,
 ) {
-    let mut rooms = HashMap::<matrix_sdk::ruma::OwnedRoomId, WatchedRoom>::new();
+    let mut watcher = Watcher::default();
     let mut updates = client.subscribe_to_all_room_updates();
     loop {
+        let mut changed = HashSet::new();
         tokio::select! {
             event = receive.recv() => {
                 let Some((room, value, received)) = event else { break; };
-                let watched = rooms.entry(room.room_id().to_owned()).or_insert_with(|| WatchedRoom::new(&room));
-                let now = keys::now_ms();
-                watched.observe_state(&value, received);
-                watched.invitations.apply(&value, now, permission(&room, &value).await);
+                watcher.observe(&room, &value, received).await;
             }
-            _ = updates.recv() => {}
+            update = updates.recv() => match update {
+                Ok(update) => changed.extend(update.iter_all_room_ids().cloned()),
+                Err(_) => changed.extend(client.joined_rooms().iter().map(|room| room.room_id().to_owned())),
+            },
             () = matrix_sdk::sleep::sleep(Duration::from_secs(1)) => {}
         }
+        watcher.step(&core, &client, generation, &changed).await;
+    }
+}
+
+/// Reads stored call state only for rooms that changed since the last step.
+#[derive(Default)]
+struct Watcher {
+    rooms: HashMap<matrix_sdk::ruma::OwnedRoomId, WatchedRoom>,
+}
+
+impl Watcher {
+    async fn observe(&mut self, room: &Room, value: &Value, received: Instant) {
+        if value["type"] == "m.room.power_levels" {
+            if let Some(watched) = self.rooms.get_mut(room.room_id()) {
+                watched.allowed.clear();
+            }
+            return;
+        }
+        let watched = self
+            .rooms
+            .entry(room.room_id().to_owned())
+            .or_insert_with(|| WatchedRoom::new(room));
+        watched.observe_state(value, received);
+        let allowed = watched.allowed(room, value).await;
+        watched.invitations.apply(value, keys::now_ms(), allowed);
+    }
+
+    async fn step(
+        &mut self,
+        core: &Core,
+        client: &Client,
+        generation: u64,
+        changed: &HashSet<matrix_sdk::ruma::OwnedRoomId>,
+    ) {
         for room in client.joined_rooms() {
             let values: Vec<_> = sticky::live_events(&room)
                 .into_iter()
                 .map(sticky::Event::into_value)
                 .collect();
-            if values.is_empty() && !rooms.contains_key(room.room_id()) {
+            if values.is_empty() && !self.rooms.contains_key(room.room_id()) {
                 continue;
             }
-            let watched = rooms
+            let watched = self
+                .rooms
                 .entry(room.room_id().to_owned())
                 .or_insert_with(|| WatchedRoom::new(&room));
+            let reread = !watched.members_read
+                || !watched.sticky.is_empty()
+                || changed.contains(room.room_id());
             watched.reconcile_sticky(&values, keys::now_ms());
             for value in values {
-                watched
-                    .invitations
-                    .apply(&value, keys::now_ms(), permission(&room, &value).await);
+                let allowed = watched.allowed(&room, &value).await;
+                watched.invitations.apply(&value, keys::now_ms(), allowed);
             }
-            reconcile_room(&core, &room, watched, generation).await;
+            if reread {
+                read_call_members(&room, watched).await;
+            }
+            reconcile_room(core, &room, watched, generation).await;
         }
-        let left: Vec<_> = rooms
+        let left: Vec<_> = self
+            .rooms
             .keys()
             .filter(|id| {
                 !client
@@ -221,18 +282,15 @@ async fn run(
             .cloned()
             .collect();
         for id in left {
-            if let Some(mut watched) = rooms.remove(&id) {
-                emit_ended(&core, generation, watched.invitations.clear());
+            if let Some(mut watched) = self.rooms.remove(&id) {
+                emit_ended(core, generation, watched.invitations.clear());
             }
         }
     }
 }
 
-async fn permission(room: &Room, event: &Value) -> bool {
-    let Some(sender) = event["sender"]
-        .as_str()
-        .and_then(|user| matrix_sdk::ruma::UserId::parse(user).ok())
-    else {
+async fn permission(room: &Room, sender: &str) -> bool {
+    let Ok(sender) = matrix_sdk::ruma::UserId::parse(sender) else {
         return false;
     };
     room.power_levels_or_default()
@@ -384,12 +442,17 @@ async fn present_invite(core: &Core, room: &Room, invite: &Invite, generation: u
     true
 }
 
-async fn reconcile_room(core: &Core, room: &Room, watched: &mut WatchedRoom, generation: u64) {
+/// Later call members arrive through `observe`.
+async fn read_call_members(room: &Room, watched: &mut WatchedRoom) {
     for kind in ["org.matrix.msc3401.call.member", "m.call.member"] {
         for event in cached_state(room, kind).await {
             watched.invitations.apply(&event, keys::now_ms(), false);
         }
     }
+    watched.members_read = true;
+}
+
+async fn reconcile_room(core: &Core, room: &Room, watched: &mut WatchedRoom, generation: u64) {
     refresh_slots(room, watched).await;
     withdraw_closed(room, watched).await;
     let (starts, ends) = watched
@@ -543,7 +606,10 @@ mod tests {
         matchers::{method, path},
     };
 
-    use super::{WatchedRoom, keys, refresh_slots};
+    use std::collections::HashSet;
+
+    use super::{WatchedRoom, Watcher, keys, refresh_slots};
+    use crate::store_reads::counting_client;
 
     async fn cached_open_room(server: &MatrixMockServer) -> matrix_sdk::Room {
         let client = server.client_builder().build().await;
@@ -665,6 +731,135 @@ mod tests {
                 .reconcile(room.own_user_id().as_str(), keys::now_ms())
                 .0
                 .is_empty()
+        );
+    }
+
+    async fn watched_call_room(
+        server: &MatrixMockServer,
+        client: &matrix_sdk::Client,
+    ) -> matrix_sdk::Room {
+        let room_id = room_id!("!call:example.org");
+        server
+            .sync_room(
+                client,
+                JoinedRoomBuilder::new(room_id).add_state_event(
+                    matrix_sdk::ruma::serde::Raw::new(&json!({
+                        "type":"org.matrix.msc3401.call.member", "event_id":"$member",
+                        "sender":"@caller:example.org", "state_key":"@caller:example.org",
+                        "origin_server_ts":1, "content":{}
+                    }))
+                    .unwrap()
+                    .cast_unchecked(),
+                ),
+            )
+            .await
+    }
+
+    #[tokio::test]
+    async fn a_watched_room_reads_its_call_state_once_until_it_changes() {
+        let server = MatrixMockServer::new().await;
+        let (client, reads) = counting_client(&server).await;
+        let (core, _events) = crate::test_support::signed_in_core(&server, client.clone()).await;
+        let room = watched_call_room(&server, &client).await;
+        let mut watcher = Watcher::default();
+        watcher
+            .observe(
+                &room,
+                &json!({"type":"m.rtc.decline", "sender":"@caller:example.org"}),
+                web_time::Instant::now(),
+            )
+            .await;
+
+        reads.reset();
+        watcher.step(&core, &client, 0, &HashSet::new()).await;
+        assert_eq!(
+            reads.state(),
+            2,
+            "the first pass reads both call member types"
+        );
+
+        reads.reset();
+        for _ in 0..10 {
+            watcher.step(&core, &client, 0, &HashSet::new()).await;
+        }
+        let other = room_id!("!other:example.org").to_owned();
+        watcher
+            .step(&core, &client, 0, &HashSet::from([other]))
+            .await;
+        assert_eq!(
+            reads.state(),
+            0,
+            "ticks and other rooms' updates stay in memory"
+        );
+
+        watcher
+            .step(
+                &core,
+                &client,
+                0,
+                &HashSet::from([room.room_id().to_owned()]),
+            )
+            .await;
+        assert_eq!(
+            reads.state(),
+            2,
+            "an update to the room reads its call state again"
+        );
+    }
+
+    #[tokio::test]
+    async fn power_levels_alone_do_not_start_watching_a_room() {
+        let server = MatrixMockServer::new().await;
+        let (client, reads) = counting_client(&server).await;
+        let (core, _events) = crate::test_support::signed_in_core(&server, client.clone()).await;
+        let room = server
+            .sync_joined_room(&client, room_id!("!quiet:example.org"))
+            .await;
+        let mut watcher = Watcher::default();
+        watcher
+            .observe(
+                &room,
+                &json!({"type":"m.room.power_levels"}),
+                web_time::Instant::now(),
+            )
+            .await;
+
+        reads.reset();
+        watcher.step(&core, &client, 0, &HashSet::new()).await;
+        assert_eq!(reads.state(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_sender_permission_is_read_once_until_power_levels_change() {
+        let server = MatrixMockServer::new().await;
+        let (client, reads) = counting_client(&server).await;
+        let room = watched_call_room(&server, &client).await;
+        let mut watcher = Watcher::default();
+        let decline = json!({"type":"m.rtc.decline", "sender":"@caller:example.org"});
+
+        reads.reset();
+        for _ in 0..5 {
+            watcher
+                .observe(&room, &decline, web_time::Instant::now())
+                .await;
+        }
+        let first = reads.state();
+        assert!(first > 0, "the first event reads power levels");
+
+        watcher
+            .observe(
+                &room,
+                &json!({"type":"m.room.power_levels"}),
+                web_time::Instant::now(),
+            )
+            .await;
+        watcher
+            .observe(&room, &decline, web_time::Instant::now())
+            .await;
+        assert_eq!(
+            reads.state(),
+            first * 2,
+            "new power levels are read once more"
         );
     }
 

@@ -73,6 +73,8 @@ pub mod store;
 mod store_disposal;
 #[cfg(not(target_family = "wasm"))]
 mod store_encryption;
+#[cfg(test)]
+mod store_reads;
 mod subscriptions;
 mod sync_support;
 #[cfg(test)]
