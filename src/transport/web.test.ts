@@ -3,13 +3,25 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 vi.mock('../worker/core.worker.ts?sharedworker&url', () => ({ default: 'core.worker.js' }));
 vi.mock('#src/generated/wasm/sable_wasm_version.js', () => ({ default: 'test-wasm-version' }));
 
-const { captureException } = vi.hoisted(() => ({
+const { captureException, startSpan, startInactiveSpan, endCoreSpan } = vi.hoisted(() => ({
   captureException: vi.fn<(error: unknown, context?: unknown) => void>(),
+  endCoreSpan: vi.fn(),
+  startSpan: vi.fn<typeof import('@sentry/sveltekit').startSpan>(),
+  startInactiveSpan: vi.fn<typeof import('@sentry/sveltekit').startInactiveSpan>(),
 }));
-vi.mock('@sentry/sveltekit', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sentry/sveltekit')>()),
-  captureException,
-}));
+vi.mock('@sentry/sveltekit', async (importOriginal) => {
+  const sentry = await importOriginal<typeof import('@sentry/sveltekit')>();
+  return {
+    ...sentry,
+    captureException,
+    startSpan: startSpan.mockImplementation(sentry.startSpan),
+    startInactiveSpan: startInactiveSpan.mockImplementation((options) => {
+      const span = sentry.startInactiveSpan(options);
+      vi.spyOn(span, 'end').mockImplementation(endCoreSpan);
+      return span;
+    }),
+  };
+});
 
 class FakePort {
   onmessage: ((message: MessageEvent) => void) | null = null;
@@ -75,6 +87,7 @@ class FakeSharedWorker extends EventTarget {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.useFakeTimers();
   FakeSharedWorker.last = null;
   FakeSharedWorker.created = 0;
@@ -112,6 +125,75 @@ async function load() {
   const { createWebTransport } = await import('./web');
   return createWebTransport();
 }
+
+test('creates one RPC span per call with only the method name', async () => {
+  const transport = await load();
+  const first = transport.call('members.list', { room_id: '!private:example.org' });
+  const second = transport.call('account.user_profile', { user_id: '@private:example.org' });
+
+  expect(startSpan.mock.calls.map(([options]) => options)).toEqual([
+    { name: 'members.list', op: 'rpc.core' },
+    { name: 'account.user_profile', op: 'rpc.core' },
+  ]);
+  FakeSharedWorker.last?.port.receive({ id: 2, ok: { display_name: 'Name' } });
+  FakeSharedWorker.last?.port.receive({ id: 1, ok: [] });
+  await expect(first).resolves.toEqual([]);
+  await expect(second).resolves.toEqual({ display_name: 'Name' });
+  transport.close();
+});
+
+test('keeps an RPC rejection inside its span', async () => {
+  const transport = await load();
+  const pending = transport.call('timeline.unsubscribe', { subscription: 1 });
+  const result = expect(pending).rejects.toThrow();
+  FakeSharedWorker.last?.port.receive({ id: 1, err: { code: 'unknown_subscription' } });
+
+  await result;
+  expect(startSpan).toHaveBeenCalledExactlyOnceWith(
+    { name: 'timeline.unsubscribe', op: 'rpc.core' },
+    expect.any(Function)
+  );
+  transport.close();
+});
+
+test('does not create RPC spans for health pings or internal messages', async () => {
+  const transport = await load();
+  const pending = transport.call('members.list', {});
+  await vi.advanceTimersByTimeAsync(20_001);
+  expect(FakeSharedWorker.last?.port.posted).toContainEqual({ id: 2, ping: true });
+  FakeSharedWorker.last?.port.receive({ id: 2, pong: true });
+  transport.setDebugLogs(true);
+  const media = transport.fetchMedia('mxc://example.org/file', 0, 0);
+  FakeSharedWorker.last?.port.receive({ id: 3, bytes: new Uint8Array([1]) });
+  await media;
+  FakeSharedWorker.last?.port.receive({ id: 1, ok: [] });
+  await pending;
+  transport.close();
+
+  expect(startSpan).toHaveBeenCalledTimes(1);
+  expect(startInactiveSpan).not.toHaveBeenCalled();
+});
+
+test('records forwarded core spans using worker epoch timestamps in seconds', async () => {
+  const transport = await load();
+  const pending = transport.call('members.list', {});
+  const startMs = 1_794_000_000_125;
+  // Delivery time and the page performance clock must not affect the span timestamps.
+  vi.setSystemTime(startMs + 5_000);
+  FakeSharedWorker.last?.port.receive({
+    span: { name: 'view.enrich_rooms', startMs, durationMs: 12.5 },
+  });
+
+  expect(startInactiveSpan).toHaveBeenCalledExactlyOnceWith({
+    name: 'view.enrich_rooms',
+    op: 'core.task',
+    startTime: startMs / 1_000,
+  });
+  expect(endCoreSpan).toHaveBeenCalledExactlyOnceWith((startMs + 12.5) / 1_000);
+  FakeSharedWorker.last?.port.receive({ id: 1, ok: [] });
+  await pending;
+  transport.close();
+});
 
 test('uses a WASM-specific worker URL', async () => {
   const transport = await load();

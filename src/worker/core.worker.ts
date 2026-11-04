@@ -6,6 +6,7 @@ import init, {
   setLogFilter,
   setLogHandler,
   setPanicHandler,
+  setSpanHandler,
 } from '#src/generated/wasm/sable_wasm.js';
 import { clearSession, loadSession, saveSession } from '#lib/platform/session-storage.js';
 import { installFirefoxFetchLimit } from './adaptive-fetch';
@@ -110,6 +111,7 @@ function errorStack(error: unknown): string | undefined {
 
 void core.then((instance) => {
   setLogHandler(boundary.handleLog);
+  setSpanHandler(boundary.handleSpan);
   instance.subscribeEvents(boundary.handleEvent);
 });
 

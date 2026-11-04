@@ -32,5 +32,6 @@ export type WorkerMessage =
   | { id: number; uri: string | null }
   | { events: CoreEvent[] }
   | { logs: string[] }
+  | { span: { name: string; startMs: number; durationMs: number } }
   | { panic: { message: string; stack?: string } }
   | { superseded: true };

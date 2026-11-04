@@ -113,6 +113,10 @@ export function createCoreWorkerBoundary(
     });
   }
 
+  function handleSpan(name: string, startMs: number, durationMs: number): void {
+    broadcast({ span: { name, startMs, durationMs } });
+  }
+
   function handleLog(text: string): void {
     const entries: string[] = [];
     for (const line of text.split('\n')) {
@@ -394,6 +398,7 @@ export function createCoreWorkerBoundary(
     connect,
     handleEvent,
     handleLog,
+    handleSpan,
     handlePanic,
     handleSuperseded,
     handleOnline: resumeSync,

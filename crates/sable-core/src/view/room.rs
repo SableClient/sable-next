@@ -328,6 +328,7 @@ pub async fn enrich_room_batch<S: BuildHasher>(
     enrich_rooms(latest_items(diffs), room_cache).await;
 }
 
+#[tracing::instrument(skip_all, target = "sable_core::tasks", name = "view.enrich_rooms")]
 pub(crate) async fn enrich_rooms<'a, S: BuildHasher>(
     rooms: impl IntoIterator<Item = &'a RoomListItem>,
     room_cache: &mut HashMap<OwnedRoomId, RoomInfo, S>,

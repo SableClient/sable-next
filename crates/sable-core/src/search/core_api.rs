@@ -628,6 +628,11 @@ impl Core {
         );
     }
 
+    #[tracing::instrument(
+        skip_all,
+        target = "sable_core::tasks",
+        name = "search.index_room_search"
+    )]
     async fn index_room_search(&self, client: &matrix_sdk::Client, room: &matrix_sdk::Room) {
         use tokio::sync::broadcast::error::TryRecvError;
 

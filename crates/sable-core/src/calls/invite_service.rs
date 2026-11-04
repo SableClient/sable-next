@@ -256,6 +256,7 @@ impl Watcher {
         watched.invitations.apply(value, keys::now_ms(), allowed);
     }
 
+    #[tracing::instrument(skip_all, target = "sable_core::tasks", name = "calls.invite.step")]
     async fn step(
         &mut self,
         core: &Core,

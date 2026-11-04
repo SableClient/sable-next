@@ -33,6 +33,24 @@ function fakeCore(call: WorkerCore['call'] = () => Promise.resolve('null')): Wor
   };
 }
 
+test('forwards core span names and epoch timing to connected pages', () => {
+  const boundary = createCoreWorkerBoundary(Promise.resolve(fakeCore()));
+  const first = new FakePort();
+  const second = new FakePort();
+  boundary.connect(first);
+  boundary.connect(second);
+
+  boundary.handleSpan('search.index_room_search', 1_794_000_000_125, 25.5);
+
+  const expected = [
+    {
+      span: { name: 'search.index_room_search', startMs: 1_794_000_000_125, durationMs: 25.5 },
+    },
+  ];
+  expect(first.messages).toEqual(expected);
+  expect(second.messages).toEqual(expected);
+});
+
 test('a core rejecting with a bare payload keeps the protocol error', async () => {
   const boundary = createCoreWorkerBoundary(
     // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- the wasm core rejects with the bare payload

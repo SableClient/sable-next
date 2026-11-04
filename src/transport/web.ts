@@ -308,6 +308,14 @@ export function createWebTransport(open: () => CoreConnection = openSharedWorker
         return;
       }
 
+      if ('span' in data) {
+        const { name, startMs, durationMs } = data.span;
+        Sentry.startInactiveSpan({ name, op: 'core.task', startTime: startMs / 1_000 }).end(
+          (startMs + durationMs) / 1_000
+        );
+        return;
+      }
+
       if ('logs' in data) {
         for (const line of data.logs) {
           const level = wasmLogLevel(line);
@@ -453,7 +461,9 @@ export function createWebTransport(open: () => CoreConnection = openSharedWorker
 
   return {
     call(method, params) {
-      return request<unknown>((id) => ({ id, call: { method, params } }));
+      return Sentry.startSpan({ name: method, op: 'rpc.core' }, () =>
+        request<unknown>((id) => ({ id, call: { method, params } }))
+      );
     },
 
     fetchMedia(source, width, height, background = false) {

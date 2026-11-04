@@ -2,6 +2,9 @@
 #![recursion_limit = "512"]
 
 mod session_store;
+mod span_layer;
+
+pub use span_layer::set_span_handler;
 
 use std::{
     cell::{Cell, RefCell},
@@ -57,6 +60,11 @@ fn init_tracing() {
         .with(targets)
         .with(console_layer)
         .with(debug_layer)
+        .with(
+            span_layer::JsSpanLayer.with_filter(tracing_subscriber::filter::filter_fn(|meta| {
+                meta.is_span() && meta.target() == "sable_core::tasks"
+            })),
+        )
         .try_init()
         .is_ok()
     {

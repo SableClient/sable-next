@@ -17,6 +17,7 @@ use matrix_sdk::ruma::push::Action;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedEventId};
 use matrix_sdk_ui::sync_service::State as SyncState;
+use tracing::Instrument as _;
 use web_time::Instant;
 
 use crate::protocol::{CoreEvent, RpcError, SyncStatus};
@@ -122,15 +123,21 @@ impl Core {
                         let core = core.clone();
                         let rules_aligned = rules_aligned.clone();
                         after_running = Some(
-                            spawn(async move {
-                                core.resubscribe_timeline_rooms().await;
-                                core.reconcile_memberships().await;
-                                core.fill_own_members().await;
-                                if !rules_aligned.load(Ordering::SeqCst) {
-                                    core.align_notification_rules().await;
-                                    rules_aligned.store(true, Ordering::SeqCst);
+                            spawn(
+                                async move {
+                                    core.resubscribe_timeline_rooms().await;
+                                    core.reconcile_memberships().await;
+                                    core.fill_own_members().await;
+                                    if !rules_aligned.load(Ordering::SeqCst) {
+                                        core.align_notification_rules().await;
+                                        rules_aligned.store(true, Ordering::SeqCst);
+                                    }
                                 }
-                            })
+                                .instrument(tracing::info_span!(
+                                    target: "sable_core::tasks",
+                                    "sync.running"
+                                )),
+                            )
                             .abort_on_drop(),
                         );
                     }
