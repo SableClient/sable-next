@@ -1,4 +1,5 @@
 use crate::api::timeline::TimelineFocusView;
+use std::collections::BTreeSet;
 use std::future::Future;
 use std::sync::Arc;
 
@@ -15,7 +16,8 @@ use matrix_sdk::ruma::{
     serde::Raw,
 };
 use matrix_sdk_ui::timeline::{
-    RoomExt, Timeline, TimelineEventFocusThreadMode, TimelineFocus, default_event_filter,
+    EncryptedMessage, RoomExt, Timeline, TimelineEventFocusThreadMode, TimelineFocus,
+    default_event_filter,
 };
 
 use matrix_sdk_base::event_cache::Event;
@@ -231,6 +233,42 @@ impl Core {
 }
 
 impl Core {
+    /// The redecryptor misses keys a push client stored while the app was in the background.
+    pub(crate) async fn retry_cached_decryption(&self) {
+        let mut timelines: Vec<Arc<Timeline>> = self
+            .timelines
+            .lock()
+            .await
+            .values()
+            .map(|cached| cached.timeline.clone())
+            .collect();
+        timelines.extend(
+            self.thread_timelines
+                .lock()
+                .await
+                .iter()
+                .map(|(_, cached)| cached.timeline.clone()),
+        );
+        for timeline in timelines {
+            let sessions: BTreeSet<String> = timeline
+                .items()
+                .await
+                .iter()
+                .filter_map(
+                    |item| match item.as_event()?.content().as_unable_to_decrypt()? {
+                        EncryptedMessage::MegolmV1AesSha2 { session_id, .. } => {
+                            Some(session_id.clone())
+                        }
+                        _ => None,
+                    },
+                )
+                .collect();
+            if !sessions.is_empty() {
+                timeline.retry_decryption(sessions).await;
+            }
+        }
+    }
+
     pub(crate) async fn timeline_for(
         &self,
         room_id: &OwnedRoomId,

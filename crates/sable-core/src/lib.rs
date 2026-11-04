@@ -521,6 +521,7 @@ impl Core {
             {
                 sync_service.start().await;
             }
+            self.retry_cached_decryption().await;
         } else if self.call_sessions.lock().await.is_empty() {
             self.sync_suspended.store(true, Ordering::SeqCst);
             // Background push fetches must not report the user online.

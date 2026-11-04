@@ -861,6 +861,93 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
         .expect("the imported key redecrypts the event");
     }
 
+    #[tokio::test]
+    async fn resuming_redecrypts_a_key_another_client_stored() {
+        let server = MatrixMockServer::new().await;
+        let store = tempfile::tempdir().unwrap();
+        let client = server
+            .client_builder()
+            .on_builder(|builder| builder.sqlite_store(store.path(), None))
+            .build()
+            .await;
+        let push = server
+            .client_builder()
+            .on_builder(|builder| builder.sqlite_store(store.path(), None))
+            .build()
+            .await;
+        let (core, _events) = Core::new(
+            store.path().to_str().unwrap(),
+            Box::new(MemorySessionStore::default()),
+        );
+        *core.session.write().await = Some(Session {
+            account_id: "a1".to_owned(),
+            client: client.clone(),
+            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+            homeserver: server.server().uri(),
+            oauth: false,
+        });
+        let room_id = room_id!("!resumed:example.org");
+        let outbound = outbound_session(room_id);
+        let key = exported(&outbound).await;
+        let content = outbound
+            .0
+            .encrypt(
+                "m.room.message",
+                &serde_json::from_value(json!({"msgtype": "m.text", "body": "while away"}))
+                    .unwrap(),
+            )
+            .await
+            .content;
+        let event = Raw::from_json_string(
+            json!({"type": "m.room.encrypted", "event_id": "$away",
+                "sender": "@sender:example.org", "origin_server_ts": 1, "content": content})
+            .to_string(),
+        )
+        .unwrap();
+        server
+            .mock_room_state_encryption()
+            .encrypted()
+            .mount()
+            .await;
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).add_timeline_event(event),
+            )
+            .await;
+        let timeline = core
+            .live_timeline(&room_id.to_owned(), false)
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(timeline.items().await.iter().any(|item| is_utd(item)));
+
+        push.olm_machine_for_testing()
+            .await
+            .as_ref()
+            .unwrap()
+            .store()
+            .import_exported_room_keys(vec![key], |_, _| {})
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        assert!(timeline.items().await.iter().any(|item| is_utd(item)));
+
+        core.retry_cached_decryption().await;
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !timeline
+                .items()
+                .await
+                .iter()
+                .any(|item| body(item) == Some("while away"))
+            {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .unwrap();
+    }
+
     fn is_utd(item: &TimelineItem) -> bool {
         item.as_event()
             .is_some_and(|event| event.content().is_unable_to_decrypt())
