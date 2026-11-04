@@ -129,6 +129,48 @@ function railOrder(names: readonly string[]): (string | null)[] {
     .filter((name) => name !== null && names.includes(name));
 }
 
+test.each([false, true])(
+  'updates the room banner after sidebar navigation (mobile: %s)',
+  async (mobile) => {
+    const child: RoomListItemView = { ...space('!child:example.org', 'Child'), room_kind: 'text' };
+    const { client } = fixtureCore([space(), child]);
+    await startRoomList(client);
+    core.rpc.room_state.banner.mockImplementation(({ room_id }) =>
+      Promise.resolve(
+        room_id === child.room_id ? 'mxc://example.org/room' : 'mxc://example.org/space'
+      )
+    );
+    onTestFinished(() => {
+      core.rpc.room_state.banner.mockResolvedValue(null);
+    });
+    const params = { spaceId: '!space:example.org', roomId: child.room_id };
+    visit('/space/!space:example.org/!child:example.org', params);
+    render(SidebarNav, { mobile });
+
+    expect(
+      await screen.findByRole('button', { name: 'common.viewBanner:Child' })
+    ).toBeInTheDocument();
+
+    visit('/search');
+    navigated();
+    expect(
+      await screen.findByRole('button', { name: 'common.viewBanner:Space' })
+    ).toBeInTheDocument();
+
+    visit('/space/!space:example.org/!child:example.org', params);
+    navigated();
+    expect(
+      await screen.findByRole('button', { name: 'common.viewBanner:Child' })
+    ).toBeInTheDocument();
+
+    visit('/space/!space:example.org/lobby', { spaceId: '!space:example.org' });
+    navigated();
+    expect(
+      await screen.findByRole('button', { name: 'common.viewBanner:Space' })
+    ).toBeInTheDocument();
+  }
+);
+
 test.each([
   ['/rooms', {}, '/create-room', ['Unspaced']],
   ['/direct', {}, '/create-room', ['Alice']],

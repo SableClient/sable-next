@@ -124,6 +124,7 @@
   interface Props {
     pathname?: string;
     spaceId?: string;
+    roomId?: string;
     onNavigate?: (href: string) => void;
     width?: number;
     collapsed?: boolean;
@@ -135,6 +136,7 @@
   let {
     pathname = page.url.pathname,
     spaceId = page.params.spaceId,
+    roomId = page.params.roomId,
     onNavigate,
     width,
     collapsed = false,
@@ -188,6 +190,9 @@
   );
 
   let activeSpaceId = $derived(activeSpace?.room_id ?? null);
+  let activeRoom = $derived(
+    activeSpace ? (findRoomByPathId(roomList.rooms, roomId) ?? null) : null
+  );
   let iconMode = $derived(roomIconOverride(activeSpaceId) ?? preferences.showRoomIcon);
 
   function navigateTo(href: string): void {
@@ -366,6 +371,7 @@
 >
   <RoomNavHeader
     {activeSpace}
+    {activeRoom}
     {title}
     titleIcon={TitleIcon}
     {collapsed}
