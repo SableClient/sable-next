@@ -19,6 +19,28 @@ const types: Record<string, string> = {
   '.webmanifest': 'application/manifest+json',
 };
 
+function emulateMissingContainerQueries(): void {
+  const supports = CSS.supports.bind(CSS);
+  CSS.supports = (property: string, value?: string) =>
+    property === 'container-type'
+      ? false
+      : value === undefined
+        ? supports(property)
+        : supports(property, value);
+  Object.defineProperty(HTMLHtmlElement.prototype, 'style', {
+    get(this: HTMLHtmlElement) {
+      const style = Reflect.get(HTMLElement.prototype, 'style', this);
+      return new Proxy(style, {
+        has: (target, key) => key !== 'container' && Reflect.has(target, key),
+        get: (target, key) => {
+          const value: unknown = Reflect.get(target, key);
+          return typeof value === 'function' ? (value.bind(target) as unknown) : value;
+        },
+      });
+    },
+  });
+}
+
 test.beforeAll(async () => {
   const headers = await readFile(resolve(directory, '_headers'), 'utf8');
   const policy = /^\s+Content-Security-Policy: (.+)$/m.exec(headers)?.[1];
@@ -129,6 +151,39 @@ test('custom CSS can load external styles and fonts', async ({ page }) => {
   await expect(page.locator('body')).toHaveCSS('--csp-external-theme', 'loaded');
   const fonts = await page.evaluate(async () => (await document.fonts.load('16px CspFont')).length);
   expect(fonts).toBeGreaterThan(0);
+});
+
+test('styles load without native container queries', async ({ page }) => {
+  await page.addInitScript(emulateMissingContainerQueries);
+  await page.route(`${origin}/__csp_container.css`, (route) =>
+    route.fulfill({
+      contentType: 'text/css',
+      body: '.csp-container{container-type:inline-size;width:200px}.csp-child{display:grid;color:rgb(4,5,6)}@container (min-width:100px){.csp-child{color:rgb(1,2,3)}}',
+    })
+  );
+  await page.goto(origin);
+  await expect(page.locator('link[rel="stylesheet"]').first()).toHaveAttribute('href', /^blob:/);
+  await expect(page.locator('body')).toHaveCSS('margin', '0px');
+  await expect(page.locator('body')).toHaveCSS('font-family', /Nunito/);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+  await page.evaluate(() => {
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<div class="csp-container"><div class="csp-child"></div></div>'
+    );
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/__csp_container.css';
+    document.head.append(link);
+  });
+  const child = page.locator('.csp-child');
+  await expect(child).toHaveCSS('display', 'grid');
+  await expect(child).toHaveCSS('color', 'rgb(1, 2, 3)');
+  await page.locator('.csp-container').evaluate((container) => {
+    container.style.width = '50px';
+  });
+  await expect(child).toHaveCSS('color', 'rgb(4, 5, 6)');
 });
 
 test('highlighter grammar modules can load from the scoped CDN', async ({ page }) => {

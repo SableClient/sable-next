@@ -151,3 +151,18 @@ test('a model that fails to load is reported without stopping the app from start
   await expect(init()).resolves.toBeUndefined();
   expect(Sentry.captureException).toHaveBeenCalledWith(failure);
 });
+
+test('a failed compatibility import does not skip model initialization', async () => {
+  const failure = new Error('Compatibility import failed');
+  const compatibility = await import('#lib/platform/browser-compat.js');
+  vi.spyOn(compatibility, 'installBrowserCompatibility').mockRejectedValueOnce(failure);
+  const { loadModel } = await import('#lib/model/model.js');
+  vi.mocked(loadModel).mockClear();
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+  const { init } = await import('./hooks.client.js');
+
+  await expect(init()).resolves.toBeUndefined();
+  expect(loadModel).toHaveBeenCalledOnce();
+  expect(Sentry.captureException).toHaveBeenCalledWith(failure);
+});

@@ -111,6 +111,11 @@ syncTelemetryConsent(preferences.errorReporting);
 export const init: ClientInit = async () => {
   try {
     await installBrowserCompatibility();
+  } catch (error) {
+    Sentry.captureException(error);
+    console.error('[sable] browser compatibility setup failed', error);
+  }
+  try {
     await loadModel();
   } catch (error) {
     Sentry.captureException(error);
