@@ -490,6 +490,200 @@ async fn a_synced_room_rule_reaches_the_listed_room() {
 }
 
 #[tokio::test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "shares sync fixtures across room states, join rules and moderation capabilities"
+)]
+async fn join_requests_include_only_moderatable_joined_knock_rooms() {
+    use matrix_sdk::ruma::{events::room::member::MembershipState, user_id};
+    use matrix_sdk_test::{InvitedRoomBuilder, LeftRoomBuilder, event_factory::EventFactory};
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let own_user_id = client.user_id().unwrap();
+    let alice = user_id!("@alice:example.org");
+    let cases = [
+        (room_id!("!invite:example.org"), "knock", 0, 100, true),
+        (
+            room_id!("!kick:example.org"),
+            "knock_restricted",
+            100,
+            0,
+            true,
+        ),
+        (room_id!("!both:example.org"), "knock", 0, 0, true),
+        (room_id!("!forbidden:example.org"), "knock", 100, 100, true),
+        (room_id!("!private:example.org"), "invite", 0, 0, true),
+        (room_id!("!public:example.org"), "public", 0, 0, true),
+        (room_id!("!empty:example.org"), "knock", 0, 0, false),
+        (room_id!("!left:example.org"), "knock", 0, 0, true),
+        (room_id!("!invited:example.org"), "knock", 0, 0, true),
+    ];
+    for (room_id, join_rule, invite, kick, knocking) in cases {
+        let factory = EventFactory::new().room(room_id).sender(own_user_id);
+        let mut members = vec![factory.member(own_user_id).into_raw()];
+        if knocking {
+            members.push(
+                factory
+                    .member(alice)
+                    .membership(MembershipState::Knock)
+                    .display_name("Alice")
+                    .into_raw(),
+            );
+        }
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_state_bulk(members.clone())
+                    .add_state_event(factory.create(own_user_id, "10".try_into().unwrap()))
+                    .add_state_event(
+                        Raw::new(&json!({
+                            "type": "m.room.join_rules", "state_key": "", "sender": own_user_id,
+                            "event_id": "$rules", "origin_server_ts": 1,
+                            "content": {"join_rule": join_rule}
+                        }))
+                        .unwrap()
+                        .cast_unchecked(),
+                    )
+                    .add_state_event(
+                        Raw::new(&json!({
+                            "type": "m.room.power_levels", "state_key": "", "sender": own_user_id,
+                            "event_id": "$levels", "origin_server_ts": 1,
+                            "content": {"invite": invite, "kick": kick}
+                        }))
+                        .unwrap()
+                        .cast_unchecked(),
+                    ),
+            )
+            .await;
+        let eligible = matches!(join_rule, "knock" | "knock_restricted")
+            && (invite == 0 || kick == 0)
+            && !matches!(
+                room_id.as_str(),
+                "!left:example.org" | "!invited:example.org"
+            );
+        Mock::given(method("GET"))
+            .and(path(format!("/_matrix/client/v3/rooms/{room_id}/members")))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"chunk": members})))
+            .expect(u64::from(eligible))
+            .mount(server.server())
+            .await;
+    }
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder
+                .add_invited_room(
+                    InvitedRoomBuilder::new(room_id!("!invited:example.org")).add_state_event(
+                        Raw::new(&json!({
+                            "type": "m.room.join_rules", "state_key": "", "sender": own_user_id,
+                            "content": {"join_rule": "knock"}
+                        }))
+                        .unwrap()
+                        .cast_unchecked(),
+                    ),
+                )
+                .add_left_room(LeftRoomBuilder::new(room_id!("!left:example.org")));
+        })
+        .await;
+    let core = core(&server, client).await;
+    let response = core.call("members.join_requests", "{}").await.unwrap();
+    let response: serde_json::Value = serde_json::from_str(response.get()).unwrap();
+    assert_eq!(response["failed"], false);
+    let rooms = response["rooms"].as_array().unwrap();
+    assert_eq!(rooms.len(), 3);
+    for (room_id, _, invite, kick, _) in cases.into_iter().take(3) {
+        let group = rooms
+            .iter()
+            .find(|group| group["room_id"] == room_id.as_str())
+            .unwrap();
+        let members = core
+            .run(crate::api::members::ListParams {
+                room_id: room_id.to_owned(),
+                memberships: vec![crate::protocol::MembershipView::Knock],
+            })
+            .await
+            .unwrap();
+        let permissions = core
+            .run(crate::api::members::PermissionsParams {
+                room_id: room_id.to_owned(),
+            })
+            .await
+            .unwrap();
+        assert_eq!(group["members"], serde_json::to_value(&members).unwrap());
+        assert_eq!(
+            group["permissions"],
+            serde_json::to_value(&permissions).unwrap()
+        );
+        assert_eq!(members.len(), 1);
+        assert_eq!(members[0].user_id, alice);
+        assert_eq!(members[0].display_name.as_deref(), Some("Alice"));
+        assert_eq!(permissions.can_invite, invite == 0);
+        assert_eq!(permissions.can_kick, kick == 0);
+    }
+}
+
+#[tokio::test]
+async fn join_requests_keep_other_rooms_when_members_fail_to_load() {
+    use matrix_sdk::ruma::{
+        events::room::member::{MembershipState, RoomMemberEvent},
+        user_id,
+    };
+    use matrix_sdk_test::event_factory::EventFactory;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let own_user_id = client.user_id().unwrap();
+    let alice = user_id!("@alice:example.org");
+    let good = room_id!("!good:example.org");
+    let bad = room_id!("!bad:example.org");
+    for room_id in [good, bad] {
+        let factory = EventFactory::new().room(room_id).sender(own_user_id);
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_state_event(factory.member(own_user_id))
+                    .add_state_event(factory.create(own_user_id, "10".try_into().unwrap()))
+                    .add_state_event(
+                        Raw::new(&json!({
+                            "type": "m.room.join_rules", "state_key": "", "sender": own_user_id,
+                            "event_id": "$rules", "origin_server_ts": 1,
+                            "content": {"join_rule": "knock"}
+                        }))
+                        .unwrap()
+                        .cast_unchecked(),
+                    ),
+            )
+            .await;
+        let response = if room_id == good {
+            ResponseTemplate::new(200).set_body_json(json!({"chunk": [
+                factory.member(own_user_id).into_raw::<RoomMemberEvent>(),
+                factory.member(alice).membership(MembershipState::Knock).into_raw::<RoomMemberEvent>()
+            ]}))
+        } else {
+            ResponseTemplate::new(403)
+                .set_body_json(json!({"errcode": "M_FORBIDDEN", "error": "Forbidden"}))
+        };
+        Mock::given(method("GET"))
+            .and(path(format!("/_matrix/client/v3/rooms/{room_id}/members")))
+            .respond_with(response)
+            .expect(1)
+            .mount(server.server())
+            .await;
+    }
+    let core = core(&server, client).await;
+    let response = core.call("members.join_requests", "{}").await.unwrap();
+    let response: serde_json::Value = serde_json::from_str(response.get()).unwrap();
+    assert_eq!(response["failed"], true);
+    let rooms = response["rooms"].as_array().unwrap();
+    assert_eq!(rooms.len(), 1);
+    assert_eq!(rooms[0]["room_id"], good.as_str());
+    assert_eq!(rooms[0]["members"][0]["user_id"], alice.as_str());
+}
+
+#[tokio::test]
 async fn room_members_use_cached_or_fetched_power_levels() {
     use matrix_sdk::ruma::user_id;
     use matrix_sdk_test::event_factory::EventFactory;

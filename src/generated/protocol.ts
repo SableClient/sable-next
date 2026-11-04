@@ -518,6 +518,12 @@ export type JoinCandidate = {
 	parent_id: string,
 };
 
+export type JoinRequestRoomView = {
+	room_id: string,
+	members: MemberView[],
+	permissions: RoomPermissionsView,
+};
+
 /**
  *  `restricted` and `knock_restricted` need an allowed-spaces list, so they are
  *  not settable here.
@@ -2481,6 +2487,10 @@ export type Rpc = {
 	room_id: string,
 	memberships?: MembershipView[],
 }) => Promise<MemberView[]>;
+    joinRequests: (params?: Record<string, never>) => Promise<{
+	rooms: JoinRequestRoomView[],
+	failed: boolean,
+}>;
     member: (params: {
 	room_id: string,
 	user_id: string,
@@ -3599,6 +3609,7 @@ export type RpcMethods = {
   'encryption.confirm_verification': Rpc['encryption']['confirmVerification'];
   'encryption.cancel_verification': Rpc['encryption']['cancelVerification'];
   'members.list': Rpc['members']['list'];
+  'members.join_requests': Rpc['members']['joinRequests'];
   'members.member': Rpc['members']['member'];
   'members.permissions': Rpc['members']['permissions'];
   'members.power_levels': Rpc['members']['powerLevels'];
@@ -3933,6 +3944,7 @@ export function createRpc(call: RpcCall): Rpc {
     },
     members: {
       list: (params) => call('members.list', params) as ReturnType<Rpc['members']['list']>,
+      joinRequests: (params = {}) => call('members.join_requests', params) as ReturnType<Rpc['members']['joinRequests']>,
       member: (params) => call('members.member', params) as ReturnType<Rpc['members']['member']>,
       permissions: (params) => call('members.permissions', params) as ReturnType<Rpc['members']['permissions']>,
       powerLevels: (params) => call('members.power_levels', params) as ReturnType<Rpc['members']['powerLevels']>,

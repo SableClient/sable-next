@@ -3,7 +3,12 @@
 import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
-import type { MemberView, RoomPermissionsView, RoomListItemView } from '#src/generated/protocol';
+import type {
+  MemberView,
+  RoomPermissionsView,
+  RoomListItemView,
+  Rpc,
+} from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 vi.mock('#lib/core/context.js');
@@ -18,6 +23,7 @@ import JoinRequestList from './JoinRequestList.svelte';
 
 const core = baseCore;
 Object.assign(core.rpc.members, {
+  joinRequests: vi.fn<Rpc['members']['joinRequests']>(),
   list: vi.fn<(params: { room_id: string }) => Promise<MemberView[]>>(),
   permissions: vi.fn<(params: { room_id: string }) => Promise<RoomPermissionsView>>(),
   denyKnock: vi.fn<(params: { room_id: string; user_id: string }) => Promise<null>>(),
@@ -57,6 +63,10 @@ const permissions = {
 } as RoomPermissionsView;
 
 beforeEach(() => {
+  core.rpc.members.joinRequests.mockReset().mockResolvedValue({
+    rooms: [{ room_id: room.room_id, members: [alice], permissions }],
+    failed: false,
+  });
   core.rpc.members.permissions.mockReset().mockResolvedValue(permissions);
   core.rpc.members.list.mockReset().mockResolvedValue([alice]);
   core.rpc.rooms.invite.mockReset().mockResolvedValue(null);
@@ -66,6 +76,10 @@ beforeEach(() => {
 
 test('approves room requests and denies space requests', async () => {
   roomList.rooms = [room, space];
+  core.rpc.members.joinRequests.mockResolvedValue({
+    rooms: [room, space].map(({ room_id }) => ({ room_id, members: [alice], permissions })),
+    failed: false,
+  });
   render(JoinRequestList);
   const user = userEvent.setup();
   await screen.findAllByText('Alice');
@@ -91,26 +105,45 @@ test('approves room requests and denies space requests', async () => {
   });
 });
 
-test('only loads requests in joined knock rooms where we can moderate', async () => {
-  roomList.rooms = [
-    room,
-    { ...space, join_rule: 'knock_restricted' },
-    { ...room, room_id: '!invited:example.org', state: 'invited' },
-    { ...room, room_id: '!private:example.org', join_rule: 'invite' },
-  ];
-  core.rpc.members.permissions.mockImplementation(({ room_id }) =>
-    Promise.resolve(
-      room_id === room.room_id
-        ? { ...permissions, can_invite: false, can_kick: false }
-        : permissions
-    )
-  );
+test('loads all requests with one RPC on mount and each room-list update', async () => {
+  roomList.rooms = [room, space];
   render(JoinRequestList);
   await screen.findByText('Alice');
-  expect(core.rpc.members.list).toHaveBeenCalledExactlyOnceWith({
-    room_id: space.room_id,
-    memberships: ['knock'],
+  expect(core.rpc.members.joinRequests).toHaveBeenCalledExactlyOnceWith({});
+  expect(core.rpc.members.permissions).not.toHaveBeenCalled();
+  expect(core.rpc.members.list).not.toHaveBeenCalled();
+
+  roomList.rooms = [{ ...room }, { ...space }];
+  await vi.waitFor(() => {
+    expect(core.rpc.members.joinRequests).toHaveBeenCalledTimes(2);
   });
+  expect(core.rpc.members.permissions).not.toHaveBeenCalled();
+  expect(core.rpc.members.list).not.toHaveBeenCalled();
+});
+
+test('sorts newest requests first and keeps room-list order for equal timestamps', async () => {
+  roomList.rooms = [room, space];
+  const bob = { ...alice, user_id: '@bob:example.org', display_name: 'Bob', member_ts: 2 };
+  core.rpc.members.joinRequests.mockResolvedValue({
+    rooms: [
+      { room_id: space.room_id, members: [alice], permissions },
+      { room_id: room.room_id, members: [alice, bob], permissions },
+    ],
+    failed: false,
+  });
+  render(JoinRequestList);
+  await screen.findByText('Bob');
+  const rows = screen.getAllByRole('listitem');
+  expect(rows.map((row) => within(row).getByText(/^(Alice|Bob)$/).textContent)).toEqual([
+    'Bob',
+    'Alice',
+    'Alice',
+  ]);
+  expect(rows.map((row) => within(row).getByText(/^(Room|Space)$/).textContent)).toEqual([
+    'Room',
+    'Room',
+    'Space',
+  ]);
 });
 
 test.each([
@@ -120,7 +153,12 @@ test.each([
 ])(
   'checks invite and kick permissions separately: $approve/$deny',
   async ({ approve, deny, ...overrides }) => {
-    core.rpc.members.permissions.mockResolvedValue({ ...permissions, ...overrides });
+    core.rpc.members.joinRequests.mockResolvedValue({
+      rooms: [
+        { room_id: room.room_id, members: [alice], permissions: { ...permissions, ...overrides } },
+      ],
+      failed: false,
+    });
     render(JoinRequestList);
     await screen.findByText('Alice');
     expect(screen.queryByRole('button', { name: 'Approve' }) !== null).toBe(approve);
@@ -144,13 +182,17 @@ test('keeps a failed request available for retry', async () => {
 
 test('shows requests from other rooms when one fails to load and retries', async () => {
   roomList.rooms = [room, space];
-  core.rpc.members.list.mockImplementation(({ room_id }) =>
-    room_id === room.room_id ? Promise.reject(new Error('offline')) : Promise.resolve([alice])
-  );
+  core.rpc.members.joinRequests.mockResolvedValue({
+    rooms: [{ room_id: space.room_id, members: [alice], permissions }],
+    failed: true,
+  });
   render(JoinRequestList);
   expect(await screen.findByRole('alert')).toHaveTextContent('Join requests could not be loaded.');
   expect(screen.getByText('Space')).toBeInTheDocument();
-  core.rpc.members.list.mockResolvedValue([alice]);
+  core.rpc.members.joinRequests.mockResolvedValue({
+    rooms: [room, space].map(({ room_id }) => ({ room_id, members: [alice], permissions })),
+    failed: false,
+  });
   await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
   await screen.findByText('Room');
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -164,11 +206,40 @@ test('refreshes live requests without restoring an answered request from stale s
 
   roomList.rooms = [{ ...room }];
   await vi.waitFor(() => {
-    expect(core.rpc.members.list).toHaveBeenCalledTimes(2);
+    expect(core.rpc.members.joinRequests).toHaveBeenCalledTimes(2);
   });
   expect(screen.queryByText('Alice')).not.toBeInTheDocument();
 
-  core.rpc.members.list.mockResolvedValue([{ ...alice, member_ts: 2 }]);
+  core.rpc.members.joinRequests.mockResolvedValue({
+    rooms: [{ room_id: room.room_id, members: [{ ...alice, member_ts: 2 }], permissions }],
+    failed: false,
+  });
   roomList.rooms = [{ ...room }];
   await screen.findByText('Alice');
+});
+
+test('shows a failed core call and retries', async () => {
+  core.rpc.members.joinRequests.mockRejectedValueOnce(new Error('offline'));
+  render(JoinRequestList);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Join requests could not be loaded.');
+  await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  await screen.findByText('Alice');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('ignores an older response after the room list changes', async () => {
+  const older = Promise.withResolvers<Awaited<ReturnType<Rpc['members']['joinRequests']>>>();
+  core.rpc.members.joinRequests.mockReturnValueOnce(older.promise);
+  render(JoinRequestList);
+  await vi.waitFor(() => {
+    expect(core.rpc.members.joinRequests).toHaveBeenCalledTimes(1);
+  });
+  roomList.rooms = [{ ...room }];
+  await screen.findByText('Alice');
+  older.resolve({ rooms: [], failed: true });
+  await older.promise;
+  await vi.waitFor(() => {
+    expect(screen.getByText('Alice')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });

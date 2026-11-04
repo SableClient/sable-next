@@ -44,29 +44,25 @@
     const current = ++run;
     loading = true;
     failed = false;
-    const rooms = roomList.rooms.filter(
-      (room) =>
-        room.state === 'joined' &&
-        (room.join_rule === 'knock' || room.join_rule === 'knock_restricted')
-    );
-    const results = await Promise.allSettled(
-      rooms.map(async (room): Promise<JoinRequest[]> => {
-        const permissions = await core.rpc.members.permissions({ room_id: room.room_id });
-        if (!permissions.can_invite && !permissions.can_kick) return [];
-        const members = await core.rpc.members.list({
-          room_id: room.room_id,
-          memberships: ['knock'],
-        });
-        return members
-          .filter((member) => member.membership === 'knock')
-          .map((member) => ({ room, member, permissions }));
-      })
-    );
-    if (current !== run) return;
-    requests = results
-      .flatMap((result) => (result.status === 'fulfilled' ? result.value : []))
-      .sort((left, right) => (right.member.member_ts ?? 0) - (left.member.member_ts ?? 0));
-    failed = results.some((result) => result.status === 'rejected');
+    const rooms = roomList.rooms;
+    try {
+      const result = await core.rpc.members.joinRequests({});
+      if (current !== run) return;
+      const groups = new Map(result.rooms.map((group) => [group.room_id, group]));
+      requests = rooms
+        .flatMap((room) => {
+          const group = groups.get(room.room_id);
+          return group
+            ? group.members.map((member) => ({ room, member, permissions: group.permissions }))
+            : [];
+        })
+        .sort((left, right) => (right.member.member_ts ?? 0) - (left.member.member_ts ?? 0));
+      failed = result.failed;
+    } catch {
+      if (current !== run) return;
+      requests = [];
+      failed = true;
+    }
     loading = false;
   }
 

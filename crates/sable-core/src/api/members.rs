@@ -3,17 +3,23 @@ use std::sync::Arc;
 
 use matrix_sdk::RoomMemberships;
 
+use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 use matrix_sdk::ruma::events::room::member::{MembershipState, RoomMemberEventContent};
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, RoomPowerLevelsEventContent};
 use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId};
 use serde::{Deserialize, Serialize};
 
 use super::Handler;
-use crate::protocol::{RpcError, FieldEdit, MemberLookView, MemberView, MembershipView, PowerLevelLocation, PowerLevelTagView, PowerLevelTagsView, PronounView, RoomPermissionsView, RoomPowerLevelsView};
+use crate::protocol::{
+    FieldEdit, JoinRequestRoomView, MemberLookView, MemberView, MembershipView, PowerLevelLocation,
+    PowerLevelTagView, PowerLevelTagsView, PronounView, RoomPermissionsView, RoomPowerLevelsView,
+    RpcError,
+};
 use crate::{Core, ResultExt, view};
 
 domain! {
     list,
+    join_requests,
     member,
     permissions,
     power_levels,
@@ -126,6 +132,60 @@ impl Handler for ListParams {
                 member
             })
             .collect())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct JoinRequestsParams {}
+
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct JoinRequestsOk {
+    pub rooms: Vec<JoinRequestRoomView>,
+    pub failed: bool,
+}
+
+impl Handler for JoinRequestsParams {
+    type Ok = JoinRequestsOk;
+
+    async fn run(self, core: &Arc<Core>) -> Result<JoinRequestsOk, RpcError> {
+        let client = core.client().await?;
+        let mut rooms = Vec::new();
+        let mut failed = false;
+        for room in client.joined_rooms() {
+            if !matches!(
+                room.join_rule(),
+                Some(JoinRule::Knock | JoinRule::KnockRestricted(_))
+            ) {
+                continue;
+            }
+            let room_id = room.room_id().to_owned();
+            let result: Result<_, RpcError> = async {
+                let permissions = core.room_permissions(&room_id).await?;
+                if !permissions.can_invite && !permissions.can_kick {
+                    return Ok(None);
+                }
+                let members = ListParams {
+                    room_id: room_id.clone(),
+                    memberships: vec![MembershipView::Knock],
+                }
+                .run(core)
+                .await?;
+                Ok((!members.is_empty()).then_some(JoinRequestRoomView {
+                    room_id,
+                    members,
+                    permissions,
+                }))
+            }
+            .await;
+            match result {
+                Ok(Some(room)) => rooms.push(room),
+                Ok(None) => {}
+                Err(_) => failed = true,
+            }
+        }
+        Ok(JoinRequestsOk { rooms, failed })
     }
 }
 

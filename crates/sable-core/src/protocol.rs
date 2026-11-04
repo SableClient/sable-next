@@ -2462,6 +2462,15 @@ pub struct MemberView {
     pub service: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct JoinRequestRoomView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub members: Vec<MemberView>,
+    pub permissions: RoomPermissionsView,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]

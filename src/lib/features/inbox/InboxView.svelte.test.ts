@@ -34,22 +34,28 @@ const room = withCounts({
 } as RoomListItemView);
 
 Object.assign(core.rpc.members, {
-  permissions: vi.fn(() =>
+  joinRequests: vi.fn(() =>
     Promise.resolve({
-      can_invite: true,
-      can_kick: true,
-      own_power_level: 100,
-    } as RoomPermissionsView)
-  ),
-  list: vi.fn(() =>
-    Promise.resolve([
-      {
-        user_id: '@alice:example.org',
-        display_name: 'Alice',
-        power_level: 0,
-        membership: 'knock',
-      },
-    ])
+      rooms: [
+        {
+          room_id: room.room_id,
+          permissions: {
+            can_invite: true,
+            can_kick: true,
+            own_power_level: 100,
+          } as RoomPermissionsView,
+          members: [
+            {
+              user_id: '@alice:example.org',
+              display_name: 'Alice',
+              power_level: 0,
+              membership: 'knock',
+            },
+          ],
+        },
+      ],
+      failed: false,
+    })
   ),
 });
 Object.assign(core.rpc.notifications, {
