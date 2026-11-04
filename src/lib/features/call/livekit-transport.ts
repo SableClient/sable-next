@@ -102,6 +102,18 @@ const defaultWorker = (): Worker =>
 // Senders keep using their previous key for a few seconds after rotating.
 const MISSING_KEY_GRACE_MS = 10_000;
 
+const keyFaultOf = (error: unknown): 'missing_key' | 'invalid_key' | undefined => {
+  if (error instanceof CryptorError) {
+    if (error.reason === CryptorErrorReason.MissingKey) return 'missing_key';
+    if (error.reason === CryptorErrorReason.InvalidKey) return 'invalid_key';
+    return undefined;
+  }
+  if (!(error instanceof Error)) return undefined;
+  if (error.message.startsWith('MissingKey: ')) return 'missing_key';
+  if (error.message.startsWith('InvalidKey: ')) return 'invalid_key';
+  return undefined;
+};
+
 // Chrome rejects a BUNDLE whose Opus sections share a payload type with different
 // fmtp, so these must keep the microphone's defaults.
 const SCREEN_AUDIO_PUBLISH: TrackPublishOptions = {
@@ -388,10 +400,8 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       event('call.connection.state', { 'call.connection_state': connectionState });
     })
     .on(RoomEvent.EncryptionError, (error, participant) => {
-      if (
-        (error instanceof CryptorError && error.reason === CryptorErrorReason.MissingKey) ||
-        (error instanceof Error && error.message.startsWith('MissingKey: '))
-      ) {
+      const keyFault = keyFaultOf(error);
+      if (keyFault) {
         const identity =
           participant?.identity ??
           (error instanceof CryptorError ? error.participantIdentity : undefined) ??
@@ -400,13 +410,13 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
         const streak = missingKeys.get(identity);
         if (!streak || now - streak.last > MISSING_KEY_GRACE_MS) {
           missingKeys.set(identity, { since: now, last: now, reported: false });
-          event('call.encryption.missing_key_frame');
+          event(`call.encryption.${keyFault}_frame`);
           return;
         }
         streak.last = now;
         if (streak.reported || now - streak.since < MISSING_KEY_GRACE_MS) return;
         streak.reported = true;
-        fail('call.encryption.missing_key', error);
+        fail(`call.encryption.${keyFault}`, error);
         return;
       }
       fail('call.encryption.error', error);

@@ -148,6 +148,34 @@ test('reports missing keys only once they outlast the key rotation grace period'
   expect(failure).not.toHaveBeenCalled();
 });
 
+test('treats decryption failures during key rotation as a grace-period key fault', () => {
+  vi.useFakeTimers();
+  const { room } = roomFixture();
+  const failure = vi.fn();
+  const event = vi.fn();
+  createLivekitTransport({
+    encryptMedia: false,
+    createRoom: () => room,
+    telemetry: { step: (_stage, action) => action(), event, failure },
+  });
+  const alice = { identity: '@alice:example.test:DEVICE' };
+  const invalid = () => new CryptorError('Decryption failed', CryptorErrorReason.InvalidKey);
+
+  room.emit(RoomEvent.EncryptionError, invalid(), alice);
+  vi.advanceTimersByTime(5_000);
+  room.emit(RoomEvent.EncryptionError, invalid(), alice);
+  expect(failure).not.toHaveBeenCalled();
+  expect(event).toHaveBeenCalledWith('call.encryption.invalid_key_frame', {});
+
+  vi.advanceTimersByTime(5_000);
+  room.emit(RoomEvent.EncryptionError, invalid(), alice);
+  expect(failure).toHaveBeenCalledExactlyOnceWith(
+    'call.encryption.invalid_key',
+    expect.any(CryptorError),
+    {}
+  );
+});
+
 test('reports other encryption errors immediately', () => {
   const { room } = roomFixture();
   const failure = vi.fn();
