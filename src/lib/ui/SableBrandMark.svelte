@@ -1,17 +1,19 @@
 <script lang="ts">
   import type { ClassValue } from 'svelte/elements';
 
+  import type { RuntimeConfig } from '#lib/config/runtime-config.js';
   import { logoUrl } from '#lib/deployment/brand.js';
   import logo from '#lib/assets/res/svg/logo.svg';
 
   interface Props {
     class?: ClassValue;
+    config?: RuntimeConfig;
   }
 
-  let { class: className = '' }: Props = $props();
+  let { class: className = '', config }: Props = $props();
 </script>
 
-<img class={['brand-mark', className]} src={logoUrl() ?? logo} alt="" />
+<img class={['brand-mark', className]} src={logoUrl(config) ?? logo} alt="" />
 
 <style>
   .brand-mark {

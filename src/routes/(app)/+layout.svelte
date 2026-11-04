@@ -1045,7 +1045,7 @@
           });
           return;
         }
-        void performNotificationAction(core, action, readReceiptIsPrivate()).catch(
+        void performNotificationAction(core, action, readReceiptIsPrivate).catch(
           (error: unknown) => {
             console.debug('[sable notifications] action not performed', error);
           }

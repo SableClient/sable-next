@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { logoutRedirectUrl } from '#lib/deployment/policy.js';
   import { CoreError } from '#src/transport';
   import { redirectAfterLogout } from '#lib/auth/logout-redirect.js';
   import { useCoreClient } from '#lib/core/context.js';
@@ -50,8 +51,9 @@
         open = false;
         return;
       }
+      const redirectUrl = logoutRedirectUrl();
       await core.logout();
-      redirectAfterLogout(core);
+      redirectAfterLogout(core, redirectUrl);
     } catch (cause) {
       error = messageFor(cause);
     } finally {

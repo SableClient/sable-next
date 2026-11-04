@@ -1,3 +1,4 @@
+import { accountDisablesReadReceipts } from '../preferences.svelte.js';
 import ArrowsOutLineVerticalIcon from 'phosphor-svelte/lib/ArrowsOutLineVerticalIcon';
 import ArrowLineDownIcon from 'phosphor-svelte/lib/ArrowLineDownIcon';
 import CalendarBlankIcon from 'phosphor-svelte/lib/CalendarBlankIcon';
@@ -438,6 +439,7 @@ export const timelineCategory: SettingsCategory = {
     },
     {
       key: 'hideReadReceipts',
+      supported: () => !accountDisablesReadReceipts(),
       section: 'receipts-typing',
       icon: ChecksIcon,
       name: 'settings.hideReadReceipts',

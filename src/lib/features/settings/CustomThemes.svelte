@@ -58,7 +58,7 @@
     onThemeChosen,
   }: { onboarding?: boolean; onThemeChosen?: (kind: ResolvedTheme) => void } = $props();
 
-  const catalogAvailable = communityFeatures();
+  let catalogAvailable = $derived(communityFeatures());
   let catalogOpen = $state(false);
   let installing = $state<string | null>(null);
   let error = $state<string | null>(null);

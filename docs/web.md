@@ -198,8 +198,51 @@ replacing the files themselves:
   browser chrome and name the iOS home screen icon. Every prerendered HTML page
   carries them, so change them in `src/app.html` and rebuild.
 
-Native desktop and mobile builds keep the Sable name and icons.
+Changing native launcher names and icons requires rebuilding the app.
 
 For non-container hosting, build with `pnpm build` and serve the `dist` directory,
 including `config.json`. Configure the web server to fall back to `index.html`
 for client routes and avoid caching `config.json` and `index.html` indefinitely.
+
+### Homeserver configuration
+
+Serve account configuration at `https://<server-name>/.well-known/sable`.
+Web, desktop and mobile clients use the entered homeserver during login and the
+server name in the account's Matrix ID after sign-in. Matrix API delegation
+does not change this location. Preserve any port in the server name and enable
+CORS (`Access-Control-Allow-Origin: *`) for web clients.
+
+Use the same format as `config.json`:
+
+```json
+{
+  "branding": {
+    "appName": "Acme Chat",
+    "logoUrl": "/branding/logo.svg",
+    "themeUrl": "/branding/theme.json"
+  },
+  "links": { "help": "https://help.example.org" },
+  "settingsLocked": { "sendReadReceipts": false }
+}
+```
+
+Supported fields: `branding`, `links`, `hideCommunityLinks`, `auth`,
+`hideUsernamePasswordFields`, `settingsDefaults` and `settingsLocked`.
+Relative branding URLs resolve against the configuration URL.
+
+Account defaults and locks accept `theme`, `hideTypingIndicators`,
+`sendTypingNotifications`, `sendReadReceipts`, `hideReadReceipts` and
+`urlPreviews`. Locking `sendReadReceipts` to `false` also hides receipt indicators
+and controls. Other settings, account switching and service endpoints remain
+controlled by the deployment and user.
+
+Account branding and links override deployment values. Login options apply to
+the selected homeserver. Settings use this precedence: deployment locks,
+account locks, user choices, account defaults, deployment defaults, built-in
+defaults. Remote values are neither saved as user preferences nor synced.
+
+Configuration is cached per account and fetched once per domain per session,
+with a five-second timeout. Failed requests and invalid documents retain the
+cache; HTTP 404/410 or `{}` clears it. Missing configuration does not block
+sign-in. Switching accounts replaces branding and settings; signing out of the
+last account restores the deployment configuration.

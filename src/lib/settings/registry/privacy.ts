@@ -1,3 +1,4 @@
+import { accountDisablesReadReceipts } from '../preferences.svelte.js';
 import BugIcon from 'phosphor-svelte/lib/BugIcon';
 import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
 import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
@@ -64,6 +65,7 @@ export const privacyCategory: SettingsCategory = {
     },
     {
       key: 'sendReadReceipts',
+      supported: () => !accountDisablesReadReceipts(),
       section: 'activity',
       icon: EyeIcon,
       name: 'common.readReceipts',

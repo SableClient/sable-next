@@ -59,7 +59,7 @@ function action(overrides: Partial<NativeNotificationAction> = {}): NativeNotifi
 
 test('a reply is sent and the room is read', async () => {
   const { client, sendMessage, markRead } = core();
-  await performNotificationAction(client, action(), false);
+  await performNotificationAction(client, action(), () => false);
 
   expect(sendMessage).toHaveBeenCalledWith(
     expect.objectContaining({ room_id: '!room:example.org', body: 'on my way' })
@@ -79,7 +79,7 @@ test('marking read sends no message', async () => {
   await performNotificationAction(
     client,
     action({ actionId: 'sable-mark-read', text: null }),
-    true
+    () => true
   );
 
   expect(sendMessage).not.toHaveBeenCalled();
@@ -95,8 +95,8 @@ test('marking read sends no message', async () => {
 
 test('a blank reply and an unknown action do nothing', async () => {
   const { client, sendMessage, markRead } = core();
-  await performNotificationAction(client, action({ text: null }), false);
-  await performNotificationAction(client, action({ actionId: 'sable-snooze' }), false);
+  await performNotificationAction(client, action({ text: null }), () => false);
+  await performNotificationAction(client, action({ actionId: 'sable-snooze' }), () => false);
 
   expect(sendMessage).not.toHaveBeenCalled();
   expect(markRead).not.toHaveBeenCalled();
@@ -104,7 +104,7 @@ test('a blank reply and an unknown action do nothing', async () => {
 
 test('an action for another account switches to it first', async () => {
   const { client, sendMessage, switchAccount } = core('account-other');
-  await performNotificationAction(client, action(), false);
+  await performNotificationAction(client, action(), () => false);
 
   expect(switchAccount).toHaveBeenCalledWith('account-me');
   expect(sendMessage).toHaveBeenCalled();
@@ -160,4 +160,16 @@ test('the invite buttons map to an answer and nothing else does', () => {
   expect(inviteNotificationAction(action('sable-invite-decline'))).toBe('decline');
   expect(inviteNotificationAction(action('sable-reply'))).toBeNull();
   expect(inviteNotificationAction(action('sable-call-answer'))).toBeNull();
+});
+
+test('resolves receipt policy after selecting the notification account', async () => {
+  const { client, switchAccount, markRead } = core('account-other');
+  let privateReceipt = false;
+  switchAccount.mockImplementation(() => {
+    privateReceipt = true;
+    return Promise.resolve();
+  });
+  await performNotificationAction(client, action(), () => privateReceipt);
+  expect(switchAccount).toHaveBeenCalledWith('account-me');
+  expect(markRead).toHaveBeenCalledWith(expect.objectContaining({ private_receipt: true }));
 });

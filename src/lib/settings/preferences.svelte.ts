@@ -1,3 +1,4 @@
+import { ACCOUNT_PREFERENCES } from '#lib/config/account-config.js';
 import { untrack } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type {
@@ -860,7 +861,11 @@ export function sanitize(stored: Record<string, unknown>, base: Preferences): Pr
 
 const explicit = new SvelteSet<keyof Preferences>();
 const locked = new SvelteSet<keyof Preferences>();
-const lockedUserValues = new SvelteMap<keyof Preferences, unknown>();
+const userValues = new SvelteMap<keyof Preferences, unknown>();
+let deploymentDefaults: Partial<Preferences> = {};
+let deploymentLocks: Partial<Preferences> = {};
+let accountDefaults: Partial<Preferences> = {};
+let accountLocks = $state.raw<Partial<Preferences>>({});
 
 function load(): Preferences {
   if (typeof localStorage === 'undefined') return { ...DEFAULTS };
@@ -877,6 +882,7 @@ function load(): Preferences {
 }
 
 export const preferences = $state<Preferences>(load());
+for (const key of explicit) userValues.set(key, preferences[key]);
 
 export function readReceiptIsPrivate(): boolean {
   return !preferences.sendReadReceipts;
@@ -893,6 +899,7 @@ export function isLockedPreference(key: keyof Preferences): boolean {
 export function setPreference<K extends keyof Preferences>(key: K, value: Preferences[K]): void {
   if (locked.has(key)) return;
   preferences[key] = value;
+  userValues.set(key, value);
   explicit.add(key);
   persist();
 }
@@ -905,35 +912,70 @@ export function applyPreferences(
   next: Preferences,
   keys: readonly (keyof Preferences)[] = PREFERENCE_KEYS
 ): void {
-  for (const key of PREFERENCE_KEYS) {
-    if (!locked.has(key)) assign(key, next[key]);
+  for (const key of keys) {
+    if (locked.has(key)) continue;
+    userValues.set(key, next[key]);
+    explicit.add(key);
   }
-  for (const key of keys) if (!locked.has(key)) explicit.add(key);
+  resolvePolicy();
   persist();
-}
-
-export function applyDeploymentDefaults(raw: Record<string, unknown>): void {
-  const defaults = sanitize(raw, preferences);
-  for (const key of PREFERENCE_KEYS) {
-    if (key in raw && !explicit.has(key)) {
-      assign(key, defaults[key]);
-    }
-  }
 }
 
 const UNSET = Object.fromEntries(
   PREFERENCE_KEYS.map((key) => [key, undefined])
 ) as unknown as Preferences;
 
-/** Locked values stay out of storage, so lifting a lock restores the reader's own choice. */
+function validPolicy(raw: Record<string, unknown>): Partial<Preferences> {
+  return Object.fromEntries(
+    Object.entries(sanitize(raw, UNSET)).filter(([key, value]) => key in raw && value !== undefined)
+  );
+}
+
+export function applyDeploymentDefaults(raw: Record<string, unknown>): void {
+  deploymentDefaults = validPolicy(raw);
+  resolvePolicy();
+}
+
 export function applyDeploymentLocks(raw: Record<string, unknown>): void {
-  const valid: Partial<Preferences> = sanitize(raw, UNSET);
+  deploymentLocks = validPolicy(raw);
+  resolvePolicy();
+}
+
+// Keep remote settings out of stored user preferences.
+export function applyAccountPreferences(
+  defaults: Record<string, unknown>,
+  locks: Record<string, unknown>
+): void {
+  const supported = (raw: Record<string, unknown>) =>
+    validPolicy(
+      Object.fromEntries(
+        ACCOUNT_PREFERENCES.filter((key) => key in raw).map((key) => [key, raw[key]])
+      )
+    );
+  accountDefaults = supported(defaults);
+  const nextLocks = supported(locks);
+  if (nextLocks.sendReadReceipts === false) nextLocks.hideReadReceipts = true;
+  accountLocks = nextLocks;
+  resolvePolicy();
+}
+
+export function accountDisablesReadReceipts(): boolean {
+  return accountLocks.sendReadReceipts === false && !preferences.sendReadReceipts;
+}
+
+function resolvePolicy(): void {
   for (const key of PREFERENCE_KEYS) {
-    const value = valid[key];
-    if (!(key in raw) || value === undefined) continue;
-    if (!locked.has(key) && explicit.has(key)) lockedUserValues.set(key, preferences[key]);
-    locked.add(key);
-    assign(key, value);
+    const value = deploymentLocks[key] ?? accountLocks[key];
+    if (value !== undefined) locked.add(key);
+    else locked.delete(key);
+    assign(
+      key,
+      (value ??
+        userValues.get(key) ??
+        accountDefaults[key] ??
+        deploymentDefaults[key] ??
+        DEFAULTS[key]) as Preferences[typeof key]
+    );
   }
 }
 
@@ -941,7 +983,7 @@ function persist(): void {
   untrack(() => {
     const stored: Record<string, unknown> = { schema: SETTINGS_SCHEMA };
     for (const key of explicit) {
-      stored[key] = locked.has(key) ? lockedUserValues.get(key) : preferences[key];
+      stored[key] = userValues.get(key);
     }
     writeJson(STORAGE_KEY, stored, '[sable settings] preferences not persisted');
   });

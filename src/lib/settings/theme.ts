@@ -63,6 +63,10 @@ export function applyCustomTheme(css: string | undefined): void {
 }
 
 export function applyDeploymentTheme(css: string): void {
+  if (!css) {
+    document.getElementById(DEPLOYMENT_STYLE_ID)?.remove();
+    return;
+  }
   const style =
     document.getElementById(DEPLOYMENT_STYLE_ID) ??
     createStyle(

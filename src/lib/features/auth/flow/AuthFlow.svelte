@@ -35,13 +35,14 @@
   import { readText, writeJson, writeText } from '#lib/platform/local-json.js';
   import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import { registrationEnabled, ssoRedirect } from '#lib/deployment/policy.js';
+  import { loginConfiguration, clearLoginConfiguration } from '#lib/deployment/deployment.js';
   import { passwordFields } from '../shared/password-fields.svelte.js';
   import { shouldAutoRedirect } from './auto-redirect';
 
   const core = useCoreClient();
   const isAddingAccount = page.url.searchParams.has('addAccount');
-  const canRegister = registrationEnabled();
-  const stageRegistry = [
+  const canRegister = $derived(registrationEnabled(loginConfiguration()));
+  const stageRegistry = $derived([
     {
       route: resolve('login'),
       completed: true,
@@ -54,7 +55,7 @@
           },
         ]
       : []),
-  ];
+  ]);
 
   function reauthAccountId(): string | undefined {
     const explicit = page.url.searchParams.get('reauth');
@@ -76,7 +77,9 @@
   let enteringStage = $state<number | null>(null);
   let retiringAfter = $state<number | null>(null);
   let furthestReached = $state(
-    Math.min(stageIndexForPath(page.url.pathname, stageRegistry), core.status === 'ready' ? 1 : 0)
+    untrack(() =>
+      Math.min(stageIndexForPath(page.url.pathname, stageRegistry), core.status === 'ready' ? 1 : 0)
+    )
   );
   let lastUrlPrefill = '';
   let loginPending = $state(false);
@@ -200,7 +203,7 @@
         ? { ...flow.loginFlows, password: false }
         : flow.loginFlows;
     const target = shouldAutoRedirect(
-      ssoRedirect(),
+      ssoRedirect(loginConfiguration()),
       flows,
       displayedStage === 0 ? 'login' : 'registration',
       autoRedirectTried
@@ -282,6 +285,7 @@
   onMount(() => {
     hasLoggedInBefore = readReturningUser();
     return () => {
+      clearLoginConfiguration();
       redirect.cleanup();
       if (!redirect.isCallbackWindow)
         void core.rpc.auth.cancelRegistration().catch((error: unknown) => {

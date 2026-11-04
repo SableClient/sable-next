@@ -66,7 +66,7 @@ export async function openNativeNotification(
 export async function performNotificationAction(
   core: Replier,
   action: NativeNotificationAction,
-  readReceiptIsPrivate: boolean
+  readReceiptIsPrivate: () => boolean
 ): Promise<void> {
   if (action.actionId !== REPLY_ACTION && action.actionId !== MARK_READ_ACTION) return;
   if (action.actionId === REPLY_ACTION && action.text === null) return;
@@ -81,7 +81,7 @@ export async function performNotificationAction(
     await core.rpc.timeline.markRead({
       room_id: action.roomId,
       event_id: action.eventId,
-      private_receipt: readReceiptIsPrivate,
+      private_receipt: readReceiptIsPrivate(),
       thread_root: null,
       subscription: null,
       fully_read: true,

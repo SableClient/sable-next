@@ -44,7 +44,7 @@
   let selected = $derived(supporterAppearance(appearance));
   let { variant, color, colors, customCardColors, cardColor, buttonColor } = $derived(selected);
   const id = $props.id();
-  const donateHref = donateUrl();
+  let donateHref = $derived(donateUrl());
   let open = $state(false);
   let donorName = $derived.by(() => {
     let shortened = '';

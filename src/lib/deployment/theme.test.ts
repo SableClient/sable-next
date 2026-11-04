@@ -54,11 +54,13 @@ it('stays below user styles applied afterwards', async () => {
   expect(ids()).toEqual(['sable-deployment-theme', 'sable-custom-theme']);
 });
 
-it('does nothing without a theme url', async () => {
+it('clears the previous theme without a theme url', async () => {
   respond(THEME);
+  await loadDeploymentTheme('/previous.sable.css');
+  vi.mocked(fetch).mockClear();
   await loadDeploymentTheme(null);
   expect(fetch).not.toHaveBeenCalled();
-  expect(ids()).toEqual([]);
+  expect(document.getElementById('sable-deployment-theme')).toBeNull();
 });
 
 it.each([
@@ -83,10 +85,54 @@ it.each([
 ])('logs and keeps the default theme on %s', async (_, setup) => {
   setup();
   await loadDeploymentTheme('/brand.sable.css');
-  expect(ids()).toEqual([]);
+  expect(document.getElementById('sable-deployment-theme')).toBeNull();
   expect(console.debug).toHaveBeenCalledWith(
     '[sable deployment] theme not applied',
     '/brand.sable.css',
     expect.anything()
   );
+});
+
+it('clears the previous theme immediately and discards a stale response', async () => {
+  respond(THEME);
+  await loadDeploymentTheme('/previous.sable.css');
+  let finishOld: (response: { ok: boolean; text: () => Promise<string> }) => void = () => {};
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishOld = resolve;
+          })
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(THEME.replace('#123456', '#abcdef')),
+      })
+  );
+  const pending = loadDeploymentTheme('/old.sable.css');
+  expect(document.getElementById('sable-deployment-theme')).toBeNull();
+  await loadDeploymentTheme('/new.sable.css');
+  finishOld({ ok: true, text: () => Promise.resolve(THEME) });
+  await pending;
+  expect(document.getElementById('sable-deployment-theme')?.textContent).toContain('#abcdef');
+});
+
+it('discards a slow theme body after signing out', async () => {
+  let finishBody: (body: string) => void = () => {};
+  const body = new Promise<string>((resolve) => {
+    finishBody = resolve;
+  });
+  const text = vi.fn(() => body);
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text }));
+  const pending = loadDeploymentTheme('/old.sable.css');
+  await vi.waitFor(() => {
+    expect(text).toHaveBeenCalled();
+  });
+  await loadDeploymentTheme(null);
+  finishBody(THEME);
+  await pending;
+  expect(document.getElementById('sable-deployment-theme')).toBeNull();
 });

@@ -1,6 +1,12 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { deviceDisplayName } from '#lib/deployment/policy.js';
+import { EMPTY_RUNTIME_CONFIG } from '#lib/config/runtime-config.js';
+import {
+  activateAccountConfiguration,
+  removeAccountConfiguration,
+  prepareLoginConfiguration,
+} from '#lib/deployment/deployment.js';
 import { reportSessionFailure } from '#lib/observability/session-telemetry.js';
 
 import type { AttachmentInfoView, CoreEvent, SessionInfo } from '#src/generated/protocol';
@@ -14,6 +20,16 @@ import { createCoreClient } from './client.svelte.js';
 import * as attachmentInfo from './attachment-info.js';
 
 vi.mock('#lib/observability/session-telemetry.js', () => ({ reportSessionFailure: vi.fn() }));
+vi.mock('#lib/deployment/deployment.js', async () => {
+  const { EMPTY_RUNTIME_CONFIG } = await import('#lib/config/runtime-config.js');
+  return {
+    deployment: () => EMPTY_RUNTIME_CONFIG,
+    loginConfiguration: () => EMPTY_RUNTIME_CONFIG,
+    activateAccountConfiguration: vi.fn(),
+    removeAccountConfiguration: vi.fn(),
+    prepareLoginConfiguration: vi.fn(() => Promise.resolve(EMPTY_RUNTIME_CONFIG)),
+  };
+});
 
 const localNetwork = vi.hoisted(() => ({ gated: false, denied: false }));
 
@@ -59,6 +75,7 @@ test('a locked account keeps its session and clears the lock after switching acc
   expect(core.memberPreviews.get('room', '', null)).toBeNull();
   expect(core.accountLocked).toBe(false);
   expect(core.session).toEqual(otherSession);
+  expect(activateAccountConfiguration).toHaveBeenLastCalledWith(otherSession);
   expect(fake.deleteAccountStore).not.toHaveBeenCalled();
 });
 
@@ -1711,4 +1728,40 @@ test('writing a profile field invalidates the cached profile', async () => {
     core.stop();
     vi.useRealTimers();
   }
+});
+
+test('login discovers configuration using the entered server and uses its device name', async () => {
+  const fake = fakeTransport({
+    'session.restore': session,
+    'session.list_accounts': [session],
+    'auth.login': session.user_id,
+  });
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+  vi.mocked(prepareLoginConfiguration).mockResolvedValueOnce({
+    ...EMPTY_RUNTIME_CONFIG,
+    auth: { ...EMPTY_RUNTIME_CONFIG.auth, deviceDisplayName: 'Acme Chat' },
+  });
+  await core.login('example.org', { kind: 'user', user: 'kris' }, 'password');
+  expect(prepareLoginConfiguration).toHaveBeenCalledWith('example.org');
+  const calls = fake.call.mock.calls.filter(([method]) => method === 'auth.login');
+  expect(calls.at(-1)?.[1]).toMatchObject({
+    device_display_name: deviceDisplayName({
+      ...EMPTY_RUNTIME_CONFIG,
+      auth: { ...EMPTY_RUNTIME_CONFIG.auth, deviceDisplayName: 'Acme Chat' },
+    }),
+  });
+  core.stop();
+});
+
+test('removing an account removes its cached homeserver configuration', async () => {
+  const fake = fakeTransport({
+    'session.restore': session,
+    'session.list_accounts': [session, otherSession],
+  });
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+  await core.removeAccount(otherSession.account_id);
+  expect(removeAccountConfiguration).toHaveBeenCalledWith(otherSession.account_id);
+  core.stop();
 });

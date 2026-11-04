@@ -22,12 +22,12 @@
 
   let { titleKey = 'nav.home' }: Props = $props();
   const hasLoggedInBefore = readReturningUser();
-  const room = supportRoom();
-  const supportHref = room
-    ? resolve('/(app)/to/[...permalink]', { permalink: roomPathParamFromId(room) })
-    : null;
-  const source = sourceUrl();
-  const donate = donateUrl();
+  let room = $derived(supportRoom());
+  let supportHref = $derived(
+    room ? resolve('/(app)/to/[...permalink]', { permalink: roomPathParamFromId(room) }) : null
+  );
+  let source = $derived(sourceUrl());
+  let donate = $derived(donateUrl());
 
   const startCards = [
     {

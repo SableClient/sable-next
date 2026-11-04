@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { loginConfiguration } from '#lib/deployment/deployment.js';
+  import { appName } from '#lib/deployment/brand.js';
   import { i18n } from '#lib/i18n.js';
   import SableBrandMark from '#lib/ui/SableBrandMark.svelte';
 
@@ -11,9 +13,12 @@
 </script>
 
 <header class="auth-heading">
-  <SableBrandMark />
+  <SableBrandMark config={loginConfiguration()} />
   <h1 id="sable-title">
-    {title ?? (hasLoggedInBefore ? i18n.t('auth.welcomeBack') : i18n.t('auth.welcome'))}
+    {title ??
+      (hasLoggedInBefore
+        ? i18n.t('auth.welcomeBack')
+        : i18n.t('auth.welcome', { appName: appName(loginConfiguration()) }))}
   </h1>
 </header>
 

@@ -1,3 +1,4 @@
+import { readText, writeText, removeLocalValue } from '#lib/platform/local-json.js';
 import {
   type CoreEvent,
   type DeviceView,
@@ -27,6 +28,12 @@ import { CoreError } from '../../transport';
 import QuickLRU from 'quick-lru';
 import { on } from 'svelte/events';
 import { deviceDisplayName } from '#lib/deployment/policy.js';
+import {
+  activateAccountConfiguration,
+  removeAccountConfiguration,
+  prepareLoginConfiguration,
+  loginConfiguration,
+} from '#lib/deployment/deployment.js';
 import {
   defaultE2eePolicy,
   parseE2eePolicy,
@@ -306,7 +313,7 @@ export class CoreClient {
           homeserver: resolvedHomeserver,
           identifier,
           password,
-          device_display_name: deviceDisplayName(),
+          device_display_name: deviceDisplayName(await prepareLoginConfiguration(homeserver)),
         })
         .catch((error: unknown) => blameLocalNetwork(error, resolvedHomeserver));
 
@@ -324,13 +331,17 @@ export class CoreClient {
 
   async loginFlows(homeserver: string): Promise<LoginFlowsView> {
     const transport = this.ensureTransport();
-    const resolvedHomeserver = await resolveHomeserverInPage(homeserver, this.resolvedHomeservers);
+    const [resolvedHomeserver] = await Promise.all([
+      resolveHomeserverInPage(homeserver, this.resolvedHomeservers),
+      prepareLoginConfiguration(homeserver),
+    ]);
     return this.#rpcOn(transport)
       .auth.loginFlows({ homeserver: resolvedHomeserver })
       .catch((error: unknown) => blameLocalNetwork(error, resolvedHomeserver));
   }
 
   async registrationFlows(homeserver: string): Promise<RegistrationFlowsView> {
+    await prepareLoginConfiguration(homeserver);
     const resolvedHomeserver = await resolveHomeserverInPage(homeserver, this.resolvedHomeservers);
     return this.rpc.auth.registrationFlows({ homeserver: resolvedHomeserver });
   }
@@ -396,7 +407,7 @@ export class CoreClient {
         password,
         registration_email: registrationEmail,
         registration_token: registrationToken,
-        device_display_name: deviceDisplayName(),
+        device_display_name: deviceDisplayName(await prepareLoginConfiguration(homeserver)),
       });
       if (result.state === 'complete') {
         await this.finishAuthentication(result.user_id);
@@ -433,7 +444,7 @@ export class CoreClient {
       homeserver: resolvedHomeserver,
       redirect_uri: redirectUri,
       intent,
-      device_display_name: deviceDisplayName(),
+      device_display_name: deviceDisplayName(await prepareLoginConfiguration(homeserver)),
     });
   }
 
@@ -513,6 +524,8 @@ export class CoreClient {
   ): Promise<string> {
     const transport = this.ensureTransport();
     const resolvedHomeserver = await resolveHomeserverInPage(homeserver, this.resolvedHomeservers);
+    await prepareLoginConfiguration(homeserver);
+    writeText('sable.sso-config-server', homeserver);
     return this.#rpcOn(transport).auth.startSsoLogin({
       reauth_account_id: reauthAccountId ?? null,
       homeserver: resolvedHomeserver,
@@ -536,14 +549,17 @@ export class CoreClient {
     this.status = 'authenticating';
 
     try {
+      const server = readText('sable.sso-config-server');
+      const config = server ? await prepareLoginConfiguration(server) : loginConfiguration();
       const userId = await this.#rpcOn(transport).auth.completeSsoLogin({
         callback_url: callbackUrl,
-        device_display_name: deviceDisplayName(),
+        device_display_name: deviceDisplayName(config),
       });
 
       if (generation !== this.generation || transport !== this.transport) return;
 
       await this.finishAuthentication(userId, generation);
+      removeLocalValue('sable.sso-config-server');
     } catch (error) {
       if (generation === this.generation && transport === this.transport) {
         this.replaceSession(previousSession);
@@ -826,6 +842,7 @@ export class CoreClient {
     await this.#rpcOn(transport).session.removeAccount({ account_id: accountId });
     await this.refreshAccounts();
     discardAccountStore(transport, accountId);
+    removeAccountConfiguration(accountId);
     clearRoomListSnapshot(accountId);
     if (userId !== undefined) clearRecentSearches(userId);
   }
@@ -841,6 +858,7 @@ export class CoreClient {
     this.status = 'authenticating';
     if (accountId !== null) {
       discardAccountStore(transport, accountId);
+      removeAccountConfiguration(accountId);
       clearRoomListSnapshot(accountId);
     }
     if (userId !== null) clearRecentSearches(userId);
@@ -994,6 +1012,7 @@ export class CoreClient {
       this.resetCachedState();
     }
     this.session = session;
+    if (changed) activateAccountConfiguration(session);
     if (session) this.reauthenticationAccountId = null;
     if (changed && session) {
       void this.primeEncryptionStatus();

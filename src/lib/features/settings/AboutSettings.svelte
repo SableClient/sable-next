@@ -45,8 +45,8 @@
   import { supporter } from '#lib/supporter/supporter.svelte.js';
 
   const core = useCoreClient();
-  const source = sourceUrl();
-  const donate = donateUrl();
+  let source = $derived(sourceUrl());
+  let donate = $derived(donateUrl());
   const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
   const automaticUpdateChecksSupported = supportsAutoUpdate() || hostsServiceWorker();
   let confirmingReset = $state(false);

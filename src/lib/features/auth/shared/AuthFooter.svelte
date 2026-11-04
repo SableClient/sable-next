@@ -1,14 +1,17 @@
 <script lang="ts">
   import { helpUrl, privacyUrl, sourceUrl, termsLinks } from '#lib/deployment/links.js';
+  import { loginConfiguration } from '#lib/deployment/deployment.js';
   import { i18n } from '#lib/i18n.js';
   const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
 
-  const links = [
-    { text: i18n.t('common.sourceCode'), url: sourceUrl() },
-    { text: i18n.t('footer.help'), url: helpUrl() },
-    { text: i18n.t('footer.privacy'), url: privacyUrl() },
-    ...termsLinks(),
-  ].filter((link): link is { text: string; url: string } => link.url !== null);
+  const links = $derived(
+    [
+      { text: i18n.t('common.sourceCode'), url: sourceUrl(loginConfiguration()) },
+      { text: i18n.t('footer.help'), url: helpUrl(loginConfiguration()) },
+      { text: i18n.t('footer.privacy'), url: privacyUrl(loginConfiguration()) },
+      ...termsLinks(loginConfiguration()),
+    ].filter((link): link is { text: string; url: string } => link.url !== null)
+  );
 </script>
 
 <footer class="auth-footer">

@@ -1,3 +1,4 @@
+import { logoutRedirectUrl } from '#lib/deployment/policy.js';
 import { base64ToUint8Array, uint8ArrayToBase64 } from 'uint8array-extras';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -285,6 +286,7 @@ export async function logoutWithPush(core: CoreClient, override: PushOverride): 
     unregisterNativePush(),
     userId === undefined ? undefined : forgetPushSession(userId),
   ]);
+  const redirectUrl = logoutRedirectUrl();
   await core.logout();
-  redirectAfterLogout(core);
+  redirectAfterLogout(core, redirectUrl);
 }
