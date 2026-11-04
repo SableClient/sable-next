@@ -1161,7 +1161,6 @@
     font: inherit;
     font-size: var(--font-size-small);
     margin: var(--space-200);
-    margin-bottom: var(--space-300);
     overflow: hidden;
     padding: var(--space-150) var(--space-200);
     text-align: left;
