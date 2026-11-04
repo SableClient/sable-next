@@ -647,6 +647,17 @@ impl Core {
         let Ok((cache, _drop_handles)) = event_cache.room(&room_id).await else {
             return;
         };
+        let Ok(events) = cache.events().await else {
+            return;
+        };
+        {
+            let index = self.search_index.lock().await;
+            // Dropping the last SDK subscriber reloads the cache from storage.
+            if index.rooms.contains_key(&room_id) && index.unclassified(&room_id, events).is_empty()
+            {
+                return;
+            }
+        }
         // Pin only while indexing: a permanent subscriber disables SDK cache shrinking.
         let Ok((mut events, mut updates)) = cache.subscribe().await else {
             return;

@@ -120,6 +120,74 @@ fn test_a_cache_refill_costs_nothing_when_the_index_already_holds_it() {
 }
 
 #[async_test]
+async fn test_reindexing_a_classified_cache_does_not_reload_it_from_storage() {
+    use std::time::Duration;
+
+    use matrix_sdk::config::StoreConfig;
+    use matrix_sdk_base::event_cache::store::ControlledMemoryStore;
+    use matrix_sdk_common::cross_process_lock::CrossProcessLockConfig;
+
+    let server = MatrixMockServer::new().await;
+    let store = ControlledMemoryStore::new();
+    let client = server
+        .client_builder()
+        .on_builder(|builder| {
+            builder.store_config(
+                StoreConfig::new(CrossProcessLockConfig::SingleProcess)
+                    .event_cache_store(Arc::new(store.clone())),
+            )
+        })
+        .build()
+        .await;
+    let room_id = room_id!("!classified:localhost").to_owned();
+    let factory = EventFactory::new()
+        .room(&room_id)
+        .sender(user_id!("@kris:localhost"));
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(&room_id).add_timeline_event(
+                factory
+                    .text_msg("already searchable")
+                    .event_id(event_id!("$classified")),
+            ),
+        )
+        .await;
+    store.wait_for_write_to_finish().await;
+
+    let (cache, _handles) = client.event_cache().unwrap().room(&room_id).await.unwrap();
+    let (core, _events) = crate::Core::new(
+        "search-classified",
+        Box::new(crate::store::MemorySessionStore::default()),
+    );
+    reingest_whole_room(&mut *core.search_index.lock().await, &cache, &room_id).await;
+    store.wait_for_write_to_start().await;
+    store.fail_next_last_chunk_load();
+
+    core.prime_persisted_rooms(&client).await;
+    core.prime_persisted_rooms(&client).await;
+
+    assert!(
+        tokio::time::timeout(Duration::from_millis(200), store.wait_for_write_to_start())
+            .await
+            .is_err(),
+        "a no-op indexing pass must not reload the cache and clear it on a storage read failure"
+    );
+    assert_eq!(cache.events().await.unwrap().len(), 1);
+    assert_eq!(
+        in_room(
+            &*core.search_index.lock().await,
+            &room_id,
+            "searchable",
+            10,
+            0
+        )
+        .len(),
+        1
+    );
+}
+
+#[async_test]
 async fn test_a_room_with_no_new_activity_is_indexed_from_its_persisted_cache() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
