@@ -1784,6 +1784,18 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'rooms.replaced_rooms': () => [],
       'rooms.open': (params) => ({
         permissions: roomPermissions(params.room_id),
+        power_levels: {
+          ban: 50,
+          kick: 50,
+          redact: 50,
+          invite: 0,
+          events_default: 0,
+          state_default: 50,
+          users_default: 0,
+          events: {},
+          users: { [session.user_id]: 100 },
+          notifications_room: 50,
+        },
         power_level_tags: {},
         widgets: roomStateEvents(params.room_id, 'im.vector.modular.widgets'),
         pinned_event_ids: [],

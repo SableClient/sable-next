@@ -1276,6 +1276,7 @@ export type RoomListOptionsView = {
 
 export type RoomOpenView = {
 	permissions: RoomPermissionsView,
+	power_levels: RoomPowerLevelsView,
 	power_level_tags: { [key in string]: PowerLevelTagView },
 	widgets: RoomStateEventView[],
 	pinned_event_ids: string[],

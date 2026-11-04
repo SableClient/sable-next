@@ -649,6 +649,22 @@ impl Core {
         &self,
         room_id: &OwnedRoomId,
     ) -> Result<crate::protocol::RoomPermissionsView, RpcError> {
+        self.room_access(room_id)
+            .await
+            .map(|(permissions, _)| permissions)
+    }
+
+    /// Permissions and the power levels they come from, in one read.
+    pub(crate) async fn room_access(
+        &self,
+        room_id: &OwnedRoomId,
+    ) -> Result<
+        (
+            crate::protocol::RoomPermissionsView,
+            crate::protocol::RoomPowerLevelsView,
+        ),
+        RpcError,
+    > {
         let room = self.room(room_id).await?;
         let user_id = room
             .client()
@@ -661,10 +677,13 @@ impl Core {
             .with_open_stores(async || room.power_levels_or_default().await)
             .await;
 
-        Ok(view::room_permissions(
-            &power_levels,
-            &user_id,
-            room.encryption_state().is_encrypted(),
+        Ok((
+            view::room_permissions(
+                &power_levels,
+                &user_id,
+                room.encryption_state().is_encrypted(),
+            ),
+            view::room_power_levels(&power_levels),
         ))
     }
 

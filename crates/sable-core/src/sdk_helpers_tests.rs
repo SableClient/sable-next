@@ -3932,3 +3932,54 @@ async fn an_unchanged_room_row_is_rebuilt_without_reading_room_state() {
     assert_eq!(cache[room_id].avatar_url.as_deref(), Some(second.as_str()));
     assert_eq!(reads.state(), 1, "a new avatar is resolved once");
 }
+
+#[tokio::test]
+async fn opening_a_room_returns_its_power_levels() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!levels:example.org");
+    let own = client.user_id().unwrap().to_owned();
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(
+                    Raw::new(&json!({
+                        "type": "m.room.create", "state_key": "", "sender": own,
+                        "event_id": "$create", "origin_server_ts": 1,
+                        "content": { "room_version": "10", "creator": own },
+                    }))
+                    .unwrap()
+                    .cast_unchecked(),
+                )
+                .add_state_event(
+                    Raw::new(&json!({
+                        "type": "m.room.power_levels", "state_key": "", "sender": own,
+                        "event_id": "$levels", "origin_server_ts": 2,
+                        "content": { "invite": 75, "users": { own.as_str(): 75 } },
+                    }))
+                    .unwrap()
+                    .cast_unchecked(),
+                ),
+        )
+        .await;
+    Mock::given(method("GET"))
+        .and(wiremock::matchers::path_regex(r"/state(/[^/]+/)?$"))
+        .respond_with(ResponseTemplate::new(404).set_body_json(json!({
+            "errcode": "M_NOT_FOUND", "error": "not found"
+        })))
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    let opened = core
+        .run(crate::api::rooms::OpenParams {
+            room_id: room_id.to_owned(),
+        })
+        .await
+        .unwrap();
+
+    assert!(opened.permissions.can_invite);
+    assert_eq!(opened.power_levels.invite, 75);
+    assert_eq!(opened.power_levels.users.get(own.as_str()), Some(&75));
+}

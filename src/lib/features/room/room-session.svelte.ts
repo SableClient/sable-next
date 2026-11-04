@@ -18,7 +18,6 @@ type RoomDetailRpc = RoomStateRpc<
   'memberListThreshold' | 'event' | 'events' | 'addWidget' | 'removeWidget'
 > & {
   rooms: Pick<Rpc['rooms'], 'open'>;
-  members: Pick<Rpc['members'], 'powerLevels'>;
 };
 
 function parseWidgets(events: readonly RoomStateEventView[]): RoomWidget[] {
@@ -55,6 +54,7 @@ export class RoomDetails {
       .then((opened) => {
         if (generation !== this.#generation) return;
         this.permissions = opened.permissions;
+        this.powerLevels = opened.power_levels;
         this.predecessor = opened.predecessor;
         this.powerTags = opened.power_level_tags;
         this.widgets = parseWidgets(opened.widgets);
@@ -63,14 +63,6 @@ export class RoomDetails {
       .catch((error: unknown) => {
         console.debug('[sable room] room details unavailable', error);
         if (generation === this.#generation) this.powerTags = {};
-      });
-    void this.rpc.members
-      .powerLevels({ room_id: roomId })
-      .then((levels) => {
-        if (generation === this.#generation) this.powerLevels = levels;
-      })
-      .catch((error: unknown) => {
-        console.debug('[sable room] power levels unavailable', error);
       });
     return () => {
       if (generation === this.#generation) this.#generation += 1;

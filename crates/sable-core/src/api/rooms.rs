@@ -125,8 +125,8 @@ impl Handler for OpenParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<RoomOpenView, RpcError> {
         let room_id = self.room_id;
-        let (permissions, power_level_tags, widgets, pinned_event_ids) = futures_util::join!(
-            core.room_permissions(&room_id),
+        let (access, power_level_tags, widgets, pinned_event_ids) = futures_util::join!(
+            core.room_access(&room_id),
             core.room_state_event_content(
                 room_id.clone(),
                 power_levels::TAGS_EVENT.to_owned(),
@@ -143,8 +143,10 @@ impl Handler for OpenParams {
             .await
             .ok()
             .and_then(|room| view::predecessor(&room));
+        let (permissions, power_levels) = access?;
         Ok(RoomOpenView {
-            permissions: permissions?,
+            permissions,
+            power_levels,
             power_level_tags: power_levels::parse_tags(
                 power_level_tags
                     .unwrap_or_else(|error| {

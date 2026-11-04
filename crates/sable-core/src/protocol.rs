@@ -1461,6 +1461,7 @@ pub struct RoomStateEventView {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct RoomOpenView {
     pub permissions: RoomPermissionsView,
+    pub power_levels: RoomPowerLevelsView,
     #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, PowerLevelTagView>))]
     pub power_level_tags: PowerLevelTagsView,
     pub widgets: Vec<RoomStateEventView>,
