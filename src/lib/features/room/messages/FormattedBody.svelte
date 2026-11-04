@@ -704,7 +704,6 @@
   .formatted-body :global(p) {
     line-height: var(--line-height-body);
     margin: 0;
-    white-space: pre-wrap;
   }
 
   .formatted-body :global(p + p) {
