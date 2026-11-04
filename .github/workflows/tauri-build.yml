@@ -164,9 +164,6 @@ jobs:
         env:
           PLATFORM: ${{ matrix.platform }}
         run: pnpm --dir electron package "$PLATFORM"
-      - name: Upload main process source maps
-        shell: bash
-        run: node scripts/ci/upload-sentry-sourcemaps.mjs electron/dist app:///dist
       - name: Attest bundles
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:

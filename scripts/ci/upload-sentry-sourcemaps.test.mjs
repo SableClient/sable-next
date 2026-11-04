@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
-import { collectMaps } from './upload-sentry-sourcemaps.mjs';
+import { collectMaps, sentryCommands } from './upload-sentry-sourcemaps.mjs';
 
 test('finds nested maps and tolerates a missing directory', async () => {
   const root = await mkdtemp(join(tmpdir(), 'sable-maps-'));
@@ -20,4 +20,11 @@ test('finds nested maps and tolerates a missing directory', async () => {
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('injects debug ids before uploading source maps', () => {
+  assert.deepEqual(sentryCommands('electron/dist', 'v1'), [
+    ['sourcemaps', 'inject', 'electron/dist'],
+    ['sourcemaps', 'upload', '--release', 'v1', 'electron/dist'],
+  ]);
 });

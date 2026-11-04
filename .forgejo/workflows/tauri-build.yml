@@ -721,8 +721,6 @@ jobs:
           install-mise-tools: 'false'
       - name: Package
         run: pnpm --dir electron package --linux
-      - name: Upload main process source maps
-        run: node scripts/ci/upload-sentry-sourcemaps.mjs electron/dist app:///dist
       - name: Upload native addon symbols
         run: node scripts/ci/upload-sentry-symbols.mjs electron/dist
       - name: Verify native core shutdown
@@ -822,8 +820,6 @@ jobs:
       - name: Remove the signing keychain
         if: ${{ always() && env.APPLE_CERTIFICATE != '' }}
         run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
-      - name: Upload main process source maps
-        run: node scripts/ci/upload-sentry-sourcemaps.mjs electron/dist app:///dist
       - name: Upload native addon symbols
         run: node scripts/ci/upload-sentry-symbols.mjs electron/dist
       - name: Verify native core shutdown

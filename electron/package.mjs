@@ -26,6 +26,11 @@ const env = { ...process.env, VITE_APP_VERSION: version, SABLE_IDENTIFIER: ident
 execFileSync(process.execPath, [join(here, 'build.mjs'), '--release'], { stdio: 'inherit', env });
 execFileSync(
   process.execPath,
+  [join(here, '../scripts/ci/upload-sentry-sourcemaps.mjs'), join(here, 'dist')],
+  { stdio: 'inherit', env }
+);
+execFileSync(
+  process.execPath,
   [
     builder,
     '--publish',
