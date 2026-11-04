@@ -928,7 +928,6 @@ jobs:
           IPA_PATH: ${{ steps.ipa.outputs.path }}
         run: node scripts/ci/forgejo-release.mjs upload "$IPA_PATH"
       - name: Upload to TestFlight
-        if: ${{ needs.setup-release.outputs.nightly == 'true' }}
         env:
           IPA_PATH: ${{ steps.ipa.outputs.path }}
         run: |
