@@ -1,27 +1,20 @@
 {
   "upcoming": {
     "added": [
+      "callInputMode",
+      "callGlobalShortcuts"
+    ],
+    "changed": []
+  },
+  "v2.3.2": {
+    "added": [
+      "hardwareVideoEncode",
+      "hardwareVideoDecode",
       "personaSelectionScope",
       "personaKeepAfterShorthand",
       "searchBackup",
       "searchBackupLimit"
     ],
     "changed": []
-  },
-  "v2.3.0": {
-    "added": [
-      "launchAtLogin",
-      "startMinimized",
-      "showAllTimestamps",
-      "messageSwipeAction",
-      "showSingleReactionCount"
-    ],
-    "changed": [
-      {
-        "key": "callScreenCodec",
-        "from": "'auto'",
-        "to": "'h264'"
-      }
-    ]
   }
 }

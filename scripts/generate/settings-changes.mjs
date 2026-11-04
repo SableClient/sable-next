@@ -1,36 +1,16 @@
-import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
+import {
+  git,
+  output,
+  releaseChanges,
+  releaseCount,
+  releaseTags,
+  root,
+} from '../release/settings-changes-release.mjs';
 
-const root = join(import.meta.dirname, '../..');
-const output = join(root, 'src/generated/settings-changes.json');
 const registryDir = 'src/lib/settings/registry';
-const releaseCount = 2;
-
-function git(...args) {
-  return execFileSync('git', args, {
-    cwd: root,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-}
-
-function releaseTags() {
-  let list;
-  try {
-    list = git('tag', '--list', '--merged', 'HEAD', 'v*');
-  } catch {
-    return [];
-  }
-  return list
-    .split('\n')
-    .filter((tag) => /^v\d+\.\d+\.\d+$/.test(tag))
-    .sort((a, b) => {
-      const [x, y] = [a, b].map((tag) => tag.slice(1).split('.').map(Number));
-      return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
-    });
-}
 
 function readSources(rev) {
   const paths =
@@ -106,11 +86,12 @@ if (import.meta.main) {
   const check = process.argv.includes('--check');
   const tags = releaseTags();
   if (tags.length <= releaseCount) {
-    if (check) throw new Error('Release tags are missing, fetch them with git fetch --tags');
-    console.warn('Release tags are missing, keeping the committed settings changes');
-    process.exit(0);
+    throw new Error('Release tags are missing, fetch them with git fetch --tags');
   }
-  const changes = buildChanges(tags, (rev) => parseSettings(readSources(rev)));
+  let changes = buildChanges(tags, (rev) => parseSettings(readSources(rev)));
+  const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  // A prepared release is not tagged until its PR merges.
+  if (!tags.includes(`v${version}`)) changes = releaseChanges(changes, version, tags);
   const json = `${JSON.stringify(changes, null, 2)}\n`;
   if (!check) writeFileSync(output, json);
   else if (readFileSync(output, 'utf8') !== json) {
