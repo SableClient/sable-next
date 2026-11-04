@@ -456,7 +456,7 @@
       />
     {/snippet}
   </PanelHeader>
-  <RoomBannerStrip {roomId} />
+  <RoomBannerStrip roomId={resolvedRoomId} />
 
   <div class="calendar-content" {@attach scrollHint}>
     <div class="calendar-range">

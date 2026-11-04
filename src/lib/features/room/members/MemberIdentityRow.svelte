@@ -84,7 +84,7 @@
       <SenderName {displayName} {colors} nameClass="member-name" compact />
       {@render secondary?.()}
       {#if userStatus}
-        {@const statusLabel = [userStatus.emoji, userStatus.text].filter(Boolean).join(' ')}
+        {@const statusLabel = [userStatus?.emoji, userStatus?.text].filter(Boolean).join(' ')}
         <Tooltip label={statusLabel}>
           {#snippet trigger({ props })}
             <span {...props} class="member-identity-status">

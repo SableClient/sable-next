@@ -583,7 +583,7 @@
               {#if room?.is_direct && room.topic && preferences.showDmTopics}
                 <span class="room-topic">{room.topic}</span>
               {:else if peerStatus}
-                {@const peerStatusLabel = [peerStatus.emoji, peerStatus.text]
+                {@const peerStatusLabel = [peerStatus?.emoji, peerStatus?.text]
                   .filter(Boolean)
                   .join(' ')}
                 <Tooltip label={peerStatusLabel}>
