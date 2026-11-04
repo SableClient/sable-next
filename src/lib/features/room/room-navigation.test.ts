@@ -44,6 +44,7 @@ function enter(from: string | null, type = 'link', delta?: number): void {
 }
 
 test.each([
+  ['/home/room', {}, '/home'],
   ['/direct/room', {}, 'direct'],
   ['/space/space/room', { spaceId: '!space' }, '/space/param:!space'],
   ['/space/space/room', {}, '/rooms'],
@@ -149,7 +150,8 @@ test('the back arrow on a phone opens the drawer over the room rather than leavi
   expect(goto).toHaveBeenCalledExactlyOnceWith('', {
     shallow: true,
     replace: true,
-    state: { mobileDrawer: 'open' },
+    state: { mobileDrawer: 'open', mobileDrawerBack: false },
+    persistState: true,
   });
 });
 
@@ -165,7 +167,11 @@ test.each([
 
   goToPage(href);
 
-  expect(goto).toHaveBeenLastCalledWith(href, { replace: replaced });
+  expect(goto).toHaveBeenLastCalledWith(href, {
+    replace: replaced,
+    state: {},
+    persistState: true,
+  });
 });
 
 test('on a phone, opening a room from the room list pushes', () => {
@@ -174,5 +180,61 @@ test('on a phone, opening a room from the room list pushes', () => {
 
   goToPage('/rooms/other');
 
-  expect(goto).toHaveBeenLastCalledWith('/rooms/other', { replace: false });
+  expect(goto).toHaveBeenLastCalledWith('/rooms/other', {
+    replace: false,
+    state: { mobileDrawerBack: true },
+    persistState: true,
+  });
+});
+
+test.each(['/home/room', '/rooms/room', '/direct/room', '/space/space/room'])(
+  'opening %s preserves the open drawer in history',
+  (href) => {
+    visit('/space/space/previous', { spaceId: 'space', roomId: 'previous' });
+    page.state.mobileDrawer = 'open';
+
+    goToPage(href);
+
+    expect(goto).toHaveBeenLastCalledWith(href, {
+      replace: false,
+      state: { mobileDrawerBack: true },
+      persistState: true,
+    });
+  }
+);
+
+test('switching rooms preserves the list entry', () => {
+  page.params = { roomId: 'room' };
+  page.state.mobileDrawerBack = true;
+
+  goToPage('/rooms/other');
+
+  expect(goto).toHaveBeenLastCalledWith('/rooms/other', {
+    replace: true,
+    state: { mobileDrawerBack: true },
+    persistState: true,
+  });
+});
+
+test('opening the current room preserves the list entry', () => {
+  page.state.mobileDrawer = 'open';
+  page.state.overlay = 0;
+
+  goToPage('/rooms/room');
+
+  expect(goto).toHaveBeenCalledExactlyOnceWith('', {
+    shallow: true,
+    replace: false,
+    state: { mobileDrawer: 'closed', mobileDrawerBack: true, overlay: 0 },
+    persistState: true,
+  });
+});
+
+test('the back arrow reuses the list entry', () => {
+  page.state.mobileDrawerBack = true;
+
+  backToRoomList();
+
+  expect(mocks.back).toHaveBeenCalledOnce();
+  expect(goto).not.toHaveBeenCalled();
 });

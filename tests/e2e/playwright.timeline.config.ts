@@ -41,6 +41,7 @@ export default defineConfig({
     'calendar-room-menu.spec.ts',
     'room-icon-badge.spec.ts',
     'space-search-navigation.spec.ts',
+    'space-back-navigation.spec.ts',
     'space-timeline-navigation.spec.ts',
     'verification-qr.spec.ts',
     'onboarding.spec.ts',

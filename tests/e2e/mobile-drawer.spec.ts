@@ -70,6 +70,14 @@ test('mobile: the room back arrow slides the list over the room, and a swipe ret
     await swipe(page, 350, 50);
     await expect(drawer).toHaveAttribute('aria-pressed', 'false');
     expect(page.url()).toBe(roomUrl);
+
+    await page.goBack();
+    await expect(drawer).toHaveAttribute('aria-pressed', 'true');
+    await page.goForward();
+    await expect(drawer).toHaveAttribute('aria-pressed', 'false');
+    await swipe(page, 50, 350);
+    await expect(drawer).toHaveAttribute('aria-pressed', 'true');
+    expect(page.url()).toBe(roomUrl);
   }
 });
 

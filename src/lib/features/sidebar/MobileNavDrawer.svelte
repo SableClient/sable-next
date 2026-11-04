@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { setPageState } from '#lib/platform/page-state.js';
   import { untrack, type Snippet } from 'svelte';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
@@ -16,7 +15,11 @@
     type SwipeGesture,
   } from '#lib/ui/swipe-gesture.js';
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
-  import { backToRoomList, goToPage, isRoomSwitch } from '#lib/features/room/room-navigation.js';
+  import {
+    backToRoomList,
+    goToPage,
+    setMobileDrawerOpen,
+  } from '#lib/features/room/room-navigation.js';
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
 
   interface Props {
@@ -145,7 +148,7 @@
 
   function setOpen(next: boolean): void {
     if (next === open || (!next && pinnedOpen)) return;
-    void setPageState({ ...page.state, mobileDrawer: next ? 'open' : 'closed' }, true);
+    setMobileDrawerOpen(next);
     if (!next) {
       focusContentOnSettle = true;
       return;
@@ -212,17 +215,18 @@
     if (event.defaultPrevented || appLayout.current || !(event.target instanceof Element)) return;
     const link = event.target.closest('a[href]');
     if (!(link instanceof HTMLAnchorElement)) return;
+    const plain =
+      event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+    if (!plain || link.origin !== page.url.origin || link.target || link.hasAttribute('download')) {
+      return;
+    }
     if (link.pathname === pathname) {
       event.preventDefault();
       setOpen(false);
       return;
     }
-    const plain =
-      event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
-    if (plain && isRoomSwitch(link.href)) {
-      event.preventDefault();
-      goToPage(link.href);
-    }
+    event.preventDefault();
+    goToPage(link.href);
   }
 
   function handleKeydown(event: KeyboardEvent) {

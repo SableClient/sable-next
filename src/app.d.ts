@@ -13,6 +13,8 @@ declare global {
       overlay?: number;
       /** Phone room-list drawer state, kept in history for native back gestures. */
       mobileDrawer?: 'open' | 'closed';
+      /** Back returns to the room list. */
+      mobileDrawerBack?: boolean;
       /** Event a notification tap lands the live timeline on, once. */
       notified?: string;
     }

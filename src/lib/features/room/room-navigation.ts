@@ -1,6 +1,5 @@
 import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
 import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
-import { setPageState } from '#lib/platform/page-state.js';
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
 
@@ -20,6 +19,7 @@ export function trackRoomEntry(): void {
 }
 
 function roomListPath(): string {
+  if (page.url.pathname.startsWith('/home/')) return resolve('/(app)/home');
   if (page.url.pathname.startsWith('/direct/')) return resolve('direct');
   if (page.url.pathname.startsWith('/space/') && page.params.spaceId) {
     const spaceId = roomPathParamFromId(page.params.spaceId);
@@ -47,13 +47,27 @@ export function backToRoomList(): void {
     void leaveRoomView();
     return;
   }
-  void setPageState({ ...page.state, mobileDrawer: 'open' }, true);
+  setMobileDrawerOpen(true);
+}
+
+export function setMobileDrawerOpen(open: boolean): void {
+  if (open && page.state.mobileDrawerBack && page.state.mobileDrawer !== 'open') {
+    history.back();
+    return;
+  }
+  // eslint-disable-next-line svelte/no-navigation-without-resolve -- shallow state on the current URL
+  void goto('', {
+    shallow: true,
+    replace: open,
+    state: { ...page.state, mobileDrawer: open ? 'open' : 'closed', mobileDrawerBack: !open },
+    persistState: true,
+  });
 }
 
 const TREE_REGIONS = '[data-focus-region="rooms"], [data-focus-region="spaces"]';
 
 const ROOM_PATH =
-  /^\/(?:(?:rooms|direct)\/[^/]+|space\/[^/]+\/(?!lobby$|create-room$|create-space$)[^/]+)$/;
+  /^\/(?:(?:home|rooms|direct)\/[^/]+|space\/[^/]+\/(?!lobby$|create-room$|create-space$)[^/]+)$/;
 
 const COMPOSER_REGION = '[data-focus-region="composer"]';
 const HEADING_ATTEMPTS = 10;
@@ -100,13 +114,22 @@ export function isRoomSwitch(href: string): boolean {
 }
 
 export function goToPage(href: string): void {
-  const samePage = new URL(href, page.url.href).pathname === page.url.pathname;
-  if (samePage && !matchesAppLayout()) {
-    void setPageState({ ...page.state, mobileDrawer: 'closed' }, true);
+  const target = new URL(href, page.url.href).pathname;
+  const mobile = !matchesAppLayout();
+  if (target === page.url.pathname && mobile) {
+    setMobileDrawerOpen(false);
     return;
   }
+  const fromList =
+    page.state.mobileDrawer === 'open' ||
+    /^\/(?:home|rooms|direct|space\/[^/]+)$/.test(page.url.pathname);
+  const replace = isRoomSwitch(href) && !fromList;
+  const state =
+    mobile && ROOM_PATH.test(target) && (fromList || (replace && page.state.mobileDrawerBack))
+      ? { mobileDrawerBack: true }
+      : {};
   // eslint-disable-next-line svelte/no-navigation-without-resolve -- callers pass a resolved href
-  void goto(href, { replace: isRoomSwitch(href) });
+  void goto(href, { replace, state, persistState: true });
 }
 
 export function scopedSearchQuery(
