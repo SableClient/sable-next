@@ -171,10 +171,11 @@ use std::sync::Arc;
 
 use futures_util::{StreamExt, future, stream};
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
+use matrix_sdk::executor::{JoinHandleExt as _, spawn};
 use matrix_sdk::ruma::api::client::state::get_state_events;
 use matrix_sdk::ruma::events::{
-    AnyGlobalAccountDataEventContent, AnyStateEvent, AnySyncStateEvent, GlobalAccountDataEventType,
-    StateEventType,
+    AnyGlobalAccountDataEvent, AnyGlobalAccountDataEventContent, AnyStateEvent, AnySyncStateEvent,
+    GlobalAccountDataEventType, StateEventType,
 };
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedRoomId, RoomId};
@@ -182,12 +183,15 @@ use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 use crate::Core;
 use crate::api::packs::ListOk;
 use crate::protocol::{CoreEvent, RpcError};
+use tokio::sync::broadcast::error::RecvError;
 
 type AccountDataContent = Option<Raw<AnyGlobalAccountDataEventContent>>;
 
 pub(crate) struct PackCache {
     account_data: HashMap<String, AccountDataContent>,
     rooms: hashlink::LruCache<OwnedRoomId, RoomPackState>,
+    /// A fetch that raced a change must not be cached.
+    changes: u64,
 }
 
 impl Default for PackCache {
@@ -195,6 +199,7 @@ impl Default for PackCache {
         Self {
             account_data: HashMap::new(),
             rooms: hashlink::LruCache::new(MAX_CACHED_ROOMS),
+            changes: 0,
         }
     }
 }
@@ -204,17 +209,72 @@ impl PackCache {
         self.rooms.get(room_id).cloned()
     }
 
-    fn remember_room(&mut self, room_id: OwnedRoomId, state: RoomPackState) {
-        self.rooms.insert(room_id, state);
-    }
-
-    pub(crate) fn forget_room(&mut self, room_id: &RoomId, event_type: &str) {
-        if event_type == ROOM_EMOTES || event_type == ROOM_IMAGE_PACK {
-            self.rooms.remove(room_id);
+    fn remember_room(&mut self, changes: u64, room_id: OwnedRoomId, state: RoomPackState) {
+        if self.changes == changes {
+            self.rooms.insert(room_id, state);
         }
     }
 
+    fn remember_account_data(
+        &mut self,
+        changes: u64,
+        event_type: &str,
+        content: AccountDataContent,
+    ) {
+        if self.changes == changes {
+            self.account_data.insert(event_type.to_owned(), content);
+        }
+    }
+
+    pub(crate) fn note_state(
+        &mut self,
+        room_id: &RoomId,
+        event_type: &str,
+        state_key: &str,
+        content: &serde_json::Value,
+    ) {
+        match event_type {
+            ROOM_EMOTES | ROOM_IMAGE_PACK => {
+                self.changes += 1;
+                let Some(state) = self.rooms.get_mut(room_id) else {
+                    return;
+                };
+                match PackContent::deserialize(content) {
+                    Ok(content) => state.apply(RoomPackEvent {
+                        event_type: event_type.to_owned(),
+                        state_key: state_key.to_owned(),
+                        content,
+                    }),
+                    Err(_) => {
+                        self.rooms.remove(room_id);
+                    }
+                }
+            }
+            SPACE_PARENT => {
+                self.changes += 1;
+                self.rooms.remove(room_id);
+            }
+            _ => {}
+        }
+    }
+
+    fn forget_room(&mut self, room_id: &RoomId) {
+        self.changes += 1;
+        self.rooms.remove(room_id);
+    }
+
+    fn forget_rooms(&mut self) {
+        self.changes += 1;
+        self.rooms.clear();
+    }
+
+    pub(crate) fn note_account_data(&mut self, event_type: &str, content: AccountDataContent) {
+        self.changes += 1;
+        self.account_data.insert(event_type.to_owned(), content);
+    }
+
     pub(crate) fn forget_account_data(&mut self, event_type: &str) {
+        self.changes += 1;
         self.account_data.remove(event_type);
     }
 }
@@ -233,20 +293,33 @@ impl RoomPackState {
         }
     }
 
+    fn apply(&mut self, pack: RoomPackEvent) {
+        if pack.event_type == ROOM_IMAGE_PACK {
+            self.packs.insert(pack.state_key.clone(), pack);
+            return;
+        }
+        if pack.content.is_deleted() {
+            self.legacy.remove(&pack.state_key);
+        }
+        self.note_legacy(&pack);
+        if self
+            .packs
+            .get(&pack.state_key)
+            .is_none_or(|current| current.event_type != ROOM_IMAGE_PACK)
+        {
+            self.packs.insert(pack.state_key.clone(), pack);
+        }
+    }
+
     fn from_server(state: &[Raw<AnyStateEvent>]) -> Self {
         let mut parsed = Self::default();
         for raw in state {
             let json = raw.json();
-            if let Ok(pack) = serde_json::from_str::<RoomPackEvent>(json.get()) {
-                if pack.event_type == ROOM_IMAGE_PACK {
-                    parsed.packs.insert(pack.state_key.clone(), pack);
-                    continue;
-                }
-                if pack.event_type == ROOM_EMOTES {
-                    parsed.note_legacy(&pack);
-                    parsed.packs.entry(pack.state_key.clone()).or_insert(pack);
-                    continue;
-                }
+            if let Ok(pack) = serde_json::from_str::<RoomPackEvent>(json.get())
+                && (pack.event_type == ROOM_IMAGE_PACK || pack.event_type == ROOM_EMOTES)
+            {
+                parsed.apply(pack);
+                continue;
             }
             if let Ok(parent) = serde_json::from_str::<SpaceParentEvent>(json.get())
                 && parent.event_type == SPACE_PARENT
@@ -287,6 +360,26 @@ impl Core {
                 let core = core.clone();
                 async move {
                     let kind = raw.get_field::<String>("type").ok().flatten();
+                    if let Some(kind) = kind.as_deref()
+                        && matches!(kind, ROOM_EMOTES | ROOM_IMAGE_PACK | SPACE_PARENT)
+                    {
+                        let state_key = raw
+                            .get_field::<String>("state_key")
+                            .ok()
+                            .flatten()
+                            .unwrap_or_default();
+                        let content = raw
+                            .get_field::<serde_json::Value>("content")
+                            .ok()
+                            .flatten()
+                            .unwrap_or_default();
+                        core.pack_cache.lock().await.note_state(
+                            room.room_id(),
+                            kind,
+                            &state_key,
+                            &content,
+                        );
+                    }
                     if matches!(kind.as_deref(), Some(ROOM_EMOTES | ROOM_IMAGE_PACK)) {
                         core.emit_if_current(
                             generation,
@@ -299,6 +392,51 @@ impl Core {
             }
         });
         self.track_session_handler(client, handle);
+
+        let handle = client.add_event_handler({
+            let core = self.clone();
+            move |raw: Raw<AnyGlobalAccountDataEvent>| {
+                let core = core.clone();
+                async move {
+                    let Some(event_type) = raw.get_field::<String>("type").ok().flatten() else {
+                        return;
+                    };
+                    if matches!(
+                        event_type.as_str(),
+                        USER_EMOTES | EMOTE_ROOMS | IMAGE_PACK_ROOMS
+                    ) {
+                        let content = raw.get_field("content").ok().flatten();
+                        core.pack_cache
+                            .lock()
+                            .await
+                            .note_account_data(&event_type, content);
+                    }
+                }
+            }
+        });
+        self.track_session_handler(client, handle);
+
+        let core = self.clone();
+        let mut updates = client.subscribe_to_all_room_updates();
+        self.track_session_task(
+            spawn(async move {
+                loop {
+                    match updates.recv().await {
+                        Ok(updates) => {
+                            let mut cache = core.pack_cache.lock().await;
+                            for (room_id, update) in &updates.joined {
+                                if update.timeline.limited {
+                                    cache.forget_room(room_id);
+                                }
+                            }
+                        }
+                        Err(RecvError::Lagged(_)) => core.pack_cache.lock().await.forget_rooms(),
+                        Err(RecvError::Closed) => break,
+                    }
+                }
+            })
+            .abort_on_drop(),
+        );
     }
 
     async fn pack_account_data(
@@ -307,15 +445,22 @@ impl Core {
         event_type: &str,
         network: bool,
     ) -> Result<(AccountDataContent, bool), matrix_sdk::Error> {
+        let changes = {
+            let cache = self.pack_cache.lock().await;
+            if let Some(cached) = cache.account_data.get(event_type) {
+                return Ok((cached.clone(), true));
+            }
+            cache.changes
+        };
         let wanted = GlobalAccountDataEventType::from(event_type);
         if network {
             match client.account().fetch_account_data(wanted.clone()).await {
                 Ok(found) => {
-                    self.pack_cache
-                        .lock()
-                        .await
-                        .account_data
-                        .insert(event_type.to_owned(), found.clone());
+                    self.pack_cache.lock().await.remember_account_data(
+                        changes,
+                        event_type,
+                        found.clone(),
+                    );
                     return Ok((found, true));
                 }
                 Err(error) => {
@@ -326,17 +471,7 @@ impl Core {
         let stored = self
             .with_open_stores(async || client.account().account_data_raw(wanted).await)
             .await?;
-        if stored.is_some() {
-            return Ok((stored, false));
-        }
-        let cached = self
-            .pack_cache
-            .lock()
-            .await
-            .account_data
-            .get(event_type)
-            .cloned();
-        Ok((cached.flatten(), false))
+        Ok((stored, false))
     }
 
     pub(crate) async fn subscribed_pack_rooms(
@@ -604,6 +739,13 @@ impl Core {
         room: &matrix_sdk::Room,
         network_fallback: bool,
     ) -> Result<(RoomPackState, bool), matrix_sdk::Error> {
+        let changes = {
+            let mut cache = self.pack_cache.lock().await;
+            if let Some(cached) = cache.room(room.room_id()) {
+                return Ok((cached, true));
+            }
+            cache.changes
+        };
         let mut stored = RoomPackState::default();
         for event_type in [ROOM_EMOTES, ROOM_IMAGE_PACK] {
             for event in &self
@@ -636,29 +778,22 @@ impl Core {
             }
         }
 
-        let cached = self.pack_cache.lock().await.room(room.room_id());
         if network_fallback {
             match self.room_state_snapshot(client, room.room_id()).await {
                 Ok(snapshot) => {
                     let state = RoomPackState::from_server(&snapshot);
-                    self.pack_cache
-                        .lock()
-                        .await
-                        .remember_room(room.room_id().to_owned(), state.clone());
+                    self.pack_cache.lock().await.remember_room(
+                        changes,
+                        room.room_id().to_owned(),
+                        state.clone(),
+                    );
                     return Ok((state, true));
                 }
-                Err(error) if stored.packs.is_empty() && cached.is_none() => {
-                    return Err(error);
-                }
+                Err(error) if stored.packs.is_empty() => return Err(error),
                 Err(error) => {
-                    tracing::warn!(room = %room.room_id(), %error, "using cached image packs after state refresh failed");
+                    tracing::warn!(room = %room.room_id(), %error, "using stored image packs after state refresh failed");
                 }
             }
-        }
-        if stored.packs.is_empty()
-            && let Some(cached) = cached
-        {
-            return Ok((cached, false));
         }
         Ok((stored, false))
     }
@@ -919,29 +1054,94 @@ mod tests {
     fn the_pack_cache_evicts_the_least_recently_used_room() {
         let mut cache = PackCache::default();
         for index in 0..MAX_CACHED_ROOMS {
-            cache.remember_room(cached_room(index), RoomPackState::default());
+            cache.remember_room(0, cached_room(index), RoomPackState::default());
         }
         assert!(cache.room(&cached_room(0)).is_some());
 
-        cache.remember_room(cached_room(MAX_CACHED_ROOMS), RoomPackState::default());
+        cache.remember_room(0, cached_room(MAX_CACHED_ROOMS), RoomPackState::default());
 
         assert_eq!(cache.rooms.len(), MAX_CACHED_ROOMS);
         assert!(cache.room(&cached_room(0)).is_some());
         assert!(cache.room(&cached_room(1)).is_none());
     }
 
+    fn pack_ids(cache: &mut PackCache, room: usize) -> Vec<(String, String)> {
+        cache
+            .room(&cached_room(room))
+            .expect("cached room")
+            .packs
+            .into_values()
+            .map(|pack| (pack.state_key, pack.event_type))
+            .collect()
+    }
+
     #[test]
-    fn writing_a_pack_forgets_only_that_room() {
+    fn a_pack_edit_patches_only_that_room() {
         let mut cache = PackCache::default();
-        cache.remember_room(cached_room(0), RoomPackState::default());
-        cache.remember_room(cached_room(1), RoomPackState::default());
+        cache.remember_room(0, cached_room(0), RoomPackState::default());
+        cache.remember_room(0, cached_room(1), RoomPackState::default());
+        let pack = serde_json::json!({"images": {"wave": {"url": "mxc://a/b"}}});
 
-        cache.forget_room(&cached_room(0), "m.room.topic");
-        assert!(cache.room(&cached_room(0)).is_some());
+        cache.note_state(&cached_room(0), "m.room.topic", "", &pack);
+        cache.note_state(&cached_room(0), ROOM_IMAGE_PACK, "cats", &pack);
 
-        cache.forget_room(&cached_room(0), ROOM_IMAGE_PACK);
+        assert_eq!(
+            pack_ids(&mut cache, 0),
+            [("cats".to_owned(), ROOM_IMAGE_PACK.to_owned())]
+        );
+        assert_eq!(pack_ids(&mut cache, 1), []);
+    }
+
+    #[test]
+    fn a_legacy_edit_does_not_replace_the_stable_pack() {
+        let mut cache = PackCache::default();
+        cache.remember_room(0, cached_room(0), RoomPackState::default());
+        let pack = serde_json::json!({"images": {"wave": {"url": "mxc://a/b"}}});
+
+        cache.note_state(&cached_room(0), ROOM_IMAGE_PACK, "cats", &pack);
+        cache.note_state(&cached_room(0), ROOM_EMOTES, "cats", &pack);
+        assert_eq!(
+            pack_ids(&mut cache, 0),
+            [("cats".to_owned(), ROOM_IMAGE_PACK.to_owned())]
+        );
+        assert!(
+            cache
+                .room(&cached_room(0))
+                .expect("room")
+                .legacy
+                .contains("cats")
+        );
+
+        cache.note_state(&cached_room(0), ROOM_EMOTES, "cats", &serde_json::json!({}));
+        assert!(cache.room(&cached_room(0)).expect("room").legacy.is_empty());
+    }
+
+    #[test]
+    fn a_new_space_parent_drops_the_room() {
+        let mut cache = PackCache::default();
+        cache.remember_room(0, cached_room(0), RoomPackState::default());
+
+        cache.note_state(
+            &cached_room(0),
+            SPACE_PARENT,
+            "!space:example.org",
+            &serde_json::json!({}),
+        );
+
         assert!(cache.room(&cached_room(0)).is_none());
-        assert!(cache.room(&cached_room(1)).is_some());
+    }
+
+    #[test]
+    fn a_fetch_that_raced_a_change_is_not_kept() {
+        let mut cache = PackCache::default();
+        let before = cache.changes;
+        cache.note_account_data(USER_EMOTES, None);
+
+        cache.remember_room(before, cached_room(0), RoomPackState::default());
+        cache.remember_account_data(before, EMOTE_ROOMS, None);
+
+        assert!(cache.room(&cached_room(0)).is_none());
+        assert!(!cache.account_data.contains_key(EMOTE_ROOMS));
     }
 }
 
@@ -1273,7 +1473,7 @@ mod server_tests {
     }
 
     #[tokio::test]
-    async fn a_refused_fetch_falls_back_to_the_last_fetched_pack() {
+    async fn a_fetched_pack_is_served_without_another_request() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let core = core();
@@ -1292,20 +1492,21 @@ mod server_tests {
         let _get = Mock::given(method("GET"))
             .and(path_regex(ACCOUNT_DATA_PATH))
             .respond_with(ResponseTemplate::new(500))
+            .expect(0)
             .mount_as_scoped(server.server())
             .await;
 
         let (found, complete) = core
             .pack_account_data(&client, USER_EMOTES, true)
             .await
-            .expect("fallback");
+            .expect("cached");
 
-        assert!(!complete);
+        assert!(complete);
         assert_eq!(images(found), ["wave"]);
     }
 
     #[tokio::test]
-    async fn a_refused_state_fetch_falls_back_to_the_last_fetched_room_packs() {
+    async fn fetched_room_packs_are_served_without_another_request() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let room = server
@@ -1343,16 +1544,17 @@ mod server_tests {
         let _state = Mock::given(method("GET"))
             .and(path_regex(ROOM_STATE_PATH))
             .respond_with(ResponseTemplate::new(500))
+            .expect(0)
             .mount_as_scoped(server.server())
             .await;
-        let fallback = core
+        let again = core
             .room_packs(&client, &room, ImagePackOriginView::Room, None, true)
             .await
-            .expect("fallback");
+            .expect("cached");
 
-        assert!(!fallback.complete);
-        assert_eq!(fallback.packs.len(), 1);
-        assert_eq!(fallback.packs[0].id, "cats");
+        assert!(again.complete);
+        assert_eq!(again.packs.len(), 1);
+        assert_eq!(again.packs[0].id, "cats");
     }
 
     #[tokio::test]

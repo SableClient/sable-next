@@ -204,25 +204,20 @@ test('a failed refresh without cached packs is reported', async () => {
   expect(apply).not.toHaveBeenCalled();
 });
 
-test('shows a stale snapshot at once and revalidates it', async () => {
+test('keeps a snapshot until the packs change', async () => {
   const now = vi.spyOn(Date, 'now').mockReturnValue(0);
-  const fresh: ImagePackView[] = [{ ...cached[0], id: 'fresh' }];
-  let refreshes = 0;
-  const rpc = packRpc(({ cached_only: cachedOnly }) => {
-    if (cachedOnly) return Promise.resolve(listing([], false));
-    refreshes += 1;
-    return Promise.resolve(listing(refreshes === 1 ? cached : fresh));
-  });
+  const rpc = packRpc(({ cached_only: cachedOnly }) =>
+    Promise.resolve(cachedOnly ? listing([], false) : listing(cached))
+  );
 
   await loadPacks(rpc, '!room:example.org', vi.fn());
-  now.mockReturnValue(10 * 60_000);
+  now.mockReturnValue(60 * 60_000);
   const apply = vi.fn();
   await loadPacks(rpc, '!room:example.org', apply);
   now.mockRestore();
 
-  expect(rpc.packs.list).toHaveBeenCalledTimes(3);
-  expect(apply).toHaveBeenNthCalledWith(1, cached);
-  expect(apply).toHaveBeenLastCalledWith(fresh);
+  expect(rpc.packs.list).toHaveBeenCalledTimes(2);
+  expect(apply).toHaveBeenCalledExactlyOnceWith(cached);
 });
 
 test('reports whether the listing it applied was complete', async () => {

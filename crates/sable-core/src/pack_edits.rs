@@ -8,7 +8,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use serde_with::{DefaultOnError, VecSkipError, serde_as};
 
-use crate::image_packs::{EmoteRooms, IMAGE_PACK_ROOMS, ROOM_EMOTES, ROOM_IMAGE_PACK, USER_EMOTES};
+use crate::image_packs::{
+    EMOTE_ROOMS, EmoteRooms, IMAGE_PACK_ROOMS, ROOM_EMOTES, ROOM_IMAGE_PACK, USER_EMOTES,
+};
 use crate::protocol::{
     ImageUsageView, PackAddressView, PackDraftView, PackImageDraftView, PackImageInfoView, RpcError,
 };
@@ -439,6 +441,11 @@ impl Core {
         removed: &[PackAddressView],
     ) -> Result<Vec<PackAddressView>, RpcError> {
         let _guard = self.account_data_lock.lock().await;
+        {
+            let mut cache = self.pack_cache.lock().await;
+            cache.forget_account_data(IMAGE_PACK_ROOMS);
+            cache.forget_account_data(EMOTE_ROOMS);
+        }
         let next = with_subscriptions(&self.pack_subscriptions().await?, added, removed);
         self.set_account_data(IMAGE_PACK_ROOMS, &subscriptions_content(&next))
             .await?;

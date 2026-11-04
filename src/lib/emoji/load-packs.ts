@@ -5,13 +5,8 @@ import type { CoreEvent, ImagePackView, Rpc } from '#src/generated/protocol';
 
 type PackRpc = Pick<Rpc, 'packs'>;
 
-interface Snapshot {
-  packs: ImagePackView[];
-  takenAt: number;
-}
-
 interface PackCache {
-  snapshots: QuickLRU<string, Snapshot>;
+  snapshots: QuickLRU<string, ImagePackView[]>;
   refreshes: Map<string, Refresh>;
   generation: number;
 }
@@ -21,7 +16,6 @@ interface Refresh {
   result: Promise<{ packs: ImagePackView[]; complete: boolean }>;
 }
 
-const SNAPSHOT_MAX_AGE_MS = 5 * 60_000;
 const MAX_SNAPSHOTS = 64;
 const caches = new WeakMap<object, PackCache>();
 const packAccountDataEvents = new Set([
@@ -71,16 +65,14 @@ export async function loadPacks(
   const key = `${accountId ?? ''}\u0000${roomId}`;
   const snapshot = cache.snapshots.get(key);
   if (snapshot !== undefined) {
-    apply(snapshot.packs);
-    if (Date.now() - snapshot.takenAt < SNAPSHOT_MAX_AGE_MS) return true;
+    apply(snapshot);
+    return true;
   }
 
-  const cached =
-    snapshot?.packs ??
-    (await imagePackListing(rpc, roomId, true)
-      .then((listing) => listing.packs)
-      .catch((): ImagePackView[] => []));
-  if (snapshot === undefined && cached.length > 0) apply(cached);
+  const cached = await imagePackListing(rpc, roomId, true)
+    .then((listing) => listing.packs)
+    .catch((): ImagePackView[] => []);
+  if (cached.length > 0) apply(cached);
 
   let refresh = cache.refreshes.get(key);
   if (refresh === undefined) {
@@ -88,7 +80,7 @@ export async function loadPacks(
     const result = imagePackListing(rpc, roomId)
       .then((listing) => {
         if (listing.complete && cache.generation === generation) {
-          cache.snapshots.set(key, { packs: listing.packs, takenAt: Date.now() });
+          cache.snapshots.set(key, listing.packs);
         }
         return listing;
       })

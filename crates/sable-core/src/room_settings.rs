@@ -604,7 +604,7 @@ impl Core {
         self.pack_cache
             .lock()
             .await
-            .forget_room(&room_id, event_type);
+            .note_state(&room_id, event_type, state_key, content);
         self.forget_room_state(&room_id, event_type);
         self.probed_state().remember_written(
             &room_id,
