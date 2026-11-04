@@ -1211,6 +1211,8 @@ fn forward_content_for_event(
         "m.relates_to",
         "m.mentions",
         "m.new_content",
+        PER_MESSAGE_PROFILE,
+        "m.per_message_profile",
         FORWARDED,
         FAMEDLY_FORWARDED,
         SABLE_FORWARDED,
@@ -1507,6 +1509,48 @@ mod tests {
                 "original_event_private": false,
             })
         );
+    }
+
+    #[test]
+    fn forwarding_keeps_the_original_profile_inside_the_forwarded_content() {
+        for key in ["com.beeper.per_message_profile", "m.per_message_profile"] {
+            for (event_type, mut source) in [
+                (
+                    "m.room.message",
+                    json!({ "msgtype": "m.text", "body": "hello" }),
+                ),
+                (
+                    "m.sticker",
+                    json!({ "body": "seal", "url": "mxc://example.org/seal", "info": {} }),
+                ),
+            ] {
+                source[key] =
+                    json!({ "displayname": "Alice", "avatar_url": "mxc://example.org/alice" });
+                let content = Value::Object(super::forward_content_for_event(
+                    object(source.clone()),
+                    object(json!({})),
+                    event_type,
+                    &[],
+                    None,
+                ));
+
+                assert!(crate::view::per_message_profile(Some(&content)).is_none());
+                assert_eq!(content["org.matrix.msc4553.forwarded"]["content"], source);
+
+                let forwarded_again = Value::Object(super::forward_content_for_event(
+                    object(content.clone()),
+                    object(json!({ "sender": "@bob:example.org" })),
+                    event_type,
+                    &[],
+                    None,
+                ));
+                assert!(crate::view::per_message_profile(Some(&forwarded_again)).is_none());
+                assert_eq!(
+                    forwarded_again["org.matrix.msc4553.forwarded"],
+                    content["org.matrix.msc4553.forwarded"]
+                );
+            }
+        }
     }
 
     #[test]
@@ -2235,6 +2279,70 @@ mod tests {
         )
         .await
         .unwrap();
+    }
+
+    #[tokio::test]
+    async fn forwarding_uses_the_forwarders_selected_profile() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let source = room_id!("!source:example.org");
+        let target = room_id!("!target:example.org");
+        server.sync_joined_room(&client, source).await;
+        server.sync_joined_room(&client, target).await;
+        server.mock_room_state_encryption().plain().mount().await;
+        let original_content = json!({
+            "msgtype": "m.text", "body": "original",
+            "com.beeper.per_message_profile": { "displayname": "Alice" },
+            "m.per_message_profile": { "displayname": "Alice" }
+        });
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/_matrix/client/v3/rooms/{source}/event/$original"
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "type": "m.room.message", "event_id": "$original", "sender": "@alice:example.org",
+                "origin_server_ts": 1, "room_id": source, "content": original_content
+            })))
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/_matrix/client/v1/rooms/{source}/relations/$original/m.replace"
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"chunk": []})))
+            .mount(server.server())
+            .await;
+        Mock::given(method("PUT"))
+            .and(wiremock::matchers::path_regex(format!(
+                "/_matrix/client/v3/rooms/{target}/send/m.room.message/.*"
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"event_id": "$forward"})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        let core = core(&server, client).await;
+        let persona =
+            serde_json::from_value(json!({ "display_name": "Bob", "has_fallback": true })).unwrap();
+        core.forward_message(
+            &source.to_owned(),
+            &event_id!("$original").to_owned(),
+            &target.to_owned(),
+            Some(&persona),
+            true,
+        )
+        .await
+        .unwrap();
+
+        let content = sent_message(&server).await;
+        assert_eq!(
+            content["com.beeper.per_message_profile"],
+            json!({ "displayname": "Bob" })
+        );
+        assert!(content.get("m.per_message_profile").is_none());
+        assert_eq!(
+            content["org.matrix.msc4553.forwarded"]["content"],
+            original_content
+        );
     }
 
     #[tokio::test]
