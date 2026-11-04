@@ -1,15 +1,13 @@
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::ruma::events::sticker::OriginalSyncStickerEvent;
 use matrix_sdk::ruma::{
-    event_id,
     events::{AnySyncMessageLikeEvent, AnySyncStateEvent, AnySyncTimelineEvent},
     serde::Raw,
 };
 use serde_json::{Value, json};
 
 use crate::search::document::{
-    document_of, poll_start_document, provisional_edit, room_message, state_document,
-    sticker_document, with_edit,
+    document_of, poll_start_document, room_message, state_document, sticker_document, with_edit,
 };
 use crate::search::replacement_of;
 
@@ -94,7 +92,8 @@ fn message_documents() -> Vec<Value> {
         .map(|(position, content)| {
             let event = golden_event(position, "m.room.message", &content);
             let (message, content) = room_message(&event).expect("a room message");
-            serde_json::to_value(document_of(&message, content.as_ref())).expect("document json")
+            serde_json::to_value(document_of(&message, content.as_ref(), false))
+                .expect("document json")
         })
         .collect()
 }
@@ -122,17 +121,9 @@ fn edit_documents() -> Vec<Value> {
     );
     let (edit, edit_content) = room_message(&edit).expect("an edit");
     let replacement = replacement_of(&edit).expect("a replacement");
-    vec![
-        serde_json::to_value(with_edit(
-            document_of(&original, original_content.as_ref()),
-            &edit,
-            replacement,
-            edit_content.as_ref(),
-        ))
-        .expect("edit json"),
-        serde_json::to_value(provisional_edit(&edit, event_id!("$golden0").to_owned()))
-            .expect("provisional json"),
-    ]
+    let mut document = document_of(&original, original_content.as_ref(), false);
+    with_edit(&mut document, &edit, replacement, edit_content.as_ref());
+    vec![serde_json::to_value(document).expect("edit json")]
 }
 
 fn poll_document() -> Value {

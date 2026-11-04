@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
+use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
 
 use super::DOCUMENT_OVERHEAD;
-use super::document::{Document, adopt_edit};
+use super::document::{Document, adopt_edit, apply_replacement, replacement_of, room_message};
 use super::persist::{self, ChunkId};
 use crate::protocol::RoomAttachmentContentView;
 
@@ -17,7 +18,6 @@ pub(super) struct Saved {
     pub(super) removed: Vec<ChunkId>,
     pub(super) merged: Vec<ChunkId>,
     pub(super) redactions: HashSet<OwnedEventId>,
-    pub(super) edits: Vec<Document>,
     pub(super) resolved: HashSet<OwnedEventId>,
 }
 
@@ -40,13 +40,21 @@ pub(super) async fn save_room(
 
     let redactions: HashSet<OwnedEventId> =
         flush.manifest.pending_redactions.iter().cloned().collect();
-    let edits = flush.manifest.pending_edits.clone();
-    let mut targets: Vec<ChunkId> = flush.cold.iter().map(|(chunk, _)| *chunk).collect();
-    for chunk in &flush.scan {
-        if !targets.contains(chunk) {
-            targets.push(*chunk);
-        }
-    }
+    let edits = flush.manifest.pending_replacements.clone();
+    let edits_by_target = group_replacements(&edits);
+    let redacted = flush
+        .manifest
+        .redacted
+        .iter()
+        .cloned()
+        .chain(redactions.iter().cloned())
+        .collect();
+    let targets: HashSet<ChunkId> = flush
+        .cold
+        .iter()
+        .map(|(chunk, _)| *chunk)
+        .chain(flush.scan.iter().copied())
+        .collect();
 
     let mut resolved = HashSet::new();
     let mut lost = Vec::new();
@@ -65,7 +73,13 @@ pub(super) async fn save_room(
             .iter()
             .find(|(id, _)| *id == chunk)
             .map(|(_, patch)| patch);
-        if merge_cold(&mut stored, patch, &redactions, &edits, &mut resolved) {
+        if merge_cold(
+            &mut stored,
+            patch,
+            &redacted,
+            &edits_by_target,
+            &mut resolved,
+        ) {
             let Some(bytes) = persist::write_chunk(client, room_id, chunk, &stored).await else {
                 return Err(Box::new(flush));
             };
@@ -79,7 +93,11 @@ pub(super) async fn save_room(
     if !merged.is_empty() || !lost.is_empty() || !redactions.is_empty() || !edits.is_empty() {
         apply_sizes(&mut flush.manifest, &sizes, &lost);
         flush.manifest.pending_redactions.clear();
-        flush.manifest.pending_edits.clear();
+        flush.manifest.pending_replacements.retain(|event| {
+            event
+                .event_id()
+                .is_some_and(|edit| !resolved.contains(edit))
+        });
         if !persist::write_manifest(client, room_id, &flush.manifest).await {
             return Err(Box::new(flush));
         }
@@ -97,7 +115,6 @@ pub(super) async fn save_room(
         removed: flush.removed,
         merged,
         redactions,
-        edits,
         resolved,
     })
 }
@@ -116,11 +133,26 @@ fn apply_sizes(
     }
 }
 
+fn group_replacements(events: &[TimelineEvent]) -> HashMap<OwnedEventId, Vec<&TimelineEvent>> {
+    let mut grouped: HashMap<_, Vec<_>> = HashMap::new();
+    for event in events {
+        if let Some((message, _)) = room_message(event)
+            && let Some(replacement) = replacement_of(&message)
+        {
+            grouped
+                .entry(replacement.event_id.clone())
+                .or_default()
+                .push(event);
+        }
+    }
+    grouped
+}
+
 fn merge_cold(
     stored: &mut persist::StoredChunk,
     patch: Option<&persist::StoredChunk>,
     redactions: &HashSet<OwnedEventId>,
-    edits: &[Document],
+    edits: &HashMap<OwnedEventId, Vec<&TimelineEvent>>,
     resolved: &mut HashSet<OwnedEventId>,
 ) -> bool {
     let mut changed = false;
@@ -134,7 +166,7 @@ fn merge_cold(
         for overlay in &patch.documents {
             if let Some(&index) = position.get(&overlay.event_id) {
                 if let Some(disk) = stored.documents.get_mut(index) {
-                    *disk = adopt_edit(overlay.clone(), Some(disk));
+                    *disk = adopt_edit(overlay.clone(), Some(disk), redactions);
                 }
             } else {
                 position.insert(overlay.event_id.clone(), stored.documents.len());
@@ -158,18 +190,25 @@ fn merge_cold(
     let before = stored.documents.len();
     stored
         .documents
-        .retain(|document| !redactions.contains(&document.event_id));
+        .retain(|document| !document.is_redacted(redactions));
     changed |= stored.documents.len() != before;
 
-    for edit in edits {
-        if let Some(disk) = stored
-            .documents
-            .iter_mut()
-            .find(|document| document.event_id == edit.event_id)
-        {
-            *disk = adopt_edit(disk.clone(), Some(edit));
-            resolved.insert(edit.event_id.clone());
-            changed = true;
+    if !edits.is_empty() {
+        for disk in &mut stored.documents {
+            if disk.encrypted.is_none() {
+                continue;
+            }
+            let Some(replacements) = edits.get(&disk.event_id) else {
+                continue;
+            };
+            for edit in replacements {
+                if let Some(applied) = apply_replacement(disk, edit, redactions) {
+                    changed |= applied;
+                }
+                if let Some(edit) = edit.event_id() {
+                    resolved.insert(edit.to_owned());
+                }
+            }
         }
     }
     changed
@@ -309,7 +348,7 @@ mod tests {
             &mut stored,
             Some(&overlay),
             &redactions,
-            &[],
+            &std::collections::HashMap::new(),
             &mut resolved
         ));
 
@@ -335,22 +374,26 @@ mod tests {
             )],
             Vec::new(),
         );
-        let mut edit = document(
-            "original",
-            "fixed",
-            "@kris:localhost",
-            900,
-            None,
-            Vec::new(),
+        let edit = matrix_sdk::deserialized_responses::TimelineEvent::from_plaintext(
+            serde_json::from_value(serde_json::json!({
+                "type": "m.room.message", "event_id": "$edit", "sender": "@kris:localhost",
+                "origin_server_ts": 900, "content": {
+                    "msgtype": "m.text", "body": "* fixed",
+                    "m.new_content": {"msgtype": "m.text", "body": "fixed"},
+                    "m.relates_to": {"rel_type": "m.replace", "event_id": "$original"}
+                }
+            }))
+            .unwrap(),
         );
-        edit.edited_at = Some(900);
         let mut resolved = std::collections::HashSet::new();
+        let edits = [edit];
+        let grouped = super::group_replacements(&edits);
 
         super::merge_cold(
             &mut stored,
             None,
             &std::collections::HashSet::new(),
-            &[edit],
+            &grouped,
             &mut resolved,
         );
 
@@ -359,6 +402,15 @@ mod tests {
         };
         assert_eq!(original.body, "fixed");
         assert_eq!(original.origin_server_ts, 5);
-        assert!(resolved.contains(event_id!("$original")));
+        assert!(resolved.contains(event_id!("$edit")));
+        resolved.clear();
+        assert!(!super::merge_cold(
+            &mut stored,
+            None,
+            &std::collections::HashSet::new(),
+            &grouped,
+            &mut resolved,
+        ));
+        assert!(resolved.contains(event_id!("$edit")));
     }
 }

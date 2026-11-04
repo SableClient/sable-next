@@ -3,8 +3,11 @@ mod crawl;
 mod golden;
 mod ingest;
 mod media;
+#[cfg(not(target_family = "wasm"))]
+mod performance;
 mod restore;
 mod server;
+mod updates;
 
 use matrix_sdk::ruma::EventId;
 use matrix_sdk::ruma::room_version_rules::RedactionRules;
@@ -62,6 +65,8 @@ pub(super) fn document(
         mentions,
         in_thread: false,
         edited_at: None,
+        edit_id: None,
+        encrypted: Some(false),
         media: Vec::new(),
         state: false,
     }

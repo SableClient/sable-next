@@ -38,6 +38,11 @@ pub(super) struct Document {
     pub(super) in_thread: bool,
     #[serde(default)]
     pub(super) edited_at: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) edit_id: Option<OwnedEventId>,
+    // None for legacy documents and events other than m.room.message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) encrypted: Option<bool>,
     #[serde(default)]
     pub(super) media: Vec<(Option<u32>, RoomAttachmentContentView)>,
     #[serde(default)]
@@ -53,8 +58,18 @@ impl Document {
             && self.mentions == other.mentions
             && self.in_thread == other.in_thread
             && self.edited_at == other.edited_at
+            && self.edit_id == other.edit_id
+            && self.encrypted == other.encrypted
             && self.media == other.media
             && self.state == other.state
+    }
+
+    pub(super) fn is_redacted(&self, redacted: &HashSet<OwnedEventId>) -> bool {
+        redacted.contains(&self.event_id)
+            || self
+                .edit_id
+                .as_ref()
+                .is_some_and(|edit| redacted.contains(edit))
     }
 
     pub(super) fn attachment_items(&self, kind: RoomAttachmentKind) -> Vec<RoomAttachmentView> {
@@ -337,6 +352,7 @@ pub(super) const fn replacement_of(
 pub(super) fn document_of(
     message: &OriginalSyncRoomMessageEvent,
     content: Option<&serde_json::Value>,
+    encrypted: bool,
 ) -> Document {
     let body = message_text(&message.content.msgtype, content);
     Document {
@@ -350,6 +366,8 @@ pub(super) fn document_of(
         mentions: mentioned_users(message.content.mentions.as_ref()),
         in_thread: matches!(message.content.relates_to, Some(Relation::Thread(_))),
         edited_at: None,
+        edit_id: None,
+        encrypted: Some(encrypted),
         media: attachment_contents(&message.content.msgtype, content),
         state: false,
     }
@@ -423,6 +441,8 @@ fn poll_document<'text>(
         mentions: Vec::new(),
         in_thread: false,
         edited_at: None,
+        edit_id: None,
+        encrypted: None,
         media: Vec::new(),
         state: false,
     }
@@ -454,40 +474,25 @@ pub(super) fn state_document(
         mentions: Vec::new(),
         in_thread: false,
         edited_at: None,
+        edit_id: None,
+        encrypted: None,
         media: Vec::new(),
         state: true,
     }
 }
 
-pub(super) fn provisional_edit(
-    edit: &OriginalSyncRoomMessageEvent,
-    target: OwnedEventId,
-) -> Document {
-    Document {
-        event_id: target,
-        body: String::new(),
-        folded: String::new(),
-        sender: edit.sender.clone(),
-        origin_server_ts: edit.origin_server_ts.get().into(),
-        attachments: Vec::new(),
-        has_link: false,
-        mentions: Vec::new(),
-        in_thread: false,
-        edited_at: None,
-        media: Vec::new(),
-        state: false,
-    }
-}
-
 pub(super) fn with_edit(
-    mut document: Document,
+    document: &mut Document,
     edit: &OriginalSyncRoomMessageEvent,
     replacement: &Replacement<RoomMessageEventContentWithoutRelation>,
     raw: Option<&serde_json::Value>,
-) -> Document {
+) -> bool {
     let edited_at: u64 = edit.origin_server_ts.get().into();
-    if document.sender != edit.sender || document.edited_at.is_some_and(|at| at > edited_at) {
-        return document;
+    if document.sender != edit.sender
+        || document.edited_at.is_some_and(|at| at > edited_at)
+        || document.edit_id.as_ref() == Some(&edit.event_id)
+    {
+        return false;
     }
 
     let content = &replacement.new_content;
@@ -496,18 +501,45 @@ pub(super) fn with_edit(
     document.attachments = attachments_of(&content.msgtype);
     document.mentions = mentioned_users(content.mentions.as_ref());
     document.edited_at = Some(edited_at);
+    document.edit_id = Some(edit.event_id.clone());
     document.media = attachment_contents(
         &content.msgtype,
         raw.and_then(|raw| raw.get("m.new_content")),
     );
-    document
+    true
 }
 
-pub(super) fn adopt_edit(mut document: Document, existing: Option<&Document>) -> Document {
+pub(super) fn apply_replacement(
+    document: &mut Document,
+    event: &TimelineEvent,
+    redacted: &HashSet<OwnedEventId>,
+) -> Option<bool> {
+    let encrypted = document.encrypted?;
+    let (edit, raw) = room_message(event)?;
+    let replacement = replacement_of(&edit)?;
+    if replacement.event_id != document.event_id
+        || edit.sender != document.sender
+        || redacted.contains(&edit.event_id)
+        || (encrypted && event.encryption_info().is_none())
+    {
+        return None;
+    }
+    Some(with_edit(document, &edit, replacement, raw.as_ref()))
+}
+
+pub(super) fn adopt_edit(
+    mut document: Document,
+    existing: Option<&Document>,
+    redacted: &HashSet<OwnedEventId>,
+) -> Document {
     let Some(existing) = existing else {
         return document;
     };
-    if existing.sender != document.sender || existing.edited_at <= document.edited_at {
+    if existing.sender != document.sender
+        || existing.edited_at <= document.edited_at
+        || existing.is_redacted(redacted)
+        || existing.encrypted != document.encrypted
+    {
         return document;
     }
 
@@ -517,6 +549,7 @@ pub(super) fn adopt_edit(mut document: Document, existing: Option<&Document>) ->
     document.mentions.clone_from(&existing.mentions);
     document.media.clone_from(&existing.media);
     document.edited_at = existing.edited_at;
+    document.edit_id.clone_from(&existing.edit_id);
     document
 }
 
@@ -591,18 +624,20 @@ pub(super) fn edited_document(
         return None;
     }
 
-    Some(
-        valid_replacements(original, replacements)
-            .filter_map(room_message)
-            .filter(|(edit, _)| !redacted.contains(&edit.event_id))
-            .fold(
-                document_of(&message, content.as_ref()),
-                |document, (edit, raw)| match replacement_of(&edit) {
-                    Some(replacement) => with_edit(document, &edit, replacement, raw.as_ref()),
-                    None => document,
-                },
-            ),
-    )
+    let mut document = document_of(
+        &message,
+        content.as_ref(),
+        original.encryption_info().is_some(),
+    );
+    for (edit, raw) in valid_replacements(original, replacements)
+        .filter_map(room_message)
+        .filter(|(edit, _)| !redacted.contains(&edit.event_id))
+    {
+        if let Some(replacement) = replacement_of(&edit) {
+            with_edit(&mut document, &edit, replacement, raw.as_ref());
+        }
+    }
+    Some(document)
 }
 
 #[cfg(test)]

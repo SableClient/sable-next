@@ -9,7 +9,7 @@ use super::Document;
 use crate::store::StoreError;
 
 pub(super) const SCHEMA: u32 = 5;
-pub(super) const DERIVATION: u32 = 1;
+pub(super) const DERIVATION: u32 = 2;
 const LEGACY_SCHEMAS: [u32; 2] = [3, 4];
 
 pub(super) type ChunkId = u32;
@@ -49,9 +49,11 @@ pub(super) struct Manifest {
     pub(super) chunks: Vec<ChunkEntry>,
     pub(super) edits: Vec<(OwnedEventId, OwnedEventId)>,
     #[serde(default)]
+    pub(super) redacted: Vec<OwnedEventId>,
+    #[serde(default)]
     pub(super) pending_redactions: Vec<OwnedEventId>,
     #[serde(default)]
-    pub(super) pending_edits: Vec<Document>,
+    pub(super) pending_replacements: Vec<matrix_sdk::deserialized_responses::TimelineEvent>,
     #[serde(default)]
     pub(super) floor: u64,
     #[serde(default)]
@@ -72,8 +74,9 @@ impl Manifest {
             next_chunk,
             chunks,
             edits,
+            redacted: Vec::new(),
             pending_redactions: Vec::new(),
-            pending_edits: Vec::new(),
+            pending_replacements: Vec::new(),
             floor,
             derived: DERIVATION,
             rederive_from: 0,

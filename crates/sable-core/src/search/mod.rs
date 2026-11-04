@@ -27,18 +27,16 @@ pub(crate) use server::ServerSearch;
 use std::time::Duration;
 
 use matrix_sdk::deserialized_responses::TimelineEvent;
-use matrix_sdk::event_cache::RoomEventCache;
 use matrix_sdk::ruma::events::ignored_user_list::IgnoredUserListEventContent;
 use matrix_sdk::ruma::events::room::message::{OriginalSyncRoomMessageEvent, Relation};
 use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
 use matrix_sdk::ruma::room_version_rules::RedactionRules;
-use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedUserId};
+use matrix_sdk::ruma::{OwnedEventId, OwnedUserId};
 
 use self::document::{Document, indexable_body, replacement_of};
 #[cfg(test)]
 use self::index::RoomIndex;
 pub(crate) use self::index::{ContextLine, Hit, MessageIndex};
-use crate::messages::valid_replacements;
 
 const EVENTS_PER_INGEST_YIELD: usize = 16;
 const DOCUMENTS_PER_RESTORE_YIELD: usize = 256;
@@ -90,6 +88,15 @@ fn ingestable_events(
         .collect()
 }
 
+fn is_redacted(event: &TimelineEvent) -> bool {
+    event
+        .raw()
+        .get_field::<serde_json::Value>("unsigned")
+        .ok()
+        .flatten()
+        .is_some_and(|unsigned| unsigned.get("redacted_because").is_some())
+}
+
 pub(crate) async fn ignored_user_ids(client: &matrix_sdk::Client) -> Vec<OwnedUserId> {
     client
         .account()
@@ -113,15 +120,6 @@ fn redacted_event_id(
         (&original.redacts, &original.content.redacts)
     };
     preferred.clone().or_else(|| fallback.clone())
-}
-
-async fn edit_is_valid(cache: &RoomEventCache, target: &EventId, edit: &TimelineEvent) -> bool {
-    match cache.find_event(target).await {
-        Ok(Some(original)) => valid_replacements(&original, std::slice::from_ref(edit))
-            .next()
-            .is_some(),
-        _ => true,
-    }
 }
 
 #[cfg(test)]

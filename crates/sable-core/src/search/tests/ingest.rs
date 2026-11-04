@@ -11,7 +11,7 @@ use std::sync::Arc;
 use super::{document, filtered_index, in_room, logged_in, reingest_whole_room};
 use crate::search::MessageIndex;
 
-async fn empty_cache(
+pub(super) async fn empty_cache(
     server: &MatrixMockServer,
     client: &matrix_sdk::Client,
     room_id: &matrix_sdk::ruma::OwnedRoomId,

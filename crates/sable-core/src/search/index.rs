@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use super::chunks::{Saved, document_bytes, split_chunk};
 use super::document::{
-    Document, FoldedTerms, adopt_edit, document_of, latest_content, poll_start_document,
-    provisional_edit, replacement_of, state_document, sticker_document, with_edit,
+    Document, FoldedTerms, adopt_edit, apply_replacement, document_of, edited_document,
+    latest_content, poll_start_document, replacement_of, state_document, sticker_document,
 };
 use super::inverted::InvertedIndex;
 use super::persist::{self, ChunkId};
@@ -13,14 +13,14 @@ use super::{
     CHANGES_BEFORE_FLUSH, CLASSIFIED_OVERHEAD, DISK_BUDGET, DOCUMENT_OVERHEAD,
     DOCUMENTS_PER_RESTORE_YIELD, EVENTS_PER_INGEST_YIELD, HYDRATE_BATCH, INITIAL_DOCUMENTS,
     IndexFilter, MEMORY_BUDGET, RETIRED_KEYS_BEFORE_VACUUM, TICKS_BEFORE_FLUSH, crawl,
-    edit_is_valid, edited_or_own_event_id, now_ms, redacted_event_id, tokenize,
+    edited_or_own_event_id, is_redacted, now_ms, redacted_event_id, tokenize,
 };
-use crate::messages::raw_content;
+use crate::messages::{raw_content, valid_replacements};
 use crate::protocol::{RoomAttachmentContentView, RoomAttachmentKind, RoomAttachmentView};
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::event_cache::RoomEventCache;
+use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::events::room::message::SyncRoomMessageEvent;
-use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
 use matrix_sdk::ruma::events::{
     AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
 };
@@ -54,7 +54,7 @@ pub(super) struct RoomIndex {
     pub(super) chunk_meta: HashMap<ChunkId, (usize, usize)>,
     pub(super) bytes: usize,
     pub(super) pending_redactions: HashSet<OwnedEventId>,
-    pub(super) pending_edits: HashMap<OwnedEventId, Document>,
+    pub(super) pending_replacements: HashMap<OwnedEventId, HashMap<OwnedEventId, TimelineEvent>>,
     pub(super) floor: u64,
     pub(super) rederive_from: u64,
     pub(super) chinese_pending: HashSet<DocKey>,
@@ -91,7 +91,7 @@ impl RoomIndex {
             chunk_meta: HashMap::new(),
             bytes: 0,
             pending_redactions: HashSet::new(),
-            pending_edits: HashMap::new(),
+            pending_replacements: HashMap::new(),
             floor: 0,
             rederive_from: 0,
             chinese_pending: HashSet::new(),
@@ -111,6 +111,7 @@ impl RoomIndex {
             .sum::<usize>();
         let mut index = Self::sized(documents.max(INITIAL_DOCUMENTS));
         index.next_chunk = manifest.next_chunk;
+        index.redacted = manifest.redacted.into_iter().collect();
         for entry in &manifest.chunks {
             index.chunks.insert(entry.start, entry.id);
             if !legacy {
@@ -141,6 +142,10 @@ impl RoomIndex {
                     matrix_sdk::sleep::sleep(Duration::ZERO).await;
                 }
                 position += 1;
+                if document.is_redacted(&index.redacted) {
+                    misplaced.insert(chunk);
+                    continue;
+                }
                 let home = index.chunk_for(document.origin_server_ts);
                 if home != chunk {
                     misplaced.extend([home, chunk]);
@@ -158,13 +163,19 @@ impl RoomIndex {
             }
         }
 
-        index.edits = manifest.edits.into_iter().collect();
+        index.edits.extend(manifest.edits);
         index.pending_redactions = manifest.pending_redactions.into_iter().collect();
-        index.pending_edits = manifest
-            .pending_edits
-            .into_iter()
-            .map(|document| (document.event_id.clone(), document))
-            .collect();
+        for event in manifest.pending_replacements {
+            if let Some(edit) = event.event_id()
+                && let Some(target) = index.edits.get(edit)
+            {
+                index
+                    .pending_replacements
+                    .entry(target.clone())
+                    .or_default()
+                    .insert(edit.to_owned(), event);
+            }
+        }
         index.floor = manifest.floor;
         index.legacy = legacy;
         index.listed = !legacy;
@@ -179,10 +190,11 @@ impl RoomIndex {
         index.dirty = stale
             || !misplaced.is_empty()
             || !index.pending_redactions.is_empty()
-            || !index.pending_edits.is_empty();
+            || !index.pending_replacements.is_empty();
         index.dirty_chunks = misplaced;
         index.changes = 0;
         index.durable = index.revision;
+        index.apply_pending_to_loaded();
         index
     }
 
@@ -339,12 +351,10 @@ impl RoomIndex {
             .map(|((&start, &chunk), end)| (start, end.copied(), chunk))
             .filter(|(_, _, chunk)| self.dirty_chunks.contains(chunk))
             .collect();
-        self.dirty_chunks.clear();
-
         let mut classified: HashMap<ChunkId, Vec<(OwnedEventId, u64)>> = HashMap::new();
         for (event_id, &ts) in &self.classified {
             if let Some(chunk) = self.chunk_at(ts)
-                && bounds.iter().any(|(_, _, dirty)| *dirty == chunk)
+                && self.dirty_chunks.contains(&chunk)
             {
                 classified
                     .entry(chunk)
@@ -352,6 +362,7 @@ impl RoomIndex {
                     .push((event_id.clone(), ts));
             }
         }
+        self.dirty_chunks.clear();
 
         let mut written = Vec::new();
         let mut cold = Vec::new();
@@ -395,7 +406,24 @@ impl RoomIndex {
             }
         }
 
-        let pending = !self.pending_redactions.is_empty() || !self.pending_edits.is_empty();
+        let pending = !self.pending_redactions.is_empty() || !self.pending_replacements.is_empty();
+        let manifest = self.manifest();
+
+        persist::Flush {
+            chunks: written,
+            cold,
+            scan: if pending {
+                self.cold.iter().copied().collect()
+            } else {
+                Vec::new()
+            },
+            removed: self.stale_chunks.clone(),
+            manifest,
+            legacy: self.legacy,
+        }
+    }
+
+    fn manifest(&self) -> persist::Manifest {
         let mut manifest = persist::Manifest::new(
             self.next_chunk,
             self.chunks
@@ -418,20 +446,14 @@ impl RoomIndex {
         );
         manifest.rederive_from = self.rederive_from;
         manifest.pending_redactions = self.pending_redactions.iter().cloned().collect();
-        manifest.pending_edits = self.pending_edits.values().cloned().collect();
-
-        persist::Flush {
-            chunks: written,
-            cold,
-            scan: if pending {
-                self.cold.iter().copied().collect()
-            } else {
-                Vec::new()
-            },
-            removed: self.stale_chunks.clone(),
-            manifest,
-            legacy: self.legacy,
-        }
+        manifest.pending_replacements = self
+            .pending_replacements
+            .values()
+            .flat_map(|edits| edits.values())
+            .cloned()
+            .collect();
+        manifest.redacted = self.redacted.iter().cloned().collect();
+        manifest
     }
 
     pub(super) fn len(&self) -> usize {
@@ -469,6 +491,13 @@ impl RoomIndex {
     }
 
     pub(super) fn upsert(&mut self, document: Document) {
+        if document.is_redacted(&self.redacted) {
+            return;
+        }
+        self.pending_redactions.remove(&document.event_id);
+        if let Some(edit) = &document.edit_id {
+            self.edits.insert(edit.clone(), document.event_id.clone());
+        }
         let chinese_pending =
             !tokenize::chinese_ready() && tokenize::contains_chinese(&document.body);
         if let Some(&key) = self.key_of.get(&document.event_id)
@@ -516,12 +545,54 @@ impl RoomIndex {
 
     pub(super) fn forget_message(&mut self, event_id: &OwnedEventId) {
         let hot = self.is_hot(event_id);
-        self.pending_edits.remove(event_id);
+        self.pending_replacements.remove(event_id);
         self.remove(event_id);
         if !hot && self.has_cold() {
             self.pending_redactions.insert(event_id.clone());
             self.dirty = true;
         }
+    }
+
+    fn remove_pending_edit(&mut self, edit: &EventId) {
+        if let Some(target) = self.edits.get(edit)
+            && let Some(edits) = self.pending_replacements.get_mut(target)
+        {
+            edits.remove(edit);
+            if edits.is_empty() {
+                self.pending_replacements.remove(target);
+            }
+        }
+    }
+
+    fn apply_pending_to_loaded(&mut self) {
+        let targets: Vec<_> = self.pending_replacements.keys().cloned().collect();
+        for target in targets {
+            if let Some(document) = self.document(&target).cloned() {
+                let document = self.apply_pending(document);
+                self.upsert(document);
+            }
+        }
+    }
+
+    fn apply_pending(&mut self, mut document: Document) -> Document {
+        if document.encrypted.is_none() {
+            return document;
+        }
+        let Some(edits) = self.pending_replacements.remove(&document.event_id) else {
+            return document;
+        };
+        let mut edits: Vec<_> = edits.into_iter().collect();
+        edits.sort_by(|(left_id, left), (right_id, right)| {
+            left.timestamp_raw()
+                .cmp(&right.timestamp_raw())
+                .then_with(|| left_id.cmp(right_id))
+        });
+        for (edit, event) in edits {
+            if apply_replacement(&mut document, &event, &self.redacted).is_none() {
+                self.edits.remove(&edit);
+            }
+        }
+        document
     }
 
     fn retire(&mut self, event_id: &OwnedEventId) {
@@ -703,9 +774,9 @@ impl MessageIndex {
         events
             .into_iter()
             .filter(|event| {
-                event
-                    .event_id()
-                    .is_some_and(|event_id| !index.already_classified(event_id))
+                event.event_id().is_some_and(|event_id| {
+                    !index.already_classified(event_id) || is_redacted(event)
+                })
             })
             .collect()
     }
@@ -746,17 +817,8 @@ impl MessageIndex {
         index
             .pending_redactions
             .retain(|event_id| !saved.redactions.contains(event_id));
-        for edit in saved.edits {
-            if index
-                .pending_edits
-                .get(&edit.event_id)
-                .is_some_and(|pending| pending.edited_at == edit.edited_at)
-            {
-                index.pending_edits.remove(&edit.event_id);
-            }
-            if !saved.resolved.contains(&edit.event_id) {
-                index.upsert(edit);
-            }
+        for edit in saved.resolved {
+            index.remove_pending_edit(&edit);
         }
         for chunk in saved.merged {
             if !index.dirty_chunks.contains(&chunk) {
@@ -960,24 +1022,17 @@ impl MessageIndex {
                 .keys_in(start, end)
                 .into_iter()
                 .filter_map(|(_, key)| index.documents.get(&key));
-            let stored: Vec<&Document> = if index.cold.contains(&chunk) {
+            let stored = if index.cold.contains(&chunk) {
                 let Some(stored) = work.loaded.get(&chunk) else {
                     return PageStep::Need(chunk);
                 };
-                stored
-                    .documents
-                    .iter()
-                    .filter(|document| {
-                        !index.key_of.contains_key(&document.event_id)
-                            && !index.pending_redactions.contains(&document.event_id)
-                    })
-                    .collect()
+                unindexed_cold_documents(index, stored)
             } else {
                 Vec::new()
             };
 
             let mut unhydrated = Vec::new();
-            for document in in_memory.chain(stored) {
+            for document in in_memory.chain(stored.iter()) {
                 let ts = document.origin_server_ts;
                 if before.is_some_and(|(cursor_ts, cursor_id)| {
                     ts > cursor_ts || (ts == cursor_ts && document.event_id.as_str() >= cursor_id)
@@ -1175,13 +1230,13 @@ impl MessageIndex {
             if position > 0 && position.is_multiple_of(DOCUMENTS_PER_RESTORE_YIELD) {
                 matrix_sdk::sleep::sleep(Duration::ZERO).await;
             }
-            if document.origin_server_ts < index.floor
-                || index.redacted.contains(&document.event_id)
-            {
+            if document.origin_server_ts < index.floor || document.is_redacted(&index.redacted) {
                 continue;
             }
             let existing = index.document(&document.event_id).cloned();
-            index.upsert(adopt_edit(document, existing.as_ref()));
+            let document = adopt_edit(document, existing.as_ref(), &index.redacted);
+            let document = index.apply_pending(document);
+            index.upsert(document);
         }
         self.unload_to_budget();
     }
@@ -1223,6 +1278,15 @@ impl MessageIndex {
             let Some(event_id) = event.event_id() else {
                 continue;
             };
+
+            if is_redacted(&event) {
+                if !index.redacted.contains(event_id) {
+                    apply_redacted(index, event_id.to_owned(), cache).await;
+                    fresh += 1;
+                    since_yield += 1;
+                }
+                continue;
+            }
 
             let rederiving = rederive
                 && index.rederive_from != 0
@@ -1288,7 +1352,9 @@ async fn apply_event(
             apply_room_message(index, event, &message, cache).await;
         }
         AnySyncMessageLikeEvent::RoomRedaction(redaction) => {
-            apply_redaction(index, &redaction, cache, rules).await;
+            if let Some(target) = redacted_event_id(&redaction, rules) {
+                apply_redacted(index, target, cache).await;
+            }
         }
         _ => {}
     }
@@ -1303,62 +1369,104 @@ async fn apply_room_message(
     let Some(message) = message.as_original() else {
         return;
     };
-    let content = raw_content(event);
+    let is_edit = replacement_of(message).is_some();
     let target = edited_or_own_event_id(message);
     if index.redacted.contains(&message.event_id) || index.redacted.contains(&target) {
         return;
     }
-    if replacement_of(message).is_some() && !edit_is_valid(cache, &target, event).await {
+    let cached = cache
+        .find_event_with_relations(&target, Some(vec![RelationType::Replacement]))
+        .await
+        .ok()
+        .flatten();
+    let fallback = if is_edit && cached.is_none() {
+        cache.find_event(&target).await.ok().flatten()
+    } else {
+        None
+    };
+    let original = cached
+        .as_ref()
+        .map(|(original, _)| original)
+        .or(fallback.as_ref());
+    if is_edit
+        && let Some(original) = original
+        && (is_redacted(original)
+            || valid_replacements(original, std::slice::from_ref(event))
+                .next()
+                .is_none())
+    {
         return;
     }
-
-    let cached = latest_content(cache, &target, &index.redacted).await;
+    let cached = cached.and_then(|(original, replacements)| {
+        edited_document(&original, &replacements, &index.redacted)
+    });
     let existing = index.document(&target).cloned();
-    let document = match replacement_of(message) {
-        Some(replacement) => {
-            index.edits.insert(message.event_id.clone(), target.clone());
-            let base = cached.or(existing);
-            if base.is_none() && index.has_cold() {
-                let pending = index
-                    .pending_edits
-                    .remove(&target)
-                    .unwrap_or_else(|| provisional_edit(message, target.clone()));
-                let edited = with_edit(pending, message, replacement, content.as_ref());
-                index.pending_edits.insert(target, edited);
-                index.dirty = true;
-                return;
-            }
-            let base = base.unwrap_or_else(|| provisional_edit(message, target));
-            with_edit(base, message, replacement, content.as_ref())
-        }
-        None => adopt_edit(
-            cached.unwrap_or_else(|| document_of(message, content.as_ref())),
+    let document = if is_edit {
+        index.edits.insert(message.event_id.clone(), target.clone());
+        index
+            .pending_replacements
+            .entry(target.clone())
+            .or_default()
+            .insert(message.event_id.clone(), event.clone());
+        index.dirty = true;
+        index.revision = index.revision.wrapping_add(1);
+        let base = cached
+            .map(|document| adopt_edit(document, existing.as_ref(), &index.redacted))
+            .or(existing);
+        let Some(base) = base else {
+            return;
+        };
+        base
+    } else {
+        adopt_edit(
+            cached.unwrap_or_else(|| {
+                document_of(
+                    message,
+                    raw_content(event).as_ref(),
+                    event.encryption_info().is_some(),
+                )
+            }),
             existing.as_ref(),
-        ),
+            &index.redacted,
+        )
     };
 
+    let document = index.apply_pending(document);
     index.upsert(document);
 }
 
-async fn apply_redaction(
-    index: &mut RoomIndex,
-    redaction: &SyncRoomRedactionEvent,
-    cache: &RoomEventCache,
-    rules: &RedactionRules,
-) {
-    let Some(redacted) = redacted_event_id(redaction, rules) else {
+async fn apply_redacted(index: &mut RoomIndex, redacted: OwnedEventId, cache: &RoomEventCache) {
+    if !index.redacted.insert(redacted.clone()) {
         return;
-    };
-    index.redacted.insert(redacted.clone());
+    }
+    index.remove_pending_edit(&redacted);
+    index.dirty = true;
+    index.revision = index.revision.wrapping_add(1);
 
     if let Some(target) = index.edits.remove(&redacted) {
-        match latest_content(cache, &target, &index.redacted).await {
-            Some(document) => index.upsert(document),
-            None => index.forget_message(&target),
+        if let Some(document) = latest_content(cache, &target, &index.redacted).await {
+            let document = adopt_edit(document, index.document(&target), &index.redacted);
+            let document = index.apply_pending(document);
+            index.upsert(document);
+        } else {
+            if index
+                .document(&target)
+                .is_some_and(|document| !document.is_redacted(&index.redacted))
+            {
+                return;
+            }
+            index.remove(&target);
+            if index.has_cold() {
+                index.pending_redactions.insert(redacted);
+            }
+            if let Some(ts) = index.classified.remove(&target) {
+                index.bytes = index.bytes.saturating_sub(CLASSIFIED_OVERHEAD);
+                index.touch(ts);
+            }
         }
     } else {
-        index.edits.retain(|_, target| *target != redacted);
         index.forget_message(&redacted);
+        index.edits.retain(|_, target| *target != redacted);
     }
 }
 
@@ -1369,6 +1477,7 @@ fn unindexed_cold_documents(index: &RoomIndex, stored: &persist::StoredChunk) ->
         .filter(|document| {
             !index.key_of.contains_key(&document.event_id)
                 && !index.pending_redactions.contains(&document.event_id)
+                && !document.is_redacted(&index.redacted)
         })
         .cloned()
         .collect();
@@ -1378,6 +1487,11 @@ fn unindexed_cold_documents(index: &RoomIndex, stored: &persist::StoredChunk) ->
             .then_with(|| left.event_id.cmp(&right.event_id))
     });
     for document in &mut documents {
+        if let Some(edits) = index.pending_replacements.get(&document.event_id) {
+            for edit in edits.values() {
+                let _ = apply_replacement(document, edit, &index.redacted);
+            }
+        }
         document.folded = document.body.to_lowercase();
     }
     documents
