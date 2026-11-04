@@ -28,6 +28,7 @@ export function reportSessionFailure(
 ): void {
   if (!Sentry.isInitialized()) return;
   const detail = error instanceof CoreError ? error.detail : undefined;
+  if (detail?.code === 'failed' && detail.log_id.startsWith('core panicked:')) return;
   const tags = {
     'session.operation': operation,
     'session.reason':

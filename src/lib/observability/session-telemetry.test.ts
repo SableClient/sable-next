@@ -54,3 +54,14 @@ test('does not capture when reporting is disabled', () => {
   reportSessionFailure('restore', new Error('failure'));
   expect(sentry.captureMessage).not.toHaveBeenCalled();
 });
+
+test('leaves a core crash to its own report', () => {
+  reportSessionFailure(
+    'restore',
+    new CoreError({
+      code: 'failed',
+      log_id: 'core panicked: core failed to start: TypeError: Load failed',
+    })
+  );
+  expect(sentry.captureMessage).not.toHaveBeenCalled();
+});

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { isLivekitMissingKey } from './sentry-event';
+import { isLivekitConnectionTimeout, isLivekitMissingKey } from './sentry-event';
 
 test('drops the console error livekit writes for a missing call key', () => {
   expect(
@@ -38,4 +38,29 @@ test('keeps other console errors and other mechanisms', () => {
   ).toBe(false);
   expect(isLivekitMissingKey({ exception: { values: [{ type: 'MissingKey' }] } })).toBe(false);
   expect(isLivekitMissingKey({})).toBe(false);
+});
+
+test('drops the console error livekit writes when a reconnect attempt times out', () => {
+  const capture = { type: 'auto.core.capture_console', handled: true };
+  expect(
+    isLivekitConnectionTimeout({
+      exception: {
+        values: [
+          { value: 'room connection has timed out (signal) [object Object]', mechanism: capture },
+        ],
+      },
+    })
+  ).toBe(true);
+  expect(
+    isLivekitConnectionTimeout({
+      exception: {
+        values: [{ value: 'requested room does not exist [object Object]', mechanism: capture }],
+      },
+    })
+  ).toBe(false);
+  expect(
+    isLivekitConnectionTimeout({
+      exception: { values: [{ value: 'room connection has timed out (signal)' }] },
+    })
+  ).toBe(false);
 });

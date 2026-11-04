@@ -12,6 +12,16 @@ export function isLivekitMissingKey(event: Event): boolean {
   );
 }
 
+export function isLivekitConnectionTimeout(event: Event): boolean {
+  return (
+    event.exception?.values?.some(
+      (exception) =>
+        exception.mechanism?.type === 'auto.core.capture_console' &&
+        exception.value?.startsWith('room connection has timed out') === true
+    ) ?? false
+  );
+}
+
 export function scrubSentryEvent<T extends Event>(event: T): T {
   if (event.message) event.message = scrubMatrixIds(event.message);
   for (const exception of event.exception?.values ?? []) {
