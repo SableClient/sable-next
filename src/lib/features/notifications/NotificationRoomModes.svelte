@@ -73,28 +73,31 @@
               <span class="kind">{i18n.t('nav.space')}</span>
             {/if}
           </a>
-          <Select
-            class="settings-item-control"
-            aria-label={i18n.t('settings.notificationRoomsMode', { room: name })}
-            value={mode}
-            items={modes.map((option) => ({
-              value: option,
-              label: i18n.t(notificationModeLabels[option]),
-            }))}
-            onValueChange={(value) => {
-              change(room, value as NotificationModeView);
-            }}
-          />
-          <IconButton
-            variant="subtle"
-            size="large"
-            label={i18n.t('settings.notificationRoomsReset', { room: name })}
-            onclick={() => {
-              change(room, null);
-            }}
-          >
-            <ArrowCounterClockwiseIcon />
-          </IconButton>
+          <div class="room-controls">
+            <Select
+              class="settings-item-control"
+              forceDropdown
+              aria-label={i18n.t('settings.notificationRoomsMode', { room: name })}
+              value={mode}
+              items={modes.map((option) => ({
+                value: option,
+                label: i18n.t(notificationModeLabels[option]),
+              }))}
+              onValueChange={(value) => {
+                change(room, value as NotificationModeView);
+              }}
+            />
+            <IconButton
+              variant="subtle"
+              size="large"
+              label={i18n.t('settings.notificationRoomsReset', { room: name })}
+              onclick={() => {
+                change(room, null);
+              }}
+            >
+              <ArrowCounterClockwiseIcon />
+            </IconButton>
+          </div>
         </li>
       {/each}
     </ul>
@@ -102,10 +105,15 @@
 </section>
 
 <style>
+  .settings-item-list > li {
+    flex-wrap: wrap;
+  }
+
   .room {
     align-items: center;
     color: inherit;
     display: flex;
+    flex-basis: 12rem;
     gap: var(--space-200);
     text-decoration: none;
   }
@@ -113,6 +121,17 @@
   .name {
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+
+  .room-controls {
+    align-items: center;
+    display: flex;
+    gap: var(--space-300);
+    max-width: 100%;
+  }
+
+  .room-controls :global(.settings-item-control) {
+    flex-shrink: 1;
   }
 
   .room:hover .name {
