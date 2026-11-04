@@ -124,7 +124,8 @@ impl Route {
 const SLOW_CALL: Duration = Duration::from_secs(2);
 
 async fn invoke<H: Handler>(core: &Arc<Core>, params: &str) -> Result<Box<RawValue>, RpcError> {
-    let handler: H = serde_json::from_str(params).map_err(|error| core.failed("call", error))?;
+    let handler: H = serde_json::from_str(params)
+        .map_err(|error| core.failed(std::any::type_name::<H>(), error))?;
     let ok = handler.run(core).await?;
     serde_json::value::to_raw_value(&ok).map_err(|error| core.failed("call", error))
 }
