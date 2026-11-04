@@ -52,6 +52,12 @@
   }
 </script>
 
+<svelte:document
+  onvisibilitychange={() => {
+    if (document.visibilityState === 'visible' && core.storageInterrupted) reload();
+  }}
+/>
+
 {#if notice}
   <div class={['banner', { crash: notice.kind === 'crash' }]} role="alert">
     <p class="message">{notice.text}</p>
