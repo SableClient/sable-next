@@ -2,7 +2,12 @@ import { expect, test, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 
-import type { RoomListItemView } from '#src/generated/protocol';
+import type {
+  CoreEvent,
+  RoomListItemView,
+  SearchCoverageView,
+  SearchHitView,
+} from '#src/generated/protocol';
 
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
@@ -16,10 +21,15 @@ vi.mock('#lib/core/context.js', () => ({
 }));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('../room/messages/event-items.svelte.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../room/messages/event-items.svelte.js')>()),
+  useEventItems: () => ({ get: () => null }),
+}));
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('#lib/rooms/room-list.svelte.js')>()),
   useRoomList: () => ({
     rooms,
+    byId: (roomId: string) => rooms.find((room) => room.room_id === roomId),
     labelFor: (roomId: string) => rooms.find((room) => room.room_id === roomId)?.name ?? roomId,
   }),
 }));
@@ -63,21 +73,51 @@ const rooms = [
 ];
 
 async function mount() {
+  let onEvent: ((event: CoreEvent) => void) | undefined;
+  const messages = vi.fn().mockResolvedValue({ hits: [], older: null });
   Object.assign(core, {
     session: { user_id: '@me:example.org' },
     searchCoverageUnavailable: false,
     searchCoverage: null,
     refreshSearchCoverage: vi.fn().mockResolvedValue(undefined),
+    subscribeEvents: vi.fn((listener: (event: CoreEvent) => void) => {
+      onEvent = listener;
+      return () => {
+        onEvent = undefined;
+      };
+    }),
+    userProfile: vi.fn().mockResolvedValue({ display_name: 'Alice', avatar_url: null }),
     rpc: {
       account: { searchUserDirectory: vi.fn().mockResolvedValue([]) },
-      search: { messages: vi.fn().mockResolvedValue({ hits: [], older: null }) },
+      search: { messages },
     },
   });
   const screen = await render(SearchView);
   const field = screen.getByRole('combobox', { name: en.common.searchMessages });
   const listbox = screen.getByRole('listbox', { name: en.search.suggestions });
   const chips = screen.getByRole('list', { name: en.search.activeFilters }).getByRole('listitem');
-  return { screen, field, listbox, chips };
+  return {
+    screen,
+    field,
+    listbox,
+    chips,
+    messages,
+    emitCoverage: (coverage: SearchCoverageView) =>
+      onEvent?.({ type: 'search_coverage', coverage }),
+  };
+}
+
+function hit(eventId: string): SearchHitView {
+  return {
+    room_id: '!general:example.org',
+    event_id: eventId,
+    body: 'deploy complete',
+    sender: '@alice:example.org',
+    origin_server_ts: 1700000000000,
+    score: 1,
+    context_before: [],
+    context_after: [],
+  };
 }
 
 test('typing an operator prefix offers completions and Tab accepts one', async () => {
@@ -216,7 +256,7 @@ test('the remove button drops the chip', async () => {
   await expect.element(chips).not.toBeInTheDocument();
 });
 
-test('backspace on an empty draft removes the last chip', async () => {
+test('backspace on an empty draft edits the last chip', async () => {
   const { field, chips } = await mount();
 
   await userEvent.fill(field.element(), 'in:Random in:General ');
@@ -226,6 +266,95 @@ test('backspace on an empty draft removes the last chip', async () => {
 
   await expect.element(chips).toHaveLength(1);
   await expect.element(chips).toHaveTextContent('in: Random');
+  await expect.element(field).toHaveValue('in:General');
+  const input = field.element() as HTMLInputElement;
+  expect(input.value.slice(input.selectionStart ?? 0, input.selectionEnd ?? 0)).toBe('General');
+});
+
+test('Shift+Tab leaves suggestions without accepting one', async () => {
+  const { field, chips } = await mount();
+  await userEvent.fill(field.element(), 'has:');
+  await userEvent.keyboard('{Shift>}{Tab}{/Shift}');
+  await expect.element(field).toHaveValue('has:');
+  await expect.element(chips).not.toBeInTheDocument();
+  await expect.element(field).not.toHaveFocus();
+});
+
+test('the first ArrowDown selects the first unhighlighted suggestion', async () => {
+  const { screen, field } = await mount();
+  await userEvent.fill(field.element(), 'i');
+  const first = screen.getByRole('option', { name: /^in:/ });
+  await expect.element(first).toHaveAttribute('aria-selected', 'false');
+  await userEvent.keyboard('{ArrowDown}');
+  await expect.element(first).toHaveAttribute('aria-selected', 'true');
+});
+
+test('clicking a filter selects its value and keeps the search text', async () => {
+  const { screen, field, chips } = await mount();
+  await userEvent.fill(field.element(), 'message in:Random ');
+  await userEvent.click(screen.getByRole('button', { name: 'Edit in:Random' }));
+  await expect.element(field).toHaveValue('message in:Random');
+  const input = field.element() as HTMLInputElement;
+  expect(input.value.slice(input.selectionStart ?? 0, input.selectionEnd ?? 0)).toBe('Random');
+  await userEvent.keyboard('General ');
+  await expect.element(chips).toHaveTextContent('in: General');
+  await expect.element(field).toHaveValue('message ');
+});
+
+test('editing a date keeps the other filters', async () => {
+  const { screen, field, chips } = await mount();
+  await userEvent.fill(field.element(), 'in:Random before:2024-01-01 message');
+  await userEvent.click(screen.getByRole('button', { name: 'Edit before:2024-01-01' }));
+  await expect.element(field).toHaveValue('message before:2024-01-01');
+  await userEvent.keyboard('2025-01-01 ');
+  await expect.element(chips).toHaveLength(2);
+  await expect
+    .element(screen.getByRole('button', { name: 'Edit before:2025-01-01' }))
+    .toBeVisible();
+  await expect.element(screen.getByRole('button', { name: 'Edit in:Random' })).toBeVisible();
+});
+
+test('editing a quoted filter preserves its negation', async () => {
+  const { screen, field } = await mount();
+  await userEvent.fill(field.element(), 'has:image -in:"Random" message');
+  await userEvent.click(screen.getByRole('button', { name: 'Edit -in:Random' }));
+  await expect.element(field).toHaveValue('message -in:"Random"');
+  await userEvent.keyboard('General ');
+  await expect.element(screen.getByRole('button', { name: 'Edit -in:General' })).toBeVisible();
+  await expect.element(screen.getByRole('button', { name: 'Edit has:image' })).toBeVisible();
+});
+
+test('a pagination error keeps results visible and retries the failed page', async () => {
+  const { screen, field, messages } = await mount();
+  messages
+    .mockResolvedValueOnce({
+      hits: Array.from({ length: 30 }, (_, index) => hit(`$first${index}`)),
+      older: null,
+    })
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValue({ hits: [hit('$next')], older: null });
+  await userEvent.fill(field.element(), 'deploy');
+  const rows = screen.getByRole('group', { name: /^Open message from/ });
+  await expect.element(rows).toHaveLength(30);
+  (screen.getByRole('button', { name: en.search.loadMore }).element() as HTMLButtonElement).click();
+  await expect.element(screen.getByText(en.search.loadFailed, { exact: true })).toBeVisible();
+  await expect.element(rows).toHaveLength(30);
+  await userEvent.click(screen.getByRole('button', { name: en.common.tryAgain }));
+  await expect.element(rows).toHaveLength(31);
+  expect(messages).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 30 }));
+});
+
+test('indexing updates refresh an unchanged search', async () => {
+  const { screen, field, messages, emitCoverage } = await mount();
+  messages
+    .mockResolvedValueOnce({ hits: [], older: null })
+    .mockResolvedValue({ hits: [hit('$indexed')], older: null });
+  await userEvent.fill(field.element(), 'deploy');
+  await expect.element(screen.getByRole('status')).toHaveTextContent(en.search.empty);
+  emitCoverage({ documents: 1, rooms_pending: 0, rooms_failed: 0, state: 'complete' });
+  await expect.element(screen.getByRole('group', { name: /^Open message from/ })).toHaveLength(1);
+  await expect.element(field).toHaveValue('deploy');
+  expect(messages).toHaveBeenCalledTimes(2);
 });
 
 test('accepting a suggestion closes the list instead of reopening it', async () => {
