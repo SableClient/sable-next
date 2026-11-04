@@ -3670,3 +3670,24 @@ async fn dehydrated_device_reports_the_server_and_the_preference() {
         json!({ "enabled": false })
     );
 }
+
+#[tokio::test]
+async fn a_revoked_token_reads_as_logged_out() {
+    use crate::errors::ResultExt;
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    Mock::given(method("GET"))
+        .and(path_regex("/profile/"))
+        .respond_with(ResponseTemplate::new(401).set_body_json(
+            json!({"errcode": "M_UNKNOWN_TOKEN", "error": "Token not active", "soft_logout": false}),
+        ))
+        .mount(server.server())
+        .await;
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    let result = client
+        .account()
+        .fetch_user_profile()
+        .await
+        .or_failed(&core, "webpusher_support");
+    assert!(matches!(result, Err(RpcError::NotLoggedIn)));
+}

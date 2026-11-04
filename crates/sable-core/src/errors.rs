@@ -102,6 +102,22 @@ impl<T, E: Error + 'static> ResultExt<T> for Result<T, E> {
                 {
                     return RpcError::MessageTooLarge;
                 }
+                if matches!(
+                    error
+                        .downcast_ref::<matrix_sdk::Error>()
+                        .and_then(matrix_sdk::Error::client_api_error_kind),
+                    Some(ErrorKind::UnknownToken(_))
+                ) {
+                    tracing::debug!(context = label, "the access token is no longer valid");
+                    return RpcError::NotLoggedIn;
+                }
+                if matches!(
+                    error.downcast_ref::<matrix_sdk::Error>(),
+                    Some(matrix_sdk::Error::InsufficientData)
+                ) {
+                    tracing::debug!(context = label, "nothing is known about this room");
+                    return RpcError::Unavailable;
+                }
                 // Transparent SDK wrappers omit their inner error from source().
                 cause = if let Some(TimelineError::SendQueueError(inner)) =
                     error.downcast_ref::<TimelineError>()
@@ -370,6 +386,13 @@ mod tests {
                 .unwrap()
                 .contains("context=\"test_label\"")
         );
+    }
+
+    #[test]
+    fn a_room_nothing_is_known_about_is_unavailable() {
+        let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+        let result = Err::<(), _>(matrix_sdk::Error::InsufficientData).or_failed(&core, "preview");
+        assert!(matches!(result, Err(RpcError::Unavailable)));
     }
 
     #[test]
