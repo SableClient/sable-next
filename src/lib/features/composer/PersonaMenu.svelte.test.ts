@@ -10,24 +10,15 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 
 import PersonaMenu from './PersonaMenu.svelte';
+import { testPersona } from '#lib/personas/persona.ts';
 
 function persona(id: string, color: string | null): PersonaView {
   return {
+    ...testPersona,
     id,
     display_name: id,
-    avatar_url: null,
-    pronouns: [],
     color_on_light: color,
     color_on_dark: color,
-    triggers: [],
-    pluralkit: null,
-    last_used: null,
-    alternate_avatars: null,
-    biography: null,
-    banner_url: null,
-    is_animal: null,
-    has_animal: null,
-    animal_need: null,
   };
 }
 

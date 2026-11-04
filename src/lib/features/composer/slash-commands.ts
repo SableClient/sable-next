@@ -254,6 +254,7 @@ async function addPersona(
     is_animal: existing?.is_animal ?? null,
     has_animal: existing?.has_animal ?? null,
     animal_need: existing?.animal_need ?? null,
+    sort_flags: existing?.sort_flags ?? null,
   } satisfies PersonaView;
   await rpc.personas.save({
     persona: next,

@@ -197,3 +197,22 @@ export function stripProxyHtml(
 export function triggerLabel(trigger: PersonaTriggerView): string {
   return `${trigger.prefix ?? ''}text${trigger.suffix ?? ''}`;
 }
+
+export const testPersona: PersonaView = {
+  id: 'kris',
+  display_name: 'Kris',
+  avatar_url: null,
+  pronouns: [],
+  color_on_light: null,
+  color_on_dark: null,
+  triggers: [],
+  pluralkit: null,
+  last_used: null,
+  alternate_avatars: null,
+  biography: null,
+  banner_url: null,
+  is_animal: null,
+  has_animal: null,
+  animal_need: null,
+  sort_flags: null,
+};

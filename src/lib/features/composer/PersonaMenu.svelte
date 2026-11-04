@@ -69,7 +69,12 @@
   let alternateAvatarMode = $derived(
     preferences.personaAlternateAvatar && alternateAvatarAvailable
   );
-  let filteredPersonas = $derived(filterPersonas(personas, query));
+  let prefilteredPersonas = $derived(
+    personas.filter((persona) => persona.id == selected?.persona_id || !persona.sort_flags?.hidden)
+  );
+  let filteredPersonas = $derived(
+    filterPersonas(query == '' ? prefilteredPersonas : personas, query)
+  );
 
   const SCOPES = {
     room: { label: 'personas.rememberedRoom', icon: RoomIcon },

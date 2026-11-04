@@ -23,7 +23,7 @@ use crate::profiles::pronoun_sets;
 use crate::protocol::PersonaAlternateAvatarView;
 use crate::protocol::{
     PerMessageProfileView, PersonaCatalogView, PersonaSelectionView, PersonaTriggerView,
-    PersonaView, PluralkitImportView, PronounView, RpcError,
+    PersonaView, PluralkitImportView, PronounView, RpcError, PersonaSortFlagsView
 };
 
 const CATALOG_V3: &str = "fi.mau.msc4461.per_message_profiles.v3";
@@ -188,6 +188,22 @@ impl AlternateAvatarIn {
 
 #[serde_as]
 #[derive(Deserialize)]
+struct SortFlagsIn {
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[serde(default)]
+    hidden: Option<bool>,
+}
+
+impl SortFlagsIn {
+    fn into_view(self) -> Option<PersonaSortFlagsView> {
+        Some(PersonaSortFlagsView {
+            hidden: self.hidden?,
+        })
+    }
+}
+
+#[serde_as]
+#[derive(Deserialize)]
 struct PersonaIn {
     #[serde_as(as = "NonBlank")]
     #[serde(default)]
@@ -232,6 +248,9 @@ struct PersonaIn {
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[serde(default, rename = "net.f0rest.animal_need")]
     pub animal_need: Option<String>,
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[serde(default, rename = "net.f0rest.sort_flags")]
+    pub sort_flags: Option<SortFlagsIn>,
 }
 
 impl PersonaIn {
@@ -268,6 +287,7 @@ impl PersonaIn {
             is_animal: self.is_animal,
             has_animal: self.has_animal,
             animal_need: self.animal_need,
+            sort_flags: self.sort_flags.and_then(SortFlagsIn::into_view),
         })
     }
 }
@@ -478,6 +498,20 @@ impl From<&PersonaAlternateAvatarView> for AlternateAvatarOut {
 }
 
 #[derive(Serialize)]
+struct SortFlagsOut {
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    hidden: bool,
+}
+
+impl From<&PersonaSortFlagsView> for SortFlagsOut {
+    fn from(sort_flags: &PersonaSortFlagsView) -> Self {
+        Self {
+            hidden: sort_flags.hidden,
+        }
+    }
+}
+
+#[derive(Serialize)]
 struct PersonaOut {
     id: String,
     displayname: String,
@@ -501,6 +535,9 @@ struct PersonaOut {
         skip_serializing_if = "Option::is_none"
     )]
     alternate_avatars: Option<Vec<AlternateAvatarOut>>,
+    #[serde(rename = "net.f0rest.sort_flags",
+        skip_serializing_if = "Option::is_none" )]
+    sort_flags: Option<SortFlagsOut>,
 }
 
 impl From<&PersonaView> for PersonaOut {
@@ -517,6 +554,7 @@ impl From<&PersonaView> for PersonaOut {
                 .alternate_avatars
                 .as_ref()
                 .map(|vec| vec.iter().map(Into::into).collect()),
+            sort_flags: persona.sort_flags.as_ref().map(Into::into),
         }
     }
 }

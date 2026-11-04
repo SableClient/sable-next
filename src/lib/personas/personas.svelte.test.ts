@@ -5,24 +5,13 @@ import type { CoreEvent, PersonaCatalogView, PersonaView } from '#src/generated/
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { PersonaStore } from './personas.svelte.js';
+import { testPersona } from './persona.js';
 
 function persona(id: string): PersonaView {
   return {
+    ...testPersona,
     id,
     display_name: id,
-    avatar_url: null,
-    pronouns: [],
-    color_on_light: null,
-    color_on_dark: null,
-    triggers: [],
-    pluralkit: null,
-    last_used: null,
-    alternate_avatars: null,
-    biography: null,
-    banner_url: null,
-    is_animal: null,
-    has_animal: null,
-    animal_need: null,
   };
 }
 

@@ -3472,7 +3472,9 @@
     "alternateAvatarNone": "Default avatar",
     "alternateAvatarViewOn": "Set alternate avatars",
     "alternateAvatarViewOff": "Back to profiles",
-    "triggerAlternateAvatar": "Avatar"
+    "triggerAlternateAvatar": "Avatar",
+    "editorSortFlags": "Profile picker sorting",
+    "sortFlagsHidden": "Hide from the picker"
   },
   "call": {
     "participantVolume": "Volume for {{name}}",

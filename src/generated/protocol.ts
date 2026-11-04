@@ -861,6 +861,11 @@ export type PersonaSelectionView = {
 	valid_until: number | null,
 };
 
+/**  Left as a struct so we can add more things, eg tags in the future. */
+export type PersonaSortFlagsView = {
+	hidden: boolean,
+};
+
 export type PersonaTriggerView = {
 	prefix: string | null,
 	suffix: string | null,
@@ -884,6 +889,7 @@ export type PersonaView = {
 	is_animal: string | null,
 	has_animal: string | null,
 	animal_need: string | null,
+	sort_flags: PersonaSortFlagsView | null,
 };
 
 export type PinReadStateView = {

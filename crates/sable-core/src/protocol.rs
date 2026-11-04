@@ -1648,6 +1648,14 @@ pub struct PersonaView {
     pub is_animal: Option<String>,
     pub has_animal: Option<String>,
     pub animal_need: Option<String>,
+    pub sort_flags: Option<PersonaSortFlagsView>
+}
+
+/// Left as a struct so we can add more things, eg tags in the future.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct PersonaSortFlagsView {
+    pub hidden: bool
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
