@@ -1,19 +1,8 @@
 {
-  "upcoming": {
+  "v2.3.4": {
     "added": [
       "callInputMode",
       "callGlobalShortcuts"
-    ],
-    "changed": []
-  },
-  "v2.3.2": {
-    "added": [
-      "hardwareVideoEncode",
-      "hardwareVideoDecode",
-      "personaSelectionScope",
-      "personaKeepAfterShorthand",
-      "searchBackup",
-      "searchBackupLimit"
     ],
     "changed": []
   }

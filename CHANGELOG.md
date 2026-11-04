@@ -1,5 +1,27 @@
 # Sable Changelog
 
+## 2.3.4 (2026-11-04)
+
+### Fixes
+
+* Load join requests for all rooms with one request instead of two per room.
+* Profile a sample of sessions in Chromium-based browsers and the desktop app to find slow interface code.
+* Read call state only for rooms that changed, instead of for every room on each sync update.
+* Reload a room's member list once per burst of membership changes, and only for profile changes of its members.
+* Read a room list picture only when it changes, instead of on every update.
+* Open a room with one request for its permissions and power levels instead of two.
+* Remove donation links and prompts from the iOS app.
+* Allow native iPhone animations to use ProMotion refresh rates.
+* Avoid reloading a room's cached history when search has already indexed its events.
+* Decrypt messages whose keys arrived in the background when the app reopens.
+* Fix RPM upgrades removing the Sable command from PATH.
+* Speed up indexing and searching messages with pending edits.
+* Fix search refresh, loading retries, keyboard navigation, and filter editing.
+* Fix stale search results after message edits, deletions, restarts, and backup restores.
+* Custom emoji and sticker packs load once per session and update live, instead of reloading every few minutes.
+* Keep the FOSS Android APK reproducible.
+* Report crashes in the core with the Rust function names where they happened.
+
 ## 2.3.3 (2026-11-04)
 
 ### Features
