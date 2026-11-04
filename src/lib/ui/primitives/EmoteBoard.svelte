@@ -1160,13 +1160,13 @@
     cursor: pointer;
     font: inherit;
     font-size: var(--font-size-small);
-    margin-bottom: var(--space-300);
+    margin: var(--space-200);
     overflow: hidden;
     padding: var(--space-150) var(--space-200);
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
-    width: 100%;
+    width: 98%;
   }
 
   .free-text:hover {
