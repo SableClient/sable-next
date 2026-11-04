@@ -57,8 +57,21 @@ const worker = globalThis.self as unknown as ServiceWorkerGlobalScope;
 // A worker from an older deploy must not depend on assets the next deploy removed.
 const MODEL_CACHE = `sable-model-${version}`;
 
+// The SPA fallback answers a missing asset with index.html and a 200, which cache.add would store as the model.
+async function fetchModel(): Promise<Response> {
+  const response = await fetch(modelWasm);
+  if (!response.ok || response.headers.get('content-type')?.includes('text/html')) {
+    throw new Error(`model wasm unavailable: ${String(response.status)}`);
+  }
+  return response;
+}
+
 worker.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(MODEL_CACHE).then((cache) => cache.add(modelWasm)));
+  event.waitUntil(
+    Promise.all([caches.open(MODEL_CACHE), fetchModel()]).then(([cache, response]) =>
+      cache.put(modelWasm, response)
+    )
+  );
 });
 
 worker.addEventListener('activate', (event) => {
@@ -76,7 +89,12 @@ worker.addEventListener('activate', (event) => {
 });
 
 async function cachedModel(): Promise<Response> {
-  return (await caches.match(modelWasm, { cacheName: MODEL_CACHE })) ?? fetch(modelWasm);
+  const cached = await caches.match(modelWasm, { cacheName: MODEL_CACHE });
+  if (cached && !cached.headers.get('content-type')?.includes('text/html')) return cached;
+  const response = await fetchModel();
+  const cache = await caches.open(MODEL_CACHE);
+  await cache.put(modelWasm, response.clone());
+  return response;
 }
 
 worker.addEventListener('error', (event) => {

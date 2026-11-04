@@ -118,3 +118,24 @@ test('count-only read pushes close messages and retain active call banners', asy
   expect(message.close).toHaveBeenCalledOnce();
   expect(call.close).not.toHaveBeenCalled();
 });
+
+test('install refuses an HTML response in place of the model', async () => {
+  const put = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal('caches', { open: () => Promise.resolve({ put }) });
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockResolvedValue(
+        new Response('<!doctype html>', { headers: { 'content-type': 'text/html' } })
+      )
+  );
+  let pending: Promise<unknown> | undefined;
+  mocks.handlers.get('install')?.({
+    waitUntil: (work: Promise<unknown>) => {
+      pending = work;
+    },
+  } as unknown as PushEvent);
+  await expect(pending).rejects.toThrow('model wasm unavailable');
+  expect(put).not.toHaveBeenCalled();
+});
