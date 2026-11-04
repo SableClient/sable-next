@@ -102,3 +102,9 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}
       run: pnpm exec vite build
+
+    - name: Upload source maps
+      if: ${{ inputs.build == 'true' }}
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: node scripts/ci/upload-sentry-sourcemaps.mjs dist
