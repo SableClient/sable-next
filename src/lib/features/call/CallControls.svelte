@@ -13,6 +13,7 @@
   import type { Snippet } from 'svelte';
 
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { formatBinding } from '#lib/ui/shortcuts/binding.js';
   import { effectiveShortcuts } from '#lib/ui/shortcuts/bindings.svelte.js';
@@ -35,6 +36,8 @@
     canScreenShare: boolean;
     compact?: boolean;
     onToggleMicrophone: () => void;
+    pushToTalk?: boolean;
+    onPushToTalk?: (held: boolean, source: string) => void;
     onToggleCamera: () => void;
     onToggleScreenShare: () => void;
     onToggleDeafen?: () => void;
@@ -57,6 +60,8 @@
     canScreenShare,
     compact = false,
     onToggleMicrophone,
+    pushToTalk = false,
+    onPushToTalk,
     onToggleCamera,
     onToggleScreenShare,
     onToggleDeafen,
@@ -83,6 +88,14 @@
   let inputs = $derived(compact ? undefined : audioInputs);
   let inputGrouped = $derived(grouped || inputs !== undefined);
   let cameraMenu = $state(false);
+  let talking = $state(false);
+  const talkSource = $props.id();
+
+  function setTalking(held: boolean): void {
+    if (talking === held) return;
+    talking = held;
+    onPushToTalk?.(held, talkSource);
+  }
 
   function shortcut(id: ShortcutId): string {
     const binding = effectiveShortcuts().find((item) => item.id === id)?.binding;
@@ -96,6 +109,13 @@
   );
   let deafenLabel = $derived(i18n.t(deafened ? 'call.undeafen' : 'call.deafen'));
 </script>
+
+<svelte:window onblur={() => setTalking(false)} />
+<svelte:document
+  onvisibilitychange={() => {
+    if (document.hidden) setTalking(false);
+  }}
+/>
 
 {#snippet control(
   tip: string,
@@ -119,6 +139,42 @@
 {/snippet}
 
 <div class={['controls', { compact }]}>
+  {#if pushToTalk && onPushToTalk}
+    {#snippet talkButton(props: Record<string, unknown>)}
+      <Button
+        {...props}
+        {@attach () => () => setTalking(false)}
+        size={compact ? 'icon' : 'medium'}
+        variant={talking ? 'primary' : 'secondary'}
+        disabled={!ready || !microphoneEnabled}
+        aria-pressed={talking}
+        onpointerdown={(event) => {
+          if (event.button !== 0) return;
+          event.preventDefault();
+          event.currentTarget.setPointerCapture(event.pointerId);
+          setTalking(true);
+        }}
+        onpointerup={() => setTalking(false)}
+        onpointercancel={() => setTalking(false)}
+        onlostpointercapture={() => setTalking(false)}
+        onkeydown={(event) => {
+          if (event.key !== ' ' && event.key !== 'Enter') return;
+          event.preventDefault();
+          setTalking(true);
+        }}
+        onkeyup={(event) => {
+          if (event.key !== ' ' && event.key !== 'Enter') return;
+          event.preventDefault();
+          setTalking(false);
+        }}
+        onblur={() => setTalking(false)}
+      >
+        <MicrophoneIcon aria-hidden="true" />
+        <span class={compact ? 'screen-reader-only' : undefined}>{i18n.t('call.pushToTalk')}</span>
+      </Button>
+    {/snippet}
+    {@render control(`${i18n.t('call.pushToTalk')}${shortcut('call.pushToTalk')}`, talkButton)}
+  {/if}
   {#snippet micButton(props: Record<string, unknown>)}
     <IconButton
       {...props}

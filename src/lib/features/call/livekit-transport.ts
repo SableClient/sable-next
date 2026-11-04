@@ -475,9 +475,14 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       await checkConnection();
 
       if (options.publishMedia !== false) {
-        await publishTrack('call.microphone.set', () =>
-          room.localParticipant.setMicrophoneEnabled(connectOptions.microphoneEnabled)
-        );
+        await publishTrack('call.microphone.set', async () => {
+          if (connectOptions.microphoneEnabled || !connectOptions.microphoneStandby) {
+            return room.localParticipant.setMicrophoneEnabled(connectOptions.microphoneEnabled);
+          }
+          const [track] = await room.localParticipant.createTracks({ audio: true });
+          await track.mute();
+          return room.localParticipant.publishTrack(track);
+        });
         await publishTrack('call.camera.set', async () =>
           room.localParticipant.setCameraEnabled(
             connectOptions.cameraEnabled,

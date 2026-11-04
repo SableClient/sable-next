@@ -70,6 +70,8 @@ export type CaptionPosition = 'above' | 'below' | 'inline' | 'hidden';
 export type UsernameClick = 'mention' | 'profile';
 export const CALL_MODES = ['auto', 'legacy', 'compatibility', 'matrix_2'] as const;
 export type CallModePreference = (typeof CALL_MODES)[number];
+export const CALL_INPUT_MODES = ['voice-activity', 'push-to-talk'] as const;
+export type CallInputMode = (typeof CALL_INPUT_MODES)[number];
 export const CALL_VIDEO_RESOLUTIONS = [
   'auto',
   '360',
@@ -363,6 +365,8 @@ export interface Preferences {
   incomingCallSound: boolean;
   outgoingRingback: boolean;
   callMicrophoneMuted: boolean;
+  callInputMode: CallInputMode;
+  callGlobalShortcuts: boolean;
   noiseSuppression: boolean;
   voiceIsolation: boolean;
   incomingVoiceIsolation: boolean;
@@ -498,6 +502,7 @@ const ENUMS = {
   captionPosition: ['above', 'below', 'inline', 'hidden'],
   usernameClick: ['mention', 'profile'],
   callMode: CALL_MODES,
+  callInputMode: CALL_INPUT_MODES,
   callCameraResolution: CALL_VIDEO_RESOLUTIONS,
   callCameraBitrate: CALL_VIDEO_BITRATES,
   callCameraCodec: CALL_VIDEO_CODECS,
@@ -729,6 +734,8 @@ const DEFAULTS: Preferences = {
   incomingCallSound: true,
   outgoingRingback: true,
   callMicrophoneMuted: false,
+  callInputMode: 'voice-activity',
+  callGlobalShortcuts: true,
   noiseSuppression: true,
   voiceIsolation: false,
   incomingVoiceIsolation: false,

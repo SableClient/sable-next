@@ -6,6 +6,10 @@ import type {
   ThemeFileSnapshot,
 } from '../../src/lib/platform/file-dialog-types';
 import type { ScreenAudioListing } from '../../src/lib/platform/screen-audio-types';
+import type {
+  DesktopCallShortcut,
+  DesktopCallShortcutEvent,
+} from '../../src/lib/platform/call-shortcut-types';
 
 interface ScreenShareCandidate {
   id: string;
@@ -32,6 +36,17 @@ ipcRenderer.on('sable-pick-screen', (_event, request: number, sources: ScreenSha
 });
 
 contextBridge.exposeInMainWorld('sableElectron', {
+  setCallShortcuts: (bindings: DesktopCallShortcut[]) =>
+    ipcRenderer.invoke('sable-call-shortcuts', bindings) as Promise<void>,
+  onCallShortcut: (callback: (event: DesktopCallShortcutEvent) => void) => {
+    const listener = (_event: IpcRendererEvent, value: DesktopCallShortcutEvent) => {
+      callback(value);
+    };
+    ipcRenderer.on('sable-call-shortcut', listener);
+    return () => {
+      ipcRenderer.removeListener('sable-call-shortcut', listener);
+    };
+  },
   platform: process.platform,
   screenAudioAvailable: process.argv.includes('--sable-screen-audio'),
   autostartAvailable: process.argv.includes('--sable-autostart'),

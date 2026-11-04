@@ -46,6 +46,7 @@ export type CallTransportConnectOptions = {
   url: string;
   token: string;
   microphoneEnabled: boolean;
+  microphoneStandby?: boolean;
   cameraEnabled: boolean;
   encryptionKeys: CallEncryptionKey[];
   publisherId?: string;

@@ -316,14 +316,15 @@
   {#if !failed}
     <div class="dock chrome">
       <CallControls
-        microphoneEnabled={session.transport.microphoneEnabled}
+        microphoneEnabled={session.microphoneEnabled && !session.deafened}
+        pushToTalk={session.inputMode === 'push-to-talk'}
+        onPushToTalk={(held, source) => void session.setTalking(held, source)}
         cameraEnabled={session.transport.cameraEnabled}
         screenShareEnabled={session.transport.screenShareEnabled}
         deafened={session.deafened}
         {ready}
         canScreenShare={session.canScreenShare}
-        onToggleMicrophone={() =>
-          void session.setMicrophoneEnabled(!session.transport.microphoneEnabled)}
+        onToggleMicrophone={() => void session.toggleMicrophone()}
         onToggleCamera={() => void session.setCameraEnabled(!session.transport.cameraEnabled)}
         onToggleScreenShare={() => void session.toggleScreenShare()}
         onToggleDeafen={() => session.setDeafened(!session.deafened)}
@@ -343,6 +344,11 @@
   {/if}
 
   <div class="notices" bind:clientHeight={noticeHeight}>
+    {#if session.desktopShortcutStatus === 'error'}
+      <Alert variant="warning" class="notice">
+        <p>{i18n.t('call.desktopShortcutsUnavailable')}</p>
+      </Alert>
+    {/if}
     {#if session.listenOnly}
       <Alert variant="warning" class="notice">
         <p>{i18n.t('call.listenOnly')}</p>

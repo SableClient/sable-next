@@ -2,7 +2,11 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { CoreEvent } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { preferences } from '#lib/settings/preferences.svelte.js';
+import {
+  preferences,
+  setPreference,
+  type CallInputMode,
+} from '#lib/settings/preferences.svelte.js';
 
 const screenAudio = vi.hoisted(() => ({ supported: vi.fn(() => false) }));
 vi.mock('#lib/platform/screen-audio.js', async (original) => ({
@@ -34,7 +38,7 @@ class MockAudioContext {
 }
 // vi.stubGlobal('AudioContext', MockAudioContext);
 
-import { CallSession, voiceStates } from './call-session.svelte.js';
+import { CallSession, TALK_RELEASE_DELAY_MS, voiceStates } from './call-session.svelte.js';
 import { MatrixKeyProvider } from './key-provider';
 import type { CallTransportConnectOptions } from './call-transport';
 import { resetCallOwner } from './call-owner';
@@ -63,8 +67,13 @@ function harness(
   const transport = {
     connected,
     keys,
-    connect: vi.fn(() => {
-      const state = { ...idleTransportState(), connection: 'connected' as const };
+    connect: vi.fn((options: CallTransportConnectOptions) => {
+      const state = {
+        ...idleTransportState(),
+        connection: 'connected' as const,
+        microphoneEnabled: options.microphoneEnabled,
+        cameraEnabled: options.cameraEnabled,
+      };
       connected.push(state);
       currentTransportState = state;
       transportListeners.forEach((listener) => {
@@ -73,7 +82,13 @@ function harness(
       return Promise.resolve();
     }),
     disconnect: vi.fn(() => Promise.resolve()),
-    setMicrophoneEnabled: vi.fn(() => Promise.resolve()),
+    setMicrophoneEnabled: vi.fn((enabled: boolean) => {
+      currentTransportState = { ...currentTransportState, microphoneEnabled: enabled };
+      transportListeners.forEach((listener) => {
+        listener(currentTransportState);
+      });
+      return Promise.resolve();
+    }),
     setCameraEnabled: vi.fn(() => Promise.resolve()),
     setEncryptionKey: vi.fn((key: { identity: string; keyIndex: number }) => {
       keys.push({ identity: key.identity, keyIndex: key.keyIndex });
@@ -153,6 +168,7 @@ beforeEach(() => {
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
   } as Response);
   resetCallOwner();
+  setPreference('callInputMode', 'voice-activity');
 });
 
 afterEach(() => {
@@ -869,10 +885,14 @@ test('deafening mutes the microphone and undeafening restores it', async () => {
   emitTransportState({ ...idleTransportState(), connection: 'connected', microphoneEnabled: true });
 
   session.setDeafened(true);
-  expect(transport.setMicrophoneEnabled).toHaveBeenLastCalledWith(false);
+  await vi.waitFor(() => {
+    expect(transport.setMicrophoneEnabled).toHaveBeenLastCalledWith(false);
+  });
 
   session.setDeafened(false);
-  expect(transport.setMicrophoneEnabled).toHaveBeenLastCalledWith(true);
+  await vi.waitFor(() => {
+    expect(transport.setMicrophoneEnabled).toHaveBeenLastCalledWith(true);
+  });
 });
 
 test('undeafening leaves a microphone muted before deafening muted', async () => {
@@ -949,6 +969,197 @@ test('the microphone mute is remembered for the next call', async () => {
 
   await session.join('!room:example.org', { microphone: true, camera: false });
   expect(preferences.callMicrophoneMuted).toBe(false);
+});
+
+async function microphoneSession(mode: CallInputMode, microphone = true, canPublish = true) {
+  setPreference('callInputMode', mode);
+  const h = harness({ canPublish });
+  const session = new CallSession(h.client, { createTransport: () => h.transport });
+  await session.join('!room:example.org', { microphone, camera: false });
+  return { ...h, session };
+}
+
+async function releaseTalk(session: CallSession, source?: string) {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const release = session.setTalking(false, source);
+  await vi.advanceTimersByTimeAsync(TALK_RELEASE_DELAY_MS);
+  vi.useRealTimers();
+  await release;
+}
+
+test('push-to-talk connects without transmitting, and transmits only while pressed', async () => {
+  const { session, transport } = await microphoneSession('push-to-talk');
+  expect(transport.connect).toHaveBeenCalledWith(
+    expect.objectContaining({ microphoneEnabled: false, microphoneStandby: true })
+  );
+  expect(session.microphoneEnabled).toBe(true);
+  await session.setTalking(true);
+  expect(session.transport.microphoneEnabled).toBe(true);
+  await releaseTalk(session);
+  expect(session.transport.microphoneEnabled).toBe(false);
+  expect(preferences.callMicrophoneMuted).toBe(false);
+});
+
+test('push-to-talk keeps transmitting briefly after release and through a quick re-press', async () => {
+  const { session, transport } = await microphoneSession('push-to-talk');
+  await session.setTalking(true);
+  vi.mocked(transport.setMicrophoneEnabled).mockClear();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const release = session.setTalking(false);
+  await vi.advanceTimersByTimeAsync(TALK_RELEASE_DELAY_MS - 1);
+  expect(session.transport.microphoneEnabled).toBe(true);
+  await session.setTalking(true);
+  await release;
+  await vi.advanceTimersByTimeAsync(TALK_RELEASE_DELAY_MS);
+  expect(transport.setMicrophoneEnabled).not.toHaveBeenCalled();
+  expect(session.transport.microphoneEnabled).toBe(true);
+  const second = session.setTalking(false);
+  await vi.advanceTimersByTimeAsync(TALK_RELEASE_DELAY_MS);
+  await second;
+  expect(session.transport.microphoneEnabled).toBe(false);
+});
+
+test('the mute shortcut toggles on each press', async () => {
+  const { session } = await microphoneSession('voice-activity');
+  await session.toggleMicrophone();
+  expect(session.transport.microphoneEnabled).toBe(false);
+  expect(preferences.callMicrophoneMuted).toBe(true);
+  await session.toggleMicrophone();
+  expect(session.transport.microphoneEnabled).toBe(true);
+  expect(preferences.callMicrophoneMuted).toBe(false);
+});
+
+test('the talk key has no effect in voice activity mode', async () => {
+  const { session, transport } = await microphoneSession('voice-activity');
+  await session.setTalking(true);
+  await session.setTalking(false);
+  expect(transport.setMicrophoneEnabled).not.toHaveBeenCalled();
+});
+
+test.each(['voice-activity', 'push-to-talk'] as const)(
+  'held keys never override a manual mute in %s mode',
+  async (mode) => {
+    const { session, transport } = await microphoneSession(mode, false);
+    await session.setTalking(true);
+    await releaseTalk(session);
+    expect(transport.setMicrophoneEnabled).not.toHaveBeenCalled();
+    expect(preferences.callMicrophoneMuted).toBe(true);
+  }
+);
+
+test('the mute shortcut overrides a held talk key', async () => {
+  const { session } = await microphoneSession('push-to-talk');
+  await session.setTalking(true);
+  await session.toggleMicrophone();
+  expect(session.transport.microphoneEnabled).toBe(false);
+  await releaseTalk(session);
+  await session.toggleMicrophone();
+  expect(session.transport.microphoneEnabled).toBe(false);
+  await session.setTalking(true);
+  expect(session.transport.microphoneEnabled).toBe(true);
+});
+
+test('releasing one talk source keeps transmitting while another source is held', async () => {
+  const { session } = await microphoneSession('push-to-talk');
+  await session.setTalking(true, 'desktop');
+  await session.setTalking(true, 'button');
+  await releaseTalk(session, 'desktop');
+  expect(session.transport.microphoneEnabled).toBe(true);
+  await releaseTalk(session, 'button');
+  expect(session.transport.microphoneEnabled).toBe(false);
+});
+
+test('deafening stops push-to-talk and requires a fresh press after undeafening', async () => {
+  const { session } = await microphoneSession('push-to-talk');
+  await session.setTalking(true);
+  session.setDeafened(true);
+  await session.setTalking(true);
+  await vi.waitFor(() => {
+    expect(session.transport.microphoneEnabled).toBe(false);
+  });
+  expect(session.deafened).toBe(true);
+  session.setDeafened(false);
+  await session.setTalking(false);
+  expect(session.transport.microphoneEnabled).toBe(false);
+  await session.setTalking(true);
+  expect(session.transport.microphoneEnabled).toBe(true);
+});
+
+test('switching input modes during a call clears held keys and respects manual mute', async () => {
+  const { session } = await microphoneSession('voice-activity');
+  session.setInputMode('push-to-talk');
+  await vi.waitFor(() => {
+    expect(session.transport.microphoneEnabled).toBe(false);
+  });
+  await session.setTalking(true);
+  session.setInputMode('voice-activity');
+  await session.setTalking(false);
+  expect(session.transport.microphoneEnabled).toBe(true);
+  await session.setMicrophoneEnabled(false);
+  session.setInputMode('push-to-talk');
+  session.setInputMode('voice-activity');
+  await vi.waitFor(() => {
+    expect(session.transport.microphoneEnabled).toBe(false);
+  });
+});
+
+test('quickly releasing a talk key waits for a pending unmute before muting again', async () => {
+  const { session, transport, emitTransportState } = await microphoneSession('push-to-talk');
+  let finishUnmute!: () => void;
+  vi.mocked(transport.setMicrophoneEnabled).mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finishUnmute = () => {
+          emitTransportState({ ...session.transport, microphoneEnabled: true });
+          resolve();
+        };
+      })
+  );
+  const press = session.setTalking(true);
+  await vi.waitFor(() => {
+    expect(transport.setMicrophoneEnabled).toHaveBeenCalledExactlyOnceWith(true);
+  });
+  const release = session.setTalking(false);
+  finishUnmute();
+  await Promise.all([press, release]);
+  expect(transport.setMicrophoneEnabled).toHaveBeenLastCalledWith(false);
+  expect(session.transport.microphoneEnabled).toBe(false);
+});
+
+test('listen-only calls ignore held microphone shortcuts', async () => {
+  const { session, transport } = await microphoneSession('push-to-talk', true, false);
+  await session.setTalking(true);
+  expect(transport.setMicrophoneEnabled).not.toHaveBeenCalled();
+});
+
+test('leaving clears held keys before joining another push-to-talk call', async () => {
+  const { session } = await microphoneSession('push-to-talk');
+  await session.setTalking(true);
+  await session.leave();
+  await session.join('!other:example.org', { microphone: true, camera: false });
+  await session.setTalking(false);
+  expect(session.transport.microphoneEnabled).toBe(false);
+});
+
+test('selecting push-to-talk while connecting mutes before join completes', async () => {
+  const { client, transport } = harness();
+  const connect = vi.mocked(transport.connect).getMockImplementation();
+  let finishConnect!: () => void;
+  vi.spyOn(transport, 'connect').mockImplementation(async (options) => {
+    await connect?.(options);
+    await new Promise<void>((resolve) => {
+      finishConnect = resolve;
+    });
+  });
+  const session = new CallSession(client, { createTransport: () => transport });
+  const join = session.join('!room:example.org', { microphone: true, camera: false });
+  await vi.waitFor(() => {
+    expect(finishConnect).toBeDefined();
+  });
+  session.setInputMode('push-to-talk');
+  finishConnect();
+  await join;
+  expect(session.transport.microphoneEnabled).toBe(false);
 });
 
 test('a camera that cannot start is reported, not swallowed', async () => {

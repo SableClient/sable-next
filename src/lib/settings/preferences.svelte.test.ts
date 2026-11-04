@@ -7,6 +7,13 @@ import {
   withComposerSeparatorCount,
 } from './preferences.svelte.js';
 
+test('keeps a saved call input mode and rejects unknown values', () => {
+  expect(sanitize({ callInputMode: 'push-to-talk' }, preferences).callInputMode).toBe(
+    'push-to-talk'
+  );
+  expect(sanitize({ callInputMode: 'unknown' }, preferences).callInputMode).toBe('voice-activity');
+});
+
 test.each([
   [true, 'on'],
   [false, 'off'],

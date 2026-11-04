@@ -7,6 +7,7 @@ import {
   Menu,
   nativeImage,
   protocol,
+  powerMonitor,
   screen,
   session,
   shell,
@@ -20,7 +21,7 @@ import {
   type UtilityProcess,
   type WebFrameMain,
 } from 'electron';
-import { createReadStream, existsSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
@@ -38,6 +39,7 @@ import type {
 
 import { deepLinksIn, deepLinkSchemes } from './deep-links';
 import { AuthLoopback } from './auth-loopback';
+import { CallShortcuts, validBindings } from './call-shortcuts';
 import { AuthWindows } from './auth-window';
 import { autostartAvailable, setLaunchAtLogin } from './autostart';
 import { registerContextMenu } from './context-menu';
@@ -72,6 +74,12 @@ declare const __SABLE_APP_VERSION__: string;
 ignoreBrokenPipes([process.stdout, process.stderr]);
 
 const IDENTIFIER = process.env.SABLE_IDENTIFIER ?? __SABLE_IDENTIFIER__;
+const callShortcuts = new CallShortcuts((event) => {
+  if (mainWindow && !mainWindow.isDestroyed())
+    mainWindow.webContents.send('sable-call-shortcut', event);
+});
+let desktopAppId: string | undefined;
+let accessibilityPrompted = false;
 const SCHEME = 'sable-app';
 const DEEP_LINK_SCHEMES = deepLinkSchemes(IDENTIFIER);
 const APP_ORIGIN = `${SCHEME}://app`;
@@ -497,6 +505,30 @@ ipcMain.handle('sable-gpu-video-status', (event) => {
   return { encode: status.video_encode, decode: status.video_decode };
 });
 
+ipcMain.handle('sable-call-shortcuts', (event, bindings: unknown) => {
+  if (
+    !isAppFrame(event.senderFrame) ||
+    event.sender !== mainWindow?.webContents ||
+    !validBindings(bindings)
+  )
+    return;
+  desktopAppId ??= (
+    JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')) as {
+      desktopName: string;
+    }
+  ).desktopName.replace(/\.desktop$/, '');
+  callShortcuts.setFocused(mainWindow.isFocused());
+  callShortcuts.configure(bindings, process.platform, isWayland, desktopAppId);
+  if (
+    process.platform === 'darwin' &&
+    callShortcuts.backend === 'exclusive' &&
+    !accessibilityPrompted
+  ) {
+    accessibilityPrompted = true;
+    systemPreferences.isTrustedAccessibilityClient(true);
+  }
+});
+
 ipcMain.handle('sable-apply-window-settings', (event, value: unknown) => {
   if (!isAppFrame(event.senderFrame)) return null;
   desktopWindowSettings = sanitizeDesktopWindowSettings(value);
@@ -577,10 +609,15 @@ function createWindow(): BrowserWindow {
   });
   window.on('focus', () => {
     window.flashFrame(false);
+    if (mainWindow === window) callShortcuts.setFocused(true);
+  });
+  window.on('blur', () => {
+    if (mainWindow === window) callShortcuts.setFocused(false);
   });
   window.on('closed', () => {
     if (mainWindow !== window) return;
     screenAudio.stop();
+    callShortcuts.stop();
     mainWindow = null;
     pageListening = false;
   });
@@ -637,9 +674,11 @@ function createWindow(): BrowserWindow {
     pageListening = false;
     cancelPicks();
     screenAudio.stop();
+    callShortcuts.stop();
   });
   window.webContents.on('render-process-gone', (_event, details) => {
     screenAudio.stop();
+    callShortcuts.stop();
     if (details.reason === 'clean-exit' || quitting) return;
     const now = Date.now();
     if (now - lastCrashReload < CRASH_RELOAD_INTERVAL_MS) return;
@@ -871,6 +910,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', (event) => {
     if (!quitting) {
       quitting = true;
+      callShortcuts.stop();
       screenAudio.stop();
       if (mainWindow && !mainWindow.isDestroyed()) rememberWindowState(mainWindow);
       persistWindowState();
@@ -891,6 +931,12 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   void app.whenReady().then(() => {
+    powerMonitor.on('suspend', () => {
+      callShortcuts.releaseAll();
+    });
+    powerMonitor.on('lock-screen', () => {
+      callShortcuts.releaseAll();
+    });
     registerDeepLinks();
     desktopTray.update(desktopWindowSettings.showSystemTrayIcon);
     core = startCore();

@@ -70,14 +70,15 @@
   <span class="screen-reader-only" role="status">{statusLabel}</span>
   <CallControls
     compact
-    microphoneEnabled={session.transport.microphoneEnabled}
+    microphoneEnabled={session.microphoneEnabled && !session.deafened}
+    pushToTalk={session.inputMode === 'push-to-talk'}
+    onPushToTalk={(held, source) => void session.setTalking(held, source)}
     cameraEnabled={session.transport.cameraEnabled}
     screenShareEnabled={session.transport.screenShareEnabled}
     deafened={session.deafened}
     ready={session.mediaReady && session.lifecycle === 'active'}
     canScreenShare={session.canScreenShare}
-    onToggleMicrophone={() =>
-      void session.setMicrophoneEnabled(!session.transport.microphoneEnabled)}
+    onToggleMicrophone={() => void session.toggleMicrophone()}
     onToggleCamera={() => void session.setCameraEnabled(!session.transport.cameraEnabled)}
     onToggleScreenShare={() => void session.toggleScreenShare()}
     onToggleDeafen={() => session.setDeafened(!session.deafened)}

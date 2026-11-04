@@ -388,6 +388,27 @@ test('does not enable the camera after cancellation during microphone setup', as
   expect(transport.getState().connection).toBe('disconnected');
 });
 
+test('a standby microphone is published muted so the first push-to-talk press is instant', async () => {
+  const fixture = roomFixture();
+  const track = { mute: vi.fn(() => Promise.resolve()) };
+  const localParticipant = fixture.localParticipant as typeof fixture.localParticipant & {
+    createTracks: ReturnType<typeof vi.fn>;
+    publishTrack: ReturnType<typeof vi.fn>;
+  };
+  localParticipant.createTracks = vi.fn(() => Promise.resolve([track]));
+  localParticipant.publishTrack = vi.fn(() => {
+    expect(track.mute).toHaveBeenCalled();
+    return Promise.resolve();
+  });
+  const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
+  await transport.connect({ ...connectOptions, microphoneEnabled: false, microphoneStandby: true });
+  expect(localParticipant.createTracks).toHaveBeenCalledWith({ audio: true });
+  expect(localParticipant.publishTrack).toHaveBeenCalledWith(track);
+  expect(fixture.mic).not.toHaveBeenCalled();
+  expect(transport.getState().microphoneEnabled).toBe(false);
+  await transport.disconnect();
+});
+
 test('a subscriber never requests microphone, camera, or screen sharing', async () => {
   const fixture = roomFixture();
   const transport = createLivekitTransport({

@@ -140,6 +140,7 @@
   import ShortcutsHelpDialog from '#lib/ui/shortcuts/ShortcutsHelpDialog.svelte';
   import { cycleRegion, focusRegion } from '#lib/ui/shortcuts/focus-regions.js';
   import { registerGlobalShortcuts } from '#lib/ui/shortcuts/global-shortcuts.js';
+  import { registerDesktopCallShortcuts } from '#lib/features/call/desktop-shortcuts.svelte.js';
   import { paletteState, shortcutsHelpState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import { unreadRoomsByPriority } from '#lib/ui/shortcuts/room-jump.js';
   import { markRoomsRead } from '#lib/features/sidebar/nav-rooms.js';
@@ -176,6 +177,11 @@
     roomName: (roomId) => roomList.byId(roomId)?.name,
   });
   provideCallSession(callSession);
+  onMount(() => registerDesktopCallShortcuts(callSession));
+  $effect(() => {
+    const inputMode = preferences.callInputMode;
+    untrack(() => callSession.setInputMode(inputMode));
+  });
   $effect(() => {
     void core.accountRevision;
     return () => void callSession.leave();
@@ -1098,10 +1104,19 @@
       'app.showShortcuts': () => {
         shortcutsHelpState.open = true;
       },
-      'call.toggleMute': () => {
+      'call.toggleMute': (event) => {
+        if (event.repeat || callSession.desktopShortcutStatus === 'portal') return;
         if (callSession.active && callSession.mediaReady) {
-          void callSession.setMicrophoneEnabled(!callSession.transport.microphoneEnabled);
+          void callSession.toggleMicrophone();
         }
+      },
+      'call.pushToTalk': {
+        press: () => {
+          void callSession.setTalking(true);
+        },
+        release: () => {
+          void callSession.setTalking(false);
+        },
       },
       'call.toggleDeafen': () => {
         if (callSession.active) callSession.setDeafened(!callSession.deafened);

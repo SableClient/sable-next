@@ -7,6 +7,8 @@
 #[cfg(windows)]
 mod screen_audio;
 
+mod call_shortcuts;
+
 use std::{
     io::{self, Write},
     sync::{

@@ -18,6 +18,7 @@ function parse(parsed: unknown): Array<[string, string]> {
 }
 
 const overrides = new SvelteMap<string, string>(readJson(STORAGE_KEY, parse, []));
+export const shortcutCapture = $state({ active: false });
 
 function persist(): void {
   writeJson(STORAGE_KEY, Object.fromEntries(overrides), '[sable shortcuts] bindings not persisted');

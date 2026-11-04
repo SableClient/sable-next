@@ -8,5 +8,13 @@
 </script>
 
 <TooltipProvider>
-  <CallControls {...props} />
+  <div class="dock">
+    <CallControls {...props} />
+  </div>
 </TooltipProvider>
+
+<style>
+  .dock {
+    container: call-dock / inline-size;
+  }
+</style>

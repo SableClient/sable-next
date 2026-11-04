@@ -17,6 +17,7 @@
     rebind,
     resetAllBindings,
     resetBinding,
+    shortcutCapture,
   } from '#lib/ui/shortcuts/bindings.svelte.js';
   import { isMacPlatform } from '#lib/ui/shortcuts/global-shortcuts.js';
   import { SHORTCUT_CATEGORIES, SHORTCUTS, type ShortcutId } from '#lib/ui/shortcuts/shortcuts.js';
@@ -28,6 +29,13 @@
   let isMac = $derived(isMacPlatform());
   let shortcuts = $derived(effectiveShortcuts());
   let rebound = $derived(SHORTCUTS.some((shortcut) => isRebound(shortcut.id)));
+
+  $effect(() => {
+    shortcutCapture.active = capturing !== null;
+    return () => {
+      shortcutCapture.active = false;
+    };
+  });
 
   function shortcutAnchor(id: ShortcutId): string {
     return `shortcut-${settingFocusId(id.replace('.', '-'))}`;

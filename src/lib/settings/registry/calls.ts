@@ -49,6 +49,28 @@ export const callsCategory: SettingsCategory = {
   ],
   items: [
     {
+      key: 'callInputMode',
+      section: 'microphone',
+      icon: MicrophoneIcon,
+      name: 'settings.callInputMode',
+      description: 'settings.callInputModeHint',
+      supported: () => !hasNativeCalls(),
+      type: 'select',
+      options: [
+        { value: 'voice-activity', label: 'settings.callInputVoiceActivity' },
+        { value: 'push-to-talk', label: 'settings.callInputPushToTalk' },
+      ],
+    },
+    {
+      key: 'callGlobalShortcuts',
+      section: 'microphone',
+      icon: MicrophoneIcon,
+      name: 'settings.callGlobalShortcuts',
+      description: 'settings.callGlobalShortcutsHint',
+      type: 'boolean',
+      supported: isElectron,
+    },
+    {
       key: 'callCameraResolution',
       section: 'call-camera',
       icon: MonitorIcon,

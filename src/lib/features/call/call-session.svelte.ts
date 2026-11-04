@@ -1,6 +1,8 @@
 import { rememberScreenAudioChoice, screenAudioSupported } from '#lib/platform/screen-audio.js';
 import type { ScreenAudioChoice } from '#lib/platform/screen-audio-stream.js';
 import { createContext } from 'svelte';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+import type { DesktopCallShortcutBackend } from '#lib/platform/call-shortcut-types.js';
 
 import type { CallMemberView, CoreEvent } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -23,7 +25,11 @@ import { CallTelemetry } from './call-telemetry';
 import { recordCallDebug } from './call-debug.svelte.js';
 import { cameraVisible, screenShareVisible, type CallPin } from './call-layout';
 import { participantKeys } from './participant-keys';
-import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+import {
+  preferences,
+  setPreference,
+  type CallInputMode,
+} from '#lib/settings/preferences.svelte.js';
 import { DEVICE_PREFERENCE } from './devices';
 import type { CallBackendGrant, CallRemoteVideoOverlay, CallVideoOverlay } from './call-transport';
 import { playSound } from '../notifications/sound';
@@ -46,6 +52,7 @@ export type CallDeviceError = 'microphone' | 'camera' | 'screen' | 'screenAudio'
 
 const OWN_KEY_TIMEOUT_MS = 10_000;
 const DEVICE_ERROR_TIMEOUT_MS = 5_000;
+export const TALK_RELEASE_DELAY_MS = 150;
 
 type PendingEvent = Extract<
   CoreEvent,
@@ -107,6 +114,11 @@ export class CallSession {
   mediaReady = $state(false);
   encryptsMedia = $state(false);
   deafened = $state(false);
+  microphoneEnabled = $state(false);
+  inputMode = $state<CallInputMode>(
+    hasNativeCalls() ? 'voice-activity' : preferences.callInputMode
+  );
+  desktopShortcutStatus = $state<'inactive' | 'error' | DesktopCallShortcutBackend>('inactive');
   connectedAt = $state<number | null>(null);
   layout = $state.raw<CallPin>({ pinned: null, gridForced: false });
   watchedScreenShareIds = $state.raw<string[]>([]);
@@ -159,7 +171,12 @@ export class CallSession {
   #ownKey: { resolve: () => void; reject: (error: Error) => void } | undefined;
   #telemetry: CallTelemetry | undefined;
   #lastJoin: { roomId: string; media: CallMedia; serviceUrl: string | null } | undefined;
-  #micBeforeDeafen: boolean | undefined;
+  #talkSources = new SvelteSet<string>();
+  #talkReleases = new SvelteMap<
+    string,
+    { timer: ReturnType<typeof setTimeout>; done: () => void }
+  >();
+  #microphoneUpdate = Promise.resolve();
 
   constructor(client: CoreClient, deps: CallSessionDeps = {}) {
     this.#client = client;
@@ -234,6 +251,8 @@ export class CallSession {
 
     this.#lease = lease;
     this.#lastJoin = { roomId, media, serviceUrl };
+    this.microphoneEnabled = media.microphone;
+    this.inputMode = hasNativeCalls() ? 'voice-activity' : preferences.callInputMode;
     setPreference('callMicrophoneMuted', !media.microphone);
     this.layout = { pinned: null, gridForced: false };
     this.watchedScreenShareIds = [];
@@ -398,7 +417,9 @@ export class CallSession {
         await transport.connect({
           url: grant.url,
           token: grant.jwt,
-          microphoneEnabled: media.microphone && !this.listenOnly,
+          microphoneEnabled: this.#canTransmit(),
+          microphoneStandby:
+            this.microphoneEnabled && !this.listenOnly && this.inputMode === 'push-to-talk',
           cameraEnabled: media.camera && !this.listenOnly,
           encryptionKeys: encryptionKeys.map(({ key }) => key),
           publisherId: connectPublisherId,
@@ -424,6 +445,10 @@ export class CallSession {
       this.mediaReady = true;
 
       this.lifecycle = 'active';
+      if (this.transport.microphoneEnabled !== this.#canTransmit()) {
+        await this.#setMicrophone(this.#canTransmit());
+        if (attempt !== this.#attemptGeneration) return;
+      }
       this.connectedAt = Date.now();
       void playSound('call_join');
       telemetry.finish('connected');
@@ -488,13 +513,96 @@ export class CallSession {
   }
 
   async setMicrophoneEnabled(enabled: boolean): Promise<void> {
+    this.microphoneEnabled = enabled;
     if (enabled && this.deafened) {
       this.deafened = false;
-      this.#micBeforeDeafen = undefined;
     }
     setPreference('callMicrophoneMuted', !enabled);
-    await this.#device('microphone', () => this.#media?.setMicrophoneEnabled(enabled));
+    await this.#setMicrophone(this.#canTransmit());
     void playSound(enabled ? 'mic_on' : 'mic_off');
+  }
+
+  toggleMicrophone(): Promise<void> {
+    return this.setMicrophoneEnabled(!this.microphoneEnabled || this.deafened);
+  }
+
+  async setTalking(held: boolean, source = 'keyboard'): Promise<void> {
+    const release = this.#talkReleases.get(source);
+    if (held) {
+      if (release) {
+        clearTimeout(release.timer);
+        this.#talkReleases.delete(source);
+        release.done();
+        return;
+      }
+      if (
+        this.lifecycle !== 'active' ||
+        !this.mediaReady ||
+        this.listenOnly ||
+        this.deafened ||
+        this.inputMode !== 'push-to-talk'
+      )
+        return;
+      if (this.#talkSources.has(source)) return;
+      this.#talkSources.add(source);
+    } else {
+      if (!this.#talkSources.has(source) || release) return;
+      const released = await new Promise<boolean>((resolve) => {
+        const timer = setTimeout(() => {
+          this.#talkReleases.delete(source);
+          resolve(this.#talkSources.delete(source));
+        }, TALK_RELEASE_DELAY_MS);
+        this.#talkReleases.set(source, {
+          timer,
+          done: () => {
+            resolve(false);
+          },
+        });
+      });
+      if (!released) return;
+    }
+    if (this.microphoneEnabled) await this.#setMicrophone(this.#canTransmit());
+  }
+
+  setInputMode(mode: CallInputMode): void {
+    if (hasNativeCalls() || this.inputMode === mode) return;
+    this.inputMode = mode;
+    this.#clearTalking();
+    if (this.lifecycle === 'active') void this.#setMicrophone(this.#canTransmit());
+  }
+
+  #clearTalking(): void {
+    for (const { timer, done } of this.#talkReleases.values()) {
+      clearTimeout(timer);
+      done();
+    }
+    this.#talkReleases.clear();
+    this.#talkSources.clear();
+  }
+
+  #canTransmit(): boolean {
+    return (
+      this.microphoneEnabled &&
+      !this.listenOnly &&
+      !this.deafened &&
+      (this.inputMode !== 'push-to-talk' || this.#talkSources.size > 0)
+    );
+  }
+
+  #setMicrophone(enabled: boolean): Promise<void> {
+    const media = this.#media;
+    const attempt = this.#attemptGeneration;
+    this.#microphoneUpdate = this.#microphoneUpdate.then(() => {
+      if (
+        media !== this.#media ||
+        attempt !== this.#attemptGeneration ||
+        this.lifecycle !== 'active' ||
+        enabled !== this.#canTransmit()
+      )
+        return;
+      return this.#device('microphone', () => media?.setMicrophoneEnabled(enabled));
+    });
+    return this.#microphoneUpdate;
   }
 
   async setParticipantVolume(identity: string, volume: number, screen = false): Promise<void> {
@@ -503,20 +611,11 @@ export class CallSession {
 
   setDeafened(deafened: boolean): void {
     if (deafened === this.deafened) return;
+    this.#clearTalking();
     this.deafened = deafened;
     if (!this.#media) return;
-
     void playSound(deafened ? 'deafen_on' : 'deafen_off');
-    if (deafened) {
-      this.#micBeforeDeafen = this.transport.microphoneEnabled;
-      if (this.#micBeforeDeafen) {
-        void this.#device('microphone', () => this.#media?.setMicrophoneEnabled(false));
-      }
-      return;
-    }
-    const restore = this.#micBeforeDeafen;
-    this.#micBeforeDeafen = undefined;
-    if (restore) void this.#device('microphone', () => this.#media?.setMicrophoneEnabled(true));
+    if (this.microphoneEnabled) void this.#setMicrophone(this.#canTransmit());
   }
 
   async switchDevice(kind: MediaDeviceKind, deviceId: string): Promise<void> {
@@ -722,6 +821,9 @@ export class CallSession {
   }
 
   async #performTeardown(): Promise<void> {
+    this.desktopShortcutStatus = 'inactive';
+    this.#clearTalking();
+    this.#microphoneUpdate = Promise.resolve();
     this.#ownKey?.reject(new Error('cancelled'));
     this.#ownKey = undefined;
 
@@ -773,7 +875,6 @@ export class CallSession {
     this.members = [];
     this.transport = idleTransportState();
     this.deafened = false;
-    this.#micBeforeDeafen = undefined;
     this.mediaReady = false;
     this.encryptsMedia = false;
     this.#telemetry?.event('call.cleanup');
