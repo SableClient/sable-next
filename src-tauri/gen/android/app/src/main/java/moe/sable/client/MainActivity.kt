@@ -3,6 +3,7 @@ package moe.sable.client
 import android.content.Intent
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.res.Configuration
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.net.ConnectivityManager
@@ -13,6 +14,7 @@ import android.provider.OpenableColumns
 import android.util.Log
 import android.util.Base64
 import android.webkit.WebView
+import android.webkit.JavascriptInterface
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.Keep
@@ -38,6 +40,7 @@ class MainActivity : TauriActivity() {
   private external fun nativeNetworkChanged(available: Boolean, unmetered: Boolean)
   private var networkCallback: ConnectivityManager.NetworkCallback? = null
   private var fullscreenClient: FullscreenChromeClient? = null
+  private var mainWebView: WebView? = null
   private val authBrowser = AuthBrowser(this)
   private val fullscreenBackCallback = object : OnBackPressedCallback(false) {
     override fun handleOnBackPressed() {
@@ -100,6 +103,8 @@ class MainActivity : TauriActivity() {
   }
 
   override fun onWebViewCreate(webView: WebView) {
+    mainWebView = webView
+    webView.addJavascriptInterface(SystemTheme(), "__sableAndroidSystemTheme")
     onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
       override fun handleOnBackPressed() {
         webView.evaluateJavascript(
@@ -116,6 +121,21 @@ class MainActivity : TauriActivity() {
       webView.webChromeClient = client
       fullscreenClient = client
     }
+  }
+
+  @Keep
+  private inner class SystemTheme {
+    @JavascriptInterface
+    fun isDarkMode(): Boolean =
+      resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+  }
+
+  override fun onConfigurationChanged(newConfig: Configuration) {
+    super.onConfigurationChanged(newConfig)
+    mainWebView?.evaluateJavascript(
+      "window.dispatchEvent(new Event('sable:system-theme-changed'))",
+      null
+    )
   }
 
   private fun setFullscreenVideo(active: Boolean) {
@@ -223,6 +243,7 @@ class MainActivity : TauriActivity() {
   }
 
   override fun onDestroy() {
+    mainWebView = null
     authBrowser.close()
     networkCallback?.let {
       runCatching {
