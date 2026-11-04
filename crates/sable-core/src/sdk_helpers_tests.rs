@@ -2647,11 +2647,11 @@ async fn recover_identity_accepts_the_passphrase_as_well_as_the_key() {
     ));
     assert!(matches!(
         recover("correct horse".to_owned()).await,
-        Err(RpcError::Failed { .. })
+        Err(RpcError::KeyStorageOutOfSync)
     ));
     assert!(matches!(
         recover(key.to_base58()).await,
-        Err(RpcError::Failed { .. })
+        Err(RpcError::KeyStorageOutOfSync)
     ));
 }
 

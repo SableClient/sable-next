@@ -55,6 +55,21 @@ test('a denied passphrase names both ways to unlock', async () => {
   expect(verification.error).toBe(t('settings.invalidRecoveryKeyOrPassphrase'));
 });
 
+test('stale secret storage points the user to an identity reset', async () => {
+  const { verification } = verificationWith({
+    rpc: {
+      encryption: {
+        recoverIdentity: () => Promise.reject(new CoreError({ code: 'key_storage_out_of_sync' })),
+      },
+    },
+  });
+  verification.recoveryKey = 'EsTc abcd';
+
+  await verification.recoverIdentity();
+
+  expect(verification.error).toBe(t('settings.keyStorageOutOfSync'));
+});
+
 test('a request is sent for the signed-in user and continues', async () => {
   const requestVerification = vi.fn(() => Promise.resolve('flow'));
   const { verification } = verificationWith({

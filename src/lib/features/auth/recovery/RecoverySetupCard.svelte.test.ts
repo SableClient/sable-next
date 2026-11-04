@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -13,6 +13,7 @@ import { core } from '#lib/core/__mocks__/context.js';
 const enableRecovery = vi.fn(() => Promise.resolve('EsTa bLiS hEd'));
 Object.assign(core.rpc.encryption, { enableRecovery });
 
+import { CoreError } from '#src/transport';
 import RecoverySetupCard from './RecoverySetupCard.svelte';
 
 function setup(recoveryKey: string | null = null) {
@@ -41,6 +42,21 @@ test('a created key cannot be left before it is kept somewhere', async () => {
   expect(continueButton()).toBeDisabled();
   await user.type(keyField(), '{Enter}');
   expect(onComplete).not.toHaveBeenCalled();
+});
+
+test('an unreadable server backup asks before it is replaced', async () => {
+  enableRecovery.mockRejectedValueOnce(new CoreError({ code: 'backup_exists' }));
+  const { user } = setup();
+
+  await user.click(screen.getByRole('button', { name: /Create recovery key/ }));
+  const dialog = await screen.findByRole('dialog');
+  expect(enableRecovery).toHaveBeenCalledWith({ passphrase: null, replace_backup: false });
+
+  await user.click(within(dialog).getByRole('button', { name: 'Replace backup' }));
+  await vi.waitFor(() => {
+    expect(keyField()).toHaveValue('EsTa bLiS hEd');
+  });
+  expect(enableRecovery).toHaveBeenLastCalledWith({ passphrase: null, replace_backup: true });
 });
 
 test('copying the key is not enough without ticking the box', async () => {

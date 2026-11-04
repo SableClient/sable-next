@@ -197,6 +197,16 @@ impl Core {
         ) {
             return RpcError::Denied;
         }
+        if let RecoveryError::SecretStorage(SecretStorageError::ImportError { name, error }) =
+            &error
+        {
+            tracing::warn!(
+                context = "recover_identity",
+                %name,
+                "secret storage is out of sync with the account: {error}"
+            );
+            return RpcError::KeyStorageOutOfSync;
+        }
         self.failed("recover_identity", error)
     }
 

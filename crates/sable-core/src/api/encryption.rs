@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
+use matrix_sdk::encryption::recovery::RecoveryError;
 use matrix_sdk::ruma::events::room::history_visibility::HistoryVisibility;
 use matrix_sdk::ruma::{OwnedDeviceId, OwnedRoomId, OwnedUserId};
 use serde::{Deserialize, Serialize};
@@ -143,7 +144,7 @@ impl Handler for RecoverIdentityParams {
         client
             .encryption()
             .recovery()
-            .recover(&self.recovery_key)
+            .recover_and_fix_backup(&self.recovery_key)
             .await
             .map_err(|error| core.recovery_error(error))?;
         core.adopt_account_data_key(&client, &self.recovery_key)
@@ -161,6 +162,9 @@ pub struct EnableRecoveryParams {
     /// A passphrase to unlock the key with. The key is returned either way.
     #[serde(default)]
     pub passphrase: Option<String>,
+    /// Deletes the unreadable server backup and the history it holds.
+    #[serde(default)]
+    pub replace_backup: bool,
 }
 
 impl Handler for EnableRecoveryParams {
@@ -169,6 +173,13 @@ impl Handler for EnableRecoveryParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
         let client = core.client().await?;
+        let backups = client.encryption().backups();
+        if self.replace_backup && !backups.are_enabled().await {
+            backups
+                .disable_and_delete()
+                .await
+                .or_failed(core, "replace_backup")?;
+        }
         let recovery = client.encryption().recovery();
         let enable = recovery.enable();
 
@@ -176,7 +187,10 @@ impl Handler for EnableRecoveryParams {
             Some(passphrase) => enable.with_passphrase(passphrase).await,
             None => enable.await,
         }
-        .or_failed(core, "enable_recovery")?;
+        .map_err(|error| match error {
+            RecoveryError::BackupExistsOnServer => RpcError::BackupExists,
+            error => core.failed("enable_recovery", error),
+        })?;
         core.adopt_account_data_key(&client, &recovery_key).await;
         Ok(recovery_key)
     }

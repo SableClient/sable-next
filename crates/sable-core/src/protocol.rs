@@ -135,6 +135,10 @@ pub enum RpcError {
     /// A sealed document this device cannot open, so writing it would erase
     /// what the other devices stored.
     DocumentLocked,
+    /// A key backup this device cannot unlock is already on the server.
+    BackupExists,
+    /// Secret storage no longer matches the account's identity.
+    KeyStorageOutOfSync,
     /// Static: safe to hide UI.
     Unsupported,
     /// Retryable: keep UI.

@@ -1428,6 +1428,10 @@ export type RpcError = { code: "not_logged_in" } | { code: "unknown_subscription
  *  what the other devices stored.
  */
 { code: "document_locked" } |
+/**  A key backup this device cannot unlock is already on the server. */
+{ code: "backup_exists" } |
+/**  Secret storage no longer matches the account's identity. */
+{ code: "key_storage_out_of_sync" } |
 /**  Static: safe to hide UI. */
 { code: "unsupported" } |
 /**  Retryable: keep UI. */
@@ -2392,6 +2396,8 @@ export type Rpc = {
     enableRecovery: (params: {
 	/**  A passphrase to unlock the key with. The key is returned either way. */
 	passphrase?: string | null,
+	/**  Deletes the unreadable server backup and the history it holds. */
+	replace_backup?: boolean,
 }) => Promise<string>;
     resetRecoveryKey: (params: {
 	passphrase?: string | null,

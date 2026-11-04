@@ -18,6 +18,7 @@ export function verificationErrorMessage(
           : 'settings.invalidRecoveryKey'
       );
     }
+    if (cause.detail.code === 'key_storage_out_of_sync') return t('settings.keyStorageOutOfSync');
     if (cause.detail.code === 'unavailable') return t('settings.verificationUnavailable');
     if (cause.detail.code === 'invalid_verification_code') {
       return t('settings.invalidVerificationCode');

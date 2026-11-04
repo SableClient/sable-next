@@ -6,6 +6,8 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n, t } from '#lib/i18n.js';
   import { saveBytes } from '#lib/platform/files.js';
+  import { CoreError } from '#src/transport';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import AuthField from '../shared/AuthField.svelte';
@@ -24,19 +26,28 @@
   const core = useCoreClient();
   let createdKey = $state('');
   let creating = $state(false);
+  let confirmingReplaceBackup = $state(false);
   let error = $state<string | null>(null);
   let kept = $state<'copied' | 'downloaded' | null>(null);
   let writtenDown = $state(false);
   const recoveryKey = $derived(createdKey || givenKey || '');
   const saved = $derived(writtenDown);
 
-  async function createRecoveryKey(): Promise<void> {
+  async function createRecoveryKey(replaceBackup = false): Promise<void> {
     creating = true;
     error = null;
     try {
-      createdKey = await core.rpc.encryption.enableRecovery({ passphrase: null });
-    } catch {
-      error = t('settings.actionFailed');
+      createdKey = await core.rpc.encryption.enableRecovery({
+        passphrase: null,
+        replace_backup: replaceBackup,
+      });
+      confirmingReplaceBackup = false;
+    } catch (cause) {
+      if (cause instanceof CoreError && cause.detail.code === 'backup_exists') {
+        confirmingReplaceBackup = true;
+      } else {
+        error = t('settings.actionFailed');
+      }
     } finally {
       creating = false;
     }
@@ -132,6 +143,15 @@
     {recoveryKey ? i18n.t('auth.continue') : i18n.t('auth.createRecoveryKey')}
   </Button>
 </form>
+
+<ConfirmDialog
+  bind:open={confirmingReplaceBackup}
+  title={i18n.t('settings.replaceKeyBackupConfirmTitle')}
+  description={i18n.t('settings.replaceKeyBackupConfirmDescription')}
+  confirmLabel={i18n.t('settings.replaceKeyBackup')}
+  busy={creating}
+  onConfirm={() => void createRecoveryKey(true)}
+/>
 
 {#if !recoveryKey}
   <AuthSecondaryAction label={i18n.t('auth.skipForNow')} onclick={onSkip} />

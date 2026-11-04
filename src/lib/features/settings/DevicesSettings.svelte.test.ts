@@ -28,6 +28,7 @@ const encryption = {
     vi.fn<(params: { device_id: string; password: string | null }) => Promise<string | null>>(),
   renameDevice: vi.fn<(params: { device_id: string; display_name: string }) => Promise<void>>(),
   resetRecoveryKey: vi.fn<() => Promise<string>>(),
+  enableRecovery: vi.fn<Rpc['encryption']['enableRecovery']>(),
   keyBackupStatus: vi.fn().mockResolvedValue({
     local_keys: 0,
     backed_up_keys: 0,
@@ -39,6 +40,7 @@ const encryption = {
 };
 Object.assign(baseCore, { rpc: { encryption } });
 
+import { CoreError } from '#src/transport';
 import DevicesSettings from './DevicesSettings.svelte';
 import { openExternalAuthUrl, openExternalAuthWindow } from '#lib/platform/external-auth.js';
 
@@ -200,6 +202,30 @@ test('asks for confirmation before resetting the recovery key', async () => {
   await user.click(within(dialog).getByRole('button', { name: 'Reset recovery key' }));
   expect(await screen.findByText('NEW KEY')).toBeInTheDocument();
   expect(encryption.resetRecoveryKey).toHaveBeenCalledOnce();
+});
+
+test('an unreadable server backup asks before it is replaced', async () => {
+  encryption.enableRecovery
+    .mockRejectedValueOnce(new CoreError({ code: 'backup_exists' }))
+    .mockResolvedValueOnce('NEW KEY');
+  encryption.status.mockResolvedValue({ ...status, recovery: 'disabled' });
+  encryption.devices.mockResolvedValue({ devices: [own] });
+  render(DevicesSettings);
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByRole('button', { name: 'Set up recovery' }));
+  const dialog = await screen.findByRole('dialog');
+  expect(encryption.enableRecovery).toHaveBeenCalledWith({
+    passphrase: null,
+    replace_backup: false,
+  });
+
+  await user.click(within(dialog).getByRole('button', { name: 'Replace backup' }));
+  expect(await screen.findByText('NEW KEY')).toBeInTheDocument();
+  expect(encryption.enableRecovery).toHaveBeenLastCalledWith({
+    passphrase: null,
+    replace_backup: true,
+  });
 });
 
 test('a session without device keys says so and offers no verification', async () => {
