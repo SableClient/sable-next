@@ -855,12 +855,22 @@ fn metadata_with(
     device_code: bool,
     client_name: Option<&str>,
 ) -> Raw<ClientMetadata> {
-    let client_uri = Url::parse("https://sable.moe").expect("this is a valid URL");
-
     let application_type = match redirect_uri.scheme() {
         _ if is_loopback_redirect(redirect_uri) => ApplicationType::Native,
         "https" | "http" => ApplicationType::Web,
         _ => ApplicationType::Native,
+    };
+    let client_uri = if application_type == ApplicationType::Web {
+        redirect_uri.join("/").expect("web redirect URI has a base")
+    } else {
+        Url::parse("https://sable.moe").expect("this is a valid URL")
+    };
+    let logo_uri = if application_type == ApplicationType::Web {
+        client_uri
+            .join("icons/logo-maskable-180x180.png")
+            .expect("client URI has a base")
+    } else {
+        Url::parse("https://docs.sable.moe/img/sable-logo.svg").expect("this is a valid URL")
     };
 
     let mut grant_types = vec![OAuthGrantType::AuthorizationCode {
@@ -878,12 +888,7 @@ fn metadata_with(
         device_display_name(client_name).to_owned(),
         [],
     ));
-    metadata.logo_uri = Some(Localized::new(
-        "https://docs.sable.moe/img/sable-logo.svg"
-            .try_into()
-            .expect("this is a valid URL"),
-        [],
-    ));
+    metadata.logo_uri = Some(Localized::new(logo_uri, []));
 
     Raw::new(&metadata).expect("client metadata serializes")
 }
@@ -999,8 +1004,9 @@ mod tests {
 
     use super::{
         AccountRegistry, PROXIED_SESSION_TIMEOUT, SESSION_TIMEOUT, account_store_id,
-        build_account_client, client_metadata, registered_redirect_uri, registration_redirect_uri,
-        removable_account_store, repair_room_key_sharing, session_timeout,
+        build_account_client, client_metadata, qr_client_metadata, registered_redirect_uri,
+        registration_redirect_uri, removable_account_store, repair_room_key_sharing,
+        session_timeout,
     };
 
     #[test]
@@ -1014,6 +1020,62 @@ mod tests {
 
         assert_eq!(name(Some("Acme Chat")), "Acme Chat");
         assert_eq!(name(None), "Sable");
+    }
+
+    #[test]
+    fn web_client_metadata_uses_the_deployment_origin() {
+        for origin in ["https://chat.example.org", "https://chat.example.net:8443"] {
+            let redirect =
+                url::Url::parse(&format!("{origin}/login/callback?flow=oidc#fragment")).unwrap();
+            for raw in [
+                client_metadata(&redirect, None),
+                qr_client_metadata(&redirect),
+            ] {
+                let value: serde_json::Value = serde_json::from_str(raw.json().get()).unwrap();
+                assert_eq!(value["application_type"], "web");
+                assert_eq!(value["client_uri"], format!("{origin}/"));
+                assert_eq!(
+                    value["logo_uri"],
+                    format!("{origin}/icons/logo-maskable-180x180.png")
+                );
+                assert_eq!(
+                    value["redirect_uris"],
+                    serde_json::json!([redirect.as_str()])
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn native_client_metadata_keeps_the_sable_identity() {
+        for (redirect, registered) in [
+            ("moe.sable.app:/login", "moe.sable.app:/login"),
+            ("moe.sable.next:/login", "moe.sable.next:/login"),
+            (
+                "http://127.0.0.1:41000/callback",
+                "http://127.0.0.1/callback",
+            ),
+            ("http://[::1]:41000/callback", "http://[::1]/callback"),
+            (
+                "http://localhost:41000/callback",
+                "http://localhost/callback",
+            ),
+        ] {
+            let redirect = url::Url::parse(redirect).unwrap();
+            for raw in [
+                client_metadata(&redirect, None),
+                qr_client_metadata(&redirect),
+            ] {
+                let value: serde_json::Value = serde_json::from_str(raw.json().get()).unwrap();
+                assert_eq!(value["application_type"], "native");
+                assert_eq!(value["client_uri"], "https://sable.moe/");
+                assert_eq!(
+                    value["logo_uri"],
+                    "https://docs.sable.moe/img/sable-logo.svg"
+                );
+                assert_eq!(value["redirect_uris"], serde_json::json!([registered]));
+            }
+        }
     }
 
     #[cfg(not(target_family = "wasm"))]
