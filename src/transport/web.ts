@@ -1,10 +1,11 @@
 import * as Sentry from '@sentry/sveltekit';
 
 import type { CoreEvent } from '#src/generated/protocol';
-import type { WorkerMessage, WorkerRequest } from '#src/worker/protocol';
+import type { WasmDebugImage, WorkerMessage, WorkerRequest } from '#src/worker/protocol';
 import wasmVersion from '#src/generated/wasm/sable_wasm_version.js';
 import coreWorkerUrl from '../worker/core.worker.ts?sharedworker&url';
 import { CoreError, type Transport } from './index';
+import { applyWasmDebugImage } from './wasm-debug';
 import { on } from 'svelte/events';
 import { recordDebugLog } from '../lib/observability/debug-log.svelte.js';
 import {
@@ -253,14 +254,14 @@ export function createWebTransport(open: () => CoreConnection = openSharedWorker
     }
   }
 
-  function handleCrash(message: string, stack?: string): void {
-    // A Rust panic crosses as a string and carries this file's stack; a worker
-    // JS failure brings its own. The fingerprint groups on the message.
+  function handleCrash(message: string, stack?: string, wasm?: WasmDebugImage): void {
+    // Rust panics differ only in their stack, so the fingerprint groups on the message.
     const error = new Error(message);
     if (stack) error.stack = stack;
-    Sentry.captureException(error, {
-      fingerprint: ['wasm-core-crash', message],
-      tags: { source: 'wasm-core' },
+    Sentry.captureException(error, (scope) => {
+      scope.setFingerprint(['wasm-core-crash', message]).setTag('source', 'wasm-core');
+      if (wasm) scope.addEventProcessor((event) => applyWasmDebugImage(event, wasm));
+      return scope;
     });
     console.error('[sable transport] core panicked', error);
     worker?.retire();
@@ -333,7 +334,7 @@ export function createWebTransport(open: () => CoreConnection = openSharedWorker
       }
 
       if ('panic' in data) {
-        handleCrash(data.panic.message, data.panic.stack);
+        handleCrash(data.panic.message, data.panic.stack, data.panic.wasm);
         return;
       }
 

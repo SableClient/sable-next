@@ -1,4 +1,4 @@
-import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { execFile, spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -6,6 +6,7 @@ import { parseArgs, promisify } from 'node:util';
 import { lock } from 'proper-lockfile';
 import { cargoPackageVersion, cargoRustFlags } from '../lib/cargo.mjs';
 import { sha256 } from '../lib/download.mjs';
+import { wasmDebugIds } from '../../src/worker/wasm-debug.ts';
 
 const { release } = parseArgs({ options: { release: { type: 'boolean' } } }).values;
 const profile = release ? 'wasm-release' : 'wasm-dev';
@@ -75,8 +76,7 @@ const output = process.env.SABLE_WASM_OUTPUT ?? 'src/generated/wasm';
 async function bindgen(input, name, { optimize, features = [] }) {
   const wasm = `${output}/${name}_bg.wasm`;
   const args = ['--target', 'web', '--out-dir', output, '--out-name', name];
-  if (keepNames) args.push('--remove-producers-section');
-  else if (release) args.push('--remove-name-section', '--remove-producers-section');
+  if (release) args.push('--remove-producers-section');
   else args.push('--debug');
   await run('wasm-bindgen', [...args, `${built}/${input}`]);
 
@@ -92,13 +92,32 @@ async function bindgen(input, name, { optimize, features = [] }) {
   if (release) {
     const optimized = `${output}/${name}_bg.optimized.wasm`;
 
-    await run('wasm-opt', [...optimize, ...(keepNames ? ['-g'] : []), wasm, '--output', optimized]);
+    await run('wasm-opt', [...optimize, '-g', wasm, '--output', optimized]);
     rmSync(wasm);
     renameSync(optimized, wasm);
+
+    const debug = `${output}/debug/${name}_bg.debug.wasm`;
+    mkdirSync(`${output}/debug`, { recursive: true });
+    await run('sentry', [
+      'wasm-split',
+      wasm,
+      '-d',
+      debug,
+      '--strip',
+      ...(keepNames ? [] : ['--strip-names']),
+    ]);
   }
 
   const generated = readFileSync(wasm);
-  await WebAssembly.compile(generated);
+  const module = await WebAssembly.compile(generated);
+  writeFileSync(
+    `${output}/${name}_build_id.js`,
+    `export default ${JSON.stringify(wasmDebugIds(module))};\n`
+  );
+  writeFileSync(
+    `${output}/${name}_build_id.d.ts`,
+    'declare const image: { code_id: string; debug_id: string } | undefined;\nexport default image;\n'
+  );
 
   // Validate instructions independently of the module's target_features section.
   const validationInput = `${output}/${name}_bg.validation.wasm`;

@@ -1,6 +1,13 @@
 import type { RpcError, CoreEvent } from '#src/generated/protocol';
 import type { Attachment, Gallery, GalleryAttachment } from '#src/transport';
 
+export interface WasmDebugImage {
+  type: 'wasm';
+  code_file: string;
+  code_id: string;
+  debug_id: string;
+}
+
 export type AttachmentRequest = Required<Omit<Attachment, 'thumbnail'>> &
   Pick<Attachment, 'thumbnail'>;
 export type GalleryRequest = Required<Omit<Gallery, 'attachments'>> & {
@@ -33,5 +40,5 @@ export type WorkerMessage =
   | { events: CoreEvent[] }
   | { logs: string[] }
   | { span: { name: string; startMs: number; durationMs: number } }
-  | { panic: { message: string; stack?: string } }
+  | { panic: { message: string; stack?: string; wasm?: WasmDebugImage } }
   | { superseded: true };

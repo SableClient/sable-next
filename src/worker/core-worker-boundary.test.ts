@@ -488,6 +488,26 @@ test('a worker failure carries its own stack to the page', () => {
   ]);
 });
 
+test('a panic forwards the wasm stack and debug image to every page', () => {
+  const boundary = createCoreWorkerBoundary(Promise.resolve(fakeCore(() => Promise.resolve('{}'))));
+  const first = new FakePort();
+  const second = new FakePort();
+  boundary.connect(first);
+  boundary.connect(second);
+  const stack = 'Error: panic\n    at sable.wasm:wasm-function[12]:0x1234';
+  const wasm = {
+    type: 'wasm' as const,
+    code_file: 'https://sable.test/sable.wasm',
+    code_id: '00112233445566778899aabbccddeeff',
+    debug_id: '00112233445566778899aabbccddeeff0',
+  };
+
+  boundary.handlePanic('panic', stack, wasm);
+
+  expect(first.messages).toEqual([{ panic: { message: 'panic', stack, wasm } }]);
+  expect(second.messages).toEqual(first.messages);
+});
+
 test('WASM logs are batched to every connected port', () => {
   const setLogCapture = vi.fn();
   vi.useFakeTimers();

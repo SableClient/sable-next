@@ -178,7 +178,6 @@ test('records forwarded core spans using worker epoch timestamps in seconds', as
   const transport = await load();
   const pending = transport.call('members.list', {});
   const startMs = 1_794_000_000_125;
-  // Delivery time and the page performance clock must not affect the span timestamps.
   vi.setSystemTime(startMs + 5_000);
   FakeSharedWorker.last?.port.receive({
     span: { name: 'view.enrich_rooms', startMs, durationMs: 12.5 },
@@ -468,11 +467,88 @@ test('a worker crash reports the stack the worker sent, grouped on its message',
     },
   });
 
+  const { Scope } = await import('@sentry/sveltekit');
   const [error, context] = captureException.mock.lastCall ?? [];
   expect((error as Error).message).toBe('worker error: Uncaught RangeError');
   expect((error as Error).stack).toBe('RangeError\n    at loop (w.js:1:2)');
-  expect(context).toMatchObject({
+  const scope = (context as (scope: InstanceType<typeof Scope>) => InstanceType<typeof Scope>)(
+    new Scope()
+  );
+  expect(scope.getScopeData()).toMatchObject({
     fingerprint: ['wasm-core-crash', 'worker error: Uncaught RangeError'],
+    eventProcessors: [],
+  });
+});
+
+test('a Rust panic associates wasm addresses with its worker image in Sentry', async () => {
+  const { Scope } = await import('@sentry/sveltekit');
+  const transport = await load();
+  void transport.call('members.list', { room_id: '!r:example.org' }).catch(() => {});
+  const wasm = {
+    type: 'wasm' as const,
+    code_file: 'https://sable.test/sable.wasm',
+    code_id: '00112233445566778899aabbccddeeff',
+    debug_id: '00112233445566778899aabbccddeeff0',
+  };
+  const stack = 'Error: panic\n    at https://sable.test/sable.wasm:wasm-function[12]:0x1234';
+  FakeSharedWorker.last?.port.receive({ panic: { message: 'panic', stack, wasm } });
+
+  const [error, context] = captureException.mock.lastCall ?? [];
+  expect((error as Error).stack).toBe(stack);
+  expect(context).toBeTypeOf('function');
+  const scope = (context as (scope: InstanceType<typeof Scope>) => InstanceType<typeof Scope>)(
+    new Scope()
+  );
+  expect(scope.getScopeData()).toMatchObject({
+    fingerprint: ['wasm-core-crash', 'panic'],
+    tags: { source: 'wasm-core' },
+  });
+  const event = {
+    exception: {
+      values: [
+        {
+          stacktrace: {
+            frames: [
+              { filename: 'https://sable.test/core.worker.js', lineno: 1 },
+              { filename: 'https://sable.test/sable.wasm:wasm-function[12]:0x1234' },
+              { filename: 'wasm://wasm/01234567:wasm-function[13]:0x5678' },
+              { filename: 'https://sable.test/other.wasm:wasm-function[1]:0x10' },
+            ],
+          },
+        },
+      ],
+    },
+    debug_meta: {
+      images: [{ type: 'sourcemap' as const, code_file: 'worker.js', debug_id: 'js-id' }],
+    },
+  };
+  const processor = scope.getScopeData().eventProcessors.at(-1);
+  expect(await processor?.(event, {})).toMatchObject({
+    exception: {
+      values: [
+        {
+          stacktrace: {
+            frames: [
+              { filename: 'https://sable.test/core.worker.js', lineno: 1 },
+              {
+                filename: wasm.code_file,
+                platform: 'native',
+                instruction_addr: '0x1234',
+                addr_mode: 'rel:1',
+              },
+              {
+                filename: wasm.code_file,
+                platform: 'native',
+                instruction_addr: '0x5678',
+                addr_mode: 'rel:1',
+              },
+              { filename: 'https://sable.test/other.wasm:wasm-function[1]:0x10' },
+            ],
+          },
+        },
+      ],
+    },
+    debug_meta: { images: [...event.debug_meta.images.slice(0, 1), wasm] },
   });
 });
 

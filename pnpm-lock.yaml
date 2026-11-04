@@ -512,6 +512,9 @@ importers:
       proper-lockfile:
         specifier: ^4.1.2
         version: 4.1.2
+      sentry:
+        specifier: 0.47.0
+        version: 0.47.0
       smol-toml:
         specifier: ^1.9.0
         version: 1.9.1
@@ -5836,6 +5839,11 @@ packages:
 
   sentry@0.45.0:
     resolution: {integrity: sha512-kgmEbLlC22lL7uneeUm9Sjz65rp5cvwYOMTxXbZCmBum4sbVre/lLT3zTV3kwXHJ9/BM8ZS0/GhZe9Cl1t6WyA==}
+    engines: {node: '>=20.0'}
+    hasBin: true
+
+  sentry@0.47.0:
+    resolution: {integrity: sha512-BDhgsAJYm99Xbx+YTREec7lME0FN8Z66YzrQ+eEWDqwigcLqs90cEx5nrhVlneL9bbDCVyt5O/7Z3RqKpHNh2A==}
     engines: {node: '>=20.0'}
     hasBin: true
 
@@ -11737,6 +11745,8 @@ snapshots:
   semver@7.8.5: {}
 
   sentry@0.45.0: {}
+
+  sentry@0.47.0: {}
 
   serialize-error@7.0.1:
     dependencies:

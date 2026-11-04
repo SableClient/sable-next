@@ -154,6 +154,7 @@
     "postcss-custom-media": "12.0.3",
     "postcss-html": "^2.0.0",
     "proper-lockfile": "^4.1.2",
+    "sentry": "0.47.0",
     "smol-toml": "^1.9.0",
     "storybook": "10.6.3",
     "stylelint": "^17.15.0",

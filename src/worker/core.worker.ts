@@ -13,6 +13,9 @@ import { installFirefoxFetchLimit } from './adaptive-fetch';
 import { createCoreWorkerBoundary } from './core-worker-boundary';
 import { claimStore } from './store-ownership';
 import { installUploadDeadline } from './upload-deadline';
+import type { WasmDebugImage } from './protocol';
+import wasmDebug from '#src/generated/wasm/sable_wasm_build_id.js';
+import wasmUrl from '#src/generated/wasm/sable_wasm_bg.wasm?url';
 
 declare const self: SharedWorkerGlobalScope;
 
@@ -22,6 +25,9 @@ installUploadDeadline(self);
 installFirefoxFetchLimit(self);
 
 let started: SableCore | null = null;
+const wasm: WasmDebugImage | undefined = wasmDebug
+  ? { ...wasmDebug, type: 'wasm', code_file: new URL(wasmUrl, self.location.href).href }
+  : undefined;
 
 async function stopCore(): Promise<void> {
   if (!started) return;
@@ -41,7 +47,9 @@ const core = claimStore(() => {
   .then(() => {
     // Before the constructor, so a panic while opening the session store still
     // carries its Rust message.
-    setPanicHandler(crash);
+    setPanicHandler((message: string) => {
+      crash(message, new Error(message).stack);
+    });
 
     const instance = new SableCore(
       'sable-next',
@@ -75,7 +83,7 @@ const boundary = createCoreWorkerBoundary(
 
 // A trap unwinds only its own call, so close the worker rather than keep re-entering a corrupted module; the next connect builds a fresh one.
 function crash(message: string, stack?: string): void {
-  boundary.handlePanic(message, stack);
+  boundary.handlePanic(message, stack, wasm);
   setTimeout(() => {
     self.close();
   }, 0);

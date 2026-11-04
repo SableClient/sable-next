@@ -127,4 +127,8 @@ runs:
       if: ${{ inputs.build == 'true' }}
       shell: bash
       working-directory: ${{ github.workspace }}
-      run: node scripts/ci/upload-sentry-sourcemaps.mjs dist
+      run: |
+        node scripts/ci/upload-sentry-sourcemaps.mjs dist
+        if [ -n "${VITE_SENTRY_DSN:-}" ]; then
+          pnpm exec sentry-cli debug-files upload src/generated/wasm/debug
+        fi

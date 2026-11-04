@@ -1,7 +1,7 @@
 import { attachmentBytes } from '../transport/attachment-bytes';
 import { createRpc } from '#src/generated/protocol';
 import type { RpcError, RpcResult, CoreEvent, SubscriptionId, Rpc } from '#src/generated/protocol';
-import type { WorkerMessage, WorkerRequest } from './protocol';
+import type { WasmDebugImage, WorkerMessage, WorkerRequest } from './protocol';
 import { TimelineEventRouter } from './timeline-event-router';
 
 const logFlushMs = 250;
@@ -89,10 +89,10 @@ export function createCoreWorkerBoundary(
     }
   }
 
-  function handlePanic(message: string, stack?: string): void {
+  function handlePanic(message: string, stack?: string, wasm?: WasmDebugImage): void {
     panic ??= message;
     broadcast({
-      panic: stack === undefined ? { message } : { message, stack },
+      panic: { message, stack, wasm },
     });
   }
 
