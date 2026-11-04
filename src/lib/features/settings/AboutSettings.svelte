@@ -183,7 +183,7 @@
       {/if}
     </div>
   </header>
-  {#if supporter.enabled}
+  {#if supporter.enabled && donate}
     <SupporterActivationSettings />
   {/if}
   <svelte:boundary>

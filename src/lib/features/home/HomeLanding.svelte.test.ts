@@ -2,6 +2,7 @@
 
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { isTauri } from '@tauri-apps/api/core';
 
 import { parseRuntimeConfig } from '#lib/config/runtime-config.js';
 import { deployment } from '#lib/deployment/deployment.js';
@@ -10,6 +11,8 @@ import HomeLanding from './HomeLanding.svelte';
 import SettingsChangesCard from './SettingsChangesCard.svelte';
 
 vi.mock('#lib/core/context.js');
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: vi.fn(() => false) }));
+vi.mock('@tauri-apps/plugin-os', () => ({ type: () => 'ios' }));
 vi.mock('#lib/deployment/deployment.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('#lib/deployment/deployment.js')>()),
   deployment: vi.fn(),
@@ -20,8 +23,23 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.mocked(isTauri).mockReturnValue(false);
   localStorage.removeItem(LOGGED_IN_MARKER);
   localStorage.clear();
+});
+
+test.each(['web', 'ios'])('donation links on %s', (platform) => {
+  const native = platform === 'ios';
+  vi.mocked(isTauri).mockReturnValue(native);
+  render(HomeLanding, { titleKey: 'nav.unspaced' });
+
+  expect(screen.getByRole('link', { name: 'Get support' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'View source' })).toBeInTheDocument();
+  if (native) {
+    expect(screen.queryByRole('link', { name: 'Donate' })).not.toBeInTheDocument();
+  } else {
+    expect(screen.getByRole('link', { name: 'Donate' })).toBeInTheDocument();
+  }
 });
 
 test('opens Get support in the Sable general room', () => {

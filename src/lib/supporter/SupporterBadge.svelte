@@ -203,23 +203,23 @@
       trapFocus={false}
       role="dialog"
       aria-labelledby={`${id}-heading`}
-      aria-describedby={`${id}-description`}
+      aria-describedby={donateHref ? `${id}-description` : undefined}
     >
       <div class="supporter-card-art" aria-hidden="true">
         <SupporterMark {...selected} />
       </div>
       <h2 id={`${id}-heading`}>{label}</h2>
-      <p id={`${id}-description`}>
-        {i18n.t(
-          isOwnBadge
-            ? 'supporter.badgeOwnDescription'
-            : donated
-              ? 'supporter.badgeDonorDescription'
-              : 'supporter.badgeDescription',
-          { name: donorName }
-        )}
-      </p>
       {#if donateHref}
+        <p id={`${id}-description`}>
+          {i18n.t(
+            isOwnBadge
+              ? 'supporter.badgeOwnDescription'
+              : donated
+                ? 'supporter.badgeDonorDescription'
+                : 'supporter.badgeDescription',
+            { name: donorName }
+          )}
+        </p>
         <LinkButton
           href={donateHref}
           target="_blank"
@@ -231,10 +231,10 @@
           <HeartIcon aria-hidden="true" weight="fill" />
           {i18n.t(donated ? 'common.supportSable' : 'supporter.badgeDonate')}
         </LinkButton>
+        <small class="supporter-card-hint"
+          >{i18n.t(donated ? 'supporter.badgeDonorHint' : 'supporter.badgeHint')}</small
+        >
       {/if}
-      <small class="supporter-card-hint"
-        >{i18n.t(donated ? 'supporter.badgeDonorHint' : 'supporter.badgeHint')}</small
-      >
     </Popover.Content>
   </Popover.Portal>
 </Popover.Root>

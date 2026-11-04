@@ -1,3 +1,6 @@
+import { isTauri } from '@tauri-apps/api/core';
+import { type as osType } from '@tauri-apps/plugin-os';
+
 import type { RuntimeConfig } from '#lib/config/runtime-config.js';
 
 import { deployment } from './deployment.js';
@@ -24,6 +27,7 @@ export function sourceUrl(config: RuntimeConfig = deployment()): string | null {
 }
 
 export function donateUrl(config: RuntimeConfig = deployment()): string | null {
+  if (isTauri() && osType() === 'ios') return null;
   return community(SABLE_DONATE_URL, config);
 }
 

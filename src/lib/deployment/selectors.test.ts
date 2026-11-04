@@ -1,4 +1,6 @@
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
+import { isTauri } from '@tauri-apps/api/core';
+import { type as osType } from '@tauri-apps/plugin-os';
 
 import { parseRuntimeConfig } from '#lib/config/runtime-config.js';
 
@@ -16,6 +18,13 @@ import { deviceDisplayName, registrationEnabled } from './policy.js';
 const build = vi.hoisted(() => ({ nightly: false }));
 vi.mock('#lib/platform/build-channel.js', () => ({ isNightlyBuild: () => build.nightly }));
 vi.mock('#lib/platform/diagnostics.js', () => ({ devicePlatformLabel: () => 'Android' }));
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: vi.fn(() => false) }));
+vi.mock('@tauri-apps/plugin-os', () => ({ type: vi.fn(() => 'ios') }));
+
+afterEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(isTauri).mockReturnValue(false);
+});
 
 const sable = parseRuntimeConfig({});
 const acme = parseRuntimeConfig({
@@ -55,4 +64,24 @@ test('a nightly build says so in the device name', () => {
   build.nightly = true;
   expect(deviceDisplayName(sable)).toBe('Sable (Nightly) on Android');
   build.nightly = false;
+});
+
+test.each(['ios', 'android', 'macos', 'windows', 'linux'] as const)(
+  'donation links on %s',
+  (os) => {
+    vi.mocked(isTauri).mockReturnValue(true);
+    vi.mocked(osType).mockReturnValue(os);
+
+    expect(donateUrl(sable)).toBe(os === 'ios' ? null : 'https://opencollective.com/sable');
+    expect(donateUrl(acme)).toBeNull();
+    expect(sourceUrl(sable)).not.toBeNull();
+    expect(supportRoom(sable)).toBe('#general:sable.moe');
+  }
+);
+
+test('web donations do not depend on the device OS', () => {
+  vi.mocked(osType).mockReturnValue('ios');
+
+  expect(donateUrl(sable)).toBe('https://opencollective.com/sable');
+  expect(osType).not.toHaveBeenCalled();
 });

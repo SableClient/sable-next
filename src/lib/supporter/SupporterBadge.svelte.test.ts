@@ -2,9 +2,17 @@
 
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
+import { isTauri } from '@tauri-apps/api/core';
 
 import SupporterBadge from './SupporterBadge.svelte';
+
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: vi.fn(() => false) }));
+vi.mock('@tauri-apps/plugin-os', () => ({ type: () => 'ios' }));
+
+afterEach(() => {
+  vi.mocked(isTauri).mockReturnValue(false);
+});
 
 async function openCard() {
   const user = userEvent.setup();
@@ -32,4 +40,15 @@ test('closes the card when the window loses focus', async () => {
   window.dispatchEvent(new Event('blur'));
 
   await expect.poll(() => screen.queryByRole('dialog')).toBeNull();
+});
+
+test('iOS keeps the badge without donation links or prompts', async () => {
+  vi.mocked(isTauri).mockReturnValue(true);
+  await openCard();
+
+  expect(screen.getByRole('heading', { name: 'Donor' })).toBeInTheDocument();
+  expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  expect(screen.queryByText(/you can too/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Any amount earns a badge/)).not.toBeInTheDocument();
+  expect(screen.getByRole('dialog')).not.toHaveAttribute('aria-describedby');
 });
