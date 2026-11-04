@@ -106,6 +106,7 @@ const REPORTED_FIELDS: &[&str] = &[
     "own_identity_trusted",
     "same_homeserver",
     "backup",
+    "backup_lookup",
     "account_cross_signed",
     "device_cross_signed",
     "megolm_session",

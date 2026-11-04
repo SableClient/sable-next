@@ -422,6 +422,69 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
     }
 
     #[tokio::test]
+    async fn a_utd_report_says_whether_the_backup_holds_the_key() {
+        use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+        let server = MatrixMockServer::new().await;
+        let (_core, client, _store) = core_for(&server).await;
+        let room_id = room_id!("!utd:example.org");
+        server
+            .sync_room(&client, JoinedRoomBuilder::new(room_id))
+            .await;
+        let room = client.get_room(room_id).unwrap();
+        assert_eq!(
+            crate::utd::backup_lookup(&room, "missing").await,
+            "no_backup_key"
+        );
+
+        let key = BackupDecryptionKey::new();
+        backup_metadata(&server, &key, 1).await;
+        unlock_backup(&client, &key).await;
+        let session = outbound_session(room_id);
+        let export = exported(&session).await;
+        let inbound = InboundGroupSession::from_export(&export).unwrap();
+        let encrypted = key.megolm_v1_public_key().encrypt(inbound).await.unwrap();
+        let session_id = export.session_id.clone();
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(move |request: &wiremock::Request| {
+                request
+                    .url
+                    .path_segments()
+                    .and_then(Iterator::last)
+                    .and_then(|segment| {
+                        percent_encoding::percent_decode_str(segment)
+                            .decode_utf8()
+                            .ok()
+                    })
+                    .is_some_and(|segment| segment == session_id)
+            })
+            .respond_with(
+                wiremock::ResponseTemplate::new(200)
+                    .set_body_json(serde_json::to_value(encrypted).unwrap()),
+            )
+            .mount(server.server())
+            .await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path_regex("/room_keys/keys/.+/.+$"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(404).set_body_json(
+                    json!({"errcode": "M_NOT_FOUND", "error": "No room_keys found"}),
+                ),
+            )
+            .mount(server.server())
+            .await;
+
+        assert_eq!(
+            crate::utd::backup_lookup(&room, "missing").await,
+            "not_in_backup"
+        );
+        assert_eq!(
+            crate::utd::backup_lookup(&room, &export.session_id).await,
+            "imported"
+        );
+        assert_eq!(session_ids(&client).await, vec![export.session_id]);
+    }
+
+    #[tokio::test]
     async fn cloud_restore_batches_keys_preserves_backup_notifications_and_can_repeat() {
         use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
         let server = MatrixMockServer::new().await;

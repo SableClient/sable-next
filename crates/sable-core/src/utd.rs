@@ -4,6 +4,7 @@ use std::time::Duration;
 use matrix_sdk::Room;
 use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::EventId;
+use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk_ui::unable_to_decrypt_hook::{
     UnableToDecryptHook, UnableToDecryptInfo, UtdHookManager,
 };
@@ -31,7 +32,20 @@ impl UnableToDecryptHook for UtdReporter {
 }
 
 async fn report(room: Room, info: UnableToDecryptInfo) {
-    let (megolm_session, sender_device) = megolm_ids(&room, &info.event_id).await;
+    let content = megolm_content(&room, &info.event_id).await;
+    let backup_lookup = match content
+        .as_ref()
+        .and_then(|content| content.session_id.as_deref())
+    {
+        Some(session_id) => backup_lookup(&room, session_id).await,
+        None => "unknown_session",
+    };
+    let (megolm_session, sender_device) = content.map_or((None, None), |content| {
+        (
+            content.session_id.as_deref().map(short_hash),
+            content.device_id.as_deref().map(short_hash),
+        )
+    });
     let encryption = room.client().encryption();
     let device_cross_signed = encryption
         .get_own_device()
@@ -50,6 +64,7 @@ async fn report(room: Room, info: UnableToDecryptInfo) {
         own_identity_trusted = info.user_trusts_own_identity,
         same_homeserver = info.own_homeserver.as_ref() == Some(&info.sender_homeserver),
         backup = ?encryption.backups().state(),
+        backup_lookup,
         account_cross_signed,
         device_cross_signed,
         megolm_session,
@@ -64,33 +79,36 @@ struct MegolmContent {
     device_id: Option<String>,
 }
 
-async fn megolm_ids(room: &Room, event_id: &EventId) -> (Option<String>, Option<String>) {
+async fn megolm_content(room: &Room, event_id: &EventId) -> Option<MegolmContent> {
     let client = room.client();
-    let Some(event_cache) = client.event_cache() else {
-        return (None, None);
-    };
-    let Ok((cache, _handles)) = event_cache.room(room.room_id()).await else {
-        return (None, None);
-    };
-    let Some(content) = cache
+    let event_cache = client.event_cache()?;
+    let (cache, _handles) = event_cache.room(room.room_id()).await.ok()?;
+    cache
         .find_event(event_id)
         .await
         .ok()
+        .flatten()?
+        .raw()
+        .get_field::<MegolmContent>("content")
+        .ok()
         .flatten()
-        .and_then(|event| {
-            event
-                .raw()
-                .get_field::<MegolmContent>("content")
-                .ok()
-                .flatten()
-        })
-    else {
-        return (None, None);
-    };
-    (
-        content.session_id.as_deref().map(short_hash),
-        content.device_id.as_deref().map(short_hash),
-    )
+}
+
+pub(crate) async fn backup_lookup(room: &Room, session_id: &str) -> &'static str {
+    match room
+        .client()
+        .encryption()
+        .backups()
+        .download_room_key(room.room_id(), session_id)
+        .await
+    {
+        Ok(true) => "imported",
+        Ok(false) => "no_backup_key",
+        Err(error) if error.client_api_error_kind() == Some(&ErrorKind::NotFound) => {
+            "not_in_backup"
+        }
+        Err(_) => "request_failed",
+    }
 }
 
 fn short_hash(value: &str) -> String {
