@@ -256,6 +256,7 @@
         <RoomNav
           {pathname}
           {spaceId}
+          {roomId}
           {onNavigate}
           callRoomId={call.active ? call.roomId : null}
           callVoiceStates={call.voiceStates}
@@ -283,6 +284,7 @@
         <RoomNav
           {pathname}
           {spaceId}
+          {roomId}
           width={roomNavWidth}
           {collapsed}
           callRoomId={call.active ? call.roomId : null}

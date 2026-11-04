@@ -6,11 +6,12 @@
     onNavigate?: (href: string) => void;
     width?: number;
     collapsed?: boolean;
+    roomId?: string;
   }
 
-  let { onNavigate, width, collapsed }: Props = $props();
+  let { onNavigate, width, collapsed, roomId }: Props = $props();
 </script>
 
 <TooltipProvider>
-  <RoomNav {onNavigate} {width} {collapsed} />
+  <RoomNav {onNavigate} {width} {collapsed} {roomId} />
 </TooltipProvider>

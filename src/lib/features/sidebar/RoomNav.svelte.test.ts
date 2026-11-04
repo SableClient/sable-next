@@ -15,6 +15,8 @@ import type {
 
 import { roomNotifications, roomUnread } from '#lib/rooms/unread.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { bannerChanged } from '#lib/features/room/room-banner.svelte.js';
+import { mediaViewerState } from '#lib/ui/media/media-viewer-state.svelte.js';
 
 const roomsFixture = vi.hoisted(() => {
   const fixture = {
@@ -166,11 +168,14 @@ beforeEach(() => {
     can_invite: false,
     can_manage_children: false,
   } as RoomPermissionsView);
+  core.rpc.room_state.banner.mockReset();
+  core.rpc.room_state.banner.mockResolvedValue(null);
   notificationSettings.mockReset();
   notificationSettings.mockResolvedValue({ room: null, default: 'mentions' });
 });
 
 afterEach(() => {
+  mediaViewerState.close();
   setPreference('roomSort', 'recent');
   setPreference('directSort', 'recent');
   setPreference('showRoomIcon', 'always');
@@ -580,8 +585,117 @@ test('a space list header shows the space banner above it', async () => {
   expect(core.rpc.room_state.banner).toHaveBeenCalledWith({ room_id: '!space:example.org' });
   expect(document.querySelector('.room-banner')).not.toBeNull();
   expect(document.querySelector('.room-nav-header')).toHaveClass('on-banner');
+});
+
+async function expectBanner(source: string, name: string): Promise<void> {
+  await user.click(await screen.findByRole('button', { name: `common.viewBanner:${name}` }));
+  expect(mediaViewerState.standaloneItem).toMatchObject({ source, filename: name });
+  mediaViewerState.close();
+}
+
+test.each([
+  ['prefers the room banner', 'room', 'space', 'room', 'General'],
+  ['falls back to the space banner', null, 'space', 'space', 'Design'],
+  ['shows a room banner when the space has none', 'room', null, 'room', 'General'],
+  ['hides the banner when neither room nor space has one', null, null, null, null],
+])('%s', async (_, roomBanner, spaceBanner, expected, name) => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!space:example.org', name: 'Design', room_kind: 'space' }),
+    makeRoom({
+      room_id: '!room:example.org',
+      name: 'General',
+      canonical_alias: '#general:example.org',
+    }),
+  ];
+  visit('/space/!space:example.org/%23general:example.org', {
+    spaceId: '!space:example.org',
+    roomId: '#general:example.org',
+  });
+  core.rpc.room_state.banner.mockImplementation(({ room_id }) => {
+    const banner = room_id === '!space:example.org' ? spaceBanner : roomBanner;
+    return Promise.resolve(banner === null ? null : `mxc://example.org/${banner}`);
+  });
+
+  await mountNav();
+  await tick();
+  await tick();
+
+  expect(core.rpc.room_state.banner).toHaveBeenCalledWith({ room_id: '!room:example.org' });
+  if (expected !== null) {
+    await expectBanner(`mxc://example.org/${expected}`, name);
+  } else {
+    expect(document.querySelector('.room-banner')).toBeNull();
+    expect(document.querySelector('.room-nav-header')).not.toHaveClass('on-banner');
+  }
+});
+
+test('room switches ignore late banner responses and reuse the space fallback', async () => {
+  const first = Promise.withResolvers<string | null>();
+  const revisit = Promise.withResolvers<string | null>();
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!space:example.org', name: 'Design', room_kind: 'space' }),
+    makeRoom({ room_id: '!first:example.org', name: 'First' }),
+    makeRoom({ room_id: '!second:example.org', name: 'Second' }),
+  ];
+  visit('/space/!space:example.org', { spaceId: '!space:example.org' });
+  core.rpc.room_state.banner.mockImplementation(({ room_id }) => {
+    if (room_id === '!space:example.org') return Promise.resolve('mxc://example.org/space');
+    return room_id === '!first:example.org' ? first.promise : Promise.resolve(null);
+  });
+
+  const view = await mountNav({ roomId: '!first:example.org' });
+  await expectBanner('mxc://example.org/space', 'Design');
+  await view.rerender({ roomId: '!second:example.org' });
+  first.resolve('mxc://example.org/stale');
+  await tick();
+  await tick();
+  await expectBanner('mxc://example.org/space', 'Design');
+
+  core.rpc.room_state.banner.mockImplementation(() => revisit.promise);
+  await view.rerender({ roomId: '!first:example.org' });
+  await expectBanner('mxc://example.org/space', 'Design');
+  revisit.resolve('mxc://example.org/current');
+  await expectBanner('mxc://example.org/current', 'First');
+  expect(
+    core.rpc.room_state.banner.mock.calls.filter(
+      ([params]) => params.room_id === '!space:example.org'
+    )
+  ).toHaveLength(1);
 
   core.rpc.room_state.banner.mockResolvedValue(null);
+  await view.rerender({ roomId: '!second:example.org' });
+  await expectBanner('mxc://example.org/space', 'Design');
+
+  await view.rerender({ roomId: undefined });
+  await expectBanner('mxc://example.org/space', 'Design');
+});
+
+test('refreshes a changed room banner and restores the space banner when it is removed', async () => {
+  let roomBanner: string | null = 'mxc://example.org/original';
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!space:example.org', name: 'Design', room_kind: 'space' }),
+    makeRoom({ room_id: '!room:example.org', name: 'General' }),
+  ];
+  visit('/space/!space:example.org/!room:example.org', {
+    spaceId: '!space:example.org',
+    roomId: '!room:example.org',
+  });
+  core.rpc.room_state.banner.mockImplementation(({ room_id }) =>
+    Promise.resolve(room_id === '!space:example.org' ? 'mxc://example.org/space' : roomBanner)
+  );
+
+  await mountNav();
+  await expectBanner('mxc://example.org/original', 'General');
+
+  roomBanner = 'mxc://example.org/replacement';
+  bannerChanged();
+  await tick();
+  await tick();
+  await expectBanner(roomBanner, 'General');
+
+  roomBanner = null;
+  bannerChanged();
+  await expectBanner('mxc://example.org/space', 'Design');
 });
 
 test('a space list header wears the space avatar when collapsed', async () => {
