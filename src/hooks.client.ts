@@ -53,6 +53,7 @@ if (dsn && preferences.errorReporting) {
       Sentry.browserApiErrorsIntegration({ eventTarget: false }),
       Sentry.consoleLoggingIntegration({ levels: ['error', 'warn'] }),
       Sentry.captureConsoleIntegration({ levels: ['error'] }),
+      Sentry.browserProfilingIntegration(),
       ...(preferences.sessionReplay
         ? [
             Sentry.replayIntegration({
@@ -70,6 +71,8 @@ if (dsn && preferences.errorReporting) {
     },
     replaysSessionSampleRate: sampleEverything ? 1 : 0.1,
     replaysOnErrorSampleRate: 1,
+    profileSessionSampleRate: sampleEverything ? 1 : 0.1,
+    profileLifecycle: 'trace',
 
     beforeSendLog(log) {
       if (log.level === 'debug' && environment === 'production') return null;

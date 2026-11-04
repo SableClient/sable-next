@@ -9,6 +9,7 @@ vi.mock('@sentry/sveltekit', () => ({
   browserApiErrorsIntegration: vi.fn(),
   consoleLoggingIntegration: vi.fn(),
   captureConsoleIntegration: vi.fn(() => ({ name: 'CaptureConsole' })),
+  browserProfilingIntegration: vi.fn(() => ({ name: 'BrowserProfiling' })),
   init: vi.fn(),
 }));
 const updatedCheck = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
@@ -77,6 +78,20 @@ test('fully samples call traces and inherits sampling for every other trace', as
     0.42
   );
   expect(inheritOrSampleWith).toHaveBeenCalledWith(0.1);
+});
+
+test('profiles the sampled sessions alongside their traces', async () => {
+  preferences.errorReporting = true;
+  vi.stubEnv('VITE_SENTRY_DSN', 'https://public@example.invalid/1');
+
+  await import('./hooks.client.js');
+
+  const options = vi.mocked(Sentry.init).mock.calls[0][0];
+  expect(options.integrations).toContainEqual({ name: 'BrowserProfiling' });
+  expect(options).toMatchObject({
+    profileLifecycle: 'trace',
+    profileSessionSampleRate: 0.1,
+  });
 });
 
 test('scrubs matrix identifiers from every streamed span', async () => {

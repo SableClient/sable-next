@@ -218,6 +218,7 @@ async function serveApp(request: Request): Promise<Response> {
     'Content-Security-Policy': target.endsWith('.html')
       ? await pagePolicy(target)
       : cspHeader(__SABLE_CSP__),
+    'Document-Policy': 'js-profiling',
   });
   // Not `net.fetch`: one network loader per module exhausts Chromium's pool on first load.
   return new Response(Readable.toWeb(createReadStream(target)) as ReadableStream, { headers });
