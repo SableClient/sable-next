@@ -166,6 +166,8 @@ targets:
           cuba: AppIconCuba
         # APP-ICON ALIASES END
         LSRequiresIPhoneOS: true
+        # Native animations only; WKWebView has a separate frame-rate cap.
+        CADisableMinimumFrameDurationOnPhone: true
         SableKeychainGroup: $(DEVELOPMENT_TEAM).{{app.identifier}}.shared
         UILaunchStoryboardName: LaunchScreen
         UIBackgroundModes: [audio, voip, remote-notification]
