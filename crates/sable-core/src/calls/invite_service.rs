@@ -9,12 +9,16 @@ use std::time::Duration;
 
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
 use matrix_sdk::executor::{JoinHandleExt as _, spawn};
+use matrix_sdk::ruma::OwnedUserId;
 use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, AnySyncStateEvent, TimelineEventType};
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::{Client, Room};
 use matrix_sdk_base::sticky::{StickyEventsUpdate, StickyKey};
 use serde_json::Value;
-use tokio::sync::broadcast::{Receiver, error::TryRecvError};
+use tokio::sync::broadcast::{
+    Receiver,
+    error::{RecvError, TryRecvError},
+};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use web_time::Instant;
 
@@ -27,6 +31,8 @@ use crate::{Core, protocol::CoreEvent};
 
 type Event = (Room, Value, Instant);
 
+const MAX_ALLOWED: usize = 1_000;
+
 struct WatchedRoom {
     invitations: Invitations,
     sticky: Receiver<StickyEventsUpdate>,
@@ -34,7 +40,7 @@ struct WatchedRoom {
     closed_slots: HashSet<String>,
     withdrawn: HashSet<String>,
     /// Whether each sender may notify the room, until power levels change.
-    allowed: HashMap<String, bool>,
+    allowed: HashMap<OwnedUserId, bool>,
     members_read: bool,
 }
 
@@ -52,14 +58,22 @@ impl WatchedRoom {
     }
 
     async fn allowed(&mut self, room: &Room, event: &Value) -> bool {
-        let Some(sender) = event["sender"].as_str() else {
+        let Some(sender) = event["sender"]
+            .as_str()
+            .and_then(|sender| OwnedUserId::try_from(sender).ok())
+        else {
             return false;
         };
-        if let Some(allowed) = self.allowed.get(sender) {
+        if let Some(allowed) = self.allowed.get(&sender) {
             return *allowed;
         }
-        let allowed = permission(room, sender).await;
-        self.allowed.insert(sender.to_owned(), allowed);
+        let allowed = room
+            .power_levels_or_default()
+            .await
+            .user_can_trigger_room_notification(&sender);
+        if self.allowed.len() < MAX_ALLOWED {
+            self.allowed.insert(sender, allowed);
+        }
         allowed
     }
 
@@ -208,7 +222,10 @@ async fn run(
             }
             update = updates.recv() => match update {
                 Ok(update) => changed.extend(update.iter_all_room_ids().cloned()),
-                Err(_) => changed.extend(client.joined_rooms().iter().map(|room| room.room_id().to_owned())),
+                Err(RecvError::Lagged(_)) => {
+                    changed.extend(client.joined_rooms().iter().map(|room| room.room_id().to_owned()));
+                }
+                Err(RecvError::Closed) => break,
             },
             () = matrix_sdk::sleep::sleep(Duration::from_secs(1)) => {}
         }
@@ -287,15 +304,6 @@ impl Watcher {
             }
         }
     }
-}
-
-async fn permission(room: &Room, sender: &str) -> bool {
-    let Ok(sender) = matrix_sdk::ruma::UserId::parse(sender) else {
-        return false;
-    };
-    room.power_levels_or_default()
-        .await
-        .user_can_trigger_room_notification(&sender)
 }
 
 fn state_value(event: RawAnySyncOrStrippedState) -> Option<Value> {
