@@ -1,0 +1,6 @@
+- Add push-to-talk and global microphone shortcuts on desktop.
+- Improved performance when switching rooms.
+- Improved performance when displaying custom reactions.
+- Improved member list performance when switching rooms.
+- Fix Sable's URL scheme lookup when sharing on iOS.
+- Fix desktop updates hanging at 0% on Windows.

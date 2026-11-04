@@ -1,5 +1,19 @@
 # Sable Changelog
 
+## 2.3.3 (2026-11-04)
+
+### Features
+
+* Add push-to-talk and global microphone shortcuts on desktop.
+
+### Fixes
+
+* Improved performance when switching rooms.
+* Improved performance when displaying custom reactions.
+* Improved member list performance when switching rooms.
+* Fix Sable's URL scheme lookup when sharing on iOS.
+* Fix desktop updates hanging at 0% on Windows.
+
 ## 2.3.2 (2026-11-03)
 
 ### Features
