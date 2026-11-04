@@ -61,6 +61,7 @@
     flex-wrap: wrap;
     gap: var(--space-200);
     justify-content: center;
+    min-width: 0;
     padding: var(--space-200);
   }
 
@@ -75,9 +76,13 @@
     height: var(--control-height-300);
     justify-content: center;
     line-height: 1;
+    max-width: 100%;
     min-width: var(--control-height-300);
+    overflow: hidden;
     text-box: trim-both cap alphabetic;
+    text-overflow: ellipsis;
     user-select: none;
+    white-space: nowrap;
   }
 
   .quick-reaction:hover {
