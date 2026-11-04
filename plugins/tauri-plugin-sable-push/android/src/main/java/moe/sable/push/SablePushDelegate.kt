@@ -12,7 +12,10 @@ class SablePushDelegate : PushDelegate {
     override fun schedule(context: Context, payload: String) = PushRenderWorker.enqueue(context, payload)
 
     override fun endpointChanged(context: Context, endpoint: String, p256dh: String?, auth: String?) =
-        PushRegistrationWorker.enqueue(context, endpoint, p256dh, auth)
+        PushRegistrationWorker.enqueue(context, null, endpoint, p256dh, auth)
+
+    override fun endpointChanged(context: Context, instance: String, endpoint: String, p256dh: String?, auth: String?) =
+        PushRegistrationWorker.enqueue(context, instance, endpoint, p256dh, auth)
 
     override fun record(context: Context, outcome: String) {
         PushOutcome.entries.firstOrNull { it.name == outcome }?.let { PushDiagnostics.record(context, it) }

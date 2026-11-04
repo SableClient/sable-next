@@ -4,8 +4,6 @@ use super::PushRegistrationError;
 use sable_core::api::push::WebPusherView;
 use sable_core::protocol::WebPushKeys;
 #[cfg(mobile)]
-use std::sync::Arc;
-#[cfg(mobile)]
 use tauri::{AppHandle, Runtime};
 #[cfg(mobile)]
 use tauri_plugin_notifications::NotificationsExt;
@@ -15,6 +13,7 @@ pub(super) struct Registration {
     pub(super) token: String,
     pub(super) p256dh: Option<String>,
     pub(super) auth: Option<String>,
+    pub(super) instance: Option<String>,
 }
 
 const DIRECT_PUSH_APP_ID: &str = "moe.sable.up";
@@ -27,6 +26,7 @@ pub(super) fn rotated_registration(app_id: &str, registration: &Registration) ->
         token: registration.token.clone(),
         p256dh: registration.p256dh.clone().filter(|_| keyed),
         auth: registration.auth.clone().filter(|_| keyed),
+        instance: registration.instance.clone(),
     }
 }
 
@@ -69,14 +69,6 @@ pub(super) fn server_web_pusher(
         auth: registration.auth.clone()?,
         event_id_only,
     })
-}
-
-/// Let the platform resolve Auto using its installed distributors and services.
-const fn provider_for_server_delivery(
-    _server_vapid: Option<&str>,
-    provider: Option<PushProvider>,
-) -> Option<PushProvider> {
-    provider
 }
 
 pub(super) fn is_unified_push_endpoint(token: &str) -> bool {
@@ -122,7 +114,6 @@ async fn active_provider<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
 #[cfg(mobile)]
 async fn distributor_gateway<R: Runtime>(
     app: &AppHandle<R>,
-    core: &Arc<sable_core::Core>,
     registration: &Registration,
     config: &PushConfig,
     server_vapid: Option<&str>,
@@ -131,17 +122,7 @@ async fn distributor_gateway<R: Runtime>(
     if !asks_distributor_for_gateway(config, registration, server_vapid, active.as_deref()) {
         return None;
     }
-    discover_gateway(core, &registration.token).await
-}
-
-#[cfg(mobile)]
-async fn discover_gateway(core: &Arc<sable_core::Core>, endpoint: &str) -> Option<String> {
-    core.run(sable_core::api::push::DiscoverGatewayParams {
-        endpoint: endpoint.to_owned(),
-    })
-    .await
-    .ok()
-    .flatten()
+    sable_core::push_check::discover_gateway(&registration.token).await
 }
 
 fn prefers_distributor_gateway(
@@ -177,6 +158,7 @@ fn without_keys(registration: Registration) -> Registration {
         token: registration.token,
         p256dh: None,
         auth: None,
+        instance: registration.instance,
     }
 }
 
@@ -184,20 +166,19 @@ fn without_keys(registration: Registration) -> Registration {
 #[cfg(mobile)]
 pub(super) async fn register_with_distributor<R: Runtime>(
     app: &AppHandle<R>,
-    core: &Arc<sable_core::Core>,
     config: &PushConfig,
     server_vapid: Option<&str>,
+    identity: &(String, String),
 ) -> Result<(Registration, Option<String>), PushRegistrationError> {
-    let provider = provider_for_server_delivery(server_vapid, config.provider);
     let register = |vapid: Option<String>| async {
         let registered = app
             .notifications()
             .register_for_push_notifications(
                 vapid,
-                provider,
+                config.provider,
                 config.embedded_gateway_url.clone(),
-                config.user_id.clone(),
-                config.device_id.clone(),
+                Some(identity.0.clone()),
+                Some(identity.1.clone()),
             )
             .await
             .map_err(|error| {
@@ -210,14 +191,14 @@ pub(super) async fn register_with_distributor<R: Runtime>(
             token: registered.device_token,
             p256dh: registered.p256dh,
             auth: registered.auth,
+            instance: registered.instance,
         })
     };
     let registration = register(Some(
         server_vapid.map_or_else(|| config.vapid_key.clone(), str::to_owned),
     ))
     .await?;
-    let Some(gateway) = distributor_gateway(app, core, &registration, config, server_vapid).await
-    else {
+    let Some(gateway) = distributor_gateway(app, &registration, config, server_vapid).await else {
         return Ok((registration, None));
     };
     Ok((without_keys(register(None).await?), Some(gateway)))
@@ -225,10 +206,7 @@ pub(super) async fn register_with_distributor<R: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        PushConfig, PushProvider, Registration, provider_for_server_delivery, pusher,
-        server_web_pusher,
-    };
+    use super::{PushConfig, PushProvider, Registration, pusher, server_web_pusher};
 
     #[test]
     fn only_a_direct_unifiedpush_endpoint_asks_its_distributor_for_a_gateway() {
@@ -241,6 +219,7 @@ mod tests {
             token: "https://ntfy.example/topic".to_owned(),
             p256dh: None,
             auth: None,
+            instance: None,
         };
         assert!(super::is_direct_unified_push(&registration, &config));
         config.gateway_override = true;
@@ -267,6 +246,7 @@ mod tests {
             token: "https://ntfy.example/topic".to_owned(),
             p256dh: Some("key".to_owned()),
             auth: Some("auth".to_owned()),
+            instance: None,
         };
         assert!(super::prefers_distributor_gateway(
             &config,
@@ -321,6 +301,7 @@ mod tests {
             token: "https://ntfy.example/upTopic?up=1".to_owned(),
             p256dh: Some("key".to_owned()),
             auth: Some("auth".to_owned()),
+            instance: None,
         };
         assert!(super::asks_distributor_for_gateway(
             &config,
@@ -359,6 +340,7 @@ mod tests {
             token: "https://ntfy.example/upNew?up=1".to_owned(),
             p256dh: Some("key".to_owned()),
             auth: Some("auth".to_owned()),
+            instance: None,
         };
         let direct = super::rotated_registration(super::DIRECT_PUSH_APP_ID, &registration);
         assert_eq!(direct.token, registration.token);
@@ -383,6 +365,7 @@ mod tests {
             token: "https://ntfy.example/endpoint".into(),
             p256dh: None,
             auth: None,
+            instance: None,
         };
         assert_eq!(
             super::registration_gateway(&registration, &config),
@@ -397,6 +380,7 @@ mod tests {
                 token: "https://push.example/endpoint".to_owned(),
                 p256dh: Some("key".to_owned()),
                 auth: Some("secret".to_owned()),
+                instance: None,
             },
             Some("moe.sable.client.android"),
             Some("moe.sable.app.sygnal"),
@@ -417,6 +401,7 @@ mod tests {
                 token: "https://ntfy.sh/up123?up=1".to_owned(),
                 p256dh: None,
                 auth: None,
+                instance: None,
             },
             Some("moe.sable.client.android"),
             Some("moe.sable.app.sygnal"),
@@ -442,6 +427,7 @@ mod tests {
                         token: token.to_owned(),
                         p256dh: p256dh.map(str::to_owned),
                         auth: auth.map(str::to_owned),
+                        instance: None,
                     },
                     Some("native"),
                     Some("web"),
@@ -463,6 +449,7 @@ mod tests {
             token: "https://ntfy.example/topic".to_owned(),
             p256dh: None,
             auth: None,
+            instance: None,
         };
         assert_eq!(
             super::registration_gateway(&registration, &config),
@@ -492,6 +479,7 @@ mod tests {
                 token: "fcm-token".to_owned(),
                 p256dh: None,
                 auth: None,
+                instance: None,
             },
             Some("moe.sable.client.android"),
             Some("moe.sable.app.sygnal"),
@@ -511,6 +499,7 @@ mod tests {
                     token: "fcm-token".to_owned(),
                     p256dh: None,
                     auth: None,
+                    instance: None,
                 },
                 None,
                 Some("moe.sable.app.sygnal"),
@@ -525,6 +514,7 @@ mod tests {
             token: "https://push.example/subscription".to_owned(),
             p256dh: Some("public-key".to_owned()),
             auth: Some("auth-secret".to_owned()),
+            instance: None,
         };
 
         let pusher =
@@ -534,19 +524,5 @@ mod tests {
         assert_eq!(pusher.auth, "auth-secret");
         assert_eq!(pusher.app_id, super::SERVER_PUSH_APP_ID);
         assert!(pusher.event_id_only);
-    }
-
-    #[test]
-    fn msc4174_auto_preserves_platform_provider_selection() {
-        assert_eq!(provider_for_server_delivery(Some("server-key"), None), None);
-        assert_eq!(
-            provider_for_server_delivery(Some("server-key"), Some(PushProvider::Auto)),
-            Some(PushProvider::Auto)
-        );
-        assert_eq!(
-            provider_for_server_delivery(Some("server-key"), Some(PushProvider::UnifiedPush)),
-            Some(PushProvider::UnifiedPush)
-        );
-        assert_eq!(provider_for_server_delivery(None, None), None);
     }
 }

@@ -280,11 +280,11 @@ export async function dropPushSubscription(
 }
 
 export async function logoutWithPush(core: CoreClient, override: PushOverride): Promise<void> {
-  const userId = core.session?.user_id;
+  const session = core.session;
   await Promise.allSettled([
     dropPushSubscription(core, override),
-    unregisterNativePush(),
-    userId === undefined ? undefined : forgetPushSession(userId),
+    session === null ? undefined : unregisterNativePush(session),
+    session === null ? undefined : forgetPushSession(session.user_id),
   ]);
   const redirectUrl = logoutRedirectUrl();
   await core.logout();

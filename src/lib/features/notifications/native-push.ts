@@ -6,6 +6,7 @@ import {
   unregisterNativePushConfig,
   listPushDistributors,
   setPushDistributor,
+  type NativePushAccount,
 } from '#lib/platform/push.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
@@ -164,11 +165,24 @@ export function registerNativePush(
   return result;
 }
 
-export function unregisterNativePush(): Promise<void> {
-  wanted = null;
-  cancelRetry();
-  retryAttempt = 0;
-  return enqueue(() => unregisterNativePushConfig());
+export function unregisterNativePush(account?: NativePushAccount): Promise<void> {
+  if (
+    !account ||
+    (wanted?.session?.user_id === account.user_id && wanted.session.device_id === account.device_id)
+  ) {
+    wanted = null;
+    cancelRetry();
+    retryAttempt = 0;
+  } else if (wanted) {
+    wanted = {
+      ...wanted,
+      accounts: wanted.accounts.filter(
+        (candidate) =>
+          candidate.user_id !== account.user_id || candidate.device_id !== account.device_id
+      ),
+    };
+  }
+  return enqueue(() => unregisterNativePushConfig(account));
 }
 
 export function switchPushProvider(

@@ -15,28 +15,33 @@ class PushRegistrationWorker(context: Context, parameters: WorkerParameters) : W
     override fun doWork(): Result {
         val policy = PushPolicy(applicationContext)
         if (!policy.notificationsEnabled) return Result.success()
-        val (user, device) = policy.accounts.entries.firstOrNull() ?: return Result.failure()
+        val instance = inputData.getString(INSTANCE)
+        val account = if (instance == null) policy.accounts.entries.singleOrNull() else null
+        if (instance == null && account == null) return Result.failure()
         val endpoint = inputData.getString(ENDPOINT) ?: return Result.failure()
         val operation = JSONObject().put("operation", "rotate")
-            .put("user_id", user).put("device_id", device).put("endpoint", endpoint)
+            .put("instance", instance).put("endpoint", endpoint)
+        account?.let { operation.put("user_id", it.key).put("device_id", it.value) }
+        operation
             .put("p256dh", inputData.getString(P256DH)).put("auth", inputData.getString(AUTH))
         return if (PushPayloadDecryptor.maintain(applicationContext, operation.toString())) Result.success()
         else if (runAttemptCount < 5) Result.retry() else Result.failure()
     }
 
     companion object {
+        private const val INSTANCE = "instance"
         private const val ENDPOINT = "endpoint"
         private const val P256DH = "p256dh"
         private const val AUTH = "auth"
 
-        fun enqueue(context: Context, endpoint: String, p256dh: String?, auth: String?) {
+        fun enqueue(context: Context, instance: String?, endpoint: String, p256dh: String?, auth: String?) {
             val request = OneTimeWorkRequestBuilder<PushRegistrationWorker>()
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setInputData(
-                    Data.Builder().putString(ENDPOINT, endpoint).putString(P256DH, p256dh).putString(AUTH, auth).build()
+                    Data.Builder().putString(INSTANCE, instance).putString(ENDPOINT, endpoint).putString(P256DH, p256dh).putString(AUTH, auth).build()
                 )
                 .build()
-            WorkManager.getInstance(context).enqueueUniqueWork("push-registration", ExistingWorkPolicy.REPLACE, request)
+            WorkManager.getInstance(context).enqueueUniqueWork("push-registration:${instance ?: "legacy"}", ExistingWorkPolicy.REPLACE, request)
         }
     }
 }

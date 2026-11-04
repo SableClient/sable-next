@@ -265,11 +265,9 @@ fn subscribe_events(state: State<'_, AppState>, channel: Channel<Vec<CoreEvent>>
 #[tauri::command]
 async fn register_push(
     app: AppHandle<tauri::Wry>,
-    state: State<'_, AppState>,
     config: notifications::PushConfig,
 ) -> Result<(), notifications::PushRegistrationError> {
-    let core = state.core.clone();
-    Box::pin(notifications::register_push(&app, &core, config)).await
+    Box::pin(notifications::register_push(&app, config)).await
 }
 
 #[tauri::command]
@@ -286,8 +284,17 @@ fn device_pusher(
 }
 
 #[tauri::command]
-async fn unregister_push(app: AppHandle<tauri::Wry>) -> Result<(), RpcError> {
-    Box::pin(notifications::unregister_push(&app)).await
+async fn unregister_push(
+    app: AppHandle<tauri::Wry>,
+    user_id: Option<String>,
+    device_id: Option<String>,
+) -> Result<(), RpcError> {
+    Box::pin(notifications::unregister_push(
+        &app,
+        user_id.as_deref(),
+        device_id.as_deref(),
+    ))
+    .await
 }
 
 #[tauri::command]

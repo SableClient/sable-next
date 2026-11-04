@@ -1,10 +1,10 @@
-import type { NativePushConfig } from '#lib/platform/push.js';
+import type { NativePushAccount, NativePushConfig } from '#lib/platform/push.js';
 
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   register: vi.fn<(config: NativePushConfig) => Promise<void>>(),
-  unregister: vi.fn<() => Promise<void>>(),
+  unregister: vi.fn<(account?: NativePushAccount) => Promise<void>>(),
   list: vi.fn(),
   select: vi.fn<(name: string) => Promise<void>>(),
   config: vi.fn(),
@@ -373,4 +373,52 @@ test('turning native push off cancels a pending retry', async () => {
   await unregisterNativePush();
   await vi.advanceTimersByTimeAsync(3_600_000);
   expect(mocks.register).toHaveBeenCalledTimes(1);
+});
+
+test('logging out another account preserves an in-flight registration and its retry', async () => {
+  vi.useFakeTimers();
+  const pending = Promise.withResolvers<undefined>();
+  mocks.register.mockReturnValueOnce(pending.promise);
+
+  const registration = registerNativePush(override, other, accounts);
+  await vi.waitFor(() => {
+    expect(mocks.register).toHaveBeenCalledTimes(1);
+  });
+  const logout = unregisterNativePush(session);
+  pending.reject(timedOut);
+  await expect(registration).rejects.toBe(timedOut);
+  await logout;
+
+  expect(mocks.unregister).toHaveBeenCalledWith(session);
+  await vi.advanceTimersByTimeAsync(15_000);
+  expect(mocks.register).toHaveBeenCalledTimes(2);
+  expect(mocks.register.mock.lastCall?.[0]).toMatchObject({
+    userId: other.user_id,
+    deviceId: other.device_id,
+    accounts: [{ userId: other.user_id, deviceId: other.device_id }],
+  });
+});
+
+test('logging out the failing account cancels only its retry', async () => {
+  vi.useFakeTimers();
+  mocks.register.mockRejectedValueOnce(timedOut);
+
+  await expect(registerNativePush(override, session, accounts)).rejects.toBe(timedOut);
+  await unregisterNativePush(session);
+  await vi.advanceTimersByTimeAsync(3_600_000);
+
+  expect(mocks.unregister).toHaveBeenCalledWith(session);
+  expect(mocks.register).toHaveBeenCalledTimes(1);
+});
+
+test('logging out another device of the same user preserves the active device retry', async () => {
+  vi.useFakeTimers();
+  mocks.register.mockRejectedValueOnce(timedOut);
+
+  await expect(registerNativePush(override, session, accounts)).rejects.toBe(timedOut);
+  await unregisterNativePush({ user_id: session.user_id, device_id: 'PREVIOUS' });
+  await vi.advanceTimersByTimeAsync(15_000);
+
+  expect(mocks.register).toHaveBeenCalledTimes(2);
+  expect(mocks.register.mock.lastCall?.[0].deviceId).toBe(session.device_id);
 });

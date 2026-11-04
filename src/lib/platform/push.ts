@@ -1,6 +1,9 @@
 import { isTauri, invoke } from '@tauri-apps/api/core';
+import type { SessionInfo } from '#src/generated/protocol';
 
 import { deliversNativePush } from './notifications.js';
+
+export type NativePushAccount = Pick<SessionInfo, 'user_id' | 'device_id'>;
 
 export interface NativePushConfig {
   gatewayUrl: string;
@@ -43,10 +46,13 @@ export async function registerNativePushConfig(config: NativePushConfig): Promis
   });
 }
 
-export async function unregisterNativePushConfig(): Promise<void> {
+export async function unregisterNativePushConfig(account?: NativePushAccount): Promise<void> {
   if (!deliversNativePush()) return;
 
-  await invoke('unregister_push');
+  await invoke(
+    'unregister_push',
+    account ? { userId: account.user_id, deviceId: account.device_id } : undefined
+  );
 }
 
 export async function supportsPushDistributors(): Promise<boolean> {

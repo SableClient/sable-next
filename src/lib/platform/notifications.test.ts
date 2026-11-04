@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({ isTauri: vi.fn(), osType: vi.fn(), invoke: vi.
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: mocks.isTauri, invoke: mocks.invoke }));
 vi.mock('@tauri-apps/plugin-os', () => ({ type: mocks.osType }));
 
-import { listPushDistributors, registerNativePushConfig } from './push';
+import { listPushDistributors, registerNativePushConfig, unregisterNativePushConfig } from './push';
 
 import { deliversNativePush, deliversWebPush, presentsInApp, pushPlatform } from './notifications';
 
@@ -116,4 +116,25 @@ test('forwards the built-in server and account through the native command', asyn
       accounts: [{ user_id: '@bob:example.org', device_id: 'OTHER' }],
     },
   });
+});
+
+test('unregisters only the supplied account and device', async () => {
+  mocks.isTauri.mockReturnValue(true);
+  mocks.osType.mockReturnValue('android');
+
+  await unregisterNativePushConfig({ user_id: '@alice:example.org', device_id: 'DEVICE' });
+
+  expect(mocks.invoke).toHaveBeenLastCalledWith('unregister_push', {
+    userId: '@alice:example.org',
+    deviceId: 'DEVICE',
+  });
+});
+
+test('unregisters all accounts only when no account is supplied', async () => {
+  mocks.isTauri.mockReturnValue(true);
+  mocks.osType.mockReturnValue('android');
+
+  await unregisterNativePushConfig();
+
+  expect(mocks.invoke).toHaveBeenLastCalledWith('unregister_push', undefined);
 });

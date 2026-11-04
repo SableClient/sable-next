@@ -12,8 +12,12 @@ use tauri::{AppHandle, Runtime};
 #[serde(tag = "operation", rename_all = "snake_case")]
 pub(crate) enum BackgroundPush {
     Rotate {
-        user_id: String,
-        device_id: String,
+        #[serde(default)]
+        user_id: Option<String>,
+        #[serde(default)]
+        device_id: Option<String>,
+        #[serde(default)]
+        instance: Option<String>,
         endpoint: String,
         p256dh: Option<String>,
         auth: Option<String>,
@@ -54,23 +58,34 @@ pub(crate) async fn maintain_background_push(
         BackgroundPush::Rotate {
             user_id,
             device_id,
+            instance,
             endpoint,
             p256dh,
             auth,
         } => {
-            let known = pushers
-                .iter()
-                .any(|pusher| pusher.user_id == user_id && pusher.device_id == device_id);
-            if !known || !is_unified_push_endpoint(&endpoint) {
+            if !is_unified_push_endpoint(&endpoint) {
                 return Err(RpcError::Unavailable);
             }
             let registration = Registration {
                 token: endpoint,
                 p256dh,
                 auth,
+                instance: instance.clone(),
             };
-            for pusher in pushers {
-                rotate_pusher(root, &pusher, &registration).await?;
+            let affected: Vec<_> = pushers
+                .iter()
+                .filter(|pusher| {
+                    pusher.accepts_rotation(
+                        instance.as_deref(),
+                        user_id.as_deref().zip(device_id.as_deref()),
+                    )
+                })
+                .collect();
+            if affected.is_empty() {
+                return Err(RpcError::Unavailable);
+            }
+            for pusher in affected {
+                rotate_pusher(root, pusher, &registration).await?;
             }
             Ok(())
         }
@@ -111,7 +126,7 @@ async fn rotate_pusher(
                         device_display_name: "Sable on Android".into(),
                         web_push: web_push.clone(),
                         event_id_only: pusher.event_id_only,
-                        append: false,
+                        append: true,
                     },
                 )
             })
@@ -137,6 +152,7 @@ async fn rotate_pusher(
         app_id,
         pusher.gateway.clone(),
         pusher.event_id_only,
+        pusher.instance.clone(),
     )?;
     retire_old_pushers(root, &identity).await;
     Ok(())

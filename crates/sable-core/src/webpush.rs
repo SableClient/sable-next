@@ -129,7 +129,7 @@ fn pusher_body(
             format: pusher.event_id_only.then_some(PushFormat::EventIdOnly),
             default_payload: user_id.map(|user_id| DefaultPayloadOut { user_id }),
         },
-        append: false,
+        append: true,
     })
 }
 
@@ -391,7 +391,7 @@ mod tests {
                     "format": "event_id_only",
                     "default_payload": { "user_id": "@alice:example.org" },
                 },
-                "append": false,
+                "append": true,
             })
         );
     }

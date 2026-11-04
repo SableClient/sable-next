@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   activeServiceWorker: vi.fn<() => Promise<unknown>>(),
   runtimeConfig: vi.fn<() => Promise<{ push: unknown }>>(),
   expectPushActivation: vi.fn<(userId: string) => Promise<void>>(),
+  forgetPushSession: vi.fn<(userId: string) => Promise<void>>(),
+  unregisterNativePush: vi.fn(),
 }));
 
 vi.mock('#lib/platform/notifications.js', () => ({
@@ -23,8 +25,9 @@ vi.mock('#lib/config/runtime-config.js', async (importOriginal) => ({
 }));
 vi.mock('#lib/notifications/room-names.js', () => ({
   expectPushActivation: mocks.expectPushActivation,
-  forgetPushSession: vi.fn(),
+  forgetPushSession: mocks.forgetPushSession,
 }));
+vi.mock('./native-push', () => ({ unregisterNativePush: mocks.unregisterNativePush }));
 vi.mock('#lib/settings/preferences.svelte.js', () => ({
   preferences: { richPushPayloads: true },
 }));
@@ -32,6 +35,7 @@ vi.mock('#lib/settings/preferences.svelte.js', () => ({
 import {
   applicationServerKeyMatches,
   currentPushKey,
+  logoutWithPush,
   needsRegistering,
   pusherDisplayName,
   registrationMarker,
@@ -194,6 +198,41 @@ test('a web push capability has the homeserver deliver, not the gateway', async 
     pusher: expect.objectContaining({ pushkey: 'keys-p256dh', app_id: WEBPUSH_APP_ID }) as unknown,
   });
   expect(commandsOf.setPusher).not.toHaveBeenCalled();
+});
+
+test('logout unregisters only the current native account before ending its session', async () => {
+  mocks.deliversWebPush.mockReturnValue(false);
+  const logout = vi.fn().mockResolvedValue(undefined);
+  const session = client.session;
+  const signedIn = Object.assign(client, {
+    accounts: [session, { user_id: '@other:example.org', device_id: 'OTHER' }],
+    logout,
+  });
+
+  await logoutWithPush(signedIn, NONE);
+
+  expect(mocks.unregisterNativePush).toHaveBeenCalledWith(session);
+  expect(mocks.forgetPushSession).toHaveBeenCalledWith('@me:example.org');
+  expect(mocks.unregisterNativePush.mock.invocationCallOrder[0]).toBeLessThan(
+    logout.mock.invocationCallOrder[0]
+  );
+  expect(logout).toHaveBeenCalledOnce();
+});
+
+test('logout without a current session never unregisters every native account', async () => {
+  mocks.deliversWebPush.mockReturnValue(false);
+  const logout = vi.fn().mockResolvedValue(undefined);
+  const signedOut = Object.assign(client, {
+    session: null,
+    accounts: [{ user_id: '@other:example.org', device_id: 'OTHER' }],
+    logout,
+  });
+
+  await logoutWithPush(signedOut, NONE);
+
+  expect(mocks.unregisterNativePush).not.toHaveBeenCalled();
+  expect(mocks.forgetPushSession).not.toHaveBeenCalled();
+  expect(logout).toHaveBeenCalledOnce();
 });
 
 test('the account is noted before the homeserver sends its validation push', async () => {
