@@ -40,6 +40,26 @@ test('a shortcut not allowed in editable fields stays out of the composer', () =
   expect(handler).not.toHaveBeenCalled();
 });
 
+test.each([
+  ['ArrowUp', 'navigation.cyclePreviousUnread'],
+  ['ArrowDown', 'navigation.cycleNextUnread'],
+] as const)('alt+shift+%s switches unread rooms from inside the composer', (key, id) => {
+  const handler = vi.fn();
+  const previousRoom = vi.fn();
+  const nextRoom = vi.fn();
+  cleanup = registerGlobalShortcuts({
+    [id]: handler,
+    'navigation.previousRoom': previousRoom,
+    'navigation.nextRoom': nextRoom,
+  });
+
+  pressInEditor(key, { altKey: true, shiftKey: true });
+
+  expect(handler).toHaveBeenCalledOnce();
+  expect(previousRoom).not.toHaveBeenCalled();
+  expect(nextRoom).not.toHaveBeenCalled();
+});
+
 test('a shortcut does nothing while a dialog is open', () => {
   const handler = vi.fn();
   cleanup = registerGlobalShortcuts({ 'navigation.nextRoom': handler });

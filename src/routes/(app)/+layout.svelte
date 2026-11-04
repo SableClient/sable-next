@@ -142,7 +142,7 @@
   import { registerGlobalShortcuts } from '#lib/ui/shortcuts/global-shortcuts.js';
   import { registerDesktopCallShortcuts } from '#lib/features/call/desktop-shortcuts.svelte.js';
   import { paletteState, shortcutsHelpState } from '#lib/ui/shortcuts/palette-state.svelte.js';
-  import { unreadRoomsByPriority } from '#lib/ui/shortcuts/room-jump.js';
+  import { unreadRoomAtOffset, unreadRoomsByPriority } from '#lib/ui/shortcuts/room-jump.js';
   import { markRoomsRead } from '#lib/features/sidebar/nav-rooms.js';
   import { hasUnread } from '#lib/rooms/unread.js';
   import { roomAtOffset } from '#lib/features/sidebar/visible-rooms.svelte.js';
@@ -1075,8 +1075,6 @@
 
   trackRouteFocus();
 
-  let unreadCycleIndex = 0;
-
   function jumpToRoom(roomId: string): void {
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath() resolves the route itself
     void goto(roomSectionPath(roomList.rooms, roomId));
@@ -1159,14 +1157,10 @@
         const unread = unreadRoomsByPriority(roomList.rooms, openRoomId, roomList.unreadFor);
         const target = unread[0];
         if (!target) return;
-        unreadCycleIndex = 0;
         jumpToRoom(target.room_id);
       },
       'navigation.cycleNextUnread': () => {
-        const unread = unreadRoomsByPriority(roomList.rooms, null, roomList.unreadFor);
-        if (unread.length === 0) return;
-        unreadCycleIndex = (unreadCycleIndex + 1) % unread.length;
-        const target = unread[unreadCycleIndex];
+        const target = unreadRoomAtOffset(roomList.rooms, openRoomId, 1, roomList.unreadFor);
         if (target) jumpToRoom(target.room_id);
       },
       'navigation.focusComposer': () => {
@@ -1188,10 +1182,7 @@
         cycleRegion(-1);
       },
       'navigation.cyclePreviousUnread': () => {
-        const unread = unreadRoomsByPriority(roomList.rooms, null, roomList.unreadFor);
-        if (unread.length === 0) return;
-        unreadCycleIndex = (unreadCycleIndex - 1 + unread.length) % unread.length;
-        const target = unread[unreadCycleIndex];
+        const target = unreadRoomAtOffset(roomList.rooms, openRoomId, -1, roomList.unreadFor);
         if (target) jumpToRoom(target.room_id);
       },
     });

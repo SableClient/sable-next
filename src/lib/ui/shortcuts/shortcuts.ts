@@ -135,12 +135,14 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     labelKey: 'shortcuts.cycleNextUnread',
     category: 'navigation',
     binding: 'alt+shift+down',
+    allowInEditable: true,
   },
   {
     id: 'navigation.cyclePreviousUnread',
     labelKey: 'shortcuts.cyclePreviousUnread',
     category: 'navigation',
     binding: 'alt+shift+up',
+    allowInEditable: true,
   },
   {
     id: 'navigation.focusComposer',

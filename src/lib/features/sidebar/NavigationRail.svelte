@@ -846,7 +846,7 @@
 
 <nav
   class="rail"
-  aria-label={i18n.t('nav.spaces')}
+  aria-label={i18n.t('nav.navigation')}
   oncontextmenu={mouseContextMenu(openDisplayMenu)}
 >
   <div
@@ -854,7 +854,7 @@
     role="tree"
     data-focus-region="spaces"
     aria-orientation="vertical"
-    aria-label={i18n.t('nav.spaces')}
+    aria-label={i18n.t('nav.navigation')}
     {@attach mobile ? noAttachment : monitor}
     {@attach rovingFocus({ tree: true })}
   >

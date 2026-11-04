@@ -16,8 +16,8 @@ test.describe('signed in as the shared account', () => {
       - link "Skip to main content"
       - complementary:
         - navigation "Primary navigation":
-          - navigation "Spaces":
-            - tree "Spaces"
+          - navigation "Navigation":
+            - tree "Navigation"
           - region "Rooms":
             - tree "Rooms":
               - treeitem "Rooms" [expanded]

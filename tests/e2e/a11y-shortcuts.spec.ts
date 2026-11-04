@@ -73,11 +73,11 @@ test('F6 and Shift+F6 cycle the regions and wrap', async ({ app, page }) => {
   await expect(app.composer).toBeFocused();
 });
 
-test('clicking a room in the list keeps focus in the list', async ({ app, homeserver, page }) => {
+test('clicking a room in the list focuses its message field', async ({ app, homeserver, page }) => {
   const room = app.roomLink('Timeline fixture');
   await room.click();
   await expect(page).toHaveURL(new RegExp(encodeURIComponent(homeserver.timelineRoomId)));
-  await expect(room).toBeFocused();
+  await expect(app.composer).toBeFocused();
 });
 
 test('opening a room from the command palette focuses its heading', async ({

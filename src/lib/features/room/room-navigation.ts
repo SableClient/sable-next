@@ -8,6 +8,7 @@ import type { RoomListItemView } from '#src/generated/protocol';
 import { findRoomByPathId, roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
 import { isEditableTarget } from '#lib/ui/shortcuts/binding.js';
 import { matchesAppLayout } from '#lib/ui/app-layout.svelte.js';
+import { focusRegion } from '#lib/ui/shortcuts/focus-regions.js';
 
 let enteredFrom: string | null = null;
 
@@ -74,13 +75,37 @@ const HEADING_ATTEMPTS = 10;
 
 export function trackRouteFocus(): void {
   let origin: Element | null = null;
+  let composerObserver: MutationObserver | undefined;
   beforeNavigate(() => {
+    composerObserver?.disconnect();
     origin = document.activeElement;
   });
   afterNavigate((navigation) => {
     const from = origin;
     origin = null;
     if (from?.isConnected && from.closest(TREE_REGIONS)) {
+      if (navigation.to && ROOM_PATH.test(navigation.to.url.pathname) && matchesAppLayout()) {
+        const focusComposer = () => {
+          if (
+            (document.activeElement !== document.body && document.activeElement !== from) ||
+            focusRegion('composer')
+          ) {
+            composerObserver?.disconnect();
+            return true;
+          }
+          return false;
+        };
+        if (!focusComposer()) {
+          composerObserver = new MutationObserver(focusComposer);
+          composerObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['contenteditable'],
+          });
+        }
+        return;
+      }
       if (document.activeElement === document.body && from instanceof HTMLElement) from.focus();
       return;
     }

@@ -1,5 +1,5 @@
 import type { RoomListItemView } from '#src/generated/protocol';
-import { type RoomUnread, roomUnread } from '#lib/rooms/unread.js';
+import { hasUnread, type RoomUnread, roomUnread } from '#lib/rooms/unread.js';
 
 import { fuzzyFilter } from './fuzzy.js';
 
@@ -68,4 +68,26 @@ export function unreadRoomsByPriority(
     .filter(({ room, counts }) => counts.unread > 0 && room.room_id !== excludeRoomId)
     .sort((a, b) => b.counts.highlight - a.counts.highlight || b.counts.unread - a.counts.unread)
     .map(({ room }) => room);
+}
+
+export function unreadRoomAtOffset(
+  rooms: readonly RoomListItemView[],
+  currentRoomId: string | null,
+  direction: 1 | -1,
+  unreadFor: RoomUnread = roomUnread
+): RoomListItemView | null {
+  const current = rooms.findIndex((room) => room.room_id === currentRoomId);
+  const start = current === -1 && direction === -1 ? rooms.length : current;
+  for (let step = 1; step <= rooms.length; step += 1) {
+    const room = rooms[(start + direction * step + rooms.length) % rooms.length];
+    if (
+      room.room_id !== currentRoomId &&
+      room.state === 'joined' &&
+      room.room_kind !== 'space' &&
+      hasUnread(unreadFor(room))
+    ) {
+      return room;
+    }
+  }
+  return null;
 }

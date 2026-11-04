@@ -863,7 +863,8 @@ test('the rail is a navigation landmark holding one tree with a single tab stop'
   });
   await tick();
 
-  const tree = within(screen.getByRole('navigation', { name: 'nav.spaces' })).getByRole('tree');
+  const navigation = screen.getByRole('navigation', { name: 'nav.navigation' });
+  const tree = within(navigation).getByRole('tree', { name: 'nav.navigation' });
   const stops = within(tree)
     .getAllByRole('treeitem')
     .filter((item) => item.tabIndex === 0);

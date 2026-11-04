@@ -43,6 +43,7 @@ export default defineConfig({
     'space-search-navigation.spec.ts',
     'space-back-navigation.spec.ts',
     'space-timeline-navigation.spec.ts',
+    'room-navigation.spec.ts',
     'verification-qr.spec.ts',
     'onboarding.spec.ts',
   ],
