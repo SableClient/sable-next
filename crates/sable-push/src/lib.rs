@@ -1,8 +1,10 @@
 //! Bounded, UI-independent notification decryption for the iOS service extension.
 
+use std::cell::Cell;
 use std::ffi::{CStr, CString, c_char};
 use std::ops::ControlFlow;
 use std::path::Path;
+use std::time::Duration;
 
 use sable_core::notifications::{ColdPush, PushImage, PushMedia, PushSession, push_sender_name};
 use sable_core::protocol::{PushEventView, PushFetchView};
@@ -11,6 +13,24 @@ use sable_core::store::{FileSessionStore, SessionStore};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 use serde_with::{DefaultOnError, VecSkipError, serde_as};
+use tokio::time::Instant;
+
+const RENDER_TIMEOUT: Duration = Duration::from_secs(20);
+const OPTIONAL_TIMEOUT: Duration = Duration::from_secs(3);
+const FINISH_RESERVE: Duration = Duration::from_secs(1);
+
+async fn optional_work<T: Default>(
+    deadline: Instant,
+    operation: impl std::future::Future<Output = T>,
+) -> T {
+    let now = Instant::now();
+    if deadline <= now {
+        return T::default();
+    }
+    tokio::time::timeout_at(deadline.min(now + OPTIONAL_TIMEOUT), operation)
+        .await
+        .unwrap_or_default()
+}
 
 #[derive(Deserialize)]
 #[serde(default)]
@@ -490,6 +510,8 @@ async fn open_session(
     account: &Account,
     room_id: Option<&str>,
     payload: &Value,
+    optional_deadline: Instant,
+    stage: &Cell<&'static str>,
 ) -> (Option<PushSession>, Vec<String>) {
     let shown = shown_rooms(payload);
     let reconcile = shown
@@ -512,7 +534,10 @@ async fn open_session(
     };
     let read_rooms = match session.as_ref() {
         Some(session) if settings.clear_on_read => {
-            session.read_rooms(&reconcile).await.unwrap_or_default()
+            stage.set("read_rooms");
+            optional_work(optional_deadline, session.read_rooms(&reconcile))
+                .await
+                .unwrap_or_default()
         }
         _ => Vec::new(),
     };
@@ -599,6 +624,8 @@ struct Alert<'a> {
     event: Option<Value>,
     encrypted: bool,
     fetched_noisy: bool,
+    optional_deadline: Instant,
+    stage: &'a Cell<&'static str>,
 }
 
 impl Alert<'_> {
@@ -662,6 +689,7 @@ impl Alert<'_> {
             .sender
             .take()
             .filter(|sender| !sender.is_empty());
+        self.stage.set("sender_name");
         let sender = self.sender_name(sender_id.as_deref()).await;
         if let Some(ring) = self.ring_payload(&sender) {
             return finish(Rendered::Ring(RingPushOut {
@@ -687,17 +715,22 @@ impl Alert<'_> {
         let session = self.session.take();
         let active_elsewhere = match &session {
             Some(session) if !message.invite && current.quiet_when_active_elsewhere => {
-                Box::pin(session.active_elsewhere()).await
+                self.stage.set("active_elsewhere");
+                optional_work(self.optional_deadline, Box::pin(session.active_elsewhere())).await
             }
             _ => false,
         };
         let media = match (sender_id.as_deref(), &session) {
             (Some(sender), Some(session)) if !message.invite => {
-                Box::pin(session.media(
-                    Some(sender),
-                    self.target.sender_display_name.as_deref(),
-                    content,
-                ))
+                self.stage.set("media");
+                optional_work(
+                    self.optional_deadline,
+                    Box::pin(session.media(
+                        Some(sender),
+                        self.target.sender_display_name.as_deref(),
+                        content,
+                    )),
+                )
                 .await
             }
             _ => PushMedia::default(),
@@ -709,6 +742,7 @@ impl Alert<'_> {
             id,
             device_id,
         } = self.account;
+        self.stage.set("check_account");
         if signed_in(self.root, &user).await != Some((id, device_id)) {
             return Flow::Break((None, None));
         }
@@ -744,20 +778,28 @@ impl Alert<'_> {
     }
 }
 
-async fn render(root: &Path, payload: &Value) -> Outcome {
+async fn render(root: &Path, payload: &Value, stage: &Cell<&'static str>) -> Outcome {
+    let optional_deadline = Instant::now() + RENDER_TIMEOUT - FINISH_RESERVE;
     let settings = policy(root);
     if !settings.enabled {
         return (None, None);
     }
     let (Flow::Break(outcome) | Flow::Continue(outcome)) =
-        render_enabled(root, payload, &settings).await;
+        render_enabled(root, payload, &settings, optional_deadline, stage).await;
     outcome
 }
 
-async fn render_enabled(root: &Path, payload: &Value, settings: &Policy) -> Flow<Outcome> {
+async fn render_enabled(
+    root: &Path,
+    payload: &Value,
+    settings: &Policy,
+    optional_deadline: Instant,
+    stage: &Cell<&'static str>,
+) -> Flow<Outcome> {
     let notification = notification(payload);
     let (target, user) = parse_target(payload, notification)?;
     let room_id = target.room_id.as_deref().filter(|room| !room.is_empty());
+    stage.set("account");
     let Some((account_id, device_id)) = signed_in(root, &user).await else {
         return stop(Issue::NoAccount);
     };
@@ -770,7 +812,17 @@ async fn render_enabled(root: &Path, payload: &Value, settings: &Policy) -> Flow
         id: account_id,
         device_id,
     };
-    let (session, read_rooms) = open_session(root, settings, &account, room_id, payload).await;
+    stage.set("open_session");
+    let (session, read_rooms) = open_session(
+        root,
+        settings,
+        &account,
+        room_id,
+        payload,
+        optional_deadline,
+        stage,
+    )
+    .await;
     let mut issue = session.is_none().then_some(Issue::NoSession);
     let Some(room_id) = room_id else {
         return if read_rooms.is_empty() {
@@ -782,6 +834,7 @@ async fn render_enabled(root: &Path, payload: &Value, settings: &Policy) -> Flow
             }))
         };
     };
+    stage.set("fetch_event");
     let fetched = fetch_event(session.as_ref(), &target, notification, &read_rooms).await?;
     if fetched.failed {
         issue = issue.or(Some(Issue::FetchFailed));
@@ -791,6 +844,7 @@ async fn render_enabled(root: &Path, payload: &Value, settings: &Policy) -> Flow
         return stop(Issue::Payload);
     };
     let ciphertext = target.kind.as_deref() == Some("m.room.encrypted");
+    stage.set("decrypt_event");
     let Ok(event) =
         decrypted_event(Box::pin(clear_event(session.as_ref(), notification, ciphertext)).await)
     else {
@@ -819,6 +873,8 @@ async fn render_enabled(root: &Path, payload: &Value, settings: &Policy) -> Flow
         event,
         encrypted,
         fetched_noisy: fetched.noisy,
+        optional_deadline,
+        stage,
     }
     .render()
     .await
@@ -873,21 +929,32 @@ pub unsafe extern "C" fn sable_push_render(
         else {
             return (None, Some(Issue::Runtime));
         };
+        let stage = Cell::new("start");
         runtime.block_on(async {
             sable_core::notifications::settle_refreshes(Box::pin(tokio::time::timeout(
-                std::time::Duration::from_secs(20),
-                render(Path::new(root), &payload),
+                RENDER_TIMEOUT,
+                render(Path::new(root), &payload, &stage),
             )))
             .await
-            .unwrap_or((None, Some(Issue::Timeout)))
+            .unwrap_or_else(|_| (None, Some(Issue::Timeout(stage.get()))))
         })
     });
     let (rendered, issue) = rendered.unwrap_or((None, Some(Issue::Panic)));
     if let Some(issue) = issue {
         report(Path::new(root), issue);
     }
-    rendered
-        .and_then(|rendered| CString::new(serde_json::to_string(&rendered).ok()?).ok())
+    let response = rendered
+        .and_then(|rendered| serde_json::to_value(rendered).ok())
+        .or_else(|| {
+            issue.map(|issue| match issue {
+                Issue::Timeout(stage) => {
+                    serde_json::json!({"issue": issue.as_str(), "stage": stage})
+                }
+                issue => serde_json::json!({"issue": issue.as_str()}),
+            })
+        });
+    response
+        .and_then(|response| CString::new(response.to_string()).ok())
         .map_or(std::ptr::null_mut(), CString::into_raw)
 }
 
@@ -899,7 +966,7 @@ enum Issue {
     FetchFailed,
     Undecryptable,
     Runtime,
-    Timeout,
+    Timeout(&'static str),
     Panic,
     Keychain,
     Expired,
@@ -914,7 +981,7 @@ impl Issue {
             Self::FetchFailed => "fetch_failed",
             Self::Undecryptable => "undecryptable",
             Self::Runtime => "runtime",
-            Self::Timeout => "timeout",
+            Self::Timeout(_) => "timeout",
             Self::Panic => "panic",
             Self::Keychain => "keychain",
             Self::Expired => "expired",
@@ -976,9 +1043,19 @@ fn report(root: &Path, issue: Issue) {
     options.environment = reporting.environment.map(Into::into);
     options.release = reporting.release.map(Into::into);
     let _guard = sentry::init(options);
+    let stage = if let Issue::Timeout(stage) = issue {
+        Some(stage)
+    } else {
+        None
+    };
     let issue = issue.as_str();
     sentry::with_scope(
-        |scope| scope.set_tag("push.issue", issue),
+        |scope| {
+            scope.set_tag("push.issue", issue);
+            if let Some(stage) = stage {
+                scope.set_tag("push.stage", stage);
+            }
+        },
         || sentry::capture_message(&format!("iOS push: {issue}"), sentry::Level::Warning),
     );
 }
@@ -1001,8 +1078,51 @@ mod tests {
     use super::*;
 
     async fn rendered(root: &Path, payload: &Value) -> Option<Value> {
-        let rendered = render(root, payload).await.0;
+        let rendered = render(root, payload, &Cell::new("start")).await.0;
         rendered.map(|rendered| serde_json::to_value(rendered).unwrap())
+    }
+
+    #[tokio::test]
+    async fn optional_work_times_out() {
+        let media: PushMedia = tokio::time::timeout(
+            Duration::from_secs(1),
+            optional_work(
+                Instant::now() + Duration::from_millis(20),
+                std::future::pending(),
+            ),
+        )
+        .await
+        .unwrap();
+        assert!(media.sender.is_none());
+        assert!(media.image.is_none());
+    }
+
+    #[tokio::test]
+    async fn optional_work_skips_expired_deadlines() {
+        let mut started = false;
+        let media = optional_work(Instant::now(), async {
+            started = true;
+            PushMedia::default()
+        })
+        .await;
+        assert!(!started);
+        assert!(media.image.is_none());
+    }
+
+    #[test]
+    #[expect(unsafe_code, reason = "tests the extension C ABI with owned C strings")]
+    fn render_failure_returns_only_diagnostics() {
+        let root = CString::new("/unused").unwrap();
+        let payload = CString::new("invalid json").unwrap();
+        // SAFETY: both arguments are valid C strings for the duration of the call.
+        let response = unsafe { sable_push_render(root.as_ptr(), payload.as_ptr()) };
+        assert!(!response.is_null());
+        // SAFETY: the returned string remains valid until it is freed below.
+        let value: Value =
+            serde_json::from_str(unsafe { CStr::from_ptr(response) }.to_str().unwrap()).unwrap();
+        // SAFETY: the pointer was returned by sable_push_render and has not been freed.
+        unsafe { sable_push_free(response) };
+        assert_eq!(value, json!({"issue": "payload"}));
     }
 
     #[test]
@@ -1244,13 +1364,13 @@ mod tests {
             "event_id": "$e", "unread_count": 1
         });
         assert!(matches!(
-            render(&root, &sygnal_event_id_only).await,
+            render(&root, &sygnal_event_id_only, &Cell::new("start")).await,
             (None, None)
         ));
 
         std::fs::write(root.join("push-policy.json"), r#"{"enabled":true}"#).unwrap();
         assert!(matches!(
-            render(&root, &sygnal_event_id_only).await,
+            render(&root, &sygnal_event_id_only, &Cell::new("start")).await,
             (None, Some(Issue::NoAccount))
         ));
 
@@ -1264,7 +1384,7 @@ mod tests {
             .save(registry.to_string().into_bytes())
             .await
             .unwrap();
-        let (alert, issue) = render(&root, &sygnal_event_id_only).await;
+        let (alert, issue) = render(&root, &sygnal_event_id_only, &Cell::new("start")).await;
         assert_eq!(
             serde_json::to_value(alert.unwrap()).unwrap()["body"],
             json!("New message")
@@ -1467,7 +1587,7 @@ mod tests {
     async fn rendered_outcomes_keep_the_native_wire_format() {
         let root = shape_root("wire").await;
         let render_wire = async |payload: Value| {
-            let (value, issue) = render(&root, &payload).await;
+            let (value, issue) = render(&root, &payload, &Cell::new("start")).await;
             (
                 value.map(|value| serde_json::to_string(&value).unwrap()),
                 issue.map(Issue::as_str),
@@ -1636,7 +1756,7 @@ mod tests {
             (Issue::FetchFailed, "fetch_failed"),
             (Issue::Undecryptable, "undecryptable"),
             (Issue::Runtime, "runtime"),
-            (Issue::Timeout, "timeout"),
+            (Issue::Timeout("fetch_event"), "timeout"),
             (Issue::Panic, "panic"),
             (Issue::Keychain, "keychain"),
             (Issue::Expired, "expired"),

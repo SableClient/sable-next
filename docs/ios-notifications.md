@@ -64,6 +64,9 @@ shown, unless the server pushes every encrypted event (MSC4028).
 Logs use the `os_log` subsystem `moe.sable.app.notifications`. With error reporting
 on, the app writes `sentry.json` to the shared folder and the extension reports
 generic fallbacks to Sentry.
+Timeouts log the failed stage and set Sentry's `push.stage` tag. Read-status checks,
+activity checks and media downloads stop after three seconds or when one second
+remains to deliver the text.
 
 Messages group and clear by recipient/room. Duplicate checks also match event ID;
 replacements are silent. Cross-process deduplication is not atomic.

@@ -88,6 +88,12 @@ final class NotificationService: UNNotificationServiceExtension {
                     self?.finish(content)
                     return
                 }
+                if let issue = rendered["issue"] as? String {
+                    let stage = rendered["stage"] as? String ?? "unknown"
+                    Self.log.error("render failed: \(issue, privacy: .public), stage: \(stage, privacy: .public)")
+                    self?.finish(content)
+                    return
+                }
                 if let rooms = rendered["read_rooms"] as? [String],
                    let user = rendered["user_id"] as? String {
                     self?.clearReadRooms(rooms, user: user)
