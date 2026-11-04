@@ -21,6 +21,8 @@ const profile: ProfileView = {
   user_id: '@me:example.org',
   display_name: 'Me',
   avatar_url: null,
+  real_name: 'Me',
+  real_avatar_url: null,
   bio: null,
   hero_color: null,
   hero_brightness: null,

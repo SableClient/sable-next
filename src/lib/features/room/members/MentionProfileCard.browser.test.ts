@@ -41,6 +41,8 @@ const baseProfile: ProfileView = {
   user_id: '@alice:example.test',
   display_name: 'Alice',
   avatar_url: null,
+  real_name: 'Alice',
+  real_avatar_url: null,
   bio: 'Hello <a href="https://example.org">link</a> <code>code</code>',
   hero_color: null,
   hero_brightness: null,
