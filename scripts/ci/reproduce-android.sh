@@ -3,7 +3,8 @@
 # published one. Runs as root in a fresh ubuntu:noble, from the tag's checkout, and
 # builds as the runner user:
 #
-#   docker run --rm -v "$PWD:/shared/workdir/SableClient/sable-next" -w /shared/workdir/SableClient/sable-next \
+#   docker run --rm --platform linux/amd64 \
+#     -v "$PWD:/shared/workdir/SableClient/sable-next" -w /shared/workdir/SableClient/sable-next \
 #     ubuntu:noble@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac \
 #     scripts/ci/reproduce-android.sh 2.1.7
 set -euo pipefail

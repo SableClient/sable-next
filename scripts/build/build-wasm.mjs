@@ -98,11 +98,17 @@ async function bindgen(input, name, { optimize, features = [] }) {
 
     const debug = `${output}/debug/${name}_bg.debug.wasm`;
     mkdirSync(`${output}/debug`, { recursive: true });
+    // wasm-split defaults to a random ID.
+    const buildId = sha256(readFileSync(wasm))
+      .slice(0, 32)
+      .replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
     await run('sentry', [
       'wasm-split',
       wasm,
       '-d',
       debug,
+      '--build-id',
+      buildId,
       '--strip',
       ...(keepNames ? [] : ['--strip-names']),
     ]);

@@ -649,7 +649,8 @@ jobs:
       - distribute-homebrew
       - distribute-playstore
     if: ${{ !cancelled() && needs.android.result == 'success' && needs.setup-release.outputs.nightly != 'true' }}
-    runs-on: docker
+    # The pinned image is amd64.
+    runs-on: ubuntu-latest
     container:
       image: ubuntu:noble@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
     timeout-minutes: 150

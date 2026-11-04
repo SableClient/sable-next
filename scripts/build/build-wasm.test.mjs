@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
@@ -107,7 +107,7 @@ if (command === 'wasm-opt') {
   }
 );
 
-test('release builds split function names into a debug file and ship only the build id', async () => {
+test('release WASM and debug symbols are reproducible', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'sable-wasm-symbols-'));
   const bin = join(directory, 'bin');
   const output = join(directory, 'wasm');
@@ -161,8 +161,8 @@ if (command === 'sentry') {
     for (const name of ['rustc', 'cargo', 'wasm-bindgen', 'wasm-opt', 'sentry']) {
       await writeFile(join(bin, name), mock, { mode: 0o755 });
     }
-    const result = await new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, [builder.pathname, '--release'], {
+    const build = () =>
+      spawnSync(process.execPath, [builder.pathname, '--release'], {
         cwd: directory,
         env: {
           ...process.env,
@@ -173,15 +173,10 @@ if (command === 'sentry') {
           SENTRY_CONFIG_DIR: join(directory, 'sentry'),
         },
         stdio: ['ignore', 'ignore', 'pipe'],
+        encoding: 'utf8',
       });
-      let stderr = '';
-      child.stderr.on('data', (chunk) => {
-        stderr += chunk;
-      });
-      child.once('error', reject);
-      child.once('close', (code) => resolve({ code, stderr }));
-    });
-    assert.equal(result.code, 0, result.stderr);
+    const result = build();
+    assert.equal(result.status, 0, result.stderr);
     for (const name of ['sable_wasm', 'sable_model']) {
       const shipped = new WebAssembly.Module(await readFile(join(output, `${name}_bg.wasm`)));
       const debug = new WebAssembly.Module(
@@ -205,17 +200,6 @@ if (command === 'sentry') {
     );
     assert.equal(optimizations.length, 2);
     assert.ok(optimizations.every((call) => call.args.includes('-g')));
-    assert.deepEqual(
-      calls.filter((call) => call.command === 'sentry').map((call) => call.args),
-      ['sable_wasm', 'sable_model'].map((name) => [
-        'wasm-split',
-        join(output, `${name}_bg.wasm`),
-        '-d',
-        join(output, 'debug', `${name}_bg.debug.wasm`),
-        '--strip',
-        '--strip-names',
-      ])
-    );
     const { default: image } = await import(join(output, 'sable_wasm_build_id.js'));
     const shipped = new WebAssembly.Module(await readFile(join(output, 'sable_wasm_bg.wasm')));
     const codeId = Buffer.from(WebAssembly.Module.customSections(shipped, 'build_id')[0]).toString(
@@ -223,6 +207,19 @@ if (command === 'sentry') {
     );
     assert.equal(image.code_id, codeId);
     assert.equal(image.debug_id, `${codeId.slice(0, 32)}0`);
+
+    const artifacts = ['sable_wasm', 'sable_model'].flatMap((name) => [
+      `${name}_bg.wasm`,
+      `debug/${name}_bg.debug.wasm`,
+      `${name}_build_id.js`,
+    ]);
+    artifacts.push('sable_wasm_version.js');
+    const readArtifacts = () => Promise.all(artifacts.map((name) => readFile(join(output, name))));
+    const expected = await readArtifacts();
+    await rm(output, { recursive: true });
+    const rebuilt = build();
+    assert.equal(rebuilt.status, 0, rebuilt.stderr);
+    assert.deepEqual(await readArtifacts(), expected);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
