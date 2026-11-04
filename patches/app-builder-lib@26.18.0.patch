@@ -1,0 +1,13 @@
+diff --git a/out/targets/FpmTarget.js b/out/targets/FpmTarget.js
+index da2d687fc8d2c4a677a1271fd1cb9ddf6809d9bc..79b118536781b49bd3799fbb20ea66d35404bf85 100644
+--- a/out/targets/FpmTarget.js
++++ b/out/targets/FpmTarget.js
+@@ -149,7 +149,7 @@ class FpmTarget extends core_1.Target {
+         const args = [
+             "--architecture",
+             (0, builder_util_1.toLinuxArchString)(arch, target),
+-            "--after-install",
++            target === "rpm" ? "--rpm-posttrans" : "--after-install",
+             scripts.afterInstall,
+             "--after-remove",
+             scripts.afterRemove,
