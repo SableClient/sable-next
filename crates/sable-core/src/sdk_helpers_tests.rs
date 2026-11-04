@@ -3691,3 +3691,50 @@ async fn a_revoked_token_reads_as_logged_out() {
         .or_failed(&core, "webpusher_support");
     assert!(matches!(result, Err(RpcError::NotLoggedIn)));
 }
+
+#[tokio::test]
+async fn an_unchanged_room_row_is_rebuilt_without_reading_room_state() {
+    use matrix_sdk_test::{User, event_factory::EventFactory};
+
+    let server = MatrixMockServer::new().await;
+    let (client, reads) = crate::store_reads::counting_client(&server).await;
+    let room_id = room_id!("!group:example.org");
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
+    let first = matrix_sdk::ruma::mxc_uri!("mxc://example.org/first");
+    let second = matrix_sdk::ruma::mxc_uri!("mxc://example.org/second");
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_state_event(factory.room_avatar().url(first)),
+        )
+        .await;
+    let item = RoomListItem::from(client.get_room(room_id).unwrap());
+    let diffs = [VectorDiff::Set {
+        index: 0,
+        value: item.clone(),
+    }];
+    let mut cache = HashMap::new();
+    crate::view::enrich_room_batch(&diffs, &mut cache).await;
+    assert_eq!(cache[room_id].avatar_url.as_deref(), Some(first.as_str()));
+
+    reads.reset();
+    for _ in 0..10 {
+        crate::view::enrich_room_batch(&diffs, &mut cache).await;
+    }
+    assert_eq!(
+        reads.state(),
+        0,
+        "re-emitted rows reuse their resolved avatar"
+    );
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_state_event(factory.room_avatar().url(second)),
+        )
+        .await;
+    reads.reset();
+    crate::view::enrich_room_batch(&diffs, &mut cache).await;
+    assert_eq!(cache[room_id].avatar_url.as_deref(), Some(second.as_str()));
+    assert_eq!(reads.state(), 1, "a new avatar is resolved once");
+}

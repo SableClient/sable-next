@@ -14,7 +14,7 @@ use matrix_sdk::ruma::events::{
     AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
 };
 use matrix_sdk::ruma::push::Ruleset;
-use matrix_sdk::ruma::{EventId, OwnedRoomId, OwnedUserId, RoomId};
+use matrix_sdk::ruma::{EventId, OwnedMxcUri, OwnedRoomId, OwnedUserId, RoomId};
 use matrix_sdk_ui::{eyeball_im, room_list_service::RoomListItem};
 
 use crate::api::rooms::RoomKind;
@@ -40,6 +40,8 @@ pub struct RoomInfo {
     pub supports_knock_restricted: bool,
     pub canonical_alias: Option<String>,
     pub avatar_url: Option<String>,
+    /// `None` for direct rooms, whose avatar can change through a member.
+    pub avatar_source: Option<AvatarSource>,
     pub children: Vec<SpaceChildEdge>,
     /// The last read of `children` failed, so they are the previous ones.
     pub children_stale: bool,
@@ -392,6 +394,13 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
         futures_util::future::join(children, is_direct(room)).await;
     let (supports_knock, supports_restricted, supports_knock_restricted) =
         crate::rooms::join_rule_support(room);
+    let avatar_source = AvatarSource::of(room);
+    let avatar_url = match (previous, &avatar_source) {
+        (Some(previous), Some(source)) if previous.avatar_source.as_ref() == Some(source) => {
+            previous.avatar_url.clone()
+        }
+        _ => room_avatar_url(room).await,
+    };
 
     RoomInfo {
         room_kind,
@@ -401,7 +410,8 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
         supports_restricted,
         supports_knock_restricted,
         canonical_alias: room.canonical_alias().map(|alias| alias.to_string()),
-        avatar_url: room_avatar_url(room).await,
+        avatar_url,
+        avatar_source,
         children,
         children_stale,
         tags: room_tags(room),
@@ -410,6 +420,22 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
         } else {
             Vec::new()
         },
+    }
+}
+
+/// The in-memory inputs of `room_avatar_url`, which reads the store.
+#[derive(Clone, PartialEq, Eq)]
+pub struct AvatarSource {
+    avatar_url: Option<OwnedMxcUri>,
+    state: matrix_sdk::RoomState,
+}
+
+impl AvatarSource {
+    fn of(room: &Room) -> Option<Self> {
+        room.direct_targets().is_empty().then(|| Self {
+            avatar_url: room.avatar_url(),
+            state: room.state(),
+        })
     }
 }
 
