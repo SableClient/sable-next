@@ -664,6 +664,8 @@ jobs:
       # Not actions/checkout: it needs Node, which the bare image lacks.
       - name: Check out the tag
         run: |
+          # The runner mounts the host's zoneinfo read-only, so tzdata cannot unpack there.
+          echo 'path-exclude=/usr/share/zoneinfo/*' > /etc/dpkg/dpkg.cfg.d/runner-zoneinfo
           apt-get update
           apt-get install -y --no-install-recommends ca-certificates git
           git init -q /shared/workdir/SableClient/sable-next
