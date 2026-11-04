@@ -36,9 +36,7 @@ class AuthBrowser(private val activity: Activity) {
     this.sheet = sheet
     val packageName = CustomTabsClient.getPackageName(activity, null)
     if (packageName == null) {
-      pending = null
-      close()
-      complete(Result.failure(IllegalStateException("No in-app browser is available")))
+      launch(uri, null, null)
       return
     }
 
