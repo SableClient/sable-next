@@ -19,10 +19,10 @@ export function reactionShortcode(
   if (!isCustomReaction(key)) return null;
 
   const sentName = sent.get(key);
-  if (sentName !== undefined) return `${sentName}`;
+  if (sentName !== undefined) return `:${sentName}:`;
 
   for (const pack of imagePacks)
-    for (const image of pack.images) if (image.url === key) return `:${image.shortcode}`;
+    for (const image of pack.images) if (image.url === key) return `:${image.shortcode}:`;
 
   return null;
 }
