@@ -17,6 +17,10 @@ typegen = ["dep:specta", "dep:specta-serde", "dep:specta-typescript", "sable-mod
 name = "generate-types"
 required-features = ["typegen"]
 
+[[bench]]
+name = "room_list"
+harness = false
+
 [dependencies]
 sable-model = { path = "../sable-model", version = "0.1.0" }
 matrix-sdk = { workspace = true, features = ["qrcode", "unstable-msc4388"] }
@@ -127,6 +131,7 @@ web-sys = { version = "0.3", features = [
 getrandom = { version = "0.4", features = ["wasm_js"] }
 
 [dev-dependencies]
+criterion = { version = "0.8.2", default-features = false }
 matrix-sdk = { workspace = true, features = ["testing"] }
 matrix-sdk-test = { workspace = true }
 matrix-sdk-test-utils = { workspace = true }
