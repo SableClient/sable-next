@@ -598,6 +598,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       notices: false,
       invites: true,
       calls: true,
+      rtc_user: true,
+      rtc_room: true,
     };
     let masterMute: boolean | null = false;
     const mentionNotificationModes: MentionNotificationsView = {

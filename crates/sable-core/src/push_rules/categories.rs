@@ -1,14 +1,15 @@
 use matrix_sdk::ruma::push::{
-    Action, PredefinedContentRuleId, PredefinedOverrideRuleId, PredefinedUnderrideRuleId, RuleKind,
-    Ruleset, SoundTweakValue, Tweak,
+    Action, EventMatchConditionData, NewConditionalPushRule, NewPushRule, PredefinedContentRuleId,
+    PredefinedOverrideRuleId, PredefinedUnderrideRuleId, PushCondition, RuleKind, Ruleset,
+    SoundTweakValue, Tweak,
 };
 
 use matrix_sdk::ruma::UserId;
 
 use super::alignment::{
-    REACTION_TO_ME, RING_ONE_TO_ONE, RTC_INVITE_TYPES, RTC_SERVER_ROOM_RULES,
-    RTC_SERVER_USER_RULES, SUPPRESS_REACTIONS, is_rtc_rule, reaction_to_me,
+    REACTION_TO_ME, RTC_SERVER_ROOM_RULES, RTC_SERVER_USER_RULES, SUPPRESS_REACTIONS,
 };
+use super::related::related_condition;
 use super::{RuleWrite, level, notifies, plan_level, rule_notifies};
 use crate::errors::CoreError;
 use crate::protocol::{
@@ -128,24 +129,18 @@ fn event_rule(rules: &Ruleset, event: EventNotificationView) -> Option<(RuleKind
                 PredefinedOverrideRuleId::InviteForMe.as_str(),
             )]
         }
-        EventNotificationView::Calls => {
-            let mut candidates = vec![(
-                RuleKind::Underride,
-                PredefinedUnderrideRuleId::Call.as_str(),
-            )];
-            candidates.extend(
-                RTC_SERVER_USER_RULES
-                    .into_iter()
-                    .chain(RTC_SERVER_ROOM_RULES)
-                    .chain(
-                        RTC_INVITE_TYPES
-                            .into_iter()
-                            .flat_map(|(_, user, room)| [user, room]),
-                    )
-                    .map(|id| (RuleKind::Override, id)),
-            );
-            candidates
-        }
+        EventNotificationView::Calls => vec![(
+            RuleKind::Underride,
+            PredefinedUnderrideRuleId::Call.as_str(),
+        )],
+        EventNotificationView::RtcUser => RTC_SERVER_USER_RULES
+            .into_iter()
+            .map(|id| (RuleKind::Override, id))
+            .collect(),
+        EventNotificationView::RtcRoom => RTC_SERVER_ROOM_RULES
+            .into_iter()
+            .map(|id| (RuleKind::Override, id))
+            .collect(),
     };
     candidates
         .into_iter()
@@ -159,7 +154,9 @@ pub(super) fn event_actions(event: EventNotificationView) -> Vec<Action> {
             Action::Notify,
             Action::SetTweak(Tweak::Sound(SoundTweakValue::Default)),
         ],
-        EventNotificationView::Calls => vec![
+        EventNotificationView::Calls
+        | EventNotificationView::RtcUser
+        | EventNotificationView::RtcRoom => vec![
             Action::Notify,
             Action::SetTweak(Tweak::Sound("ring".into())),
         ],
@@ -168,6 +165,19 @@ pub(super) fn event_actions(event: EventNotificationView) -> Vec<Action> {
 }
 
 pub(super) fn event_notifies(rules: &Ruleset, event: EventNotificationView) -> Option<bool> {
+    let rtc_ids = match event {
+        EventNotificationView::RtcUser => Some(RTC_SERVER_USER_RULES),
+        EventNotificationView::RtcRoom => Some(RTC_SERVER_ROOM_RULES),
+        _ => None,
+    };
+    if let Some(ids) = rtc_ids {
+        return ids
+            .into_iter()
+            .filter_map(|id| rules.get(RuleKind::Override, id))
+            .fold(None, |state, rule| {
+                Some(state.unwrap_or(false) || rule_notifies(rule))
+            });
+    }
     if matches!(event, EventNotificationView::Reactions)
         && let Some(rule) = rules.get(RuleKind::Override, REACTION_TO_ME)
     {
@@ -186,6 +196,8 @@ pub fn event_notifications(rules: &Ruleset) -> EventNotificationsView {
         notices: event_notifies(rules, EventNotificationView::Notices),
         invites: event_notifies(rules, EventNotificationView::Invites),
         calls: event_notifies(rules, EventNotificationView::Calls),
+        rtc_user: event_notifies(rules, EventNotificationView::RtcUser),
+        rtc_room: event_notifies(rules, EventNotificationView::RtcRoom),
     }
 }
 
@@ -198,21 +210,24 @@ pub fn plan_event(
     enabled: bool,
     user_id: &UserId,
 ) -> Result<Vec<RuleWrite>, CoreError> {
-    let (kind, rule_id) =
-        event_rule(rules, event).ok_or("the server has no rule for this kind of event")?;
     if matches!(event, EventNotificationView::Reactions) {
-        let mut writes = vec![
-            RuleWrite::Actions {
-                kind: kind.clone(),
-                rule_id: rule_id.clone(),
-                actions: vec![],
-            },
-            RuleWrite::Enabled {
-                kind,
-                rule_id,
-                enabled: true,
-            },
-        ];
+        let mut writes = Vec::new();
+        if let Some((kind, rule_id)) = event_rule(rules, event) {
+            writes.extend([
+                RuleWrite::Actions {
+                    kind: kind.clone(),
+                    rule_id: rule_id.clone(),
+                    actions: vec![],
+                },
+                RuleWrite::Enabled {
+                    kind,
+                    rule_id,
+                    enabled: true,
+                },
+            ]);
+        } else if rules.get(RuleKind::Override, REACTION_TO_ME).is_none() {
+            return Err("the server has no rule for this kind of event".into());
+        }
         if enabled {
             writes.push(reaction_to_me(user_id));
         } else if rules.get(RuleKind::Override, REACTION_TO_ME).is_some() {
@@ -223,21 +238,21 @@ pub fn plan_event(
         }
         return Ok(writes);
     }
-    let mut targets = vec![(kind, rule_id)];
-    if matches!(event, EventNotificationView::Calls) {
-        for rule in rules
-            .override_
-            .iter()
-            .filter(|rule| is_rtc_rule(&rule.rule_id) || rule.rule_id == RING_ONE_TO_ONE)
-        {
-            if !targets
-                .iter()
-                .any(|(kind, id)| *kind == RuleKind::Override && *id == rule.rule_id)
-            {
-                targets.push((RuleKind::Override, rule.rule_id.clone()));
-            }
-        }
-    }
+    let (kind, rule_id) =
+        event_rule(rules, event).ok_or("the server has no rule for this kind of event")?;
+    let targets: Vec<_> = match event {
+        EventNotificationView::RtcUser => RTC_SERVER_USER_RULES
+            .into_iter()
+            .filter(|id| rules.get(RuleKind::Override, id).is_some())
+            .map(|id| (RuleKind::Override, id.to_owned()))
+            .collect(),
+        EventNotificationView::RtcRoom => RTC_SERVER_ROOM_RULES
+            .into_iter()
+            .filter(|id| rules.get(RuleKind::Override, id).is_some())
+            .map(|id| (RuleKind::Override, id.to_owned()))
+            .collect(),
+        _ => vec![(kind, rule_id)],
+    };
     Ok(targets
         .into_iter()
         .flat_map(|(kind, rule_id)| {
@@ -299,4 +314,18 @@ pub fn plan_membership(enabled: bool) -> Vec<RuleWrite> {
             enabled: true,
         },
     ]
+}
+
+pub(super) fn reaction_to_me(user_id: &UserId) -> RuleWrite {
+    RuleWrite::Put(NewPushRule::Override(NewConditionalPushRule::new(
+        REACTION_TO_ME.to_owned(),
+        vec![
+            PushCondition::EventMatch(EventMatchConditionData::new(
+                "type".to_owned(),
+                "m.reaction".to_owned(),
+            )),
+            related_condition("m.annotation", "sender", user_id.as_str()),
+        ],
+        vec![Action::Notify],
+    )))
 }

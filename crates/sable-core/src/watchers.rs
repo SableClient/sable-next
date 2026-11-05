@@ -87,7 +87,7 @@ impl Core {
             spawn(async move {
                 let mut failures = 0u32;
                 let mut running_since = None::<Instant>;
-                let rules_aligned = Arc::new(AtomicBool::new(false));
+                let rules_cleaned = Arc::new(AtomicBool::new(false));
                 let mut after_running = None;
                 loop {
                     let next = if matches!(states.get(), SyncState::Offline) {
@@ -121,16 +121,15 @@ impl Core {
                     core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(state)));
                     if running {
                         let core = core.clone();
-                        let rules_aligned = rules_aligned.clone();
+                        let rules_cleaned = rules_cleaned.clone();
                         after_running = Some(
                             spawn(
                                 async move {
                                     core.resubscribe_timeline_rooms().await;
                                     core.reconcile_memberships().await;
                                     core.fill_own_members().await;
-                                    if !rules_aligned.load(Ordering::SeqCst) {
-                                        core.align_notification_rules().await;
-                                        rules_aligned.store(true, Ordering::SeqCst);
+                                    if !rules_cleaned.load(Ordering::SeqCst) {
+                                        core.retry_rule_cleanup(generation, &rules_cleaned).await;
                                     }
                                 }
                                 .instrument(tracing::info_span!(

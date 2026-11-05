@@ -17,9 +17,7 @@ mod keywords;
 mod related;
 mod store;
 
-pub use alignment::plan_alignment;
-use alignment::{STICKER, STICKER_DIRECT};
-use categories::{event_actions, event_notifies};
+pub use alignment::plan_cleanup;
 pub use categories::{
     event_notifications, master_muted, mention_notifications, plan_event, plan_master,
     plan_membership, plan_mention, pushes_every_encrypted_event,
@@ -149,20 +147,11 @@ const fn message_rule(direct: bool) -> PredefinedUnderrideRuleId {
     }
 }
 
-const fn encrypted_rule(direct: bool) -> PredefinedUnderrideRuleId {
-    if direct {
-        PredefinedUnderrideRuleId::EncryptedRoomOneToOne
-    } else {
-        PredefinedUnderrideRuleId::Encrypted
-    }
-}
-
-const fn default_family(direct: bool) -> [&'static str; 7] {
+const fn default_family(direct: bool) -> [&'static str; 6] {
     if direct {
         [
             ".m.rule.room_one_to_one",
             ".m.rule.encrypted_room_one_to_one",
-            STICKER_DIRECT,
             ".m.rule.poll_start_one_to_one",
             ".m.rule.poll_end_one_to_one",
             ".org.matrix.msc3930.rule.poll_start_one_to_one",
@@ -172,7 +161,6 @@ const fn default_family(direct: bool) -> [&'static str; 7] {
         [
             ".m.rule.message",
             ".m.rule.encrypted",
-            STICKER,
             ".m.rule.poll_start",
             ".m.rule.poll_end",
             ".org.matrix.msc3930.rule.poll_start",
@@ -243,7 +231,6 @@ pub fn new_rule(
 
 #[must_use]
 pub fn plan_room_mode(
-    rules: &Ruleset,
     room_id: &RoomId,
     direct: bool,
     mode: Option<NotificationModeView>,
@@ -289,31 +276,12 @@ pub fn plan_room_mode(
         });
     }
 
-    let mut stale: Vec<(RuleKind, String)> = vec![
-        (RuleKind::Override, room_id.to_string()),
-        (RuleKind::Room, room_id.to_string()),
-    ];
-    stale.extend(
-        rules
-            .override_
-            .iter()
-            .filter(|rule| !rule.default && targets_room(&rule.conditions, room_id))
-            .map(|rule| (RuleKind::Override, rule.rule_id.clone())),
-    );
-    stale.extend(
-        rules
-            .underride
-            .iter()
-            .filter(|rule| !rule.default && targets_room(&rule.conditions, room_id))
-            .map(|rule| (RuleKind::Underride, rule.rule_id.clone())),
-    );
-    let mut seen = std::collections::HashSet::new();
-    for (kind, rule_id) in stale {
-        if kept.as_ref() == Some(&kind) && rule_id == room_id.as_str() {
-            continue;
-        }
-        if seen.insert((kind.to_string(), rule_id.clone())) {
-            writes.push(RuleWrite::Delete { kind, rule_id });
+    for kind in [RuleKind::Override, RuleKind::Room] {
+        if kept.as_ref() != Some(&kind) {
+            writes.push(RuleWrite::Delete {
+                kind,
+                rule_id: room_id.to_string(),
+            });
         }
     }
     writes

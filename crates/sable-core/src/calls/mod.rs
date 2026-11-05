@@ -18,8 +18,6 @@ mod invite_delivery_tests;
 #[cfg(test)]
 mod notify_sdk_tests;
 
-#[cfg(test)]
-pub(crate) use notify::NOTIFICATION_EVENT_TYPE;
 pub(crate) use notify::{is_call_event_type, is_call_membership_event_type};
 mod runtime;
 pub(crate) use runtime::State as CallRuntimeState;

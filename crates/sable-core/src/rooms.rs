@@ -1,4 +1,7 @@
-use std::collections::BTreeSet;
+use std::{
+    collections::BTreeSet,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use crate::api::rooms::DirectoryRoomType;
 use crate::api::rooms::PublicRoomsParams;
@@ -9,6 +12,7 @@ use matrix_sdk::ruma::SpaceChildOrder;
 use matrix_sdk::ruma::api::FeatureFlag;
 use matrix_sdk::ruma::api::client::directory::get_public_rooms_filtered;
 use matrix_sdk::ruma::api::client::membership::joined_rooms;
+use matrix_sdk::ruma::api::client::push::get_pushrules_all;
 use matrix_sdk::ruma::api::client::space::get_hierarchy;
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::directory::{Filter, RoomTypeFilter};
@@ -276,20 +280,40 @@ impl Core {
         }
     }
 
-    pub(crate) async fn align_notification_rules(&self) {
+    pub(crate) async fn retry_rule_cleanup(&self, generation: u64, completed: &AtomicBool) {
+        while self.session_generation.load(Ordering::SeqCst) == generation && !self.sync_paused() {
+            if self.cleanup_notification_rules().await {
+                completed.store(true, Ordering::SeqCst);
+                return;
+            }
+            matrix_sdk::sleep::sleep(std::time::Duration::from_secs(30)).await;
+        }
+    }
+
+    pub(crate) async fn cleanup_notification_rules(&self) -> bool {
         let Ok(client) = self.client().await else {
-            return;
+            return false;
         };
         let Some(user_id) = client.user_id() else {
-            return;
+            return false;
         };
         let Ok(rules) = self.push_rules().await else {
-            return;
+            return false;
         };
-        let writes = crate::push_rules::plan_alignment(&rules.snapshot().await, user_id);
+        // Fetch current rules so retries see successful deletions.
+        let snapshot = match client.send(get_pushrules_all::v3::Request::new()).await {
+            Ok(response) => response.global,
+            Err(error) => {
+                tracing::warn!("could not load notification rules for cleanup: {error}");
+                return false;
+            }
+        };
+        let writes = crate::push_rules::plan_cleanup(&snapshot, user_id);
         if let Err(error) = rules.apply(writes).await {
-            tracing::warn!("could not align notification rules: {error}");
+            tracing::warn!("could not clean up notification rules: {error}");
+            return false;
         }
+        true
     }
 
     pub(crate) async fn reconcile_memberships(&self) {

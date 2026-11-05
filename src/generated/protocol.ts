@@ -342,7 +342,7 @@ export type EventDraft = {
 	until: string | null,
 };
 
-export type EventNotificationView = "membership" | "reactions" | "edits" | "notices" | "invites" | "calls";
+export type EventNotificationView = "membership" | "reactions" | "edits" | "notices" | "invites" | "calls" | "rtc_user" | "rtc_room";
 
 export type EventNotificationsView = {
 	membership: boolean | null,
@@ -351,6 +351,8 @@ export type EventNotificationsView = {
 	notices: boolean | null,
 	invites: boolean | null,
 	calls: boolean | null,
+	rtc_user: boolean | null,
+	rtc_room: boolean | null,
 };
 
 export type EventPreview = {

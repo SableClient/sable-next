@@ -56,7 +56,9 @@
     { key: 'edits', label: 'settings.notificationEdits' },
     { key: 'notices', label: 'settings.notificationNotices' },
     { key: 'invites', label: 'settings.notificationInvites' },
-    { key: 'calls', label: 'settings.notificationCalls' },
+    { key: 'rtc_user', label: 'settings.notificationCalls' },
+    { key: 'rtc_room', label: 'settings.notificationRoomCalls' },
+    { key: 'calls', label: 'settings.notificationLegacyCalls' },
   ];
 
   const eventItems = [
@@ -87,7 +89,10 @@
       (view) => {
         if (alive) events = view;
       },
-      (error: unknown) => console.warn('[sable notifications] loading event settings failed', error)
+      (error: unknown) => {
+        console.warn('[sable notifications] loading event settings failed', error);
+        if (alive) failed = true;
+      }
     );
     void core.rpc.notifications.masterMute().then(
       (value) => {
@@ -174,6 +179,7 @@
     <SettingsAnchorLink anchor="notification-push" />
   </div>
   <p class="hint settings-description">{i18n.t('settings.notificationPushHint')}</p>
+  <p class="hint settings-description">{i18n.t('settings.notificationRulesCleanupHint')}</p>
 
   {#if failed}
     <Alert variant="warning" role="status">
@@ -214,16 +220,25 @@
     {/each}
     {#if events}
       {#each eventRows as { key, label } (key)}
-        {#if events[key] !== null}
-          <SettingsRow id={`notification-event-${key}`} title={i18n.t(label)}>
-            <Select
-              aria-label={i18n.t(label)}
-              value={events[key] ? 'on' : 'off'}
-              items={eventItems.map((item) => ({ value: item.value, label: i18n.t(item.label) }))}
-              onValueChange={(value) => {
-                saveEvent(key, value === 'on');
-              }}
-            />
+        {@const supported = events[key] != null}
+        {#if supported || key === 'rtc_user' || key === 'rtc_room'}
+          <SettingsRow
+            id={`notification-event-${key}`}
+            title={i18n.t(label)}
+            description={!supported ? i18n.t('settings.notificationRtcUnavailableHint') : undefined}
+          >
+            {#if supported}
+              <Select
+                aria-label={i18n.t(label)}
+                value={events[key] ? 'on' : 'off'}
+                items={eventItems.map((item) => ({ value: item.value, label: i18n.t(item.label) }))}
+                onValueChange={(value) => {
+                  saveEvent(key, value === 'on');
+                }}
+              />
+            {:else}
+              <span class="hint">{i18n.t('settings.unavailable')}</span>
+            {/if}
           </SettingsRow>
         {/if}
       {/each}

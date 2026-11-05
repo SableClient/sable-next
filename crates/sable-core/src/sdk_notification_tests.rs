@@ -315,7 +315,7 @@ async fn a_message_delivered_late_by_a_resumed_sync_does_not_alert() {
     clippy::too_many_lines,
     reason = "one sequential flow kept in a single function"
 )]
-async fn bridge_status_events_do_not_notify() {
+async fn an_existing_bridge_status_rule_is_respected() {
     use matrix_sdk::ruma::push::{Action, NewPushRule, NewSimplePushRule, Ruleset};
     use matrix_sdk::ruma::{
         event_id,
@@ -338,6 +338,11 @@ async fn bridge_status_events_do_not_notify() {
             None,
         )
         .unwrap();
+    rules.override_.insert(serde_json::from_value(json!({
+        "rule_id":"my-bridge-status", "default":false, "enabled":true,
+        "conditions":[{"kind":"event_match", "key":"type", "pattern":"com.beeper.message_send_status"}],
+        "actions":[],
+    })).unwrap());
     server.mock_room_state_encryption().plain().mount().await;
     server
         .mock_sync()
@@ -364,23 +369,6 @@ async fn bridge_status_events_do_not_notify() {
         })
         .await;
     let (core, mut events) = watching(&server, &client).await;
-    Mock::given(method("PUT"))
-        .and(path_regex(r"/pushrules/global/override/moe\.sable\.suppress_bridge_status$"))
-        .and(wiremock::matchers::body_json(json!({
-            "conditions": [{"kind": "event_match", "key": "type", "pattern": "com.beeper.message_send_status"}],
-            "actions": []
-        })))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
-        .expect(1)
-        .mount(server.server())
-        .await;
-    Mock::given(method("PUT"))
-        .and(path_regex(r"/pushrules/global/"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
-        .mount(server.server())
-        .await;
-    core.align_notification_rules().await;
-    let rules = core.push_rules().await.unwrap().snapshot().await;
 
     for (event_id, event_type, content, unread) in [
         (
@@ -690,7 +678,6 @@ async fn a_second_room_mode_change_before_the_sync_echo_still_lands() {
 
     rules
         .apply(plan_room_mode(
-            &rules.snapshot().await,
             room_id,
             false,
             Some(NotificationModeView::Mute),
@@ -703,12 +690,7 @@ async fn a_second_room_mode_change_before_the_sync_echo_still_lands() {
     );
 
     rules
-        .apply(plan_room_mode(
-            &rules.snapshot().await,
-            room_id,
-            false,
-            None,
-        ))
+        .apply(plan_room_mode(room_id, false, None))
         .await
         .unwrap();
 
@@ -743,14 +725,132 @@ async fn a_missing_rule_on_delete_is_not_a_failure() {
     let rules = PushRules::load(&client).await;
 
     rules
-        .apply(plan_room_mode(
-            &rules.snapshot().await,
-            room_id!("!gone:example.org"),
-            false,
-            None,
-        ))
+        .apply(plan_room_mode(room_id!("!gone:example.org"), false, None))
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn notification_cleanup_reads_the_server_and_retries_a_partial_failure() {
+    use matrix_sdk::ruma::push::ConditionalPushRule;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let (core, _) = watching(&server, &client).await;
+    let mut remote = Ruleset::server_default(client.user_id().unwrap());
+    for id in ["moe.sable.sticker", "moe.sable.sticker_one_to_one"] {
+        let mut conditions =
+            vec![json!({"kind":"event_match", "key":"type", "pattern":"m.sticker"})];
+        if id.ends_with("one_to_one") {
+            conditions.insert(0, json!({"kind":"room_member_count", "is":"2"}));
+        }
+        remote.underride.insert(serde_json::from_value::<ConditionalPushRule>(json!({
+            "rule_id":id, "default":false, "enabled":true, "conditions":conditions, "actions":[],
+        })).unwrap());
+    }
+    let get = Mock::given(method("GET"))
+        .and(path_regex(r"/pushrules/$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"global":remote})))
+        .mount_as_scoped(server.server())
+        .await;
+    Mock::given(method("DELETE"))
+        .and(path_regex(r"/underride/moe\.sable\.sticker$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let failure = Mock::given(method("DELETE"))
+        .and(path_regex(r"/underride/moe\.sable\.sticker_one_to_one$"))
+        .respond_with(
+            ResponseTemplate::new(403)
+                .set_body_json(json!({"errcode":"M_FORBIDDEN", "error":"temporary denial"})),
+        )
+        .expect(1)
+        .mount_as_scoped(server.server())
+        .await;
+    assert!(!core.cleanup_notification_rules().await);
+    drop(failure);
+    drop(get);
+    // The first deletion already succeeded. A new fetch must see that progress.
+    remote.underride.shift_remove("moe.sable.sticker");
+    let get = Mock::given(method("GET"))
+        .and(path_regex(r"/pushrules/$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"global":remote})))
+        .mount_as_scoped(server.server())
+        .await;
+    Mock::given(method("DELETE"))
+        .and(path_regex(r"/underride/moe\.sable\.sticker_one_to_one$"))
+        .respond_with(
+            ResponseTemplate::new(404)
+                .set_body_json(json!({"errcode":"M_NOT_FOUND", "error":"already removed"})),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+    assert!(core.cleanup_notification_rules().await);
+    drop(get);
+    remote
+        .underride
+        .shift_remove("moe.sable.sticker_one_to_one");
+    Mock::given(method("GET"))
+        .and(path_regex(r"/pushrules/$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"global":remote})))
+        .mount(server.server())
+        .await;
+    let completed = std::sync::atomic::AtomicBool::new(false);
+    core.retry_rule_cleanup(
+        core.session_generation
+            .load(std::sync::atomic::Ordering::SeqCst),
+        &completed,
+    )
+    .await;
+    assert!(completed.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(
+        server
+            .server()
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .all(|request| request.method.as_str() != "PUT")
+    );
+    core.session_tasks.lock().clear();
+}
+
+#[tokio::test]
+async fn notification_cleanup_does_not_succeed_when_rules_cannot_be_fetched() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let (core, _) = watching(&server, &client).await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"/pushrules/$"))
+        .respond_with(
+            ResponseTemplate::new(403)
+                .set_body_json(json!({"errcode":"M_FORBIDDEN", "error":"unavailable"})),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+    assert!(!core.cleanup_notification_rules().await);
+    let completed = std::sync::atomic::AtomicBool::new(false);
+    core.retry_rule_cleanup(
+        core.session_generation
+            .load(std::sync::atomic::Ordering::SeqCst)
+            + 1,
+        &completed,
+    )
+    .await;
+    assert!(!completed.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(
+        server
+            .server()
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .all(|request| request.method.as_str() != "DELETE")
+    );
+    core.session_tasks.lock().clear();
 }
 
 #[tokio::test]

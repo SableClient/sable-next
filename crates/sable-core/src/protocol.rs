@@ -1683,14 +1683,14 @@ pub struct PersonaView {
     pub is_animal: Option<String>,
     pub has_animal: Option<String>,
     pub animal_need: Option<String>,
-    pub sort_flags: Option<PersonaSortFlagsView>
+    pub sort_flags: Option<PersonaSortFlagsView>,
 }
 
 /// Left as a struct so we can add more things, eg tags in the future.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct PersonaSortFlagsView {
-    pub hidden: bool
+    pub hidden: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2398,6 +2398,8 @@ pub enum EventNotificationView {
     Notices,
     Invites,
     Calls,
+    RtcUser,
+    RtcRoom,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -2409,6 +2411,8 @@ pub struct EventNotificationsView {
     pub notices: Option<bool>,
     pub invites: Option<bool>,
     pub calls: Option<bool>,
+    pub rtc_user: Option<bool>,
+    pub rtc_room: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

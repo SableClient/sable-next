@@ -103,11 +103,6 @@ impl PushRules {
                 .send(set_pushrule::v3::Request::new(rule))
                 .await
                 .map(|_| ()),
-            RuleWrite::PutAfter { rule, after } => {
-                let mut request = set_pushrule::v3::Request::new(rule);
-                request.after = Some(after);
-                self.client.send(request).await.map(|_| ())
-            }
             RuleWrite::Actions {
                 kind,
                 rule_id,
@@ -150,10 +145,6 @@ impl PushRules {
 #[derive(Debug, Clone)]
 pub enum RuleWrite {
     Put(NewPushRule),
-    PutAfter {
-        rule: NewPushRule,
-        after: String,
-    },
     Actions {
         kind: RuleKind,
         rule_id: String,
@@ -176,9 +167,6 @@ impl RuleWrite {
     pub(super) fn apply_to(self, rules: &mut Ruleset) {
         let result = match self {
             Self::Put(rule) => rules.insert(rule, None, None).map_err(|e| e.to_string()),
-            Self::PutAfter { rule, after } => rules
-                .insert(rule, Some(&after), None)
-                .map_err(|e| e.to_string()),
             Self::Actions {
                 kind,
                 rule_id,

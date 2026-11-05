@@ -304,14 +304,11 @@ impl Handler for SetRoomsNotificationModeParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         let rules = core.push_rules().await?;
-        let snapshot = rules.snapshot().await;
         let mut writes = Vec::new();
         for room_id in &self.room_ids {
             let room = core.room(room_id).await?;
             let direct = notifications::uses_direct_push_rules(&room);
-            writes.extend(push_rules::plan_room_mode(
-                &snapshot, room_id, direct, self.mode,
-            ));
+            writes.extend(push_rules::plan_room_mode(room_id, direct, self.mode));
         }
         rules
             .apply(writes)
