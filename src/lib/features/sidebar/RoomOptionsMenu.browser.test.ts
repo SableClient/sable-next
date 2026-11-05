@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { expect, test, vi } from 'vitest';
+import { tick } from 'svelte';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { createCoreStub } from '#lib/core/__mocks__/context.js';
@@ -37,6 +38,52 @@ const currentRoom = withCounts({
   marked_unread: false,
   latest_event: null,
 });
+
+test.each([1280, 390])(
+  'parent space loading keeps menu rows in place at width %i',
+  async (width) => {
+    await page.viewport(width, 900);
+    let resolveParents!: (parents: { room_id: string; via: string[] }[]) => void;
+    let resolvePreview!: (preview: { name: string }) => void;
+    const parents = new Promise<{ room_id: string; via: string[] }[]>((resolve) => {
+      resolveParents = resolve;
+    });
+    const preview = new Promise<{ name: string }>((resolve) => {
+      resolvePreview = resolve;
+    });
+    const core = createCoreStub({
+      rpc: {
+        spaces: { unjoinedSpaceParents: vi.fn(() => parents) },
+        rooms: { preview: vi.fn(() => preview) },
+        members: { permissions: vi.fn().mockResolvedValue({ can_manage_children: false }) },
+        notifications: { settings: vi.fn().mockResolvedValue({ room: null, default: 'mentions' }) },
+      },
+    }) as unknown as CoreClient;
+    await render(RoomOptionsMenuHarness, {
+      core,
+      room: currentRoom,
+      rooms: [currentRoom],
+      registerRefresh: () => {},
+    });
+    await page.getByRole('button', { name: 'Room options' }).click();
+    const join = page.getByRole('menuitem', { name: 'Join space', exact: true });
+    await expect.element(join).toBeDisabled();
+    const leave = page.getByRole('menuitem', { name: 'Leave room', exact: true });
+    const before = leave.element().getBoundingClientRect().top;
+
+    resolveParents([{ room_id: '!parent:example.org', via: ['example.org'] }]);
+    await expect.element(join).toBeEnabled();
+    resolvePreview({ name: 'Parent space' });
+    await tick();
+    await expect.poll(() => leave.element().getBoundingClientRect().top).toBe(before);
+
+    if (width >= 768) await join.hover();
+    else await join.click();
+    await expect
+      .element(page.getByRole('menuitem', { name: 'Join Parent space', exact: true }))
+      .toBeVisible();
+  }
+);
 
 test.each([1280, 390])(
   'opens notification settings and applies a mode at width %i',

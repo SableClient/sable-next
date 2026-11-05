@@ -13,12 +13,13 @@
 
   interface Props {
     label: string;
+    disabled?: boolean;
     class?: string;
     trigger: Snippet;
     children: Snippet;
   }
 
-  let { label, class: surfaceClass, trigger, children }: Props = $props();
+  let { label, disabled = false, class: surfaceClass, trigger, children }: Props = $props();
 
   const parent = useActionMenuSurface();
   let open = $state(false);
@@ -37,6 +38,7 @@
 {#if parent.sheet}
   <button
     type="button"
+    {disabled}
     role="menuitem"
     class="menu-item menu-item-roomy action-menu-row"
     aria-haspopup="dialog"
@@ -55,7 +57,7 @@
   {/if}
 {:else}
   <DropdownMenu.Sub>
-    <DropdownMenu.SubTrigger class="menu-item">
+    <DropdownMenu.SubTrigger class="menu-item" {disabled}>
       {@render trigger()}
       <CaretRightIcon class="menu-submenu-chevron" aria-hidden="true" />
     </DropdownMenu.SubTrigger>

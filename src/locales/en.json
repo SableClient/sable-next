@@ -371,6 +371,7 @@
     "menuMoveDown": "Move down",
     "menuRemoveFromSpace": "Remove from {{space}}",
     "menuJoinParentSpace": "Join {{space}}",
+    "menuJoinSpace": "Join space",
     "menuLeave": "Leave room",
     "menuLeaveSpace": "Leave space",
     "menuShowSpaceTimeline": "Show space timeline",

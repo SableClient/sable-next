@@ -38,6 +38,7 @@
   import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
+  import ActionMenuSub from '#lib/ui/primitives/ActionMenuSub.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import { untrack } from 'svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
@@ -437,16 +438,22 @@
       </ActionMenuItem>
     {/if}
 
-    {#each joinableParents as parent (parent.room_id)}
-      <ActionMenuItem
-        onSelect={() => {
-          joinParent(parent);
-        }}
-      >
+    <ActionMenuSub label={i18n.t('room.menuJoinSpace')} disabled={joinableParents.length === 0}>
+      {#snippet trigger()}
         <SignInIcon />
-        {i18n.t('room.menuJoinParentSpace', { space: parent.name ?? parent.room_id })}
-      </ActionMenuItem>
-    {/each}
+        {i18n.t('room.menuJoinSpace')}
+      {/snippet}
+      {#each joinableParents as parent (parent.room_id)}
+        <ActionMenuItem
+          onSelect={() => {
+            joinParent(parent);
+          }}
+        >
+          <SignInIcon />
+          {i18n.t('room.menuJoinParentSpace', { space: parent.name ?? parent.room_id })}
+        </ActionMenuItem>
+      {/each}
+    </ActionMenuSub>
 
     {#if room.room_kind !== 'space' && removableParent}
       <ActionMenuItem
