@@ -1,6 +1,34 @@
 import { AtUri } from '@atproto/syntax';
+import QuickLRU from 'quick-lru';
 
 const APPVIEWS = new Set(['bsky.app', 'witchsky.app', 'blacksky.community', 'reddwarf.app']);
+
+const detailCache = new QuickLRU<
+  {
+    pds: string;
+    did: string;
+    key: string;
+  },
+  BlueskyPostDetails
+>({ maxSize: 256 });
+
+const profileCache = new QuickLRU<
+  {
+    pds: string;
+    did: string;
+  },
+  BlueskyProfileDetails
+>({ maxSize: 256 });
+
+const relationCache = new QuickLRU<
+  {
+    did: string;
+    record: string;
+  },
+  { reposts: number; likes: number; comments: number }
+>({ maxSize: 256 });
+
+const blobCache = new QuickLRU<{ cid: string; did: string; pds: string }, Blob>({ maxSize: 64 });
 
 export type AtprotoRecord = {
   repo: string;
@@ -167,13 +195,18 @@ export async function fetchPostDetails(
   did: string,
   key: string
 ): Promise<BlueskyPostDetails | null> {
+  const cached = detailCache.get({ pds, did, key });
+  if (cached) return cached;
+
   const url = new URL(
     `${pds}/xrpc/com.atproto.repo.getRecord?repo=${did}&collection=app.bsky.feed.post&rkey=${key}`
   );
   url.searchParams.set('format', 'json');
   const response = await fetch(url);
   if (!response.ok) return null;
+
   const body = (await response.json()) as BlueskyPostDetails;
+  detailCache.set({ pds, did, key }, body);
 
   if (body.value.embed) await hydrateBlobs(body.value.embed, did, pds);
 
@@ -198,6 +231,9 @@ export async function fetchProfile(
   pds: string,
   did: string
 ): Promise<BlueskyProfileDetails | null> {
+  const cached = profileCache.get({ pds, did });
+  if (cached) return cached;
+
   const url = new URL(
     `${pds}/xrpc/com.atproto.repo.getRecord?repo=${did}&collection=app.bsky.actor.profile&rkey=self`
   );
@@ -205,6 +241,7 @@ export async function fetchProfile(
   const response = await fetch(url);
   if (!response.ok) return null;
   const body = (await response.json()) as BlueskyProfileDetails;
+  profileCache.set({ pds, did }, body);
 
   const blob = await fetchBlob(body.value.avatar.ref.$link, did, pds);
   if (blob) body.value.avatar['moe.sable.blob'] = blob;
@@ -213,10 +250,14 @@ export async function fetchProfile(
 }
 
 export async function fetchBlob(cid: string, did: string, pds: string): Promise<Blob | null> {
+  const cached = blobCache.get({ cid, did, pds });
+  if (cached) return cached;
+
   const url = new URL(`${pds}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${cid}`);
   const response = await fetch(url);
   if (!response.ok) return null;
   const body = await response.blob();
+  blobCache.set({ cid, did, pds }, body);
 
   return body;
 }
@@ -225,6 +266,9 @@ export async function getPostRelationCount(
   did: string,
   record: string
 ): Promise<{ reposts: number; likes: number; comments: number } | null> {
+  const cached = relationCache.get({ did, record });
+  if (cached) return cached;
+
   const url = new URL(
     `https://constellation.microcosm.blue/links/all?target=${encodeURIComponent(`at://${did}/app.bsky.feed.post/${record}`)}`
   );
@@ -244,12 +288,15 @@ export async function getPostRelationCount(
       };
     };
   };
-
-  return {
+  const stats = {
     reposts: body.links['app.bsky.feed.repost']?.['.subject.uri']?.distinct_dids ?? 0,
     likes: body.links['app.bsky.feed.like']?.['.subject.uri']?.distinct_dids ?? 0,
     comments: body.links['app.bsky.feed.post']?.['.reply.root.uri']?.records ?? 0,
   };
+
+  relationCache.set({ did, record }, stats);
+
+  return stats;
 }
 
 export async function resolveMiniDoc(repo: string): Promise<MiniDoc | null> {
