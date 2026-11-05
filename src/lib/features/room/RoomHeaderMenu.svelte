@@ -81,6 +81,7 @@
   async function copyLink(): Promise<void> {
     if (!room) return;
     if (!(await copyRoomLink(core, room))) toasts.error(i18n.t('errors.copyFailed'));
+    else toasts.info(i18n.t('timeline.linkCopied'));
   }
 </script>
 

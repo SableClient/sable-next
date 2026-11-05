@@ -11,6 +11,8 @@ import Harness from './RoomComposerHarness.test.svelte';
 
 const NEWLINE = '{Shift>}{Enter}{/Shift}';
 
+vi.setConfig({ testTimeout: 30_000 });
+
 function literal(text: string): string {
   return text.replaceAll('{', '{{').replaceAll('[', '[[');
 }

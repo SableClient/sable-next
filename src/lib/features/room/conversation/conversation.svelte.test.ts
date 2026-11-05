@@ -22,6 +22,7 @@ import { Conversation } from './conversation.svelte';
 
 vi.mock('#lib/core/api/messages.svelte.js', () => ({ sendMessage: vi.fn(), editMessage: vi.fn() }));
 import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
+import { testPersona } from '#lib/personas/persona.ts';
 
 const ROOM = '!room:example.org';
 
@@ -760,21 +761,10 @@ function proxying() {
   return setup([], '@kris:example.org', {
     personas: [
       {
+        ...testPersona,
         id: 'kris',
         display_name: 'Kris',
-        avatar_url: null,
-        pronouns: [],
-        color_on_light: null,
-        color_on_dark: null,
         triggers: [{ prefix: 'k:', suffix: null, keep_trigger: false, alternate_avatar_id: null }],
-        pluralkit: null,
-        last_used: null,
-        alternate_avatars: null,
-        biography: null,
-        banner_url: null,
-        is_animal: null,
-        has_animal: null,
-        animal_need: null,
       },
     ],
   });
@@ -820,21 +810,10 @@ test('messages containing only a persona trigger and whitespace are not sent', a
 test('personas off in a room ignore the selection and proxy triggers', async () => {
   setPreference('personaProxying', true);
   const kris = {
+    ...testPersona,
     id: 'kris',
     display_name: 'Kris',
-    avatar_url: null,
-    pronouns: [],
-    color_on_light: null,
-    color_on_dark: null,
     triggers: [{ prefix: 'k:', suffix: null, keep_trigger: false, alternate_avatar_id: null }],
-    pluralkit: null,
-    last_used: null,
-    alternate_avatars: null,
-    biography: null,
-    banner_url: null,
-    is_animal: null,
-    has_animal: null,
-    animal_need: null,
   };
   const select = vi.fn(() => Promise.resolve());
   const { conversation, sendMessage } = setup([], '@kris:example.org', {
@@ -1130,23 +1109,7 @@ test('does not fetch previews for URLs absent from the body', async () => {
 test.each([false, true])(
   'message types respect the selected PMP with room disabled=%s',
   async (disabled) => {
-    const persona = {
-      id: 'kris',
-      display_name: 'Kris',
-      avatar_url: null,
-      pronouns: [],
-      color_on_light: null,
-      color_on_dark: null,
-      triggers: [],
-      pluralkit: null,
-      last_used: null,
-      alternate_avatars: null,
-      biography: null,
-      banner_url: null,
-      is_animal: null,
-      has_animal: null,
-      animal_need: null,
-    };
+    const persona = testPersona;
     const h = setup([], '@kris:example.org', {
       personas: [persona],
       selectionFor: () => ({ persona_id: 'kris', valid_until: null, alternate_avatar_id: null }),

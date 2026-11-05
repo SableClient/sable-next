@@ -126,6 +126,7 @@ export function personaFromPluralkit(
     is_animal: null,
     has_animal: null,
     animal_need: null,
+    sort_flags: null,
   };
 }
 

@@ -197,6 +197,7 @@
       eventId
     ).then((copied) => {
       if (!copied) toasts.error(i18n.t('errors.copyFailed'));
+      else toasts.info(i18n.t('timeline.linkCopied'));
     });
   }
 

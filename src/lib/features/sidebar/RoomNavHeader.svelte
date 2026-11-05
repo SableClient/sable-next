@@ -18,40 +18,56 @@
 
   interface Props {
     activeSpace: RoomListItemView | null;
+    activeRoom: RoomListItemView | null;
     title: string;
     titleIcon: Component;
     collapsed: boolean;
     menuItems: Snippet;
   }
 
-  let { activeSpace, title, titleIcon: TitleIcon, collapsed, menuItems }: Props = $props();
+  let {
+    activeSpace,
+    activeRoom,
+    title,
+    titleIcon: TitleIcon,
+    collapsed,
+    menuItems,
+  }: Props = $props();
 
   const core = useCoreClient();
   let activeSpaceId = $derived(activeSpace?.room_id ?? null);
+  let activeRoomId = $derived(activeRoom?.room_id ?? null);
 
-  let banner = $state<string | null>(null);
+  let spaceBanner = $state<string | null>(null);
+  let roomBanner = $state<string | null>(null);
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a cache nothing renders from
   const banners = new Map<string, string | null>();
 
-  $effect(() => {
-    const spaceId = activeSpaceId;
+  function loadBanner(roomId: string | null, onLoad: (url: string | null) => void) {
     void bannerChanges.version;
-    if (spaceId === null) {
-      banner = null;
+    if (roomId === null) {
+      onLoad(null);
       return;
     }
 
     let current = true;
-    banner = banners.get(spaceId) ?? null;
-    void readRoomBanner(core, spaceId).then((next) => {
-      banners.set(spaceId, next);
-      if (current) banner = next;
+    onLoad(banners.get(roomId) ?? null);
+    void readRoomBanner(core, roomId).then((next) => {
+      if (!current) return;
+      banners.set(roomId, next);
+      onLoad(next);
     });
     return () => {
       current = false;
     };
-  });
+  }
 
+  // Keep the space banner ready as a fallback without reloading it on every room switch.
+  $effect(() => loadBanner(activeSpaceId, (next) => (spaceBanner = next)));
+  $effect(() => loadBanner(activeRoomId, (next) => (roomBanner = next)));
+
+  let banner = $derived(roomBanner ?? spaceBanner);
+  let bannerName = $derived(roomBanner !== null ? (activeRoom?.display_name ?? title) : title);
   let bannerShown = $derived(banner !== null && !collapsed && preferences.showRoomBanners);
   const { min, max } = PREFERENCE_RANGES.roomBannerHeight;
 </script>
@@ -59,7 +75,7 @@
 <div class="room-nav-top">
   {#if bannerShown && banner}
     <div class="room-banner" style:height={`${preferences.roomBannerHeight}px`}>
-      <Banner source={banner} name={title} width={640} height={190} />
+      <Banner source={banner} name={bannerName} width={640} height={190} />
       <ResizeHandle
         value={preferences.roomBannerHeight}
         {min}

@@ -3,6 +3,8 @@ import { onDestroy, type Snippet } from 'svelte';
 import type { MemberView, PerMessageProfileView, TimelineItemView } from '#src/generated/protocol';
 
 import { copyText } from '#lib/platform/clipboard.js';
+import { i18n } from '#lib/i18n.js';
+import { toasts } from '#lib/ui/toasts.svelte.js';
 import { useCoreClient } from '#lib/core/context.js';
 import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
 import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
@@ -267,7 +269,13 @@ export class TimelineRow {
     const selected = selectedText(this.element);
     this.menu.open(item.id, { x: event.clientX, y: event.clientY }, () => ({
       ...withSelectedText(this.actions, selected),
-      onCopyHref: link ? () => void copyText(link) : undefined,
+      onCopyHref: link
+        ? () => {
+            void copyText(link)
+              .then(() => toasts.info(i18n.t('timeline.linkCopied')))
+              .catch(() => toasts.error(i18n.t('errors.copyFailed')));
+          }
+        : undefined,
     }));
   };
 }

@@ -243,7 +243,14 @@ export class MessageActionExecutor {
     }
 
     async function copyText(): Promise<void> {
-      if (policy.body) await writeClipboard(policy.body);
+      if (!policy.body) return;
+      try {
+        await writeClipboard(policy.body);
+        toasts.info(t('common.copied'));
+      } catch (error) {
+        console.debug('[sable timeline] copy message failed', error);
+        toasts.error(t('errors.actionFailed'));
+      }
     }
     return {
       roomId,

@@ -8,6 +8,7 @@
   import { useMessageMenu } from '#lib/features/room/messages/message-menu-open.svelte.js';
   import { formatMessageTimestamp } from '#lib/ui/date-time.js';
   import { i18n } from '#lib/i18n.js';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
   import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
   import MessagePreview from '#lib/features/room/messages/MessagePreview.svelte';
   import { opensFrom } from '#lib/features/room/messages/message-preview.js';
@@ -58,7 +59,14 @@
     onReact: onReact ? (key: string) => onReact(thread.eventId, key) : undefined,
     onOpenThread: () => onOpen(thread.eventId),
     onEdit: thread.editable && onEdit ? () => onEdit(thread) : undefined,
-    onCopyText: thread.preview === '' ? undefined : () => void copyText(thread.preview),
+    onCopyText:
+      thread.preview === ''
+        ? undefined
+        : () => {
+            void copyText(thread.preview)
+              .then(() => toasts.info(i18n.t('common.copied')))
+              .catch(() => toasts.error(i18n.t('errors.actionFailed')));
+          },
     onCopyLink: () => onCopyLink(thread.eventId),
     onPin: onPin ? () => onPin(thread.eventId) : undefined,
     pinned,

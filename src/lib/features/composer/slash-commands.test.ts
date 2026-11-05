@@ -27,6 +27,7 @@ import {
 } from './slash-commands';
 
 import en from '../../../locales/en.json' with { type: 'json' };
+import { testPersona } from '#lib/personas/persona.ts';
 
 function fakeCommands() {
   return {
@@ -654,21 +655,9 @@ test('/addwidget shows its usage for a url the core refuses', async () => {
 test('/pmpproxy appends a persona trigger', async () => {
   const rpc = fakeRpc();
   const persona = {
+    ...testPersona,
     id: 'alt',
     display_name: 'Alt',
-    avatar_url: null,
-    pronouns: [],
-    color_on_light: null,
-    color_on_dark: null,
-    triggers: [],
-    pluralkit: null,
-    last_used: null,
-    alternate_avatars: null,
-    biography: null,
-    banner_url: null,
-    is_animal: null,
-    has_animal: null,
-    animal_need: null,
   } satisfies PersonaView;
   rpc.personas.list.mockResolvedValueOnce({
     personas: [persona],

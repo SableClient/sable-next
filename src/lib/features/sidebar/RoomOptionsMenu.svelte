@@ -267,11 +267,13 @@
 
   async function copyLink(): Promise<void> {
     if (!(await copyRoomLink(core, room))) toasts.error(i18n.t('errors.copyFailed'));
+    else toasts.info(i18n.t('timeline.linkCopied'));
   }
 
   async function copyId(): Promise<void> {
     try {
       await copyText(room.room_id);
+      toasts.info(i18n.t('common.copied'));
     } catch (error) {
       console.debug('[sable room] copy id failed', error);
       toasts.error(i18n.t('errors.copyFailed'));

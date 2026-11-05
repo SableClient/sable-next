@@ -88,9 +88,9 @@
         <Tooltip label={statusLabel}>
           {#snippet trigger({ props })}
             <span {...props} class="member-identity-status">
-              {#if userStatus.emoji}<span class="member-identity-status-emoji"
+              {#if userStatus?.emoji}<span class="member-identity-status-emoji"
                   >{userStatus.emoji}</span
-                >{/if}{userStatus.text}
+                >{/if}{userStatus?.text}
             </span>
           {/snippet}
         </Tooltip>

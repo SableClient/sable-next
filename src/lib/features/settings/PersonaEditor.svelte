@@ -58,6 +58,7 @@
   let is_animal = $state('');
   let has_animal = $state('');
   let animal_need = $state('');
+  let hidden = $state(false);
 
   $effect(() => {
     if (!open) return;
@@ -75,6 +76,7 @@
       is_animal = persona?.is_animal ?? '';
       has_animal = persona?.has_animal ?? '';
       animal_need = persona?.animal_need ?? '';
+      hidden = persona?.sort_flags?.hidden ?? false;
       error = null;
     });
   });
@@ -207,6 +209,7 @@
           is_animal: is_animal ?? null,
           has_animal: has_animal ?? null,
           animal_need: animal_need ?? null,
+          sort_flags: { hidden },
         },
         persona?.id ?? null,
         persona
@@ -510,6 +513,15 @@
       </label>
     </fieldset>
 
+    <fieldset class="triggers">
+      <legend>{i18n.t('personas.editorSortFlags')}</legend>
+
+      <label class="field inline">
+        <span>{i18n.t('personas.sortFlagsHidden')}</span>
+        <Switch label="" bind:checked={hidden} />
+      </label>
+    </fieldset>
+
     <DialogActions>
       <Button
         variant="secondary"
@@ -577,6 +589,12 @@
   .field small {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
+  }
+
+  .field.inline {
+    display: flex;
+    flex-flow: row nowrap;
+    justify-content: space-between;
   }
 
   .colors {

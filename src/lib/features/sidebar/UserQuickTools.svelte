@@ -191,7 +191,7 @@
         </a>
         <!-- eslint-enable svelte/no-navigation-without-resolve -->
       {/snippet}
-      <Tooltip label={i18n.t(item.label)} side="right" {trigger} />
+      <Tooltip label={toolLabel(item)} side="right" {trigger} />
     {/each}
     <AccountSwitcher mode="compact" />
   </nav>
@@ -227,7 +227,7 @@
           </a>
           <!-- eslint-enable svelte/no-navigation-without-resolve -->
         {/snippet}
-        <Tooltip label={i18n.t(item.label)} {trigger} />
+        <Tooltip label={toolLabel(item)} {trigger} />
       {/each}
     </div>
   </nav>

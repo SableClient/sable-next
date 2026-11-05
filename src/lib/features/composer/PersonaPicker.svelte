@@ -77,6 +77,7 @@
   let selected = $derived(held || null);
   let active = $derived(shorthandHint?.persona ?? resolvePersona(scopeSelections) ?? null);
   let sortedPersonas = $derived(
+    // (
     preferences.personaPickerSortOrder === 'recent'
       ? personas.personas.slice().sort((a, b) => (b.last_used ?? 0) - (a.last_used ?? 0))
       : preferences.personaPickerSortOrder === 'alphabetical-asc'
@@ -84,6 +85,7 @@
         : preferences.personaPickerSortOrder === 'alphabetical-desc'
           ? personas.personas.slice().sort((a, b) => b.display_name.localeCompare(a.display_name))
           : personas.personas
+    // ).filter((persona) => persona.id == active?.id || !(persona.sort_flags?.hidden) )
   );
   let shown = $derived(edit ? edit.current : active);
   let label = $derived(
