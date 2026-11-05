@@ -525,6 +525,7 @@ test('loads GIFs from the original so they animate', async () => {
 });
 
 test('a GIF its sender flagged as still loads the thumbnail (MSC4230)', async () => {
+  preferences.autoplayGifs = false;
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   render(MediaImage, {
     props: {
@@ -541,9 +542,11 @@ test('a GIF its sender flagged as still loads the thumbnail (MSC4230)', async ()
   await Promise.resolve();
   expect(core.fetchMedia).not.toHaveBeenCalledWith('mxc://example.org/still', 0, 0);
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/still', 800, 600);
+  expect(document.querySelector('.gif-preview-source')).toBeNull();
 });
 
 test('a PNG its sender flagged as animated loads the original (MSC4230)', async () => {
+  preferences.autoplayGifs = false;
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   render(MediaImage, {
     props: {
@@ -559,43 +562,49 @@ test('a PNG its sender flagged as animated loads the original (MSC4230)', async 
   await flushed();
   await Promise.resolve();
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/apng', 0, 0);
-});
-
-test('shows a static GIF preview until its play button is pressed', async () => {
-  preferences.autoplayGifs = false;
-  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:animated');
-  render(MediaImage, {
-    props: {
-      source: 'mxc://example.org/animated',
-      alt: 'Animated image',
-      width: 800,
-      height: 600,
-      mime: 'image/gif',
-    },
-  });
-
-  const container = document.querySelector<HTMLElement>('.media-image');
-  if (!container) throw new Error('media image was not rendered');
   await vi.waitFor(() => {
-    expect(container.querySelector('.gif-preview-source')).not.toBeNull();
+    expect(document.querySelector('.gif-preview-source')).not.toBeNull();
   });
-  const preview = container.querySelector<HTMLImageElement>('.gif-preview-source');
-  if (!preview) throw new Error('GIF preview source was not rendered');
-  void fireEvent.load(preview);
-  await flushed();
-
-  expect(container.querySelector('canvas')).not.toBeNull();
-  expect(container.querySelector('.play-gif')).not.toBeNull();
-  expect(container.querySelector('img:not(.gif-preview-source)')).toBeNull();
-
-  await user.click(screen.getByRole('button', { name: 'Play GIF' }));
-  // The one image plays: hidden behind the canvas until now, shown from here.
-  const playing = document.querySelector<HTMLImageElement>('img');
-  expect(playing?.src).toBe('blob:animated');
-  expect(playing?.getAttribute('aria-hidden')).toBeNull();
-  expect(document.querySelector('.play-gif')).toBeNull();
 });
+
+test.each(['image/gif', 'image/webp', 'image/apng', 'image/avif'])(
+  'shows a still %s preview until its play button is pressed',
+  async (mime) => {
+    preferences.autoplayGifs = false;
+    core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:animated');
+    render(MediaImage, {
+      props: {
+        source: 'mxc://example.org/animated',
+        alt: 'Animated image',
+        width: 800,
+        height: 600,
+        mime,
+      },
+    });
+
+    const container = document.querySelector<HTMLElement>('.media-image');
+    if (!container) throw new Error('media image was not rendered');
+    await vi.waitFor(() => {
+      expect(container.querySelector('.gif-preview-source')).not.toBeNull();
+    });
+    const preview = container.querySelector<HTMLImageElement>('.gif-preview-source');
+    if (!preview) throw new Error('animation preview was not rendered');
+    void fireEvent.load(preview);
+    await flushed();
+
+    expect(container.querySelector('canvas')).not.toBeNull();
+    expect(container.querySelector('.play-gif')).not.toBeNull();
+    expect(container.querySelector('img:not(.gif-preview-source)')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Play animation' }));
+    // The one image plays: hidden behind the canvas until now, shown from here.
+    const playing = document.querySelector<HTMLImageElement>('img');
+    expect(playing?.src).toBe('blob:animated');
+    expect(playing?.getAttribute('aria-hidden')).toBeNull();
+    expect(document.querySelector('.play-gif')).toBeNull();
+  }
+);
 
 test('an autoplay prop overrides the GIF preference in both directions', async () => {
   preferences.autoplayGifs = true;
@@ -657,15 +666,15 @@ test('stops a playing GIF instead of opening the viewer', async () => {
   });
   void fireEvent.load(find('.gif-preview-source'));
   await flushed();
-  await user.click(screen.getByRole('button', { name: 'Play GIF' }));
+  await user.click(screen.getByRole('button', { name: 'Play animation' }));
 
-  const playing = screen.getByRole('button', { name: 'Stop GIF' });
+  const playing = screen.getByRole('button', { name: 'Stop animation' });
   await user.click(playing);
 
   expect(onclick).not.toHaveBeenCalled();
   expect(document.querySelector('.play-gif')).not.toBeNull();
   // The wrapper never changes element, only what pressing it means.
-  expect(playing).toHaveAccessibleName('Play GIF');
+  expect(playing).toHaveAccessibleName('Play animation');
 });
 
 test('keeps the GIF on screen until the decoder has painted a frame', async () => {
@@ -711,64 +720,67 @@ test('keeps the GIF on screen until the decoder has painted a frame', async () =
   expect(document.querySelector('.gif-preview-source.ready')).toBeNull();
 });
 
-test('steps GIF frames itself and stops on the frame it held', async () => {
-  preferences.autoplayGifs = false;
-  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:stepped');
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() => Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) }))
-  );
-  const decoded: number[] = [];
-  vi.stubGlobal(
-    'ImageDecoder',
-    class {
-      tracks = {
-        ready: Promise.resolve(),
-        selectedTrack: { animated: true, frameCount: 3 },
-      };
-      completed = Promise.resolve();
-      decode({ frameIndex }: { frameIndex: number }) {
-        decoded.push(frameIndex);
-        return Promise.resolve({
-          image: { displayWidth: 4, displayHeight: 4, duration: 20_000, close: () => {} },
-        });
+test.each(['image/gif', 'image/webp', 'image/apng', 'image/avif'])(
+  'steps %s frames and stops on the current frame',
+  async (mime) => {
+    preferences.autoplayGifs = false;
+    core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:stepped');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) }))
+    );
+    const decoded: number[] = [];
+    vi.stubGlobal(
+      'ImageDecoder',
+      class {
+        tracks = {
+          ready: Promise.resolve(),
+          selectedTrack: { animated: true, frameCount: 3 },
+        };
+        completed = Promise.resolve();
+        decode({ frameIndex }: { frameIndex: number }) {
+          decoded.push(frameIndex);
+          return Promise.resolve({
+            image: { displayWidth: 4, displayHeight: 4, duration: 20_000, close: () => {} },
+          });
+        }
+        close() {}
       }
-      close() {}
-    }
-  );
+    );
 
-  render(MediaImage, {
-    props: {
-      source: 'mxc://example.org/stepped',
-      alt: 'Animated image',
-      width: 800,
-      height: 600,
-      mime: 'image/gif',
-    },
-  });
+    render(MediaImage, {
+      props: {
+        source: 'mxc://example.org/stepped',
+        alt: 'Animated image',
+        width: 800,
+        height: 600,
+        mime,
+      },
+    });
 
-  // A frame is decoded and held, with no <img> left to animate on its own.
-  await vi.waitFor(() => {
+    // A frame is decoded and held, with no <img> left to animate on its own.
+    await vi.waitFor(() => {
+      expect(document.querySelector('.play-gif')).not.toBeNull();
+    });
+    expect(document.querySelector('img')).toBeNull();
+    expect(decoded.at(-1)).toBe(0);
+
+    const held = decoded.length;
+    await user.click(screen.getByRole('button', { name: 'Play animation' }));
+    await vi.waitFor(() => {
+      expect(decoded.length).toBeGreaterThan(held + 2);
+    });
+    expect(decoded.slice(held, held + 3)).toEqual([1, 2, 0]);
+    expect(document.querySelector('.play-gif')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Stop animation' }));
+    const stopped = decoded.length;
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    expect(decoded.length).toBe(stopped);
     expect(document.querySelector('.play-gif')).not.toBeNull();
-  });
-  expect(document.querySelector('img')).toBeNull();
-  expect(decoded.at(-1)).toBe(0);
-
-  const held = decoded.length;
-  await user.click(screen.getByRole('button', { name: 'Play GIF' }));
-  await vi.waitFor(() => {
-    expect(decoded.length).toBeGreaterThan(held + 2);
-  });
-  expect(decoded.slice(held, held + 3)).toEqual([1, 2, 0]);
-  expect(document.querySelector('.play-gif')).toBeNull();
-
-  await user.click(screen.getByRole('button', { name: 'Stop GIF' }));
-  const stopped = decoded.length;
-  await new Promise((resolve) => setTimeout(resolve, 120));
-  expect(decoded.length).toBe(stopped);
-  expect(document.querySelector('.play-gif')).not.toBeNull();
-});
+  }
+);
 
 async function settle(): Promise<void> {
   await flushed();

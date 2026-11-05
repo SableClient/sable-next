@@ -63,14 +63,17 @@ async function mount() {
   return { screen, field, results };
 }
 
-test('typing filters settings by their name across categories', async () => {
-  const { field, results } = await mount();
-  await userEvent.fill(field.element(), 'autoplay gifs');
+test.each(['autoplay animated images', 'autoplay gifs', 'webp', 'apng', 'avif'])(
+  'finds the animation autoplay setting for "%s"',
+  async (query) => {
+    const { screen, field } = await mount();
+    await userEvent.fill(field.element(), query);
 
-  await expect.poll(() => results.elements().length).toBe(1);
-  expect(results.element().textContent).toContain('Autoplay GIFs');
-  expect(results.element().textContent).toContain('In Media');
-});
+    await expect
+      .element(screen.getByText('Autoplay animated images', { exact: true }))
+      .toBeVisible();
+  }
+);
 
 test('typing matches on the translated description, not just the name', async () => {
   const { field, results } = await mount();

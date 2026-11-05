@@ -6,7 +6,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function stubDecoder(track: unknown, duration: number | null = 300_000): void {
+function stubDecoder(track: unknown, duration: number | null = 300_000) {
+  const created = vi.fn();
   vi.stubGlobal(
     'fetch',
     vi.fn(() => Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) }))
@@ -14,6 +15,9 @@ function stubDecoder(track: unknown, duration: number | null = 300_000): void {
   vi.stubGlobal(
     'ImageDecoder',
     class {
+      constructor(init: ImageDecoderInit) {
+        created(init.type);
+      }
       tracks = { ready: Promise.resolve(), selectedTrack: track };
       completed = Promise.resolve();
       decode() {
@@ -24,7 +28,20 @@ function stubDecoder(track: unknown, duration: number | null = 300_000): void {
       close() {}
     }
   );
+  return created;
 }
+
+test.each(['image/gif', 'image/webp', 'image/apng', 'image/avif', 'image/png'])(
+  'decodes frames using %s',
+  async (type) => {
+    const created = stubDecoder({ animated: true, frameCount: 3 });
+    const playback = await openGifPlayback('blob:animated', type);
+
+    expect(playback?.frameCount).toBe(3);
+    expect(created).toHaveBeenCalledWith(type);
+    playback?.close();
+  }
+);
 
 test('gives up where the platform cannot decode frames', async () => {
   vi.stubGlobal('ImageDecoder', undefined);

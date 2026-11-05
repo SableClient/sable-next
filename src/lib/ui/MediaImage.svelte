@@ -225,8 +225,7 @@
       imageLoaded &&
       cachedMediaType(core, requested, requestedWidth, requestedHeight) === 'image/svg+xml'
   );
-  let animatedGif = $derived(animatedHint !== false && (mime === 'image/gif' || named('.gif')));
-  let manualGif = $derived(animatedGif && !emoticon && !(autoplay ?? preferences.autoplayGifs));
+  let manualGif = $derived(animated && !emoticon && !(autoplay ?? preferences.autoplayGifs));
   let paused = $derived(
     (animated || original) && (animationsPaused() || (emoticon && !preferences.autoplayStickers))
   );
@@ -360,9 +359,10 @@
 
   $effect(() => {
     if (!url || !manualGif) return;
+    const type = cachedMediaType(core, requested, requestedWidth, requestedHeight) || mime;
     let playback: GifPlayback | null = null;
     let active = true;
-    void openGifPlayback(url).then((opened) => {
+    void openGifPlayback(url, type || undefined).then((opened) => {
       if (!active || !opened) {
         opened?.close();
         return;

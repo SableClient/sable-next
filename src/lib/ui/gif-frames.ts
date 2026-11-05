@@ -1,5 +1,5 @@
 /**
- * Frame-stepped GIF playback: an `<img>` cannot pause and `drawImage` copies frame 0.
+ * Frame-stepped animation playback: an `<img>` cannot pause and `drawImage` copies frame 0.
  * Without `ImageDecoder` (WebKit) callers let the `<img>` animate.
  */
 
@@ -35,17 +35,20 @@ async function ownsFrames(decoder: ImageDecoder): Promise<boolean> {
 /**
  * Opens `url` for frame stepping, or `null` when frames cannot be decoded or it is not an animation. Frames decode on demand.
  */
-export async function openGifPlayback(url: string): Promise<GifPlayback | null> {
+export async function openGifPlayback(
+  url: string,
+  type = 'image/gif'
+): Promise<GifPlayback | null> {
   if (typeof ImageDecoder !== 'function') return null;
 
   let decoder: ImageDecoder;
   try {
     const response = await fetch(url);
-    decoder = new ImageDecoder({ data: await response.arrayBuffer(), type: 'image/gif' });
+    decoder = new ImageDecoder({ data: await response.arrayBuffer(), type });
     await decoder.tracks.ready;
     await decoder.completed;
   } catch (error) {
-    console.debug('[sable media] the gif could not be decoded', error);
+    console.debug('[sable media] the animation could not be decoded', error);
     return null;
   }
 
@@ -75,7 +78,7 @@ export async function openGifPlayback(url: string): Promise<GifPlayback | null> 
           },
         };
       } catch (error) {
-        console.debug('[sable media] a gif frame could not be decoded', error);
+        console.debug('[sable media] an animation frame could not be decoded', error);
         return null;
       }
     },
