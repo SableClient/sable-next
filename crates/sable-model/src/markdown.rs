@@ -539,9 +539,7 @@ mod tests {
             ),
             (
                 "the ||butler **did**|| it",
-                Some(
-                    "the <span data-mx-spoiler=\"\">butler </span><strong><span data-mx-spoiler=\"\">did</span></strong> it",
-                ),
+                Some("the <span data-mx-spoiler=\"\">butler <strong>did</strong></span> it"),
             ),
             ("a || b || c", None),
             ("a |||| b", None),
@@ -571,6 +569,39 @@ mod tests {
             let content = markdown_to_content(markdown, &[]);
             assert_eq!(content.body, markdown);
             assert_eq!(content.formatted_body.as_deref(), formatted, "{markdown}");
+        }
+    }
+
+    #[test]
+    fn formatting_inside_a_spoiler_keeps_one_span_and_preview_placeholder() {
+        for (markdown, formatted) in [
+            ("*huge*", "<em>huge</em>"),
+            ("**huge**", "<strong>huge</strong>"),
+            ("~~huge~~", "<del>huge</del>"),
+            ("`huge`", "<code>huge</code>"),
+            (
+                "[huge](https://example.org)",
+                "<a href=\"https://example.org\">huge</a>",
+            ),
+            (
+                "$[fg.color=f00 huge]",
+                "<span data-mx-color=\"#ff0000\">huge</span>",
+            ),
+        ] {
+            let source = format!("||this is a {markdown} spoiler||");
+            let content = markdown_to_content(&source, &[]);
+            assert_eq!(
+                content.formatted_body,
+                Some(format!(
+                    "<span data-mx-spoiler=\"\">this is a {formatted} spoiler</span>"
+                )),
+                "{source}"
+            );
+            assert_eq!(
+                crate::html::preview_body(&content.body, content.formatted_body.as_deref()),
+                "[Spoiler]",
+                "{source}"
+            );
         }
     }
 

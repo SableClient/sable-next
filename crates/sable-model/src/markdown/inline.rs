@@ -22,14 +22,15 @@ pub(super) enum Mark {
     Link(String),
 }
 
-pub(super) const LINK: u8 = 0;
-pub(super) const STRONG: u8 = 1;
-pub(super) const EM: u8 = 2;
-pub(super) const STRIKE: u8 = 3;
-const CODE: u8 = 4;
-const SPOILER: u8 = 10;
-const COLOR: u8 = 8;
-const BG_COLOR: u8 = 9;
+// Spoilers wrap other marks so formatting changes keep a single reveal target.
+const SPOILER: u8 = 0;
+pub(super) const LINK: u8 = 1;
+pub(super) const STRONG: u8 = 2;
+pub(super) const EM: u8 = 3;
+pub(super) const STRIKE: u8 = 4;
+const CODE: u8 = 5;
+const COLOR: u8 = 9;
+const BG_COLOR: u8 = 10;
 
 impl Mark {
     /// The composer schema's mark order, which is also the order marks nest in.

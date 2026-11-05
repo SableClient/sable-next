@@ -28,6 +28,7 @@ const timeline = Object.assign(baseCore.rpc.timeline, {
 
 import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
+import { markdownToContent } from '#lib/model/model.js';
 
 import FormattedBody from './FormattedBody.svelte';
 import FormattedBodyHarness from './FormattedBodyHarness.test.svelte';
@@ -220,6 +221,30 @@ test('applies Matrix colours and keeps spoilers hidden until asked', async () =>
   await user.click(spoiler);
   expect(spoiler.ariaPressed).toBe('false');
 });
+
+test.each(['click', 'keyboard'] as const)(
+  'a formatted spoiler reveals together by %s and leaves the next spoiler hidden',
+  async (input) => {
+    const { formatted_body: html } = markdownToContent(
+      '||this is a *huge* spoiler|| and ||another||',
+      []
+    );
+    render(FormattedBody, { html: html ?? '' });
+    await tick();
+
+    expect(document.querySelectorAll('[data-mx-spoiler]')).toHaveLength(2);
+    const spoiler = screen.getByRole('button', { name: 'this is a huge spoiler' });
+    expect(spoiler.ariaPressed).toBe('true');
+    if (input === 'click') await user.click(screen.getByText('huge'));
+    else {
+      spoiler.focus();
+      await user.keyboard('{Enter}');
+    }
+
+    expect(spoiler.ariaPressed).toBe('false');
+    expect(screen.getByRole('button', { name: 'another' }).ariaPressed).toBe('true');
+  }
+);
 
 test('inline image hiding is local and leaves custom emotes alone', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));

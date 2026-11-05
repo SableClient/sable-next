@@ -358,6 +358,17 @@ export const composerSchema = new Schema({
     },
   },
   marks: {
+    // Spoilers wrap other marks so formatting changes keep a single reveal target.
+    spoiler: {
+      attrs: { reason: { default: '' } },
+      parseDOM: [
+        {
+          tag: 'span[data-mx-spoiler]',
+          getAttrs: (dom) => ({ reason: dom.getAttribute('data-mx-spoiler') ?? '' }),
+        },
+      ],
+      toDOM: (mark) => ['span', { 'data-mx-spoiler': mark.attrs.reason as string }, 0],
+    },
     link: {
       attrs: { href: {} },
       inclusive: false,
@@ -435,16 +446,6 @@ export const composerSchema = new Schema({
         },
       ],
       toDOM: (mark) => ['span', { 'data-mx-bg-color': mark.attrs.value as string }, 0],
-    },
-    spoiler: {
-      attrs: { reason: { default: '' } },
-      parseDOM: [
-        {
-          tag: 'span[data-mx-spoiler]',
-          getAttrs: (dom) => ({ reason: dom.getAttribute('data-mx-spoiler') ?? '' }),
-        },
-      ],
-      toDOM: (mark) => ['span', { 'data-mx-spoiler': mark.attrs.reason as string }, 0],
     },
   },
 });

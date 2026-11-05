@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { TimelineItemContentView } from '#src/generated/protocol';
 import { replyPreviewBody } from '#lib/features/room/messages/reply-preview.js';
+import { markdownToContent } from '#lib/model/model.js';
 
 const video: TimelineItemContentView = {
   kind: 'video',
@@ -129,6 +130,24 @@ test('a spoiler stays hidden in the preview', () => {
       html: '<span data-mx-spoiler="">secret</span>',
     })
   ).toBe('[Spoiler]');
+});
+
+test('a formatted spoiler uses one placeholder while separate spoilers stay separate', () => {
+  const { body, formatted_body: html } = markdownToContent(
+    '||this is a *huge* spoiler|| and ||another||',
+    []
+  );
+
+  expect(
+    replyPreviewBody({
+      kind: 'message',
+      body,
+      html: html ?? '',
+      msgtype: 'text',
+      edited: false,
+      jumbo: null,
+    })
+  ).toBe('[Spoiler] and [Spoiler]');
 });
 
 test('an uncaptioned gallery is quoted by its file names', () => {
