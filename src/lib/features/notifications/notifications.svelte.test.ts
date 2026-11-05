@@ -495,6 +495,34 @@ function message(eventId: string): NotificationView {
   return { ...invite(), event_id: eventId, body: 'Hello', noisy: true };
 }
 
+test.each([
+  ['darwin', 0],
+  ['linux', 1],
+  ['win32', 1],
+])('message notifications on %s request attention %i times', async (platform, calls) => {
+  const show = vi.fn();
+  class BrowserNotification extends EventTarget {
+    static permission = 'granted';
+    constructor() {
+      super();
+      show();
+    }
+  }
+  const requestAttention = vi.fn();
+  vi.stubGlobal('Notification', BrowserNotification);
+  vi.stubGlobal('sableElectron', { platform, requestAttention });
+  preferences.systemNotifications = true;
+  const notifications = center();
+
+  notifications.present(message('$one'));
+  await vi.waitFor(() => {
+    expect(show).toHaveBeenCalledOnce();
+  });
+
+  expect(requestAttention).toHaveBeenCalledTimes(calls);
+  notifications.stop();
+});
+
 test.each(['browser', 'electron'])(
   'clicking a %s notification opens its room and message',
   async (platform) => {

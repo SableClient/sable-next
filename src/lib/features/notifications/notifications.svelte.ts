@@ -342,7 +342,8 @@ export class NotificationCenter {
       });
       return;
     }
-    electronBridge()?.requestAttention();
+    const electron = electronBridge();
+    if (electron && electron.platform !== 'darwin') electron.requestAttention();
 
     notification.addEventListener('click', () => {
       const electron = electronBridge();
