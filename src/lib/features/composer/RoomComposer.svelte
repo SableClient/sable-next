@@ -127,7 +127,6 @@
   import { isVoiceRecordingSupported } from './voice-recorder-support';
   import './composer-chrome.css';
   import { resolveProxy, type ProxyMatch } from '#lib/personas/persona.js';
-  import { throttle } from '#lib/ui/throttle.svelte.js';
 
   interface Props {
     roomId: string;
@@ -480,7 +479,7 @@
       if (change.docChanged) {
         typing.update(empty);
         scheduleDraftLinks();
-        throttledShorthandHinting();
+        shorthandHinting();
         scheduleLayout();
         draft.schedulePersist();
       }
@@ -762,7 +761,6 @@
       }
     }
   }
-  const throttledShorthandHinting = throttle(shorthandHinting, 300);
 
   function failureText(cause: unknown): string {
     const { key, values } = sendFailure(cause);
