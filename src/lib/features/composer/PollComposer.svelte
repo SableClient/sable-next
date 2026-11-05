@@ -116,12 +116,14 @@
     </div>
     <div class="max-selection">
       <div class="max-selection-textual">
-        <span>{i18n.t('composer.pollMaxSelection')}</span>
+        <label for="poll-max-selection">{i18n.t('composer.pollMaxSelection')}</label>
         <input
+          id="poll-max-selection"
           class="form-control max-selection-input"
           min="1"
           max={answers.length}
           type="number"
+          aria-label={i18n.t('composer.pollMaxSelection')}
           bind:value={maxSelections}
         />
       </div>

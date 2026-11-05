@@ -25,6 +25,10 @@ test('removing an answer keeps the others and their order', async () => {
   expect(pizza).toHaveValue('Pizza');
   expect(screen.queryByRole('textbox', { name: 'Answer 3' })).not.toBeInTheDocument();
 
+  expect(
+    screen.getByRole('spinbutton', { name: 'How many options may one person pick' })
+  ).toHaveValue(1);
+
   await user.click(screen.getByRole('button', { name: 'Create poll' }));
 
   expect(onCreate).toHaveBeenCalledWith('Lunch?', ['Soup', 'Pizza'], false, 1);
