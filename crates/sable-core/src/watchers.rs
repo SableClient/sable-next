@@ -367,10 +367,27 @@ impl Core {
                     return;
                 };
                 let mut changes = rules.subscribe();
-                while let Ok(()) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) =
-                    changes.recv().await
-                {
+                loop {
+                    while changes.try_recv().is_ok() {}
                     core.emit_if_current(generation, CoreEvent::NotificationSettingsChanged);
+                    let retry = match rules.reconcile_direct_default().await {
+                        Ok(()) => false,
+                        Err(error) => {
+                            tracing::warn!(%error, "could not reconcile DM notification defaults");
+                            true
+                        }
+                    };
+                    if retry {
+                        matrix_sdk::sleep::sleep(std::time::Duration::from_secs(30)).await;
+                        continue;
+                    }
+                    let received = changes.recv().await;
+                    if matches!(
+                        received,
+                        Err(tokio::sync::broadcast::error::RecvError::Closed)
+                    ) {
+                        return;
+                    }
                 }
             })
             .abort_on_drop(),

@@ -46,7 +46,7 @@
     label: string;
     direct: boolean;
   }[] = [
-    { key: 'direct', label: 'settings.notificationDefaultTwoMembers', direct: true },
+    { key: 'direct', label: 'settings.notificationDefaultDirectRooms', direct: true },
     { key: 'group', label: 'settings.notificationDefaultOtherRooms', direct: false },
   ];
 

@@ -1,21 +1,26 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use matrix_sdk::Client;
 use matrix_sdk::event_handler::EventHandlerDropGuard;
 use matrix_sdk::ruma::api::client::push::{
-    delete_pushrule, set_pushrule, set_pushrule_actions, set_pushrule_enabled,
+    delete_pushrule, get_pushrules_all, set_pushrule, set_pushrule_actions, set_pushrule_enabled,
 };
 use matrix_sdk::ruma::api::error::ErrorKind;
-use matrix_sdk::ruma::events::push_rules::PushRulesEvent;
+use matrix_sdk::ruma::events::{AnyGlobalAccountDataEvent, direct::DirectEventContent};
 use matrix_sdk::ruma::push::{Action, NewPushRule, RuleKind, Ruleset};
-use tokio::sync::{RwLock, broadcast};
+use matrix_sdk::ruma::serde::Raw;
+use tokio::sync::{Mutex, RwLock, broadcast};
 
+use super::direct::{self, DirectDefault};
 use super::pushes_every_encrypted_event;
 use crate::errors::CoreError;
+use crate::protocol::NotificationModeView;
 
 pub struct PushRules {
     client: Client,
     rules: Arc<RwLock<Ruleset>>,
+    write_lock: Mutex<()>,
     changes: broadcast::Sender<()>,
     _handler: EventHandlerDropGuard,
 }
@@ -39,11 +44,18 @@ impl PushRules {
         let handle = client.add_event_handler({
             let rules = rules.clone();
             let changes = changes.clone();
-            move |event: PushRulesEvent| {
+            move |event: AnyGlobalAccountDataEvent| {
                 let rules = rules.clone();
                 let changes = changes.clone();
                 async move {
-                    *rules.write().await = event.content.global;
+                    match event {
+                        AnyGlobalAccountDataEvent::PushRules(event) => {
+                            *rules.write().await = event.content.global;
+                        }
+                        AnyGlobalAccountDataEvent::Direct(_) => {}
+                        event if event.event_type().to_string() == direct::DEFAULT_EVENT => {}
+                        _ => return,
+                    }
                     let _ = changes.send(());
                 }
             }
@@ -52,6 +64,7 @@ impl PushRules {
         Arc::new(Self {
             client: client.clone(),
             rules,
+            write_lock: Mutex::new(()),
             changes,
             _handler: client.event_handler_drop_guard(handle),
         })
@@ -59,6 +72,126 @@ impl PushRules {
 
     pub async fn snapshot(&self) -> Ruleset {
         self.rules.read().await.clone()
+    }
+
+    async fn fetch_direct_default(&self) -> Result<Option<DirectDefault>, CoreError> {
+        self.client
+            .account()
+            .fetch_account_data(direct::DEFAULT_EVENT.into())
+            .await
+            .map_err(CoreError::backend)?
+            .map(|raw| {
+                raw.deserialize_as_unchecked::<DirectDefault>()
+                    .map_err(CoreError::backend)
+            })
+            .transpose()
+    }
+
+    async fn save_direct_default(&self, preference: &DirectDefault) -> Result<(), CoreError> {
+        self.client
+            .account()
+            .set_account_data_raw(
+                direct::DEFAULT_EVENT.into(),
+                Raw::new(preference)
+                    .map_err(CoreError::backend)?
+                    .cast_unchecked(),
+            )
+            .await
+            .map_err(CoreError::backend)?;
+        let _ = self.changes.send(());
+        Ok(())
+    }
+
+    async fn refresh(&self) -> Result<Ruleset, CoreError> {
+        let rules = self
+            .client
+            .send(get_pushrules_all::v3::Request::new())
+            .await
+            .map_err(CoreError::backend)?
+            .global;
+        *self.rules.write().await = rules.clone();
+        Ok(rules)
+    }
+
+    pub(crate) async fn set_direct_default(
+        &self,
+        mode: NotificationModeView,
+    ) -> Result<(), CoreError> {
+        let _guard = self.write_lock.lock().await;
+        let mode = if mode == NotificationModeView::Mute {
+            NotificationModeView::Mentions
+        } else {
+            mode
+        };
+        let before = self.refresh().await?;
+        super::plan_default_mode(&before, true, mode)?;
+        let mut preference = self
+            .fetch_direct_default()
+            .await?
+            .unwrap_or_else(|| DirectDefault {
+                mode,
+                pending_one_to_one: false,
+                managed: BTreeMap::new(),
+            });
+        preference.mode = mode;
+        preference.pending_one_to_one = true;
+        self.save_direct_default(&preference).await?;
+        self.reconcile_direct(&preference, &before).await
+    }
+
+    pub(crate) async fn reconcile_direct_default(&self) -> Result<(), CoreError> {
+        let _guard = self.write_lock.lock().await;
+        let rules = self.refresh().await?;
+        let mut preference = self
+            .fetch_direct_default()
+            .await?
+            .unwrap_or_else(|| DirectDefault {
+                mode: super::default_mode(&rules, true),
+                pending_one_to_one: false,
+                managed: BTreeMap::new(),
+            });
+        if !preference.pending_one_to_one {
+            preference.mode = super::default_mode(&rules, true);
+        }
+        self.reconcile_direct(&preference, &rules).await
+    }
+
+    async fn reconcile_direct(
+        &self,
+        preference: &DirectDefault,
+        rules: &Ruleset,
+    ) -> Result<(), CoreError> {
+        let rooms: BTreeSet<_> = self
+            .client
+            .account()
+            .fetch_account_data_static::<DirectEventContent>()
+            .await
+            .map_err(CoreError::backend)?
+            .map(|raw| raw.deserialize().map_err(CoreError::backend))
+            .transpose()?
+            .unwrap_or_default()
+            .values()
+            .flatten()
+            .cloned()
+            .collect();
+        let mut preference = preference.clone();
+        if preference.pending_one_to_one {
+            self.apply_locked(super::plan_default_mode(rules, true, preference.mode)?)
+                .await?;
+            preference.pending_one_to_one = false;
+            self.save_direct_default(&preference).await?;
+        }
+        let (writes, pending, next) = direct::plan(&self.snapshot().await, &preference, &rooms);
+        let changed = !writes.is_empty();
+        if changed && pending != preference {
+            // Record both rule definitions before sending so a partial write can be retried.
+            self.save_direct_default(&pending).await?;
+        }
+        self.apply_locked(writes).await?;
+        if changed || next != preference {
+            self.save_direct_default(&next).await?;
+        }
+        Ok(())
     }
 
     pub async fn pushes_every_encrypted_event(&self) -> bool {
@@ -74,6 +207,11 @@ impl PushRules {
     ///
     /// When the server rejects a write.
     pub async fn apply(&self, writes: Vec<RuleWrite>) -> Result<(), CoreError> {
+        let _guard = self.write_lock.lock().await;
+        self.apply_locked(writes).await
+    }
+
+    async fn apply_locked(&self, writes: Vec<RuleWrite>) -> Result<(), CoreError> {
         let planned = writes.len();
         let mut result = Ok(());
         let mut applied = 0_usize;

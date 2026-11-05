@@ -27,6 +27,8 @@ use crate::{
     store::MemorySessionStore,
 };
 
+mod direct;
+
 #[expect(clippy::unwrap_used, reason = "test code")]
 async fn watching(
     server: &MatrixMockServer,
@@ -1005,6 +1007,29 @@ async fn resetting_a_bridged_dm_to_default_does_not_create_a_room_push_rule() {
     })
     .await
     .unwrap();
+    Mock::given(method("GET"))
+        .and(path_regex(r"/pushrules/$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "global": core.push_rules().await.unwrap().snapshot().await
+        })))
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(
+            r"/account_data/(moe.sable.dm_notification_default|m.direct)$",
+        ))
+        .respond_with(ResponseTemplate::new(404).set_body_json(json!({
+            "errcode":"M_NOT_FOUND", "error":"not set"
+        })))
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex(
+            r"/account_data/moe.sable.dm_notification_default$",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .mount(server.server())
+        .await;
     for direct in [true, false] {
         core.run(SetDefaultModeParams {
             direct,
