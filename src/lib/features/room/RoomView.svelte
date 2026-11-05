@@ -591,6 +591,7 @@
       canonical_alias: resolvedRoom?.canonical_alias ?? null,
     };
     if (!(await copyRoomLink(core, room, eventId))) toasts.error(i18n.t('errors.copyFailed'));
+    else toasts.info(i18n.t('timeline.linkCopied'));
   }
 
   function memberDisplayName(userId: string): string | null {
