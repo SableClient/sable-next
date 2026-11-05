@@ -1,0 +1,6 @@
+- Allow flagging per-message-profiles to be hidden from the profile picker
+- Fix Android push notifications showing HTML for messages sent with Element's rich text editor.
+- Announce play/pause state correctly and format seek timestamps for screen readers in the audio player.
+- Bluesky embeds cached locally for faster load-times
+- Show confirmation toasts when copying messages, links, and room IDs.
+- Fix opening joined rooms from the Explore spaces sidebar when Home is disabled.

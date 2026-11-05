@@ -1,5 +1,24 @@
 # Sable Changelog
 
+## 2.3.5 (2026-11-05)
+
+### Features
+
+* Allow flagging per-message-profiles to be hidden from the profile picker
+
+### Fixes
+
+* Fix Android push notifications showing HTML for messages sent with Element's rich text editor.
+* Announce play/pause state correctly and format seek timestamps for screen readers in the audio player.
+* Bluesky embeds cached locally for faster load-times
+* Show confirmation toasts when copying messages, links, and room IDs.
+* Fix opening joined rooms from the Explore spaces sidebar when Home is disabled.
+* Add accessible label to poll maximum selections input.
+* Show unread count in inbox quick tool tooltips.
+* Show the open room's banner above the room list when one is set, falling back to the space's banner otherwise (#1063).
+* Add a close button to the keyboard shortcuts help dialog.
+* Fix crash when a user status clears while displayed.
+
 ## 2.3.4 (2026-11-04)
 
 ### Fixes
