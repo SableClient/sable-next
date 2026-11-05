@@ -595,8 +595,9 @@
                 <Tooltip label={peerStatusLabel}>
                   {#snippet trigger({ props })}
                     <span {...props} class="room-topic">
-                      {#if peerStatus.emoji}<span class="room-status-emoji">{peerStatus.emoji}</span
-                        >{/if}{peerStatus.text}
+                      {#if peerStatus?.emoji}<span class="room-status-emoji"
+                          >{peerStatus.emoji}</span
+                        >{/if}{peerStatus?.text}
                     </span>
                   {/snippet}
                 </Tooltip>
