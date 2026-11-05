@@ -15,6 +15,7 @@ use crate::push_rules::room_settings;
 use crate::view::{RoomInfo, apply_diff, room_counts, room_list_item};
 
 pub(crate) type DmSpaceLinks = BTreeMap<OwnedRoomId, Vec<OwnedRoomId>>;
+pub(crate) type ParentSpaceLinks = BTreeMap<OwnedRoomId, Vec<(OwnedRoomId, Vec<String>)>>;
 
 #[derive(Debug, Default)]
 pub(crate) struct RoomListRows {
@@ -30,6 +31,7 @@ impl RoomListRows {
         &mut self,
         cache: &HashMap<OwnedRoomId, RoomInfo, S>,
         links: &DmSpaceLinks,
+        parents: &ParentSpaceLinks,
     ) -> Vec<VectorDiff<RoomListItemView>> {
         let listed: HashSet<&RoomId> = self.rows.iter().map(|row| &*row.room_id).collect();
         let mut linked: HashMap<OwnedRoomId, Vec<OwnedRoomId>> = HashMap::new();
@@ -44,6 +46,18 @@ impl RoomListRows {
                     .push(room_id.clone());
             }
         }
+        let mut parent_children: HashMap<&RoomId, Vec<(&RoomId, &[String])>> = HashMap::new();
+        for (room_id, spaces) in parents {
+            if !listed.contains(&**room_id) {
+                continue;
+            }
+            for (space_id, via) in spaces {
+                parent_children
+                    .entry(space_id)
+                    .or_default()
+                    .push((room_id, via));
+            }
+        }
 
         let mut diffs = Vec::new();
         for (index, row) in self.rows.iter_mut().enumerate() {
@@ -54,6 +68,22 @@ impl RoomListRows {
                 continue;
             };
             let mut children = info.children.clone();
+            for (room_id, via) in parent_children.get(&*row.room_id).into_iter().flatten() {
+                if children
+                    .iter()
+                    .any(|edge| edge.room_id == room_id.as_str() && !edge.via.is_empty())
+                {
+                    continue;
+                }
+                children.retain(|edge| edge.room_id != room_id.as_str());
+                children.push(SpaceChildEdge {
+                    room_id: room_id.to_string(),
+                    via: via.to_vec(),
+                    order: None,
+                    origin_server_ts: 0,
+                    suggested: false,
+                });
+            }
             for room_id in linked.get(&row.room_id).into_iter().flatten() {
                 if children.iter().any(|edge| edge.room_id == room_id.as_str()) {
                     continue;
@@ -291,7 +321,10 @@ mod tests {
         });
         let links = DmSpaceLinks::from([(chat.to_owned(), vec![space.to_owned()])]);
 
-        assert!(rows.relink(&cache, &links).is_empty());
+        assert!(
+            rows.relink(&cache, &links, &ParentSpaceLinks::new())
+                .is_empty()
+        );
         assert_eq!(rows.rows[0].space_children, [edge]);
     }
 
@@ -314,7 +347,7 @@ mod tests {
             (away.to_owned(), vec![space.to_owned()]),
         ]);
 
-        let diffs = rows.relink(&cache, &links);
+        let diffs = rows.relink(&cache, &links, &ParentSpaceLinks::new());
 
         let [VectorDiff::Set { index: 0, value }] = diffs.as_slice() else {
             panic!("expected the space's row to change, got {diffs:?}");
@@ -325,7 +358,34 @@ mod tests {
             .map(|edge| (edge.room_id.as_str(), edge.via.clone()))
             .collect();
         assert_eq!(children, [(chat.as_str(), vec!["other.org".to_owned()])]);
-        assert!(rows.relink(&cache, &links).is_empty());
+        assert!(
+            rows.relink(&cache, &links, &ParentSpaceLinks::new())
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn relink_uses_validated_parent_claims_and_removes_them_when_revoked() {
+        let rules = Ruleset::server_default(user_id!("@me:example.org"));
+        let space = room_id!("!space:example.org");
+        let room = room_id!("!TSu72vOzgRWPPXopf7dUlfzwXvrBCKMGerwFTWkXtpA");
+        let cache = HashMap::from([(space.to_owned(), space_info(Vec::new()))]);
+        let mut space_row = summary(space, &rules);
+        space_row.room_kind = Some(RoomKind::Space);
+        let mut rows = RoomListRows::default();
+        rows.apply(&VectorDiff::Reset {
+            values: vec![space_row, summary(room, &rules)],
+        });
+        let parents = ParentSpaceLinks::from([(
+            room.to_owned(),
+            vec![(space.to_owned(), vec!["sable.moe".into()])],
+        )]);
+
+        rows.relink(&cache, &DmSpaceLinks::new(), &parents);
+        assert_eq!(rows.rows[0].space_children[0].room_id, room.as_str());
+        assert_eq!(rows.rows[0].space_children[0].via, ["sable.moe"]);
+        rows.relink(&cache, &DmSpaceLinks::new(), &ParentSpaceLinks::new());
+        assert!(rows.rows[0].space_children.is_empty());
     }
 
     #[test]

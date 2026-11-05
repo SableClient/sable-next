@@ -260,4 +260,18 @@ mod tests {
         state[3]["content"]["users"][sender.as_str()] = json!(49);
         assert!(!super::legitimate(&state, child, sender));
     }
+
+    #[test]
+    fn room_v12_creator_can_claim_a_parent_without_a_child_event() {
+        let child = room_id!("!TSu72vOzgRWPPXopf7dUlfzwXvrBCKMGerwFTWkXtpA");
+        let sender = user_id!("@seven:sable.moe");
+        let mut state = vec![
+            json!({"type": "m.room.create", "state_key": "", "sender": sender, "content": {"type": "m.space", "room_version": "12", "additional_creators": ["@7w1:matrix.org"]}}),
+            json!({"type": "m.room.member", "state_key": sender, "content": {"membership": "join"}}),
+            json!({"type": "m.room.power_levels", "state_key": "", "content": {"state_default": 50, "users": {}}}),
+        ];
+        assert!(super::legitimate(&state, child, sender));
+        state[1]["content"]["membership"] = json!("leave");
+        assert!(!super::legitimate(&state, child, sender));
+    }
 }

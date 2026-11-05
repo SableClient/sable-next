@@ -258,6 +258,14 @@ pub(crate) async fn space_parents(
     core: &Core,
     room: &matrix_sdk::Room,
 ) -> Vec<(OwnedRoomId, Vec<String>)> {
+    space_parents_with_network(core, room, true).await
+}
+
+pub(crate) async fn space_parents_with_network(
+    core: &Core,
+    room: &matrix_sdk::Room,
+    network: bool,
+) -> Vec<(OwnedRoomId, Vec<String>)> {
     let events = core
         .with_open_stores(async || room.get_state_events(StateEventType::SpaceParent).await)
         .await
@@ -272,7 +280,7 @@ pub(crate) async fn space_parents(
             serde_json::from_str::<crate::space_parents::ParentClaim>(raw.get()).ok()
         })
         .collect::<Vec<_>>();
-    crate::space_parents::validate(core, &room.client(), room.room_id(), &claims, true)
+    crate::space_parents::validate(core, &room.client(), room.room_id(), &claims, network)
         .await
         .into_iter()
         .filter_map(|parent| parent.room_id().map(|id| (id, parent.content.via)))
@@ -919,6 +927,53 @@ mod tests {
                     vec!["other.org".to_owned()]
                 ),
             ]
+        );
+    }
+
+    #[tokio::test]
+    async fn cached_parent_claim_accepts_a_joined_v12_creator() {
+        let server = MatrixMockServer::new().await;
+        let room_id = room_id!("!TSu72vOzgRWPPXopf7dUlfzwXvrBCKMGerwFTWkXtpA");
+        let space_id = room_id!("!space:example.org");
+        let client = joined(&server, &[room_id, space_id]).await;
+        let raw = |event: Value| Raw::new(&event).unwrap().cast_unchecked();
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(space_id).add_state_bulk([
+                    raw(state(
+                        "m.room.create",
+                        "",
+                        &json!({"type": "m.space", "room_version": "12"}),
+                    )),
+                    raw(state(
+                        "m.room.member",
+                        ALICE,
+                        &json!({"membership": "join"}),
+                    )),
+                    raw(state(
+                        "m.room.power_levels",
+                        "",
+                        &json!({"state_default": 50}),
+                    )),
+                ]),
+            )
+            .await;
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).add_state_event(raw(state(
+                    "m.space.parent",
+                    space_id.as_str(),
+                    &json!({"via": ["example.org"]}),
+                ))),
+            )
+            .await;
+        let (core, _events) = Core::new("cosmetics", Box::new(MemorySessionStore::default()));
+        let room = client.get_room(room_id).unwrap();
+        assert_eq!(
+            super::space_parents_with_network(&core, &room, false).await,
+            [(space_id.to_owned(), vec!["example.org".to_owned()])]
         );
     }
 

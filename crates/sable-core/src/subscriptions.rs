@@ -31,7 +31,7 @@ use crate::protocol::{
 };
 use crate::push_rules::PushRules;
 use crate::room_list_batch::DiffBatch;
-use crate::room_list_rows::{DmSpaceLinks, RoomListRows};
+use crate::room_list_rows::{DmSpaceLinks, ParentSpaceLinks, RoomListRows};
 use crate::room_sections::RoomSections;
 use crate::timeline_overlay::{ReplyFallback, TimelineOverlay};
 use crate::timelines::{
@@ -102,6 +102,7 @@ struct RoomListWorker {
     sections: RoomSections,
     options: watch::Receiver<RoomListOptionsView>,
     dm_spaces: DmSpaceLinks,
+    parent_spaces: ParentSpaceLinks,
     dm_spaces_changed: watch::Receiver<()>,
     nicknames: watch::Receiver<crate::nicknames::Nicknames>,
     controller: RoomListDynamicEntriesController,
@@ -120,6 +121,36 @@ impl RoomListWorker {
     ) {
         let mut batch = DiffBatch::new(ROOM_LIST_BATCH_INTERVAL);
         self.dm_spaces = self.load_dm_spaces().await;
+        let (state_changed, mut state_changes) = watch::channel(());
+        let handle = self.client.add_event_handler(
+            move |raw: matrix_sdk::ruma::serde::Raw<
+                matrix_sdk::ruma::events::AnySyncStateEvent,
+            >,
+                  room: matrix_sdk::Room| {
+                let state_changed = state_changed.clone();
+                async move {
+                    let Ok(event) = raw.deserialize_as_unchecked::<serde_json::Value>() else {
+                        return;
+                    };
+                    let kind = event.get("type").and_then(serde_json::Value::as_str);
+                    if kind == Some("m.space.parent")
+                        || (room.is_space()
+                            && matches!(
+                                kind,
+                                Some(
+                                    "m.space.child"
+                                        | "m.room.member"
+                                        | "m.room.power_levels"
+                                        | "m.room.create"
+                                )
+                            ))
+                    {
+                        state_changed.send_replace(());
+                    }
+                }
+            },
+        );
+        let _handler = self.client.event_handler_drop_guard(handle);
         loop {
             let held = batch.wait(Instant::now());
             let diffs = tokio::select! {
@@ -150,7 +181,12 @@ impl RoomListWorker {
                         break;
                     }
                     self.dm_spaces = self.load_dm_spaces().await;
-                    self.rows.relink(&self.room_cache, &self.dm_spaces)
+                    self.rows.relink(&self.room_cache, &self.dm_spaces, &self.parent_spaces)
+                }
+                changed = state_changes.changed() => {
+                    if changed.is_err() { break; }
+                    self.refresh_parents().await;
+                    self.rows.relink(&self.room_cache, &self.dm_spaces, &self.parent_spaces)
                 }
                 diffs = stream.next() => {
                     let Some(diffs) = diffs else { break };
@@ -200,6 +236,24 @@ impl RoomListWorker {
         crate::account_documents::synced_dm_spaces(&self.client).await
     }
 
+    async fn refresh_parents(&mut self) {
+        let rooms = self
+            .rows
+            .rows()
+            .iter()
+            .filter_map(|row| self.client.get_room(&row.room_id));
+        let core = &self.core;
+        let parents = futures_util::future::join_all(rooms.map(|room| async move {
+            let links = crate::cosmetics::space_parents_with_network(core, &room, false).await;
+            (room.room_id().to_owned(), links)
+        }))
+        .await;
+        self.parent_spaces = parents
+            .into_iter()
+            .filter(|(_, links)| !links.is_empty())
+            .collect();
+    }
+
     async fn on_stores_reopened(
         &mut self,
     ) -> Option<Vec<crate::protocol::VectorDiff<RoomListItemView>>> {
@@ -217,7 +271,11 @@ impl RoomListWorker {
             &self.rules,
             &self.nicknames.borrow(),
         );
-        diffs.extend(self.rows.relink(&self.room_cache, &self.dm_spaces));
+        self.refresh_parents().await;
+        diffs.extend(
+            self.rows
+                .relink(&self.room_cache, &self.dm_spaces, &self.parent_spaces),
+        );
         (!diffs.is_empty()).then_some(diffs)
     }
 
@@ -252,11 +310,29 @@ impl RoomListWorker {
                 })
             })
             .collect();
+        let previous: std::collections::HashSet<_> = self
+            .rows
+            .rows()
+            .iter()
+            .map(|row| row.room_id.clone())
+            .collect();
         for diff in &diffs {
             self.rows.apply(diff);
         }
         self.rows.evict(&mut self.room_cache);
-        diffs.extend(self.rows.relink(&self.room_cache, &self.dm_spaces));
+        if previous.len() != self.rows.rows().len()
+            || self
+                .rows
+                .rows()
+                .iter()
+                .any(|row| !previous.contains(&row.room_id))
+        {
+            self.refresh_parents().await;
+        }
+        diffs.extend(
+            self.rows
+                .relink(&self.room_cache, &self.dm_spaces, &self.parent_spaces),
+        );
         diffs
     }
 
@@ -412,6 +488,7 @@ impl Core {
                 sections: RoomSections::default(),
                 options: core.room_list_options.subscribe(),
                 dm_spaces: DmSpaceLinks::default(),
+                parent_spaces: ParentSpaceLinks::default(),
                 dm_spaces_changed: core.dm_spaces_changed.subscribe(),
                 nicknames,
                 controller,
