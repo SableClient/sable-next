@@ -64,6 +64,9 @@ pub(super) fn message_image(
     use matrix_sdk::ruma::events::room::MediaSource;
     use serde_json::Value;
 
+    if crate::view::spoiler_reason(Some(content)).is_some() {
+        return None;
+    }
     let msgtype = content.get("msgtype")?.as_str()?;
     if msgtype != "m.image" && msgtype != "m.video" {
         return None;
@@ -204,6 +207,25 @@ mod tests {
     use serde_json::json;
 
     use super::{clear_push_media, message_image};
+
+    #[test]
+    fn push_images_skip_spoilers() {
+        for mut content in [
+            json!({"msgtype": "m.image", "url": "mxc://example.org/full"}),
+            json!({"msgtype": "m.image", "url": "mxc://example.org/full",
+                "info": {"thumbnail_url": "mxc://example.org/small"}}),
+            json!({"msgtype": "m.video",
+                "info": {"thumbnail_url": "mxc://example.org/frame"}}),
+        ] {
+            assert!(message_image(&content).is_some());
+            content[crate::view::SPOILER_PROPERTY] = true.into();
+            assert!(message_image(&content).is_none());
+            content[crate::view::SPOILER_REASON_PROPERTY] = "plot twist".into();
+            assert!(message_image(&content).is_none());
+            content[crate::view::SPOILER_PROPERTY] = false.into();
+            assert!(message_image(&content).is_some());
+        }
+    }
 
     #[test]
     fn a_push_image_prefers_a_thumbnail_and_skips_large_encrypted_originals() {
