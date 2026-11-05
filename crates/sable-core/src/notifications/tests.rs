@@ -1045,6 +1045,117 @@ async fn an_event_id_only_push_is_fetched_in_the_shape_of_a_rich_payload() {
 }
 
 #[tokio::test]
+async fn an_ios_push_recovers_a_missing_key_from_backup() {
+    push_backup_recovery(false).await;
+}
+
+#[tokio::test]
+async fn an_android_push_recovers_a_missing_key_from_backup() {
+    push_backup_recovery(true).await;
+}
+
+async fn push_backup_recovery(cached: bool) {
+    use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+    use wiremock::matchers::{body_partial_json, method, path_regex};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let tag = if cached {
+        "backup-android"
+    } else {
+        "backup-ios"
+    };
+    let mut fixture = ColdFixture::new(tag, cold_room_with_members(), None).await;
+    let sender = fixture.server.client_builder().build().await;
+    let outbound = shared_room_key(&sender).await;
+    let machine = sender.olm_machine_for_testing().await;
+    let inbound = machine
+        .as_ref()
+        .unwrap()
+        .store()
+        .get_inbound_group_session(room_id!("!cold:example.org"), outbound.session_id())
+        .await
+        .unwrap()
+        .unwrap();
+    let backup_key = BackupDecryptionKey::new();
+    let encrypted_key = backup_key
+        .megolm_v1_public_key()
+        .encrypt(inbound)
+        .await
+        .unwrap();
+    Mock::given(method("GET"))
+        .and(path_regex("/room_keys/version$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "algorithm": "m.megolm_backup.v1.curve25519-aes-sha2",
+            "auth_data": {"public_key": backup_key.megolm_v1_public_key().to_base64()},
+            "version": "1", "count": 1, "etag": "1"
+        })))
+        .mount(fixture.server.server())
+        .await;
+    let backup = Mock::given(method("GET"))
+        .and(path_regex("/room_keys/keys/.+/.+$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(encrypted_key))
+        .expect(1)
+        .mount_as_scoped(fixture.server.server())
+        .await;
+    fixture
+        .client
+        .as_ref()
+        .unwrap()
+        .olm_machine_for_testing()
+        .await
+        .as_ref()
+        .unwrap()
+        .backup_machine()
+        .save_decryption_key(Some(backup_key), Some("1".to_owned()))
+        .await
+        .unwrap();
+    drop(fixture.client.take());
+
+    let message: serde_json::Value = serde_json::from_str(
+        &encrypted_push(
+            &outbound,
+            "m.room.message",
+            json!({"msgtype": "m.text", "body": "recovered while closed"}),
+        )
+        .await,
+    )
+    .unwrap();
+    let _fetch = mount_fetch_with(&fixture, &message, true, true).await;
+    Mock::given(method("POST"))
+        .and(path_regex("/sync$"))
+        .and(body_partial_json(json!({"conn_id": "encryption"})))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"pos": "1"}))
+                .set_delay(std::time::Duration::from_millis(50)),
+        )
+        .mount(fixture.server.server())
+        .await;
+
+    let session = if cached {
+        session(&fixture).await
+    } else {
+        super::PushSession::open(
+            &cold_push_store_dir(&fixture.data_dir),
+            "@alice:example.org",
+            "A",
+            COLD_ROOM,
+        )
+        .await
+        .unwrap()
+    };
+    let fetched = session.fetch("$cold").await;
+    let PushFetchView::Event { event } = fetched else {
+        panic!("unexpected notification: {fetched:?}");
+    };
+    assert_eq!(event.event_type, "m.room.message");
+    assert_eq!(event.content["body"], "recovered while closed");
+    drop(session);
+    drop(backup);
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
 async fn a_fetched_mention_is_noisy() {
     let fixture = ColdFixture::new("fetch-mention", cold_room_with_members(), None).await;
     let message = json!({"type": "m.room.message", "event_id": "$mention",

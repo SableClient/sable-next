@@ -509,8 +509,6 @@ pub(crate) async fn repair_room_key_sharing(client: &Client) -> Result<(), CoreE
 #[derive(Clone, Copy)]
 enum ClientRole {
     Account,
-    /// Opened beside the account's own client, possibly in another process, so
-    /// it leaves keys, backups and cross-signing to that one.
     #[cfg(not(target_family = "wasm"))]
     Notification,
 }
@@ -549,11 +547,7 @@ impl ClientRole {
     const fn encryption_settings(self) -> EncryptionSettings {
         let account = self.is_account();
         EncryptionSettings {
-            backup_download_strategy: if account {
-                BackupDownloadStrategy::AfterDecryptionFailure
-            } else {
-                BackupDownloadStrategy::Manual
-            },
+            backup_download_strategy: BackupDownloadStrategy::AfterDecryptionFailure,
             auto_enable_cross_signing: account,
             auto_enable_backups: account,
         }
