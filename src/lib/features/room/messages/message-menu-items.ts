@@ -35,6 +35,7 @@ export type MessageActions = {
   onEdit?: () => void;
   onReproxy?: () => void;
   onDelete?: () => void;
+  onCancelSend?: () => void;
   onCopyText?: () => void;
   copyTextLabel?: string;
   onCopyLink?: () => void;
@@ -242,6 +243,15 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       icon: ReportIcon,
       run: actions.onReport,
       separated: true,
+    });
+  }
+  if (actions.onCancelSend) {
+    rows.push({
+      key: 'cancel-send',
+      label: 'timeline.cancelSend',
+      icon: TrashIcon,
+      run: actions.onCancelSend,
+      destructive: true,
     });
   }
   if (actions.onDelete) {

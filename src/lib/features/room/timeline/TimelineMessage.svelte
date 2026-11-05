@@ -113,6 +113,7 @@
     onCopyLink,
     onMenuOpenChange,
     onSwipeMembers,
+    onCancelSend,
   }));
 
   let defaultEmoteSize = $derived(preferences.timelineEmoteSize === 'default');
@@ -146,7 +147,7 @@
   let galleryCount = $derived(item.content.kind === 'gallery' ? item.content.items.length : 0);
   const saving = mediaProgress(row.core, () => row.actionExecutor.savingSource);
   let transfer = $derived.by(() => {
-    const onCancel = item.transaction_id ? cancelUpload : undefined;
+    const onCancel = item.transaction_id ? cancelSend : undefined;
     if (upload !== null) {
       const part = upload.total > 0 ? Math.min(1, upload.current / upload.total) : 0;
       const gallery = galleryCount > 1;
@@ -220,7 +221,7 @@
   let trailingReceiptBadge = $derived(receiptsVisible && !receiptsInline);
   let inlineReceipts = $derived(receiptsVisible && receiptsInline);
 
-  function cancelUpload(): void {
+  function cancelSend(): void {
     if (item.transaction_id) onCancelSend?.(item.transaction_id);
   }
 
@@ -301,7 +302,7 @@
       {...row.actions}
     />
   {/if}
-  {#if !row.actionable && editable && item.transaction_id && row.engagement.engaged}
+  {#if !row.actionable && !row.canCancelSend && editable && item.transaction_id && row.engagement.engaged}
     <MessageActions {roomId} onEdit={row.actions.onEdit} />
   {/if}
 {/snippet}

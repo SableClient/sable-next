@@ -26,12 +26,21 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
 import { guardTouchClicks } from '#lib/ui/trailing-click.js';
 
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
-import { core, user, resetTimelineItemTest, item, imageItem } from './timeline-item-fixtures';
+import {
+  core,
+  user,
+  resetTimelineItemTest,
+  item,
+  imageItem,
+  openMenu,
+  menuItem,
+} from './timeline-item-fixtures';
 import { withRowFields } from './row-fixtures.js';
 
 afterEach(resetTimelineItemTest);
 
 test('a message waiting for the server shows a sending status until it is sent', async () => {
+  const onCancelSend = vi.fn();
   const sending: TimelineItemView = {
     ...item(false),
     event_id: null,
@@ -40,11 +49,14 @@ test('a message waiting for the server shows a sending status until it is sent',
     send_state: { status: 'sending', progress: null },
   };
   const view = render(TimelineItemHarness, {
-    props: { core, item: { item: sending, collapsed: false } },
+    props: { core, item: { item: sending, collapsed: false, onCancelSend } },
   });
   await tick();
 
   expect(screen.getByRole('status')).toHaveTextContent('Sending…');
+  await openMenu(document.querySelector('.message'));
+  await user.click(menuItem('Cancel sending'));
+  expect(onCancelSend).toHaveBeenCalledWith('txn-text');
 
   await view.rerender({
     core,
@@ -53,6 +65,7 @@ test('a message waiting for the server shows a sending status until it is sent',
   await tick();
 
   expect(screen.queryByRole('status')).toBeNull();
+  expect(screen.queryByRole('menuitem', { name: 'Cancel sending' })).toBeNull();
 });
 
 test('shows an indeterminate upload bar until the core reports progress', async () => {
@@ -85,6 +98,33 @@ test('a right click on a message still sending does not open the browser menu', 
   document.querySelector('article')?.dispatchEvent(native);
 
   expect(native.defaultPrevented).toBe(true);
+});
+
+test('a touch context menu can cancel a pending message', async () => {
+  const onCancelSend = vi.fn();
+  const sending: TimelineItemView = {
+    ...item(false),
+    event_id: null,
+    transaction_id: 'txn-text',
+    is_own: true,
+    send_state: { status: 'sending', progress: null },
+  };
+  render(TimelineItemHarness, {
+    props: { core, item: { item: sending, collapsed: false, onCancelSend } },
+  });
+  await tick();
+
+  document
+    .querySelector('article.message')
+    ?.dispatchEvent(
+      new PointerEvent('contextmenu', { pointerType: 'touch', bubbles: true, cancelable: true })
+    );
+  await tick();
+  const unguard = guardTouchClicks();
+  await user.click(screen.getByRole('button', { name: 'Cancel sending' }));
+  unguard();
+
+  expect(onCancelSend).toHaveBeenCalledWith('txn-text');
 });
 
 test('cancels an upload that is still sending', async () => {

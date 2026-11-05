@@ -20,6 +20,7 @@ import { senderDisplayColors } from '../members/members.js';
 import { hasSenderRoles, useSenderRoles } from '../members/sender-roles.js';
 import { MessageSwipe } from '../messages/message-swipe.svelte.js';
 import { useMessageMenu } from '../messages/message-menu-open.svelte.js';
+import type { MessageActions } from '../messages/message-menu-items';
 import { useMessageDialogs } from '../messages/message-dialogs.svelte.js';
 import {
   MessageActionExecutor,
@@ -91,6 +92,7 @@ export interface TimelineRowOptions extends MessageCallbacks {
   hasLinkPreviews: boolean;
   onMenuOpenChange?: (open: boolean) => void;
   onSwipeMembers?: () => void;
+  onCancelSend?: (transactionId: string) => void;
 }
 
 export class TimelineRow {
@@ -149,7 +151,7 @@ export class TimelineRow {
       },
     });
     this.press = new LongPress({
-      enabled: () => this.actionable,
+      enabled: () => this.actionable || this.canCancelSend,
       onPress: () => {
         const { item } = this.#options();
         this.menu.set(item.id, false);
@@ -212,9 +214,21 @@ export class TimelineRow {
     const { item, preview } = this.#options();
     return !preview && item.event_id !== null && this.stalled === null && !this.pending;
   });
-  readonly actions = $derived.by(() => this.actionExecutor.actions);
+  readonly canCancelSend = $derived.by(() => {
+    const { item, preview, onCancelSend } = this.#options();
+    return !preview && this.pending && item.transaction_id !== null && onCancelSend !== undefined;
+  });
+  readonly actions = $derived.by((): MessageActions => {
+    if (!this.canCancelSend) return this.actionExecutor.actions;
+    return {
+      onCancelSend: () => {
+        const { item, onCancelSend } = this.#options();
+        if (this.pending && item.transaction_id) onCancelSend?.(item.transaction_id);
+      },
+    };
+  });
   readonly showActions = $derived(
-    this.actionable && (this.engagement.engaged || this.actionsPinned)
+    (this.actionable || this.canCancelSend) && (this.engagement.engaged || this.actionsPinned)
   );
 
   attach = (node: HTMLElement): (() => void) => {
@@ -252,11 +266,15 @@ export class TimelineRow {
     const { item } = this.#options();
     if (this.press.touch || touchContextMenu(event)) {
       event.preventDefault();
-      if (this.actionable && !this.press.pending && !this.dialogs.isOpen(item, 'sheet'))
+      if (
+        (this.actionable || this.canCancelSend) &&
+        !this.press.pending &&
+        !this.dialogs.isOpen(item, 'sheet')
+      )
         this.press.fire(event);
       return;
     }
-    if (!this.actionable) {
+    if (!this.actionable && !this.canCancelSend) {
       if (this.pending) event.preventDefault();
       return;
     }
@@ -269,13 +287,14 @@ export class TimelineRow {
     const selected = selectedText(this.element);
     this.menu.open(item.id, { x: event.clientX, y: event.clientY }, () => ({
       ...withSelectedText(this.actions, selected),
-      onCopyHref: link
-        ? () => {
-            void copyText(link)
-              .then(() => toasts.info(i18n.t('timeline.linkCopied')))
-              .catch(() => toasts.error(i18n.t('errors.copyFailed')));
-          }
-        : undefined,
+      onCopyHref:
+        link && this.actionable
+          ? () => {
+              void copyText(link)
+                .then(() => toasts.info(i18n.t('timeline.linkCopied')))
+                .catch(() => toasts.error(i18n.t('errors.copyFailed')));
+            }
+          : undefined,
     }));
   };
 }

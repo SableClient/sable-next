@@ -1067,6 +1067,7 @@
     },
     "morePronouns": "+{{count, number}}",
     "sending": "Sending…",
+    "cancelSend": "Cancel sending",
     "uploading": "Uploading attachment",
     "uploadingItem": "{{current, number}} of {{count, number}}",
     "downloading": "Downloading attachment",
