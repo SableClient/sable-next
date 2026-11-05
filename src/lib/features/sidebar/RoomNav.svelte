@@ -5,6 +5,7 @@
   import type { NotificationModeView, RoomListItemView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { voiceChat } from '#lib/features/room/voice-chat.svelte.js';
   import {
     findRoomByPathId,
@@ -318,6 +319,9 @@
     if (unspacedSection) {
       return resolve('/(app)/rooms/[roomId]', { roomId: routeId });
     }
+
+    // The disabled Home layout redirects to /rooms and drops the selected room.
+    if (!preferences.showHome) return roomSectionPath(roomList.rooms, row.roomId);
 
     return resolve('/(app)/home/[roomId]', { roomId: routeId });
   }
