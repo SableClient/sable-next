@@ -88,5 +88,18 @@ test.each([
 
   const { checkForPackagedUpdate } = await load();
 
-  await expect(checkForPackagedUpdate()).resolves.toBe(newer);
+  await expect(checkForPackagedUpdate()).resolves.toBe(newer ? latest : null);
+});
+
+test.each([
+  ['linux', false, true],
+  ['darwin', false, false],
+  ['win32', true, true],
+])('desktop checks on %s with self updates %s are %s', async (platform, automatic, supported) => {
+  vi.stubGlobal('sableElectron', { platform });
+  vi.stubGlobal('__SABLE_AUTO_UPDATE__', automatic);
+
+  const { supportsDesktopUpdateChecks } = await load();
+
+  expect(supportsDesktopUpdateChecks()).toBe(supported);
 });

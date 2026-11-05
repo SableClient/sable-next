@@ -18,6 +18,7 @@
     checkForUpdate,
     relaunchApp,
     supportsAutoUpdate,
+    supportsDesktopUpdateChecks,
     updatePlatform,
   } from '#lib/platform/updates.js';
   import { desktopDataDir } from '#lib/platform/data-dir.js';
@@ -48,7 +49,7 @@
   let source = $derived(sourceUrl());
   let donate = $derived(donateUrl());
   const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
-  const automaticUpdateChecksSupported = supportsAutoUpdate() || hostsServiceWorker();
+  const automaticUpdateChecksSupported = supportsDesktopUpdateChecks() || hostsServiceWorker();
   let confirmingReset = $state(false);
   let resetting = $state(false);
   let resetFailed = $state(false);

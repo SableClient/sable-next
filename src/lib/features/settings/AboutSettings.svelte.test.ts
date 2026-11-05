@@ -20,6 +20,7 @@ import AboutSettings from './AboutSettings.svelte';
 
 afterEach(() => {
   vi.mocked(isTauri).mockReturnValue(false);
+  vi.unstubAllGlobals();
   supporter.stop();
 });
 
@@ -66,6 +67,16 @@ test('desktop builds show the folder Sable keeps its data in', async () => {
 
   expect(await screen.findByText('/home/me/.local/share/moe.sable.next')).toBeInTheDocument();
   expect(screen.getByText('Data folder')).toBeInTheDocument();
+});
+
+test('package-managed desktop builds expose automatic update checks', () => {
+  vi.stubGlobal('sableElectron', { platform: 'linux' });
+  vi.stubGlobal('__SABLE_AUTO_UPDATE__', false);
+  render(AboutSettings);
+
+  expect(
+    screen.getByRole('switch', { name: 'Check for updates automatically' })
+  ).toBeInTheDocument();
 });
 
 test.each(['web', 'ios'])('donation controls on %s', (platform) => {

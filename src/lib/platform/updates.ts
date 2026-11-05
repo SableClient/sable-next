@@ -26,6 +26,10 @@ export function supportsAutoUpdate(): boolean {
   return updatePlatform() === 'desktop' && window.__SABLE_AUTO_UPDATE__ !== false;
 }
 
+export function supportsDesktopUpdateChecks(): boolean {
+  return supportsAutoUpdate() || electronBridge()?.platform === 'linux';
+}
+
 export function updatePlatform(): 'desktop' | 'mobile' | 'web' {
   if (electronBridge()) return 'desktop';
   return isNativeMobile() ? 'mobile' : 'web';
@@ -51,10 +55,10 @@ export async function checkForMobileUpdate(): Promise<boolean> {
   return typeof latest === 'string' && isNewerVersion(latest, current);
 }
 
-export async function checkForPackagedUpdate(): Promise<boolean> {
+export async function checkForPackagedUpdate(): Promise<string | null> {
   const current = import.meta.env.VITE_APP_VERSION;
   const latest = await electronBridge()?.latestVersion();
-  return Boolean(current && latest && isNewerVersion(latest, current));
+  return current && latest && isNewerVersion(latest, current) ? latest : null;
 }
 
 export async function checkForUpdate(): Promise<AvailableUpdate | null> {

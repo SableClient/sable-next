@@ -3,6 +3,7 @@
     const POLL_INTERVAL_MS = 300_000;
 
     let visible = $state(true);
+    let packagedVersion = $state<string | null>(null);
 
     function showUpdate(found: AvailableUpdate): void {
       if (found.version !== desktopUpdate.update?.version) visible = true;
@@ -13,6 +14,12 @@
       const { stage } = desktopUpdate;
       if (stage.name === 'downloading' || stage.name === 'staged') return;
       try {
+        if (!supportsAutoUpdate()) {
+          const found = await checkForPackagedUpdate();
+          if (found !== packagedVersion) visible = true;
+          packagedVersion = found;
+          return;
+        }
         const found = await checkForUpdate();
         if (found) showUpdate(found);
       } catch (error) {
@@ -27,7 +34,7 @@
     );
 
     $effect(() => {
-      if (!supportsAutoUpdate() || !preferences.autoUpdateCheck) return undefined;
+      if (!supportsDesktopUpdateChecks() || !preferences.autoUpdateCheck) return undefined;
 
       untrack(() => void poll());
       const timer = setInterval(() => void poll(), POLL_INTERVAL_MS);
@@ -38,7 +45,7 @@
 
     return {
       get priority(): Priority {
-        if (desktopUpdate.update !== null && visible) {
+        if ((desktopUpdate.update !== null || packagedVersion !== null) && visible) {
           return 'update';
         } else {
           return null;
@@ -55,6 +62,10 @@
 
       get stage() {
         return desktopUpdate.stage;
+      },
+
+      get packagedVersion() {
+        return packagedVersion;
       },
 
       install: installPendingUpdate,
@@ -74,9 +85,11 @@
     type UpdateStage,
   } from '#lib/platform/desktop-update.svelte.js';
   import {
+    checkForPackagedUpdate,
     checkForUpdate,
     relaunchApp,
     supportsAutoUpdate,
+    supportsDesktopUpdateChecks,
     subscribeToUpdates,
     type AvailableUpdate,
   } from '#lib/platform/updates.js';
@@ -88,11 +101,13 @@
 
   type UpdateState = {
     update: AvailableUpdate | null;
+    packagedVersion: string | null;
     stage: UpdateStage;
     install(): Promise<void>;
   };
 
-  let { dismiss, update, stage, install }: PriorityProvider<UpdateState> = $props();
+  let { dismiss, update, packagedVersion, stage, install }: PriorityProvider<UpdateState> =
+    $props();
 
   const bannerTitle = $derived(
     stage.name === 'staged'
@@ -110,7 +125,9 @@
     {bannerTitle}
   {/snippet}
   {#snippet body()}
-    {#if stage.name === 'staged'}
+    {#if packagedVersion}
+      {i18n.t('settings.aboutPackageUpdateAvailable')}
+    {:else if stage.name === 'staged'}
       {i18n.t('settings.updateBannerStagedBody', { version })}
     {:else if stage.name === 'failed'}
       {stage.message}
@@ -126,11 +143,11 @@
     <Button variant="ghost" size="small" onclick={dismiss}>
       {i18n.t('settings.updateBannerLater')}
     </Button>
-    {#if stage.name === 'staged'}
+    {#if !packagedVersion && stage.name === 'staged'}
       <Button variant="primary" size="small" onclick={() => void relaunchApp()}>
         {i18n.t('settings.updateBannerRestart')}
       </Button>
-    {:else}
+    {:else if !packagedVersion}
       <Button
         variant="primary"
         size="small"
