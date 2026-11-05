@@ -4,7 +4,9 @@ use std::time::Duration;
 
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::{Client, config::RequestConfig};
-use matrix_sdk_ui::sync_service::{State, SyncService};
+#[cfg(any(target_family = "wasm", test))]
+use matrix_sdk_ui::sync_service::State;
+use matrix_sdk_ui::sync_service::SyncService;
 
 use crate::{Core, ResultExt, protocol::RpcError};
 
@@ -12,6 +14,13 @@ use crate::{Core, ResultExt, protocol::RpcError};
 pub(crate) const SYNC_STALL: Duration = Duration::from_secs(90);
 
 impl Core {
+    pub(crate) async fn resume_sync(&self, sync_service: &SyncService) {
+        let _serial = self.activity_lock.lock().await;
+        if !self.sync_paused() && self.network_available.load(Ordering::SeqCst) {
+            sync_service.start().await;
+        }
+    }
+
     /// The wasm HTTP client ignores request timeouts, so a long-poll on a connection that died
     /// during sleep never returns.
     #[cfg(any(target_family = "wasm", test))]
@@ -35,7 +44,10 @@ impl Core {
                         continue;
                     }
                     let _serial = core.activity_lock.lock().await;
-                    if matches!(sync_service.state().get(), State::Running) && !core.sync_paused() {
+                    if matches!(sync_service.state().get(), State::Running)
+                        && !core.sync_paused()
+                        && core.network_available.load(Ordering::SeqCst)
+                    {
                         tracing::warn!("no sync response for {stall:?}, restarting sync");
                         sync_service.stop().await;
                         sync_service.start().await;
@@ -60,15 +72,13 @@ impl Core {
             spawn(async move {
                 while changes.next().await.is_some() {
                     let _serial = core.activity_lock.lock().await;
-                    let running = matches!(sync_service.state().get(), State::Running)
-                        && !core.sync_suspended.load(Ordering::SeqCst);
                     if let Some(event_cache) = client.event_cache()
                         && let Err(error) = event_cache.clear_all_rooms().await
                     {
                         tracing::warn!(%error, "clearing the event cache after an ignore change");
                     }
                     sync_service.expire_sessions().await;
-                    if running {
+                    if !core.sync_paused() && core.network_available.load(Ordering::SeqCst) {
                         sync_service.start().await;
                     }
                 }

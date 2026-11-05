@@ -1908,6 +1908,110 @@ mod regression_tests {
     }
 
     #[tokio::test]
+    async fn foregrounding_without_a_session_clears_the_previous_pause() {
+        let (_store, _server, core, _room) = core_with_room().await;
+        core.set_app_active(false);
+        core.apply_app_activity(false).await;
+        assert!(core.sync_paused());
+        core.take_session().await;
+
+        core.set_app_active(true);
+        core.apply_app_activity(true).await;
+
+        assert!(!core.sync_paused());
+    }
+
+    #[tokio::test]
+    async fn unlocking_an_account_keeps_a_background_sync_paused() {
+        use matrix_sdk_ui::sync_service::State;
+        use std::{sync::atomic::Ordering, time::Duration};
+
+        let (_store, server, core, room) = core_with_room().await;
+        server
+            .mock_who_am_i()
+            .ok_with_user_id(room.client().user_id().unwrap())
+            .mount()
+            .await;
+        server
+            .mock_sliding_sync()
+            .with_delay(Duration::from_secs(1))
+            .ok_json(serde_json::json!({"pos": "p", "lists": {}, "rooms": {}}))
+            .mount()
+            .await;
+        core.lock_account(core.session_generation.load(Ordering::SeqCst));
+        core.set_app_active(false);
+        core.apply_app_activity(false).await;
+
+        tokio::time::timeout(Duration::from_secs(35), async {
+            while core.account_locked.load(Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        let _transition = core.lock_session_transition().await;
+        assert!(matches!(
+            core.sync_service().await.unwrap().state().get(),
+            State::Idle
+        ));
+    }
+
+    #[tokio::test]
+    async fn an_ignore_change_restarts_an_idle_foreground_sync() {
+        use matrix_sdk_test::event_factory::EventFactory;
+        use matrix_sdk_ui::sync_service::State;
+        use std::time::Duration;
+
+        let (_store, server, core, room) = core_with_room().await;
+        let client = room.client();
+        let sync = core.sync_service().await.unwrap();
+        server
+            .mock_sliding_sync()
+            .with_delay(Duration::from_secs(1))
+            .ok_json(serde_json::json!({"pos": "p", "lists": {}, "rooms": {}}))
+            .mount()
+            .await;
+        core.watch_ignored_history(&client, &sync);
+
+        server
+            .mock_sync()
+            .ok_and_run(&client, |response| {
+                response.add_global_account_data(EventFactory::new().ignored_user_list([
+                    matrix_sdk::ruma::user_id!("@ignored:example.org").to_owned(),
+                ]));
+            })
+            .await;
+
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while !matches!(sync.state().get(), State::Running) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn queued_sync_recovery_cannot_undo_a_background_pause() {
+        use matrix_sdk_ui::sync_service::State;
+
+        let (_store, _server, core, _room) = core_with_room().await;
+        let sync = core.sync_service().await.unwrap();
+        sync.start().await;
+        let serial = core.activity_lock.lock().await;
+        core.set_app_active(false);
+        let mut pause = std::pin::pin!(core.apply_app_activity(false));
+        assert!(futures_util::poll!(&mut pause).is_pending());
+        let mut recovery = std::pin::pin!(core.resume_sync(&sync));
+        assert!(futures_util::poll!(&mut recovery).is_pending());
+        drop(serial);
+
+        tokio::join!(pause, recovery);
+
+        assert!(matches!(sync.state().get(), State::Idle));
+    }
+
+    #[tokio::test]
     async fn a_stale_pause_cannot_stop_a_new_background_interval() {
         use matrix_sdk_ui::sync_service::State;
 

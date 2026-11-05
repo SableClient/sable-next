@@ -47,7 +47,10 @@ impl Core {
                         locked: true,
                     },
                 );
-                sync.stop().await;
+                {
+                    let _serial = core.activity_lock.lock().await;
+                    sync.stop().await;
+                }
                 let mut delay = Duration::from_secs(30);
                 loop {
                     matrix_sdk::sleep::sleep(delay).await;
@@ -68,7 +71,7 @@ impl Core {
                         }
                         core.account_locked.store(false, Ordering::SeqCst);
                         client.send_queue().set_enabled(true).await;
-                        sync.start().await;
+                        core.resume_sync(&sync).await;
                         core.emit_if_current(
                             generation,
                             CoreEvent::AccountLockChanged {

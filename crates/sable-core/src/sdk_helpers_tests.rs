@@ -2939,7 +2939,14 @@ async fn an_identity_reset_retries_a_wrong_password_and_returns_the_new_key() {
         .await;
     server
         .mock_upload_cross_signing_keys()
-        .uiaa()
+        .respond_with_code_and_json(
+            401,
+            json!({
+                "flows": [{ "stages": ["m.login.password"] }],
+                "params": {},
+                "session": "oFIJVvtEOCKmRUTYKTYIIPHL"
+            }),
+        )
         .with_priority(3)
         .expect(1)
         .mount()

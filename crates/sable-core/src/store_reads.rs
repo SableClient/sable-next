@@ -408,6 +408,13 @@ impl StateStore for CountingStore {
         self.inner.get_global_profiles(user_ids).await
     }
 
+    async fn get_missing_global_profiles<'a>(
+        &self,
+        user_ids: &'a [OwnedUserId],
+    ) -> Result<Vec<&'a UserId>, Self::Error> {
+        self.inner.get_missing_global_profiles(user_ids).await
+    }
+
     async fn close(&self) -> Result<(), Self::Error> {
         self.inner.close().await
     }

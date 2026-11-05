@@ -96,8 +96,8 @@ impl Core {
                         Ok(states.next().await)
                     };
                     let Ok(next) = next else {
-                        if server_reachable(&support_client).await && !core.sync_paused() {
-                            restarted.start().await;
+                        if server_reachable(&support_client).await {
+                            core.resume_sync(&restarted).await;
                         }
                         continue;
                     };
@@ -145,7 +145,7 @@ impl Core {
                         continue;
                     }
                     if idle {
-                        restarted.start().await;
+                        core.resume_sync(&restarted).await;
                     } else if failed {
                         after_running.take();
                         if core.detect_account_lock(&support_client, generation).await {
@@ -170,9 +170,7 @@ impl Core {
                         }
                         crate::watchers::retry_backoff(failures).await;
                         failures = failures.saturating_add(1);
-                        if !core.sync_paused() {
-                            restarted.start().await;
-                        }
+                        core.resume_sync(&restarted).await;
                     }
                 }
             })

@@ -863,6 +863,74 @@ async fn legacy_move_fixture(
 }
 
 #[tokio::test]
+async fn rejoining_a_call_resumes_sync_after_a_background_leave() {
+    use matrix_sdk_ui::sync_service::State as SyncState;
+    use std::sync::atomic::Ordering;
+    use std::time::Duration;
+
+    let (server, sfu, room, _, _, _) = legacy_move_fixture(true).await;
+    server
+        .mock_sliding_sync()
+        .with_delay(Duration::from_secs(1))
+        .ok_json(serde_json::json!({"pos": "p", "lists": {}, "rooms": {}}))
+        .mount()
+        .await;
+    server
+        .mock_room_send()
+        .ok(event_id!("$invite"))
+        .mount()
+        .await;
+    let client = room.client();
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service: sync_service.clone(),
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+    core.apply_app_activity(true).await;
+    let first = core
+        .join_call(
+            room.room_id().to_owned(),
+            Some(sfu.uri()),
+            Some(CallMode::Legacy),
+            None,
+        )
+        .await
+        .unwrap();
+
+    core.set_app_active(false);
+    core.apply_app_activity(false).await;
+    core.leave_call(first.session).await.unwrap();
+    assert!(matches!(sync_service.state().get(), SyncState::Idle));
+    assert!(core.sync_suspended.load(Ordering::SeqCst));
+
+    let second = core
+        .join_call(
+            room.room_id().to_owned(),
+            Some(sfu.uri()),
+            Some(CallMode::Legacy),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert!(matches!(sync_service.state().get(), SyncState::Running));
+    assert!(!core.sync_suspended.load(Ordering::SeqCst));
+    assert!(!core.app_active.load(Ordering::Relaxed));
+
+    core.set_network_available(false).await;
+    sync_service.stop().await;
+    core.set_network_available(true).await;
+    assert!(matches!(sync_service.state().get(), SyncState::Running));
+
+    core.leave_call(second.session).await.unwrap();
+    assert!(matches!(sync_service.state().get(), SyncState::Idle));
+}
+
+#[tokio::test]
 async fn a_legacy_publisher_follows_the_oldest_members_focus() {
     let (_homeserver, sfu, room, own, oldest, state) = legacy_move_fixture(true).await;
 

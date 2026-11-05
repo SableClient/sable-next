@@ -507,16 +507,17 @@ impl Core {
         if self.app_active.load(Ordering::Relaxed) != active {
             return;
         }
+        let should_sync = active || !self.call_sessions.lock().await.is_empty();
+        #[cfg(target_os = "ios")]
+        if should_sync && self.sync_suspended.load(Ordering::SeqCst) {
+            self.reopen_stores().await;
+        }
+        self.sync_suspended.store(!should_sync, Ordering::SeqCst);
         let Ok(sync_service) = self.sync_service().await else {
             return;
         };
-        if active {
-            #[cfg(target_os = "ios")]
-            if self.sync_suspended.load(Ordering::SeqCst) {
-                self.reopen_stores().await;
-            }
+        if should_sync {
             // Starting a running service is a no-op, but from `Offline` it retries at once.
-            self.sync_suspended.store(false, Ordering::SeqCst);
             self.set_sync_presence(presence::state(self.desired_presence()))
                 .await;
             if !self.account_locked.load(Ordering::SeqCst)
@@ -525,8 +526,7 @@ impl Core {
                 sync_service.start().await;
             }
             self.retry_cached_decryption().await;
-        } else if self.call_sessions.lock().await.is_empty() {
-            self.sync_suspended.store(true, Ordering::SeqCst);
+        } else {
             // Background push fetches must not report the user online.
             self.set_sync_presence(matrix_sdk::ruma::presence::PresenceState::Offline)
                 .await;
@@ -538,8 +538,9 @@ impl Core {
 
     pub async fn set_network_available(self: &Arc<Self>, available: bool) {
         let was_available = self.network_available.swap(available, Ordering::SeqCst);
-        if available && !was_available && self.app_active.load(Ordering::Relaxed) {
-            self.apply_activity(true, None).await;
+        if available && !was_available && !self.sync_paused() {
+            self.apply_activity(self.app_active.load(Ordering::Relaxed), None)
+                .await;
         }
     }
 

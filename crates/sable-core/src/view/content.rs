@@ -145,7 +145,7 @@ const fn utd_cause(message: &EncryptedMessage) -> UtdCauseView {
             UtdCauseView::WithheldForUnverifiedOrInsecureDevice
         }
         UtdCause::WithheldBySender => UtdCauseView::WithheldBySender,
-        UtdCause::Unknown => UtdCauseView::Unknown,
+        UtdCause::Unknown | UtdCause::Malformed => UtdCauseView::Unknown,
     }
 }
 

@@ -602,6 +602,12 @@ pub(super) async fn join(
             sticky_member: own.member_id.filter(|_| mode == CallMode::Matrix2),
         },
     );
+    drop(calls);
+    core.apply_app_activity(core.app_active.load(Ordering::Relaxed))
+        .await;
+    if core.session_generation.load(Ordering::SeqCst) != generation {
+        return Err(RpcError::NotLoggedIn);
+    }
     Ok(join_ok(
         session,
         encrypt_media,
