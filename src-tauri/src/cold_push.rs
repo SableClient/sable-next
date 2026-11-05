@@ -17,6 +17,22 @@ const NEEDS_KEY_QUIETLY: &str = "needs-key-quietly";
 
 #[unsafe(no_mangle)]
 #[expect(unsafe_code, reason = "JNI entry point")]
+pub(crate) extern "system" fn Java_moe_sable_push_PushPayloadDecryptor_nativePreviewBody<'frame>(
+    mut unowned_env: EnvUnowned<'frame>,
+    _class: JClass<'frame>,
+    body: JString<'frame>,
+    formatted: JString<'frame>,
+) -> JString<'frame> {
+    let result = unowned_env.with_env(|env: &mut Env<'frame>| -> Result<_, jni::errors::Error> {
+        let preview =
+            sable_core::matrix_html::preview_body(&body.to_string(), Some(&formatted.to_string()));
+        JString::from_str(env, preview)
+    });
+    result.resolve::<jni::errors::ThrowRuntimeExAndDefault>()
+}
+
+#[unsafe(no_mangle)]
+#[expect(unsafe_code, reason = "JNI entry point")]
 pub(crate) extern "system" fn Java_moe_sable_push_PushPayloadDecryptor_nativeDecryptPush<'frame>(
     unowned_env: EnvUnowned<'frame>,
     _class: JClass<'frame>,

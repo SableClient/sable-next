@@ -59,12 +59,12 @@ object PushNotifier {
         val id = roomNotificationId(userId, roomId)
         val encrypted = notification.optBoolean(ENCRYPTED_FLAG)
         val allowed = policy.showContent && (!encrypted || policy.showEncryptedContent)
-        val body = notification.optJSONObject("content")?.optString("body")?.takeIf { it.isNotEmpty() }
+        val body = if (allowed) PushPayloadDecryptor.previewBody(context, notification.optJSONObject("content")) else null
         val revision = PushNotificationGate.revision(context, id)
         attachMedia(context, notification, roomId,
             content = notification.optJSONObject("content")?.takeIf { allowed })
         PushNotificationGate.post(context, id, revision) {
-            post(context, notification, body.takeIf { allowed } ?: "New message")
+            post(context, notification, body ?: "New message")
         }
     }
 
@@ -286,13 +286,10 @@ object PushNotifier {
         val allowed = store.showContent && store.showEncryptedContent
         attachMedia(context, notification, notification.optString("room_id"),
             content = clear.optJSONObject("content")?.takeIf { allowed })
-        val text = clear.optJSONObject("content")
-            ?.optString("body")
-            ?.takeIf { it.isNotEmpty() }
+        val text = if (allowed) PushPayloadDecryptor.previewBody(context, clear.optJSONObject("content")) else null
         if (text == null && allowed) PushDiagnostics.record(context, PushOutcome.EMPTY_BODY, traceOf(notification))
-        val body = text?.takeIf { allowed }
         PushNotificationGate.post(context, id, revision) {
-            post(context, notification, body ?: "Encrypted message")
+            post(context, notification, text ?: "Encrypted message")
         }
     }
 
@@ -763,9 +760,7 @@ object PushNotifier {
         }
         if (notification.optString("type") != "m.room.encrypted") {
             PushDiagnostics.record(context, PushOutcome.PLAINTEXT, traceOf(notification))
-            return notification.optJSONObject("content")
-                ?.optString("body")
-                ?.takeIf { it.isNotEmpty() }
+            return PushPayloadDecryptor.previewBody(context, notification.optJSONObject("content"))
                 ?: "New message"
         }
 

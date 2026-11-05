@@ -24,6 +24,18 @@ internal object PushPayloadDecryptor {
 
     private var loaded: Boolean? = null
 
+    private external fun nativePreviewBody(body: String, formatted: String): String?
+
+    fun previewBody(context: Context, content: JSONObject?): String? {
+        val body = (content?.opt("body") as? String)?.takeIf { it.isNotEmpty() } ?: return null
+        val formatted = (content.opt("formatted_body") as? String)?.takeIf { it.isNotBlank() }
+        if (content.optString("format") != "org.matrix.custom.html" || formatted == null) return body
+        if (!available(context)) return null
+        return runCatching { nativePreviewBody(body, formatted) }
+            .onFailure { Log.i(TAG, "Push preview unavailable: ${it.message}") }
+            .getOrNull()
+    }
+
     private external fun nativeMaintainPush(storeDir: String, operation: String): String?
 
     fun maintain(context: Context, operation: String): Boolean =

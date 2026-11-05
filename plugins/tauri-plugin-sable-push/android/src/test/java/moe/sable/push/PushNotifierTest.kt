@@ -40,6 +40,8 @@ class PushNotifierTest {
         every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any()) } answers {
             JSONObject().put("sender_name", arg<String?>(5).orEmpty())
         }
+        every { PushPayloadDecryptor.previewBody(any(), match { it?.toString() == richContent().toString() }) } returns
+            "Alice hi & welcome"
 
         val launchIntent = Intent(Intent.ACTION_MAIN)
             .addCategory(Intent.CATEGORY_LAUNCHER)
@@ -335,6 +337,102 @@ class PushNotifierTest {
     private fun shownTexts(): List<String> = androidx.core.app.NotificationCompat.MessagingStyle
         .extractMessagingStyleFromNotification(notificationManager.activeNotifications.single().notification)!!
         .messages.map { it.text.toString() }
+
+    private fun richContent() = JSONObject()
+        .put("msgtype", "m.text")
+        .put("body", "<a data-mention-type=\"user\" href=\"https://matrix.to/#/@alice:example.org\" contenteditable=\"false\">Alice</a> hi &amp; welcome")
+        .put("format", "org.matrix.custom.html")
+        .put("formatted_body", "<a href=\"https://matrix.to/#/@alice:example.org\">Alice</a> hi &amp; welcome")
+
+    @Test
+    fun richTextPushUsesPlainPreviewInNotificationAndHistory() {
+        val payload = JSONObject(pushPayload("!rich:example.org", "\$rich"))
+        payload.getJSONObject("notification").put("content", richContent())
+
+        PushNotifier.showFromPush(context, payload.toString())
+
+        assertEquals(listOf("Alice hi & welcome"), shownTexts())
+        val posted = notificationManager.activeNotifications.single().notification
+        assertTrue(posted.extras.getString(Notification.EXTRA_TEXT)!!.contains("Alice hi & welcome"))
+        PushNotifier.show(context, warmNotification("!rich:example.org", "\$next", "next"))
+        assertEquals(listOf("Alice hi & welcome", "next"), shownTexts())
+    }
+
+    @Test
+    fun fetchedRichTextPushUsesPlainPreview() {
+        PushPolicy(context).accounts = mapOf("@alice:example.org" to "DEVICE")
+        val clear = JSONObject().put("type", "m.room.message").put("content", richContent())
+        every { PushPayloadDecryptor.fetch(any(), any(), any(), any(), any()) } returns
+            PushDecryptResult.Success(clear.toString())
+        val payload = JSONObject(pushPayload("!rich:example.org", "\$rich"))
+        payload.getJSONObject("notification").remove("content")
+
+        PushNotifier.showFromPush(context, payload.toString())
+
+        assertEquals(listOf("Alice hi & welcome"), shownTexts())
+    }
+
+    @Test
+    fun locallyDecryptedRichTextPushUsesPlainPreview() {
+        val state = PushPolicy(context)
+        state.accounts = mapOf("@alice:example.org" to "DEVICE")
+        state.showEncryptedContent = true
+        val clear = JSONObject().put("type", "m.room.message").put("content", richContent())
+        every { PushPayloadDecryptor.decryptLocally(any(), any(), any(), any(), any()) } returns
+            PushDecryptResult.Success(clear.toString())
+        val payload = JSONObject(pushPayload("!rich:example.org", "\$rich"))
+        payload.getJSONObject("notification").put("type", "m.room.encrypted")
+
+        PushNotifier.showFromPush(context, payload.toString())
+
+        assertEquals(listOf("Alice hi & welcome"), shownTexts())
+    }
+
+    @Test
+    fun decryptedRichTextPushUsesPlainPreview() {
+        val state = PushPolicy(context)
+        state.accounts = mapOf("@alice:example.org" to "DEVICE")
+        state.showEncryptedContent = true
+        val clear = JSONObject().put("type", "m.room.message").put("content", richContent())
+        every { PushPayloadDecryptor.decrypt(any(), any(), any(), any(), any()) } returns
+            PushDecryptResult.Success(clear.toString())
+        val payload = JSONObject(pushPayload("!rich:example.org", "\$rich"))
+        payload.getJSONObject("notification").put("type", "m.room.encrypted")
+
+        PushNotifier.showFromPush(context, payload.toString())
+
+        assertEquals(listOf("Alice hi & welcome"), shownTexts())
+    }
+
+    @Test
+    fun plainTextPushKeepsLiteralMarkup() {
+        val body = "<b>literal</b> &amp; text"
+        for ((index, format) in listOf(null, "org.example.other", 5).withIndex()) {
+            val payload = JSONObject(pushPayload("!literal:example.org", "\$literal$index", body))
+            payload.getJSONObject("notification").getJSONObject("content")
+                .put("format", format).put("formatted_body", "<b>formatted</b>")
+            PushNotifier.showFromPush(context, payload.toString())
+            assertEquals(List(index + 1) { body }, shownTexts())
+        }
+    }
+
+    @Test
+    fun unavailableRichTextPreviewUsesGenericMessage() {
+        every { PushPayloadDecryptor.previewBody(any(), any()) } returns null
+        val payload = JSONObject(pushPayload("!rich:example.org", "\$rich"))
+        payload.getJSONObject("notification").put("content", richContent())
+
+        PushNotifier.showFromPush(context, payload.toString())
+
+        assertEquals(listOf("New message"), shownTexts())
+    }
+
+    @Test
+    fun warmRichTextNotificationUsesPlainPreview() {
+        val notification = warmNotification("!rich:example.org", "\$rich", "").put("content", richContent())
+        PushNotifier.show(context, notification)
+        assertEquals(listOf("Alice hi & welcome"), shownTexts())
+    }
 
     @Test
     fun show_postsNothingWhileNotificationsAreDisabled() {
