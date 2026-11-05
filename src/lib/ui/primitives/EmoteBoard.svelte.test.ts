@@ -222,7 +222,12 @@ test('enter picks the selected emote and closes', async () => {
 });
 
 test('shift+enter picks the selected emote and keeps the board open', async () => {
-  const { search, onPick } = await mountSearching();
+  const editor = document.body.appendChild(document.createElement('button'));
+  const { search, onPick } = await mountSearching(
+    vi.fn(() => {
+      editor.focus();
+    })
+  );
 
   await fireEvent.keyDown(search, { key: 'Enter', shiftKey: true });
 
@@ -231,6 +236,9 @@ test('shift+enter picks the selected emote and keeps the board open', async () =
     'emoticon',
     true
   );
+  await tick();
+  expect(search).toHaveFocus();
+  editor.remove();
 });
 
 test('enter reacts with the typed text over a matching emote', async () => {

@@ -4,6 +4,8 @@ import { render } from 'vitest-browser-svelte';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { writeRecent } from '#lib/emoji/recent-packs.svelte.js';
+import { isMacPlatform } from '#lib/ui/shortcuts/global-shortcuts.js';
 import { CoreError } from '#src/transport';
 
 import en from '../../../locales/en.json' with { type: 'json' };
@@ -37,7 +39,10 @@ function client(): CoreClient {
       fetchMedia: () => Promise.resolve(new Uint8Array()),
     },
     rpc: {
-      messages: { mediaConfig: () => Promise.resolve({ upload_size: 100 * 1024 * 1024 }) },
+      messages: {
+        mediaConfig: () => Promise.resolve({ upload_size: 100 * 1024 * 1024 }),
+        frequentReactions: () => Promise.resolve([]),
+      },
       room_state: { botCommands: () => Promise.resolve([]) },
       personas: { list: () => Promise.resolve({ personas: [], selections: [] }) },
       packs: { list: () => Promise.resolve({ packs: [], complete: true }) },
@@ -85,6 +90,38 @@ async function mount(
   };
   return { screen, composer, sent, editor, firstParagraph };
 }
+
+test.each(['search', 'cell'])(
+  'shift+enter keeps focus on the recent emote from %s',
+  async (from) => {
+    await page.viewport(1280, 900);
+    writeRecent(['🔥', '👍']);
+    try {
+      const { screen, composer, editor } = await mount(true);
+      await userEvent.click(composer);
+      const modifier = isMacPlatform() ? 'Meta' : 'Control';
+      await userEvent.keyboard(`{${modifier}>}e{/${modifier}}`);
+      const search = screen.getByRole('searchbox', { name: en.composer.searchPacks });
+      await expect.element(search).toHaveFocus();
+      await userEvent.keyboard('{ArrowRight}');
+      const selected = () => document.querySelector('[data-selected]')?.getAttribute('aria-label');
+      const label = selected();
+      expect(label).toBeTruthy();
+      const cell = screen.getByRole('gridcell', { name: label ?? '', exact: true }).first();
+      if (from === 'cell') cell.element().focus();
+
+      await userEvent.keyboard(NEWLINE);
+
+      await expect.element(from === 'search' ? search : cell).toHaveFocus();
+      if (from === 'search') expect(selected()).toBe(label);
+      await expect.poll(() => editor().textContent).toContain('👍');
+      await userEvent.keyboard(NEWLINE);
+      await expect.poll(() => editor().textContent.split('👍').length).toBe(3);
+    } finally {
+      writeRecent([]);
+    }
+  }
+);
 
 test.for([
   ['**', '<strong>test</strong>'],
