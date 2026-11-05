@@ -176,6 +176,7 @@ beforeEach(() => {
 
 afterEach(() => {
   mediaViewerState.close();
+  setPreference('showHome', false);
   setPreference('roomSort', 'recent');
   setPreference('directSort', 'recent');
   setPreference('showRoomIcon', 'always');
@@ -429,11 +430,47 @@ test('a space lists the favourite the core lifted out of its subspace', async ()
   expect(row('Deep')).toHaveAttribute('href', '/space/!root%3Aexample.org/!deep%3Aexample.org');
 });
 
-test('home links a room to its own section', async () => {
+test('home links a room to its own section when enabled', async () => {
+  setPreference('showHome', true);
   roomsFixture.rooms = [makeRoom({ room_id: '!plain:example.org', name: 'Plain' })];
 
   await mountNav();
   expect(row('Plain')).toHaveAttribute('href', '/home/!plain%3Aexample.org');
+});
+
+test('explore links rooms to their sections when Home is disabled', async () => {
+  visit('/explore');
+  setPreference('showHome', false);
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!plain:example.org', name: 'Plain' }),
+    makeRoom({ room_id: '!dm:example.org', name: 'Chat', is_direct: true }),
+    makeRoom({ room_id: '!child:example.org', name: 'Child' }),
+    makeRoom({
+      room_id: '!space:example.org',
+      name: 'Space',
+      room_kind: 'space',
+      space_children: [
+        {
+          room_id: '!child:example.org',
+          via: [],
+          order: null,
+          origin_server_ts: 1,
+          suggested: false,
+        },
+      ],
+    }),
+  ];
+  listSections(
+    sectionView('home', {
+      rooms: ['!plain:example.org', '!dm:example.org', '!child:example.org'],
+    })
+  );
+
+  await mountNav();
+
+  expect(row('Plain')).toHaveAttribute('href', '/rooms/!plain%3Aexample.org');
+  expect(row('Chat')).toHaveAttribute('href', '/direct/!dm%3Aexample.org');
+  expect(row('Child')).toHaveAttribute('href', '/space/!space%3Aexample.org/!child%3Aexample.org');
 });
 
 test('a room listed by a space section links through that space', async () => {
