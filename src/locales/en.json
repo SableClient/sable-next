@@ -1076,6 +1076,7 @@
     "videoAttachment": "Video attachment",
     "playVideo": "Play {{name}}",
     "playAudio": "Play {{name}}",
+    "pauseAudio": "Pause {{name}}",
     "audioSeek": "Seek",
     "audioVolume": "Volume",
     "showEmbed": "Show {{name}}",

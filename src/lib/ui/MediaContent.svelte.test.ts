@@ -192,6 +192,11 @@ test('falls back to the plain audio player when there is no waveform', async () 
 
   expect(document.querySelector('.voice-message-player')).toBeNull();
   expect(document.querySelector('.audio-container')).not.toBeNull();
+  expect(screen.getByRole('button', { name: 'Play clip.ogg' })).toBeInTheDocument();
+  expect(screen.getByRole('slider', { name: 'Seek' })).toHaveAttribute(
+    'aria-valuetext',
+    '00:00 / XX:XX'
+  );
 });
 
 test('audio file volume popover sets and remembers the volume', async () => {

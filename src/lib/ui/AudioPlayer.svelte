@@ -103,7 +103,7 @@
     <button
       class="audio-play-button"
       type="button"
-      aria-label={i18n.t('timeline.playAudio', { name: label })}
+      aria-label={i18n.t(isPlaying ? 'timeline.pauseAudio' : 'timeline.playAudio', { name: label })}
       onclick={() => {
         if (!isPlaying) {
           try {
@@ -133,6 +133,7 @@
       step="0.01"
       value={seekPosition}
       aria-label={i18n.t('timeline.audioSeek')}
+      aria-valuetext={`${formatTimestamp(seekPosition)} / ${duration ? formatTimestamp(duration) : 'XX:XX'}`}
       onpointerdown={() => (seekUserIsInteracting = true)}
       onpointerup={() => (seekUserIsInteracting = false)}
       onpointercancel={() => (seekUserIsInteracting = false)}
