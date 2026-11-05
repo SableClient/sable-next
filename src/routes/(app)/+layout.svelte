@@ -95,7 +95,8 @@
   import {
     callNotificationAction,
     inviteNotificationAction,
-    openNativeNotification,
+    NativeNotificationOpener,
+    type NativeNotificationOpen,
     selectNotificationAccount,
     performNotificationAction,
   } from '#lib/features/notifications/native-actions.js';
@@ -155,6 +156,8 @@
 
   let { children }: Props = $props();
   const core = useCoreClient();
+  const notificationOpener = new NativeNotificationOpener(core);
+  onDestroy(() => notificationOpener.cancel());
   const roomList = new RoomList(core);
   provideRoomList(roomList);
   $effect(() => {
@@ -831,13 +834,13 @@
 
     const { roomId, userId, eventId } = pushedRoom;
     pushedRoom = null;
-    const opened =
-      userId === null
-        ? openNotification(roomId, eventId)
-        : openFromNotification({ userId, roomId, eventId }, openNotification);
-    void opened.catch((error: unknown) => {
-      console.warn('[sable notifications] notification not opened', error);
-    });
+    const notifiedUser = userId ?? core.session?.user_id;
+    if (!notifiedUser) return;
+    void openFromNotification({ userId: notifiedUser, roomId, eventId }, openNotification).catch(
+      (error: unknown) => {
+        console.warn('[sable notifications] notification not opened', error);
+      }
+    );
   });
 
   $effect(() => {
@@ -926,7 +929,15 @@
       console.warn('[sable rooms] room list unavailable', error);
     });
     void spaceSidebar.start(core);
-    notifications.start(core, openNotification);
+    const userId = untrack(() => core.session?.user_id);
+    notifications.start(core, (roomId, eventId) => {
+      if (!userId) return;
+      void openFromNotification({ userId, roomId, eventId }, openNotification).catch(
+        (error: unknown) => {
+          console.warn('[sable notifications] notification not opened', error);
+        }
+      );
+    });
     presence.start(core);
     dismissedInvites.start(core);
     dmSpaces.start(core);
@@ -981,17 +992,24 @@
 
   async function openFromNotification(
     target: NativeNotificationTarget,
-    open: (roomId: string, eventId: string | null) => void | Promise<void>
+    open: NativeNotificationOpen
   ): Promise<void> {
-    const opening = await openNativeNotification(core, target, open);
+    const opening = await notificationOpener.open(target, open);
     if (opening === 'unknown_account') toasts.error(i18n.t('nav.notificationAccountMissing'));
     if (opening === 'switch_failed') toasts.error(i18n.t('nav.switchAccountFailed'));
   }
 
-  async function openNotification(roomId: string, eventId: string | null): Promise<void> {
+  async function openNotification(
+    roomId: string,
+    eventId: string | null,
+    isCurrent: () => boolean
+  ): Promise<void> {
     await tick();
+    if (!isCurrent()) return;
     await roomList.start();
+    if (!isCurrent()) return;
     await roomList.whenListed(roomId, NOTIFIED_ROOM_WAIT_MS);
+    if (!isCurrent()) return;
     if (roomList.rooms.find((room) => room.room_id === roomId)?.state === 'invited') {
       await goto(resolve('/(app)/inbox'));
       return;
@@ -1024,10 +1042,9 @@
   $effect(() => {
     if (core.status !== 'ready' || !alertsNatively()) return;
 
-    let stop: (() => void) | null = null;
-    let stopped = false;
+    const controller = new AbortController();
 
-    void Promise.all([
+    for (const watching of [
       watchNativeNotificationActions((action) => {
         const invite = inviteNotificationAction(action);
         if (invite !== null) {
@@ -1050,26 +1067,21 @@
             console.debug('[sable notifications] action not performed', error);
           }
         );
-      }),
+      }, controller.signal),
       watchNativeNotificationClicks((target) => {
         void openFromNotification(target, openNotification).catch((error: unknown) => {
           console.warn('[sable notifications] notification not opened', error);
         });
-      }),
-    ])
-      .then((offs) => {
-        stop = () => {
-          for (const off of offs) off();
-        };
-        if (stopped) stop();
-      })
-      .catch((error: unknown) => {
+      }, controller.signal),
+    ]) {
+      void watching.catch((error: unknown) => {
         console.debug('[sable notifications] native listeners not attached', error);
       });
+    }
 
     return () => {
-      stopped = true;
-      stop?.();
+      controller.abort();
+      notificationOpener.cancel();
     };
   });
 

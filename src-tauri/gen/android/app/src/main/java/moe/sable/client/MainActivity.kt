@@ -150,6 +150,7 @@ class MainActivity : TauriActivity() {
   }
 
   override fun onNewIntent(intent: Intent) {
+    setIntent(intent)
     super.onNewIntent(intent)
     stageShareIntent(intent)
   }

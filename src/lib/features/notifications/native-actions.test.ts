@@ -13,7 +13,7 @@ import type {
 
 import {
   inviteNotificationAction,
-  openNativeNotification,
+  NativeNotificationOpener,
   performNotificationAction,
 } from './native-actions';
 
@@ -22,7 +22,7 @@ type Replier = Parameters<typeof performNotificationAction>[0];
 function core(accountId = 'account-me') {
   const sendMessage = vi.fn().mockResolvedValue(undefined);
   const markRead = vi.fn().mockResolvedValue(undefined);
-  const switchAccount = vi.fn().mockResolvedValue(undefined);
+  const switchAccount = vi.fn();
   const accounts = [
     { account_id: 'account-me', user_id: '@me:example.org' },
     { account_id: 'account-other', user_id: '@other:example.org' },
@@ -33,6 +33,12 @@ function core(accountId = 'account-me') {
     rpc: { messages: { send: sendMessage }, timeline: { markRead } },
     switchAccount,
   } as unknown as Replier;
+  switchAccount.mockImplementation((selectedId: string) => {
+    client.session = accounts.find(
+      (account) => account.account_id === selectedId
+    ) as Replier['session'];
+    return Promise.resolve();
+  });
 
   return { client, sendMessage, markRead, switchAccount };
 }
@@ -115,11 +121,15 @@ test('opening an inactive account notification switches before navigating', asyn
   const open = vi.fn();
 
   await expect(
-    openNativeNotification(client, target({ userId: '@other:example.org' }), open)
+    new NativeNotificationOpener(client).open(target({ userId: '@other:example.org' }), open)
   ).resolves.toBe('opened');
 
   expect(switchAccount).toHaveBeenCalledWith('account-other');
-  expect(open).toHaveBeenCalledWith('!room:example.org', '$event:example.org');
+  expect(open).toHaveBeenCalledWith(
+    '!room:example.org',
+    '$event:example.org',
+    expect.any(Function)
+  );
   expect(switchAccount).toHaveBeenCalledBefore(open);
 });
 
@@ -130,7 +140,7 @@ test('a notification whose account cannot be switched to stays on the current ro
   const open = vi.fn();
 
   await expect(
-    openNativeNotification(client, target({ userId: '@other:example.org' }), open)
+    new NativeNotificationOpener(client).open(target({ userId: '@other:example.org' }), open)
   ).resolves.toBe('switch_failed');
 
   expect(open).not.toHaveBeenCalled();
@@ -141,7 +151,7 @@ test('a notification for an account that is gone opens nothing', async () => {
   const open = vi.fn();
 
   await expect(
-    openNativeNotification(client, target({ userId: '@gone:example.org' }), open)
+    new NativeNotificationOpener(client).open(target({ userId: '@gone:example.org' }), open)
   ).resolves.toBe('unknown_account');
 
   expect(switchAccount).not.toHaveBeenCalled();
@@ -167,9 +177,137 @@ test('resolves receipt policy after selecting the notification account', async (
   let privateReceipt = false;
   switchAccount.mockImplementation(() => {
     privateReceipt = true;
+    client.session = client.accounts.find(
+      (account) => account.user_id === '@me:example.org'
+    ) as Replier['session'];
     return Promise.resolve();
   });
   await performNotificationAction(client, action(), () => privateReceipt);
   expect(switchAccount).toHaveBeenCalledWith('account-me');
   expect(markRead).toHaveBeenCalledWith(expect.objectContaining({ private_receipt: true }));
+});
+
+test('a switch that returns without selecting the account does not open a room', async () => {
+  const { client, switchAccount } = core();
+  switchAccount.mockResolvedValue(undefined);
+  const open = vi.fn();
+
+  await expect(
+    new NativeNotificationOpener(client).open(target({ userId: '@other:example.org' }), open)
+  ).resolves.toBe('switch_failed');
+  expect(open).not.toHaveBeenCalled();
+});
+
+test('a newer tap supersedes an older room lookup', async () => {
+  const { client } = core();
+  const opener = new NativeNotificationOpener(client);
+  const started = Promise.withResolvers<undefined>();
+  const listed = Promise.withResolvers<undefined>();
+  const navigated: string[] = [];
+  const older = opener.open(
+    target({ roomId: '!older:example.org' }),
+    async (roomId, _eventId, isCurrent) => {
+      started.resolve(undefined);
+      await listed.promise;
+      if (isCurrent()) navigated.push(roomId);
+    }
+  );
+  await started.promise;
+  await opener.open(target({ roomId: '!newer:example.org' }), (roomId, _eventId, isCurrent) => {
+    if (isCurrent()) navigated.push(roomId);
+  });
+  listed.resolve(undefined);
+
+  await expect(older).resolves.toBe('superseded');
+  expect(navigated).toEqual(['!newer:example.org']);
+});
+
+test('a tap for the current account waits for an older account switch before selecting it', async () => {
+  const { client, switchAccount } = core();
+  const opener = new NativeNotificationOpener(client);
+  const started = Promise.withResolvers<undefined>();
+  const switched = Promise.withResolvers<undefined>();
+  switchAccount.mockImplementation(async (accountId: string) => {
+    if (accountId === 'account-other') {
+      started.resolve(undefined);
+      await switched.promise;
+    }
+    client.session = client.accounts.find(
+      (account) => account.account_id === accountId
+    ) as Replier['session'];
+  });
+  const openOld = vi.fn();
+  const openNew = vi.fn();
+  const older = opener.open(target({ userId: '@other:example.org' }), openOld);
+  await started.promise;
+  const newer = opener.open(target(), openNew);
+  expect(switchAccount).toHaveBeenCalledTimes(1);
+  switched.resolve(undefined);
+
+  await expect(older).resolves.toBe('superseded');
+  await expect(newer).resolves.toBe('opened');
+  expect(switchAccount.mock.calls).toEqual([['account-other'], ['account-me']]);
+  expect(openOld).not.toHaveBeenCalled();
+  expect(openNew).toHaveBeenCalledOnce();
+  expect(client.session?.account_id).toBe('account-me');
+});
+
+test.each(['cancel', 'account change'] as const)(
+  '%s invalidates an in-flight room lookup',
+  async (reason) => {
+    const { client } = core();
+    const opener = new NativeNotificationOpener(client);
+    const started = Promise.withResolvers<undefined>();
+    const listed = Promise.withResolvers<undefined>();
+    const navigate = vi.fn();
+    const opening = opener.open(target(), async (_roomId, _eventId, isCurrent) => {
+      started.resolve(undefined);
+      await listed.promise;
+      if (isCurrent()) navigate();
+    });
+    await started.promise;
+    if (reason === 'cancel') opener.cancel();
+    else client.session = client.accounts[1] as Replier['session'];
+    listed.resolve(undefined);
+
+    await expect(opening).resolves.toBe('superseded');
+    expect(navigate).not.toHaveBeenCalled();
+  }
+);
+
+test('a failed older switch does not stop a newer tap from selecting its account', async () => {
+  const { client, switchAccount } = core();
+  const opener = new NativeNotificationOpener(client);
+  const started = Promise.withResolvers<undefined>();
+  const switched = Promise.withResolvers<undefined>();
+  switchAccount.mockImplementationOnce(async () => {
+    started.resolve(undefined);
+    await switched.promise;
+    throw new Error('switch failed');
+  });
+  const open = vi.fn();
+  const older = opener.open(target({ userId: '@other:example.org' }), vi.fn());
+  await started.promise;
+  const newer = opener.open(target(), open);
+  switched.resolve(undefined);
+
+  await expect(older).resolves.toBe('superseded');
+  await expect(newer).resolves.toBe('opened');
+  expect(open).toHaveBeenCalledOnce();
+});
+
+test('changing accounts while sending a reply does not mark the other account read', async () => {
+  const { client, sendMessage, markRead } = core();
+  const started = Promise.withResolvers<undefined>();
+  const sent = Promise.withResolvers<undefined>();
+  sendMessage.mockImplementation(async () => {
+    started.resolve(undefined);
+    await sent.promise;
+  });
+  const replying = performNotificationAction(client, action(), () => false);
+  await started.promise;
+  client.session = client.accounts[1] as Replier['session'];
+  sent.resolve(undefined);
+  await replying;
+  expect(markRead).not.toHaveBeenCalled();
 });

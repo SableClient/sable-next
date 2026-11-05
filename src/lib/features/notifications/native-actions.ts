@@ -41,26 +41,60 @@ export async function selectNotificationAccount(
   if (core.session?.account_id !== account.account_id) {
     await core.switchAccount(account.account_id);
   }
+  if (core.session?.account_id !== account.account_id) {
+    throw new Error('The notification account was not selected');
+  }
   return true;
 }
 
-export type NotificationOpening = 'opened' | 'unknown_account' | 'switch_failed';
+export type NotificationOpening = 'opened' | 'unknown_account' | 'switch_failed' | 'superseded';
+export type NativeNotificationOpen = (
+  roomId: string,
+  eventId: string | null,
+  isCurrent: () => boolean
+) => void | Promise<void>;
 
-export async function openNativeNotification(
-  core: AccountSwitcher,
-  target: NativeNotificationTarget,
-  open: (roomId: string, eventId: string | null) => void | Promise<void>
-): Promise<NotificationOpening> {
-  let selected: boolean;
-  try {
-    selected = await selectNotificationAccount(core, target.userId);
-  } catch (error) {
-    console.warn('[sable notifications] account not switched', error);
-    return 'switch_failed';
+export class NativeNotificationOpener {
+  private generation = 0;
+  private selecting: Promise<void> = Promise.resolve();
+
+  constructor(private readonly core: AccountSwitcher) {}
+
+  cancel(): void {
+    this.generation += 1;
   }
-  if (!selected) return 'unknown_account';
-  await open(target.roomId, target.eventId);
-  return 'opened';
+
+  async open(
+    target: NativeNotificationTarget,
+    open: NativeNotificationOpen
+  ): Promise<NotificationOpening> {
+    const generation = ++this.generation;
+    const selecting = this.selecting.then(async () => {
+      if (generation !== this.generation) return null;
+      return (await selectNotificationAccount(this.core, target.userId)) ? this.core.session : null;
+    });
+    this.selecting = selecting.then(
+      () => undefined,
+      () => undefined
+    );
+    let session: AccountSwitcher['session'];
+    try {
+      session = await selecting;
+    } catch (error) {
+      if (generation !== this.generation) return 'superseded';
+      console.warn('[sable notifications] account not switched', error);
+      return 'switch_failed';
+    }
+    if (generation !== this.generation) return 'superseded';
+    if (session === null) return 'unknown_account';
+    const isCurrent = (): boolean =>
+      generation === this.generation &&
+      this.core.session === session &&
+      session.user_id === target.userId;
+    if (!isCurrent()) return 'superseded';
+    await open(target.roomId, target.eventId, isCurrent);
+    return isCurrent() ? 'opened' : 'superseded';
+  }
 }
 
 export async function performNotificationAction(
@@ -72,12 +106,15 @@ export async function performNotificationAction(
   if (action.actionId === REPLY_ACTION && action.text === null) return;
 
   if (!(await selectNotificationAccount(core, action.userId))) return;
+  const session = core.session;
+  if (session?.user_id !== action.userId) return;
 
   if (action.text !== null && action.actionId === REPLY_ACTION) {
     await sendMessage(core.rpc, action.roomId, action.text);
   }
 
   if (action.eventId !== null) {
+    if (core.session !== session) return;
     await core.rpc.timeline.markRead({
       room_id: action.roomId,
       event_id: action.eventId,
