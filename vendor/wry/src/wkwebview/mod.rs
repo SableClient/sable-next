@@ -32,9 +32,11 @@ use class::{
 use dpi::{LogicalPosition, LogicalSize};
 #[cfg(target_os = "macos")]
 use objc2::runtime::Bool;
+#[cfg(any(debug_assertions, feature = "devtools", feature = "mac-proxy"))]
+use objc2::runtime::NSObject;
 use objc2::{
   rc::Retained,
-  runtime::{AnyObject, NSObject, ProtocolObject},
+  runtime::{AnyObject, ProtocolObject},
   AllocAnyThread, DeclaredClass, MainThreadOnly, Message,
 };
 #[cfg(target_os = "macos")]
@@ -47,8 +49,10 @@ use objc2_foundation::{
   NSHTTPCookieDomain, NSHTTPCookieExpires, NSHTTPCookieMaximumAge, NSHTTPCookieName,
   NSHTTPCookiePath, NSHTTPCookiePropertyKey, NSHTTPCookieSecure, NSHTTPCookieValue,
   NSHTTPCookieVersion, NSJSONSerialization, NSMutableDictionary, NSMutableURLRequest, NSNumber,
-  NSObjectNSKeyValueCoding, NSObjectProtocol, NSString, NSUTF8StringEncoding, NSURL, NSUUID,
+  NSObjectNSKeyValueCoding, NSString, NSUTF8StringEncoding, NSURL, NSUUID,
 };
+#[cfg(any(target_os = "macos", debug_assertions, feature = "devtools"))]
+use objc2_foundation::NSObjectProtocol;
 #[cfg(target_os = "ios")]
 use objc2_ui_kit::{UIScrollView, UIViewAutoresizing};
 
@@ -963,7 +967,7 @@ impl InnerWebView {
 
   pub fn set_background_color(&self, _background_color: RGBA) -> Result<()> {
     #[cfg(target_os = "ios")]
-    unsafe {
+    {
       let (red, green, blue, alpha) = _background_color;
 
       let color = objc2_ui_kit::UIColor::colorWithRed_green_blue_alpha(
@@ -1068,9 +1072,7 @@ impl InnerWebView {
       #[cfg(target_os = "macos")]
       window.makeFirstResponder(Some(&self.ns_view));
       #[cfg(target_os = "ios")]
-      unsafe {
-        window.becomeFirstResponder()
-      };
+      window.becomeFirstResponder();
     }
 
     Ok(())

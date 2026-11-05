@@ -123,13 +123,6 @@ pub(super) async fn pusher_client(
     not(mobile),
     expect(dead_code, reason = "only a mobile build registers a pusher")
 )]
-#[cfg_attr(
-    all(mobile, not(target_os = "android")),
-    expect(
-        dead_code,
-        reason = "only android declares accounts to the push plugin"
-    )
-)]
 pub(crate) struct PushAccount {
     pub user_id: String,
     pub device_id: String,
@@ -151,13 +144,6 @@ pub(crate) struct PushConfig {
     pub user_id: Option<String>,
     pub device_id: Option<String>,
     #[serde(default)]
-    #[cfg_attr(
-        all(mobile, not(target_os = "android")),
-        expect(
-            dead_code,
-            reason = "only android declares accounts to the push plugin"
-        )
-    )]
     pub accounts: Vec<PushAccount>,
     /// Absent when the reader has retargeted the gateway: a token distributor
     /// needs an app id that gateway serves, and only the deployment names one.

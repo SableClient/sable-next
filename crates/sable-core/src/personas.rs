@@ -22,8 +22,8 @@ use crate::ResultExt;
 use crate::profiles::pronoun_sets;
 use crate::protocol::PersonaAlternateAvatarView;
 use crate::protocol::{
-    PerMessageProfileView, PersonaCatalogView, PersonaSelectionView, PersonaTriggerView,
-    PersonaView, PluralkitImportView, PronounView, RpcError, PersonaSortFlagsView
+    PerMessageProfileView, PersonaCatalogView, PersonaSelectionView, PersonaSortFlagsView,
+    PersonaTriggerView, PersonaView, PluralkitImportView, PronounView, RpcError,
 };
 
 const CATALOG_V3: &str = "fi.mau.msc4461.per_message_profiles.v3";
@@ -535,8 +535,10 @@ struct PersonaOut {
         skip_serializing_if = "Option::is_none"
     )]
     alternate_avatars: Option<Vec<AlternateAvatarOut>>,
-    #[serde(rename = "net.f0rest.sort_flags",
-        skip_serializing_if = "Option::is_none" )]
+    #[serde(
+        rename = "net.f0rest.sort_flags",
+        skip_serializing_if = "Option::is_none"
+    )]
     sort_flags: Option<SortFlagsOut>,
 }
 
