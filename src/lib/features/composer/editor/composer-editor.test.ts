@@ -2692,3 +2692,23 @@ describe('pasting what select-all copied', () => {
     expect(editorView.state.doc.firstChild?.childCount).toBe(2);
   });
 });
+
+test('a length-limited editor rejects typing past the limit and still allows deletion', () => {
+  const editor = openWith({ maxLength: 5 });
+  typeAfterBreak(editor, 'hello');
+  typeAfterBreak(editor, '!');
+  expect(editor.text()).toBe('hello');
+  view(editor).dispatch(view(editor).state.tr.delete(5, 6));
+  typeAfterBreak(editor, '!');
+  expect(editor.text()).toBe('hell!');
+});
+
+test('an existing bio over the limit can still be loaded and shortened', () => {
+  const editor = openWith({ maxLength: 5 });
+  editor.setText('existing biography');
+  expect(editor.text()).toBe('existing biography');
+  typeAfterBreak(editor, '!');
+  expect(editor.text()).toBe('existing biography');
+  view(editor).dispatch(view(editor).state.tr.delete(1, 10));
+  expect(editor.text()).toBe('biography');
+});

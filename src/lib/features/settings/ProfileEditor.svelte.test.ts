@@ -162,3 +162,31 @@ test('the tabs are one tab stop that arrow keys move and select', async () => {
   expect(edit).toHaveFocus();
   expect(edit).toHaveAttribute('aria-selected', 'true');
 });
+
+test('editing and saving the bio retains custom emoji and inline image URLs', async () => {
+  const user = userEvent.setup();
+  const onSaved = vi.fn();
+  render(ProfileEditor, {
+    profile: {
+      ...profile,
+      bio: '<p>Hello <img data-mx-emoticon src="mxc://example.org/wave" alt=":wave:"> <img src="mxc://example.org/cat" alt="Cat"></p>',
+    },
+    userId: profile.user_id,
+    onSaved,
+  });
+  const bio = screen.getByRole('combobox', { name: 'Biography' });
+  await user.click(bio);
+  await user.paste(' cheers');
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  await vi.waitFor(() => {
+    expect(onSaved).toHaveBeenCalled();
+  });
+  const [field, value] = setProfileField.mock.calls[0];
+  expect(field).toBe('gay.fomx.biography');
+  const texts = (value as { 'm.text': { body: string; mimetype?: string }[] })['m.text'];
+  expect(texts).toHaveLength(2);
+  expect(texts[0].mimetype).toBe('text/html');
+  expect(texts[0].body).toContain('mxc://example.org/wave');
+  expect(texts[0].body).toContain('mxc://example.org/cat');
+  expect(texts[1].body).toContain('cheers');
+});

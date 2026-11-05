@@ -42,6 +42,7 @@
     resizable?: boolean;
     /** Reactions can be plain unicode, so the board offers both on one surface. */
     unicode?: boolean;
+    unicodeOnly?: boolean;
     /** A reaction key cannot be a sticker. */
     stickers?: boolean;
     reactions?: boolean;
@@ -58,6 +59,7 @@
     variant = 'popover',
     resizable = false,
     unicode = false,
+    unicodeOnly = false,
     stickers = true,
     reactions = false,
     gifs = null,
@@ -110,6 +112,11 @@
   let chosen = $state.raw({ key: '', row: 0, col: 0 });
 
   $effect(() => {
+    if (unicodeOnly) {
+      loading = false;
+      packs = [];
+      return;
+    }
     let cancelled = false;
     const accountId = core.session?.account_id ?? null;
     loading = true;

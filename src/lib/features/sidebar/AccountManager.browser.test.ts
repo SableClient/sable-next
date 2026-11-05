@@ -378,3 +378,28 @@ test.each([
 
   mediaViewerState.close();
 });
+
+test('status emoji can be picked and cleared without changing the text', async () => {
+  await page.viewport(1280, 800);
+  const { screen, bubble, setProfileField } = await mount(
+    profileWith({ status: { text: 'Working', emoji: '🚀' } })
+  );
+  await expect.poll(() => bubble().textContent).toContain('🚀');
+  await userEvent.click(bubble());
+  await userEvent.click(page.getByRole('button', { name: 'Choose status emoji' }));
+  await userEvent.fill(page.getByRole('searchbox', { name: 'Search emoji and emotes' }), 'fire');
+  await userEvent.click(page.getByRole('gridcell', { name: 'fire', exact: true }));
+  await userEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+  await expect
+    .poll(() => setProfileField.mock.calls)
+    .toEqual([['org.matrix.msc4426.status', { text: 'Working', emoji: '🔥' }]]);
+  await expect.poll(() => bubble().textContent).toContain('🔥');
+
+  await userEvent.click(bubble());
+  await userEvent.click(page.getByRole('button', { name: 'Choose status emoji' }));
+  await userEvent.click(page.getByRole('button', { name: 'Remove status emoji' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+  await expect
+    .poll(() => setProfileField.mock.calls.at(-1))
+    .toEqual(['org.matrix.msc4426.status', { text: 'Working', emoji: '' }]);
+});

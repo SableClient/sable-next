@@ -21,14 +21,6 @@
   import { MAX_PRONOUN_INPUT, pronounSets, pronounText } from '#lib/profile/pronouns.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import MentionProfileCard from '#lib/features/room/members/MentionProfileCard.svelte';
-  import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
-  import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
-  import ListBulletsIcon from 'phosphor-svelte/lib/ListBulletsIcon';
-  import QuotesIcon from 'phosphor-svelte/lib/QuotesIcon';
-  import TextBIcon from 'phosphor-svelte/lib/TextBIcon';
-  import TextItalicIcon from 'phosphor-svelte/lib/TextItalicIcon';
-  import TextStrikethroughIcon from 'phosphor-svelte/lib/TextStrikethroughIcon';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import { senderColor } from '../room/timeline/timeline-format';
@@ -44,7 +36,9 @@
   import './profile-editor.css';
   import SpaceProfileEditor from './SpaceProfileEditor.svelte';
   import { isActiveSpace } from '#lib/features/sidebar/nav-rooms.js';
-  import { bioHtml, bioMarkdown, bioTexts } from './bio-markdown.js';
+  import { bioContent, bioHtml, bioTexts, type BioContent } from './bio-content.js';
+  import BioEditor from './BioEditor.svelte';
+  import StatusEmojiPicker from './StatusEmojiPicker.svelte';
   import ColorSetting from '#lib/ui/ColorSetting.svelte';
   import { hexColorOrEmpty } from '#lib/ui/hex-color.js';
   import { type SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
@@ -77,7 +71,8 @@
     pronouns: string;
     timezone: string;
     status: string;
-    bio: string;
+    statusEmoji: string;
+    bio: BioContent;
     light: string;
     dark: string;
     hero: string;
@@ -106,7 +101,8 @@
       pronouns: pronounText(source.pronouns),
       timezone: source.timezone ?? '',
       status: source.status?.text ?? '',
-      bio: bioMarkdown(source.bio ?? ''),
+      statusEmoji: source.status?.emoji ?? '',
+      bio: bioContent(source.bio ?? ''),
       light: source.name_color_light ?? '',
       dark: source.name_color_dark ?? '',
       hero: source.hero_color ?? '',
@@ -158,7 +154,7 @@
     avatar_url: avatarPreview ?? (draft.avatarRemoved ? null : profile.avatar_url),
     banner_url: draft.banner,
     bio: bioHtml(draft.bio),
-    status: draft.status ? { text: draft.status, emoji: profile.status?.emoji ?? null } : null,
+    status: draft.status ? { text: draft.status, emoji: draft.statusEmoji || null } : null,
     pronouns: pronounSets(draft.pronouns).map(({ summary, language }) => ({
       summary,
       language: language ?? null,
@@ -265,9 +261,9 @@
 
   function fields(): Array<[string, unknown]> {
     const out: Array<[string, unknown]> = [];
-    if (changed('status')) {
+    if (changed('status', 'statusEmoji')) {
       out.push(
-        [STATUS_FIELD, statusContent(draft.status, profile.status?.emoji)],
+        [STATUS_FIELD, statusContent(draft.status, draft.statusEmoji)],
         ...legacyDeletes(profile.legacy_fields, LEGACY_STATUS_FIELDS)
       );
     }
@@ -292,7 +288,7 @@
     }
     if (changed('bio')) {
       out.push(
-        [BIO_FIELD, draft.bio ? { 'm.text': bioTexts(draft.bio) } : null],
+        [BIO_FIELD, draft.bio.body ? { 'm.text': bioTexts(draft.bio) } : null],
         ...legacyDeletes(profile.legacy_fields, LEGACY_BIO_FIELDS)
       );
     }
@@ -360,44 +356,6 @@
     if (!formEl?.contains(document.activeElement)) return;
     event.preventDefault();
     void save();
-  }
-
-  interface BioFormat {
-    id: 'bold' | 'italic' | 'strike' | 'code' | 'link' | 'quote' | 'list';
-    icon: typeof TextBIcon;
-    open: string;
-    close: string;
-    line?: boolean;
-  }
-
-  const bioFormats: BioFormat[] = [
-    { id: 'bold', icon: TextBIcon, open: '**', close: '**' },
-    { id: 'italic', icon: TextItalicIcon, open: '*', close: '*' },
-    { id: 'strike', icon: TextStrikethroughIcon, open: '~~', close: '~~' },
-    { id: 'code', icon: CodeIcon, open: '`', close: '`' },
-    { id: 'link', icon: LinkIcon, open: '[', close: '](https://)' },
-    { id: 'quote', icon: QuotesIcon, open: '> ', close: '', line: true },
-    { id: 'list', icon: ListBulletsIcon, open: '- ', close: '', line: true },
-  ];
-
-  function formatBio({ open, close, line }: BioFormat): void {
-    const field = document.getElementById('account-bio');
-    if (!(field instanceof HTMLTextAreaElement)) return;
-    const { selectionStart: start, selectionEnd: end, value } = field;
-    const from = line ? value.lastIndexOf('\n', start - 1) + 1 : start;
-    const selected = value.slice(from, end);
-    const wrapped = line
-      ? selected
-          .split('\n')
-          .map((row) => `${open}${row}`)
-          .join('\n')
-      : `${open}${selected}${close}`;
-    draft.bio = value.slice(0, from) + wrapped + value.slice(end);
-    const caret = from + wrapped.length - (line ? 0 : close.length);
-    requestAnimationFrame(() => {
-      field.focus();
-      field.setSelectionRange(caret, caret);
-    });
   }
 
   function cancel(): void {
@@ -496,15 +454,18 @@
           nameColorDark={draft.dark || null}
         >
           {#snippet statusField()}
-            <TextInput
-              id="account-status"
-              class="inline-edit"
-              bind:value={draft.status}
-              autocomplete="off"
-              aria-label={i18n.t('settings.status')}
-              placeholder={i18n.t('common.statusPlaceholder')}
-              maxlength={MAX_STATUS_TEXT_BYTES}
-            />
+            <div class="status-input">
+              <TextInput
+                id="account-status"
+                class="inline-edit"
+                bind:value={draft.status}
+                autocomplete="off"
+                aria-label={i18n.t('settings.status')}
+                placeholder={i18n.t('common.statusPlaceholder')}
+                maxlength={MAX_STATUS_TEXT_BYTES}
+              />
+              <StatusEmojiPicker bind:value={draft.statusEmoji} />
+            </div>
           {/snippet}
           {#snippet nameField()}
             <div class="caption-field">
@@ -687,26 +648,7 @@
 
           <div class="caption-field">
             <label class="caption" for="account-bio">{i18n.t('settings.biography')}</label>
-            <div class="bio-toolbar" role="toolbar" aria-label={i18n.t('settings.bioFormatting')}>
-              {#each bioFormats as format (format.id)}
-                <IconButton
-                  variant="ghost"
-                  size="small"
-                  label={i18n.t(`settings.bioFormat.${format.id}`)}
-                  onclick={() => formatBio(format)}
-                >
-                  <format.icon />
-                </IconButton>
-              {/each}
-            </div>
-            <TextArea
-              id="account-bio"
-              class="inline-edit"
-              bind:value={draft.bio}
-              rows={4}
-              maxlength={5000}
-              placeholder={i18n.t('settings.biographyHint')}
-            />
+            <BioEditor id="account-bio" bind:value={draft.bio} />
           </div>
         </ProfileCard>
       </div>

@@ -10,6 +10,11 @@
 .profile-section .profile-hero .profile-card {
   border: 0;
   border-radius: 0;
+  overflow: visible;
+}
+
+.profile-section .profile-hero .profile-card-panel.framed {
+  overflow: visible;
 }
 
 .profile-section .profile-hero .profile-card-bio {
@@ -190,4 +195,11 @@
   .profile-section .color-controls .text-input:hover:not(:focus) {
     --form-control-line: var(--surface-var-container-line);
   }
+}
+
+.profile-section .status-input {
+  align-items: center;
+  display: flex;
+  gap: var(--space-100);
+  min-width: 0;
 }

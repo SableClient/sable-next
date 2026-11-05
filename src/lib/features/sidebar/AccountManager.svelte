@@ -45,6 +45,7 @@
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import StatusEmojiPicker from '#lib/features/settings/StatusEmojiPicker.svelte';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { AccountDirectory } from './account-directory.svelte.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
@@ -73,6 +74,7 @@
     { value: 'offline', label: i18n.t('presence.offline') },
   ]);
   let statusDraft = $state('');
+  let statusEmojiDraft = $state('');
   let presenceDraft = $state<PresenceView>(preferences.presence);
   let statusOpen = $state(false);
   let statusSaving = $state(false);
@@ -112,9 +114,9 @@
     statusSaving = true;
     statusError = null;
     const text = truncateUtf8(statusDraft.trim(), MAX_STATUS_TEXT_BYTES);
-    const status = statusContent(text, userStatus?.emoji);
+    const status = statusContent(text, statusEmojiDraft);
     try {
-      if (text !== ownStatus) {
+      if (text !== ownStatus || (status?.emoji ?? '') !== (userStatus?.emoji ?? '')) {
         await core.setProfileField(STATUS_FIELD, status);
         for (const [field] of legacyDeletes(profile?.legacy_fields ?? [], LEGACY_STATUS_FIELDS)) {
           await core.setProfileField(field, null);
@@ -184,6 +186,7 @@
     aria-label={`${i18n.t('presence.setStatus')}: ${i18n.t(`presence.${preferences.presence}`)}${ownStatus ? `, ${ownStatus}` : ''}`}
     onclick={() => {
       statusDraft = ownStatus;
+      statusEmojiDraft = userStatus?.emoji ?? '';
       presenceDraft = preferences.presence;
       statusError = null;
       statusOpen = true;
@@ -373,13 +376,16 @@
       onSelect={(value) => (presenceDraft = value)}
     />
     <FormField fieldId="presence-status-message" label={i18n.t('presence.statusMessage')}>
-      <TextInput
-        id="presence-status-message"
-        bind:value={statusDraft}
-        disabled={statusSaving}
-        maxlength={MAX_STATUS_TEXT_BYTES}
-        placeholder={i18n.t('common.statusPlaceholder')}
-      />
+      <div class="status-message-input">
+        <TextInput
+          id="presence-status-message"
+          bind:value={statusDraft}
+          disabled={statusSaving}
+          maxlength={MAX_STATUS_TEXT_BYTES}
+          placeholder={i18n.t('common.statusPlaceholder')}
+        />
+        <StatusEmojiPicker bind:value={statusEmojiDraft} disabled={statusSaving} />
+      </div>
     </FormField>
     {#if statusError}<Alert variant="critical" role="alert">{statusError}</Alert>{/if}
     <DialogActions>
@@ -389,8 +395,9 @@
       <Button
         type="submit"
         loading={statusSaving}
-        disabled={statusDraft.trim() === ownStatus && presenceDraft === preferences.presence}
-        >{i18n.t('common.save')}</Button
+        disabled={statusDraft.trim() === ownStatus &&
+          statusEmojiDraft === (userStatus?.emoji ?? '') &&
+          presenceDraft === preferences.presence}>{i18n.t('common.save')}</Button
       >
     </DialogActions>
   </form>
@@ -717,6 +724,12 @@
       right: var(--space-400);
       top: var(--space-400);
     }
+  }
+
+  .status-message-input {
+    align-items: center;
+    display: flex;
+    gap: var(--space-100);
   }
 
   .status-sheet {
