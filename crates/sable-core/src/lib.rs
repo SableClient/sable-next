@@ -495,6 +495,9 @@ impl Core {
     }
 
     async fn apply_activity(self: &Arc<Self>, active: bool, revision: Option<u64>) {
+        if self.app_active.load(Ordering::Relaxed) != active {
+            return;
+        }
         let _serial = self.activity_lock.lock().await;
         if revision
             .is_some_and(|revision| self.app_activity_revision.load(Ordering::SeqCst) != revision)

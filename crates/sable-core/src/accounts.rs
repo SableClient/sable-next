@@ -2014,6 +2014,42 @@ mod regression_tests {
     }
 
     #[tokio::test]
+    async fn a_foreground_session_starts_while_the_activity_lock_is_busy() {
+        use crate::session::{AccountRegistry, PersistedAccount, current_session};
+        use std::time::Duration;
+
+        let (_store, server, core, room) = core_with_room().await;
+        let client = room.client();
+        let mut registry = AccountRegistry::empty();
+        registry.upsert(PersistedAccount {
+            account_id: "first".to_owned(),
+            store_id: core.store_id.clone(),
+            session: current_session(&client, server.server().uri()).unwrap(),
+            needs_reauth: false,
+            device_invalidated: false,
+        });
+        *core.accounts.lock().await = Some(registry);
+        drop(core.take_session().await);
+        core.set_app_active(true);
+
+        let _activity = core.activity_lock.lock().await;
+        let generation = core.claim_session_generation().await;
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            core.start_session(
+                client,
+                server.server().uri(),
+                "first".to_owned(),
+                generation.value(),
+                &crate::session::store_lease(&core.store_id).await,
+            ),
+        )
+        .await
+        .expect("startup blocked on the activity lock")
+        .unwrap();
+    }
+
+    #[tokio::test]
     async fn a_session_started_while_hidden_stays_suspended() {
         use crate::session::{AccountRegistry, PersistedAccount, current_session};
         use matrix_sdk_ui::sync_service::State;
