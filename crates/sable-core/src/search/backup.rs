@@ -23,7 +23,9 @@ use super::document::Document;
 use super::now_ms;
 use super::persist::{self, Cover};
 use crate::Core;
-use crate::protocol::{SearchBackupState, SearchBackupView};
+use crate::protocol::{
+    SearchBackupActivity, SearchBackupProgress, SearchBackupState, SearchBackupView,
+};
 use crate::sealed_account_data::{AccountDataKey, cached_key};
 
 const BACKUP_EVENT: &str = "moe.sable.search_backup";
@@ -519,7 +521,61 @@ impl SearchBackup {
 
     fn set_state(&self, state: SearchBackupState) {
         if let Ok(mut status) = self.status.lock() {
-            status.state = state;
+            status.state = if state == SearchBackupState::Idle && status.failures > 0 {
+                SearchBackupState::Failed
+            } else {
+                state
+            };
+            if state != SearchBackupState::Working {
+                status.progress = None;
+            }
+        }
+    }
+
+    fn schedule(&self, delay: Duration) {
+        if let Ok(mut status) = self.status.lock() {
+            status.next_run_ms =
+                Some(now_ms().saturating_add(u64::try_from(delay.as_millis()).unwrap_or(u64::MAX)));
+        }
+    }
+
+    fn activity(&self, activity: SearchBackupActivity, room: Option<&Room>) {
+        if let Ok(mut status) = self.status.lock() {
+            status.progress = Some(SearchBackupProgress {
+                activity,
+                room: room.map(|room| {
+                    room.cached_display_name()
+                        .map_or_else(|| room.room_id().to_string(), |name| name.to_string())
+                }),
+                parts_done: 0,
+                parts_total: 0,
+                transferred_bytes: 0,
+                total_bytes: None,
+            });
+        }
+    }
+
+    fn transfer(&self, parts_total: usize, total_bytes: Option<u64>) {
+        if let Ok(mut status) = self.status.lock()
+            && let Some(progress) = &mut status.progress
+        {
+            progress.parts_total = parts_total;
+            progress.total_bytes = total_bytes;
+        }
+    }
+
+    fn transferred(&self, bytes: u64) {
+        if let Ok(mut status) = self.status.lock()
+            && let Some(progress) = &mut status.progress
+        {
+            progress.parts_done += 1;
+            progress.transferred_bytes = progress.transferred_bytes.saturating_add(bytes);
+        }
+    }
+
+    fn fail(&self) {
+        if let Ok(mut status) = self.status.lock() {
+            status.failures += 1;
         }
     }
 
@@ -531,6 +587,10 @@ impl SearchBackup {
             .unwrap_or_default();
         if !self.enabled.load(Ordering::Relaxed) {
             view.state = SearchBackupState::Off;
+            view.progress = None;
+            view.next_run_ms = None;
+        } else if view.state == SearchBackupState::Off {
+            view.state = SearchBackupState::Scheduled;
         }
         view.limit_bytes = self.limit_bytes();
         view.rooms_imported = rooms_imported;
@@ -659,12 +719,14 @@ impl Core {
         let core = self.clone();
         let client = client.clone();
 
+        self.search_backup.schedule(BACKUP_START_DELAY);
         self.track_session_task(
             spawn(async move {
                 let mut session = BackupSession::default();
                 matrix_sdk::sleep::sleep(BACKUP_START_DELAY).await;
                 loop {
                     core.backup_pass(&client, &mut session, now_ms()).await;
+                    core.search_backup.schedule(BACKUP_INTERVAL);
                     matrix_sdk::sleep::sleep(BACKUP_INTERVAL).await;
                 }
             })
@@ -686,6 +748,11 @@ impl Core {
             return;
         };
         backup.set_state(SearchBackupState::Working);
+        if let Ok(mut status) = backup.status.lock() {
+            status.failures = 0;
+            status.next_run_ms = None;
+        }
+        backup.activity(SearchBackupActivity::Checking, None);
         if !self.import_backups(client, &key).await {
             backup.set_state(SearchBackupState::WaitingForWifi);
             return;
@@ -715,6 +782,8 @@ impl Core {
                     progress.has_token(&room_id),
                 )
             };
+            self.search_backup
+                .activity(SearchBackupActivity::Checking, Some(&room));
             let Some(manifest) = synced_manifest(&room, key).await else {
                 continue;
             };
@@ -727,6 +796,8 @@ impl Core {
             if self.search_index.lock().await.is_full() {
                 break;
             }
+            self.search_backup
+                .activity(SearchBackupActivity::Downloading, Some(&room));
             if !self
                 .import_room(client, &room_id, &manifest, local.as_ref(), crawled)
                 .await
@@ -745,10 +816,23 @@ impl Core {
         local: Option<&Cover>,
         crawled: bool,
     ) -> bool {
-        for segment in &manifest.segments {
-            if local.is_some_and(|local| segment.start >= local.from && segment.end <= local.until)
+        let pending: Vec<_> = manifest
+            .segments
+            .iter()
+            .filter(|segment| {
+                !local
+                    .is_some_and(|local| segment.start >= local.from && segment.end <= local.until)
+            })
+            .collect();
+        self.search_backup.transfer(
+            pending.len(),
+            Some(pending.iter().map(|segment| segment.bytes).sum()),
+        );
+        for segment in pending {
+            if let Ok(mut status) = self.search_backup.status.lock()
+                && let Some(progress) = &mut status.progress
             {
-                continue;
+                progress.activity = SearchBackupActivity::Downloading;
             }
             let request = MediaRequestParameters {
                 source: MediaSource::Encrypted(Box::new(segment.file.clone())),
@@ -764,14 +848,22 @@ impl Core {
             let bytes = match downloaded {
                 Ok(bytes) => bytes,
                 Err(error) => {
+                    self.search_backup.fail();
                     warn!(%room_id, "downloading a search backup segment failed: {error}");
                     return true;
                 }
             };
+            self.search_backup.transferred(bytes.len() as u64);
+            if let Ok(mut status) = self.search_backup.status.lock()
+                && let Some(progress) = &mut status.progress
+            {
+                progress.activity = SearchBackupActivity::Importing;
+            }
             let Some(payload) = persist::decode(bytes)
                 .ok()
                 .and_then(|json| serde_json::from_slice::<SegmentPayload>(&json).ok())
             else {
+                self.search_backup.fail();
                 warn!(%room_id, "a search backup segment did not decode");
                 return true;
             };
@@ -813,7 +905,11 @@ impl Core {
             .and_then(|size| usize::try_from(u64::from(size) / 2).ok())
             .unwrap_or(OLD_SEGMENT_JSON);
 
+        self.search_backup
+            .activity(SearchBackupActivity::Cleaning, None);
         self.retract_left_rooms(client, key, &own, session).await;
+        self.search_backup
+            .activity(SearchBackupActivity::Checking, None);
 
         let mut owned = HashMap::new();
         for room in client.joined_rooms() {
@@ -826,6 +922,10 @@ impl Core {
         let mut used: u64 = owned.values().map(BackupManifest::bytes).sum();
         let mut published: HashSet<OwnedRoomId> = owned.keys().cloned().collect();
         let mut state = SearchBackupState::Idle;
+        if let Ok(mut status) = self.search_backup.status.lock() {
+            status.published_bytes = used;
+            status.rooms_published = published.len();
+        }
 
         for room in client.joined_rooms() {
             let room_id = room.room_id().to_owned();
@@ -864,9 +964,20 @@ impl Core {
             {
                 Published::Done => {
                     published.insert(room_id);
+                    if let Ok(mut status) = self.search_backup.status.lock() {
+                        status.published_bytes = used;
+                        status.rooms_published = published.len();
+                    }
                 }
                 Published::Skipped => {}
-                Published::StopPass => break,
+                Published::StopPass => {
+                    state = if self.search_network.allows_backup() {
+                        SearchBackupState::Failed
+                    } else {
+                        SearchBackupState::WaitingForWifi
+                    };
+                    break;
+                }
                 Published::Halt(halt) => {
                     session.refused = halt == SearchBackupState::Refused;
                     state = halt;
@@ -875,10 +986,6 @@ impl Core {
             }
         }
 
-        if let Ok(mut status) = self.search_backup.status.lock() {
-            status.published_bytes = used;
-            status.rooms_published = published.len();
-        }
         state
     }
 
@@ -910,6 +1017,8 @@ impl Core {
             return Published::Skipped;
         }
 
+        self.search_backup
+            .activity(SearchBackupActivity::Preparing, Some(room));
         let Some(history) = settled_history(client, &room_id).await else {
             return Published::Skipped;
         };
@@ -924,6 +1033,7 @@ impl Core {
         let previous = match fetch_manifest(client, &room_id, key).await {
             Ok(previous) => previous,
             Err(error) => {
+                self.search_backup.fail();
                 warn!(%room_id, "reading the search backup manifest failed: {error}");
                 return Published::Skipped;
             }
@@ -952,31 +1062,13 @@ impl Core {
         stale.extend(plan.replaced);
         let freed: u64 = stale.iter().map(|segment| segment.bytes).sum();
 
-        let mut segments = Vec::with_capacity(plan.segments.len());
-        let mut added = 0;
-        for planned in plan.segments {
-            let segment = match planned {
-                Planned::Keep(segment) => segment,
-                Planned::Upload { start, end } => {
-                    let budget = self
-                        .search_backup
-                        .limit_bytes()
-                        .saturating_add(freed)
-                        .saturating_sub(used.saturating_add(added));
-                    match self
-                        .upload_segment(client, &room_id, &history, (start, end), budget)
-                        .await
-                    {
-                        Ok(segment) => {
-                            added += segment.bytes;
-                            segment
-                        }
-                        Err(outcome) => return outcome,
-                    }
-                }
-            };
-            segments.push(segment);
-        }
+        let (segments, added) = match self
+            .upload_plan(client, room, &history, plan.segments, *used, freed)
+            .await
+        {
+            Ok(uploaded) => uploaded,
+            Err(outcome) => return outcome,
+        };
 
         let manifest = BackupManifest {
             version: BACKUP_VERSION,
@@ -990,13 +1082,60 @@ impl Core {
             published_ms: now,
             segments,
         };
+        self.search_backup
+            .activity(SearchBackupActivity::Publishing, Some(room));
         if !write_manifest(room, key, &manifest).await {
+            self.search_backup.fail();
             return Published::Skipped;
         }
         *used = used.saturating_add(added).saturating_sub(freed);
+        self.search_backup
+            .activity(SearchBackupActivity::Cleaning, Some(room));
         session.redact(client, &stale).await;
         info!(%room_id, from, covered, "published the search backup");
         Published::Done
+    }
+
+    async fn upload_plan(
+        &self,
+        client: &Client,
+        room: &Room,
+        history: &History,
+        planned: Vec<Planned>,
+        used: u64,
+        freed: u64,
+    ) -> Result<(Vec<Segment>, u64), Published> {
+        self.search_backup
+            .activity(SearchBackupActivity::Uploading, Some(room));
+        self.search_backup.transfer(
+            planned
+                .iter()
+                .filter(|segment| matches!(segment, Planned::Upload { .. }))
+                .count(),
+            None,
+        );
+        let room_id = room.room_id().to_owned();
+        let mut segments = Vec::with_capacity(planned.len());
+        let mut added = 0;
+        for planned in planned {
+            let segment = match planned {
+                Planned::Keep(segment) => segment,
+                Planned::Upload { start, end } => {
+                    let budget = self
+                        .search_backup
+                        .limit_bytes()
+                        .saturating_add(freed)
+                        .saturating_sub(used.saturating_add(added));
+                    let segment = self
+                        .upload_segment(client, &room_id, history, (start, end), budget)
+                        .await?;
+                    added += segment.bytes;
+                    segment
+                }
+            };
+            segments.push(segment);
+        }
+        Ok((segments, added))
     }
 
     async fn upload_segment(
@@ -1020,9 +1159,11 @@ impl Core {
             .await
             .ok_or(Published::StopPass)?;
         let file = uploaded.map_err(|error| {
+            self.search_backup.fail();
             warn!(%room_id, "uploading a search backup segment failed: {error}");
             upload_failed(&error)
         })?;
+        self.search_backup.transferred(bytes);
         Ok(Segment {
             start,
             end,

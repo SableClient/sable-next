@@ -431,3 +431,62 @@ fn test_a_partial_backup_stops_the_crawl_only_where_it_can_resume() {
     let complete = super::imported_cover(None, &manifest(room()), true);
     assert!(complete.stops);
 }
+
+#[test]
+fn sharing_progress_tracks_completed_parts_and_clears_after_a_pass() {
+    use crate::protocol::{SearchBackupActivity, SearchBackupState};
+    use std::sync::atomic::Ordering;
+
+    let backup = super::SearchBackup::default();
+    backup.enabled.store(true, Ordering::Relaxed);
+    backup.set_state(SearchBackupState::Working);
+    backup.activity(SearchBackupActivity::Downloading, None);
+    backup.transfer(4, Some(4096));
+    backup.transferred(1024);
+    backup.transferred(1024);
+    let view = backup.view(3);
+    let progress = view.progress.unwrap();
+    assert_eq!(progress.parts_done, 2);
+    assert_eq!(progress.parts_total, 4);
+    assert_eq!(progress.transferred_bytes, 2048);
+    assert_eq!(progress.total_bytes, Some(4096));
+    assert_eq!(view.rooms_imported, 3);
+
+    backup.set_state(SearchBackupState::Idle);
+    assert!(backup.view(3).progress.is_none());
+    backup.activity(SearchBackupActivity::Uploading, None);
+    backup.transfer(2, None);
+    let progress = backup.view(3).progress.unwrap();
+    assert_eq!(progress.parts_done, 0);
+    assert_eq!(progress.transferred_bytes, 0);
+    assert_eq!(progress.total_bytes, None);
+}
+
+#[test]
+fn sharing_reports_scheduling_failures_and_disabled_state() {
+    use crate::protocol::{SearchBackupActivity, SearchBackupState};
+    use std::sync::atomic::Ordering;
+
+    let backup = super::SearchBackup::default();
+    backup.enabled.store(true, Ordering::Relaxed);
+    backup.schedule(super::BACKUP_START_DELAY);
+    let view = backup.view(0);
+    assert_eq!(view.state, SearchBackupState::Scheduled);
+    assert!(view.next_run_ms.is_some_and(|at| at > super::now_ms()));
+
+    backup.set_state(SearchBackupState::Working);
+    backup.activity(SearchBackupActivity::Uploading, None);
+    backup.fail();
+    backup.set_state(SearchBackupState::Idle);
+    let view = backup.view(0);
+    assert_eq!(view.state, SearchBackupState::Failed);
+    assert_eq!(view.failures, 1);
+    assert!(view.progress.is_none());
+
+    backup.activity(SearchBackupActivity::Uploading, None);
+    backup.enabled.store(false, Ordering::Relaxed);
+    let view = backup.view(0);
+    assert_eq!(view.state, SearchBackupState::Off);
+    assert!(view.progress.is_none());
+    assert!(view.next_run_ms.is_none());
+}

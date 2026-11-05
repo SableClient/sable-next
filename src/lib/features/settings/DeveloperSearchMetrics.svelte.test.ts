@@ -44,6 +44,9 @@ const metrics: SearchMetricsView = {
     limit_bytes: 0,
     rooms_published: 0,
     rooms_imported: 0,
+    progress: null,
+    next_run_ms: null,
+    failures: 0,
   },
 };
 

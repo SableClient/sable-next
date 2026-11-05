@@ -1308,6 +1308,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           limit_bytes: 0,
           rooms_published: 0,
           rooms_imported: 0,
+          progress: null,
+          next_run_ms: null,
+          failures: 0,
         },
       }),
       'calls.join': () => ({

@@ -590,18 +590,53 @@ pub struct SearchMetricsView {
 pub enum SearchBackupState {
     #[default]
     Off,
+    Scheduled,
     WaitingForWifi,
     Locked,
     Working,
     Idle,
     LimitReached,
     Refused,
+    Failed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum SearchBackupActivity {
+    Checking,
+    Preparing,
+    Downloading,
+    Importing,
+    Uploading,
+    Publishing,
+    Cleaning,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SearchBackupProgress {
+    pub activity: SearchBackupActivity,
+    pub room: Option<String>,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub parts_done: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub parts_total: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub transferred_bytes: u64,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub total_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct SearchBackupView {
     pub state: SearchBackupState,
+    pub progress: Option<SearchBackupProgress>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub next_run_ms: Option<u64>,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub failures: usize,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub published_bytes: u64,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]

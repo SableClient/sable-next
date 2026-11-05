@@ -1499,10 +1499,24 @@ export type SealedAccountDataView = {
 
 export type SearchAttachment = "image" | "video" | "audio" | "file" | "link" | "poll";
 
-export type SearchBackupState = "off" | "waiting_for_wifi" | "locked" | "working" | "idle" | "limit_reached" | "refused";
+export type SearchBackupActivity = "checking" | "preparing" | "downloading" | "importing" | "uploading" | "publishing" | "cleaning";
+
+export type SearchBackupProgress = {
+	activity: SearchBackupActivity,
+	room: string | null,
+	parts_done: number,
+	parts_total: number,
+	transferred_bytes: number,
+	total_bytes: number | null,
+};
+
+export type SearchBackupState = "off" | "scheduled" | "waiting_for_wifi" | "locked" | "working" | "idle" | "limit_reached" | "refused" | "failed";
 
 export type SearchBackupView = {
 	state: SearchBackupState,
+	progress: SearchBackupProgress | null,
+	next_run_ms: number | null,
+	failures: number,
 	published_bytes: number,
 	limit_bytes: number,
 	rooms_published: number,
