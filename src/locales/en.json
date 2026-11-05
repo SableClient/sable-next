@@ -3398,7 +3398,7 @@
     "latching": "Keep the profile selected after shorthand",
     "fallback": "Prefix messages with profile names for older clients",
     "manageTitle": "Your per-message profiles",
-    "manageDescription": "Stored on your account, so every client that supports profiles sees the same list.",
+    "manageDescription": "Stored as encrypted account data, compatible with other supported clients.",
     "empty": "No profiles yet.",
     "add": "New profile",
     "edit": "Edit {{name}}",
