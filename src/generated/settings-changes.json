@@ -1,9 +1,1 @@
-{
-  "v2.3.3": {
-    "added": [
-      "callInputMode",
-      "callGlobalShortcuts"
-    ],
-    "changed": []
-  }
-}
+{}
