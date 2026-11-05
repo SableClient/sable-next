@@ -35,6 +35,7 @@ export default defineConfig({
     'reply-name-color.spec.ts',
     'thread-panel.spec.ts',
     'thread-actions.spec.ts',
+    'thread-quotes.spec.ts',
     'settings-backdrop.spec.ts',
     'sheet-swipe.spec.ts',
     'voice-room-chat.spec.ts',

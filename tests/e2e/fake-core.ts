@@ -29,6 +29,7 @@ import type {
 
 export type RoomCoreMode =
   | 'ready'
+  | 'direct'
   | 'room_name_overflow'
   | 'thread_links'
   | 'thread_error'
@@ -171,8 +172,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       topic: null,
       topic_html: null,
       avatar_url: null,
-      is_direct: false,
-      direct_targets: [],
+      is_direct: workerMode === 'direct',
+      direct_targets: workerMode === 'direct' ? ['@alice:example.test'] : [],
       join_rule: 'invite',
       tags: [],
       state: 'joined',

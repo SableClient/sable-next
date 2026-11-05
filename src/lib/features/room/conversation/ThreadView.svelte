@@ -113,6 +113,12 @@
       : Promise.resolve();
   }
 
+  function jumpToEvent(eventId: string): void {
+    if (!timelineList?.jumpToEvent(eventId)) {
+      focusEventId = eventId;
+    }
+  }
+
   $effect(() => {
     const target = focusEventId;
     if (target === null) {
@@ -270,6 +276,7 @@
     {focusEventId}
     threadRootId={rootEventId}
     onRetryLoad={() => timeline.retry()}
+    onJumpToEvent={jumpToEvent}
     onJumpToLive={timeline.mode.kind === 'focused' ? () => void returnToThread() : undefined}
     {roomId}
     {members}

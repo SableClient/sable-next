@@ -72,6 +72,49 @@ function image(eventId: string, filename: string): TimelineItemView {
   });
 }
 
+test.each([false, true])('thread quotes jump to messages (loaded=%s)', async (loaded) => {
+  const reply = image('$reply', 'reply.png');
+  reply.in_reply_to = {
+    event_id: '$quoted',
+    sender: '@alice:example.org',
+    sender_name: 'Alice',
+    sender_mentioned: false,
+    body: 'Quoted message',
+    fallback: null,
+  };
+  const startThread = vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (
+    this: RoomTimeline
+  ) {
+    this.mode = { kind: 'thread', rootEventId: '$root' };
+    this.items = loaded ? [image('$quoted', 'quoted.png'), reply] : [reply];
+    this.hasSnapshot = true;
+    return Promise.resolve();
+  });
+  const start = vi.spyOn(RoomTimeline.prototype, 'start').mockResolvedValue();
+  vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();
+  const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo').mockResolvedValue(true);
+  const user = userEvent.setup();
+  render(ThreadViewHarness, {
+    panel: { roomId: '!room:example.org', rootEventId: '$root', onClose: () => {} },
+  });
+
+  const quote = await screen.findByRole('button', { name: 'Alice Quoted message' });
+  jumps.mockClear();
+  await user.click(quote);
+
+  await vi.waitFor(() => {
+    if (loaded) {
+      expect(jumps).toHaveBeenCalledWith('event:$quoted', 'center', expect.any(Boolean));
+    } else {
+      expect(start).toHaveBeenCalledWith('!room:example.org', '$quoted');
+    }
+  });
+  if (loaded) {
+    expect(start).not.toHaveBeenCalled();
+    expect(startThread).toHaveBeenCalledOnce();
+  }
+});
+
 test('an image in a thread opens the viewer on that image', async () => {
   vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (this: RoomTimeline) {
     this.items = [image('$first', 'first.png'), image('$second', 'second.png')];
