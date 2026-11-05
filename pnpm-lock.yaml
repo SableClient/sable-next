@@ -163,6 +163,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
+  '@sapphi-red/web-noise-suppressor@0.4.1': 04511f6908145288b825d9dbf66c17aaa96ae9c5594a38cf4133602fc8ad6828
   '@sveltejs/kit@3.1.0': 6589fb8ecd1177fe34954a01735f3a86ea8c7c2e478a3937cfef8697fffd94b7
   app-builder-lib@26.18.0: facf1d0d35a984729a251fc70348081c9937ff84229f36b8fd203014521e51e9
   livekit-client@2.23.0: b07083d5861f45e5bae2c9baafca2e249cebbe7389cf9f3e78fa0e61b0d31c1e
@@ -206,6 +207,9 @@ importers:
       '@sableclient/twemoji-font':
         specifier: ^1.0.4
         version: 1.0.4
+      '@sapphi-red/web-noise-suppressor':
+        specifier: 0.4.1
+        version: 0.4.1(patch_hash=04511f6908145288b825d9dbf66c17aaa96ae9c5594a38cf4133602fc8ad6828)
       '@tauri-apps/api':
         specifier: 2.12.4
         version: 2.12.4
@@ -245,9 +249,6 @@ importers:
       culori:
         specifier: ^4.0.2
         version: 4.0.2
-      deepfilternet3-noise-filter:
-        specifier: 1.3.0
-        version: 1.3.0(livekit-client@2.23.0(patch_hash=b07083d5861f45e5bae2c9baafca2e249cebbe7389cf9f3e78fa0e61b0d31c1e)(@types/dom-mediacapture-record@1.0.22))
       diff:
         specifier: 9.0.0
         version: 9.0.0
@@ -2523,6 +2524,9 @@ packages:
   '@sableclient/twemoji-font@1.0.4':
     resolution: {integrity: sha512-LzvQB/VZtv5KEq1VYq2azr7v7cYT8oklOVRGkAN2RNwa3sF0XcnqM3lBHSYRFXQleGLSUgs3gA0slbwkD2+sJw==}
 
+  '@sapphi-red/web-noise-suppressor@0.4.1':
+    resolution: {integrity: sha512-hy2GnF079+zi4n9BZUf+GGIQ1IofApAk6rgGMyMQ3soHfz/GKu1pcCsmePyIHVvUuv1LrFudw9BmmBqoOKay5w==}
+
   '@sentry/browser-utils@11.10.0':
     resolution: {integrity: sha512-P/bYHTgj76sYBYCZa524YoZ/hZac2XCW3i3qShrMXnh7s63x1cweUjD7BDVDb0L/lGMwtuObuZeRnCif4hWLNg==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
@@ -3894,12 +3898,6 @@ packages:
 
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
-
-  deepfilternet3-noise-filter@1.3.0:
-    resolution: {integrity: sha512-yYFUlPuvPguqcd/R6/OSsr0noGqlqOE50JkCWYHogk+PjLj9qrNgwTt5zKraVkKnw0l4+eXJagkz2SUWtUl4sQ==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      livekit-client: ^2.0.0
 
   deepmerge@4.3.1:
     resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
@@ -7980,6 +7978,8 @@ snapshots:
 
   '@sableclient/twemoji-font@1.0.4': {}
 
+  '@sapphi-red/web-noise-suppressor@0.4.1(patch_hash=04511f6908145288b825d9dbf66c17aaa96ae9c5594a38cf4133602fc8ad6828)': {}
+
   '@sentry/browser-utils@11.10.0':
     dependencies:
       '@sentry/conventions': 0.29.0
@@ -9458,10 +9458,6 @@ snapshots:
     optional: true
 
   deep-is@0.1.4: {}
-
-  deepfilternet3-noise-filter@1.3.0(livekit-client@2.23.0(patch_hash=b07083d5861f45e5bae2c9baafca2e249cebbe7389cf9f3e78fa0e61b0d31c1e)(@types/dom-mediacapture-record@1.0.22)):
-    dependencies:
-      livekit-client: 2.23.0(patch_hash=b07083d5861f45e5bae2c9baafca2e249cebbe7389cf9f3e78fa0e61b0d31c1e)(@types/dom-mediacapture-record@1.0.22)
 
   deepmerge@4.3.1: {}
 

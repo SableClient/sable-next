@@ -3,6 +3,7 @@
   import { on } from 'svelte/events';
   import { RoomEvent, Track, type Participant, type RemoteTrack } from 'livekit-client';
   import type { Room as LivekitRoom } from 'livekit-client';
+  import type { RnnoiseWorkletNode } from '@sapphi-red/web-noise-suppressor';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import type { CallTelemetry } from './call-telemetry';
   import { ignoreError } from './call-transport';
@@ -23,7 +24,7 @@
   type Filtered = {
     source: AudioNode;
     gain: GainNode;
-    filter?: AudioWorkletNode;
+    filter?: RnnoiseWorkletNode;
     live: boolean;
     off: () => void;
   };
@@ -118,6 +119,7 @@
         .create()
         .then((filter) => {
           if (filtered.get(element) !== graph) {
+            filter.destroy();
             filter.disconnect();
             return;
           }
@@ -134,6 +136,7 @@
       filtered.delete(element);
       graph.off();
       graph.source.disconnect();
+      graph.filter?.destroy();
       graph.filter?.disconnect();
       graph.gain.disconnect();
     };

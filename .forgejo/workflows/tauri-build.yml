@@ -369,7 +369,7 @@ jobs:
         with:
           name: web-assets
       - name: Drop assets the native app never loads
-        run: rm -rf dist/deepfilternet3 dist/_app/immutable/workers
+        run: rm -rf dist/_app/immutable/workers
       - name: Set up app
         uses: ./.forgejo/actions/setup
         with:

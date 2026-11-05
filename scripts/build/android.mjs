@@ -101,7 +101,6 @@ run('rustup', ['target', 'add', ...targets.map((target) => rustTargets[target])]
 
 const webDist = resolve(values['web-dist'] ?? 'dist');
 if (!values['web-dist']) await buildWeb();
-rmSync(join(webDist, 'deepfilternet3'), { recursive: true, force: true });
 rmSync(join(webDist, '_app/immutable/workers'), { recursive: true, force: true });
 
 const geolocation = 'src-tauri/capabilities/geolocation.json';

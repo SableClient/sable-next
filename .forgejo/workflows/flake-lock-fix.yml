@@ -6,7 +6,6 @@ on:
     paths:
       - 'pnpm-lock.yaml'
       - '**/Cargo.lock'
-      - 'scripts/build/fetch-deepfilternet.mjs'
       - 'packaging/nix/wasm-bindgen-cli.nix'
   workflow_dispatch:
 
@@ -39,7 +38,6 @@ jobs:
             nix build -L --keep-going --no-link \
               .#sable-unwrapped.pnpmDeps \
               .#sable-unwrapped.cargoDeps \
-              .#sable-deepfilternet-assets \
               .#sable-wasm-bindgen-cli.src \
               .#sable-wasm-bindgen-cli.cargoDeps 2>&1 |
               tee /dev/stderr |

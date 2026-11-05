@@ -1,51 +1,114 @@
-import { DeepFilterNet3Core, DeepFilterNoiseFilterProcessor } from 'deepfilternet3-noise-filter';
+import type { AudioProcessorOptions, Track, TrackProcessor } from 'livekit-client';
+import type { RnnoiseWorkletNode } from '@sapphi-red/web-noise-suppressor';
+import workletUrl from '@sapphi-red/web-noise-suppressor/rnnoiseWorklet.js?url';
+import wasmUrl from '@sapphi-red/web-noise-suppressor/rnnoise.wasm?url';
+import simdUrl from '@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url';
+import { ignoreError } from './call-transport';
 
-const assetConfig = { cdnUrl: '/deepfilternet3' };
 const SAMPLE_RATE = 48000;
-const SUPPRESSION_LEVEL = 50;
 
-type LoadedCore = {
-  assets: { wasmModule: WebAssembly.Module; modelBytes: ArrayBuffer } | null;
-};
+async function loadFilter() {
+  // The package defines AudioWorkletNode subclasses at module scope.
+  const { RnnoiseWorkletNode, loadRnnoise } = await import('@sapphi-red/web-noise-suppressor');
+  const wasmBinary = await loadRnnoise({ url: wasmUrl, simdUrl });
+  return { RnnoiseWorkletNode, wasmBinary };
+}
+
+let loaded: ReturnType<typeof loadFilter> | undefined;
+
+function loadAssets() {
+  return (loaded ??= loadFilter().catch((error: unknown) => {
+    loaded = undefined;
+    throw error;
+  }));
+}
 
 export type VoiceFilterBank = {
   readonly context: AudioContext;
-  create: () => Promise<AudioWorkletNode>;
+  create: () => Promise<RnnoiseWorkletNode>;
   close: () => void;
 };
 
 export const supportsVoiceFilter = (): boolean =>
-  DeepFilterNoiseFilterProcessor.isSupported() && typeof AudioWorkletNode !== 'undefined';
-
-export const createMicrophoneFilter = (): DeepFilterNoiseFilterProcessor =>
-  new DeepFilterNoiseFilterProcessor({ assetConfig });
+  typeof AudioContext !== 'undefined' &&
+  typeof AudioWorkletNode !== 'undefined' &&
+  typeof WebAssembly !== 'undefined';
 
 export function createVoiceFilterBank(): VoiceFilterBank {
   const context = new AudioContext({ sampleRate: SAMPLE_RATE });
-  const core = new DeepFilterNet3Core({
-    sampleRate: SAMPLE_RATE,
-    noiseReductionLevel: SUPPRESSION_LEVEL,
-    assetConfig,
-  });
-  let registered: Promise<AudioWorkletNode> | undefined;
+  let ready: ReturnType<typeof loadFilter> | undefined;
 
   return {
     context,
     create: async () => {
-      if (!registered) {
-        registered = core.initialize().then(() => core.createAudioWorkletNode(context));
-        return registered;
-      }
-      await registered;
-      const { assets } = core as unknown as LoadedCore;
-      if (!assets) throw new Error('DeepFilterNet3 assets are not loaded');
-      return new AudioWorkletNode(context, 'deepfilter-audio-processor', {
-        processorOptions: { ...assets, suppressionLevel: SUPPRESSION_LEVEL },
-      });
+      const { RnnoiseWorkletNode, wasmBinary } = await (ready ??= Promise.all([
+        loadAssets(),
+        context.audioWorklet.addModule(workletUrl),
+      ]).then(([assets]) => assets));
+      if (context.state === 'closed') throw new Error('Voice filter bank is closed');
+      const filter = new RnnoiseWorkletNode(context, { wasmBinary, maxChannels: 1 });
+      filter.channelCount = 1;
+      filter.channelCountMode = 'explicit';
+      return filter;
     },
     close: () => {
-      core.destroy();
-      void context.close();
+      void context.close().catch(ignoreError);
     },
   };
+}
+
+export function createMicrophoneFilter(): TrackProcessor<Track.Kind.Audio, AudioProcessorOptions> {
+  let bank: VoiceFilterBank | undefined;
+  let source: MediaStreamAudioSourceNode | undefined;
+  let filter: RnnoiseWorkletNode | undefined;
+  let destination: MediaStreamAudioDestinationNode | undefined;
+
+  const cleanup = (): void => {
+    source?.disconnect();
+    filter?.destroy();
+    filter?.disconnect();
+    destination?.stream.getTracks().forEach((track) => {
+      track.stop();
+    });
+    bank?.close();
+    bank = undefined;
+    source = undefined;
+    filter = undefined;
+    destination = undefined;
+    processor.processedTrack = undefined;
+  };
+
+  const init = async ({ track }: AudioProcessorOptions): Promise<void> => {
+    cleanup();
+    const currentBank = createVoiceFilterBank();
+    bank = currentBank;
+    try {
+      const node = await currentBank.create();
+      if (bank !== currentBank) {
+        node.destroy();
+        node.disconnect();
+        return;
+      }
+      filter = node;
+      destination = currentBank.context.createMediaStreamDestination();
+      source = currentBank.context.createMediaStreamSource(new MediaStream([track]));
+      source.connect(filter).connect(destination);
+      await currentBank.context.resume();
+      if (bank === currentBank) processor.processedTrack = destination.stream.getAudioTracks()[0];
+    } catch (error) {
+      if (bank === currentBank) cleanup();
+      throw error;
+    }
+  };
+
+  const processor: TrackProcessor<Track.Kind.Audio, AudioProcessorOptions> = {
+    name: 'rnnoise',
+    init,
+    restart: init,
+    destroy: () => {
+      cleanup();
+      return Promise.resolve();
+    },
+  };
+  return processor;
 }

@@ -24,7 +24,7 @@ RUN apt-get update \
     && corepack prepare pnpm@12.14.0 --activate
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY . .
-RUN SABLE_SKIP_DEEPFILTERNET=1 pnpm run build:server
+RUN pnpm run build:server
 
 FROM rust:1.97-bookworm AS build
 

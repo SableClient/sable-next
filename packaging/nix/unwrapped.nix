@@ -10,7 +10,6 @@
   sable-wasm-bindgen-cli,
   binaryen,
   lld,
-  sable-deepfilternet-assets,
 }:
 
 let
@@ -35,10 +34,6 @@ stdenv.mkDerivation (finalAttrs: {
     fetcherVersion = 4;
     hash = "sha256-iByuz4i5cmxa/6fdR2cTsQRQ78IsLE/GvrV/TUHq3ds=";
   };
-
-  postPatch = ''
-    cp --no-preserve all -r ${sable-deepfilternet-assets} static/deepfilternet3
-  '';
 
   nativeBuildInputs = [
     pnpm

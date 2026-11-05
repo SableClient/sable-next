@@ -21,7 +21,6 @@
           callPackage = lib.callPackageWith (pkgs // packages // { src = self; });
           packages = {
             sable-wasm-bindgen-cli = callPackage ./packaging/nix/wasm-bindgen-cli.nix { };
-            sable-deepfilternet-assets = callPackage ./packaging/nix/deepfilternet.nix { };
             sable-unwrapped = callPackage ./packaging/nix/unwrapped.nix { };
             sable = callPackage ./packaging/nix/sable.nix { };
             default = packages.sable;

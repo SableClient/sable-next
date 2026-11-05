@@ -342,7 +342,11 @@ test('keeps audio attached across participant updates', async () => {
 test('keeps incoming filters across participant updates', async () => {
   const source = { connect: vi.fn((node: AudioNode) => node), disconnect: vi.fn() };
   const gain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
-  const filter = { connect: vi.fn((node: AudioNode) => node), disconnect: vi.fn() };
+  const filter = {
+    connect: vi.fn((node: AudioNode) => node),
+    disconnect: vi.fn(),
+    destroy: vi.fn(),
+  };
   const bank = {
     context: {
       destination: {},
@@ -377,14 +381,69 @@ test('keeps incoming filters across participant updates', async () => {
     expect(track.detach).not.toHaveBeenCalled();
     expect(document.querySelector('audio')?.muted).toBe(true);
     expect(source.connect).toHaveBeenLastCalledWith(filter);
+    const screenAudio = Object.assign(fakeTrack('screen'), {
+      source: Track.Source.ScreenShareAudio,
+    });
+    room.emit(RoomEvent.TrackSubscribed, screenAudio, undefined, { identity: 'participant' });
+    await tick();
+    expect(bank.create).toHaveBeenCalledOnce();
+    expect(bank.context.createMediaStreamSource).toHaveBeenCalledOnce();
+    expect(screenAudio.attach).toHaveBeenCalledOnce();
   } finally {
     instance.unmount();
     preferences.incomingVoiceIsolation = previousIsolation;
   }
 
   expect(bank.close).toHaveBeenCalledOnce();
+  expect(filter.destroy).toHaveBeenCalledOnce();
   expect(filter.disconnect).toHaveBeenCalledOnce();
 });
+
+test.each(['unsubscribe', 'unmount'])(
+  'destroys an incoming filter that finishes loading after %s',
+  async (release) => {
+    const source = { connect: vi.fn((node: AudioNode) => node), disconnect: vi.fn() };
+    const gain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
+    const filter = { connect: vi.fn(), disconnect: vi.fn(), destroy: vi.fn() };
+    const pending = Promise.withResolvers<typeof filter>();
+    const bank = {
+      context: {
+        destination: {},
+        createMediaStreamSource: vi.fn(() => source),
+        createGain: vi.fn(() => gain),
+        resume: vi.fn(() => Promise.resolve()),
+      },
+      create: vi.fn(() => pending.promise),
+      close: vi.fn(),
+    };
+    vi.spyOn(voiceFilter, 'supportsVoiceFilter').mockReturnValue(true);
+    vi.spyOn(voiceFilter, 'createVoiceFilterBank').mockReturnValue(
+      bank as unknown as voiceFilter.VoiceFilterBank
+    );
+    vi.stubGlobal('MediaStream', vi.fn());
+    const previousIsolation = preferences.incomingVoiceIsolation;
+    preferences.incomingVoiceIsolation = true;
+    const track = fakeTrack('voice');
+    const room = fakeRoom(track);
+    const instance = render(CallAudio, { room: room.room });
+
+    try {
+      expect(bank.create).toHaveBeenCalledOnce();
+      if (release === 'unsubscribe') room.emit(RoomEvent.TrackUnsubscribed, track);
+      else instance.unmount();
+      pending.resolve(filter);
+      await tick();
+
+      expect(filter.destroy).toHaveBeenCalledOnce();
+      expect(filter.disconnect).toHaveBeenCalledOnce();
+      expect(filter.connect).not.toHaveBeenCalled();
+      expect(source.connect).toHaveBeenCalledOnce();
+    } finally {
+      if (release === 'unsubscribe') instance.unmount();
+      preferences.incomingVoiceIsolation = previousIsolation;
+    }
+  }
+);
 
 test('keeps the element audible until the amplifying context is running', async () => {
   const source = { connect: vi.fn((node: AudioNode) => node), disconnect: vi.fn() };

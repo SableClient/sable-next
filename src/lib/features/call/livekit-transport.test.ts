@@ -3,7 +3,9 @@ import {
   ConnectionState,
   CryptorError,
   CryptorErrorReason,
+  LocalAudioTrack,
   RoomEvent,
+  Track,
   type Room,
 } from 'livekit-client';
 
@@ -11,6 +13,7 @@ import { createLivekitTransport } from './livekit-transport';
 import { ScreenAudioError } from './call-transport';
 import type { CallTelemetry } from './call-telemetry';
 import { MatrixKeyProvider } from './key-provider';
+import * as voiceFilter from './voice-filter';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 const screenAudio = vi.hoisted(() => ({
@@ -1055,6 +1058,42 @@ test('carries the microphone processing preferences into the room options', () =
 
   preferences.noiseSuppression = true;
   preferences.echoCancellation = true;
+});
+
+test('falls back to browser noise suppression if the microphone processor fails', async () => {
+  const previousIsolation = preferences.voiceIsolation;
+  const previousSuppression = preferences.noiseSuppression;
+  preferences.voiceIsolation = true;
+  preferences.noiseSuppression = true;
+  vi.spyOn(voiceFilter, 'supportsVoiceFilter').mockReturnValue(true);
+  const filter = {
+    name: 'rnnoise',
+    init: vi.fn(() => Promise.resolve()),
+    restart: vi.fn(() => Promise.resolve()),
+    destroy: vi.fn(() => Promise.resolve()),
+  };
+  const createFilter = vi.spyOn(voiceFilter, 'createMicrophoneFilter').mockReturnValue(filter);
+  const track = Object.assign(Object.create(LocalAudioTrack.prototype) as LocalAudioTrack, {
+    setProcessor: vi.fn(() => Promise.reject(new Error('filter unavailable'))),
+    applyConstraints: vi.fn(() => Promise.resolve()),
+  });
+  const { room } = roomFixture();
+  const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => room });
+  try {
+    room.emit(RoomEvent.LocalTrackPublished, { track, source: Track.Source.ScreenShareAudio });
+    expect(createFilter).not.toHaveBeenCalled();
+    room.emit(RoomEvent.LocalTrackPublished, { track, source: Track.Source.Microphone });
+
+    await vi.waitFor(() => {
+      expect(track.applyConstraints).toHaveBeenCalledWith({ noiseSuppression: true });
+    });
+    expect(track.setProcessor).toHaveBeenCalledWith(filter);
+    expect(filter.destroy).toHaveBeenCalledOnce();
+  } finally {
+    preferences.voiceIsolation = previousIsolation;
+    preferences.noiseSuppression = previousSuppression;
+    await transport.disconnect();
+  }
 });
 
 test('connects audio-only when the camera permission was refused', async () => {

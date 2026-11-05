@@ -6,7 +6,6 @@ import { defineConfig } from 'vite';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 
-import { fetchDeepFilterNet } from './scripts/build/fetch-deepfilternet.mjs';
 import { emojiDataPlugin } from './scripts/build/emoji-data-plugin.mjs';
 import { writeCspHeaders } from './scripts/build/csp.mjs';
 
@@ -69,13 +68,6 @@ export default defineConfig({
   },
   plugins: [
     emojiDataPlugin(),
-    {
-      name: 'deepfilternet-assets',
-      buildStart: async () => {
-        if (!process.env.VITEST && !process.env.SABLE_SKIP_DEEPFILTERNET)
-          await fetchDeepFilterNet();
-      },
-    },
     sentrySvelteKit({
       // The plugin detects the adapter from `svelte.config.js`, which this
       // project does not have, and does not know `adapter-static` either.

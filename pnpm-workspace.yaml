@@ -25,6 +25,8 @@ minimumReleaseAgeExclude:
   - '@sableclient/*'
   - electron@45.0.0
 patchedDependencies:
+  # Start the worklet's message port so destroy() stops RNNoise processing.
+  '@sapphi-red/web-noise-suppressor@0.4.1': patches/@sapphi-red__web-noise-suppressor@0.4.1.patch
   '@sveltejs/kit@3.1.0': patches/@sveltejs__kit@3.1.0.patch
   # Run RPM setup after the previous version's removal script.
   app-builder-lib@26.18.0: patches/app-builder-lib@26.18.0.patch
