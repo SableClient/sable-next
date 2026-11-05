@@ -9,12 +9,13 @@ const mocks = vi.hoisted(() => ({
   notifications: vi.fn().mockResolvedValue([]),
   complete: vi.fn(),
   record: vi.fn().mockResolvedValue(undefined),
+  location: { protocol: 'https:' },
 }));
 
 vi.mock('$app/env', () => ({ version: 'test' }));
 vi.mock('#lib/model/model.js', async (original) => ({
   ...(await original<object>()),
-  loadModel: () => Promise.resolve(),
+  loadModel: (source: Promise<Response>) => source.then(() => undefined),
 }));
 vi.mock('#lib/features/notifications/push-fetch.js', async (original) => ({
   ...(await original<object>()),
@@ -49,6 +50,7 @@ vi.mock('#lib/notifications/room-names.js', () => ({
 
 beforeAll(async () => {
   vi.stubGlobal('self', {
+    location: mocks.location,
     addEventListener: (type: string, handler: (event: PushEvent) => void) => {
       mocks.handlers.set(type, handler);
     },
@@ -62,6 +64,8 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.location.protocol = 'https:';
+  vi.stubGlobal('caches', { match: () => Promise.resolve(new Response()) });
 });
 afterAll(() => vi.unstubAllGlobals());
 
@@ -138,4 +142,52 @@ test('install refuses an HTML response in place of the model', async () => {
   } as unknown as PushEvent);
   await expect(pending).rejects.toThrow('model wasm unavailable');
   expect(put).not.toHaveBeenCalled();
+});
+
+test('install caches the model on HTTPS', async () => {
+  const response = new Response('wasm', { headers: { 'content-type': 'application/wasm' } });
+  const put = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal('caches', { open: () => Promise.resolve({ put }) });
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+  let pending: Promise<unknown> | undefined;
+  mocks.handlers.get('install')?.({
+    waitUntil: (work: Promise<unknown>) => {
+      pending = work;
+    },
+  } as unknown as PushEvent);
+
+  await pending;
+
+  expect(put).toHaveBeenCalledWith(expect.any(String), response);
+});
+
+test('install skips the model cache on the desktop custom scheme', async () => {
+  mocks.location.protocol = 'sable-app:';
+  const open = vi.fn().mockRejectedValue(new Error('unsupported scheme'));
+  let pending: Promise<unknown> | undefined;
+  vi.stubGlobal('caches', { open });
+
+  mocks.handlers.get('install')?.({
+    waitUntil: (work: Promise<unknown>) => {
+      pending = work;
+    },
+  } as unknown as PushEvent);
+  await pending;
+
+  expect(open).not.toHaveBeenCalled();
+});
+
+test('pushes load the model without Cache API on the desktop custom scheme', async () => {
+  mocks.location.protocol = 'sable-app:';
+  const match = vi.fn().mockRejectedValue(new Error('unsupported scheme'));
+  const open = vi.fn().mockRejectedValue(new Error('unsupported scheme'));
+  const fetch = vi.fn().mockResolvedValue(new Response('wasm'));
+  vi.stubGlobal('caches', { match, open });
+  vi.stubGlobal('fetch', fetch);
+
+  await push({ user_id: '@me:example.org', room_id: '!room:example.org', counts: { unread: 0 } });
+
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(match).not.toHaveBeenCalled();
+  expect(open).not.toHaveBeenCalled();
 });

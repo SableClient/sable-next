@@ -57,6 +57,10 @@ const worker = globalThis.self as unknown as ServiceWorkerGlobalScope;
 // A worker from an older deploy must not depend on assets the next deploy removed.
 const MODEL_CACHE = `sable-model-${version}`;
 
+function supportsModelCache(): boolean {
+  return worker.location.protocol === 'https:' || worker.location.protocol === 'http:';
+}
+
 // The SPA fallback answers a missing asset with index.html and a 200, which cache.add would store as the model.
 async function fetchModel(): Promise<Response> {
   const response = await fetch(modelWasm);
@@ -67,6 +71,7 @@ async function fetchModel(): Promise<Response> {
 }
 
 worker.addEventListener('install', (event) => {
+  if (!supportsModelCache()) return;
   event.waitUntil(
     Promise.all([caches.open(MODEL_CACHE), fetchModel()]).then(([cache, response]) =>
       cache.put(modelWasm, response)
@@ -89,6 +94,7 @@ worker.addEventListener('activate', (event) => {
 });
 
 async function cachedModel(): Promise<Response> {
+  if (!supportsModelCache()) return fetchModel();
   const cached = await caches.match(modelWasm, { cacheName: MODEL_CACHE });
   if (cached && !cached.headers.get('content-type')?.includes('text/html')) return cached;
   const response = await fetchModel();
