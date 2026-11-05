@@ -598,7 +598,7 @@
   {/if}
 {/snippet}
 
-{#snippet itemLink(item: RailItem, props: Record<string, unknown>, held: boolean, level: number)}
+{#snippet itemLink(item: RailItem, props: Record<string, unknown>, level: number)}
   {@const active = isActive(item)}
   <a
     {...props}
@@ -609,7 +609,7 @@
       { 'nav-tab-outlined': outlined(item), 'space-item': Boolean(item.initial) },
     ]}
     href={item.navigateHref ?? item.href}
-    draggable={held ? 'false' : undefined}
+    draggable="false"
     onclick={mobile
       ? (event) => {
           navigate(item, event);
@@ -624,13 +624,13 @@
   </a>
 {/snippet}
 
-{#snippet railItem(item: RailItem, held: boolean, level = 1)}
+{#snippet railItem(item: RailItem, level = 1)}
   {#if mobile}
-    {@render itemLink(item, {}, held, level)}
+    {@render itemLink(item, {}, level)}
   {:else}
     {@const label = i18n.t(item.label)}
     {#snippet trigger({ props }: { props: Record<string, unknown> })}
-      {@render itemLink(item, props, held, level)}
+      {@render itemLink(item, props, level)}
     {/snippet}
     <Tooltip {label} side="right" {trigger} />
   {/if}
@@ -667,7 +667,7 @@
       },
     })}
   >
-    {@render railItem(item, false)}
+    {@render railItem(item)}
   </div>
 {/snippet}
 
@@ -686,7 +686,7 @@
     {@attach dragSource(ref)}
     {@attach dropTarget(ref, folderId === undefined)}
   >
-    {@render railItem(item, !mobile, folderId === undefined ? 1 : 2)}
+    {@render railItem(item, folderId === undefined ? 1 : 2)}
   </div>
 {/snippet}
 
@@ -864,7 +864,7 @@
           {#if item.section !== undefined}
             {@render sectionItem(item, item.section)}
           {:else}
-            {@render railItem(item, false)}
+            {@render railItem(item)}
           {/if}
         </li>
       {/each}
@@ -1084,6 +1084,10 @@
 {/if}
 
 <style>
+  .rail-slot :global(.avatar-root) {
+    pointer-events: none;
+  }
+
   .call-mark {
     align-items: center;
     background: var(--success-main);

@@ -75,6 +75,21 @@ test('dragging above or below a space reorders the rail', async ({ page }) => {
   await reorder(page, 'Gamma', 'Beta', { x: 20, y: 40 }, ['Alpha', 'Beta', 'Gamma']);
 });
 
+test('dragging the centre of a space avatar reorders its space', async ({ page }) => {
+  await openRail(page);
+  await railLink(page, 'Gamma')
+    .locator('.avatar-root')
+    .evaluate((avatar) => {
+      const image = document.createElement('img');
+      image.src =
+        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="red"/></svg>';
+      image.style.cssText = 'width:100%;height:100%';
+      avatar.replaceChildren(image);
+    });
+
+  await reorder(page, 'Gamma', 'Alpha', { x: 20, y: 2 }, ['Gamma', 'Alpha', 'Beta']);
+});
+
 test('a folder opens to its spaces and takes another one by drag', async ({ page }) => {
   await openRail(page);
   await group(page);
