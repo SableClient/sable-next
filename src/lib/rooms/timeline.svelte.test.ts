@@ -610,14 +610,14 @@ test.each(['backward', 'forward'] as const)(
     const timeline = new RoomTimeline(core as unknown as CoreClient);
     const state = direction === 'backward' ? 'backwardPagination' : 'forwardPagination';
     await timeline.start('!room:example.org', direction === 'forward' ? '$target' : undefined);
-    const paginate =
-      direction === 'backward' ? timeline.paginateBackward : timeline.paginateForward;
+    const paginate = (limit: number) =>
+      direction === 'backward' ? timeline.paginateBackward(limit) : timeline.paginateForward(limit);
 
-    await expect(paginate.call(timeline, 25)).rejects.toThrow('pagination failed');
+    await expect(paginate(25)).rejects.toThrow('pagination failed');
     expect(timeline.error).toBe('load_failed');
     expect(timeline[state]).toBe('idle');
 
-    await paginate.call(timeline, 25);
+    await paginate(25);
     expect(timeline.error).toBe(null);
   }
 );
@@ -836,7 +836,7 @@ class SwitchingCore {
         paginate: (params: { subscription: number; direction: 'backward' | 'forward' }) =>
           this.paginate(params.subscription, params.direction),
         unsubscribe: (params: { subscription: number }) => this.unsubscribe(params.subscription),
-        readMarker: async () => null,
+        readMarker: () => Promise.resolve(null),
       },
     };
   }

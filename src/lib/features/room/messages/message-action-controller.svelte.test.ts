@@ -6,9 +6,9 @@ import { toasts } from '#lib/ui/toasts.svelte.js';
 import { MessageActionExecutor } from './message-action-controller.svelte.js';
 import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
-const writeClipboard = vi.fn(() => Promise.resolve());
+const writeClipboard = vi.fn((_text?: string) => Promise.resolve());
 vi.mock('#lib/platform/clipboard.js', () => ({
-  copyText: (...args: unknown[]) => writeClipboard(...args),
+  copyText: (text: string) => writeClipboard(text),
 }));
 
 function message(): TimelineItemView {
