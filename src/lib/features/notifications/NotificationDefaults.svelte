@@ -46,8 +46,8 @@
     label: string;
     direct: boolean;
   }[] = [
-    { key: 'direct', label: 'common.directMessages', direct: true },
-    { key: 'group', label: 'settings.notificationDefaultGroup', direct: false },
+    { key: 'direct', label: 'settings.notificationDefaultTwoMembers', direct: true },
+    { key: 'group', label: 'settings.notificationDefaultOtherRooms', direct: false },
   ];
 
   const eventRows: { key: EventNotificationView; label: string }[] = [
@@ -179,6 +179,7 @@
     <SettingsAnchorLink anchor="notification-push" />
   </div>
   <p class="hint settings-description">{i18n.t('settings.notificationPushHint')}</p>
+  <p class="hint settings-description">{i18n.t('settings.notificationMemberCountHint')}</p>
   <p class="hint settings-description">{i18n.t('settings.notificationRulesCleanupHint')}</p>
 
   {#if failed}
