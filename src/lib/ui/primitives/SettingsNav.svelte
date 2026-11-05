@@ -125,6 +125,7 @@
   .settings-nav-group {
     display: grid;
     gap: var(--space-050);
+    grid-template-columns: minmax(0, 1fr);
     min-width: 0;
   }
 

@@ -141,3 +141,26 @@ test('mobile: log out is the last row of the section list', async () => {
   expect(row.y).toBeGreaterThan(about.y);
   await expectNoA11yViolations(screen.container, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
 });
+
+test('selected settings rows stay inside the sidebar with wide fonts and outline labels', async () => {
+  await page.viewport(1280, 900);
+  Object.assign(core, { session: { user_id: '@me:example.org' }, encryption: null });
+  core.commands = core;
+  const screen = await render(SettingsNavigatorHarness, {
+    component: SettingsNavigator,
+    section: 'notifications',
+    outlineLabel: 'Notifications for direct messages and spaces',
+  });
+  const nav = screen.getByRole('navigation', { name: 'Settings sections' }).element();
+  nav.style.fontFamily = 'monospace';
+  nav.style.setProperty('--font-size-label', '1.5rem');
+  const selected = screen.getByRole('link', { name: 'Notifications', exact: true });
+  await expect
+    .element(screen.getByRole('link', { name: 'Notifications for direct messages and spaces' }))
+    .toBeVisible();
+
+  await expect
+    .poll(() => selected.element().getBoundingClientRect().right)
+    .toBeLessThanOrEqual(nav.getBoundingClientRect().right);
+  expect(nav.scrollWidth).toBeLessThanOrEqual(nav.clientWidth);
+});
