@@ -9,6 +9,7 @@
 
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { isAnimatedImage } from '#lib/ui/media-url.js';
+  import { animationsPaused, holdStillFrame } from '#lib/ui/still-frame.js';
 
   import { identityColor } from './identity-color.js';
   import { toInitials } from './initials.js';
@@ -94,7 +95,7 @@
 
 {#snippet avatar()}
   <div
-    {@attach isMxc && !original ? playOnHover : undefined}
+    {@attach playOnHover}
     class={['avatar-root', `avatar-${size}`, className]}
     aria-hidden={decorative ? 'true' : undefined}
     role={decorative ? undefined : 'img'}
@@ -111,6 +112,8 @@
         {uniform}
         tint={recolor}
         {original}
+        freeze={!original || !hovered}
+        autoplay
         {refreshOnResume}
         pixelate={false}
         onloaded={() => {
@@ -128,6 +131,7 @@
           width={96}
           height={96}
           original
+          autoplay
           pixelate={false}
           onloaded={(url) => void checkAnimated(src, url)}
         />
@@ -140,6 +144,9 @@
         style:display={paintedSrc === src ? undefined : 'none'}
         onload={() => (paintedSrc = src)}
         onerror={() => (failedSrc = src)}
+        {@attach (image) => {
+          if (paintedSrc === src) holdStillFrame(image, !hovered || animationsPaused());
+        }}
       />
     {/if}
 

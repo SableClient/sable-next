@@ -62,6 +62,7 @@
     uniform?: boolean;
     tint?: boolean;
     original?: boolean;
+    freeze?: boolean;
     pixelate?: boolean;
     autoplay?: boolean | null;
     emoticon?: boolean;
@@ -94,6 +95,7 @@
     uniform = false,
     tint = false,
     original = false,
+    freeze = false,
     pixelate = true,
     autoplay = null,
     emoticon = false,
@@ -227,7 +229,9 @@
   );
   let manualGif = $derived(animated && !emoticon && !(autoplay ?? preferences.autoplayGifs));
   let paused = $derived(
-    (animated || original) && (animationsPaused() || (emoticon && !preferences.autoplayStickers))
+    freeze ||
+      ((animated || original) &&
+        (animationsPaused() || (emoticon && !preferences.autoplayStickers)))
   );
   let heldFrame = $derived(paused && imageLoaded && imageElement ? stillFrame(imageElement) : null);
   let heldUrl = $derived(heldFrame ?? url);

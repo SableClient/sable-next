@@ -1,15 +1,21 @@
 // @vitest-environment happy-dom
 
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
 
+import { core } from '#lib/core/__mocks__/context.js';
 import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 import { formatMessageTimestamp } from '#lib/ui/date-time.js';
 
 import ReadReceiptStack from './ReadReceiptStack.svelte';
+
+afterEach(() => {
+  core.fetchMedia.mockReset();
+  vi.restoreAllMocks();
+});
 
 const members = [
   {
@@ -37,6 +43,73 @@ const members = [
     service: false,
   },
 ];
+
+test.each(['article', 'div'])('receipt avatars play only on hover inside <%s>', async (tag) => {
+  const gif = new TextEncoder().encode('GIF89a');
+  core.fetchMedia.mockResolvedValue(gif);
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+    blob: () => Promise.resolve(new Blob([gif])),
+  } as Response);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    drawImage: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;still');
+  const container = document.body.appendChild(document.createElement(tag));
+  onTestFinished(() => {
+    container.remove();
+  });
+  const source = `mxc://example.org/receipt-${tag}`;
+  render(
+    ReadReceiptStack,
+    {
+      target: container,
+      props: {
+        readers: [members[0].user_id],
+        members: [{ ...members[0], avatar_url: source }],
+        onOpen: () => {},
+      },
+    },
+    { wrapper: TooltipProvider }
+  );
+
+  const layers = () => container.querySelectorAll<HTMLElement>('.avatar-image');
+  await vi.waitFor(() => {
+    expect(layers()[0]?.querySelector('img')).not.toBeNull();
+  });
+  const thumbnail = layers()[0].querySelector('img');
+  if (!thumbnail) throw new Error('receipt picture not rendered');
+  Object.defineProperties(thumbnail, {
+    complete: { value: true },
+    naturalWidth: { value: 32 },
+    naturalHeight: { value: 32 },
+  });
+  await fireEvent.load(thumbnail);
+  expect(thumbnail.getAttribute('src')).toBe('data:image/png;still');
+  expect(layers()).toHaveLength(1);
+  expect(core.fetchMedia).not.toHaveBeenCalledWith(source, 0, 0);
+
+  const hoverTarget = tag === 'article' ? container : container.querySelector('.avatar-root');
+  if (!hoverTarget) throw new Error('receipt hover target not rendered');
+  await fireEvent.pointerEnter(hoverTarget, { pointerType: 'touch' });
+  expect(layers()).toHaveLength(1);
+
+  await fireEvent.pointerEnter(hoverTarget, { pointerType: 'mouse' });
+  expect(layers()).toHaveLength(2);
+  expect(core.fetchMedia).toHaveBeenCalledWith(source, 0, 0);
+  await vi.waitFor(() => {
+    expect(layers()[1]?.querySelector('img')).not.toBeNull();
+  });
+  const animated = layers()[1].querySelector('img');
+  if (!animated) throw new Error('animated receipt picture not rendered');
+  await fireEvent.load(animated);
+  await vi.waitFor(() => {
+    expect(layers()[1]?.style.opacity).toBe('');
+  });
+
+  await fireEvent.pointerLeave(hoverTarget, { pointerType: 'mouse' });
+  expect(layers()).toHaveLength(1);
+  expect(thumbnail.getAttribute('src')).toBe('data:image/png;still');
+});
 
 test('opens profiles from each face', async () => {
   const user = userEvent.setup();
