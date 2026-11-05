@@ -1,11 +1,10 @@
-/* eslint @typescript-eslint/no-unsafe-function-type: "off", @typescript-eslint/no-explicit-any: "off" */
-export function throttle(func: Function, delay: number) {
+export function throttle<Args extends unknown[]>(func: (...args: Args) => void, delay: number) {
   let ready = true;
-  return (...args: any) => {
+  return (...args: Args) => {
     if (!ready) return;
     ready = false;
 
-    func.apply(null, args);
+    func.call(null, ...args);
     setTimeout(() => {
       ready = true;
     }, delay);
