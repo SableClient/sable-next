@@ -1,6 +1,8 @@
 import type { CallSupportView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { runtimeConfig } from '#lib/config/runtime-config.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
+import { callServiceUrl } from '#lib/features/call/call-service-url.js';
 
 /** No member count yet means unknown, so a large room never flashes the button while loading. */
 export function offersCall(room: {
@@ -19,12 +21,13 @@ export function offersCall(room: {
 
 export class RoomCallSupport {
   current = $state<CallSupportView | null>(null);
-  fallbackUrl = $state<string | null>(null);
+  #deploymentFallback = $state<string | null>(null);
+  fallbackUrl = $derived(callServiceUrl(preferences.callServiceUrl) ?? this.#deploymentFallback);
 
   constructor(core: Pick<CoreClient, 'rpc'>, roomId: () => string) {
     $effect(() => {
       void runtimeConfig().then((config) => {
-        this.fallbackUrl = config.calls.livekitServiceUrl;
+        this.#deploymentFallback = config.calls.livekitServiceUrl;
       });
     });
 

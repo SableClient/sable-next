@@ -182,6 +182,13 @@ export const settingsPanels: Record<string, SettingsPanelDefinition[]> = {
   ],
   calls: [
     {
+      id: 'call-service',
+      section: 'call-service',
+      targets: targets([
+        ['call-service-url', 'settings.callServiceUrl', 'settings.callServiceUrlHint'],
+      ]),
+    },
+    {
       id: 'call-devices',
       section: 'call-devices',
       supported: () => !hasNativeCalls(),

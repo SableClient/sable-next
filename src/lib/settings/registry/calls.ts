@@ -45,6 +45,7 @@ export const callsCategory: SettingsCategory = {
     { id: 'ringing', name: 'settings.groups.ringing' },
     { id: 'call-button', name: 'settings.groups.callButton' },
     { id: 'call-screens', name: 'settings.groups.callScreens' },
+    { id: 'call-service', name: 'settings.callServiceTitle' },
     { id: 'call-compat', name: 'settings.groups.callCompat' },
   ],
   items: [

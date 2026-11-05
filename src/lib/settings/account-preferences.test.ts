@@ -12,6 +12,17 @@ async function loadWith(stored: Record<string, unknown> = {}) {
   return import('./preferences.svelte.js');
 }
 
+test('keeps the custom call service across reloads and can clear it', async () => {
+  const settings = await loadWith();
+  settings.setPreference('callServiceUrl', 'https://rtc.example.org/');
+  vi.resetModules();
+  const restored = await import('./preferences.svelte.js');
+  expect(restored.preferences.callServiceUrl).toBe('https://rtc.example.org/');
+  restored.setPreference('callServiceUrl', '');
+  vi.resetModules();
+  expect((await import('./preferences.svelte.js')).preferences.callServiceUrl).toBe('');
+});
+
 test('switching account defaults restores deployment defaults without storing policy', async () => {
   const settings = await loadWith();
   settings.applyDeploymentDefaults({ theme: 'dark' });

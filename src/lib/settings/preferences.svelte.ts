@@ -363,6 +363,7 @@ export interface Preferences {
   alwaysShowCallButton: boolean;
   callScreenPreview: boolean;
   callMode: CallModePreference;
+  callServiceUrl: string;
   incomingCallSound: boolean;
   outgoingRingback: boolean;
   callMicrophoneMuted: boolean;
@@ -534,6 +535,7 @@ const FREE_TEXT = [
   'fontFamily',
   'fontFamilyMono',
   'audioInputDevice',
+  'callServiceUrl',
   'audioOutputDevice',
   'videoInputDevice',
   'presenceStatusMessage',
@@ -732,6 +734,7 @@ const DEFAULTS: Preferences = {
   alwaysShowCallButton: false,
   callScreenPreview: true,
   callMode: 'auto',
+  callServiceUrl: '',
   incomingCallSound: true,
   outgoingRingback: true,
   callMicrophoneMuted: false,
