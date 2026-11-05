@@ -1,6 +1,8 @@
 <script lang="ts">
+  import XIcon from 'phosphor-svelte/lib/XIcon';
   import { i18n } from '#lib/i18n.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import { formatBinding } from './binding.js';
   import { isMacPlatform } from './global-shortcuts.js';
@@ -21,7 +23,19 @@
 <DialogFrame bind:open variant="verification" label={i18n.t('shortcuts.helpTitle')}>
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <div class="help" tabindex="0">
-    <h2>{i18n.t('shortcuts.helpTitle')}</h2>
+    <div class="help-header">
+      <h2>{i18n.t('shortcuts.helpTitle')}</h2>
+      <IconButton
+        variant="ghost"
+        size="small"
+        label={i18n.t('common.close')}
+        onclick={() => {
+          open = false;
+        }}
+      >
+        <XIcon />
+      </IconButton>
+    </div>
     {#each SHORTCUT_CATEGORIES as category (category.id)}
       {@const items = shortcuts.filter((shortcut) => shortcut.category === category.id)}
       <section aria-labelledby="shortcuts-{category.id}">
@@ -44,6 +58,12 @@
     display: grid;
     gap: var(--space-400);
     width: min(28rem, calc(100vw - 2rem));
+  }
+
+  .help-header {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
   }
 
   h2 {
