@@ -279,6 +279,7 @@ struct Frontend {
 impl Server {
     pub fn new(config: Config) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let instance_lock = Arc::new(lock_instance(&config.data_dir)?);
+        sable_core::secrets::install_file_secrets(&config.data_dir);
         outbound::install(&config.allowed_private_cidrs)?;
         let oidc = match (
             &config.oidc_issuer,

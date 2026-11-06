@@ -389,6 +389,12 @@ impl SecretBackend for FileSecrets {
     }
 }
 
+/// Stores keys in owner-only files under `directory/secrets`.
+#[cfg(not(any(target_os = "android", target_os = "ios", target_family = "wasm")))]
+pub fn install_file_secrets(directory: &Path) {
+    install(Box::new(FileSecrets(directory.join("secrets"))));
+}
+
 /// Falls back to owner-only files under `directory` when the OS has no usable keyring. The first
 /// start picks the store for good: leaving a keyring would orphan the keys already in it.
 /// `SABLE_SECRET_STORE=files` overrides that.
