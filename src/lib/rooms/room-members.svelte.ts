@@ -78,6 +78,15 @@ export class RoomMemberLoader {
     }
   }
 
+  upsert(roomId: string, member: MemberView): void {
+    if (this.roomId !== roomId) return;
+    const at = this.members.findIndex((known) => known.user_id === member.user_id);
+    this.members =
+      at === -1
+        ? [...this.members, member]
+        : this.members.map((known, index) => (index === at ? member : known));
+  }
+
   setPowerLevel(roomId: string, userId: string, level: number): void {
     if (this.roomId !== roomId) return;
     this.members = this.members.map((member) =>

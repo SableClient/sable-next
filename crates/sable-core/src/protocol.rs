@@ -356,6 +356,8 @@ pub enum CoreEvent {
     MembersChanged {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
+        /// The member as of this event. `None` asks for a full reload.
+        member: Option<MemberView>,
     },
 
     BotCommandsChanged {

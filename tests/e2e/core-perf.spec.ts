@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
+import type { PerfSnapshot } from '../../src/worker/perf-stats';
 import { readCorePerf } from './fixtures/core-perf';
 import { quietFor } from './fixtures/settle';
 import { expect, test, SIGNED_OUT } from './fixtures/test';
@@ -15,6 +16,10 @@ type Budget = {
 };
 
 const MEGABYTE = 1024 * 1024;
+
+function callCount(perf: PerfSnapshot, method: string): number {
+  return Object.hasOwn(perf.calls, method) ? perf.calls[method].count : 0;
+}
 
 const budget = JSON.parse(
   readFileSync(new URL('./core-perf.budget.json', import.meta.url), 'utf8')
@@ -56,11 +61,15 @@ test('the core stays within its IndexedDB and latency budget', async ({
       'm.mentions': { user_ids: [bootstrap.userId] },
     });
   }
+  await expect(page.getByRole('feed').getByText(`ping ${String(CHURN_MESSAGES - 1)}`)).toBeVisible({
+    timeout: 30_000,
+  });
+  const beforeRename = await readCorePerf(browser);
   await guest.sendStateEvent(scratchRoom.roomId, 'm.room.member', guest.userId, {
     membership: 'join',
     displayname: 'Renamed guest',
   });
-  await expect(page.getByRole('feed').getByText(`ping ${String(CHURN_MESSAGES - 1)}`)).toBeVisible({
+  await expect(page.getByRole('feed').getByText('Renamed guest').first()).toBeVisible({
     timeout: 30_000,
   });
 
@@ -107,6 +116,12 @@ test('the core stays within its IndexedDB and latency budget', async ({
   expect
     .soft(slowestBudgeted?.[1].maxMs ?? 0, `slowest core call ${slowestBudgeted?.[0] ?? ''}`)
     .toBeLessThanOrEqual(budget.slowestCallMs);
+  expect
+    .soft(
+      callCount(settled, 'members.list') - callCount(beforeRename, 'members.list'),
+      'member list reloads after a rename'
+    )
+    .toBe(0);
   expect.soft(wasmMegabytes, 'core wasm memory').toBeLessThanOrEqual(budget.wasmMegabytes);
   expect
     .soft(idle.wasmGrowthMegabytes, 'core wasm memory growth while idle')
