@@ -2,10 +2,12 @@ use sable_model::text::visible_name;
 
 use crate::api::notifications::InboxFilter;
 use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use matrix_sdk::Room;
 use matrix_sdk::deserialized_responses::TimelineEvent;
+use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::room::MessagesOptions;
 use matrix_sdk::ruma::events::receipt::{ReceiptThread, ReceiptType};
 use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, AnySyncTimelineEvent};
@@ -29,6 +31,7 @@ const MAX_ENTRIES: usize = 5_000;
 const PREVIEW_LIMIT: usize = 120;
 const PAGE_SIZE: u16 = 50;
 const MAX_PAGES: usize = 5;
+const INBOX_FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[expect(
@@ -53,7 +56,7 @@ pub(crate) struct Entry {
     reply: bool,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 struct Stored {
     version: u32,
     entries: Vec<Entry>,
@@ -176,6 +179,26 @@ const fn matches(entry: &Entry, filter: InboxFilter) -> bool {
     }
 }
 
+#[derive(Default)]
+pub(crate) struct InboxCache {
+    stored: Option<Stored>,
+    revision: u64,
+    saved: u64,
+}
+
+impl InboxCache {
+    async fn stored(
+        &mut self,
+        core: &Core,
+        client: &matrix_sdk::Client,
+    ) -> Result<&mut Stored, RpcError> {
+        if self.stored.is_none() {
+            self.stored = Some(core.with_open_stores(async || load(client).await).await?);
+        }
+        Ok(self.stored.get_or_insert_default())
+    }
+}
+
 async fn load(client: &matrix_sdk::Client) -> Result<Stored, RpcError> {
     let bytes = match client.state_store().get_custom_value(KEY).await {
         Ok(Some(bytes)) => bytes,
@@ -195,15 +218,15 @@ async fn load(client: &matrix_sdk::Client) -> Result<Stored, RpcError> {
     }
 }
 
-async fn save(client: &matrix_sdk::Client, stored: &mut Stored) -> Result<(), RpcError> {
+fn encode(stored: &mut Stored) -> Result<Vec<u8>, RpcError> {
     stored.version = SCHEMA;
-    let bytes = match serde_json::to_vec(stored) {
-        Ok(bytes) => bytes,
-        Err(error) => {
-            warn!("serialising the inbox store failed: {error}");
-            return Err(RpcError::Unavailable);
-        }
-    };
+    serde_json::to_vec(stored).map_err(|error| {
+        warn!("serialising the inbox store failed: {error}");
+        RpcError::Unavailable
+    })
+}
+
+async fn write(client: &matrix_sdk::Client, bytes: Vec<u8>) -> Result<(), RpcError> {
     if let Err(error) = client
         .state_store()
         .set_custom_value_no_read(KEY, bytes)
@@ -505,13 +528,56 @@ impl Core {
         if fresh.is_empty() && cursors.is_empty() && unread_scans.is_empty() {
             return Ok(0);
         }
-        let _guard = self.inbox_lock.lock().await;
-        let mut stored = self.with_open_stores(async || load(client).await).await?;
+        let mut inbox = self.inbox.lock().await;
+        let stored = inbox.stored(self, client).await?;
         let added = merge(&mut stored.entries, fresh);
         stored.cursors.extend(cursors);
         stored.unread_scans.extend(unread_scans);
-        save(client, &mut stored).await?;
+        inbox.revision += 1;
         Ok(added)
+    }
+
+    async fn stored_inbox(&self, client: &matrix_sdk::Client) -> Result<Stored, RpcError> {
+        self.inbox.lock().await.stored(self, client).await.cloned()
+    }
+
+    pub(crate) async fn flush_inbox(&self, client: &matrix_sdk::Client) {
+        let _writing = self.inbox_flush.lock().await;
+        let (revision, bytes) = {
+            let mut inbox = self.inbox.lock().await;
+            if inbox.revision == inbox.saved {
+                return;
+            }
+            let Some(stored) = inbox.stored.as_mut() else {
+                return;
+            };
+            let Ok(bytes) = encode(stored) else {
+                return;
+            };
+            (inbox.revision, bytes)
+        };
+        if self
+            .with_open_stores(async || write(client, bytes).await)
+            .await
+            .is_ok()
+        {
+            let mut inbox = self.inbox.lock().await;
+            inbox.saved = inbox.saved.max(revision);
+        }
+    }
+
+    pub(crate) fn watch_inbox_persist(self: &Arc<Self>, client: &matrix_sdk::Client) {
+        let core = self.clone();
+        let client = client.clone();
+        self.track_session_task(
+            spawn(async move {
+                loop {
+                    matrix_sdk::sleep::sleep(INBOX_FLUSH_INTERVAL).await;
+                    core.flush_inbox(&client).await;
+                }
+            })
+            .abort_on_drop(),
+        );
     }
 
     pub(crate) async fn record_live_inbox(
@@ -552,16 +618,16 @@ impl Core {
             return;
         };
         let client = room.client();
-        let stored = {
-            let _guard = self.inbox_lock.lock().await;
-            self.with_open_stores(async || load(&client).await).await
+        let undecryptable = {
+            let mut inbox = self.inbox.lock().await;
+            inbox.stored(self, &client).await.is_ok_and(|stored| {
+                stored
+                    .entries
+                    .iter()
+                    .any(|entry| entry.event_id == event_id && entry.undecryptable)
+            })
         };
-        if !stored.is_ok_and(|stored| {
-            stored
-                .entries
-                .iter()
-                .any(|entry| entry.event_id == event_id && entry.undecryptable)
-        }) {
+        if !undecryptable {
             return;
         }
         self.record_live_inbox(room, event.raw(), actions, generation)
@@ -577,7 +643,7 @@ impl Core {
         scope: InboxScope<'_>,
     ) -> Result<(Vec<InboxItemView>, bool), RpcError> {
         let client = self.client().await?;
-        let stored = self.with_open_stores(async || load(&client).await).await?;
+        let stored = self.stored_inbox(&client).await?;
         let mut rooms: HashMap<OwnedRoomId, Option<(bool, RoomReadState)>> = HashMap::new();
         let mut threads: HashMap<OwnedEventId, u64> = HashMap::new();
         let limit = usize::try_from(limit).unwrap_or(usize::MAX);
@@ -682,7 +748,7 @@ impl Core {
         crate::rooms::fill_own_members(&client)
             .await
             .or_failed(self, "inbox_memberships")?;
-        let stored = self.with_open_stores(async || load(&client).await).await?;
+        let stored = self.stored_inbox(&client).await?;
         let every_encrypted = self.every_encrypted_event_pushed().await;
         let candidates = backfill_candidates(self, &client, &stored, include_read, room_id).await?;
         drop(stored);
@@ -864,6 +930,30 @@ mod tests {
             .unwrap();
         assert!(entry.encrypted);
         assert!(entry.body.is_none());
+    }
+
+    #[tokio::test]
+    async fn recorded_notifications_reach_the_store_only_on_flush() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, _room) = setup(&server, 1).await;
+        for (event, ts) in [("first", 100), ("second", 200)] {
+            core.record_inbox(
+                &client,
+                vec![entry(event, ts)],
+                BTreeMap::new(),
+                BTreeMap::new(),
+            )
+            .await
+            .unwrap();
+        }
+        assert_eq!(super::load(&client).await.unwrap().entries, []);
+
+        core.flush_inbox(&client).await;
+
+        let stored = super::load(&client).await.unwrap();
+        assert_eq!(stored.entries.len(), 2);
+        *core.inbox.lock().await = super::InboxCache::default();
+        assert_eq!(core.stored_inbox(&client).await.unwrap().entries.len(), 2);
     }
 
     #[tokio::test]

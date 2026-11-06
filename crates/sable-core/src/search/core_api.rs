@@ -98,8 +98,10 @@ impl Core {
             HashSet::new()
         };
 
-        let index = self.search_index.lock().await;
-        let mut hits = index.search_pinned(query, &filter, pinned, order, limit, offset);
+        let mut index = self.search_index.lock().await;
+        let mut hits = index
+            .search_pinned(query, &filter, pinned, order, limit, offset)
+            .await;
         index.fill_context(&mut hits, &filter.not_senders, context);
         hits
     }
@@ -296,7 +298,7 @@ impl Core {
                     self.search_index
                         .lock()
                         .await
-                        .restore_room(&room_id, restored)
+                        .restore_room_deferred(&room_id, restored)
                         .await;
                 }
                 persist::Opened::Unreadable => {
@@ -336,7 +338,7 @@ impl Core {
             manifest.chunks.retain(|entry| !missing.contains(&entry.id));
             let mut index = self.search_index.lock().await;
             index
-                .restore_room(
+                .restore_room_deferred(
                     &room_id,
                     persist::Restored {
                         manifest,
@@ -524,6 +526,14 @@ impl Core {
 
     pub(crate) async fn prime_persisted_rooms(self: &Arc<Self>, client: &matrix_sdk::Client) {
         for room in client.joined_rooms() {
+            if self
+                .search_index
+                .lock()
+                .await
+                .latest_indexed(room.room_id(), &room.latest_event())
+            {
+                continue;
+            }
             self.index_room_search(client, &room).await;
         }
     }

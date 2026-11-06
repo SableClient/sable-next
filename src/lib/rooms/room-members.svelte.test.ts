@@ -156,3 +156,18 @@ test('a power level change patches the loaded members', async () => {
   loader.setPowerLevel('!room:example.org', '@a:b', 50);
   expect(loader.members.map((entry) => entry.power_level)).toEqual([50, 0]);
 });
+
+test('an upsert replaces a known member and appends a new one', async () => {
+  const loader = new RoomMemberLoader();
+  await loader.load('!room:example.org', () => Promise.resolve([member('@a:b'), member('@c:d')]));
+  loader.upsert('!other:example.org', member('@a:b', 'Elsewhere'));
+  expect(loader.members.map((entry) => entry.display_name)).toEqual([null, null]);
+
+  loader.upsert('!room:example.org', member('@a:b', 'Renamed'));
+  loader.upsert('!room:example.org', member('@e:f', 'Joined'));
+  expect(loader.members.map((entry) => [entry.user_id, entry.display_name])).toEqual([
+    ['@a:b', 'Renamed'],
+    ['@c:d', null],
+    ['@e:f', 'Joined'],
+  ]);
+});

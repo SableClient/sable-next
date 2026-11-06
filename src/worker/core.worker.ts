@@ -11,6 +11,7 @@ import init, {
 import { clearSession, loadSession, saveSession } from '#lib/platform/session-storage.js';
 import { installFirefoxFetchLimit } from './adaptive-fetch';
 import { createCoreWorkerBoundary } from './core-worker-boundary';
+import { PerfStats } from './perf-stats';
 import { claimStore } from './store-ownership';
 import { installUploadDeadline } from './upload-deadline';
 import type { WasmDebugImage } from './protocol';
@@ -23,6 +24,10 @@ const SHUTDOWN_LIMIT_MS = 5_000;
 
 installUploadDeadline(self);
 installFirefoxFetchLimit(self);
+const perf = new PerfStats();
+perf.instrument(globalThis);
+let wasmMemory: WebAssembly.Memory | undefined;
+Reflect.set(self, '__sablePerf', () => perf.snapshot(wasmMemory));
 
 let started: SableCore | null = null;
 const wasm: WasmDebugImage | undefined = wasmDebug
@@ -44,7 +49,8 @@ const core = claimStore(() => {
   });
 })
   .then(() => init())
-  .then(() => {
+  .then((output) => {
+    wasmMemory = output.memory;
     // Before the constructor, so a panic while opening the session store still
     // carries its Rust message.
     setPanicHandler((message: string) => {
@@ -78,7 +84,10 @@ const boundary = createCoreWorkerBoundary(
       setLogFilter(filter);
     });
   },
-  stopCore
+  stopCore,
+  (method, elapsedMs) => {
+    perf.recordCall(method, elapsedMs);
+  }
 );
 
 // A trap unwinds only its own call, so close the worker rather than keep re-entering a corrupted module; the next connect builds a fresh one.

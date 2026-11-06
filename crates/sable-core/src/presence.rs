@@ -17,6 +17,7 @@ const POLL_TIMEOUT: Duration = Duration::from_secs(30);
 const POLL_GAP: Duration = Duration::from_secs(20);
 const REQUEST_TIMEOUT: Duration = Duration::from_mins(1);
 const FETCH_CONCURRENCY: usize = 8;
+const SINCE_KEY: &[u8] = b"sable.presence.since";
 
 pub(crate) const fn view(state: &PresenceState) -> PresenceView {
     match state {
@@ -63,7 +64,7 @@ impl Core {
 
         self.track_session_task(
             spawn(async move {
-                let mut since: Option<String> = None;
+                let mut since = stored_since(&core, &client).await;
 
                 loop {
                     core.wait_until_active().await;
@@ -89,10 +90,20 @@ impl Core {
                                 };
                                 core.emit_if_current(generation, presence_event(&event));
                             }
-                            since = Some(response.next_batch);
+                            if since.as_deref() != Some(response.next_batch.as_str()) {
+                                store_since(&core, &client, &response.next_batch).await;
+                                since = Some(response.next_batch);
+                            }
                         }
                         Err(error) => {
                             tracing::debug!("presence sync failed: {error}");
+                            if since.is_some()
+                                && error.as_client_api_error().is_some_and(|error| {
+                                    error.status_code == http::StatusCode::BAD_REQUEST
+                                })
+                            {
+                                since = None;
+                            }
                         }
                     }
 
@@ -149,6 +160,29 @@ impl Core {
     }
 }
 
+async fn stored_since(core: &Core, client: &matrix_sdk::Client) -> Option<String> {
+    let bytes = core
+        .with_open_stores(async || client.state_store().get_custom_value(SINCE_KEY).await)
+        .await
+        .ok()
+        .flatten()?;
+    String::from_utf8(bytes).ok()
+}
+
+async fn store_since(core: &Core, client: &matrix_sdk::Client, since: &str) {
+    if let Err(error) = core
+        .with_open_stores(async || {
+            client
+                .state_store()
+                .set_custom_value_no_read(SINCE_KEY, since.as_bytes().to_vec())
+                .await
+        })
+        .await
+    {
+        tracing::debug!("presence sync token not stored: {error}");
+    }
+}
+
 fn presence_event(event: &PresenceEvent) -> CoreEvent {
     CoreEvent::Presence {
         user_id: event.sender.clone(),
@@ -160,7 +194,22 @@ fn presence_event(event: &PresenceEvent) -> CoreEvent {
 
 #[cfg(test)]
 mod tests {
-    use super::presence_filter;
+    use matrix_sdk::test_utils::mocks::MatrixMockServer;
+
+    use super::{presence_filter, store_since, stored_since};
+    use crate::{Core, store::MemorySessionStore};
+
+    #[tokio::test]
+    async fn the_presence_sync_token_survives_a_restart() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let (core, _) = Core::new("presence", Box::new(MemorySessionStore::default()));
+        assert_eq!(stored_since(&core, &client).await, None);
+
+        store_since(&core, &client, "s42").await;
+
+        assert_eq!(stored_since(&core, &client).await.as_deref(), Some("s42"));
+    }
 
     #[test]
     fn the_filter_asks_for_presence_and_nothing_else() {

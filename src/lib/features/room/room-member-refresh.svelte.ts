@@ -5,8 +5,8 @@ import type { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
 const MEMBER_REFRESH_DELAY_MS = 500;
 
 export function refreshRoomMembers(
-  core: Pick<CoreClient, 'rpc' | 'onProfileChanged' | 'subscribeEvents'>,
-  memberLoader: Pick<RoomMemberLoader, 'refresh' | 'members'>,
+  core: Pick<CoreClient, 'rpc' | 'subscribeEvents'>,
+  memberLoader: Pick<RoomMemberLoader, 'refresh' | 'members' | 'upsert'>,
   resolvedRoomId: () => string
 ): void {
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -25,13 +25,15 @@ export function refreshRoomMembers(
 
   $effect(() =>
     core.subscribeEvents((event) => {
-      if (event.type === 'members_changed' && event.room_id === resolvedRoomId()) refresh();
-    })
-  );
-
-  $effect(() =>
-    core.onProfileChanged((userId) => {
-      if (memberLoader.members.some((member) => member.user_id === userId)) refresh();
+      if (event.type === 'nicknames_changed') {
+        const listed = (userId: string) =>
+          memberLoader.members.some((member) => member.user_id === userId);
+        if (event.user_ids.some(listed)) refresh();
+        return;
+      }
+      if (event.type !== 'members_changed' || event.room_id !== resolvedRoomId()) return;
+      if (event.member) memberLoader.upsert(event.room_id, event.member);
+      else refresh();
     })
   );
 }

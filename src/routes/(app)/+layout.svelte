@@ -958,26 +958,29 @@
     void core.accountRevision;
     if (core.status !== 'ready') return;
 
-    void roomList.start().catch((error: unknown) => {
-      console.warn('[sable rooms] room list unavailable', error);
+    // Restarting these wipes the room list, so a state they read must not rerun this effect.
+    untrack(() => {
+      void roomList.start().catch((error: unknown) => {
+        console.warn('[sable rooms] room list unavailable', error);
+      });
+      void spaceSidebar.start(core);
+      const userId = core.session?.user_id;
+      notifications.start(core, (roomId, eventId) => {
+        if (!userId) return;
+        void openFromNotification({ userId, roomId, eventId }, openNotification).catch(
+          (error: unknown) => {
+            console.warn('[sable notifications] notification not opened', error);
+          }
+        );
+      });
+      presence.start(core);
+      dismissedInvites.start(core);
+      dmSpaces.start(core);
+      spaceNotifications.start(core);
+      mediaPreviewSettings.start(core);
+      profileOverrides.start(core);
+      supporter.start(core);
     });
-    void spaceSidebar.start(core);
-    const userId = untrack(() => core.session?.user_id);
-    notifications.start(core, (roomId, eventId) => {
-      if (!userId) return;
-      void openFromNotification({ userId, roomId, eventId }, openNotification).catch(
-        (error: unknown) => {
-          console.warn('[sable notifications] notification not opened', error);
-        }
-      );
-    });
-    presence.start(core);
-    dismissedInvites.start(core);
-    dmSpaces.start(core);
-    spaceNotifications.start(core);
-    mediaPreviewSettings.start(core);
-    profileOverrides.start(core);
-    supporter.start(core);
     return () => {
       roomList.stop();
       spaceSidebar.stop();

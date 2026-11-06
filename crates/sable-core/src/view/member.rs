@@ -3,7 +3,7 @@ use sable_model::text::visible_name;
 use matrix_sdk::room::RoomMember;
 use matrix_sdk::ruma::Int;
 use matrix_sdk::ruma::UserId;
-use matrix_sdk::ruma::events::room::member::MembershipState;
+use matrix_sdk::ruma::events::room::member::{MembershipState, OriginalSyncRoomMemberEvent};
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
 use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventType};
 
@@ -31,6 +31,38 @@ pub fn member_view(member: &RoomMember, nicknames: &crate::nicknames::Nicknames)
     };
     nicknames.apply_member(&mut view);
     view
+}
+
+/// Builds the view from the event itself, since sliding sync leaves a timeline member event out of
+/// the stored member list.
+#[must_use]
+pub fn member_event_view(
+    event: &OriginalSyncRoomMemberEvent,
+    power_levels: Option<&RoomPowerLevels>,
+    service: bool,
+    nicknames: &crate::nicknames::Nicknames,
+) -> Option<MemberView> {
+    let user_id = UserId::parse(&event.state_key).ok()?;
+    let membership = &event.content.membership;
+    let mut view = MemberView {
+        power_level: power_levels.map_or(0, |levels| clamp_power_level(levels.for_user(&user_id))),
+        real_name: event
+            .content
+            .displayname
+            .as_deref()
+            .and_then(visible_name)
+            .map(str::to_owned),
+        real_avatar_url: event.content.avatar_url.as_ref().map(ToString::to_string),
+        display_name: None,
+        avatar_url: None,
+        membership: membership_view(membership),
+        member_ts: Some(u64::from(event.origin_server_ts.get())),
+        kicked: matches!(membership, MembershipState::Leave) && event.sender != user_id,
+        service,
+        user_id,
+    };
+    nicknames.apply_member(&mut view);
+    Some(view)
 }
 
 const fn membership_view(state: &MembershipState) -> MembershipView {

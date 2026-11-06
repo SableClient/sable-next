@@ -86,7 +86,7 @@ async fn announced(
     tokio::time::timeout(Duration::from_secs(20), async {
         loop {
             match events.recv().await {
-                Some(CoreEvent::MembersChanged { room_id }) if &room_id == room => return,
+                Some(CoreEvent::MembersChanged { room_id, .. }) if &room_id == room => return,
                 Some(_) => {}
                 None => panic!("closed"),
             }

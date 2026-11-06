@@ -243,6 +243,18 @@ impl StateStore for CountingStore {
             .await
     }
 
+    async fn get_event_room_receipt_events_batch<'a>(
+        &self,
+        room_id: &RoomId,
+        receipt_type: ReceiptType,
+        receipt_thread: &ReceiptThread,
+        event_ids: &[&'a EventId],
+    ) -> Result<BTreeMap<&'a EventId, Vec<(OwnedUserId, Receipt)>>, Self::Error> {
+        self.inner
+            .get_event_room_receipt_events_batch(room_id, receipt_type, receipt_thread, event_ids)
+            .await
+    }
+
     async fn get_custom_value(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
         self.inner.get_custom_value(key).await
     }

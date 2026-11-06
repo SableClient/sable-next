@@ -1,0 +1,9 @@
+{
+  "idleTransactions": 450,
+  "idleRequests": 750,
+  "sessionTransactions": 2200,
+  "slowestCallMs": 2000,
+  "slowCallExemptions": ["calls.support"],
+  "wasmMegabytes": 12,
+  "idleWasmGrowthMegabytes": 2
+}

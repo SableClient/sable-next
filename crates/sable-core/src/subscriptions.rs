@@ -119,6 +119,7 @@ struct RoomListWorker {
 enum ParentStateChange {
     Room(OwnedRoomId),
     Space(OwnedRoomId),
+    Member(OwnedRoomId, OwnedUserId),
 }
 
 impl RoomListWorker {
@@ -142,15 +143,16 @@ impl RoomListWorker {
                     let kind = event.get("type").and_then(serde_json::Value::as_str);
                     let change = if kind == Some("m.space.parent") {
                         Some(ParentStateChange::Room(room.room_id().to_owned()))
+                    } else if room.is_space() && kind == Some("m.room.member") {
+                        event
+                            .get("state_key")
+                            .and_then(serde_json::Value::as_str)
+                            .and_then(|user| OwnedUserId::try_from(user).ok())
+                            .map(|user| ParentStateChange::Member(room.room_id().to_owned(), user))
                     } else if room.is_space()
                         && matches!(
                             kind,
-                            Some(
-                                "m.space.child"
-                                    | "m.room.member"
-                                    | "m.room.power_levels"
-                                    | "m.room.create"
-                            )
+                            Some("m.space.child" | "m.room.power_levels" | "m.room.create")
                         )
                     {
                         Some(ParentStateChange::Space(room.room_id().to_owned()))
@@ -213,18 +215,20 @@ impl RoomListWorker {
                     let Some(change) = change else { break; };
                     let mut rooms = HashSet::new();
                     let mut spaces = HashSet::new();
+                    let mut members = HashSet::new();
                     for change in std::iter::once(change).chain(std::iter::from_fn(|| state_changes.try_recv().ok())) {
                         match change {
                             ParentStateChange::Room(id) => { rooms.insert(id); }
                             ParentStateChange::Space(id) => { spaces.insert(id); }
+                            ParentStateChange::Member(id, user) => { members.insert((id, user)); }
                         }
                     }
-                    self.refresh_changed_parents(&rooms, &spaces).await;
+                    self.refresh_changed_parents(&rooms, &spaces, &members).await;
                     self.rows.relink(&self.room_cache, &self.dm_spaces, &self.parents.links)
                 }
                 result = parent_results.recv() => {
-                    let Some((room, version, parents)) = result else { break; };
-                    if !self.parents.apply((room, version, parents)) { continue; }
+                    let Some(result) = result else { break; };
+                    if !self.parents.apply(&self.client, result) { continue; }
                     self.rows.relink(&self.room_cache, &self.dm_spaces, &self.parents.links)
                 }
                 diffs = stream.next() => {
@@ -279,6 +283,7 @@ impl RoomListWorker {
         &mut self,
         rooms: &HashSet<OwnedRoomId>,
         spaces: &HashSet<OwnedRoomId>,
+        members: &HashSet<(OwnedRoomId, OwnedUserId)>,
     ) {
         let listed = self
             .rows
@@ -287,7 +292,7 @@ impl RoomListWorker {
             .map(|row| row.room_id.clone())
             .collect();
         self.parents
-            .refresh(&self.core, &self.client, &listed, rooms, spaces)
+            .refresh(&self.core, &self.client, &listed, rooms, spaces, members)
             .await;
     }
 
@@ -314,7 +319,8 @@ impl RoomListWorker {
             .iter()
             .map(|row| row.room_id.clone())
             .collect();
-        self.refresh_changed_parents(&rooms, &HashSet::new()).await;
+        self.refresh_changed_parents(&rooms, &HashSet::new(), &HashSet::new())
+            .await;
         diffs.extend(
             self.rows
                 .relink(&self.room_cache, &self.dm_spaces, &self.parents.links),
@@ -371,7 +377,8 @@ impl RoomListWorker {
             .collect();
         let added = current.difference(&previous).cloned().collect();
         let changed_spaces = current.symmetric_difference(&previous).cloned().collect();
-        self.refresh_changed_parents(&added, &changed_spaces).await;
+        self.refresh_changed_parents(&added, &changed_spaces, &HashSet::new())
+            .await;
         diffs.extend(
             self.rows
                 .relink(&self.room_cache, &self.dm_spaces, &self.parents.links),

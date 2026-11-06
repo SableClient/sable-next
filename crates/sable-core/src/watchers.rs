@@ -536,17 +536,28 @@ impl Core {
 
         let handle = client.add_event_handler({
             let core = self.clone();
-            move |_: OriginalSyncRoomMemberEvent, room: matrix_sdk::Room| {
+            move |event: OriginalSyncRoomMemberEvent, room: matrix_sdk::Room| {
                 let core = core.clone();
                 async move {
                     // Sliding sync reads state from `required_state` only, so a member event
                     // in the timeline leaves the stored member list stale.
                     room.mark_members_missing();
                     core.forget_members_loaded(room.room_id());
+                    let power_levels = room.power_levels().await.ok();
+                    let service = room.service_members().is_some_and(|members| {
+                        members.iter().any(|id| id == event.state_key.as_str())
+                    });
+                    let member = crate::view::member_event_view(
+                        &event,
+                        power_levels.as_ref(),
+                        service,
+                        &core.nicknames(),
+                    );
                     core.emit_if_current(
                         generation,
                         CoreEvent::MembersChanged {
                             room_id: room.room_id().to_owned(),
+                            member,
                         },
                     );
                 }
@@ -894,7 +905,7 @@ mod tests {
     use tokio::sync::mpsc::UnboundedReceiver;
 
     use crate::Core;
-    use crate::protocol::CoreEvent;
+    use crate::protocol::{CoreEvent, MembershipView};
     use crate::store::MemorySessionStore;
 
     const ALICE: &str = "@alice:example.org";
@@ -1096,12 +1107,28 @@ mod tests {
             )
             .await;
 
-        let announced = std::iter::from_fn(|| events.try_recv().ok())
-            .filter(
-                |event| matches!(event, CoreEvent::MembersChanged { room_id: id } if id == room_id),
-            )
-            .count();
-        assert_eq!(announced, 7);
+        let announced: Vec<_> = std::iter::from_fn(|| events.try_recv().ok())
+            .filter_map(|event| match event {
+                CoreEvent::MembersChanged {
+                    room_id: id,
+                    member: Some(member),
+                } if id == room_id => Some((member.user_id.to_string(), member.membership)),
+                _ => None,
+            })
+            .collect();
+        let alice = |membership| (ALICE.to_owned(), membership);
+        assert_eq!(
+            announced,
+            [
+                ("@bob:example.org".to_owned(), MembershipView::Join),
+                alice(MembershipView::Invite),
+                alice(MembershipView::Join),
+                alice(MembershipView::Leave),
+                alice(MembershipView::Ban),
+                alice(MembershipView::Leave),
+                alice(MembershipView::Join),
+            ]
+        );
     }
 
     #[tokio::test]

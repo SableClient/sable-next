@@ -1412,3 +1412,42 @@ async fn a_key_older_than_one_already_emitted_for_the_same_index_is_dropped() {
         Ok(crate::protocol::CoreEvent::CallEncryptionKey { .. })
     ));
 }
+
+#[tokio::test]
+async fn call_support_reuses_the_prefetched_well_known() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = owned_room_id!("!call:example.org");
+    server.sync_joined_room(&client, &room_id).await;
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client: client.clone(),
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+    let well_known_requests = || async {
+        server
+            .server()
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .filter(|request| request.url.path() == "/.well-known/matrix/client")
+            .count()
+    };
+
+    let _ = client.well_known_rtc_transports().await;
+    let prefetched = well_known_requests().await;
+    core.call_support(crate::api::calls::SupportParams {
+        room_id,
+        livekit_service_url: None,
+    })
+    .await
+    .unwrap();
+
+    assert!(prefetched > 0);
+    assert_eq!(well_known_requests().await, prefetched);
+}

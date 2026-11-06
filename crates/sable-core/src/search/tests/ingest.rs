@@ -917,3 +917,53 @@ async fn test_redacting_an_edit_brings_the_previous_body_back() {
 
     drop(room);
 }
+
+#[async_test]
+async fn test_a_live_pass_applies_an_edit_that_arrives_with_its_original() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!live:localhost").to_owned();
+    let original_id = event_id!("$original");
+    let room = server.sync_joined_room(&client, &room_id).await;
+    let factory = EventFactory::new()
+        .room(&room_id)
+        .sender(user_id!("@kris:localhost"));
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(&room_id)
+                .add_timeline_event(
+                    factory
+                        .text_msg("the deploy pipeline is broken")
+                        .event_id(original_id),
+                )
+                .add_timeline_event(
+                    factory
+                        .text_msg("* the rollback finished")
+                        .edit(
+                            original_id,
+                            RoomMessageEventContentWithoutRelation::text_plain(
+                                "the rollback finished",
+                            ),
+                        )
+                        .event_id(event_id!("$edit")),
+                ),
+        )
+        .await;
+    let (cache, _drop) = client
+        .event_cache()
+        .unwrap()
+        .room(&room_id)
+        .await
+        .expect("room event cache");
+    let mut index = MessageIndex::new();
+    reingest_whole_room(&mut index, &cache, &room_id).await;
+
+    assert!(in_room(&index, &room_id, "deploy", 10, 0).is_empty());
+    let hits = in_room(&index, &room_id, "rollback", 10, 0);
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].event_id, original_id);
+
+    drop(room);
+}

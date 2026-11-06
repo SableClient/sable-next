@@ -956,6 +956,7 @@ impl Core {
             .map(|session| session.client.clone());
         if let Some(client) = client {
             self.flush_search_index(&client).await;
+            self.flush_inbox(&client).await;
         }
         let mut session = self.session.write().await;
         self.session_handlers.lock().clear();
@@ -968,6 +969,7 @@ impl Core {
         self.timelines.lock().await.clear();
         self.thread_timelines.lock().await.clear();
         self.account_data_types.lock().await.clear();
+        *self.inbox.lock().await = crate::inbox::InboxCache::default();
         *self.pack_cache.lock().await = image_packs::PackCache::default();
         self.calendars.lock().await.clear();
         *self.push_rules.lock().await = None;
@@ -1112,6 +1114,8 @@ impl Core {
         self.watch_joined_invites(&client);
         self.watch_send_queue(&client);
         self.watch_presence(&client, generation);
+        self.watch_inbox_persist(&client);
+        self.prefetch_call_well_known(&client);
         let store_id = self
             .registered_store_id(&account_id)
             .await
@@ -2207,7 +2211,7 @@ mod regression_tests {
             (
                 format!("sable.search.room.{room_id}").into_bytes(),
                 serde_json::to_vec(&serde_json::json!({
-                    "version": 5, "derived": 1, "next_chunk": 2, "edits": [],
+                    "version": 5, "derived": 2, "next_chunk": 2, "edits": [],
                     "chunks": [
                         { "id": 0, "start": 0, "bytes": 100, "count": 1 },
                         { "id": 1, "start": 200, "bytes": 100, "count": 1 }
@@ -2260,13 +2264,15 @@ mod regression_tests {
             core.search_index
                 .lock()
                 .await
-                .search(
+                .search_pinned(
                     "archaeology",
                     &crate::search::IndexFilter::default(),
+                    std::collections::HashSet::new(),
                     crate::api::search::SearchOrder::Rank,
                     10,
                     0
                 )
+                .await
                 .len(),
             2,
             "both restored documents should match"

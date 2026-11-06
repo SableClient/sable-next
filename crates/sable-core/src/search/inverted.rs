@@ -13,6 +13,7 @@ pub(super) struct InvertedIndex<K> {
     lengths: HashMap<K, u32>,
     total_length: u64,
     removed: HashSet<K>,
+    deferred: bool,
 }
 
 impl<K: Copy + Eq + Hash> InvertedIndex<K> {
@@ -22,10 +23,22 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
             lengths: HashMap::with_capacity(documents),
             total_length: 0,
             removed: HashSet::new(),
+            deferred: false,
         }
     }
 
+    pub(super) const fn defer(&mut self, deferred: bool) {
+        self.deferred = deferred;
+    }
+
+    pub(super) const fn is_deferred(&self) -> bool {
+        self.deferred
+    }
+
     pub(super) fn add_document(&mut self, key: K, text: &str) {
+        if self.deferred {
+            return;
+        }
         let terms = tokenize::tokenize(text);
         let mut counts: HashMap<&str, u32> = HashMap::with_capacity(terms.len());
         for term in &terms {
