@@ -209,10 +209,6 @@
     white-space: nowrap;
   }
 
-  :global(.selection-label) {
-    text-transform: capitalize;
-  }
-
   :global(.selection-label.literal-label) {
     text-transform: none;
   }

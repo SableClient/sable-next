@@ -22,7 +22,7 @@ jobs:
         with:
           ref: main
           persist-credentials: true
-          token: ${{ github.token }}
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Install Lix
         uses: https://github.com/samueldr/lix-gha-installer-action@a0fee77b2a98bb7c5c0ed7ae6d6ad4903dbdad0d # v2026-06-15
