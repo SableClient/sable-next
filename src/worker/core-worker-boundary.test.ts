@@ -670,6 +670,113 @@ test('a superseded worker tells every page', () => {
   expect(second.messages).toEqual([{ superseded: true }]);
 });
 
+describe('search foreground across tabs', () => {
+  const options = {
+    sharing: true,
+    crawler: true,
+    disk_budget_mb: 512,
+    unmetered_only: true,
+    server_search: false,
+    tuning: {
+      crawl_pause_ms: 3000,
+      trickle_pause_ms: 10000,
+      flush_interval_secs: 60,
+      batch: 50,
+      base_events: 20000,
+      max_events: 50000,
+    },
+    foreground: true,
+  };
+
+  test('a hidden page cannot pause search while another page is visible', async () => {
+    const call = vi.fn<WorkerCore['call']>(() => Promise.resolve('null'));
+    const boundary = createCoreWorkerBoundary(Promise.resolve(fakeCore(call)));
+    const first = new FakePort();
+    const second = new FakePort();
+    boundary.connect(first);
+    boundary.connect(second);
+    await first.send({ visible: true });
+    await second.send({ visible: false });
+    await second.send({
+      id: 1,
+      call: { method: 'session.set_search_options', params: { ...options, foreground: false } },
+    });
+    expect(JSON.parse(call.mock.calls.at(-1)?.[1] ?? 'null')).toMatchObject({
+      foreground: true,
+      sharing: true,
+    });
+  });
+
+  test('closing the last visible page pauses search without disabling sharing', async () => {
+    const call = vi.fn<WorkerCore['call']>(() => Promise.resolve('null'));
+    const boundary = createCoreWorkerBoundary(Promise.resolve(fakeCore(call)));
+    const first = new FakePort();
+    const second = new FakePort();
+    boundary.connect(first);
+    boundary.connect(second);
+    await first.send({ visible: true });
+    await second.send({ visible: false });
+    await first.send({ id: 1, call: { method: 'session.set_search_options', params: options } });
+    await first.send({ disconnect: true });
+    expect(JSON.parse(call.mock.calls.at(-1)?.[1] ?? 'null')).toMatchObject({
+      foreground: false,
+      sharing: true,
+    });
+    expect(first.onmessage).toBeNull();
+    await second.send({ visible: true });
+    expect(JSON.parse(call.mock.calls.at(-1)?.[1] ?? 'null')).toMatchObject({
+      foreground: true,
+      sharing: true,
+    });
+  });
+
+  test('foreground updates wait for an in-flight settings call', async () => {
+    const pending = Promise.withResolvers<string>();
+    const call = vi
+      .fn<WorkerCore['call']>(() => Promise.resolve('null'))
+      .mockImplementationOnce(() => pending.promise);
+    const boundary = createCoreWorkerBoundary(Promise.resolve(fakeCore(call)));
+    const port = new FakePort();
+    boundary.connect(port);
+    await port.send({ visible: true });
+    await port.send({ id: 1, call: { method: 'session.set_search_options', params: options } });
+    await port.send({ visible: false });
+    expect(call).toHaveBeenCalledOnce();
+    pending.resolve('null');
+    await vi.waitFor(() => {
+      expect(call).toHaveBeenCalledTimes(2);
+    });
+    expect(JSON.parse(call.mock.calls[1][1])).toMatchObject({ foreground: false, sharing: true });
+  });
+
+  test('cache reset drains settings updates before closing the stores', async () => {
+    const pending = Promise.withResolvers<string>();
+    const call = vi.fn<WorkerCore['call']>(() => pending.promise);
+    const stop = vi.fn(() => Promise.resolve());
+    const boundary = createCoreWorkerBoundary(
+      Promise.resolve(fakeCore(call)),
+      undefined,
+      undefined,
+      undefined,
+      stop
+    );
+    const port = new FakePort();
+    boundary.connect(port);
+    await port.send({ visible: true });
+    await port.send({ id: 1, call: { method: 'session.set_search_options', params: options } });
+    const resetting = port.onmessage?.({
+      data: { id: 2, reset: true },
+    } as MessageEvent<WorkerRequest>);
+    await Promise.resolve();
+    expect(stop).not.toHaveBeenCalled();
+    pending.resolve('null');
+    await resetting;
+    expect(stop).toHaveBeenCalledOnce();
+    expect(call).toHaveBeenCalledOnce();
+    expect(port.onmessage).toBeNull();
+  });
+});
+
 describe('sync activity', () => {
   beforeEach(() => {
     vi.useFakeTimers();

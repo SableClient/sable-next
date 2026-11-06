@@ -45,6 +45,10 @@ export function createCoreWorkerBoundary(
   stop: () => Promise<void> = () => Promise.resolve()
 ) {
   const ports = new Set<WorkerPort>();
+  const visibility = new Map<WorkerPort, boolean>();
+  type SearchOptions = Parameters<Rpc['session']['setSearchOptions']>[0];
+  let searchOptions: SearchOptions | undefined;
+  let searchOptionsTask = Promise.resolve('null');
   const timelineEvents = new TimelineEventRouter<WorkerPort>();
   let panic: string | null = null;
   let logs: string[] = [];
@@ -60,8 +64,38 @@ export function createCoreWorkerBoundary(
       });
   }
 
+  function anyVisible(): boolean {
+    return [...visibility.values()].some(Boolean);
+  }
+
+  function applySearchOptions(options: SearchOptions): Promise<string> {
+    searchOptions = { ...options, foreground: anyVisible() };
+    const pending = searchOptions;
+    searchOptionsTask = searchOptionsTask
+      .catch(() => 'null')
+      .then(async () => {
+        const instance = await core;
+        return instance.call(
+          'session.set_search_options',
+          JSON.stringify({ ...pending, foreground: anyVisible() })
+        );
+      });
+    return searchOptionsTask;
+  }
+
+  function updateSearchForeground(): void {
+    if (!searchOptions || searchOptions.foreground === anyVisible()) return;
+    void applySearchOptions(searchOptions).catch((error: unknown) => {
+      console.debug('[sable worker] search activity not applied', error);
+    });
+  }
+
   function closePort(port: WorkerPort): void {
-    ports.delete(port);
+    if (!ports.delete(port)) return;
+    visibility.delete(port);
+    port.onmessage = null;
+    port.onmessageerror = null;
+    updateSearchForeground();
     const subscriptions = timelineEvents.removeOwner(port);
     if (subscriptions.length === 0) return;
 
@@ -183,8 +217,10 @@ export function createCoreWorkerBoundary(
           });
           return;
         }
+        searchOptions = undefined;
         closePort(port);
         // The page clears the stores once answered, so nothing may still write to them.
+        await searchOptionsTask.catch(() => 'null');
         await stop();
         port.postMessage({ id: request.id, uri: null });
         terminate();
@@ -201,6 +237,8 @@ export function createCoreWorkerBoundary(
         return;
       }
       if ('visible' in request) {
+        visibility.set(port, request.visible);
+        updateSearchForeground();
         if (request.visible) resumeSync();
         return;
       }
@@ -326,6 +364,14 @@ export function createCoreWorkerBoundary(
         }
         if ('call' in request) {
           const { method } = request.call;
+          if (method === 'session.set_search_options') {
+            if (!ports.has(port)) return;
+            const options = request.call.params as SearchOptions;
+            if (!visibility.has(port)) visibility.set(port, options.foreground);
+            const ok: unknown = JSON.parse(await applySearchOptions(options));
+            if (ports.has(port)) port.postMessage({ id, ok } satisfies WorkerMessage);
+            return;
+          }
           const params = JSON.stringify(request.call.params);
           if (method === 'timeline.paginate' || method === 'timeline.unsubscribe') {
             const { subscription } = request.call.params as {
@@ -388,7 +434,7 @@ export function createCoreWorkerBoundary(
             console.error('[sable worker] core rejected with a non-protocol error', cause);
           }
         }
-        port.postMessage({ id, err });
+        if (ports.has(port)) port.postMessage({ id, err });
       }
     };
     port.start();

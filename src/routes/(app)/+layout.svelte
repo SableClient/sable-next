@@ -50,6 +50,7 @@
   import { hasPendingSetup } from '#lib/features/auth/setup/setup-record.js';
   import { readText } from '#lib/platform/local-json.js';
   import { watchScheduledQueue } from '#lib/features/composer/scheduled-sender.js';
+  import { watchSearchPeers } from '#lib/search/search-peer.js';
   import {
     alertsNatively,
     forgetLeftNativeConversations,
@@ -158,6 +159,10 @@
   const core = useCoreClient();
   const notificationOpener = new NativeNotificationOpener(core);
   onDestroy(() => notificationOpener.cancel());
+  let stopSearchPeers: (() => void) | null = null;
+  let searchPeerKey: string | null = null;
+  let searchOptionsReady: Promise<unknown> = Promise.resolve();
+  onDestroy(() => stopSearchPeers?.());
   const roomList = new RoomList(core);
   provideRoomList(roomList);
   $effect(() => {
@@ -553,29 +558,54 @@
 
   $effect(() => {
     void core.accountRevision;
+    const sharing = preferences.searchSharing && typeof RTCPeerConnection !== 'undefined';
+    const unmeteredOnly = preferences.searchUnmeteredOnly;
+    const peerKey =
+      core.status === 'ready' && sharing
+        ? `${core.session?.account_id}:${core.accountRevision}:${unmeteredOnly}`
+        : null;
+    if (peerKey !== searchPeerKey) {
+      stopSearchPeers?.();
+      stopSearchPeers = null;
+      searchPeerKey = peerKey;
+    }
     if (core.status !== 'ready') return;
+    let current = true;
 
-    void core.rpc.session
-      .setSearchOptions({
-        disk_budget_mb: Number(preferences.searchIndexLimit),
-        crawler: preferences.searchCrawler,
-        backup: preferences.searchBackup,
-        backup_limit_mb: Number(preferences.searchBackupLimit),
-        unmetered_only: preferences.searchUnmeteredOnly,
-        server_search: preferences.serverSearch,
-        tuning: {
-          crawl_pause_ms: Number(preferences.searchCrawlPause) * 1000,
-          trickle_pause_ms: Number(preferences.searchTricklePause) * 1000,
-          flush_interval_secs: Number(preferences.searchFlushInterval),
-          batch: Number(preferences.searchBatchSize),
-          base_events: Number(preferences.searchBaseEvents),
-          max_events: Number(preferences.searchMaxEvents),
-        },
-        foreground: documentVisible,
+    searchOptionsReady = core.rpc.session.setSearchOptions({
+      disk_budget_mb: Number(preferences.searchIndexLimit),
+      crawler: preferences.searchCrawler,
+      sharing,
+      unmetered_only: unmeteredOnly,
+      server_search: preferences.serverSearch,
+      tuning: {
+        crawl_pause_ms: Number(preferences.searchCrawlPause) * 1000,
+        trickle_pause_ms: Number(preferences.searchTricklePause) * 1000,
+        flush_interval_secs: Number(preferences.searchFlushInterval),
+        batch: Number(preferences.searchBatchSize),
+        base_events: Number(preferences.searchBaseEvents),
+        max_events: Number(preferences.searchMaxEvents),
+      },
+      foreground: documentVisible,
+    });
+    void searchOptionsReady
+      .then(() => {
+        if (current && peerKey !== null && stopSearchPeers === null) {
+          stopSearchPeers = watchSearchPeers(core, {
+            unmeteredOnly,
+            beforeStart: async () => {
+              await tick();
+              await searchOptionsReady;
+            },
+          });
+        }
       })
       .catch((error: unknown) => {
         console.warn('[sable search] search options not applied', error);
       });
+    return () => {
+      current = false;
+    };
   });
 
   $effect(() => {

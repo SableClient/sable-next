@@ -56,6 +56,7 @@ describe('prepareSettings', () => {
     expect(content.settings).not.toHaveProperty('systemNotifications');
     expect(content.settings).not.toHaveProperty('settingsSync');
     expect(content.settings).not.toHaveProperty('searchUnmeteredOnly');
+    expect(content.settings).not.toHaveProperty('searchSharing');
     expect(content.settings).not.toHaveProperty('threadPresentation');
   });
 

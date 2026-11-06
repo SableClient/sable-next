@@ -225,6 +225,11 @@ pub enum RegistrationResultView {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CoreEvent {
+    SearchPeer {
+        session_id: String,
+        initiator: bool,
+        signal: SearchPeerSignal,
+    },
     AccountLockChanged {
         account_id: String,
         locked: bool,
@@ -581,70 +586,63 @@ pub struct SearchMetricsView {
     pub average_request_ms: Option<u64>,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub running_ms: Option<u64>,
-    pub backup: SearchBackupView,
+    pub sharing: SearchSharingView,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SearchPeerSignal {
+    Open,
+    Negotiate { description: SearchPeerDescription },
+    Candidate { candidate: SearchPeerCandidate },
+    Close,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SearchPeerDescription {
+    #[serde(rename = "type")]
+    pub kind: SearchPeerDescriptionType,
+    pub sdp: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum SearchPeerDescriptionType {
+    Offer,
+    Answer,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct SearchPeerCandidate {
+    pub candidate: String,
+    pub sdp_mid: Option<String>,
+    pub sdp_m_line_index: Option<u16>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SearchSharingView {
+    pub state: SearchPeerState,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub rooms_received: usize,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
-pub enum SearchBackupState {
+pub enum SearchPeerState {
     #[default]
     Off,
-    Scheduled,
-    WaitingForWifi,
-    Locked,
-    Working,
+    Waiting,
+    Connecting,
+    Transferring,
     Idle,
-    LimitReached,
-    Refused,
-    Failed,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-#[serde(rename_all = "snake_case")]
-pub enum SearchBackupActivity {
-    Checking,
-    Preparing,
-    Downloading,
-    Importing,
-    Uploading,
-    Publishing,
-    Cleaning,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-pub struct SearchBackupProgress {
-    pub activity: SearchBackupActivity,
-    pub room: Option<String>,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub parts_done: usize,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub parts_total: usize,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub transferred_bytes: u64,
-    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
-    pub total_bytes: Option<u64>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-pub struct SearchBackupView {
-    pub state: SearchBackupState,
-    pub progress: Option<SearchBackupProgress>,
-    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
-    pub next_run_ms: Option<u64>,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub failures: usize,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub published_bytes: u64,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub limit_bytes: u64,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub rooms_published: usize,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub rooms_imported: usize,
+    Unavailable,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

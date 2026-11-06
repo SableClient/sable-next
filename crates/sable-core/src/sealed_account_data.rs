@@ -463,7 +463,7 @@ pub(crate) async fn request_account_data_key(client: &matrix_sdk::Client) {
     .await;
 }
 
-async fn verified_own_sender(
+pub(crate) async fn verified_own_sender(
     client: &matrix_sdk::Client,
     sender: &UserId,
     encryption: Option<EncryptionInfo>,

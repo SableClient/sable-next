@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use super::Handler;
 use crate::search::MAX_SEARCH_RESULTS;
-use crate::protocol::{RpcError, SearchCoverageView, SearchFilter, SearchHitView, SearchMetricsView};
+use crate::protocol::{
+    RpcError, SearchCoverageView, SearchFilter, SearchHitView, SearchMetricsView, SearchPeerSignal,
+};
 use crate::{Core, view};
 
 const MAX_SEARCH_CONTEXT: usize = 3;
@@ -13,6 +15,63 @@ domain! {
     messages,
     coverage,
     metrics,
+    peer_start,
+    peer_signal,
+    peer_exchange,
+    peer_close,
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PeerStartParams {}
+
+impl Handler for PeerStartParams {
+    type Ok = ();
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.start_search_peers().await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PeerSignalParams {
+    pub session_id: String,
+    pub signal: SearchPeerSignal,
+}
+
+impl Handler for PeerSignalParams {
+    type Ok = ();
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.signal_search_peer(&self.session_id, self.signal).await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PeerExchangeParams {
+    pub session_id: String,
+    pub data: Option<String>,
+}
+
+impl Handler for PeerExchangeParams {
+    type Ok = Option<String>;
+    async fn run(self, core: &Arc<Core>) -> Result<Self::Ok, RpcError> {
+        core.exchange_search_peer(&self.session_id, self.data).await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PeerCloseParams {
+    pub session_id: String,
+}
+
+impl Handler for PeerCloseParams {
+    type Ok = ();
+    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
+        core.close_search_peer(&self.session_id);
+        std::future::ready(Ok(()))
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]

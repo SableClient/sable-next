@@ -49,6 +49,12 @@ test('defaults to unmetered crawling and keeps the saved preference', () => {
   expect(sanitize({ searchUnmeteredOnly: false }, preferences).searchUnmeteredOnly).toBe(false);
 });
 
+test('shares directly between devices by default', () => {
+  const defaults = sanitize({}, preferences);
+  expect(defaults.searchSharing).toBe(true);
+  expect(sanitize({ searchSharing: false }, preferences).searchSharing).toBe(false);
+});
+
 test('keeps a notification volume inside its range', () => {
   expect(sanitize({ soundsNotificationVolume: 0.4 }, preferences).soundsNotificationVolume).toBe(
     0.4

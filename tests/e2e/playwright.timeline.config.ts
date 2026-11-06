@@ -22,6 +22,7 @@ export default defineConfig({
     'composer-paste.spec.ts',
     'account-mobile.spec.ts',
     'settings-size.spec.ts',
+    'search-sharing.spec.ts',
     'theme-catalog.spec.ts',
     'theme-variables.spec.ts',
     'reaction-sheet.spec.ts',

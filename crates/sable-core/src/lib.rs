@@ -195,7 +195,7 @@ pub struct Core {
     widget_feed: AtomicBool,
     notifications_enabled: AtomicBool,
     search_crawler_enabled: AtomicBool,
-    search_backup: search::SearchBackup,
+    search_sharing: search::SearchSharing,
     search_network: search::CrawlNetwork,
     search_foreground: AtomicBool,
     app_active: AtomicBool,
@@ -310,7 +310,7 @@ impl Core {
             widget_feed: AtomicBool::new(false),
             notifications_enabled: AtomicBool::new(true),
             search_crawler_enabled: AtomicBool::new(true),
-            search_backup: search::SearchBackup::default(),
+            search_sharing: search::SearchSharing::default(),
             search_network: search::CrawlNetwork::default(),
             search_foreground: AtomicBool::new(true),
             app_active: AtomicBool::new(true),
@@ -538,6 +538,9 @@ impl Core {
 
     pub async fn set_network_available(self: &Arc<Self>, available: bool) {
         let was_available = self.network_available.swap(available, Ordering::SeqCst);
+        if !available {
+            self.cancel_search_peers();
+        }
         if available && !was_available && !self.sync_paused() {
             self.apply_activity(self.app_active.load(Ordering::Relaxed), None)
                 .await;
@@ -623,10 +626,14 @@ impl Core {
 
     pub fn set_search_network_unmetered(&self, unmetered: bool) {
         self.search_network.set_unmetered(unmetered);
+        if !self.search_network.allows_crawl() {
+            self.cancel_search_peers();
+        }
     }
 
     pub(crate) fn search_crawl_active(&self) -> bool {
-        self.app_active.load(Ordering::Relaxed)
+        !self.search_sharing.discovering()
+            && self.app_active.load(Ordering::Relaxed)
             && self.search_foreground.load(Ordering::Relaxed)
             && self.search_network.allows_crawl()
     }

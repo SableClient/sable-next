@@ -68,6 +68,9 @@ export function loadModel(source?: Promise<Response>): Promise<unknown> {
   return pending;
 }
 
+export const SearchPeerDecoder = wasm.SearchPeerDecoder;
+export const encodeSearchPeerFrame = wasm.encodeSearchPeerFrame;
+
 export function parseSearchQuery(input: string): ParsedQuery {
   return JSON.parse(wasm.parseSearchQuery(input)) as ParsedQuery;
 }

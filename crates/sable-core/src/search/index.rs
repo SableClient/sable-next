@@ -1207,6 +1207,21 @@ impl MessageIndex {
         self.ingest_with(room_id, events, cache, rules, false).await
     }
 
+    pub(super) async fn import_redactions(
+        &mut self,
+        room_id: &OwnedRoomId,
+        redacted: Vec<OwnedEventId>,
+        cache: &RoomEventCache,
+    ) {
+        let index = self
+            .rooms
+            .entry(room_id.clone())
+            .or_insert_with(RoomIndex::new);
+        for event_id in redacted {
+            apply_redacted(index, event_id, cache).await;
+        }
+    }
+
     pub(super) async fn import(
         &mut self,
         room_id: &OwnedRoomId,

@@ -115,6 +115,16 @@ pub(crate) struct DelayState {
     active: bool,
     lost: bool,
 }
+
+impl DelayState {
+    fn shared(id: Option<String>) -> Arc<tokio::sync::Mutex<Self>> {
+        Arc::new(tokio::sync::Mutex::new(Self {
+            id,
+            active: true,
+            lost: false,
+        }))
+    }
+}
 const HANGUP_RETRY_BACKOFF: Duration = Duration::from_secs(1);
 const HANGUP_RETRY_BUDGET: Duration = Duration::from_secs(12);
 const USE_KEY_DELAY: Duration = Duration::from_millis(keys::USE_KEY_DELAY_MS);

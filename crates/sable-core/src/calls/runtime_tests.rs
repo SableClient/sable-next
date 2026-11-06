@@ -773,11 +773,7 @@ async fn refreshing_a_delayed_leave_cancels_the_old_event_and_respects_hangup() 
         .await;
     let mut own = member(CallMode::Matrix2, 1, &[]);
     own.member_id = Some("member".to_owned());
-    let delay = Arc::new(Mutex::new(super::super::DelayState {
-        id: Some("old".to_owned()),
-        active: true,
-        lost: false,
-    }));
+    let delay = super::super::DelayState::shared(Some("old".to_owned()));
     super::refresh_encrypted_hangup(core.clone(), room.clone(), own.clone(), delay.clone()).await;
     assert_eq!(delay.lock().await.id.as_deref(), Some("new"));
     delay.lock().await.active = false;
