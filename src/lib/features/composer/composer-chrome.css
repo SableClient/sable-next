@@ -91,6 +91,15 @@
   min-width: 0;
 }
 
+@container (width < 40rem) {
+  .composer-row.formatting-open {
+    grid-template-areas:
+      'field field field'
+      'formatting formatting formatting'
+      'before hint after';
+  }
+}
+
 .composer-before,
 .composer-after {
   align-items: center;

@@ -325,7 +325,7 @@ test('formatting uses the footer space', async () => {
   await expect.poll(() => document.querySelector('.formatting')).toBeNull();
 });
 
-for (const width of [320, 520, 768]) {
+for (const width of [320, 412, 520, 768]) {
   test(`formatting controls stay visible in a narrow ${String(width)}px composer`, async () => {
     await page.viewport(width, 812);
     const { screen } = await mount(true, {
@@ -341,8 +341,9 @@ for (const width of [320, 520, 768]) {
     const plus = boxOf('.composer-before');
     const actions = boxOf('.composer-after');
     expect(strip.y).toBeGreaterThanOrEqual(field.y + field.height);
-    if (width < 400) {
+    if (width < 640) {
       expect(strip.y + strip.height).toBeLessThanOrEqual(actions.y);
+      expect(strip.height).toBeLessThanOrEqual(3 * actions.height + 4);
     } else {
       expect(strip.x).toBeGreaterThanOrEqual(plus.x + plus.width);
       expect(strip.x + strip.width).toBeLessThanOrEqual(actions.x);
