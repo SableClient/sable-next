@@ -3338,11 +3338,13 @@ export type Rpc = {
 	space_id: string,
 	room_id: string,
 	order?: string | null,
+	via?: string[] | null,
 }) => Promise<null>;
     setChildSuggested: (params: {
 	space_id: string,
 	room_id: string,
 	suggested: boolean,
+	via?: string[] | null,
 }) => Promise<null>;
     hierarchy: (params: {
 	space_id: string,
