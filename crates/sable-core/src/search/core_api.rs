@@ -388,7 +388,7 @@ impl Core {
         self.save_rooms(client, due).await;
     }
 
-    async fn save_rooms(&self, client: &matrix_sdk::Client, rooms: Vec<OwnedRoomId>) {
+    pub(super) async fn save_rooms(&self, client: &matrix_sdk::Client, rooms: Vec<OwnedRoomId>) {
         for room_id in rooms {
             let Some((flush, revision, listed)) =
                 self.search_index.lock().await.take_flush(&room_id)
@@ -596,7 +596,6 @@ impl Core {
                 core.prime_persisted_rooms(&client).await;
 
                 core.watch_search_crawl(&client);
-                core.watch_search_backup(&client);
                 core.watch_search_persist(&client);
                 core.watch_search_dictionary();
 

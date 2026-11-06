@@ -203,7 +203,7 @@ async fn test_cold_edit_rollback_survives_save() {
 }
 
 #[async_test]
-async fn test_redaction_survives_restart_before_backup_import() {
+async fn test_redaction_survives_restart_before_peer_import() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room = room_id!("!updates:localhost").to_owned();
@@ -246,7 +246,7 @@ async fn test_redaction_survives_restart_before_backup_import() {
         .await;
     assert!(
         in_room(&restored, &room, "original", 10, 0).is_empty(),
-        "backup import resurrected a deleted message after restart"
+        "peer import resurrected a deleted message after restart"
     );
 }
 
@@ -364,7 +364,7 @@ async fn test_redacting_a_pending_edit_before_restart_keeps_the_original() {
 }
 
 #[async_test]
-async fn test_a_stale_backup_cannot_restore_a_redacted_edit() {
+async fn test_a_stale_peer_cannot_restore_a_redacted_edit() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room = room_id!("!updates:localhost").to_owned();

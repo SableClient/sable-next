@@ -932,6 +932,10 @@ async fn a_pending_invite_does_not_make_a_room_one_to_one() {
 }
 
 #[tokio::test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one sequential flow kept in a single function"
+)]
 async fn resetting_a_bridged_dm_to_default_does_not_create_a_room_push_rule() {
     use std::collections::BTreeSet;
 

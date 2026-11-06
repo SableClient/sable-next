@@ -1277,6 +1277,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'session.integration_manager_terms': () => [],
       'session.integration_manager_url': () => 'https://integrations.example.test/index.html',
       'search.messages': (params) => ({ hits: searchHits(params), older: null }),
+      'search.peer_start': () => null,
+      'search.peer_signal': () => null,
+      'search.peer_exchange': () => null,
+      'search.peer_close': () => null,
       'search.coverage': () => ({
         documents: 0,
         rooms_pending: 0,
@@ -1305,15 +1309,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         last_request_ms: null,
         average_request_ms: null,
         running_ms: null,
-        backup: {
-          state: 'off',
-          published_bytes: 0,
-          limit_bytes: 0,
-          rooms_published: 0,
-          rooms_imported: 0,
-          progress: null,
-          next_run_ms: null,
-          failures: 0,
+        sharing: {
+          state: 'waiting',
+          rooms_received: 0,
         },
       }),
       'calls.join': () => ({

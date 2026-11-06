@@ -569,11 +569,7 @@ pub(super) async fn join(
         return Err(RpcError::NotLoggedIn);
     }
     let shared = state.clone();
-    let delay = Arc::new(Mutex::new(super::DelayState {
-        id: delay,
-        active: true,
-        lost: false,
-    }));
+    let delay = super::DelayState::shared(delay);
     drop(postpone);
     let postpone = Some(core.spawn_managed_postpone_loop(delay.clone(), wake.clone()));
     let updates = updates(

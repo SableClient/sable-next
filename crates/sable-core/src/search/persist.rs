@@ -511,14 +511,27 @@ pub(super) struct StoredCrawl {
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) struct StoredCrawlRoom {
+    #[serde(default)]
+    pub(super) shared_resume: bool,
+    #[serde(default)]
+    pub(super) frontier: Option<u64>,
+    #[serde(default = "default_gapped")]
+    pub(super) gapped: bool,
     pub(super) token: Option<String>,
     pub(super) reached_start: bool,
     #[serde(default)]
     pub(super) cover: Option<Cover>,
 }
 
+const fn default_gapped() -> bool {
+    // Older checkpoints did not track undecryptable events.
+    true
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) struct Cover {
+    #[serde(default)]
+    pub(super) anchor: Option<OwnedEventId>,
     pub(super) from: u64,
     pub(super) until: u64,
     pub(super) resume: Option<String>,

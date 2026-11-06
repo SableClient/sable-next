@@ -18,6 +18,7 @@ use matrix_sdk::{EncryptionState, Room, RoomState};
 use tracing::warn;
 
 use super::persist::{self, Cover, StoredCrawlRoom};
+use super::sharing::DISCOVERY_MS;
 use crate::Core;
 use crate::protocol::{
     CoreEvent, SearchCoverageState, SearchCoverageView, SearchCrawlPhase, SearchMetricsView,
@@ -31,7 +32,6 @@ pub(super) const CRAWL_MAX_AGE_MS: u64 = 26 * 7 * 24 * 60 * 60 * 1000;
 const CRAWL_IDLE: Duration = Duration::from_secs(30);
 const CRAWL_BASE_EVENTS: usize = 20_000;
 const MAX_CRAWLED_EVENTS: usize = 50_000;
-const CRAWL_START_DELAY: Duration = Duration::from_secs(90);
 const CRAWL_LATENCY_FACTOR: u32 = 10;
 const CRAWL_TRICKLE_PAUSE: Duration = Duration::from_secs(10);
 const BLIND_EVENTS_BEFORE_SKIP: usize = 200;
@@ -104,7 +104,11 @@ pub(crate) struct CrawlProgress {
     ingesting: Option<OwnedRoomId>,
     visits: HashMap<OwnedRoomId, usize>,
     tokens: HashMap<OwnedRoomId, Option<String>>,
+    frontiers: HashMap<OwnedRoomId, u64>,
+    resumed: HashSet<OwnedRoomId>,
+    gapped: HashSet<OwnedRoomId>,
     covered: HashMap<OwnedRoomId, Cover>,
+    anchored: HashSet<OwnedRoomId>,
     probed: HashSet<OwnedRoomId>,
     blind: HashMap<OwnedRoomId, usize>,
     lost_sessions: HashSet<(OwnedRoomId, String)>,
@@ -240,6 +244,9 @@ impl CrawlProgress {
                 (
                     room_id.clone(),
                     StoredCrawlRoom {
+                        shared_resume: self.resumed.contains(room_id),
+                        frontier: self.frontiers.get(room_id).copied(),
+                        gapped: self.gapped.contains(room_id),
                         token: self.tokens.get(room_id).cloned().flatten(),
                         reached_start: false,
                         cover: self.covered.get(room_id).cloned(),
@@ -251,6 +258,9 @@ impl CrawlProgress {
             rooms.insert(
                 room_id.clone(),
                 StoredCrawlRoom {
+                    shared_resume: self.resumed.contains(room_id),
+                    frontier: self.frontiers.get(room_id).copied(),
+                    gapped: self.gapped.contains(room_id),
                     token: None,
                     reached_start: true,
                     cover: self.covered.get(room_id).cloned(),
@@ -271,19 +281,22 @@ impl CrawlProgress {
             .map_or(0, |cover| cover.until)
     }
 
-    pub(super) fn covered_rooms(&self) -> usize {
-        self.covered.len()
-    }
-
     pub(super) fn has_token(&self, room_id: &RoomId) -> bool {
         self.tokens.get(room_id).is_some_and(Option::is_some)
     }
 
-    pub(super) fn saved_token(&self, room_id: &RoomId) -> Option<String> {
-        self.saved
-            .get(room_id)
-            .filter(|saved| !saved.reached_start)
-            .and_then(|saved| saved.token.clone())
+    pub(super) fn share_boundary(&self, room_id: &RoomId) -> (Option<u64>, Option<String>) {
+        let Some(saved) = self.saved.get(room_id) else {
+            return (None, None);
+        };
+        if saved.gapped {
+            return (None, None);
+        }
+        if saved.reached_start {
+            (Some(0), None)
+        } else {
+            (saved.frontier, saved.token.clone())
+        }
     }
 
     fn jump(&mut self, room_id: &OwnedRoomId) -> bool {
@@ -299,16 +312,29 @@ impl CrawlProgress {
             return false;
         };
         self.advance(room_id, Some(token));
+        self.resumed.insert(room_id.clone());
         true
     }
 
-    pub(super) fn exhausted(&self, room_id: &RoomId) -> bool {
-        self.exhausted.contains(room_id)
+    fn reject_shared_resume(&mut self, room_id: &RoomId) -> bool {
+        if !self.resumed.remove(room_id) {
+            return false;
+        }
+        self.tokens.remove(room_id);
+        self.covered.remove(room_id);
+        self.anchored.remove(room_id);
+        self.frontiers.remove(room_id);
+        self.exhausted.remove(room_id);
+        self.reached_start.remove(room_id);
+        self.saved.remove(room_id);
+        self.changed = true;
+        true
     }
 
     pub(super) fn cover(&mut self, room_id: &OwnedRoomId, cover: Cover, revision: u64) {
         if self.covered.get(room_id) != Some(&cover) {
             self.covered.insert(room_id.clone(), cover);
+            self.anchored.remove(room_id);
             self.changed = true;
             self.awaiting.insert(room_id.clone(), revision);
         }
@@ -341,6 +367,15 @@ impl CrawlProgress {
             if self.discarded.contains(&room_id) {
                 self.changed = true;
                 continue;
+            }
+            if room.shared_resume {
+                self.resumed.insert(room_id.clone());
+            }
+            if let Some(frontier) = room.frontier {
+                self.frontiers.insert(room_id.clone(), frontier);
+            }
+            if room.gapped {
+                self.gapped.insert(room_id.clone());
             }
             if let Some(cover) = room.cover {
                 self.covered.insert(room_id.clone(), cover);
@@ -382,6 +417,10 @@ impl CrawlProgress {
         self.failed.remove(room_id);
         self.visits.remove(room_id);
         self.tokens.remove(room_id);
+        self.frontiers.remove(room_id);
+        self.resumed.remove(room_id);
+        self.gapped.remove(room_id);
+        self.anchored.remove(room_id);
         self.covered.remove(room_id);
         self.probed.remove(room_id);
         self.blind.remove(room_id);
@@ -427,7 +466,12 @@ impl Core {
         }
 
         self.report_coverage(client, &mut reported).await;
-        matrix_sdk::sleep::sleep(CRAWL_START_DELAY).await;
+        if self.search_sharing.discovering() {
+            let deadline = web_time::Instant::now() + Duration::from_millis(DISCOVERY_MS);
+            while self.search_sharing.discovering() && web_time::Instant::now() < deadline {
+                matrix_sdk::sleep::sleep(Duration::from_millis(100)).await;
+            }
+        }
 
         loop {
             self.report_coverage(client, &mut reported).await;
@@ -524,7 +568,7 @@ impl Core {
         }
     }
 
-    async fn save_changed_checkpoints(&self, client: &matrix_sdk::Client) {
+    pub(super) async fn save_changed_checkpoints(&self, client: &matrix_sdk::Client) {
         let awaiting = self.search_crawl.lock().await.awaiting.clone();
         let unflushed: HashSet<OwnedRoomId> = {
             let index = self.search_index.lock().await;
@@ -558,6 +602,13 @@ impl Core {
         error: &matrix_sdk::Error,
     ) -> Option<Duration> {
         let mut progress = self.search_crawl.lock().await;
+        if error
+            .as_client_api_error()
+            .is_some_and(|api| api.status_code.as_u16() == 400)
+            && progress.reject_shared_resume(room_id)
+        {
+            return Some(Duration::ZERO);
+        }
 
         let Pushback::Transient(retry_after) = pushback(error) else {
             progress.fail(room_id.clone());
@@ -672,7 +723,7 @@ impl Core {
             running_ms: metrics
                 .started_ms
                 .map(|started| now_ms().saturating_sub(started)),
-            backup: self.search_backup.view(progress.covered_rooms()),
+            sharing: self.search_sharing.view(),
         }
     }
 
@@ -691,7 +742,10 @@ impl Core {
 
             rooms
                 .iter()
-                .filter(|room| !progress.skips(room.room_id()))
+                .filter(|room| {
+                    !progress.skips(room.room_id())
+                        && !self.search_sharing.restoring(room.room_id())
+                })
                 .map(|room| {
                     (
                         room.room_id(),
@@ -813,6 +867,37 @@ impl Core {
                         .is_some_and(|ts| u64::from(ts.get()) < floor)
                 })
         };
+        let anchor = self
+            .search_crawl
+            .lock()
+            .await
+            .cover_of(room_id)
+            .filter(|cover| cover.stops)
+            .and_then(|cover| cover.anchor.clone());
+        if let Some(anchor) = anchor {
+            let mut progress = self.search_crawl.lock().await;
+            if progress.anchored.contains(room_id) {
+                let jumped = progress.jump(room_id);
+                return Some(CrawlOutcome::Batch(CrawlBatch {
+                    reached_start: !jumped,
+                    exhausted: !jumped,
+                    undecryptable: 0,
+                    readable: true,
+                }));
+            }
+            if chunk
+                .iter()
+                .any(|event| event.event_id() == Some(anchor.as_ref()))
+            {
+                progress.anchored.insert(room_id.clone());
+            }
+            return below(floor).then_some(CrawlOutcome::Batch(CrawlBatch {
+                reached_start: true,
+                exhausted: true,
+                undecryptable: 0,
+                readable: true,
+            }));
+        }
         if !below(floor) && below(stop) && self.search_crawl.lock().await.jump(room_id) {
             return Some(CrawlOutcome::Batch(CrawlBatch {
                 reached_start: false,
@@ -902,6 +987,12 @@ impl Core {
                 .await
                 .advance(room_id, messages.end);
             let rules = room.clone_info().room_version_rules_or_default().redaction;
+            let gap = messages.chunk.iter().any(|event| event.kind.is_utd());
+            let frontier = messages
+                .chunk
+                .iter()
+                .filter_map(|event| event.timestamp_raw().map(|ts| u64::from(ts.get())))
+                .min();
             let mut events = messages.chunk;
             events.reverse();
 
@@ -917,6 +1008,18 @@ impl Core {
 
             let mut progress = self.search_crawl.lock().await;
             progress.ingesting = None;
+            if gap {
+                progress.gapped.insert(room_id.clone());
+            }
+            if !progress.gapped.contains(room_id)
+                && let Some(frontier) = frontier
+            {
+                progress
+                    .frontiers
+                    .entry(room_id.clone())
+                    .and_modify(|previous| *previous = (*previous).min(frontier))
+                    .or_insert(frontier);
+            }
             progress.awaiting.insert(room_id.clone(), revision);
             progress.events = progress.events.saturating_add(fresh);
         }
@@ -1536,6 +1639,9 @@ mod tests {
         progress.restore(BTreeMap::from([(
             room(),
             StoredCrawlRoom {
+                shared_resume: false,
+                frontier: None,
+                gapped: false,
                 token: None,
                 reached_start: true,
                 cover: None,
@@ -1577,6 +1683,30 @@ mod tests {
                 .and_then(|room| room.token.as_deref()),
             Some("t42")
         );
+    }
+
+    #[test]
+    fn test_legacy_checkpoints_do_not_advertise_coverage() {
+        for reached_start in [false, true] {
+            let stored: StoredCrawlRoom = serde_json::from_value(serde_json::json!({
+                "token": "t42",
+                "frontier": 42,
+                "reached_start": reached_start,
+            }))
+            .unwrap();
+            let mut progress = CrawlProgress::default();
+            progress.restore([(room(), stored)].into());
+            assert_eq!(progress.share_boundary(&room()), (None, None));
+        }
+        let stored: StoredCrawlRoom = serde_json::from_value(serde_json::json!({
+            "token": null,
+            "reached_start": true,
+            "gapped": false,
+        }))
+        .unwrap();
+        let mut progress = CrawlProgress::default();
+        progress.restore([(room(), stored)].into());
+        assert_eq!(progress.share_boundary(&room()), (Some(0), None));
     }
 
     #[test]
@@ -1713,7 +1843,7 @@ mod tests {
     }
 
     #[async_test]
-    async fn test_the_crawl_stops_where_an_imported_backup_takes_over() {
+    async fn test_the_crawl_skips_history_received_from_a_peer() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
 
@@ -1752,6 +1882,7 @@ mod tests {
         core.search_crawl.lock().await.cover(
             &room_id,
             super::super::persist::Cover {
+                anchor: None,
                 from: 0,
                 until: super::now_ms(),
                 resume: None,
@@ -1777,7 +1908,7 @@ mod tests {
     }
 
     #[async_test]
-    async fn test_the_crawl_jumps_to_where_a_partial_backup_left_off() {
+    async fn test_the_crawl_resumes_below_history_received_from_a_peer() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
 
@@ -1816,6 +1947,7 @@ mod tests {
         core.search_crawl.lock().await.cover(
             &room_id,
             super::super::persist::Cover {
+                anchor: None,
                 from: 0,
                 until: super::now_ms(),
                 resume: Some("resume-here".to_owned()),
@@ -2024,5 +2156,35 @@ mod tests {
             )),
             None
         );
+    }
+
+    #[test]
+    fn test_an_expired_shared_resume_token_restarts_from_the_live_timeline() {
+        let room = matrix_sdk::ruma::room_id!("!resume:localhost").to_owned();
+        let mut progress = super::CrawlProgress::default();
+        progress.restore(std::collections::BTreeMap::from([(
+            room.clone(),
+            super::StoredCrawlRoom {
+                shared_resume: true,
+                frontier: Some(10),
+                gapped: false,
+                token: Some("expired".into()),
+                reached_start: false,
+                cover: Some(super::Cover {
+                    from: 10,
+                    until: 20,
+                    stops: false,
+                    ..super::Cover::default()
+                }),
+            },
+        )]));
+        assert!(progress.reject_shared_resume(&room));
+        assert_eq!(
+            progress.token_or(&room, Some("live".into())).as_deref(),
+            Some("live")
+        );
+        assert!(progress.cover_of(&room).is_none());
+        assert_eq!(progress.share_boundary(&room), (None, None));
+        assert!(!progress.reject_shared_resume(&room));
     }
 }

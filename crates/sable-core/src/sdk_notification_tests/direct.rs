@@ -1,3 +1,5 @@
+#![expect(clippy::unwrap_used, clippy::indexing_slicing, reason = "test code")]
+
 use std::collections::BTreeMap;
 
 use matrix_sdk::ruma::push::Ruleset;
@@ -36,18 +38,23 @@ impl Respond for PushServer {
         }
         if path.contains("/account_data/") {
             if verb == "PUT" {
-                assert!(path.ends_with(PREFERENCE));
+                assert!(
+                    path.ends_with(PREFERENCE),
+                    "unexpected account data PUT {path}"
+                );
                 remote.preference = Some(request.body_json().unwrap());
                 return ResponseTemplate::new(200).set_body_json(json!({}));
             }
             if path.ends_with("/m.direct") {
                 return ResponseTemplate::new(200).set_body_json(json!(remote.direct));
             }
-            return match &remote.preference {
-                Some(content) => ResponseTemplate::new(200).set_body_json(content),
-                None => ResponseTemplate::new(404)
-                    .set_body_json(json!({"errcode":"M_NOT_FOUND", "error":"not set"})),
-            };
+            return remote.preference.as_ref().map_or_else(
+                || {
+                    ResponseTemplate::new(404)
+                        .set_body_json(json!({"errcode":"M_NOT_FOUND", "error":"not set"}))
+                },
+                |content| ResponseTemplate::new(200).set_body_json(content),
+            );
         }
         let suffix = path.split("/pushrules/global/").nth(1).unwrap();
         let (kind, suffix) = suffix.split_once('/').unwrap();

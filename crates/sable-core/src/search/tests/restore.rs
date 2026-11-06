@@ -363,6 +363,9 @@ async fn test_a_stale_derivation_keeps_documents_and_opens_a_rederive_window() {
     progress.restore(std::collections::BTreeMap::from([(
         room_id.clone(),
         crate::search::persist::StoredCrawlRoom {
+            shared_resume: false,
+            frontier: None,
+            gapped: false,
             token: None,
             reached_start: true,
             cover: None,

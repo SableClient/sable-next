@@ -1,4 +1,3 @@
-mod backup;
 mod chunks;
 mod core_api;
 mod crawl;
@@ -6,6 +5,7 @@ mod document;
 mod index;
 mod inverted;
 mod network;
+mod sharing;
 pub(crate) use network::CrawlNetwork;
 mod dictionary;
 mod filter;
@@ -17,12 +17,12 @@ mod tokenize;
 
 pub(crate) const MAX_SEARCH_RESULTS: usize = 200;
 
-pub(crate) use backup::SearchBackup;
 pub(crate) use crawl::CrawlProgress;
 pub(crate) use filter::IndexFilter;
 #[cfg(not(target_family = "wasm"))]
 pub(crate) use persist::reset_state_cache;
 pub(crate) use server::ServerSearch;
+pub(crate) use sharing::SearchSharing;
 
 use std::time::Duration;
 

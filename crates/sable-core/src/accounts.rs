@@ -960,6 +960,7 @@ impl Core {
         let mut session = self.session.write().await;
         self.session_handlers.lock().clear();
         self.session_tasks.lock().clear();
+        self.search_sharing.reset_session().await;
         self.subscriptions.lock().await.clear();
         self.room_subscriptions.lock().await.clear();
         self.warm_rooms.lock().clear();
@@ -1080,6 +1081,7 @@ impl Core {
         self.watch_session_changes(session_changes, generation);
         self.watch_encryption(&client, generation);
         self.watch_account_data_key_sharing(&client, generation);
+        self.watch_search_peers(&client, generation);
         self.resume_dehydrated_device(&client);
         self.watch_devices(&client, generation);
         self.watch_oauth_metadata(&client, generation);
