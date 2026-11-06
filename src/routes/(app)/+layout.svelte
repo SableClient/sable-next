@@ -51,6 +51,7 @@
   import { readText } from '#lib/platform/local-json.js';
   import { watchScheduledQueue } from '#lib/features/composer/scheduled-sender.js';
   import { watchSearchPeers } from '#lib/search/search-peer.js';
+  import { runtimeConfig } from '#lib/config/runtime-config.js';
   import {
     alertsNatively,
     forgetLeftNativeConversations,
@@ -588,11 +589,12 @@
       },
       foreground: documentVisible,
     });
-    void searchOptionsReady
-      .then(() => {
+    void Promise.all([searchOptionsReady, runtimeConfig()])
+      .then(([, config]) => {
         if (current && peerKey !== null && stopSearchPeers === null) {
           stopSearchPeers = watchSearchPeers(core, {
             unmeteredOnly,
+            stunServers: config.searchSharing.stunServers,
             beforeStart: async () => {
               await tick();
               await searchOptionsReady;

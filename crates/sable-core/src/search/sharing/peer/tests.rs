@@ -406,22 +406,50 @@ fn only_the_sender_offers_and_only_the_receiver_answers() {
 }
 
 #[test]
-fn frostbite_fields_round_trip() {
-    let content = ToDeviceSearchPeerEventContent {
-        session: "s".repeat(SESSION_ID_LEN),
+fn frostbite_events_use_the_documented_fields() {
+    let negotiate = serde_json::to_value(ToDeviceFrostbiteNegotiateEventContent {
+        session: "s".into(),
         timestamp: 7,
-        signal: Signal::Candidate {
-            candidate: SearchPeerCandidate {
-                candidate: "candidate:1 1 udp 1 192.0.2.1 9 typ host".into(),
-                sdp_mid: Some("0".into()),
-                sdp_m_line_index: Some(0),
-            },
+        description: SearchPeerDescription {
+            kind: SearchPeerDescriptionType::Offer,
+            sdp: "v=0".into(),
         },
-    };
-    let json = serde_json::to_value(&content).unwrap();
-    assert_eq!(json["session"], "s".repeat(SESSION_ID_LEN));
-    assert_eq!(json["timestamp"], 7);
-    assert_eq!(json["kind"], "candidate");
-    assert_eq!(json["candidate"]["sdpMid"], "0");
-    assert_eq!(json["candidate"]["sdpMLineIndex"], 0);
+    })
+    .unwrap();
+    assert_eq!(
+        negotiate,
+        serde_json::json!({
+            "session": "s",
+            "timestamp": 7,
+            "description": { "type": "offer", "sdp": "v=0" },
+        })
+    );
+    let candidate = serde_json::to_value(ToDeviceFrostbiteCandidateEventContent {
+        session: "s".into(),
+        candidate: SearchPeerCandidate {
+            candidate: "candidate:1 1 udp 1 192.0.2.1 9 typ host".into(),
+            sdp_mid: Some("0".into()),
+            sdp_m_line_index: Some(0),
+        },
+    })
+    .unwrap();
+    assert_eq!(
+        candidate,
+        serde_json::json!({
+            "session": "s",
+            "candidate": {
+                "candidate": "candidate:1 1 udp 1 192.0.2.1 9 typ host",
+                "sdpMid": "0",
+                "sdpMLineIndex": 0,
+            },
+        })
+    );
+    assert_eq!(
+        ToDeviceFrostbiteNegotiateEventContent::TYPE,
+        "computer.gingershaped.frostbite.negotiate"
+    );
+    assert_eq!(
+        ToDeviceFrostbiteCandidateEventContent::TYPE,
+        "computer.gingershaped.frostbite.candidate"
+    );
 }

@@ -103,7 +103,12 @@ export default mergeConfig(
                 browser: {
                   enabled: true,
                   headless: true,
-                  provider: playwright({ contextOptions: { reducedMotion: 'reduce' } }),
+                  provider: playwright({
+                    contextOptions: { reducedMotion: 'reduce' },
+                    launchOptions: {
+                      args: ['--disable-features=WebRtcHideLocalIpsWithMdns'],
+                    },
+                  }),
                   instances: [
                     { browser: 'chromium', name: 'browser', exclude: TOUCH_BROWSER_TESTS },
                     {
