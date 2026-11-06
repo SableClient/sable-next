@@ -145,16 +145,22 @@ export function goToPage(href: string): void {
     setMobileDrawerOpen(false);
     return;
   }
+  if (isRoomSwitch(href)) {
+    // The list entry must hold the open room, or Back reloads the previous one under the drawer.
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- callers pass a resolved href
+    void goto(href, { replace: true, state: { mobileDrawer: 'open' }, persistState: true }).then(
+      () => {
+        if (page.url.pathname === target) setMobileDrawerOpen(false);
+      }
+    );
+    return;
+  }
   const fromList =
     page.state.mobileDrawer === 'open' ||
     /^\/(?:home|rooms|direct|space\/[^/]+)$/.test(page.url.pathname);
-  const replace = isRoomSwitch(href) && !fromList;
-  const state =
-    mobile && ROOM_PATH.test(target) && (fromList || (replace && page.state.mobileDrawerBack))
-      ? { mobileDrawerBack: true }
-      : {};
+  const state = mobile && ROOM_PATH.test(target) && fromList ? { mobileDrawerBack: true } : {};
   // eslint-disable-next-line svelte/no-navigation-without-resolve -- callers pass a resolved href
-  void goto(href, { replace, state, persistState: true });
+  void goto(href, { replace: false, state, persistState: true });
 }
 
 export function scopedSearchQuery(

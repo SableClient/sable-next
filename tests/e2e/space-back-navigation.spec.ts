@@ -72,6 +72,11 @@ test('mobile: Back returns to the selected space', async ({ page }) => {
     await expect(drawer).toHaveAttribute('aria-pressed', 'false');
     await page.goBack();
     await expect(drawer).toHaveAttribute('aria-pressed', 'true');
+    await expect(page).toHaveURL(new RegExp(`${random(name)}$`));
+    await expect(nav.locator(`a.room-row[href="${random(name)}"]`)).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
     await expect(nav.getByRole('heading', { name, exact: true })).toBeVisible();
     await page.goForward();
     await expect(page).toHaveURL(new RegExp(`${random(name)}$`));
@@ -83,7 +88,7 @@ test('mobile: Back returns to the selected space', async ({ page }) => {
     }
     await page.getByRole('button', { name: 'Back to rooms', exact: true }).click();
     await expect(drawer).toHaveAttribute('aria-pressed', 'true');
-    await expect(page).toHaveURL(new RegExp(`${general(name)}$`));
+    await expect(page).toHaveURL(new RegExp(`${random(name)}$`));
   }
 
   await page.goBack();
