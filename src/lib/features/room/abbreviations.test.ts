@@ -78,3 +78,9 @@ test('never marks inside a link, code or an existing abbreviation', () => {
   const html = '<a href="https://pr.example.org">PR</a><code>PR</code><abbr title="x">PR</abbr>';
   expect(mark(html, [['pr', 'Pull request']])).toBe(html);
 });
+
+test('leaves a term followed by an accented letter alone', () => {
+  expect(mark('<p>présenter PR</p>', [['pr', 'Pull Request']])).toBe(
+    '<p>présenter <abbr data-abbr-definition="Pull Request" tabindex="0">PR</abbr></p>'
+  );
+});
