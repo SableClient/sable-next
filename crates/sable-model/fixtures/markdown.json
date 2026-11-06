@@ -592,7 +592,7 @@
   {
     "markdown": "||secret||",
     "pills": [],
-    "body": "||secret||",
+    "body": "[Spoiler]",
     "formatted_body": "<span data-mx-spoiler=\"\">secret</span>",
     "mentions": {
       "user_ids": [],
@@ -612,7 +612,7 @@
   {
     "markdown": "||a **b**||",
     "pills": [],
-    "body": "||a **b**||",
+    "body": "[Spoiler]",
     "formatted_body": "<span data-mx-spoiler=\"\">a <strong>b</strong></span>",
     "mentions": {
       "user_ids": [],
@@ -622,7 +622,7 @@
   {
     "markdown": "x ||y|| z",
     "pills": [],
-    "body": "x ||y|| z",
+    "body": "x [Spoiler] z",
     "formatted_body": "x <span data-mx-spoiler=\"\">y</span> z",
     "mentions": {
       "user_ids": [],

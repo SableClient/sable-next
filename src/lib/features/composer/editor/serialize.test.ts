@@ -142,10 +142,9 @@ test('escaped and invalid MFM stay literal', () => {
 });
 
 test('MFM that runs past a spoiler stays literal inside it', () => {
-  const source = '||secret $[fg.color=f00 red|| tail]';
-  const message = serializePlain(textDoc(source));
+  const message = serializePlain(textDoc('||secret $[fg.color=f00 red|| tail]'));
 
-  expect(message.body).toBe(source);
+  expect(message.body).toBe('[Spoiler] tail]');
   expect(message.formatted).toBe('<span data-mx-spoiler="">secret $[fg.color=f00 red</span> tail]');
 });
 
@@ -163,10 +162,9 @@ test('MFM inside a spoiler colours the hidden text', () => {
 });
 
 test('a spoiler inside MFM keeps its colour', () => {
-  const source = '$[fg.color=f00 a ||b|| c]';
-  const message = serializePlain(textDoc(source));
+  const message = serializePlain(textDoc('$[fg.color=f00 a ||b|| c]'));
 
-  expect(message.body).toBe(source);
+  expect(message.body).toBe('a [Spoiler] c');
   expect(message.formatted).toBe(
     '<span data-mx-color="#ff0000">a </span><span data-mx-spoiler=""><span data-mx-color="#ff0000">b</span></span><span data-mx-color="#ff0000"> c</span>'
   );

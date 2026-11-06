@@ -430,7 +430,7 @@ test('reading a room closes every banner it posted', async () => {
     expect(show).toHaveBeenCalledTimes(2);
   });
 
-  notifications.retireRead([room(0)]);
+  notifications.retireRead([readThrough('$two')]);
   expect(close).toHaveBeenCalledTimes(2);
   notifications.stop();
 });
@@ -636,4 +636,47 @@ test.each([
   });
   mocks.faviconUrl.mockReturnValue(null);
   notifications.stop();
+});
+
+test('a notification for a room the list still shows as read is not retired by the sweep', () => {
+  class BrowserNotification extends EventTarget {
+    static permission = 'granted';
+    close = vi.fn();
+  }
+  vi.stubGlobal('Notification', BrowserNotification);
+  preferences.systemNotifications = true;
+  const notifications = center();
+  notifications.retireRead([room(0)]);
+  mocks.retire.mockClear();
+
+  notifications.present(message('$new'));
+  notifications.retireRead([room(0)]);
+  expect(mocks.retire).not.toHaveBeenCalled();
+
+  notifications.retireRead([withCounts({ ...readThrough('$new'), unread: 1, notifying: 1 })]);
+  notifications.retireRead([readThrough('$new')]);
+  expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@me:example.org', ['!room:example.org']);
+});
+
+test('only the opened room is retired when another room has a pending alert', () => {
+  const notifications = center();
+  notifications.present(message('$dm'));
+  mocks.retire.mockClear();
+
+  notifications.readRoom('!other:example.org');
+
+  expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@me:example.org', ['!other:example.org']);
+});
+
+test('a pending alert is released once the room list moves past its event', () => {
+  const notifications = center();
+  notifications.retireRead([room(0)]);
+  notifications.present(message('$new'));
+  mocks.retire.mockClear();
+
+  notifications.retireRead([
+    { ...room(0), latest_event: { event_id: '$newer', timestamp: Date.now() } } as RoomListItemView,
+  ]);
+
+  expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@me:example.org', ['!room:example.org']);
 });

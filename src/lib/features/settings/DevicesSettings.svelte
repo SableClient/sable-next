@@ -454,19 +454,7 @@
     >
       {#snippet actions()}
         {#if accountManagementUrl}
-          {@const url = accountManagementUrl}
-          <LinkButton
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onclick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              void openExternalAuthUrl(url).catch((cause: unknown) => {
-                error = messageFor(cause);
-              });
-            }}
-          >
+          <LinkButton href={accountManagementUrl} target="_blank" rel="noopener noreferrer">
             {i18n.t('settings.devicesDashboard')}
           </LinkButton>
         {/if}

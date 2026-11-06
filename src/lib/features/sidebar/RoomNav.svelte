@@ -1099,8 +1099,11 @@
   }
 
   @media (any-hover: hover) and (any-pointer: fine) {
-    .room-row-wrap:not(:has(.room-status > *, .voice-live)):is(:hover, :focus-within) .room-row,
-    .room-row-wrap:not(:has(.room-status > *, .voice-live)):has(
+    .room-list:not(.collapsed)
+      .room-row-wrap:not(:has(.room-status > *, .voice-live)):is(:hover, :focus-within)
+      .room-row,
+    .room-list:not(.collapsed)
+      .room-row-wrap:not(:has(.room-status > *, .voice-live)):has(
         :global(.room-options-trigger[data-state='open'])
       )
       .room-row {

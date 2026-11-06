@@ -26,6 +26,8 @@ const AVATAR_SIZE = 96;
 const POSTED_RETIRE_DELAY_MS = 1000;
 type OpenRoom = (roomId: string, eventId: string | null) => void;
 
+const UNLISTED_GRACE_MS = 60_000;
+
 export class NotificationCenter {
   private stopEvents: (() => void) | null = null;
   private stopNativePush: (() => void) | null = null;
@@ -40,6 +42,7 @@ export class NotificationCenter {
   private readonly pushed = new Map<string, string>();
   private readonly unread = new Set<string>();
   private readonly retired = new Set<string>();
+  private readonly unlisted = new Map<string, { eventId: string; shownAt: number }>();
   private readonly readRooms = new Set<string>();
   private readonly invites = new Map<string, boolean>();
   private readonly presented = new Map<string, Notification[]>();
@@ -101,6 +104,7 @@ export class NotificationCenter {
     this.reading = null;
     this.unread.clear();
     this.retired.clear();
+    this.unlisted.clear();
     this.invites.clear();
     this.presented.clear();
   }
@@ -197,10 +201,12 @@ export class NotificationCenter {
       if (room.state === 'invited') continue;
       if (hasUnread(unreadFor(room))) {
         this.unread.add(room.room_id);
+        this.unlisted.delete(room.room_id);
         this.retired.delete(room.room_id);
         this.pushed.delete(room.room_id);
         continue;
       }
+      if (this.awaitingList(room)) continue;
 
       read.push(room.room_id);
       this.unread.delete(room.room_id);
@@ -215,6 +221,19 @@ export class NotificationCenter {
 
     this.settleAll([...settled]);
     if (preferences.clearNotificationsOnRead) this.retirePostedAlerts(read);
+  }
+
+  private awaitingList(room: RoomListItemView): boolean {
+    const pending = this.unlisted.get(room.room_id);
+    if (pending === undefined) return false;
+    const latest = room.latest_event;
+    const caughtUp =
+      latest?.event_id === pending.eventId ||
+      (latest?.timestamp ?? 0) >= pending.shownAt ||
+      Date.now() - pending.shownAt > UNLISTED_GRACE_MS;
+    if (!caughtUp) return true;
+    this.unlisted.delete(room.room_id);
+    return false;
   }
 
   private retirePostedAlerts(roomIds: readonly string[]): void {
@@ -240,6 +259,7 @@ export class NotificationCenter {
 
   private forget(roomId: string): void {
     this.unread.delete(roomId);
+    this.unlisted.delete(roomId);
     this.retired.add(roomId);
     this.invites.delete(roomId);
   }
@@ -269,6 +289,8 @@ export class NotificationCenter {
       this.invites.set(view.room_id, this.invites.get(view.room_id) ?? false);
     } else {
       this.unread.add(view.room_id);
+      if (this.reading !== view.room_id)
+        this.unlisted.set(view.room_id, { eventId: view.event_id, shownAt: Date.now() });
     }
 
     const allowed = soundsAllowed();

@@ -4,6 +4,8 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import {
   TimelineWindow,
+  recallTimelineView,
+  rememberTimelineView,
   type Measured,
   type TimelineRow,
   type TimelineWindowState,
@@ -1238,4 +1240,50 @@ test('the fully visible boundary excludes a partially visible last row', async (
   viewport.dispatchEvent(new Event('scroll'));
   expect(window.state.lastVisible).toBe(26);
   expect(window.state.lastFullyVisible).toBe(25);
+});
+
+test('a reader scrolled up reports a view that a new window resumes at the same offset', async () => {
+  const first = fixture();
+  await first.window.update(entries(100));
+  await first.window.jumpTo('20', 'start');
+  first.viewport.scrollTop -= 17;
+  first.viewport.dispatchEvent(new Event('scroll'));
+  await vi.advanceTimersByTimeAsync(200);
+  const view = first.window.view;
+  if (!view) throw new Error('a scrolled-up reader has a view');
+  const row = first.content.querySelector(`[data-timeline-key="${view.key}"]`);
+  if (!row) throw new Error('missing anchored row');
+  const offset = row.getBoundingClientRect().top - first.viewport.getBoundingClientRect().top;
+  expect(offset).toBe(view.top);
+
+  const second = fixture();
+  await second.window.update(entries(100));
+  expect(await second.window.resume(view)).toBe(true);
+  const resumed = second.content.querySelector(`[data-timeline-key="${view.key}"]`);
+  if (!resumed) throw new Error('missing resumed row');
+  expect(resumed.getBoundingClientRect().top - second.viewport.getBoundingClientRect().top).toBe(
+    view.top
+  );
+  expect(second.window.state.pinned).toBe(false);
+});
+
+test('a reader at the latest message has no view to remember', async () => {
+  const { window } = fixture();
+  await window.update(entries(100));
+  expect(window.state.pinned).toBe(true);
+  expect(window.view).toBeNull();
+});
+
+test('a remembered view is replaced by a newer one and dropped when cleared', () => {
+  rememberTimelineView('!a:x:', { key: '1', top: 3 });
+  rememberTimelineView('!a:x:', { key: '2', top: 5 });
+  expect(recallTimelineView('!a:x:')).toEqual({ key: '2', top: 5 });
+  rememberTimelineView('!a:x:', null);
+  expect(recallTimelineView('!a:x:')).toBeUndefined();
+});
+
+test('resuming at a row the window no longer holds leaves the reader where they are', async () => {
+  const { window } = fixture();
+  await window.update(entries(10));
+  expect(await window.resume({ key: 'gone', top: 0 })).toBe(false);
 });

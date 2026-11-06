@@ -1,3 +1,5 @@
+import QuickLRU from 'quick-lru';
+
 export interface TimelineEntry<T> {
   key: string;
   value: T;
@@ -42,7 +44,7 @@ interface BucketSizes {
   count: number;
 }
 
-interface Anchor {
+export interface Anchor {
   key: string;
   top: number;
 }
@@ -83,6 +85,18 @@ export function timelineSizes(scope: string): Map<string, Measured> {
     scopedSizes.delete(oldest);
   }
   return sizes;
+}
+
+const VIEW_SCOPES = 50;
+const views = new QuickLRU<string, Anchor>({ maxSize: VIEW_SCOPES });
+
+export function rememberTimelineView(scope: string, anchor: Anchor | null): void {
+  if (anchor) views.set(scope, anchor);
+  else views.delete(scope);
+}
+
+export function recallTimelineView(scope: string): Anchor | undefined {
+  return views.get(scope);
 }
 
 export class TimelineWindow<T> {
@@ -217,6 +231,18 @@ export class TimelineWindow<T> {
       pinned: this.pinned,
       scrolling: this.active,
     };
+  }
+
+  get view(): Anchor | null {
+    const anchor = this.pinned ? undefined : this.anchors[0];
+    return anchor ? { ...anchor } : null;
+  }
+
+  async resume({ key, top }: Anchor): Promise<boolean> {
+    if (!(await this.jumpTo(key, 'start'))) return false;
+    this.writeOffset(this.options.viewport.scrollTop - top);
+    this.publish(this.capture());
+    return true;
   }
 
   get contentHeight(): number {
