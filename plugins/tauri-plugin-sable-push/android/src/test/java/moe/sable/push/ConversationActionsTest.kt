@@ -80,7 +80,8 @@ class ConversationActionsTest {
         PushNotifier.showFromPush(context, JSONObject().put("notification", notification).put("user_id", user).toString())
     }
 
-    private fun posted() = notificationManager.activeNotifications.single().notification
+    private fun posted() = notificationManager.activeNotifications
+        .single { it.id != PushNotifier.SUMMARY_ID }.notification
 
     private fun texts() = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posted())!!
         .messages.map { it.text.toString() }

@@ -225,6 +225,7 @@ class SablePushPlugin(private val activity: Activity) : Plugin(activity) {
             WorkManager.getInstance(activity).cancelAllWorkByTag("push-room:$id")
             PushNotificationGate.dismiss(activity, id) { manager.cancel(id) }
         }
+        PushNotifier.cancelOrphanedSummary(activity)
     }
 
     private fun dismissAll() {

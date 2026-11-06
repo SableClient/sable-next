@@ -30,6 +30,8 @@ object PushNotifier {
     private const val INVITES_CHANNEL_ID = "invites"
     private const val CALLS_CHANNEL_ID = "calls"
     private const val GROUP_KEY = "matrix_messages"
+    /** Notification ids derive from non-negative hashes, so a negative id never names a conversation. */
+    internal const val SUMMARY_ID = -1
 
     private const val RTC_NOTIFICATION_TYPE = "m.rtc.notification"
     private const val RTC_NOTIFICATION_TYPE_UNSTABLE = "org.matrix.msc4075.rtc.notification"
@@ -251,6 +253,7 @@ object PushNotifier {
             PushDiagnostics.record(context, PushOutcome.READ_DISMISSED, traceOf(notification))
             val manager = context.getSystemService(NotificationManager::class.java)
             PushNotificationGate.dismiss(context, id) { manager.cancel(id) }
+            cancelOrphanedSummary(context)
         } else {
             PushDiagnostics.record(context, PushOutcome.READ_KEPT, traceOf(notification))
         }
@@ -406,6 +409,7 @@ object PushNotifier {
         manager.activeNotifications
             .filter { it.tag == null && it.notification.extras.getString(ACCOUNT_KEY) == userId }
             .forEach { active -> PushNotificationGate.dismiss(context, active.id) { manager.cancel(active.id) } }
+        cancelOrphanedSummary(context)
     }
 
     private fun reconcileRead(
@@ -427,6 +431,7 @@ object PushNotifier {
         val readRooms = read.toSet()
         val dismissed = shown.filter { it.notification.extras.getString(ROOM_KEY) in readRooms }
         dismissed.forEach { active -> PushNotificationGate.dismiss(context, active.id) { manager.cancel(active.id) } }
+        cancelOrphanedSummary(context)
         return dismissed.isNotEmpty()
     }
 
@@ -495,6 +500,16 @@ object PushNotifier {
             .setOnlyAlertOnce(cooling)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setGroup(GROUP_KEY)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .apply {
+                notification.optJSONObject("counts")?.optInt("unread", 0)?.takeIf { it > 0 }?.let { setNumber(it) }
+            }
+            .setPublicVersion(
+                NotificationCompat.Builder(context, channelId)
+                    .setSmallIcon(iconId)
+                    .setContentTitle(if (isInvite) "New Invitation" else "New message")
+                    .build()
+            )
 
         var repeat = false
 
@@ -560,6 +575,7 @@ object PushNotifier {
 
         val built = builder.build()
         NotificationManagerCompat.from(context).notify(notifId, built)
+        postSummary(context, iconId)
         NotificationReceipts.record(context, notifId, eventId)
         AlertLog.posted(
             context, "push", traceOf(notification), built,
@@ -573,6 +589,31 @@ object PushNotifier {
                 "alertedAgoMs=${alertedAt?.let { now - it }}",
             ),
         )
+    }
+
+    /** One summary for every account, since they share [GROUP_KEY]. */
+    private fun postSummary(context: Context, iconId: Int) {
+        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+        val summary = NotificationCompat.Builder(context, MESSAGES_CHANNEL_ID)
+            .setSmallIcon(iconId)
+            .setContentTitle("New messages")
+            .setStyle(NotificationCompat.InboxStyle().setBigContentTitle("New messages"))
+            .setGroup(GROUP_KEY)
+            .setGroupSummary(true)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
+            .setAutoCancel(true)
+            .setContentIntent(
+                PendingIntent.getActivity(context, SUMMARY_ID, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            )
+            .build()
+        NotificationManagerCompat.from(context).notify(SUMMARY_ID, summary)
+    }
+
+    /** The summary of an emptied group is only noise, so it goes with the last conversation. */
+    internal fun cancelOrphanedSummary(context: Context) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val active = manager.activeNotifications.filter { it.tag == null && it.notification.group == GROUP_KEY }
+        if (active.isNotEmpty() && active.all { it.id == SUMMARY_ID }) manager.cancel(SUMMARY_ID)
     }
 
     private fun postIncomingCall(context: Context, notification: JSONObject, event: JSONObject) {

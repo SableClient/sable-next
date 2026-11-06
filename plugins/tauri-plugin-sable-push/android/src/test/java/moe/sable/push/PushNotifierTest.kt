@@ -64,13 +64,15 @@ class PushNotifierTest {
 
     private fun shadowNotificationManager() = shadowOf(notificationManager)
 
+    private fun conversations() = notificationManager.activeNotifications.filter { it.id != PushNotifier.SUMMARY_ID }
+
     @Test
     fun successiveMessagesKeepHistoryAndDismissalClearsIt() {
         val room = "!history:example.org"
         PushNotifier.showFromPush(context, pushPayload(room, "\$one", "first"))
         PushNotifier.showFromPush(context, pushPayload(room, "\$two", "second"))
         fun texts(): List<String> = androidx.core.app.NotificationCompat.MessagingStyle
-            .extractMessagingStyleFromNotification(notificationManager.activeNotifications.single().notification)!!
+            .extractMessagingStyleFromNotification(conversations().single().notification)!!
             .messages.map { it.text.toString() }
         assertEquals(listOf("first", "second"), texts())
         PushNotifier.showFromPush(context, pushPayload(room, "\$two", "second"))
@@ -85,10 +87,10 @@ class PushNotifierTest {
         val room = "!mixed:example.org"
         PushNotifier.showFromPush(context, pushPayload(room, "\$first", "first"))
         PushNotifier.show(context, warmNotification(room, "\$second", "second"))
-        val alerted = notificationManager.activeNotifications.single().notification
+        val alerted = conversations().single().notification
         PushNotifier.show(context, warmNotification(room, "\$second", "second"))
         PushNotifier.showFromPush(context, pushPayload(room, "\$second", "second"))
-        val posted = notificationManager.activeNotifications.single().notification
+        val posted = conversations().single().notification
         val style = androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posted)!!
         assertEquals(listOf("first", "second"), style.messages.map { it.text.toString() })
         assertSame(alerted, posted)
@@ -98,9 +100,9 @@ class PushNotifierTest {
     fun theRunningAppDoesNotRepostAnEventThePushAlreadyShowed() {
         val room = "!local:example.org"
         PushNotifier.showFromPush(context, pushPayload(room, "\$one", "hello"))
-        val alerted = notificationManager.activeNotifications.single().notification
+        val alerted = conversations().single().notification
         PushNotifier.show(context, warmNotification(room, "\$one", "hello"))
-        assertSame(alerted, notificationManager.activeNotifications.single().notification)
+        assertSame(alerted, conversations().single().notification)
     }
 
     @Test
@@ -108,7 +110,7 @@ class PushNotifierTest {
         val room = "!history:example.org"
         for (i in 1..12) PushNotifier.showFromPush(context, pushPayload(room, "\$event$i", "body$i"))
         fun messages() = androidx.core.app.NotificationCompat.MessagingStyle
-            .extractMessagingStyleFromNotification(notificationManager.activeNotifications.single().notification)!!.messages
+            .extractMessagingStyleFromNotification(conversations().single().notification)!!.messages
         assertEquals((5..12).map { "body$it" }, messages().map { it.text.toString() })
         PushPolicy(context).showContent = false
         PushNotifier.showFromPush(context, pushPayload(room, "\$event12", "body12"))
@@ -122,9 +124,9 @@ class PushNotifierTest {
         PushNotifier.showFromPush(context, payload)
         notificationManager.cancelAll()
         PushNotifier.showFromPush(context, payload)
-        assertTrue(notificationManager.activeNotifications.isEmpty())
+        assertTrue(conversations().isEmpty())
         PushNotifier.show(context, warmNotification(room, "\$seen", "already seen"))
-        assertTrue(notificationManager.activeNotifications.isEmpty())
+        assertTrue(conversations().isEmpty())
     }
 
     @Test
@@ -133,7 +135,7 @@ class PushNotifierTest {
         for (i in 1..12) PushNotifier.showFromPush(context, pushPayload(room, "\$event$i", "body$i"))
         PushNotifier.showFromPush(context, pushPayload(room, "\$event1", "body1"))
         val messages = androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
-            notificationManager.activeNotifications.single().notification)!!.messages
+            conversations().single().notification)!!.messages
         assertEquals((5..12).map { "body$it" }, messages.map { it.text.toString() })
     }
 
@@ -152,16 +154,16 @@ class PushNotifierTest {
             val payload = JSONObject(pushPayload(room, "\$first"))
             payload.getJSONObject("notification").put("type", "m.room.encrypted")
             PushNotifier.showFromPush(context, payload.toString(), receivedAt = 1_000L)
-            val posted = notificationManager.activeNotifications.single().notification
+            val posted = conversations().single().notification
             assertTrue(posted.extras.getString(Notification.EXTRA_TEXT)!!.contains("second"))
             assertEquals(2_000L, posted.`when`)
             val messages = androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
-                notificationManager.activeNotifications.single().notification)!!.messages
+                conversations().single().notification)!!.messages
             assertEquals(listOf("first", "second"), messages.map { it.text.toString() })
-            val intent = shadowOf(notificationManager.activeNotifications.single().notification.contentIntent).savedIntent
+            val intent = shadowOf(conversations().single().notification.contentIntent).savedIntent
             val target = JSONObject(intent.getStringExtra(NotificationIntents.NOTIFICATION_OBJECT)!!).getJSONObject("extra")
             assertEquals("\$second", target.getString("event_id"))
-            val actions = notificationManager.activeNotifications.single().notification.actions
+            val actions = conversations().single().notification.actions
             assertEquals(2, actions.size)
             for (action in actions) {
                 val actionIntent = shadowOf(action.actionIntent).savedIntent
@@ -183,7 +185,7 @@ class PushNotifierTest {
         PushNotifier.show(context, warmNotification(room, "\$first", "first"), receivedAt = 1_000L)
 
         assertEquals(listOf("first", "second"), shownTexts())
-        val posted = notificationManager.activeNotifications.single().notification
+        val posted = conversations().single().notification
         assertTrue(posted.extras.getString(Notification.EXTRA_TEXT)!!.contains("second"))
         assertEquals(2_000L, posted.`when`)
     }
@@ -200,7 +202,7 @@ class PushNotifierTest {
         val next = PushNotificationGate.revision(context, id)
         assertNotEquals(previous, next)
         PushNotifier.showFromPush(context, pushPayload(room, "\$new", userId = user), next)
-        assertEquals(1, notificationManager.activeNotifications.size)
+        assertEquals(1, conversations().size)
     }
 
     @Test
@@ -212,9 +214,9 @@ class PushNotifierTest {
         val payload = pushPayload(room, "\$event", userId = user)
         PushNotificationGate.dismiss(context, id) { notificationManager.cancel(id) }
         PushNotifier.showFromPush(context, payload, revision)
-        assertTrue(notificationManager.activeNotifications.isEmpty())
+        assertTrue(conversations().isEmpty())
         PushNotifier.showFromPush(context, payload, PushNotificationGate.revision(context, id))
-        assertEquals(1, notificationManager.activeNotifications.size)
+        assertEquals(1, conversations().size)
     }
 
     @Test
@@ -236,7 +238,7 @@ class PushNotifierTest {
         for ((recipient, outcome) in listOf(null to PushOutcome.MISSING_RECIPIENT, "@other:example.org" to PushOutcome.WRONG_RECIPIENT)) {
             PushNotifier.showFromPush(context, pushPayload("!room:example.org", "\$event", userId = recipient))
             assertEquals(outcome.name, PushDiagnostics.drain(context).lastOutcome)
-            assertTrue(notificationManager.activeNotifications.isEmpty())
+            assertTrue(conversations().isEmpty())
         }
     }
 
@@ -248,7 +250,7 @@ class PushNotifierTest {
 
         assertEquals(
             listOf(PushNotifier.roomNotificationId("@alice:example.org", "!room:example.org")),
-            notificationManager.activeNotifications.map { it.id }
+            conversations().map { it.id }
         )
     }
 
@@ -261,21 +263,21 @@ class PushNotifierTest {
             context,
             pushPayload("!room:example.org", "\$bob", userId = "@bob:example.org")
         )
-        assertEquals(1, notificationManager.activeNotifications.size)
+        assertEquals(1, conversations().size)
 
         PushNotifier.showFromPush(
             context,
             pushPayload("!other:example.org", "\$stranger", userId = "@carol:example.org")
         )
         assertEquals(PushOutcome.WRONG_RECIPIENT.name, PushDiagnostics.drain(context).lastOutcome)
-        assertEquals(1, notificationManager.activeNotifications.size)
+        assertEquals(1, conversations().size)
     }
 
     @Test
     fun hiddenPlaintextNeverReachesTheNotification() {
         PushPolicy(context).showContent = false
         PushNotifier.showFromPush(context, pushPayload("!private:example.org", "$" + "private", "secret text"))
-        val shown = notificationManager.activeNotifications.single().notification
+        val shown = conversations().single().notification
         assertFalse(shown.extras.toString().contains("secret text"))
     }
 
@@ -286,7 +288,7 @@ class PushNotifierTest {
 
         PushNotifier.showFromPush(context, pushPayload("!diagnostic:sable.invalid", "${'$'}sable-diagnostic-abc"))
 
-        assertTrue(notificationManager.activeNotifications.isEmpty())
+        assertTrue(conversations().isEmpty())
         val entry = PushDiagnostics.history(context).getJSONObject(0)
         assertEquals("DIAGNOSTIC_RECEIVED", entry.getString("outcome"))
         assertEquals("${'$'}sable-diagnostic-abc", entry.getString("eventId"))
@@ -305,6 +307,95 @@ class PushNotifierTest {
         assertEquals("!traced:example.org", posted.getString("roomId"))
         assertEquals("${'$'}traced", posted.getString("eventId"))
         assertEquals("@alice:example.org", posted.getString("userId"))
+    }
+
+    @Test
+    fun messageNotificationsCarryTheAccountWideUnreadCount() {
+        val payload = JSONObject(pushPayload("!count:example.org", "\$one"))
+        payload.getJSONObject("notification").put("counts", JSONObject().put("unread", 7))
+        PushNotifier.showFromPush(context, payload.toString())
+        assertEquals(7, conversations().single().notification.number)
+
+        PushNotifier.showFromPush(context, pushPayload("!plain:example.org", "\$two"))
+        val plain = conversations().single { it.id != PushNotifier.roomNotificationId("@alice:example.org", "!count:example.org") }
+        assertEquals(0, plain.notification.number)
+    }
+
+    @Test
+    fun messageAndInviteNotificationsHideTheirContentOnTheLockScreen() {
+        PushNotifier.showFromPush(context, pushPayload("!lock:example.org", "\$one", "secret text"))
+        val invite = JSONObject(pushPayload("!invite:example.org", "\$invite"))
+        invite.getJSONObject("notification").put("type", "m.room.member")
+            .put("content", JSONObject().put("membership", "invite"))
+        PushNotifier.showFromPush(context, invite.toString())
+
+        val shown = conversations().map { it.notification }
+        assertEquals(2, shown.size)
+        for (notification in shown) {
+            assertEquals(Notification.VISIBILITY_PRIVATE, notification.visibility)
+            val public = notification.publicVersion!!
+            assertEquals(notification.channelId, public.channelId)
+            assertFalse(public.extras.toString().contains("secret text"))
+            assertNull(public.extras.getCharSequence(Notification.EXTRA_TEXT))
+        }
+        assertEquals(
+            setOf("New message", "New Invitation"),
+            shown.map { it.publicVersion!!.extras.getCharSequence(Notification.EXTRA_TITLE).toString() }.toSet()
+        )
+    }
+
+    @Test
+    fun incomingCallsStayPublic() {
+        PushPolicy(context).accounts = mapOf("@alice:example.org" to "ALICE")
+        every { PushPayloadDecryptor.fetch(any(), any(), any(), any(), any()) } returns
+            PushDecryptResult.Success("""{"type":"org.matrix.msc4075.rtc.notification","content":{"notification_type":"ring","lifetime":30000}}""")
+        PushNotifier.showFromPush(context, ringPayload("!call:example.org", "\$ring"))
+        val call = notificationManager.activeNotifications.single().notification
+        assertEquals(Notification.VISIBILITY_PUBLIC, call.visibility)
+        assertNull(call.publicVersion)
+    }
+
+    @Test
+    fun oneSummaryGroupsEveryConversationAndOnlyChildrenAlert() {
+        PushPolicy(context).accounts = mapOf("@alice:example.org" to "ALICE", "@bob:example.org" to "BOB")
+        PushNotifier.showFromPush(context, pushPayload("!one:example.org", "\$one"))
+        PushNotifier.showFromPush(context, pushPayload("!two:example.org", "\$two", userId = "@bob:example.org"))
+
+        val summaries = notificationManager.activeNotifications.filter { it.id == PushNotifier.SUMMARY_ID }
+        val summary = summaries.single().notification
+        assertTrue(summary.flags and Notification.FLAG_GROUP_SUMMARY != 0)
+        assertEquals(Notification.GROUP_ALERT_CHILDREN, summary.groupAlertBehavior)
+        assertEquals("matrix_messages", summary.group)
+        assertEquals(conversations()[0].notification.channelId, summary.channelId)
+        assertTrue(conversations().all { it.notification.group == "matrix_messages" })
+        assertTrue(conversations().none { it.id == PushNotifier.SUMMARY_ID })
+    }
+
+    @Test
+    fun theSummaryGoesWhenTheLastConversationIsDismissed() {
+        PushPolicy(context).accounts = mapOf("@alice:example.org" to "ALICE", "@bob:example.org" to "BOB")
+        PushNotifier.showFromPush(context, pushPayload("!one:example.org", "\$one"))
+        PushNotifier.showFromPush(context, pushPayload("!two:example.org", "\$two", userId = "@bob:example.org"))
+
+        PushNotifier.showFromPush(context, accountReadPayload("@alice:example.org"))
+        assertEquals(2, notificationManager.activeNotifications.size)
+
+        PushNotifier.showFromPush(context, accountReadPayload("@bob:example.org"))
+        assertTrue(notificationManager.activeNotifications.isEmpty())
+    }
+
+    @Test
+    fun theSummaryGoesWhenAReadUpdateDismissesTheLastConversation() {
+        PushNotifier.showFromPush(context, pushPayload("!one:example.org", "\$one"))
+        PushNotifier.showFromPush(context, """{"notification":{"user_id":"@alice:example.org","room_id":"!one:example.org","counts":{"unread":0}}}""")
+        assertTrue(notificationManager.activeNotifications.isEmpty())
+    }
+
+    @Test
+    fun theSummaryIdNeverNamesAConversation() {
+        assertTrue(PushNotifier.SUMMARY_ID < 0)
+        assertTrue(PushNotifier.roomNotificationId("@alice:example.org", "!r:example.org") >= 0)
+        assertTrue(PushNotifier.fallbackNotificationId("!r:example.org") >= 0)
     }
 
     private fun pushPayload(
@@ -335,7 +426,7 @@ class PushNotifierTest {
         .put("content", JSONObject().put("body", body))
 
     private fun shownTexts(): List<String> = androidx.core.app.NotificationCompat.MessagingStyle
-        .extractMessagingStyleFromNotification(notificationManager.activeNotifications.single().notification)!!
+        .extractMessagingStyleFromNotification(conversations().single().notification)!!
         .messages.map { it.text.toString() }
 
     private fun richContent() = JSONObject()
@@ -352,7 +443,7 @@ class PushNotifierTest {
         PushNotifier.showFromPush(context, payload.toString())
 
         assertEquals(listOf("Alice hi & welcome"), shownTexts())
-        val posted = notificationManager.activeNotifications.single().notification
+        val posted = conversations().single().notification
         assertTrue(posted.extras.getString(Notification.EXTRA_TEXT)!!.contains("Alice hi & welcome"))
         PushNotifier.show(context, warmNotification("!rich:example.org", "\$next", "next"))
         assertEquals(listOf("Alice hi & welcome", "next"), shownTexts())
@@ -438,7 +529,7 @@ class PushNotifierTest {
     fun show_postsNothingWhileNotificationsAreDisabled() {
         PushPolicy(context).notificationsEnabled = false
         PushNotifier.show(context, warmNotification("!warm:example.org", "\$one", "hello"))
-        assertTrue(notificationManager.activeNotifications.isEmpty())
+        assertTrue(conversations().isEmpty())
     }
 
     @Test
@@ -463,7 +554,7 @@ class PushNotifierTest {
     fun show_aDirectChatHasNoConversationTitle() {
         PushNotifier.show(context, warmNotification("!dm:example.org", "\$one", "hi").put("moe.sable.direct", true))
         val style = androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
-            notificationManager.activeNotifications.single().notification)!!
+            conversations().single().notification)!!
         assertNull(style.conversationTitle)
         assertFalse(style.isGroupConversation)
     }
@@ -475,7 +566,7 @@ class PushNotifierTest {
         PushNotifier.show(context, named.put("sender", "@bob:example.org"))
         PushNotifier.show(context, warmNotification("!room:example.org", "\$two", "yo").apply { remove("sender_display_name") })
         val style = androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
-            notificationManager.activeNotifications.single().notification)!!
+            conversations().single().notification)!!
         assertEquals(listOf("@bob:example.org", "Someone"), style.messages.map { it.person?.name?.toString() })
     }
 
@@ -484,7 +575,7 @@ class PushNotifierTest {
         val invite = warmNotification("!invite:example.org", "", "").put("type", "m.room.member")
             .put("content", JSONObject().put("membership", "invite"))
         PushNotifier.show(context, invite)
-        val posted = notificationManager.activeNotifications.single().notification
+        val posted = conversations().single().notification
         assertEquals("invites", posted.channelId)
         assertEquals(
             listOf(PushActions.ACCEPT_INVITE, PushActions.DECLINE_INVITE),
@@ -748,7 +839,7 @@ class PushNotifierTest {
 
         PushNotifier.showFromPush(context, notification.toString())
 
-        val incoming = notificationManager.activeNotifications.single()
+        val incoming = conversations().single()
         assertEquals(PushNotifier.callNotificationId("@alice:example.org", room), incoming.id)
         assertEquals(Notification.CATEGORY_CALL, incoming.notification.category)
     }
@@ -766,7 +857,7 @@ class PushNotifierTest {
 
         PushNotifier.showFromPush(context, payload)
 
-        val incoming = notificationManager.activeNotifications.single()
+        val incoming = conversations().single()
         assertEquals(PushNotifier.callNotificationId("@alice:example.org", room), incoming.id)
         assertEquals(Notification.CATEGORY_CALL, incoming.notification.category)
         assertNotNull(incoming.notification.fullScreenIntent)
@@ -786,7 +877,7 @@ class PushNotifierTest {
 
         PushNotifier.showFromPush(context, payload)
 
-        val incoming = notificationManager.activeNotifications.single()
+        val incoming = conversations().single()
         assertEquals(PushNotifier.callNotificationId("@alice:example.org", room), incoming.id)
         assertEquals(Notification.CATEGORY_CALL, incoming.notification.category)
         assertNotNull(incoming.notification.fullScreenIntent)
@@ -806,7 +897,7 @@ class PushNotifierTest {
 
         PushNotifier.showFromPush(context, payload)
 
-        val incoming = notificationManager.activeNotifications.single()
+        val incoming = conversations().single()
         assertEquals(PushNotifier.callNotificationId("@alice:example.org", room), incoming.id)
         assertEquals(Notification.CATEGORY_CALL, incoming.notification.category)
         assertNotNull(incoming.notification.fullScreenIntent)
@@ -840,7 +931,7 @@ class PushNotifierTest {
 
         PushNotifier.showFromPush(context, notification.toString())
 
-        assertTrue(notificationManager.activeNotifications.isEmpty())
+        assertTrue(conversations().isEmpty())
         verify(exactly = 0) { PushPayloadDecryptor.fetch(any(), any(), any(), any(), any()) }
     }
 
@@ -852,7 +943,7 @@ class PushNotifierTest {
 
         PushNotifier.showFromPush(context, """{"room_id":"!redacted:example.org","event_id":"${'$'}redacted","user_id":"@alice:example.org"}""")
 
-        assertTrue(notificationManager.activeNotifications.isEmpty())
+        assertTrue(conversations().isEmpty())
     }
 
     @Test
@@ -862,7 +953,7 @@ class PushNotifierTest {
 
         PushNotifier.showFromPush(context, encryptedPush("!redacted:example.org", "\$redacted"))
 
-        assertTrue(notificationManager.activeNotifications.isEmpty())
+        assertTrue(conversations().isEmpty())
     }
 
     @Test
@@ -870,13 +961,13 @@ class PushNotifierTest {
         every { PushPayloadDecryptor.decryptLocally(any(), any(), any(), any(), any()) } returns
             PushDecryptResult.NeedsKey(quietly = false)
         every { PushPayloadDecryptor.decrypt(any(), any(), any(), any(), any()) } answers {
-            assertTrue(notificationManager.activeNotifications.isEmpty())
+            assertTrue(conversations().isEmpty())
             PushDecryptResult.Success("""{"type":"m.room.message","content":{},"unsigned":{"redacted_because":{}}}""")
         }
 
         PushNotifier.showFromPush(context, encryptedPush("!redacted:example.org", "\$redacted"))
 
-        assertTrue(notificationManager.activeNotifications.isEmpty())
+        assertTrue(conversations().isEmpty())
     }
 
     @Test
@@ -903,34 +994,34 @@ class PushNotifierTest {
     fun showFromPush_doesNotAlertWhenAKeyFetchDiscardsTheEvent() {
         val room = "!existing:example.org"
         PushNotifier.showFromPush(context, pushPayload(room, "\$message"))
-        val previous = notificationManager.activeNotifications.single().notification
+        val previous = conversations().single().notification
         every { PushPayloadDecryptor.decryptLocally(any(), any(), any(), any(), any()) } returns
             PushDecryptResult.NeedsKey(quietly = false)
         every { PushPayloadDecryptor.decrypt(any(), any(), any(), any(), any()) } answers {
-            assertSame(previous, notificationManager.activeNotifications.single().notification)
+            assertSame(previous, conversations().single().notification)
             PushDecryptResult.Discard
         }
 
         PushNotifier.showFromPush(context, encryptedPush(room, "\$filtered"))
 
-        assertSame(previous, notificationManager.activeNotifications.single().notification)
+        assertSame(previous, conversations().single().notification)
     }
 
     @Test
     fun showFromPush_doesNotAlertWhenAKeyFetchCannotEvaluateTheRules() {
         val room = "!existing:example.org"
         PushNotifier.showFromPush(context, pushPayload(room, "\$message"))
-        val previous = notificationManager.activeNotifications.single().notification
+        val previous = conversations().single().notification
         every { PushPayloadDecryptor.decryptLocally(any(), any(), any(), any(), any()) } returns
             PushDecryptResult.NeedsKey(quietly = false)
         every { PushPayloadDecryptor.decrypt(any(), any(), any(), any(), any()) } answers {
-            assertSame(previous, notificationManager.activeNotifications.single().notification)
+            assertSame(previous, conversations().single().notification)
             PushDecryptResult.DiscardUnevaluated
         }
 
         PushNotifier.showFromPush(context, encryptedPush(room, "\$filtered"))
 
-        assertSame(previous, notificationManager.activeNotifications.single().notification)
+        assertSame(previous, conversations().single().notification)
     }
 
     @Test
@@ -945,13 +1036,13 @@ class PushNotifierTest {
 
         PushNotifier.showFromPush(context, payload)
 
-        assertTrue(notificationManager.activeNotifications.isEmpty())
+        assertTrue(conversations().isEmpty())
     }
 
     @Test
     fun showFromPush_ignoresRoomCountUpdatesWithoutAnEvent() {
         PushNotifier.showFromPush(context, """{"room_id":"!counts:example.org","user_id":"@alice:example.org","counts":{"unread":5}}""")
-        assertTrue(notificationManager.activeNotifications.isEmpty())
+        assertTrue(conversations().isEmpty())
     }
 
     @Test
@@ -990,7 +1081,7 @@ class PushNotifierTest {
         PushNotifier.showFromPush(context, """{"notification":{"user_id":"@alice:example.org","room_id":"!read:example.org","counts":{"unread":0}}}""")
         PushNotifier.showFromPush(context, accountReadPayload("@alice:example.org"))
 
-        assertEquals(1, notificationManager.activeNotifications.size)
+        assertEquals(1, conversations().size)
     }
 
     @Test
@@ -1000,13 +1091,13 @@ class PushNotifierTest {
         PushNotifier.showFromPush(context, pushPayload("!one:example.org", "\$one"))
         PushNotifier.showFromPush(context, pushPayload("!two:example.org", "\$two", userId = "@bob:example.org"))
         PushNotifier.show(context, warmNotification("!warm:example.org", "\$warm", "warm"))
-        assertEquals(3, notificationManager.activeNotifications.size)
+        assertEquals(3, conversations().size)
 
         PushNotifier.showFromPush(context, accountReadPayload("@alice:example.org"))
 
         assertEquals(
             listOf(PushNotifier.roomNotificationId("@bob:example.org", "!two:example.org")),
-            notificationManager.activeNotifications.map { it.id }
+            conversations().map { it.id }
         )
     }
 
@@ -1017,7 +1108,7 @@ class PushNotifierTest {
 
         PushNotifier.showFromPush(context, accountReadPayload("@stranger:example.org"))
 
-        assertEquals(1, notificationManager.activeNotifications.size)
+        assertEquals(1, conversations().size)
     }
 
     @Test
@@ -1027,7 +1118,7 @@ class PushNotifierTest {
 
         PushNotifier.showFromPush(context, """{"notification":{"counts":{"unread":0}}}""")
 
-        assertEquals(0, notificationManager.activeNotifications.size)
+        assertEquals(0, conversations().size)
     }
 
     private fun accountReadPayload(userId: String): String = JSONObject().put("notification", JSONObject()
@@ -1047,7 +1138,7 @@ class PushNotifierTest {
 
         PushNotifier.showFromPush(context, encryptedPush(room, "\$old"))
 
-        assertTrue(notificationManager.activeNotifications.isEmpty())
+        assertTrue(conversations().isEmpty())
     }
 
     @Test
@@ -1087,7 +1178,7 @@ class PushNotifierTest {
         PushNotifier.showFromPush(context, pushPayload("!r1:example.org", "\$e1"))
         PushNotifier.showFromPush(context, pushPayload("!r1:example.org", "\$e2", "second"))
 
-        assertEquals(1, shadowNotificationManager().allNotifications.size)
+        assertEquals(1, conversations().size)
 
         val posted = shadowNotificationManager().getNotification(null, canonicalId("!r1:example.org"))!!
         val savedIntent = shadowOf(posted.contentIntent).savedIntent
@@ -1105,7 +1196,7 @@ class PushNotifierTest {
         val shadow = shadowNotificationManager()
         assertNotNull(shadow.getNotification(null, canonicalId("!r1:example.org")))
         assertNotNull(shadow.getNotification(null, canonicalId("!r2:example.org")))
-        assertEquals(2, shadow.allNotifications.size)
+        assertEquals(2, conversations().size)
     }
 
     @Test
@@ -1118,7 +1209,7 @@ class PushNotifierTest {
         val shadow = shadowNotificationManager()
         assertNotNull(shadow.getNotification(null, PushNotifier.fallbackNotificationId("!r3:example.org")))
         assertNull(shadow.getNotification(null, canonicalId("!r3:example.org")))
-        assertEquals(1, shadow.allNotifications.size)
+        assertEquals(1, conversations().size)
     }
 
     @Test
@@ -1147,7 +1238,7 @@ class PushNotifierTest {
             .put("content", JSONObject().put("notification_type", "ring"))
         PushNotifier.showFromPush(context, notification.toString())
         verify(exactly = 1) { PushPayloadDecryptor.fetch(any(), "@alice:example.org", "ALICE", "!call:example.org", "\$call") }
-        assertTrue(notificationManager.activeNotifications.isEmpty())
+        assertTrue(conversations().isEmpty())
     }
 
     @Test
@@ -1159,7 +1250,7 @@ class PushNotifierTest {
             .put("room_id", "!stable:example.org").put("event_id", "\$stable")
             .put("type", "m.rtc.invite").put("content", JSONObject())
         PushNotifier.showFromPush(context, notification.toString())
-        val posted = notificationManager.activeNotifications.single().notification
+        val posted = conversations().single().notification
         assertEquals(Notification.CATEGORY_CALL, posted.category)
         assertEquals(1200L, posted.timeoutAfter)
     }
@@ -1364,7 +1455,7 @@ class PushNotifierTest {
             }
             if (delivery == "warm") PushNotifier.show(context, notification)
             else PushNotifier.showFromPush(context, notification.toString())
-            val posted = notificationManager.activeNotifications.single().notification
+            val posted = conversations().single().notification
             when (delivery) {
                 "invite" -> assertEquals("Mum invites you to Room 1", posted.extras.getString(Notification.EXTRA_TEXT))
                 "ring", "encrypted-ring" -> assertEquals("Mum",
@@ -1387,7 +1478,7 @@ class PushNotifierTest {
             .put("sender", "@bob:example.org").put("sender_display_name", "\u200b\u2800")
         PushNotifier.show(context, notification)
         val style = androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
-            notificationManager.activeNotifications.single().notification)!!
+            conversations().single().notification)!!
         assertEquals("@bob:example.org", style.messages.last().person?.name)
     }
 
@@ -1544,7 +1635,7 @@ class PushNotifierTest {
         PushPolicy(context).showEncryptedContent = false
         PushNotifier.showFromPush(context, encrypted)
 
-        val posted = shadowNotificationManager().allNotifications.last()
+        val posted = conversations().last().notification
         val text = posted.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
         assertTrue("leaked content with the setting off: ${'$'}text", text.contains("Encrypted message"))
     }
@@ -1558,16 +1649,16 @@ class PushNotifierTest {
     fun showFromPush_quietsARoomThatAlertedWithinTheNotifyOnceWindow() {
         val room = "!once:example.org"
         PushNotifier.showFromPush(context, pushPayload(room, "${'$'}one", "first"))
-        val first = notificationManager.activeNotifications.single().notification
+        val first = conversations().single().notification
         assertTrue(first.flags and Notification.FLAG_ONLY_ALERT_ONCE == 0)
 
         PushNotifier.showFromPush(context, pushPayload(room, "${'$'}two", "second"))
-        val quiet = notificationManager.activeNotifications.single().notification
+        val quiet = conversations().single().notification
         assertTrue(quiet.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
 
         PushPolicy(context).notifyOnce = false
         PushNotifier.showFromPush(context, pushPayload(room, "${'$'}three", "third"))
-        val loud = notificationManager.activeNotifications.single().notification
+        val loud = conversations().single().notification
         assertTrue(loud.flags and Notification.FLAG_ONLY_ALERT_ONCE == 0)
     }
 
@@ -1583,7 +1674,7 @@ class PushNotifierTest {
         PushNotifier.showFromPush(context, noisy("${'$'}one"))
         PushNotifier.showFromPush(context, noisy("${'$'}two"))
 
-        val loud = notificationManager.activeNotifications.single().notification
+        val loud = conversations().single().notification
         assertTrue(loud.flags and Notification.FLAG_ONLY_ALERT_ONCE == 0)
     }
 

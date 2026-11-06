@@ -78,6 +78,7 @@ class ConversationActionReceiver : BroadcastReceiver() {
             PushNotificationGate.dismiss(context, action.notificationId) {
                 NotificationManagerCompat.from(context).cancel(action.notificationId)
             }
+            PushNotifier.cancelOrphanedSummary(context)
             if (action.eventId.isEmpty()) return
         }
         ConversationActionWorker.enqueue(context, action)
