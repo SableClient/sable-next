@@ -1152,6 +1152,11 @@ test('a room whose parent space we are not in offers to join it', async () => {
   await mountNav();
 
   await openMenu('Plain');
+  const joinSpace = await screen.findByRole('menuitem', { name: 'room.menuJoinSpace' });
+  await vi.waitFor(() => {
+    expect(joinSpace).not.toHaveAttribute('data-disabled');
+  });
+  await user.click(joinSpace);
   const join = await screen.findByRole('menuitem', {
     name: 'room.menuJoinParentSpace:Parent',
   });
