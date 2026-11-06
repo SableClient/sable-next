@@ -613,7 +613,7 @@
     "markdown": "||a **b**||",
     "pills": [],
     "body": "||a **b**||",
-    "formatted_body": "<span data-mx-spoiler=\"\">a </span><strong><span data-mx-spoiler=\"\">b</span></strong>",
+    "formatted_body": "<span data-mx-spoiler=\"\">a <strong>b</strong></span>",
     "mentions": {
       "user_ids": [],
       "room": false

@@ -152,7 +152,7 @@ test('MFM that runs past a spoiler stays literal inside it', () => {
 test('MFM inside a spoiler colours the hidden text', () => {
   const plain = serializePlain(textDoc('||a $[fg.color=f00 b]||'));
   expect(plain.formatted).toBe(
-    '<span data-mx-spoiler="">a </span><span data-mx-color="#ff0000"><span data-mx-spoiler="">b</span></span>'
+    '<span data-mx-spoiler="">a <span data-mx-color="#ff0000">b</span></span>'
   );
 
   const rich = serializeComposer(
@@ -162,13 +162,13 @@ test('MFM inside a spoiler colours the hidden text', () => {
   expect(rich.formatted).toBe(plain.formatted);
 });
 
-test('a spoiler inside MFM stays inside the colour', () => {
+test('a spoiler inside MFM keeps its colour', () => {
   const source = '$[fg.color=f00 a ||b|| c]';
   const message = serializePlain(textDoc(source));
 
   expect(message.body).toBe(source);
   expect(message.formatted).toBe(
-    '<span data-mx-color="#ff0000">a <span data-mx-spoiler="">b</span> c</span>'
+    '<span data-mx-color="#ff0000">a </span><span data-mx-spoiler=""><span data-mx-color="#ff0000">b</span></span><span data-mx-color="#ff0000"> c</span>'
   );
 });
 
@@ -219,6 +219,30 @@ test('underline and spoiler each serialise to their Matrix HTML', () => {
   expect(message.formatted).toBe('<u>u</u> <span data-mx-spoiler="">secret</span>');
 });
 
+test.each([
+  ['*huge*', '<em>huge</em>'],
+  ['**huge**', '<strong>huge</strong>'],
+  ['~~huge~~', '<del>huge</del>'],
+  ['`huge`', '<code>huge</code>'],
+  ['[huge](https://example.org)', '<a href="https://example.org">huge</a>'],
+])('formatting %s inside a spoiler keeps one span in both composer modes', (markdown, html) => {
+  const source = `||this is a ${markdown} spoiler||`;
+  const plain = serializePlain(textDoc(source));
+  const rich = serializeComposer(richFromPlain(textDoc(source)));
+
+  expect(plain.formatted).toBe(`<span data-mx-spoiler="">this is a ${html} spoiler</span>`);
+  expect(rich.formatted).toBe(plain.formatted);
+  expect(rich.body).toBe('[Spoiler]');
+});
+
+test('separate spoilers keep their reasons through a rich-text edit', () => {
+  const html =
+    '<span data-mx-spoiler="first">one <em>secret</em></span>' +
+    '<span data-mx-spoiler="second">another <strong>secret</strong></span>';
+
+  expect(serializeComposer(parseMatrixHtml(html)).formatted).toBe(html);
+});
+
 test.each(['||before `secret` after||', '||`secret`||', '||before `||secret||` after||'])(
   'inline code stays hidden when parsing %s',
   (source) => {
@@ -230,9 +254,7 @@ test.each(['||before `secret` after||', '||`secret`||', '||before `||secret||` a
       holder.innerHTML = message.formatted ?? '';
       const code = holder.querySelector('code');
       expect(code?.textContent).toContain('secret');
-      expect(
-        code?.closest('[data-mx-spoiler]') ?? code?.querySelector('[data-mx-spoiler]')
-      ).not.toBeNull();
+      expect(code?.closest('[data-mx-spoiler]')).not.toBeNull();
       const visible = holder.cloneNode(true) as HTMLElement;
       for (const spoiler of visible.querySelectorAll('[data-mx-spoiler]')) spoiler.remove();
       expect(visible.textContent).toBe('');
@@ -248,9 +270,9 @@ test('editing spoilered inline code preserves the spoiler reason and hidden fall
   expect(message.body).not.toContain('secret');
   const holder = document.createElement('div');
   holder.innerHTML = message.formatted ?? '';
-  expect(holder.querySelector('code [data-mx-spoiler]')?.getAttribute('data-mx-spoiler')).toBe(
-    'answer'
-  );
+  expect(
+    holder.querySelector('code')?.closest('[data-mx-spoiler]')?.getAttribute('data-mx-spoiler')
+  ).toBe('answer');
 });
 
 test('spoilered code containing bars survives a table Markdown round trip', () => {

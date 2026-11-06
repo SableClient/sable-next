@@ -97,7 +97,7 @@ test.each([
   formatCommands[first](editor.state, editor.dispatch);
   formatCommands[second](editor.state, editor.dispatch);
 
-  expect(marksOn('secret')).toEqual(['code', 'spoiler']);
+  expect(marksOn('secret')).toEqual(['spoiler', 'code']);
   expect(serializeComposer(editor.state.doc).body).not.toContain('secret');
 });
 
@@ -105,7 +105,7 @@ test('typing inline code inside a spoiler keeps the whole spoiler hidden', () =>
   const editor = open();
   type('||before `secret` after||');
 
-  expect(marksOn('secret')).toEqual(['code', 'spoiler']);
+  expect(marksOn('secret')).toEqual(['spoiler', 'code']);
   expect(serializeComposer(editor.state.doc).body).not.toContain('secret');
   expect(serializeComposer(editor.state.doc).body).not.toContain('after');
 });
