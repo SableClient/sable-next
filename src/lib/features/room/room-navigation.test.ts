@@ -155,23 +155,13 @@ test('the back arrow on a phone opens the drawer over the room rather than leavi
   });
 });
 
-test.each([
-  ['/rooms/other', true],
-  ['/direct/other', true],
-  ['/space/space/other', true],
-  ['/space/space/lobby', false],
-  ['/rooms', false],
-])('on a phone, opening %s from a room replaces the entry: %s', (href, replaced) => {
+test.each(['/space/space/lobby', '/rooms'])('on a phone, opening %s from a room pushes', (href) => {
   page.url = new URL('https://app.test/rooms/room');
   page.params = { roomId: 'room' };
 
   goToPage(href);
 
-  expect(goto).toHaveBeenLastCalledWith(href, {
-    replace: replaced,
-    state: {},
-    persistState: true,
-  });
+  expect(goto).toHaveBeenLastCalledWith(href, { replace: false, state: {}, persistState: true });
 });
 
 test('on a phone, opening a room from the room list pushes', () => {
@@ -187,33 +177,55 @@ test('on a phone, opening a room from the room list pushes', () => {
   });
 });
 
-test.each(['/home/room', '/rooms/room', '/direct/room', '/space/space/room'])(
-  'opening %s preserves the open drawer in history',
-  (href) => {
-    visit('/space/space/previous', { spaceId: 'space', roomId: 'previous' });
-    page.state.mobileDrawer = 'open';
+test.each([
+  ['the drawer over a room', { mobileDrawer: 'open' as const }, '/home/room'],
+  ['the drawer over a room', { mobileDrawer: 'open' as const }, '/rooms/room'],
+  ['the drawer over a room', { mobileDrawer: 'open' as const }, '/direct/room'],
+  ['the drawer over a room', { mobileDrawer: 'open' as const }, '/space/space/room'],
+  ['a room above the list', { mobileDrawerBack: true }, '/rooms/room'],
+  ['a room with no list behind it', {}, '/direct/room'],
+])('switching rooms from %s points the list entry at %s', async (_from, state, href) => {
+  visit('/space/space/previous', { spaceId: 'space', roomId: 'previous' });
+  Object.assign(page.state, state);
+  goto.mockImplementationOnce((path, options) => {
+    visit(path, { roomId: 'room' });
+    Object.assign(page.state, options?.state);
+    return Promise.resolve();
+  });
 
-    goToPage(href);
+  goToPage(href);
+  await vi.waitFor(() => {
+    expect(goto).toHaveBeenCalledTimes(2);
+  });
 
-    expect(goto).toHaveBeenLastCalledWith(href, {
-      replace: false,
-      state: { mobileDrawerBack: true },
-      persistState: true,
-    });
-  }
-);
-
-test('switching rooms preserves the list entry', () => {
-  page.params = { roomId: 'room' };
-  page.state.mobileDrawerBack = true;
-
-  goToPage('/rooms/other');
-
-  expect(goto).toHaveBeenLastCalledWith('/rooms/other', {
+  expect(goto).toHaveBeenNthCalledWith(1, href, {
     replace: true,
-    state: { mobileDrawerBack: true },
+    state: { mobileDrawer: 'open' },
     persistState: true,
   });
+  expect(goto).toHaveBeenNthCalledWith(2, '', {
+    shallow: true,
+    replace: false,
+    state: { mobileDrawer: 'closed', mobileDrawerBack: true },
+    persistState: true,
+  });
+});
+
+test('a room switch that is superseded leaves the drawer alone', async () => {
+  visit('/rooms/previous', { roomId: 'previous' });
+  page.state.mobileDrawer = 'open';
+  goto.mockImplementationOnce(() => {
+    visit('/rooms/elsewhere', { roomId: 'elsewhere' });
+    return Promise.resolve();
+  });
+
+  goToPage('/rooms/other');
+  await vi.waitFor(() => {
+    expect(goto).toHaveBeenCalledOnce();
+  });
+  await Promise.resolve();
+
+  expect(goto).toHaveBeenCalledOnce();
 });
 
 test('opening the current room preserves the list entry', () => {
