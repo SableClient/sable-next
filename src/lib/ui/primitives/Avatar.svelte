@@ -254,7 +254,6 @@
     color: var(--sec-on-container);
     display: flex;
     justify-content: center;
-    text-transform: capitalize;
   }
 
   .avatar-button {
