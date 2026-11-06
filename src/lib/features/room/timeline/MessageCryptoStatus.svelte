@@ -2,13 +2,11 @@
   import { i18n } from '#lib/i18n.ts';
   import ResponsiveInfoDialog from '#lib/ui/primitives/ResponsiveInfoDialog.svelte';
   import type { MessageShieldCode, MessageShieldView } from '#src/generated/protocol';
-  import {
-    KeyIcon,
-    LockSimpleOpenIcon,
-    ShieldIcon,
-    ShieldWarningIcon,
-    type IconComponentProps,
-  } from 'phosphor-svelte';
+  import KeyIcon from 'phosphor-svelte/lib/KeyIcon';
+  import LockSimpleOpenIcon from 'phosphor-svelte/lib/LockSimpleOpenIcon';
+  import ShieldIcon from 'phosphor-svelte/lib/ShieldIcon';
+  import ShieldWarningIcon from 'phosphor-svelte/lib/ShieldWarningIcon';
+  import type { IconComponentProps } from 'phosphor-svelte';
   import type { Component } from 'svelte';
 
   const ICONS: Record<MessageShieldCode, Component<IconComponentProps>> = {

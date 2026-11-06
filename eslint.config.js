@@ -7,6 +7,13 @@ import oxlint from 'eslint-plugin-oxlint';
 import svelte from 'eslint-plugin-svelte';
 import tseslint from 'typescript-eslint';
 
+const PHOSPHOR_BARREL = {
+  name: 'phosphor-svelte',
+  allowTypeImports: true,
+  message:
+    "Import each icon from 'phosphor-svelte/lib/<Name>' so the bundle keeps only the icons it uses.",
+};
+
 export default defineConfig([
   includeIgnoreFile(fileURLToPath(new URL('.gitignore', import.meta.url))),
   js.configs.recommended,
@@ -30,11 +37,13 @@ export default defineConfig([
         { property: 'toSorted', message: 'Needs Chrome 110; use .slice().sort().' },
         { property: 'toReversed', message: 'Needs Chrome 110; use .slice().reverse().' },
         { property: 'toSpliced', message: 'Needs Chrome 110.' },
+        { property: 'with', message: 'Needs Chrome 110; use .map() or a copy.' },
         { property: 'findLast', message: 'Needs Chrome 97; walk the array backwards.' },
         { property: 'findLastIndex', message: 'Needs Chrome 97; walk the array backwards.' },
         { object: 'Object', property: 'groupBy', message: 'Needs Chrome 117.' },
       ],
       'no-alert': 'error',
+      'no-restricted-imports': ['error', { paths: [PHOSPHOR_BARREL] }],
       'no-restricted-globals': [
         'error',
         { name: 'structuredClone', message: 'Needs Chrome 98; use a JSON round trip.' },
@@ -48,6 +57,7 @@ export default defineConfig([
       'no-restricted-imports': [
         'error',
         {
+          paths: [PHOSPHOR_BARREL],
           patterns: [
             {
               group: ['#lib/features/*', '**/features/*'],

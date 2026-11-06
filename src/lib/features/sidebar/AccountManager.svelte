@@ -49,7 +49,7 @@
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { AccountDirectory } from './account-directory.svelte.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
-  import { QrCodeIcon } from 'phosphor-svelte';
+  import QrCodeIcon from 'phosphor-svelte/lib/QrCodeIcon';
   import QrLinkDialog from '../qr-login/QrLinkDialog.svelte';
 
   const core = useCoreClient();

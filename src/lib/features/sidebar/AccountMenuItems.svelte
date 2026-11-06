@@ -17,7 +17,7 @@
   import { useActionMenuSurface } from '#lib/ui/primitives/action-menu.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
-  import { QrCodeIcon } from 'phosphor-svelte';
+  import QrCodeIcon from 'phosphor-svelte/lib/QrCodeIcon';
 
   const PRESENCE_OPTIONS: readonly PresenceView[] = ['online', 'unavailable', 'offline'];
 

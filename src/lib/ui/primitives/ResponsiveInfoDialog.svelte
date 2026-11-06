@@ -3,7 +3,7 @@
   import ResponsiveDialog from './ResponsiveDialog.svelte';
   import IconButton from './IconButton.svelte';
   import { i18n } from '#lib/i18n.ts';
-  import { XIcon } from 'phosphor-svelte';
+  import XIcon from 'phosphor-svelte/lib/XIcon';
 
   interface Props {
     open?: boolean;

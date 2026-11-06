@@ -3,7 +3,9 @@
   import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
   import ShieldWarningIcon from 'phosphor-svelte/lib/ShieldWarningIcon';
   import type { Component } from 'svelte';
-  import { ClockCounterClockwiseIcon, DevicesIcon, type IconComponentProps } from 'phosphor-svelte';
+  import ClockCounterClockwiseIcon from 'phosphor-svelte/lib/ClockCounterClockwiseIcon';
+  import DevicesIcon from 'phosphor-svelte/lib/DevicesIcon';
+  import type { IconComponentProps } from 'phosphor-svelte';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
   import type { UtdCauseView } from '#src/generated/protocol';
 
