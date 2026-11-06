@@ -22,6 +22,8 @@
   import { MOTION_MS, motionMs, shouldReduceMotion } from '#lib/ui/motion.js';
   import {
     TimelineWindow,
+    recallTimelineView,
+    rememberTimelineView,
     timelineSizes,
     type TimelineEntry,
     type TimelineRow,
@@ -216,6 +218,7 @@
     active && page.state.settings === undefined && !appLayout.drawerCovers(page.state)
   );
   const readRoomId = untrack(() => roomId);
+  const viewScope = readRoomId ? `${readRoomId}:${untrack(() => threadRootId) ?? ''}` : null;
   let readUpTo: string | null = null;
   let fullyReadAt: string | null = null;
   function settleFullyRead(): void {
@@ -562,13 +565,13 @@
       },
       isAnchor: ({ item }) => item.event_id !== null,
       estimateSize: ({ item }) => estimateRowSize(item.content, mediaColumn),
-      sizes: readRoomId
-        ? timelineSizes(`${readRoomId}:${untrack(() => threadRootId) ?? ''}`)
-        : undefined,
+      sizes: viewScope ? timelineSizes(viewScope) : undefined,
       canFollowLatest: () => untrack(() => timeline.reachesLatest),
     });
     controller = engine;
     return () => {
+      if (viewScope && opened && timeline.mode.kind === 'live')
+        rememberTimelineView(viewScope, engine.view);
       disposed = true;
       focus.cancel();
       widths.disconnect();
@@ -627,11 +630,17 @@
       timeline.readMarkerEventId
     );
     const landingPending = landingEventId !== null && onRequestUnread !== undefined;
+    const remembered =
+      viewScope && live && !focusEventId ? recallTimelineView(viewScope) : undefined;
+    const resumeView =
+      remembered && !landingEventId && entries.some((entry) => entry.key === remembered.key)
+        ? remembered
+        : undefined;
     const markerEntry = () =>
       unread.active
         ? entries.find(({ value }) => value.item.content.kind === 'read_marker')
         : undefined;
-    if (!markerEntry() && !entryFor(landingEventId) && !landingPending) {
+    if (!resumeView && !markerEntry() && !entryFor(landingEventId) && !landingPending) {
       revealed = true;
     }
     await initializingUnread;
@@ -647,9 +656,10 @@
     }
     const landingEntry = () => entryFor(landingEventId);
     const unreadEntry = markerEntry();
-    if (!unreadEntry && !landingEntry() && !landingPending) revealed = true;
+    if (!resumeView && !unreadEntry && !landingEntry() && !landingPending) revealed = true;
     filling = true;
     try {
+      if (resumeView && !disposed && (await engine.resume(resumeView))) return;
       const notified = landingEntry();
       const landing = notified ?? (landingPending || holdAtLatest ? undefined : unreadEntry);
       if (landing && !disposed && engine.state.pinned) {

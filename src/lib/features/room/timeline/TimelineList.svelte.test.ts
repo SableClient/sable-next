@@ -12,7 +12,7 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 import { timelineItem as item } from '#lib/features/room/timeline/test-items.js';
 import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
-import { TimelineWindow } from '#lib/timeline/timeline-window.js';
+import { TimelineWindow, rememberTimelineView } from '#lib/timeline/timeline-window.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { TIMELINE_LAYOUT } from './timeline-layout';
 import { MAX_EMPTY_REFILLS } from './timeline-pagination.svelte.js';
@@ -39,6 +39,7 @@ import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 let animationFrames: FrameRequestCallback[];
 
 beforeEach(() => {
+  rememberTimelineView('!room:example.org:', null);
   resetPage();
   // happy-dom has no Web Animations API.
   Element.prototype.animate = () =>
@@ -1439,12 +1440,13 @@ interface LiveTimeline {
 let currentLiveList: { followingLive: boolean };
 
 /** Every row lays out at `ROW`, so the virtualiser and the stubbed box agree. */
-async function mountLive(roomTimeline: RoomTimeline): Promise<LiveTimeline> {
+async function mountLive(roomTimeline: RoomTimeline, roomId?: string): Promise<LiveTimeline> {
   layOutRows();
   roomTimeline.mode = { kind: 'live' };
   roomTimeline.backwardPagination = 'end';
   const list = {
     timeline: roomTimeline,
+    roomId,
     onRequestHistory: () => Promise.resolve(false),
     onRequestFuture: async () => {},
     onRead: async () => {},
@@ -1765,6 +1767,40 @@ test('leaves a reader deep in history where they are when they send', async () =
   await runAnimationFrames();
 
   expect(followingLive()).toBe(false);
+});
+
+test('returning to a room restores how far up the reader was', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  onTestFinished(() => {
+    rememberTimelineView('!returning:example.org:', null);
+  });
+  const { element, end, instance } = await mountLive(roomTimeline, '!returning:example.org');
+  await dragTo(element, end, end - 900);
+  await finishWheelGesture(element);
+  const left = element.scrollTop;
+  (instance as { unmount: () => void }).unmount();
+
+  const reopened = timeline();
+  reopened.items = liveItems(20);
+  const again = await mountLive(reopened, '!returning:example.org');
+
+  expect(followingLive()).toBe(false);
+  expect(again.element.scrollTop).toBeLessThan(end - 500);
+  expect(Math.abs(again.element.scrollTop - left)).toBeLessThanOrEqual(ROW);
+});
+
+test('a room that was left at the latest message reopens following it', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance } = await mountLive(roomTimeline, '!latest:example.org');
+  (instance as { unmount: () => void }).unmount();
+
+  const reopened = timeline();
+  reopened.items = liveItems(20);
+  await mountLive(reopened, '!latest:example.org');
+
+  expect(followingLive()).toBe(true);
 });
 
 test('scrolling back to the end restores follow mode', async () => {
