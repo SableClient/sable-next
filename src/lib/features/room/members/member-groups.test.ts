@@ -20,6 +20,8 @@ function member(
     sender: `@${user}:x`,
     sender_name: null,
     reactions: [],
+    read_by: [],
+    read_timestamps: {},
     content: {
       kind: 'membership',
       user_id: `@${user}:x`,
@@ -49,6 +51,8 @@ const message = {
   id: 'message',
   event_id: '$message',
   reactions: [],
+  read_by: [],
+  read_timestamps: {},
   content: { kind: 'message', body: 'hi', html: 'hi', msgtype: 'text', edited: false },
 } as unknown as TimelineItemView;
 
@@ -80,6 +84,19 @@ test('a run of two or more member events becomes one unit keyed on its newest ev
   expect(units[1].item).toBe(items[2]);
   expect(units[1].group).toEqual([items[1], items[2]]);
   expect(units[0].group).toBeNull();
+});
+
+test('receipts on a collapsed group move to the last event before it', () => {
+  const read = { ...message, read_by: ['@bob:x'], read_timestamps: { '@bob:x': 1 } };
+  const items = [
+    read,
+    member('a', 'joined', { read_by: ['@carol:x'], read_timestamps: { '@carol:x': 2 } }),
+    member('b', 'joined'),
+  ];
+  const [first] = groupMemberEvents(items);
+
+  expect(first.item.read_by).toEqual(['@bob:x', '@carol:x']);
+  expect(first.item.read_timestamps).toEqual({ '@bob:x': 1, '@carol:x': 2 });
 });
 
 test('a lone member event, a moderated one or reactions stay their own row', () => {
