@@ -16,6 +16,27 @@ use std::sync::Arc;
 
 use crate::search::MessageIndex;
 
+pub(super) async fn in_restored_room(
+    index: &mut MessageIndex,
+    room_id: &matrix_sdk::ruma::OwnedRoomId,
+    query: &str,
+    limit: usize,
+) -> Vec<crate::search::Hit> {
+    index
+        .search_pinned(
+            query,
+            &crate::search::IndexFilter {
+                rooms: vec![room_id.clone()],
+                ..crate::search::IndexFilter::default()
+            },
+            std::collections::HashSet::new(),
+            crate::api::search::SearchOrder::Rank,
+            limit,
+            0,
+        )
+        .await
+}
+
 pub(super) fn in_room(
     index: &MessageIndex,
     room_id: &matrix_sdk::ruma::OwnedRoomId,

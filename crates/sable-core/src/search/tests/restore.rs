@@ -3,7 +3,7 @@ use matrix_sdk::ruma::{event_id, room_id, user_id};
 use matrix_sdk::test_utils::mocks::{MatrixMockServer, RoomMessagesResponseTemplate};
 use matrix_sdk_test::{JoinedRoomBuilder, async_test, event_factory::EventFactory};
 
-use super::{document, found, in_room, picture};
+use super::{document, found, in_restored_room, in_room, picture};
 use crate::search::MessageIndex;
 use crate::search::crawl::{CrawlBatch, CrawlOutcome};
 
@@ -353,8 +353,13 @@ async fn test_a_stale_derivation_keeps_documents_and_opens_a_rederive_window() {
     core.restore_persisted_index(&client).await;
 
     {
-        let index = core.search_index.lock().await;
-        assert_eq!(in_room(&index, &room_id, "message", 50, 0).len(), 10);
+        let mut index = core.search_index.lock().await;
+        assert_eq!(
+            in_restored_room(&mut index, &room_id, "message", 50)
+                .await
+                .len(),
+            10
+        );
         assert!(index.rooms[&room_id].rederive_from > 0);
         assert!(index.rooms[&room_id].dirty);
     }
@@ -539,13 +544,13 @@ async fn test_a_v3_blob_from_main_is_split_into_chunks_without_a_recrawl() {
     );
     core.restore_persisted_index(&client).await;
     assert_eq!(
-        in_room(
-            &*core.search_index.lock().await,
+        in_restored_room(
+            &mut *core.search_index.lock().await,
             &room_id,
             "archaeology",
             5_000,
-            0
         )
+        .await
         .len(),
         3_000
     );
@@ -569,9 +574,11 @@ async fn test_a_v3_blob_from_main_is_split_into_chunks_without_a_recrawl() {
         Box::new(crate::store::MemorySessionStore::default()),
     );
     second.restore_persisted_index(&client).await;
-    let index = second.search_index.lock().await;
+    let mut index = second.search_index.lock().await;
     assert_eq!(
-        in_room(&index, &room_id, "archaeology", 5_000, 0).len(),
+        in_restored_room(&mut index, &room_id, "archaeology", 5_000)
+            .await
+            .len(),
         3_000
     );
     assert!(index.rooms[&room_id].already_classified(event_id!("$reaction")));
@@ -663,13 +670,13 @@ async fn test_a_flushed_index_is_searchable_in_the_next_session() {
     );
     second.restore_persisted_index(&client).await;
 
-    let hits = in_room(
-        &*second.search_index.lock().await,
+    let hits = in_restored_room(
+        &mut *second.search_index.lock().await,
         &room_id,
         "archaeology",
         10,
-        0,
-    );
+    )
+    .await;
     assert_eq!(
         hits.len(),
         1,
@@ -812,4 +819,119 @@ async fn test_a_restored_room_waits_out_the_ticks_before_it_is_rewritten() {
         index.rooms_due_to_flush().is_empty(),
         "one change after a restore must not rewrite the whole room"
     );
+}
+
+#[async_test]
+async fn test_a_deferred_restore_tokenizes_only_when_a_search_needs_the_room() {
+    let room = room_id!("!deferred:localhost").to_owned();
+    let mut index = MessageIndex::new();
+    index
+        .restore_room_deferred(
+            &room,
+            restored_from(vec![document(
+                "late",
+                "deploy finished",
+                "@kris:localhost",
+                1_000,
+                None,
+                Vec::new(),
+            )]),
+        )
+        .await;
+    assert!(index.rooms[&room].index.is_deferred());
+
+    let elsewhere = crate::search::IndexFilter {
+        rooms: vec![room_id!("!other:localhost").to_owned()],
+        ..crate::search::IndexFilter::default()
+    };
+    index.build_indexes(&elsewhere).await;
+    assert!(index.rooms[&room].index.is_deferred());
+
+    let hits = index
+        .search_pinned(
+            "deploy",
+            &crate::search::IndexFilter::default(),
+            std::collections::HashSet::new(),
+            crate::api::search::SearchOrder::Rank,
+            20,
+            0,
+        )
+        .await;
+    assert!(!index.rooms[&room].index.is_deferred());
+    assert_eq!(
+        hits.iter()
+            .map(|hit| hit.event_id.as_str())
+            .collect::<Vec<_>>(),
+        ["$late"]
+    );
+}
+
+#[async_test]
+async fn test_documents_ingested_before_a_deferred_build_stay_searchable() {
+    let room = room_id!("!deferred-ingest:localhost").to_owned();
+    let mut index = MessageIndex::new();
+    index
+        .restore_room_deferred(
+            &room,
+            restored_from(vec![document(
+                "old",
+                "alpha message",
+                "@kris:localhost",
+                1_000,
+                None,
+                Vec::new(),
+            )]),
+        )
+        .await;
+    index
+        .rooms
+        .get_mut(&room)
+        .expect("the room")
+        .upsert(document(
+            "new",
+            "alpha reply",
+            "@kris:localhost",
+            2_000,
+            None,
+            Vec::new(),
+        ));
+    index
+        .build_indexes(&crate::search::IndexFilter::default())
+        .await;
+    let mut hits = found(&index, "alpha", &crate::search::IndexFilter::default());
+    hits.sort();
+    assert_eq!(hits, ["$new", "$old"]);
+}
+
+#[test]
+fn test_a_room_whose_latest_event_is_classified_needs_no_priming() {
+    use matrix_sdk::deserialized_responses::TimelineEvent;
+    use matrix_sdk::latest_events::LatestEventValue;
+
+    let room = room_id!("!primed:localhost").to_owned();
+    let factory = EventFactory::new()
+        .room(&room)
+        .sender(user_id!("@kris:localhost"));
+    let latest = LatestEventValue::Remote(TimelineEvent::from_plaintext(
+        factory
+            .text_msg("hello")
+            .event_id(event_id!("$latest"))
+            .into_raw_sync(),
+    ));
+
+    let mut index = MessageIndex::new();
+    assert!(!index.latest_indexed(&room, &latest));
+
+    index
+        .rooms
+        .insert(room.clone(), crate::search::RoomIndex::new());
+    assert!(!index.latest_indexed(&room, &latest));
+    assert!(!index.latest_indexed(&room, &LatestEventValue::None));
+
+    index
+        .rooms
+        .get_mut(&room)
+        .expect("the room")
+        .mark_classified(event_id!("$latest").to_owned(), 1);
+    assert!(index.latest_indexed(&room, &latest));
 }

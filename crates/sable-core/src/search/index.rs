@@ -19,6 +19,7 @@ use crate::messages::{raw_content, valid_replacements};
 use crate::protocol::{RoomAttachmentContentView, RoomAttachmentKind, RoomAttachmentView};
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::event_cache::RoomEventCache;
+use matrix_sdk::latest_events::LatestEventValue;
 use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::events::room::message::SyncRoomMessageEvent;
 use matrix_sdk::ruma::events::{
@@ -98,7 +99,12 @@ impl RoomIndex {
         }
     }
 
+    #[cfg(test)]
     pub(super) async fn restored(restored: persist::Restored) -> Self {
+        Self::restored_with(restored, false).await
+    }
+
+    async fn restored_with(restored: persist::Restored, deferred: bool) -> Self {
         let persist::Restored {
             manifest,
             loaded,
@@ -109,7 +115,8 @@ impl RoomIndex {
             .iter()
             .map(|(_, stored)| stored.documents.len())
             .sum::<usize>();
-        let mut index = Self::sized(documents.max(INITIAL_DOCUMENTS));
+        let mut index = Self::new();
+        index.index.defer(deferred && documents > 0);
         index.next_chunk = manifest.next_chunk;
         index.redacted = manifest.redacted.into_iter().collect();
         for entry in &manifest.chunks {
@@ -196,6 +203,18 @@ impl RoomIndex {
         index.durable = index.revision;
         index.apply_pending_to_loaded();
         index
+    }
+
+    async fn build_index(&mut self) {
+        let mut index = InvertedIndex::with_capacity(self.documents.len());
+        for (position, (&key, document)) in self.documents.iter().enumerate() {
+            if position > 0 && position.is_multiple_of(DOCUMENTS_PER_RESTORE_YIELD) {
+                matrix_sdk::sleep::sleep(Duration::ZERO).await;
+            }
+            index.add_document(key, &document.body);
+        }
+        self.index = index;
+        self.retired_keys = 0;
     }
 
     fn has_cold(&self) -> bool {
@@ -713,17 +732,16 @@ impl MessageIndex {
             .values_mut()
             .filter(|room| !room.chinese_pending.is_empty())
         {
-            let count = room.documents.len();
-            let mut index = InvertedIndex::with_capacity(count);
-            for (position, (&key, document)) in room.documents.iter().enumerate() {
-                if position > 0 && position.is_multiple_of(DOCUMENTS_PER_RESTORE_YIELD) {
-                    matrix_sdk::sleep::sleep(Duration::ZERO).await;
-                }
-                index.add_document(key, &document.body);
-            }
-            room.index = index;
-            room.retired_keys = 0;
+            room.build_index().await;
             room.chinese_pending.clear();
+        }
+    }
+
+    pub(super) async fn build_indexes(&mut self, filter: &IndexFilter) {
+        for (room_id, room) in &mut self.rooms {
+            if room.index.is_deferred() && Self::in_scope(filter, room_id) {
+                room.build_index().await;
+            }
         }
     }
 
@@ -753,6 +771,7 @@ impl MessageIndex {
         self.unreadable.insert(room_id.clone());
     }
 
+    #[cfg(test)]
     pub(super) async fn restore_room(
         &mut self,
         room_id: &OwnedRoomId,
@@ -760,6 +779,28 @@ impl MessageIndex {
     ) {
         let index = RoomIndex::restored(restored).await;
         self.rooms.insert(room_id.clone(), index);
+    }
+
+    pub(super) async fn restore_room_deferred(
+        &mut self,
+        room_id: &OwnedRoomId,
+        restored: persist::Restored,
+    ) {
+        let index = RoomIndex::restored_with(restored, true).await;
+        self.rooms.insert(room_id.clone(), index);
+    }
+
+    pub(super) fn latest_indexed(&self, room_id: &RoomId, latest: &LatestEventValue) -> bool {
+        if let LatestEventValue::Remote(event) = latest
+            && is_redacted(event)
+        {
+            return false;
+        }
+        latest.event_id().is_some_and(|event_id| {
+            self.rooms
+                .get(room_id)
+                .is_some_and(|index| index.already_classified(&event_id))
+        })
     }
 
     pub(super) fn unclassified(
@@ -964,10 +1005,23 @@ impl MessageIndex {
         limit: usize,
         offset: usize,
     ) -> Vec<Hit> {
-        self.search_pinned(query, filter, HashSet::new(), order, limit, offset)
+        self.ranked_hits(query, filter, HashSet::new(), order, limit, offset)
     }
 
-    pub(crate) fn search_pinned(
+    pub(crate) async fn search_pinned(
+        &mut self,
+        query: &str,
+        filter: &IndexFilter,
+        pinned: HashSet<OwnedEventId>,
+        order: SearchOrder,
+        limit: usize,
+        offset: usize,
+    ) -> Vec<Hit> {
+        self.build_indexes(filter).await;
+        self.ranked_hits(query, filter, pinned, order, limit, offset)
+    }
+
+    fn ranked_hits(
         &self,
         query: &str,
         filter: &IndexFilter,
@@ -976,6 +1030,13 @@ impl MessageIndex {
         limit: usize,
         offset: usize,
     ) -> Vec<Hit> {
+        debug_assert!(
+            !self
+                .rooms
+                .iter()
+                .any(|(room_id, room)| room.index.is_deferred() && Self::in_scope(filter, room_id)),
+            "a deferred room index must be built before it is searched"
+        );
         let terms = FoldedTerms::of(filter, pinned);
         let ranked = self
             .rooms
@@ -1323,7 +1384,7 @@ impl MessageIndex {
             }
             index.mark_classified(event_id.to_owned(), ts);
 
-            apply_event(index, &event, cache, rules).await;
+            apply_event(index, &event, cache, rules, rederive).await;
         }
 
         self.unload_to_budget();
@@ -1331,11 +1392,13 @@ impl MessageIndex {
     }
 }
 
+/// Only crawled pages can hold an edit that never passes through this index.
 async fn apply_event(
     index: &mut RoomIndex,
     event: &TimelineEvent,
     cache: &RoomEventCache,
     rules: &RedactionRules,
+    crawled: bool,
 ) {
     let message = match event.raw().deserialize() {
         Ok(AnySyncTimelineEvent::MessageLike(message)) => message,
@@ -1364,7 +1427,7 @@ async fn apply_event(
 
     match message {
         AnySyncMessageLikeEvent::RoomMessage(message) => {
-            apply_room_message(index, event, &message, cache).await;
+            apply_room_message(index, event, &message, cache, crawled).await;
         }
         AnySyncMessageLikeEvent::RoomRedaction(redaction) => {
             if let Some(target) = redacted_event_id(&redaction, rules) {
@@ -1380,6 +1443,7 @@ async fn apply_room_message(
     event: &TimelineEvent,
     message: &SyncRoomMessageEvent,
     cache: &RoomEventCache,
+    crawled: bool,
 ) {
     let Some(message) = message.as_original() else {
         return;
@@ -1389,11 +1453,15 @@ async fn apply_room_message(
     if index.redacted.contains(&message.event_id) || index.redacted.contains(&target) {
         return;
     }
-    let cached = cache
-        .find_event_with_relations(&target, Some(vec![RelationType::Replacement]))
-        .await
-        .ok()
-        .flatten();
+    let cached = if is_edit || crawled {
+        cache
+            .find_event_with_relations(&target, Some(vec![RelationType::Replacement]))
+            .await
+            .ok()
+            .flatten()
+    } else {
+        None
+    };
     let fallback = if is_edit && cached.is_none() {
         cache.find_event(&target).await.ok().flatten()
     } else {
@@ -1952,7 +2020,7 @@ mod tests {
 
         let search = |wanted| {
             index
-                .search_pinned(
+                .ranked_hits(
                     "deploy",
                     &super::IndexFilter {
                         pinned: Some(wanted),

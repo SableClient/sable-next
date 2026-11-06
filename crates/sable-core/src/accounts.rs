@@ -2263,13 +2263,15 @@ mod regression_tests {
             core.search_index
                 .lock()
                 .await
-                .search(
+                .search_pinned(
                     "archaeology",
                     &crate::search::IndexFilter::default(),
+                    std::collections::HashSet::new(),
                     crate::api::search::SearchOrder::Rank,
                     10,
                     0
                 )
+                .await
                 .len(),
             2,
             "both restored documents should match"
