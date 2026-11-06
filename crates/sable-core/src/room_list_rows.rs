@@ -386,7 +386,7 @@ mod tests {
         assert_eq!(rows.rows[0].space_children[0].room_id, room.as_str());
         assert_eq!(rows.rows[0].space_children[0].via, ["sable.moe"]);
         rows.relink(&cache, &DmSpaceLinks::new(), &ParentSpaceLinks::new());
-        assert!(rows.rows[0].space_children.is_empty());
+        assert_eq!(rows.rows[0].space_children, []);
     }
 
     #[test]

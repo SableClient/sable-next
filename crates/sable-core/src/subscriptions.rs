@@ -122,23 +122,19 @@ enum ParentStateChange {
 }
 
 impl RoomListWorker {
-    async fn run(
-        mut self,
-        mut stream: impl Stream<Item = Vec<VectorDiff<RoomListItem>>> + Unpin,
-        loading: impl Fn() -> RoomListLoadingState,
-        mut stores_open: watch::Receiver<bool>,
-        mut rule_changes: broadcast::Receiver<()>,
-        mut parent_results: mpsc::UnboundedReceiver<ParentResult>,
+    fn watch_parent_state(
+        &self,
+    ) -> (
+        matrix_sdk::event_handler::EventHandlerDropGuard,
+        mpsc::UnboundedReceiver<ParentStateChange>,
     ) {
-        let mut batch = DiffBatch::new(ROOM_LIST_BATCH_INTERVAL);
-        self.dm_spaces = self.load_dm_spaces().await;
-        let (state_changed, mut state_changes) = mpsc::unbounded_channel();
+        let (sender, receiver) = mpsc::unbounded_channel();
         let handle = self.client.add_event_handler(
             move |raw: matrix_sdk::ruma::serde::Raw<
                 matrix_sdk::ruma::events::AnySyncStateEvent,
             >,
                   room: matrix_sdk::Room| {
-                let state_changed = state_changed.clone();
+                let sender = sender.clone();
                 async move {
                     let Ok(event) = raw.deserialize_as_unchecked::<serde_json::Value>() else {
                         return;
@@ -162,12 +158,25 @@ impl RoomListWorker {
                         None
                     };
                     if let Some(change) = change {
-                        let _ = state_changed.send(change);
+                        let _ = sender.send(change);
                     }
                 }
             },
         );
-        let _handler = self.client.event_handler_drop_guard(handle);
+        (self.client.event_handler_drop_guard(handle), receiver)
+    }
+
+    async fn run(
+        mut self,
+        mut stream: impl Stream<Item = Vec<VectorDiff<RoomListItem>>> + Unpin,
+        loading: impl Fn() -> RoomListLoadingState,
+        mut stores_open: watch::Receiver<bool>,
+        mut rule_changes: broadcast::Receiver<()>,
+        mut parent_results: mpsc::UnboundedReceiver<ParentResult>,
+    ) {
+        let mut batch = DiffBatch::new(ROOM_LIST_BATCH_INTERVAL);
+        self.dm_spaces = self.load_dm_spaces().await;
+        let (_handler, mut state_changes) = self.watch_parent_state();
         loop {
             let held = batch.wait(Instant::now());
             let diffs = tokio::select! {

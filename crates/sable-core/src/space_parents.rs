@@ -63,7 +63,7 @@ impl ParentTracker {
                 self.claims.insert(room_id, claims);
             }
         }
-        let affected: Vec<_> = self
+        let affected = self
             .claims
             .iter()
             .filter(|(room, claims)| {
@@ -72,27 +72,25 @@ impl ParentTracker {
                         .iter()
                         .any(|claim| claim.room_id().is_some_and(|id| spaces.contains(&id)))
             })
-            .map(|(room, claims)| (room.clone(), claims.clone()))
-            .collect();
-        let validated =
-            futures_util::future::join_all(affected.into_iter().map(|(room, claims)| async move {
-                let claims: Vec<_> = claims
-                    .into_iter()
-                    .filter(|claim| {
-                        claim
-                            .room_id()
-                            .and_then(|id| client.get_room(&id))
-                            .is_some_and(|space| space.state() == matrix_sdk::RoomState::Joined)
-                    })
-                    .collect();
-                let parents = validate(core, client, &room, &claims, false)
-                    .await
-                    .into_iter()
-                    .filter_map(|claim| claim.room_id().map(|id| (id, claim.content.via)))
-                    .collect::<Vec<_>>();
-                (room, claims, parents)
-            }))
-            .await;
+            .map(|(room, claims)| (room.clone(), claims.clone()));
+        let validated = futures_util::future::join_all(affected.map(|(room, claims)| async move {
+            let claims: Vec<_> = claims
+                .into_iter()
+                .filter(|claim| {
+                    claim
+                        .room_id()
+                        .and_then(|id| client.get_room(&id))
+                        .is_some_and(|space| space.state() == matrix_sdk::RoomState::Joined)
+                })
+                .collect();
+            let parents = validate(core, client, &room, &claims, false)
+                .await
+                .into_iter()
+                .filter_map(|claim| claim.room_id().map(|id| (id, claim.content.via)))
+                .collect::<Vec<_>>();
+            (room, claims, parents)
+        }))
+        .await;
         for (room, claims, parents) in validated {
             self.version += 1;
             let version = self.version;
