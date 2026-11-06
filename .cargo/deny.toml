@@ -173,7 +173,6 @@ unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = [
   "https://github.com/yanqianglu/tauri-plugin-auth-session",
-  "https://github.com/Choochmeque/tauri-plugin-sharekit",
   "https://github.com/ruma/ruma",
   "https://git.sable.moe/SableClient/matrix-rust-sdk",
   "https://github.com/SableClient/tauri-plugin-app-icon",
