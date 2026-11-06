@@ -1278,9 +1278,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'session.integration_manager_url': () => 'https://integrations.example.test/index.html',
       'search.messages': (params) => ({ hits: searchHits(params), older: null }),
       'search.peer_start': () => null,
-      'search.peer_signal': () => null,
       'search.peer_exchange': () => null,
-      'search.peer_close': () => null,
+      'rtc.signal': () => null,
+      'rtc.close': () => null,
       'search.coverage': () => ({
         documents: 0,
         rooms_pending: 0,

@@ -131,14 +131,20 @@ async fn discovery_keeps_active_transfers_and_metered_policy_closes_them() {
         .peers
         .lock()
         .insert("session".into(), Peer::new("DEVICE".into(), true, now_ms()));
+    core.open_rtc(
+        RtcPurpose::SearchSharing,
+        "session".into(),
+        "DEVICE".into(),
+        true,
+    );
     core.start_search_peers().await.unwrap();
     assert!(peers.peers.lock().contains_key("session"));
     core.set_search_network_unmetered(false);
     assert!(peers.peers.lock().is_empty());
     assert!(matches!(
         events.recv().await,
-        Some(CoreEvent::SearchPeer {
-            signal: SearchPeerSignal::Close,
+        Some(CoreEvent::Rtc {
+            signal: RtcSignal::Close,
             ..
         })
     ));
@@ -249,10 +255,10 @@ async fn verified_devices_copy_history_and_changes() {
     }
     let id = tokio::time::timeout(Duration::from_secs(5), async {
         while let Some(event) = target_events.recv().await {
-            if let CoreEvent::SearchPeer {
+            if let CoreEvent::Rtc {
                 session_id,
-                initiator: true,
-                signal: SearchPeerSignal::Open,
+                sender: true,
+                signal: RtcSignal::Open,
             } = event
             {
                 return session_id;
@@ -376,80 +382,4 @@ async fn browsers_transfer_verified_search_history() {
     assert!(target.search_crawl.lock().await.cover_of(&room).is_some());
     assert!(writer.search_sharing.peers.lock().is_empty());
     assert!(target.search_sharing.peers.lock().is_empty());
-}
-
-#[test]
-fn only_the_sender_offers_and_only_the_receiver_answers() {
-    let description = |kind| SearchPeerDescription {
-        kind,
-        sdp: "v=0".into(),
-    };
-    assert!(valid_description(
-        &description(SearchPeerDescriptionType::Offer),
-        true
-    ));
-    assert!(!valid_description(
-        &description(SearchPeerDescriptionType::Answer),
-        true
-    ));
-    assert!(valid_description(
-        &description(SearchPeerDescriptionType::Answer),
-        false
-    ));
-    assert!(!valid_description(
-        &description(SearchPeerDescriptionType::Offer),
-        false
-    ));
-    let mut oversized = description(SearchPeerDescriptionType::Offer);
-    oversized.sdp = "x".repeat(MAX_SDP + 1);
-    assert!(!valid_description(&oversized, true));
-}
-
-#[test]
-fn frostbite_events_use_the_documented_fields() {
-    let negotiate = serde_json::to_value(ToDeviceFrostbiteNegotiateEventContent {
-        session: "s".into(),
-        timestamp: 7,
-        description: SearchPeerDescription {
-            kind: SearchPeerDescriptionType::Offer,
-            sdp: "v=0".into(),
-        },
-    })
-    .unwrap();
-    assert_eq!(
-        negotiate,
-        serde_json::json!({
-            "session": "s",
-            "timestamp": 7,
-            "description": { "type": "offer", "sdp": "v=0" },
-        })
-    );
-    let candidate = serde_json::to_value(ToDeviceFrostbiteCandidateEventContent {
-        session: "s".into(),
-        candidate: SearchPeerCandidate {
-            candidate: "candidate:1 1 udp 1 192.0.2.1 9 typ host".into(),
-            sdp_mid: Some("0".into()),
-            sdp_m_line_index: Some(0),
-        },
-    })
-    .unwrap();
-    assert_eq!(
-        candidate,
-        serde_json::json!({
-            "session": "s",
-            "candidate": {
-                "candidate": "candidate:1 1 udp 1 192.0.2.1 9 typ host",
-                "sdpMid": "0",
-                "sdpMLineIndex": 0,
-            },
-        })
-    );
-    assert_eq!(
-        ToDeviceFrostbiteNegotiateEventContent::TYPE,
-        "computer.gingershaped.frostbite.negotiate"
-    );
-    assert_eq!(
-        ToDeviceFrostbiteCandidateEventContent::TYPE,
-        "computer.gingershaped.frostbite.candidate"
-    );
 }

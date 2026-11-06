@@ -3,7 +3,8 @@
 import { afterEach, beforeEach, expect, test, vi, type Mock } from 'vitest';
 
 import { SearchPeerDecoder, encodeSearchPeerFrame } from '#lib/model/model.js';
-import { watchSearchPeers, type SearchPeerCore, type SearchPeerEvent } from './search-peer';
+import type { RtcEvent } from '#lib/rtc/connect.js';
+import { watchSearchPeers, type SearchPeerCore } from './search-peer';
 
 class Channel extends EventTarget {
   label = 'sable-search-v1';
@@ -107,7 +108,7 @@ class Peer extends EventTarget {
   }
 }
 
-let listener: (event: SearchPeerEvent) => void;
+let listener: (event: RtcEvent) => void;
 let subscribeEvents: Mock<SearchPeerCore['subscribeEvents']>;
 let core: SearchPeerCore;
 let stop: (() => void) | undefined;
@@ -128,10 +129,13 @@ beforeEach(() => {
     rpc: {
       search: {
         peerStart: vi.fn(() => Promise.resolve(null)),
-        peerSignal: vi.fn(() => Promise.resolve(null)),
         peerExchange: vi.fn(() => Promise.resolve(null)),
-        peerClose: vi.fn(() => Promise.resolve(null)),
       },
+      rtc: {
+        signal: vi.fn(() => Promise.resolve(null)),
+        close: vi.fn(() => Promise.resolve(null)),
+      },
+      calls: { turnServer: vi.fn(() => Promise.reject(new Error('no turn'))) },
     },
   };
 });
@@ -145,7 +149,7 @@ afterEach(() => {
 
 function start(): Channel {
   stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
-  listener({ type: 'search_peer', session_id: 'test', initiator: true, signal: { kind: 'open' } });
+  listener({ type: 'rtc', session_id: 'test', sender: true, signal: { kind: 'open' } });
   return Peer.instances[0].channel;
 }
 
@@ -226,23 +230,23 @@ test('a datachannel setup failure releases the peer immediately', () => {
     }
   );
   stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
-  listener({ type: 'search_peer', session_id: 'test', initiator: true, signal: { kind: 'open' } });
+  listener({ type: 'rtc', session_id: 'test', sender: true, signal: { kind: 'open' } });
   expect(Peer.instances[0].close).toHaveBeenCalledOnce();
-  expect(core.rpc.search.peerClose).toHaveBeenCalledOnce();
+  expect(core.rpc.rtc.close).toHaveBeenCalledOnce();
 });
 
 test('deferred signaling rejection after cleanup does not reopen or double-close a session', async () => {
   const signal = Promise.withResolvers<null>();
-  vi.mocked(core.rpc.search.peerSignal).mockReturnValue(signal.promise);
+  vi.mocked(core.rpc.rtc.signal).mockReturnValue(signal.promise);
   const channel = start();
   await vi.waitFor(() => {
-    expect(core.rpc.search.peerSignal).toHaveBeenCalledOnce();
+    expect(core.rpc.rtc.signal).toHaveBeenCalledOnce();
   });
   stop?.();
   signal.reject(new Error('stopped'));
   await signal.promise.catch(() => {});
   expect(channel.close).toHaveBeenCalledOnce();
-  expect(core.rpc.search.peerClose).toHaveBeenCalledOnce();
+  expect(core.rpc.rtc.close).toHaveBeenCalledOnce();
 });
 
 test('a deferred exchange rejection after an account switch cannot call the new account', async () => {
@@ -258,7 +262,7 @@ test('a deferred exchange rejection after an account switch cannot call the new 
   exchange.reject(new Error('stopped'));
   await exchange.promise.catch(() => {});
   expect(channel.close).toHaveBeenCalledOnce();
-  expect(core.rpc.search.peerClose).not.toHaveBeenCalled();
+  expect(core.rpc.rtc.close).not.toHaveBeenCalled();
 });
 
 test('index requests wait for acknowledgement and retry a lost greeting', async () => {
@@ -285,7 +289,7 @@ test('a negotiation timeout releases the connection', async () => {
   start();
   await vi.advanceTimersByTimeAsync(20_000);
   expect(Peer.instances[0].close).toHaveBeenCalledOnce();
-  expect(core.rpc.search.peerClose).toHaveBeenCalledWith({ session_id: 'test' });
+  expect(core.rpc.rtc.close).toHaveBeenCalledWith({ session_id: 'test' });
 });
 
 test('discovery retries on resume and at regular intervals', async () => {
@@ -318,12 +322,12 @@ test('metered and offline transitions close active transfers', () => {
   connection.type = 'cellular';
   connection.dispatchEvent(new Event('change'));
   expect(Peer.instances[0].close).toHaveBeenCalledOnce();
-  expect(core.rpc.search.peerClose).toHaveBeenCalledOnce();
+  expect(core.rpc.rtc.close).toHaveBeenCalledOnce();
   connection.type = 'wifi';
   listener({
-    type: 'search_peer',
+    type: 'rtc',
     session_id: 'second',
-    initiator: true,
+    sender: true,
     signal: { kind: 'open' },
   });
   vi.stubGlobal('navigator', { onLine: false, connection });
@@ -336,98 +340,15 @@ test('late account cleanup does not send old session RPCs to the new account', (
   core.session = { account_id: 'other' };
   stop?.();
   expect(Peer.instances[0].close).toHaveBeenCalledOnce();
-  expect(core.rpc.search.peerClose).not.toHaveBeenCalled();
-});
-
-test('the sender offers on negotiationneeded and trickles candidates', async () => {
-  start();
-  const peer = Peer.instances[0];
-  await vi.waitFor(() => {
-    expect(core.rpc.search.peerSignal).toHaveBeenCalledWith({
-      session_id: 'test',
-      signal: { kind: 'negotiate', description: { type: 'offer', sdp: 'local-sdp' } },
-    });
-  });
-  peer.dispatchEvent(
-    Object.assign(new Event('icecandidate'), {
-      candidate: { candidate: 'candidate:1', sdpMid: '0', sdpMLineIndex: 0 },
-    })
-  );
-  await vi.waitFor(() => {
-    expect(core.rpc.search.peerSignal).toHaveBeenLastCalledWith({
-      session_id: 'test',
-      signal: {
-        kind: 'candidate',
-        candidate: { candidate: 'candidate:1', sdpMid: '0', sdpMLineIndex: 0 },
-      },
-    });
-  });
-});
-
-test('the receiver answers each offer and queues early candidates', async () => {
-  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
-  const candidate = { candidate: 'candidate:1', sdpMid: '0', sdpMLineIndex: 0 };
-  listener({
-    type: 'search_peer',
-    session_id: 'test',
-    initiator: false,
-    signal: { kind: 'candidate', candidate },
-  });
-  const peer = Peer.instances[0];
-  expect(peer.addIceCandidate).not.toHaveBeenCalled();
-  listener({
-    type: 'search_peer',
-    session_id: 'test',
-    initiator: false,
-    signal: { kind: 'negotiate', description: { type: 'offer', sdp: 'remote' } },
-  });
-  listener({
-    type: 'search_peer',
-    session_id: 'test',
-    initiator: false,
-    signal: { kind: 'candidate', candidate },
-  });
-  await vi.waitFor(() => {
-    expect(peer.addIceCandidate).toHaveBeenCalledTimes(2);
-    expect(core.rpc.search.peerSignal).toHaveBeenCalledWith({
-      session_id: 'test',
-      signal: { kind: 'negotiate', description: { type: 'answer', sdp: 'local-sdp' } },
-    });
-  });
-  listener({
-    type: 'search_peer',
-    session_id: 'test',
-    initiator: false,
-    signal: { kind: 'negotiate', description: { type: 'offer', sdp: 'renegotiated' } },
-  });
-  await vi.waitFor(() => {
-    expect(peer.setRemoteDescription).toHaveBeenLastCalledWith({
-      type: 'offer',
-      sdp: 'renegotiated',
-    });
-    expect(peer.setLocalDescription).toHaveBeenCalledTimes(2);
-  });
-});
-
-test('a receiver closes on an answer that only the sender may send', async () => {
-  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
-  listener({
-    type: 'search_peer',
-    session_id: 'test',
-    initiator: false,
-    signal: { kind: 'negotiate', description: { type: 'answer', sdp: 'remote' } },
-  });
-  await vi.waitFor(() => {
-    expect(Peer.instances[0].close).toHaveBeenCalledOnce();
-  });
+  expect(core.rpc.rtc.close).not.toHaveBeenCalled();
 });
 
 test('a backend cancellation closes the browser channel', () => {
   const channel = start();
   listener({
-    type: 'search_peer',
+    type: 'rtc',
     session_id: 'test',
-    initiator: false,
+    sender: false,
     signal: { kind: 'close' },
   });
   expect(channel.close).toHaveBeenCalledOnce();

@@ -1,7 +1,8 @@
 import { expect, test, vi } from 'vitest';
 
-import type { SearchPeerSignal } from '#src/generated/protocol';
-import { watchSearchPeers, type SearchPeerCore, type SearchPeerEvent } from './search-peer';
+import type { RtcSignal } from '#src/generated/protocol';
+import type { RtcEvent } from '#lib/rtc/connect.js';
+import { watchSearchPeers, type SearchPeerCore } from './search-peer';
 
 test(
   'two devices exchange chunked history through real WebRTC channels',
@@ -9,11 +10,8 @@ test(
   async () => {
     const payload = 'History with 中文 and 🙂 '.repeat(20_000);
     const received: string[][] = [[], []];
-    const listeners = [
-      new Set<(event: SearchPeerEvent) => void>(),
-      new Set<(event: SearchPeerEvent) => void>(),
-    ];
-    const signals: SearchPeerSignal[] = [];
+    const listeners = [new Set<(event: RtcEvent) => void>(), new Set<(event: RtcEvent) => void>()];
+    const signals: RtcSignal[] = [];
     const send = vi.spyOn(RTCDataChannel.prototype, 'send');
     const cores = [0, 1].map((side): SearchPeerCore => ({
       session: { account_id: `account-${side}` },
@@ -24,26 +22,27 @@ test(
       rpc: {
         search: {
           peerStart: vi.fn(() => Promise.resolve(null)),
-          peerSignal: vi.fn<SearchPeerCore['rpc']['search']['peerSignal']>(
-            ({ session_id, signal }) => {
-              signals.push(signal);
-              queueMicrotask(() => {
-                for (const listener of listeners[1 - side]) {
-                  listener({ type: 'search_peer', session_id, initiator: side === 1, signal });
-                }
-              });
-
-              return Promise.resolve(null);
-            }
-          ),
           peerExchange: vi.fn<SearchPeerCore['rpc']['search']['peerExchange']>(({ data }) => {
             if (data === null) return Promise.resolve(`request-${side}`);
             if (data === `request-${1 - side}`) return Promise.resolve(`${side}:${payload}`);
             received[side].push(data);
             return Promise.resolve(null);
           }),
-          peerClose: vi.fn(() => Promise.resolve(null)),
         },
+        rtc: {
+          signal: vi.fn<SearchPeerCore['rpc']['rtc']['signal']>(({ session_id, signal }) => {
+            signals.push(signal);
+            queueMicrotask(() => {
+              for (const listener of listeners[1 - side]) {
+                listener({ type: 'rtc', session_id, sender: side === 1, signal });
+              }
+            });
+
+            return Promise.resolve(null);
+          }),
+          close: vi.fn(() => Promise.resolve(null)),
+        },
+        calls: { turnServer: vi.fn(() => Promise.reject(new Error('no turn'))) },
       },
     }));
     const stops = cores.map((core) =>
@@ -56,9 +55,9 @@ test(
       });
       for (const listener of listeners[0]) {
         listener({
-          type: 'search_peer',
+          type: 'rtc',
           session_id: 'loopback',
-          initiator: true,
+          sender: true,
           signal: { kind: 'open' },
         });
       }
@@ -88,8 +87,8 @@ test(
       });
       send.mockRestore();
     }
-    expect(cores[0].rpc.search.peerClose).toHaveBeenCalledWith({ session_id: 'loopback' });
-    expect(cores[1].rpc.search.peerClose).toHaveBeenCalledWith({ session_id: 'loopback' });
+    expect(cores[0].rpc.rtc.close).toHaveBeenCalledWith({ session_id: 'loopback' });
+    expect(cores[1].rpc.rtc.close).toHaveBeenCalledWith({ session_id: 'loopback' });
   }
 );
 
@@ -100,10 +99,13 @@ test('a hidden lock owner releases peer handling to a waiting visible tab', asyn
     rpc: {
       search: {
         peerStart: vi.fn(() => Promise.resolve(null)),
-        peerSignal: vi.fn(() => Promise.resolve(null)),
         peerExchange: vi.fn(() => Promise.resolve(null)),
-        peerClose: vi.fn(() => Promise.resolve(null)),
       },
+      rtc: {
+        signal: vi.fn(() => Promise.resolve(null)),
+        close: vi.fn(() => Promise.resolve(null)),
+      },
+      calls: { turnServer: vi.fn(() => Promise.reject(new Error('no turn'))) },
     },
   };
   const stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
@@ -145,10 +147,13 @@ test('only one tab handles shared-worker peer sessions for an account', async ()
     rpc: {
       search: {
         peerStart: vi.fn(() => Promise.resolve(null)),
-        peerSignal: vi.fn(() => Promise.resolve(null)),
         peerExchange: vi.fn(() => Promise.resolve(null)),
-        peerClose: vi.fn(() => Promise.resolve(null)),
       },
+      rtc: {
+        signal: vi.fn(() => Promise.resolve(null)),
+        close: vi.fn(() => Promise.resolve(null)),
+      },
+      calls: { turnServer: vi.fn(() => Promise.reject(new Error('no turn'))) },
     },
   });
   const first = core();

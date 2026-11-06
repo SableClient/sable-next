@@ -76,6 +76,7 @@ domains! {
     push,
     room_state,
     rooms,
+    rtc,
     search,
     session,
     spaces,

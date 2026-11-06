@@ -96,22 +96,19 @@ try {
       };
       const listeners = new Set();
       window.peerEvent = (event) => listeners.forEach((listener) => listener(event));
-      const methods = {
-        peerStart: 'peer_start',
-        peerSignal: 'peer_signal',
-        peerExchange: 'peer_exchange',
-        peerClose: 'peer_close',
+      const route = (method) => (params) => window.peerCall(method, params);
+      const rpc = {
+        search: {
+          peerStart: route('search.peer_start'),
+          peerExchange: route('search.peer_exchange'),
+        },
+        rtc: { signal: route('rtc.signal'), close: route('rtc.close') },
+        calls: { turnServer: route('calls.turn_server') },
       };
-      const search = Object.fromEntries(
-        Object.entries(methods).map(([name, method]) => [
-          name,
-          (params) => window.peerCall(`search.${method}`, params),
-        ])
-      );
       window.stopPeers = watchSearchPeers(
         {
           session: { account_id: `device-${side}` },
-          rpc: { search },
+          rpc,
           subscribeEvents(listener) {
             listeners.add(listener);
             return () => listeners.delete(listener);

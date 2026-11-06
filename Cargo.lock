@@ -7768,6 +7768,7 @@ dependencies = [
  "rusqlite",
  "rust-stemmers",
  "rustls",
+ "sable-frostbite",
  "sable-model",
  "serde",
  "serde_json",
@@ -7792,6 +7793,17 @@ dependencies = [
  "wiremock",
  "zbus-secret-service-keyring-store",
  "zeroize",
+]
+
+[[package]]
+name = "sable-frostbite"
+version = "0.1.0"
+dependencies = [
+ "matrix-sdk",
+ "matrix-sdk-base",
+ "serde",
+ "serde_json",
+ "specta",
 ]
 
 [[package]]

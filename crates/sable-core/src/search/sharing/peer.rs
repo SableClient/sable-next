@@ -5,21 +5,13 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use base64::Engine as _;
 use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::EncryptionInfo;
-use matrix_sdk::encryption::identities::Device;
-use matrix_sdk::event_handler::SyncEvent;
-use matrix_sdk::ruma::events::StaticEventContent;
 use matrix_sdk::ruma::events::macros::EventContent;
-use matrix_sdk::ruma::serde::Raw;
-use matrix_sdk::ruma::{OwnedDeviceId, OwnedRoomId, OwnedUserId};
-use matrix_sdk_base::crypto::CollectStrategy;
-use serde::de::DeserializeOwned;
+use matrix_sdk::ruma::{DeviceId, OwnedDeviceId, OwnedRoomId};
 use serde::{Deserialize, Serialize};
 
 use crate::Core;
-use crate::protocol::{
-    CoreEvent, RpcError, SearchPeerCandidate, SearchPeerDescription, SearchPeerDescriptionType,
-    SearchPeerSignal, SearchPeerState, SearchSharingView,
-};
+use crate::protocol::{CoreEvent, RpcError, RtcSignal, SearchPeerState, SearchSharingView};
+use crate::rtc::RtcPurpose;
 use crate::sealed_account_data::verified_own_sender;
 use crate::search::now_ms;
 
@@ -27,9 +19,6 @@ mod transfer;
 
 use transfer::{Download, Received, Snapshot};
 
-const MAX_SDP: usize = 48 * 1024;
-const MAX_CANDIDATE: usize = 1024;
-const MAX_CANDIDATES: usize = 64;
 const MAX_PEERS: usize = 2;
 const SESSION_MS: u64 = 120_000;
 const RETRY_MS: u64 = 60_000;
@@ -51,52 +40,10 @@ enum Discovery {
     Ready,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
-#[ruma_event(type = "computer.gingershaped.frostbite.negotiate", kind = ToDevice)]
-pub(crate) struct ToDeviceFrostbiteNegotiateEventContent {
-    session: String,
-    timestamp: u64,
-    description: SearchPeerDescription,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
-#[ruma_event(type = "computer.gingershaped.frostbite.candidate", kind = ToDevice)]
-pub(crate) struct ToDeviceFrostbiteCandidateEventContent {
-    session: String,
-    candidate: SearchPeerCandidate,
-}
-
-struct Incoming {
-    sender: OwnedUserId,
-    session: String,
-    timestamp: Option<u64>,
-    signal: Signal,
-}
-
-enum Signal {
-    Discovery(Discovery),
-    Negotiate(SearchPeerDescription),
-    Candidate(SearchPeerCandidate),
-}
-
-fn valid_description(description: &SearchPeerDescription, from_initiator: bool) -> bool {
-    let expected = if from_initiator {
-        SearchPeerDescriptionType::Offer
-    } else {
-        SearchPeerDescriptionType::Answer
-    };
-    description.kind == expected && !description.sdp.is_empty() && description.sdp.len() <= MAX_SDP
-}
-
-fn valid_candidate(candidate: &SearchPeerCandidate) -> bool {
-    candidate.candidate.len() + candidate.sdp_mid.as_ref().map_or(0, String::len) <= MAX_CANDIDATE
-}
-
 struct Peer {
     device: OwnedDeviceId,
     initiator: bool,
     touched: u64,
-    candidates: usize,
     download: Download,
     snapshot: Option<Snapshot>,
 }
@@ -107,7 +54,6 @@ impl Peer {
             device,
             initiator,
             touched,
-            candidates: 0,
             download: Download::default(),
             snapshot: None,
         }))
@@ -190,71 +136,21 @@ impl Core {
         self.search_sharing
             .available
             .store(false, Ordering::Relaxed);
-        let peers = std::mem::take(&mut *self.search_sharing.peers.lock());
+        self.search_sharing.peers.lock().clear();
         self.search_sharing.status.lock().0 = SearchPeerState::Waiting;
-        for (session_id, _) in peers {
-            self.emit(CoreEvent::SearchPeer {
-                session_id,
-                initiator: false,
-                signal: SearchPeerSignal::Close,
-            });
-        }
+        self.close_rtc_purpose(RtcPurpose::SearchSharing);
     }
 
     pub(crate) fn watch_search_peers(self: &Arc<Self>, client: &Client, generation: u64) {
-        self.watch_search_signal(client, generation, |event: ToDeviceSearchPeerEvent| {
-            let content = event.content;
-            Incoming {
-                sender: event.sender,
-                session: content.session,
-                timestamp: Some(content.timestamp),
-                signal: Signal::Discovery(content.kind),
-            }
-        });
-        self.watch_search_signal(
-            client,
-            generation,
-            |event: ToDeviceFrostbiteNegotiateEvent| {
-                let content = event.content;
-                Incoming {
-                    sender: event.sender,
-                    session: content.session,
-                    timestamp: Some(content.timestamp),
-                    signal: Signal::Negotiate(content.description),
-                }
-            },
-        );
-        self.watch_search_signal(
-            client,
-            generation,
-            |event: ToDeviceFrostbiteCandidateEvent| {
-                let content = event.content;
-                Incoming {
-                    sender: event.sender,
-                    session: content.session,
-                    timestamp: None,
-                    signal: Signal::Candidate(content.candidate),
-                }
-            },
-        );
-    }
-
-    fn watch_search_signal<E>(
-        self: &Arc<Self>,
-        client: &Client,
-        generation: u64,
-        incoming: fn(E) -> Incoming,
-    ) where
-        E: SyncEvent + DeserializeOwned + Send + 'static,
-    {
         let weak = Arc::downgrade(self);
         let handle = client.add_event_handler(
-            move |event: E, encryption: Option<EncryptionInfo>, client: Client| {
+            move |event: ToDeviceSearchPeerEvent,
+                  encryption: Option<EncryptionInfo>,
+                  client: Client| {
                 let weak = weak.clone();
-                let incoming = incoming(event);
                 async move {
                     if let Some(core) = weak.upgrade() {
-                        core.receive_search_signal(&client, generation, encryption, incoming)
+                        core.receive_search_peer(&client, generation, event, encryption)
                             .await;
                     }
                 }
@@ -263,27 +159,23 @@ impl Core {
         self.track_session_handler(client, handle);
     }
 
-    async fn receive_search_signal(
+    async fn receive_search_peer(
         &self,
         client: &Client,
         generation: u64,
+        event: ToDeviceSearchPeerEvent,
         encryption: Option<EncryptionInfo>,
-        Incoming {
-            sender,
-            session,
-            timestamp,
-            signal,
-        }: Incoming,
     ) {
+        let content = event.content;
         if self.session_generation.load(Ordering::SeqCst) != generation
             || !self.peers_allowed()
             || !self.search_sharing.available.load(Ordering::Relaxed)
-            || session.len() != SESSION_ID_LEN
-            || timestamp.is_some_and(|ts| now_ms().abs_diff(ts) > SESSION_MS)
+            || content.session.len() != SESSION_ID_LEN
+            || now_ms().abs_diff(content.timestamp) > SESSION_MS
         {
             return;
         }
-        let Some(device) = verified_own_sender(client, &sender, encryption).await else {
+        let Some(device) = verified_own_sender(client, &event.sender, encryption).await else {
             return;
         };
         let _session = self.session.read().await;
@@ -293,52 +185,53 @@ impl Core {
             return;
         }
         let id = device.device_id().to_owned();
-        if matches!(signal, Signal::Discovery(Discovery::Probe)) {
-            {
-                self.search_sharing.remove_expired(now_ms());
-                let mut peers = self.search_sharing.peers.lock();
-                if peers.contains_key(&session) || peers.len() >= MAX_PEERS {
+        let session = content.session;
+        match content.kind {
+            Discovery::Probe => {
+                {
+                    self.search_sharing.remove_expired(now_ms());
+                    let mut peers = self.search_sharing.peers.lock();
+                    if peers.contains_key(&session) || peers.len() >= MAX_PEERS {
+                        return;
+                    }
+                    peers.insert(session.clone(), Peer::new(id.clone(), false, now_ms()));
+                }
+                if !self.open_rtc(
+                    RtcPurpose::SearchSharing,
+                    session.clone(),
+                    id.clone(),
+                    false,
+                ) || send_discovery(client, &id, &session, Discovery::Ready)
+                    .await
+                    .is_err()
+                {
+                    self.search_sharing.peers.lock().remove(&session);
+                    self.close_rtc(&session);
+                }
+            }
+            Discovery::Ready => {
+                let peer = self.search_sharing.peers.lock().get(&session).cloned();
+                let Some(peer) = peer else { return };
+                let mut peer = peer.lock().await;
+                if !peer.initiator
+                    || peer.device != id
+                    || now_ms().saturating_sub(peer.touched) > SESSION_MS
+                    || !self.open_rtc(RtcPurpose::SearchSharing, session.clone(), id, true)
+                {
                     return;
                 }
-                peers.insert(session.clone(), Peer::new(id.clone(), false, now_ms()));
+                peer.touched = now_ms();
+                self.search_sharing.status.lock().0 = SearchPeerState::Connecting;
+                self.emit_if_current(
+                    generation,
+                    CoreEvent::Rtc {
+                        session_id: session,
+                        sender: true,
+                        signal: RtcSignal::Open,
+                    },
+                );
             }
-            if send_signal(client, &id, &session, Signal::Discovery(Discovery::Ready))
-                .await
-                .is_err()
-            {
-                self.search_sharing.peers.lock().remove(&session);
-            }
-            return;
         }
-        let peer = self.search_sharing.peers.lock().get(&session).cloned();
-        let Some(peer) = peer else { return };
-        let mut peer = peer.lock().await;
-        if peer.device != id || now_ms().saturating_sub(peer.touched) > SESSION_MS {
-            return;
-        }
-        peer.touched = now_ms();
-        let signal = match signal {
-            Signal::Discovery(Discovery::Ready) if peer.initiator => SearchPeerSignal::Open,
-            Signal::Negotiate(description) if valid_description(&description, !peer.initiator) => {
-                SearchPeerSignal::Negotiate { description }
-            }
-            Signal::Candidate(candidate)
-                if valid_candidate(&candidate) && peer.candidates < MAX_CANDIDATES =>
-            {
-                peer.candidates += 1;
-                SearchPeerSignal::Candidate { candidate }
-            }
-            _ => return,
-        };
-        self.search_sharing.status.lock().0 = SearchPeerState::Connecting;
-        self.emit_if_current(
-            generation,
-            CoreEvent::SearchPeer {
-                session_id: session,
-                initiator: peer.initiator,
-                signal,
-            },
-        );
     }
 
     pub(crate) async fn start_search_peers(&self) -> Result<(), RpcError> {
@@ -391,14 +284,9 @@ impl Core {
                 session_id.clone(),
                 Peer::new(device.device_id().to_owned(), true, now),
             );
-            if send_signal(
-                &client,
-                device.device_id(),
-                &session_id,
-                Signal::Discovery(Discovery::Probe),
-            )
-            .await
-            .is_err()
+            if send_discovery(&client, device.device_id(), &session_id, Discovery::Probe)
+                .await
+                .is_err()
             {
                 state.peers.lock().remove(&session_id);
             }
@@ -442,36 +330,6 @@ impl Core {
         Ok(peer)
     }
 
-    pub(crate) async fn signal_search_peer(
-        &self,
-        session_id: &str,
-        signal: SearchPeerSignal,
-    ) -> Result<(), RpcError> {
-        let session = self.session.read().await;
-        let client = session
-            .as_ref()
-            .ok_or(RpcError::NotLoggedIn)?
-            .client
-            .clone();
-        let peer = self.search_peer(&client, session_id).await?;
-        let (device, initiator) = {
-            let peer = peer.lock().await;
-            (peer.device.clone(), peer.initiator)
-        };
-        let signal = match signal {
-            SearchPeerSignal::Negotiate { description }
-                if valid_description(&description, initiator) =>
-            {
-                Signal::Negotiate(description)
-            }
-            SearchPeerSignal::Candidate { candidate } if valid_candidate(&candidate) => {
-                Signal::Candidate(candidate)
-            }
-            _ => return Err(RpcError::Unavailable),
-        };
-        send_signal(&client, &device, session_id, signal).await
-    }
-
     pub(crate) fn close_search_peer(&self, session_id: &str) {
         let mut peers = self.search_sharing.peers.lock();
         peers.remove(session_id);
@@ -486,58 +344,20 @@ impl Core {
     }
 }
 
-async fn send_signal(
+async fn send_discovery(
     client: &Client,
-    device_id: &matrix_sdk::ruma::DeviceId,
-    session_id: &str,
-    signal: Signal,
+    device: &DeviceId,
+    session: &str,
+    kind: Discovery,
 ) -> Result<(), RpcError> {
-    let user = client.user_id().ok_or(RpcError::NotLoggedIn)?;
-    let device = client
-        .encryption()
-        .get_device(user, device_id)
-        .await
-        .map_err(|_| RpcError::Unavailable)?
-        .filter(Device::is_verified)
-        .ok_or(RpcError::Unavailable)?;
-    let session = session_id.to_owned();
-    let timestamp = now_ms();
-    let (event_type, raw) = match signal {
-        Signal::Discovery(kind) => (
-            ToDeviceSearchPeerEventContent::TYPE,
-            Raw::new(&ToDeviceSearchPeerEventContent {
-                session,
-                timestamp,
-                kind,
-            })
-            .map(Raw::cast_unchecked),
-        ),
-        Signal::Negotiate(description) => (
-            ToDeviceFrostbiteNegotiateEventContent::TYPE,
-            Raw::new(&ToDeviceFrostbiteNegotiateEventContent {
-                session,
-                timestamp,
-                description,
-            })
-            .map(Raw::cast_unchecked),
-        ),
-        Signal::Candidate(candidate) => (
-            ToDeviceFrostbiteCandidateEventContent::TYPE,
-            Raw::new(&ToDeviceFrostbiteCandidateEventContent { session, candidate })
-                .map(Raw::cast_unchecked),
-        ),
+    let content = ToDeviceSearchPeerEventContent {
+        session: session.to_owned(),
+        timestamp: now_ms(),
+        kind,
     };
-    let raw = raw.map_err(|_| RpcError::Unavailable)?;
-    let failures = client
-        .encryption()
-        .encrypt_and_send_raw_to_device(vec![&device], event_type, raw, CollectStrategy::AllDevices)
+    sable_frostbite::send(client, device, &content)
         .await
-        .map_err(|_| RpcError::Unavailable)?;
-    if failures.is_empty() {
-        Ok(())
-    } else {
-        Err(RpcError::Unavailable)
-    }
+        .map_err(|_| RpcError::Unavailable)
 }
 
 #[cfg(test)]
