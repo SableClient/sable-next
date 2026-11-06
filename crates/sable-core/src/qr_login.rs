@@ -107,6 +107,14 @@ fn grant_failure(error: &QRCodeGrantLoginError) -> QrLoginFailureView {
     }
 }
 
+async fn msc_4388_supported(oauth: &matrix_sdk::authentication::oauth::OAuth) -> bool {
+    oauth
+        .msc_4388_rendezvous_server_supported()
+        .await
+        .inspect_err(|error| tracing::debug!("MSC4388 rendezvous discovery failed: {error}"))
+        .unwrap_or(false)
+}
+
 fn shown(data: &QrCodeData) -> QrLoginProgressView {
     level_h_code(&data.to_bytes()).map_or(QrLoginProgressView::Starting, |code| {
         QrLoginProgressView::ShowCode { code }
@@ -227,7 +235,9 @@ impl Core {
                 login.await
             } else {
                 let mut login = builder.generate();
-                login.with_msc4388_support();
+                if msc_4388_supported(&oauth).await {
+                    login.with_msc4388_support();
+                }
                 let _watch = core.watch(false, login.subscribe_to_progress(), move |update| {
                     login_view(update, |state| generated(&flow_slots, state))
                 });
@@ -316,7 +326,9 @@ impl Core {
                 grant.await
             } else {
                 let mut grant = oauth.grant_login_with_qr_code().generate();
-                grant.with_msc4388_support();
+                if msc_4388_supported(&oauth).await {
+                    grant.with_msc4388_support();
+                }
                 let _watch = core.watch(true, grant.subscribe_to_progress(), move |update| {
                     grant_view(&flow_slots, update, |state| generated(&flow_slots, state))
                 });
