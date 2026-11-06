@@ -3,7 +3,7 @@ use std::hash::BuildHasher;
 
 use matrix_sdk::EncryptionState;
 use matrix_sdk::latest_events::{LatestEventValue, LocalLatestEventValue, RemoteLatestEventValue};
-use matrix_sdk::room::Room;
+use matrix_sdk::room::{Room, RoomMember};
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 use matrix_sdk::ruma::events::room::member::MembershipState;
@@ -42,6 +42,7 @@ pub struct RoomInfo {
     pub avatar_url: Option<String>,
     /// `None` for direct rooms, whose avatar can change through a member.
     pub avatar_source: Option<AvatarSource>,
+    pub direct_name: Option<String>,
     pub children: Vec<SpaceChildEdge>,
     /// The last read of `children` failed, so they are the previous ones.
     pub children_stale: bool,
@@ -75,6 +76,7 @@ pub fn room_list_item<S: BuildHasher>(
         canonical_alias: info.and_then(|info| info.canonical_alias.clone()),
         name: item
             .name()
+            .or_else(|| info.and_then(|info| info.direct_name.clone()))
             .or_else(|| item.cached_display_name().map(|name| name.to_string())),
         topic: item.topic(),
         topic_html: item.topic_content().as_ref().and_then(topic_html),
@@ -395,6 +397,11 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
         futures_util::future::join(children, is_direct(room)).await;
     let (supports_knock, supports_restricted, supports_knock_restricted) =
         crate::rooms::join_rule_support(room);
+    let direct_name = if room.name().is_none() {
+        direct_peer_name(room).await
+    } else {
+        None
+    };
     let avatar_source = AvatarSource::of(room);
     let avatar_url = match (previous, &avatar_source) {
         (Some(previous), Some(source)) if previous.avatar_source.as_ref() == Some(source) => {
@@ -413,6 +420,7 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
         canonical_alias: room.canonical_alias().map(|alias| alias.to_string()),
         avatar_url,
         avatar_source,
+        direct_name,
         children,
         children_stale,
         tags: room_tags(room),
@@ -461,11 +469,7 @@ async fn room_avatar_url(room: &Room) -> Option<String> {
     }
 }
 
-/// Use synced profiles only: rendering the room list must not fetch members.
-async fn direct_avatar_url(room: &Room) -> Option<String> {
-    if room.direct_targets().is_empty() {
-        return None;
-    }
+async fn direct_peer(room: &Room) -> Option<RoomMember> {
     let service_members = room.service_members().unwrap_or_default();
     let targets: Vec<OwnedUserId> = room
         .direct_targets()
@@ -473,15 +477,37 @@ async fn direct_avatar_url(room: &Room) -> Option<String> {
         .filter_map(|target| OwnedUserId::try_from(target.as_str()).ok())
         .filter(|target| target != room.own_user_id() && !service_members.contains(target))
         .collect();
-    if let [target] = targets.as_slice()
-        && let Ok(Some(member)) = room.get_member_no_sync(target).await
-        && matches!(
-            member.membership(),
-            MembershipState::Join | MembershipState::Invite
-        )
-        && let Some(avatar) = member.avatar_url()
+    let [target] = targets.as_slice() else {
+        return None;
+    };
+    room.get_member_no_sync(target)
+        .await
+        .ok()
+        .flatten()
+        .filter(|member| {
+            matches!(
+                member.membership(),
+                MembershipState::Join | MembershipState::Invite
+            )
+        })
+}
+
+pub(crate) async fn direct_peer_name(room: &Room) -> Option<String> {
+    direct_peer(room)
+        .await
+        .map(|member| member.name().to_owned())
+}
+
+/// Use synced profiles only: rendering the room list must not fetch members.
+async fn direct_avatar_url(room: &Room) -> Option<String> {
+    if room.direct_targets().is_empty() {
+        return None;
+    }
+    if let Some(avatar) = direct_peer(room)
+        .await
+        .and_then(|member| member.avatar_url().map(ToString::to_string))
     {
-        return Some(avatar.to_string());
+        return Some(avatar);
     }
     // Sliding sync can supply a hero's picture before their member event.
     let heroes = room.heroes().await;

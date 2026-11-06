@@ -24,6 +24,7 @@ pub use item::{
     Highlights, LocalContent, aggregation_item, latest_edit_id, standalone_item, timeline_item,
 };
 pub use member::{member_view, room_permissions, room_power_levels};
+pub(crate) use room::direct_peer_name;
 pub use room::{
     RoomInfo, enrich_room_batch, listless_room_list_item, predecessor, room_counts, room_list_item,
 };

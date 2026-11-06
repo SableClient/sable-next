@@ -74,6 +74,10 @@ pub(super) async fn fetch_push_event_with(
             if let Some(content) = normalized {
                 event.content = content;
             }
+            if let Some(room) = client.get_room(room_id) {
+                let is_direct = room.is_direct().await.unwrap_or(false);
+                apply_direct_name(&room, &mut event.room_name, is_direct).await;
+            }
             if event.sender_display_name.is_none() {
                 event.sender_display_name = Some(sender_name(client, room_id, &event.sender).await);
             }
@@ -171,7 +175,11 @@ pub async fn notification(
 
     match related_notification(&notifications, client, room_id, event_id).await {
         Ok(NotificationStatus::Event(item)) if item.actions.as_deref().is_some_and(notifies) => {
-            Some(view(client.user_id()?.to_owned(), room_id, event_id, *item))
+            let mut view = view(client.user_id()?.to_owned(), room_id, event_id, *item);
+            if let Some(room) = client.get_room(room_id) {
+                apply_direct_name(&room, &mut view.room_name, view.is_direct).await;
+            }
+            Some(view)
         }
         _ => None,
     }
@@ -190,12 +198,14 @@ pub(crate) async fn foreground_notification(
         Ok(NotificationStatus::Event(item))
             if !(discard_undecryptable && still_encrypted(&item.event)) =>
         {
-            Some(view(
+            let mut view = view(
                 room.own_user_id().to_owned(),
                 room.room_id(),
                 event_id,
                 *item,
-            ))
+            );
+            apply_direct_name(room, &mut view.room_name, view.is_direct).await;
+            Some(view)
         }
         _ => None,
     }
@@ -211,6 +221,15 @@ fn still_encrypted(event: &NotificationEvent) -> bool {
 
 pub(crate) fn raw_is_encrypted(raw: &Raw<AnySyncTimelineEvent>) -> bool {
     raw.get_field::<String>("type").ok().flatten().as_deref() == Some("m.room.encrypted")
+}
+
+async fn apply_direct_name(room: &matrix_sdk::Room, name: &mut String, is_direct: bool) {
+    if is_direct
+        && room.name().is_none()
+        && let Some(peer) = crate::view::direct_peer_name(room).await
+    {
+        *name = peer;
+    }
 }
 
 pub(crate) async fn invite_notification(
