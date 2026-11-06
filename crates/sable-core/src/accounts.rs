@@ -2207,7 +2207,7 @@ mod regression_tests {
             (
                 format!("sable.search.room.{room_id}").into_bytes(),
                 serde_json::to_vec(&serde_json::json!({
-                    "version": 5, "derived": 1, "next_chunk": 2, "edits": [],
+                    "version": 5, "derived": 2, "next_chunk": 2, "edits": [],
                     "chunks": [
                         { "id": 0, "start": 0, "bytes": 100, "count": 1 },
                         { "id": 1, "start": 200, "bytes": 100, "count": 1 }
