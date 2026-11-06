@@ -254,37 +254,12 @@ impl CosmeticsCache {
     }
 }
 
-pub(crate) async fn space_parents(
-    core: &Core,
-    room: &matrix_sdk::Room,
-) -> Vec<(OwnedRoomId, Vec<String>)> {
-    let events = core
-        .with_open_stores(async || room.get_state_events(StateEventType::SpaceParent).await)
-        .await
-        .unwrap_or_default();
-    let claims = events
-        .iter()
-        .filter_map(|event| {
-            let raw = match event {
-                RawAnySyncOrStrippedState::Sync(raw) => raw.json(),
-                RawAnySyncOrStrippedState::Stripped(raw) => raw.json(),
-            };
-            serde_json::from_str::<crate::space_parents::ParentClaim>(raw.get()).ok()
-        })
-        .collect::<Vec<_>>();
-    crate::space_parents::validate(core, &room.client(), room.room_id(), &claims, true)
-        .await
-        .into_iter()
-        .filter_map(|parent| parent.room_id().map(|id| (id, parent.content.via)))
-        .collect()
-}
-
 pub(crate) async fn unjoined_space_parents(
     core: &Core,
     client: &matrix_sdk::Client,
     room: &matrix_sdk::Room,
 ) -> Vec<crate::protocol::SpaceParentView> {
-    space_parents(core, room)
+    crate::space_parents::parents(core, room)
         .await
         .into_iter()
         .filter(|(parent, _)| {
@@ -308,7 +283,7 @@ pub(crate) async fn first_space_parent(
     {
         return Some(space);
     }
-    space_parents(core, room)
+    crate::space_parents::parents(core, room)
         .await
         .into_iter()
         .next()

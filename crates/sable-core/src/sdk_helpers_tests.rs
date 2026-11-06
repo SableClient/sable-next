@@ -1067,6 +1067,194 @@ async fn next_room_list_diff(
 }
 
 #[tokio::test]
+async fn room_list_updates_when_a_parent_claim_is_added_and_revoked() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!room:example.org");
+    let space_id = room_id!("!space:example.org");
+    let sender = "@alice:example.org";
+    let state = |kind: &str, key: &str, content: serde_json::Value| {
+        Raw::new(&json!({
+            "type": kind, "state_key": key, "sender": sender,
+            "event_id": format!("${kind}-{key}"), "origin_server_ts": 1, "content": content
+        }))
+        .unwrap()
+        .cast_unchecked()
+    };
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(space_id).add_state_bulk([
+                state(
+                    "m.room.create",
+                    "",
+                    json!({"type": "m.space", "room_version": "12"}),
+                ),
+                state("m.room.member", sender, json!({"membership": "join"})),
+                state("m.room.power_levels", "", json!({"state_default": 50})),
+            ]),
+        )
+        .await;
+    server.sync_joined_room(&client, room_id).await;
+    let (core, mut events) = core_with_events(&server, client.clone()).await;
+    let SubscribeRoomListOk { subscription, .. } =
+        core.run(SubscribeRoomListParams::default()).await.unwrap();
+    let mut rows = Vec::new();
+    loop {
+        for diff in next_room_list_diff(&mut events, subscription).await {
+            crate::view::apply_diff(&mut rows, &diff);
+        }
+        if rows
+            .iter()
+            .any(|row: &crate::protocol::RoomListItemView| row.room_id == room_id)
+            && rows.iter().any(|row| row.room_id == space_id)
+        {
+            break;
+        }
+    }
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_state_event(state(
+                "m.space.parent",
+                space_id.as_str(),
+                json!({"via": ["example.org"]}),
+            )),
+        )
+        .await;
+    loop {
+        for diff in next_room_list_diff(&mut events, subscription).await {
+            crate::view::apply_diff(&mut rows, &diff);
+        }
+        if rows
+            .iter()
+            .find(|row| row.room_id == space_id)
+            .is_some_and(|space| {
+                space
+                    .space_children
+                    .iter()
+                    .any(|edge| edge.room_id == room_id.as_str())
+            })
+        {
+            break;
+        }
+    }
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(space_id).add_state_event(state(
+                "m.room.member",
+                sender,
+                json!({"membership": "leave"}),
+            )),
+        )
+        .await;
+    loop {
+        for diff in next_room_list_diff(&mut events, subscription).await {
+            crate::view::apply_diff(&mut rows, &diff);
+        }
+        if rows
+            .iter()
+            .find(|row| row.room_id == space_id)
+            .is_some_and(|space| {
+                !space
+                    .space_children
+                    .iter()
+                    .any(|edge| edge.room_id == room_id.as_str())
+            })
+        {
+            break;
+        }
+    }
+    core.run(UnsubscribeParams { subscription }).await.unwrap();
+}
+
+#[tokio::test]
+async fn room_list_resolves_missing_parent_state_without_waiting_for_the_network() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!room:example.org");
+    let space_id = room_id!("!space:example.org");
+    let sender = "@alice:example.org";
+    let event = |kind: &str, key: &str, content: serde_json::Value| {
+        json!({
+            "type": kind, "state_key": key, "sender": sender,
+            "event_id": format!("${kind}-{key}"), "origin_server_ts": 1, "content": content
+        })
+    };
+    let create = event(
+        "m.room.create",
+        "",
+        json!({"type": "m.space", "room_version": "12"}),
+    );
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(space_id)
+                .add_state_event(Raw::new(&create).unwrap().cast_unchecked()),
+        )
+        .await;
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_state_event(
+                Raw::new(&event(
+                    "m.space.parent",
+                    space_id.as_str(),
+                    json!({"via": ["example.org"]}),
+                ))
+                .unwrap()
+                .cast_unchecked(),
+            ),
+        )
+        .await;
+    Mock::given(method("GET"))
+        .and(path(format!("/_matrix/client/v3/rooms/{space_id}/state")))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(std::time::Duration::from_secs(2))
+                .set_body_json(json!([
+                    create,
+                    event("m.room.member", sender, json!({"membership": "join"})),
+                    event("m.room.power_levels", "", json!({"state_default": 50})),
+                ])),
+        )
+        .mount(server.server())
+        .await;
+    let (core, mut events) = core_with_events(&server, client).await;
+    let SubscribeRoomListOk { subscription, .. } =
+        core.run(SubscribeRoomListParams::default()).await.unwrap();
+    let first = tokio::time::timeout(
+        std::time::Duration::from_millis(1500),
+        next_room_list_diff(&mut events, subscription),
+    )
+    .await
+    .expect("room list should not wait for parent state");
+    let mut rows = Vec::new();
+    for diff in first {
+        crate::view::apply_diff(&mut rows, &diff);
+    }
+    loop {
+        if rows
+            .iter()
+            .find(|row: &&crate::protocol::RoomListItemView| row.room_id == space_id)
+            .is_some_and(|space| {
+                space
+                    .space_children
+                    .iter()
+                    .any(|edge| edge.room_id == room_id.as_str())
+            })
+        {
+            break;
+        }
+        for diff in next_room_list_diff(&mut events, subscription).await {
+            crate::view::apply_diff(&mut rows, &diff);
+        }
+    }
+    core.run(UnsubscribeParams { subscription }).await.unwrap();
+}
+
+#[tokio::test]
 async fn local_read_waits_for_open_stores() {
     let server = MatrixMockServer::new().await;
     let store = tempfile::tempdir().unwrap();

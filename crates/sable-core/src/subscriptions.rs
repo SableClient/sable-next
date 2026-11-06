@@ -1,7 +1,11 @@
 use crate::api::timeline::SubscribeParams;
 use crate::api::timeline::TimelineFocusView;
 use crate::api::timeline::WarmRoomsParams;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 
 use futures_util::future::{self, Either};
 use futures_util::{Stream, StreamExt, pin_mut};
@@ -20,7 +24,7 @@ use matrix_sdk_ui::timeline::{
     Error as TimelineError, EventSendState, SendTarget, Timeline, TimelineItem,
 };
 use tokio::sync::broadcast::error::RecvError;
-use tokio::sync::{broadcast, watch};
+use tokio::sync::{broadcast, mpsc, watch};
 use web_time::Instant;
 
 use crate::ResultExt;
@@ -33,6 +37,7 @@ use crate::push_rules::PushRules;
 use crate::room_list_batch::DiffBatch;
 use crate::room_list_rows::{DmSpaceLinks, RoomListRows};
 use crate::room_sections::RoomSections;
+use crate::space_parents::{ParentResult, ParentTracker};
 use crate::timeline_overlay::{ReplyFallback, TimelineOverlay};
 use crate::timelines::{
     AggregationScope, aggregation_items, build_room_timeline, fill_sender_profiles,
@@ -102,12 +107,18 @@ struct RoomListWorker {
     sections: RoomSections,
     options: watch::Receiver<RoomListOptionsView>,
     dm_spaces: DmSpaceLinks,
+    parents: ParentTracker,
     dm_spaces_changed: watch::Receiver<()>,
     nicknames: watch::Receiver<crate::nicknames::Nicknames>,
     controller: RoomListDynamicEntriesController,
     grown_to: u32,
     core: Arc<Core>,
     subscription: SubscriptionId,
+}
+
+enum ParentStateChange {
+    Room(OwnedRoomId),
+    Space(OwnedRoomId),
 }
 
 impl RoomListWorker {
@@ -117,9 +128,46 @@ impl RoomListWorker {
         loading: impl Fn() -> RoomListLoadingState,
         mut stores_open: watch::Receiver<bool>,
         mut rule_changes: broadcast::Receiver<()>,
+        mut parent_results: mpsc::UnboundedReceiver<ParentResult>,
     ) {
         let mut batch = DiffBatch::new(ROOM_LIST_BATCH_INTERVAL);
         self.dm_spaces = self.load_dm_spaces().await;
+        let (state_changed, mut state_changes) = mpsc::unbounded_channel();
+        let handle = self.client.add_event_handler(
+            move |raw: matrix_sdk::ruma::serde::Raw<
+                matrix_sdk::ruma::events::AnySyncStateEvent,
+            >,
+                  room: matrix_sdk::Room| {
+                let state_changed = state_changed.clone();
+                async move {
+                    let Ok(event) = raw.deserialize_as_unchecked::<serde_json::Value>() else {
+                        return;
+                    };
+                    let kind = event.get("type").and_then(serde_json::Value::as_str);
+                    let change = if kind == Some("m.space.parent") {
+                        Some(ParentStateChange::Room(room.room_id().to_owned()))
+                    } else if room.is_space()
+                        && matches!(
+                            kind,
+                            Some(
+                                "m.space.child"
+                                    | "m.room.member"
+                                    | "m.room.power_levels"
+                                    | "m.room.create"
+                            )
+                        )
+                    {
+                        Some(ParentStateChange::Space(room.room_id().to_owned()))
+                    } else {
+                        None
+                    };
+                    if let Some(change) = change {
+                        let _ = state_changed.send(change);
+                    }
+                }
+            },
+        );
+        let _handler = self.client.event_handler_drop_guard(handle);
         loop {
             let held = batch.wait(Instant::now());
             let diffs = tokio::select! {
@@ -150,7 +198,25 @@ impl RoomListWorker {
                         break;
                     }
                     self.dm_spaces = self.load_dm_spaces().await;
-                    self.rows.relink(&self.room_cache, &self.dm_spaces)
+                    self.rows.relink(&self.room_cache, &self.dm_spaces, &self.parents.links)
+                }
+                change = state_changes.recv() => {
+                    let Some(change) = change else { break; };
+                    let mut rooms = HashSet::new();
+                    let mut spaces = HashSet::new();
+                    for change in std::iter::once(change).chain(std::iter::from_fn(|| state_changes.try_recv().ok())) {
+                        match change {
+                            ParentStateChange::Room(id) => { rooms.insert(id); }
+                            ParentStateChange::Space(id) => { spaces.insert(id); }
+                        }
+                    }
+                    self.refresh_changed_parents(&rooms, &spaces).await;
+                    self.rows.relink(&self.room_cache, &self.dm_spaces, &self.parents.links)
+                }
+                result = parent_results.recv() => {
+                    let Some((room, version, parents)) = result else { break; };
+                    if !self.parents.apply((room, version, parents)) { continue; }
+                    self.rows.relink(&self.room_cache, &self.dm_spaces, &self.parents.links)
                 }
                 diffs = stream.next() => {
                     let Some(diffs) = diffs else { break };
@@ -200,6 +266,22 @@ impl RoomListWorker {
         crate::account_documents::synced_dm_spaces(&self.client).await
     }
 
+    async fn refresh_changed_parents(
+        &mut self,
+        rooms: &HashSet<OwnedRoomId>,
+        spaces: &HashSet<OwnedRoomId>,
+    ) {
+        let listed = self
+            .rows
+            .rows()
+            .iter()
+            .map(|row| row.room_id.clone())
+            .collect();
+        self.parents
+            .refresh(&self.core, &self.client, &listed, rooms, spaces)
+            .await;
+    }
+
     async fn on_stores_reopened(
         &mut self,
     ) -> Option<Vec<crate::protocol::VectorDiff<RoomListItemView>>> {
@@ -217,7 +299,17 @@ impl RoomListWorker {
             &self.rules,
             &self.nicknames.borrow(),
         );
-        diffs.extend(self.rows.relink(&self.room_cache, &self.dm_spaces));
+        let rooms = self
+            .rows
+            .rows()
+            .iter()
+            .map(|row| row.room_id.clone())
+            .collect();
+        self.refresh_changed_parents(&rooms, &HashSet::new()).await;
+        diffs.extend(
+            self.rows
+                .relink(&self.room_cache, &self.dm_spaces, &self.parents.links),
+        );
         (!diffs.is_empty()).then_some(diffs)
     }
 
@@ -252,11 +344,29 @@ impl RoomListWorker {
                 })
             })
             .collect();
+        let previous: std::collections::HashSet<_> = self
+            .rows
+            .rows()
+            .iter()
+            .map(|row| row.room_id.clone())
+            .collect();
         for diff in &diffs {
             self.rows.apply(diff);
         }
         self.rows.evict(&mut self.room_cache);
-        diffs.extend(self.rows.relink(&self.room_cache, &self.dm_spaces));
+        let current: HashSet<_> = self
+            .rows
+            .rows()
+            .iter()
+            .map(|row| row.room_id.clone())
+            .collect();
+        let added = current.difference(&previous).cloned().collect();
+        let changed_spaces = current.symmetric_difference(&previous).cloned().collect();
+        self.refresh_changed_parents(&added, &changed_spaces).await;
+        diffs.extend(
+            self.rows
+                .relink(&self.room_cache, &self.dm_spaces, &self.parents.links),
+        );
         diffs
     }
 
@@ -403,6 +513,7 @@ impl Core {
             let rule_changes = push_rules.subscribe();
             let rules = push_rules.snapshot().await;
             let nicknames = core.nickname_changes();
+            let (parent_results_tx, parent_results_rx) = mpsc::unbounded_channel();
             let worker = RoomListWorker {
                 client,
                 push_rules,
@@ -412,6 +523,7 @@ impl Core {
                 sections: RoomSections::default(),
                 options: core.room_list_options.subscribe(),
                 dm_spaces: DmSpaceLinks::default(),
+                parents: ParentTracker::new(parent_results_tx),
                 dm_spaces_changed: core.dm_spaces_changed.subscribe(),
                 nicknames,
                 controller,
@@ -425,6 +537,7 @@ impl Core {
                     || loading.get(),
                     stores_open,
                     rule_changes,
+                    parent_results_rx,
                 )
                 .await;
         })
