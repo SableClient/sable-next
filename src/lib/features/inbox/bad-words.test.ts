@@ -18,3 +18,9 @@ test('a listed word with regex metacharacters matches literally', () => {
   expect(hasBadWords('what a b!tch')).toBe(true);
   expect(hasBadWords('ass-fucker')).toBe(true);
 });
+
+test('a listed word followed or preceded by an accented letter is part of a longer word', () => {
+  expect(hasBadWords('Assé de bonheur')).toBe(false);
+  expect(hasBadWords('éass')).toBe(false);
+  expect(hasBadWords('shit…')).toBe(true);
+});
