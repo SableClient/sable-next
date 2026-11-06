@@ -11,6 +11,7 @@
     "os:allow-os-type",
     "clipboard-manager:allow-write-text",
     "notifications:default",
+    "notifications:push",
     "sentry:default"
   ]
 }
