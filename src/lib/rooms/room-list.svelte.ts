@@ -236,10 +236,11 @@ export class RoomList {
     if (this.subscription !== null) return;
     if (this.startPromise) return this.startPromise;
 
-    untrack(() => {
+    // Options are sent by `setOptions`, so the effect that starts the list must not resubscribe on them.
+    const promise = untrack(() => {
       this.paintSnapshot();
+      return this.startSubscription();
     });
-    const promise = this.startSubscription();
     this.startPromise = promise;
 
     try {
