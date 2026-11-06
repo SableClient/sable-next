@@ -846,7 +846,7 @@ mod tests {
             Some("eng".to_owned())
         );
         assert_eq!(
-            suggest_person(&directory.people, "@erw").map(|found| found.value),
+            suggest_person(&directory.people, "@kr").map(|found| found.value),
             Some("@kris:example.org".to_owned())
         );
         assert_eq!(suggest_person(&directory.people, " "), None);
