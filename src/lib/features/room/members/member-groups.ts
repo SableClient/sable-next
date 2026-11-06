@@ -61,6 +61,29 @@ export function groupMemberEvents(items: readonly TimelineItemView[]): TimelineU
       start += 1;
     }
   }
+  return withGroupReceiptsHoisted(units);
+}
+
+function withGroupReceiptsHoisted(units: TimelineUnit[]): TimelineUnit[] {
+  let holder = -1;
+  units.forEach((unit, index) => {
+    if (unit.group === null) {
+      if (unit.item.event_id !== null) holder = index;
+      return;
+    }
+    if (holder < 0 || !unit.group.some((member) => member.read_by.length > 0)) return;
+    const item = units[holder].item;
+    const readTimestamps: Record<string, number> = { ...item.read_timestamps };
+    for (const member of unit.group) Object.assign(readTimestamps, member.read_timestamps);
+    units[holder] = {
+      ...units[holder],
+      item: {
+        ...item,
+        read_by: [...new Set([...item.read_by, ...unit.group.flatMap((member) => member.read_by)])],
+        read_timestamps: readTimestamps,
+      },
+    };
+  });
   return units;
 }
 

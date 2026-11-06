@@ -7,6 +7,7 @@ use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::room::{PushContext, Room};
 use matrix_sdk::ruma::events::AnySyncTimelineEvent;
 use matrix_sdk::ruma::push::Action;
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
     EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedTransactionId, OwnedUserId,
     TransactionId, UserId,
@@ -25,8 +26,8 @@ use matrix_sdk_ui::{
 
 use crate::protocol::{
     MembershipChangeView, MentionView, MessageShieldCode, MessageShieldView, PerMessageProfileView,
-    ReactionGroup, SendBlockView, SendStateView, TimelineItemContentView, TimelineItemView,
-    TimelineRowKind, TimelineVisibility, UploadProgressView,
+    ReactionGroup, SendBlockView, SendStateView, ThreadSummaryView, TimelineItemContentView,
+    TimelineItemView, TimelineRowKind, TimelineVisibility, UploadProgressView,
 };
 
 use super::content::{content, raw_formatted_body};
@@ -37,7 +38,9 @@ use super::previews::{bundled_link_previews, link_previews_removed};
 use super::profile::per_message_profile;
 use super::raw::RawFields;
 use super::state::forum_title;
-use super::thread::{bundled_thread_summary, in_reply_to, msg_like, thread_summary};
+use super::thread::{
+    bundled_thread_summary, in_reply_to, merge_thread_summary, msg_like, thread_summary,
+};
 
 #[derive(Default)]
 pub struct Highlights(HashMap<String, bool>);
@@ -489,14 +492,10 @@ pub async fn standalone_item(
         .raw()
         .deserialize_as_unchecked::<RawFields>()
         .unwrap_or_default();
-    let thread_summary = thread_summary(&item_content).or_else(|| {
-        event
-            .raw()
-            .get_field::<serde_json::Value>("unsigned")
-            .ok()
-            .flatten()
-            .and_then(|unsigned| bundled_thread_summary(&unsigned))
-    });
+    let thread_summary = merge_thread_summary(
+        thread_summary(&item_content),
+        unsigned_thread_summary(event.raw()),
+    );
 
     let mut view_content = content(
         &item_content,
@@ -545,6 +544,17 @@ fn message_profile(
 }
 
 #[must_use]
+fn unsigned_thread_summary<T>(raw: &Raw<T>) -> Option<ThreadSummaryView> {
+    raw.get_field::<serde_json::Value>("unsigned")
+        .ok()
+        .flatten()
+        .and_then(|unsigned| bundled_thread_summary(&unsigned))
+}
+
+fn original_bundled_thread_summary(event: &EventTimelineItem) -> Option<ThreadSummaryView> {
+    unsigned_thread_summary(event.original_json()?)
+}
+
 pub fn timeline_item(
     item: &Arc<TimelineItem>,
     own_user_id: Option<&UserId>,
@@ -607,7 +617,10 @@ pub fn timeline_item(
                 content,
                 in_reply_to: in_reply_to(event.content()),
                 thread_root: msg_like(event.content()).and_then(|msg| msg.thread_root.clone()),
-                thread_summary: thread_summary(event.content()),
+                thread_summary: merge_thread_summary(
+                    thread_summary(event.content()),
+                    original_bundled_thread_summary(event),
+                ),
                 reactions: annotatable_reactions(event),
                 is_own: event.is_own(),
                 read_by: event.read_receipts().keys().cloned().collect(),
