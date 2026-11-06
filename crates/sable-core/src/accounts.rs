@@ -956,6 +956,7 @@ impl Core {
             .map(|session| session.client.clone());
         if let Some(client) = client {
             self.flush_search_index(&client).await;
+            self.flush_inbox(&client).await;
         }
         let mut session = self.session.write().await;
         self.session_handlers.lock().clear();
@@ -968,6 +969,7 @@ impl Core {
         self.timelines.lock().await.clear();
         self.thread_timelines.lock().await.clear();
         self.account_data_types.lock().await.clear();
+        *self.inbox.lock().await = crate::inbox::InboxCache::default();
         *self.pack_cache.lock().await = image_packs::PackCache::default();
         self.calendars.lock().await.clear();
         *self.push_rules.lock().await = None;
@@ -1112,6 +1114,7 @@ impl Core {
         self.watch_joined_invites(&client);
         self.watch_send_queue(&client);
         self.watch_presence(&client, generation);
+        self.watch_inbox_persist(&client);
         let store_id = self
             .registered_store_id(&account_id)
             .await

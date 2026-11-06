@@ -182,7 +182,8 @@ pub struct Core {
     room_subscriptions: Mutex<std::collections::BTreeSet<OwnedRoomId>>,
     warm_rooms: parking_lot::Mutex<std::collections::VecDeque<OwnedRoomId>>,
     account_data_lock: Mutex<()>,
-    inbox_lock: Mutex<()>,
+    inbox: Mutex<inbox::InboxCache>,
+    inbox_flush: Mutex<()>,
     account_data_types: Mutex<std::collections::BTreeSet<String>>,
     pack_cache: Mutex<image_packs::PackCache>,
     calendars: Mutex<HashMap<OwnedRoomId, calendar::RoomCalendar>>,
@@ -367,7 +368,8 @@ impl Core {
             room_subscriptions: Mutex::new(std::collections::BTreeSet::new()),
             warm_rooms: parking_lot::Mutex::new(std::collections::VecDeque::new()),
             account_data_lock: Mutex::new(()),
-            inbox_lock: Mutex::new(()),
+            inbox: Mutex::new(inbox::InboxCache::default()),
+            inbox_flush: Mutex::new(()),
             account_data_types: Mutex::new(std::collections::BTreeSet::new()),
             pack_cache: Mutex::new(image_packs::PackCache::default()),
             calendars: Mutex::new(HashMap::new()),
@@ -530,6 +532,9 @@ impl Core {
             }
             self.retry_cached_decryption().await;
         } else {
+            if let Ok(client) = self.client().await {
+                self.flush_inbox(&client).await;
+            }
             // Background push fetches must not report the user online.
             self.set_sync_presence(matrix_sdk::ruma::presence::PresenceState::Offline)
                 .await;
