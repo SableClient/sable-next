@@ -940,22 +940,31 @@ pub unsafe extern "C" fn sable_push_render(
         })
     });
     let (rendered, issue) = rendered.unwrap_or((None, Some(Issue::Panic)));
-    if let Some(issue) = issue {
-        report(Path::new(root), issue);
-    }
-    let response = rendered
-        .and_then(|rendered| serde_json::to_value(rendered).ok())
-        .or_else(|| {
-            issue.map(|issue| match issue {
-                Issue::Timeout(stage) => {
-                    serde_json::json!({"issue": issue.as_str(), "stage": stage})
-                }
-                issue => serde_json::json!({"issue": issue.as_str()}),
-            })
-        });
+    let reporting = issue.map(|issue| {
+        std::panic::catch_unwind(|| report(Path::new(root), issue)).unwrap_or("failed")
+    });
+    let response = render_response(rendered, issue, reporting);
     response
         .and_then(|response| CString::new(response.to_string()).ok())
         .map_or(std::ptr::null_mut(), CString::into_raw)
+}
+
+fn render_response(
+    rendered: Option<Rendered>,
+    issue: Option<Issue>,
+    reporting: Option<&str>,
+) -> Option<Value> {
+    let mut response = rendered.and_then(|rendered| serde_json::to_value(rendered).ok());
+    if let Some(issue) = issue {
+        let response = response.get_or_insert_with(|| serde_json::json!({}));
+        let object = response.as_object_mut()?;
+        let mut diagnostic = serde_json::json!({"issue": issue.as_str(), "reporting": reporting});
+        if let Issue::Timeout(stage) = issue {
+            diagnostic["stage"] = stage.into();
+        }
+        object.insert("diagnostic".to_owned(), diagnostic);
+    }
+    response
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1028,21 +1037,21 @@ struct Reporting {
     release: Option<String>,
 }
 
-fn report(root: &Path, issue: Issue) {
+fn report(root: &Path, issue: Issue) -> &'static str {
     let Some(reporting) = std::fs::read(root.join("sentry.json"))
         .ok()
         .and_then(|bytes| serde_json::from_slice::<Reporting>(&bytes).ok())
     else {
-        return;
+        return "unavailable";
     };
     let Ok(dsn) = reporting.dsn.parse() else {
-        return;
+        return "unavailable";
     };
     let mut options = sentry::ClientOptions::default();
     options.dsn = Some(dsn);
     options.environment = reporting.environment.map(Into::into);
     options.release = reporting.release.map(Into::into);
-    let _guard = sentry::init(options);
+    let guard = sentry::init(options);
     let stage = if let Issue::Timeout(stage) = issue {
         Some(stage)
     } else {
@@ -1058,6 +1067,11 @@ fn report(root: &Path, issue: Issue) {
         },
         || sentry::capture_message(&format!("iOS push: {issue}"), sentry::Level::Warning),
     );
+    if guard.close(None) {
+        "drained"
+    } else {
+        "incomplete"
+    }
 }
 
 /// # Safety
@@ -1122,7 +1136,24 @@ mod tests {
             serde_json::from_str(unsafe { CStr::from_ptr(response) }.to_str().unwrap()).unwrap();
         // SAFETY: the pointer was returned by sable_push_render and has not been freed.
         unsafe { sable_push_free(response) };
-        assert_eq!(value, json!({"issue": "payload"}));
+        assert_eq!(
+            value,
+            json!({"diagnostic": {"issue": "payload", "reporting": "unavailable"}})
+        );
+    }
+
+    #[test]
+    fn timeout_diagnostic_includes_stage() {
+        let value = render_response(
+            None,
+            Some(Issue::Timeout("decrypt_event")),
+            Some("incomplete"),
+        )
+        .unwrap();
+        assert_eq!(
+            value,
+            json!({"diagnostic": {"issue": "timeout", "stage": "decrypt_event", "reporting": "incomplete"}})
+        );
     }
 
     #[test]
@@ -1385,11 +1416,10 @@ mod tests {
             .await
             .unwrap();
         let (alert, issue) = render(&root, &sygnal_event_id_only, &Cell::new("start")).await;
-        assert_eq!(
-            serde_json::to_value(alert.unwrap()).unwrap()["body"],
-            json!("New message")
-        );
         assert_eq!(issue, Some(Issue::NoSession));
+        let response = render_response(alert, issue, Some("unavailable")).unwrap();
+        assert_eq!(response["body"], json!("New message"));
+        assert_eq!(response["diagnostic"]["issue"], "no_session");
         std::fs::remove_dir_all(root).unwrap();
     }
 

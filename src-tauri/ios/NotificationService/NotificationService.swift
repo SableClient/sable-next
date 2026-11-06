@@ -47,6 +47,7 @@ final class NotificationService: UNNotificationServiceExtension {
 
         guard let group = Bundle.main.object(forInfoDictionaryKey: "SableAppGroup") as? String,
               let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) else {
+            Self.log.error("shared container unavailable, showing the generic alert")
             finish(content)
             return
         }
@@ -62,6 +63,7 @@ final class NotificationService: UNNotificationServiceExtension {
             )
             guard let data = try? JSONSerialization.data(withJSONObject: userInfo),
                   let payload = String(data: data, encoding: .utf8) else {
+                Self.log.error("invalid notification payload, showing the generic alert")
                 Self.report("payload", root: root.path)
                 self?.finish(content)
                 return
@@ -85,14 +87,15 @@ final class NotificationService: UNNotificationServiceExtension {
                 defer { sable_push_free(result) }
                 let bytes = Data(String(cString: result).utf8)
                 guard let rendered = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any] else {
+                    Self.log.error("invalid render response, showing the generic alert")
                     self?.finish(content)
                     return
                 }
-                if let issue = rendered["issue"] as? String {
-                    let stage = rendered["stage"] as? String ?? "unknown"
-                    Self.log.error("render failed: \(issue, privacy: .public), stage: \(stage, privacy: .public)")
-                    self?.finish(content)
-                    return
+                if let diagnostic = rendered["diagnostic"] as? [String: String],
+                   let issue = diagnostic["issue"] {
+                    let stage = diagnostic["stage"] ?? "unknown"
+                    let reporting = diagnostic["reporting"] ?? "unknown"
+                    Self.log.error("push issue: \(issue, privacy: .public), stage: \(stage, privacy: .public), reporting: \(reporting, privacy: .public)")
                 }
                 if let rooms = rendered["read_rooms"] as? [String],
                    let user = rendered["user_id"] as? String {
@@ -453,7 +456,7 @@ final class NotificationService: UNNotificationServiceExtension {
         let root = policyRoot
         communication = nil
         lock.unlock()
-        if let root { Self.report("expired", root: root) }
         if let content { complete(content) }
+        if let root { Self.report("expired", root: root) }
     }
 }
