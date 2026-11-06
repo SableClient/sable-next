@@ -400,9 +400,16 @@ pub fn markdown_to_content(markdown: &str, pills: &[ComposerPill]) -> ComposerCo
     let mentions = mentions(&typed, pills, &linked);
 
     let plain = plain_text(&linked).is_some_and(|text| text == body) && !receiver_formats(&body);
+    let formatted_body = (!plain).then(|| html::html(&linked, pills, receiver_formats));
+    let body = match formatted_body.as_deref() {
+        Some(formatted) if formatted.contains("data-mx-spoiler") => {
+            crate::html::preview_body(&body, Some(formatted))
+        }
+        _ => body,
+    };
     ComposerContent {
-        formatted_body: (!plain).then(|| html::html(&linked, pills, receiver_formats)),
         body,
+        formatted_body,
         mentions,
     }
 }
@@ -537,10 +544,6 @@ mod tests {
                 "**hi** \\$[unixtime 0]",
                 Some("<strong>hi</strong> <span>$</span>[unixtime 0]"),
             ),
-            (
-                "the ||butler **did**|| it",
-                Some("the <span data-mx-spoiler=\"\">butler <strong>did</strong></span> it"),
-            ),
             ("a || b || c", None),
             ("a |||| b", None),
             ("a || b", None),
@@ -597,12 +600,20 @@ mod tests {
                 )),
                 "{source}"
             );
-            assert_eq!(
-                crate::html::preview_body(&content.body, content.formatted_body.as_deref()),
-                "[Spoiler]",
-                "{source}"
-            );
+            assert_eq!(content.body, "[Spoiler]", "{source}");
         }
+    }
+
+    #[test]
+    fn a_spoiler_is_hidden_from_the_plain_body_and_other_text_kept() {
+        let content = markdown_to_content("the ||butler **did**|| it", &[]);
+        assert_eq!(content.body, "the [Spoiler] it");
+        assert_eq!(
+            content.formatted_body.as_deref(),
+            Some("the <span data-mx-spoiler=\"\">butler <strong>did</strong></span> it")
+        );
+        let plain = markdown_to_content("no **secret** here", &[]);
+        assert_eq!(plain.body, "no **secret** here");
     }
 
     #[test]
