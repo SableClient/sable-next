@@ -133,7 +133,7 @@
   position: relative;
 }
 
-@media (any-pointer: fine) {
+@media (pointer: fine) {
   .composer-formatting .formatting {
     flex-wrap: wrap;
     height: auto;
