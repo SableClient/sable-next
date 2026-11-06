@@ -5,7 +5,7 @@ import type { WorkerMessage } from './protocol';
 
 const { setPanicHandler, init } = vi.hoisted(() => ({
   setPanicHandler: vi.fn<(callback: (message: string) => void) => void>(),
-  init: vi.fn(),
+  init: vi.fn(() => Promise.resolve({ memory: new WebAssembly.Memory({ initial: 1 }) })),
 }));
 vi.mock('#src/generated/wasm/sable_wasm.js', () => ({
   default: init,

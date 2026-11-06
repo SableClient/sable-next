@@ -42,8 +42,18 @@ export function createCoreWorkerBoundary(
   setLogCapture: (enabled: boolean) => void = () => {},
   terminate: () => void = () => {},
   setLogFilter: (filter: string) => void = () => {},
-  stop: () => Promise<void> = () => Promise.resolve()
+  stop: () => Promise<void> = () => Promise.resolve(),
+  onCall: (method: string, elapsedMs: number) => void = () => {}
 ) {
+  async function timedCall(instance: WorkerCore, method: string, params: string): Promise<string> {
+    const started = performance.now();
+    try {
+      return await instance.call(method, params);
+    } finally {
+      onCall(method, performance.now() - started);
+    }
+  }
+
   const ports = new Set<WorkerPort>();
   const visibility = new Map<WorkerPort, boolean>();
   type SearchOptions = Parameters<Rpc['session']['setSearchOptions']>[0];
@@ -391,7 +401,7 @@ export function createCoreWorkerBoundary(
               if (!ports.has(port)) return;
               timelineEvents.begin(port);
               pendingTimeline = true;
-              const ok = JSON.parse(await instance.call(method, params)) as RpcResult<
+              const ok = JSON.parse(await timedCall(instance, method, params)) as RpcResult<
                 Rpc['timeline']['subscribe']
               >;
               if (typeof ok.subscription !== 'number')
@@ -412,7 +422,7 @@ export function createCoreWorkerBoundary(
             }
             throw new Error('Timeline startup overflowed; retry opening the room');
           }
-          const ok: unknown = JSON.parse(await instance.call(method, params));
+          const ok: unknown = JSON.parse(await timedCall(instance, method, params));
           if (method === 'timeline.unsubscribe') {
             timelineEvents.release(
               (request.call.params as { subscription: SubscriptionId }).subscription
