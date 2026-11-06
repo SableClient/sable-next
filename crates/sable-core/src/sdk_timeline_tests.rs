@@ -210,6 +210,67 @@ async fn a_plaintext_message_in_an_encrypted_room_is_flagged() {
 }
 
 #[tokio::test]
+async fn a_redacted_message_in_an_encrypted_room_has_no_shield() {
+    for event_type in ["m.room.message", "m.room.encrypted"] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!redacted:example.org");
+        let event_id = event_id!("$redacted");
+        let factory = EventFactory::new().room(room_id).sender(User::Alice);
+        server
+            .mock_room_state_encryption()
+            .encrypted()
+            .mount()
+            .await;
+        let event = json!({
+            "type": event_type,
+            "event_id": event_id,
+            "sender": User::Alice.to_string(),
+            "origin_server_ts": 1_700_000_000_000_u64,
+            "content": {},
+            "unsigned": { "redacted_because": {
+                "type": "m.room.redaction",
+                "event_id": "$redaction",
+                "sender": User::Alice.to_string(),
+                "origin_server_ts": 1_700_000_000_001_u64,
+                "content": { "redacts": event_id },
+            } },
+        });
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_state_event(factory.room_encryption())
+                    .add_timeline_event(
+                        matrix_sdk::ruma::serde::Raw::new(&event)
+                            .unwrap()
+                            .cast_unchecked(),
+                    ),
+            )
+            .await;
+        let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
+            .await
+            .unwrap();
+        let items = timeline.items().await;
+        let item = items
+            .iter()
+            .find(|item| item.as_event().and_then(|event| event.event_id()) == Some(event_id))
+            .unwrap();
+        let view = crate::view::timeline_item(
+            item,
+            client.user_id(),
+            &crate::view::Highlights::default(),
+            &crate::view::LocalContent::default(),
+        );
+        assert!(matches!(
+            view.content,
+            crate::protocol::TimelineItemContentView::Redacted { .. }
+        ));
+        assert_eq!(view.shield, None, "{event_type}");
+    }
+}
+
+#[tokio::test]
 async fn only_a_state_change_that_came_encrypted_is_hidden_as_forged() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

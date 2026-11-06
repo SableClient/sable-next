@@ -618,7 +618,12 @@ pub fn timeline_item(
                 mention,
                 forwarded,
                 forum_title,
-                shield: msg_like(event.content()).and_then(|_| shield(event.get_shield(false))),
+                shield: msg_like(event.content())
+                    .and_then(|_| shield(event.get_shield(false)))
+                    .filter(|shield| {
+                        !event.content().is_redacted()
+                            || shield.code != MessageShieldCode::SentInClear
+                    }),
             }
         }
 
