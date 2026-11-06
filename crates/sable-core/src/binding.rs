@@ -7,6 +7,25 @@ pub const EVENT_BATCH_LIMIT: usize = 256;
 
 pub const DEFAULT_LOG_FILTER: &str = "info,matrix_sdk::http_client=off,matrix_sdk::latest_events::latest_event::builder=off,matrix_sdk_base::room::display_name=off";
 
+/// Only warnings in the SDK, but the room keys they carried are lost. Our own
+/// code marks such warnings with `reported = true` instead.
+const REPORTED_SDK_WARNINGS: &[&str] = &[
+    "matrix_sdk_crypto::olm::account",
+    "matrix_sdk_crypto::session_manager::sessions",
+    "matrix_sdk_crypto::session_manager::group_sessions",
+    "matrix_sdk_crypto::gossiping",
+];
+
+/// Warnings that explain a message or a call that could not be decrypted.
+#[must_use]
+pub fn is_reported_warning(metadata: &tracing::Metadata<'_>) -> bool {
+    *metadata.level() == tracing::Level::WARN
+        && (metadata.fields().field("reported").is_some()
+            || REPORTED_SDK_WARNINGS
+                .iter()
+                .any(|reported| metadata.target().starts_with(reported)))
+}
+
 /// Serializes a batch, dropping only the events that fail rather than the whole batch.
 #[must_use]
 pub fn encode_event_batch(batch: &[CoreEvent]) -> Option<String> {

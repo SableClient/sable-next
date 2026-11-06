@@ -180,15 +180,6 @@ const IGNORED_TARGETS: &[&str] = &[
     "matrix_sdk::http_client",
 ];
 
-/// Only warnings in the SDK, but the room keys they carried are lost. Our own
-/// code marks such warnings with `reported = true` instead.
-const REPORTED_SDK_WARNINGS: &[&str] = &[
-    "matrix_sdk_crypto::olm::account",
-    "matrix_sdk_crypto::session_manager::sessions",
-    "matrix_sdk_crypto::session_manager::group_sessions",
-    "matrix_sdk_crypto::gossiping",
-];
-
 pub(crate) fn tracing_filter(
     metadata: &tracing::Metadata<'_>,
 ) -> sentry::integrations::tracing::EventFilter {
@@ -201,12 +192,7 @@ pub(crate) fn tracing_filter(
     {
         return EventFilter::Ignore;
     }
-    if *level == tracing::Level::WARN
-        && (metadata.fields().field("reported").is_some()
-            || REPORTED_SDK_WARNINGS
-                .iter()
-                .any(|reported| target.starts_with(reported)))
-    {
+    if sable_core::binding::is_reported_warning(metadata) {
         return EventFilter::Event | EventFilter::Log;
     }
     match *level {

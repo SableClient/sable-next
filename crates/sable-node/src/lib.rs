@@ -91,7 +91,8 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeJsLogWriter {
     fn make_writer_for(&'a self, meta: &tracing::Metadata<'_>) -> Self::Writer {
         JsLogWriter {
             capturing: LOG_CAPTURE.load(Ordering::Relaxed)
-                || meta.level() == &tracing::Level::ERROR,
+                || meta.level() == &tracing::Level::ERROR
+                || sable_core::binding::is_reported_warning(meta),
             line: String::new(),
         }
     }
