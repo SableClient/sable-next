@@ -38,6 +38,7 @@ import {
 import { ComposerEditor } from './editor/composer-editor';
 import { composerSchema } from './editor/schema';
 import { textDoc } from './editor/serialize';
+import { testPersona } from '#lib/personas/persona.js';
 import Harness from './RoomComposerHarness.test.svelte';
 
 afterEach(() => {
@@ -252,6 +253,57 @@ test('the editor mounts as a labelled combobox surface', async () => {
   const editable = document.querySelector('[role="combobox"]');
   expect(editable?.getAttribute('aria-label')).toBe('Send a message…');
   expect(editable?.getAttribute('contenteditable')).toBe('true');
+});
+
+test.each([
+  { prefix: 'k: ', suffix: null, before: 'hello', after: 'k: hello' },
+  { prefix: null, suffix: '-k', before: 'hello-', after: 'hello-k' },
+])('completing a shorthand previews its profile without another edit: $after', async (trigger) => {
+  vi.useFakeTimers();
+  setPreference('personaProxying', true);
+  const mount = vi.spyOn(ComposerEditor.prototype, 'mount');
+  const client = Object.assign(core(), { onProfileChanged: () => () => {} });
+  vi.spyOn(client.rpc.personas, 'list').mockResolvedValue({
+    personas: [
+      {
+        ...testPersona,
+        triggers: [
+          {
+            prefix: trigger.prefix,
+            suffix: trigger.suffix,
+            keep_trigger: false,
+            alternate_avatar_id: null,
+          },
+        ],
+      },
+    ],
+    account: null,
+    rooms: {},
+    disabled_rooms: [],
+  });
+  try {
+    setup({ roomId: '!room:example.org' }, client);
+    await flushed();
+    const editor = mount.mock.contexts[0] as ComposerEditor;
+    mount.mockRestore();
+    await vi.advanceTimersByTimeAsync(300);
+
+    editor.setText(trigger.before);
+    await flushed();
+    expect(screen.getByRole('button', { name: 'Send as' })).toBeInTheDocument();
+    editor.setText(trigger.after);
+    await flushed();
+    expect(screen.getByRole('button', { name: 'Sending as Kris' })).toBeInTheDocument();
+
+    editor.setText(trigger.before);
+    await flushed();
+    expect(screen.getByRole('button', { name: 'Send as' })).toBeInTheDocument();
+  } finally {
+    mount.mockRestore();
+    setPreference('personaProxying', false);
+    cleanup();
+    vi.useRealTimers();
+  }
 });
 
 test('the emoji board shortcut works while the composer is not focused', async () => {
