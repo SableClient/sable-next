@@ -36,7 +36,7 @@ export function abbreviationPattern(map: AbbreviationMap): RegExp | null {
   const terms = [...map.keys()]
     .sort((left, right) => right.length - left.length)
     .map(escapeStringRegexp);
-  return new RegExp(`\\b(?:${terms.join('|')})\\b`, 'gi');
+  return new RegExp(`(?<![\\p{L}\\p{N}_])(?:${terms.join('|')})(?![\\p{L}\\p{N}_])`, 'giu');
 }
 
 function resolveMatch(map: AbbreviationMap, text: string): AbbreviationMatch | undefined {

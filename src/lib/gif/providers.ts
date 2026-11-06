@@ -263,7 +263,37 @@ export function gifSearchAvailable(
 
 export type ProxiedGif = { mxcUrl: string; mimetype: string };
 
+const uploadedMxc = /^mxc:\/\/[^/]+\/[^/]+$/;
+
+export function isUploadedGifSource(value: string): boolean {
+  return uploadedMxc.test(value) && !proxiedMxc.test(value);
+}
+
+export function gifFromUploadedMxc(
+  source: string,
+  filename: string,
+  width: number | null,
+  height: number | null,
+  size: number | null,
+  mimetype: string | null
+): GifResult | undefined {
+  if (mimetype !== 'image/gif' || !isUploadedGifSource(source)) return undefined;
+
+  return {
+    id: '',
+    title: filename.replace(/\.[^.]+$/, '') || 'GIF',
+    mediaUrl: source,
+    previewUrl: source,
+    width: width ?? 0,
+    height: height ?? 0,
+    size: size ?? 0,
+    mimetype,
+  };
+}
+
 export function proxiedGif(gif: GifResult, proxyUrl: string | null): ProxiedGif | undefined {
+  if (isUploadedGifSource(gif.mediaUrl)) return { mxcUrl: gif.mediaUrl, mimetype: gif.mimetype };
+
   const server = proxyUrl?.trim();
   if (!server) return undefined;
 
@@ -339,6 +369,7 @@ export function gifFilename(title: string, mimetype: string): string {
 }
 
 export function isAllowedGifMediaUrl(value: string): boolean {
+  if (isUploadedGifSource(value)) return true;
   try {
     const url = new URL(value);
     return Object.values(gifProviders).some((provider) => provider.isMediaUrlAllowed(url));

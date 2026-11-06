@@ -91,3 +91,11 @@ test('asks the core for sent shortcodes once per message and set of custom keys'
   );
   expect(calls).toBe(2);
 });
+
+test('a long text reaction is cut to a readable label without splitting a character', () => {
+  const long = '👍🏽'.repeat(100);
+  const label = reactionEmoteLabel(long, imagePacks, 'Custom emote');
+
+  expect(label).toBe(`${'👍🏽'.repeat(64)}…`);
+  expect(reactionEmoteLabel('👍', imagePacks, 'Custom emote')).toBe('👍');
+});

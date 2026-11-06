@@ -183,7 +183,7 @@
               {/if}
             {/if}
           {:else}
-            <em>{reaction.key}</em>
+            <em>{label}</em>
           {/if}
         </span>
         {#if reaction.senders.length > 1 || preferences.showSingleReactionCount}
@@ -348,6 +348,10 @@
     font-size: var(--font-size-body);
     font-style: normal;
     line-height: 1;
+    max-width: 9.375rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .reaction-count {

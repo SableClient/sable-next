@@ -17,6 +17,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
 
 import { goto, resetNavigation } from '#lib/test-support/app-navigation.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { trackNotificationOpening } from '#lib/features/notifications/notification-opening.svelte.js';
 import Page from './+page.svelte';
 
 afterEach(() => {
@@ -37,4 +38,19 @@ test('starts on Home when it is enabled', async () => {
   await tick();
 
   expect(goto).toHaveBeenCalledWith('/home', { replace: true });
+});
+
+test('waits for a notification being opened before restoring a room', async () => {
+  const opened = Promise.withResolvers<undefined>();
+  const opening = trackNotificationOpening(opened.promise);
+  render(Page);
+  await tick();
+
+  expect(goto).not.toHaveBeenCalled();
+
+  opened.resolve(undefined);
+  await opening;
+  await tick();
+
+  expect(goto).toHaveBeenCalledWith('/rooms', { replace: true });
 });

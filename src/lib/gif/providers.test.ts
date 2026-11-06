@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 import {
   gifFilename,
   gifFromProxiedMxc,
+  gifFromUploadedMxc,
   gifProvider,
   gifProviders,
   gifSearchAvailable,
@@ -259,4 +260,26 @@ test('an mxc that is not a proxied provider gif is not a favorite candidate', ()
   expect(gifFromProxiedMxc('mxc://gifs.example/tenor_!!!', 'a.gif', null, null, null, null)).toBe(
     undefined
   );
+});
+
+test('an uploaded gif keeps its own mxc url and needs no proxy to be resent', () => {
+  const uploaded = gifFromUploadedMxc('mxc://example.org/abc', 'cat.gif', 4, 3, 10, 'image/gif');
+
+  expect(uploaded).toMatchObject({ mediaUrl: 'mxc://example.org/abc', title: 'cat', width: 4 });
+  expect(uploaded && proxiedGif(uploaded, null)).toEqual({
+    mxcUrl: 'mxc://example.org/abc',
+    mimetype: 'image/gif',
+  });
+});
+
+test('only plain mxc gifs count as uploaded', () => {
+  expect(
+    gifFromUploadedMxc('mxc://example.org/abc', 'a.png', 1, 1, 1, 'image/png')
+  ).toBeUndefined();
+  expect(
+    gifFromUploadedMxc('{"url":"mxc://example.org/abc"}', 'a.gif', 1, 1, 1, 'image/gif')
+  ).toBeUndefined();
+  expect(
+    gifFromUploadedMxc('mxc://gifs.example/tenor_YWJj', 'a.gif', 1, 1, 1, 'image/gif')
+  ).toBeUndefined();
 });

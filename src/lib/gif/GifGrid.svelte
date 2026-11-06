@@ -3,6 +3,7 @@
   import HeartStraightIcon from 'phosphor-svelte/lib/HeartStraightIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
@@ -10,6 +11,7 @@
   import { GifSearch } from './gif-search.svelte';
   import {
     gifProvider,
+    isUploadedGifSource,
     type GifProviderSetting,
     type GifResult,
     type GifsConfig,
@@ -67,15 +69,27 @@
                 onPick(gif);
               }}
             >
-              <img
-                src={gif.previewUrl}
-                alt=""
-                width={gif.width || 4}
-                height={gif.height || 3}
-                loading="lazy"
-                decoding="async"
-                referrerpolicy="no-referrer"
-              />
+              {#if isUploadedGifSource(gif.previewUrl)}
+                <MediaImage
+                  source={gif.previewUrl}
+                  alt=""
+                  width={gif.width || 4}
+                  height={gif.height || 3}
+                  intrinsicWidth={gif.width || null}
+                  intrinsicHeight={gif.height || null}
+                  mime={gif.mimetype}
+                />
+              {:else}
+                <img
+                  src={gif.previewUrl}
+                  alt=""
+                  width={gif.width || 4}
+                  height={gif.height || 3}
+                  loading="lazy"
+                  decoding="async"
+                  referrerpolicy="no-referrer"
+                />
+              {/if}
             </button>
           {/snippet}
         </Tooltip>

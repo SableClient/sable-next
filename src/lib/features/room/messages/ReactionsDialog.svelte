@@ -10,7 +10,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
-  import { isCustomReaction, reactionEmoteLabel } from './reaction-emote-label.js';
+  import { isCustomReaction, reactionEmoteLabel, reactionText } from './reaction-emote-label.js';
   import TabbedMemberListDialog from '../members/TabbedMemberListDialog.svelte';
   import { memberName } from '../members/members.js';
   import { fetchReaction, redactReaction } from './redact-reaction.js';
@@ -110,7 +110,7 @@
         emoticon
       />
     {:else}
-      <em>{reaction.key}</em>
+      <em>{reactionText(reaction.key)}</em>
     {/if}
   {/snippet}
   {#snippet memberAction(reaction, sender)}

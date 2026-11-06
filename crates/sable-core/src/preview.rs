@@ -1,7 +1,9 @@
 use matrix_sdk::ruma::events::room::message::{MessageFormat, MessageType};
 use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, AnySyncTimelineEvent};
+use sable_model::truncate::truncate_graphemes;
 
 const FALLBACK: &str = "sent a message";
+const MAX_REACTION_BYTES: usize = 256;
 
 pub(crate) fn describe(event: &AnySyncTimelineEvent) -> String {
     let AnySyncTimelineEvent::MessageLike(message) = event else {
@@ -17,7 +19,7 @@ pub(crate) fn describe(event: &AnySyncTimelineEvent) -> String {
         AnySyncMessageLikeEvent::Sticker(_) => "sent a sticker".to_owned(),
         AnySyncMessageLikeEvent::Reaction(reaction) => reaction.as_original().map_or_else(
             || FALLBACK.to_owned(),
-            |event| format!("reacted with {}", event.content.relates_to.key),
+            |event| describe_reaction(&event.content.relates_to.key),
         ),
         AnySyncMessageLikeEvent::UnstablePollStart(poll) => poll.as_original().map_or_else(
             || FALLBACK.to_owned(),
@@ -26,6 +28,15 @@ pub(crate) fn describe(event: &AnySyncTimelineEvent) -> String {
         AnySyncMessageLikeEvent::CallInvite(_) => "started a call".to_owned(),
         _ => FALLBACK.to_owned(),
     }
+}
+
+fn describe_reaction(key: &str) -> String {
+    if key.starts_with("mxc://") {
+        return "reacted with a custom emote".to_owned();
+    }
+    let shown = truncate_graphemes(key, MAX_REACTION_BYTES);
+    let ellipsis = if shown.len() < key.len() { "…" } else { "" };
+    format!("reacted with {shown}{ellipsis}")
 }
 
 fn describe_message(msgtype: &MessageType) -> String {
@@ -54,7 +65,7 @@ mod tests {
     use matrix_sdk::ruma::serde::Raw;
     use serde_json::json;
 
-    use super::{describe, describe_message};
+    use super::{MAX_REACTION_BYTES, describe, describe_message, describe_reaction};
 
     fn message(content: serde_json::Value) -> RoomMessageEventContent {
         serde_json::from_value(content).expect("a valid message content")
@@ -154,6 +165,19 @@ mod tests {
         ] {
             assert_eq!(describe_message(&message(content).msgtype), expected);
         }
+    }
+
+    #[test]
+    fn a_reaction_preview_hides_media_urls_and_shortens_long_text() {
+        assert_eq!(
+            describe_reaction("mxc://example.org/cat"),
+            "reacted with a custom emote"
+        );
+        let long = "a".repeat(1000);
+        assert_eq!(
+            describe_reaction(&long),
+            format!("reacted with {}…", "a".repeat(MAX_REACTION_BYTES))
+        );
     }
 
     #[test]

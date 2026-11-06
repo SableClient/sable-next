@@ -109,11 +109,15 @@ impl Auth {
             return Err("registry username conflicts with legacy account".into());
         }
         if let Some(hash) = &password_hash {
-            PasswordHash::new(hash)?;
+            PasswordHash::new(hash).map_err(|_| {
+                "invalid password_hash (SABLE_SERVER_PASSWORD_HASH): expected an Argon2 password hash"
+            })?;
         }
         for user in &users.users {
             if let Some(hash) = &user.password_hash {
-                PasswordHash::new(hash)?;
+                PasswordHash::new(hash).map_err(|_| {
+                    format!("invalid password hash for user {} in users.json", user.id)
+                })?;
             }
         }
         Ok(Self {
