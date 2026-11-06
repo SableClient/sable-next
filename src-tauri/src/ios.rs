@@ -537,3 +537,34 @@ pub(crate) fn haptic_feedback(app: tauri::AppHandle, strong: bool) -> Result<(),
     })
     .map_err(|error| error.to_string())
 }
+
+#[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "tauri extracts command arguments by value"
+)]
+pub(crate) fn set_badge_count(app: tauri::AppHandle, count: isize) -> Result<(), String> {
+    app.run_on_main_thread(move || {
+        let Some(class) = AnyClass::get(c"UNUserNotificationCenter") else {
+            return;
+        };
+        // setBadgeCount:withCompletionHandler: is iOS 16+, and the app still supports 15.
+        if !class.responds_to(sel!(setBadgeCount:withCompletionHandler:)) {
+            // SAFETY: applicationIconBadgeNumber is an NSInteger property on the main-thread UIApplication
+            let _: () =
+                unsafe { msg_send![shared_application(), setApplicationIconBadgeNumber: count] };
+            return;
+        }
+        // SAFETY: +currentNotificationCenter returns the non-nil singleton
+        let center: &AnyObject = unsafe { msg_send![class, currentNotificationCenter] };
+        let done = RcBlock::new(|error: *mut AnyObject| {
+            if !error.is_null() {
+                log::warn!("setting the badge count failed");
+            }
+        });
+        // SAFETY: setBadgeCount:withCompletionHandler: takes an NSInteger and a (NSError *) block, which the callee copies
+        let _: () =
+            unsafe { msg_send![center, setBadgeCount: count, withCompletionHandler: &*done] };
+    })
+    .map_err(|error| error.to_string())
+}

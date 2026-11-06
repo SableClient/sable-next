@@ -33,3 +33,19 @@ it('sets and clears the browser badge', async () => {
   expect(setAppBadge).toHaveBeenCalledWith(3);
   expect(clearAppBadge).toHaveBeenCalledOnce();
 });
+
+it('sets the native iOS badge', async () => {
+  vi.resetModules();
+  const invoke = vi.fn().mockResolvedValue(undefined);
+  vi.doMock('@tauri-apps/api/core', () => ({ invoke, isTauri: () => true }));
+  vi.doMock('@tauri-apps/plugin-os', () => ({ type: () => 'ios' }));
+  const { setUnreadBadge: set } = await import('./badge.js');
+  await set(3);
+  await set(0);
+  expect(invoke.mock.calls).toEqual([
+    ['set_badge_count', { count: 3 }],
+    ['set_badge_count', { count: 0 }],
+  ]);
+  vi.doUnmock('@tauri-apps/api/core');
+  vi.doUnmock('@tauri-apps/plugin-os');
+});

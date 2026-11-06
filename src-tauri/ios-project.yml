@@ -64,6 +64,7 @@ targets:
         keychain-access-groups: [$(AppIdentifierPrefix){{app.identifier}}.shared]
         com.apple.developer.default-data-protection: NSFileProtectionCompleteUntilFirstUserAuthentication
         com.apple.developer.usernotifications.communication: true
+        com.apple.developer.usernotifications.time-sensitive: true
     settings:
       groups: [app]
       base:
@@ -205,6 +206,7 @@ targets:
       properties:
         aps-environment: development
         com.apple.developer.usernotifications.communication: true
+        com.apple.developer.usernotifications.time-sensitive: true
         com.apple.security.application-groups: [group.{{app.identifier}}]
         keychain-access-groups: [$(AppIdentifierPrefix){{app.identifier}}.shared]
         com.apple.developer.default-data-protection: NSFileProtectionCompleteUntilFirstUserAuthentication

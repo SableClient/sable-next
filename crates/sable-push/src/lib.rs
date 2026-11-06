@@ -179,6 +179,10 @@ struct ContentPushOut {
     user_id: String,
     sounds: bool,
     noisy: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    highlight: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unread: Option<u64>,
     invite: bool,
     active_elsewhere: bool,
     group: bool,
@@ -307,15 +311,25 @@ struct Devices {
     devices: Vec<Device>,
 }
 
-fn rings(notification: &Value) -> bool {
+fn any_tweaks(notification: &Value, test: impl Fn(&Map<String, Value>) -> bool) -> bool {
     Devices::deserialize(notification)
         .unwrap_or_default()
         .devices
         .iter()
         .filter_map(|device| device.tweaks.as_ref())
-        .any(|tweaks| {
-            tweaks.contains_key("sound") || tweaks.get("highlight") == Some(&Value::Bool(true))
-        })
+        .any(test)
+}
+
+fn highlighted(notification: &Value) -> bool {
+    any_tweaks(notification, |tweaks| {
+        tweaks.get("highlight") == Some(&Value::Bool(true))
+    })
+}
+
+fn rings(notification: &Value) -> bool {
+    any_tweaks(notification, |tweaks| {
+        tweaks.contains_key("sound") || tweaks.get("highlight") == Some(&Value::Bool(true))
+    })
 }
 
 #[serde_as]
@@ -765,6 +779,8 @@ impl Alert<'_> {
             user_id: user,
             sounds: current.sounds,
             noisy,
+            highlight: highlighted(self.notification),
+            unread: self.target.counts.as_ref().and_then(|counts| counts.unread),
             invite: message.invite,
             active_elsewhere,
             group: !room_name.is_empty(),
@@ -1291,6 +1307,16 @@ mod tests {
     }
 
     #[test]
+    fn only_a_highlight_tweak_marks_a_push_highlighted() {
+        let push = |tweaks: Value| json!({"devices":[{"pushkey":"k","tweaks":tweaks}]});
+
+        assert!(highlighted(&push(json!({"highlight":true}))));
+        assert!(!highlighted(&push(json!({"highlight":false}))));
+        assert!(!highlighted(&push(json!({"sound":"default"}))));
+        assert!(!highlighted(&json!({"room_id":"!room:example.org"})));
+    }
+
+    #[test]
     fn a_fetched_event_completes_an_event_id_only_push() {
         let push = json!({"room_id":"!room:example.org","event_id":"$e","counts":{"unread":2}});
         let event = PushEventView {
@@ -1757,6 +1783,8 @@ mod tests {
                 user_id: "@u".to_owned(),
                 sounds: false,
                 noisy: true,
+                highlight: true,
+                unread: Some(4),
                 invite: false,
                 active_elsewhere: true,
                 group: false,
@@ -1769,7 +1797,7 @@ mod tests {
             json!({
                 "title": "t", "body": "b", "text": "x", "sender": "s", "sender_id": null,
                 "event_id": null, "room_id": "!r", "user_id": "@u", "sounds": false,
-                "noisy": true, "invite": false, "active_elsewhere": true, "group": false,
+                "noisy": true, "highlight": true, "unread": 4, "invite": false, "active_elsewhere": true, "group": false,
                 "sender_avatar": "mxc://a", "room_avatar": null, "image": null, "members": 3,
                 "read_rooms": ["!a:example.org"]
             })

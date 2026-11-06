@@ -1,3 +1,6 @@
+import { invoke } from '@tauri-apps/api/core';
+import { type as osType } from '@tauri-apps/plugin-os';
+
 import { electronBridge } from './electron';
 import { isNativeMobile } from './os';
 
@@ -37,7 +40,13 @@ export async function setUnreadBadge(count: number): Promise<void> {
     return;
   }
 
-  if (isNativeMobile() || !('setAppBadge' in navigator)) return;
+  if (isNativeMobile()) {
+    // Android's badge follows its notifications.
+    if (osType() === 'ios') await invoke('set_badge_count', { count: value ?? 0 }).catch(() => {});
+    return;
+  }
+
+  if (!('setAppBadge' in navigator)) return;
   if (value === null) await navigator.clearAppBadge();
   else await navigator.setAppBadge(value);
 }

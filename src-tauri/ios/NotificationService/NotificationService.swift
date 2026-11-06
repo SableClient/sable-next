@@ -15,6 +15,7 @@ final class NotificationService: UNNotificationServiceExtension {
     private var originalSound: UNNotificationSound?
     private var activeElsewhere = false
     private var communication: INSendMessageIntent?
+    private var important = false
     private static let messageCategory = "sable-message"
     private static let inviteCategory = "sable-invite"
     private static let alertedAtKey = "sable_alerted_at"
@@ -42,6 +43,7 @@ final class NotificationService: UNNotificationServiceExtension {
         originalSound = request.content.sound
         activeElsewhere = false
         communication = nil
+        important = false
         policyRoot = nil
         lock.unlock()
 
@@ -127,6 +129,12 @@ final class NotificationService: UNNotificationServiceExtension {
                 }
                 let invite = rendered["invite"] as? Bool == true
                 updated.categoryIdentifier = invite ? Self.inviteCategory : Self.messageCategory
+                if let unread = rendered["unread"] as? Int { updated.badge = NSNumber(value: unread) }
+                if !invite, rendered["highlight"] as? Bool == true || rendered["group"] as? Bool != true {
+                    self?.lock.lock()
+                    self?.important = true
+                    self?.lock.unlock()
+                }
                 if rendered["active_elsewhere"] as? Bool == true {
                     self?.lock.lock()
                     self?.activeElsewhere = true
@@ -229,7 +237,7 @@ final class NotificationService: UNNotificationServiceExtension {
 
     private func clearRead(_ read: [String: Any], user: String) {
         guard read["clear"] as? Bool == true else {
-            suppress()
+            suppress(badge: 0)
             return
         }
         let room = read["room_id"] as? String
@@ -242,7 +250,7 @@ final class NotificationService: UNNotificationServiceExtension {
             if !identifiers.isEmpty {
                 UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: identifiers)
             }
-            self?.suppress()
+            self?.suppress(badge: 0)
         }
     }
 
@@ -261,12 +269,14 @@ final class NotificationService: UNNotificationServiceExtension {
         }
     }
 
-    private func suppress() {
+    private func suppress(badge: Int? = nil) {
         lock.lock()
         let handler = completion
         completion = nil
         lock.unlock()
-        handler?(UNNotificationContent())
+        let content = UNMutableNotificationContent()
+        content.badge = badge.map { NSNumber(value: $0) }
+        handler?(content)
     }
 
     private func ring(_ ring: [String: Any], room: String, user: String, fallback: UNMutableNotificationContent) {
@@ -413,6 +423,7 @@ final class NotificationService: UNNotificationServiceExtension {
         let sound = originalSound
         let activeElsewhere = self.activeElsewhere
         let intent = communication
+        let important = self.important
         communication = nil
         lock.unlock()
         guard let handler else { return }
@@ -439,6 +450,8 @@ final class NotificationService: UNNotificationServiceExtension {
             || cooling
         // Dropping the alert needs the filtering entitlement. Without it the generic fallback stays visible.
         if activeElsewhere || cooling { updated.interruptionLevel = .passive }
+        else if important && !quiet { updated.interruptionLevel = .timeSensitive }
+        updated.relevanceScore = quiet ? 0.2 : important ? 1 : 0.5
         updated.sound = !quiet && root?.withCString { sable_push_sounds($0) } == true ? sound : nil
         if let stamp = quiet ? alertedAt : Optional(now) {
             updated.userInfo[Self.alertedAtKey] = stamp

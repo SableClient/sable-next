@@ -827,6 +827,8 @@ pub fn run() {
             ios::haptic_feedback,
             #[cfg(target_os = "ios")]
             ios::set_system_bars_hidden,
+            #[cfg(target_os = "ios")]
+            ios::set_badge_count,
             #[cfg(target_os = "android")]
             mobile::copy_image_to_clipboard,
             #[cfg(target_os = "android")]
