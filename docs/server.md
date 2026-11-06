@@ -45,7 +45,9 @@ docker run -d --name sable-server --restart unless-stopped \
 Put an HTTPS reverse proxy in front of the server. The session cookie is secure,
 so HTTPS is required outside loopback local development. Non-loopback `http`
 `public_url` values are rejected because browsers will not keep the login cookie.
-Back up the data directory; it contains the Matrix stores and encryption keys.
+Back up the data directory and its parent, which contains the Matrix account
+stores. Server mode keeps store keys in owner-only files under
+`data_dir/secrets`, so the backup must include that directory.
 
 ## Binary
 
@@ -157,7 +159,7 @@ with the same data volume and configuration.
 
 Once loaded, users continue syncing after browsers disconnect, until they are
 disabled or the server stops. The server stores each new user's Matrix
-credentials and encryption keys under `data_dir/users/USER_ID`. The server
+credentials and account data under `data_dir/users/USER_ID`. The server
 operator can access every user's data. Isolation is enforced within one process,
 not by separate operating-system sandboxes.
 
