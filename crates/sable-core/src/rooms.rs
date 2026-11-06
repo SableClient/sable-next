@@ -465,22 +465,21 @@ impl Core {
         room_id: &RoomId,
         via: Option<Vec<String>>,
     ) -> Result<SpaceChildEventContent, RpcError> {
-        match self
+        if let Some(content) = self
             .space_child_content(space, room_id, "space_child_content: read")
             .await?
         {
-            Some(content) => Ok(content),
-            None => {
-                let via = via.ok_or(RpcError::UnknownRoom)?;
-                let via: Vec<_> = via
-                    .into_iter()
-                    .map(|server| ServerName::parse(server).map_err(|_| RpcError::UnknownRoom))
-                    .collect::<Result<_, _>>()?;
-                if via.is_empty() {
-                    return Err(RpcError::UnknownRoom);
-                }
-                Ok(SpaceChildEventContent::new(via))
+            Ok(content)
+        } else {
+            let via = via.ok_or(RpcError::UnknownRoom)?;
+            let via: Vec<_> = via
+                .into_iter()
+                .map(|server| ServerName::parse(server).map_err(|_| RpcError::UnknownRoom))
+                .collect::<Result<_, _>>()?;
+            if via.is_empty() {
+                return Err(RpcError::UnknownRoom);
             }
+            Ok(SpaceChildEventContent::new(via))
         }
     }
 
