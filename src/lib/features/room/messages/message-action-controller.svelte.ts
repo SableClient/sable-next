@@ -9,7 +9,7 @@ import { saveBytes, savesNatively, saveVideoToPhotos } from '#lib/platform/files
 import { favoriteGifs, isFavorite, toggleFavorite } from '#lib/gif/favorites.svelte.js';
 import { isNativeMobile, isAndroid } from '#lib/platform/os.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
-import { gifFromProxiedMxc } from '#lib/gif/providers.js';
+import { gifFromProxiedMxc, gifFromUploadedMxc } from '#lib/gif/providers.js';
 import { downloadCandidates, emoteCandidates } from '#lib/features/emotes/steal-emotes.js';
 import { pinErrorMessage, type PinnedEvents } from '../timeline/pinned-events.svelte.js';
 import type { Bookmarks } from '#lib/rooms/bookmarks.svelte.js';
@@ -104,14 +104,22 @@ export class MessageActionExecutor {
     });
     const gif =
       item.content.kind === 'image'
-        ? gifFromProxiedMxc(
+        ? (gifFromProxiedMxc(
             item.content.source,
             item.content.filename,
             item.content.width,
             item.content.height,
             item.content.size,
             item.content.mime
-          )
+          ) ??
+          gifFromUploadedMxc(
+            item.content.source,
+            item.content.filename,
+            item.content.width,
+            item.content.height,
+            item.content.size,
+            item.content.mime
+          ))
         : undefined;
     const downloadMedia = async (media: {
       source: string;

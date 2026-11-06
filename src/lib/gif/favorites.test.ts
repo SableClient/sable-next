@@ -119,3 +119,17 @@ test('recents and favourites keep their own stores', async () => {
   expect(recentGifs()).toHaveLength(1);
   expect(localStorage.getItem(storageKey)).toBeNull();
 });
+
+test('an uploaded mxc gif survives a reload of the favourites', async () => {
+  const uploaded = gif({
+    mediaUrl: 'mxc://example.org/abc',
+    previewUrl: 'mxc://example.org/abc',
+  });
+  const first = await loadStore();
+  first.toggleFavorite(uploaded);
+
+  const reloaded = await loadRawStore(localStorage.getItem(storageKey) ?? '[]');
+
+  expect(reloaded.favoriteGifs()).toEqual([uploaded]);
+  expect(reloaded.isFavorite(reloaded.favoriteGifs(), uploaded)).toBe(true);
+});
