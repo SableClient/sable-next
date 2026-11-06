@@ -109,7 +109,11 @@
   let mounted = $state.raw({ start: 0, end: 0 });
   let pendingFocus: { section: string; index: number } | null = null;
   let searchFocused = $state(false);
-  let chosen = $state.raw({ key: '', row: 0, col: 0 });
+  let chosen = $state.raw<{ key: string; row: number; col: number; source?: string }>({
+    key: '',
+    row: 0,
+    col: 0,
+  });
 
   $effect(() => {
     if (unicodeOnly) {
@@ -332,6 +336,14 @@
   let navIndex = $derived(new Map(navRows.map((row, index) => [row.id, index])));
   let boardKey = $derived(`${tab}:${query.trim()}`);
   let selection = $derived.by(() => {
+    if (chosen.key === boardKey && chosen.source !== undefined) {
+      for (const [row, items] of navRows.entries()) {
+        const col = rowCells(items).findIndex(
+          (cell) => (cell.image?.url ?? cell.emoji) === chosen.source
+        );
+        if (col >= 0) return { row, col };
+      }
+    }
     const row = chosen.key === boardKey ? Math.min(chosen.row, navRows.length - 1) : 0;
     const length = navRows[row] ? rowCells(navRows[row]).length : 0;
     return { row, col: chosen.key === boardKey ? Math.min(chosen.col, length - 1) : 0 };
@@ -464,8 +476,25 @@
       pick(cell.image, keepOpen);
       return;
     }
+    keepPickFocus(keepOpen, cell.emoji);
     if (!reactions) rememberEmote(cell.emoji);
     onPickUnicode?.(cell.emoji, keepOpen);
+  }
+
+  function keepPickFocus(keepOpen: boolean, source: string): void {
+    if (!keepOpen) return;
+    const focused = document.activeElement;
+    if (!(focused instanceof HTMLElement)) return;
+    const board = focused.closest('.board');
+    const section = focused.closest<HTMLElement>('[data-section]')?.dataset.section;
+    void tick().then(() => {
+      const target = section
+        ? board?.querySelector<HTMLElement>(
+            `[data-section="${CSS.escape(section)}"] [data-source="${CSS.escape(source)}"]`
+          )
+        : focused;
+      target?.focus({ preventScroll: true });
+    });
   }
 
   function targetCell(key: string, from: number, last: number): number | null {
@@ -547,6 +576,9 @@
     const cell = showFreeText && chosen.key !== boardKey ? undefined : selectedCell();
     if (cell) {
       event.preventDefault();
+      if (event.shiftKey) {
+        chosen = { key: boardKey, ...selection, source: cell.image?.url ?? cell.emoji };
+      }
       pickCell(cell, event.shiftKey);
       return;
     }
@@ -575,6 +607,7 @@
   }
 
   function pick(image: PackImageView, keepOpen: boolean): void {
+    keepPickFocus(keepOpen, image.url);
     if (!reactions) rememberEmote(image.url, tab === 'sticker' ? 'sticker' : 'emoticon');
     onPick(image, tab as ImageUsageView, keepOpen);
   }
@@ -760,6 +793,7 @@
                               type="button"
                               role="gridcell"
                               data-cell={index}
+                              data-source={source}
                               data-selected={isSelected(row.id, column) || undefined}
                               tabindex={tabStop(row.section, index, column) ? 0 : -1}
                               aria-label={label}
