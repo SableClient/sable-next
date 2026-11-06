@@ -135,14 +135,23 @@ test('signs out the selected devices in one batch', async () => {
   });
 });
 
-test('opens the server devices dashboard', async () => {
+test('the server devices dashboard is a plain external link, not an auth popup', async () => {
   const url = 'https://id.example.org/account?action=org.matrix.sessions_list';
-  const user = await renderDevices([own, other1], url);
+  await renderDevices([own, other1], url);
 
   const dashboard = screen.getByRole('link', { name: 'Devices dashboard' });
   expect(dashboard).toHaveAttribute('href', url);
-  await user.click(dashboard);
-  expect(openExternalAuthUrl).toHaveBeenCalledWith(url);
+  expect(dashboard).toHaveAttribute('target', '_blank');
+  dashboard.addEventListener(
+    'click',
+    (event) => {
+      event.preventDefault();
+    },
+    { once: true }
+  );
+  dashboard.click();
+  expect(openExternalAuthUrl).not.toHaveBeenCalled();
+  expect(openExternalAuthWindow).not.toHaveBeenCalled();
 });
 
 test('device removal opens account management without asking for a password', async () => {
