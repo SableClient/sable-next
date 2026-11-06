@@ -1,1 +1,8 @@
-{}
+{
+  "upcoming": {
+    "added": [
+      "searchSharing"
+    ],
+    "changed": []
+  }
+}
