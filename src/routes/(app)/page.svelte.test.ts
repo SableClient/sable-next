@@ -5,6 +5,8 @@ import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+const navigating = vi.hoisted(() => ({ to: null as unknown }));
+vi.mock('$app/state', () => ({ navigating }));
 vi.mock('#lib/core/context.js', () => ({
   useCoreClient: () => ({
     status: 'ready',
@@ -21,6 +23,7 @@ import Page from './+page.svelte';
 
 afterEach(() => {
   setPreference('showHome', false);
+  navigating.to = null;
   resetNavigation();
 });
 
@@ -37,4 +40,12 @@ test('starts on Home when it is enabled', async () => {
   await tick();
 
   expect(goto).toHaveBeenCalledWith('/home', { replace: true });
+});
+
+test('leaves a navigation already in flight alone', async () => {
+  navigating.to = { url: new URL('http://localhost/direct/!room') };
+  render(Page);
+  await tick();
+
+  expect(goto).not.toHaveBeenCalled();
 });
