@@ -83,6 +83,9 @@ This example shows the supported fields. Omit the ones you do not need.
   "calls": {
     "livekitServiceUrl": "https://livekit.example.org"
   },
+  "searchSharing": {
+    "stunServers": ["stun:stun.example.org:3478"]
+  },
   "disableAccountSwitcher": false,
   "hideUsernamePasswordFields": false,
   "settingsDefaults": {
@@ -109,6 +112,9 @@ This example shows the supported fields. Omit the ones you do not need.
   GIF search also needs `proxyUrl` (a Matrix server name, without a scheme) and
   the API key for the selected provider.
 - `calls.livekitServiceUrl` provides a fallback LiveKit service URL.
+- `searchSharing.stunServers` lists the STUN servers used to share search history between
+  devices. It defaults to `stun:stun.sable.moe:3478`. An empty list keeps transfers on the
+  local network.
 - `disableAccountSwitcher` and `hideUsernamePasswordFields` default to `false`.
 - `settingsDefaults` sets initial client preferences. Existing user choices take
   precedence. The example shows three settings; all accepted preference names,

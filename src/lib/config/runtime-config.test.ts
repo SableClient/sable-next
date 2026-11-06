@@ -194,6 +194,21 @@ test('a deployment fallback focus is read, and a blank one is no focus', () => {
   }
 });
 
+test('search sharing reads STUN servers and falls back to the Sable server', () => {
+  expect(parseRuntimeConfig({}).searchSharing.stunServers).toEqual(['stun:stun.sable.moe:3478']);
+  expect(
+    parseRuntimeConfig({ searchSharing: { stunServers: ['stun:stun.example:3478'] } }).searchSharing
+      .stunServers
+  ).toEqual(['stun:stun.example:3478']);
+  expect(
+    parseRuntimeConfig({ searchSharing: { stunServers: [] } }).searchSharing.stunServers
+  ).toEqual([]);
+  expect(
+    parseRuntimeConfig({ searchSharing: { stunServers: ['https://example'] } }).searchSharing
+      .stunServers
+  ).toEqual(['stun:stun.sable.moe:3478']);
+});
+
 test('the account switcher is disabled only by an explicit true', () => {
   expect(parseRuntimeConfig({ disableAccountSwitcher: true }).disableAccountSwitcher).toBe(true);
 

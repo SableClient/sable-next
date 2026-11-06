@@ -114,6 +114,10 @@ const AuthSchema = v.object({
 
 const EmbedsSchema = v.object({ serviceUrl: OptionalHttpService });
 const CallsSchema = v.object({ livekitServiceUrl: Text });
+const StunUrl = v.pipe(NonBlankText, v.regex(/^stuns?:/));
+const SearchSharingSchema = v.object({
+  stunServers: v.fallback(v.array(StunUrl), ['stun:stun.sable.moe:3478']),
+});
 const RuntimeSchema = v.pipe(
   v.object({
     pushNotificationDetails: v.fallback(v.nullable(PushSchema), null),
@@ -121,6 +125,7 @@ const RuntimeSchema = v.pipe(
     gifs: v.fallback(GifsSchema, v.parse(GifsSchema, {})),
     embeds: v.fallback(EmbedsSchema, v.parse(EmbedsSchema, {})),
     calls: v.fallback(CallsSchema, v.parse(CallsSchema, {})),
+    searchSharing: v.fallback(SearchSharingSchema, v.parse(SearchSharingSchema, {})),
     homeserverList: TextList,
     allowCustomHomeservers: v.fallback(v.boolean(), BUILT_IN_HOMESERVERS.allowCustom),
     defaultHomeserver: v.optional(v.unknown()),
@@ -147,6 +152,7 @@ const RuntimeSchema = v.pipe(
       homeservers: withDefaultAt(homeservers, source.defaultHomeserver),
       exploreServers: source.featuredCommunities.servers,
       calls: source.calls,
+      searchSharing: source.searchSharing,
       disableAccountSwitcher: source.disableAccountSwitcher,
       settingsDefaults: source.settingsDefaults,
       hideUsernamePasswordFields: source.hideUsernamePasswordFields,

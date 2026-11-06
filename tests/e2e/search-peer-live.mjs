@@ -117,7 +117,7 @@ try {
             return () => listeners.delete(listener);
           },
         },
-        { unmeteredOnly: true }
+        { unmeteredOnly: true, stunServers: [] }
       );
     }, side);
   }

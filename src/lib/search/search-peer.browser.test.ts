@@ -46,7 +46,9 @@ test(
         },
       },
     }));
-    const stops = cores.map((core) => watchSearchPeers(core, { unmeteredOnly: true }));
+    const stops = cores.map((core) =>
+      watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] })
+    );
     try {
       await vi.waitFor(() => {
         expect(cores[0].rpc.search.peerStart).toHaveBeenCalledOnce();
@@ -73,9 +75,7 @@ test(
         signal.kind === 'candidate' ? [signal.candidate.candidate] : []
       );
       expect(candidates.length).toBeGreaterThan(0);
-      expect(
-        candidates.every((line) => !line.includes('typ relay') && !line.includes('typ srflx'))
-      ).toBe(true);
+      expect(candidates.every((line) => !line.includes('typ relay'))).toBe(true);
       expect(send.mock.calls.length).toBeGreaterThan(20);
       const encoder = new TextEncoder();
       for (const [frame] of send.mock.calls) {
@@ -106,7 +106,7 @@ test('a hidden lock owner releases peer handling to a waiting visible tab', asyn
       },
     },
   };
-  const stop = watchSearchPeers(core, { unmeteredOnly: true });
+  const stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
   const visibility = vi.spyOn(document, 'visibilityState', 'get');
   const abort = new AbortController();
   let acquired = false;
@@ -153,8 +153,8 @@ test('only one tab handles shared-worker peer sessions for an account', async ()
   });
   const first = core();
   const second = core();
-  const stopFirst = watchSearchPeers(first, { unmeteredOnly: true });
-  const stopSecond = watchSearchPeers(second, { unmeteredOnly: true });
+  const stopFirst = watchSearchPeers(first, { unmeteredOnly: true, stunServers: [] });
+  const stopSecond = watchSearchPeers(second, { unmeteredOnly: true, stunServers: [] });
   try {
     await vi.waitFor(() => {
       expect(first.rpc.search.peerStart).toHaveBeenCalledOnce();

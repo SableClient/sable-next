@@ -33,6 +33,7 @@ interface NetworkConnection extends EventTarget {
 
 interface SearchPeerOptions {
   unmeteredOnly: boolean;
+  stunServers: string[];
   beforeStart?: () => Promise<unknown>;
 }
 
@@ -144,7 +145,9 @@ function connectSearchPeers(
 
   function create(sessionId: string, initiator: boolean) {
     const decoder = new SearchPeerDecoder();
-    const peer = new RTCPeerConnection({ iceServers: [] });
+    const peer = new RTCPeerConnection({
+      iceServers: options.stunServers.map((urls) => ({ urls })),
+    });
     const abort = new AbortController();
     let channel: RTCDataChannel | null = null;
     let closed = false;

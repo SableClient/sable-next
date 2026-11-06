@@ -144,21 +144,25 @@ afterEach(() => {
 });
 
 function start(): Channel {
-  stop = watchSearchPeers(core, { unmeteredOnly: true });
+  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
   listener({ type: 'search_peer', session_id: 'test', initiator: true, signal: { kind: 'open' } });
   return Peer.instances[0].channel;
 }
 
 test('unsupported browsers do not start discovery', () => {
   vi.stubGlobal('RTCPeerConnection', undefined);
-  stop = watchSearchPeers(core, { unmeteredOnly: true });
+  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
   expect(core.rpc.search.peerStart).not.toHaveBeenCalled();
   expect(subscribeEvents).not.toHaveBeenCalled();
 });
 
 test('foreground options finish applying before discovery starts', async () => {
   const ready = Promise.withResolvers<null>();
-  stop = watchSearchPeers(core, { unmeteredOnly: true, beforeStart: () => ready.promise });
+  stop = watchSearchPeers(core, {
+    unmeteredOnly: true,
+    stunServers: [],
+    beforeStart: () => ready.promise,
+  });
   expect(subscribeEvents).not.toHaveBeenCalled();
   expect(core.rpc.search.peerStart).not.toHaveBeenCalled();
   ready.resolve(null);
@@ -169,7 +173,11 @@ test('foreground options finish applying before discovery starts', async () => {
 
 test('an account switch cancels startup while foreground options are pending', async () => {
   const ready = Promise.withResolvers<null>();
-  stop = watchSearchPeers(core, { unmeteredOnly: true, beforeStart: () => ready.promise });
+  stop = watchSearchPeers(core, {
+    unmeteredOnly: true,
+    stunServers: [],
+    beforeStart: () => ready.promise,
+  });
   core.session = { account_id: 'other' };
   ready.resolve(null);
   await ready.promise;
@@ -185,7 +193,7 @@ test('a visibility change during startup closes the connection', () => {
     document.dispatchEvent(new Event('visibilitychange'));
     return unsubscribe;
   });
-  stop = watchSearchPeers(core, { unmeteredOnly: true });
+  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
   expect(unsubscribe).toHaveBeenCalledOnce();
   expect(core.rpc.search.peerStart).not.toHaveBeenCalled();
   visibility.mockRestore();
@@ -194,7 +202,7 @@ test('a visibility change during startup closes the connection', () => {
 test('a failed foreground update can retry on the next activation', async () => {
   const ready = Promise.withResolvers<null>();
   const beforeStart = vi.fn(() => ready.promise);
-  stop = watchSearchPeers(core, { unmeteredOnly: true, beforeStart });
+  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [], beforeStart });
   ready.reject(new Error('options unavailable'));
   await ready.promise.catch(() => {});
   await Promise.resolve();
@@ -217,7 +225,7 @@ test('a datachannel setup failure releases the peer immediately', () => {
       }
     }
   );
-  stop = watchSearchPeers(core, { unmeteredOnly: true });
+  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
   listener({ type: 'search_peer', session_id: 'test', initiator: true, signal: { kind: 'open' } });
   expect(Peer.instances[0].close).toHaveBeenCalledOnce();
   expect(core.rpc.search.peerClose).toHaveBeenCalledOnce();
@@ -283,7 +291,7 @@ test('a negotiation timeout releases the connection', async () => {
 test('discovery retries on resume and at regular intervals', async () => {
   vi.useFakeTimers();
   const visibility = vi.spyOn(document, 'visibilityState', 'get');
-  stop = watchSearchPeers(core, { unmeteredOnly: true });
+  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
   await vi.advanceTimersByTimeAsync(1000);
   visibility.mockReturnValue('hidden');
   document.dispatchEvent(new Event('visibilitychange'));
@@ -357,7 +365,7 @@ test('the sender offers on negotiationneeded and trickles candidates', async () 
 });
 
 test('the receiver answers each offer and queues early candidates', async () => {
-  stop = watchSearchPeers(core, { unmeteredOnly: true });
+  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
   const candidate = { candidate: 'candidate:1', sdpMid: '0', sdpMLineIndex: 0 };
   listener({
     type: 'search_peer',
@@ -402,7 +410,7 @@ test('the receiver answers each offer and queues early candidates', async () => 
 });
 
 test('a receiver closes on an answer that only the sender may send', async () => {
-  stop = watchSearchPeers(core, { unmeteredOnly: true });
+  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
   listener({
     type: 'search_peer',
     session_id: 'test',
