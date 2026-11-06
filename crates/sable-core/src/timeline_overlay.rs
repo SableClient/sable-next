@@ -26,18 +26,24 @@ pub(crate) struct ReplyFallback {
     sender: Option<OwnedUserId>,
     body: Option<String>,
     fallback: Option<ReplyFallbackView>,
+    session_id: Option<String>,
 }
 
 impl ReplyFallback {
     #[must_use]
     pub(crate) fn from_source(source: &Value) -> Option<Self> {
         let preview = event_preview(source)?;
+        let session_id = (source.get("type")?.as_str()? == "m.room.encrypted")
+            .then(|| source.pointer("/content/session_id")?.as_str())
+            .flatten()
+            .map(str::to_owned);
         Some(Self {
             sender: preview
                 .sender
                 .and_then(|sender| OwnedUserId::try_from(sender).ok()),
             body: preview.body,
             fallback: preview.fallback,
+            session_id,
         })
     }
 }
@@ -258,12 +264,34 @@ impl TimelineOverlay {
         stand_in: ReplyFallback,
     ) -> Vec<VectorDiff<TimelineItemView>> {
         let touched = event_id.clone();
-        self.replies.insert(event_id, stand_in);
+        if let Some(previous) = self.replies.insert(event_id, stand_in) {
+            for reply in self
+                .items
+                .iter_mut()
+                .filter_map(|item| item.in_reply_to.as_mut())
+                .filter(|reply| {
+                    reply.event_id == touched
+                        && reply.body == previous.body
+                        && reply.fallback == previous.fallback
+                })
+            {
+                reply.body = None;
+                reply.fallback = None;
+            }
+        }
         self.refresh(|item| {
             item.in_reply_to
                 .as_ref()
                 .is_some_and(|reply| reply.event_id == touched)
         })
+    }
+
+    pub(crate) fn encrypted_replies(&self, keyed: impl Fn(&str) -> bool) -> Vec<OwnedEventId> {
+        self.replies
+            .iter()
+            .filter(|(_, stand_in)| stand_in.session_id.as_deref().is_some_and(&keyed))
+            .map(|(event_id, _)| event_id.clone())
+            .collect()
     }
 
     pub(crate) fn set_bridged(&mut self) -> Vec<VectorDiff<TimelineItemView>> {
@@ -554,6 +582,49 @@ mod tests {
             Some(ReplyFallbackView::Reaction {
                 key: "👍".to_owned()
             })
+        );
+    }
+
+    #[test]
+    fn an_encrypted_stand_in_is_replaced_once_its_key_arrives() {
+        let mut overlay = TimelineOverlay::default();
+        let reply = item(
+            "r",
+            "@bob:x",
+            Some(reply_to(event_id!("$secret"), None, None)),
+        );
+        overlay.reset(vec![reply]);
+
+        let encrypted = read(&json!({
+            "type": "m.room.encrypted",
+            "sender": "@ana:x",
+            "content": {"algorithm": "m.megolm.v1.aes-sha2", "session_id": "s1", "ciphertext": "x"}
+        }));
+        overlay.set_reply(event_id!("$secret").to_owned(), encrypted);
+        assert_eq!(
+            overlay.encrypted_replies(|session| session == "s1"),
+            vec![event_id!("$secret").to_owned()]
+        );
+        assert_eq!(
+            overlay.encrypted_replies(|session| session == "s2"),
+            Vec::<OwnedEventId>::new()
+        );
+
+        let decrypted = read(&json!({
+            "type": "m.room.message",
+            "sender": "@ana:x",
+            "content": {"msgtype": "m.text", "body": "hello"}
+        }));
+        let diffs = overlay.set_reply(event_id!("$secret").to_owned(), decrypted);
+        let [VectorDiff::Set { value, .. }] = diffs.as_slice() else {
+            panic!("one set");
+        };
+        let shown = value.in_reply_to.as_ref().expect("a reply");
+        assert_eq!(shown.body.as_deref(), Some("hello"));
+        assert_eq!(shown.fallback, None);
+        assert_eq!(
+            overlay.encrypted_replies(|_| true),
+            Vec::<OwnedEventId>::new()
         );
     }
 

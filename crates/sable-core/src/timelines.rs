@@ -267,6 +267,7 @@ impl Core {
                 timeline.retry_decryption(sessions).await;
             }
         }
+        self.refresh_encrypted_replies(None, |_| true).await;
     }
 
     pub(crate) async fn timeline_for(

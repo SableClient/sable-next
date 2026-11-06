@@ -19,7 +19,10 @@ export function readEventSource(
   const pending = read(roomId, eventId)
     .then((source) => {
       const event: unknown = JSON.parse(source);
-      return isRecord(event) ? event : null;
+      if (!isRecord(event)) return null;
+      // Its key may still arrive, so read it again next time.
+      if (event.type === 'm.room.encrypted') sources.delete(key);
+      return event;
     })
     .catch((error: unknown) => {
       console.debug('[sable timeline] event source unavailable', error);

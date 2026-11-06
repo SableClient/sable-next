@@ -1,5 +1,6 @@
 use sable_model::text::visible_name;
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -15,7 +16,7 @@ use matrix_sdk::ruma::events::{
 };
 use matrix_sdk::ruma::push::Action;
 use matrix_sdk::ruma::serde::Raw;
-use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedEventId};
+use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, RoomId};
 use matrix_sdk_ui::sync_service::State as SyncState;
 use tracing::Instrument as _;
 use web_time::Instant;
@@ -385,6 +386,36 @@ impl Core {
                         Err(tokio::sync::broadcast::error::RecvError::Closed)
                     ) {
                         return;
+                    }
+                }
+            })
+            .abort_on_drop(),
+        );
+    }
+
+    pub(crate) async fn watch_room_keys(self: &Arc<Self>, client: &matrix_sdk::Client) {
+        let Some(keys) = client.encryption().room_keys_received_stream().await else {
+            return;
+        };
+        let core = self.clone();
+        self.track_session_task(
+            spawn(async move {
+                pin_mut!(keys);
+                while let Some(received) = keys.next().await {
+                    match received {
+                        Ok(keys) => {
+                            let rooms: BTreeSet<&RoomId> =
+                                keys.iter().map(|key| &*key.room_id).collect();
+                            for room in rooms {
+                                core.refresh_encrypted_replies(Some(room), |session| {
+                                    keys.iter().any(|key| {
+                                        &*key.room_id == room && key.session_id == session
+                                    })
+                                })
+                                .await;
+                            }
+                        }
+                        Err(_) => core.refresh_encrypted_replies(None, |_| true).await,
                     }
                 }
             })
