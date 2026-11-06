@@ -102,6 +102,7 @@
     selectNotificationAccount,
     performNotificationAction,
   } from '#lib/features/notifications/native-actions.js';
+  import { trackNotificationOpening } from '#lib/features/notifications/notification-opening.svelte.js';
   import {
     NotificationCenter,
     provideNotificationCenter,
@@ -1026,7 +1027,7 @@
     target: NativeNotificationTarget,
     open: NativeNotificationOpen
   ): Promise<void> {
-    const opening = await notificationOpener.open(target, open);
+    const opening = await trackNotificationOpening(notificationOpener.open(target, open));
     if (opening === 'unknown_account') toasts.error(i18n.t('nav.notificationAccountMissing'));
     if (opening === 'switch_failed') toasts.error(i18n.t('nav.switchAccountFailed'));
   }

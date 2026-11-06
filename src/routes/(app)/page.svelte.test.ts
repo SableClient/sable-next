@@ -5,8 +5,6 @@ import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
-const navigating = vi.hoisted(() => ({ to: null as unknown }));
-vi.mock('$app/state', () => ({ navigating }));
 vi.mock('#lib/core/context.js', () => ({
   useCoreClient: () => ({
     status: 'ready',
@@ -19,11 +17,11 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
 
 import { goto, resetNavigation } from '#lib/test-support/app-navigation.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { trackNotificationOpening } from '#lib/features/notifications/notification-opening.svelte.js';
 import Page from './+page.svelte';
 
 afterEach(() => {
   setPreference('showHome', false);
-  navigating.to = null;
   resetNavigation();
 });
 
@@ -42,10 +40,17 @@ test('starts on Home when it is enabled', async () => {
   expect(goto).toHaveBeenCalledWith('/home', { replace: true });
 });
 
-test('leaves a navigation already in flight alone', async () => {
-  navigating.to = { url: new URL('http://localhost/direct/!room') };
+test('waits for a notification being opened before restoring a room', async () => {
+  const opened = Promise.withResolvers<undefined>();
+  const opening = trackNotificationOpening(opened.promise);
   render(Page);
   await tick();
 
   expect(goto).not.toHaveBeenCalled();
+
+  opened.resolve(undefined);
+  await opening;
+  await tick();
+
+  expect(goto).toHaveBeenCalledWith('/rooms', { replace: true });
 });

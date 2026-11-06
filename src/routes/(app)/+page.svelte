@@ -1,8 +1,8 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { navigating } from '$app/state';
   import { useCoreClient } from '#lib/core/context.js';
+  import { openingNotification } from '#lib/features/notifications/notification-opening.svelte.js';
   import { takeAfterLogin } from '#lib/auth/after-login.js';
   import { hasPendingSetup } from '#lib/features/auth/setup/setup-record.js';
   import { readText } from '#lib/platform/local-json.js';
@@ -19,7 +19,7 @@
   $effect(() => {
     const session = core.session;
     if (redirected || core.status !== 'ready' || !session) return;
-    if (navigating.to !== null) return;
+    if (openingNotification()) return;
     if (hasPendingSetup({ getItem: readText }, session.user_id, session.device_id)) return;
 
     requestedPath ??= takeAfterLogin('');
