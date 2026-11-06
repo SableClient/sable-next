@@ -123,6 +123,26 @@ test('collapsed room rows keep their unread badges inside the row', async () => 
   await expectNoA11yViolations(document.body, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
 });
 
+test('hovering a collapsed room keeps its avatar inside the row', async () => {
+  roomsFixture.rooms = [room({ room_id: '!a:example.org', name: 'General' })];
+  await mountNav({ collapsed: true, width: 50 });
+
+  await expect
+    .poll(() => document.querySelector('.room-list.collapsed .room-row .avatar-root'))
+    .not.toBeNull();
+  const row = document.querySelector<HTMLElement>('.room-list.collapsed .room-row');
+  const avatar = row?.querySelector('.avatar-root');
+  if (!row || !avatar) throw new Error('the collapsed room row is not rendered');
+  const before = avatar.getBoundingClientRect();
+
+  await userEvent.hover(row);
+  const after = avatar.getBoundingClientRect();
+  const box = row.getBoundingClientRect();
+  expect(after.left).toBe(before.left);
+  expect(after.left).toBeGreaterThanOrEqual(box.left);
+  expect(after.right).toBeLessThanOrEqual(box.right);
+});
+
 test('the row options button toggles the shared menu and returns focus', async () => {
   roomsFixture.rooms = [room({ room_id: '!a:example.org', name: 'General' })];
   const screen = await mountNav();
