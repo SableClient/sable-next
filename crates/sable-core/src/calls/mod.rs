@@ -628,6 +628,18 @@ impl Core {
         invite_service::watch(self, client, generation);
     }
 
+    /// The well-known fallback in `discovered_service_urls` retries a server name that may serve
+    /// nothing, so it is fetched here rather than on the first room header.
+    pub(crate) fn prefetch_call_well_known(&self, client: &Client) {
+        let client = client.clone();
+        self.track_session_task(
+            spawn(async move {
+                let _ = client.well_known_rtc_transports().await;
+            })
+            .abort_on_drop(),
+        );
+    }
+
     async fn retract_membership(
         &self,
         room: &Room,

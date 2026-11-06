@@ -1115,6 +1115,7 @@ impl Core {
         self.watch_send_queue(&client);
         self.watch_presence(&client, generation);
         self.watch_inbox_persist(&client);
+        self.prefetch_call_well_known(&client);
         let store_id = self
             .registered_store_id(&account_id)
             .await
