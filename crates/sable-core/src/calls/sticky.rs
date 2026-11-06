@@ -9,8 +9,7 @@ use ruma::serde::Raw;
 use ruma::{OwnedDeviceId, OwnedEventId};
 use serde_json::Value;
 
-const STICKY_DURATION_MS: u32 = 3_600_000;
-const ENCRYPTED_STICKY_DURATION_MS: u32 = 120_000;
+pub(super) const STICKY_DURATION_MS: u32 = 3_600_000;
 
 pub(super) struct StickySync {
     conn_id: String,
@@ -400,11 +399,11 @@ pub(super) async fn send_wire(
     wire: super::membership::RtcWire,
 ) -> Result<ruma::OwnedEventId, matrix_sdk::Error> {
     let content = serde_json::to_value(content)?;
-    let duration = match room.latest_encryption_state().await? {
-        matrix_sdk::EncryptionState::NotEncrypted => STICKY_DURATION_MS,
-        state if state.is_encrypted() => ENCRYPTED_STICKY_DURATION_MS,
+    match room.latest_encryption_state().await? {
+        matrix_sdk::EncryptionState::NotEncrypted => {}
+        state if state.is_encrypted() => {}
         _ => return Err(matrix_sdk::Error::InsufficientData),
-    };
+    }
     Ok(room
         .send_raw(
             if wire == super::membership::RtcWire::Stable {
@@ -414,7 +413,7 @@ pub(super) async fn send_wire(
             },
             content,
         )
-        .with_sticky_duration(Duration::from_millis(duration.into()))
+        .with_sticky_duration(Duration::from_millis(STICKY_DURATION_MS.into()))
         .await?
         .response
         .event_id)

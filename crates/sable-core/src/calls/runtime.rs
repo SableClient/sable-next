@@ -30,7 +30,6 @@ const UNRESOLVED_KEY_REPORT_MS: u64 = 30_000;
 const SILENT_MEMBER_REPORT_MS: u64 = 10_000;
 const RENEW_INTERVAL_MS: u64 = 600_000;
 const STICKY_RENEW_INTERVAL_MS: u64 = 3_300_000;
-const ENCRYPTED_STICKY_RENEW_INTERVAL_MS: u64 = 30_000;
 const SLOT_CHECK_INTERVAL_MS: u64 = 5_000;
 const PUBLISHER_RETRY_MS: u64 = 30_000;
 
@@ -211,7 +210,6 @@ async fn send_delayed_leave(
     room: &Room,
     support: crate::delayed_events::DelayedEventsSupport,
     own: &CallMember,
-    encrypted: bool,
 ) -> Result<String, matrix_sdk::Error> {
     sticky::send_delayed_event(
         &room.client(),
@@ -228,7 +226,7 @@ async fn send_delayed_leave(
             own.wire,
         ),
         HANGUP_DELAY,
-        if encrypted { 120_000 } else { 3_600_000 },
+        sticky::STICKY_DURATION_MS,
     )
     .await
 }
@@ -248,7 +246,7 @@ async fn publish(
         }
         let support = core.delayed_events_support().await.unwrap_or_default();
         if support.any() {
-            match send_delayed_leave(room, support, own, encrypted).await {
+            match send_delayed_leave(room, support, own).await {
                 Ok(id) => Some(id),
                 Err(error) => {
                     tracing::warn!(?error, "could not schedule a delayed call leave");
@@ -1016,14 +1014,7 @@ async fn emit_roster(
         },
     );
     (
-        state
-            .members
-            .iter()
-            .filter(|member| {
-                state.own.mode != CallMode::Matrix2 || member.mode == CallMode::Matrix2
-            })
-            .cloned()
-            .collect::<Vec<_>>(),
+        state.members.clone(),
         state.distributor.clone(),
         publisher_id,
     )
@@ -1138,8 +1129,7 @@ fn emit_pending(
     let pending = std::mem::take(&mut state.pending_keys);
     for pending in pending {
         let member = state.members.iter().find(|member| {
-            (state.own.mode != CallMode::Matrix2 || member.mode == CallMode::Matrix2)
-                && member.user_id == pending.sender
+            member.user_id == pending.sender
                 && member.device_id.as_deref() == Some(pending.device.as_ref())
                 && (member.mode != CallMode::Matrix2
                     || (member.member_id.is_some()
@@ -1482,8 +1472,12 @@ async fn refresh_encrypted_hangup(
         }
         delay.id = None;
     }
-    match send_delayed_leave(&room, support, &own, true).await {
-        Ok(id) => delay.id = Some(id),
+    delay.lost = true;
+    match send_delayed_leave(&room, support, &own).await {
+        Ok(id) => {
+            delay.id = Some(id);
+            delay.lost = false;
+        }
         Err(error) => tracing::warn!(?error, "could not refresh the delayed call leave"),
     }
 }
@@ -1493,7 +1487,6 @@ async fn restore_hangup(
     room: &Room,
     own: &CallMember,
     delay: &Mutex<super::DelayState>,
-    encrypted: bool,
 ) {
     let mut delay = delay.lock().await;
     if !delay.active || !delay.lost {
@@ -1503,7 +1496,7 @@ async fn restore_hangup(
         let Ok(support) = core.delayed_events_support().await else {
             return;
         };
-        send_delayed_leave(room, support, own, encrypted)
+        send_delayed_leave(room, support, own)
             .await
             .inspect_err(|error| tracing::warn!(?error, "could not restore the delayed call leave"))
             .ok()
@@ -1515,6 +1508,29 @@ async fn restore_hangup(
         delay.id = Some(id);
         delay.lost = false;
     }
+}
+
+async fn protect_membership_renewal(
+    core: &Core,
+    delay: &Mutex<super::DelayState>,
+) -> super::Postponed {
+    let mut delay = delay.lock().await;
+    if !delay.active {
+        return super::Postponed::Gone;
+    }
+    let Some(id) = delay.id.as_deref() else {
+        return if delay.lost {
+            super::Postponed::Unreachable
+        } else {
+            super::Postponed::Restarted
+        };
+    };
+    let result = core.postpone_hangup(id).await;
+    if result == super::Postponed::Gone {
+        delay.id = None;
+        delay.lost = true;
+    }
+    result
 }
 
 struct UpdateContext {
@@ -1638,23 +1654,26 @@ impl UpdateContext {
             *delay_roster = roster;
             (state.own.clone(), state.intent, changed)
         };
-        restore_hangup(&self.core, &self.room, &own, &self.delay, self.encrypted).await;
+        if absent && self.delay.lock().await.lost {
+            self.terminate_membership();
+            return;
+        }
+        restore_hangup(&self.core, &self.room, &own, &self.delay).await;
         let mut refresh_delay = self.encrypted && own.mode == CallMode::Matrix2 && roster_changed;
         let renew_interval = if own.mode == CallMode::Matrix2 {
-            if self
-                .core
-                .room_is_encrypted(&self.room)
-                .await
-                .unwrap_or(true)
-            {
-                ENCRYPTED_STICKY_RENEW_INTERVAL_MS
-            } else {
-                STICKY_RENEW_INTERVAL_MS
-            }
+            STICKY_RENEW_INTERVAL_MS
         } else {
             RENEW_INTERVAL_MS
         };
         if absent || keys::now_ms().saturating_sub(*renewed) >= renew_interval {
+            match protect_membership_renewal(&self.core, &self.delay).await {
+                super::Postponed::Gone => {
+                    self.terminate_membership();
+                    return;
+                }
+                super::Postponed::Unreachable => return,
+                super::Postponed::Restarted => {}
+            }
             match publish_membership(&self.room, &own, intent).await {
                 Ok(_) => {
                     *renewed = keys::now_ms();

@@ -35,6 +35,53 @@ pub(in crate::calls) fn member(mode: CallMode, created_ts: u64, foci: &[&str]) -
 }
 
 #[tokio::test]
+async fn encrypted_media_key_reaches_another_sable_call_member() {
+    let server = MatrixMockServer::new().await;
+    server.mock_crypto_endpoints_preset().await;
+    let (alice, bob) = server.set_up_alice_and_bob_for_encryption().await;
+    let room_id = owned_room_id!("!call:example.org");
+    let room = server.sync_joined_room(&alice, &room_id).await;
+    let mut sender = member(CallMode::Compatibility, 1, &["https://sfu.example.org"]);
+    sender.user_id = alice.user_id().unwrap().to_owned();
+    sender.device_id = Some(alice.device_id().unwrap().to_owned());
+    sender.member_id = Some("alice-member".to_owned());
+    sender.identity = "alice-livekit-identity".to_owned();
+    let mut receiver = member(CallMode::Matrix2, 1, &["https://sfu.example.org"]);
+    receiver.user_id = bob.user_id().unwrap().to_owned();
+    receiver.device_id = Some(bob.device_id().unwrap().to_owned());
+    receiver.member_id = Some("bob-member".to_owned());
+    let (core, mut events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    let state = Arc::new(Mutex::new(State::new(
+        receiver.clone(),
+        vec![sender.clone(), receiver.clone()],
+        super::StickyMemberships::default(),
+        &room_id,
+        false,
+        None,
+        false,
+    )));
+    let _guards = super::watch_keys(&core, &bob, 1, CallSessionId(1), room_id.clone(), state);
+    let synced = server
+        .mock_capture_put_to_device_then_sync_back(alice.user_id().unwrap(), &bob)
+        .await;
+    let mut distributor = super::keys::KeyDistributor::new(
+        room_id,
+        sender.user_id.clone(),
+        sender.device_id.clone().unwrap(),
+        sender.member_id.clone().unwrap(),
+        sender.identity.clone(),
+    );
+    assert!(matches!(
+        distributor.roll(&room, &[receiver]).await,
+        super::keys::Rolled::Rotated { .. }
+    ));
+    synced.await;
+    assert!(
+        matches!(events.try_recv(), Ok(crate::protocol::CoreEvent::CallEncryptionKey { identity, own: false, .. }) if identity == sender.identity)
+    );
+}
+
+#[tokio::test]
 async fn joining_an_unsupported_slot_does_not_publish_membership() {
     use matrix_sdk::ruma::{events::AnySyncStateEvent, serde::Raw};
     use matrix_sdk_test::JoinedRoomBuilder;
@@ -716,6 +763,36 @@ async fn a_delayed_leave_the_server_already_sent_is_reported_gone() {
 }
 
 #[tokio::test]
+async fn renewal_checks_that_the_delayed_leave_is_still_pending() {
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let (server, core, _room) = delayed_leave_fixture().await;
+    Mock::given(method("POST"))
+        .and(path(
+            "/_matrix/client/unstable/org.matrix.msc4140/delayed_events/fired",
+        ))
+        .respond_with(ResponseTemplate::new(404).set_body_json(
+            serde_json::json!({"errcode": "M_NOT_FOUND", "error": "Delayed event not found"}),
+        ))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let delay = Mutex::new(super::super::DelayState {
+        id: Some("fired".to_owned()),
+        active: true,
+        lost: false,
+    });
+    assert_eq!(
+        super::protect_membership_renewal(&core, &delay).await,
+        super::super::Postponed::Gone
+    );
+    let delay = delay.lock().await;
+    assert!(delay.lost);
+    assert!(delay.id.is_none());
+}
+
+#[tokio::test]
 async fn a_lost_delayed_leave_is_scheduled_again_once() {
     use wiremock::matchers::{method, path_regex};
     use wiremock::{Mock, ResponseTemplate};
@@ -739,8 +816,8 @@ async fn a_lost_delayed_leave_is_scheduled_again_once() {
         lost: true,
     });
 
-    super::restore_hangup(&core, &room, &own, &delay, false).await;
-    super::restore_hangup(&core, &room, &own, &delay, false).await;
+    super::restore_hangup(&core, &room, &own, &delay).await;
+    super::restore_hangup(&core, &room, &own, &delay).await;
 
     let delay = delay.lock().await;
     assert_eq!(delay.id.as_deref(), Some("new"));

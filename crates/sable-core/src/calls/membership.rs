@@ -328,8 +328,8 @@ fn sticky_timing(
     now_ms: u64,
 ) -> Option<(u64, u64)> {
     let duration = sticky.and_then(|sticky| sticky.0?.duration_ms)?;
-    let duration = duration.min(3_600_000);
     let order_expires_at_ms = created_ts.saturating_add(duration);
+    let duration = duration.min(3_600_000);
     let expires_at_ms = unsigned
         .and_then(|unsigned| unsigned.msc4354_ttl_ms.or(unsigned.ttl_ms)?.0)
         .map_or_else(
@@ -874,7 +874,7 @@ mod tests {
         assert_eq!(member.foci, ["https://focus.example.org"]);
         assert_eq!(
             member.identity,
-            "HDygEJZPKxdLyHX7ic7VpvsISAOOtDo/FX8oZfgj3+0"
+            "fy53C+VzB2i4DYEzQ2rL8RixeS0KyRA1qnFiggsxWhs"
         );
     }
 
@@ -1197,6 +1197,18 @@ mod tests {
         stale["origin_server_ts"] = serde_json::json!(200);
         assert!(!store.apply(&stale, 1000));
         assert_eq!(store.members(1000)[0].created_ts, 200);
+    }
+
+    #[test]
+    fn sticky_order_uses_the_unclamped_duration() {
+        let mut store = super::StickyMemberships::default();
+        let mut first = sticky_event("$a", 100);
+        first["msc4354_sticky"]["duration_ms"] = serde_json::json!(3_600_200);
+        assert!(store.apply(&first, 100));
+        let mut second = sticky_event("$b", 200);
+        second["msc4354_sticky"]["duration_ms"] = serde_json::json!(3_600_000);
+        assert!(!store.apply(&second, 200));
+        assert_eq!(store.members(200)[0].created_ts, 100);
     }
 
     #[test]

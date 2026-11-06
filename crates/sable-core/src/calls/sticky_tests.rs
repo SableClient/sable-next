@@ -179,9 +179,16 @@ async fn test_encrypted_delayed_leave_is_not_sent_as_plaintext() {
         .await;
     Mock::given(method("PUT"))
         .and(path_regex(r"/rooms/.*/send/m\.room\.encrypted/.*"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"delay_id": "$delay"})))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"delay_id": "$delay", "event_id": "$sent:example.org"})),
+        )
         .mount(server.server())
         .await;
+
+    send(&alice, &room, json!({"msc4354_sticky_key": "member"}))
+        .await
+        .expect("encrypted sticky send");
 
     send_delayed(
         &alice,
@@ -194,9 +201,30 @@ async fn test_encrypted_delayed_leave_is_not_sent_as_plaintext() {
     .expect("encrypted delayed leave");
 
     let requests = server.received_requests().await.unwrap();
+    let membership = requests
+        .iter()
+        .find(|request| {
+            request.url.path().contains("/send/m.room.encrypted/")
+                && !request
+                    .url
+                    .query_pairs()
+                    .any(|(key, _)| key == "org.matrix.msc4140.delay")
+        })
+        .expect("encrypted membership request");
+    assert!(
+        membership.url.query_pairs().any(|(key, value)| key
+            == "org.matrix.msc4354.sticky_duration_ms"
+            && value == "3600000")
+    );
     let request = requests
         .iter()
-        .find(|request| request.url.path().contains("/send/m.room.encrypted/"))
+        .find(|request| {
+            request.url.path().contains("/send/m.room.encrypted/")
+                && request
+                    .url
+                    .query_pairs()
+                    .any(|(key, _)| key == "org.matrix.msc4140.delay")
+        })
         .expect("encrypted delayed request");
     let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
     assert_eq!(body["algorithm"], "m.megolm.v1.aes-sha2");
