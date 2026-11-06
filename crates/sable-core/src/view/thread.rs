@@ -94,6 +94,21 @@ pub(super) fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSumm
     })
 }
 
+pub(super) fn merge_thread_summary(
+    local: Option<ThreadSummaryView>,
+    bundled: Option<ThreadSummaryView>,
+) -> Option<ThreadSummaryView> {
+    match (local, bundled) {
+        (Some(local), Some(bundled)) if bundled.num_replies > local.num_replies => {
+            Some(ThreadSummaryView {
+                num_replies: bundled.num_replies,
+                ..local
+            })
+        }
+        (local, bundled) => local.or(bundled),
+    }
+}
+
 #[serde_as]
 #[derive(Default, serde::Deserialize)]
 #[serde(default)]
@@ -432,6 +447,24 @@ mod tests {
             summary.latest_fallback,
             Some(ReplyFallbackView::VerificationRequest)
         );
+    }
+
+    #[test]
+    fn merge_prefers_the_larger_bundled_count_and_keeps_local_preview() {
+        let view = |num_replies, latest: &str| ThreadSummaryView {
+            num_replies,
+            latest_event_id: Some(latest.to_owned()),
+            latest_body: None,
+            latest_fallback: None,
+        };
+        let merged = merge_thread_summary(Some(view(0, "$local")), Some(view(5, "$bundled")))
+            .expect("summary");
+        assert_eq!(merged.num_replies, 5);
+        assert_eq!(merged.latest_event_id.as_deref(), Some("$local"));
+        let merged = merge_thread_summary(Some(view(7, "$local")), Some(view(5, "$bundled")))
+            .expect("summary");
+        assert_eq!(merged.num_replies, 7);
+        assert!(merge_thread_summary(None, Some(view(2, "$b"))).is_some());
     }
 
     #[test]
