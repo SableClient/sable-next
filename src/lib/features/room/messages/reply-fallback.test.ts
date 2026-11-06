@@ -34,3 +34,12 @@ test('a reply quotes its body, or says what the replied-to event was', () => {
   expect(replyText(reply(null, null), t)).toBe('');
   expect(replyText(null, t)).toBe('');
 });
+
+test('a reply to a custom or very long reaction names it briefly', () => {
+  expect(replyText(reply(null, { kind: 'reaction', key: 'mxc://example.org/cat' }), t)).toBe(
+    'timeline.replyToReaction:{"key":"timeline.customEmote"}'
+  );
+  expect(replyText(reply(null, { kind: 'reaction', key: 'a'.repeat(500) }), t)).toBe(
+    `timeline.replyToReaction:{"key":"${'a'.repeat(64)}…"}`
+  );
+});

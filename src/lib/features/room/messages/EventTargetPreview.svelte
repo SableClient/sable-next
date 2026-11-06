@@ -14,6 +14,7 @@
   import { memberName, senderDisplayColors } from '../members/members.js';
   import { eventPreview, reactionKey } from '#lib/model/model.js';
   import { fallbackText } from './reply-fallback';
+  import { isCustomReaction, reactionText } from './reaction-emote-label.js';
   import { replyPreviewBody } from './reply-preview';
   import { hasSenderRoles, useSenderRoles } from '../members/sender-roles';
   import SenderName from '../members/SenderName.svelte';
@@ -83,7 +84,11 @@
       const key = reactionKey(content.content);
       return {
         sender: item.sender,
-        body: key ? t('timeline.replyToReaction', { key }) : t('timeline.redacted'),
+        body: key
+          ? t('timeline.replyToReaction', {
+              key: isCustomReaction(key) ? t('timeline.customEmote') : reactionText(key),
+            })
+          : t('timeline.redacted'),
       };
     }
     return { sender: item.sender, body: replyPreviewBody(content) || stateEventText(item, t) };

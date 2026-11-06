@@ -2,6 +2,8 @@ import type { ReplyFallbackView, ReplyView } from '#src/generated/protocol';
 
 import type { Translate } from '../timeline/state-event-text';
 
+import { isCustomReaction, reactionText } from './reaction-emote-label.js';
+
 export function fallbackText(
   body: string | null,
   fallback: ReplyFallbackView | null,
@@ -12,7 +14,11 @@ export function fallbackText(
     case 'redacted':
       return t('timeline.redacted');
     case 'reaction':
-      return t('timeline.replyToReaction', { key: fallback.key });
+      return t('timeline.replyToReaction', {
+        key: isCustomReaction(fallback.key)
+          ? t('timeline.customEmote')
+          : reactionText(fallback.key),
+      });
     case 'redaction':
       return t('timeline.replyToRedaction');
     case 'verification_request':

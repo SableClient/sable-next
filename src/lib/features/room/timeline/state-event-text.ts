@@ -2,7 +2,7 @@ import { isRecord } from '#lib/guards.js';
 import { reactionKey } from '#lib/model/model.js';
 import type { StateChangeView, TimelineItemView } from '#src/generated/protocol';
 
-import { isCustomReaction } from '../messages/reaction-emote-label';
+import { isCustomReaction, reactionText } from '../messages/reaction-emote-label';
 import { relationOf } from './timeline-event-index';
 
 export type Translate = (key: string, values?: Record<string, unknown>) => string;
@@ -67,7 +67,7 @@ function hiddenEventText(
     if (key) {
       return t('timeline.hiddenReaction', {
         user,
-        key: isCustomReaction(key) ? t('timeline.customEmote') : key,
+        key: isCustomReaction(key) ? t('timeline.customEmote') : reactionText(key),
       });
     }
   }
