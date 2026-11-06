@@ -48,7 +48,7 @@ test('shows this device’s code with the logo, and offers the other ways', asyn
   const user = setup({ phase: 'choose', qr: code, can_scan: true, can_compare: true });
 
   expect(qr()?.querySelector('image')).toBeInTheDocument();
-  expect(button(/Scan their code instead/)).toBeInTheDocument();
+  expect(button(/Scan a code instead/)).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: /Compare emoji instead/ }));
   expect(encryption.startSasVerification).toHaveBeenCalledWith({
     user_id: '@alice:example.org',
@@ -59,7 +59,7 @@ test('shows this device’s code with the logo, and offers the other ways', asyn
 test('a scanned code goes to the core as base64', async () => {
   const user = setup({ phase: 'choose', qr: code, can_scan: true, can_compare: false });
 
-  await user.click(screen.getByRole('button', { name: /Scan their code instead/ }));
+  await user.click(screen.getByRole('button', { name: /Scan a code instead/ }));
   expect(qr()).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'scan stub' }));
 
@@ -84,7 +84,7 @@ test('hides QR actions while a scan is pending', async () => {
       })
   );
   const user = setup({ phase: 'choose', qr: code, can_scan: true, can_compare: true });
-  await user.click(screen.getByRole('button', { name: /Scan their code instead/ }));
+  await user.click(screen.getByRole('button', { name: /Scan a code instead/ }));
   await user.click(screen.getByRole('button', { name: 'scan stub' }));
 
   expect(qr()).not.toBeInTheDocument();
@@ -99,7 +99,7 @@ test('shows scan errors and allows retry', async () => {
     new CoreError({ code: 'invalid_verification_code' })
   );
   const user = setup({ phase: 'choose', qr: code, can_scan: true, can_compare: true });
-  await user.click(screen.getByRole('button', { name: /Scan their code instead/ }));
+  await user.click(screen.getByRole('button', { name: /Scan a code instead/ }));
   await user.click(screen.getByRole('button', { name: 'scan stub' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent('That isn’t a verification code.');
@@ -116,16 +116,16 @@ test('without our own code, the scanner waits for a tap', async () => {
   expect(screen.getByText('How would you like to verify?')).toBeInTheDocument();
   expect(button(/scan stub/)).not.toBeInTheDocument();
   expect(button(/Compare emoji instead/)).toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'Scan their code with the camera' }));
+  await user.click(screen.getByRole('button', { name: 'Scan a code with the camera' }));
   expect(button(/scan stub/)).toBeInTheDocument();
-  expect(button(/Scan their code with the camera/)).not.toBeInTheDocument();
+  expect(button(/Scan a code with the camera/)).not.toBeInTheDocument();
 });
 
 test('shows our code first', async () => {
   const user = setup({ phase: 'choose', qr: code, can_scan: true, can_compare: true });
 
   expect(button(/scan stub/)).not.toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: /Scan their code instead/ }));
+  await user.click(screen.getByRole('button', { name: /Scan a code instead/ }));
   expect(qr()).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Show this device’s code' }));
   expect(qr()).toBeInTheDocument();
