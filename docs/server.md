@@ -105,6 +105,14 @@ deployments. Quote the password hash in shell commands: it contains `$`.
 Account stores are created alongside `data_dir`, so its parent must also be
 writable and included in backups.
 
+In a Compose YAML file, escape each `$` in the password hash as `$$` to prevent
+variable interpolation, even when the value is quoted. For example:
+
+```yaml
+environment:
+  SABLE_SERVER_PASSWORD_HASH: '$$argon2id$$v=19$$m=19456,t=2,p=1$$...'
+```
+
 The image health check uses port `18008`; if you change the listening port,
 also override the health check. The server exposes `/healthz` for health checks.
 

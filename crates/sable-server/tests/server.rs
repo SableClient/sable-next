@@ -18,6 +18,22 @@ use tokio_tungstenite::{
     tungstenite::{Message, client::IntoClientRequest},
 };
 
+#[test]
+fn invalid_configured_password_hash_reports_the_setting() {
+    let directory = tempdir().unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_sable-server"))
+        .env("SABLE_SERVER_LISTEN_ADDR", "127.0.0.1:0")
+        .env("SABLE_SERVER_PUBLIC_URL", "http://localhost")
+        .env("SABLE_SERVER_DATA_DIR", directory.path())
+        .env("SABLE_SERVER_PASSWORD_HASH", "secret-malformed-hash")
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("SABLE_SERVER_PASSWORD_HASH"), "{stderr}");
+    assert!(!stderr.contains("secret-malformed-hash"), "{stderr}");
+}
+
 async fn start_server() -> (String, Server, tokio::task::JoinHandle<()>) {
     start_server_with_ip_source(ClientIpSource::ConnectInfo).await
 }
