@@ -1,7 +1,5 @@
 import { app, ipcMain, type WebFrameMain } from 'electron';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 
 type IsAppFrame = (frame: WebFrameMain | null | undefined) => boolean;
 
@@ -22,9 +20,7 @@ export function supportsAutoUpdate(): boolean {
     app.isPackaged &&
     !process.mas &&
     !process.env.FLATPAK_ID &&
-    (process.platform !== 'linux' ||
-      Boolean(process.env.APPIMAGE) ||
-      existsSync(join(process.resourcesPath, 'app-update.yml')))
+    (process.platform !== 'linux' || Boolean(process.env.APPIMAGE))
   );
 }
 

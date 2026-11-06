@@ -2,7 +2,6 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   app: { isPackaged: true, getVersion: (): string => '2.0.0' },
-  existsSync: vi.fn(() => true),
   setFeedURL: vi.fn(),
   handle: vi.fn<(channel: string, handler: (event: { senderFrame: object }) => unknown) => void>(),
   checkForUpdates: vi.fn(),
@@ -10,7 +9,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('electron', () => ({ app: mocks.app, ipcMain: { handle: mocks.handle } }));
 vi.mock('electron-updater', () => ({ autoUpdater: mocks }));
-vi.mock('node:fs', () => ({ existsSync: mocks.existsSync }));
 
 import { registerUpdater, setUpdateChannel, supportsAutoUpdate } from './updater';
 
@@ -31,11 +29,9 @@ beforeEach(() => {
   vi.stubEnv('APPIMAGE', '');
   mocks.app.isPackaged = true;
   mocks.app.getVersion = () => '2.0.0';
-  mocks.existsSync.mockReturnValue(true);
 });
 
-test('AUR packages without updater metadata do not configure or check the Debian feed', async () => {
-  mocks.existsSync.mockReturnValue(false);
+test('package-managed Linux installs do not configure or check the self-update feed', async () => {
   expect(supportsAutoUpdate()).toBe(false);
   setUpdateChannel('stable');
   expect(mocks.setFeedURL).not.toHaveBeenCalled();
@@ -46,13 +42,7 @@ test('AUR packages without updater metadata do not configure or check the Debian
   expect(mocks.checkForUpdates).not.toHaveBeenCalled();
 });
 
-test('native deb and rpm packages retain their updater', () => {
-  expect(supportsAutoUpdate()).toBe(true);
-  expect(mocks.existsSync).toHaveBeenCalledWith('/opt/Sable/resources/app-update.yml');
-});
-
-test('AppImages retain updates without adjacent metadata', () => {
-  mocks.existsSync.mockReturnValue(false);
+test('AppImages install their own updates', () => {
   vi.stubEnv('APPIMAGE', '/home/user/Sable.AppImage');
   expect(supportsAutoUpdate()).toBe(true);
 });
@@ -67,7 +57,6 @@ test('Flatpak and development builds do not offer self updates', () => {
 
 test.each(['darwin', 'win32'])('%s retains updates without Linux metadata', (platform) => {
   vi.stubGlobal('process', { ...process, platform });
-  mocks.existsSync.mockReturnValue(false);
   expect(supportsAutoUpdate()).toBe(true);
 });
 
@@ -107,6 +96,7 @@ test.each([
 });
 
 test('self-updating builds leave the latest version to the updater', async () => {
+  vi.stubEnv('APPIMAGE', '/home/user/Sable.AppImage');
   const fetch = vi.fn();
   vi.stubGlobal('fetch', fetch);
   registerUpdater(() => true);
@@ -115,4 +105,19 @@ test('self-updating builds leave the latest version to the updater', async () =>
   );
   expect(await handler?.[1]({ senderFrame: {} })).toBeNull();
   expect(fetch).not.toHaveBeenCalled();
+});
+
+test('an rpm or deb install reports the latest release instead of installing it', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(new Response('version: 2.4.0\nfiles: []\n')))
+  );
+  registerUpdater(() => true);
+  const check = mocks.handle.mock.calls.find(([channel]) => channel === 'sable-update-check');
+  const latest = mocks.handle.mock.calls.find(
+    ([channel]) => channel === 'sable-update-latest-version'
+  );
+  expect(await check?.[1]({ senderFrame: {} })).toBeNull();
+  expect(mocks.checkForUpdates).not.toHaveBeenCalled();
+  expect(await latest?.[1]({ senderFrame: {} })).toBe('2.4.0');
 });
