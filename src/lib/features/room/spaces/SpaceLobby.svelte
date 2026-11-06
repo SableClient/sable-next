@@ -362,10 +362,12 @@
     suggestedOverrides = [...suggestedOverrides.filter(others), override];
 
     try {
+      const edge = childEdges(merged, parentId).find((child) => child.room_id === roomId);
       await core.rpc.spaces.setChildSuggested({
         space_id: parentId,
         room_id: roomId,
         suggested,
+        via: edge?.origin_server_ts === 0 ? edge.via : null,
       });
     } catch (error) {
       console.warn('[sable lobby] suggestion not saved', error);
@@ -544,11 +546,18 @@
     ];
 
     try {
-      for (const change of changes) {
+      const pending = [...changes].sort(
+        (a, b) =>
+          Number(siblings.find((edge) => edge.room_id === b.roomId)?.origin_server_ts === 0) -
+          Number(siblings.find((edge) => edge.room_id === a.roomId)?.origin_server_ts === 0)
+      );
+      for (const change of pending) {
+        const edge = siblings.find((sibling) => sibling.room_id === change.roomId);
         await core.rpc.spaces.setChildOrder({
           space_id: parentId,
           room_id: change.roomId,
           order: change.order,
+          via: edge?.origin_server_ts === 0 ? edge.via : null,
         });
       }
     } catch (error) {

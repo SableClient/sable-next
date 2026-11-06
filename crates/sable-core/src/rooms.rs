@@ -459,18 +459,42 @@ impl Core {
             .filter(|content| !content.via.is_empty()))
     }
 
+    async fn space_child_content_or_via(
+        &self,
+        space: &Room,
+        room_id: &RoomId,
+        via: Option<Vec<String>>,
+    ) -> Result<SpaceChildEventContent, RpcError> {
+        match self
+            .space_child_content(space, room_id, "space_child_content: read")
+            .await?
+        {
+            Some(content) => Ok(content),
+            None => {
+                let via = via.ok_or(RpcError::UnknownRoom)?;
+                let via: Vec<_> = via
+                    .into_iter()
+                    .map(|server| ServerName::parse(server).map_err(|_| RpcError::UnknownRoom))
+                    .collect::<Result<_, _>>()?;
+                if via.is_empty() {
+                    return Err(RpcError::UnknownRoom);
+                }
+                Ok(SpaceChildEventContent::new(via))
+            }
+        }
+    }
+
     pub(crate) async fn set_space_child_order(
         &self,
         space_id: &OwnedRoomId,
         room_id: &RoomId,
         order: Option<String>,
+        via: Option<Vec<String>>,
     ) -> Result<(), RpcError> {
         let space = self.room(space_id).await?;
-
         let mut content = self
-            .space_child_content(&space, room_id, "set_space_child_order: read")
-            .await?
-            .ok_or(RpcError::UnknownRoom)?;
+            .space_child_content_or_via(&space, room_id, via)
+            .await?;
 
         content.order = match order {
             Some(order) => Some(
@@ -493,13 +517,13 @@ impl Core {
         space_id: &OwnedRoomId,
         room_id: &RoomId,
         suggested: bool,
+        via: Option<Vec<String>>,
     ) -> Result<(), RpcError> {
         let space = self.room(space_id).await?;
 
         let mut content = self
-            .space_child_content(&space, room_id, "set_space_child_suggested: read")
-            .await?
-            .ok_or(RpcError::UnknownRoom)?;
+            .space_child_content_or_via(&space, room_id, via)
+            .await?;
         content.suggested = suggested;
 
         space

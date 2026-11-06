@@ -48,13 +48,15 @@ pub struct SetChildOrderParams {
     pub room_id: OwnedRoomId,
     #[serde(default)]
     pub order: Option<String>,
+    #[serde(default)]
+    pub via: Option<Vec<String>>,
 }
 
 impl Handler for SetChildOrderParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_space_child_order(&self.space_id, &self.room_id, self.order)
+        core.set_space_child_order(&self.space_id, &self.room_id, self.order, self.via)
             .await
     }
 }
@@ -67,13 +69,15 @@ pub struct SetChildSuggestedParams {
     #[cfg_attr(feature = "typegen", specta(type = String))]
     pub room_id: OwnedRoomId,
     pub suggested: bool,
+    #[serde(default)]
+    pub via: Option<Vec<String>>,
 }
 
 impl Handler for SetChildSuggestedParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_space_child_suggested(&self.space_id, &self.room_id, self.suggested)
+        core.set_space_child_suggested(&self.space_id, &self.room_id, self.suggested, self.via)
             .await
     }
 }

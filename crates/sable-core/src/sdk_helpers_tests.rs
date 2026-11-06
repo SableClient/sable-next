@@ -2911,6 +2911,7 @@ async fn suggesting_a_child_keeps_its_via_and_order() {
             space_id: room_id!("!space:example.org").to_owned(),
             room_id: room_id!("!child:example.org").to_owned(),
             suggested: true,
+            via: None,
         },
     )
     .await;
@@ -2922,6 +2923,22 @@ async fn suggesting_a_child_keeps_its_via_and_order() {
 }
 
 #[tokio::test]
+async fn suggesting_a_parent_claim_creates_the_child_edge() {
+    let writes = space_child_writes(
+        None,
+        SetChildSuggestedParams {
+            space_id: room_id!("!space:example.org").to_owned(),
+            room_id: room_id!("!child:example.org").to_owned(),
+            suggested: true,
+            via: Some(vec!["other.org".to_owned()]),
+        },
+    )
+    .await;
+
+    assert_eq!(writes, [json!({"via": ["other.org"], "suggested": true})]);
+}
+
+#[tokio::test]
 async fn reordering_a_child_keeps_its_via_and_suggestion() {
     let writes = space_child_writes(
         Some(json!({"via": ["other.org"], "order": "b", "suggested": true})),
@@ -2929,6 +2946,7 @@ async fn reordering_a_child_keeps_its_via_and_suggestion() {
             space_id: room_id!("!space:example.org").to_owned(),
             room_id: room_id!("!child:example.org").to_owned(),
             order: Some("a".to_owned()),
+            via: None,
         },
     )
     .await;
@@ -2937,6 +2955,22 @@ async fn reordering_a_child_keeps_its_via_and_suggestion() {
         writes,
         [json!({"via": ["other.org"], "order": "a", "suggested": true})]
     );
+}
+
+#[tokio::test]
+async fn reordering_a_parent_claim_creates_the_child_edge() {
+    let writes = space_child_writes(
+        None,
+        SetChildOrderParams {
+            space_id: room_id!("!space:example.org").to_owned(),
+            room_id: room_id!("!child:example.org").to_owned(),
+            order: Some("a".to_owned()),
+            via: Some(vec!["other.org".to_owned()]),
+        },
+    )
+    .await;
+
+    assert_eq!(writes, [json!({"via": ["other.org"], "order": "a"})]);
 }
 
 #[tokio::test]
