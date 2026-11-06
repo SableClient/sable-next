@@ -1,18 +1,15 @@
 # Search sharing
 
 Search history is shared between verified devices on the same account over an ordered,
-reliable WebRTC data channel. ICE uses the `searchSharing.stunServers` from `config.json`
-(default `stun:stun.sable.moe:3478`) and no TURN server.
+reliable WebRTC data channel. ICE uses `searchSharing.stunServers` from `config.json`
+(default `stun:stun.sable.moe:3478`) and the homeserver's TURN server when it has one.
 
-Signaling implements the Frostbite device RTC framework, accepting only encrypted to-device
-messages from the account's verified devices.
+Devices find each other with `moe.sable.search_peer.v1` (`session`, `timestamp`, `kind`):
+`probe` picks a device, `ready` answers. The prober becomes the sender.
 
-- `moe.sable.search_peer.v1` (`session`, `timestamp`, `kind`) starts a session: `probe`
-  picks a device, `ready` answers. The prober becomes the sender.
-- `computer.gingershaped.frostbite.negotiate` (`session`, `timestamp`, `description`):
-  the sender offers, the receiver answers.
-- `computer.gingershaped.frostbite.candidate` (`session`, `candidate`) trickles ICE
-  candidates.
+Signaling then follows Frostbite over encrypted to-device events from verified devices:
+`computer.gingershaped.frostbite.negotiate` (`session`, `timestamp`, `description`) and
+`computer.gingershaped.frostbite.candidate` (`session`, `candidate`).
 
 Each device requests rooms (`list`, `rooms`), then their parts (`room`, `part`, `next`,
 `done`). Parts are JSON, compressed with zlib and encoded as unpadded base64. Their

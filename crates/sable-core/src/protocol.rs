@@ -225,10 +225,10 @@ pub enum RegistrationResultView {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CoreEvent {
-    SearchPeer {
+    Rtc {
         session_id: String,
-        initiator: bool,
-        signal: SearchPeerSignal,
+        sender: bool,
+        signal: RtcSignal,
     },
     AccountLockChanged {
         account_id: String,
@@ -592,36 +592,15 @@ pub struct SearchMetricsView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub enum SearchPeerSignal {
+pub enum RtcSignal {
     Open,
-    Negotiate { description: SearchPeerDescription },
-    Candidate { candidate: SearchPeerCandidate },
+    Negotiate {
+        description: sable_frostbite::Description,
+    },
+    Candidate {
+        candidate: sable_frostbite::IceCandidate,
+    },
     Close,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-pub struct SearchPeerDescription {
-    #[serde(rename = "type")]
-    pub kind: SearchPeerDescriptionType,
-    pub sdp: String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-#[serde(rename_all = "snake_case")]
-pub enum SearchPeerDescriptionType {
-    Offer,
-    Answer,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-#[serde(rename_all = "camelCase")]
-pub struct SearchPeerCandidate {
-    pub candidate: String,
-    pub sdp_mid: Option<String>,
-    pub sdp_m_line_index: Option<u16>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]

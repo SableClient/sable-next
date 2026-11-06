@@ -71,10 +71,10 @@ pub(super) async fn exchange(
                 };
                 write(&mut input, &response);
             }
-            Some(event @ CoreEvent::SearchPeer { .. }) = left.recv() => {
+            Some(event @ CoreEvent::Rtc { .. }) = left.recv() => {
                 write(&mut input, &json!({ "side": 0, "event": event }));
             }
-            Some(event @ CoreEvent::SearchPeer { .. }) = right.recv() => {
+            Some(event @ CoreEvent::Rtc { .. }) = right.recv() => {
                 write(&mut input, &json!({ "side": 1, "event": event }));
             }
             _ = ticker.tick() => {

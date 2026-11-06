@@ -1,5 +1,6 @@
-import type { CoreEvent, Rpc, SearchPeerSignal } from '#src/generated/protocol';
+import type { CoreEvent, Rpc } from '#src/generated/protocol';
 import { SearchPeerDecoder, encodeSearchPeerFrame } from '#lib/model/model.js';
+import { connectRtc, iceServers, type RtcCore, type RtcEvent } from '#lib/rtc/connect.js';
 
 // The message and segment formats are described in docs/search-sharing.md.
 const CHANNEL = 'sable-search-v1';
@@ -8,20 +9,18 @@ const FRAME_BYTES = 16 * 1024;
 const MAX_QUEUED_BYTES = 2 * MAX_MESSAGE_BYTES;
 const MAX_QUEUED_MESSAGES = 8;
 const MAX_SESSIONS = 4;
-const MAX_SDP_BYTES = 48 * 1024;
-const MAX_PENDING_CANDIDATES = 64;
 const BUFFER_HIGH = 64 * 1024;
 const BUFFER_LOW = 32 * 1024;
 const NEGOTIATION_MS = 20_000;
 const IDLE_MS = 60_000;
 const DISCOVERY_MS = 60_000;
 
-export type SearchPeerEvent = Extract<CoreEvent, { type: 'search_peer' }>;
-type SearchPeerRpc = Pick<Rpc['search'], 'peerStart' | 'peerSignal' | 'peerExchange' | 'peerClose'>;
-
 export interface SearchPeerCore {
   session: { account_id: string } | null;
-  rpc: { search: SearchPeerRpc };
+  rpc: RtcCore['rpc'] & {
+    search: Pick<Rpc['search'], 'peerStart' | 'peerExchange'>;
+    calls: Pick<Rpc['calls'], 'turnServer'>;
+  };
   subscribeEvents(callback: (event: CoreEvent) => void): () => void;
 }
 
@@ -127,12 +126,13 @@ function connectSearchPeers(
 ): () => void {
   const sessions = new Map<
     string,
-    { signal(event: SearchPeerEvent): Promise<void>; close: () => void }
+    { receive(event: RtcEvent): Promise<void>; close: () => void }
   >();
   const connection = (navigator as Navigator & { connection?: NetworkConnection }).connection;
   const rpc = core.rpc.search;
   let stopped = false;
   let discovering = false;
+  let servers: RTCIceServer[] = options.stunServers.map((urls) => ({ urls }));
 
   const current = (): boolean => !stopped && core.session?.account_id === account;
   const allowed = (): boolean =>
@@ -145,9 +145,8 @@ function connectSearchPeers(
 
   function create(sessionId: string, initiator: boolean) {
     const decoder = new SearchPeerDecoder();
-    const peer = new RTCPeerConnection({
-      iceServers: options.stunServers.map((urls) => ({ urls })),
-    });
+    const rtc = connectRtc(core, { sessionId, sender: initiator, iceServers: servers }, close);
+    const { peer } = rtc;
     const abort = new AbortController();
     let channel: RTCDataChannel | null = null;
     let closed = false;
@@ -158,9 +157,6 @@ function connectSearchPeers(
     let incomingBytes = 0;
     let incomingMessages = 0;
     let processing = Promise.resolve();
-    let signaling = Promise.resolve();
-    let outgoing = Promise.resolve();
-    const pendingCandidates: RTCIceCandidateInit[] = [];
     const negotiation = setTimeout(close, NEGOTIATION_MS);
     const active = (): boolean => !closed && allowed();
     const channelOpen = (): boolean => channel?.readyState === 'open' && active();
@@ -179,9 +175,9 @@ function connectSearchPeers(
       abort.abort();
       decoder.free();
       channel?.close();
-      peer.close();
-      const registered = sessions.delete(sessionId);
-      if (registered && current()) void rpc.peerClose({ session_id: sessionId }).catch(() => {});
+      sessions.delete(sessionId);
+      if (current()) rtc.close();
+      else peer.close();
     }
 
     async function sendFrame(frame: string | ArrayBuffer): Promise<void> {
@@ -205,39 +201,6 @@ function connectSearchPeers(
       const bytes = encodeSearchPeerFrame(data);
       for (let start = 0; start < bytes.length; start += FRAME_BYTES) {
         await sendFrame(new Uint8Array(bytes.subarray(start, start + FRAME_BYTES)).buffer);
-      }
-    }
-
-    function signal(next: SearchPeerSignal): void {
-      outgoing = outgoing
-        .then(async () => {
-          if (active()) await rpc.peerSignal({ session_id: sessionId, signal: next });
-        })
-        .catch(close);
-    }
-
-    async function describe(): Promise<void> {
-      await peer.setLocalDescription();
-      const description = peer.localDescription;
-      if (!active() || !description) return;
-      if (description.type !== 'offer' && description.type !== 'answer') return;
-      signal({ kind: 'negotiate', description: { type: description.type, sdp: description.sdp } });
-    }
-
-    async function remote(next: SearchPeerSignal): Promise<void> {
-      if (next.kind === 'negotiate') {
-        const { description } = next;
-        if (description.type !== (initiator ? 'answer' : 'offer')) throw new Error('wrong role');
-        if (description.sdp.length > MAX_SDP_BYTES) throw new Error('oversized description');
-        await peer.setRemoteDescription(description);
-        for (const candidate of pendingCandidates.splice(0)) await peer.addIceCandidate(candidate);
-        if (!initiator) await describe();
-      } else if (next.kind === 'candidate') {
-        const { candidate } = next;
-        if (peer.remoteDescription) await peer.addIceCandidate(candidate);
-        else if (pendingCandidates.length < MAX_PENDING_CANDIDATES)
-          pendingCandidates.push(candidate);
-        else throw new Error('too many candidates');
       }
     }
 
@@ -334,25 +297,6 @@ function connectSearchPeers(
     peer.addEventListener('datachannel', (event) => {
       attach(event.channel);
     });
-    peer.addEventListener('icecandidate', ({ candidate }) => {
-      if (!candidate?.candidate) return;
-      signal({
-        kind: 'candidate',
-        candidate: {
-          candidate: candidate.candidate,
-          sdpMid: candidate.sdpMid,
-          sdpMLineIndex: candidate.sdpMLineIndex,
-        },
-      });
-    });
-    if (initiator) {
-      peer.addEventListener('negotiationneeded', () => {
-        signaling = signaling.then(describe).catch(close);
-      });
-    }
-    peer.addEventListener('connectionstatechange', () => {
-      if (peer.connectionState === 'failed' || peer.connectionState === 'closed') close();
-    });
     try {
       if (initiator) attach(peer.createDataChannel(CHANNEL, { ordered: true }));
     } catch (error) {
@@ -362,48 +306,48 @@ function connectSearchPeers(
 
     return {
       close,
-      signal(event: SearchPeerEvent): Promise<void> {
-        signaling = signaling.then(async () => {
-          if (!active() || event.initiator !== initiator) {
-            close();
-            return;
-          }
-          await remote(event.signal);
-        });
-        return signaling;
+      receive(event: RtcEvent): Promise<void> {
+        if (!active()) {
+          close();
+          return Promise.resolve();
+        }
+        return rtc.receive(event);
       },
     };
   }
 
   const unsubscribe = core.subscribeEvents((event) => {
-    if (event.type !== 'search_peer' || !current()) return;
+    if (event.type !== 'rtc' || !current()) return;
     let session = sessions.get(event.session_id);
     if (!allowed() || event.signal.kind === 'close') {
       session?.close();
       return;
     }
     if (!session) {
-      const opens = event.initiator === (event.signal.kind === 'open');
+      const opens = event.sender === (event.signal.kind === 'open');
       if (!opens || sessions.size >= MAX_SESSIONS) {
-        void rpc.peerClose({ session_id: event.session_id }).catch(() => {});
+        void core.rpc.rtc.close({ session_id: event.session_id }).catch(() => {});
         return;
       }
       try {
-        session = create(event.session_id, event.initiator);
+        session = create(event.session_id, event.sender);
         sessions.set(event.session_id, session);
       } catch {
-        void rpc.peerClose({ session_id: event.session_id }).catch(() => {});
         return;
       }
     }
-    void session.signal(event).catch(session.close);
+    void session.receive(event).catch(session.close);
   });
 
   const discover = (): void => {
     if (!allowed() || document.visibilityState !== 'visible' || discovering) return;
     discovering = true;
-    void rpc
-      .peerStart({})
+    void Promise.all([
+      iceServers(options.stunServers, () => core.rpc.calls.turnServer()).then((next) => {
+        servers = next;
+      }),
+      rpc.peerStart({}),
+    ])
       .catch(() => {})
       .finally(() => {
         discovering = false;

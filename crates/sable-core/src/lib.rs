@@ -61,6 +61,7 @@ mod room_sections;
 mod room_settings;
 mod room_widgets;
 mod rooms;
+mod rtc;
 mod scheduled;
 mod sealed_account_data;
 pub mod search;
@@ -196,6 +197,7 @@ pub struct Core {
     notifications_enabled: AtomicBool,
     search_crawler_enabled: AtomicBool,
     search_sharing: search::SearchSharing,
+    rtc: rtc::RtcSessions,
     search_network: search::CrawlNetwork,
     search_foreground: AtomicBool,
     app_active: AtomicBool,
@@ -311,6 +313,7 @@ impl Core {
             notifications_enabled: AtomicBool::new(true),
             search_crawler_enabled: AtomicBool::new(true),
             search_sharing: search::SearchSharing::default(),
+            rtc: rtc::RtcSessions::default(),
             search_network: search::CrawlNetwork::default(),
             search_foreground: AtomicBool::new(true),
             app_active: AtomicBool::new(true),
