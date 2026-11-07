@@ -826,10 +826,16 @@
 
   /* Glyph sizes for emoji-only messages, deliberately off the type scale. */
   .jumbo {
-    --jumbo-size-1: 2.4rem;
-    --jumbo-size-2: 1.9rem;
-    --jumbo-size-3: 1.5rem;
-    --jumbo-size-4: 1.25rem;
+    --jumbo-size-1: 3rem;
+    --jumbo-size-2: 2.4rem;
+    --jumbo-size-3: 1.9rem;
+    --jumbo-size-4: 1.55rem;
+  }
+
+  .jumbo :global([data-emoji]) {
+    font-size: inherit;
+    line-height: inherit;
+    vertical-align: baseline;
   }
 
   .jumbo :global(.formatted-body img) {

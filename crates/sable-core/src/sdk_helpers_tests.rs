@@ -2780,7 +2780,7 @@ async fn missing_media_never_opens_the_circuit() {
         assert!(matches!(
             core.media_thumbnail(format!("mxc://gone.example/{id}"), 0, 0)
                 .await,
-            Err(RpcError::Unavailable)
+            Err(RpcError::MediaNotFound)
         ));
     }
     core.media_thumbnail("mxc://gone.example/ok".to_owned(), 0, 0)
@@ -4211,4 +4211,36 @@ async fn opening_a_room_returns_its_power_levels() {
     assert!(opened.permissions.can_invite);
     assert_eq!(opened.power_levels.invite, 75);
     assert_eq!(opened.power_levels.users.get(own.as_str()), Some(&75));
+}
+
+#[tokio::test]
+async fn missing_media_is_reported_apart_from_a_failing_server() {
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .build()
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v1/media/download/example.org/gone"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v1/media/download/example.org/flaky"))
+        .respond_with(ResponseTemplate::new(502))
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    assert!(matches!(
+        core.fetch_media("mxc://example.org/gone".to_owned(), 0, 0, true)
+            .await,
+        Err(crate::protocol::RpcError::MediaNotFound)
+    ));
+    assert!(matches!(
+        core.fetch_media("mxc://example.org/flaky".to_owned(), 0, 0, true)
+            .await,
+        Err(crate::protocol::RpcError::Unavailable)
+    ));
 }

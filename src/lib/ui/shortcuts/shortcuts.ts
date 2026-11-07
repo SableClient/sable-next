@@ -306,7 +306,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     id: 'composer.sub',
     labelKey: 'composer.subscript',
     category: 'composer',
-    binding: 'mod+,',
+    binding: 'mod+shift+,',
     allowInEditable: true,
   },
   {
@@ -383,7 +383,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     id: 'composer.toggleSource',
     labelKey: 'composer.markdownSource',
     category: 'composer',
-    binding: 'mod+shift+m',
+    binding: 'mod+shift+l',
     allowInEditable: true,
   },
   {
@@ -409,17 +409,9 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   },
 ] as const;
 
-export function shortcutScope(shortcut: Pick<ShortcutDefinition, 'category'>): string {
-  return shortcut.category === 'composer' ? 'composer' : 'global';
-}
-
 export function shortcutsConflicts(isMac: boolean): ReturnType<typeof findShortcutConflicts> {
   return findShortcutConflicts(
-    SHORTCUTS.map((shortcut) => ({
-      id: shortcut.id,
-      binding: shortcut.binding,
-      scope: shortcutScope(shortcut),
-    })),
+    SHORTCUTS.map((shortcut) => ({ id: shortcut.id, binding: shortcut.binding })),
     isMac
   );
 }

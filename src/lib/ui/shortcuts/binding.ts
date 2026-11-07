@@ -141,7 +141,6 @@ function canonicalBinding(binding: string, isMac: boolean): string {
 export interface ConflictCandidate {
   id: string;
   binding: string;
-  scope: string;
 }
 
 export function findShortcutConflicts(
@@ -152,7 +151,6 @@ export function findShortcutConflicts(
 
   for (const [i, a] of candidates.entries()) {
     for (const b of candidates.slice(i + 1)) {
-      if (a.scope !== b.scope) continue;
       if (canonicalBinding(a.binding, isMac) === canonicalBinding(b.binding, isMac)) {
         conflicts.push([a, b]);
       }

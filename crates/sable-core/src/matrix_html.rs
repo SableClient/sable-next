@@ -14,6 +14,7 @@ use matrix_sdk::ruma::{MatrixUri, MxcUri};
 use regex_lite::Regex;
 use sable_model::color::is_hex_color;
 use sable_model::html::nests_too_deeply;
+use sable_model::jumbo;
 
 pub use sable_model::html::preview_body;
 
@@ -98,6 +99,7 @@ fn tag_attributes() -> HashMap<&'static str, HashSet<&'static str>> {
                 "data-mx-spoiler",
                 "data-mx-maths",
                 "data-mx-room-mention",
+                "data-emoji",
             ]),
         ),
         ("div", HashSet::from(["data-mx-maths"])),
@@ -210,7 +212,7 @@ static MATRIX_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
                 },
                 PropertiesNames {
                     parent: "span",
-                    properties: &["data-mx-room-mention"],
+                    properties: &["data-mx-room-mention", "data-emoji"],
                 },
                 PropertiesNames {
                     parent: "time",
@@ -419,6 +421,20 @@ fn room_mention_spans(text: &str) -> Vec<(usize, usize)> {
         .collect()
 }
 
+fn escape_with_emoji(text: &str) -> String {
+    let mut html = String::with_capacity(text.len());
+    let mut offset = 0;
+    for (start, end) in jumbo::emoji_runs(text) {
+        html.push_str(&escape_html(text.get(offset..start).unwrap_or_default()));
+        html.push_str("<span data-emoji>");
+        html.push_str(&escape_html(text.get(start..end).unwrap_or_default()));
+        html.push_str("</span>");
+        offset = end;
+    }
+    html.push_str(&escape_html(text.get(offset..).unwrap_or_default()));
+    html
+}
+
 fn render_plain_text(text: &str) -> String {
     let mut spans: Vec<(usize, usize, SpanKind)> = PLAIN_TEXT_LINKS
         .links(text)
@@ -462,7 +478,7 @@ fn render_plain_text(text: &str) -> String {
         let (Some(before), Some(link)) = (text.get(offset..start), text.get(start..end)) else {
             continue;
         };
-        html.push_str(&escape_html(before));
+        html.push_str(&escape_with_emoji(before));
         match kind {
             SpanKind::Email => html.push_str(&anchor(&format!("mailto:{link}"), link)),
             SpanKind::Url => html.push_str(&anchor(link, link)),
@@ -477,7 +493,7 @@ fn render_plain_text(text: &str) -> String {
         }
         offset = end;
     }
-    html.push_str(&escape_html(text.get(offset..).unwrap_or_default()));
+    html.push_str(&escape_with_emoji(text.get(offset..).unwrap_or_default()));
     html
 }
 
@@ -1026,6 +1042,25 @@ mod tests {
         );
         assert!(!display_html("first\nsecond", Some("<b>rich</b>")).contains("data-plain-body"));
         assert_eq!(display_html("", None), "");
+    }
+
+    #[test]
+    fn wraps_emoji_runs_in_plain_and_formatted_text() {
+        assert_eq!(
+            display_html("hi 👍🎉 <b>", None),
+            "<span data-plain-body>hi <span data-emoji>👍🎉</span> &lt;b&gt;</span>"
+        );
+        assert_eq!(
+            display_html(
+                "x",
+                Some("<p>go 🔥 <a href=\"https://a.example\">🔥</a> <code>🔥</code></p>")
+            ),
+            "<p>go <span data-emoji=\"\">🔥</span> <a href=\"https://a.example\" rel=\"noreferrer noopener\">🔥</a> <code>🔥</code></p>"
+        );
+        assert_eq!(
+            display_html("© 1", None),
+            "<span data-plain-body>© 1</span>"
+        );
     }
 
     #[test]

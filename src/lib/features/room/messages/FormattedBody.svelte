@@ -759,6 +759,14 @@
     white-space: pre-wrap;
   }
 
+  .formatted-body :global([data-emoji]) {
+    --emoji-size: 1.375em;
+
+    font-size: var(--emoji-size);
+    line-height: 0;
+    vertical-align: -0.2em;
+  }
+
   .formatted-body :global(h1),
   .formatted-body :global(h2),
   .formatted-body :global(h3),

@@ -143,6 +143,8 @@ pub enum RpcError {
     Unsupported,
     /// Retryable: keep UI.
     Unavailable,
+    /// The server answered 404: asking again will not find it.
+    MediaNotFound,
     /// The media's server keeps failing; asking again before this is pointless.
     MediaServerUnavailable {
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]

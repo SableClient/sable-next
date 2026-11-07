@@ -2,7 +2,7 @@
 
 use icu_properties::{
     CodePointSetData,
-    props::{EmojiComponent, ExtendedPictographic},
+    props::{EmojiComponent, EmojiPresentation, ExtendedPictographic},
 };
 use ruma_html::{Html, NodeData, NodeRef};
 use unicode_segmentation::UnicodeSegmentation;
@@ -44,6 +44,30 @@ pub fn emoji_level(body: &str) -> Option<u8> {
             .filter(|grapheme| !trim(grapheme).is_empty())
             .count(),
     )
+}
+
+/// Byte ranges of the runs of emoji graphemes in `text`. Symbols that default
+/// to text presentation, like `©`, only count with a variation selector.
+#[must_use]
+pub fn emoji_runs(text: &str) -> Vec<(usize, usize)> {
+    const VARIATION_SELECTOR_16: char = '\u{FE0F}';
+    const KEYCAP: char = '\u{20E3}';
+    let presentation = CodePointSetData::new::<EmojiPresentation>();
+    let mut runs: Vec<(usize, usize)> = Vec::new();
+    for (start, grapheme) in text.grapheme_indices(true) {
+        let emoji = grapheme
+            .chars()
+            .any(|c| presentation.contains(c) || c == VARIATION_SELECTOR_16 || c == KEYCAP);
+        if !emoji {
+            continue;
+        }
+        let end = start + grapheme.len();
+        match runs.last_mut() {
+            Some(run) if run.1 == start => run.1 = end,
+            _ => runs.push((start, end)),
+        }
+    }
+    runs
 }
 
 fn blank(node: &NodeRef) -> bool {
@@ -94,7 +118,26 @@ pub fn emoticon_level(html: &str) -> Option<u8> {
 
 #[cfg(test)]
 mod tests {
-    use super::{emoji_level, emoticon_level};
+    use super::{emoji_level, emoji_runs, emoticon_level};
+
+    fn runs(text: &str) -> Vec<&str> {
+        emoji_runs(text)
+            .into_iter()
+            .filter_map(|(start, end)| text.get(start..end))
+            .collect()
+    }
+
+    #[test]
+    fn emoji_runs_group_adjacent_emoji_graphemes() {
+        assert_eq!(runs("hi 👍🎉 there 🔥"), ["👍🎉", "🔥"]);
+        assert_eq!(runs("a 👍🏽 b"), ["👍🏽"]);
+        assert_eq!(runs("a 👨‍👩‍👧 b 🇫🇷 c 1️⃣ d ❤️"), ["👨‍👩‍👧", "🇫🇷", "1️⃣", "❤️"]);
+    }
+
+    #[test]
+    fn emoji_runs_skip_text_symbols_and_digits() {
+        assert_eq!(runs("© ™ 1 # * 2024"), Vec::<&str>::new());
+    }
 
     fn emote(name: &str) -> String {
         format!(r#"<img alt="{name}" height="32" src="mxc://example.org/{name}" title="{name}">"#)

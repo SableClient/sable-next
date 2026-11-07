@@ -13,7 +13,8 @@
   import { DEFAULT_FRAME_MS, openGifPlayback, type GifPlayback } from '#lib/ui/gif-frames.js';
   import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
   import { pixelatedImage } from '#lib/ui/pixelated.js';
-  import { automaticMediaRetryDelay, mediaRetryDelay } from '#lib/ui/media-retry.js';
+  import { mediaFailureHold, mediaRetryDelay } from '#lib/ui/media-retry.js';
+  import { CoreError } from '#src/transport';
   import {
     cachedMediaType,
     cachedMediaUrl,
@@ -35,6 +36,7 @@
 
   const BLURHASH_DECODE_WIDTH = 32;
   const ORIENTATION_TOLERANCE = 0.05;
+  const RECONNECT_RETRY_SPREAD_MS = 3000;
   const THUMBNAIL_MIN_SOURCE_BYTES = 1024 * 1024;
   const ANIMATED_MIMES = ['image/gif', 'image/apng', 'image/avif', 'image/webp'];
   const ANIMATED_EXTENSIONS = ['.gif', '.apng', '.avif', '.webp'];
@@ -105,8 +107,21 @@
     spoilerName,
   }: Props = $props();
   const core = useCoreClient();
-  let outcome = $state.raw<{ key: string; url: string | null; undecodable?: true } | null>(null);
-  let backoff = $derived({ source, attempt: 0, forced: 0, manual: 0, automatic: 0, at: 0 });
+  let outcome = $state.raw<{
+    key: string;
+    url: string | null;
+    undecodable?: true;
+    missing?: true;
+  } | null>(null);
+  let backoff = $derived({
+    source,
+    attempt: 0,
+    forced: 0,
+    manual: 0,
+    automatic: 0,
+    wait: 0,
+    at: 0,
+  });
   let resume = $derived({ source, count: 0 });
   let hiddenAt: number | null = null;
   let attempt = $derived(backoff.attempt);
@@ -189,6 +204,7 @@
   );
   let failed = $derived(outcome?.key === requestKey && outcome.url === null);
   let undecodable = $derived(failed && outcome?.undecodable === true);
+  let permanent = $derived(undecodable || (failed && outcome?.missing === true));
   let retryingFailure = $derived(
     outcome !== null &&
       outcome.url === null &&
@@ -290,10 +306,27 @@
     });
   });
 
+  // A load that failed while offline, or before the session restored, would otherwise stay blank.
+  let syncWasLive = untrack(() => core.sync?.state === 'live');
+  $effect(() => {
+    const live = core.sync?.state === 'live';
+    const reconnected = live && !syncWasLive;
+    syncWasLive = live;
+    if (!reconnected) return;
+    const timer = setTimeout(() => {
+      if (!failed || permanent) return;
+      const next = backoff.attempt + 1;
+      backoff = { ...backoff, attempt: next, forced: next, automatic: 0, at: 0 };
+    }, Math.random() * RECONNECT_RETRY_SPREAD_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  });
+
   $effect(() => {
     const current = backoff;
-    const delay = automaticMediaRetryDelay(current.automatic);
-    if (!failed || undecodable || delay === null) return;
+    if (!failed || permanent) return;
+    const delay = Math.max(mediaFailureHold(current.automatic), current.wait);
     const timeout = setTimeout(() => {
       backoff = { ...current, attempt: current.attempt + 1 };
     }, delay);
@@ -347,11 +380,21 @@
         }
         outcome = { key, url: nextUrl };
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!active) return;
-        outcome = { key, url: null };
+        const detail = error instanceof CoreError ? error.detail : null;
+        outcome =
+          detail?.code === 'media_not_found'
+            ? { key, url: null, missing: true }
+            : { key, url: null };
         const automatic = previous.automatic + 1;
-        backoff = { ...previous, automatic, at: manualRetryDeadline(previous, canRetry) };
+        const wait = detail?.code === 'media_server_unavailable' ? detail.retry_after_ms : 0;
+        backoff = {
+          ...previous,
+          automatic,
+          wait,
+          at: manualRetryDeadline(previous, canRetry),
+        };
         onfailed?.(shownSource);
       });
 
