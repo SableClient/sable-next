@@ -3,7 +3,6 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { untrack } from 'svelte';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { findRoomByPathId, roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -22,7 +21,7 @@
   let listedRoom = $derived(findRoomByPathId(roomList.rooms, roomId));
   let joined = $derived(listedRoom?.state === 'joined');
 
-  let mountedRoomId = $state(untrack(() => (appLayout.current ? roomId : null)));
+  let mountedRoomId = $state<string | null>(null);
   $effect(() => {
     const id = roomId;
     if (appLayout.current) {
@@ -40,6 +39,8 @@
       clearTimeout(timer);
     };
   });
+
+  let roomMounted = $derived(appLayout.current || mountedRoomId === roomId);
 
   let listed = $derived(roomList.settled);
 
@@ -80,7 +81,7 @@
   });
 </script>
 
-{#if (space === null || eventTimeline) && mountedRoomId === roomId}
+{#if (space === null || eventTimeline) && roomMounted}
   {#if joined || unlistedRoom || (!listed && roomId.startsWith('!'))}
     <RoomView {roomId} {eventId} {notifiedEventId} room={unlistedRoom} />
   {:else if listed}
