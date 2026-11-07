@@ -29,7 +29,11 @@ const failures = new QuickLRU<string, { count: number; until: number }>({
   maxAge: MEDIA_FAILURE_MEMORY_MS,
 });
 /* Not cleared by a retry: the core already knows the server is failing. */
-const refused = new QuickLRU<string, true>({ maxSize: MAX_MEDIA_METADATA });
+const refused = new QuickLRU<string, number>({ maxSize: MAX_MEDIA_METADATA });
+const missing = new QuickLRU<string, true>({
+  maxSize: MAX_MEDIA_METADATA,
+  maxAge: MEDIA_FAILURE_MEMORY_MS,
+});
 const aspectRatios = new QuickLRU<string, number>({ maxSize: MAX_MEDIA_METADATA });
 let objectUrlBytes = 0;
 let evictQueued = false;
@@ -203,9 +207,17 @@ export function loadMediaUrl(
   mime?: string | null
 ): Promise<string> {
   const key = cacheKey(core.session?.account_id, source, width, height);
-  if (isHeld(key) || refused.has(key)) {
-    return Promise.reject(new Error('Media unavailable'));
+  if (missing.has(key)) return Promise.reject(new CoreError({ code: 'media_not_found' }));
+  const refusedUntil = refused.get(key);
+  if (refusedUntil !== undefined) {
+    return Promise.reject(
+      new CoreError({
+        code: 'media_server_unavailable',
+        retry_after_ms: Math.max(0, refusedUntil - Date.now()),
+      })
+    );
   }
+  if (isHeld(key)) return Promise.reject(new Error('Media unavailable'));
   const joined = pending.get(key);
   if (joined !== undefined) return joined;
   const request = core.media
@@ -241,7 +253,13 @@ export function loadMediaUrl(
   pending.set(key, request);
   void request.catch((error: unknown) => {
     if (error instanceof CoreError && error.detail.code === 'media_server_unavailable') {
-      refused.set(key, true, { maxAge: error.detail.retry_after_ms });
+      refused.set(key, Date.now() + error.detail.retry_after_ms, {
+        maxAge: error.detail.retry_after_ms,
+      });
+      return;
+    }
+    if (error instanceof CoreError && error.detail.code === 'media_not_found') {
+      missing.set(key, true);
       return;
     }
     recordFailure(key);
@@ -259,6 +277,9 @@ export function retryMediaUrl(
   const prefix = `${core.session?.account_id ?? ''}:${source}:`;
   for (const key of [...failures.keys()]) {
     if (key.startsWith(prefix)) failures.delete(key);
+  }
+  for (const key of [...missing.keys()]) {
+    if (key.startsWith(prefix)) missing.delete(key);
   }
   return loadMediaUrl(core, source, width, height, mime);
 }

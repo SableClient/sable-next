@@ -227,7 +227,13 @@ impl Core {
         if let Some(probe) = probe.as_mut() {
             probe.armed = false;
         }
-        result.map_err(|_| RpcError::Unavailable)
+        result.map_err(|error| {
+            if is_not_found(&error) {
+                RpcError::MediaNotFound
+            } else {
+                RpcError::Unavailable
+            }
+        })
     }
 
     async fn media_bytes(
