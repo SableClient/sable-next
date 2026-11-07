@@ -1,5 +1,40 @@
 # Sable Changelog
 
+## 2.4.0 (2026-11-07)
+
+### Features
+
+* Show the unread count on the iOS app icon, keep message text off the Android lock screen, group Android conversations under one summary, and let direct messages and mentions break through Focus on iOS.
+
+### Fixes
+
+* Stop marking abbreviations inside words that continue with an accented letter.
+* Keep the formatting toolbar on one scrollable row on phones with a stylus, instead of filling the screen.
+* Stop flagging invites as offensive when a listed word is only part of a longer accented word.
+* Keep room icons in place when hovering them in the collapsed room list.
+* Keep the composer formatting bar to a single row on phones (#1671).
+* Open the devices dashboard in the browser instead of a sign-in popup window.
+* Name an unnamed direct chat after its chosen direct partner, in the room list and notifications alike.
+* Report messages that cannot be decrypted from the desktop app, as the other apps already do.
+* Allow saving GIFs that were uploaded to a room, not only GIFs from search providers.
+* The share sheet on iPhone now opens at full width again instead of as a small popup in the corner.
+* Stop offering to install updates on rpm and deb installs, which belong to the package manager, and show that a new version is available instead.
+* Shorten long text reactions everywhere they appear, and name custom emote reactions in replies and notifications instead of showing their media link.
+* Describe join, leave and join request notifications instead of showing them as a sent message.
+* On phones, swiping back after picking a room from the list now reopens the list over that room instead of reloading the previous one.
+* Stop clearing a fresh notification for another room right after it appears.
+* Open the notified room and message when a notification launches the app, instead of the last opened room.
+* Fall back to the older QR sign-in when the homeserver does not offer the 2025 one.
+* Show read receipts on the message before a collapsed group of join and leave events, instead of hiding them.
+* Return to where you were scrolled when switching back to a room, unless there are new unread messages to land on.
+* Keep the composer in place when switching rooms on desktop.
+* Keep formatted spoiler text together so it reveals in one click and uses one placeholder in previews.
+* Hide spoilers from the plain text of sent messages, so notifications and other clients no longer show them.
+* Show a quoted message once it can be decrypted instead of keeping the encrypted placeholder.
+* Scale tall GIFs, animated images and video previews down to fit instead of cropping them.
+* Show the server's thread reply count when the local count is lower, such as after the cache was cleared.
+* Keep receiving new messages while another of your devices is online, instead of only after a reload.
+
 ## 2.3.5 (2026-11-05)
 
 ### Features
