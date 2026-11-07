@@ -4,7 +4,6 @@ import android.content.Intent
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.res.Configuration
-import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.net.ConnectivityManager
 import android.net.Network
@@ -34,12 +33,17 @@ import moe.sable.push.ConversationShortcuts
 import moe.sable.push.Secrets
 import org.json.JSONArray
 import org.json.JSONObject
+import androidx.core.content.edit
+import androidx.core.net.toUri
+import androidx.core.graphics.drawable.toDrawable
 
 class MainActivity : TauriActivity() {
   private external fun nativeInitSystemBars()
   private external fun nativeNetworkChanged(available: Boolean, unmetered: Boolean)
   private var networkCallback: ConnectivityManager.NetworkCallback? = null
   private var fullscreenClient: FullscreenChromeClient? = null
+  @Volatile private var instance: MainActivity? = null
+  
   private var mainWebView: WebView? = null
   private val authBrowser = AuthBrowser(this)
   private val fullscreenBackCallback = object : OnBackPressedCallback(false) {
@@ -54,11 +58,13 @@ class MainActivity : TauriActivity() {
     NativeSentry.apply(this, getSharedPreferences("sentry", MODE_PRIVATE).getBoolean("enabled", false))
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+    
     instance = this
     onBackPressedDispatcher.addCallback(this, fullscreenBackCallback)
     runCatching { nativeInitSystemBars() }.onFailure {
       Log.e("Sable", "Could not initialize the native Activity bridge", it)
     }
+    
     AppLifecycle.start()
     startNetworkMonitor()
     stageShareIntent(intent)
@@ -66,13 +72,14 @@ class MainActivity : TauriActivity() {
 
   private fun startNetworkMonitor() {
     val connectivity = getSystemService(ConnectivityManager::class.java)
+    
     val callback = object : ConnectivityManager.NetworkCallback() {
       private var current: Network? = null
 
       override fun onAvailable(network: Network) {
         if (instance !== this@MainActivity) return
         current = network
-        nativeNetworkChanged(true, false)
+        nativeNetworkChanged(available = true, unmetered = false)
       }
 
       override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
@@ -90,9 +97,10 @@ class MainActivity : TauriActivity() {
         if (instance !== this@MainActivity) return
         if (network != current) return
         current = null
-        nativeNetworkChanged(false, false)
+        nativeNetworkChanged(available = false, unmetered = false)
       }
     }
+    
     runCatching {
       nativeNetworkChanged(connectivity.activeNetwork != null, false)
       connectivity.registerDefaultNetworkCallback(callback)
@@ -140,12 +148,14 @@ class MainActivity : TauriActivity() {
 
   private fun setFullscreenVideo(active: Boolean) {
     val controller = WindowCompat.getInsetsController(window, window.decorView)
+    
     if (active) {
       controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
       controller.hide(WindowInsetsCompat.Type.systemBars())
     } else {
       controller.show(WindowInsetsCompat.Type.systemBars())
     }
+    
     fullscreenBackCallback.isEnabled = active
   }
 
@@ -184,6 +194,7 @@ class MainActivity : TauriActivity() {
       batchDir.deleteRecursively()
       return
     }
+    
     File(batchDir, "share.json").writeText(
       JSONObject().apply {
         put("version", 1)
@@ -221,6 +232,7 @@ class MainActivity : TauriActivity() {
           if (i >= 0) c.getString(i)?.let { displayName = it }
         }
       }
+      
       val sanitized = displayName
         .replace("/", "_").replace("\\", "_").replace("\u0000", "")
         .take(120)
@@ -229,9 +241,10 @@ class MainActivity : TauriActivity() {
       val fileName = "$index-$sanitized"
       val input = resolver.openInputStream(uri)
       if (input == null) {
-        android.util.Log.w("ShareTarget", "provider returned no stream for $uri")
+        Log.w("ShareTarget", "provider returned no stream for $uri")
         return
       }
+      
       input.use { FileOutputStream(File(batchDir, fileName)).use { output -> it.copyTo(output) } }
       items.put(JSONObject().apply {
         put("kind", "file")
@@ -239,39 +252,44 @@ class MainActivity : TauriActivity() {
         put("mime", resolver.getType(uri) ?: "application/octet-stream")
       })
     } catch (e: Exception) {
-      android.util.Log.w("ShareTarget", "stage failed: ${e.message}")
+      Log.w("ShareTarget", "stage failed: ${e.message}")
     }
   }
 
   override fun onDestroy() {
     mainWebView = null
     authBrowser.close()
+    
     networkCallback?.let {
       runCatching {
         getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it)
       }
     }
+    
     networkCallback = null
     if (instance === this) {
       instance = null
-      nativeNetworkChanged(true, false)
+      nativeNetworkChanged(available = true, unmetered = false)
     }
+    
     super.onDestroy()
   }
 
+  // functions here aren't unused as they're used by the rust backend
   companion object {
-    @Volatile private var instance: MainActivity? = null
     private var hiddenBarsDepth = 0
     private var shownBarsBehavior: Int? = null
 
     @Keep
     @JvmStatic
+    @Suppress("unused")
     fun openAuthUrlNative(id: String, url: String, sheet: Boolean): Boolean {
-      val activity = checkNotNull(instance) { "Activity is unavailable" }
+      val activity = checkNotNull(MainActivity().instance) { "Activity is unavailable" }
       val result = CompletableFuture<Boolean>()
+      
       activity.runOnUiThread {
         runCatching {
-          activity.authBrowser.open(id, Uri.parse(url), sheet) { opened ->
+          activity.authBrowser.open(id, url.toUri(), sheet) { opened ->
             opened.fold(result::complete) { result.completeExceptionally(it) }
           }
         }.onFailure { result.completeExceptionally(it) }
@@ -281,15 +299,19 @@ class MainActivity : TauriActivity() {
 
     @Keep
     @JvmStatic
+    @Suppress("unused")
     fun closeAuthWindowNative(id: String) {
-      val activity = instance ?: return
+      val activity = MainActivity().instance ?: return
+      
       activity.runOnUiThread { activity.authBrowser.dismiss(id) }
     }
 
     @Keep
     @JvmStatic
+    @Suppress("unused")
     fun hapticFeedbackNative(strong: Boolean) {
-      val activity = instance ?: return
+      val activity = MainActivity().instance ?: return
+      
       activity.runOnUiThread {
         activity.window.decorView.performHapticFeedback(
           if (strong) android.view.HapticFeedbackConstants.LONG_PRESS
@@ -302,8 +324,10 @@ class MainActivity : TauriActivity() {
     // so only the icon contrast is left. setStatusBarColor is a no-op from API 35.
     @Keep
     @JvmStatic
+    @Suppress("unused")
     fun setStatusBarLightNative(light: Boolean) {
-      val activity = instance ?: return
+      val activity = MainActivity().instance ?: return
+      
       activity.runOnUiThread {
         val window = activity.window
         val controller = WindowCompat.getInsetsController(window, window.decorView)
@@ -316,19 +340,23 @@ class MainActivity : TauriActivity() {
     // background, which follows the system theme rather than the app's.
     @Keep
     @JvmStatic
+    @Suppress("unused")
     fun setWindowBackgroundNative(color: Int) {
-      val activity = instance ?: return
+      val activity = MainActivity().instance ?: return
+      
       activity.runOnUiThread {
-        activity.window.setBackgroundDrawable(ColorDrawable(color))
+        activity.window.setBackgroundDrawable(color.toDrawable())
       }
     }
 
     @Keep
     @JvmStatic
+    @Suppress("unused")
     fun copyImageToClipboardNative(image: String) {
-      val activity = checkNotNull(instance) { "Activity is unavailable" }
+      val activity = checkNotNull(MainActivity().instance) { "Activity is unavailable" }
       val directory = File(activity.cacheDir, "clipboard").apply { mkdirs() }
       val file = File(directory, "image.png")
+      
       try {
         file.writeBytes(Base64.decode(image, Base64.NO_WRAP))
         val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", file)
@@ -337,6 +365,7 @@ class MainActivity : TauriActivity() {
             ClipData.newUri(activity.contentResolver, "Image", uri)
           )
         }
+        
         activity.runOnUiThread(copy)
         copy.get()
       } catch (error: Exception) {
@@ -347,8 +376,10 @@ class MainActivity : TauriActivity() {
 
     @Keep
     @JvmStatic
+    @Suppress("unused")
     fun setNavigationBarLightNative(light: Boolean) {
-      val activity = instance ?: return
+      val activity = MainActivity().instance ?: return
+      
       activity.runOnUiThread {
         val window = activity.window
         val controller = WindowCompat.getInsetsController(window, window.decorView)
@@ -358,22 +389,26 @@ class MainActivity : TauriActivity() {
 
     @Keep
     @JvmStatic
+    @Suppress("unused")
     fun setSystemBarsHiddenNative(hidden: Boolean) {
-      val activity = instance ?: return
+      val activity = MainActivity().instance ?: return
       activity.runOnUiThread {
         val window = activity.window
         val controller = WindowCompat.getInsetsController(window, window.decorView)
+        
         if (hidden) {
           hiddenBarsDepth += 1
           if (hiddenBarsDepth > 1) return@runOnUiThread
           shownBarsBehavior = controller.systemBarsBehavior
           controller.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+          
           controller.hide(WindowInsetsCompat.Type.systemBars())
         } else {
           hiddenBarsDepth = maxOf(0, hiddenBarsDepth - 1)
           if (hiddenBarsDepth > 0) return@runOnUiThread
           controller.show(WindowInsetsCompat.Type.systemBars())
+          
           shownBarsBehavior?.let { controller.systemBarsBehavior = it }
           shownBarsBehavior = null
         }
@@ -382,10 +417,17 @@ class MainActivity : TauriActivity() {
 
     @Keep
     @JvmStatic
+    @Suppress("unused")
     fun setSentryEnabledNative(enabled: Boolean) {
-      val activity = instance ?: return
+      val activity = MainActivity().instance ?: return
+      
       activity.runOnUiThread {
-        activity.getSharedPreferences("sentry", MODE_PRIVATE).edit().putBoolean("enabled", enabled).apply()
+        activity.getSharedPreferences("sentry", MODE_PRIVATE).edit {
+          putBoolean(
+            "enabled",
+            enabled
+          )
+        }
         NativeSentry.apply(activity, enabled)
       }
     }
