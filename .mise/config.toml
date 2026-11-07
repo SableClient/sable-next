@@ -202,7 +202,7 @@ env = { MISE_ENV = "tauri" }
 # Through `mise exec`, which is what puts the tauri env's sdkmanager on PATH.
 run = [
   "yes | mise exec -- sdkmanager --licenses",
-  'mise exec -- sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0" "ndk;{{env.ANDROID_NDK_VERSION}}"',
+  'mise exec -- sdkmanager "platform-tools" "platforms;android-37.0" "build-tools;35.0.0" "ndk;{{env.ANDROID_NDK_VERSION}}"',
 ]
 
 [tasks."tauri:setup:macos"]

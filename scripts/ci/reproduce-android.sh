@@ -36,7 +36,7 @@ unzip -q "$downloads/tools.zip" -d "$ANDROID_HOME/cmdline-tools"
 mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
 export PATH="/opt/node-v$node_version-linux-x64/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/$build_tools:$PATH"
 (yes || true) | sdkmanager --licenses >/dev/null
-sdkmanager "platforms;android-35" "platforms;android-36" "build-tools;$build_tools" "ndk;$ndk_version"
+sdkmanager "platforms;android-36" "platforms;android-37.0" "build-tools;$build_tools" "ndk;$ndk_version"
 export NDK_HOME="$ANDROID_HOME/ndk/$ndk_version"
 
 npm install --global corepack@latest
