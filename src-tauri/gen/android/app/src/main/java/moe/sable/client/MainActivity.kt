@@ -58,11 +58,13 @@ class MainActivity : TauriActivity() {
     NativeSentry.apply(this, getSharedPreferences("sentry", MODE_PRIVATE).getBoolean("enabled", false))
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+    
     instance = this
     onBackPressedDispatcher.addCallback(this, fullscreenBackCallback)
     runCatching { nativeInitSystemBars() }.onFailure {
       Log.e("Sable", "Could not initialize the native Activity bridge", it)
     }
+    
     AppLifecycle.start()
     startNetworkMonitor()
     stageShareIntent(intent)
@@ -70,6 +72,7 @@ class MainActivity : TauriActivity() {
 
   private fun startNetworkMonitor() {
     val connectivity = getSystemService(ConnectivityManager::class.java)
+    
     val callback = object : ConnectivityManager.NetworkCallback() {
       private var current: Network? = null
 
@@ -97,6 +100,7 @@ class MainActivity : TauriActivity() {
         nativeNetworkChanged(available = false, unmetered = false)
       }
     }
+    
     runCatching {
       nativeNetworkChanged(connectivity.activeNetwork != null, false)
       connectivity.registerDefaultNetworkCallback(callback)
@@ -144,12 +148,14 @@ class MainActivity : TauriActivity() {
 
   private fun setFullscreenVideo(active: Boolean) {
     val controller = WindowCompat.getInsetsController(window, window.decorView)
+    
     if (active) {
       controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
       controller.hide(WindowInsetsCompat.Type.systemBars())
     } else {
       controller.show(WindowInsetsCompat.Type.systemBars())
     }
+    
     fullscreenBackCallback.isEnabled = active
   }
 
@@ -188,6 +194,7 @@ class MainActivity : TauriActivity() {
       batchDir.deleteRecursively()
       return
     }
+    
     File(batchDir, "share.json").writeText(
       JSONObject().apply {
         put("version", 1)
@@ -252,16 +259,19 @@ class MainActivity : TauriActivity() {
   override fun onDestroy() {
     mainWebView = null
     authBrowser.close()
+    
     networkCallback?.let {
       runCatching {
         getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it)
       }
     }
+    
     networkCallback = null
     if (instance === this) {
       instance = null
       nativeNetworkChanged(available = true, unmetered = false)
     }
+    
     super.onDestroy()
   }
 
@@ -410,6 +420,7 @@ class MainActivity : TauriActivity() {
     @Suppress("unused")
     fun setSentryEnabledNative(enabled: Boolean) {
       val activity = MainActivity().instance ?: return
+      
       activity.runOnUiThread {
         activity.getSharedPreferences("sentry", MODE_PRIVATE).edit {
           putBoolean(
