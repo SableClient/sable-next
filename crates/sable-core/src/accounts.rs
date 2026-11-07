@@ -961,6 +961,7 @@ impl Core {
         let mut session = self.session.write().await;
         self.session_handlers.lock().clear();
         self.session_tasks.lock().clear();
+        self.to_device_inbox.lock().take();
         self.search_sharing.reset_session().await;
         self.rtc.clear();
         self.subscriptions.lock().await.clear();

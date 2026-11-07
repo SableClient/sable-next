@@ -183,8 +183,12 @@ impl Core {
                 let incoming = incoming(event);
                 async move {
                     if let Some(core) = weak.upgrade() {
-                        core.receive_rtc(&client, generation, encryption, incoming)
-                            .await;
+                        let deferred = core.clone();
+                        core.defer_to_device(Box::pin(async move {
+                            deferred
+                                .receive_rtc(&client, generation, encryption, incoming)
+                                .await;
+                        }));
                     }
                 }
             },

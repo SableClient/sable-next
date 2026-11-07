@@ -105,7 +105,7 @@ use std::{
     },
 };
 
-use matrix_sdk::executor::AbortOnDrop;
+use matrix_sdk::executor::{AbortOnDrop, JoinHandleExt};
 use matrix_sdk::ruma::events::call::member::CallMemberStateKey;
 use matrix_sdk::ruma::events::{AnyGlobalAccountDataEventContent, GlobalAccountDataEventType};
 use matrix_sdk::ruma::serde::Raw;
@@ -119,6 +119,8 @@ use session::{AccountRegistry, Session};
 use store::SessionStore;
 
 pub(crate) type Task = AbortOnDrop<()>;
+
+const TO_DEVICE_WORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// Lets pushes and pusher upkeep use the clients of the core that owns their store.
 #[cfg(not(target_family = "wasm"))]
@@ -178,6 +180,9 @@ pub struct Core {
     qr_flow: Mutex<Option<qr_login::QrFlow>>,
     pending_identity_reset: Mutex<Option<verification::PendingIdentityReset>>,
     session_tasks: parking_lot::Mutex<Vec<Task>>,
+    to_device_inbox: parking_lot::Mutex<
+        Option<mpsc::UnboundedSender<matrix_sdk_common::BoxFuture<'static, ()>>>,
+    >,
     subscriptions: Mutex<HashMap<SubscriptionId, Subscription>>,
     room_subscriptions: Mutex<std::collections::BTreeSet<OwnedRoomId>>,
     warm_rooms: parking_lot::Mutex<std::collections::VecDeque<OwnedRoomId>>,
@@ -364,6 +369,7 @@ impl Core {
             qr_flow: Mutex::new(None),
             pending_identity_reset: Mutex::new(None),
             session_tasks: parking_lot::Mutex::new(Vec::new()),
+            to_device_inbox: parking_lot::Mutex::new(None),
             subscriptions: Mutex::new(HashMap::new()),
             room_subscriptions: Mutex::new(std::collections::BTreeSet::new()),
             warm_rooms: parking_lot::Mutex::new(std::collections::VecDeque::new()),
@@ -460,6 +466,35 @@ impl Core {
     /// Session tasks must outlive their spawn call. Dropping `Task` aborts it.
     pub(crate) fn track_session_task(&self, task: Task) {
         self.session_tasks.lock().push(task);
+    }
+
+    /// The SDK awaits event handlers before its next sync request.
+    pub(crate) fn defer_to_device(&self, work: matrix_sdk_common::BoxFuture<'static, ()>) {
+        let mut inbox = self.to_device_inbox.lock();
+        let work = match inbox.as_ref() {
+            Some(sender) => match sender.send(work) {
+                Ok(()) => return,
+                Err(mpsc::error::SendError(work)) => work,
+            },
+            None => work,
+        };
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let _ = sender.send(work);
+        *inbox = Some(sender);
+        self.track_session_task(
+            matrix_sdk::executor::spawn(async move {
+                while let Some(work) = receiver.recv().await {
+                    // The wasm HTTP client ignores request timeouts.
+                    if matrix_sdk::timeout::timeout(work, TO_DEVICE_WORK_TIMEOUT)
+                        .await
+                        .is_err()
+                    {
+                        tracing::warn!("to-device work timed out");
+                    }
+                }
+            })
+            .abort_on_drop(),
+        );
     }
 
     pub(crate) fn track_session_handler(
@@ -891,6 +926,37 @@ impl Core {
 mod tests {
     use super::*;
     use crate::protocol::RpcError;
+
+    #[tokio::test]
+    async fn to_device_work_runs_in_order_without_blocking_the_caller() {
+        let (core, _events) = Core::new(
+            "to-device-inbox",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        let (release, released) = tokio::sync::oneshot::channel::<()>();
+        let (done, mut finished) = mpsc::unbounded_channel();
+        let first = done.clone();
+        core.defer_to_device(Box::pin(async move {
+            released.await.unwrap();
+            first.send(1).unwrap();
+        }));
+        let second = done.clone();
+        core.defer_to_device(Box::pin(async move {
+            second.send(2).unwrap();
+        }));
+        tokio::task::yield_now().await;
+        finished.try_recv().unwrap_err();
+        release.send(()).unwrap();
+        assert_eq!(finished.recv().await, Some(1));
+        assert_eq!(finished.recv().await, Some(2));
+
+        core.session_tasks.lock().clear();
+        core.to_device_inbox.lock().take();
+        core.defer_to_device(Box::pin(async move {
+            done.send(3).unwrap();
+        }));
+        assert_eq!(finished.recv().await, Some(3));
+    }
 
     struct FailingClearSessionStore;
 
