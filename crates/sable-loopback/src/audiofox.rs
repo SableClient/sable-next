@@ -17,10 +17,10 @@ struct Session {
 
 static SESSION: Mutex<Option<Session>> = Mutex::new(None);
 
-fn process_table() -> HashMap<u32, Process> {
-    let mut system = System::new();
+fn process_table() -> Result<HashMap<u32, Process>, String> {
+    let mut system = System::new().map_err(|error| error.to_string())?;
     system.refresh_processes(ProcessesToUpdate::All, true);
-    system
+    Ok(system
         .processes()
         .iter()
         .map(|(pid, process)| {
@@ -32,7 +32,7 @@ fn process_table() -> HashMap<u32, Process> {
                 },
             )
         })
-        .collect()
+        .collect())
 }
 
 fn is_own(pid: u32, root_pid: u32, processes: &HashMap<u32, Process>) -> bool {
@@ -47,7 +47,7 @@ fn is_own(pid: u32, root_pid: u32, processes: &HashMap<u32, Process>) -> bool {
 }
 
 fn sources(manager: &AudioManager, root_pid: u32) -> Result<Vec<AudioSource>, String> {
-    let processes = process_table();
+    let processes = process_table()?;
     let sources = manager.list().map_err(|error| error.to_string())?;
     #[cfg(target_os = "linux")]
     let allowed = linux_sources(root_pid, &processes)?;
