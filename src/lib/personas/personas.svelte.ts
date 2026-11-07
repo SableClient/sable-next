@@ -43,6 +43,10 @@ export class PersonaStore {
 
   constructor(private readonly core: CoreClient) {
     this.core.subscribeEvents((event: CoreEvent) => {
+      if (event.type === 'sync_status') {
+        if (event.state !== 'offline' && !this.loaded) void this.load();
+        return;
+      }
       if (event.type !== 'personas_changed') return;
 
       if (this.inFlight !== null) {

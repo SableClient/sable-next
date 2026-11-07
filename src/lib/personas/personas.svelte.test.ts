@@ -150,3 +150,22 @@ test('the picker opens on the closest scope holding a selection', async () => {
   expect(store.scopeFor('room', '!room', spaces)).toBe('room');
   expect(store.scopeFor('space', '!room', { target: null, order: [] })).toBe('account');
 });
+
+test('a failed load retries when sync comes back', async () => {
+  const { rpc, store, emit } = setup();
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  rpc.list.mockRejectedValueOnce(new Error('offline'));
+  await store.load();
+  expect(store.error).toBe('personas.loadFailed');
+  const restored = persona('restored');
+  rpc.list.mockResolvedValueOnce(catalog([restored]));
+
+  emit({ type: 'sync_status', state: 'offline' });
+  expect(rpc.list).toHaveBeenCalledTimes(1);
+  emit({ type: 'sync_status', state: 'live' });
+
+  await vi.waitFor(() => {
+    expect(store.personas).toEqual([restored]);
+  });
+  expect(store.error).toBeNull();
+});

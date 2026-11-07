@@ -257,6 +257,7 @@ export class Conversation {
       return;
     }
 
+    await this.#personas.load();
     const untouched = outcome.body === body;
     const outgoing = this.#personaFor(
       targetRoomId,

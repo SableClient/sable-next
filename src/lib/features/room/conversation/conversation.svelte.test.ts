@@ -88,6 +88,7 @@ function setup(
     disabledIn: () => false,
     select: () => Promise.resolve(),
     save: () => Promise.resolve(),
+    load: () => Promise.resolve(),
     ...store,
   };
   const personas = {
@@ -845,6 +846,7 @@ function scheduling() {
     core,
     personas: {
       personas: [],
+      load: () => Promise.resolve(),
       selectionFor: () => null,
       associationFor: () => undefined,
     } as unknown as PersonaStore,
@@ -898,6 +900,7 @@ function rescheduling(
     core,
     personas: {
       personas: [],
+      load: () => Promise.resolve(),
       selectionFor: () => null,
       associationFor: () => undefined,
     } as unknown as PersonaStore,
