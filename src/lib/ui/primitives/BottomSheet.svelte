@@ -156,10 +156,7 @@
       if (canExpand() && (-moved >= threshold || velocity <= -dismissVelocity)) expanded = true;
       dragOffset = 0;
     } else if (moved >= threshold || velocity >= dismissVelocity) {
-      if (expanded) {
-        expanded = false;
-        dragOffset = 0;
-      } else dismiss();
+      dismiss();
     } else dragOffset = 0;
   }
 
@@ -212,7 +209,7 @@
       previousY = touch.clientY;
       previousTime = event.timeStamp;
       moved = deltaY;
-      dragOffset = Math.max(0, deltaY);
+      dragOffset = expandable ? deltaY : Math.max(0, deltaY);
     }
 
     function end(): void {
@@ -267,13 +264,13 @@
     : dismissing
       ? 'sheet-dismissing'
       : 'sheet-settling'}
-  contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight || expanded ? 'height: calc(100dvh - var(--safe-top) - var(--keyboard-overlap) - var(--space-300) * 2);' : ''} transform: translateY(${dismissing ? '100%' : `${String(dragOffset)}px`})`}
+  contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight || expanded ? 'height: calc(100dvh - var(--safe-top) - var(--keyboard-overlap) - var(--space-300) * 2); overflow: hidden;' : ''} transform: translateY(${dismissing ? '100%' : `${String(dragOffset)}px`})`}
   {onOpenChange}
   {onOpenAutoFocus}
 >
   <div
     bind:this={body}
-    class={{ 'content-inset': contentInset, expanded }}
+    class={{ 'content-inset': contentInset, expanded, collapsed: !expanded && expandable }}
     role="presentation"
     onclickcapture={contentClick}
     onpointerdown={startContentDrag}
@@ -350,6 +347,10 @@
 
   .content-inset {
     padding: var(--control-height-large) 0 var(--space-400);
+  }
+
+  .collapsed {
+    height: 16rem;
   }
 
   .expanded {

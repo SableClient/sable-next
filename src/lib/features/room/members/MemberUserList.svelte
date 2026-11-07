@@ -90,7 +90,6 @@
     flex: 1;
     list-style: none;
     margin: 0;
-    max-height: 16rem;
     min-height: 0;
     overflow-y: auto;
     padding: var(--space-100) var(--space-200) var(--space-200);
