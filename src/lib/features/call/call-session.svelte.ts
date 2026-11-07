@@ -494,21 +494,29 @@ export class CallSession {
     this.deviceError = null;
   }
 
-  async #device(kind: CallDeviceError, action: () => Promise<void> | undefined): Promise<void> {
-    if (this.listenOnly) return;
+  async #device(kind: CallDeviceError, action: () => Promise<void> | undefined): Promise<boolean> {
+    if (this.listenOnly) return false;
     const attempt = this.#attemptGeneration;
     try {
       await action();
       if (this.deviceError === kind) this.clearDeviceError();
+      return true;
     } catch (error) {
       if (attempt !== this.#attemptGeneration || !this.active || this.lifecycle === 'leaving')
-        return;
-      if (kind === 'screen' && error instanceof Error && error.name === 'NotAllowedError') return;
+        return false;
+      // A cancelled screen picker: WebView2 and browsers reject with NotAllowedError, Electron with AbortError.
+      if (
+        kind === 'screen' &&
+        error instanceof Error &&
+        (error.name === 'NotAllowedError' || error.name === 'AbortError')
+      )
+        return false;
       this.clearDeviceError();
       this.deviceError = error instanceof ScreenAudioError ? 'screenAudio' : kind;
       this.#deviceErrorTimer = setTimeout(() => {
         this.clearDeviceError();
       }, DEVICE_ERROR_TIMEOUT_MS);
+      return error instanceof ScreenAudioError;
     }
   }
 
@@ -592,7 +600,7 @@ export class CallSession {
   #setMicrophone(enabled: boolean): Promise<void> {
     const media = this.#media;
     const attempt = this.#attemptGeneration;
-    this.#microphoneUpdate = this.#microphoneUpdate.then(() => {
+    this.#microphoneUpdate = this.#microphoneUpdate.then(async () => {
       if (
         media !== this.#media ||
         attempt !== this.#attemptGeneration ||
@@ -600,7 +608,7 @@ export class CallSession {
         enabled !== this.#canTransmit()
       )
         return;
-      return this.#device('microphone', () => media?.setMicrophoneEnabled(enabled));
+      await this.#device('microphone', () => media?.setMicrophoneEnabled(enabled));
     });
     return this.#microphoneUpdate;
   }
@@ -645,7 +653,6 @@ export class CallSession {
     }
     if (screenAudioSupported()) this.choosingScreenAudio = true;
     else await this.#shareScreen(undefined);
-    void playSound('screenshare_start');
   }
 
   async shareScreenWith(audio: ScreenAudioChoice): Promise<void> {
@@ -655,9 +662,10 @@ export class CallSession {
   }
 
   async #shareScreen(audio: ScreenAudioChoice | undefined) {
-    await this.#device('screen', () =>
+    const shared = await this.#device('screen', () =>
       this.#media?.capabilities.screenShare?.setEnabled(true, audio)
     );
+    if (shared) void playSound('screenshare_start');
   }
 
   async #stopScreenShare(): Promise<void> {

@@ -23,12 +23,14 @@ export class PersonaStore {
     personas: [],
     account: null,
     rooms: {},
+    account_rooms: [],
     disabled_rooms: [],
   });
 
   readonly personas = $derived(this.catalog.personas);
   readonly account = $derived(this.catalog.account);
   readonly rooms = $derived(this.catalog.rooms);
+  readonly accountRooms = $derived(this.catalog.account_rooms);
   readonly disabledRooms = $derived(this.catalog.disabled_rooms);
 
   loading = $state(false);
@@ -41,6 +43,10 @@ export class PersonaStore {
 
   constructor(private readonly core: CoreClient) {
     this.core.subscribeEvents((event: CoreEvent) => {
+      if (event.type === 'sync_status') {
+        if (event.state !== 'offline' && !this.loaded) void this.load();
+        return;
+      }
       if (event.type !== 'personas_changed') return;
 
       if (this.inFlight !== null) {
@@ -60,7 +66,13 @@ export class PersonaStore {
 
   private reset(): void {
     this.revision = this.core.accountRevision;
-    this.catalog = { personas: [], account: null, rooms: {}, disabled_rooms: [] };
+    this.catalog = {
+      personas: [],
+      account: null,
+      rooms: {},
+      account_rooms: [],
+      disabled_rooms: [],
+    };
     this.error = null;
     this.loaded = false;
     this.inFlight = null;
@@ -132,21 +144,22 @@ export class PersonaStore {
   }
 
   associationFor(roomId: string): PersonaAssociation {
-    return this.disabledIn(roomId) ? false : (this.rooms[roomId] ?? undefined);
+    if (this.disabledIn(roomId)) return false;
+    if (this.accountRooms.includes(roomId)) return 'account';
+    return this.rooms[roomId] ?? undefined;
   }
 
   disabledIn(roomId: string): boolean {
     return this.disabledRooms.includes(roomId);
   }
 
-  async disable(roomId: string): Promise<void> {
-    await this.core.rpc.personas.disableRoom({ room_id: roomId });
+  async useAccount(roomId: string): Promise<void> {
+    await this.core.rpc.personas.accountRoom({ room_id: roomId });
     this.catalog = {
       ...this.catalog,
       rooms: Object.fromEntries(Object.entries(this.rooms).filter(([key]) => key !== roomId)),
-      disabled_rooms: this.disabledIn(roomId)
-        ? this.disabledRooms
-        : [...this.disabledRooms, roomId],
+      account_rooms: [...this.accountRooms.filter((key) => key !== roomId), roomId],
+      disabled_rooms: this.disabledRooms.filter((key) => key !== roomId),
     };
   }
 
@@ -178,6 +191,7 @@ export class PersonaStore {
     const rest = Object.fromEntries(Object.entries(this.rooms).filter(([key]) => key !== roomId));
     this.catalog = {
       ...this.catalog,
+      account_rooms: this.accountRooms.filter((key) => key !== roomId),
       disabled_rooms: this.disabledRooms.filter((key) => key !== roomId),
       rooms: selection === null ? rest : { ...rest, [roomId]: selection },
     };
@@ -210,7 +224,7 @@ export class PersonaStore {
           ? [roomId, ...spaces.order]
           : [roomId, ...spaces.order.slice(0, spaces.order.indexOf(target))];
 
-    if (target !== null && personaId === null) await this.disable(target);
+    if (target !== null && personaId === null) await this.useAccount(target);
     else await this.select(target, personaId, null, alternateAvatarId);
     for (const id of overriding) {
       if (this.associationFor(id) !== undefined) await this.select(id, null);

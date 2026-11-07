@@ -75,6 +75,24 @@ test('cancelling a chat action leaves the profile open without creating a room',
   expect(goto.mock.calls.some(([path]) => path.startsWith('/direct/'))).toBe(false);
 });
 
+test('a cancelled chat action is not asked again when the room list reconnects', async () => {
+  const { rerender } = render(UserLinkCard, {
+    props: { userId: '@alice:example.org', startChat: true },
+  });
+  await screen.findByRole('dialog');
+  await userEvent.click(screen.getByRole('button', { name: i18n.t('common.cancel') }));
+  await vi.waitFor(() => {
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  roomList.settled = false;
+  await rerender({ userId: '@alice:example.org', startChat: true });
+  roomList.settled = true;
+  await rerender({ userId: '@alice:example.org', startChat: true });
+
+  expect(screen.queryByRole('dialog')).toBeNull();
+});
+
 test('a chat action opens an existing joined DM without creating one or asking again', async () => {
   roomList.rooms = [
     {

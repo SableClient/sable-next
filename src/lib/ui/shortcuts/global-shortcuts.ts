@@ -2,7 +2,7 @@ import { on } from 'svelte/events';
 
 import { isDialogOpen, isEditableTarget, matchesBinding } from './binding.js';
 import { effectiveShortcuts } from './bindings.svelte.js';
-import { type ShortcutId } from './shortcuts.js';
+import { type ShortcutDefinition, type ShortcutId } from './shortcuts.js';
 
 type ShortcutHandler =
   | ((event: KeyboardEvent) => void)
@@ -14,7 +14,10 @@ export function isMacPlatform(): boolean {
   return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 }
 
-export function registerGlobalShortcuts(handlers: ShortcutHandlers): () => void {
+export function registerGlobalShortcuts(
+  handlers: ShortcutHandlers,
+  isEnabled: (shortcut: ShortcutDefinition) => boolean = () => true
+): () => void {
   const held = new Map<ShortcutId, { event: KeyboardEvent; release: () => void }>();
 
   const releaseAll = (): void => {
@@ -31,7 +34,7 @@ export function registerGlobalShortcuts(handlers: ShortcutHandlers): () => void 
 
     for (const shortcut of effectiveShortcuts()) {
       const handler = handlers[shortcut.id];
-      if (!handler) continue;
+      if (!handler || !isEnabled(shortcut)) continue;
       if (!shortcut.allowInEditable && isEditableTarget(event.target)) continue;
       if (
         typeof handler !== 'function' &&

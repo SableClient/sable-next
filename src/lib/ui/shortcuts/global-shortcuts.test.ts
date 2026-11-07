@@ -208,3 +208,19 @@ test('a dialog or composing event cannot start a hold', () => {
   key('keydown');
   expect(press).not.toHaveBeenCalled();
 });
+
+test('a disabled shortcut leaves the key to the browser', () => {
+  const handler = vi.fn();
+  cleanup = registerGlobalShortcuts({ 'call.pushToTalk': handler }, () => false);
+
+  const event = new KeyboardEvent('keydown', {
+    key: 'T',
+    ctrlKey: true,
+    shiftKey: true,
+    cancelable: true,
+  });
+  window.dispatchEvent(event);
+
+  expect(handler).not.toHaveBeenCalled();
+  expect(event.defaultPrevented).toBe(false);
+});

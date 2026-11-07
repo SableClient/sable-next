@@ -135,7 +135,14 @@ function core(): CoreClient {
       messages: { mediaConfig, frequentReactions: () => Promise.resolve([]) },
       room_state: { botCommands: () => Promise.resolve(botCommands) },
       personas: {
-        list: () => Promise.resolve({ personas: [], account: null, rooms: {}, disabled_rooms: [] }),
+        list: () =>
+          Promise.resolve({
+            personas: [],
+            account: null,
+            rooms: {},
+            account_rooms: [],
+            disabled_rooms: [],
+          }),
       },
       packs: { list: () => Promise.resolve({ packs, complete: true }) },
     },
@@ -279,6 +286,7 @@ test.each([
     ],
     account: null,
     rooms: {},
+    account_rooms: [],
     disabled_rooms: [],
   });
   try {

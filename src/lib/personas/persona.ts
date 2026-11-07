@@ -58,7 +58,8 @@ function live(selection: PersonaSelectionView | undefined, now: number): boolean
   return selection.valid_until === null || selection.valid_until > now;
 }
 
-export type PersonaAssociation = PersonaSelectionView | false | undefined;
+/** `'account'` sends as the account but lets triggers proxy, `false` turns personas off. */
+export type PersonaAssociation = PersonaSelectionView | 'account' | false | undefined;
 
 export type SelectionScope = 'room' | 'space' | 'account';
 
@@ -78,7 +79,7 @@ export function heldSelection({
   now,
 }: PersonaScope): PersonaAssociation {
   for (const selection of [room, ...spaces, account]) {
-    if (selection === false) return false;
+    if (selection === false || selection === 'account') return selection;
     if (live(selection, now) && personaById(personas, selection?.persona_id)) return selection;
   }
   return undefined;
@@ -90,7 +91,8 @@ export function resolvePersona({
 }: PersonaScope & { proxied?: PersonaView | undefined }): PersonaView | undefined {
   const held = heldSelection(scope);
   if (held === false) return undefined;
-  return proxied ?? personaById(scope.personas, held?.persona_id);
+  if (proxied) return proxied;
+  return held === 'account' ? undefined : personaById(scope.personas, held?.persona_id);
 }
 
 export function alternateAvatarId(
@@ -100,7 +102,7 @@ export function alternateAvatarId(
 ): string | null {
   return (
     trigger?.alternate_avatar_id ??
-    (held && held.persona_id === persona.id ? held.alternate_avatar_id : null)
+    (held && held !== 'account' && held.persona_id === persona.id ? held.alternate_avatar_id : null)
   );
 }
 

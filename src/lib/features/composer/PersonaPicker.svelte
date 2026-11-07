@@ -74,7 +74,7 @@
     now: Date.now(),
   });
   let held = $derived(heldSelection(scopeSelections));
-  let selected = $derived(held || null);
+  let selected = $derived(held && held !== 'account' ? held : null);
   let active = $derived(shorthandHint?.persona ?? resolvePersona(scopeSelections) ?? null);
   let sortedPersonas = $derived(
     // (

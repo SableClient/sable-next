@@ -1,7 +1,7 @@
-use crate::api::personas::DisableRoomParams;
 use crate::api::personas::ReorderParams;
 use crate::api::personas::SaveParams;
 use crate::api::personas::SetSelectionParams;
+use crate::api::personas::{AccountRoomParams, DisableRoomParams};
 use std::collections::{BTreeMap, BTreeSet};
 
 use matrix_sdk::Room;
@@ -628,6 +628,8 @@ struct AccountSelectionOut {
 #[derive(Debug, Clone)]
 enum RoomAssociation {
     Persona(PersonaSelectionView),
+    /// Sends as the account, while typed triggers still pick a persona.
+    Account,
     Disabled,
 }
 
@@ -635,6 +637,7 @@ impl Serialize for RoomAssociation {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::Persona(selection) => SelectionOut::from(selection).serialize(serializer),
+            Self::Account => serializer.serialize_bool(true),
             Self::Disabled => serializer.serialize_bool(false),
         }
     }
@@ -651,7 +654,7 @@ impl AssociationIn {
     fn into_association(self) -> Option<RoomAssociation> {
         match self {
             Self::Off(false) => Some(RoomAssociation::Disabled),
-            Self::Off(true) => None,
+            Self::Off(true) => Some(RoomAssociation::Account),
             Self::Persona(selection) => selection.into_view().map(RoomAssociation::Persona),
         }
     }
@@ -897,7 +900,7 @@ pub(crate) async fn notification_profile(
         .unwrap_or_default();
     if matches!(
         associations.get(room_id.as_str()),
-        Some(RoomAssociation::Disabled)
+        Some(RoomAssociation::Account | RoomAssociation::Disabled)
     ) {
         return Ok(None);
     }
@@ -923,7 +926,7 @@ pub(crate) async fn notification_profile(
     let now = u64::from(matrix_sdk::ruma::MilliSecondsSinceUnixEpoch::now().0);
     for association in selections {
         let selection = match association {
-            RoomAssociation::Disabled => return Ok(None),
+            RoomAssociation::Account | RoomAssociation::Disabled => return Ok(None),
             RoomAssociation::Persona(selection) => selection,
         };
         if selection.valid_until.is_some_and(|until| until <= now) {
@@ -1073,11 +1076,18 @@ impl Core {
     async fn persona_account_data(
         &self,
         event_type: GlobalAccountDataEventType,
+        fetch: bool,
     ) -> Result<Option<Value>, RpcError> {
-        let Some(raw) = self
-            .global_account_data(event_type, "personas: fetch_account_data")
-            .await?
-        else {
+        let raw = if fetch {
+            self.global_account_data(event_type, "personas: fetch_account_data")
+                .await?
+        } else {
+            let client = self.client().await?;
+            self.with_open_stores(async || client.account().account_data_raw(event_type).await)
+                .await
+                .or_failed(self, "personas: stored_account_data")?
+        };
+        let Some(raw) = raw else {
             return Ok(None);
         };
 
@@ -1086,9 +1096,9 @@ impl Core {
             .or_failed(self, "personas_deserialize")
     }
 
-    async fn load_personas(&self) -> Result<Vec<PersonaView>, RpcError> {
+    async fn load_personas(&self, fetch: bool) -> Result<Vec<PersonaView>, RpcError> {
         if let Some(content) = self
-            .persona_account_data(GlobalAccountDataEventType::from(CATALOG_V3))
+            .persona_account_data(GlobalAccountDataEventType::from(CATALOG_V3), fetch)
             .await?
             && content.get("profiles").is_some()
         {
@@ -1096,14 +1106,14 @@ impl Core {
         }
 
         let Some(content) = self
-            .persona_account_data(GlobalAccountDataEventType::from(CATALOG_V2))
+            .persona_account_data(GlobalAccountDataEventType::from(CATALOG_V2), fetch)
             .await?
         else {
             return Ok(Vec::new());
         };
 
         let personas = personas_from_catalog(&content);
-        if personas.is_empty() {
+        if personas.is_empty() || !fetch {
             return Ok(personas);
         }
 
@@ -1114,7 +1124,7 @@ impl Core {
     /// A backup file is the v3 catalog event wrapped under its own type.
     pub(crate) async fn persona_backup(&self) -> Result<String, RpcError> {
         let content = self
-            .persona_account_data(GlobalAccountDataEventType::from(CATALOG_V3))
+            .persona_account_data(GlobalAccountDataEventType::from(CATALOG_V3), true)
             .await?;
         serde_json::to_string_pretty(&json!({ CATALOG_V3: content }))
             .or_failed(self, "persona_backup")
@@ -1148,9 +1158,12 @@ impl Core {
         .await
     }
 
-    async fn account_selection(&self) -> Result<Option<PersonaSelectionView>, RpcError> {
+    async fn account_selection(
+        &self,
+        fetch: bool,
+    ) -> Result<Option<PersonaSelectionView>, RpcError> {
         Ok(self
-            .persona_account_data(selection_event("globalassociation"))
+            .persona_account_data(selection_event("globalassociation"), fetch)
             .await?
             .as_ref()
             .and_then(|content| {
@@ -1161,34 +1174,53 @@ impl Core {
             }))
     }
 
-    async fn room_selections(&self) -> Result<BTreeMap<String, RoomAssociation>, RpcError> {
+    async fn room_selections(
+        &self,
+        fetch: bool,
+    ) -> Result<BTreeMap<String, RoomAssociation>, RpcError> {
         Ok(self
-            .persona_account_data(selection_event("roomassociation"))
+            .persona_account_data(selection_event("roomassociation"), fetch)
             .await?
             .as_ref()
             .map(room_associations)
             .unwrap_or_default())
     }
 
-    pub(crate) async fn personas(&self) -> Result<PersonaCatalogView, RpcError> {
-        let _guard = self.account_data_lock.lock().await;
+    async fn catalog_view(&self, fetch: bool) -> Result<PersonaCatalogView, RpcError> {
         let mut rooms = BTreeMap::new();
+        let mut account_rooms = Vec::new();
         let mut disabled_rooms = Vec::new();
-        for (room_id, association) in self.room_selections().await? {
+        for (room_id, association) in self.room_selections(fetch).await? {
             match association {
                 RoomAssociation::Persona(selection) => {
                     rooms.insert(room_id, selection);
                 }
+                RoomAssociation::Account => account_rooms.push(room_id),
                 RoomAssociation::Disabled => disabled_rooms.push(room_id),
             }
         }
 
         Ok(PersonaCatalogView {
-            personas: self.load_personas().await?,
-            account: self.account_selection().await?,
+            personas: self.load_personas(fetch).await?,
+            account: self.account_selection(fetch).await?,
             rooms,
+            account_rooms,
             disabled_rooms,
         })
+    }
+
+    pub(crate) async fn personas(&self) -> Result<PersonaCatalogView, RpcError> {
+        let _guard = self.account_data_lock.lock().await;
+        match self.catalog_view(true).await {
+            Ok(catalog) => Ok(catalog),
+            Err(error) => {
+                tracing::warn!(
+                    ?error,
+                    "using the stored persona catalog after a fetch failed"
+                );
+                self.catalog_view(false).await
+            }
+        }
     }
 
     pub(crate) async fn save_persona(
@@ -1201,7 +1233,7 @@ impl Core {
     ) -> Result<Vec<PersonaView>, RpcError> {
         let _guard = self.account_data_lock.lock().await;
         let replaced = previous_id.unwrap_or_else(|| persona.id.clone());
-        let mut personas = self.load_personas().await?;
+        let mut personas = self.load_personas(true).await?;
 
         personas.retain(|existing| existing.id != persona.id || existing.id == replaced);
         match personas.iter_mut().find(|existing| existing.id == replaced) {
@@ -1223,7 +1255,7 @@ impl Core {
 
     pub(crate) async fn remove_persona(&self, id: &str) -> Result<Vec<PersonaView>, RpcError> {
         let _guard = self.account_data_lock.lock().await;
-        let mut personas = self.load_personas().await?;
+        let mut personas = self.load_personas(true).await?;
         personas.retain(|persona| persona.id != id);
 
         self.save_personas(&personas).await?;
@@ -1237,7 +1269,7 @@ impl Core {
         ReorderParams { ids }: ReorderParams,
     ) -> Result<Vec<PersonaView>, RpcError> {
         let _guard = self.account_data_lock.lock().await;
-        let personas = self.load_personas().await?;
+        let personas = self.load_personas(true).await?;
         let mut reordered = Vec::with_capacity(personas.len());
         for id in ids {
             if let Some(persona) = personas.iter().find(|persona| persona.id == id)
@@ -1258,7 +1290,7 @@ impl Core {
     }
 
     async fn repoint_selections(&self, from: &str, to: Option<&str>) -> Result<(), RpcError> {
-        if let Some(account) = self.account_selection().await?
+        if let Some(account) = self.account_selection(true).await?
             && account.persona_id == from
         {
             let selection = to.map(|id| PersonaSelectionView {
@@ -1276,7 +1308,7 @@ impl Core {
             .await?;
         }
 
-        let mut rooms = self.room_selections().await?;
+        let mut rooms = self.room_selections(true).await?;
         let affected: Vec<String> = rooms
             .iter()
             .filter(|(_, association)| {
@@ -1346,7 +1378,7 @@ impl Core {
                 .await;
         };
 
-        let mut rooms = self.room_selections().await?;
+        let mut rooms = self.room_selections(true).await?;
         match selection {
             Some(selection) => {
                 rooms.insert(room_id.to_string(), RoomAssociation::Persona(selection));
@@ -1364,8 +1396,18 @@ impl Core {
         DisableRoomParams { room_id }: DisableRoomParams,
     ) -> Result<(), RpcError> {
         let _guard = self.account_data_lock.lock().await;
-        let mut rooms = self.room_selections().await?;
+        let mut rooms = self.room_selections(true).await?;
         rooms.insert(room_id.to_string(), RoomAssociation::Disabled);
+        self.write_room_selections(rooms).await
+    }
+
+    pub(crate) async fn account_room_personas(
+        &self,
+        AccountRoomParams { room_id }: AccountRoomParams,
+    ) -> Result<(), RpcError> {
+        let _guard = self.account_data_lock.lock().await;
+        let mut rooms = self.room_selections(true).await?;
+        rooms.insert(room_id.to_string(), RoomAssociation::Account);
         self.write_room_selections(rooms).await
     }
 }
@@ -1500,6 +1542,25 @@ mod tests {
                     "!kris:example.org": { "profileId": "kris", "validUntil": 20 },
                 }
             })
+        );
+    }
+
+    #[test]
+    fn a_room_sending_as_the_account_round_trips_as_true() {
+        let content = json!({ "associations": { "!plain:example.org": true } });
+
+        let rooms = room_associations(&content);
+
+        assert!(matches!(
+            rooms.get("!plain:example.org"),
+            Some(RoomAssociation::Account)
+        ));
+        assert_eq!(
+            serde_json::to_value(RoomAssociationsOut {
+                associations: rooms
+            })
+            .expect("serializable"),
+            content
         );
     }
 
@@ -1824,5 +1885,48 @@ mod tests {
             display_name: None,
             ..profile("Kris", true)
         }
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_server_serves_the_stored_catalog() {
+        use crate::{Core, session::Session, store::MemorySessionStore};
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use matrix_sdk_ui::sync_service::SyncService;
+        use std::sync::Arc;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path_regex},
+        };
+
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        server
+            .mock_sync()
+            .ok_and_run(&client, |builder| {
+                builder.add_custom_global_account_data(json!({
+                    "type": super::CATALOG_V3,
+                    "content": { "profiles": [{ "id": "kris", "displayname": "Kris" }] }
+                }));
+            })
+            .await;
+        let (core, _events) =
+            Core::new("offline-personas", Box::new(MemorySessionStore::default()));
+        *core.session.write().await = Some(Session {
+            account_id: "test".into(),
+            client: client.clone(),
+            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+            homeserver: server.server().uri(),
+            oauth: false,
+        });
+        let _unreachable = Mock::given(method("GET"))
+            .and(path_regex("/account_data/"))
+            .respond_with(ResponseTemplate::new(500))
+            .mount_as_scoped(server.server())
+            .await;
+
+        let catalog = core.personas().await.unwrap();
+
+        assert_eq!(catalog.personas.len(), 1);
+        assert_eq!(catalog.personas[0].id, "kris");
     }
 }

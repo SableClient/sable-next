@@ -2,11 +2,12 @@
   export function priorityProvider() {
     const POLL_INTERVAL_MS = 300_000;
 
+    const web = updatePlatform() === 'web';
     let dismissedGeneration = $state(0);
-    let visible = $derived(webUpdateState.generation > dismissedGeneration);
+    let visible = $derived(web && webUpdateState.generation > dismissedGeneration);
 
     $effect(() => {
-      if (!preferences.autoUpdateCheck || !('serviceWorker' in navigator)) return undefined;
+      if (!web || !preferences.autoUpdateCheck || !('serviceWorker' in navigator)) return undefined;
 
       const check = (): void => {
         checkForWebUpdate().catch((error: unknown) => {
@@ -38,6 +39,7 @@
 <script lang="ts">
   import { on } from 'svelte/events';
   import { i18n } from '#lib/i18n.js';
+  import { updatePlatform } from '#lib/platform/updates.js';
   import { checkForWebUpdate, webUpdateState } from '#lib/platform/web-updates.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import AlertBanner from '#lib/ui/primitives/AlertBanner.svelte';

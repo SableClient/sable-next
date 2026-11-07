@@ -349,7 +349,7 @@
     font-style: normal;
     line-height: 1;
     max-width: 9.375rem;
-    overflow: hidden;
+    overflow-x: clip;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

@@ -16,7 +16,7 @@ function persona(id: string): PersonaView {
 }
 
 function catalog(personas: PersonaView[] = []): PersonaCatalogView {
-  return { personas, account: null, rooms: {}, disabled_rooms: [] };
+  return { personas, account: null, rooms: {}, account_rooms: [], disabled_rooms: [] };
 }
 
 function setup() {
@@ -27,6 +27,7 @@ function setup() {
     remove: vi.fn(),
     reorder: vi.fn(),
     disableRoom: vi.fn().mockResolvedValue(undefined),
+    accountRoom: vi.fn().mockResolvedValue(undefined),
     setSelection: vi.fn().mockResolvedValue(undefined),
   };
   const core = {
@@ -110,6 +111,7 @@ test('choosing globally clears the room and space overrides that would win', asy
   rpc.list.mockResolvedValue({
     ...catalog([persona('a'), persona('b')]),
     rooms: { '!space': sel('a') },
+    account_rooms: [],
     disabled_rooms: ['!room'],
   });
   await store.load();
@@ -125,15 +127,16 @@ test('choosing globally clears the room and space overrides that would win', asy
   expect(rpc.setSelection).not.toHaveBeenCalledWith(expect.objectContaining({ room_id: '!other' }));
 });
 
-test('the account profile in a space turns profiles off there and drops the room override', async () => {
+test('the account profile in a space sends as the account there and drops the room override', async () => {
   const { rpc, store } = setup();
   rpc.list.mockResolvedValue({ ...catalog([persona('a')]), rooms: { '!room': sel('a') } });
   await store.load();
 
   await store.remember('space', '!room', { target: '!space', order: ['!space'] }, null);
 
-  expect(rpc.disableRoom).toHaveBeenCalledWith({ room_id: '!space' });
-  expect(store.associationFor('!space')).toBe(false);
+  expect(rpc.accountRoom).toHaveBeenCalledWith({ room_id: '!space' });
+  expect(rpc.disableRoom).not.toHaveBeenCalled();
+  expect(store.associationFor('!space')).toBe('account');
   expect(store.associationFor('!room')).toBeUndefined();
 });
 
@@ -146,4 +149,23 @@ test('the picker opens on the closest scope holding a selection', async () => {
   expect(store.scopeFor('picker', '!room', spaces)).toBe('space');
   expect(store.scopeFor('room', '!room', spaces)).toBe('room');
   expect(store.scopeFor('space', '!room', { target: null, order: [] })).toBe('account');
+});
+
+test('a failed load retries when sync comes back', async () => {
+  const { rpc, store, emit } = setup();
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  rpc.list.mockRejectedValueOnce(new Error('offline'));
+  await store.load();
+  expect(store.error).toBe('personas.loadFailed');
+  const restored = persona('restored');
+  rpc.list.mockResolvedValueOnce(catalog([restored]));
+
+  emit({ type: 'sync_status', state: 'offline' });
+  expect(rpc.list).toHaveBeenCalledTimes(1);
+  emit({ type: 'sync_status', state: 'live' });
+
+  await vi.waitFor(() => {
+    expect(store.personas).toEqual([restored]);
+  });
+  expect(store.error).toBeNull();
 });

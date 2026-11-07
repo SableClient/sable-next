@@ -7,7 +7,7 @@ import { emojiForShortcode } from '#lib/emoji/emoji.js';
 
 import { composerSchema } from './schema';
 
-const pattern = /(?<![^\s\uFFFC]):([^\s:\uFFFC]{1,100}):$/u;
+const pattern = /(?<![\p{L}\p{N}_:]):([^\s:\uFFFC]{1,100}):$/u;
 
 export function emoticonNode(image: PackImageView): ProseMirrorNode {
   return composerSchema.nodes.emoticon.create({

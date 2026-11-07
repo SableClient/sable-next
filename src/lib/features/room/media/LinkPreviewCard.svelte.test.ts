@@ -295,6 +295,33 @@ test('an image-only preview renders inline instead of as a card', async () => {
   expect(button.closest('.link-preview')).not.toBeInTheDocument();
 });
 
+test('an image-only preview stays mounted while its url is resolved again', async () => {
+  preferences.urlPreviews = true;
+  core.rpc.messages.urlPreview.mockResolvedValue(
+    preview({
+      url: 'https://media.example/anim.gif',
+      title: null,
+      description: 'anim.gif',
+      image: 'mxc://example.org/anim',
+      image_mime: 'image/gif',
+    })
+  );
+  const { rerender } = render(LinkPreviewCard, {
+    url: 'https://media.example/anim.gif',
+    encrypted: false,
+  });
+  const shown = await screen.findByRole('button', { name: 'Open anim.gif' });
+
+  await rerender({
+    url: 'https://media.example/anim.gif',
+    encrypted: false,
+    bundled: preview({ url: 'https://media.example/anim.gif', title: null }),
+  });
+
+  await tick();
+  expect(screen.getByRole('button', { name: 'Open anim.gif' })).toBe(shown);
+});
+
 test('an image-only preview opens the media viewer instead of the url', async () => {
   preferences.urlPreviews = true;
   core.rpc.messages.urlPreview.mockResolvedValue(

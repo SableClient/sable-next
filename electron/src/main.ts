@@ -90,6 +90,8 @@ app.userAgentFallback = `${USER_AGENT} ${app.userAgentFallback}`;
 
 const devUrl = process.env.SABLE_DEV_URL;
 const distDir = resolve(app.getAppPath(), process.env.SABLE_DIST ?? '../dist');
+const bundleVersionFile = join(distDir, '_app', 'version.json');
+const startedBundle = readBundleVersion();
 // Not process.resourcesPath: Nix runs app.asar with the shared nixpkgs Electron.
 const resourcesDir = dirname(app.getAppPath());
 const isLinux = process.platform === 'linux';
@@ -203,6 +205,20 @@ async function pagePolicy(file: string): Promise<string> {
   return computed;
 }
 
+function readBundleVersion(): string | undefined {
+  try {
+    return readFileSync(bundleVersionFile, 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+// A package upgrade swaps dist on disk while the running app.asar, and its preload, stay old.
+function bundleReplaced(): boolean {
+  const current = readBundleVersion();
+  return startedBundle !== undefined && current !== undefined && current !== startedBundle;
+}
+
 async function serveApp(request: Request): Promise<Response> {
   const path = resolve(distDir, `.${decodeURIComponent(new URL(request.url).pathname)}`);
   const fromDist = relative(distDir, path);
@@ -211,6 +227,11 @@ async function serveApp(request: Request): Promise<Response> {
   const file = entry?.isDirectory() ? join(path, 'index.html') : path;
   const found = entry !== undefined && (await stat(file).catch(() => undefined))?.isFile();
   const target = found ? file : join(distDir, '404.html');
+  if (target.endsWith('.html') && bundleReplaced()) {
+    app.relaunch();
+    app.quit();
+    return new Response(null, { status: 503 });
+  }
   const type = mime.getType(target) ?? 'application/octet-stream';
 
   const headers = new Headers({

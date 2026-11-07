@@ -1495,6 +1495,13 @@ describe.each([false, true])('emoticon conversion (rich text: %s)', (rich) => {
     expect(editor.doc()?.textContent).toBe('😂 😄');
   });
 
+  test('converts a shortcode right after punctuation but not inside a word or after a colon', () => {
+    const editor = open();
+    type(editor, '+:x: (:joy:) a:x: 12:joy: ::x:');
+
+    expect(editor.doc()?.textContent).toBe('+❌ (😂) a:x: 12:joy: ::x:');
+  });
+
   test('Backspace restores the literal emoticon', () => {
     const editor = open();
     type(editor, '<3');

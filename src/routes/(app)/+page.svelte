@@ -6,8 +6,7 @@
   import { takeAfterLogin } from '#lib/auth/after-login.js';
   import { hasPendingSetup } from '#lib/features/auth/setup/setup-record.js';
   import { readText } from '#lib/platform/local-json.js';
-  import { lastRoomId } from '#lib/rooms/last-room.js';
-  import { roomSectionPath } from '#lib/rooms/permalink.js';
+  import { lastRoomId, lastRoomSection, restoredRoomPath } from '#lib/rooms/last-room.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
@@ -28,12 +27,17 @@
     const room = roomList.byId(savedRoomId);
     const target =
       room?.state === 'joined' && room?.room_kind !== 'space' && !room.is_tombstoned
-        ? roomSectionPath(roomList.rooms, room.room_id)
+        ? restoredRoomPath(
+            roomList.rooms,
+            room.room_id,
+            lastRoomSection(session.account_id),
+            preferences.showHome
+          )
         : preferences.showHome
           ? resolve('/(app)/home')
           : resolve('/(app)/rooms');
     redirected = true;
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- takeAfterLogin() and roomSectionPath() resolve their routes
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- takeAfterLogin() and restoredRoomPath() resolve their routes
     void goto(requestedPath || target, { replace: true });
   });
 </script>

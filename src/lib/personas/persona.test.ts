@@ -274,6 +274,15 @@ describe('resolvePersona', () => {
     expect(resolvePersona({ personas, room: false, spaces: [space], now: 1000 })).toBeUndefined();
   });
 
+  it('sends as the account in a room or space set to it, while a trigger still proxies', () => {
+    const account = { persona_id: 'Kris', valid_until: null, alternate_avatar_id: null };
+    expect(resolvePersona({ personas, room: 'account', account, now: 1000 })).toBeUndefined();
+    expect(resolvePersona({ personas, spaces: ['account'], account, now: 1000 })).toBeUndefined();
+    expect(
+      resolvePersona({ personas, proxied: robin, room: 'account', account, now: 1000 })?.id
+    ).toBe('Robin');
+  });
+
   it('lets a room selection override a space that is off', () => {
     const resolved = resolvePersona({
       personas,
