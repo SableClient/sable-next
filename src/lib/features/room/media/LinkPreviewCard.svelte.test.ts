@@ -22,6 +22,7 @@ Object.assign(core.rpc.messages, {
 
 import LinkPreviewCard from './LinkPreviewCard.svelte';
 import LinkPreviewCardMediaHarness from './LinkPreviewCardMediaHarness.test.svelte';
+import LinkPreviewCardTooltipHarness from './LinkPreviewCardTooltipHarness.test.svelte';
 import { previewWhitelistEntry } from './link-preview.js';
 import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -320,6 +321,25 @@ test('an image-only preview stays mounted while its url is resolved again', asyn
 
   await tick();
   expect(screen.getByRole('button', { name: 'Open anim.gif' })).toBe(shown);
+});
+
+test('an image-only preview unmounts cleanly when its preview is cleared', async () => {
+  preferences.urlPreviews = true;
+  core.rpc.messages.urlPreview.mockResolvedValue(
+    preview({
+      url: 'https://media.example/clear.gif',
+      title: null,
+      description: 'clear.gif',
+      image: 'mxc://example.org/clear',
+    })
+  );
+  render(LinkPreviewCardTooltipHarness, { url: 'https://media.example/clear.gif' });
+  await screen.findByRole('button', { name: 'Open clear.gif' });
+
+  preferences.urlPreviews = false;
+  await tick();
+
+  expect(screen.queryByRole('button', { name: 'Open clear.gif' })).not.toBeInTheDocument();
 });
 
 test('an image-only preview opens the media viewer instead of the url', async () => {
