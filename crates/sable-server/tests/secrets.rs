@@ -1,5 +1,3 @@
-#![expect(clippy::expect_used, clippy::unwrap_used, reason = "test assertions")]
-
 use sable_server::{Server, config::Config};
 
 #[tokio::test]

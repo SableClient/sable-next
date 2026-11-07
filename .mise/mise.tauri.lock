@@ -4,7 +4,7 @@ lockfile_version = 2
 
 [[tools.android-sdk]]
 version = "22.0"
-backend = "vfox:mise-plugins/vfox-android-sdk"
+backend = "vfox:jdx/vfox-android-sdk"
 specifiers = ["22.0"]
 
 [tools.android-sdk."platforms.linux-arm64"]

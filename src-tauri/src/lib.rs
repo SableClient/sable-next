@@ -693,9 +693,6 @@ fn install_logging() {
     let console = paranoid_android::layer("sable");
     #[cfg(not(target_os = "android"))]
     let console = tracing_subscriber::fmt::layer();
-    let sentry = ::sentry::integrations::tracing::layer()
-        .event_filter(sentry::tracing_filter)
-        .span_filter(|_| false);
     let subscriber = tracing_subscriber::registry()
         .with(console.with_filter(filter()))
         .with(
@@ -705,7 +702,7 @@ fn install_logging() {
                 .with_writer(debug_log::MakeDebugLogWriter)
                 .with_filter(filter()),
         )
-        .with(sentry);
+        .with(sentry::tracing_layer());
     if let Err(error) = subscriber.try_init() {
         eprintln!("could not install the log subscriber: {error}");
     }

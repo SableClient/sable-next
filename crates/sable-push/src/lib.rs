@@ -974,11 +974,13 @@ fn render_response(
     if let Some(issue) = issue {
         let response = response.get_or_insert_with(|| serde_json::json!({}));
         let object = response.as_object_mut()?;
-        let mut diagnostic = serde_json::json!({"issue": issue.as_str(), "reporting": reporting});
+        let mut diagnostic =
+            serde_json::Map::from_iter([("issue".to_owned(), issue.as_str().into())]);
+        diagnostic.insert("reporting".to_owned(), reporting.into());
         if let Issue::Timeout(stage) = issue {
-            diagnostic["stage"] = stage.into();
+            diagnostic.insert("stage".to_owned(), stage.into());
         }
-        object.insert("diagnostic".to_owned(), diagnostic);
+        object.insert("diagnostic".to_owned(), diagnostic.into());
     }
     response
 }

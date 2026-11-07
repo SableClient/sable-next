@@ -180,26 +180,39 @@ const IGNORED_TARGETS: &[&str] = &[
     "matrix_sdk::http_client",
 ];
 
-pub(crate) fn tracing_filter(
-    metadata: &tracing::Metadata<'_>,
-) -> sentry::integrations::tracing::EventFilter {
-    use sentry::integrations::tracing::EventFilter;
-
-    let (target, level) = (metadata.target(), metadata.level());
-    if IGNORED_TARGETS
+fn is_ignored(metadata: &tracing::Metadata<'_>) -> bool {
+    IGNORED_TARGETS
         .iter()
-        .any(|ignored| target.starts_with(ignored))
-    {
-        return EventFilter::Ignore;
-    }
-    if sable_core::binding::is_reported_warning(metadata) {
-        return EventFilter::Event | EventFilter::Log;
-    }
-    match *level {
-        tracing::Level::ERROR => EventFilter::Event | EventFilter::Log,
-        tracing::Level::WARN => EventFilter::Breadcrumb | EventFilter::Log,
-        _ => EventFilter::Ignore,
-    }
+        .any(|ignored| metadata.target().starts_with(ignored))
+}
+
+fn is_error_event(metadata: &tracing::Metadata<'_>) -> bool {
+    !is_ignored(metadata)
+        && (*metadata.level() == tracing::Level::ERROR
+            || sable_core::binding::is_reported_warning(metadata))
+}
+
+fn is_breadcrumb(metadata: &tracing::Metadata<'_>) -> bool {
+    !is_ignored(metadata)
+        && *metadata.level() == tracing::Level::WARN
+        && !sable_core::binding::is_reported_warning(metadata)
+}
+
+fn is_log(metadata: &tracing::Metadata<'_>) -> bool {
+    !is_ignored(metadata) && *metadata.level() <= tracing::Level::WARN
+}
+
+pub(crate) fn tracing_layer<S>() -> impl tracing_subscriber::Layer<S>
+where
+    S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+{
+    use sentry::integrations::tracing::{BreadcrumbLayer, ErrorLayer, LogLayer};
+    use tracing_subscriber::{Layer as _, filter::filter_fn};
+
+    BreadcrumbLayer::new()
+        .with_filter(filter_fn(is_breadcrumb))
+        .and_then(ErrorLayer::new().with_filter(filter_fn(is_error_event)))
+        .and_then(LogLayer::new().with_filter(filter_fn(is_log)))
 }
 
 static CONSENT: AtomicBool = AtomicBool::new(false);
@@ -275,8 +288,7 @@ mod tests {
             Some(client.clone()),
             Arc::new(sentry::Scope::default()),
         ));
-        let subscriber = tracing_subscriber::registry()
-            .with(sentry::integrations::tracing::layer().event_filter(tracing_filter));
+        let subscriber = tracing_subscriber::registry().with(tracing_layer());
         sentry::Hub::run(hub, || tracing::subscriber::with_default(subscriber, emit));
         assert!(client.flush(Some(std::time::Duration::from_secs(1))));
         transport
