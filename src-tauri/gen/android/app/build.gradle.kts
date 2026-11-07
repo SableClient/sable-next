@@ -104,6 +104,7 @@ android {
     }
     buildFeatures {
         buildConfig = true
+        resValues = true
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
