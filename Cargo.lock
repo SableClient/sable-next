@@ -295,7 +295,7 @@ dependencies = [
  "objc2-foundation",
  "parking_lot 0.12.5",
  "percent-encoding",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
  "wl-clipboard-rs",
  "x11rb",
 ]
@@ -2086,7 +2086,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2367,7 +2367,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5141,11 +5141,14 @@ dependencies = [
 
 [[package]]
 name = "minidumper-child"
-version = "0.5.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1dd1d5c43819abcc73ced5a1287c58fdc715c9f993b7cc9debc6ae7cb8421994"
+checksum = "e8d9c1eee90a552d5357f34eacf3e700372dd2760a0ba0cde68708c3972fb53d"
 dependencies = [
+ "crash-context",
  "crash-handler",
+ "libc",
+ "mach2",
  "minidumper",
  "thiserror 2.0.21",
  "uuid",
@@ -5447,7 +5450,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6932,7 +6935,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7604,7 +7607,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7663,7 +7666,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8145,9 +8148,9 @@ dependencies = [
 
 [[package]]
 name = "sentry"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fa951f4e644464ebfd2347a7ab03b0828c512d2448a76262cad2607b343dff4"
+checksum = "e7c2c887f17023c9462a4202176efc33ca7228f9c30c0141c765ab534ab2d36b"
 dependencies = [
  "cfg_aliases",
  "httpdate",
@@ -8167,9 +8170,9 @@ dependencies = [
 
 [[package]]
 name = "sentry-backtrace"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f27cf048aa63ccd5bc94c29989133eabb82e9c6bf7441b58e9d4a95837a105"
+checksum = "c391d4330f3b37fdddf2b928151244e8c2dc0cfea1740e455cc8942af436f919"
 dependencies = [
  "backtrace",
  "regex",
@@ -8178,9 +8181,9 @@ dependencies = [
 
 [[package]]
 name = "sentry-contexts"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5ed680585dbdacdf9859c2b4dc53358ff02bd256766882e22e343836db36b22"
+checksum = "654dacb94135c713e1dcbff01314a83d333f0e62f76b91fed5ab87415075530c"
 dependencies = [
  "hostname",
  "libc",
@@ -8192,9 +8195,9 @@ dependencies = [
 
 [[package]]
 name = "sentry-core"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3ed398494bb8fc412a11a182c1883a10ae147587b8f6314abd222d1d626f31b"
+checksum = "edcb294ca821e5c5624edaf33535eb18b06ef4f8675201d3e4d81ce325741692"
 dependencies = [
  "rand 0.10.3",
  "sentry-types",
@@ -8205,9 +8208,9 @@ dependencies = [
 
 [[package]]
 name = "sentry-debug-images"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55854bb40681e84ffd2a69578ad4ef9bfaf5bf2bf1380a745578b591fa24af22"
+checksum = "74835055f6a57b78c0e13f941b460e39edc1899b05fe31dd47cd02367f70888f"
 dependencies = [
  "findshlibs",
  "sentry-core",
@@ -8215,9 +8218,9 @@ dependencies = [
 
 [[package]]
 name = "sentry-log"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a3dc14009e1c24b07a8ff9ff8e1bcd0913b3e448b1565e679414776f2e58651"
+checksum = "f24141aaeb20c731719b33077f1063a79e07eef63a4954530559c067ba046aad"
 dependencies = [
  "bitflags 2.13.2",
  "log",
@@ -8226,9 +8229,9 @@ dependencies = [
 
 [[package]]
 name = "sentry-minidump"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ffa59eab15910d1edf0705a172bd408ac7487d6e0ab622dd402a92b35b230dc"
+checksum = "55831db2fa73841be2e016cbd421c147e8d1617710d85e52fae8d9ab30863c18"
 dependencies = [
  "minidumper-child",
  "sentry-core",
@@ -8238,9 +8241,9 @@ dependencies = [
 
 [[package]]
 name = "sentry-panic"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7153e68642b761ed3aa62c022795c11b2facc728b2db7484084492373c944f9"
+checksum = "f5d28522f81ed90510ec43ed01cb1873a393b329dc719f93335b4c75fbef05d1"
 dependencies = [
  "sentry-backtrace",
  "sentry-core",
@@ -8248,9 +8251,9 @@ dependencies = [
 
 [[package]]
 name = "sentry-tracing"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7e7db1aefdf623f4e48e21ec9e4af535024187aeafb2a4cc7e29d035def5a13"
+checksum = "ec67c296aadc41d4d41b64738908c51cacddf99edebe7a2b476f9bf40de93ff5"
 dependencies = [
  "bitflags 2.13.2",
  "sentry-backtrace",
@@ -8261,9 +8264,9 @@ dependencies = [
 
 [[package]]
 name = "sentry-types"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c18bf7b159bdfc7c8f97816f476b4947a1937fb6bea9d38d3479e58631614ac"
+checksum = "83d84a36b6bdeeb7813976fb899fca45d94540d2e2b80eac91ba66b4c654d8f0"
 dependencies = [
  "debugid",
  "hex",
@@ -9688,7 +9691,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -11063,7 +11066,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -11625,7 +11628,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d6f32a0ff4a9f6f01231eb2059cc85479330739333e0e58cadf03b6af2cca10"
 dependencies = [
  "cfg-if",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
