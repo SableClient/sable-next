@@ -84,6 +84,7 @@ android {
         getByName("release") {
             signingConfig = signingConfigs.getByName("release").takeIf { it.storeFile != null }
             isMinifyEnabled = true
+            isShrinkResources = true
             packaging {
                 jniLibs.useLegacyPackaging = true
             }
@@ -103,6 +104,7 @@ android {
     }
     buildFeatures {
         buildConfig = true
+        resValues = true
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
