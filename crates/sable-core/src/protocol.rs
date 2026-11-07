@@ -1793,6 +1793,7 @@ pub struct PersonaCatalogView {
     pub personas: Vec<PersonaView>,
     pub account: Option<PersonaSelectionView>,
     pub rooms: std::collections::BTreeMap<String, PersonaSelectionView>,
+    pub account_rooms: Vec<String>,
     pub disabled_rooms: Vec<String>,
 }
 

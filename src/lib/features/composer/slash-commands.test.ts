@@ -77,6 +77,7 @@ function fakeRpc() {
           personas: [],
           account: null,
           rooms: {},
+          account_rooms: [],
           disabled_rooms: [],
         } as PersonaCatalogView)
       ),
@@ -663,6 +664,7 @@ test('/pmpproxy appends a persona trigger', async () => {
     personas: [persona],
     account: null,
     rooms: {},
+    account_rooms: [],
     disabled_rooms: [],
   });
 

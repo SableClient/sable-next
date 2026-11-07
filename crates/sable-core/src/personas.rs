@@ -1,7 +1,7 @@
-use crate::api::personas::DisableRoomParams;
 use crate::api::personas::ReorderParams;
 use crate::api::personas::SaveParams;
 use crate::api::personas::SetSelectionParams;
+use crate::api::personas::{AccountRoomParams, DisableRoomParams};
 use std::collections::{BTreeMap, BTreeSet};
 
 use matrix_sdk::Room;
@@ -628,6 +628,8 @@ struct AccountSelectionOut {
 #[derive(Debug, Clone)]
 enum RoomAssociation {
     Persona(PersonaSelectionView),
+    /// Sends as the account, while typed triggers still pick a persona.
+    Account,
     Disabled,
 }
 
@@ -635,6 +637,7 @@ impl Serialize for RoomAssociation {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::Persona(selection) => SelectionOut::from(selection).serialize(serializer),
+            Self::Account => serializer.serialize_bool(true),
             Self::Disabled => serializer.serialize_bool(false),
         }
     }
@@ -651,7 +654,7 @@ impl AssociationIn {
     fn into_association(self) -> Option<RoomAssociation> {
         match self {
             Self::Off(false) => Some(RoomAssociation::Disabled),
-            Self::Off(true) => None,
+            Self::Off(true) => Some(RoomAssociation::Account),
             Self::Persona(selection) => selection.into_view().map(RoomAssociation::Persona),
         }
     }
@@ -897,7 +900,7 @@ pub(crate) async fn notification_profile(
         .unwrap_or_default();
     if matches!(
         associations.get(room_id.as_str()),
-        Some(RoomAssociation::Disabled)
+        Some(RoomAssociation::Account | RoomAssociation::Disabled)
     ) {
         return Ok(None);
     }
@@ -923,7 +926,7 @@ pub(crate) async fn notification_profile(
     let now = u64::from(matrix_sdk::ruma::MilliSecondsSinceUnixEpoch::now().0);
     for association in selections {
         let selection = match association {
-            RoomAssociation::Disabled => return Ok(None),
+            RoomAssociation::Account | RoomAssociation::Disabled => return Ok(None),
             RoomAssociation::Persona(selection) => selection,
         };
         if selection.valid_until.is_some_and(|until| until <= now) {
@@ -1173,12 +1176,14 @@ impl Core {
     pub(crate) async fn personas(&self) -> Result<PersonaCatalogView, RpcError> {
         let _guard = self.account_data_lock.lock().await;
         let mut rooms = BTreeMap::new();
+        let mut account_rooms = Vec::new();
         let mut disabled_rooms = Vec::new();
         for (room_id, association) in self.room_selections().await? {
             match association {
                 RoomAssociation::Persona(selection) => {
                     rooms.insert(room_id, selection);
                 }
+                RoomAssociation::Account => account_rooms.push(room_id),
                 RoomAssociation::Disabled => disabled_rooms.push(room_id),
             }
         }
@@ -1187,6 +1192,7 @@ impl Core {
             personas: self.load_personas().await?,
             account: self.account_selection().await?,
             rooms,
+            account_rooms,
             disabled_rooms,
         })
     }
@@ -1368,6 +1374,16 @@ impl Core {
         rooms.insert(room_id.to_string(), RoomAssociation::Disabled);
         self.write_room_selections(rooms).await
     }
+
+    pub(crate) async fn account_room_personas(
+        &self,
+        AccountRoomParams { room_id }: AccountRoomParams,
+    ) -> Result<(), RpcError> {
+        let _guard = self.account_data_lock.lock().await;
+        let mut rooms = self.room_selections().await?;
+        rooms.insert(room_id.to_string(), RoomAssociation::Account);
+        self.write_room_selections(rooms).await
+    }
 }
 
 fn merge_persona(current: &mut PersonaView, base: &PersonaView, incoming: &PersonaView) {
@@ -1500,6 +1516,25 @@ mod tests {
                     "!kris:example.org": { "profileId": "kris", "validUntil": 20 },
                 }
             })
+        );
+    }
+
+    #[test]
+    fn a_room_sending_as_the_account_round_trips_as_true() {
+        let content = json!({ "associations": { "!plain:example.org": true } });
+
+        let rooms = room_associations(&content);
+
+        assert!(matches!(
+            rooms.get("!plain:example.org"),
+            Some(RoomAssociation::Account)
+        ));
+        assert_eq!(
+            serde_json::to_value(RoomAssociationsOut {
+                associations: rooms
+            })
+            .expect("serializable"),
+            content
         );
     }
 

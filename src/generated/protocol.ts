@@ -869,6 +869,7 @@ export type PersonaCatalogView = {
 	personas: PersonaView[],
 	account: PersonaSelectionView | null,
 	rooms: { [key in string]: PersonaSelectionView },
+	account_rooms: string[],
 	disabled_rooms: string[],
 };
 
@@ -3015,6 +3016,9 @@ export type Rpc = {
     disableRoom: (params: {
 	room_id: string,
 }) => Promise<null>;
+    accountRoom: (params: {
+	room_id: string,
+}) => Promise<null>;
     backup: (params?: Record<string, never>) => Promise<string>;
     checkBackup: (params: {
 	backup: string,
@@ -3778,6 +3782,7 @@ export type RpcMethods = {
   'personas.reorder': Rpc['personas']['reorder'];
   'personas.set_selection': Rpc['personas']['setSelection'];
   'personas.disable_room': Rpc['personas']['disableRoom'];
+  'personas.account_room': Rpc['personas']['accountRoom'];
   'personas.backup': Rpc['personas']['backup'];
   'personas.check_backup': Rpc['personas']['checkBackup'];
   'personas.restore_backup': Rpc['personas']['restoreBackup'];
@@ -4126,6 +4131,7 @@ export function createRpc(call: RpcCall): Rpc {
       reorder: (params) => call('personas.reorder', params) as ReturnType<Rpc['personas']['reorder']>,
       setSelection: (params) => call('personas.set_selection', params) as ReturnType<Rpc['personas']['setSelection']>,
       disableRoom: (params) => call('personas.disable_room', params) as ReturnType<Rpc['personas']['disableRoom']>,
+      accountRoom: (params) => call('personas.account_room', params) as ReturnType<Rpc['personas']['accountRoom']>,
       backup: (params = {}) => call('personas.backup', params) as ReturnType<Rpc['personas']['backup']>,
       checkBackup: (params) => call('personas.check_backup', params) as ReturnType<Rpc['personas']['checkBackup']>,
       restoreBackup: (params) => call('personas.restore_backup', params) as ReturnType<Rpc['personas']['restoreBackup']>,
