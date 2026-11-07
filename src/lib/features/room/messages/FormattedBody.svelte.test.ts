@@ -158,6 +158,16 @@ test('renders an @room mention as a chip', async () => {
   expect(screen.getByText('@room')).toHaveAttribute('data-mx-room-mention');
 });
 
+test('keeps the emoji span out of the copied text', async () => {
+  const { container } = render(FormattedBody, {
+    props: { html: 'nice <span data-emoji>👍</span>' },
+  });
+  await tick();
+
+  expect(screen.getByText('👍')).toHaveAttribute('data-emoji');
+  expect(container.textContent).toBe('nice 👍');
+});
+
 test('resolves a room permalink name through its via server', async () => {
   core.rpc.rooms.preview.mockResolvedValue({ name: 'Sable' } as RoomPreviewView);
   const url = 'https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe';
