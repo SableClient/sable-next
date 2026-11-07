@@ -215,6 +215,7 @@ mod keyring {
     pub(super) struct Keyring {
         store: Arc<CredentialStore>,
         service: String,
+        collection: Option<String>,
     }
 
     /// oo7 can lose a race and never answer, which would hang whatever waits on the key.
@@ -238,6 +239,18 @@ mod keyring {
     #[cfg(any(target_os = "ios", target_os = "macos", target_os = "windows"))]
     fn answered<T>(work: impl FnOnce() -> Result<T, StoreError>) -> Result<T, StoreError> {
         work()
+    }
+
+    /// KWallet serves its wallets without a `default` alias, where the store would write.
+    #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "windows")))]
+    fn collection_without_default_alias() -> Option<String> {
+        use secret_service::{EncryptionType, blocking::SecretService};
+
+        let service = SecretService::connect(EncryptionType::Plain).ok()?;
+        if service.get_default_collection().is_ok() {
+            return None;
+        }
+        service.get_any_collection().ok()?.get_label().ok()
     }
 
     fn unavailable(error: &Error) -> StoreError {
@@ -283,13 +296,21 @@ mod keyring {
                     let store: Arc<CredentialStore> =
                         zbus_secret_service_keyring_store::Store::new()
                             .map_err(|error| unavailable(&error))?;
-                    let keyring = Self { store, service };
+                    let keyring = Self {
+                        store,
+                        service,
+                        collection: collection_without_default_alias(),
+                    };
                     keyring.probe()?;
                     Ok(keyring)
                 })
             };
             #[cfg(any(target_os = "ios", target_os = "macos", target_os = "windows"))]
-            Ok(Self { store, service })
+            Ok(Self {
+                store,
+                service,
+                collection: None,
+            })
         }
 
         /// A Secret Service can answer reads and still refuse every write, as one started without
@@ -313,7 +334,12 @@ mod keyring {
             #[cfg(target_os = "ios")]
             let modifiers = HashMap::from([("access-policy", "AfterFirstUnlockThisDeviceOnly")]);
             #[cfg(not(target_os = "ios"))]
-            let modifiers = HashMap::new();
+            let modifiers: HashMap<&str, &str> = self
+                .collection
+                .as_deref()
+                .map(|label| ("target", label))
+                .into_iter()
+                .collect();
             self.store
                 .build(&self.service, name, Some(&modifiers))
                 .map_err(failure)

@@ -7759,6 +7759,7 @@ dependencies = [
  "rustls",
  "sable-frostbite",
  "sable-model",
+ "secret-service",
  "serde",
  "serde_json",
  "serde_with",

@@ -102,6 +102,7 @@ windows-native-keyring-store = "1.1.0"
 [target.'cfg(all(unix, not(any(target_os = "macos", target_os = "ios", target_os = "android"))))'.dependencies]
 keyring-core = "1.0.1"
 zbus-secret-service-keyring-store = { version = "1.0.1", features = ["rt-async-io-crypto-rust"] }
+secret-service = { version = "5.2.0", features = ["rt-async-io-crypto-rust"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std", "tls12"] }
