@@ -29,6 +29,7 @@
   let opening = $state(false);
   let failed = $state(false);
   let confirming = $state(false);
+  let prompted: string | null = null;
 
   let name = $derived(profile?.display_name ?? userId);
   let avatar_url = $derived(profile?.avatar_url ?? null);
@@ -60,7 +61,8 @@
   $effect(() => {
     // Read only the request here: profile loading and room updates must not repeat it.
     const requestedUser = userId;
-    if (!startChat || !roomList.settled) return;
+    if (!startChat || !roomList.settled || prompted === requestedUser) return;
+    prompted = requestedUser;
     untrack(() => {
       const target = existingChatPath(roomList.rooms, requestedUser);
       if (target !== null) {
