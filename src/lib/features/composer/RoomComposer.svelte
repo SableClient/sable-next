@@ -562,6 +562,9 @@
       prefilledFor = null;
       prefilledDoc = undefined;
       error = null;
+      recording = false;
+      recordingDraft = undefined;
+      boardOpen = false;
       typing.leave(previousRoomId);
     },
   });
