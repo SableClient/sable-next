@@ -1083,6 +1083,7 @@ impl Core {
 
         self.watch_session_changes(session_changes, generation);
         self.watch_encryption(&client, generation);
+        self.watch_room_keys(&client).await;
         self.watch_account_data_key_sharing(&client, generation);
         self.watch_search_peers(&client, generation);
         self.watch_rtc(&client, generation);

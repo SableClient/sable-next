@@ -948,22 +948,63 @@ impl Core {
             .await
             .and_then(|item| view::reply_without_body(item.content()));
         if let Some(replied) = unresolved {
-            match self.event_source(room_id, &replied, false).await {
-                Ok((source, ..)) => {
-                    let stand_in = serde_json::from_str(&source)
-                        .ok()
-                        .and_then(|source| ReplyFallback::from_source(&source));
-                    if let Some(stand_in) = stand_in {
-                        self.overlay_reply(room_id, &replied, &stand_in).await;
-                    }
-                }
-                Err(error) => {
-                    tracing::debug!(?error, "replied-to event unavailable");
-                }
-            }
+            self.fill_reply(room_id, &replied).await;
         }
         fetched.or_failed(self, "fetch_event_details")?;
         Ok(())
+    }
+
+    async fn fill_reply(&self, room_id: &OwnedRoomId, replied: &OwnedEventId) {
+        match self.event_source(room_id, replied, false).await {
+            Ok((source, ..)) => {
+                let stand_in = serde_json::from_str(&source)
+                    .ok()
+                    .and_then(|source| ReplyFallback::from_source(&source));
+                if let Some(stand_in) = stand_in {
+                    self.overlay_reply(room_id, replied, &stand_in).await;
+                }
+            }
+            Err(error) => {
+                tracing::debug!(?error, "replied-to event unavailable");
+            }
+        }
+    }
+
+    /// A replied-to event fetched from the server is outside the event cache,
+    /// so the SDK never redecrypts it once its key arrives.
+    pub(crate) async fn refresh_encrypted_replies(
+        &self,
+        room_id: Option<&RoomId>,
+        keyed: impl Fn(&str) -> bool,
+    ) {
+        let pending: std::collections::BTreeSet<(OwnedRoomId, OwnedEventId)> = self
+            .subscriptions
+            .lock()
+            .await
+            .values()
+            .filter_map(|entry| {
+                let (SubscriptionKind::LiveTimeline(room)
+                | SubscriptionKind::FocusedTimeline(room)) = &entry.kind
+                else {
+                    return None;
+                };
+                let overlay = entry
+                    .overlay
+                    .as_ref()
+                    .filter(|_| room_id.is_none_or(|wanted| wanted == room))?;
+                Some(
+                    overlay
+                        .lock()
+                        .encrypted_replies(&keyed)
+                        .into_iter()
+                        .map(|replied| (room.clone(), replied)),
+                )
+            })
+            .flatten()
+            .collect();
+        for (room, replied) in pending {
+            self.fill_reply(&room, &replied).await;
+        }
     }
 
     async fn watch_aggregations(
