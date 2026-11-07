@@ -39,7 +39,7 @@ test('sends sampled call traces without the transport secret', async () => {
   await telemetry.step('call.signaling.join', () => Promise.resolve());
   telemetry.finish('connected');
   telemetry.event('call.transport.state', { 'call.connection': 'reconnecting' });
-  telemetry.failure(
+  telemetry.terminal(
     'call.transport.connect',
     new Error('wss://sfu.example.org?token=super-secret')
   );

@@ -40,6 +40,7 @@ export type CallTransportState = {
   cameraEnabled: boolean;
   screenShareEnabled: boolean;
   error?: string;
+  disconnectReason?: string;
 };
 
 export type CallTransportConnectOptions = {
@@ -135,5 +136,12 @@ export function decodeCallKey(encoded: string): Uint8Array<ArrayBuffer> | null {
     return key.length > 0 ? key : null;
   } catch {
     return null;
+  }
+}
+
+export class TransportDisconnectError extends Error {
+  constructor(readonly reason: string) {
+    super(`transport-disconnected: ${reason}`);
+    this.name = 'TransportDisconnectError';
   }
 }

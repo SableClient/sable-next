@@ -14,6 +14,12 @@ vi.mock('#lib/platform/screen-audio.js', async (original) => ({
   screenAudioSupported: screenAudio.supported,
 }));
 
+const sentry = vi.hoisted(() => ({ captureException: vi.fn() }));
+vi.mock('@sentry/sveltekit', async (original) => ({
+  ...(await original<typeof import('@sentry/sveltekit')>()),
+  captureException: sentry.captureException,
+}));
+
 const sounds = vi.hoisted(() => ({ played: [] as string[] }));
 vi.mock('#lib/features/notifications/sound.js', async (original) => {
   const actual = await original<typeof import('#lib/features/notifications/sound.js')>();
@@ -185,6 +191,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  sentry.captureException.mockClear();
 });
 
 test('an unencrypted call connects without waiting for a key', async () => {
@@ -1409,4 +1416,79 @@ test('a started screen share plays its sound', async () => {
   await session.toggleScreenShare();
 
   expect(sounds.played).toContain('screenshare_start');
+});
+
+const reportedCause = (): string =>
+  (sentry.captureException.mock.calls[0] as [Error, { tags: Record<string, string> }])[1].tags[
+    'call.error_category'
+  ];
+
+test('an abnormal disconnect after joining is reported once with the livekit reason', async () => {
+  const { client, transport, emitTransportState } = harness();
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+
+  emitTransportState({
+    ...idleTransportState(),
+    connection: 'disconnected',
+    disconnectReason: 'CONNECTION_TIMEOUT',
+  });
+  await vi.waitFor(() => {
+    expect(session.lifecycle).toBe('failed');
+  });
+
+  expect(sentry.captureException).toHaveBeenCalledOnce();
+  expect(reportedCause()).toBe('disconnect.CONNECTION_TIMEOUT');
+});
+
+test('a server-side room end is not reported', async () => {
+  const { client, transport, emitTransportState } = harness();
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+
+  emitTransportState({
+    ...idleTransportState(),
+    connection: 'disconnected',
+    disconnectReason: 'ROOM_DELETED',
+  });
+  await vi.waitFor(() => {
+    expect(session.lifecycle).toBe('failed');
+  });
+
+  expect(sentry.captureException).not.toHaveBeenCalled();
+});
+
+test('a failed join reports the core error instead of a placeholder', async () => {
+  const error = Object.assign(new Error('rpc failed'), {
+    detail: { code: 'failed', log_id: 'log-9' },
+  });
+  const { client, transport } = harness({ joinError: error });
+  const session = new CallSession(client, { createTransport: () => transport });
+
+  await session.join('!room:example.org', { microphone: true, camera: false });
+
+  expect(sentry.captureException).toHaveBeenCalledOnce();
+  expect(reportedCause()).toBe('code.failed');
+});
+
+test('a join cancelled by a denied device is not reported', async () => {
+  const { client, transport } = harness();
+  transport.connect = vi.fn(() => Promise.reject(new DOMException('denied', 'NotAllowedError')));
+  const session = new CallSession(client, { createTransport: () => transport });
+
+  await session.join('!room:example.org', { microphone: true, camera: false });
+
+  expect(session.lifecycle).toBe('failed');
+  expect(sentry.captureException).not.toHaveBeenCalled();
+});
+
+test('a non-fatal signaling error stays a breadcrumb', async () => {
+  const h = harness();
+  const session = new CallSession(h.client, { createTransport: () => h.transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+
+  h.emit({ type: 'call_signaling_error', session: 7, stage: 'sync', fatal: false });
+
+  expect(session.lifecycle).toBe('active');
+  expect(sentry.captureException).not.toHaveBeenCalled();
 });
