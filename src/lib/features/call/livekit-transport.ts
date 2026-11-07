@@ -43,6 +43,7 @@ import {
   videoResolution,
 } from './video-quality';
 import type { CallTelemetry } from './call-telemetry';
+import { routeLivekitLogs } from './livekit-logging';
 
 const qualityOf = (quality: ConnectionQuality): CallConnectionQuality => {
   switch (quality) {
@@ -134,6 +135,7 @@ const DISPLAY_AUDIO_CAPTURE: ScreenShareCaptureOptions = {
 };
 
 export function createLivekitTransport(options: LivekitTransportOptions): LivekitTransport {
+  routeLivekitLogs();
   const keyProvider = options.encryptMedia ? new MatrixKeyProvider() : undefined;
   const worker = keyProvider ? (options.createWorker ?? defaultWorker)() : undefined;
   const voiceIsolation = preferences.noiseSuppression && preferences.voiceIsolation;
