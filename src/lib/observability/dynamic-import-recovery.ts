@@ -1,24 +1,33 @@
 import { updated } from '$app/state';
 
+import { ModelAssetError } from '#lib/model/model.js';
+
 const RELOAD_KEY = 'sable:dynamic-import-reload';
 const RELOAD_WINDOW_MS = 30_000;
 
-function isDynamicImportError(error: unknown): boolean {
+function isStaleAssetError(error: unknown): boolean {
   return (
-    error instanceof Error &&
-    /(?:failed to fetch|error loading) dynamically imported module|unable to preload CSS for/i.test(
-      error.message
-    )
+    error instanceof ModelAssetError ||
+    (error instanceof Error &&
+      /(?:failed to fetch|error loading) dynamically imported module|importing a module script failed|unable to preload CSS for/i.test(
+        error.message
+      ))
   );
 }
 
+let reloading = false;
+
+export function isReloadingForNewBuild(error: unknown): boolean {
+  return reloading && isStaleAssetError(error);
+}
+
 /**
- * Reloads only when the failed import comes from a build the server has
+ * Reloads only when the failed asset comes from a build the server has
  * replaced. A failure on an unchanged build is a network problem and a reload
  * would not fix it, so the error is left to surface instead.
  */
-export async function recoverStaleDynamicImport(error: unknown): Promise<boolean> {
-  if (!isDynamicImportError(error)) return false;
+export async function recoverStaleAsset(error: unknown): Promise<boolean> {
+  if (!isStaleAssetError(error)) return false;
 
   try {
     const now = Date.now();
@@ -27,6 +36,7 @@ export async function recoverStaleDynamicImport(error: unknown): Promise<boolean
     if (!(await updated.check())) return false;
 
     sessionStorage.setItem(RELOAD_KEY, String(now));
+    reloading = true;
     location.reload();
     return true;
   } catch {
@@ -36,7 +46,7 @@ export async function recoverStaleDynamicImport(error: unknown): Promise<boolean
 
 export function installDynamicImportRecovery(): () => void {
   const handleRejection = (event: Event): void => {
-    void recoverStaleDynamicImport((event as PromiseRejectionEvent).reason);
+    void recoverStaleAsset((event as PromiseRejectionEvent).reason);
   };
 
   window.addEventListener('unhandledrejection', handleRejection);

@@ -4,7 +4,11 @@ import type { ClientInit, HandleClientError } from '@sveltejs/kit/hooks';
 import { tolerateUnknownListeners } from '#lib/platform/tauri-events.js';
 import { installBrowserCompatibility } from '#lib/platform/browser-compat.js';
 import { syncTelemetryConsent } from '#lib/platform/telemetry.js';
-import { installDynamicImportRecovery } from '#lib/observability/dynamic-import-recovery.js';
+import {
+  installDynamicImportRecovery,
+  isReloadingForNewBuild,
+  recoverStaleAsset,
+} from '#lib/observability/dynamic-import-recovery.js';
 import { sanitizePayload, scrubMatrixIds, scrubMatrixUrl } from '#lib/observability/scrubbers.js';
 import { scrubSentryEvent } from '#lib/observability/sentry-event.js';
 import { untrackFetch } from '#lib/observability/untracked-fetch.js';
@@ -94,6 +98,7 @@ if (dsn && preferences.errorReporting) {
     },
 
     beforeSend(event, hint) {
+      if (isReloadingForNewBuild(hint.originalException)) return null;
       if (hint.originalException instanceof CoreError) {
         event.fingerprint = ['{{ default }}', hint.originalException.detail.code];
       }
@@ -116,6 +121,7 @@ export const init: ClientInit = async () => {
   try {
     await loadModelForApp();
   } catch (error) {
+    if (await recoverStaleAsset(error)) return;
     Sentry.captureException(error);
   }
 };
