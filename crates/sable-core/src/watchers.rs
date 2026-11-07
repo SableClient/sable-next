@@ -126,12 +126,7 @@ impl Core {
                         after_running = Some(
                             spawn(
                                 async move {
-                                    core.resubscribe_timeline_rooms().await;
-                                    core.reconcile_memberships().await;
-                                    core.fill_own_members().await;
-                                    if !rules_cleaned.load(Ordering::SeqCst) {
-                                        core.retry_rule_cleanup(generation, &rules_cleaned).await;
-                                    }
+                                    core.after_sync_running(generation, &rules_cleaned).await;
                                 }
                                 .instrument(tracing::info_span!(
                                     target: "sable_core::tasks",

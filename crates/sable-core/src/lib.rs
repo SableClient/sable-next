@@ -657,6 +657,19 @@ impl Core {
         }
     }
 
+    /// Drops `work` once the stores close, so it must be started again after they reopen.
+    pub(crate) async fn until_stores_close<T>(
+        &self,
+        work: impl std::future::Future<Output = T>,
+    ) -> Option<T> {
+        let mut open = self.stores_open.subscribe();
+        tokio::select! {
+            biased;
+            _ = open.wait_for(|open| !*open) => None,
+            output = work => Some(output),
+        }
+    }
+
     pub(crate) async fn wait_until_active(&self) {
         loop {
             let woken = self.app_wake.notified();

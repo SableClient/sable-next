@@ -1284,6 +1284,25 @@ async fn local_read_waits_for_open_stores() {
 }
 
 #[tokio::test]
+async fn background_work_stops_when_the_stores_close() {
+    let server = MatrixMockServer::new().await;
+    let store = tempfile::tempdir().unwrap();
+    let client = space_client(&server, store.path()).await;
+    let core = core(&server, client).await;
+
+    assert_eq!(core.until_stores_close(async { 1 }).await, Some(1));
+
+    let work = core.until_stores_close(std::future::pending::<()>());
+    tokio::pin!(work);
+    tokio::time::timeout(std::time::Duration::from_millis(100), &mut work)
+        .await
+        .expect_err("the work keeps running while the stores are open");
+
+    core.stores_open.send_replace(false);
+    assert_eq!(work.await, None);
+}
+
+#[tokio::test]
 async fn space_sidebar_waits_for_stores_to_reopen() {
     let server = MatrixMockServer::new().await;
     let store = tempfile::tempdir().unwrap();

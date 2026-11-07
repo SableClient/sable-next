@@ -280,6 +280,18 @@ impl Core {
         }
     }
 
+    pub(crate) async fn after_sync_running(&self, generation: u64, rules_cleaned: &AtomicBool) {
+        self.until_stores_close(async {
+            self.resubscribe_timeline_rooms().await;
+            self.reconcile_memberships().await;
+            self.fill_own_members().await;
+            if !rules_cleaned.load(Ordering::SeqCst) {
+                self.retry_rule_cleanup(generation, rules_cleaned).await;
+            }
+        })
+        .await;
+    }
+
     pub(crate) async fn retry_rule_cleanup(&self, generation: u64, completed: &AtomicBool) {
         while self.session_generation.load(Ordering::SeqCst) == generation && !self.sync_paused() {
             if self.cleanup_notification_rules().await {
