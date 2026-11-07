@@ -15,6 +15,7 @@
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import { animationsPaused } from '#lib/ui/still-frame.js';
   import { videoPlayback } from '#lib/ui/video-playback.js';
 
   const BLURHASH_POSTER_WIDTH = 32;
@@ -62,6 +63,20 @@
   let started = $derived(startedSource === source || video.autoplay);
   let awaitingPlay = $derived(!started && url === null);
   let posterFailed = $state<string | null>(null);
+  let videoElement = $state<HTMLVideoElement>();
+  let heldForFocus = false;
+
+  $effect(() => {
+    if (!videoElement || !video.autoplay) return;
+    if (animationsPaused()) {
+      if (videoElement.paused) return;
+      videoElement.pause();
+      heldForFocus = true;
+    } else if (heldForFocus) {
+      heldForFocus = false;
+      void videoElement.play().catch(() => {});
+    }
+  });
   let unsupportedUrl = $state<string | null>(null);
   let aspectRatio = $derived(
     typeof width === 'number' &&
@@ -193,6 +208,7 @@
     </span>
   {:else if url}
     <video
+      bind:this={videoElement}
       class="media-content media-video"
       controls={video.controls}
       controlslist={savesNatively() ? 'nodownload' : undefined}
