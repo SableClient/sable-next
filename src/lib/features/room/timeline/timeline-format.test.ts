@@ -237,6 +237,15 @@ test('hides profile changes and raw state events by default, keeping joins', () 
   expect(visible.map((entry) => entry.content.kind)).toEqual(['membership', 'message']);
 });
 
+test('a receipt on a join moves to the message before it, which can show it', () => {
+  const before = withEvent(message, '$before');
+  const join = { ...withEvent(joined, '$join'), read_by: ['@bob:example.org'] };
+
+  const visible = visibleTimelineItems([before, join], defaults);
+
+  expect(visible.map((entry) => entry.read_by)).toEqual([['@bob:example.org'], []]);
+});
+
 test('shows an event the SDK left in the timeline twice only once, where it first appears', () => {
   const first = { ...withEvent(message, '$dup'), read_by: ['@bob:example.org'] };
   const later = { ...withEvent(message, '$dup'), id: 'second-copy', read_by: [] };

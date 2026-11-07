@@ -139,24 +139,33 @@ export function visibleTimelineItems(
 ): TimelineItemView[] {
   const shown = new Set<string>();
   const kept: TimelineItemView[] = [];
-  let lastEvent = -1;
+  let lastMessage = -1;
+  const moveReceipts = (item: TimelineItemView): void => {
+    const holder = kept[lastMessage];
+    kept[lastMessage] = {
+      ...holder,
+      read_by: [...holder.read_by, ...item.read_by],
+      read_timestamps: { ...holder.read_timestamps, ...item.read_timestamps },
+    };
+  };
   for (const item of items) {
     if (item.content.kind === 'date_divider') continue;
     if (item.event_id) {
       if (shown.has(item.event_id)) continue;
       shown.add(item.event_id);
     }
-    if (isVisibleEvent(item, preferences, context)) {
-      kept.push(item);
-      if (item.event_id) lastEvent = kept.length - 1;
-    } else if (item.read_by.length > 0 && lastEvent >= 0) {
-      const holder = kept[lastEvent];
-      kept[lastEvent] = {
-        ...holder,
-        read_by: [...holder.read_by, ...item.read_by],
-        read_timestamps: { ...holder.read_timestamps, ...item.read_timestamps },
-      };
+    const movable = item.read_by.length > 0 && lastMessage >= 0;
+    if (!isVisibleEvent(item, preferences, context)) {
+      if (movable) moveReceipts(item);
+      continue;
     }
+    if (movable && !isMessageRow(item)) {
+      moveReceipts(item);
+      kept.push({ ...item, read_by: [], read_timestamps: {} });
+    } else {
+      kept.push(item);
+    }
+    if (item.event_id && isMessageRow(item)) lastMessage = kept.length - 1;
   }
 
   const visible: TimelineItemView[] = [];
