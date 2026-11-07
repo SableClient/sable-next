@@ -2,6 +2,8 @@ const TYPING_TIMEOUT_MS = 4000;
 
 export class TypingNotifier {
   #timeout: ReturnType<typeof setTimeout> | undefined;
+  /** The room the server believes we are typing in, which `roomId()` no longer names once the view is leaving. */
+  #typingIn: string | null = null;
 
   constructor(
     private readonly roomId: () => string,
@@ -9,28 +11,27 @@ export class TypingNotifier {
   ) {}
 
   update(empty: boolean): void {
-    if (this.#timeout) clearTimeout(this.#timeout);
     if (empty) {
-      this.#send(this.roomId(), false);
+      this.stop();
       return;
     }
 
-    this.#send(this.roomId(), true);
+    if (this.#timeout) clearTimeout(this.#timeout);
+    const room = this.roomId();
+    if (this.#typingIn !== null && this.#typingIn !== room) this.#send(this.#typingIn, false);
+    this.#typingIn = room;
+    this.#send(room, true);
     this.#timeout = setTimeout(() => {
-      this.#send(this.roomId(), false);
+      this.stop();
     }, TYPING_TIMEOUT_MS);
   }
 
   stop(): void {
     if (this.#timeout) clearTimeout(this.#timeout);
-    this.#send(this.roomId(), false);
-  }
-
-  leave(roomId: string): void {
-    if (!this.#timeout) return;
-    clearTimeout(this.#timeout);
     this.#timeout = undefined;
-    this.#send(roomId, false);
+    if (this.#typingIn === null) return;
+    this.#send(this.#typingIn, false);
+    this.#typingIn = null;
   }
 
   #send(roomId: string, typing: boolean): void {

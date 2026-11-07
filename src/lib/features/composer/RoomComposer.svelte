@@ -558,14 +558,14 @@
       staged = files.staged;
       nextStagedId = files.nextStagedId;
     },
-    onLeave: (previousRoomId) => {
+    onLeave: () => {
       prefilledFor = null;
       prefilledDoc = undefined;
       error = null;
       recording = false;
       recordingDraft = undefined;
       boardOpen = false;
-      typing.leave(previousRoomId);
+      typing.stop();
     },
   });
 
