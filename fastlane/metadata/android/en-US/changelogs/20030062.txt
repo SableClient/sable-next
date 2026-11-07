@@ -1,0 +1,4 @@
+- Show the unread count on the iOS app icon, keep message text off the Android lock screen, group Android conversations under one summary, and let direct messages and mentions break through Focus on iOS.
+- Stop marking abbreviations inside words that continue with an accented letter.
+- Keep the formatting toolbar on one scrollable row on phones with a stylus, instead of filling the screen.
+- Stop flagging invites as offensive when a listed word is only part of a longer accented word.
