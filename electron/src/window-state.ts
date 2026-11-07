@@ -10,7 +10,7 @@ export interface WindowState extends Rectangle {
 }
 
 export const MIN_WIDTH = 400;
-export const MIN_HEIGHT = 500;
+export const MIN_HEIGHT = 400;
 
 const Coordinate = v.pipe(v.number(), v.finite(), v.transform(Math.round));
 const WindowStateSchema = v.object({
