@@ -351,21 +351,31 @@ impl Core {
         client: &matrix_sdk::Client,
         generation: u64,
     ) {
+        let weak = Arc::downgrade(self);
         let handle = client.add_event_handler(
-            |event: ToDeviceAccountDataKeyRequestEvent,
-             encryption: Option<EncryptionInfo>,
-             client: matrix_sdk::Client| async move {
-                let Some(device) = verified_own_sender(&client, &event.sender, encryption).await
-                else {
-                    return;
-                };
-                let Some(key) = cached_key(&client).await else {
-                    return;
-                };
-                let content = ToDeviceAccountDataKeySendEventContent {
-                    key: key.to_base64(),
-                };
-                send_to(&client, &[device], &content).await;
+            move |event: ToDeviceAccountDataKeyRequestEvent,
+                  encryption: Option<EncryptionInfo>,
+                  client: matrix_sdk::Client| {
+                let weak = weak.clone();
+                async move {
+                    let Some(core) = weak.upgrade() else {
+                        return;
+                    };
+                    core.defer_to_device(Box::pin(async move {
+                        let Some(device) =
+                            verified_own_sender(&client, &event.sender, encryption).await
+                        else {
+                            return;
+                        };
+                        let Some(key) = cached_key(&client).await else {
+                            return;
+                        };
+                        let content = ToDeviceAccountDataKeySendEventContent {
+                            key: key.to_base64(),
+                        };
+                        send_to(&client, &[device], &content).await;
+                    }));
+                }
             },
         );
         self.track_session_handler(client, handle);
@@ -377,30 +387,33 @@ impl Core {
                   client: matrix_sdk::Client| {
                 let core = core.clone();
                 async move {
-                    if verified_own_sender(&client, &event.sender, encryption)
-                        .await
-                        .is_none()
-                        || cached_key(&client).await.is_some()
-                    {
-                        return;
-                    }
-                    let Some(key) = AccountDataKey::from_base64(&event.content.key) else {
-                        tracing::warn!("ignoring an account data key that is not 32 bytes");
-                        return;
-                    };
-                    cache_key(&client, &key).await;
-                    core.emit_if_current(
-                        generation,
-                        CoreEvent::AccountDataChanged {
-                            event_type: ADK_SECRET.to_owned(),
-                        },
-                    );
-                    core.emit_if_current(
-                        generation,
-                        CoreEvent::EncryptionStatus {
-                            status: crate::verification::encryption_status(&client).await,
-                        },
-                    );
+                    let inbox = core.clone();
+                    inbox.defer_to_device(Box::pin(async move {
+                        if verified_own_sender(&client, &event.sender, encryption)
+                            .await
+                            .is_none()
+                            || cached_key(&client).await.is_some()
+                        {
+                            return;
+                        }
+                        let Some(key) = AccountDataKey::from_base64(&event.content.key) else {
+                            tracing::warn!("ignoring an account data key that is not 32 bytes");
+                            return;
+                        };
+                        cache_key(&client, &key).await;
+                        core.emit_if_current(
+                            generation,
+                            CoreEvent::AccountDataChanged {
+                                event_type: ADK_SECRET.to_owned(),
+                            },
+                        );
+                        core.emit_if_current(
+                            generation,
+                            CoreEvent::EncryptionStatus {
+                                status: crate::verification::encryption_status(&client).await,
+                            },
+                        );
+                    }));
                 }
             },
         );

@@ -375,8 +375,12 @@ impl Core {
                 let weak = weak.clone();
                 async move {
                     if let Some(core) = weak.upgrade() {
-                        core.receive_search_peer(&client, generation, event, encryption)
-                            .await;
+                        let deferred = core.clone();
+                        core.defer_to_device(Box::pin(async move {
+                            deferred
+                                .receive_search_peer(&client, generation, event, encryption)
+                                .await;
+                        }));
                     }
                 }
             },
