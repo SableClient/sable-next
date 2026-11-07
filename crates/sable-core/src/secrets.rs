@@ -215,6 +215,7 @@ mod keyring {
     pub(super) struct Keyring {
         store: Arc<CredentialStore>,
         service: String,
+        #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "windows")))]
         collection: Option<String>,
     }
 
@@ -241,7 +242,7 @@ mod keyring {
         work()
     }
 
-    /// KWallet serves its wallets without a `default` alias, where the store would write.
+    /// `KWallet` serves its wallets without a `default` alias, where the store would write.
     #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "windows")))]
     fn collection_without_default_alias() -> Option<String> {
         use secret_service::{EncryptionType, blocking::SecretService};
@@ -306,11 +307,7 @@ mod keyring {
                 })
             };
             #[cfg(any(target_os = "ios", target_os = "macos", target_os = "windows"))]
-            Ok(Self {
-                store,
-                service,
-                collection: None,
-            })
+            Ok(Self { store, service })
         }
 
         /// A Secret Service can answer reads and still refuse every write, as one started without
@@ -333,7 +330,9 @@ mod keyring {
             // The notification service extension reads while the device is locked.
             #[cfg(target_os = "ios")]
             let modifiers = HashMap::from([("access-policy", "AfterFirstUnlockThisDeviceOnly")]);
-            #[cfg(not(target_os = "ios"))]
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
+            let modifiers = HashMap::new();
+            #[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "windows")))]
             let modifiers: HashMap<&str, &str> = self
                 .collection
                 .as_deref()
