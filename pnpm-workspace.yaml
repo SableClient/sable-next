@@ -33,4 +33,6 @@ patchedDependencies:
   livekit-client@2.23.0: patches/livekit-client@2.23.0.patch
   # Backport https://github.com/benjamn/recast/pull/1442 until it is released.
   recast@0.23.21: patches/recast@0.23.21.patch
+  # Cancel the queued scroll frame on teardown so it cannot read a destroyed wrapper.
+  svelte-tiny-virtual-list@4.0.0: patches/svelte-tiny-virtual-list@4.0.0.patch
   svelte@5.57.2: patches/svelte@5.57.2.patch
