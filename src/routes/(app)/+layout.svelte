@@ -15,7 +15,7 @@
     roomListOptions,
   } from '#lib/rooms/room-list.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
-  import { rememberLastRoom } from '#lib/rooms/last-room.js';
+  import { HOME_SECTION, rememberLastRoom } from '#lib/rooms/last-room.js';
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { Bookmarks, provideBookmarks } from '#lib/rooms/bookmarks.svelte.js';
@@ -1022,7 +1022,10 @@
     if (core.status !== 'ready' || !accountId || !roomList.settled) return;
     const room = roomList.byId(openRoomId);
     if (room?.state === 'joined' && room.room_kind !== 'space' && !room.is_tombstoned) {
-      rememberLastRoom(accountId, room.room_id);
+      const section = page.url.pathname.startsWith('/home/')
+        ? HOME_SECTION
+        : (findRoomByPathId(roomList.rooms, page.params.spaceId)?.room_id ?? null);
+      rememberLastRoom(accountId, room.room_id, section);
     }
   });
 
