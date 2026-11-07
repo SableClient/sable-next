@@ -190,6 +190,49 @@ test('holds the typing user ids so a room opened later reads them', async () => 
   roomList.stop();
 });
 
+test('stops a user typing once their message arrives in the room list', async () => {
+  const room = {
+    room_id: '!room:example.org',
+    display_name: '!room:example.org',
+    latest_event: { sender: '@bob:example.org', body: 'old', event_id: '$1', sending: false },
+  } as RoomListItemView;
+  const eventListeners: ((event: unknown) => void)[] = [];
+  const core = {
+    subscribeEvents: vi.fn((listener: (event: unknown) => void) => {
+      eventListeners.push(listener);
+      return () => {};
+    }),
+    rpc: {
+      timeline: {
+        subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
+        unsubscribe: vi.fn(() => Promise.resolve()),
+      },
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  await roomList.start();
+  for (const listener of eventListeners) {
+    listener({
+      type: 'typing',
+      room_id: room.room_id,
+      user_ids: ['@alice:example.org', '@bob:example.org'],
+    });
+  }
+  const sent = { ...room, latest_event: { ...room.latest_event, event_id: '$2' } };
+  for (const listener of eventListeners) {
+    listener({
+      type: 'room_list_diff',
+      subscription: 1,
+      diffs: [{ op: 'set', index: 0, value: sent }],
+      sections: null,
+    });
+  }
+
+  expect(roomList.typingUserIds(room.room_id)).toEqual(['@alice:example.org']);
+  roomList.stop();
+});
+
 test('paints the persisted room list before the subscription answers', async () => {
   const room = withCounts({
     room_id: '!persisted:example.org',

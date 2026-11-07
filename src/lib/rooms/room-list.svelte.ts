@@ -408,8 +408,32 @@ export class RoomList {
     this.snapshotDirty = false;
   }
 
+  private stopTypingForNewMessages(rooms: readonly RoomListItemView[]): void {
+    if (this.typingUsers.size === 0) return;
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a local lookup, never stored
+    const previous = new Map(this.#source.map((room) => [room.room_id, room.latest_event]));
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt wholesale, never mutated once stored
+    const typing = new Map(this.typingUsers);
+    for (const room of rooms) {
+      const latest = room.latest_event;
+      const typers = typing.get(room.room_id);
+      if (!typers || !latest?.sender || !previous.has(room.room_id)) continue;
+      if (latest.event_id === previous.get(room.room_id)?.event_id) continue;
+      const remaining = typers.filter((userId) => userId !== latest.sender);
+      if (remaining.length === typers.length) continue;
+      if (remaining.length > 0) typing.set(room.room_id, remaining);
+      else typing.delete(room.room_id);
+    }
+    if (
+      typing.size !== this.typingUsers.size ||
+      [...typing].some(([id, users]) => users !== this.typingUsers.get(id))
+    )
+      this.typingUsers = typing;
+  }
+
   private setRooms(rooms: RoomListItemView[]): void {
     this.live = true;
+    this.stopTypingForNewMessages(rooms);
     this.#source = rooms;
     for (const waiter of this.listedWaiters) {
       if (rooms.some((room) => room.room_id === waiter.roomId)) waiter.resolve();
