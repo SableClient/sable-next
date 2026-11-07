@@ -17,9 +17,8 @@ use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId, RoomId, 
 use matrix_sdk::send_queue::RoomSendQueueUpdate;
 use matrix_sdk_base::event_cache::Event;
 use matrix_sdk_ui::eyeball_im::VectorDiff;
-use matrix_sdk_ui::room_list_service::RoomListDynamicEntriesController;
+use matrix_sdk_ui::room_list_service::RoomListItem;
 use matrix_sdk_ui::room_list_service::filters::new_filter_non_left;
-use matrix_sdk_ui::room_list_service::{RoomListItem, RoomListLoadingState};
 use matrix_sdk_ui::timeline::{
     Error as TimelineError, EventSendState, SendTarget, Timeline, TimelineItem,
 };
@@ -67,13 +66,10 @@ async fn next_queue_update(
     }
 }
 
-const ROOM_LIST_PAGE_SIZE: usize = 200;
+/// A lagged room list resends a `Reset` cut to the page size, so a smaller page drops rooms.
+const ROOM_LIST_PAGE_SIZE: usize = usize::MAX;
 const ROOM_LIST_BATCH_INTERVAL: Duration = Duration::from_millis(100);
 pub(crate) const MAX_WARM_ROOMS: usize = 32;
-
-const fn pages_for(total: u32) -> usize {
-    (total as usize).div_ceil(ROOM_LIST_PAGE_SIZE)
-}
 
 pub(crate) fn abort_rejected_redaction(timeline: &Arc<Timeline>, item: &TimelineItem) {
     let Some(event) = item.as_event() else {
@@ -110,8 +106,6 @@ struct RoomListWorker {
     parents: ParentTracker,
     dm_spaces_changed: watch::Receiver<()>,
     nicknames: watch::Receiver<crate::nicknames::Nicknames>,
-    controller: RoomListDynamicEntriesController,
-    grown_to: u32,
     core: Arc<Core>,
     subscription: SubscriptionId,
 }
@@ -171,7 +165,6 @@ impl RoomListWorker {
     async fn run(
         mut self,
         mut stream: impl Stream<Item = Vec<VectorDiff<RoomListItem>>> + Unpin,
-        loading: impl Fn() -> RoomListLoadingState,
         mut stores_open: watch::Receiver<bool>,
         mut rule_changes: broadcast::Receiver<()>,
         mut parent_results: mpsc::UnboundedReceiver<ParentResult>,
@@ -233,7 +226,7 @@ impl RoomListWorker {
                 }
                 diffs = stream.next() => {
                     let Some(diffs) = diffs else { break };
-                    self.on_entries(diffs, loading()).await
+                    self.on_entries(diffs).await
                 }
                 changed = self.nicknames.changed() => {
                     if changed.is_err() {
@@ -331,19 +324,7 @@ impl RoomListWorker {
     async fn on_entries(
         &mut self,
         diffs: Vec<VectorDiff<RoomListItem>>,
-        loading: RoomListLoadingState,
     ) -> Vec<crate::protocol::VectorDiff<RoomListItemView>> {
-        if let RoomListLoadingState::Loaded {
-            maximum_number_of_rooms: Some(total),
-        } = loading
-            && total > self.grown_to
-        {
-            for _ in 0..pages_for(total) {
-                self.controller.add_one_page();
-            }
-            self.grown_to = total;
-        }
-
         view::prime_display_names(&diffs).await;
         view::enrich_room_batch(&diffs, &mut self.room_cache).await;
         let mut diffs: Vec<_> = diffs
@@ -522,7 +503,6 @@ impl Core {
                 }
             };
 
-            let loading = room_list.loading_state();
             let (stream, controller) = room_list.entries_with_dynamic_adapters(ROOM_LIST_PAGE_SIZE);
             controller.set_filter(Box::new(new_filter_non_left()));
 
@@ -542,15 +522,12 @@ impl Core {
                 parents: ParentTracker::new(parent_results_tx),
                 dm_spaces_changed: core.dm_spaces_changed.subscribe(),
                 nicknames,
-                controller,
-                grown_to: 0,
                 core,
                 subscription,
             };
             worker
                 .run(
                     Box::pin(stream),
-                    || loading.get(),
                     stores_open,
                     rule_changes,
                     parent_results_rx,
