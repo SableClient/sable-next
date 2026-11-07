@@ -1129,111 +1129,114 @@
   }
 
   $effect(() => {
-    return registerGlobalShortcuts({
-      'navigation.openRoomSearch': () => {
-        paletteState.open = true;
-      },
-      'app.searchMessages': () => {
-        if (page.url.pathname.startsWith(resolve('search'))) {
-          document.getElementById(MESSAGE_SEARCH_FIELD_ID)?.focus();
-          return;
-        }
-        // eslint-disable-next-line svelte/no-navigation-without-resolve -- contextSearchPath() resolves the route itself
-        void goto(contextSearchPath(roomList.rooms, page.params.roomId, page.params.spaceId));
-      },
-      'app.openBookmarks': () => {
-        void goto(resolve('bookmarks'));
-      },
-      'app.createRoom': () => {
-        void goto(resolve('create-room'));
-      },
-      'app.showShortcuts': () => {
-        shortcutsHelpState.open = true;
-      },
-      'call.toggleMute': (event) => {
-        if (event.repeat || callSession.desktopShortcutStatus === 'portal') return;
-        if (callSession.active && callSession.mediaReady) {
-          void callSession.toggleMicrophone();
-        }
-      },
-      'call.pushToTalk': {
-        press: () => {
-          void callSession.setTalking(true);
+    return registerGlobalShortcuts(
+      {
+        'navigation.openRoomSearch': () => {
+          paletteState.open = true;
         },
-        release: () => {
-          void callSession.setTalking(false);
+        'app.searchMessages': () => {
+          if (page.url.pathname.startsWith(resolve('search'))) {
+            document.getElementById(MESSAGE_SEARCH_FIELD_ID)?.focus();
+            return;
+          }
+          // eslint-disable-next-line svelte/no-navigation-without-resolve -- contextSearchPath() resolves the route itself
+          void goto(contextSearchPath(roomList.rooms, page.params.roomId, page.params.spaceId));
+        },
+        'app.openBookmarks': () => {
+          void goto(resolve('bookmarks'));
+        },
+        'app.createRoom': () => {
+          void goto(resolve('create-room'));
+        },
+        'app.showShortcuts': () => {
+          shortcutsHelpState.open = true;
+        },
+        'call.toggleMute': (event) => {
+          if (event.repeat || callSession.desktopShortcutStatus === 'portal') return;
+          if (callSession.active && callSession.mediaReady) {
+            void callSession.toggleMicrophone();
+          }
+        },
+        'call.pushToTalk': {
+          press: () => {
+            void callSession.setTalking(true);
+          },
+          release: () => {
+            void callSession.setTalking(false);
+          },
+        },
+        'call.toggleDeafen': () => {
+          if (callSession.active) callSession.setDeafened(!callSession.deafened);
+        },
+        'call.toggleCamera': () => {
+          if (callSession.active && callSession.mediaReady) {
+            void callSession.setCameraEnabled(!callSession.transport.cameraEnabled);
+          }
+        },
+        'call.toggleScreenShare': () => {
+          if (callSession.active && callSession.mediaReady && callSession.canScreenShare) {
+            void callSession.toggleScreenShare();
+          }
+        },
+        'call.hangUp': () => {
+          if (callSession.active) void callSession.leave();
+        },
+        'app.openSettings': () => {
+          void goto(resolve('/(app)/settings'));
+        },
+        'navigation.previousRoom': () => {
+          const target = roomAtOffset(openRoomId, -1);
+          if (target) jumpToRoom(target);
+        },
+        'navigation.nextRoom': () => {
+          const target = roomAtOffset(openRoomId, 1);
+          if (target) jumpToRoom(target);
+        },
+        'room.markRead': () => {
+          const room = roomList.byId(openRoomId);
+          markRoomsRead([room], core.rpc.timeline, readReceiptIsPrivate());
+        },
+        'room.markAllRead': () => {
+          markRoomsRead(roomList.rooms, core.rpc.timeline, readReceiptIsPrivate());
+        },
+        'room.close': () => {
+          if (openRoomId) backToRoomList();
+        },
+        'navigation.nextUnread': () => {
+          const unread = unreadRoomsByPriority(roomList.rooms, openRoomId, roomList.unreadFor);
+          const target = unread[0];
+          if (!target) return;
+          jumpToRoom(target.room_id);
+        },
+        'navigation.cycleNextUnread': () => {
+          const target = unreadRoomAtOffset(roomList.rooms, openRoomId, 1, roomList.unreadFor);
+          if (target) jumpToRoom(target.room_id);
+        },
+        'navigation.focusComposer': () => {
+          focusRegion('composer');
+        },
+        'navigation.focusTimeline': () => {
+          focusRegion('timeline');
+        },
+        'navigation.focusRoomList': () => {
+          focusRegion('rooms');
+        },
+        'navigation.focusSpaces': () => {
+          focusRegion('spaces');
+        },
+        'navigation.nextRegion': () => {
+          cycleRegion(1);
+        },
+        'navigation.previousRegion': () => {
+          cycleRegion(-1);
+        },
+        'navigation.cyclePreviousUnread': () => {
+          const target = unreadRoomAtOffset(roomList.rooms, openRoomId, -1, roomList.unreadFor);
+          if (target) jumpToRoom(target.room_id);
         },
       },
-      'call.toggleDeafen': () => {
-        if (callSession.active) callSession.setDeafened(!callSession.deafened);
-      },
-      'call.toggleCamera': () => {
-        if (callSession.active && callSession.mediaReady) {
-          void callSession.setCameraEnabled(!callSession.transport.cameraEnabled);
-        }
-      },
-      'call.toggleScreenShare': () => {
-        if (callSession.active && callSession.mediaReady && callSession.canScreenShare) {
-          void callSession.toggleScreenShare();
-        }
-      },
-      'call.hangUp': () => {
-        if (callSession.active) void callSession.leave();
-      },
-      'app.openSettings': () => {
-        void goto(resolve('/(app)/settings'));
-      },
-      'navigation.previousRoom': () => {
-        const target = roomAtOffset(openRoomId, -1);
-        if (target) jumpToRoom(target);
-      },
-      'navigation.nextRoom': () => {
-        const target = roomAtOffset(openRoomId, 1);
-        if (target) jumpToRoom(target);
-      },
-      'room.markRead': () => {
-        const room = roomList.byId(openRoomId);
-        markRoomsRead([room], core.rpc.timeline, readReceiptIsPrivate());
-      },
-      'room.markAllRead': () => {
-        markRoomsRead(roomList.rooms, core.rpc.timeline, readReceiptIsPrivate());
-      },
-      'room.close': () => {
-        if (openRoomId) backToRoomList();
-      },
-      'navigation.nextUnread': () => {
-        const unread = unreadRoomsByPriority(roomList.rooms, openRoomId, roomList.unreadFor);
-        const target = unread[0];
-        if (!target) return;
-        jumpToRoom(target.room_id);
-      },
-      'navigation.cycleNextUnread': () => {
-        const target = unreadRoomAtOffset(roomList.rooms, openRoomId, 1, roomList.unreadFor);
-        if (target) jumpToRoom(target.room_id);
-      },
-      'navigation.focusComposer': () => {
-        focusRegion('composer');
-      },
-      'navigation.focusTimeline': () => {
-        focusRegion('timeline');
-      },
-      'navigation.focusRoomList': () => {
-        focusRegion('rooms');
-      },
-      'navigation.focusSpaces': () => {
-        focusRegion('spaces');
-      },
-      'navigation.nextRegion': () => {
-        cycleRegion(1);
-      },
-      'navigation.previousRegion': () => {
-        cycleRegion(-1);
-      },
-      'navigation.cyclePreviousUnread': () => {
-        const target = unreadRoomAtOffset(roomList.rooms, openRoomId, -1, roomList.unreadFor);
-        if (target) jumpToRoom(target.room_id);
-      },
-    });
+      (shortcut) => shortcut.category !== 'call' || callSession.active
+    );
   });
 </script>
 
