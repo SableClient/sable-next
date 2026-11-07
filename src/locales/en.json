@@ -865,6 +865,8 @@
     "startSlow": "This is taking longer than usual.",
     "unableToStart": "Unable to restore your session.",
     "startFailed": "Check your connection and device storage, then try again.",
+    "modelLoadFailed": "Unable to load the app.",
+    "modelLoadFailedDetail": "Part of the app could not be downloaded. Check your connection, then try again.",
     "signInRecoveryHint": "Signing in creates a new device and keeps your saved account data."
   },
   "home": {

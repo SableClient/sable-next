@@ -9,7 +9,7 @@ import { sanitizePayload, scrubMatrixIds, scrubMatrixUrl } from '#lib/observabil
 import { scrubSentryEvent } from '#lib/observability/sentry-event.js';
 import { untrackFetch } from '#lib/observability/untracked-fetch.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
-import { loadModel } from '#lib/model/model.js';
+import { loadModelForApp } from '#lib/model/model-load.svelte.js';
 import { CoreError } from '#src/transport';
 import { prewarmTransport } from '#src/transport/create';
 
@@ -114,10 +114,9 @@ export const init: ClientInit = async () => {
     console.error('[sable] browser compatibility setup failed', error);
   }
   try {
-    await loadModel();
+    await loadModelForApp();
   } catch (error) {
     Sentry.captureException(error);
-    console.error('[sable] the model failed to load', error);
   }
 };
 
