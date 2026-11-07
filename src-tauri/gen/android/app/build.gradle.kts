@@ -35,7 +35,7 @@ fun sentryBuildConfigValue(name: String): String =
     System.getenv(name).orEmpty().replace("\\", "\\\\").replace("\"", "\\\"")
 
 android {
-    compileSdk = 36
+    compileSdk = 37
     System.getenv("ANDROID_NDK_VERSION")?.let { ndkVersion = it }
     namespace = "moe.sable.client"
     defaultConfig {

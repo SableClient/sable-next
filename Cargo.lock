@@ -9553,7 +9553,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-sharekit"
-version = "0.4.0-rc.7"
+version = "0.4.0-rc.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1a89a463a6eb1a098a250a89c95578d3d2797165c7f2d4ad84294f632f6f703"
 dependencies = [
  "log",
  "objc2",
