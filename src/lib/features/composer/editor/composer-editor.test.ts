@@ -1405,8 +1405,8 @@ describe('the markdown source toggle round trip', () => {
     const modes: boolean[] = [];
     const editor = openWith({ onSourceToggle: (source) => modes.push(source) });
     editor.setText('hi');
-    press(editor, 'm', { mod: true, shift: true });
-    press(editor, 'm', { mod: true, shift: true });
+    press(editor, 'l', { mod: true, shift: true });
+    press(editor, 'l', { mod: true, shift: true });
 
     expect(modes).toEqual([true, false]);
   });

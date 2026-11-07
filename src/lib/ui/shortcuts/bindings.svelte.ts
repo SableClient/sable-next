@@ -3,7 +3,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
 
 import { findShortcutConflicts } from './binding.js';
-import { SHORTCUTS, shortcutScope, type ShortcutDefinition, type ShortcutId } from './shortcuts.js';
+import { SHORTCUTS, type ShortcutDefinition, type ShortcutId } from './shortcuts.js';
 
 const STORAGE_KEY = 'sable-shortcut-bindings';
 const SHORTCUT_IDS = new Set<string>(SHORTCUTS.map((shortcut) => shortcut.id));
@@ -59,7 +59,6 @@ export function conflictsWith(id: ShortcutId, binding: string, isMac: boolean): 
   const candidates = effectiveShortcuts().map((shortcut) => ({
     id: shortcut.id,
     binding: shortcut.id === id ? binding : shortcut.binding,
-    scope: shortcutScope(shortcut),
   }));
 
   return findShortcutConflicts(candidates, isMac)
