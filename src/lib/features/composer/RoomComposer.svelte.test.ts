@@ -1085,7 +1085,7 @@ test.each([
   }
 );
 
-test('recording a voice message keeps the typed draft', async () => {
+async function withDeniedMicrophone(run: () => Promise<void>): Promise<void> {
   vi.stubGlobal('AudioContext', vi.fn());
   vi.stubGlobal('Worker', vi.fn());
   Object.defineProperty(navigator, 'mediaDevices', {
@@ -1093,6 +1093,22 @@ test('recording a voice message keeps the typed draft', async () => {
     value: { getUserMedia: () => Promise.reject(new DOMException('', 'NotAllowedError')) },
   });
   try {
+    await run();
+  } finally {
+    vi.unstubAllGlobals();
+    Reflect.deleteProperty(navigator, 'mediaDevices');
+  }
+}
+
+async function startRecording(): Promise<void> {
+  await press(screen.getByRole('button', { name: 'Record a voice message' }));
+  await vi.waitFor(() => {
+    expect(document.querySelector('.voice-close')).not.toBeNull();
+  });
+}
+
+test('recording a voice message keeps the typed draft', () =>
+  withDeniedMicrophone(async () => {
     writeDraft('!room:example.org', {
       doc: textDoc('hold on').toJSON(),
       staged: [],
@@ -1101,30 +1117,17 @@ test('recording a voice message keeps the typed draft', async () => {
     setup({ roomId: '!room:example.org' });
     await flushed();
 
-    await press(screen.getByRole('button', { name: 'Record a voice message' }));
-    await vi.waitFor(() => {
-      expect(document.querySelector('.voice-close')).not.toBeNull();
-    });
+    await startRecording();
     await press(document.querySelector('.voice-close'));
 
     await vi.waitFor(() => {
       expect(editorText()).toBe('hold on');
     });
     expect(screen.getByRole('button', { name: 'Record a voice message' })).toBeInTheDocument();
-  } finally {
-    vi.unstubAllGlobals();
-    Reflect.deleteProperty(navigator, 'mediaDevices');
-  }
-});
+  }));
 
-test('switching rooms drops the voice recording and keeps its draft in the old room', async () => {
-  vi.stubGlobal('AudioContext', vi.fn());
-  vi.stubGlobal('Worker', vi.fn());
-  Object.defineProperty(navigator, 'mediaDevices', {
-    configurable: true,
-    value: { getUserMedia: () => Promise.reject(new DOMException('', 'NotAllowedError')) },
-  });
-  try {
+test('switching rooms drops the voice recording and keeps its draft in the old room', () =>
+  withDeniedMicrophone(async () => {
     writeDraft('!first:example.org', {
       doc: textDoc('hold on').toJSON(),
       staged: [],
@@ -1139,11 +1142,7 @@ test('switching rooms drops the voice recording and keeps its draft in the old r
     });
     await flushed();
 
-    await press(screen.getByRole('button', { name: 'Record a voice message' }));
-    await vi.waitFor(() => {
-      expect(document.querySelector('.voice-close')).not.toBeNull();
-    });
-
+    await startRecording();
     switchRoom?.('!second:example.org');
     await flushed();
 
@@ -1153,11 +1152,7 @@ test('switching rooms drops the voice recording and keeps its draft in the old r
     switchRoom?.('!first:example.org');
     await flushed();
     expect(editorText()).toBe('hold on');
-  } finally {
-    vi.unstubAllGlobals();
-    Reflect.deleteProperty(navigator, 'mediaDevices');
-  }
-});
+  }));
 
 test('a failed send puts the message back in the editor', async () => {
   setup({
