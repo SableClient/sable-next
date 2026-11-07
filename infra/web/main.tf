@@ -13,6 +13,18 @@ resource "cloudflare_worker_version" "site" {
   compatibility_date = "2026-03-03"
   worker_id          = cloudflare_worker.site.id
 
+  main_module = "worker.mjs"
+  modules = [{
+    name         = "worker.mjs"
+    content_type = "application/javascript+module"
+    content_file = abspath("${path.module}/worker.mjs")
+  }]
+
+  bindings = [{
+    type = "assets"
+    name = "ASSETS"
+  }]
+
   assets = {
     directory = abspath("${path.module}/../../dist")
     config = {
