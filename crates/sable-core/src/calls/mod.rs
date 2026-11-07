@@ -943,7 +943,7 @@ impl Core {
         let room = self.room(&room_id).await?;
         runtime::set_screen_sharing(&room, &state, active)
             .await
-            .map_err(|error| self.room_error("set_call_screen_sharing", error))?;
+            .or_failed(self, "set_call_screen_sharing")?;
         Ok(())
     }
 
@@ -1005,14 +1005,14 @@ impl Core {
                 wire,
             )
             .await
-            .map_err(|error| self.room_error("leave_call", error))?;
+            .or_failed(self, "leave_call")?;
             return Ok(());
         }
         self.room(&call.room_id)
             .await?
             .send_state_event_for_key(&call.state_key, left_membership())
             .await
-            .map_err(|error| self.room_error("leave_call", error))?;
+            .or_failed(self, "leave_call")?;
 
         Ok(())
     }

@@ -260,7 +260,7 @@ impl Handler for SendRedactionParams {
             .await?
             .redact(&self.event_id, self.reason.as_deref(), None)
             .await
-            .map_err(|error| core.homeserver_http_error("send_redaction", error))?;
+            .or_failed(core, "send_redaction")?;
         Ok(response.event_id.to_string())
     }
 }
@@ -1113,7 +1113,7 @@ impl Handler for UrlPreviewParams {
                 tracing::info!(context = "url_preview", "the homeserver refused the url");
                 return Ok(None);
             }
-            Err(error) => return Err(core.homeserver_http_error("url_preview", error)),
+            Err(error) => return Err(core.rpc_error("url_preview", &error)),
         };
 
         Ok(response

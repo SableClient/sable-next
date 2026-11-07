@@ -364,7 +364,7 @@ impl Handler for SetUserPowerLevelParams {
             .await?
             .update_power_levels(vec![(&self.user_id, self.power_level.into())])
             .await
-            .map_err(|error| core.room_error("set_user_power_level", error))?;
+            .or_failed(core, "set_user_power_level")?;
 
         Ok(())
     }
@@ -389,7 +389,7 @@ impl Handler for KickParams {
             .await?
             .kick_user(&self.user_id, self.reason.as_deref())
             .await
-            .map_err(|error| core.room_error("kick_user", error))?;
+            .or_failed(core, "kick_user")?;
 
         Ok(())
     }
@@ -441,7 +441,7 @@ impl Handler for BanParams {
             .await?
             .ban_user(&self.user_id, self.reason.as_deref())
             .await
-            .map_err(|error| core.room_error("ban_user", error))?;
+            .or_failed(core, "ban_user")?;
 
         Ok(())
     }
@@ -466,7 +466,7 @@ impl Handler for UnbanParams {
             .await?
             .unban_user(&self.user_id, self.reason.as_deref())
             .await
-            .map_err(|error| core.room_error("unban_user", error))?;
+            .or_failed(core, "unban_user")?;
 
         Ok(())
     }

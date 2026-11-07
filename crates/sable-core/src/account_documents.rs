@@ -290,7 +290,7 @@ impl Core {
         Ok(self
             .with_open_stores(async || room.account_data(event_type.into()).await)
             .await
-            .map_err(|error| self.room_error("room_account_data", error))?
+            .or_failed(self, "room_account_data")?
             .and_then(|raw| raw.get_field::<Value>("content").ok().flatten()))
     }
 
@@ -346,7 +346,7 @@ impl Core {
                 .cast_unchecked();
             room.set_account_data_raw(event.into(), raw)
                 .await
-                .map_err(|error| self.room_error("set_room_media_previews", error))?;
+                .or_failed(self, "set_room_media_previews")?;
         }
         Ok(media_preview_config(Some(&content)))
     }

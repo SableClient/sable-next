@@ -281,7 +281,7 @@ impl Handler for LeaveParams {
             .await?
             .leave()
             .await
-            .map_err(|error| core.room_error("leave_room", error))?;
+            .or_failed(core, "leave_room")?;
 
         // Keeping it would hand a stale timeline back on rejoin.
         core.timelines.lock().await.remove(&self.room_id);
@@ -307,7 +307,7 @@ impl Handler for InviteParams {
             .await?
             .invite_user_by_id(&self.user_id)
             .await
-            .map_err(|error| core.room_error("invite_user", error))?;
+            .or_failed(core, "invite_user")?;
 
         Ok(())
     }
@@ -495,12 +495,12 @@ impl Handler for CreateDmParams {
                 client
                     .create_room(request)
                     .await
-                    .map_err(|error| core.room_error("create_dm", error))?
+                    .or_failed(core, "create_dm")?
             }
             None => client
                 .create_dm(&user_id)
                 .await
-                .map_err(|error| core.room_error("create_dm", error))?,
+                .or_failed(core, "create_dm")?,
         };
 
         Ok(room.room_id().to_string())
@@ -563,7 +563,7 @@ impl Handler for UpgradeParams {
         let response = client
             .send(request)
             .await
-            .map_err(|error| core.room_error("upgrade_room", error.into()))?;
+            .or_failed(core, "upgrade_room")?;
         core.copy_room_packs(&client, &old_room, &response.replacement_room)
             .await;
 
@@ -617,7 +617,7 @@ impl Handler for DirectoryVisibilityParams {
             .await?
             .send(get_room_visibility::v3::Request::new(self.room_id))
             .await
-            .map_err(|error| core.room_error("room_directory_visibility", error.into()))?;
+            .or_failed(core, "room_directory_visibility")?;
 
         Ok(response.visibility == Visibility::Public)
     }
@@ -648,7 +648,7 @@ impl Handler for SetDirectoryVisibilityParams {
                 visibility,
             ))
             .await
-            .map_err(|error| core.room_error("set_room_directory_visibility", error.into()))?;
+            .or_failed(core, "set_room_directory_visibility")?;
 
         Ok(())
     }
@@ -670,7 +670,7 @@ impl Handler for AliasesParams {
             .await?
             .send(aliases::v3::Request::new(self.room_id))
             .await
-            .map_err(|error| core.room_error("room_aliases", error.into()))?;
+            .or_failed(core, "room_aliases")?;
 
         Ok(response
             .aliases
@@ -698,7 +698,7 @@ impl Handler for CreateAliasParams {
             .await?
             .send(create_alias::v3::Request::new(alias, self.room_id))
             .await
-            .map_err(|error| core.room_error("create_room_alias", error.into()))?;
+            .or_failed(core, "create_room_alias")?;
 
         Ok(())
     }
@@ -720,7 +720,7 @@ impl Handler for DeleteAliasParams {
             .await?
             .send(delete_alias::v3::Request::new(alias))
             .await
-            .map_err(|error| core.room_error("delete_room_alias", error.into()))?;
+            .or_failed(core, "delete_room_alias")?;
 
         Ok(())
     }
@@ -849,11 +849,11 @@ impl Handler for SetTagParams {
         if self.set {
             room.set_tag(name, TagInfo::new())
                 .await
-                .map_err(|error| core.room_error("set_room_tag", error))?;
+                .or_failed(core, "set_room_tag")?;
         } else {
             room.remove_tag(name)
                 .await
-                .map_err(|error| core.room_error("remove_room_tag", error))?;
+                .or_failed(core, "remove_room_tag")?;
         }
 
         Ok(())

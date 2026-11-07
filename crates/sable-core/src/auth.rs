@@ -166,7 +166,7 @@ impl Core {
         {
             login = login.device_id(&account.session.credentials.device_id());
         }
-        login.await.map_err(|error| self.login_error(error))?;
+        login.await.or_failed(self, "login")?;
 
         let matrix = client
             .matrix_auth()
@@ -259,7 +259,7 @@ impl Core {
                 tracing::debug!("homeserver has no legacy login flows: {error}");
             }
             Err(error) => {
-                return Err(self.homeserver_http_error("login_flows_legacy", error));
+                return Err(self.rpc_error("login_flows_legacy", &error));
             }
         }
 
@@ -276,7 +276,7 @@ impl Core {
             }
             Err(OAuthDiscoveryError::NotSupported) => {}
             Err(OAuthDiscoveryError::Http(error)) if !flows.password && !flows.sso => {
-                return Err(self.homeserver_http_error("login_flows_oauth", error));
+                return Err(self.rpc_error("login_flows_oauth", &error));
             }
             Err(error) if !flows.password && !flows.sso => {
                 return Err(self.failed("login_flows_oauth", error));

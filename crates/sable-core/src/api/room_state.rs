@@ -61,7 +61,7 @@ impl Handler for SetNameParams {
             .await?
             .set_name(self.name.unwrap_or_default())
             .await
-            .map_err(|error| core.room_error("set_room_name", error))?;
+            .or_failed(core, "set_room_name")?;
         Ok(())
     }
 }
@@ -89,7 +89,7 @@ impl Handler for SetTopicParams {
             .await?
             .send_state_event(topic_content(&self.topic))
             .await
-            .map_err(|error| core.room_error("set_room_topic", error))?;
+            .or_failed(core, "set_room_topic")?;
         Ok(())
     }
 }
@@ -113,13 +113,13 @@ impl Handler for SetAvatarParams {
             Some(url) => {
                 room.set_avatar_url(&mxc_uri(&url)?, None)
                     .await
-                    .map_err(|error| core.room_error("set_room_avatar", error))?;
+                    .or_failed(core, "set_room_avatar")?;
             }
             // State cannot be deleted, so empty content is the removal.
             None => {
                 room.send_state_event(RoomAvatarEventContent::new())
                     .await
-                    .map_err(|error| core.room_error("clear_room_avatar", error))?;
+                    .or_failed(core, "clear_room_avatar")?;
             }
         }
 
@@ -447,7 +447,7 @@ impl Handler for AccountDataParams {
         let event = core
             .with_open_stores(async || room.account_data(self.event_type.into()).await)
             .await
-            .map_err(|error| core.room_error("room_account_data", error))?;
+            .or_failed(core, "room_account_data")?;
 
         Ok(event
             .and_then(|raw| raw.get_field::<serde_json::Value>("content").ok().flatten())
@@ -499,7 +499,7 @@ impl Handler for SetAccountDataParams {
             .await?
             .set_account_data_raw(self.event_type.into(), raw)
             .await
-            .map_err(|error| core.room_error("set_room_account_data", error))?;
+            .or_failed(core, "set_room_account_data")?;
         Ok(())
     }
 }
@@ -574,7 +574,7 @@ impl Handler for BotCommandsParams {
         let mut commands = core
             .bot_commands_for(&client, &room)
             .await
-            .map_err(|error| core.room_error("bot_commands", error))?;
+            .or_failed(core, "bot_commands")?;
         let nicknames = core.nicknames();
         for command in &mut commands {
             nicknames.apply_bot(command);

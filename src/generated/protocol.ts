@@ -1469,6 +1469,8 @@ export type RpcError = { code: "not_logged_in" } | { code: "unknown_subscription
 { code: "unavailable" } |
 /**  The server answered 404: asking again will not find it. */
 { code: "media_not_found" } |
+/**  The homeserver answered 404: asking again will not find it. */
+{ code: "not_found" } |
 /**  The media's server keeps failing; asking again before this is pointless. */
 { code: "media_server_unavailable"; retry_after_ms: number } |
 /**  Refused, recoverable by user action. */

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::Handler;
 use crate::protocol::{RpcError, SidebarItemView, SpaceHierarchyRoomView, SpaceParentView};
-use crate::{Core, view};
+use crate::{Core, ResultExt, view};
 
 domain! {
     add,
@@ -130,7 +130,7 @@ impl Handler for RemoveParams {
                 serde_json::Value::Object(serde_json::Map::new()),
             )
             .await
-            .map_err(|error| core.room_error("remove_from_space", error))?;
+            .or_failed(core, "remove_from_space")?;
         Ok(())
     }
 }

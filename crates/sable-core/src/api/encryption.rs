@@ -146,7 +146,7 @@ impl Handler for RecoverIdentityParams {
             .recovery()
             .recover_and_fix_backup(&self.recovery_key)
             .await
-            .map_err(|error| core.recovery_error(error))?;
+            .map_err(|error| core.recovery_error(&error))?;
         core.adopt_account_data_key(&client, &self.recovery_key)
             .await;
         Ok(())

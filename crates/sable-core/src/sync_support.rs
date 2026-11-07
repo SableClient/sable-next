@@ -108,7 +108,7 @@ impl Core {
                     .disable_retry(),
             ))
             .await
-            .map_err(|error| self.homeserver_http_error("sliding_sync_support", error))?;
+            .or_failed(self, "sliding_sync_support")?;
         if versions
             .unstable_features
             .get("org.matrix.simplified_msc3575")

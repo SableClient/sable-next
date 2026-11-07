@@ -110,7 +110,7 @@ impl Handler for UserProfileParams {
             .account()
             .fetch_user_profile_of(&self.user_id)
             .await
-            .map_err(|error| core.profile_error(error))?;
+            .map_err(|error| core.profile_error(&error))?;
         let mut profile = profile_view(self.user_id, &response);
         core.nicknames().apply_profile(&mut profile);
         Ok(profile)
@@ -640,7 +640,7 @@ impl Handler for SetPresenceParams {
         client
             .set_presence(presence::state(self.presence), self.status_message, true)
             .await
-            .map_err(|error| core.room_error("set_presence", error))?;
+            .or_failed(core, "set_presence")?;
 
         if let Some(user_id) = client.user_id() {
             core.fetch_presence(vec![user_id.to_owned()]).await;

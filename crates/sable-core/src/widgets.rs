@@ -12,7 +12,6 @@ use futures_util::pin_mut;
 use matrix_sdk::RoomState;
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
 use matrix_sdk::executor::{JoinHandleExt, spawn};
-use matrix_sdk::ruma::api::Direction;
 use matrix_sdk::ruma::api::client::account::request_openid_token;
 use matrix_sdk::ruma::api::client::delayed_events::update_delayed_event::UpdateAction;
 use matrix_sdk::ruma::api::client::relations::{
@@ -21,6 +20,7 @@ use matrix_sdk::ruma::api::client::relations::{
 use matrix_sdk::ruma::api::client::to_device::send_event_to_device;
 use matrix_sdk::ruma::api::client::user_directory::search_users;
 use matrix_sdk::ruma::api::client::voip::get_turn_server_info;
+use matrix_sdk::ruma::api::{Direction, error::FromHttpResponseError};
 use matrix_sdk::ruma::events::GlobalAccountDataEventType;
 use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::events::{
@@ -407,7 +407,7 @@ impl Core {
             .await?
             .send(request)
             .await
-            .map_err(|error| self.homeserver_http_error("search_user_directory", error))?;
+            .or_failed(self, "search_user_directory")?;
 
         Ok((
             response.limited,
@@ -458,7 +458,7 @@ impl Core {
             };
             return delayed_events::send(&client, support, event)
                 .await
-                .map_err(|error| self.homeserver_http_error(LABEL, error));
+                .or_failed(self, LABEL);
         }
         if let Some(duration) = sticky_duration_ms {
             if self.room_is_encrypted(&room).await? {
@@ -483,7 +483,7 @@ impl Core {
         };
         delayed_events::send(&client, support, event)
             .await
-            .map_err(|error| self.homeserver_http_error(LABEL, error))
+            .or_failed(self, LABEL)
     }
 
     pub(crate) async fn widget_send_sticky_event(
@@ -509,7 +509,7 @@ impl Core {
     ) -> Result<(), RpcError> {
         delayed_events::update(&self.client().await?, delay_id, UpdateAction::Restart)
             .await
-            .map_err(|error| self.homeserver_http_error("restart_delayed_event", error))?;
+            .or_failed(self, "restart_delayed_event")?;
         Ok(())
     }
 
@@ -550,7 +550,7 @@ impl Core {
                     wire,
                 ))
                 .await
-                .map_err(|error| self.homeserver_http_error(LABEL, error))?;
+                .or_failed(self, LABEL)?;
             return Ok(());
         }
 
@@ -660,10 +660,7 @@ impl Core {
             request.to = to;
             request.limit = limit;
             request.dir = dir;
-            let response = client
-                .send(request)
-                .await
-                .map_err(|error| self.homeserver_http_error(LABEL, error))?;
+            let response = client.send(request).await.or_failed(self, LABEL)?;
             (response.chunk, response.next_batch, response.prev_batch)
         } else {
             let mut request =
@@ -672,10 +669,7 @@ impl Core {
             request.to = to;
             request.limit = limit;
             request.dir = dir;
-            let response = client
-                .send(request)
-                .await
-                .map_err(|error| self.homeserver_http_error(LABEL, error))?;
+            let response = client.send(request).await.or_failed(self, LABEL)?;
             (response.chunk, response.next_batch, response.prev_batch)
         };
 
@@ -715,12 +709,27 @@ impl Core {
     }
 
     pub(crate) async fn turn_server(&self) -> Result<TurnServerView, RpcError> {
-        let response = self
+        let response = match self
             .client()
             .await?
             .send(get_turn_server_info::v3::Request::new())
             .await
-            .map_err(|error| self.homeserver_http_error("turn_server", error))?;
+        {
+            Ok(response) => response,
+            // A homeserver without TURN answers `{}`, which has no `username`.
+            Err(matrix_sdk::HttpError::Api(error))
+                if matches!(*error, FromHttpResponseError::Deserialization(_)) =>
+            {
+                tracing::debug!("the homeserver has no TURN server");
+                return Ok(TurnServerView {
+                    username: String::new(),
+                    password: String::new(),
+                    uris: Vec::new(),
+                    ttl_ms: 0,
+                });
+            }
+            Err(error) => return Err(self.rpc_error("turn_server", &error)),
+        };
         Ok(TurnServerView {
             username: response.username,
             password: response.password,
@@ -735,7 +744,7 @@ impl Core {
             .await?
             .discover_rtc_transports()
             .await
-            .map_err(|error| self.homeserver_http_error("rtc_transports", error))?
+            .or_failed(self, "rtc_transports")?
             .unwrap_or_default();
         serde_json::to_value(transports)
             .map(|transports| serde_json::json!({ "rtc_transports": transports }))
@@ -761,7 +770,7 @@ impl Core {
                 .await
                 .map(|response| response.body),
         }
-        .map_err(|error| self.homeserver_http_error(LABEL, error))?;
+        .or_failed(self, LABEL)?;
         serde_json::from_slice(&response).or_failed(self, LABEL)
     }
 
@@ -1055,7 +1064,7 @@ impl Core {
         let response = client
             .send(request_openid_token::v3::Request::new(user_id))
             .await
-            .map_err(|error| self.homeserver_http_error("openid_token", error))?;
+            .or_failed(self, "openid_token")?;
 
         Ok(OpenIdTokenView {
             access_token: response.access_token,
@@ -1390,6 +1399,22 @@ mod tests {
         assert_eq!(server.username, "u");
         assert_eq!(server.uris, ["turn:example.org"]);
         assert_eq!(server.ttl_ms, 86_400_000);
+    }
+
+    #[tokio::test]
+    async fn a_homeserver_without_turn_has_no_servers() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        Mock::given(method("GET"))
+            .and(path("/_matrix/client/v3/voip/turnServer"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .mount(server.server())
+            .await;
+        let core = core_with(&server, client).await;
+
+        let server = core.turn_server().await.unwrap();
+
+        assert_eq!(server.uris, Vec::<String>::new());
     }
 
     #[tokio::test]

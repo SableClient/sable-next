@@ -267,7 +267,7 @@ impl Core {
 
         room.send_state_event(content)
             .await
-            .map_err(|error| self.room_error("set_room_join_rule", error))?;
+            .or_failed(self, "set_room_join_rule")?;
         Ok(())
     }
 
@@ -329,7 +329,7 @@ impl Core {
         match room
             .latest_encryption_state()
             .await
-            .map_err(|error| self.room_error("room_encryption_state", error))?
+            .or_failed(self, "room_encryption_state")?
         {
             matrix_sdk::EncryptionState::Encrypted => Ok(true),
             matrix_sdk::EncryptionState::NotEncrypted => Ok(false),
@@ -357,7 +357,7 @@ impl Core {
             space
                 .send_state_event_for_key(room_id, content)
                 .await
-                .map_err(|error| self.room_error("add_to_space", error))?;
+                .or_failed(self, "add_to_space")?;
             return Ok(());
         }
 
@@ -506,7 +506,7 @@ impl Core {
         space
             .send_state_event_for_key(room_id, content)
             .await
-            .map_err(|error| self.room_error("set_space_child_order", error))?;
+            .or_failed(self, "set_space_child_order")?;
 
         Ok(())
     }
@@ -528,7 +528,7 @@ impl Core {
         space
             .send_state_event_for_key(room_id, content)
             .await
-            .map_err(|error| self.room_error("set_space_child_suggested", error))?;
+            .or_failed(self, "set_space_child_suggested")?;
 
         Ok(())
     }
@@ -553,7 +553,7 @@ impl Core {
                 let resolved = client
                     .resolve_room_alias(alias)
                     .await
-                    .map_err(|error| self.room_error(context, error.into()))?;
+                    .or_failed(self, context)?;
                 servers.push(alias.server_name().to_owned());
                 (resolved.room_id, resolved.servers)
             }
@@ -588,7 +588,7 @@ impl Core {
                 {
                     return Err(RpcError::Banned { reason });
                 }
-                return Err(self.room_error("join_room", error));
+                return Err(self.rpc_error("join_room", &error));
             }
         };
 
@@ -717,7 +717,7 @@ impl Core {
             .await?
             .public_rooms_filtered(request)
             .await
-            .map_err(|error| self.room_error("public_rooms", error.into()))?;
+            .or_failed(self, "public_rooms")?;
 
         Ok(PublicRoomsOk {
             rooms: response.chunk.iter().map(view::public_room).collect(),
@@ -742,7 +742,7 @@ impl Core {
             .send(request)
             .with_request_config(RequestConfig::short_retry())
             .await
-            .map_err(|error| self.room_error("space_hierarchy", error.into()))?;
+            .or_failed(self, "space_hierarchy")?;
 
         // Ordering lives on each parent's `m.space.child` edges, so the chunks
         // are passed through unsorted.

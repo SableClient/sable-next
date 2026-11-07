@@ -331,7 +331,7 @@ impl Handler for TimestampToEventParams {
         match core.client().await?.send(request).await {
             Ok(response) => Ok(Some(response.event_id.to_string())),
             Err(error) if error.client_api_error_kind() == Some(&ErrorKind::NotFound) => Ok(None),
-            Err(error) => Err(core.homeserver_http_error("timestamp_to_event", error)),
+            Err(error) => Err(core.rpc_error("timestamp_to_event", &error)),
         }
     }
 }
@@ -364,7 +364,7 @@ impl Handler for ListThreadsParams {
         let threads = room
             .list_threads(options)
             .await
-            .map_err(|error| core.room_error("list_threads", error))?;
+            .or_failed(core, "list_threads")?;
 
         let push = room.push_context().await.ok().flatten();
         let roots = futures_util::future::join_all(
@@ -546,7 +546,7 @@ impl Handler for SetFullyReadParams {
             .await?
             .send_multiple_receipts(Receipts::new().fully_read_marker(self.event_id))
             .await
-            .map_err(|error| core.room_error("set_fully_read", error))
+            .or_failed(core, "set_fully_read")
     }
 }
 
@@ -569,12 +569,12 @@ impl Handler for MarkUnreadParams {
         if let Some(event_id) = self.read_marker {
             room.send_multiple_receipts(Receipts::new().fully_read_marker(event_id))
                 .await
-                .map_err(|error| core.room_error("mark_unread_marker", error))?;
+                .or_failed(core, "mark_unread_marker")?;
         }
 
         room.set_unread_flag(true)
             .await
-            .map_err(|error| core.room_error("mark_unread", error))
+            .or_failed(core, "mark_unread")
     }
 }
 
@@ -593,7 +593,7 @@ impl Handler for ReadMarkerParams {
         let fully_read = core
             .with_open_stores(async || room.account_data_static::<FullyReadEventContent>().await)
             .await
-            .map_err(|error| core.room_error("read_marker", error))?
+            .or_failed(core, "read_marker")?
             .and_then(|raw| raw.deserialize().ok())
             .map(|event| event.content.event_id);
         let event_id = fully_read.or_else(|| {

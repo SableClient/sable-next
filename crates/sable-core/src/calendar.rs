@@ -128,7 +128,7 @@ impl Core {
             let messages = room
                 .messages(options)
                 .await
-                .map_err(|error| self.room_error("calendar_entries", error))?;
+                .or_failed(self, "calendar_entries")?;
             for event in &messages.chunk {
                 let Ok(event) = event.raw().deserialize_as::<Value>() else {
                     continue;
@@ -215,11 +215,11 @@ impl Core {
         .or_failed(self, "save_calendar_event")?;
         room.send_raw(CALENDAR_EVENTS, content)
             .await
-            .map_err(|error| self.room_error("save_calendar_event", error))?;
+            .or_failed(self, "save_calendar_event")?;
         if let Some(replaces) = replaces {
             room.redact(&replaces, None, None)
                 .await
-                .map_err(|error| self.room_error("save_calendar_event", error.into()))?;
+                .or_failed(self, "save_calendar_event")?;
         }
         Ok(())
     }
@@ -235,7 +235,7 @@ impl Core {
             .await?
             .send_raw(RSVP_EVENT, content)
             .await
-            .map_err(|error| self.room_error("answer_calendar_event", error))?;
+            .or_failed(self, "answer_calendar_event")?;
         Ok(())
     }
 
@@ -257,14 +257,14 @@ impl Core {
         let created = room
             .send_raw(CALENDAR_CREATE, empty)
             .await
-            .map_err(|error| self.room_error("calendar_id", error))?;
+            .or_failed(self, "calendar_id")?;
         let calendars = to_raw_value(&CalendarsOut {
             calendars: [created.response.event_id.clone()],
         })
         .or_failed(self, "calendar_id")?;
         room.send_state_event_raw(CALENDARS, "", calendars)
             .await
-            .map_err(|error| self.room_error("calendar_id", error))?;
+            .or_failed(self, "calendar_id")?;
         self.forget_room_state(room.room_id(), CALENDARS);
         Ok(created.response.event_id.to_string())
     }
