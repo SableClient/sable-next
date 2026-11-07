@@ -926,8 +926,19 @@ pub fn run() {
     app.run(|app, event| {
         if matches!(event, tauri::RunEvent::Exit) {
             hang_up_before_exit(app);
+            #[cfg(target_os = "android")]
+            exit_without_destructors();
         }
     });
+}
+
+/// tao's `exit()` would run C++ static destructors under live binder and
+/// webview threads, aborting on a destroyed mutex.
+#[cfg(target_os = "android")]
+#[expect(unsafe_code, reason = "libc::_exit has no safe wrapper")]
+fn exit_without_destructors() -> ! {
+    // SAFETY: `_exit` takes no pointers and never returns.
+    unsafe { libc::_exit(0) }
 }
 
 const EXIT_HANGUP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
