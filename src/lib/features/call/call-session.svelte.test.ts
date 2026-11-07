@@ -14,6 +14,18 @@ vi.mock('#lib/platform/screen-audio.js', async (original) => ({
   screenAudioSupported: screenAudio.supported,
 }));
 
+const sounds = vi.hoisted(() => ({ played: [] as string[] }));
+vi.mock('#lib/features/notifications/sound.js', async (original) => {
+  const actual = await original<typeof import('#lib/features/notifications/sound.js')>();
+  return {
+    ...actual,
+    playSound: (...args: Parameters<typeof actual.playSound>) => {
+      sounds.played.push(args[0]);
+      return actual.playSound(...args);
+    },
+  };
+});
+
 let gains: { gain: { value: number } }[];
 class MockAudioContext {
   state: AudioContextState = 'running';
@@ -1366,4 +1378,35 @@ test('a camera failure that lands after leaving is not reported', async () => {
   await enabling;
 
   expect(session.deviceError).toBeNull();
+});
+
+test.each(['AbortError', 'NotAllowedError'])(
+  'a screen picker cancelled with %s stays silent',
+  async (name) => {
+    const { client, transport } = harness();
+    const cancelled = new DOMException('cancelled', name);
+    transport.capabilities = {
+      screenShare: { setEnabled: vi.fn(() => Promise.reject(cancelled)) },
+    };
+    const session = new CallSession(client, { createTransport: () => transport });
+    await session.join('!room:example.org', { microphone: true, camera: false });
+    sounds.played.length = 0;
+
+    await session.toggleScreenShare();
+
+    expect(session.deviceError).toBeNull();
+    expect(sounds.played).not.toContain('screenshare_start');
+  }
+);
+
+test('a started screen share plays its sound', async () => {
+  const { client, transport } = harness();
+  transport.capabilities = { screenShare: { setEnabled: vi.fn(() => Promise.resolve()) } };
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+  sounds.played.length = 0;
+
+  await session.toggleScreenShare();
+
+  expect(sounds.played).toContain('screenshare_start');
 });
