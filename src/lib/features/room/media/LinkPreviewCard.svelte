@@ -21,23 +21,29 @@
   let { url, encrypted, bundled = null }: Props = $props();
   const core = useCoreClient();
   let preview = $state<UrlPreviewView | null>(null);
+  let resolvedUrl: string | null = null;
   let sources = $derived(previewSources(encrypted));
 
   $effect(() => {
     if (bundled !== null && hasPreviewData(bundled)) {
       preview =
         preferences.urlPreviews || preferences.clientEmbeds || sources.server ? bundled : null;
+      resolvedUrl = null;
       return;
     }
     if (!sources.server && !sources.client) {
       preview = null;
+      resolvedUrl = null;
       return;
     }
 
     let cancelled = false;
-    preview = null;
-    void resolveUrlPreview(core.rpc.messages, url, sources).then((result) => {
-      if (!cancelled) preview = result;
+    const wanted = url;
+    if (resolvedUrl !== wanted) preview = null;
+    void resolveUrlPreview(core.rpc.messages, wanted, sources).then((result) => {
+      if (cancelled) return;
+      preview = result;
+      resolvedUrl = wanted;
     });
     return () => {
       cancelled = true;
