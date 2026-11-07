@@ -1310,8 +1310,17 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         average_request_ms: null,
         running_ms: null,
         sharing: {
-          state: 'waiting',
+          state: 'idle',
+          pause: null,
+          outcome: null,
+          peer: null,
+          rooms_copied: 0,
           rooms_received: 0,
+          last_copy: null,
+          automatic: false,
+          asked: 0,
+          serving: 0,
+          candidates: [],
         },
       }),
       'calls.join': () => ({

@@ -1,9 +1,14 @@
-import type { CoreEvent, Rpc, RtcSignal } from '#src/generated/protocol';
+import type { CoreEvent, Rpc, RtcPurpose, RtcSignal } from '#src/generated/protocol';
 
 const MAX_SDP_BYTES = 48 * 1024;
 const MAX_PENDING_CANDIDATES = 64;
 
 export type RtcEvent = Extract<CoreEvent, { type: 'rtc' }>;
+
+export function isRtcEvent(event: CoreEvent, purpose: RtcPurpose): event is RtcEvent {
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- search sharing is the only purpose so far
+  return event.type === 'rtc' && event.purpose === purpose;
+}
 
 export interface RtcCore {
   rpc: { rtc: Pick<Rpc['rtc'], 'signal' | 'close'> };

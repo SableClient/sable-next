@@ -118,6 +118,8 @@ try {
       );
     }, side);
   }
+  await call(0, 'search.peer_start');
+  await call(1, 'search.peer_find');
   for (;;) {
     const result = await call(1, 'search.messages', { query: 'needle', limit: 100, offset: 0 });
     if (result.hits.length === 60) break;
@@ -126,6 +128,7 @@ try {
   for (;;) {
     const metrics = await Promise.all([0, 1].map((side) => call(side, 'search.metrics')));
     if (metrics.every(({ sharing }) => sharing.state === 'idle')) {
+      assert.equal(metrics[1].sharing.outcome, 'completed');
       assert.equal(metrics[1].sharing.rooms_received, 1);
       break;
     }

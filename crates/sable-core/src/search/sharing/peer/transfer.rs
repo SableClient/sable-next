@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 use super::super::{
     History, MAX_SEGMENT_JSON, STANDARD_NO_PAD, SegmentPayload, settled_history, sha256,
 };
-use super::Peer;
+use super::{Peer, Phase, Role, WANT_MS};
 use crate::Core;
-use crate::protocol::{RpcError, SearchPeerState};
+use crate::protocol::{RpcError, SearchPeerCopyView};
 use crate::search::now_ms;
 
 const STORE_KEY: &[u8] = b"sable.search.peers.v1";
@@ -59,11 +59,32 @@ enum Frame {
     },
 }
 
+impl Frame {
+    const fn handled_by(&self) -> Role {
+        match self {
+            Self::List { .. } | Self::Room { .. } | Self::Next { .. } => Role::Provider,
+            Self::Rooms { .. } | Self::Part { .. } | Self::Done { .. } => Role::Requester,
+        }
+    }
+}
+
 #[derive(Default, Deserialize, Serialize)]
+#[serde(default)]
 pub(super) struct Received {
     parts: HashMap<OwnedRoomId, Vec<Part>>,
     pub(super) rooms: HashSet<OwnedRoomId>,
     covers: HashMap<OwnedRoomId, String>,
+    pub(super) verified: bool,
+    pub(super) wanted_since: Option<u64>,
+    pub(super) last_active: u64,
+    pub(super) last_copy: Option<SearchPeerCopyView>,
+}
+
+impl Received {
+    pub(super) fn wants_copy(&self, now: u64) -> bool {
+        self.wanted_since
+            .is_some_and(|since| now.saturating_sub(since) < WANT_MS)
+    }
 }
 
 pub(super) struct Snapshot {
@@ -105,16 +126,22 @@ impl Core {
             .ok_or(RpcError::NotLoggedIn)?
             .client
             .clone();
-        let peer = self.search_peer(&client, session_id).await?;
-        let mut peer = peer.lock().await;
+        let slot = self.search_slot(&client, session_id).await?;
+        let mut peer = slot.peer.lock().await;
         self.load_peer_receipts(&client).await;
         let Some(data) = data else {
-            self.search_sharing.status.lock().0 = SearchPeerState::Transferring;
+            if slot.role != Role::Requester {
+                return Err(RpcError::Unavailable);
+            }
+            self.transferring(session_id);
             peer.download = Download::default();
             return encode(&Frame::List { offset: 0 }).map(Some);
         };
         let frame: Frame = serde_json::from_str(&data).map_err(|_| RpcError::Unavailable)?;
-        self.search_sharing.status.lock().0 = SearchPeerState::Transferring;
+        if slot.role != frame.handled_by() {
+            return Err(RpcError::Unavailable);
+        }
+        self.transferring(session_id);
         let reply = match frame {
             Frame::List { offset } => Some(list_rooms(&client, offset)),
             Frame::Rooms { rooms, next } => {
@@ -178,13 +205,47 @@ impl Core {
                 download.current = None;
                 download.parts.clear();
                 self.search_sharing.restoring.lock().remove(&room);
+                self.copied_room(session_id);
                 self.next_peer_room(&client, download).await?
             }
         };
-        if peer.download.finished && peer.snapshot.is_none() {
-            self.search_sharing.status.lock().0 = SearchPeerState::Idle;
+        let finished = slot.role == Role::Requester && peer.download.finished;
+        drop(peer);
+        if finished {
+            self.complete_search_copy(&client, session_id).await;
         }
         reply.as_ref().map(encode).transpose()
+    }
+
+    fn transferring(&self, session_id: &str) {
+        let mut catchup = self.search_sharing.catchup.lock();
+        if catchup.phase.session() == Some(session_id) {
+            catchup.phase = Phase::Transferring {
+                session: session_id.to_owned(),
+            };
+        }
+    }
+
+    fn copied_room(&self, session_id: &str) {
+        let mut catchup = self.search_sharing.catchup.lock();
+        if catchup.phase.session() == Some(session_id) {
+            catchup.rooms += 1;
+        }
+    }
+
+    pub(super) async fn update_received<T>(
+        &self,
+        client: &Client,
+        change: impl FnOnce(&mut Received) -> (bool, T),
+    ) -> Result<T, RpcError> {
+        self.load_peer_receipts(client).await;
+        let mut received = self.search_sharing.received.lock().await;
+        let received = received.get_or_insert_with(Received::default);
+        let (changed, value) = change(received);
+        if changed {
+            save_received(client, received).await?;
+        }
+        Ok(value)
     }
 
     pub(super) async fn load_peer_receipts(&self, client: &Client) {
@@ -201,8 +262,6 @@ impl Core {
                     .unwrap_or_default(),
             );
         }
-        self.search_sharing.status.lock().1 =
-            received.as_ref().map_or(0, |state| state.rooms.len());
     }
 
     async fn next_peer_room(
@@ -397,7 +456,6 @@ impl Core {
         if useful {
             received.rooms.insert(room.clone());
         }
-        self.search_sharing.status.lock().1 = received.rooms.len();
         save_received(client, received).await
     }
 

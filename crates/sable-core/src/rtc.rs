@@ -17,10 +17,7 @@ use crate::sealed_account_data::verified_own_sender;
 const SESSION_MS: u64 = 120_000;
 const MAX_CANDIDATES: usize = 64;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum RtcPurpose {
-    SearchSharing,
-}
+pub(crate) use crate::protocol::RtcPurpose;
 
 struct Session {
     device: OwnedDeviceId,
@@ -89,6 +86,7 @@ impl Core {
         for session_id in closed {
             self.emit(CoreEvent::Rtc {
                 session_id,
+                purpose,
                 sender: false,
                 signal: RtcSignal::Close,
             });
@@ -215,7 +213,7 @@ impl Core {
         let Some(device) = verified_own_sender(client, &sender, encryption).await else {
             return;
         };
-        let local_sender = {
+        let (purpose, local_sender) = {
             let mut sessions = self.rtc.0.lock();
             let Some(entry) = sessions.get_mut(&session) else {
                 return;
@@ -239,12 +237,13 @@ impl Core {
                 entry.candidates += 1;
             }
             entry.touched = now_ms();
-            entry.sender
+            (entry.purpose, entry.sender)
         };
         self.emit_if_current(
             generation,
             CoreEvent::Rtc {
                 session_id: session,
+                purpose,
                 sender: local_sender,
                 signal,
             },

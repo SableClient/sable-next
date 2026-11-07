@@ -5,7 +5,7 @@ import type { RtcEvent } from '#lib/rtc/connect.js';
 import { watchSearchPeers, type SearchPeerCore } from './search-peer';
 
 test(
-  'two devices exchange chunked history through real WebRTC channels',
+  'the receiving device downloads chunked history through real WebRTC channels',
   { timeout: 30_000 },
   async () => {
     const payload = 'History with 中文 and 🙂 '.repeat(20_000);
@@ -34,7 +34,13 @@ test(
             signals.push(signal);
             queueMicrotask(() => {
               for (const listener of listeners[1 - side]) {
-                listener({ type: 'rtc', session_id, sender: side === 1, signal });
+                listener({
+                  type: 'rtc',
+                  purpose: 'search_sharing',
+                  session_id,
+                  sender: side === 1,
+                  signal,
+                });
               }
             });
 
@@ -56,6 +62,7 @@ test(
       for (const listener of listeners[0]) {
         listener({
           type: 'rtc',
+          purpose: 'search_sharing',
           session_id: 'loopback',
           sender: true,
           signal: { kind: 'open' },
@@ -63,11 +70,10 @@ test(
       }
       await vi.waitFor(
         () => {
-          expect(received.map((messages) => messages.length)).toEqual([1, 1]);
+          expect(received.map((messages) => messages.length)).toEqual([0, 1]);
         },
         { timeout: 20_000, interval: 50 }
       );
-      expect(received[0]).toEqual([`1:${payload}`]);
       expect(received[1]).toEqual([`0:${payload}`]);
       expect(signals.filter(({ kind }) => kind === 'negotiate')).toHaveLength(2);
       const candidates = signals.flatMap((signal) =>

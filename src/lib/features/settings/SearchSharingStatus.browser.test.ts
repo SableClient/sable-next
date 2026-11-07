@@ -16,13 +16,27 @@ test('sharing status fits desktop and narrow settings panels', async () => {
     rpc: {
       search: {
         metrics: vi.fn(() =>
-          Promise.resolve({ sharing: { state: 'waiting', rooms_received: 12 } })
+          Promise.resolve({
+            sharing: {
+              state: 'idle',
+              pause: null,
+              outcome: 'no_answer',
+              peer: null,
+              rooms_copied: 0,
+              rooms_received: 12,
+              last_copy: { device_id: 'PHONE', name: 'Phone', at_ms: 0, rooms: 12 },
+              automatic: true,
+              asked: 2,
+              serving: 0,
+              candidates: [],
+            },
+          })
         ),
       },
     },
   });
   const screen = await render(SearchSharingStatus);
-  await expect.element(screen.getByText('Waiting for another device')).toBeVisible();
+  await expect.element(screen.getByText('Ready')).toBeVisible();
   await expect.element(screen.getByText('Rooms received directly')).toBeVisible();
 
   for (const width of [1280, 320]) {

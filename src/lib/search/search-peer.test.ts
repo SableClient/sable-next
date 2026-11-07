@@ -149,8 +149,28 @@ afterEach(() => {
 
 function start(): Channel {
   stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
-  listener({ type: 'rtc', session_id: 'test', sender: true, signal: { kind: 'open' } });
+  listener({
+    type: 'rtc',
+    purpose: 'search_sharing',
+    session_id: 'test',
+    sender: true,
+    signal: { kind: 'open' },
+  });
   return Peer.instances[0].channel;
+}
+
+function receive(): Channel {
+  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
+  listener({
+    type: 'rtc',
+    purpose: 'search_sharing',
+    session_id: 'test',
+    sender: false,
+    signal: { kind: 'negotiate', description: { type: 'offer', sdp: 'remote-sdp' } },
+  });
+  const peer = Peer.instances[0];
+  peer.dispatchEvent(Object.assign(new Event('datachannel'), { channel: peer.channel }));
+  return peer.channel;
 }
 
 test('unsupported browsers do not start discovery', () => {
@@ -230,7 +250,13 @@ test('a datachannel setup failure releases the peer immediately', () => {
     }
   );
   stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
-  listener({ type: 'rtc', session_id: 'test', sender: true, signal: { kind: 'open' } });
+  listener({
+    type: 'rtc',
+    purpose: 'search_sharing',
+    session_id: 'test',
+    sender: true,
+    signal: { kind: 'open' },
+  });
   expect(Peer.instances[0].close).toHaveBeenCalledOnce();
   expect(core.rpc.rtc.close).toHaveBeenCalledOnce();
 });
@@ -252,7 +278,7 @@ test('deferred signaling rejection after cleanup does not reopen or double-close
 test('a deferred exchange rejection after an account switch cannot call the new account', async () => {
   const exchange = Promise.withResolvers<string | null>();
   vi.mocked(core.rpc.search.peerExchange).mockReturnValue(exchange.promise);
-  const channel = start();
+  const channel = receive();
   channel.open();
   await vi.waitFor(() => {
     expect(core.rpc.search.peerExchange).toHaveBeenCalledOnce();
@@ -265,9 +291,30 @@ test('a deferred exchange rejection after an account switch cannot call the new 
   expect(core.rpc.rtc.close).not.toHaveBeenCalled();
 });
 
+test('rtc sessions of other features are left alone', () => {
+  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
+  listener({
+    type: 'rtc',
+    purpose: 'file_transfer' as 'search_sharing',
+    session_id: 'other',
+    sender: true,
+    signal: { kind: 'open' },
+  });
+  expect(Peer.instances).toHaveLength(0);
+  expect(core.rpc.rtc.close).not.toHaveBeenCalled();
+});
+
+test('the sending device waits for the receiver to request history', async () => {
+  const channel = start();
+  channel.open();
+  await Promise.resolve();
+  expect(core.rpc.search.peerExchange).not.toHaveBeenCalled();
+  expect(channel.send).toHaveBeenCalledWith('ready');
+});
+
 test('index requests wait for acknowledgement and retry a lost greeting', async () => {
   vi.useFakeTimers();
-  const channel = start();
+  const channel = receive();
   channel.readyState = 'open';
   channel.dispatchEvent(new Event('open'));
   await vi.advanceTimersByTimeAsync(250);
@@ -326,6 +373,7 @@ test('metered and offline transitions close active transfers', () => {
   connection.type = 'wifi';
   listener({
     type: 'rtc',
+    purpose: 'search_sharing',
     session_id: 'second',
     sender: true,
     signal: { kind: 'open' },
@@ -347,6 +395,7 @@ test('a backend cancellation closes the browser channel', () => {
   const channel = start();
   listener({
     type: 'rtc',
+    purpose: 'search_sharing',
     session_id: 'test',
     sender: false,
     signal: { kind: 'close' },
@@ -365,7 +414,7 @@ test('invalid or oversized frames close before reaching the core', () => {
 });
 
 test('incoming messages reach the core in order without overlapping RPCs', async () => {
-  const channel = start();
+  const channel = receive();
   const first = Promise.withResolvers<null>();
   vi.mocked(core.rpc.search.peerExchange).mockImplementation(({ data }) =>
     data === 'a' ? first.promise : Promise.resolve(null)
@@ -389,7 +438,7 @@ test('incoming messages reach the core in order without overlapping RPCs', async
 });
 
 test('too many queued messages close the channel while the core is busy', async () => {
-  const channel = start();
+  const channel = receive();
   const pending = Promise.withResolvers<null>();
   vi.mocked(core.rpc.search.peerExchange).mockReturnValue(pending.promise);
   channel.open();
@@ -407,7 +456,7 @@ test('too many queued messages close the channel while the core is busy', async 
 test('UTF-8 chunks fit the datachannel limit and wait for backpressure', async () => {
   const data = '中文🙂'.repeat(10_000);
   vi.mocked(core.rpc.search.peerExchange).mockResolvedValueOnce(data);
-  const channel = start();
+  const channel = receive();
   channel.bufferedAmount = 80 * 1024;
   channel.open();
   await vi.waitFor(() => {

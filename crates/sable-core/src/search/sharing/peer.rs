@@ -1,16 +1,27 @@
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Weak};
+use std::time::Duration;
 
 use base64::Engine as _;
 use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::EncryptionInfo;
+use matrix_sdk::encryption::VerificationState;
+use matrix_sdk::encryption::identities::Device;
+use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::events::macros::EventContent;
+use matrix_sdk::ruma::events::{AnyToDeviceEventContent, StaticEventContent};
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{DeviceId, OwnedDeviceId, OwnedRoomId};
+use matrix_sdk_base::crypto::CollectStrategy;
 use serde::{Deserialize, Serialize};
 
 use crate::Core;
-use crate::protocol::{CoreEvent, RpcError, RtcSignal, SearchPeerState, SearchSharingView};
+use crate::protocol::{
+    CoreEvent, RpcError, RtcSignal, SearchPeerCandidateStatus, SearchPeerCandidateView,
+    SearchPeerCopyView, SearchPeerDeviceView, SearchPeerOutcome, SearchPeerPause, SearchPeerState,
+    SearchSharingView,
+};
 use crate::rtc::RtcPurpose;
 use crate::sealed_account_data::verified_own_sender;
 use crate::search::now_ms;
@@ -19,10 +30,16 @@ mod transfer;
 
 use transfer::{Download, Received, Snapshot};
 
-const MAX_PEERS: usize = 2;
+const MAX_SERVING: usize = 2;
+const MAX_ASKED: usize = 32;
 const SESSION_MS: u64 = 120_000;
 const RETRY_MS: u64 = 60_000;
-pub(crate) const DISCOVERY_MS: u64 = 5_000;
+pub(crate) const DISCOVERY_MS: u64 = 10_000;
+const CONNECT_MS: u64 = 30_000;
+const WANT_MS: u64 = 24 * 60 * 60 * 1000;
+const ABSENCE_MS: u64 = 7 * 24 * 60 * 60 * 1000;
+const ACTIVE_WRITE_MS: u64 = 60 * 60 * 1000;
+const INACTIVE_DEVICE_MS: u64 = 90 * 24 * 60 * 60 * 1000;
 const SESSION_ID_LEN: usize = 32;
 
 #[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
@@ -30,33 +47,192 @@ const SESSION_ID_LEN: usize = 32;
 pub(crate) struct ToDeviceSearchPeerEventContent {
     session: String,
     timestamp: u64,
+    #[serde(flatten)]
     kind: Discovery,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 enum Discovery {
-    Probe,
-    Ready,
+    Query,
+    Info { documents: u64, complete_rooms: u64 },
+    Request,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Role {
+    Requester,
+    Provider,
 }
 
 struct Peer {
-    device: OwnedDeviceId,
-    initiator: bool,
     touched: u64,
     download: Download,
     snapshot: Option<Snapshot>,
 }
 
-impl Peer {
-    fn new(device: OwnedDeviceId, initiator: bool, touched: u64) -> Arc<tokio::sync::Mutex<Self>> {
-        Arc::new(tokio::sync::Mutex::new(Self {
+#[derive(Clone)]
+struct Slot {
+    role: Role,
+    device: OwnedDeviceId,
+    peer: Arc<tokio::sync::Mutex<Peer>>,
+}
+
+impl Slot {
+    fn new(role: Role, device: OwnedDeviceId, touched: u64) -> Self {
+        Self {
+            role,
             device,
-            initiator,
-            touched,
-            download: Download::default(),
-            snapshot: None,
-        }))
+            peer: Arc::new(tokio::sync::Mutex::new(Peer {
+                touched,
+                download: Download::default(),
+                snapshot: None,
+            })),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Candidate {
+    device: OwnedDeviceId,
+    name: Option<String>,
+    documents: u64,
+    complete_rooms: u64,
+    status: SearchPeerCandidateStatus,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+enum Phase {
+    #[default]
+    Idle,
+    Discovering {
+        until: u64,
+    },
+    Connecting {
+        session: String,
+        since: u64,
+    },
+    Transferring {
+        session: String,
+    },
+}
+
+impl Phase {
+    fn session(&self) -> Option<&str> {
+        match self {
+            Self::Connecting { session, .. } | Self::Transferring { session } => Some(session),
+            Self::Idle | Self::Discovering { .. } => None,
+        }
+    }
+}
+
+#[derive(Default)]
+struct Catchup {
+    phase: Phase,
+    query: String,
+    asked: Vec<(OwnedDeviceId, Option<String>)>,
+    candidates: Vec<Candidate>,
+    current: Option<usize>,
+    outcome: Option<SearchPeerOutcome>,
+    last_attempt: u64,
+    rooms: usize,
+}
+
+impl Catchup {
+    fn begin(&mut self, query: String, now: u64) {
+        *self = Self {
+            phase: Phase::Discovering {
+                until: now.saturating_add(DISCOVERY_MS),
+            },
+            query,
+            last_attempt: now,
+            ..Self::default()
+        };
+    }
+
+    fn finish(&mut self, outcome: Option<SearchPeerOutcome>) {
+        self.phase = Phase::Idle;
+        self.current = None;
+        self.outcome = outcome;
+    }
+
+    fn reply(&mut self, device: &DeviceId, session: &str, documents: u64, complete_rooms: u64) {
+        if self.phase == Phase::Idle
+            || self.query != session
+            || self.candidates.iter().any(|known| known.device == device)
+        {
+            return;
+        }
+        let Some((_, name)) = self.asked.iter().find(|(asked, _)| asked == device) else {
+            return;
+        };
+        self.candidates.push(Candidate {
+            device: device.to_owned(),
+            name: name.clone(),
+            documents,
+            complete_rooms,
+            status: SearchPeerCandidateStatus::Waiting,
+        });
+    }
+
+    fn rank(&mut self) {
+        self.candidates.sort_by_key(|candidate| {
+            std::cmp::Reverse((candidate.documents, candidate.complete_rooms))
+        });
+    }
+
+    fn advance(&mut self, failed: Option<&str>) -> bool {
+        match (&self.phase, failed) {
+            (Phase::Discovering { .. }, None) => {
+                self.rank();
+                true
+            }
+            (phase, Some(failed)) if phase.session() == Some(failed) => {
+                if let Some(current) = self.current_mut() {
+                    current.status = SearchPeerCandidateStatus::Failed;
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn pick(&mut self, session: String, now: u64) -> Option<OwnedDeviceId> {
+        let Some(index) = self.candidates.iter().position(|candidate| {
+            candidate.status == SearchPeerCandidateStatus::Waiting && candidate.documents > 0
+        }) else {
+            let outcome = if self.candidates.is_empty() {
+                SearchPeerOutcome::NoAnswer
+            } else if self
+                .candidates
+                .iter()
+                .all(|candidate| candidate.documents == 0)
+            {
+                SearchPeerOutcome::NothingToCopy
+            } else if self.rooms > 0 {
+                SearchPeerOutcome::Interrupted
+            } else {
+                SearchPeerOutcome::Failed
+            };
+            self.finish(Some(outcome));
+            return None;
+        };
+        self.current = Some(index);
+        self.phase = Phase::Connecting {
+            session,
+            since: now,
+        };
+        let candidate = self.current_mut()?;
+        candidate.status = SearchPeerCandidateStatus::Trying;
+        Some(candidate.device.clone())
+    }
+
+    fn current(&self) -> Option<&Candidate> {
+        self.candidates.get(self.current?)
+    }
+
+    fn current_mut(&mut self) -> Option<&mut Candidate> {
+        self.candidates.get_mut(self.current?)
     }
 }
 
@@ -64,42 +240,32 @@ impl Peer {
 pub(crate) struct SearchSharing {
     pub(crate) enabled: AtomicBool,
     available: AtomicBool,
-    last_start: AtomicU64,
-    probe_cursor: AtomicUsize,
-    peers: parking_lot::Mutex<HashMap<String, Arc<tokio::sync::Mutex<Peer>>>>,
+    slots: parking_lot::Mutex<HashMap<String, Slot>>,
+    catchup: parking_lot::Mutex<Catchup>,
     restoring: parking_lot::Mutex<HashMap<OwnedRoomId, u64>>,
     received: tokio::sync::Mutex<Option<Received>>,
-    status: parking_lot::Mutex<(SearchPeerState, usize)>,
 }
 
 impl SearchSharing {
-    fn rotate_probe_candidates<T>(&self, candidates: &mut [T]) {
-        if !candidates.is_empty() {
-            let offset = self.probe_cursor.fetch_add(1, Ordering::Relaxed) % candidates.len();
-            candidates.rotate_left(offset);
-        }
-    }
-
-    fn remove_expired(&self, now: u64) {
-        self.peers.lock().retain(|_, peer| {
-            peer.try_lock()
+    fn remove_expired(slots: &mut HashMap<String, Slot>, now: u64) {
+        slots.retain(|_, slot| {
+            slot.peer
+                .try_lock()
                 .map_or(true, |peer| now.saturating_sub(peer.touched) < SESSION_MS)
         });
     }
 
     pub(crate) fn discovering(&self) -> bool {
         self.enabled.load(Ordering::Relaxed)
-            && now_ms().saturating_sub(self.last_start.load(Ordering::Relaxed)) < DISCOVERY_MS
+            && matches!(self.catchup.lock().phase, Phase::Discovering { .. })
     }
 
     pub(crate) async fn reset_session(&self) {
         self.available.store(false, Ordering::Relaxed);
-        self.peers.lock().clear();
+        self.slots.lock().clear();
         self.restoring.lock().clear();
+        *self.catchup.lock() = Catchup::default();
         *self.received.lock().await = None;
-        self.last_start.store(0, Ordering::Relaxed);
-        self.probe_cursor.store(0, Ordering::Relaxed);
-        *self.status.lock() = (SearchPeerState::Off, 0);
     }
 
     pub(crate) fn restoring(&self, room: &matrix_sdk::ruma::RoomId) -> bool {
@@ -108,36 +274,95 @@ impl SearchSharing {
             .get(room)
             .is_some_and(|deadline| *deadline > now_ms())
     }
-
-    pub(crate) fn view(&self) -> SearchSharingView {
-        let (state, rooms_received) = *self.status.lock();
-        SearchSharingView {
-            state: if !self.enabled.load(Ordering::Relaxed) {
-                SearchPeerState::Off
-            } else if state == SearchPeerState::Off {
-                SearchPeerState::Waiting
-            } else {
-                state
-            },
-            rooms_received,
-        }
-    }
 }
 
 impl Core {
     fn peers_allowed(&self) -> bool {
-        self.search_sharing.enabled.load(Ordering::Relaxed)
-            && self.network_available.load(Ordering::Relaxed)
-            && self.search_network.allows_crawl()
-            && self.search_foreground.load(Ordering::Relaxed)
+        self.search_sharing.enabled.load(Ordering::Relaxed) && self.search_peer_pause().is_none()
+    }
+
+    fn search_peer_pause(&self) -> Option<SearchPeerPause> {
+        if !self.network_available.load(Ordering::Relaxed) {
+            Some(SearchPeerPause::Offline)
+        } else if !self.search_network.allows_crawl() {
+            Some(SearchPeerPause::Metered)
+        } else if !self.search_foreground.load(Ordering::Relaxed) {
+            Some(SearchPeerPause::Background)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) async fn search_sharing_view(&self) -> SearchSharingView {
+        let sharing = &self.search_sharing;
+        if !sharing.enabled.load(Ordering::Relaxed) {
+            return SearchSharingView::default();
+        }
+        let (rooms_received, last_copy, automatic) = {
+            let received = sharing.received.lock().await;
+            received.as_ref().map_or((0, None, false), |received| {
+                (
+                    received.rooms.len(),
+                    received.last_copy.clone(),
+                    received.wants_copy(now_ms()),
+                )
+            })
+        };
+        let serving = sharing
+            .slots
+            .lock()
+            .values()
+            .filter(|slot| slot.role == Role::Provider)
+            .count();
+        let catchup = sharing.catchup.lock();
+        SearchSharingView {
+            state: match catchup.phase {
+                Phase::Idle => SearchPeerState::Idle,
+                Phase::Discovering { .. } => SearchPeerState::Discovering,
+                Phase::Connecting { .. } => SearchPeerState::Connecting,
+                Phase::Transferring { .. } => SearchPeerState::Transferring,
+            },
+            pause: self.search_peer_pause(),
+            outcome: catchup.outcome,
+            peer: catchup.current().map(|candidate| SearchPeerDeviceView {
+                device_id: candidate.device.to_string(),
+                name: candidate.name.clone(),
+            }),
+            rooms_copied: catchup.rooms,
+            rooms_received,
+            last_copy,
+            automatic,
+            asked: catchup.asked.len(),
+            serving,
+            candidates: catchup
+                .candidates
+                .iter()
+                .map(|candidate| SearchPeerCandidateView {
+                    device_id: candidate.device.to_string(),
+                    name: candidate.name.clone(),
+                    documents: candidate.documents,
+                    complete_rooms: candidate.complete_rooms,
+                    status: candidate.status,
+                })
+                .collect(),
+        }
     }
 
     pub(crate) fn cancel_search_peers(&self) {
-        self.search_sharing
-            .available
-            .store(false, Ordering::Relaxed);
-        self.search_sharing.peers.lock().clear();
-        self.search_sharing.status.lock().0 = SearchPeerState::Waiting;
+        let sharing = &self.search_sharing;
+        sharing.available.store(false, Ordering::Relaxed);
+        sharing.slots.lock().clear();
+        {
+            let mut catchup = sharing.catchup.lock();
+            match catchup.phase {
+                Phase::Idle => {}
+                Phase::Discovering { .. } => catchup.finish(None),
+                Phase::Connecting { .. } | Phase::Transferring { .. } => {
+                    catchup.finish(Some(SearchPeerOutcome::Interrupted));
+                }
+            }
+            catchup.last_attempt = 0;
+        }
         self.close_rtc_purpose(RtcPurpose::SearchSharing);
     }
 
@@ -157,6 +382,38 @@ impl Core {
             },
         );
         self.track_session_handler(client, handle);
+
+        let weak = Arc::downgrade(self);
+        self.track_session_task(
+            spawn(async move {
+                loop {
+                    matrix_sdk::sleep::sleep(Duration::from_secs(1)).await;
+                    let Some(core) = weak.upgrade() else { return };
+                    if core.session_generation.load(Ordering::SeqCst) != generation {
+                        return;
+                    }
+                    core.tick_search_peers().await;
+                }
+            })
+            .abort_on_drop(),
+        );
+
+        let weak = Arc::downgrade(self);
+        let watched = client.clone();
+        let mut verification = client.encryption().verification_state();
+        self.track_session_task(
+            spawn(async move {
+                loop {
+                    if verification.get() == VerificationState::Verified {
+                        verified(&weak, &watched).await;
+                    }
+                    if verification.next().await.is_none() {
+                        return;
+                    }
+                }
+            })
+            .abort_on_drop(),
+        );
     }
 
     async fn receive_search_peer(
@@ -179,145 +436,320 @@ impl Core {
             return;
         };
         let _session = self.session.read().await;
-        if self.session_generation.load(Ordering::SeqCst) != generation
-            || !self.search_sharing.available.load(Ordering::Relaxed)
-        {
+        if self.session_generation.load(Ordering::SeqCst) != generation {
             return;
         }
         let id = device.device_id().to_owned();
         let session = content.session;
         match content.kind {
-            Discovery::Probe => {
-                {
-                    self.search_sharing.remove_expired(now_ms());
-                    let mut peers = self.search_sharing.peers.lock();
-                    if peers.contains_key(&session) || peers.len() >= MAX_PEERS {
-                        return;
-                    }
-                    peers.insert(session.clone(), Peer::new(id.clone(), false, now_ms()));
-                }
-                if !self.open_rtc(
-                    RtcPurpose::SearchSharing,
-                    session.clone(),
-                    id.clone(),
-                    false,
-                ) || send_discovery(client, &id, &session, Discovery::Ready)
-                    .await
-                    .is_err()
-                {
-                    self.search_sharing.peers.lock().remove(&session);
-                    self.close_rtc(&session);
+            Discovery::Query => {
+                let documents = self.search_index.lock().await.stored_documents() as u64;
+                let complete_rooms = self.search_crawl.lock().await.complete_rooms() as u64;
+                let info = Discovery::Info {
+                    documents,
+                    complete_rooms,
+                };
+                if send_discovery(client, &id, &session, info).await.is_err() {
+                    tracing::debug!(device = %id, "could not answer a search peer query");
                 }
             }
-            Discovery::Ready => {
-                let peer = self.search_sharing.peers.lock().get(&session).cloned();
-                let Some(peer) = peer else { return };
-                let mut peer = peer.lock().await;
-                if !peer.initiator
-                    || peer.device != id
-                    || now_ms().saturating_sub(peer.touched) > SESSION_MS
-                    || !self.open_rtc(RtcPurpose::SearchSharing, session.clone(), id, true)
-                {
-                    return;
-                }
-                peer.touched = now_ms();
-                self.search_sharing.status.lock().0 = SearchPeerState::Connecting;
-                self.emit_if_current(
-                    generation,
-                    CoreEvent::Rtc {
-                        session_id: session,
-                        sender: true,
-                        signal: RtcSignal::Open,
-                    },
+            Discovery::Info {
+                documents,
+                complete_rooms,
+            } => {
+                self.search_sharing
+                    .catchup
+                    .lock()
+                    .reply(&id, &session, documents, complete_rooms);
+            }
+            Discovery::Request => self.serve_search_peer(generation, session, id),
+        }
+    }
+
+    fn serve_search_peer(&self, generation: u64, session: String, device: OwnedDeviceId) {
+        let (accepted, replaced) = {
+            let mut slots = self.search_sharing.slots.lock();
+            SearchSharing::remove_expired(&mut slots, now_ms());
+            let replaced: Vec<String> = slots
+                .iter()
+                .filter(|(_, slot)| slot.role == Role::Provider && slot.device == device)
+                .map(|(id, _)| id.clone())
+                .collect();
+            for id in &replaced {
+                slots.remove(id);
+            }
+            let serving = slots
+                .values()
+                .filter(|slot| slot.role == Role::Provider)
+                .count();
+            let accepted = !slots.contains_key(&session) && serving < MAX_SERVING;
+            if accepted {
+                slots.insert(
+                    session.clone(),
+                    Slot::new(Role::Provider, device.clone(), now_ms()),
                 );
             }
+            (accepted, replaced)
+        };
+        for session_id in replaced {
+            self.close_rtc(&session_id);
+            self.emit_if_current(
+                generation,
+                CoreEvent::Rtc {
+                    session_id,
+                    purpose: RtcPurpose::SearchSharing,
+                    sender: true,
+                    signal: RtcSignal::Close,
+                },
+            );
         }
+        if !accepted {
+            return;
+        }
+        if !self.open_rtc(RtcPurpose::SearchSharing, session.clone(), device, true) {
+            self.search_sharing.slots.lock().remove(&session);
+            return;
+        }
+        self.emit_if_current(
+            generation,
+            CoreEvent::Rtc {
+                session_id: session,
+                purpose: RtcPurpose::SearchSharing,
+                sender: true,
+                signal: RtcSignal::Open,
+            },
+        );
     }
 
     pub(crate) async fn start_search_peers(&self) -> Result<(), RpcError> {
         if !self.peers_allowed() {
             return Ok(());
         }
-        let state = &self.search_sharing;
-        state.available.store(true, Ordering::Relaxed);
+        self.search_sharing.available.store(true, Ordering::Relaxed);
+        let client = self.client().await?;
         let now = now_ms();
-        state.remove_expired(now);
-        if !state.peers.lock().is_empty() {
-            return Ok(());
-        }
-        let last = state.last_start.load(Ordering::Relaxed);
-        if now.saturating_sub(last) < RETRY_MS {
-            return Ok(());
-        }
-        if state
-            .last_start
-            .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
-            .is_err()
-        {
-            return Ok(());
-        }
-        let session = self.session.read().await;
-        let client = session
-            .as_ref()
-            .ok_or(RpcError::NotLoggedIn)?
-            .client
-            .clone();
-        self.load_peer_receipts(&client).await;
-        state.status.lock().0 = SearchPeerState::Waiting;
-        let own = client.user_id().ok_or(RpcError::NotLoggedIn)?;
-        let devices = client
-            .encryption()
-            .get_user_devices(own)
-            .await
-            .map_err(|_| RpcError::Unavailable)?;
-        let mut candidates: Vec<_> = devices
-            .devices()
-            .filter(|device| device.is_verified() && Some(device.device_id()) != client.device_id())
-            .collect();
-        candidates.sort_by(|a, b| a.device_id().cmp(b.device_id()));
-        state.rotate_probe_candidates(&mut candidates);
-        for device in candidates.into_iter().take(MAX_PEERS) {
-            let mut random = [0_u8; 24];
-            getrandom::fill(&mut random).map_err(|_| RpcError::Unavailable)?;
-            let session_id = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random);
-            state.peers.lock().insert(
-                session_id.clone(),
-                Peer::new(device.device_id().to_owned(), true, now),
-            );
-            if send_discovery(&client, device.device_id(), &session_id, Discovery::Probe)
-                .await
-                .is_err()
-            {
-                state.peers.lock().remove(&session_id);
-            }
+        let wanted = self
+            .update_received(&client, |received| {
+                if received.last_active != 0
+                    && now.saturating_sub(received.last_active) > ABSENCE_MS
+                {
+                    received.wanted_since = Some(now);
+                }
+                let changed = now.saturating_sub(received.last_active) > ACTIVE_WRITE_MS;
+                if changed {
+                    received.last_active = now;
+                }
+                (changed, received.wants_copy(now))
+            })
+            .await?;
+        if wanted {
+            self.discover_search_peers(&client, false).await?;
         }
         Ok(())
     }
 
-    async fn search_peer(
-        &self,
-        client: &Client,
-        session_id: &str,
-    ) -> Result<Arc<tokio::sync::Mutex<Peer>>, RpcError> {
+    pub(crate) async fn find_search_peers(&self) -> Result<(), RpcError> {
+        if !self.peers_allowed() {
+            return Err(RpcError::Unavailable);
+        }
+        self.search_sharing.available.store(true, Ordering::Relaxed);
+        let client = self.client().await?;
+        let now = now_ms();
+        self.update_received(&client, |received| {
+            received.wanted_since = Some(now);
+            (true, ())
+        })
+        .await?;
+        self.discover_search_peers(&client, true).await
+    }
+
+    async fn discover_search_peers(&self, client: &Client, force: bool) -> Result<(), RpcError> {
+        let query = session_id().ok_or(RpcError::Unavailable)?;
+        {
+            let mut catchup = self.search_sharing.catchup.lock();
+            let started = now_ms();
+            if catchup.phase != Phase::Idle
+                || (!force && started.saturating_sub(catchup.last_attempt) < RETRY_MS)
+            {
+                return Ok(());
+            }
+            catchup.begin(query.clone(), started);
+        }
+        let devices = match query_targets(client).await {
+            Ok(devices) => devices,
+            Err(error) => {
+                self.finish_discovery(&query, SearchPeerOutcome::Failed);
+                return Err(error);
+            }
+        };
+        if devices.is_empty() {
+            self.finish_discovery(&query, SearchPeerOutcome::NoDevices);
+            return Ok(());
+        }
+        {
+            let mut catchup = self.search_sharing.catchup.lock();
+            if catchup.query != query {
+                return Ok(());
+            }
+            catchup.asked = devices
+                .iter()
+                .map(|device| {
+                    (
+                        device.device_id().to_owned(),
+                        device.display_name().map(str::to_owned),
+                    )
+                })
+                .collect();
+        }
+        let content = ToDeviceSearchPeerEventContent {
+            session: query.clone(),
+            timestamp: now_ms(),
+            kind: Discovery::Query,
+        };
+        if let Err(error) = broadcast(client, &devices, &content).await {
+            self.finish_discovery(&query, SearchPeerOutcome::Failed);
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    fn finish_discovery(&self, query: &str, outcome: SearchPeerOutcome) {
+        let mut catchup = self.search_sharing.catchup.lock();
+        if catchup.query == query {
+            catchup.finish(Some(outcome));
+        }
+    }
+
+    async fn tick_search_peers(&self) {
+        enum Due {
+            Choose,
+            GiveUp(String),
+        }
+        let now = now_ms();
+        let due = match &self.search_sharing.catchup.lock().phase {
+            Phase::Discovering { until } if now >= *until => Due::Choose,
+            Phase::Connecting { session, since } if now.saturating_sub(*since) >= CONNECT_MS => {
+                Due::GiveUp(session.clone())
+            }
+            _ => return,
+        };
+        match due {
+            Due::Choose => self.next_search_peer(None).await,
+            Due::GiveUp(session) => {
+                self.search_sharing.slots.lock().remove(&session);
+                self.close_rtc(&session);
+                self.emit(CoreEvent::Rtc {
+                    session_id: session.clone(),
+                    purpose: RtcPurpose::SearchSharing,
+                    sender: false,
+                    signal: RtcSignal::Close,
+                });
+                self.next_search_peer(Some(session)).await;
+            }
+        }
+    }
+
+    async fn next_search_peer(&self, mut failed: Option<String>) {
+        let Ok(client) = self.client().await else {
+            return;
+        };
+        loop {
+            let Some(session) = session_id() else {
+                self.search_sharing
+                    .catchup
+                    .lock()
+                    .finish(Some(SearchPeerOutcome::Failed));
+                return;
+            };
+            let device = {
+                let mut catchup = self.search_sharing.catchup.lock();
+                if !catchup.advance(failed.as_deref()) {
+                    return;
+                }
+                let Some(device) = catchup.pick(session.clone(), now_ms()) else {
+                    return;
+                };
+                device
+            };
+            self.search_sharing.slots.lock().insert(
+                session.clone(),
+                Slot::new(Role::Requester, device.clone(), now_ms()),
+            );
+            if self.open_rtc(
+                RtcPurpose::SearchSharing,
+                session.clone(),
+                device.clone(),
+                false,
+            ) && send_discovery(&client, &device, &session, Discovery::Request)
+                .await
+                .is_ok()
+            {
+                return;
+            }
+            self.search_sharing.slots.lock().remove(&session);
+            self.close_rtc(&session);
+            failed = Some(session);
+        }
+    }
+
+    async fn complete_search_copy(&self, client: &Client, session: &str) {
+        let copy = {
+            let mut catchup = self.search_sharing.catchup.lock();
+            if catchup.phase.session() != Some(session) {
+                return;
+            }
+            let Some(current) = catchup.current_mut() else {
+                return;
+            };
+            current.status = SearchPeerCandidateStatus::Done;
+            let candidate = current.clone();
+            let rooms = catchup.rooms;
+            catchup.finish(Some(SearchPeerOutcome::Completed));
+            SearchPeerCopyView {
+                device_id: candidate.device.to_string(),
+                name: candidate.name,
+                at_ms: now_ms(),
+                rooms,
+            }
+        };
+        if let Err(error) = self
+            .update_received(client, |received| {
+                received.last_copy = Some(copy);
+                received.wanted_since = None;
+                (true, ())
+            })
+            .await
+        {
+            tracing::warn!(?error, "could not save the search copy result");
+        }
+        self.emit(CoreEvent::Rtc {
+            session_id: session.to_owned(),
+            purpose: RtcPurpose::SearchSharing,
+            sender: false,
+            signal: RtcSignal::Close,
+        });
+    }
+
+    async fn search_slot(&self, client: &Client, session_id: &str) -> Result<Slot, RpcError> {
         if !self.peers_allowed() {
             self.cancel_search_peers();
             return Err(RpcError::Unavailable);
         }
-        let peer = self
+        let slot = self
             .search_sharing
-            .peers
+            .slots
             .lock()
             .get(session_id)
             .cloned()
             .ok_or(RpcError::Unavailable)?;
-        let mut current = peer.lock().await;
-        if now_ms().saturating_sub(current.touched) > SESSION_MS {
+        let mut peer = slot.peer.lock().await;
+        if now_ms().saturating_sub(peer.touched) > SESSION_MS {
             return Err(RpcError::Unavailable);
         }
         let user = client.user_id().ok_or(RpcError::NotLoggedIn)?;
         if !client
             .encryption()
-            .get_device(user, &current.device)
+            .get_device(user, &slot.device)
             .await
             .ok()
             .flatten()
@@ -325,23 +757,105 @@ impl Core {
         {
             return Err(RpcError::Unavailable);
         }
-        current.touched = now_ms();
-        drop(current);
-        Ok(peer)
+        peer.touched = now_ms();
+        drop(peer);
+        Ok(slot)
     }
 
-    pub(crate) fn close_search_peer(&self, session_id: &str) {
-        let mut peers = self.search_sharing.peers.lock();
-        peers.remove(session_id);
-        if peers.is_empty() {
-            let mut status = self.search_sharing.status.lock();
-            status.0 = if status.1 > 0 {
-                SearchPeerState::Idle
-            } else {
-                SearchPeerState::Waiting
-            };
-        }
+    pub(crate) async fn close_search_peer(&self, session_id: &str) {
+        self.search_sharing.slots.lock().remove(session_id);
+        self.next_search_peer(Some(session_id.to_owned())).await;
     }
+}
+
+async fn verified(core: &Weak<Core>, client: &Client) {
+    let Some(core) = core.upgrade() else { return };
+    let now = now_ms();
+    let first = core
+        .update_received(client, |received| {
+            let first = !received.verified;
+            if first {
+                received.verified = true;
+                received.wanted_since = Some(now);
+            }
+            (first, first)
+        })
+        .await
+        .unwrap_or(false);
+    if first
+        && core.peers_allowed()
+        && core.search_sharing.available.load(Ordering::Relaxed)
+        && let Err(error) = core.discover_search_peers(client, true).await
+    {
+        tracing::debug!(?error, "could not look for search peers after verification");
+    }
+}
+
+fn session_id() -> Option<String> {
+    let mut random = [0_u8; 24];
+    getrandom::fill(&mut random).ok()?;
+    Some(base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random))
+}
+
+async fn query_targets(client: &Client) -> Result<Vec<Device>, RpcError> {
+    let own = client.user_id().ok_or(RpcError::NotLoggedIn)?;
+    let devices = client
+        .encryption()
+        .get_user_devices(own)
+        .await
+        .map_err(|_| RpcError::Unavailable)?;
+    let seen: Option<HashMap<OwnedDeviceId, Option<u64>>> =
+        client.devices().await.ok().map(|response| {
+            response
+                .devices
+                .into_iter()
+                .map(|device| {
+                    (
+                        device.device_id,
+                        device.last_seen_ts.map(|ts| u64::from(ts.get())),
+                    )
+                })
+                .collect()
+        });
+    let now = now_ms();
+    let mut targets: Vec<(u64, Device)> = devices
+        .devices()
+        .filter(|device| device.is_verified() && Some(device.device_id()) != client.device_id())
+        .filter_map(|device| {
+            let last_seen = match &seen {
+                Some(seen) => *seen.get(device.device_id())?,
+                None => None,
+            };
+            if last_seen.is_some_and(|ts| now.saturating_sub(ts) > INACTIVE_DEVICE_MS) {
+                return None;
+            }
+            Some((last_seen.unwrap_or(0), device))
+        })
+        .collect();
+    targets.sort_by_key(|(last_seen, _)| std::cmp::Reverse(*last_seen));
+    targets.truncate(MAX_ASKED);
+    Ok(targets.into_iter().map(|(_, device)| device).collect())
+}
+
+async fn broadcast(
+    client: &Client,
+    devices: &[Device],
+    content: &ToDeviceSearchPeerEventContent,
+) -> Result<(), RpcError> {
+    let raw: Raw<AnyToDeviceEventContent> = Raw::new(content)
+        .map_err(|_| RpcError::Unavailable)?
+        .cast_unchecked();
+    client
+        .encryption()
+        .encrypt_and_send_raw_to_device(
+            devices.iter().collect(),
+            ToDeviceSearchPeerEventContent::TYPE,
+            raw,
+            CollectStrategy::AllDevices,
+        )
+        .await
+        .map(|_| ())
+        .map_err(|_| RpcError::Unavailable)
 }
 
 async fn send_discovery(

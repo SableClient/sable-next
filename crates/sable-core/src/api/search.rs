@@ -16,6 +16,7 @@ domain! {
     coverage,
     metrics,
     peer_start,
+    peer_find,
     peer_exchange,
 }
 
@@ -27,6 +28,17 @@ impl Handler for PeerStartParams {
     type Ok = ();
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         core.start_search_peers().await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PeerFindParams {}
+
+impl Handler for PeerFindParams {
+    type Ok = ();
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.find_search_peers().await
     }
 }
 

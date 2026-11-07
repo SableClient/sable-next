@@ -33,9 +33,9 @@ pub struct CloseParams {
 
 impl Handler for CloseParams {
     type Ok = ();
-    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         core.close_rtc(&self.session_id);
-        core.close_search_peer(&self.session_id);
-        std::future::ready(Ok(()))
+        core.close_search_peer(&self.session_id).await;
+        Ok(())
     }
 }
