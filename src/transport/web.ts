@@ -9,8 +9,7 @@ import { applyWasmDebugImage } from './wasm-debug';
 import { on } from 'svelte/events';
 import { recordDebugLog } from '../lib/observability/debug-log.svelte.js';
 import {
-  isReportableCoreWarning,
-  isExpectedCoreFailure,
+  readCoreLine,
   wasmErrorFingerprint,
   wasmErrorTitle,
   wasmLogLevel,
@@ -33,24 +32,14 @@ function isStorageFailure(line: string): boolean {
   );
 }
 
-function reportCoreError(line: string, onStorageFailure: () => void): void {
-  const storage = isStorageFailure(line);
-  if (storage) onStorageFailure();
-  if (isExpectedCoreFailure(line)) {
-    Sentry.addBreadcrumb({
-      category: 'core.sync',
-      level: 'warning',
-      message: wasmErrorTitle(line),
-    });
-    return;
-  }
+function reportCoreError(line: string): void {
   const fingerprint = wasmErrorFingerprint(line);
   const title = wasmErrorTitle(line);
-  const seen = isReportableCoreWarning(line) ? title : fingerprint;
+  const seen = wasmLogLevel(line) === 'warn' ? title : fingerprint;
   if (fingerprint === '' || reportedCoreErrors.has(seen)) return;
   reportedCoreErrors.add(seen);
   Sentry.captureException(Object.assign(new Error(title), { name: 'CoreLog' }), {
-    level: storage ? 'warning' : 'error',
+    level: isStorageFailure(line) ? 'warning' : 'error',
     fingerprint: ['wasm-core-error', fingerprint],
     tags: { source: 'wasm-core' },
   });
@@ -318,15 +307,23 @@ export function createWebTransport(open: () => CoreConnection = openSharedWorker
       }
 
       if ('logs' in data) {
-        for (const line of data.logs) {
+        for (const raw of data.logs) {
+          const { text: line, reported } = readCoreLine(raw);
           const level = wasmLogLevel(line);
           recordDebugLog(level, level === 'error' ? 'error' : 'general', 'wasm', line.trim());
           if (line.includes('session tokens:')) {
             Sentry.addBreadcrumb({ category: 'core.session', level: 'info', message: line.trim() });
           }
-          if (level === 'error' || isReportableCoreWarning(line)) {
-            reportCoreError(line, () => {
-              for (const listener of storageFailureListeners) listener();
+          if (level === 'info') continue;
+          if ((level === 'error' || reported) && isStorageFailure(line)) {
+            for (const listener of storageFailureListeners) listener();
+          }
+          if (reported) reportCoreError(line);
+          else {
+            Sentry.addBreadcrumb({
+              category: 'core.sync',
+              level: level === 'error' ? 'error' : 'warning',
+              message: wasmErrorTitle(line),
             });
           }
         }

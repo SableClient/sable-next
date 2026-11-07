@@ -3,10 +3,15 @@ import { createRpc } from '#src/generated/protocol';
 import type { RpcError, RpcResult, CoreEvent, SubscriptionId, Rpc } from '#src/generated/protocol';
 import type { WasmDebugImage, WorkerMessage, WorkerRequest } from './protocol';
 import { TimelineEventRouter } from './timeline-event-router';
+import { readCoreLine } from '../lib/observability/wasm-log';
 
 const logFlushMs = 250;
 const logBufferLimit = 500;
 const logLevelPrefix = /^\s*(TRACE|DEBUG|INFO|WARN|ERROR)\s/;
+
+function startsLogEntry(line: string): boolean {
+  return readCoreLine(line).reported || logLevelPrefix.test(line);
+}
 
 export type WorkerCore = {
   call(method: string, params: string): Promise<string>;
@@ -166,7 +171,7 @@ export function createCoreWorkerBoundary(
     for (const line of text.split('\n')) {
       if (!line.trim()) continue;
       const last = entries.length - 1;
-      if (last >= 0 && !logLevelPrefix.test(line)) entries[last] += `\n${line.trimEnd()}`;
+      if (last >= 0 && !startsLogEntry(line)) entries[last] += `\n${line.trimEnd()}`;
       else entries.push(line.trimEnd());
     }
     for (const entry of entries) {

@@ -555,6 +555,21 @@ test('the lines after a log entry stay attached to it', () => {
   vi.useRealTimers();
 });
 
+test('a line the core marked as reported starts its own entry', () => {
+  vi.useFakeTimers();
+  const boundary = createCoreWorkerBoundary(Promise.resolve(fakeCore(() => Promise.resolve('{}'))));
+  const port = new FakePort();
+  boundary.connect(port);
+
+  boundary.handleLog('ERROR matrix_sdk: first(\n    detail,\n)\n\u001eERROR sable_core: second');
+  vi.advanceTimersByTime(250);
+
+  expect(port.messages).toEqual([
+    { logs: ['ERROR matrix_sdk: first(\n    detail,\n)', '\u001eERROR sable_core: second'] },
+  ]);
+  vi.useRealTimers();
+});
+
 test('overflowing the log buffer drops and reports the excess', () => {
   const setLogCapture = vi.fn();
   vi.useFakeTimers();

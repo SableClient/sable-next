@@ -15,7 +15,10 @@ use std::{
 use js_sys::Function;
 use sable_core::{
     Core,
-    binding::{DEFAULT_LOG_FILTER, EVENT_BATCH_LIMIT, encode_event_batch, rpc_error_json},
+    binding::{
+        DEFAULT_LOG_FILTER, EVENT_BATCH_LIMIT, REPORTED_LOG_MARK, encode_event_batch,
+        is_reported_event, rpc_error_json,
+    },
     protocol::{CoreEvent, RpcError},
 };
 use session_store::JsSessionStore;
@@ -82,6 +85,7 @@ thread_local! {
 
 struct JsLogWriter {
     capturing: bool,
+    reported: bool,
     line: String,
 }
 
@@ -105,7 +109,12 @@ impl Drop for JsLogWriter {
         }
         let notify = LOG_NOTIFIER.with_borrow(Clone::clone);
         if let Some(notify) = notify {
-            let _ = notify.call1(&JsValue::NULL, &JsValue::from_str(&self.line));
+            let line = if self.reported {
+                format!("{REPORTED_LOG_MARK}{}", self.line)
+            } else {
+                std::mem::take(&mut self.line)
+            };
+            let _ = notify.call1(&JsValue::NULL, &JsValue::from_str(&line));
         }
         LOG_NOTIFYING.set(false);
     }
@@ -119,14 +128,17 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeJsLogWriter {
     fn make_writer(&'a self) -> Self::Writer {
         JsLogWriter {
             capturing: LOG_CAPTURE.get(),
+            reported: false,
             line: String::new(),
         }
     }
 
     /// Error lines always reach the page, since `Failed` carries only a `log_id`.
     fn make_writer_for(&'a self, meta: &tracing::Metadata<'_>) -> Self::Writer {
+        let reported = is_reported_event(meta);
         JsLogWriter {
-            capturing: LOG_CAPTURE.get() || meta.level() == &tracing::Level::ERROR,
+            capturing: LOG_CAPTURE.get() || meta.level() == &tracing::Level::ERROR || reported,
+            reported,
             line: String::new(),
         }
     }
