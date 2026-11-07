@@ -1,6 +1,13 @@
 import type { CoreEvent, Rpc } from '#src/generated/protocol';
 import { SearchPeerDecoder, encodeSearchPeerFrame } from '#lib/model/model.js';
-import { connectRtc, iceServers, type RtcCore, type RtcEvent } from '#lib/rtc/connect.js';
+import {
+  connectRtc,
+  iceServers,
+  isRtcEvent,
+  type RtcCore,
+  type RtcEvent,
+} from '#lib/rtc/connect.js';
+import { reportSearchPeerConnection, selectedRoute } from '#lib/search/search-peer-diagnostics.js';
 
 // The message and segment formats are described in docs/search-sharing.md.
 const CHANNEL = 'sable-search-v1';
@@ -159,6 +166,22 @@ function connectSearchPeers(
     let processing = Promise.resolve();
     const negotiation = setTimeout(close, NEGOTIATION_MS);
     const active = (): boolean => !closed && allowed();
+    const report = (route: RTCIceCandidateType | null = null): void => {
+      reportSearchPeerConnection({
+        sessionId,
+        sending: initiator,
+        state: peer.connectionState,
+        route,
+      });
+    };
+    report();
+    peer.addEventListener('connectionstatechange', () => {
+      if (peer.connectionState === 'connected')
+        void selectedRoute(peer).then(report, () => {
+          report();
+        });
+      else report();
+    });
     const channelOpen = (): boolean => channel?.readyState === 'open' && active();
 
     function touch(): void {
@@ -233,8 +256,10 @@ function connectSearchPeers(
             started = true;
             clearInterval(hello);
             clearTimeout(negotiation);
-            incomingMessages += 1;
-            exchange(null);
+            if (!initiator) {
+              incomingMessages += 1;
+              exchange(null);
+            }
           }
           return;
         }
@@ -317,7 +342,7 @@ function connectSearchPeers(
   }
 
   const unsubscribe = core.subscribeEvents((event) => {
-    if (event.type !== 'rtc' || !current()) return;
+    if (!isRtcEvent(event, 'search_sharing') || !current()) return;
     let session = sessions.get(event.session_id);
     if (!allowed() || event.signal.kind === 'close') {
       session?.close();

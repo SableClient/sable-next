@@ -227,6 +227,7 @@ pub enum RegistrationResultView {
 pub enum CoreEvent {
     Rtc {
         session_id: String,
+        purpose: RtcPurpose,
         sender: bool,
         signal: RtcSignal,
     },
@@ -605,12 +606,31 @@ pub enum RtcSignal {
     Close,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum RtcPurpose {
+    SearchSharing,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct SearchSharingView {
     pub state: SearchPeerState,
+    pub pause: Option<SearchPeerPause>,
+    pub outcome: Option<SearchPeerOutcome>,
+    pub peer: Option<SearchPeerDeviceView>,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub rooms_copied: usize,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub rooms_received: usize,
+    pub last_copy: Option<SearchPeerCopyView>,
+    pub automatic: bool,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub asked: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub serving: usize,
+    pub candidates: Vec<SearchPeerCandidateView>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
@@ -619,11 +639,71 @@ pub struct SearchSharingView {
 pub enum SearchPeerState {
     #[default]
     Off,
-    Waiting,
+    Idle,
+    Discovering,
     Connecting,
     Transferring,
-    Idle,
-    Unavailable,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum SearchPeerPause {
+    Offline,
+    Metered,
+    Background,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum SearchPeerOutcome {
+    Completed,
+    NoDevices,
+    NoAnswer,
+    NothingToCopy,
+    Failed,
+    Interrupted,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SearchPeerDeviceView {
+    pub device_id: String,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SearchPeerCopyView {
+    pub device_id: String,
+    pub name: Option<String>,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub at_ms: u64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub rooms: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SearchPeerCandidateView {
+    pub device_id: String,
+    pub name: Option<String>,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub documents: u64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub complete_rooms: u64,
+    pub status: SearchPeerCandidateStatus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum SearchPeerCandidateStatus {
+    Waiting,
+    Trying,
+    Failed,
+    Done,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

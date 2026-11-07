@@ -40,7 +40,16 @@ const metrics: SearchMetricsView = {
   running_ms: 120_000,
   sharing: {
     state: 'off',
+    pause: null,
+    outcome: null,
+    peer: null,
+    rooms_copied: 0,
     rooms_received: 0,
+    last_copy: null,
+    automatic: false,
+    asked: 0,
+    serving: 0,
+    candidates: [],
   },
 };
 

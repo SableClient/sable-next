@@ -32,7 +32,7 @@ let core: RtcCore;
 const candidate = { candidate: 'candidate:1', sdpMid: '0', sdpMLineIndex: 0 };
 
 function event(signal: RtcEvent['signal'], sender: boolean): RtcEvent {
-  return { type: 'rtc', session_id: 's', sender, signal };
+  return { type: 'rtc', purpose: 'search_sharing', session_id: 's', sender, signal };
 }
 
 beforeEach(() => {

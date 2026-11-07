@@ -219,6 +219,10 @@ impl CrawlProgress {
         *seen >= BLIND_EVENTS_BEFORE_SKIP
     }
 
+    pub(super) fn complete_rooms(&self) -> usize {
+        self.reached_start.len()
+    }
+
     fn blind_rooms(&self) -> usize {
         self.blind
             .values()
@@ -723,7 +727,7 @@ impl Core {
             running_ms: metrics
                 .started_ms
                 .map(|started| now_ms().saturating_sub(started)),
-            sharing: self.search_sharing.view(),
+            sharing: self.search_sharing_view().await,
         }
     }
 

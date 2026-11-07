@@ -1,55 +1,174 @@
 #[cfg(not(target_family = "wasm"))]
 mod browser;
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 
 use super::super::{History, STANDARD_NO_PAD};
 use super::*;
 use crate::search::tests::document;
 
-#[test]
-fn unanswered_probe_sessions_expire() {
-    let sharing = SearchSharing::default();
-    sharing
-        .peers
-        .lock()
-        .insert("session".into(), Peer::new("DEVICE".into(), true, 100));
-    sharing.remove_expired(100 + SESSION_MS - 1);
-    assert!(sharing.peers.lock().contains_key("session"));
-    sharing.remove_expired(100 + SESSION_MS);
-    assert!(sharing.peers.lock().is_empty());
+fn catchup_with(devices: &[(&str, u64, u64)]) -> Catchup {
+    let mut catchup = Catchup::default();
+    catchup.begin("query".into(), 0);
+    catchup.asked = devices
+        .iter()
+        .map(|(device, ..)| ((*device).into(), Some(format!("{device} name"))))
+        .collect();
+    for (device, documents, complete_rooms) in devices {
+        catchup.reply(
+            <&DeviceId>::from(*device),
+            "query",
+            *documents,
+            *complete_rooms,
+        );
+    }
+    catchup
 }
 
 #[test]
-fn discovery_rotates_between_devices_after_probes_expire() {
-    let sharing = SearchSharing::default();
-    let mut attempted = HashSet::new();
-    for _ in 0..3 {
-        let mut candidates = ["A", "B", "C"];
-        sharing.rotate_probe_candidates(&mut candidates);
-        attempted.extend(candidates.into_iter().take(MAX_PEERS));
-    }
-    assert_eq!(attempted, HashSet::from(["A", "B", "C"]));
+fn unanswered_sessions_expire() {
+    let mut slots = HashMap::from([(
+        "session".into(),
+        Slot::new(Role::Requester, "DEVICE".into(), 100),
+    )]);
+    SearchSharing::remove_expired(&mut slots, 100 + SESSION_MS - 1);
+    assert!(slots.contains_key("session"));
+    SearchSharing::remove_expired(&mut slots, 100 + SESSION_MS);
+    assert!(slots.is_empty());
+}
+
+#[test]
+fn only_asked_devices_answering_the_current_query_become_candidates() {
+    let mut catchup = catchup_with(&[("A", 10, 0)]);
+    catchup.reply(<&DeviceId>::from("A"), "query", 99, 0);
+    catchup.reply(<&DeviceId>::from("B"), "query", 50, 0);
+    catchup.reply(<&DeviceId>::from("A"), "other", 50, 0);
+    assert_eq!(catchup.candidates.len(), 1);
+    assert_eq!(catchup.candidates[0].documents, 10);
+    assert_eq!(catchup.candidates[0].name.as_deref(), Some("A name"));
+}
+
+#[test]
+fn deep_history_is_tried_first_and_failures_move_to_the_next_device() {
+    let mut catchup = catchup_with(&[
+        ("SMALL", 10, 5),
+        ("EMPTY", 0, 0),
+        ("DEEP", 500, 1),
+        ("WIDE", 500, 3),
+    ]);
+    assert!(catchup.advance(None));
+    assert_eq!(
+        catchup.pick("s1".into(), 0).as_deref(),
+        Some(<&DeviceId>::from("WIDE"))
+    );
+    assert!(!catchup.advance(Some("stale")));
+    assert!(catchup.advance(Some("s1")));
+    assert_eq!(
+        catchup.pick("s2".into(), 0).as_deref(),
+        Some(<&DeviceId>::from("DEEP"))
+    );
+    catchup.rooms = 2;
+    assert!(catchup.advance(Some("s2")));
+    assert_eq!(
+        catchup.pick("s3".into(), 0).as_deref(),
+        Some(<&DeviceId>::from("SMALL"))
+    );
+    assert!(catchup.advance(Some("s3")));
+    assert_eq!(catchup.pick("s4".into(), 0), None);
+    assert_eq!(catchup.phase, Phase::Idle);
+    assert_eq!(catchup.outcome, Some(SearchPeerOutcome::Interrupted));
+    assert_eq!(
+        catchup
+            .candidates
+            .iter()
+            .map(|candidate| candidate.status)
+            .collect::<Vec<_>>(),
+        [
+            SearchPeerCandidateStatus::Failed,
+            SearchPeerCandidateStatus::Failed,
+            SearchPeerCandidateStatus::Failed,
+            SearchPeerCandidateStatus::Waiting,
+        ]
+    );
+}
+
+#[test]
+fn discovery_reports_why_nothing_was_copied() {
+    let mut silent = catchup_with(&[]);
+    silent.advance(None);
+    assert_eq!(silent.pick("s".into(), 0), None);
+    assert_eq!(silent.outcome, Some(SearchPeerOutcome::NoAnswer));
+
+    let mut empty = catchup_with(&[("A", 0, 0)]);
+    empty.advance(None);
+    assert_eq!(empty.pick("s".into(), 0), None);
+    assert_eq!(empty.outcome, Some(SearchPeerOutcome::NothingToCopy));
+
+    let mut unreachable = catchup_with(&[("A", 5, 0)]);
+    unreachable.advance(None);
+    unreachable.pick("s".into(), 0);
+    unreachable.advance(Some("s"));
+    assert_eq!(unreachable.pick("t".into(), 0), None);
+    assert_eq!(unreachable.outcome, Some(SearchPeerOutcome::Failed));
+}
+
+#[test]
+fn discovery_events_use_the_documented_fields() {
+    let content = ToDeviceSearchPeerEventContent {
+        session: "s".into(),
+        timestamp: 1,
+        kind: Discovery::Info {
+            documents: 2,
+            complete_rooms: 3,
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(&content).unwrap(),
+        serde_json::json!({
+            "session": "s",
+            "timestamp": 1,
+            "kind": "info",
+            "documents": 2,
+            "complete_rooms": 3,
+        })
+    );
+    let request: ToDeviceSearchPeerEventContent = serde_json::from_value(
+        serde_json::json!({"session": "s", "timestamp": 1, "kind": "request"}),
+    )
+    .unwrap();
+    assert_eq!(request.kind, Discovery::Request);
 }
 
 #[tokio::test]
-async fn discovery_is_rate_limited_in_the_core() {
-    let (core, _) = Core::new(
-        "peer-rate-limit",
+async fn each_device_gets_one_served_session_and_the_rest_wait() {
+    let (core, mut events) = Core::new(
+        "peer-serve",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    core.search_sharing.enabled.store(true, Ordering::Relaxed);
-    core.set_search_network_unmetered(true);
-    let now = now_ms();
-    core.search_sharing.last_start.store(now, Ordering::Relaxed);
-    core.start_search_peers().await.unwrap();
-    core.search_sharing
-        .last_start
-        .store(now.saturating_sub(RETRY_MS), Ordering::Relaxed);
-    assert!(matches!(
-        core.start_search_peers().await,
-        Err(RpcError::NotLoggedIn)
-    ));
+    let generation = core.session_generation.load(Ordering::SeqCst);
+    core.serve_search_peer(generation, "a1".into(), "A".into());
+    core.serve_search_peer(generation, "a2".into(), "A".into());
+    core.serve_search_peer(generation, "b1".into(), "B".into());
+    core.serve_search_peer(generation, "c1".into(), "C".into());
+    let mut slots: Vec<_> = core.search_sharing.slots.lock().keys().cloned().collect();
+    slots.sort();
+    assert_eq!(slots, ["a2", "b1"]);
+    let mut signals = Vec::new();
+    while let Ok(CoreEvent::Rtc {
+        session_id, signal, ..
+    }) = events.try_recv()
+    {
+        signals.push((session_id, signal));
+    }
+    assert_eq!(
+        signals,
+        [
+            ("a1".into(), RtcSignal::Open),
+            ("a1".into(), RtcSignal::Close),
+            ("a2".into(), RtcSignal::Open),
+            ("b1".into(), RtcSignal::Open),
+        ]
+    );
 }
 
 #[test]
@@ -120,27 +239,29 @@ async fn a_stale_peer_does_not_replace_a_newer_local_edit() {
 }
 
 #[tokio::test]
-async fn discovery_keeps_active_transfers_and_metered_policy_closes_them() {
+async fn metered_policy_interrupts_a_copy_and_reports_the_pause() {
     let (core, mut events) = Core::new(
         "peer-policy",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    let peers = &core.search_sharing;
-    peers.enabled.store(true, Ordering::Relaxed);
-    peers
-        .peers
-        .lock()
-        .insert("session".into(), Peer::new("DEVICE".into(), true, now_ms()));
+    let sharing = &core.search_sharing;
+    sharing.enabled.store(true, Ordering::Relaxed);
+    core.set_search_network_unmetered(true);
+    sharing.slots.lock().insert(
+        "session".into(),
+        Slot::new(Role::Requester, "DEVICE".into(), now_ms()),
+    );
+    *sharing.catchup.lock() = catchup_with(&[("DEVICE", 5, 0)]);
+    sharing.catchup.lock().advance(None);
+    sharing.catchup.lock().pick("session".into(), now_ms());
     core.open_rtc(
         RtcPurpose::SearchSharing,
         "session".into(),
         "DEVICE".into(),
-        true,
+        false,
     );
-    core.start_search_peers().await.unwrap();
-    assert!(peers.peers.lock().contains_key("session"));
     core.set_search_network_unmetered(false);
-    assert!(peers.peers.lock().is_empty());
+    assert!(sharing.slots.lock().is_empty());
     assert!(matches!(
         events.recv().await,
         Some(CoreEvent::Rtc {
@@ -148,6 +269,10 @@ async fn discovery_keeps_active_transfers_and_metered_policy_closes_them() {
             ..
         })
     ));
+    let view = core.search_sharing_view().await;
+    assert_eq!(view.state, SearchPeerState::Idle);
+    assert_eq!(view.pause, Some(SearchPeerPause::Metered));
+    assert_eq!(view.outcome, Some(SearchPeerOutcome::Interrupted));
     core.exchange_search_peer("session", None)
         .await
         .unwrap_err();
@@ -172,7 +297,9 @@ async fn live_core(
         homeserver: client.homeserver().to_string(),
         oauth: false,
     });
-    core.watch_search_peers(client, core.session_generation.load(Ordering::SeqCst));
+    let generation = core.session_generation.load(Ordering::SeqCst);
+    core.watch_search_peers(client, generation);
+    core.watch_rtc(client, generation);
     (core, events)
 }
 
@@ -240,39 +367,46 @@ async fn verified_devices_copy_history_and_changes() {
     reader.sync_once(SyncSettings::default()).await.unwrap();
     trust(&source, &reader).await;
     trust(&reader, &source).await;
-    let (writer, _writer_events) = live_core(&source, "peer-source").await;
-    let (target, mut target_events) = live_core(&reader, "peer-reader").await;
+    let (writer, mut writer_events) = live_core(&source, "peer-source").await;
+    let (target, _target_events) = live_core(&reader, "peer-reader").await;
     crawl_to_start(&writer, &source, &room).await;
     writer.start_search_peers().await.unwrap();
-    target.start_search_peers().await.unwrap();
-    for _ in 0..3 {
-        for client in [&source, &reader] {
-            client
-                .sync_once(SyncSettings::default().timeout(Duration::from_millis(100)))
-                .await
-                .unwrap();
-        }
-    }
-    let id = tokio::time::timeout(Duration::from_secs(5), async {
-        while let Some(event) = target_events.recv().await {
-            if let CoreEvent::Rtc {
-                session_id,
-                sender: true,
-                signal: RtcSignal::Open,
-            } = event
-            {
-                return session_id;
+    target.find_search_peers().await.unwrap();
+    let id = tokio::time::timeout(Duration::from_secs(40), async {
+        loop {
+            for client in [&source, &reader] {
+                client
+                    .sync_once(SyncSettings::default().timeout(Duration::from_millis(100)))
+                    .await
+                    .unwrap();
             }
+            while let Ok(event) = writer_events.try_recv() {
+                if let CoreEvent::Rtc {
+                    session_id,
+                    purpose: RtcPurpose::SearchSharing,
+                    sender: true,
+                    signal: RtcSignal::Open,
+                } = event
+                {
+                    return session_id;
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
         }
-        panic!("event channel closed");
     })
     .await
     .unwrap();
+    let view = target.search_sharing_view().await;
+    assert_eq!(view.state, SearchPeerState::Connecting);
+    assert_eq!(view.candidates.len(), 1);
     assert_eq!(needles(&target, &room).await, 0);
     assert!(exchange(&writer, &target, &id).await >= 2);
     assert_eq!(needles(&target, &room).await, 30);
     assert!(target.search_crawl.lock().await.cover_of(&room).is_some());
-    assert_eq!(target.search_sharing.view().rooms_received, 1);
+    let view = target.search_sharing_view().await;
+    assert_eq!(view.rooms_received, 1);
+    assert_eq!(view.outcome, Some(SearchPeerOutcome::Completed));
+    assert_eq!(view.last_copy.map(|copy| copy.rooms), Some(1));
     assert_eq!(exchange(&writer, &target, &id).await, 0);
 
     let event_id = super::super::settled_history(&source, &room)
@@ -380,6 +514,6 @@ async fn browsers_transfer_verified_search_history() {
     .await;
     assert_eq!(needles(&target, &room).await, 60);
     assert!(target.search_crawl.lock().await.cover_of(&room).is_some());
-    assert!(writer.search_sharing.peers.lock().is_empty());
-    assert!(target.search_sharing.peers.lock().is_empty());
+    assert!(writer.search_sharing.slots.lock().is_empty());
+    assert!(target.search_sharing.slots.lock().is_empty());
 }
