@@ -600,7 +600,7 @@ impl Core {
             .await?
             .send_state_event_raw(event_type, state_key, content)
             .await
-            .map_err(|error| self.room_error("send_state_event", error))?;
+            .or_failed(self, "send_state_event")?;
         self.pack_cache
             .lock()
             .await
@@ -697,7 +697,7 @@ impl Core {
         let stored = self
             .with_open_stores(async || room.get_state_events(event_type.into()).await)
             .await
-            .map_err(|error| self.room_error("room_state_events", error))?;
+            .or_failed(self, "room_state_events")?;
 
         let events: Vec<RoomStateEventView> = stored
             .iter()
@@ -730,7 +730,7 @@ impl Core {
         let snapshot = self
             .room_state_snapshot(&client, room.room_id())
             .await
-            .map_err(|error| self.room_error("room_state_events", error))?;
+            .or_failed(self, "room_state_events")?;
         let state = room_state_by_type(&snapshot);
         let events = state.get(event_type).cloned().unwrap_or_default();
         self.probed_state().remember_full(room_id, state);
@@ -795,7 +795,7 @@ impl Core {
             Ok(response) => state_event_content(response.event_or_content.get()),
             Err(error) if error.client_api_error_kind() == Some(&ErrorKind::NotFound) => None,
             Err(error) => {
-                return Err(self.room_error("room_state_event", error.into()));
+                return Err(self.rpc_error("room_state_event", &error));
             }
         };
         self.probed_state()

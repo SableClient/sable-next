@@ -67,7 +67,7 @@ fn change_password_request(
 }
 
 impl Core {
-    fn password_reset_error(&self, context: &str, error: matrix_sdk::HttpError) -> RpcError {
+    fn password_reset_error(&self, context: &str, error: &matrix_sdk::HttpError) -> RpcError {
         match error.client_api_error_kind() {
             Some(ErrorKind::ThreepidNotFound | ErrorKind::NotFound) => RpcError::UnknownEmail,
             Some(
@@ -79,7 +79,7 @@ impl Core {
             Some(kind) if kind.errcode().as_str().starts_with("M_PASSWORD_") => {
                 RpcError::WeakPassword
             }
-            _ => self.homeserver_http_error(context, error),
+            _ => self.rpc_error(context, error),
         }
     }
 
@@ -110,7 +110,7 @@ impl Core {
         let response = client
             .send(request)
             .await
-            .map_err(|error| self.password_reset_error("password_reset_email", error))?;
+            .map_err(|error| self.password_reset_error("password_reset_email", &error))?;
         Ok(RequestPasswordResetEmailOk {
             client_secret: client_secret.to_string(),
             sid: response.sid.to_string(),
@@ -141,7 +141,7 @@ impl Core {
             Ok(_) => return Ok(()),
             Err(error) => match error.as_uiaa_response() {
                 Some(info) => info.clone(),
-                None => return Err(self.password_reset_error("reset_password", error)),
+                None => return Err(self.password_reset_error("reset_password", &error)),
             },
         };
         if !offers_email_identity(&info) {
@@ -162,7 +162,7 @@ impl Core {
             Err(error) if error.as_uiaa_response().is_some() => {
                 Err(RpcError::EmailVerificationFailed)
             }
-            Err(error) => Err(self.password_reset_error("reset_password", error)),
+            Err(error) => Err(self.password_reset_error("reset_password", &error)),
         }
     }
 }

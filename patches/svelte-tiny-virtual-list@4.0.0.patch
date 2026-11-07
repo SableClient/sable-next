@@ -1,0 +1,12 @@
+diff --git a/dist/VirtualList.svelte b/dist/VirtualList.svelte
+index f130ed9609d77fbb67907228e50facec61430e80..2e665f1fca4f3e03b3632d8978ba858fce475573 100644
+--- a/dist/VirtualList.svelte
++++ b/dist/VirtualList.svelte
+@@ -104,6 +104,7 @@
+ 		wrapper.addEventListener('scroll', handleScrollAsync, options);
+ 
+ 		return () => {
++			if (frame !== undefined) cancelAnimationFrame(frame);
+ 			// @ts-expect-error because options is not really needed, but maybe in the future
+ 			wrapper.removeEventListener('scroll', handleScrollAsync, options);
+ 		};

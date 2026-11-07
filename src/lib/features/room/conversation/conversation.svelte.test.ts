@@ -60,6 +60,7 @@ function setup(
   const sendGesture = vi.fn(() => Promise.resolve());
   const toggleReaction = vi.fn(() => Promise.resolve());
   const urlPreview = vi.fn(() => Promise.resolve(null));
+  const setTyping = vi.fn((..._args: unknown[]) => Promise.resolve());
   const core = {
     session: { user_id: userId },
     media: {
@@ -78,6 +79,7 @@ function setup(
         sendGesture,
         react: toggleReaction,
         urlPreview,
+        setTyping,
       },
       account: {},
     },
@@ -113,6 +115,7 @@ function setup(
     sendGesture,
     toggleReaction,
     urlPreview,
+    setTyping,
     timeline,
     conversation: new Conversation({
       core,
@@ -160,6 +163,21 @@ test('quick reactions resume live before choosing the latest message', async () 
     persona: null,
   });
   expect(fixture.sendMessage).not.toHaveBeenCalled();
+});
+
+test.each(['', '#alias:example.org', 'room'])(
+  'typing is not announced to %j, which is not a room id',
+  async (target) => {
+    const fixture = setup([], '@kris:example.org');
+    await fixture.conversation.setTyping(target, true);
+    expect(fixture.setTyping).not.toHaveBeenCalled();
+  }
+);
+
+test('typing is announced to a room id', async () => {
+  const fixture = setup([], '@kris:example.org');
+  await fixture.conversation.setTyping(ROOM, true);
+  expect(fixture.setTyping).toHaveBeenCalledWith({ room_id: ROOM, typing: true });
 });
 
 test('quick reactions do nothing in an empty room', async () => {

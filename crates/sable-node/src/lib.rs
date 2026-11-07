@@ -25,7 +25,10 @@ use napi::{
 use napi_derive::napi;
 use sable_core::{
     Core,
-    binding::{DEFAULT_LOG_FILTER, EVENT_BATCH_LIMIT, encode_event_batch, rpc_error_json},
+    binding::{
+        DEFAULT_LOG_FILTER, EVENT_BATCH_LIMIT, REPORTED_LOG_MARK, encode_event_batch,
+        is_reported_event, rpc_error_json,
+    },
     protocol::{CoreEvent, RpcError},
     store::ExclusiveFileSessionStore,
 };
@@ -45,6 +48,7 @@ fn js_err(error: &RpcError) -> napi::Error {
 
 struct JsLogWriter {
     capturing: bool,
+    reported: bool,
     line: String,
 }
 
@@ -68,10 +72,11 @@ impl Drop for JsLogWriter {
         }
         let handler = LOG_HANDLER.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(handler) = handler.as_ref() {
-            handler.call(
-                std::mem::take(&mut self.line),
-                ThreadsafeFunctionCallMode::NonBlocking,
-            );
+            let mut line = std::mem::take(&mut self.line);
+            if self.reported {
+                line.insert(0, REPORTED_LOG_MARK);
+            }
+            handler.call(line, ThreadsafeFunctionCallMode::NonBlocking);
         }
     }
 }
@@ -84,15 +89,18 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeJsLogWriter {
     fn make_writer(&'a self) -> Self::Writer {
         JsLogWriter {
             capturing: LOG_CAPTURE.load(Ordering::Relaxed),
+            reported: false,
             line: String::new(),
         }
     }
 
     fn make_writer_for(&'a self, meta: &tracing::Metadata<'_>) -> Self::Writer {
+        let reported = is_reported_event(meta);
         JsLogWriter {
             capturing: LOG_CAPTURE.load(Ordering::Relaxed)
                 || meta.level() == &tracing::Level::ERROR
-                || sable_core::binding::is_reported_warning(meta),
+                || reported,
+            reported,
             line: String::new(),
         }
     }

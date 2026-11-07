@@ -9,6 +9,7 @@ import {
   type RemoteParticipant,
   CryptorError,
   CryptorErrorReason,
+  DisconnectReason,
   RoomEvent,
   Track,
   type TrackPublication,
@@ -42,7 +43,8 @@ import {
   videoPublishOptions,
   videoResolution,
 } from './video-quality';
-import type { CallTelemetry } from './call-telemetry';
+import { isExpectedDeviceError, type CallTelemetry } from './call-telemetry';
+import { routeLivekitLogs } from './livekit-logging';
 
 const qualityOf = (quality: ConnectionQuality): CallConnectionQuality => {
   switch (quality) {
@@ -102,16 +104,16 @@ const defaultWorker = (): Worker =>
 // Senders keep using their previous key for a few seconds after rotating.
 const MISSING_KEY_GRACE_MS = 10_000;
 
-const keyFaultOf = (error: unknown): 'missing_key' | 'invalid_key' | undefined => {
+const encryptionFaultOf = (error: unknown): 'missing_key' | 'invalid_key' | 'error' => {
   if (error instanceof CryptorError) {
     if (error.reason === CryptorErrorReason.MissingKey) return 'missing_key';
     if (error.reason === CryptorErrorReason.InvalidKey) return 'invalid_key';
-    return undefined;
+    return 'error';
   }
-  if (!(error instanceof Error)) return undefined;
+  if (!(error instanceof Error)) return 'error';
   if (error.message.startsWith('MissingKey: ')) return 'missing_key';
   if (error.message.startsWith('InvalidKey: ')) return 'invalid_key';
-  return undefined;
+  return 'error';
 };
 
 // Chrome rejects a BUNDLE whose Opus sections share a payload type with different
@@ -134,6 +136,7 @@ const DISPLAY_AUDIO_CAPTURE: ScreenShareCaptureOptions = {
 };
 
 export function createLivekitTransport(options: LivekitTransportOptions): LivekitTransport {
+  routeLivekitLogs();
   const keyProvider = options.encryptMedia ? new MatrixKeyProvider() : undefined;
   const worker = keyProvider ? (options.createWorker ?? defaultWorker)() : undefined;
   const voiceIsolation = preferences.noiseSuppression && preferences.voiceIsolation;
@@ -390,8 +393,9 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     .on(RoomEvent.Disconnected, (reason) => {
       missingKeys.clear();
       void stopSharingAudio();
-      publish({ connection: 'disconnected', participants: [] });
-      event('call.connection.disconnected', { 'call.disconnect_reason': reason ?? -1 });
+      const disconnectReason = reason === undefined ? 'UNKNOWN' : DisconnectReason[reason];
+      publish({ connection: 'disconnected', participants: [], disconnectReason });
+      event('call.connection.disconnected', { 'call.disconnect_reason': disconnectReason });
       healthGeneration += 1;
       if (healthTimer) clearTimeout(healthTimer);
       healthTimer = undefined;
@@ -400,30 +404,26 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       event('call.connection.state', { 'call.connection_state': connectionState });
     })
     .on(RoomEvent.EncryptionError, (error, participant) => {
-      const keyFault = keyFaultOf(error);
-      if (keyFault) {
-        const identity =
-          participant?.identity ??
-          (error instanceof CryptorError ? error.participantIdentity : undefined) ??
-          '';
-        const now = Date.now();
-        const streak = missingKeys.get(identity);
-        if (!streak || now - streak.last > MISSING_KEY_GRACE_MS) {
-          missingKeys.set(identity, { since: now, last: now, reported: false });
-          event(`call.encryption.${keyFault}_frame`);
-          return;
-        }
-        streak.last = now;
-        if (streak.reported || now - streak.since < MISSING_KEY_GRACE_MS) return;
-        streak.reported = true;
-        fail(`call.encryption.${keyFault}`, error);
+      const fault = encryptionFaultOf(error);
+      const identity =
+        participant?.identity ??
+        (error instanceof CryptorError ? error.participantIdentity : undefined) ??
+        '';
+      const now = Date.now();
+      const streak = missingKeys.get(identity);
+      if (!streak || now - streak.last > MISSING_KEY_GRACE_MS) {
+        missingKeys.set(identity, { since: now, last: now, reported: false });
+        event(`call.encryption.${fault}_frame`);
         return;
       }
-      fail('call.encryption.error', error);
+      streak.last = now;
+      if (streak.reported || now - streak.since < MISSING_KEY_GRACE_MS) return;
+      streak.reported = true;
+      fail(`call.encryption.${fault}`, error);
     })
     .on(RoomEvent.MediaDevicesError, (error) => {
-      if (error.name === 'NotAllowedError') {
-        event('call.media.device_denied');
+      if (isExpectedDeviceError(error.name)) {
+        event('call.media.device_denied', { 'call.error_name': error.name });
         return;
       }
       fail('call.media.device_error', error);

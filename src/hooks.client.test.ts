@@ -25,6 +25,7 @@ vi.mock('#src/transport', () => ({
 }));
 vi.mock('#lib/model/model.js', () => ({
   loadModel: vi.fn(() => Promise.resolve()),
+  ModelAssetError: class ModelAssetError extends Error {},
 }));
 
 afterEach(() => {

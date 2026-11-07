@@ -11,40 +11,13 @@ export function wasmLogLevel(line: string): WasmLogLevel {
   return 'info';
 }
 
-/**
- * Only warnings in the SDK, but the room keys they carried are lost. Our own
- * code marks such warnings with `reported = true` instead.
- */
-const REPORTED_SDK_WARNINGS = [
-  'matrix_sdk_crypto::olm::account:',
-  'matrix_sdk_crypto::session_manager::sessions:',
-  'matrix_sdk_crypto::session_manager::group_sessions:',
-  'matrix_sdk_crypto::gossiping::',
-];
+/** Starts a line the Rust side decided to report, see `REPORTED_LOG_MARK` in `binding.rs`. */
+const REPORTED_MARK = '\u001e';
 const REPORTED_FIELD = /\sreported=true\b/;
 
-/** Warnings that explain a message or a call that could not be decrypted. */
-export function isReportableCoreWarning(line: string): boolean {
-  return (
-    wasmLogLevel(line) === 'warn' &&
-    (REPORTED_FIELD.test(line) || REPORTED_SDK_WARNINGS.some((target) => line.includes(target)))
-  );
-}
-
-const UNREACHABLE =
-  /Failed to fetch|Load failed|NetworkError|error sending request\b|tcp connect error|dns error|connection (?:refused|reset|closed)|operation timed out/i;
-const SERVER_UNAVAILABLE = /status_code:\s*(?:429|5\d\d)\b|returned an error: \[(?:429|5\d\d)\b/;
-
-export function isExpectedCoreFailure(line: string): boolean {
-  return (
-    UNREACHABLE.test(line) ||
-    SERVER_UNAVAILABLE.test(line) ||
-    /invalid_grant|refresh token was rejected/.test(line) ||
-    line.includes('Failed to return /publicRooms') ||
-    line.includes('The store is closed') ||
-    line.includes('the signed one-time key was missing') ||
-    line.includes('room_latest_events: Room is unknown')
-  );
+export function readCoreLine(line: string): { text: string; reported: boolean } {
+  const reported = line.startsWith(REPORTED_MARK);
+  return { text: reported ? line.slice(REPORTED_MARK.length) : line, reported };
 }
 
 function withoutSpans(line: string): string {

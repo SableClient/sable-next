@@ -517,7 +517,7 @@ export class Conversation {
   };
 
   readonly setTyping = async (targetRoomId: string, typing: boolean): Promise<void> => {
-    if (!preferences.sendTypingNotifications) return;
+    if (!preferences.sendTypingNotifications || !targetRoomId.startsWith('!')) return;
     await this.#core.rpc.messages.setTyping({ room_id: targetRoomId, typing });
   };
 

@@ -3,17 +3,21 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 vi.mock('../worker/core.worker.ts?sharedworker&url', () => ({ default: 'core.worker.js' }));
 vi.mock('#src/generated/wasm/sable_wasm_version.js', () => ({ default: 'test-wasm-version' }));
 
-const { captureException, startSpan, startInactiveSpan, endCoreSpan } = vi.hoisted(() => ({
-  captureException: vi.fn<(error: unknown, context?: unknown) => void>(),
-  endCoreSpan: vi.fn(),
-  startSpan: vi.fn<typeof import('@sentry/sveltekit').startSpan>(),
-  startInactiveSpan: vi.fn<typeof import('@sentry/sveltekit').startInactiveSpan>(),
-}));
+const { captureException, addBreadcrumb, startSpan, startInactiveSpan, endCoreSpan } = vi.hoisted(
+  () => ({
+    captureException: vi.fn<(error: unknown, context?: unknown) => void>(),
+    addBreadcrumb: vi.fn<(breadcrumb: unknown) => void>(),
+    endCoreSpan: vi.fn(),
+    startSpan: vi.fn<typeof import('@sentry/sveltekit').startSpan>(),
+    startInactiveSpan: vi.fn<typeof import('@sentry/sveltekit').startInactiveSpan>(),
+  })
+);
 vi.mock('@sentry/sveltekit', async (importOriginal) => {
   const sentry = await importOriginal<typeof import('@sentry/sveltekit')>();
   return {
     ...sentry,
     captureException,
+    addBreadcrumb,
     startSpan: startSpan.mockImplementation(sentry.startSpan),
     startInactiveSpan: startInactiveSpan.mockImplementation((options) => {
       const span = sentry.startInactiveSpan(options);
@@ -622,7 +626,7 @@ test('reports new core errors after twenty distinct failures', async () => {
   captureException.mockClear();
   const logs = Array.from(
     { length: 26 },
-    (_, index) => `ERROR failure_${String.fromCharCode(97 + index)}`
+    (_, index) => `\u001eERROR sable_core: failure_${String.fromCharCode(97 + index)}`
   );
   FakeSharedWorker.last?.port.receive({ logs });
   expect(captureException).toHaveBeenCalledTimes(26);
@@ -637,7 +641,7 @@ test('reports an undecryptable message once per megolm session, grouped together
   const restored = transport.call('session.restore', {}).catch(() => undefined);
   captureException.mockClear();
   const utd = (session: string) =>
-    `WARN sable_core::utd: unable to decrypt a message reported=true cause=Unknown megolm_session="${session}"`;
+    `\u001eWARN sable_core::utd: unable to decrypt a message reported=true cause=Unknown megolm_session="${session}"`;
   FakeSharedWorker.last?.port.receive({ logs: [utd('0a1b2c3d4e5f'), utd('0a1b2c3d4e5f')] });
   FakeSharedWorker.last?.port.receive({ logs: [utd('ffeeddccbbaa')] });
   expect(captureException).toHaveBeenCalledTimes(2);
@@ -645,6 +649,23 @@ test('reports an undecryptable message once per megolm session, grouped together
     ([, context]) => (context as { fingerprint: string[] }).fingerprint
   );
   expect(first).toEqual(second);
+  transport.close();
+  await restored;
+});
+
+test('keeps errors that are not ours as breadcrumbs', async () => {
+  const transport = await load();
+  const restored = transport.call('session.restore', {}).catch(() => undefined);
+  captureException.mockClear();
+  addBreadcrumb.mockClear();
+  FakeSharedWorker.last?.port.receive({
+    logs: [
+      'ERROR matrix_sdk_ui::sync_service: Error while processing room list',
+      'WARN matrix_sdk_crypto::gossiping::machine: key request from an unknown device',
+    ],
+  });
+  expect(captureException).not.toHaveBeenCalled();
+  expect(addBreadcrumb).toHaveBeenCalledTimes(2);
   transport.close();
   await restored;
 });

@@ -15,7 +15,13 @@ import type {
   CallTransportCapabilities,
   CallTransportState,
 } from './call-transport';
-import { decodeCallKey, idleTransportState, ignoreError, ScreenAudioError } from './call-transport';
+import {
+  decodeCallKey,
+  idleTransportState,
+  ignoreError,
+  ScreenAudioError,
+  TransportDisconnectError,
+} from './call-transport';
 import { acquireCallOwner, type CallOwnerLease } from './call-owner';
 import type { LivekitTransport } from './livekit-transport';
 import { createNativeTransport } from './native-transport';
@@ -298,7 +304,7 @@ export class CallSession {
         this.#deps.e2eeSupported ?? (await import('./key-provider')).isCallE2eeSupported;
       if (attempt !== this.#attemptGeneration) return;
       if (grant.encrypt_media && !supported()) {
-        telemetry.failure('call.encryption.unsupported', new Error('OperationError'));
+        telemetry.terminal('call.encryption.unsupported', new Error('e2ee-unsupported'));
         await this.#teardown();
         this.#fail('e2ee-unsupported');
         telemetry.finish('failed');
@@ -371,7 +377,10 @@ export class CallSession {
           telemetry.event('call.transport.state', { 'call.connection': state.connection });
         }
         if (state.connection === 'disconnected' && this.lifecycle === 'active') {
-          telemetry.failure('call.transport.disconnected', new Error('OperationError'));
+          telemetry.terminal(
+            'call.transport.disconnected',
+            new TransportDisconnectError(state.disconnectReason ?? 'UNKNOWN')
+          );
           this.lifecycle = 'leaving';
           void this.#teardown().then(() => {
             if (this.lifecycle === 'leaving') {
@@ -388,7 +397,7 @@ export class CallSession {
           telemetry.event('call.encryption.key_import', {
             'call.key_import_failure': keyState.lastFailure,
           });
-          telemetry.failure('call.encryption.key_import', new Error('OperationError'));
+          telemetry.failure('call.encryption.key_import', new Error('key-import-failed'));
           this.#ownKey?.reject(new Error('own-key-failed'));
           this.#ownKey = undefined;
           return;
@@ -454,7 +463,7 @@ export class CallSession {
       telemetry.finish('connected');
     } catch (error) {
       if (attempt !== this.#attemptGeneration) return;
-      telemetry.failure('call.join', error);
+      telemetry.terminal('call.join', error);
       await this.#teardown();
       this.#fail(this.#classify(error));
       telemetry.finish('failed');
@@ -702,8 +711,12 @@ export class CallSession {
     if (this.#session === undefined || event.session !== this.#session) return;
 
     if (event.type === 'call_signaling_error') {
-      this.#telemetry?.failure(`call.signaling.${event.stage}`, new Error('OperationError'));
-      if (!event.fatal || this.lifecycle === 'idle' || this.lifecycle === 'leaving') return;
+      const signalingError = new Error('signaling-error');
+      if (!event.fatal || this.lifecycle === 'idle' || this.lifecycle === 'leaving') {
+        this.#telemetry?.failure(`call.signaling.${event.stage}`, signalingError);
+        return;
+      }
+      this.#telemetry?.terminal(`call.signaling.${event.stage}`, signalingError);
       ++this.#attemptGeneration;
       this.#backendEnded = true;
       this.lifecycle = 'leaving';
@@ -775,8 +788,8 @@ export class CallSession {
       () => {
         if (event.own) this.#markReady();
       },
-      () => {
-        this.#telemetry?.failure('call.encryption.key_import', new Error('OperationError'));
+      (error: unknown) => {
+        this.#telemetry?.failure('call.encryption.key_import', error);
         this.#ownKey?.reject(new Error('own-key-failed'));
         this.#ownKey = undefined;
       }

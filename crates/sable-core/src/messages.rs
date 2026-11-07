@@ -637,7 +637,7 @@ impl Core {
             {
                 return Ok(Vec::new());
             }
-            Err(error) => return Err(self.homeserver_http_error(context, error)),
+            Err(error) => return Err(self.rpc_error(context, &error)),
         };
         let lenient = response
             .into_content()
@@ -677,7 +677,7 @@ impl Core {
         if changed {
             room.send_state_event(RoomPinnedEventsEventContent::new(events))
                 .await
-                .map_err(|error| self.room_error("set_pinned", error))?;
+                .or_failed(self, "set_pinned")?;
         }
 
         let events = self.load_pinned(&room, "set_pinned").await?;
@@ -711,7 +711,7 @@ impl Core {
             .await?
             .send(report_room::v3::Request::new(room_id, reason))
             .await
-            .map_err(|error| self.homeserver_http_error("report_room", error))?;
+            .or_failed(self, "report_room")?;
         Ok(())
     }
 
@@ -723,7 +723,7 @@ impl Core {
             .await?
             .send(report_user::v3::Request::new(user_id, reason))
             .await
-            .map_err(|error| self.homeserver_http_error("report_user", error))?;
+            .or_failed(self, "report_user")?;
         Ok(())
     }
 
@@ -738,7 +738,7 @@ impl Core {
             .await?
             .event(event_id, None)
             .await
-            .map_err(|error| self.room_error("event_source", error))?;
+            .or_failed(self, "event_source")?;
 
         let encrypted = event.encryption_info().is_some();
         let original = if encrypted && include_original {

@@ -5,9 +5,11 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 const check = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
 vi.mock('$app/state', () => ({ updated: { check } }));
 
+import { ModelAssetError } from '#lib/model/model.js';
 import {
   installDynamicImportRecovery,
-  recoverStaleDynamicImport,
+  isReloadingForNewBuild,
+  recoverStaleAsset,
 } from './dynamic-import-recovery.js';
 
 beforeEach(() => {
@@ -24,13 +26,14 @@ afterEach(() => {
 test.each([
   'Failed to fetch dynamically imported module',
   'Error loading dynamically imported module',
+  'Importing a module script failed.',
   'Unable to preload CSS for https://next.sable.moe/_app/immutable/assets/TextArea.css',
 ])('reloads once for %s when the build is stale', async (message) => {
   const reload = vi.fn();
   vi.stubGlobal('location', { reload });
   vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
 
-  await expect(recoverStaleDynamicImport(new Error(message))).resolves.toBe(true);
+  await expect(recoverStaleAsset(new Error(message))).resolves.toBe(true);
 
   expect(reload).toHaveBeenCalledOnce();
 });
@@ -41,7 +44,7 @@ test('does not reload for a transient failure on an unchanged build', async () =
   check.mockResolvedValue(false);
 
   await expect(
-    recoverStaleDynamicImport(new Error('Failed to fetch dynamically imported module'))
+    recoverStaleAsset(new Error('Failed to fetch dynamically imported module'))
   ).resolves.toBe(false);
 
   expect(reload).not.toHaveBeenCalled();
@@ -55,7 +58,7 @@ test('does not reload again inside the recovery window', async () => {
   vi.spyOn(Date, 'now').mockReturnValue(1_000_001);
 
   await expect(
-    recoverStaleDynamicImport(new Error('Failed to fetch dynamically imported module'))
+    recoverStaleAsset(new Error('Failed to fetch dynamically imported module'))
   ).resolves.toBe(false);
 
   expect(reload).not.toHaveBeenCalled();
@@ -66,10 +69,8 @@ test('ignores errors that are not dynamic import failures', async () => {
   const reload = vi.fn();
   vi.stubGlobal('location', { reload });
 
-  await expect(recoverStaleDynamicImport({ message: 'Internal Error', status: 500 })).resolves.toBe(
-    false
-  );
-  await expect(recoverStaleDynamicImport(new Error('navigation failed'))).resolves.toBe(false);
+  await expect(recoverStaleAsset({ message: 'Internal Error', status: 500 })).resolves.toBe(false);
+  await expect(recoverStaleAsset(new Error('navigation failed'))).resolves.toBe(false);
 
   expect(check).not.toHaveBeenCalled();
   expect(reload).not.toHaveBeenCalled();
@@ -86,7 +87,7 @@ test('does not reload when storage cannot be written', async () => {
   });
 
   await expect(
-    recoverStaleDynamicImport(new Error('Failed to fetch dynamically imported module'))
+    recoverStaleAsset(new Error('Failed to fetch dynamically imported module'))
   ).resolves.toBe(false);
 
   expect(reload).not.toHaveBeenCalled();
@@ -107,4 +108,16 @@ test('the rejection listener reloads on a stale build and leaves the rejection o
 
   expect(event.defaultPrevented).toBe(false);
   stop();
+});
+
+test('reloads when the model wasm came back as a page, and stops reporting that failure', async () => {
+  const reload = vi.fn();
+  vi.stubGlobal('location', { reload });
+  const error = new ModelAssetError(200);
+
+  await expect(recoverStaleAsset(error)).resolves.toBe(true);
+
+  expect(reload).toHaveBeenCalledOnce();
+  expect(isReloadingForNewBuild(error)).toBe(true);
+  expect(isReloadingForNewBuild(new Error('navigation failed'))).toBe(false);
 });

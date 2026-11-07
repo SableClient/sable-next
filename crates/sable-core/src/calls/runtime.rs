@@ -266,7 +266,7 @@ async fn publish(
         Err(error) => {
             drop(postpone);
             retract(core, room, own, delay).await;
-            return Err(core.room_error("join_call", error));
+            return Err(core.rpc_error("join_call", &error));
         }
     };
     let provision = if own.mode == CallMode::Matrix2 && own.wire == membership::RtcWire::Stable {

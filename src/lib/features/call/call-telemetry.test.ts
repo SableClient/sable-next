@@ -26,6 +26,7 @@ vi.mock('@sentry/sveltekit', () => ({
 }));
 
 import { CallTelemetry } from './call-telemetry';
+import { TransportDisconnectError } from './call-transport';
 
 beforeEach(() => {
   telemetryMock.spans.length = 0;
@@ -56,7 +57,7 @@ test('records a bounded sanitized failure with the attempt correlation', async (
   await expect(
     telemetry.step('call.transport.connect', () => Promise.reject(new Error(secret)))
   ).rejects.toThrow(secret);
-  telemetry.failure('call.transport.connect', new Error(secret));
+  telemetry.terminal('call.transport.connect', new Error(secret));
   telemetry.finish('failed');
 
   expect(telemetryMock.captureException).toHaveBeenCalledOnce();
@@ -64,7 +65,7 @@ test('records a bounded sanitized failure with the attempt correlation', async (
     { message: string },
     { contexts: { call: Record<string, unknown> } },
   ];
-  expect(error.message).toBe('Call operation failed: call.transport.connect');
+  expect(error.message).toBe('Call failed: call.transport.connect');
   expect(context.contexts.call).toMatchObject({
     'call.stage': 'call.transport.connect',
     'call.error_category': 'error.Error',
@@ -81,7 +82,7 @@ test('records a safe native command code without its private detail', () => {
     detail: { code: 'unavailable' },
   });
 
-  telemetry.failure('call.signaling.join', error);
+  telemetry.terminal('call.signaling.join', error);
 
   const [, context] = telemetryMock.captureException.mock.calls[0] as [
     Error,
@@ -104,17 +105,116 @@ test('keeps matching failures from separate backends distinct', () => {
     'call.backend_id': 'second',
   });
 
-  expect(telemetryMock.captureException).toHaveBeenCalledTimes(2);
+  expect(telemetryMock.addBreadcrumb).toHaveBeenCalledTimes(2);
   for (const [index, backendId] of ['first', 'second'].entries()) {
-    expect(telemetryMock.captureException).toHaveBeenNthCalledWith(
+    expect(telemetryMock.addBreadcrumb).toHaveBeenNthCalledWith(
       index + 1,
-      expect.any(Error),
       expect.objectContaining({
-        contexts: { call: expect.objectContaining({ 'call.backend_id': backendId }) as unknown },
+        data: expect.objectContaining({ 'call.backend_id': backendId }) as unknown,
       })
     );
   }
 });
+
+test('records a failed step as a breadcrumb and an error span without an event', async () => {
+  const telemetry = new CallTelemetry();
+
+  await expect(
+    telemetry.step('call.transport.connect', () => Promise.reject(new Error('boom')))
+  ).rejects.toThrow('boom');
+  telemetry.failure('call.signaling.leave', new Error('boom'));
+
+  expect(telemetryMock.captureException).not.toHaveBeenCalled();
+  expect(telemetryMock.addBreadcrumb).toHaveBeenCalledWith(
+    expect.objectContaining({
+      category: 'call',
+      level: 'error',
+      message: 'call.transport.connect failed',
+    })
+  );
+  expect(telemetryMock.spans.filter(({ options }) => options.name === 'call.failure')).toHaveLength(
+    2
+  );
+});
+
+test('reports a terminal failure once with the stage that first failed', async () => {
+  const telemetry = new CallTelemetry();
+  const cause = new Error('rpc');
+  await expect(telemetry.step('call.signaling.join', () => Promise.reject(cause))).rejects.toBe(
+    cause
+  );
+
+  telemetry.terminal('call.join', cause);
+  telemetry.terminal('call.transport.disconnected', new Error('later'));
+
+  expect(telemetryMock.captureException).toHaveBeenCalledOnce();
+  const [error, context] = telemetryMock.captureException.mock.calls[0] as [
+    Error,
+    { fingerprint: string[]; tags: Record<string, string> },
+  ];
+  expect(error.message).toBe('Call failed: call.signaling.join');
+  expect(context.fingerprint).toEqual(['call', 'call.signaling.join', 'error.Error']);
+  expect(context.tags['call.stage']).toBe('call.signaling.join');
+});
+
+test('reports the core error code and log id of a failed RPC', () => {
+  const telemetry = new CallTelemetry();
+  const cause = Object.assign(new Error('rpc failed'), {
+    detail: { code: 'failed', log_id: 'log-123' },
+  });
+
+  telemetry.terminal('call.join', cause);
+
+  const [, context] = telemetryMock.captureException.mock.calls[0] as [
+    Error,
+    { contexts: { call: Record<string, unknown> }; fingerprint: string[] },
+  ];
+  expect(context.contexts.call).toMatchObject({
+    'call.error_category': 'code.failed',
+    'call.log_id': 'log-123',
+  });
+  expect(context.fingerprint).toEqual(['call', 'call.join', 'code.failed']);
+});
+
+test('reports the livekit disconnect reason by name', () => {
+  const telemetry = new CallTelemetry();
+
+  telemetry.terminal(
+    'call.transport.disconnected',
+    new TransportDisconnectError('CONNECTION_TIMEOUT')
+  );
+
+  const [, context] = telemetryMock.captureException.mock.calls[0] as [
+    Error,
+    { tags: Record<string, string> },
+  ];
+  expect(context.tags['call.error_category']).toBe('disconnect.CONNECTION_TIMEOUT');
+});
+
+test.each(['NotAllowedError', 'NotFoundError', 'AbortError'])(
+  'does not report %s as a failed call',
+  (name) => {
+    const telemetry = new CallTelemetry();
+
+    telemetry.terminal('call.join', Object.assign(new Error('device'), { name }));
+
+    expect(telemetryMock.captureException).not.toHaveBeenCalled();
+    expect(telemetryMock.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'info' })
+    );
+  }
+);
+
+test.each(['CLIENT_INITIATED', 'ROOM_DELETED', 'PARTICIPANT_REMOVED'])(
+  'does not report a %s disconnect as a failed call',
+  (reason) => {
+    const telemetry = new CallTelemetry();
+
+    telemetry.terminal('call.transport.disconnected', new TransportDisconnectError(reason));
+
+    expect(telemetryMock.captureException).not.toHaveBeenCalled();
+  }
+);
 
 test('creates runtime events outside the completed join root', () => {
   const telemetry = new CallTelemetry();

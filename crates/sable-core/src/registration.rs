@@ -12,7 +12,6 @@ use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::{ClientSecret, OwnedClientSecret, OwnedSessionId, UInt};
 
 use crate::ResultExt;
-use crate::errors::retry_delay_ms;
 use crate::protocol::{RegistrationResultView, RpcError};
 use crate::session::{Credentials, PersistedSession};
 use crate::{Core, protocol, session};
@@ -241,7 +240,7 @@ impl Core {
         Ok(RegistrationResultView::Complete { user_id })
     }
 
-    fn registration_error(&self, error: matrix_sdk::Error) -> RpcError {
+    fn registration_error(&self, error: &matrix_sdk::Error) -> RpcError {
         match error.client_api_error_kind() {
             Some(ErrorKind::Forbidden | ErrorKind::ThreepidDenied) => {
                 RpcError::RegistrationUnavailable
@@ -251,13 +250,7 @@ impl Core {
             Some(ErrorKind::ThreepidInUse) => RpcError::InvalidEmail,
             Some(ErrorKind::ThreepidAuthFailed) => RpcError::EmailVerificationFailed,
             Some(ErrorKind::WeakPassword) => RpcError::WeakPassword,
-            Some(ErrorKind::LimitExceeded(limit)) => RpcError::RateLimited {
-                retry_after_ms: limit.retry_after.as_ref().and_then(retry_delay_ms),
-            },
-            _ => match error {
-                matrix_sdk::Error::Http(error) => self.homeserver_http_error("register", *error),
-                _ => self.failed("register", error),
-            },
+            _ => self.rpc_error("register", error),
         }
     }
 
@@ -413,7 +406,7 @@ impl Core {
             }
             Err(error) => {
                 let Some(info) = error.as_uiaa_response().cloned() else {
-                    return Err(self.registration_error(error));
+                    return Err(self.registration_error(&error));
                 };
                 let Some(session) = info.session.clone() else {
                     return Err(self.failed("register", "UIAA response had no session"));
@@ -542,7 +535,7 @@ impl Core {
     fn update_registration_from_error(
         &self,
         pending: &mut PendingRegistration,
-        error: matrix_sdk::Error,
+        error: &matrix_sdk::Error,
         submitted_stage: &str,
     ) -> Result<bool, RpcError> {
         let Some(info) = error.as_uiaa_response().cloned() else {
@@ -638,7 +631,7 @@ impl Core {
                 Err(error) => {
                     let progressed = match self.update_registration_from_error(
                         &mut pending,
-                        error,
+                        &error,
                         &submitted_stage,
                     ) {
                         Ok(progressed) => progressed,
@@ -731,7 +724,7 @@ impl Core {
             Ok(response) => response,
             Err(error) => {
                 self.restore_pending_registration(pending).await;
-                return Err(self.registration_error(error.into()));
+                return Err(self.registration_error(&error.into()));
             }
         };
         {
@@ -885,7 +878,7 @@ impl Core {
                 )
             })?;
         let Some(info) = error.as_uiaa_response() else {
-            return Err(self.registration_error(error));
+            return Err(self.registration_error(&error));
         };
         if info.flows.is_empty() {
             return Err(self.failed(

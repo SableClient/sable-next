@@ -3364,7 +3364,7 @@ async fn room_command_error(response: ResponseTemplate) -> Option<crate::protoco
     let (core, _events) = Core::new("errors", Box::new(MemorySessionStore::default()));
     let error = room.set_room_topic("nope").await.err()?;
 
-    Some(core.room_error("set_room_topic", error))
+    Some(core.rpc_error("set_room_topic", &error))
 }
 
 #[tokio::test]

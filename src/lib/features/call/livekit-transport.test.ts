@@ -3,6 +3,7 @@ import {
   ConnectionState,
   CryptorError,
   CryptorErrorReason,
+  DisconnectReason,
   LocalAudioTrack,
   RoomEvent,
   Track,
@@ -179,7 +180,63 @@ test('treats decryption failures during key rotation as a grace-period key fault
   );
 });
 
-test('reports other encryption errors immediately', () => {
+test('gives other encryption errors the same grace period as key faults', () => {
+  vi.useFakeTimers();
+  const { room } = roomFixture();
+  const failure = vi.fn();
+  const event = vi.fn();
+  createLivekitTransport({
+    encryptMedia: false,
+    createRoom: () => room,
+    telemetry: { step: (_stage, action) => action(), event, failure },
+  });
+  const internal = new Error('InternalError: encryption failed');
+
+  room.emit(RoomEvent.EncryptionError, internal);
+  room.emit(RoomEvent.EncryptionError, internal);
+  expect(failure).not.toHaveBeenCalled();
+  expect(event).toHaveBeenCalledWith('call.encryption.error_frame', {});
+
+  vi.advanceTimersByTime(5_000);
+  room.emit(RoomEvent.EncryptionError, internal);
+  vi.advanceTimersByTime(5_000);
+  room.emit(RoomEvent.EncryptionError, internal);
+  room.emit(RoomEvent.EncryptionError, internal);
+  expect(failure).toHaveBeenCalledExactlyOnceWith('call.encryption.error', internal, {});
+});
+
+test('publishes the livekit disconnect reason by name', () => {
+  const { room } = roomFixture();
+  const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => room });
+
+  room.emit(RoomEvent.Disconnected, DisconnectReason.CONNECTION_TIMEOUT);
+
+  expect(transport.getState()).toMatchObject({
+    connection: 'disconnected',
+    disconnectReason: 'CONNECTION_TIMEOUT',
+  });
+});
+
+test.each(['NotAllowedError', 'NotFoundError', 'AbortError'])(
+  'treats a %s device error as an expected outcome',
+  (name) => {
+    const { room } = roomFixture();
+    const failure = vi.fn();
+    const event = vi.fn();
+    createLivekitTransport({
+      encryptMedia: false,
+      createRoom: () => room,
+      telemetry: { step: (_stage, action) => action(), event, failure },
+    });
+
+    room.emit(RoomEvent.MediaDevicesError, Object.assign(new Error('device'), { name }));
+
+    expect(failure).not.toHaveBeenCalled();
+    expect(event).toHaveBeenCalledWith('call.media.device_denied', { 'call.error_name': name });
+  }
+);
+
+test('records other device errors as a step failure', () => {
   const { room } = roomFixture();
   const failure = vi.fn();
   createLivekitTransport({
@@ -187,10 +244,11 @@ test('reports other encryption errors immediately', () => {
     createRoom: () => room,
     telemetry: { step: (_stage, action) => action(), event: vi.fn(), failure },
   });
+  const error = Object.assign(new Error('busy'), { name: 'NotReadableError' });
 
-  room.emit(RoomEvent.EncryptionError, new Error('InternalError: encryption failed'));
+  room.emit(RoomEvent.MediaDevicesError, error);
 
-  expect(failure).toHaveBeenCalledExactlyOnceWith('call.encryption.error', expect.any(Error), {});
+  expect(failure).toHaveBeenCalledExactlyOnceWith('call.media.device_error', error, {});
 });
 
 beforeEach(() => {

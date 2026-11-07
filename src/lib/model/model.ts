@@ -52,14 +52,30 @@ import type {
   ZonedInstant,
 } from '#src/generated/protocol';
 import loadWasm, * as wasm from '#src/generated/wasm/sable_model.js';
+import modelWasm from '#src/generated/wasm/sable_model_bg.wasm?url';
 
 export type ArgumentDrafts = Record<string, ArgumentDraft>;
 
 let loading: Promise<unknown> | null = null;
 
+export class ModelAssetError extends Error {
+  constructor(readonly status: number) {
+    super(`model wasm unavailable: ${String(status)}`);
+    this.name = 'ModelAssetError';
+  }
+}
+
+async function fetchModel(): Promise<Response> {
+  const response = await fetch(modelWasm);
+  if (!response.ok || response.headers.get('content-type')?.includes('text/html')) {
+    throw new ModelAssetError(response.status);
+  }
+  return response;
+}
+
 /** Every call below needs this to have settled once; a failed load is retried. */
 export function loadModel(source?: Promise<Response>): Promise<unknown> {
-  const pending = (loading ??= loadWasm(source && { module_or_path: source }).catch(
+  const pending = (loading ??= loadWasm({ module_or_path: source ?? fetchModel() }).catch(
     (error: unknown) => {
       loading = null;
       throw error;

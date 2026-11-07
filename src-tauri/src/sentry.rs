@@ -99,6 +99,8 @@ fn scrub_event(mut event: Event<'static>) -> Event<'static> {
 const REPORTED_FIELDS: &[&str] = &[
     "error",
     "code",
+    "context",
+    "log_id",
     "source",
     "cause",
     "age",
@@ -174,32 +176,31 @@ fn scrub_log(mut log: sentry::protocol::Log) -> sentry::protocol::Log {
     log
 }
 
-const IGNORED_TARGETS: &[&str] = &[
+/// Fire once per room per sync response, which would drown the breadcrumbs.
+const NOISY_TARGETS: &[&str] = &[
     "matrix_sdk_base::room::display_name",
     "matrix_sdk::latest_events",
     "matrix_sdk::http_client",
 ];
 
-fn is_ignored(metadata: &tracing::Metadata<'_>) -> bool {
-    IGNORED_TARGETS
+fn is_noisy(metadata: &tracing::Metadata<'_>) -> bool {
+    NOISY_TARGETS
         .iter()
-        .any(|ignored| metadata.target().starts_with(ignored))
+        .any(|noisy| metadata.target().starts_with(noisy))
 }
 
 fn is_error_event(metadata: &tracing::Metadata<'_>) -> bool {
-    !is_ignored(metadata)
-        && (*metadata.level() == tracing::Level::ERROR
-            || sable_core::binding::is_reported_warning(metadata))
+    sable_core::binding::is_reported_event(metadata)
 }
 
 fn is_breadcrumb(metadata: &tracing::Metadata<'_>) -> bool {
-    !is_ignored(metadata)
-        && *metadata.level() == tracing::Level::WARN
-        && !sable_core::binding::is_reported_warning(metadata)
+    !is_noisy(metadata)
+        && *metadata.level() <= tracing::Level::WARN
+        && !sable_core::binding::is_reported_event(metadata)
 }
 
 fn is_log(metadata: &tracing::Metadata<'_>) -> bool {
-    !is_ignored(metadata) && *metadata.level() <= tracing::Level::WARN
+    !is_noisy(metadata) && *metadata.level() <= tracing::Level::WARN
 }
 
 pub(crate) fn tracing_layer<S>() -> impl tracing_subscriber::Layer<S>
@@ -295,7 +296,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_tauri_plugin_core_and_sdk_errors_with_warning_breadcrumbs() {
+    fn reports_only_app_and_core_errors_and_keeps_the_rest_as_breadcrumbs() {
         let transport = record(|| {
             tracing::warn!(target: "tauri_plugin_updater", "updater retry");
             tracing::error!(target: "app_lib", room_id = "!private:example.org", access_token = "secret", error = "GET /rooms/%21private%3Aexample.org/messages", "tauri command failed");
@@ -310,7 +311,14 @@ mod tests {
             .iter()
             .filter_map(sentry::Envelope::event)
             .collect();
-        assert_eq!(events.len(), 4);
+        let messages: Vec<_> = events
+            .iter()
+            .map(|event| event.message.as_deref())
+            .collect();
+        assert_eq!(
+            messages,
+            [Some("tauri command failed"), Some("core failed")]
+        );
         let sent = serde_json::to_string(&events[0]).unwrap();
         assert!(!sent.contains("private"));
         assert!(!sent.contains("secret"));
@@ -320,6 +328,17 @@ mod tests {
         assert_eq!(
             events[0].breadcrumbs.values[0].message.as_deref(),
             Some("updater retry")
+        );
+        let breadcrumbs: Vec<_> = events[1]
+            .breadcrumbs
+            .values
+            .iter()
+            .filter_map(|breadcrumb| breadcrumb.message.as_deref())
+            .collect();
+        assert!(breadcrumbs.contains(&"update failed"), "{breadcrumbs:?}");
+        assert!(
+            !breadcrumbs.contains(&"known noisy event"),
+            "{breadcrumbs:?}"
         );
         let mut logs = Vec::new();
         for envelope in envelopes.iter() {
@@ -335,6 +354,21 @@ mod tests {
         assert_eq!(logs.len(), 5);
         assert!(logs.contains(&"update failed"));
         assert!(!logs.contains(&"Error while sending request"));
+    }
+
+    #[test]
+    fn keeps_the_rpc_name_and_log_id_of_a_core_failure() {
+        let transport = record(|| {
+            tracing::error!(target: "sable_core::errors", log_id = "e7", context = "send_message", "boom");
+        });
+        let envelopes = transport.0.lock().unwrap();
+        let event = envelopes
+            .iter()
+            .find_map(sentry::Envelope::event)
+            .expect("the failure is reported");
+        let sent = serde_json::to_string(&event).unwrap();
+        assert!(sent.contains("send_message"), "{sent}");
+        assert!(sent.contains("e7"), "{sent}");
     }
 
     #[test]
@@ -354,6 +388,8 @@ mod tests {
                 "unable to decrypt a message"
             );
             tracing::warn!(target: "matrix_sdk_crypto::machine", "a routine warning");
+            tracing::warn!(target: "matrix_sdk_crypto::gossiping::machine", "a key request from an unknown device");
+            tracing::warn!(target: "matrix_sdk_crypto::session_manager::sessions", "a device is out of one-time keys");
         });
         let envelopes = transport.0.lock().unwrap();
         let events: Vec<_> = envelopes

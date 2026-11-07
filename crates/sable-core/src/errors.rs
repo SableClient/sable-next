@@ -89,73 +89,247 @@ pub(crate) trait ResultExt<T> {
 
 impl<T, E: Error + 'static> ResultExt<T> for Result<T, E> {
     fn or_failed(self, core: &Core, label: &str) -> Result<T, RpcError> {
-        self.map_err(|error| {
-            let mut cause = Some(&error as &(dyn Error + 'static));
-            while let Some(error) = cause {
-                if matches!(
-                    error.downcast_ref::<RoomSendQueueStorageError>(),
-                    Some(RoomSendQueueStorageError::EventTooLarge)
-                ) || error
-                    .downcast_ref::<matrix_sdk::Error>()
-                    .and_then(matrix_sdk::Error::client_api_error_kind)
-                    == Some(&ErrorKind::TooLarge)
-                {
-                    return RpcError::MessageTooLarge;
-                }
-                if matches!(
-                    error
-                        .downcast_ref::<matrix_sdk::Error>()
-                        .and_then(matrix_sdk::Error::client_api_error_kind),
-                    Some(ErrorKind::UnknownToken(_))
-                ) {
-                    tracing::debug!(context = label, "the access token is no longer valid");
-                    return RpcError::NotLoggedIn;
-                }
-                if matches!(
-                    error.downcast_ref::<matrix_sdk::Error>(),
-                    Some(matrix_sdk::Error::InsufficientData)
-                ) {
-                    tracing::debug!(context = label, "nothing is known about this room");
-                    return RpcError::Unavailable;
-                }
-                // Transparent SDK wrappers omit their inner error from source().
-                cause = if let Some(TimelineError::SendQueueError(inner)) =
-                    error.downcast_ref::<TimelineError>()
-                {
-                    Some(inner)
-                } else if let Some(RoomSendQueueError::StorageError(inner)) =
-                    error.downcast_ref::<RoomSendQueueError>()
-                {
-                    Some(inner)
-                } else {
-                    error.source()
-                };
-            }
-            core.failed(label, error)
-        })
+        self.map_err(|error| core.rpc_error(label, &error))
     }
 }
 
+/// An outcome the user or the homeserver caused, not a defect to act on.
+struct Expected {
+    rpc: RpcError,
+    level: tracing::Level,
+    category: &'static str,
+    message: &'static str,
+}
+
+impl Expected {
+    const fn new(
+        rpc: RpcError,
+        level: tracing::Level,
+        category: &'static str,
+        message: &'static str,
+    ) -> Self {
+        Self {
+            rpc,
+            level,
+            category,
+            message,
+        }
+    }
+
+    fn log(&self, context: &str, error: &dyn Error) {
+        let (category, message) = (self.category, self.message);
+        let error = error_chain(error);
+        match self.level {
+            tracing::Level::WARN => {
+                tracing::warn!(context, category, %error, "{message}");
+            }
+            tracing::Level::INFO => {
+                tracing::info!(context, category, %error, "{message}");
+            }
+            _ => tracing::debug!(context, category, %error, "{message}"),
+        }
+    }
+}
+
+fn http_error<'a>(error: &'a (dyn Error + 'static)) -> Option<&'a matrix_sdk::HttpError> {
+    match error.downcast_ref::<matrix_sdk::Error>() {
+        Some(matrix_sdk::Error::Http(http)) => Some(http),
+        Some(_) => None,
+        None => error.downcast_ref::<matrix_sdk::HttpError>(),
+    }
+}
+
+fn client_api_error<'a>(
+    error: &'a (dyn Error + 'static),
+) -> Option<&'a matrix_sdk::ruma::api::error::Error> {
+    error.downcast_ref::<matrix_sdk::Error>().map_or_else(
+        || {
+            error
+                .downcast_ref::<matrix_sdk::HttpError>()
+                .and_then(matrix_sdk::HttpError::as_client_api_error)
+        },
+        matrix_sdk::Error::as_client_api_error,
+    )
+}
+
+fn classify_api_error(api_error: &matrix_sdk::ruma::api::error::Error) -> Option<Expected> {
+    use tracing::Level;
+
+    let status = api_error.status_code;
+    let kind = api_error.error_kind();
+    Some(match kind {
+        Some(ErrorKind::UserLocked) => Expected::new(
+            RpcError::AccountLocked,
+            Level::WARN,
+            "locked",
+            "the account is locked",
+        ),
+        Some(ErrorKind::UserSuspended) => Expected::new(
+            RpcError::AccountSuspended,
+            Level::WARN,
+            "suspended",
+            "the account is suspended",
+        ),
+        Some(ErrorKind::UnknownToken(_) | ErrorKind::MissingToken) => Expected::new(
+            RpcError::NotLoggedIn,
+            Level::DEBUG,
+            "auth",
+            "the access token is no longer valid",
+        ),
+        Some(ErrorKind::TooLarge) => Expected::new(
+            RpcError::MessageTooLarge,
+            Level::DEBUG,
+            "too_large",
+            "the homeserver refused the size",
+        ),
+        Some(ErrorKind::LimitExceeded(limit)) => Expected::new(
+            RpcError::RateLimited {
+                retry_after_ms: limit.retry_after.as_ref().and_then(retry_delay_ms),
+            },
+            Level::WARN,
+            "rate_limited",
+            "homeserver request refused",
+        ),
+        Some(ErrorKind::Unrecognized) => Expected::new(
+            RpcError::Unsupported,
+            Level::INFO,
+            "unsupported",
+            "homeserver does not implement this endpoint",
+        ),
+        Some(ErrorKind::Forbidden) => Expected::new(
+            RpcError::Denied,
+            Level::WARN,
+            "denied",
+            "homeserver request refused",
+        ),
+        // Namespaced by an MSC, such as `UK.TIMEDOUT.MSC4406.SENDER_IGNORED`.
+        Some(kind) if !kind.errcode().as_str().starts_with("M_") => Expected::new(
+            RpcError::Denied,
+            Level::WARN,
+            "denied",
+            "homeserver request refused",
+        ),
+        _ if status.as_u16() == 429 => Expected::new(
+            RpcError::RateLimited {
+                retry_after_ms: None,
+            },
+            Level::WARN,
+            "rate_limited",
+            "homeserver request refused",
+        ),
+        _ if matches!(status.as_u16(), 401 | 403) => Expected::new(
+            RpcError::Denied,
+            Level::WARN,
+            "denied",
+            "homeserver request refused",
+        ),
+        _ if status.as_u16() == 404 => Expected::new(
+            RpcError::NotFound,
+            Level::DEBUG,
+            "not_found",
+            "the homeserver does not have it",
+        ),
+        _ if status.is_server_error() => Expected::new(
+            RpcError::Unavailable,
+            Level::WARN,
+            "server",
+            "homeserver request failed",
+        ),
+        _ => return None,
+    })
+}
+
+fn classify_one(error: &(dyn Error + 'static)) -> Option<Expected> {
+    use tracing::Level;
+
+    if matches!(
+        error.downcast_ref::<RoomSendQueueStorageError>(),
+        Some(RoomSendQueueStorageError::EventTooLarge)
+    ) {
+        return Some(Expected::new(
+            RpcError::MessageTooLarge,
+            Level::DEBUG,
+            "too_large",
+            "the event is too large to queue",
+        ));
+    }
+    if let Some(expected) = client_api_error(error).and_then(classify_api_error) {
+        return Some(expected);
+    }
+    if matches!(http_error(error), Some(matrix_sdk::HttpError::Reqwest(_)))
+        || error.is::<reqwest::Error>()
+    {
+        return Some(Expected::new(
+            RpcError::Unavailable,
+            Level::WARN,
+            "network",
+            "homeserver request failed",
+        ));
+    }
+    if matches!(
+        error.downcast_ref::<matrix_sdk::Error>(),
+        Some(matrix_sdk::Error::InsufficientData)
+    ) {
+        return Some(Expected::new(
+            RpcError::Unavailable,
+            Level::DEBUG,
+            "unknown_room",
+            "nothing is known about this room",
+        ));
+    }
+    if matches!(
+        error.downcast_ref::<TimelineError>(),
+        Some(TimelineError::UnsupportedEvent)
+    ) {
+        return Some(Expected::new(
+            RpcError::Unsupported,
+            Level::DEBUG,
+            "unsupported",
+            "the event cannot be used here",
+        ));
+    }
+    None
+}
+
+fn classify(error: &(dyn Error + 'static)) -> Option<Expected> {
+    let mut cause = Some(error);
+    while let Some(error) = cause {
+        if let Some(expected) = classify_one(error) {
+            return Some(expected);
+        }
+        // Transparent SDK wrappers omit their inner error from source().
+        cause = if let Some(TimelineError::SendQueueError(inner)) =
+            error.downcast_ref::<TimelineError>()
+        {
+            Some(inner)
+        } else if let Some(RoomSendQueueError::StorageError(inner)) =
+            error.downcast_ref::<RoomSendQueueError>()
+        {
+            Some(inner)
+        } else {
+            error.source()
+        };
+    }
+    None
+}
+
 impl Core {
+    /// The one place an error becomes an `RpcError`. What the homeserver or the
+    /// user caused stays out of the error log, which is what gets reported.
+    pub(crate) fn rpc_error(&self, context: &str, error: &(dyn Error + 'static)) -> RpcError {
+        match classify(error) {
+            Some(expected) => {
+                expected.log(context, error);
+                expected.rpc
+            }
+            None => self.failed(context, error_chain(error)),
+        }
+    }
+
     pub fn failed(&self, context: &str, error: impl Display) -> RpcError {
         let log_id = format!("e{}", self.next_log_id.fetch_add(1, Ordering::Relaxed));
         tracing::error!(log_id, context, "{error}");
         RpcError::Failed { log_id }
-    }
-
-    pub(crate) fn failed_with_source(
-        &self,
-        context: &str,
-        error: &dyn std::error::Error,
-    ) -> RpcError {
-        let mut message = error.to_string();
-        let mut source = error.source();
-        while let Some(cause) = source {
-            message.push_str(": ");
-            message.push_str(&cause.to_string());
-            source = cause.source();
-        }
-        self.failed(context, message)
     }
 
     pub(crate) fn oauth_login_error(&self, context: &str, error: &OAuthError) -> RpcError {
@@ -172,33 +346,17 @@ impl Core {
             );
             return RpcError::AuthProviderUnreachable;
         }
-        self.failed_with_source(context, error)
+        self.rpc_error(context, error)
     }
 
-    pub(crate) fn login_error(&self, error: matrix_sdk::Error) -> RpcError {
-        if error.client_api_error_kind() == Some(&ErrorKind::Forbidden) {
-            tracing::warn!(
-                operation = "password_login",
-                "homeserver rejected the credentials"
-            );
-            return RpcError::Denied;
-        }
-
-        match error {
-            matrix_sdk::Error::Http(error) => self.homeserver_http_error("login", *error),
-            _ => self.failed("login", error),
-        }
-    }
-
-    pub(crate) fn recovery_error(&self, error: RecoveryError) -> RpcError {
+    pub(crate) fn recovery_error(&self, error: &RecoveryError) -> RpcError {
         if matches!(
             error,
             RecoveryError::SecretStorage(SecretStorageError::SecretStorageKey(_))
         ) {
             return RpcError::Denied;
         }
-        if let RecoveryError::SecretStorage(SecretStorageError::ImportError { name, error }) =
-            &error
+        if let RecoveryError::SecretStorage(SecretStorageError::ImportError { name, error }) = error
         {
             tracing::warn!(
                 context = "recover_identity",
@@ -207,122 +365,30 @@ impl Core {
             );
             return RpcError::KeyStorageOutOfSync;
         }
-        self.failed("recover_identity", error)
+        self.rpc_error("recover_identity", error)
     }
 
-    pub(crate) fn profile_error(&self, error: matrix_sdk::Error) -> RpcError {
-        if error
+    pub(crate) fn profile_error(&self, error: &matrix_sdk::Error) -> RpcError {
+        if matches!(
+            error.client_api_error_kind(),
+            Some(ErrorKind::Forbidden | ErrorKind::BadJson)
+        ) || error
             .as_client_api_error()
-            .is_some_and(|api_error| api_error.status_code.as_u16() == 404)
+            .is_some_and(|api_error| api_error.status_code == http::StatusCode::NOT_FOUND)
         {
-            tracing::debug!(context = "user_profile", "the user has no profile");
-            return RpcError::Unavailable;
-        }
-        if error.client_api_error_kind() == Some(&ErrorKind::Forbidden) {
-            tracing::debug!(context = "user_profile", "the profile is not visible to us");
-            return RpcError::Unavailable;
-        }
-        if error.client_api_error_kind() == Some(&ErrorKind::BadJson) {
             tracing::debug!(
                 context = "user_profile",
-                "the homeserver rejected the remote profile"
+                "the homeserver does not show this profile"
             );
             return RpcError::Unavailable;
         }
-
-        match error {
-            matrix_sdk::Error::Http(error) => self.homeserver_http_error("user_profile", *error),
-            _ => self.failed("user_profile", error),
-        }
-    }
-
-    pub(crate) fn room_error(&self, context: &str, error: matrix_sdk::Error) -> RpcError {
-        match error.client_api_error_kind() {
-            Some(ErrorKind::Forbidden) => {
-                tracing::warn!(context, category = "denied", "room operation refused");
-                return RpcError::Denied;
-            }
-            Some(ErrorKind::LimitExceeded(limit)) => {
-                let retry_after_ms = limit.retry_after.as_ref().and_then(retry_delay_ms);
-                tracing::warn!(context, category = "rate_limited", "room operation refused");
-                return RpcError::RateLimited { retry_after_ms };
-            }
-            _ => {}
-        }
-
-        match error {
-            matrix_sdk::Error::Http(error) => self.homeserver_http_error(context, *error),
-            _ => self.failed(context, error),
-        }
-    }
-
-    pub(crate) fn homeserver_http_error(
-        &self,
-        context: &str,
-        error: matrix_sdk::HttpError,
-    ) -> RpcError {
-        match error.client_api_error_kind() {
-            Some(ErrorKind::UserLocked) => RpcError::AccountLocked,
-            Some(ErrorKind::UserSuspended) => RpcError::AccountSuspended,
-            Some(ErrorKind::LimitExceeded(limit)) => {
-                tracing::warn!(
-                    context,
-                    category = "rate_limited",
-                    "homeserver request failed"
-                );
-                RpcError::RateLimited {
-                    retry_after_ms: limit.retry_after.as_ref().and_then(retry_delay_ms),
-                }
-            }
-            _ if error
-                .as_client_api_error()
-                .is_some_and(|api_error| api_error.status_code.as_u16() == 429) =>
-            {
-                tracing::warn!(
-                    context,
-                    category = "rate_limited",
-                    "homeserver request failed"
-                );
-                RpcError::RateLimited {
-                    retry_after_ms: None,
-                }
-            }
-            Some(ErrorKind::Unrecognized) => {
-                tracing::info!(
-                    context,
-                    category = "unsupported",
-                    "homeserver does not implement this endpoint"
-                );
-                RpcError::Unsupported
-            }
-            _ if matches!(error, matrix_sdk::HttpError::Reqwest(_)) => {
-                tracing::warn!(
-                    context,
-                    category = "network",
-                    "homeserver request failed: {}",
-                    error_chain(&error)
-                );
-                RpcError::Unavailable
-            }
-            _ if error
-                .as_client_api_error()
-                .is_some_and(|api_error| api_error.status_code.is_server_error()) =>
-            {
-                tracing::warn!(
-                    context,
-                    category = "server",
-                    "homeserver request failed: {error}"
-                );
-                RpcError::Unavailable
-            }
-            _ => self.failed(context, error),
-        }
+        self.rpc_error("user_profile", error)
     }
 
     pub(crate) fn discovery_error(&self, error: impl Into<crate::session::BuildError>) -> RpcError {
         match error.into() {
             crate::session::BuildError::Sdk(matrix_sdk::ClientBuildError::Http(error)) => {
-                self.homeserver_http_error("login_flows_discovery", error)
+                self.rpc_error("login_flows_discovery", &error)
             }
             crate::session::BuildError::Store(error) => self.failed("account_store", error),
             crate::session::BuildError::Sdk(_) => RpcError::UnknownHomeserver,
@@ -351,7 +417,10 @@ mod tests {
 
     use parking_lot::Mutex;
 
-    use matrix_sdk::ruma::api::error::RetryAfter;
+    use matrix_sdk::ruma::api::error::{
+        ErrorBody, FromHttpResponseError, RetryAfter, StandardErrorBody,
+    };
+    use matrix_sdk::{HttpError, RumaApiError};
 
     use super::error_chain;
 
@@ -374,28 +443,188 @@ mod tests {
         }
     }
 
-    #[test]
-    fn or_failed_records_the_given_label() {
+    type Check = fn(&RpcError) -> bool;
+
+    fn capture<T>(run: impl FnOnce(&Core) -> T) -> (T, String) {
         let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
         let output = Arc::new(Mutex::new(Vec::new()));
         let subscriber = tracing_subscriber::fmt()
             .with_ansi(false)
             .without_time()
+            .with_max_level(tracing::Level::DEBUG)
             .with_writer({
                 let output = output.clone();
                 move || TestWriter(output.clone())
             })
             .finish();
-        let result = tracing::subscriber::with_default(subscriber, || {
-            Err::<(), _>(io::Error::other("problem")).or_failed(&core, "test_label")
-        });
+        let result = tracing::subscriber::with_default(subscriber, || run(&core));
+        let log = String::from_utf8(output.lock().clone()).unwrap();
+        (result, log)
+    }
+
+    fn api_error(status: u16, errcode: &str) -> HttpError {
+        let body: StandardErrorBody =
+            serde_json::from_value(serde_json::json!({ "errcode": errcode, "error": "refused" }))
+                .unwrap();
+        let error = matrix_sdk::ruma::api::error::Error::new(
+            http::StatusCode::from_u16(status).unwrap(),
+            ErrorBody::Standard(body),
+        );
+        HttpError::Api(Box::new(FromHttpResponseError::Server(
+            RumaApiError::MatrixError(error),
+        )))
+    }
+
+    #[test]
+    fn or_failed_records_the_given_label() {
+        let (result, log) =
+            capture(|core| Err::<(), _>(io::Error::other("problem")).or_failed(core, "test_label"));
 
         assert!(matches!(result, Err(RpcError::Failed { .. })));
-        assert!(
-            String::from_utf8(output.lock().clone())
-                .unwrap()
-                .contains("context=\"test_label\"")
-        );
+        assert!(log.contains("context=\"test_label\""), "{log}");
+        assert!(log.contains("ERROR"), "{log}");
+    }
+
+    #[test]
+    fn a_failure_nobody_expected_stays_an_error() {
+        let (result, log) =
+            capture(|core| Err::<(), _>(api_error(400, "M_BAD_JSON")).or_failed(core, "probe"));
+
+        assert!(matches!(result, Err(RpcError::Failed { .. })));
+        assert!(log.contains("ERROR"), "{log}");
+    }
+
+    #[test]
+    fn what_a_homeserver_answers_is_classified_below_error() {
+        let cases: [(HttpError, Check, &str); 11] = [
+            (
+                api_error(401, "M_UNKNOWN_TOKEN"),
+                |e| matches!(e, RpcError::NotLoggedIn),
+                "DEBUG",
+            ),
+            (
+                api_error(401, "M_MISSING_TOKEN"),
+                |e| matches!(e, RpcError::NotLoggedIn),
+                "DEBUG",
+            ),
+            (
+                api_error(403, "M_FORBIDDEN"),
+                |e| matches!(e, RpcError::Denied),
+                "WARN",
+            ),
+            (
+                api_error(404, "M_NOT_FOUND"),
+                |e| matches!(e, RpcError::NotFound),
+                "DEBUG",
+            ),
+            (
+                api_error(404, "M_UNRECOGNIZED"),
+                |e| matches!(e, RpcError::Unsupported),
+                "INFO",
+            ),
+            (
+                api_error(400, "UK.TIMEDOUT.MSC4406.SENDER_IGNORED"),
+                |e| matches!(e, RpcError::Denied),
+                "WARN",
+            ),
+            (
+                api_error(429, "M_LIMIT_EXCEEDED"),
+                |e| matches!(e, RpcError::RateLimited { .. }),
+                "WARN",
+            ),
+            (
+                api_error(502, "M_UNKNOWN"),
+                |e| matches!(e, RpcError::Unavailable),
+                "WARN",
+            ),
+            (
+                api_error(503, "M_UNKNOWN"),
+                |e| matches!(e, RpcError::Unavailable),
+                "WARN",
+            ),
+            (
+                api_error(413, "M_TOO_LARGE"),
+                |e| matches!(e, RpcError::MessageTooLarge),
+                "DEBUG",
+            ),
+            (
+                api_error(403, "M_USER_LOCKED"),
+                |e| matches!(e, RpcError::AccountLocked),
+                "WARN",
+            ),
+        ];
+        for (error, expected, level) in cases {
+            let text = error.to_string();
+            let (result, log) = capture(|core| Err::<(), _>(error).or_failed(core, "probe"));
+            let rpc = result.unwrap_err();
+            assert!(expected(&rpc), "{text}: {rpc:?}");
+            assert!(
+                log.contains(level),
+                "{text} logged at the wrong level: {log}"
+            );
+            assert!(!log.contains("ERROR"), "{text}: {log}");
+        }
+    }
+
+    #[test]
+    fn an_sdk_error_wrapping_the_response_is_classified_too() {
+        let (result, log) = capture(|core| {
+            Err::<(), _>(matrix_sdk::Error::Http(Box::new(api_error(
+                403,
+                "M_FORBIDDEN",
+            ))))
+            .or_failed(core, "probe")
+        });
+
+        assert!(matches!(result, Err(RpcError::Denied)));
+        assert!(!log.contains("ERROR"), "{log}");
+    }
+
+    #[test]
+    fn a_dropped_connection_is_unavailable() {
+        let transport = reqwest::Client::new().get("not a url").build().unwrap_err();
+        let (result, log) =
+            capture(|core| Err::<(), _>(HttpError::Reqwest(transport)).or_failed(core, "probe"));
+
+        assert!(matches!(result, Err(RpcError::Unavailable)));
+        assert!(log.contains("WARN"), "{log}");
+        assert!(!log.contains("ERROR"), "{log}");
+    }
+
+    #[test]
+    fn an_event_that_cannot_be_used_is_unsupported() {
+        let (result, log) = capture(|core| {
+            Err::<(), _>(matrix_sdk_ui::timeline::Error::UnsupportedEvent).or_failed(core, "probe")
+        });
+
+        assert!(matches!(result, Err(RpcError::Unsupported)));
+        assert!(!log.contains("ERROR"), "{log}");
+    }
+
+    #[test]
+    fn a_missing_profile_is_unavailable() {
+        let (result, log) = capture(|core| {
+            core.profile_error(&matrix_sdk::Error::Http(Box::new(api_error(
+                404,
+                "M_NOT_FOUND",
+            ))))
+        });
+
+        assert!(matches!(result, RpcError::Unavailable));
+        assert!(!log.contains("ERROR"), "{log}");
+    }
+
+    #[test]
+    fn a_profile_the_homeserver_hides_is_unavailable() {
+        let (result, log) = capture(|core| {
+            core.profile_error(&matrix_sdk::Error::Http(Box::new(api_error(
+                403,
+                "M_FORBIDDEN",
+            ))))
+        });
+
+        assert!(matches!(result, RpcError::Unavailable));
+        assert!(!log.contains("ERROR"), "{log}");
     }
 
     #[test]

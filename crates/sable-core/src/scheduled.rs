@@ -212,7 +212,7 @@ impl Core {
         let response = client
             .send(get_all_delayed_events::unstable::Request::new())
             .await
-            .map_err(|error| self.homeserver_http_error("scheduled_messages", error))?;
+            .or_failed(self, "scheduled_messages")?;
 
         Ok(response
             .delayed_events

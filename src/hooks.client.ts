@@ -4,16 +4,16 @@ import type { ClientInit, HandleClientError } from '@sveltejs/kit/hooks';
 import { tolerateUnknownListeners } from '#lib/platform/tauri-events.js';
 import { installBrowserCompatibility } from '#lib/platform/browser-compat.js';
 import { syncTelemetryConsent } from '#lib/platform/telemetry.js';
-import { installDynamicImportRecovery } from '#lib/observability/dynamic-import-recovery.js';
-import { sanitizePayload, scrubMatrixIds, scrubMatrixUrl } from '#lib/observability/scrubbers.js';
 import {
-  isLivekitConnectionTimeout,
-  isLivekitMissingKey,
-  scrubSentryEvent,
-} from '#lib/observability/sentry-event.js';
+  installDynamicImportRecovery,
+  isReloadingForNewBuild,
+  recoverStaleAsset,
+} from '#lib/observability/dynamic-import-recovery.js';
+import { sanitizePayload, scrubMatrixIds, scrubMatrixUrl } from '#lib/observability/scrubbers.js';
+import { scrubSentryEvent } from '#lib/observability/sentry-event.js';
 import { untrackFetch } from '#lib/observability/untracked-fetch.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
-import { loadModel } from '#lib/model/model.js';
+import { loadModelForApp } from '#lib/model/model-load.svelte.js';
 import { CoreError } from '#src/transport';
 import { prewarmTransport } from '#src/transport/create';
 
@@ -98,7 +98,7 @@ if (dsn && preferences.errorReporting) {
     },
 
     beforeSend(event, hint) {
-      if (isLivekitMissingKey(event) || isLivekitConnectionTimeout(event)) return null;
+      if (isReloadingForNewBuild(hint.originalException)) return null;
       if (hint.originalException instanceof CoreError) {
         event.fingerprint = ['{{ default }}', hint.originalException.detail.code];
       }
@@ -119,10 +119,10 @@ export const init: ClientInit = async () => {
     console.error('[sable] browser compatibility setup failed', error);
   }
   try {
-    await loadModel();
+    await loadModelForApp();
   } catch (error) {
+    if (await recoverStaleAsset(error)) return;
     Sentry.captureException(error);
-    console.error('[sable] the model failed to load', error);
   }
 };
 

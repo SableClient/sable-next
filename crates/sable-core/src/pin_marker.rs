@@ -135,7 +135,7 @@ impl Core {
         let content = self
             .with_open_stores(async || room.account_data(PIN_MARKER_EVENT.into()).await)
             .await
-            .map_err(|error| self.room_error("pin_marker", error))?
+            .or_failed(self, "pin_marker")?
             .and_then(|raw| raw.get_field::<Value>("content").ok().flatten());
         Ok(read_marker(content.as_ref()))
     }
@@ -152,7 +152,7 @@ impl Core {
             .await?
             .set_account_data_raw(PIN_MARKER_EVENT.into(), raw)
             .await
-            .map_err(|error| self.room_error("pin_marker", error))?;
+            .or_failed(self, "pin_marker")?;
         Ok(())
     }
 

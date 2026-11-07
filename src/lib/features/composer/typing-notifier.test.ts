@@ -64,20 +64,47 @@ test('stop cancels the pending timeout', () => {
   ]);
 });
 
-test('leave notifies the room being left only while typing is pending', () => {
+test('stop tells the room that was typed in after the view has moved on', () => {
   const typing = notifier();
 
-  typing.leave('!old:example.org');
+  typing.stop();
   expect(calls).toEqual([]);
 
   typing.update(false);
-  roomId = '!b:example.org';
-  typing.leave('!a:example.org');
+  roomId = '';
+  typing.stop();
   vi.advanceTimersByTime(4000);
 
   expect(calls).toEqual([
     ['!a:example.org', true],
     ['!a:example.org', false],
+  ]);
+});
+
+test('the timeout tells the room that was typed in', () => {
+  const typing = notifier();
+
+  typing.update(false);
+  roomId = '#alias:example.org';
+  vi.advanceTimersByTime(4000);
+
+  expect(calls).toEqual([
+    ['!a:example.org', true],
+    ['!a:example.org', false],
+  ]);
+});
+
+test('typing in another room stops the previous one first', () => {
+  const typing = notifier();
+
+  typing.update(false);
+  roomId = '!b:example.org';
+  typing.update(false);
+
+  expect(calls).toEqual([
+    ['!a:example.org', true],
+    ['!a:example.org', false],
+    ['!b:example.org', true],
   ]);
 });
 
@@ -88,7 +115,7 @@ test('swallows notification failures', async () => {
     () => Promise.reject(new Error('offline'))
   );
 
-  typing.stop();
+  typing.update(false);
   await vi.runAllTimersAsync();
 
   expect(debug).toHaveBeenCalledWith(

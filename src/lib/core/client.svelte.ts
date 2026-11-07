@@ -1082,7 +1082,7 @@ export class CoreClient {
     } catch (error) {
       if (generation !== this.generation) return;
 
-      console.error('[sable core] restore failed', error);
+      console.debug('[sable core] restore failed', error);
       reportSessionFailure('restore', error);
       if (error instanceof CoreError) {
         try {

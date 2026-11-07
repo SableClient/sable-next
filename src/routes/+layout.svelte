@@ -15,6 +15,8 @@
   import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
   import TitleBar from '#lib/ui/TitleBar.svelte';
   import SessionRestoreError from '#lib/ui/SessionRestoreError.svelte';
+  import ModelLoadError from '#lib/ui/ModelLoadError.svelte';
+  import { modelLoadFailed } from '#lib/model/model-load.svelte.js';
   import AccountLocked from '#lib/features/sidebar/AccountLocked.svelte';
   import favicon from '#lib/assets/favicon.png';
   import { appName, faviconUrl } from '#lib/deployment/brand.js';
@@ -139,7 +141,7 @@
   });
 
   $effect(() => {
-    if (mounted && serverAuthReady && serverAuthenticated) {
+    if (mounted && serverAuthReady && serverAuthenticated && !modelLoadFailed()) {
       void (async () => {
         if (serverMode) {
           const previouslyBound = boundServerIdentity();
@@ -262,7 +264,9 @@
   {/if}
 
   <TooltipProvider>
-    {#if core.accountLocked}
+    {#if modelLoadFailed()}
+      <ModelLoadError />
+    {:else if core.accountLocked}
       <AccountLocked />
     {:else if core.restoreFailed}
       <SessionRestoreError />
