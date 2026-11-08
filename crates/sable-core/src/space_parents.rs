@@ -455,14 +455,13 @@ fn legitimate(state: &[Value], child: &RoomId, sender: &UserId) -> bool {
     if create_content.kind.as_deref() != Some("m.space") {
         return false;
     }
-    if state.iter().any(|event| {
+    if let Some(child_event) = state.iter().find(|event| {
         event.kind.as_deref() == Some("m.space.child")
             && event.state_key.as_deref() == Some(child.as_str())
-            && content_of::<ChildContentIn>(event)
-                .via
-                .is_some_and(|via| !via.is_empty())
     }) {
-        return true;
+        return content_of::<ChildContentIn>(child_event)
+            .via
+            .is_some_and(|via| !via.is_empty());
     }
     if !state.iter().any(|event| {
         event.kind.as_deref() == Some("m.room.member")
@@ -533,11 +532,13 @@ mod tests {
         ];
         assert!(super::legitimate(&state, child, sender));
         state[1]["content"] = json!({"via": []});
-        assert!(!super::legitimate(&state, child, sender));
         state.push(json!({"type": "m.room.member", "state_key": sender, "content": {"membership": "join"}}));
         state.push(json!({"type": "m.room.power_levels", "state_key": "", "content": {"users": {sender: 50}, "events": {"m.space.child": 50}}}));
+        assert!(!super::legitimate(&state, child, sender));
+
+        state.remove(1);
         assert!(super::legitimate(&state, child, sender));
-        state[3]["content"]["users"][sender.as_str()] = json!(49);
+        state[2]["content"]["users"][sender.as_str()] = json!(49);
         assert!(!super::legitimate(&state, child, sender));
     }
 
