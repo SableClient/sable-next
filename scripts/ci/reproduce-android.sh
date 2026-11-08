@@ -15,6 +15,7 @@ node_sha256=cc2f601cee82d9a5a233302fe307abc600727035fd7d2c3a3571755989e95008
 tools_url=https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip
 tools_sha256=4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583
 ndk_version="$(sed -n 's/^ANDROID_NDK_VERSION = "\(.*\)"$/\1/p' .mise/config.toml)"
+platform="$(sed -n 's/^ANDROID_PLATFORM = "\(.*\)"$/\1/p' .mise/config.toml)"
 build_tools="$(sed -n 's/^ANDROID_BUILD_TOOLS_VERSION = "\(.*\)"$/\1/p' .mise/config.toml)"
 
 export DEBIAN_FRONTEND=noninteractive
@@ -36,7 +37,7 @@ unzip -q "$downloads/tools.zip" -d "$ANDROID_HOME/cmdline-tools"
 mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
 export PATH="/opt/node-v$node_version-linux-x64/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/$build_tools:$PATH"
 (yes || true) | sdkmanager --licenses >/dev/null
-sdkmanager "platforms;android-36" "platforms;android-37.0" "build-tools;$build_tools" "ndk;$ndk_version"
+sdkmanager "platforms;android-36" "platforms;$platform" "build-tools;$build_tools" "ndk;$ndk_version"
 export NDK_HOME="$ANDROID_HOME/ndk/$ndk_version"
 
 npm install --global corepack@latest
