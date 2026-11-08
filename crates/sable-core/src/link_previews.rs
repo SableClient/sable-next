@@ -336,6 +336,8 @@ pub(crate) async fn scraped_media(source: &str) -> Option<Result<Vec<u8>, RpcErr
 
 const MAX_PREVIEW_IMAGE_BYTES: usize = 1024 * 1024;
 
+const MAX_POST_IMAGE_BYTES: usize = 10 * 1024 * 1024;
+
 const MAX_BUNDLED_IMAGES: usize = 10;
 
 pub(crate) struct PreviewImage {
@@ -403,7 +405,15 @@ pub(crate) fn bundled_link_previews(
 }
 
 impl Core {
-    async fn preview_image_bytes(client: &matrix_sdk::Client, image: &str) -> Option<Vec<u8>> {
+    async fn preview_image_bytes(
+        client: &matrix_sdk::Client,
+        image: &str,
+        #[cfg_attr(
+            target_family = "wasm",
+            expect(unused_variables, reason = "the web fetches no scraped media")
+        )]
+        max_bytes: usize,
+    ) -> Option<Vec<u8>> {
         if is_mxc(image) {
             let request = MediaRequestParameters {
                 source: MediaSource::Plain(OwnedMxcUri::from(image)),
@@ -412,7 +422,7 @@ impl Core {
             return client.media().get_media_content(&request, false).await.ok();
         }
         #[cfg(not(target_family = "wasm"))]
-        if let Some(bytes) = local::scraped_media(image, MAX_PREVIEW_IMAGE_BYTES).await {
+        if let Some(bytes) = local::scraped_media(image, max_bytes).await {
             return bytes.ok();
         }
         None
@@ -425,13 +435,13 @@ impl Core {
         previews: &[UrlPreviewView],
     ) -> HashMap<String, PreviewImage> {
         let mut images = HashMap::new();
-        let mut wanted: Vec<(&str, Option<&str>)> = Vec::new();
+        let mut wanted: Vec<WantedImage> = Vec::new();
         for preview in previews {
-            for target in preview_images(preview) {
-                if wanted.len() < MAX_BUNDLED_IMAGES
-                    && !wanted.iter().any(|known| known.0 == target.0)
-                {
-                    wanted.push(target);
+            for image in preview_images(preview) {
+                if let Some(known) = wanted.iter_mut().find(|known| known.source == image.source) {
+                    known.max_bytes = known.max_bytes.max(image.max_bytes);
+                } else if wanted.len() < MAX_BUNDLED_IMAGES {
+                    wanted.push(image);
                 }
             }
         }
@@ -445,11 +455,16 @@ impl Core {
             return images;
         };
         let client = room.client();
-        for (image, mime) in wanted {
-            let Some(data) = Self::preview_image_bytes(&client, image).await else {
+        for WantedImage {
+            source: image,
+            mime,
+            max_bytes,
+        } in wanted
+        {
+            let Some(data) = Self::preview_image_bytes(&client, image, max_bytes).await else {
                 continue;
             };
-            if data.is_empty() || data.len() > MAX_PREVIEW_IMAGE_BYTES {
+            if data.is_empty() || data.len() > max_bytes {
                 continue;
             }
             let size = data.len() as u64;
@@ -474,15 +489,29 @@ impl Core {
     }
 }
 
+struct WantedImage<'a> {
+    source: &'a str,
+    mime: Option<&'a str>,
+    max_bytes: usize,
+}
+
 /// The main image, then the avatars and images of the post and its quote.
-fn preview_images(preview: &UrlPreviewView) -> Vec<(&str, Option<&str>)> {
-    fn post_images<'a>(post: &'a PostView, images: &mut Vec<(&'a str, Option<&'a str>)>) {
-        images.extend(post.author.avatar.as_deref().map(|avatar| (avatar, None)));
+fn preview_images(preview: &UrlPreviewView) -> Vec<WantedImage<'_>> {
+    fn post_images<'a>(post: &'a PostView, images: &mut Vec<WantedImage<'a>>) {
+        images.extend(post.author.avatar.as_deref().map(|avatar| WantedImage {
+            source: avatar,
+            mime: None,
+            max_bytes: MAX_PREVIEW_IMAGE_BYTES,
+        }));
         images.extend(
             post.media
                 .iter()
                 .filter(|media| media.kind == PostMediaKindView::Image)
-                .map(|media| (media.source.as_str(), media.mime.as_deref())),
+                .map(|media| WantedImage {
+                    source: &media.source,
+                    mime: media.mime.as_deref(),
+                    max_bytes: MAX_POST_IMAGE_BYTES,
+                }),
         );
         if let Some(quote) = &post.quote {
             post_images(quote, images);
@@ -491,7 +520,11 @@ fn preview_images(preview: &UrlPreviewView) -> Vec<(&str, Option<&str>)> {
     let mut images: Vec<_> = preview
         .image
         .as_deref()
-        .map(|image| (image, preview.image_mime.as_deref()))
+        .map(|image| WantedImage {
+            source: image,
+            mime: preview.image_mime.as_deref(),
+            max_bytes: MAX_PREVIEW_IMAGE_BYTES,
+        })
         .into_iter()
         .collect();
     if let Some(post) = &preview.post {

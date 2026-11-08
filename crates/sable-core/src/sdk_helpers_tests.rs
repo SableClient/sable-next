@@ -186,6 +186,48 @@ async fn preview_thumbnail_failures_omit_images() {
     }
 }
 
+#[tokio::test]
+async fn post_photos_may_exceed_the_thumbnail_cap() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!preview:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    server
+        .mock_authenticated_media_config()
+        .ok_default()
+        .mount()
+        .await;
+    server.mock_room_state_encryption().plain().mount().await;
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v1/media/download/example.org/photo"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![7; 2 * 1024 * 1024]))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/_matrix/media/v3/upload"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "content_uri": "mxc://example.org/persistent",
+        })))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let preview = crate::link_previews::url_preview(
+        "https://example.org".to_owned(),
+        &json!({
+            "og:type": "note", "note:content": "hi", "og:image": "mxc://example.org/photo",
+        }),
+    )
+    .unwrap();
+    let previews = [preview];
+    let images = core
+        .prepare_preview_images(&room_id.to_owned(), &previews)
+        .await;
+    let bundles = crate::link_previews::bundled_link_previews(&previews, &images, true).unwrap();
+    assert_eq!(bundles[0]["og:image"], "mxc://example.org/persistent");
+}
+
 async fn core_with_events(
     server: &MatrixMockServer,
     client: matrix_sdk::Client,
