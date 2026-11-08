@@ -66,6 +66,8 @@
   let tint = $derived(paintedSrc === src ? undefined : plate);
   let hovered = $state(false);
   let animatedSrc = $state<string | null>(null);
+  let overlaySrc = $state<string | null>(null);
+  let playing = $derived(hovered && overlaySrc === src && animatedSrc === src);
 
   async function checkAnimated(source: string, url: string | null): Promise<void> {
     if (!url) return;
@@ -85,6 +87,7 @@
     });
     const stopLeave = on(scope, 'pointerleave', () => {
       hovered = false;
+      overlaySrc = null;
     });
     return () => {
       stopEnter();
@@ -104,7 +107,7 @@
     {#if isMxc && src}
       <MediaImage
         class="avatar-image"
-        style={tint ? `background: ${tint}` : undefined}
+        style={playing ? 'opacity: 0' : tint ? `background: ${tint}` : undefined}
         source={src}
         alt=""
         width={96}
@@ -125,7 +128,7 @@
       {#if hovered && !original}
         <MediaImage
           class="avatar-image"
-          style={animatedSrc === src ? undefined : 'opacity: 0'}
+          style={playing ? undefined : 'opacity: 0'}
           source={src}
           alt=""
           width={96}
@@ -133,7 +136,10 @@
           original
           autoplay
           pixelate={false}
-          onloaded={(url) => void checkAnimated(src, url)}
+          onloaded={(url) => {
+            overlaySrc = src;
+            void checkAnimated(src, url);
+          }}
         />
       {/if}
     {:else if src}

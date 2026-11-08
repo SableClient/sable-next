@@ -61,6 +61,9 @@ test.each(['thumbnail', 'encrypted', 'local', 'original', 'named-gif'])(
         expect(animated.complete).toBe(true);
         expect(animated.naturalWidth).toBe(1);
         expect(animated.closest<HTMLElement>('.avatar-image')?.style.opacity).toBe('');
+        if (images.length > 1) {
+          expect(images[0].closest<HTMLElement>('.avatar-image')?.style.opacity).toBe('0');
+        }
       });
 
       await userEvent.unhover(root);
