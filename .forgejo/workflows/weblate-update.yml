@@ -22,8 +22,17 @@ jobs:
           WEBLATE_TOKEN: ${{ secrets.WEBLATE_API_TOKEN }}
         run: |
           for operation in commit push pull; do
-            curl --fail --silent --show-error \
-              --header "Authorization: Token $WEBLATE_TOKEN" \
-              --json "{\"operation\": \"$operation\"}" \
-              "$WEBLATE_URL/api/components/$WEBLATE_COMPONENT/repository/"
+            # Weblate answers 423 while another operation holds the repository lock.
+            for attempt in 1 2 3 4 5; do
+              status=$(curl --silent --show-error --output /dev/stderr --write-out '%{http_code}' \
+                --header "Authorization: Token $WEBLATE_TOKEN" \
+                --json "{\"operation\": \"$operation\"}" \
+                "$WEBLATE_URL/api/components/$WEBLATE_COMPONENT/repository/")
+              [ "$status" = 200 ] && break
+              if [ "$status" != 423 ] || [ "$attempt" = 5 ]; then
+                echo "$operation failed with HTTP $status"
+                exit 1
+              fi
+              sleep 15
+            done
           done
