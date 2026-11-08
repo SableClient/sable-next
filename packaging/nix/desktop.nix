@@ -8,6 +8,8 @@
   pnpmConfigHook,
   nodejs_26,
   pkg-config,
+  aws-lc,
+  sqlite,
   pipewire,
   libpulseaudio,
   autoPatchelfHook,
@@ -46,6 +48,8 @@ stdenv.mkDerivation (finalAttrs: {
   ];
 
   buildInputs = [
+    aws-lc
+    sqlite
     pipewire
     libpulseaudio
     stdenv.cc.cc.lib
