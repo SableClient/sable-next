@@ -294,9 +294,9 @@ impl SessionStore for MemorySessionStore {
 
 #[cfg(all(test, not(target_family = "wasm")))]
 mod tests {
-    use super::{FileSessionStore, SessionStore, write_atomic};
     #[cfg(unix)]
     use super::write_atomic_private;
+    use super::{FileSessionStore, SessionStore, write_atomic};
 
     #[test]
     fn concurrent_atomic_writers_publish_complete_files_without_leftovers() {

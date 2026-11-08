@@ -18,7 +18,7 @@ use matrix_sdk::{EncryptionState, Room, RoomState};
 use tracing::warn;
 
 use super::persist::{self, Cover, StoredCrawlRoom};
-use super::sharing::DISCOVERY_MS;
+use super::sharing::DISCOVERY;
 use crate::Core;
 use crate::protocol::{
     CoreEvent, SearchCoverageState, SearchCoverageView, SearchCrawlPhase, SearchMetricsView,
@@ -471,7 +471,7 @@ impl Core {
 
         self.report_coverage(client, &mut reported).await;
         if self.search_sharing.discovering() {
-            let deadline = web_time::Instant::now() + Duration::from_millis(DISCOVERY_MS);
+            let deadline = web_time::Instant::now() + DISCOVERY;
             while self.search_sharing.discovering() && web_time::Instant::now() < deadline {
                 matrix_sdk::sleep::sleep(Duration::from_millis(100)).await;
             }

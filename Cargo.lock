@@ -7917,12 +7917,10 @@ dependencies = [
 name = "sable-model-wasm"
 version = "0.1.0"
 dependencies = [
- "bytes",
  "js-sys",
  "sable-model",
  "serde",
  "serde_json",
- "tokio-util",
  "wasm-bindgen",
 ]
 

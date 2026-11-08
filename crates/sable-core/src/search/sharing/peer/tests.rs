@@ -9,7 +9,7 @@ use crate::search::tests::document;
 
 fn catchup_with(devices: &[(&str, u64, u64)]) -> Catchup {
     let mut catchup = Catchup::default();
-    catchup.begin("query".into(), 0);
+    catchup.begin("query".into(), Instant::now());
     catchup.asked = devices
         .iter()
         .map(|(device, ..)| ((*device).into(), Some(format!("{device} name"))))
@@ -25,15 +25,23 @@ fn catchup_with(devices: &[(&str, u64, u64)]) -> Catchup {
     catchup
 }
 
+fn tried(next: Next) -> Option<OwnedDeviceId> {
+    match next {
+        Next::Try(device) => Some(device),
+        Next::Ignore | Next::Finished(_) => None,
+    }
+}
+
 #[test]
 fn unanswered_sessions_expire() {
+    let opened = Instant::now();
     let mut slots = HashMap::from([(
         "session".into(),
-        Slot::new(Role::Requester, "DEVICE".into(), 100),
+        Slot::new(Role::Requester, "DEVICE".into(), opened),
     )]);
-    SearchSharing::remove_expired(&mut slots, 100 + SESSION_MS - 1);
+    SearchSharing::remove_expired(&mut slots, opened + SESSION_TIMEOUT / 2);
     assert!(slots.contains_key("session"));
-    SearchSharing::remove_expired(&mut slots, 100 + SESSION_MS);
+    SearchSharing::remove_expired(&mut slots, opened + SESSION_TIMEOUT);
     assert!(slots.is_empty());
 }
 
@@ -56,25 +64,24 @@ fn deep_history_is_tried_first_and_failures_move_to_the_next_device() {
         ("DEEP", 500, 1),
         ("WIDE", 500, 3),
     ]);
-    assert!(catchup.advance(None));
     assert_eq!(
-        catchup.pick("s1".into(), 0).as_deref(),
-        Some(<&DeviceId>::from("WIDE"))
+        tried(catchup.next(None, "s1".into(), Instant::now())),
+        Some("WIDE".into())
     );
-    assert!(!catchup.advance(Some("stale")));
-    assert!(catchup.advance(Some("s1")));
+    assert!(matches!(
+        catchup.next(Some("stale"), "x".into(), Instant::now()),
+        Next::Ignore
+    ));
     assert_eq!(
-        catchup.pick("s2".into(), 0).as_deref(),
-        Some(<&DeviceId>::from("DEEP"))
+        tried(catchup.next(Some("s1"), "s2".into(), Instant::now())),
+        Some("DEEP".into())
     );
     catchup.rooms = 2;
-    assert!(catchup.advance(Some("s2")));
     assert_eq!(
-        catchup.pick("s3".into(), 0).as_deref(),
-        Some(<&DeviceId>::from("SMALL"))
+        tried(catchup.next(Some("s2"), "s3".into(), Instant::now())),
+        Some("SMALL".into())
     );
-    assert!(catchup.advance(Some("s3")));
-    assert_eq!(catchup.pick("s4".into(), 0), None);
+    assert!(tried(catchup.next(Some("s3"), "s4".into(), Instant::now())).is_none());
     assert_eq!(catchup.phase, Phase::Idle);
     assert_eq!(catchup.outcome, Some(SearchPeerOutcome::Interrupted));
     assert_eq!(
@@ -93,38 +100,71 @@ fn deep_history_is_tried_first_and_failures_move_to_the_next_device() {
 }
 
 #[test]
+fn a_slow_connection_moves_on_to_the_next_device() {
+    let mut catchup = catchup_with(&[("FAST", 10, 0), ("SLOW", 50, 0)]);
+    let started = Instant::now();
+    assert_eq!(catchup.overdue(started), None);
+    assert_eq!(
+        catchup.overdue(started + DISCOVERY),
+        Some(Overdue::Discovery)
+    );
+    assert_eq!(
+        tried(catchup.next(None, "s1".into(), started)),
+        Some("SLOW".into())
+    );
+    assert_eq!(catchup.overdue(started + CONNECT_TIMEOUT / 2), None);
+    assert_eq!(
+        catchup.overdue(started + CONNECT_TIMEOUT),
+        Some(Overdue::Connection("s1".into()))
+    );
+    assert_eq!(
+        tried(catchup.next(Some("s1"), "s2".into(), started)),
+        Some("FAST".into())
+    );
+}
+
+#[test]
 fn discovery_reports_why_nothing_was_copied() {
+    let finished =
+        |catchup: &mut Catchup, failed| match catchup.next(failed, "t".into(), Instant::now()) {
+            Next::Finished(outcome) => Some(outcome),
+            _ => None,
+        };
     let mut silent = catchup_with(&[]);
-    silent.advance(None);
-    assert_eq!(silent.pick("s".into(), 0), None);
+    assert_eq!(
+        finished(&mut silent, None),
+        Some(SearchPeerOutcome::NoAnswer)
+    );
     assert_eq!(silent.outcome, Some(SearchPeerOutcome::NoAnswer));
 
     let mut empty = catchup_with(&[("A", 0, 0)]);
-    empty.advance(None);
-    assert_eq!(empty.pick("s".into(), 0), None);
-    assert_eq!(empty.outcome, Some(SearchPeerOutcome::NothingToCopy));
+    assert_eq!(
+        finished(&mut empty, None),
+        Some(SearchPeerOutcome::NothingToCopy)
+    );
 
     let mut unreachable = catchup_with(&[("A", 5, 0)]);
-    unreachable.advance(None);
-    unreachable.pick("s".into(), 0);
-    unreachable.advance(Some("s"));
-    assert_eq!(unreachable.pick("t".into(), 0), None);
-    assert_eq!(unreachable.outcome, Some(SearchPeerOutcome::Failed));
+    unreachable.next(None, "s".into(), Instant::now());
+    assert_eq!(
+        finished(&mut unreachable, Some("s")),
+        Some(SearchPeerOutcome::Failed)
+    );
 }
 
 #[test]
 fn discovery_events_use_the_documented_fields() {
-    let content = ToDeviceSearchPeerEventContent {
-        session: "s".into(),
-        timestamp: 1,
-        kind: Discovery::Info {
+    let mut content = ToDeviceSearchPeerEventContent::new(
+        "s".into(),
+        Discovery::Info {
             documents: 2,
             complete_rooms: 3,
         },
-    };
+    );
+    content.timestamp = 1;
     assert_eq!(
         serde_json::to_value(&content).unwrap(),
         serde_json::json!({
+            "version": 2,
             "session": "s",
             "timestamp": 1,
             "kind": "info",
@@ -133,10 +173,16 @@ fn discovery_events_use_the_documented_fields() {
         })
     );
     let request: ToDeviceSearchPeerEventContent = serde_json::from_value(
-        serde_json::json!({"session": "s", "timestamp": 1, "kind": "request"}),
+        serde_json::json!({"version": 2, "session": "s", "timestamp": 1, "kind": "request"}),
     )
     .unwrap();
     assert_eq!(request.kind, Discovery::Request);
+    serde_json::from_value::<ToDeviceSearchPeerEventContent>(serde_json::json!({
+        "session": "s",
+        "timestamp": 1,
+        "kind": "request",
+    }))
+    .unwrap_err();
 }
 
 #[tokio::test]
@@ -238,6 +284,35 @@ async fn a_stale_peer_does_not_replace_a_newer_local_edit() {
     assert!(in_room(&index, &room, "original", 10, 0).is_empty());
 }
 
+#[test]
+fn a_copy_is_due_until_one_succeeds_and_again_after_a_week() {
+    let mut received = Received::default();
+    assert!(received.copy_due());
+    received.synced_at = Some(now_ms());
+    assert!(!received.copy_due());
+    received.synced_at = Some(now_ms() - 8 * 24 * 60 * 60 * 1000);
+    assert!(received.copy_due());
+}
+
+#[tokio::test]
+async fn the_automatic_copy_runs_once_and_a_failed_start_does_not_count() {
+    let (core, _events) = Core::new(
+        "peer-auto",
+        Box::new(crate::store::MemorySessionStore::default()),
+    );
+    core.search_sharing.enabled.store(true, Ordering::Relaxed);
+    core.search_foreground.store(true, Ordering::Relaxed);
+    core.set_search_network_unmetered(true);
+    core.start_search_peers().await.unwrap_err();
+    core.start_search_peers().await.unwrap_err();
+    core.search_sharing
+        .auto_tried
+        .store(true, Ordering::Relaxed);
+    core.start_search_peers().await.unwrap();
+    core.cancel_search_peers();
+    core.start_search_peers().await.unwrap_err();
+}
+
 #[tokio::test]
 async fn metered_policy_interrupts_a_copy_and_reports_the_pause() {
     let (core, mut events) = Core::new(
@@ -249,11 +324,13 @@ async fn metered_policy_interrupts_a_copy_and_reports_the_pause() {
     core.set_search_network_unmetered(true);
     sharing.slots.lock().insert(
         "session".into(),
-        Slot::new(Role::Requester, "DEVICE".into(), now_ms()),
+        Slot::new(Role::Requester, "DEVICE".into(), Instant::now()),
     );
     *sharing.catchup.lock() = catchup_with(&[("DEVICE", 5, 0)]);
-    sharing.catchup.lock().advance(None);
-    sharing.catchup.lock().pick("session".into(), now_ms());
+    sharing
+        .catchup
+        .lock()
+        .next(None, "session".into(), Instant::now());
     core.open_rtc(
         RtcPurpose::SearchSharing,
         "session".into(),
@@ -332,7 +409,7 @@ async fn exchange(source: &Core, target: &Core, id: &str) -> usize {
     )]);
     let mut payloads = 0;
     while let Some((to_target, frame)) = frames.pop_front() {
-        if frame.contains("\"kind\":\"part\"") && !frame.contains("\"data\":null") {
+        if frame.contains("\"kind\":\"data\"") {
             payloads += 1;
         }
         let receiver = if to_target { target } else { source };
@@ -453,8 +530,8 @@ async fn verified_devices_copy_history_and_changes() {
             .await
             .as_ref()
             .unwrap()
-            .rooms
-            .contains(&room)
+            .known
+            .contains_key(&room)
     );
     reader
         .encryption()
@@ -466,6 +543,16 @@ async fn verified_devices_copy_history_and_changes() {
         .await
         .unwrap();
     target.exchange_search_peer(&id, None).await.unwrap_err();
+
+    target.forget_search_sharing(&reader).await;
+    let view = target.search_sharing_view().await;
+    assert_eq!(view.rooms_received, 0);
+    assert!(view.last_copy.is_none());
+    assert!(view.automatic);
+    target.search_sharing.received.lock().await.take();
+    target.load_peer_receipts(&reader).await;
+    let stored = target.search_sharing.received.lock().await;
+    assert!(stored.as_ref().unwrap().known.is_empty());
 }
 
 #[cfg(not(target_family = "wasm"))]

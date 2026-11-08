@@ -18,6 +18,7 @@ domain! {
     peer_start,
     peer_find,
     peer_exchange,
+    peer_reset,
 }
 
 #[derive(Debug, Deserialize)]
@@ -39,6 +40,19 @@ impl Handler for PeerFindParams {
     type Ok = ();
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         core.find_search_peers().await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PeerResetParams {}
+
+impl Handler for PeerResetParams {
+    type Ok = ();
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        let client = core.client().await?;
+        core.forget_search_sharing(&client).await;
+        Ok(())
     }
 }
 

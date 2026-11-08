@@ -1,69 +1,104 @@
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 use base64::Engine as _;
 use matrix_sdk::Client;
-use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
+use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId};
 use serde::{Deserialize, Serialize};
+use web_time::Instant;
 
 use super::super::{
     History, MAX_SEGMENT_JSON, STANDARD_NO_PAD, SegmentPayload, settled_history, sha256,
 };
-use super::{Peer, Phase, Role, WANT_MS};
+use super::{Phase, RESYNC_AFTER, age};
 use crate::Core;
 use crate::protocol::{RpcError, SearchPeerCopyView};
 use crate::search::now_ms;
 
 const STORE_KEY: &[u8] = b"sable.search.peers.v1";
-const MAX_FRAME: usize = 6 * 1024 * 1024;
-const ROOM_PAGE: usize = 32;
+const MAX_MESSAGE: usize = 6 * 1024 * 1024;
 const MAX_PARTS: usize = 1024;
 const SHA256_B64_LEN: usize = 43;
-const RESTORING_MS: u64 = 30_000;
+const RESTORING: Duration = Duration::from_secs(30);
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Debug, thiserror::Error)]
+enum CopyError {
+    #[error("session unavailable: {0:?}")]
+    Session(RpcError),
+    #[error("message is too large or malformed")]
+    Malformed,
+    #[error("unexpected `{0}` message")]
+    Unexpected(&'static str),
+    #[error("invalid part list for {0}")]
+    InvalidParts(OwnedRoomId),
+    #[error("part {part} of {room} failed its hash or range check")]
+    BadPart { room: OwnedRoomId, part: usize },
+    #[error("{0} is no longer joined")]
+    NotJoined(OwnedRoomId),
+    #[error("could not read the event cache of {0}")]
+    EventCache(OwnedRoomId),
+    #[error("the index could not save {0}")]
+    NotDurable(OwnedRoomId),
+    #[error("could not save the received parts")]
+    Store,
+}
+
+impl CopyError {
+    fn into_rpc(self) -> RpcError {
+        match self {
+            Self::Session(error) => error,
+            _ => RpcError::Unavailable,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct Part {
     start: u64,
     end: u64,
     sha256: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct SharedCover {
+    from: u64,
+    until: u64,
+    resume: Option<String>,
+    anchor: Option<OwnedEventId>,
+}
+
+/// The receiver asks for one room at a time with `Room`, gets its part list
+/// with `Parts`, then fetches each part it does not have with `Get` and `Data`.
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-enum Frame {
-    List {
-        offset: usize,
-    },
-    Rooms {
-        rooms: Vec<OwnedRoomId>,
-        next: Option<usize>,
-    },
+enum Message {
     Room {
         room: OwnedRoomId,
-        known: Vec<String>,
     },
-    Next {
+    Parts {
         room: OwnedRoomId,
+        parts: Vec<Part>,
+        cover: Option<SharedCover>,
     },
-    Part {
+    Get {
         room: OwnedRoomId,
-        part: Part,
-        data: Option<String>,
+        part: usize,
     },
-    Done {
+    Data {
         room: OwnedRoomId,
-        from: u64,
-        until: u64,
-        resume: Option<String>,
-        anchor: Option<OwnedEventId>,
-        coverage: bool,
+        part: usize,
+        data: String,
     },
 }
 
-impl Frame {
-    const fn handled_by(&self) -> Role {
+impl Message {
+    const fn kind(&self) -> &'static str {
         match self {
-            Self::List { .. } | Self::Room { .. } | Self::Next { .. } => Role::Provider,
-            Self::Rooms { .. } | Self::Part { .. } | Self::Done { .. } => Role::Requester,
+            Self::Room { .. } => "room",
+            Self::Parts { .. } => "parts",
+            Self::Get { .. } => "get",
+            Self::Data { .. } => "data",
         }
     }
 }
@@ -71,44 +106,70 @@ impl Frame {
 #[derive(Default, Deserialize, Serialize)]
 #[serde(default)]
 pub(super) struct Received {
-    parts: HashMap<OwnedRoomId, Vec<Part>>,
-    pub(super) rooms: HashSet<OwnedRoomId>,
-    covers: HashMap<OwnedRoomId, String>,
-    pub(super) verified: bool,
-    pub(super) wanted_since: Option<u64>,
-    pub(super) last_active: u64,
+    /// Hashes of the parts imported per room. Anything that drops indexed
+    /// history must forget them, see `forget_shared_room`.
+    pub(super) known: HashMap<OwnedRoomId, HashSet<String>>,
+    pub(super) synced_at: Option<u64>,
     pub(super) last_copy: Option<SearchPeerCopyView>,
 }
 
 impl Received {
-    pub(super) fn wants_copy(&self, now: u64) -> bool {
-        self.wanted_since
-            .is_some_and(|since| now.saturating_sub(since) < WANT_MS)
+    pub(super) fn copy_due(&self) -> bool {
+        self.synced_at.is_none_or(|at| age(at) > RESYNC_AFTER)
     }
+}
+
+pub(super) enum Transfer {
+    Sending(Option<Snapshot>),
+    Receiving(Download),
 }
 
 pub(super) struct Snapshot {
     room: OwnedRoomId,
     history: History,
-    spans: VecDeque<(u64, u64)>,
-    known: HashSet<String>,
-    revision: u64,
-    from: u64,
-    until: u64,
-    resume: Option<String>,
-    anchor: Option<OwnedEventId>,
-    coverage: bool,
+    parts: Vec<Part>,
+    cover: Option<SharedCover>,
 }
 
 #[derive(Default)]
 pub(super) struct Download {
-    finished: bool,
+    epoch: u64,
     rooms: VecDeque<OwnedRoomId>,
-    next: Option<usize>,
-    current: Option<OwnedRoomId>,
+    asked: Option<OwnedRoomId>,
+    fetch: Option<Fetch>,
+}
+
+#[derive(Debug)]
+struct Fetch {
+    room: OwnedRoomId,
     parts: Vec<Part>,
-    known: HashSet<String>,
-    visited: HashSet<OwnedRoomId>,
+    missing: VecDeque<usize>,
+    cover: Option<SharedCover>,
+}
+
+impl Fetch {
+    fn new(
+        room: OwnedRoomId,
+        parts: Vec<Part>,
+        cover: Option<SharedCover>,
+        known: &HashSet<String>,
+    ) -> Result<Self, CopyError> {
+        if !valid_parts(&parts, cover.as_ref()) {
+            return Err(CopyError::InvalidParts(room));
+        }
+        let missing = parts
+            .iter()
+            .enumerate()
+            .filter(|(_, part)| !known.contains(&part.sha256))
+            .map(|(index, _)| index)
+            .collect();
+        Ok(Self {
+            room,
+            parts,
+            missing,
+            cover,
+        })
+    }
 }
 
 impl Core {
@@ -117,104 +178,174 @@ impl Core {
         session_id: &str,
         data: Option<String>,
     ) -> Result<Option<String>, RpcError> {
-        if data.as_ref().is_some_and(|data| data.len() > MAX_FRAME) {
-            return Err(RpcError::Unavailable);
-        }
+        self.exchange(session_id, data).await.map_err(|error| {
+            tracing::debug!(session = session_id, %error, "search copy stopped");
+            error.into_rpc()
+        })
+    }
+
+    async fn exchange(
+        &self,
+        session_id: &str,
+        data: Option<String>,
+    ) -> Result<Option<String>, CopyError> {
+        let message = data
+            .map(|data| {
+                (data.len() <= MAX_MESSAGE)
+                    .then(|| serde_json::from_str::<Message>(&data).ok())
+                    .flatten()
+                    .ok_or(CopyError::Malformed)
+            })
+            .transpose()?;
+        // Held for the whole exchange so a logout cannot reset the index
+        // while this copy is still writing into it.
         let session = self.session.read().await;
         let client = session
             .as_ref()
-            .ok_or(RpcError::NotLoggedIn)?
+            .ok_or(CopyError::Session(RpcError::NotLoggedIn))?
             .client
             .clone();
-        let slot = self.search_slot(&client, session_id).await?;
+        let slot = self
+            .search_slot(&client, session_id)
+            .await
+            .map_err(CopyError::Session)?;
         let mut peer = slot.peer.lock().await;
         self.load_peer_receipts(&client).await;
-        let Some(data) = data else {
-            if slot.role != Role::Requester {
-                return Err(RpcError::Unavailable);
-            }
-            self.transferring(session_id);
-            peer.download = Download::default();
-            return encode(&Frame::List { offset: 0 }).map(Some);
-        };
-        let frame: Frame = serde_json::from_str(&data).map_err(|_| RpcError::Unavailable)?;
-        if slot.role != frame.handled_by() {
-            return Err(RpcError::Unavailable);
-        }
         self.transferring(session_id);
-        let reply = match frame {
-            Frame::List { offset } => Some(list_rooms(&client, offset)),
-            Frame::Rooms { rooms, next } => {
-                if peer.download.current.is_some()
-                    || !peer.download.rooms.is_empty()
-                    || rooms.len() > ROOM_PAGE
-                {
-                    return Err(RpcError::Unavailable);
-                }
-                peer.download.rooms = rooms
-                    .into_iter()
-                    .filter(|room| {
-                        joined(&client, room) && peer.download.visited.insert(room.clone())
-                    })
-                    .collect();
-                peer.download.next = next;
-                self.next_peer_room(&client, &mut peer.download).await?
+        let reply = match (&mut peer.transfer, message) {
+            (Transfer::Receiving(download), None) => {
+                *download = Download {
+                    epoch: self.search_sharing.epoch.load(Ordering::Relaxed),
+                    rooms: joined_rooms(&client),
+                    ..Download::default()
+                };
+                self.next_request(&client, session_id, download).await?
             }
-            Frame::Room { room, known } => {
-                if known.len() > MAX_PARTS || !joined(&client, &room) || peer.snapshot.is_some() {
-                    return Err(RpcError::Unavailable);
-                }
-                peer.snapshot = self.peer_snapshot(&client, room.clone(), known).await;
-                Some(self.next_peer_part(&mut peer, room).await?)
+            (Transfer::Receiving(download), Some(message)) => {
+                self.receive(&client, session_id, download, message).await?
             }
-            Frame::Next { room } => Some(self.next_peer_part(&mut peer, room).await?),
-            Frame::Part { room, part, data } => {
-                let download = &mut peer.download;
-                if download.current.as_ref() != Some(&room)
-                    || !joined(&client, &room)
-                    || !valid_part(&download.parts, &part)
-                {
-                    return Err(RpcError::Unavailable);
-                }
-                if let Some(data) = data {
-                    let payload = decode(&part, &data).ok_or(RpcError::Unavailable)?;
-                    self.import_peer_payload(&client, &room, &part, payload)
-                        .await?;
-                } else if !download.known.contains(&part.sha256) {
-                    return Err(RpcError::Unavailable);
-                }
-                download.parts.push(part);
-                Some(Frame::Next { room })
+            (Transfer::Sending(snapshot), Some(message)) => {
+                Some(self.send(&client, snapshot, message).await?)
             }
-            Frame::Done {
-                room,
-                from,
-                until,
-                resume,
-                anchor,
-                coverage,
-            } => {
-                let download = &mut peer.download;
-                if download.current.as_ref() != Some(&room) {
-                    return Err(RpcError::Unavailable);
-                }
-                if coverage && complete(&download.parts, from, until) && joined(&client, &room) {
-                    self.finish_peer_room(&client, &room, from, until, resume, anchor)
-                        .await?;
-                }
-                download.current = None;
-                download.parts.clear();
-                self.search_sharing.restoring.lock().remove(&room);
-                self.copied_room(session_id);
-                self.next_peer_room(&client, download).await?
-            }
+            (Transfer::Sending(_), None) => return Err(CopyError::Unexpected("start")),
         };
-        let finished = slot.role == Role::Requester && peer.download.finished;
+        let finished = reply.is_none() && matches!(peer.transfer, Transfer::Receiving(_));
         drop(peer);
         if finished {
             self.complete_search_copy(&client, session_id).await;
         }
-        reply.as_ref().map(encode).transpose()
+        reply
+            .map(|reply| {
+                serde_json::to_string(&reply)
+                    .ok()
+                    .filter(|data| data.len() <= MAX_MESSAGE)
+                    .ok_or(CopyError::Malformed)
+            })
+            .transpose()
+    }
+
+    async fn send(
+        &self,
+        client: &Client,
+        snapshot: &mut Option<Snapshot>,
+        message: Message,
+    ) -> Result<Message, CopyError> {
+        match message {
+            Message::Room { room } => {
+                *snapshot = if joined(client, &room) {
+                    self.peer_snapshot(client, room.clone()).await
+                } else {
+                    None
+                };
+                let (parts, cover) = match snapshot {
+                    Some(snapshot) => (snapshot.parts.clone(), snapshot.cover.clone()),
+                    None => (Vec::new(), None),
+                };
+                Ok(Message::Parts { room, parts, cover })
+            }
+            Message::Get { room, part } => {
+                let snapshot = snapshot
+                    .as_ref()
+                    .filter(|snapshot| snapshot.room == room)
+                    .ok_or(CopyError::Unexpected("get"))?;
+                let json = snapshot
+                    .parts
+                    .get(part)
+                    .and_then(|info| snapshot.history.part(info.start, info.end).json())
+                    .ok_or(CopyError::Unexpected("get"))?;
+                let data =
+                    STANDARD_NO_PAD.encode(miniz_oxide::deflate::compress_to_vec_zlib(&json, 6));
+                Ok(Message::Data { room, part, data })
+            }
+            other => Err(CopyError::Unexpected(other.kind())),
+        }
+    }
+
+    async fn receive(
+        &self,
+        client: &Client,
+        session_id: &str,
+        download: &mut Download,
+        message: Message,
+    ) -> Result<Option<Message>, CopyError> {
+        match message {
+            Message::Parts { room, parts, cover } => {
+                if download.asked.as_ref() != Some(&room) {
+                    return Err(CopyError::Unexpected("parts"));
+                }
+                download.asked = None;
+                let known = self.known_parts(&room).await;
+                download.fetch = Some(Fetch::new(room, parts, cover, &known)?);
+            }
+            Message::Data { room, part, data } => {
+                let fetch = download
+                    .fetch
+                    .as_mut()
+                    .filter(|fetch| fetch.room == room && fetch.missing.front() == Some(&part))
+                    .ok_or(CopyError::Unexpected("data"))?;
+                let payload = fetch
+                    .parts
+                    .get(part)
+                    .and_then(|info| decode(info, &data))
+                    .ok_or_else(|| CopyError::BadPart {
+                        room: room.clone(),
+                        part,
+                    })?;
+                self.import_peer_payload(client, &room, payload).await?;
+                fetch.missing.pop_front();
+            }
+            other => return Err(CopyError::Unexpected(other.kind())),
+        }
+        self.next_request(client, session_id, download).await
+    }
+
+    async fn next_request(
+        &self,
+        client: &Client,
+        session_id: &str,
+        download: &mut Download,
+    ) -> Result<Option<Message>, CopyError> {
+        if let Some(fetch) = &download.fetch
+            && let Some(&part) = fetch.missing.front()
+        {
+            return Ok(Some(Message::Get {
+                room: fetch.room.clone(),
+                part,
+            }));
+        }
+        if let Some(fetch) = download.fetch.take() {
+            self.finish_peer_room(client, fetch, download.epoch).await?;
+            self.copied_room(session_id);
+        }
+        let Some(room) = download.rooms.pop_front() else {
+            return Ok(None);
+        };
+        self.search_sharing
+            .restoring
+            .lock()
+            .insert(room.clone(), Instant::now() + RESTORING);
+        download.asked = Some(room.clone());
+        Ok(Some(Message::Room { room }))
     }
 
     fn transferring(&self, session_id: &str) {
@@ -233,19 +364,39 @@ impl Core {
         }
     }
 
-    pub(super) async fn update_received<T>(
-        &self,
-        client: &Client,
-        change: impl FnOnce(&mut Received) -> (bool, T),
-    ) -> Result<T, RpcError> {
+    pub(super) async fn mark_synced(&self, client: &Client, copy: Option<SearchPeerCopyView>) {
         self.load_peer_receipts(client).await;
         let mut received = self.search_sharing.received.lock().await;
         let received = received.get_or_insert_with(Received::default);
-        let (changed, value) = change(received);
-        if changed {
-            save_received(client, received).await?;
+        received.synced_at = Some(now_ms());
+        if copy.is_some() {
+            received.last_copy = copy;
         }
-        Ok(value)
+        if let Err(error) = save_received(client, received).await {
+            tracing::warn!(%error, "could not save the search copy result");
+        }
+    }
+
+    pub(crate) async fn forget_shared_room(&self, client: &Client, room: &RoomId) {
+        self.load_peer_receipts(client).await;
+        let mut received = self.search_sharing.received.lock().await;
+        let Some(received) = received.as_mut() else {
+            return;
+        };
+        if received.known.remove(room).is_some()
+            && let Err(error) = save_received(client, received).await
+        {
+            tracing::warn!(%error, "could not forget the received search parts");
+        }
+    }
+
+    pub(super) async fn clear_received(&self, client: &Client) {
+        let mut received = self.search_sharing.received.lock().await;
+        self.search_sharing.epoch.fetch_add(1, Ordering::Relaxed);
+        *received = Some(Received::default());
+        if let Err(error) = client.state_store().remove_custom_value(STORE_KEY).await {
+            tracing::warn!(%error, "could not clear the search sharing data");
+        }
     }
 
     pub(super) async fn load_peer_receipts(&self, client: &Client) {
@@ -264,69 +415,26 @@ impl Core {
         }
     }
 
-    async fn next_peer_room(
-        &self,
-        client: &Client,
-        download: &mut Download,
-    ) -> Result<Option<Frame>, RpcError> {
-        if let Some(room) = download.rooms.pop_front() {
-            let previous = self
-                .search_sharing
-                .received
-                .lock()
-                .await
-                .as_ref()
-                .and_then(|state| state.parts.get(&room))
-                .cloned()
-                .unwrap_or_default();
-            let history = settled_history(client, &room).await;
-            let known: Vec<_> = previous
-                .iter()
-                .filter(|part| {
-                    history.as_ref().is_some_and(|history| {
-                        let payload = if part.start == part.end {
-                            history.corrections()
-                        } else {
-                            history.slice(part.start, part.end)
-                        };
-                        payload
-                            .json()
-                            .is_some_and(|json| sha256(&json) == part.sha256)
-                    })
-                })
-                .map(|part| part.sha256.clone())
-                .collect();
-            download.known = known.iter().cloned().collect();
-            download.current = Some(room.clone());
-            self.search_sharing
-                .restoring
-                .lock()
-                .insert(room.clone(), now_ms().saturating_add(RESTORING_MS));
-            Ok(Some(Frame::Room { room, known }))
-        } else if let Some(offset) = download.next.take() {
-            Ok(Some(Frame::List { offset }))
-        } else {
-            download.finished = true;
-            Ok(None)
-        }
+    async fn known_parts(&self, room: &OwnedRoomId) -> HashSet<String> {
+        self.search_sharing
+            .received
+            .lock()
+            .await
+            .as_ref()
+            .and_then(|received| received.known.get(room))
+            .cloned()
+            .unwrap_or_default()
     }
 
-    async fn peer_snapshot(
-        &self,
-        client: &Client,
-        room: OwnedRoomId,
-        known: Vec<String>,
-    ) -> Option<Snapshot> {
+    async fn peer_snapshot(&self, client: &Client, room: OwnedRoomId) -> Option<Snapshot> {
         self.save_rooms(client, vec![room.clone()]).await;
         self.save_changed_checkpoints(client).await;
-        let revision = {
+        {
             let index = self.search_index.lock().await;
-            let revision = index.revision(&room);
-            if !index.settled(&room) || !index.is_durable(&room, revision) {
+            if !index.settled(&room) || !index.is_durable(&room, index.revision(&room)) {
                 return None;
             }
-            revision
-        };
+        }
         let history = settled_history(client, &room).await?;
         let (boundary, resume) = self.search_crawl.lock().await.share_boundary(&room);
         let floor = self.search_index.lock().await.floor_of(&room);
@@ -338,8 +446,7 @@ impl Core {
             .weights
             .last()
             .map_or(from, |&(ts, _)| ts.saturating_add(1));
-        let anchor = history.anchor(from, until);
-        let mut spans = VecDeque::from([(0, 0)]);
+        let mut spans = vec![(0, 0)];
         if until > from {
             let target = history
                 .weight(from, until)
@@ -349,88 +456,51 @@ impl Core {
                 .min(MAX_SEGMENT_JSON);
             spans.extend(history.pack(from, until, target));
         }
-        let coverage = boundary == Some(from) && until > from;
+        let parts = spans
+            .into_iter()
+            .map(|(start, end)| {
+                let json = history
+                    .part(start, end)
+                    .json()
+                    .filter(|json| json.len() <= MAX_SEGMENT_JSON)?;
+                Some(Part {
+                    start,
+                    end,
+                    sha256: sha256(&json),
+                })
+            })
+            .collect::<Option<Vec<_>>>()?;
+        let cover = (boundary == Some(from) && until > from).then(|| SharedCover {
+            from,
+            until,
+            resume,
+            anchor: history.anchor(from, until),
+        });
         Some(Snapshot {
             room,
             history,
-            spans,
-            known: known.into_iter().collect(),
-            revision,
-            from,
-            until,
-            resume: if coverage { resume } else { None },
-            anchor,
-            coverage,
+            parts,
+            cover,
         })
-    }
-
-    async fn next_peer_part(&self, peer: &mut Peer, room: OwnedRoomId) -> Result<Frame, RpcError> {
-        let Some(snapshot) = peer.snapshot.as_mut() else {
-            return Ok(Frame::Done {
-                room,
-                from: 0,
-                until: 0,
-                resume: None,
-                anchor: None,
-                coverage: false,
-            });
-        };
-        if snapshot.room != room {
-            return Err(RpcError::Unavailable);
-        }
-        if let Some((start, end)) = snapshot.spans.pop_front() {
-            let payload = if start == end {
-                snapshot.history.corrections()
-            } else {
-                snapshot.history.slice(start, end)
-            };
-            let json = payload
-                .json()
-                .filter(|json| json.len() <= MAX_SEGMENT_JSON)
-                .ok_or(RpcError::Unavailable)?;
-            let part = Part {
-                start,
-                end,
-                sha256: sha256(&json),
-            };
-            let data = (!snapshot.known.contains(&part.sha256)).then(|| {
-                STANDARD_NO_PAD.encode(miniz_oxide::deflate::compress_to_vec_zlib(&json, 6))
-            });
-            Ok(Frame::Part { room, part, data })
-        } else {
-            let coverage = snapshot.coverage
-                && self.search_index.lock().await.revision(&room) == snapshot.revision;
-            let done = Frame::Done {
-                room,
-                from: snapshot.from,
-                until: snapshot.until,
-                resume: snapshot.resume.clone(),
-                anchor: snapshot.anchor.clone(),
-                coverage,
-            };
-            peer.snapshot = None;
-            Ok(done)
-        }
     }
 
     async fn import_peer_payload(
         &self,
         client: &Client,
         room: &OwnedRoomId,
-        part: &Part,
         payload: SegmentPayload,
-    ) -> Result<(), RpcError> {
+    ) -> Result<(), CopyError> {
         if !self.peers_allowed() {
-            return Err(RpcError::Unavailable);
+            return Err(CopyError::Session(RpcError::Unavailable));
         }
-        let useful = !payload.documents.is_empty()
-            || !payload.classified.is_empty()
-            || !payload.redacted.is_empty();
-        let event_cache = client.event_cache().ok_or(RpcError::Unavailable)?;
-        let (cache, _guard) = event_cache
-            .room(room)
-            .await
-            .map_err(|_| RpcError::Unavailable)?;
+        if !joined(client, room) {
+            return Err(CopyError::NotJoined(room.clone()));
+        }
+        let (cache, _guard) = match client.event_cache() {
+            Some(event_cache) => event_cache.room(room).await.ok(),
+            None => None,
+        }
+        .ok_or_else(|| CopyError::EventCache(room.clone()))?;
         let revision = {
             let mut index = self.search_index.lock().await;
             index
@@ -442,81 +512,71 @@ impl Core {
             index.revision(room)
         };
         self.save_rooms(client, vec![room.clone()]).await;
-        if !self.search_index.lock().await.is_durable(room, revision) {
-            return Err(RpcError::Unavailable);
+        if self.search_index.lock().await.is_durable(room, revision) {
+            Ok(())
+        } else {
+            Err(CopyError::NotDurable(room.clone()))
         }
-        let mut received = self.search_sharing.received.lock().await;
-        let received = received.get_or_insert_with(Received::default);
-        let parts = received.parts.entry(room.clone()).or_default();
-        parts.retain(|old| old.start != part.start || old.end != part.end);
-        if parts.len() >= MAX_PARTS {
-            parts.clear();
-        }
-        parts.push(part.clone());
-        if useful {
-            received.rooms.insert(room.clone());
-        }
-        save_received(client, received).await
     }
 
     async fn finish_peer_room(
         &self,
         client: &Client,
-        room: &OwnedRoomId,
-        from: u64,
-        until: u64,
-        resume: Option<String>,
-        anchor: Option<OwnedEventId>,
-    ) -> Result<(), RpcError> {
-        let signature = sha256(
-            &serde_json::to_vec(&(from, until, &resume, &anchor))
-                .map_err(|_| RpcError::Unavailable)?,
-        );
-        let mut received = self.search_sharing.received.lock().await;
-        let received = received.get_or_insert_with(Received::default);
-        if received.covers.get(room) == Some(&signature) {
+        fetch: Fetch,
+        epoch: u64,
+    ) -> Result<(), CopyError> {
+        let room = fetch.room;
+        self.search_sharing.restoring.lock().remove(&room);
+        if let Some(shared) = fetch.cover.filter(|_| joined(client, &room)) {
+            let mut cover = {
+                let crawl = self.search_crawl.lock().await;
+                super::super::merged_cover(
+                    crawl.cover_of(&room),
+                    shared.from,
+                    shared.until,
+                    shared.resume.as_deref(),
+                    shared.anchor.as_ref(),
+                    crawl.has_token(&room),
+                )
+            };
+            let (revision, floor) = {
+                let index = self.search_index.lock().await;
+                (index.revision(&room), index.floor_of(&room))
+            };
+            if floor > cover.from {
+                cover.from = floor;
+                cover.resume = None;
+                cover.stops = false;
+            }
+            self.search_crawl.lock().await.cover(&room, cover, revision);
+            self.save_changed_checkpoints(client).await;
+        }
+        if fetch.parts.is_empty() {
             return Ok(());
         }
-        let mut cover = {
-            let crawl = self.search_crawl.lock().await;
-            super::super::merged_cover(
-                crawl.cover_of(room),
-                from,
-                until,
-                resume.as_deref(),
-                anchor.as_ref(),
-                crawl.has_token(room),
-            )
-        };
-        let index = self.search_index.lock().await;
-        let revision = index.revision(room);
-        let floor = index.floor_of(room);
-        drop(index);
-        if floor > cover.from {
-            cover.from = floor;
-            cover.resume = None;
-            cover.stops = false;
+        let mut received = self.search_sharing.received.lock().await;
+        if self.search_sharing.epoch.load(Ordering::Relaxed) != epoch {
+            return Ok(());
         }
-        self.search_crawl.lock().await.cover(room, cover, revision);
-        self.save_changed_checkpoints(client).await;
-        received.covers.insert(room.clone(), signature);
-        save_received(client, received).await
+        let received = received.get_or_insert_with(Received::default);
+        received.known.insert(
+            room,
+            fetch.parts.into_iter().map(|part| part.sha256).collect(),
+        );
+        save_received(client, received)
+            .await
+            .map_err(|_| CopyError::Store)
     }
 }
 
-fn list_rooms(client: &Client, offset: usize) -> Frame {
+fn joined_rooms(client: &Client) -> VecDeque<OwnedRoomId> {
     let mut rooms: Vec<_> = client
         .joined_rooms()
         .into_iter()
         .map(|room| room.room_id().to_owned())
         .collect();
     rooms.sort();
-    let next = (offset.saturating_add(ROOM_PAGE) < rooms.len())
-        .then_some(offset.saturating_add(ROOM_PAGE));
-    Frame::Rooms {
-        rooms: rooms.into_iter().skip(offset).take(ROOM_PAGE).collect(),
-        next,
-    }
+    rooms.into()
 }
 
 fn joined(client: &Client, room: &OwnedRoomId) -> bool {
@@ -525,40 +585,37 @@ fn joined(client: &Client, room: &OwnedRoomId) -> bool {
         .is_some_and(|room| room.state() == matrix_sdk::RoomState::Joined)
 }
 
-async fn save_received(client: &Client, received: &Received) -> Result<(), RpcError> {
-    let bytes = serde_json::to_vec(received).map_err(|_| RpcError::Unavailable)?;
+async fn save_received(
+    client: &Client,
+    received: &Received,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let bytes = serde_json::to_vec(received)?;
     client
         .state_store()
         .set_custom_value(STORE_KEY, bytes)
-        .await
-        .map_err(|_| RpcError::Unavailable)?;
+        .await?;
     Ok(())
 }
 
-fn encode(frame: &Frame) -> Result<String, RpcError> {
-    serde_json::to_string(&frame)
-        .ok()
-        .filter(|data| data.len() <= MAX_FRAME)
-        .ok_or(RpcError::Unavailable)
-}
-
-fn valid_part(previous: &[Part], part: &Part) -> bool {
-    part.sha256.len() == SHA256_B64_LEN
-        && previous.len() < MAX_PARTS
-        && previous
-            .last()
-            .map_or(part.start == 0 && part.end == 0, |last| {
-                part.start < part.end && (last.end == 0 || last.end == part.start)
-            })
-}
-
-fn complete(parts: &[Part], from: u64, until: u64) -> bool {
-    parts.get(1).is_some_and(|part| part.start == from)
-        && parts.last().is_some_and(|part| part.end == until)
-        && parts
+/// Parts start with the redactions part `[0, 0)`, then cover a contiguous
+/// time range. A shared crawl cover must match that range exactly.
+fn valid_parts(parts: &[Part], cover: Option<&SharedCover>) -> bool {
+    let Some((first, history)) = parts.split_first() else {
+        return cover.is_none();
+    };
+    let ranges_ok = parts.len() <= MAX_PARTS
+        && parts.iter().all(|part| part.sha256.len() == SHA256_B64_LEN)
+        && first.start == 0
+        && first.end == 0
+        && history.iter().all(|part| part.start < part.end)
+        && history
             .windows(2)
-            .skip(1)
-            .all(|pair| matches!(pair, [left, right] if left.end == right.start))
+            .all(|pair| matches!(pair, [left, right] if left.end == right.start));
+    ranges_ok
+        && cover.is_none_or(|cover| {
+            history.first().is_some_and(|part| part.start == cover.from)
+                && history.last().is_some_and(|part| part.end == cover.until)
+        })
 }
 
 fn decode(part: &Part, data: &str) -> Option<SegmentPayload> {
@@ -575,20 +632,47 @@ mod tests {
         Part {
             start,
             end,
-            sha256: "a".repeat(SHA256_B64_LEN),
+            sha256: format!("{start:0>43}"),
+        }
+    }
+
+    fn cover(from: u64, until: u64) -> SharedCover {
+        SharedCover {
+            from,
+            until,
+            resume: None,
+            anchor: None,
         }
     }
 
     #[test]
-    fn deletions_must_arrive_before_contiguous_history() {
-        assert!(!valid_part(&[], &part(0, 10)));
-        let parts = vec![part(0, 0), part(0, 10)];
-        assert!(valid_part(&parts, &part(10, 20)));
-        assert!(!valid_part(&parts, &part(11, 20)));
-        assert!(!valid_part(&parts, &part(0, 0)));
-        assert!(complete(&parts, 0, 10));
-        assert!(!complete(&parts, 0, 20));
-        assert!(!complete(&[part(0, 0), part(0, 10), part(11, 20)], 0, 20));
+    fn parts_start_with_redactions_and_cover_a_contiguous_range() {
+        assert!(valid_parts(&[], None));
+        assert!(!valid_parts(&[], Some(&cover(0, 10))));
+        assert!(!valid_parts(&[part(0, 10)], None));
+        let parts = [part(0, 0), part(0, 10), part(10, 20)];
+        assert!(valid_parts(&parts, None));
+        assert!(valid_parts(&parts, Some(&cover(0, 20))));
+        assert!(!valid_parts(&parts, Some(&cover(0, 30))));
+        assert!(!valid_parts(&[part(0, 0), part(0, 10), part(11, 20)], None));
+        assert!(!valid_parts(&[part(0, 0), part(0, 0)], None));
+    }
+
+    #[test]
+    fn only_parts_with_unknown_hashes_are_fetched() {
+        let parts = vec![part(0, 0), part(1, 10), part(10, 20)];
+        let known = HashSet::from([part(1, 10).sha256]);
+        let fetch = Fetch::new("!room:localhost".try_into().unwrap(), parts, None, &known).unwrap();
+        assert_eq!(fetch.missing, [0, 2]);
+        assert!(matches!(
+            Fetch::new(
+                "!room:localhost".try_into().unwrap(),
+                vec![part(5, 10)],
+                None,
+                &known
+            ),
+            Err(CopyError::InvalidParts(_))
+        ));
     }
 
     #[test]

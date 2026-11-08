@@ -13,7 +13,7 @@ use super::persist::{self, Cover};
 #[cfg(test)]
 mod live;
 mod peer;
-pub(crate) use peer::{DISCOVERY_MS, SearchSharing};
+pub(crate) use peer::{DISCOVERY, SearchSharing};
 
 const MAX_SEGMENT_JSON: usize = 4 * 1024 * 1024;
 const CLASSIFIED_JSON: usize = 24;
@@ -146,6 +146,14 @@ impl History {
             documents,
             edits,
             redacted: Vec::new(),
+        }
+    }
+
+    fn part(&self, start: u64, end: u64) -> SegmentPayload {
+        if start == end {
+            self.corrections()
+        } else {
+            self.slice(start, end)
         }
     }
 

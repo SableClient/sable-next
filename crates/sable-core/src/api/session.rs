@@ -356,10 +356,14 @@ impl Handler for SetSearchOptionsParams {
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         core.search_foreground
             .store(self.foreground, Ordering::Relaxed);
-        core.search_sharing
+        let was_sharing = core
+            .search_sharing
             .enabled
-            .store(self.sharing, Ordering::Relaxed);
+            .swap(self.sharing, Ordering::Relaxed);
         if !self.sharing {
+            if was_sharing && let Ok(client) = core.client().await {
+                core.forget_search_sharing(&client).await;
+            }
             core.cancel_search_peers();
             core.search_sharing.reset_session().await;
         }

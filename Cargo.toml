@@ -52,7 +52,6 @@ serde_json = { version = "1", features = ["preserve_order"] }
 serde_with = "3"
 tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread", "macros", "fs"] }
 tokio-util = "0.7.20"
-bytes = "1"
 futures-util = "0.3"
 tracing = { version = "0.1", features = ["release_max_level_debug"] }
 url = "2"

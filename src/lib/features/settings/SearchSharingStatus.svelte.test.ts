@@ -14,8 +14,9 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 
 const searchMetrics = vi.fn<() => Promise<SearchMetricsView>>();
 const peerFind = vi.fn(() => Promise.resolve(null));
+const peerReset = vi.fn(() => Promise.resolve(null));
 const core = Object.assign(baseCore, {
-  rpc: { search: { metrics: searchMetrics, peerFind } },
+  rpc: { search: { metrics: searchMetrics, peerFind, peerReset } },
 });
 
 import SearchSharingStatus from './SearchSharingStatus.svelte';
@@ -74,6 +75,7 @@ beforeEach(() => {
 afterEach(() => {
   searchMetrics.mockReset();
   peerFind.mockClear();
+  peerReset.mockClear();
   preferences.developerTools = false;
   core.session = null;
   preferences.searchSharing = true;
@@ -104,6 +106,16 @@ test('a new device explains when history is copied and offers to copy now', asyn
   expect(peerFind).toHaveBeenCalledOnce();
 });
 
+test('the reset button forgets what this device received', async () => {
+  searchMetrics.mockResolvedValue(withSharing({ rooms_received: 3 }));
+  render(SearchSharingStatus);
+  await settle();
+
+  document.querySelector<HTMLButtonElement>('#search-sharing-reset button')?.click();
+  await settle();
+  expect(peerReset).toHaveBeenCalledOnce();
+});
+
 test('the pause reason replaces the waiting state', async () => {
   searchMetrics.mockResolvedValue(withSharing({ pause: 'metered', outcome: 'no_answer' }));
   render(SearchSharingStatus);
@@ -130,12 +142,12 @@ test('progress names the device being copied from', async () => {
   expect(status()).toContain('Copying from MacBook, 3 rooms so far');
 });
 
-test('an unanswered automatic copy says it keeps asking', async () => {
+test('an unanswered automatic copy says it asks again next time', async () => {
   searchMetrics.mockResolvedValue(withSharing({ outcome: 'no_answer', automatic: true }));
   render(SearchSharingStatus);
   await settle();
 
-  expect(status()).toContain('keeps asking while it is open');
+  expect(status()).toContain('asks again the next time it opens');
 });
 
 test('the last copy and received rooms stay visible', async () => {

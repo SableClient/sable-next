@@ -30,10 +30,6 @@ use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use wasm_bindgen::prelude::*;
 
-mod search_peer;
-
-pub use search_peer::{SearchPeerDecoder, encode_search_peer_frame};
-
 /// Everything crosses as JSON, typed on the other side by the generated
 /// protocol types.
 fn json(value: &impl serde::Serialize) -> Result<String, JsError> {

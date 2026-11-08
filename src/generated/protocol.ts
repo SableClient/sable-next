@@ -3331,6 +3331,7 @@ export type Rpc = {
 	session_id: string,
 	data: string | null,
 }) => Promise<string | null>;
+    peerReset: (params?: Record<string, never>) => Promise<null>;
   };
   session: {
     restore: (params?: Record<string, never>) => Promise<SessionInfo | null>;
@@ -3860,6 +3861,7 @@ export type RpcMethods = {
   'search.peer_start': Rpc['search']['peerStart'];
   'search.peer_find': Rpc['search']['peerFind'];
   'search.peer_exchange': Rpc['search']['peerExchange'];
+  'search.peer_reset': Rpc['search']['peerReset'];
   'session.restore': Rpc['session']['restore'];
   'session.list_accounts': Rpc['session']['listAccounts'];
   'session.switch_account': Rpc['session']['switchAccount'];
@@ -4219,6 +4221,7 @@ export function createRpc(call: RpcCall): Rpc {
       peerStart: (params = {}) => call('search.peer_start', params) as ReturnType<Rpc['search']['peerStart']>,
       peerFind: (params = {}) => call('search.peer_find', params) as ReturnType<Rpc['search']['peerFind']>,
       peerExchange: (params) => call('search.peer_exchange', params) as ReturnType<Rpc['search']['peerExchange']>,
+      peerReset: (params = {}) => call('search.peer_reset', params) as ReturnType<Rpc['search']['peerReset']>,
     },
     session: {
       restore: (params = {}) => call('session.restore', params) as ReturnType<Rpc['session']['restore']>,

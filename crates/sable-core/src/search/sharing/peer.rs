@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
@@ -15,6 +15,7 @@ use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{DeviceId, OwnedDeviceId, OwnedRoomId};
 use matrix_sdk_base::crypto::CollectStrategy;
 use serde::{Deserialize, Serialize};
+use web_time::Instant;
 
 use crate::Core;
 use crate::protocol::{
@@ -28,27 +29,39 @@ use crate::search::now_ms;
 
 mod transfer;
 
-use transfer::{Download, Received, Snapshot};
+use transfer::{Download, Received, Transfer};
 
 const MAX_SERVING: usize = 2;
 const MAX_ASKED: usize = 32;
-const SESSION_MS: u64 = 120_000;
-const RETRY_MS: u64 = 60_000;
-pub(crate) const DISCOVERY_MS: u64 = 10_000;
-const CONNECT_MS: u64 = 30_000;
-const WANT_MS: u64 = 24 * 60 * 60 * 1000;
-const ABSENCE_MS: u64 = 7 * 24 * 60 * 60 * 1000;
-const ACTIVE_WRITE_MS: u64 = 60 * 60 * 1000;
-const INACTIVE_DEVICE_MS: u64 = 90 * 24 * 60 * 60 * 1000;
+const SESSION_TIMEOUT: Duration = Duration::from_secs(120);
+pub(crate) const DISCOVERY: Duration = Duration::from_secs(10);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+const RESYNC_AFTER: Duration = Duration::from_hours(7 * 24);
+const INACTIVE_DEVICE: Duration = Duration::from_hours(90 * 24);
 const SESSION_ID_LEN: usize = 32;
+/// Devices only talk to devices using the same copy protocol. Events from
+/// releases before this field existed fail to parse and are ignored.
+const PROTOCOL_VERSION: u32 = 2;
 
 #[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
 #[ruma_event(type = "moe.sable.search_peer.v1", kind = ToDevice)]
 pub(crate) struct ToDeviceSearchPeerEventContent {
+    version: u32,
     session: String,
     timestamp: u64,
     #[serde(flatten)]
     kind: Discovery,
+}
+
+impl ToDeviceSearchPeerEventContent {
+    fn new(session: String, kind: Discovery) -> Self {
+        Self {
+            version: PROTOCOL_VERSION,
+            session,
+            timestamp: now_ms(),
+            kind,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -66,9 +79,8 @@ enum Role {
 }
 
 struct Peer {
-    touched: u64,
-    download: Download,
-    snapshot: Option<Snapshot>,
+    touched: Instant,
+    transfer: Transfer,
 }
 
 #[derive(Clone)]
@@ -79,14 +91,16 @@ struct Slot {
 }
 
 impl Slot {
-    fn new(role: Role, device: OwnedDeviceId, touched: u64) -> Self {
+    fn new(role: Role, device: OwnedDeviceId, touched: Instant) -> Self {
         Self {
             role,
             device,
             peer: Arc::new(tokio::sync::Mutex::new(Peer {
                 touched,
-                download: Download::default(),
-                snapshot: None,
+                transfer: match role {
+                    Role::Provider => Transfer::Sending(None),
+                    Role::Requester => Transfer::Receiving(Download::default()),
+                },
             })),
         }
     }
@@ -106,11 +120,11 @@ enum Phase {
     #[default]
     Idle,
     Discovering {
-        until: u64,
+        deadline: Instant,
     },
     Connecting {
         session: String,
-        since: u64,
+        deadline: Instant,
     },
     Transferring {
         session: String,
@@ -126,6 +140,18 @@ impl Phase {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum Overdue {
+    Discovery,
+    Connection(String),
+}
+
+enum Next {
+    Ignore,
+    Try(OwnedDeviceId),
+    Finished(SearchPeerOutcome),
+}
+
 #[derive(Default)]
 struct Catchup {
     phase: Phase,
@@ -134,18 +160,16 @@ struct Catchup {
     candidates: Vec<Candidate>,
     current: Option<usize>,
     outcome: Option<SearchPeerOutcome>,
-    last_attempt: u64,
     rooms: usize,
 }
 
 impl Catchup {
-    fn begin(&mut self, query: String, now: u64) {
+    fn begin(&mut self, query: String, now: Instant) {
         *self = Self {
             phase: Phase::Discovering {
-                until: now.saturating_add(DISCOVERY_MS),
+                deadline: now + DISCOVERY,
             },
             query,
-            last_attempt: now,
             ..Self::default()
         };
     }
@@ -175,32 +199,29 @@ impl Catchup {
         });
     }
 
-    fn rank(&mut self) {
-        self.candidates.sort_by_key(|candidate| {
-            std::cmp::Reverse((candidate.documents, candidate.complete_rooms))
-        });
-    }
-
-    fn advance(&mut self, failed: Option<&str>) -> bool {
+    fn next(&mut self, failed: Option<&str>, session: String, now: Instant) -> Next {
         match (&self.phase, failed) {
             (Phase::Discovering { .. }, None) => {
-                self.rank();
-                true
+                self.candidates.sort_by_key(|candidate| {
+                    std::cmp::Reverse((candidate.documents, candidate.complete_rooms))
+                });
             }
             (phase, Some(failed)) if phase.session() == Some(failed) => {
                 if let Some(current) = self.current_mut() {
                     current.status = SearchPeerCandidateStatus::Failed;
                 }
-                true
             }
-            _ => false,
+            _ => return Next::Ignore,
         }
-    }
-
-    fn pick(&mut self, session: String, now: u64) -> Option<OwnedDeviceId> {
-        let Some(index) = self.candidates.iter().position(|candidate| {
-            candidate.status == SearchPeerCandidateStatus::Waiting && candidate.documents > 0
-        }) else {
+        let Some((index, candidate)) =
+            self.candidates
+                .iter_mut()
+                .enumerate()
+                .find(|(_, candidate)| {
+                    candidate.status == SearchPeerCandidateStatus::Waiting
+                        && candidate.documents > 0
+                })
+        else {
             let outcome = if self.candidates.is_empty() {
                 SearchPeerOutcome::NoAnswer
             } else if self
@@ -215,16 +236,15 @@ impl Catchup {
                 SearchPeerOutcome::Failed
             };
             self.finish(Some(outcome));
-            return None;
+            return Next::Finished(outcome);
         };
         self.current = Some(index);
         self.phase = Phase::Connecting {
             session,
-            since: now,
+            deadline: now + CONNECT_TIMEOUT,
         };
-        let candidate = self.current_mut()?;
         candidate.status = SearchPeerCandidateStatus::Trying;
-        Some(candidate.device.clone())
+        Next::Try(candidate.device.clone())
     }
 
     fn current(&self) -> Option<&Candidate> {
@@ -234,24 +254,40 @@ impl Catchup {
     fn current_mut(&mut self) -> Option<&mut Candidate> {
         self.candidates.get_mut(self.current?)
     }
+
+    fn overdue(&self, now: Instant) -> Option<Overdue> {
+        match &self.phase {
+            Phase::Discovering { deadline } if now >= *deadline => Some(Overdue::Discovery),
+            Phase::Connecting { session, deadline } if now >= *deadline => {
+                Some(Overdue::Connection(session.clone()))
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Default)]
 pub(crate) struct SearchSharing {
     pub(crate) enabled: AtomicBool,
+    /// The app is running the WebRTC side, so this device can answer and serve.
     available: AtomicBool,
+    /// The automatic copy already ran since launch or since the network came back.
+    auto_tried: AtomicBool,
+    /// Bumped when saved copy data is wiped, so a copy that started before
+    /// does not save part hashes afterwards.
+    epoch: AtomicU64,
     slots: parking_lot::Mutex<HashMap<String, Slot>>,
     catchup: parking_lot::Mutex<Catchup>,
-    restoring: parking_lot::Mutex<HashMap<OwnedRoomId, u64>>,
+    restoring: parking_lot::Mutex<HashMap<OwnedRoomId, Instant>>,
     received: tokio::sync::Mutex<Option<Received>>,
 }
 
 impl SearchSharing {
-    fn remove_expired(slots: &mut HashMap<String, Slot>, now: u64) {
+    fn remove_expired(slots: &mut HashMap<String, Slot>, now: Instant) {
         slots.retain(|_, slot| {
-            slot.peer
-                .try_lock()
-                .map_or(true, |peer| now.saturating_sub(peer.touched) < SESSION_MS)
+            slot.peer.try_lock().map_or(true, |peer| {
+                now.duration_since(peer.touched) < SESSION_TIMEOUT
+            })
         });
     }
 
@@ -262,6 +298,7 @@ impl SearchSharing {
 
     pub(crate) async fn reset_session(&self) {
         self.available.store(false, Ordering::Relaxed);
+        self.auto_tried.store(false, Ordering::Relaxed);
         self.slots.lock().clear();
         self.restoring.lock().clear();
         *self.catchup.lock() = Catchup::default();
@@ -272,7 +309,7 @@ impl SearchSharing {
         self.restoring
             .lock()
             .get(room)
-            .is_some_and(|deadline| *deadline > now_ms())
+            .is_some_and(|deadline| *deadline > Instant::now())
     }
 }
 
@@ -302,9 +339,9 @@ impl Core {
             let received = sharing.received.lock().await;
             received.as_ref().map_or((0, None, false), |received| {
                 (
-                    received.rooms.len(),
+                    received.known.len(),
                     received.last_copy.clone(),
-                    received.wants_copy(now_ms()),
+                    received.copy_due(),
                 )
             })
         };
@@ -361,9 +398,16 @@ impl Core {
                     catchup.finish(Some(SearchPeerOutcome::Interrupted));
                 }
             }
-            catchup.last_attempt = 0;
         }
+        sharing.auto_tried.store(false, Ordering::Relaxed);
         self.close_rtc_purpose(RtcPurpose::SearchSharing);
+    }
+
+    pub(crate) async fn forget_search_sharing(&self, client: &Client) {
+        self.cancel_search_peers();
+        *self.search_sharing.catchup.lock() = Catchup::default();
+        self.search_sharing.restoring.lock().clear();
+        self.clear_received(client).await;
     }
 
     pub(crate) fn watch_search_peers(self: &Arc<Self>, client: &Client, generation: u64) {
@@ -403,17 +447,17 @@ impl Core {
         );
 
         let weak = Arc::downgrade(self);
-        let watched = client.clone();
         let mut verification = client.encryption().verification_state();
         self.track_session_task(
             spawn(async move {
-                loop {
-                    if verification.get() == VerificationState::Verified {
-                        verified(&weak, &watched).await;
+                let mut previous = verification.get();
+                while let Some(state) = verification.next().await {
+                    if previous == VerificationState::Unverified
+                        && state == VerificationState::Verified
+                    {
+                        verified(&weak).await;
                     }
-                    if verification.next().await.is_none() {
-                        return;
-                    }
+                    previous = state;
                 }
             })
             .abort_on_drop(),
@@ -431,8 +475,9 @@ impl Core {
         if self.session_generation.load(Ordering::SeqCst) != generation
             || !self.peers_allowed()
             || !self.search_sharing.available.load(Ordering::Relaxed)
+            || content.version != PROTOCOL_VERSION
             || content.session.len() != SESSION_ID_LEN
-            || now_ms().abs_diff(content.timestamp) > SESSION_MS
+            || Duration::from_millis(now_ms().abs_diff(content.timestamp)) > SESSION_TIMEOUT
         {
             return;
         }
@@ -473,7 +518,7 @@ impl Core {
     fn serve_search_peer(&self, generation: u64, session: String, device: OwnedDeviceId) {
         let (accepted, replaced) = {
             let mut slots = self.search_sharing.slots.lock();
-            SearchSharing::remove_expired(&mut slots, now_ms());
+            SearchSharing::remove_expired(&mut slots, Instant::now());
             let replaced: Vec<String> = slots
                 .iter()
                 .filter(|(_, slot)| slot.role == Role::Provider && slot.device == device)
@@ -490,7 +535,7 @@ impl Core {
             if accepted {
                 slots.insert(
                     session.clone(),
-                    Slot::new(Role::Provider, device.clone(), now_ms()),
+                    Slot::new(Role::Provider, device.clone(), Instant::now()),
                 );
             }
             (accepted, replaced)
@@ -529,26 +574,23 @@ impl Core {
         if !self.peers_allowed() {
             return Ok(());
         }
-        self.search_sharing.available.store(true, Ordering::Relaxed);
-        let client = self.client().await?;
-        let now = now_ms();
-        let wanted = self
-            .update_received(&client, |received| {
-                if received.last_active != 0
-                    && now.saturating_sub(received.last_active) > ABSENCE_MS
-                {
-                    received.wanted_since = Some(now);
-                }
-                let changed = now.saturating_sub(received.last_active) > ACTIVE_WRITE_MS;
-                if changed {
-                    received.last_active = now;
-                }
-                (changed, received.wants_copy(now))
-            })
-            .await?;
-        if wanted {
-            self.discover_search_peers(&client, false).await?;
+        let sharing = &self.search_sharing;
+        sharing.available.store(true, Ordering::Relaxed);
+        if sharing.auto_tried.load(Ordering::Relaxed) {
+            return Ok(());
         }
+        let client = self.client().await?;
+        self.load_peer_receipts(&client).await;
+        let due = sharing
+            .received
+            .lock()
+            .await
+            .as_ref()
+            .is_some_and(Received::copy_due);
+        if due {
+            self.discover_search_peers(&client).await?;
+        }
+        sharing.auto_tried.store(true, Ordering::Relaxed);
         Ok(())
     }
 
@@ -558,26 +600,17 @@ impl Core {
         }
         self.search_sharing.available.store(true, Ordering::Relaxed);
         let client = self.client().await?;
-        let now = now_ms();
-        self.update_received(&client, |received| {
-            received.wanted_since = Some(now);
-            (true, ())
-        })
-        .await?;
-        self.discover_search_peers(&client, true).await
+        self.discover_search_peers(&client).await
     }
 
-    async fn discover_search_peers(&self, client: &Client, force: bool) -> Result<(), RpcError> {
+    async fn discover_search_peers(&self, client: &Client) -> Result<(), RpcError> {
         let query = session_id().ok_or(RpcError::Unavailable)?;
         {
             let mut catchup = self.search_sharing.catchup.lock();
-            let started = now_ms();
-            if catchup.phase != Phase::Idle
-                || (!force && started.saturating_sub(catchup.last_attempt) < RETRY_MS)
-            {
+            if catchup.phase != Phase::Idle {
                 return Ok(());
             }
-            catchup.begin(query.clone(), started);
+            catchup.begin(query.clone(), Instant::now());
         }
         let devices = match query_targets(client).await {
             Ok(devices) => devices,
@@ -605,11 +638,7 @@ impl Core {
                 })
                 .collect();
         }
-        let content = ToDeviceSearchPeerEventContent {
-            session: query.clone(),
-            timestamp: now_ms(),
-            kind: Discovery::Query,
-        };
+        let content = ToDeviceSearchPeerEventContent::new(query.clone(), Discovery::Query);
         if let Err(error) = broadcast(client, &devices, &content).await {
             self.finish_discovery(&query, SearchPeerOutcome::Failed);
             return Err(error);
@@ -625,32 +654,23 @@ impl Core {
     }
 
     async fn tick_search_peers(&self) {
-        enum Due {
-            Choose,
-            GiveUp(String),
-        }
-        let now = now_ms();
-        let due = match &self.search_sharing.catchup.lock().phase {
-            Phase::Discovering { until } if now >= *until => Due::Choose,
-            Phase::Connecting { session, since } if now.saturating_sub(*since) >= CONNECT_MS => {
-                Due::GiveUp(session.clone())
-            }
-            _ => return,
+        let overdue = self.search_sharing.catchup.lock().overdue(Instant::now());
+        let failed = match overdue {
+            None => return,
+            Some(Overdue::Discovery) => None,
+            Some(Overdue::Connection(session)) => Some(session),
         };
-        match due {
-            Due::Choose => self.next_search_peer(None).await,
-            Due::GiveUp(session) => {
-                self.search_sharing.slots.lock().remove(&session);
-                self.close_rtc(&session);
-                self.emit(CoreEvent::Rtc {
-                    session_id: session.clone(),
-                    purpose: RtcPurpose::SearchSharing,
-                    sender: false,
-                    signal: RtcSignal::Close,
-                });
-                self.next_search_peer(Some(session)).await;
-            }
+        if let Some(session) = &failed {
+            self.search_sharing.slots.lock().remove(session);
+            self.close_rtc(session);
+            self.emit(CoreEvent::Rtc {
+                session_id: session.clone(),
+                purpose: RtcPurpose::SearchSharing,
+                sender: false,
+                signal: RtcSignal::Close,
+            });
         }
+        self.next_search_peer(failed).await;
     }
 
     async fn next_search_peer(&self, mut failed: Option<String>) {
@@ -665,19 +685,22 @@ impl Core {
                     .finish(Some(SearchPeerOutcome::Failed));
                 return;
             };
-            let device = {
-                let mut catchup = self.search_sharing.catchup.lock();
-                if !catchup.advance(failed.as_deref()) {
+            let next = self.search_sharing.catchup.lock().next(
+                failed.as_deref(),
+                session.clone(),
+                Instant::now(),
+            );
+            let device = match next {
+                Next::Finished(SearchPeerOutcome::NothingToCopy) => {
+                    self.mark_synced(&client, None).await;
                     return;
                 }
-                let Some(device) = catchup.pick(session.clone(), now_ms()) else {
-                    return;
-                };
-                device
+                Next::Ignore | Next::Finished(_) => return,
+                Next::Try(device) => device,
             };
             self.search_sharing.slots.lock().insert(
                 session.clone(),
-                Slot::new(Role::Requester, device.clone(), now_ms()),
+                Slot::new(Role::Requester, device.clone(), Instant::now()),
             );
             if self.open_rtc(
                 RtcPurpose::SearchSharing,
@@ -716,16 +739,7 @@ impl Core {
                 rooms,
             }
         };
-        if let Err(error) = self
-            .update_received(client, |received| {
-                received.last_copy = Some(copy);
-                received.wanted_since = None;
-                (true, ())
-            })
-            .await
-        {
-            tracing::warn!(?error, "could not save the search copy result");
-        }
+        self.mark_synced(client, Some(copy)).await;
         self.emit(CoreEvent::Rtc {
             session_id: session.to_owned(),
             purpose: RtcPurpose::SearchSharing,
@@ -747,7 +761,7 @@ impl Core {
             .cloned()
             .ok_or(RpcError::Unavailable)?;
         let mut peer = slot.peer.lock().await;
-        if now_ms().saturating_sub(peer.touched) > SESSION_MS {
+        if peer.touched.elapsed() > SESSION_TIMEOUT {
             return Err(RpcError::Unavailable);
         }
         let user = client.user_id().ok_or(RpcError::NotLoggedIn)?;
@@ -761,7 +775,7 @@ impl Core {
         {
             return Err(RpcError::Unavailable);
         }
-        peer.touched = now_ms();
+        peer.touched = Instant::now();
         drop(peer);
         Ok(slot)
     }
@@ -772,27 +786,21 @@ impl Core {
     }
 }
 
-async fn verified(core: &Weak<Core>, client: &Client) {
+async fn verified(core: &Weak<Core>) {
     let Some(core) = core.upgrade() else { return };
-    let now = now_ms();
-    let first = core
-        .update_received(client, |received| {
-            let first = !received.verified;
-            if first {
-                received.verified = true;
-                received.wanted_since = Some(now);
-            }
-            (first, first)
-        })
-        .await
-        .unwrap_or(false);
-    if first
-        && core.peers_allowed()
-        && core.search_sharing.available.load(Ordering::Relaxed)
-        && let Err(error) = core.discover_search_peers(client, true).await
-    {
+    if !core.search_sharing.available.load(Ordering::Relaxed) {
+        return;
+    }
+    core.search_sharing
+        .auto_tried
+        .store(false, Ordering::Relaxed);
+    if let Err(error) = core.start_search_peers().await {
         tracing::debug!(?error, "could not look for search peers after verification");
     }
+}
+
+fn age(timestamp_ms: u64) -> Duration {
+    Duration::from_millis(now_ms().saturating_sub(timestamp_ms))
 }
 
 fn session_id() -> Option<String> {
@@ -821,7 +829,6 @@ async fn query_targets(client: &Client) -> Result<Vec<Device>, RpcError> {
                 })
                 .collect()
         });
-    let now = now_ms();
     let mut targets: Vec<(u64, Device)> = devices
         .devices()
         .filter(|device| device.is_verified() && Some(device.device_id()) != client.device_id())
@@ -830,7 +837,7 @@ async fn query_targets(client: &Client) -> Result<Vec<Device>, RpcError> {
                 Some(seen) => *seen.get(device.device_id())?,
                 None => None,
             };
-            if last_seen.is_some_and(|ts| now.saturating_sub(ts) > INACTIVE_DEVICE_MS) {
+            if last_seen.is_some_and(|ts| age(ts) > INACTIVE_DEVICE) {
                 return None;
             }
             Some((last_seen.unwrap_or(0), device))
@@ -868,11 +875,7 @@ async fn send_discovery(
     session: &str,
     kind: Discovery,
 ) -> Result<(), RpcError> {
-    let content = ToDeviceSearchPeerEventContent {
-        session: session.to_owned(),
-        timestamp: now_ms(),
-        kind,
-    };
+    let content = ToDeviceSearchPeerEventContent::new(session.to_owned(), kind);
     sable_frostbite::send(client, device, &content)
         .await
         .map_err(|_| RpcError::Unavailable)

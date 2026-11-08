@@ -521,6 +521,7 @@ impl Core {
             if let Some(index) = self.search_index.lock().await.rooms.get_mut(&room_id) {
                 index.evict_oldest_chunk(chunk, next);
             }
+            self.forget_shared_room(client, &room_id).await;
         }
     }
 
@@ -554,6 +555,7 @@ impl Core {
                     *core.search_index.lock().await = MessageIndex::new();
                     core.search_crawl.lock().await.reset();
                     core.server_search.lock().await.reset();
+                    core.forget_search_sharing(&client).await;
 
                     if !persist::forget_crawl(&client).await {
                         let _ = persist::forget_crawl(&client).await;
@@ -627,6 +629,7 @@ impl Core {
                         core.search_index.lock().await.forget_room(&room_id);
                         core.search_crawl.lock().await.forget(&room_id);
                         let _ = persist::forget(&client, &room_id).await;
+                        core.forget_shared_room(&client, &room_id).await;
                         continue;
                     };
 

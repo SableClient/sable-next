@@ -20,6 +20,7 @@
   const core = useCoreClient();
   let sharing = $state<SearchSharingView | null>(null);
   let finding = $state(false);
+  let resetting = $state(false);
   let connections = $state<SearchPeerConnection[]>([]);
 
   $effect(() => {
@@ -118,6 +119,12 @@
     await core.rpc.search.peerFind({}).catch(() => {});
     finding = false;
   }
+
+  async function reset(): Promise<void> {
+    resetting = true;
+    await core.rpc.search.peerReset({}).catch(() => {});
+    resetting = false;
+  }
 </script>
 
 {#if sharing}
@@ -158,6 +165,15 @@
     {/if}
     <SettingsRow id="search-sharing-received" title={i18n.t('settings.searchPeerRoomsReceived')}>
       <code>{sharing.rooms_received}</code>
+    </SettingsRow>
+    <SettingsRow
+      id="search-sharing-reset"
+      title={i18n.t('settings.searchPeerReset')}
+      description={i18n.t('settings.searchPeerResetHint')}
+    >
+      <Button size="small" loading={resetting} onclick={reset}>
+        {i18n.t('settings.searchPeerResetAction')}
+      </Button>
     </SettingsRow>
     {#if preferences.developerTools}
       <SettingsRow id="search-sharing-asked" title={i18n.t('settings.searchPeerDebugAsked')}>
