@@ -811,6 +811,8 @@ pub fn run() {
             #[cfg(target_os = "ios")]
             ios::save_media_to_photos,
             #[cfg(target_os = "ios")]
+            ios::h264_from_hevc,
+            #[cfg(target_os = "ios")]
             ios::open_in_app_auth_url,
             #[cfg(target_os = "ios")]
             ios::close_in_app_auth_window,

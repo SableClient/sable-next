@@ -104,6 +104,13 @@ libc = "=0.2.191"
 tauri-plugin-auth-session = { version = "0.2.2", git = "https://github.com/yanqianglu/tauri-plugin-auth-session", rev = "b335cfff0662d04e468df8e32869c047e6400135" }
 block2 = "0.6"
 objc2 = "0.6"
+objc2-av-foundation = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "AVAsset",
+  "AVAssetExportSession",
+  "AVMediaFormat",
+  "block2",
+] }
 objc2-foundation = { version = "0.3", features = [
   "NSError",
   "NSString",

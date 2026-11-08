@@ -12,6 +12,10 @@ use objc2::{
     runtime::{AnyClass, AnyObject, ClassBuilder, Sel},
     sel,
 };
+use objc2_av_foundation::{
+    AVAssetExportPreset1920x1080, AVAssetExportSession, AVAssetExportSessionStatus,
+    AVFileTypeMPEG4, AVURLAsset,
+};
 use objc2_foundation::{NSString, NSURL};
 use objc2_photos::{
     PHAccessLevel, PHAssetCreationRequest, PHAssetResourceType, PHAuthorizationStatus,
@@ -293,6 +297,88 @@ pub(crate) async fn save_media_to_photos(request: tauri::ipc::Request<'_>) -> Re
     tauri::async_runtime::spawn_blocking(move || write_to_photos(&bytes, &filename, resource_type))
         .await
         .map_err(|error| error.to_string())?
+}
+
+#[link(name = "AVFoundation", kind = "framework")]
+unsafe extern "C" {}
+
+fn h264_export(input: &std::path::Path, output: &std::path::Path) -> Result<(), String> {
+    let source = NSURL::fileURLWithPath(&NSString::from_str(&input.to_string_lossy()));
+    // SAFETY: no options are passed
+    let asset = unsafe { AVURLAsset::URLAssetWithURL_options(&source, None) };
+    // SAFETY: a valid preset name, and the non-HEVC presets encode H.264
+    let session = unsafe {
+        AVAssetExportSession::exportSessionWithAsset_presetName(
+            &asset,
+            AVAssetExportPreset1920x1080,
+        )
+    }
+    .ok_or("the video cannot be exported as H.264")?;
+    // SAFETY: a framework constant
+    let file_type = unsafe { AVFileTypeMPEG4 }.ok_or("MPEG-4 export is unavailable")?;
+    let target = NSURL::fileURLWithPath(&NSString::from_str(&output.to_string_lossy()));
+    // SAFETY: the session has not started
+    unsafe { session.setOutputURL(Some(&target)) };
+    // SAFETY: the session has not started
+    unsafe { session.setOutputFileType(Some(file_type)) };
+    // SAFETY: the session has not started
+    unsafe { session.setShouldOptimizeForNetworkUse(true) };
+
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    let sender = Mutex::new(Some(sender));
+    let handler: RcBlock<dyn Fn()> = RcBlock::new(move || {
+        if let Ok(mut sender) = sender.lock()
+            && let Some(sender) = sender.take()
+        {
+            let _ = sender.send(());
+        }
+    });
+    // SAFETY: the handler only sends on a Mutex-guarded channel, so it is sendable
+    unsafe { session.exportAsynchronouslyWithCompletionHandler(&handler) };
+    receiver
+        .recv()
+        .map_err(|_| "the video export was cancelled")?;
+    // SAFETY: the export has finished
+    if unsafe { session.status() } == AVAssetExportSessionStatus::Completed {
+        return Ok(());
+    }
+    // SAFETY: the export has finished
+    Err(unsafe { session.error() }.map_or_else(
+        || "the video export failed".to_owned(),
+        |error| error.localizedDescription().to_string(),
+    ))
+}
+
+#[tauri::command]
+pub(crate) async fn h264_from_hevc(
+    request: tauri::ipc::Request<'_>,
+) -> Result<tauri::ipc::Response, String> {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("the video bytes must ride the request body".into());
+    };
+    let bytes = bytes.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let stem = std::env::temp_dir().join(format!(
+            "sable-h264-{}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let input = stem.with_extension("mov");
+        let output = stem.with_extension("mp4");
+        let result = std::fs::write(&input, &bytes)
+            .map_err(|error| format!("failed to stage the video: {error}"))
+            .and_then(|()| h264_export(&input, &output))
+            .and_then(|()| {
+                std::fs::read(&output)
+                    .map_err(|error| format!("failed to read the export: {error}"))
+            });
+        let _ = std::fs::remove_file(&input);
+        let _ = std::fs::remove_file(&output);
+        result.map(tauri::ipc::Response::new)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
