@@ -2489,6 +2489,7 @@
     "pushEmbeddedServerInvalid": "An ntfy server is an https address with no username, query or fragment.",
     "pushGateway": "Push gateway",
     "pushGatewayHint": "Where your homeserver sends notifications when {{appName}} is closed. Leave these blank to use the gateway this deployment ships with.",
+    "pushGatewayUnifiedPush": "ntfy is its own push gateway. Leave these blank.",
     "pushGatewayDefault": "Using {{gateway}}",
     "pushGatewayServer": "This homeserver delivers web push notifications itself.",
     "pushGatewayUrl": "Gateway URL",

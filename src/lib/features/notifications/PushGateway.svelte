@@ -260,6 +260,9 @@
     <SettingsAnchorLink anchor="push-gateway" />
   </div>
   <p class="hint settings-description">{i18n.t('settings.pushGatewayHint')}</p>
+  {#if android && (provider === 'unifiedpush' || provider === 'embedded')}
+    <p class="hint">{i18n.t('settings.pushGatewayUnifiedPush')}</p>
+  {/if}
 
   {#if !deliversWebPush() && !native}
     <Alert variant="info">
