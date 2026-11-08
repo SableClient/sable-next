@@ -1,0 +1,4 @@
+- On iOS, sending the app to the background no longer leaves work running against its closed databases.
+- Image link previews no longer crash when they are cleared while on screen.
+- If part of the app fails to download at startup, a retry screen shows instead of a broken app.
+- Error reports leave out expected server, network and call failures, and carry the cause of the ones that remain.
