@@ -1,5 +1,17 @@
 # Sable Changelog
 
+## 2.3.7 (2026-11-08)
+
+### Fixes
+
+* On iOS, sending the app to the background no longer leaves work running against its closed databases.
+* Image link previews no longer crash when they are cleared while on screen.
+* If part of the app fails to download at startup, a retry screen shows instead of a broken app.
+* Error reports leave out expected server, network and call failures, and carry the cause of the ones that remain.
+* An open tab reloads into the new version when an update removes files it still needs, instead of failing to load.
+* Leaving a room while typing clears the typing notice in that room.
+* Closing pinned messages or the emoji picker right after scrolling no longer throws an error.
+
 ## 2.3.6 (2026-11-07)
 
 ### Features
