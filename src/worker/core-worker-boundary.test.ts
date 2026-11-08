@@ -29,6 +29,7 @@ function fakeCore(call: WorkerCore['call'] = () => Promise.resolve('null')): Wor
     sendAttachment: () => Promise.resolve(),
     sendGallery: () => Promise.resolve(),
     uploadMedia: () => Promise.resolve(''),
+    rtcData: () => Promise.resolve(new Uint8Array(new ArrayBuffer())),
     setActive: () => Promise.resolve(),
   };
 }
@@ -172,6 +173,20 @@ test('asks the WASM core to forget a media source', async () => {
 
   expect(forgetMedia).toHaveBeenCalledWith('mxc://example.org/broken');
   expect(port.messages).toEqual([{ id: 1, uri: null }]);
+});
+
+test('passes an RTC frame to the core and returns the reply bytes', async () => {
+  const core = fakeCore();
+  const rtcData = vi.fn(() => Promise.resolve(new Uint8Array([9, 8])));
+  core.rtcData = rtcData;
+  const boundary = createCoreWorkerBoundary(Promise.resolve(core));
+  const port = new FakePort();
+  boundary.connect(port);
+
+  await port.send({ id: 1, rtc: { sessionId: 'session', frame: new Uint8Array([1, 2]) } });
+
+  expect(rtcData).toHaveBeenCalledWith('session', new Uint8Array([1, 2]));
+  expect(port.messages).toEqual([{ id: 1, bytes: new Uint8Array([9, 8]) }]);
 });
 
 test('passes gallery items and shared metadata to the WASM core', async () => {

@@ -344,6 +344,16 @@ export function createWsTransport(options: WsTransportOptions): Transport {
       return (await response.json()) as string;
     },
 
+    async rtcData(sessionId, frame) {
+      const response = await fetchServer(`/_sable/rtc/${encodeURIComponent(sessionId)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: frame,
+      });
+      if (!response.ok) throw await responseError(response);
+      return new Uint8Array(await response.arrayBuffer());
+    },
+
     setDebugLogs() {},
 
     subscribe(listener) {

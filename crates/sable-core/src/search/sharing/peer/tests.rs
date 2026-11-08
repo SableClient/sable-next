@@ -241,7 +241,7 @@ fn discovery_events_use_the_documented_fields() {
     assert_eq!(
         serde_json::to_value(&content).unwrap(),
         serde_json::json!({
-            "version": 3,
+            "version": 4,
             "session": "s",
             "timestamp": 1,
             "kind": "info",
@@ -251,7 +251,7 @@ fn discovery_events_use_the_documented_fields() {
         })
     );
     let request: ToDeviceSearchPeerEventContent = serde_json::from_value(
-        serde_json::json!({"version": 3, "session": "s", "timestamp": 1, "kind": "request"}),
+        serde_json::json!({"version": 4, "session": "s", "timestamp": 1, "kind": "request"}),
     )
     .unwrap();
     assert_eq!(request.kind, Discovery::Request);
@@ -541,7 +541,10 @@ async fn exchange(source: &Core, target: &Core, id: &str) -> usize {
     )]);
     let mut payloads = 0;
     while let Some((to_target, frame)) = frames.pop_front() {
-        if frame.contains("\"kind\":\"data\"") {
+        if matches!(
+            rmp_serde::from_slice(&frame),
+            Ok(transfer::Message::Data { .. })
+        ) {
             payloads += 1;
         }
         let receiver = if to_target { target } else { source };

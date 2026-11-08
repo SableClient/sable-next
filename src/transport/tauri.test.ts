@@ -40,6 +40,18 @@ test.each([undefined, false, true])(
   }
 );
 
+test('sends an RTC frame as raw bytes with the session in a header', async () => {
+  invoke.mockResolvedValue(new Uint8Array([3]).buffer);
+  const transport = createTauriTransport();
+  const frame = new Uint8Array([1, 2]);
+
+  await expect(transport.rtcData('session id', frame)).resolves.toEqual(new Uint8Array([3]));
+  const call = invoke.mock.calls.at(-1) ?? [];
+  expect(call[0]).toBe('rtc_data');
+  expect(call[1]).toBe(frame);
+  expect(headersOf(call)).toEqual({ session: 'session%20id' });
+});
+
 test('percent-encodes the attachment request header', async () => {
   invoke.mockResolvedValue(undefined);
   const transport = createTauriTransport();

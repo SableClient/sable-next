@@ -935,6 +935,10 @@ export class CoreClient {
     return uri;
   }
 
+  rtcData(sessionId: string, frame: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+    return this.ensureTransport().rtcData(sessionId, frame);
+  }
+
   subscribeEvents(onEvent: (event: CoreEvent) => void): () => void {
     return this.ensureTransport().subscribe((event) => {
       if (event.type === 'verification') {

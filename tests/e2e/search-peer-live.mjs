@@ -80,6 +80,9 @@ try {
     pages.push(page);
     await page.goto(`http://127.0.0.1:${port}/`);
     await page.exposeFunction('peerCall', (method, params) => call(side, method, params));
+    await page.exposeFunction('peerData', (sessionId, frame) =>
+      call(side, 'rtc_data', { session_id: sessionId, frame })
+    );
     await call(side, 'session.set_search_options', options);
     await page.evaluate(async (side) => {
       const { loadModel } = await import('/src/lib/model/model.ts');
@@ -100,7 +103,6 @@ try {
       const rpc = {
         search: {
           peerStart: route('search.peer_start'),
-          peerExchange: route('search.peer_exchange'),
         },
         rtc: { signal: route('rtc.signal'), close: route('rtc.close') },
         calls: { turnServer: route('calls.turn_server') },
@@ -109,6 +111,8 @@ try {
         {
           session: { account_id: `device-${side}` },
           rpc,
+          rtcData: async (sessionId, frame) =>
+            new Uint8Array(await window.peerData(sessionId, Array.from(frame))),
           subscribeEvents(listener) {
             listeners.add(listener);
             return () => listeners.delete(listener);

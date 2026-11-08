@@ -25,6 +25,7 @@ export type WorkerCore = {
   sendAttachment(request: string, bytes: Uint8Array<ArrayBuffer>): Promise<void>;
   sendGallery(request: string, bytes: Uint8Array<ArrayBuffer>): Promise<void>;
   uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string>;
+  rtcData(sessionId: string, frame: Uint8Array<ArrayBuffer>): Promise<Uint8Array>;
   setActive(active: boolean): Promise<void>;
 };
 
@@ -375,6 +376,12 @@ export function createCoreWorkerBoundary(
           const { mime, bytes } = request.upload;
           const uri = await instance.uploadMedia(mime, bytes);
           port.postMessage({ id, uri } satisfies WorkerMessage);
+          return;
+        }
+        if ('rtc' in request) {
+          const { sessionId, frame } = request.rtc;
+          const bytes = (await instance.rtcData(sessionId, frame)) as Uint8Array<ArrayBuffer>;
+          port.postMessage({ id, bytes } satisfies WorkerMessage, [bytes.buffer]);
           return;
         }
         if ('call' in request) {

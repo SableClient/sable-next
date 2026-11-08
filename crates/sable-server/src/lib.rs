@@ -52,7 +52,7 @@ use crate::{
     },
     cli::Cli,
     config::{Config, is_loopback_url},
-    media::{forget_media, media, send_attachment, send_gallery, upload},
+    media::{forget_media, media, rtc_data, send_attachment, send_gallery, upload},
     oidc_routes::{oidc_callback, oidc_start, oidc_status},
     sessions::SessionMemoryStore,
 };
@@ -405,6 +405,7 @@ impl Server {
             .route("/_sable/logout", post(logout))
             .route("/_sable/media/{server}/{media_id}", get(media))
             .route("/_sable/media/forget", post(forget_media))
+            .route("/_sable/rtc/{session}", post(rtc_data))
             .merge(uploads);
         let static_files = ServeDir::new(self.frontend.directory.clone())
             .precompressed_gzip()

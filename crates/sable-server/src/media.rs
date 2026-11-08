@@ -86,6 +86,24 @@ pub(super) async fn upload(
     }
 }
 
+pub(super) async fn rtc_data(
+    Extension(runtime): Extension<Arc<UserRuntime>>,
+    AxumPath(session_id): AxumPath<String>,
+    body: Bytes,
+) -> Response {
+    match runtime.core.rtc_data(&session_id, &body).await {
+        Ok(bytes) => {
+            let mut response = (StatusCode::OK, bytes).into_response();
+            response.headers_mut().insert(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/octet-stream"),
+            );
+            response
+        }
+        Err(error) => rpc_error_response(error),
+    }
+}
+
 #[derive(Deserialize)]
 pub(super) struct ForgetMediaRequest {
     source: String,

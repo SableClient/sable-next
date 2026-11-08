@@ -78,6 +78,9 @@ export interface Transport {
   /** Resolves with the `mxc:` URI, which the avatar commands take. */
   uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string>;
 
+  /** Resolves with the bytes to send back on the data channel, empty when there are none. */
+  rtcData(sessionId: string, frame: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>>;
+
   setDebugLogs(enabled: boolean): void;
 
   subscribe(onEvent: (event: CoreEvent) => void): () => void;

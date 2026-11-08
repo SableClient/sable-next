@@ -17,6 +17,7 @@ interface NativeCore {
   sendAttachment(request: string, bytes: Uint8Array): Promise<void>;
   sendGallery(request: string, bytes: Uint8Array): Promise<void>;
   uploadMedia(mime: string, bytes: Uint8Array): Promise<string>;
+  rtcData(sessionId: string, frame: Uint8Array): Promise<Buffer>;
   subscribeEvents(onEvents: (json: string) => void): void;
 }
 
@@ -64,6 +65,7 @@ function serve(directory: string): void {
     sendAttachment: (request, bytes) => unwrap(instance.sendAttachment(request, bytes)),
     sendGallery: (request, items) => unwrap(instance.sendGallery(request, items)),
     uploadMedia: (mime, bytes) => unwrap(instance.uploadMedia(mime, bytes)),
+    rtcData: (sessionId, frame) => unwrap(instance.rtcData(sessionId, frame)),
     setActive: (active) => unwrap(instance.setActive(active)),
   };
 

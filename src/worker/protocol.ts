@@ -26,7 +26,8 @@ export type WorkerRequest =
   | { id: number; forget: { source: string } }
   | { id: number; attachment: AttachmentRequest }
   | { id: number; gallery: GalleryRequest }
-  | { id: number; upload: { mime: string; bytes: Uint8Array<ArrayBuffer> } };
+  | { id: number; upload: { mime: string; bytes: Uint8Array<ArrayBuffer> } }
+  | { id: number; rtc: { sessionId: string; frame: Uint8Array<ArrayBuffer> } };
 
 /** Worker → page. Events carry no id because they answer nothing. */
 export type WorkerMessage =

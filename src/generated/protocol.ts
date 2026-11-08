@@ -3367,10 +3367,6 @@ export type Rpc = {
     metrics: (params?: Record<string, never>) => Promise<SearchMetricsView>;
     peerStart: (params?: Record<string, never>) => Promise<null>;
     peerFind: (params?: Record<string, never>) => Promise<null>;
-    peerExchange: (params: {
-	session_id: string,
-	data: string | null,
-}) => Promise<string | null>;
     peerReset: (params?: Record<string, never>) => Promise<null>;
   };
   session: {
@@ -3900,7 +3896,6 @@ export type RpcMethods = {
   'search.metrics': Rpc['search']['metrics'];
   'search.peer_start': Rpc['search']['peerStart'];
   'search.peer_find': Rpc['search']['peerFind'];
-  'search.peer_exchange': Rpc['search']['peerExchange'];
   'search.peer_reset': Rpc['search']['peerReset'];
   'session.restore': Rpc['session']['restore'];
   'session.list_accounts': Rpc['session']['listAccounts'];
@@ -4260,7 +4255,6 @@ export function createRpc(call: RpcCall): Rpc {
       metrics: (params = {}) => call('search.metrics', params) as ReturnType<Rpc['search']['metrics']>,
       peerStart: (params = {}) => call('search.peer_start', params) as ReturnType<Rpc['search']['peerStart']>,
       peerFind: (params = {}) => call('search.peer_find', params) as ReturnType<Rpc['search']['peerFind']>,
-      peerExchange: (params) => call('search.peer_exchange', params) as ReturnType<Rpc['search']['peerExchange']>,
       peerReset: (params = {}) => call('search.peer_reset', params) as ReturnType<Rpc['search']['peerReset']>,
     },
     session: {

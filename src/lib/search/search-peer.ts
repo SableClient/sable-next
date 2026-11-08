@@ -10,8 +10,6 @@ import { reportSearchPeerConnection, selectedRoute } from '#lib/search/search-pe
 
 // Messages and their framing are described in docs/search-sharing.md.
 const CHANNEL = 'sable-search-v1';
-const END = 'end';
-const MAX_MESSAGE_BYTES = 6 * 1024 * 1024;
 const CHUNK_BYTES = 16 * 1024;
 const NEGOTIATION_MS = 20_000;
 const IDLE_MS = 120_000;
@@ -20,9 +18,10 @@ const START_INTERVAL_MS = 60_000;
 export interface SearchPeerCore {
   session: { account_id: string } | null;
   rpc: RtcCore['rpc'] & {
-    search: Pick<Rpc['search'], 'peerStart' | 'peerExchange'>;
+    search: Pick<Rpc['search'], 'peerStart'>;
     calls: Pick<Rpc['calls'], 'turnServer'>;
   };
+  rtcData(sessionId: string, frame: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>>;
   subscribeEvents(callback: (event: CoreEvent) => void): () => void;
 }
 
@@ -117,15 +116,13 @@ function connectSearchPeers(
         connection?.metered !== true &&
         connection?.saveData !== true));
 
-  // The sender creates the channel and answers, the receiver asks first.
+  // The sender creates the channel. Framing and turn-taking live in the core.
   function create(sessionId: string, initiator: boolean) {
     const rtc = connectRtc(core, { sessionId, sender: initiator, iceServers: servers }, close);
     const { peer } = rtc;
     let channel: RTCDataChannel | null = null;
     let closed = false;
-    let busy = false;
-    let chunks: Uint8Array[] = [];
-    let received = 0;
+    let pending = Promise.resolve();
     let idle: ReturnType<typeof setTimeout> | undefined;
     const negotiation = setTimeout(close, NEGOTIATION_MS);
     const active = (): boolean => !closed && allowed();
@@ -162,58 +159,40 @@ function connectSearchPeers(
       else peer.close();
     }
 
-    function send(data: string): void {
+    function send(bytes: Uint8Array<ArrayBuffer>): void {
       if (!channel || channel.readyState !== 'open' || !active()) throw new Error('closed');
-      const bytes = new TextEncoder().encode(data);
       for (let start = 0; start < bytes.length; start += CHUNK_BYTES) {
-        channel.send(bytes.slice(start, start + CHUNK_BYTES).buffer);
+        channel.send(bytes.slice(start, start + CHUNK_BYTES));
       }
-      channel.send(END);
       touch();
     }
 
-    async function exchange(data: string | null): Promise<void> {
-      busy = true;
-      try {
-        const reply = await rpc.peerExchange({ session_id: sessionId, data });
-        if (reply !== null && active()) send(reply);
-      } finally {
-        busy = false;
-      }
+    // Frames reach the core one at a time and in order.
+    function forward(frame: Uint8Array<ArrayBuffer>): void {
+      pending = pending
+        .then(async () => {
+          if (!active()) return;
+          const reply = await core.rtcData(sessionId, frame);
+          if (reply.byteLength > 0 && active()) send(reply);
+        })
+        .catch(close);
     }
 
     function receive(event: MessageEvent<unknown>): void {
-      try {
-        if (!active() || busy) throw new Error('unexpected message');
-        touch();
-        const frame = event.data;
-        if (frame === END) {
-          const bytes = new Uint8Array(received);
-          let offset = 0;
-          for (const chunk of chunks) {
-            bytes.set(chunk, offset);
-            offset += chunk.length;
-          }
-          chunks = [];
-          received = 0;
-          const message = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-          void exchange(message).catch(close);
-          return;
-        }
-        if (!(frame instanceof ArrayBuffer) || frame.byteLength > CHUNK_BYTES)
-          throw new Error('invalid chunk');
-        received += frame.byteLength;
-        if (received > MAX_MESSAGE_BYTES) throw new Error('message too large');
-        chunks.push(new Uint8Array(frame));
-      } catch {
+      const frame = event.data;
+      // An empty frame tells the core the channel opened.
+      if (!active() || !(frame instanceof ArrayBuffer) || frame.byteLength === 0) {
         close();
+        return;
       }
+      touch();
+      forward(new Uint8Array(frame));
     }
 
     function opened(): void {
       clearTimeout(negotiation);
       touch();
-      if (!initiator) void exchange(null).catch(close);
+      forward(new Uint8Array(0));
     }
 
     function attach(target: RTCDataChannel): void {

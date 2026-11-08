@@ -563,6 +563,13 @@ export function createWebTransport(open: () => CoreConnection = openSharedWorker
       return uri ?? '';
     },
 
+    rtcData(sessionId, frame) {
+      return request<Uint8Array<ArrayBuffer>>(
+        (id) => ({ id, rtc: { sessionId, frame } }),
+        [frame.buffer]
+      );
+    },
+
     setDebugLogs(enabled) {
       debugLogs = enabled;
       worker?.port.postMessage({ debugLogs: enabled });

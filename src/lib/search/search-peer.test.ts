@@ -11,7 +11,7 @@ class Channel extends EventTarget {
   maxRetransmits = null;
   maxPacketLifeTime = null;
   readyState = 'connecting';
-  send = vi.fn<(data: string | ArrayBuffer) => void>();
+  send = vi.fn<(data: Uint8Array) => void>();
   close = vi.fn(() => {
     this.readyState = 'closed';
   });
@@ -19,13 +19,10 @@ class Channel extends EventTarget {
     this.readyState = 'open';
     this.dispatchEvent(new Event('open'));
   }
-  deliver(message: string): void {
-    const bytes = new TextEncoder().encode(message);
-    for (let start = 0; start < bytes.length; start += 16 * 1024) {
-      const data = bytes.slice(start, start + 16 * 1024).buffer;
-      this.dispatchEvent(new MessageEvent('message', { data }));
+  deliver(...frames: number[][]): void {
+    for (const frame of frames) {
+      this.dispatchEvent(new MessageEvent('message', { data: new Uint8Array(frame).buffer }));
     }
-    this.dispatchEvent(new MessageEvent('message', { data: 'end' }));
   }
 }
 
@@ -61,6 +58,7 @@ class Peer extends EventTarget {
 
 let listener: (event: RtcEvent) => void;
 let subscribeEvents: Mock<SearchPeerCore['subscribeEvents']>;
+let rtcData: Mock<SearchPeerCore['rtcData']>;
 let core: SearchPeerCore;
 let stop: (() => void) | undefined;
 let connection: EventTarget & { type: string };
@@ -74,13 +72,14 @@ beforeEach(() => {
     listener = callback;
     return vi.fn();
   });
+  rtcData = vi.fn<SearchPeerCore['rtcData']>(() => Promise.resolve(new Uint8Array(0)));
   core = {
     session: { account_id: 'account' },
     subscribeEvents,
+    rtcData,
     rpc: {
       search: {
         peerStart: vi.fn(() => Promise.resolve(null)),
-        peerExchange: vi.fn(() => Promise.resolve(null)),
       },
       rtc: {
         signal: vi.fn(() => Promise.resolve(null)),
@@ -227,12 +226,12 @@ test('deferred signaling rejection after cleanup does not reopen or double-close
 });
 
 test('a deferred exchange rejection after an account switch cannot call the new account', async () => {
-  const exchange = Promise.withResolvers<string | null>();
-  vi.mocked(core.rpc.search.peerExchange).mockReturnValue(exchange.promise);
+  const exchange = Promise.withResolvers<Uint8Array<ArrayBuffer>>();
+  rtcData.mockReturnValue(exchange.promise);
   const channel = receive();
   channel.open();
   await vi.waitFor(() => {
-    expect(core.rpc.search.peerExchange).toHaveBeenCalledOnce();
+    expect(rtcData).toHaveBeenCalledOnce();
   });
   core.session = { account_id: 'other' };
   stop?.();
@@ -255,20 +254,16 @@ test('rtc sessions of other features are left alone', () => {
   expect(core.rpc.rtc.close).not.toHaveBeenCalled();
 });
 
-test('the sending device waits for the receiver to ask', async () => {
-  const channel = start();
-  channel.open();
-  await Promise.resolve();
-  expect(core.rpc.search.peerExchange).not.toHaveBeenCalled();
-  expect(channel.send).not.toHaveBeenCalled();
-});
-
-test('the receiving device asks as soon as its channel opens', async () => {
-  const channel = receive();
+test.each([
+  ['sending', start],
+  ['receiving', receive],
+])('the %s device tells the core when its channel opens', async (_, open) => {
+  const channel = open();
   channel.open();
   await vi.waitFor(() => {
-    expect(core.rpc.search.peerExchange).toHaveBeenCalledWith({ session_id: 'test', data: null });
+    expect(rtcData).toHaveBeenCalledWith('test', new Uint8Array(0));
   });
+  expect(channel.send).not.toHaveBeenCalled();
 });
 
 test('a negotiation timeout releases the connection', async () => {
@@ -346,51 +341,53 @@ test('a backend cancellation closes the browser channel', () => {
   expect(Peer.instances[0].close).toHaveBeenCalledOnce();
 });
 
-test('invalid or oversized chunks close before reaching the core', () => {
+test.each([
+  ['text', 'end'],
+  ['empty', new ArrayBuffer(0)],
+])('%s frames close before reaching the core', (_, data) => {
   const channel = start();
-  channel.dispatchEvent(
-    new MessageEvent('message', { data: new Uint8Array(16 * 1024 + 1).buffer })
-  );
+  channel.dispatchEvent(new MessageEvent('message', { data }));
   expect(channel.close).toHaveBeenCalledOnce();
-  expect(core.rpc.search.peerExchange).not.toHaveBeenCalled();
+  expect(rtcData).not.toHaveBeenCalled();
 });
 
-test('a message sent while the core is busy closes the channel', async () => {
-  const pending = Promise.withResolvers<null>();
-  vi.mocked(core.rpc.search.peerExchange).mockReturnValue(pending.promise);
+test('frames reach the core one at a time and in order', async () => {
+  const opening = Promise.withResolvers<Uint8Array<ArrayBuffer>>();
+  rtcData.mockReturnValueOnce(opening.promise);
+  const channel = receive();
+  channel.open();
+  channel.deliver([1], [2, 3]);
+  await vi.waitFor(() => {
+    expect(rtcData).toHaveBeenCalledOnce();
+  });
+  await Promise.resolve();
+  expect(rtcData).toHaveBeenCalledOnce();
+  opening.resolve(new Uint8Array(0));
+  await vi.waitFor(() => {
+    expect(rtcData).toHaveBeenCalledTimes(3);
+  });
+  expect(rtcData.mock.calls.map(([, frame]) => [...frame])).toEqual([[], [1], [2, 3]]);
+  expect(channel.close).not.toHaveBeenCalled();
+});
+
+test('replies are sent in chunks of at most 16 KiB', async () => {
+  const reply = new Uint8Array(40 * 1024).map((_, index) => index % 251);
+  rtcData.mockResolvedValueOnce(reply);
   const channel = receive();
   channel.open();
   await vi.waitFor(() => {
-    expect(core.rpc.search.peerExchange).toHaveBeenCalledOnce();
+    expect(channel.send).toHaveBeenCalledTimes(3);
   });
-  channel.deliver('early');
-  expect(channel.close).toHaveBeenCalledOnce();
-  expect(core.rpc.search.peerExchange).toHaveBeenCalledOnce();
-  pending.resolve(null);
+  const chunks = channel.send.mock.calls.map(([frame]) => frame);
+  expect(chunks.map((chunk) => chunk.byteLength)).toEqual([16 * 1024, 16 * 1024, 8 * 1024]);
+  expect(new Uint8Array(chunks.flatMap((chunk) => [...chunk]))).toEqual(reply);
 });
 
-test('replies are sent as UTF-8 chunks and read back whole', async () => {
-  const data = '中文🙂'.repeat(10_000);
-  vi.mocked(core.rpc.search.peerExchange).mockResolvedValueOnce(data);
+test('a core error closes the channel', async () => {
+  rtcData.mockRejectedValueOnce(new Error('malformed'));
   const channel = receive();
   channel.open();
   await vi.waitFor(() => {
-    expect(channel.send).toHaveBeenLastCalledWith('end');
-  });
-  const chunks = channel.send.mock.calls
-    .map(([frame]) => frame)
-    .filter((frame): frame is ArrayBuffer => frame instanceof ArrayBuffer);
-  const bytes = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.byteLength, 0));
-  let offset = 0;
-  for (const chunk of chunks) {
-    expect(chunk.byteLength).toBeLessThanOrEqual(16 * 1024);
-    bytes.set(new Uint8Array(chunk), offset);
-    offset += chunk.byteLength;
-  }
-  expect(new TextDecoder().decode(bytes)).toBe(data);
-
-  channel.deliver(data);
-  await vi.waitFor(() => {
-    expect(core.rpc.search.peerExchange).toHaveBeenLastCalledWith({ session_id: 'test', data });
+    expect(channel.close).toHaveBeenCalledOnce();
   });
 });

@@ -4,12 +4,20 @@ import type { RtcSignal } from '#src/generated/protocol';
 import type { RtcEvent } from '#lib/rtc/connect.js';
 import { watchSearchPeers, type SearchPeerCore } from './search-peer';
 
+function framed(body: Uint8Array): Uint8Array<ArrayBuffer> {
+  const message = new Uint8Array(4 + body.length);
+  new DataView(message.buffer).setUint32(0, body.length);
+  message.set(body, 4);
+  return message;
+}
+
 test(
   'the receiving device downloads chunked history through real WebRTC channels',
   { timeout: 30_000 },
   async () => {
-    const payload = 'History with 中文 and 🙂 '.repeat(20_000);
-    const received: string[][] = [[], []];
+    const payload = new Uint8Array(300_000).map((_, index) => index % 251);
+    const inboxes: number[][] = [[], []];
+    const received: Uint8Array[][] = [[], []];
     const listeners = [new Set<(event: RtcEvent) => void>(), new Set<(event: RtcEvent) => void>()];
     const signals: RtcSignal[] = [];
     const send = vi.spyOn(RTCDataChannel.prototype, 'send');
@@ -19,15 +27,20 @@ test(
         listeners[side].add(callback);
         return () => listeners[side].delete(callback);
       },
+      rtcData: vi.fn<SearchPeerCore['rtcData']>((_, frame) => {
+        const nothing = new Uint8Array(0);
+        if (frame.length === 0)
+          return Promise.resolve(side === 1 ? framed(new Uint8Array([1])) : nothing);
+        const inbox = inboxes[side];
+        for (const byte of frame) inbox.push(byte);
+        const length = new DataView(Uint8Array.from(inbox.slice(0, 4)).buffer).getUint32(0);
+        if (inbox.length < 4 + length) return Promise.resolve(nothing);
+        received[side].push(Uint8Array.from(inbox.splice(0).slice(4)));
+        return Promise.resolve(side === 0 ? framed(payload) : nothing);
+      }),
       rpc: {
         search: {
           peerStart: vi.fn(() => Promise.resolve(null)),
-          peerExchange: vi.fn<SearchPeerCore['rpc']['search']['peerExchange']>(({ data }) => {
-            if (data === null) return Promise.resolve(`request-${side}`);
-            if (data === `request-${1 - side}`) return Promise.resolve(`${side}:${payload}`);
-            received[side].push(data);
-            return Promise.resolve(null);
-          }),
         },
         rtc: {
           signal: vi.fn<SearchPeerCore['rpc']['rtc']['signal']>(({ session_id, signal }) => {
@@ -70,18 +83,19 @@ test(
       }
       await vi.waitFor(
         () => {
-          expect(received.map((messages) => messages.length)).toEqual([0, 1]);
+          expect(received.map((messages) => messages.length)).toEqual([1, 1]);
         },
         { timeout: 20_000, interval: 50 }
       );
-      expect(received[1]).toEqual([`0:${payload}`]);
+      expect(received[0]).toEqual([new Uint8Array([1])]);
+      expect(received[1]).toEqual([payload]);
       expect(signals.filter(({ kind }) => kind === 'negotiate')).toHaveLength(2);
       const candidates = signals.flatMap((signal) =>
         signal.kind === 'candidate' ? [signal.candidate.candidate] : []
       );
       expect(candidates.length).toBeGreaterThan(0);
       expect(candidates.every((line) => !line.includes('typ relay'))).toBe(true);
-      expect(send.mock.calls.length).toBeGreaterThan(20);
+      expect(send).toHaveBeenCalledTimes(1 + Math.ceil((payload.length + 4) / (16 * 1024)));
       const encoder = new TextEncoder();
       for (const [frame] of send.mock.calls) {
         const size = typeof frame === 'string' ? encoder.encode(frame).length : frame.byteLength;
@@ -102,10 +116,10 @@ test('a hidden lock owner releases peer handling to a waiting visible tab', asyn
   const core: SearchPeerCore = {
     session: { account_id: 'visibility-handoff' },
     subscribeEvents: vi.fn(() => () => {}),
+    rtcData: vi.fn(() => Promise.resolve(new Uint8Array(0))),
     rpc: {
       search: {
         peerStart: vi.fn(() => Promise.resolve(null)),
-        peerExchange: vi.fn(() => Promise.resolve(null)),
       },
       rtc: {
         signal: vi.fn(() => Promise.resolve(null)),
@@ -150,10 +164,10 @@ test('only one tab handles shared-worker peer sessions for an account', async ()
   const core = (): SearchPeerCore => ({
     session: { account_id: 'shared-worker-account' },
     subscribeEvents: vi.fn(() => () => {}),
+    rtcData: vi.fn(() => Promise.resolve(new Uint8Array(0))),
     rpc: {
       search: {
         peerStart: vi.fn(() => Promise.resolve(null)),
-        peerExchange: vi.fn(() => Promise.resolve(null)),
       },
       rtc: {
         signal: vi.fn(() => Promise.resolve(null)),

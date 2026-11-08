@@ -14,7 +14,7 @@ turned off, when the index is rebuilt or from the settings reset button.
 
 Discovery uses encrypted `moe.sable.search_peer.v1` to-device events (`version`, `session`,
 `timestamp`, `kind`) from verified devices of the same account. `version` is the copy
-protocol version, currently `3`. Devices ignore events with another version or none:
+protocol version, currently `4`. Devices ignore events with another version or none:
 
 - `query`: the requesting device sends it to every verified device seen in the last 90 days.
 - `info` (`documents`, `complete_rooms`, `busy`): each device that can serve answers with
@@ -34,8 +34,13 @@ described in the Frostbite device RTC framework:
 `computer.gingershaped.frostbite.candidate` (`session`, `candidate`). If the connection
 fails within 30 seconds or drops, the next device in the ranking is requested.
 
-The data channel is `sable-search-v1`. The receiver speaks first, and the sender only
-answers, one message at a time. For each of its joined rooms the receiver sends:
+The data channel is `sable-search-v1`. The app passes each binary frame to the core as it
+arrives, plus an empty frame when the channel opens, and sends back the bytes the core returns.
+
+Each message is a big-endian `u32` length followed by a MessagePack map of that many bytes, at
+most 6 MiB, sent in binary frames of up to 16 KiB. A message has a `kind` field. The receiver
+speaks first, and the sender only answers, one message at a time. Bytes past the end of a
+message close the channel. For each of its joined rooms the receiver sends:
 
 - `room` (`room`): the sender answers `parts` (`room`, `parts`, `cover`). `parts` lists
   `start`, `end` and `sha256` per part and is empty when the sender can't share the room.
@@ -43,12 +48,8 @@ answers, one message at a time. For each of its joined rooms the receiver sends:
   The sender answers `data` (`room`, `part`, `data`).
 
 The first part, `[0, 0)`, carries redactions. The rest cover a contiguous time range
-without splitting events with the same timestamp. Part data is JSON, compressed with zlib
-and encoded as unpadded base64, and the hash covers the uncompressed JSON. `cover`
-(`from`, `until`, `resume`, `anchor`) is the sender's gap-free crawl range. It is only
-sent when the parts cover exactly that range, and the receiver merges it into its own
+without splitting events with the same timestamp. Part data is JSON compressed with zlib and
+sent as MessagePack binary. `sha256` is the unpadded base64 SHA-256 of the uncompressed JSON.
+`cover` (`from`, `until`, `resume`, `anchor`) is the sender's gap-free crawl range. It is
+only sent when the parts cover exactly that range, and the receiver merges it into its own
 crawl progress once every part is imported.
-
-Each message is sent as binary UTF-8 chunks of up to 16 KiB followed by the string `end`,
-and is limited to 6 MiB. A message that arrives while the previous one is still being
-handled closes the channel.

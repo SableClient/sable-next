@@ -1,22 +1,18 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Duration;
 
-use base64::Engine as _;
 use matrix_sdk::Client;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId};
 use serde::{Deserialize, Serialize};
 use web_time::Instant;
 
-use super::super::{
-    History, MAX_SEGMENT_JSON, STANDARD_NO_PAD, SegmentPayload, settled_history, sha256,
-};
+use super::super::{History, MAX_SEGMENT_JSON, SegmentPayload, settled_history, sha256};
 use super::{RESYNC_AFTER, age};
 use crate::Core;
 use crate::protocol::{RpcError, SearchPeerCopyView};
 use crate::search::now_ms;
 
 const STORE_KEY: &[u8] = b"sable.search.peers.v1";
-const MAX_MESSAGE: usize = 6 * 1024 * 1024;
 const MAX_PARTS: usize = 1024;
 const SHA256_B64_LEN: usize = 43;
 const RESTORING: Duration = Duration::from_secs(30);
@@ -25,7 +21,7 @@ const RESTORING: Duration = Duration::from_secs(30);
 enum CopyError {
     #[error("session unavailable: {0:?}")]
     Session(RpcError),
-    #[error("message is too large or malformed")]
+    #[error("malformed message")]
     Malformed,
     #[error("unexpected `{0}` message")]
     Unexpected(&'static str),
@@ -53,14 +49,14 @@ impl CopyError {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct Part {
+pub(super) struct Part {
     start: u64,
     end: u64,
     sha256: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct SharedCover {
+pub(super) struct SharedCover {
     from: u64,
     until: u64,
     resume: Option<String>,
@@ -71,7 +67,7 @@ struct SharedCover {
 /// with `Parts`, then fetches each part it does not have with `Get` and `Data`.
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-enum Message {
+pub(super) enum Message {
     Room {
         room: OwnedRoomId,
     },
@@ -87,7 +83,8 @@ enum Message {
     Data {
         room: OwnedRoomId,
         part: usize,
-        data: String,
+        #[serde(with = "serde_bytes")]
+        data: Vec<u8>,
     },
 }
 
@@ -175,8 +172,8 @@ impl Core {
     pub(crate) async fn exchange_search_peer(
         &self,
         session_id: &str,
-        data: Option<String>,
-    ) -> Result<Option<String>, RpcError> {
+        data: Option<Vec<u8>>,
+    ) -> Result<Option<Vec<u8>>, RpcError> {
         self.exchange(session_id, data).await.map_err(|error| {
             tracing::debug!(session = session_id, %error, "search copy stopped");
             error.into_rpc()
@@ -186,15 +183,10 @@ impl Core {
     async fn exchange(
         &self,
         session_id: &str,
-        data: Option<String>,
-    ) -> Result<Option<String>, CopyError> {
+        data: Option<Vec<u8>>,
+    ) -> Result<Option<Vec<u8>>, CopyError> {
         let message = data
-            .map(|data| {
-                (data.len() <= MAX_MESSAGE)
-                    .then(|| serde_json::from_str::<Message>(&data).ok())
-                    .flatten()
-                    .ok_or(CopyError::Malformed)
-            })
+            .map(|data| rmp_serde::from_slice::<Message>(&data).map_err(|_| CopyError::Malformed))
             .transpose()?;
         // Held for the whole exchange so a logout cannot reset the index
         // while this copy is still writing into it.
@@ -225,7 +217,7 @@ impl Core {
             (Transfer::Sending(snapshot), Some(message)) => {
                 Some(self.send(&client, snapshot, message).await?)
             }
-            (Transfer::Sending(_), None) => return Err(CopyError::Unexpected("start")),
+            (Transfer::Sending(_), None) => None,
         };
         let finished = reply.is_none() && matches!(*transfer, Transfer::Receiving(_));
         drop(transfer);
@@ -233,12 +225,7 @@ impl Core {
             self.complete_search_copy(&client, session_id).await;
         }
         reply
-            .map(|reply| {
-                serde_json::to_string(&reply)
-                    .ok()
-                    .filter(|data| data.len() <= MAX_MESSAGE)
-                    .ok_or(CopyError::Malformed)
-            })
+            .map(|reply| rmp_serde::to_vec_named(&reply).map_err(|_| CopyError::Malformed))
             .transpose()
     }
 
@@ -271,8 +258,7 @@ impl Core {
                     .get(part)
                     .and_then(|info| snapshot.history.part(info.start, info.end).json())
                     .ok_or(CopyError::Unexpected("get"))?;
-                let data =
-                    STANDARD_NO_PAD.encode(miniz_oxide::deflate::compress_to_vec_zlib(&json, 6));
+                let data = miniz_oxide::deflate::compress_to_vec_zlib(&json, 6);
                 Ok(Message::Data { room, part, data })
             }
             other => Err(CopyError::Unexpected(other.kind())),
@@ -629,9 +615,8 @@ fn valid_parts(parts: &[Part], cover: Option<&SharedCover>) -> bool {
         })
 }
 
-fn decode(part: &Part, data: &str) -> Option<SegmentPayload> {
-    let bytes = STANDARD_NO_PAD.decode(data).ok()?;
-    SegmentPayload::decode(&bytes, part.start, part.end, &part.sha256)
+fn decode(part: &Part, data: &[u8]) -> Option<SegmentPayload> {
+    SegmentPayload::decode(data, part.start, part.end, &part.sha256)
 }
 
 #[cfg(test)]
@@ -702,7 +687,7 @@ mod tests {
             redacted: Vec::new(),
         };
         let json = payload.json().unwrap();
-        let data = STANDARD_NO_PAD.encode(miniz_oxide::deflate::compress_to_vec_zlib(&json, 6));
+        let data = miniz_oxide::deflate::compress_to_vec_zlib(&json, 6);
         let mut part = Part {
             start: 10,
             end: 11,
@@ -719,7 +704,7 @@ mod tests {
     #[test]
     fn decompression_is_bounded() {
         let json = vec![b' '; MAX_SEGMENT_JSON + 1];
-        let data = STANDARD_NO_PAD.encode(miniz_oxide::deflate::compress_to_vec_zlib(&json, 6));
+        let data = miniz_oxide::deflate::compress_to_vec_zlib(&json, 6);
         assert!(
             decode(
                 &Part {
@@ -731,5 +716,24 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    #[test]
+    fn part_data_travels_as_messagepack_binary() {
+        let message = Message::Data {
+            room: "!room:localhost".try_into().unwrap(),
+            part: 3,
+            data: vec![0, 159, 255],
+        };
+        let bytes = rmp_serde::to_vec_named(&message).unwrap();
+        assert!(
+            bytes
+                .windows(5)
+                .any(|window| window == [0xc4, 3, 0, 159, 255])
+        );
+        let Message::Data { part, data, .. } = rmp_serde::from_slice(&bytes).unwrap() else {
+            panic!("expected data");
+        };
+        assert_eq!((part, data), (3, vec![0, 159, 255]));
     }
 }

@@ -325,6 +325,25 @@ impl SableCore {
     }
 
     #[napi]
+    pub fn rtc_data<'env>(
+        &self,
+        env: &'env Env,
+        session_id: String,
+        frame: Buffer,
+    ) -> napi::Result<PromiseRaw<'env, Buffer>> {
+        let core = self.core.clone();
+        let frame = Vec::from(frame);
+        env.spawn_future_with_callback(
+            async move {
+                core.rtc_data(&session_id, &frame)
+                    .await
+                    .map_err(|error| js_err(&error))
+            },
+            |_env, bytes| Ok(Buffer::from(bytes)),
+        )
+    }
+
+    #[napi]
     pub fn subscribe_events(&self, on_events: Callback) -> napi::Result<()> {
         let mut events = self
             .events

@@ -178,6 +178,18 @@ test('does not create RPC spans for health pings or internal messages', async ()
   expect(startInactiveSpan).not.toHaveBeenCalled();
 });
 
+test('sends an RTC frame to the worker and resolves with the reply bytes', async () => {
+  const transport = await load();
+  const reply = transport.rtcData('session', new Uint8Array([1, 2]));
+  expect(FakeSharedWorker.last?.port.posted).toContainEqual({
+    id: 1,
+    rtc: { sessionId: 'session', frame: new Uint8Array([1, 2]) },
+  });
+  FakeSharedWorker.last?.port.receive({ id: 1, bytes: new Uint8Array([3]) });
+  await expect(reply).resolves.toEqual(new Uint8Array([3]));
+  transport.close();
+});
+
 test('records forwarded core spans using worker epoch timestamps in seconds', async () => {
   const transport = await load();
   const pending = transport.call('members.list', {});

@@ -317,6 +317,19 @@ impl SableCore {
             .map_err(|error| js_err(&error))
     }
 
+    /// Resolves with the bytes to send back, empty when there is nothing to send.
+    ///
+    /// # Errors
+    ///
+    /// Returns a JSON-encoded command error when the frame cannot be handled.
+    #[wasm_bindgen(js_name = rtcData)]
+    pub async fn rtc_data(&self, session_id: String, frame: Vec<u8>) -> Result<Vec<u8>, String> {
+        self.core
+            .rtc_data(&session_id, &frame)
+            .await
+            .map_err(|error| js_err(&error))
+    }
+
     /// Called once; each call carries a `CoreEvent[]` as JSON.
     ///
     /// # Errors

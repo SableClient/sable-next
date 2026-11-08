@@ -202,6 +202,25 @@ async fn carried_gallery(core: &sable_core::Core, request: &impl Carried) -> Res
         .await
 }
 
+async fn carried_rtc(core: &Arc<Core>, request: &impl Carried) -> Result<Response, RpcError> {
+    let session = request.header("session").ok_or(RpcError::InvalidMedia)?;
+    let bytes = core.rtc_data(&session, &request.bytes()?).await?;
+    Ok(Response::new(bytes))
+}
+
+#[tauri::command]
+async fn rtc_data(state: State<'_, AppState>, request: Request<'_>) -> Result<Response, RpcError> {
+    carried_rtc(&state.core, &request).await
+}
+
+#[tauri::command]
+async fn rtc_data_base64(
+    state: State<'_, AppState>,
+    request: Base64Invoke,
+) -> Result<Response, RpcError> {
+    carried_rtc(&state.core, &request).await
+}
+
 #[tauri::command]
 async fn send_gallery(state: State<'_, AppState>, request: Request<'_>) -> Result<(), RpcError> {
     carried_gallery(&state.core, &request).await
@@ -786,6 +805,8 @@ pub fn run() {
             send_attachment_base64,
             upload_media,
             upload_media_base64,
+            rtc_data,
+            rtc_data_base64,
             open_external_url,
             register_push,
             unregister_push,

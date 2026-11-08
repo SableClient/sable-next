@@ -204,6 +204,21 @@ test('uses authenticated HTTP endpoints for media and binary sends', async () =>
   transport.close();
 });
 
+test('posts an RTC frame and resolves with the reply bytes', async () => {
+  const transport = createWsTransport({ url: '/_sable/ws' });
+  const fetchMock = vi.fn(() => Promise.resolve(new Response(new Uint8Array([3]))));
+  vi.stubGlobal('fetch', fetchMock);
+
+  await expect(transport.rtcData('a/b', new Uint8Array([1, 2]))).resolves.toEqual(
+    new Uint8Array([3])
+  );
+  expect(fetchMock).toHaveBeenCalledWith(
+    expect.stringContaining('/_sable/rtc/a%2Fb'),
+    expect.objectContaining({ method: 'POST', body: new Uint8Array([1, 2]) })
+  );
+  transport.close();
+});
+
 test.each([
   ['/_sable/ws', 'https://sable.test'],
   ['http://server.test/ws?user_id=old#socket', 'http://server.test'],

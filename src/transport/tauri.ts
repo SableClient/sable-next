@@ -150,6 +150,10 @@ export function createTauriTransport(): Transport {
       return carry<string>('upload_media', bytes, { mime });
     },
 
+    async rtcData(sessionId, frame) {
+      return new Uint8Array(await carry<ArrayBuffer>('rtc_data', frame, { session: sessionId }));
+    },
+
     setDebugLogs(enabled) {
       invoke('set_debug_logs', { enabled, channel: logs }).catch((error: unknown) => {
         console.warn('[sable transport] core log capture unavailable', error);
