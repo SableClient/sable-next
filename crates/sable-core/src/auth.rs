@@ -38,8 +38,20 @@ impl Core {
             .await?
             .accounts
             .into_iter()
-            .find(|account| account.account_id == account_id && account.needs_reauth)
+            .find(|account| account.account_id == account_id)
             .ok_or(RpcError::NotLoggedIn)?;
+        if !account.needs_reauth {
+            #[cfg(not(target_family = "wasm"))]
+            let missing = self.login_tokens_missing(&account).await?;
+            #[cfg(target_family = "wasm")]
+            let missing = false;
+            if !missing {
+                return Err(RpcError::NotLoggedIn);
+            }
+            self.mark_account_needs_reauth(Some(&account_id), false)
+                .await?;
+            account.needs_reauth = true;
+        }
         if !account.device_invalidated {
             match session::validate_saved_crypto_store(&account.store_id, &account.session).await {
                 Ok(()) => {}
@@ -827,6 +839,55 @@ mod tests {
             .unwrap();
         assert!(account.device_invalidated);
         assert!(core.accounts().await.unwrap().accounts[0].device_invalidated);
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn only_an_account_whose_saved_tokens_are_gone_can_sign_in_again() {
+        let directory = tempfile::tempdir().unwrap();
+        let base = directory.path().join("data");
+        let base = base.to_str().unwrap();
+        let store = session::account_store_id(base, "a1");
+        let path = std::path::Path::new(&store).join("store");
+        std::fs::create_dir_all(&path).unwrap();
+        matrix_sdk::SqliteCryptoStore::open(path, None)
+            .await
+            .unwrap();
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "version": 1, "active_account_id": "a1", "next_account_id": 2,
+            "accounts": [{"account_id": "a1", "store_id": store,
+                "needs_reauth": false, "device_invalidated": false,
+                "session": {"homeserver": "https://example.org", "resolved_homeserver": "https://example.org",
+                    "credentials": {"kind": "password", "user_id": "@alice:example.org", "device_id": "D", "access_token": ""}}
+            }]
+        })).unwrap();
+        let (registry, _) = session::AccountRegistry::from_bytes(&bytes, base).unwrap();
+        let (core, _) = Core::new(base, Box::new(crate::store::MemorySessionStore::default()));
+        *core.accounts.lock().await = Some(registry);
+        let logins = crate::credentials::LoginTokens::new(std::path::Path::new(base));
+        logins
+            .save(
+                "a1",
+                "D",
+                &matrix_sdk::SessionTokens {
+                    access_token: "saved".to_owned(),
+                    refresh_token: None,
+                },
+            )
+            .unwrap();
+
+        assert!(matches!(
+            core.reauthentication_account(Some("a1".into())).await,
+            Err(RpcError::NotLoggedIn)
+        ));
+        assert!(!core.accounts().await.unwrap().accounts[0].needs_reauth);
+
+        logins.forget("a1");
+        core.reauthentication_account(Some("a1".into()))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(core.accounts().await.unwrap().accounts[0].needs_reauth);
     }
 
     #[cfg(not(target_family = "wasm"))]

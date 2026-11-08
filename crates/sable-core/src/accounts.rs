@@ -665,6 +665,21 @@ impl Core {
         Ok(embedded)
     }
 
+    #[cfg(not(target_family = "wasm"))]
+    pub(crate) async fn login_tokens_missing(
+        &self,
+        account: &PersistedAccount,
+    ) -> Result<bool, RpcError> {
+        let logins = crate::credentials::LoginTokens::new(std::path::Path::new(&self.store_id));
+        let account_id = account.account_id.clone();
+        let device_id = account.session.credentials.device_id();
+        let tokens = tokio::task::spawn_blocking(move || logins.read(&account_id, &device_id))
+            .await
+            .or_failed(self, "reauth_login_tokens")?
+            .or_failed(self, "reauth_login_tokens")?;
+        Ok(tokens.is_none())
+    }
+
     /// `None` forgets every login.
     #[cfg(not(target_family = "wasm"))]
     async fn forget_login_tokens(&self, account_id: Option<&str>) {

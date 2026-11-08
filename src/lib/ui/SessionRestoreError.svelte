@@ -25,11 +25,11 @@
     }
   }
 
-  async function signIn(): Promise<void> {
+  async function signIn(query = 'addAccount=1'): Promise<void> {
     switching = true;
     switchFailed = false;
     try {
-      await goto(resolve('login?addAccount=1'));
+      await goto(resolve(`login?${query}`));
       core.beginSignInRecovery();
     } catch (error) {
       console.warn('[sable auth] opening sign-in failed', error);
@@ -47,6 +47,15 @@
   {#each core.accounts.filter((account) => !account.needs_reauth) as account (account.account_id)}
     <Button disabled={busy} onclick={() => void switchAccount(account.account_id)}>
       {i18n.t('nav.switchAccount')}: {account.user_id} ({account.device_id})
+    </Button>
+    <Button
+      disabled={busy}
+      onclick={() =>
+        void signIn(
+          `addAccount=1&reauth=${encodeURIComponent(account.account_id)}&server=${encodeURIComponent(account.homeserver)}`
+        )}
+    >
+      {i18n.t('nav.accountSignInAgain')}: {account.user_id}
     </Button>
   {/each}
   {#if switchFailed}<p role="alert">{i18n.t('app.unableToStart')}</p>{/if}

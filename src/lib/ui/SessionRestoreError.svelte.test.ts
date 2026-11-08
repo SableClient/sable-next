@@ -75,7 +75,7 @@ test('can select another saved account while restoration is blocked', async () =
   });
   render(SessionRestoreError);
   expect(screen.queryByRole('button', { name: /@one:x/ })).not.toBeInTheDocument();
-  await fireEvent.click(screen.getByRole('button', { name: /@two:x/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Switch account: @two:x/ }));
   expect(core.switchAccount).toHaveBeenCalledWith('healthy');
   expect(goto).toHaveBeenCalledWith('/rooms');
 });
@@ -86,8 +86,26 @@ test('a failed account switch leaves retry and sign-in available', async () => {
     switchAccount: vi.fn().mockRejectedValue(new Error('missing crypto')),
   });
   render(SessionRestoreError);
-  await fireEvent.click(screen.getByRole('button', { name: /@one:x/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Switch account: @one:x/ }));
   expect(goto).not.toHaveBeenCalled();
   expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled();
   expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled();
+});
+
+test('signs a saved account in again on its own device', async () => {
+  Object.assign(core, {
+    accounts: [
+      {
+        account_id: 'a2',
+        user_id: '@one:x',
+        device_id: 'ONE',
+        homeserver: 'https://x',
+        needs_reauth: false,
+      },
+    ],
+  });
+  render(SessionRestoreError);
+  await fireEvent.click(screen.getByRole('button', { name: 'Sign in again: @one:x' }));
+  expect(goto).toHaveBeenCalledWith('/login?addAccount=1&reauth=a2&server=https%3A%2F%2Fx');
+  expect(core.beginSignInRecovery).toHaveBeenCalledOnce();
 });
