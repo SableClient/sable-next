@@ -31,6 +31,7 @@ import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import moe.sable.push.ConversationShortcuts
 import moe.sable.push.Secrets
+import java.lang.ref.WeakReference
 import org.json.JSONArray
 import org.json.JSONObject
 import androidx.core.content.edit
@@ -42,8 +43,6 @@ class MainActivity : TauriActivity() {
   private external fun nativeNetworkChanged(available: Boolean, unmetered: Boolean)
   private var networkCallback: ConnectivityManager.NetworkCallback? = null
   private var fullscreenClient: FullscreenChromeClient? = null
-  @Volatile private var instance: MainActivity? = null
-  
   private var mainWebView: WebView? = null
   private val authBrowser = AuthBrowser(this)
   private val fullscreenBackCallback = object : OnBackPressedCallback(false) {
@@ -277,6 +276,12 @@ class MainActivity : TauriActivity() {
 
   // functions here aren't unused as they're used by the rust backend
   companion object {
+    @Volatile private var instanceRef: WeakReference<MainActivity>? = null
+    private var instance: MainActivity?
+      get() = instanceRef?.get()
+      set(value) {
+        instanceRef = value?.let(::WeakReference)
+      }
     private var hiddenBarsDepth = 0
     private var shownBarsBehavior: Int? = null
 
@@ -284,7 +289,7 @@ class MainActivity : TauriActivity() {
     @JvmStatic
     @Suppress("unused")
     fun openAuthUrlNative(id: String, url: String, sheet: Boolean): Boolean {
-      val activity = checkNotNull(MainActivity().instance) { "Activity is unavailable" }
+      val activity = checkNotNull(instance) { "Activity is unavailable" }
       val result = CompletableFuture<Boolean>()
       
       activity.runOnUiThread {
@@ -301,7 +306,7 @@ class MainActivity : TauriActivity() {
     @JvmStatic
     @Suppress("unused")
     fun closeAuthWindowNative(id: String) {
-      val activity = MainActivity().instance ?: return
+      val activity = instance ?: return
       
       activity.runOnUiThread { activity.authBrowser.dismiss(id) }
     }
@@ -310,7 +315,7 @@ class MainActivity : TauriActivity() {
     @JvmStatic
     @Suppress("unused")
     fun hapticFeedbackNative(strong: Boolean) {
-      val activity = MainActivity().instance ?: return
+      val activity = instance ?: return
       
       activity.runOnUiThread {
         activity.window.decorView.performHapticFeedback(
@@ -326,7 +331,7 @@ class MainActivity : TauriActivity() {
     @JvmStatic
     @Suppress("unused")
     fun setStatusBarLightNative(light: Boolean) {
-      val activity = MainActivity().instance ?: return
+      val activity = instance ?: return
       
       activity.runOnUiThread {
         val window = activity.window
@@ -342,7 +347,7 @@ class MainActivity : TauriActivity() {
     @JvmStatic
     @Suppress("unused")
     fun setWindowBackgroundNative(color: Int) {
-      val activity = MainActivity().instance ?: return
+      val activity = instance ?: return
       
       activity.runOnUiThread {
         activity.window.setBackgroundDrawable(color.toDrawable())
@@ -353,7 +358,7 @@ class MainActivity : TauriActivity() {
     @JvmStatic
     @Suppress("unused")
     fun copyImageToClipboardNative(image: String) {
-      val activity = checkNotNull(MainActivity().instance) { "Activity is unavailable" }
+      val activity = checkNotNull(instance) { "Activity is unavailable" }
       val directory = File(activity.cacheDir, "clipboard").apply { mkdirs() }
       val file = File(directory, "image.png")
       
@@ -378,7 +383,7 @@ class MainActivity : TauriActivity() {
     @JvmStatic
     @Suppress("unused")
     fun setNavigationBarLightNative(light: Boolean) {
-      val activity = MainActivity().instance ?: return
+      val activity = instance ?: return
       
       activity.runOnUiThread {
         val window = activity.window
@@ -391,7 +396,7 @@ class MainActivity : TauriActivity() {
     @JvmStatic
     @Suppress("unused")
     fun setSystemBarsHiddenNative(hidden: Boolean) {
-      val activity = MainActivity().instance ?: return
+      val activity = instance ?: return
       activity.runOnUiThread {
         val window = activity.window
         val controller = WindowCompat.getInsetsController(window, window.decorView)
@@ -419,7 +424,7 @@ class MainActivity : TauriActivity() {
     @JvmStatic
     @Suppress("unused")
     fun setSentryEnabledNative(enabled: Boolean) {
-      val activity = MainActivity().instance ?: return
+      val activity = instance ?: return
       
       activity.runOnUiThread {
         activity.getSharedPreferences("sentry", MODE_PRIVATE).edit {
