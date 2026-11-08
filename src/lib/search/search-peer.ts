@@ -13,7 +13,6 @@ const CHANNEL = 'sable-search-v1';
 const END = 'end';
 const MAX_MESSAGE_BYTES = 6 * 1024 * 1024;
 const CHUNK_BYTES = 16 * 1024;
-const MAX_SESSIONS = 4;
 const NEGOTIATION_MS = 20_000;
 const IDLE_MS = 120_000;
 const START_INTERVAL_MS = 60_000;
@@ -100,10 +99,9 @@ function connectSearchPeers(
   options: SearchPeerOptions,
   account: string
 ): () => void {
-  const sessions = new Map<
-    string,
-    { receive(event: RtcEvent): Promise<void>; close: () => void }
-  >();
+  // The core runs one copy at a time, as sender or receiver.
+  let session: { id: string; receive(event: RtcEvent): Promise<void>; close: () => void } | null =
+    null;
   const connection = (navigator as Navigator & { connection?: NetworkConnection }).connection;
   const rpc = core.rpc.search;
   let stopped = false;
@@ -159,7 +157,7 @@ function connectSearchPeers(
       clearTimeout(negotiation);
       clearTimeout(idle);
       channel?.close();
-      sessions.delete(sessionId);
+      if (session?.id === sessionId) session = null;
       if (current()) rtc.close();
       else peer.close();
     }
@@ -250,6 +248,7 @@ function connectSearchPeers(
     }
 
     return {
+      id: sessionId,
       close,
       receive(event: RtcEvent): Promise<void> {
         if (!active()) {
@@ -263,25 +262,25 @@ function connectSearchPeers(
 
   const unsubscribe = core.subscribeEvents((event) => {
     if (!isRtcEvent(event, 'search_sharing') || !current()) return;
-    let session = sessions.get(event.session_id);
+    let target = session?.id === event.session_id ? session : null;
     if (!allowed() || event.signal.kind === 'close') {
-      session?.close();
+      target?.close();
       return;
     }
-    if (!session) {
+    if (!target) {
       const opens = event.sender === (event.signal.kind === 'open');
-      if (!opens || sessions.size >= MAX_SESSIONS) {
+      if (!opens || session) {
         void core.rpc.rtc.close({ session_id: event.session_id }).catch(() => {});
         return;
       }
       try {
-        session = create(event.session_id, event.sender);
-        sessions.set(event.session_id, session);
+        target = create(event.session_id, event.sender);
+        session = target;
       } catch {
         return;
       }
     }
-    void session.receive(event).catch(session.close);
+    void target.receive(event).catch(target.close);
   });
 
   const discover = (): void => {
@@ -299,9 +298,8 @@ function connectSearchPeers(
       });
   };
   const networkChanged = (): void => {
-    if (!allowed()) {
-      for (const session of sessions.values()) session.close();
-    } else discover();
+    if (!allowed()) session?.close();
+    else discover();
   };
   const timer = setInterval(discover, START_INTERVAL_MS);
   window.addEventListener('online', networkChanged);
@@ -316,7 +314,7 @@ function connectSearchPeers(
     window.removeEventListener('online', networkChanged);
     window.removeEventListener('offline', networkChanged);
     connection?.removeEventListener('change', networkChanged);
-    for (const session of sessions.values()) session.close();
+    session?.close();
     stopped = true;
   };
 }

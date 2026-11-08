@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use base64::Engine as _;
@@ -11,7 +10,7 @@ use web_time::Instant;
 use super::super::{
     History, MAX_SEGMENT_JSON, STANDARD_NO_PAD, SegmentPayload, settled_history, sha256,
 };
-use super::{Phase, RESYNC_AFTER, age};
+use super::{RESYNC_AFTER, age};
 use crate::Core;
 use crate::protocol::{RpcError, SearchPeerCopyView};
 use crate::search::now_ms;
@@ -105,15 +104,15 @@ impl Message {
 
 #[derive(Default, Deserialize, Serialize)]
 #[serde(default)]
-pub(super) struct Received {
+pub(super) struct Saved {
     /// Hashes of the parts imported per room. Anything that drops indexed
     /// history must forget them, see `forget_shared_room`.
-    pub(super) known: HashMap<OwnedRoomId, HashSet<String>>,
-    pub(super) synced_at: Option<u64>,
+    known: HashMap<OwnedRoomId, HashSet<String>>,
+    synced_at: Option<u64>,
     pub(super) last_copy: Option<SearchPeerCopyView>,
 }
 
-impl Received {
+impl Saved {
     pub(super) fn copy_due(&self) -> bool {
         self.synced_at.is_none_or(|at| age(at) > RESYNC_AFTER)
     }
@@ -205,17 +204,16 @@ impl Core {
             .ok_or(CopyError::Session(RpcError::NotLoggedIn))?
             .client
             .clone();
-        let slot = self
-            .search_slot(&client, session_id)
+        let transfer = self
+            .search_session(&client, session_id)
             .await
             .map_err(CopyError::Session)?;
-        let mut peer = slot.peer.lock().await;
-        self.load_peer_receipts(&client).await;
-        self.transferring(session_id);
-        let reply = match (&mut peer.transfer, message) {
+        let mut transfer = transfer.lock().await;
+        self.load_saved(&client).await;
+        let reply = match (&mut *transfer, message) {
             (Transfer::Receiving(download), None) => {
                 *download = Download {
-                    epoch: self.search_sharing.epoch.load(Ordering::Relaxed),
+                    epoch: self.search_sharing.state.lock().epoch,
                     rooms: joined_rooms(&client),
                     ..Download::default()
                 };
@@ -229,8 +227,8 @@ impl Core {
             }
             (Transfer::Sending(_), None) => return Err(CopyError::Unexpected("start")),
         };
-        let finished = reply.is_none() && matches!(peer.transfer, Transfer::Receiving(_));
-        drop(peer);
+        let finished = reply.is_none() && matches!(*transfer, Transfer::Receiving(_));
+        drop(transfer);
         if finished {
             self.complete_search_copy(&client, session_id).await;
         }
@@ -294,7 +292,7 @@ impl Core {
                     return Err(CopyError::Unexpected("parts"));
                 }
                 download.asked = None;
-                let known = self.known_parts(&room).await;
+                let known = self.known_parts(&room);
                 download.fetch = Some(Fetch::new(room, parts, cover, &known)?);
             }
             Message::Data { room, part, data } => {
@@ -341,87 +339,109 @@ impl Core {
             return Ok(None);
         };
         self.search_sharing
-            .restoring
+            .state
             .lock()
+            .restoring
             .insert(room.clone(), Instant::now() + RESTORING);
         download.asked = Some(room.clone());
         Ok(Some(Message::Room { room }))
     }
 
-    fn transferring(&self, session_id: &str) {
-        let mut catchup = self.search_sharing.catchup.lock();
-        if catchup.phase.session() == Some(session_id) {
-            catchup.phase = Phase::Transferring {
-                session: session_id.to_owned(),
-            };
-        }
-    }
-
     fn copied_room(&self, session_id: &str) {
-        let mut catchup = self.search_sharing.catchup.lock();
-        if catchup.phase.session() == Some(session_id) {
-            catchup.rooms += 1;
-        }
+        self.update_sharing(|state| {
+            if matches!(&state.phase, super::Phase::Receiving(session) if session.id == session_id)
+            {
+                state.rooms += 1;
+            }
+        });
     }
 
     pub(super) async fn mark_synced(&self, client: &Client, copy: Option<SearchPeerCopyView>) {
-        self.load_peer_receipts(client).await;
-        let mut received = self.search_sharing.received.lock().await;
-        let received = received.get_or_insert_with(Received::default);
-        received.synced_at = Some(now_ms());
-        if copy.is_some() {
-            received.last_copy = copy;
-        }
-        if let Err(error) = save_received(client, received).await {
+        self.load_saved(client).await;
+        self.update_sharing(|state| {
+            let saved = state.saved.get_or_insert_with(Saved::default);
+            saved.synced_at = Some(now_ms());
+            if copy.is_some() {
+                saved.last_copy = copy;
+            }
+        });
+        if let Err(error) = self.save(client).await {
             tracing::warn!(%error, "could not save the search copy result");
         }
     }
 
     pub(crate) async fn forget_shared_room(&self, client: &Client, room: &RoomId) {
-        self.load_peer_receipts(client).await;
-        let mut received = self.search_sharing.received.lock().await;
-        let Some(received) = received.as_mut() else {
-            return;
-        };
-        if received.known.remove(room).is_some()
-            && let Err(error) = save_received(client, received).await
-        {
+        self.load_saved(client).await;
+        let removed = self
+            .search_sharing
+            .state
+            .lock()
+            .saved
+            .as_mut()
+            .is_some_and(|saved| saved.known.remove(room).is_some());
+        if removed && let Err(error) = self.save(client).await {
             tracing::warn!(%error, "could not forget the received search parts");
         }
     }
 
-    pub(super) async fn clear_received(&self, client: &Client) {
-        let mut received = self.search_sharing.received.lock().await;
-        self.search_sharing.epoch.fetch_add(1, Ordering::Relaxed);
-        *received = Some(Received::default());
+    pub(super) async fn clear_saved(&self, client: &Client) {
+        let _store = self.search_sharing.store.lock().await;
+        self.update_sharing(|state| {
+            state.epoch += 1;
+            state.saved = Some(Saved::default());
+        });
         if let Err(error) = client.state_store().remove_custom_value(STORE_KEY).await {
             tracing::warn!(%error, "could not clear the search sharing data");
         }
     }
 
-    pub(super) async fn load_peer_receipts(&self, client: &Client) {
-        let mut received = self.search_sharing.received.lock().await;
-        if received.is_none() {
-            *received = Some(
-                client
-                    .state_store()
-                    .get_custom_value(STORE_KEY)
-                    .await
-                    .ok()
-                    .flatten()
-                    .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-                    .unwrap_or_default(),
-            );
+    pub(super) async fn load_saved(&self, client: &Client) {
+        if self.search_sharing.state.lock().saved.is_some() {
+            return;
         }
+        let _store = self.search_sharing.store.lock().await;
+        if self.search_sharing.state.lock().saved.is_some() {
+            return;
+        }
+        let saved = client
+            .state_store()
+            .get_custom_value(STORE_KEY)
+            .await
+            .ok()
+            .flatten()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or_default();
+        self.update_sharing(|state| {
+            state.saved.get_or_insert(saved);
+        });
     }
 
-    async fn known_parts(&self, room: &OwnedRoomId) -> HashSet<String> {
-        self.search_sharing
-            .received
+    async fn save(&self, client: &Client) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let _store = self.search_sharing.store.lock().await;
+        let bytes = self
+            .search_sharing
+            .state
             .lock()
-            .await
+            .saved
             .as_ref()
-            .and_then(|received| received.known.get(room))
+            .map(serde_json::to_vec)
+            .transpose()?;
+        if let Some(bytes) = bytes {
+            client
+                .state_store()
+                .set_custom_value(STORE_KEY, bytes)
+                .await?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn known_parts(&self, room: &OwnedRoomId) -> HashSet<String> {
+        self.search_sharing
+            .state
+            .lock()
+            .saved
+            .as_ref()
+            .and_then(|saved| saved.known.get(room))
             .cloned()
             .unwrap_or_default()
     }
@@ -526,7 +546,7 @@ impl Core {
         epoch: u64,
     ) -> Result<(), CopyError> {
         let room = fetch.room;
-        self.search_sharing.restoring.lock().remove(&room);
+        self.search_sharing.state.lock().restoring.remove(&room);
         if let Some(shared) = fetch.cover.filter(|_| joined(client, &room)) {
             let mut cover = {
                 let crawl = self.search_crawl.lock().await;
@@ -554,18 +574,21 @@ impl Core {
         if fetch.parts.is_empty() {
             return Ok(());
         }
-        let mut received = self.search_sharing.received.lock().await;
-        if self.search_sharing.epoch.load(Ordering::Relaxed) != epoch {
-            return Ok(());
+        let kept = {
+            let mut state = self.search_sharing.state.lock();
+            let current = state.epoch == epoch;
+            if current {
+                state.saved.get_or_insert_with(Saved::default).known.insert(
+                    room,
+                    fetch.parts.into_iter().map(|part| part.sha256).collect(),
+                );
+            }
+            current
+        };
+        if kept {
+            self.save(client).await.map_err(|_| CopyError::Store)?;
         }
-        let received = received.get_or_insert_with(Received::default);
-        received.known.insert(
-            room,
-            fetch.parts.into_iter().map(|part| part.sha256).collect(),
-        );
-        save_received(client, received)
-            .await
-            .map_err(|_| CopyError::Store)
+        Ok(())
     }
 }
 
@@ -583,18 +606,6 @@ fn joined(client: &Client, room: &OwnedRoomId) -> bool {
     client
         .get_room(room)
         .is_some_and(|room| room.state() == matrix_sdk::RoomState::Joined)
-}
-
-async fn save_received(
-    client: &Client,
-    received: &Received,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let bytes = serde_json::to_vec(received)?;
-    client
-        .state_store()
-        .set_custom_value(STORE_KEY, bytes)
-        .await?;
-    Ok(())
 }
 
 /// Parts start with the redactions part `[0, 0)`, then cover a contiguous

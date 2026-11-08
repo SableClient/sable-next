@@ -7,7 +7,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import {
-    searchPeerConnections,
+    watchSearchPeerConnections,
     type SearchPeerConnection,
   } from '#lib/search/search-peer-diagnostics.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -31,27 +31,22 @@
 
     sharing = null;
     let active = true;
-    let fetching = false;
-    const refresh = async (): Promise<void> => {
-      if (fetching) return;
-      fetching = true;
-      try {
-        const metrics = await core.rpc.search.metrics();
-        if (!active) return;
-        sharing = metrics.sharing;
-        connections = searchPeerConnections();
-      } catch {
-        if (active) sharing = null;
-      } finally {
-        fetching = false;
-      }
-    };
-
-    void refresh();
-    const timer = setInterval(() => void refresh(), 1000);
+    const unsubscribe = core.subscribeEvents((event) => {
+      if (event.type === 'search_sharing') sharing = event.sharing;
+    });
+    const unwatch = watchSearchPeerConnections((next) => {
+      connections = next;
+    });
+    core.rpc.search.metrics().then(
+      (metrics) => {
+        if (active && sharing === null) sharing = metrics.sharing;
+      },
+      () => {}
+    );
     return () => {
       active = false;
-      clearInterval(timer);
+      unsubscribe();
+      unwatch();
     };
   });
 
@@ -65,9 +60,10 @@
   };
   const candidateKeys: Record<SearchPeerCandidateStatus, string> = {
     waiting: 'settings.searchPeerCandidateWaiting',
+    busy: 'settings.searchPeerCandidateBusy',
     trying: 'settings.searchPeerCandidateTrying',
     failed: 'settings.searchPeerCandidateFailed',
-    done: 'settings.searchPeerCandidateDone',
+    done: 'common.copied',
   };
 
   let supported = $derived.by(() => {
@@ -75,11 +71,7 @@
     return true;
   });
   let device = $derived(sharing?.peer ? (sharing.peer.name ?? sharing.peer.device_id) : '');
-  let busy = $derived(
-    sharing?.state === 'discovering' ||
-      sharing?.state === 'connecting' ||
-      sharing?.state === 'transferring'
-  );
+  let busy = $derived(sharing !== null && sharing.state !== 'idle' && sharing.state !== 'off');
 
   let badge = $derived.by(() => {
     if (!preferences.searchSharing) return i18n.t('settings.searchPeerStateOff');
@@ -88,10 +80,14 @@
     switch (sharing?.state) {
       case 'discovering':
         return i18n.t('settings.searchPeerStateDiscovering');
+      case 'waiting':
+        return i18n.t('settings.searchPeerStateWaiting');
       case 'connecting':
         return i18n.t('settings.searchPeerStateConnecting');
-      case 'transferring':
+      case 'receiving':
         return i18n.t('settings.searchPeerStateTransferring');
+      case 'sending':
+        return i18n.t('settings.searchPeerStateSending');
       default:
         return i18n.t('settings.searchPeerStateIdle');
     }
@@ -105,9 +101,11 @@
     if (sharing.pause === 'metered') return i18n.t('settings.searchPeerPausedMetered');
     if (sharing.pause === 'background') return i18n.t('settings.searchPeerPausedBackground');
     if (sharing.state === 'discovering') return i18n.t('settings.searchPeerDiscovering');
+    if (sharing.state === 'waiting') return i18n.t('settings.searchPeerWaiting', { device });
     if (sharing.state === 'connecting') return i18n.t('settings.searchPeerConnecting', { device });
-    if (sharing.state === 'transferring')
+    if (sharing.state === 'receiving')
       return i18n.t('settings.searchPeerTransferring', { device, count: sharing.rooms_copied });
+    if (sharing.state === 'sending') return i18n.t('settings.searchPeerSending', { device });
     if (sharing.outcome === 'no_answer' && sharing.automatic)
       return i18n.t('settings.searchPeerNoAnswerRetrying');
     if (sharing.outcome) return i18n.t(outcomeKeys[sharing.outcome]);
@@ -163,24 +161,18 @@
         </Button>
       </SettingsRow>
     {/if}
-    <SettingsRow id="search-sharing-received" title={i18n.t('settings.searchPeerRoomsReceived')}>
-      <code>{sharing.rooms_received}</code>
-    </SettingsRow>
     <SettingsRow
       id="search-sharing-reset"
       title={i18n.t('settings.searchPeerReset')}
       description={i18n.t('settings.searchPeerResetHint')}
     >
       <Button size="small" loading={resetting} onclick={reset}>
-        {i18n.t('settings.searchPeerResetAction')}
+        {i18n.t('common.reset')}
       </Button>
     </SettingsRow>
     {#if preferences.developerTools}
       <SettingsRow id="search-sharing-asked" title={i18n.t('settings.searchPeerDebugAsked')}>
         <code>{sharing.asked}</code>
-      </SettingsRow>
-      <SettingsRow id="search-sharing-serving" title={i18n.t('settings.searchPeerDebugServing')}>
-        <code>{sharing.serving}</code>
       </SettingsRow>
       <SettingsRow id="search-sharing-outcome" title={i18n.t('settings.searchPeerDebugOutcome')}>
         <code>{sharing.outcome ?? '-'}</code>

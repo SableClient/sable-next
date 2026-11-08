@@ -129,7 +129,7 @@ try {
     const metrics = await Promise.all([0, 1].map((side) => call(side, 'search.metrics')));
     if (metrics.every(({ sharing }) => sharing.state === 'idle')) {
       assert.equal(metrics[1].sharing.outcome, 'completed');
-      assert.equal(metrics[1].sharing.rooms_received, 1);
+      assert.equal(metrics[1].sharing.rooms_copied, 1);
       break;
     }
     await new Promise((resolve) => setTimeout(resolve, 100));

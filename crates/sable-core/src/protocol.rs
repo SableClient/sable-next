@@ -301,6 +301,10 @@ pub enum CoreEvent {
         coverage: SearchCoverageView,
     },
 
+    SearchSharing {
+        sharing: SearchSharingView,
+    },
+
     Notification {
         notification: NotificationView,
     },
@@ -624,16 +628,13 @@ pub struct SearchSharingView {
     pub pause: Option<SearchPeerPause>,
     pub outcome: Option<SearchPeerOutcome>,
     pub peer: Option<SearchPeerDeviceView>,
+    /// Rooms copied by the current or last receiving attempt.
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub rooms_copied: usize,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub rooms_received: usize,
     pub last_copy: Option<SearchPeerCopyView>,
     pub automatic: bool,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub asked: usize,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub serving: usize,
     pub candidates: Vec<SearchPeerCandidateView>,
 }
 
@@ -645,8 +646,11 @@ pub enum SearchPeerState {
     Off,
     Idle,
     Discovering,
+    /// The device with the most history is busy with another copy.
+    Waiting,
     Connecting,
-    Transferring,
+    Receiving,
+    Sending,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -705,6 +709,7 @@ pub struct SearchPeerCandidateView {
 #[serde(rename_all = "snake_case")]
 pub enum SearchPeerCandidateStatus {
     Waiting,
+    Busy,
     Trying,
     Failed,
     Done,

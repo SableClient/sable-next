@@ -14,20 +14,24 @@ turned off, when the index is rebuilt or from the settings reset button.
 
 Discovery uses encrypted `moe.sable.search_peer.v1` to-device events (`version`, `session`,
 `timestamp`, `kind`) from verified devices of the same account. `version` is the copy
-protocol version, currently `2`. Devices ignore events with another version or none:
+protocol version, currently `3`. Devices ignore events with another version or none:
 
 - `query`: the requesting device sends it to every verified device seen in the last 90 days.
-- `info` (`documents`, `complete_rooms`): each device that can serve right now answers with
-  the size of its index.
+- `info` (`documents`, `complete_rooms`, `busy`): each device that can serve answers with
+  the size of its index. `busy` is set while it is already sending or receiving a copy.
 - `request`: after 10 seconds, the requesting device picks the device with the most indexed
   messages, then the most fully indexed rooms. `session` is the Frostbite session ID.
+
+A device takes part in one copy at a time. If the best device is busy, the requesting device
+asks every device again 30 seconds later, until that device is free. A busy device refuses a
+`request` with an `info` that has `busy` set. When two devices request each other at once,
+the one with the smaller device ID drops its own attempt and serves.
 
 The chosen device becomes the Frostbite sender and the requesting device the receiver, as
 described in the Frostbite device RTC framework:
 `computer.gingershaped.frostbite.negotiate` (`session`, `timestamp`, `description`) and
 `computer.gingershaped.frostbite.candidate` (`session`, `candidate`). If the connection
-fails within 30 seconds or drops, the next device in the ranking is requested. A device
-serves at most two copies at once and one per requesting device.
+fails within 30 seconds or drops, the next device in the ranking is requested.
 
 The data channel is `sable-search-v1`. The receiver speaks first, and the sender only
 answers, one message at a time. For each of its joined rooms the receiver sends:

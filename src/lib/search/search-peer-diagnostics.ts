@@ -8,9 +8,18 @@ export interface SearchPeerConnection {
 const MAX_CONNECTIONS = 4;
 
 const connections: SearchPeerConnection[] = [];
+const listeners = new Set<(connections: SearchPeerConnection[]) => void>();
 
-export function searchPeerConnections(): SearchPeerConnection[] {
+function snapshot(): SearchPeerConnection[] {
   return connections.map((connection) => ({ ...connection }));
+}
+
+export function watchSearchPeerConnections(
+  listener: (connections: SearchPeerConnection[]) => void
+): () => void {
+  listener(snapshot());
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 export function reportSearchPeerConnection(connection: SearchPeerConnection): void {
@@ -18,6 +27,7 @@ export function reportSearchPeerConnection(connection: SearchPeerConnection): vo
   if (index >= 0) connections[index] = connection;
   else connections.unshift(connection);
   connections.splice(MAX_CONNECTIONS);
+  for (const listener of listeners) listener(snapshot());
 }
 
 interface Stat {

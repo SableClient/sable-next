@@ -365,7 +365,7 @@ impl Handler for SetSearchOptionsParams {
                 core.forget_search_sharing(&client).await;
             }
             core.cancel_search_peers();
-            core.search_sharing.reset_session().await;
+            core.search_sharing.reset_session();
         }
         core.search_network.set_unmetered_only(self.unmetered_only);
         if !self.foreground || !core.search_network.allows_crawl() {

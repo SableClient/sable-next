@@ -4,7 +4,7 @@ import { render } from '@testing-library/svelte';
 import { flushSync, tick } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import type { SearchMetricsView, SearchSharingView } from '#src/generated/protocol';
+import type { CoreEvent, SearchMetricsView, SearchSharingView } from '#src/generated/protocol';
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('#lib/core/context.js');
@@ -15,8 +15,14 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 const searchMetrics = vi.fn<() => Promise<SearchMetricsView>>();
 const peerFind = vi.fn(() => Promise.resolve(null));
 const peerReset = vi.fn(() => Promise.resolve(null));
+const unsubscribe = vi.fn();
+let listener: ((event: CoreEvent) => void) | undefined;
 const core = Object.assign(baseCore, {
   rpc: { search: { metrics: searchMetrics, peerFind, peerReset } },
+  subscribeEvents(callback: (event: CoreEvent) => void) {
+    listener = callback;
+    return unsubscribe;
+  },
 });
 
 import SearchSharingStatus from './SearchSharingStatus.svelte';
@@ -53,11 +59,9 @@ function idle(overrides: Partial<SearchSharingView> = {}): SearchSharingView {
     outcome: null,
     peer: null,
     rooms_copied: 0,
-    rooms_received: 0,
     last_copy: null,
     automatic: false,
     asked: 0,
-    serving: 0,
     candidates: [],
     ...overrides,
   };
@@ -76,6 +80,8 @@ afterEach(() => {
   searchMetrics.mockReset();
   peerFind.mockClear();
   peerReset.mockClear();
+  unsubscribe.mockClear();
+  listener = undefined;
   preferences.developerTools = false;
   core.session = null;
   preferences.searchSharing = true;
@@ -107,7 +113,9 @@ test('a new device explains when history is copied and offers to copy now', asyn
 });
 
 test('the reset button forgets what this device received', async () => {
-  searchMetrics.mockResolvedValue(withSharing({ rooms_received: 3 }));
+  searchMetrics.mockResolvedValue(
+    withSharing({ last_copy: { device_id: 'PHONE', name: null, at_ms: 0, rooms: 3 } })
+  );
   render(SearchSharingStatus);
   await settle();
 
@@ -131,7 +139,7 @@ test('the pause reason replaces the waiting state', async () => {
 test('progress names the device being copied from', async () => {
   searchMetrics.mockResolvedValue(
     withSharing({
-      state: 'transferring',
+      state: 'receiving',
       peer: { device_id: 'MAC', name: 'MacBook' },
       rooms_copied: 3,
     })
@@ -150,11 +158,21 @@ test('an unanswered automatic copy says it asks again next time', async () => {
   expect(status()).toContain('asks again the next time it opens');
 });
 
-test('the last copy and received rooms stay visible', async () => {
+test('a busy device is waited for by name', async () => {
+  searchMetrics.mockResolvedValue(
+    withSharing({ state: 'waiting', peer: { device_id: 'MAC', name: 'MacBook' } })
+  );
+  render(SearchSharingStatus);
+  await settle();
+
+  expect(status()).toContain('Waiting');
+  expect(status()).toContain('MacBook is copying with another device');
+});
+
+test('the last copy stays visible', async () => {
   searchMetrics.mockResolvedValue(
     withSharing({
       outcome: 'completed',
-      rooms_received: 4,
       last_copy: { device_id: 'PHONE', name: null, at_ms: 0, rooms: 2 },
     })
   );
@@ -165,7 +183,6 @@ test('the last copy and received rooms stay visible', async () => {
   expect(document.getElementById('search-sharing-last-copy')?.textContent).toContain(
     '2 rooms from PHONE'
   );
-  expect(document.getElementById('search-sharing-received')?.textContent).toContain('4');
 });
 
 test('developer tools list every candidate with its index size', async () => {
@@ -204,7 +221,7 @@ test('unsupported browsers show that direct sharing is unavailable', async () =>
 
 test('disabling sharing takes precedence over stale transfer status', async () => {
   preferences.searchSharing = false;
-  searchMetrics.mockResolvedValue(withSharing({ state: 'transferring' }));
+  searchMetrics.mockResolvedValue(withSharing({ state: 'receiving' }));
   render(SearchSharingStatus);
   await settle();
 
@@ -212,28 +229,19 @@ test('disabling sharing takes precedence over stale transfer status', async () =
   expect(status()).not.toContain('Copying');
 });
 
-test('polling does not overlap requests and stops on unmount', async () => {
-  vi.useFakeTimers();
-  try {
-    const pending = Promise.withResolvers<SearchMetricsView>();
-    searchMetrics.mockReturnValueOnce(pending.promise);
-    const component = render(SearchSharingStatus);
-    flushSync();
-    await vi.advanceTimersByTimeAsync(3000);
-    expect(searchMetrics).toHaveBeenCalledOnce();
-    pending.resolve(metrics);
-    await settle();
-    searchMetrics.mockResolvedValue(
-      withSharing({ state: 'transferring', peer: { device_id: 'MAC', name: null } })
-    );
-    await vi.advanceTimersByTimeAsync(1000);
-    await settle();
-    expect(status()).toContain('Copying');
-    expect(searchMetrics).toHaveBeenCalledTimes(2);
-    component.unmount();
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(searchMetrics).toHaveBeenCalledTimes(2);
-  } finally {
-    vi.useRealTimers();
-  }
+test('pushed sharing events replace the fetched status until unmount', async () => {
+  searchMetrics.mockResolvedValue(metrics);
+  const component = render(SearchSharingStatus);
+  await settle();
+  expect(status()).toContain('Ready');
+
+  listener?.({
+    type: 'search_sharing',
+    sharing: idle({ state: 'sending', peer: { device_id: 'PHONE', name: 'Phone' } }),
+  });
+  await settle();
+  expect(status()).toContain('Sending search history to Phone');
+  expect(searchMetrics).toHaveBeenCalledOnce();
+  component.unmount();
+  expect(unsubscribe).toHaveBeenCalledOnce();
 });

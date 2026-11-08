@@ -977,7 +977,7 @@ impl Core {
         self.session_handlers.lock().clear();
         self.session_tasks.lock().clear();
         self.to_device_inbox.lock().take();
-        self.search_sharing.reset_session().await;
+        self.search_sharing.reset_session();
         self.rtc.clear();
         self.subscriptions.lock().await.clear();
         self.room_subscriptions.lock().await.clear();

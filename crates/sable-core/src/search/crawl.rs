@@ -727,7 +727,7 @@ impl Core {
             running_ms: metrics
                 .started_ms
                 .map(|started| now_ms().saturating_sub(started)),
-            sharing: self.search_sharing_view().await,
+            sharing: self.search_sharing_view(),
         }
     }
 
