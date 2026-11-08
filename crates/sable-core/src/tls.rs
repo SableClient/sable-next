@@ -56,30 +56,26 @@ pub fn apply(builder: ClientBuilder) -> ClientBuilder {
     builder.tls_backend_preconfigured(config)
 }
 
-#[cfg(all(not(target_os = "android"), not(target_family = "wasm")))]
+#[cfg(not(target_family = "wasm"))]
 pub(crate) fn apply_sdk(builder: matrix_sdk::ClientBuilder) -> matrix_sdk::ClientBuilder {
-    let builder = builder.user_agent(crate::USER_AGENT);
-    match PROXY.get() {
-        Some(url) => builder.proxy(url),
-        None => builder,
-    }
+    use std::time::Duration;
+
+    // Pings evict a connection left on the network the device switched away from.
+    let Ok(client) = apply(
+        matrix_sdk::reqwest::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .http2_keep_alive_interval(Duration::from_secs(15))
+            .http2_keep_alive_timeout(Duration::from_secs(10)),
+    )
+    .build() else {
+        return builder;
+    };
+    builder.http_client(client)
 }
 
 #[cfg(target_family = "wasm")]
 pub(crate) const fn apply_sdk(builder: matrix_sdk::ClientBuilder) -> matrix_sdk::ClientBuilder {
     builder
-}
-
-#[cfg(target_os = "android")]
-pub(crate) fn apply_sdk(builder: matrix_sdk::ClientBuilder) -> matrix_sdk::ClientBuilder {
-    let builder = builder.user_agent(crate::USER_AGENT);
-    let Ok(client) =
-        apply(matrix_sdk::reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)))
-            .build()
-    else {
-        return builder;
-    };
-    builder.http_client(client)
 }
 
 #[cfg(target_os = "android")]
