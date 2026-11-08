@@ -164,6 +164,9 @@
               playing = false;
             });
         }}
+        oncommit={(value) => {
+          setPreference(sound.preference, value);
+        }}
       />
 
       <label class="form-control range-reading">
