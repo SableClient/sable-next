@@ -29,8 +29,11 @@ pub(super) fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<
             bundles
                 .iter()
                 .filter_map(|bundle| {
-                    let data = crate::link_previews::PreviewData::read(bundle)?;
-                    let video = data.video();
+                    let data = sable_link_preview::PreviewData::read(bundle)?;
+                    let video = data
+                        .video(crate::link_previews::is_mxc)
+                        .map(crate::link_previews::video_view);
+                    let encrypted = crate::link_previews::encrypted_image(&data);
                     let theme_color = data.valid_theme_color();
                     let card = data.valid_card();
                     let url = data.stable_matched_url.or(data.legacy_matched_url)?;
@@ -40,8 +43,7 @@ pub(super) fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<
                     if !body.is_some_and(|body| body.contains(&url)) {
                         return None;
                     }
-                    let image = data
-                        .encrypted_image
+                    let image = encrypted
                         .filter(|file| file.url.is_valid())
                         .map(|file| media_source(&MediaSource::Encrypted(Box::new(file))))
                         .or_else(|| data.image.filter(|image| image.starts_with("mxc://")));
