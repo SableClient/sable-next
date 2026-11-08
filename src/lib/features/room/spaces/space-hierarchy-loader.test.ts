@@ -114,3 +114,22 @@ test('a failed refetch keeps the stale level without failing the lobby', async (
   expect(second.fetched.map((room) => room.room_id)).toEqual(['!kept:x']);
   warn.mockRestore();
 });
+
+test('a removed child stays gone from the cached level on revisit', async () => {
+  const space = {
+    room_id: '!removal:x',
+    children: [{ room_id: '!gone:x' }, { room_id: '!kept:x' }],
+  } as SpaceHierarchyRoomView;
+  const { core } = fakeCore(() => Promise.resolve({ rooms: [space], next_batch: null }));
+  const first = load(core, '!removal:x');
+  await vi.waitFor(() => {
+    expect(first.loadedLevels.has('!removal:x')).toBe(true);
+  });
+
+  first.forgetChild('!removal:x', '!gone:x');
+  const second = load(core, '!removal:x');
+
+  for (const loader of [first, second]) {
+    expect(loader.fetched[0].children.map((edge) => edge.room_id)).toEqual(['!kept:x']);
+  }
+});

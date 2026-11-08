@@ -106,6 +106,20 @@ export class SpaceHierarchyLoader {
     this.enqueue([levelId]);
   }
 
+  forgetChild(parentId: string, childId: string): void {
+    const drop = (rooms: SpaceHierarchyRoomView[]) =>
+      rooms.map((room) =>
+        room.room_id === parentId
+          ? { ...room, children: room.children.filter((edge) => edge.room_id !== childId) }
+          : room
+      );
+    for (const [levelId, rooms] of this.#levels) this.#levels.set(levelId, drop(rooms));
+    for (const [key, level] of [...cachedLevels]) {
+      cachedLevels.set(key, { ...level, rooms: drop(level.rooms) });
+    }
+    this.#publish();
+  }
+
   fail(): void {
     this.failed = true;
   }

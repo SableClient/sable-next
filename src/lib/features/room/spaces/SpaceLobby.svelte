@@ -467,6 +467,7 @@
 
     try {
       await core.rpc.spaces.remove({ space_id: parentId, room_id: entry.room.room_id });
+      hierarchy.forgetChild(parentId, entry.room.room_id);
       removed.add(entry.key);
     } catch (error) {
       console.warn('[sable lobby] remove failed', error);
@@ -482,6 +483,7 @@
         space_id: section.owner_id,
         room_id: section.parent_id,
       });
+      hierarchy.forgetChild(section.owner_id, section.parent_id);
     } catch (error) {
       console.warn('[sable lobby] remove failed', error);
       hierarchy.fail();
@@ -498,6 +500,7 @@
     }
     try {
       await core.rpc.spaces.remove({ space_id: from, room_id: roomId });
+      hierarchy.forgetChild(from, roomId);
       for (const section of sections) {
         if (section.parent_id !== from) continue;
         for (const entry of section.rooms) {
