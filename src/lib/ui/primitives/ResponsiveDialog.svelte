@@ -10,10 +10,11 @@
     open?: boolean;
     label: string;
     closeLabel: string;
+    expandable?: boolean;
     children: Snippet<[boolean]>;
   }
 
-  let { open = $bindable(false), label, closeLabel, children }: Props = $props();
+  let { open = $bindable(false), label, closeLabel, expandable, children }: Props = $props();
 
   const appLayout = new AppLayout();
   let desktop = $derived(appLayout.current);
@@ -24,7 +25,7 @@
     {@render children(true)}
   </DialogFrame>
 {:else}
-  <BottomSheet bind:open {label} {closeLabel}>
+  <BottomSheet bind:open {label} {closeLabel} {expandable}>
     {@render children(false)}
   </BottomSheet>
 {/if}

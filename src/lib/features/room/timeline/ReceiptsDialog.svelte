@@ -46,11 +46,13 @@
   label={i18n.t('common.readReceipts')}
   closeLabel={i18n.t('timeline.closeReadReceipts')}
   children={content}
+  expandable
 />
 
 <style>
   .receipts-dialog {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-300);
     width: min(22rem, calc(100vw - 2rem));
   }
