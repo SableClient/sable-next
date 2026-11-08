@@ -68,6 +68,7 @@ const cases: Record<string, TimelineItemView> = {
         theme_color: null,
         card: null,
         author_name: null,
+        post: null,
       },
     ],
   },

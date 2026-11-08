@@ -168,13 +168,5 @@ export const mediaCategory: SettingsCategory = {
       type: 'boolean',
       gatedBy: 'clientEmbeds',
     },
-    {
-      key: 'blueskyEmbeds',
-      section: 'embeds',
-      icon: InstagramLogoIcon,
-      name: 'settings.blueskyEmbeds',
-      type: 'boolean',
-      gatedBy: 'clientEmbeds',
-    },
   ],
 };

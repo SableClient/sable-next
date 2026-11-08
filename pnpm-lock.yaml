@@ -184,9 +184,6 @@ importers:
       '@atlaskit/pragmatic-drag-and-drop-auto-scroll':
         specifier: ^3.2.1
         version: 3.2.1
-      '@atproto/syntax':
-        specifier: ^0.7.6
-        version: 0.7.7
       '@choochmeque/tauri-plugin-sharekit-api':
         specifier: 0.4.0-rc.7
         version: 0.4.0-rc.7
@@ -611,10 +608,6 @@ packages:
 
   '@atlaskit/pragmatic-drag-and-drop@4.0.0':
     resolution: {integrity: sha512-pyDo2B5NiaExoKGmgeXKGNUL4aR4UzzSZm8QWWjYTEyBLVqSqKyKUwtVxMw2YEkakagOGFONUdHM32LAH2nPug==}
-
-  '@atproto/syntax@0.7.7':
-    resolution: {integrity: sha512-MJ+QUo8yzAGP2SOQKs2CBI2ouY5KaO9Pv5a7laX3xtrkfWmS/s96L/FCJm5VBHEvKXmd6ap/HSGypYclQcfoWA==}
-    engines: {node: '>=22'}
 
   '@axe-core/playwright@4.14.0':
     resolution: {integrity: sha512-SGUhG5PIHd2eMdpgBF2PyQLOhX+qyDR2PT4cmoS4Qk2ak+jX/rrSvst9l0PGv5WTHolKpUMvVmoHpr4cZgf1RQ==}
@@ -4705,9 +4698,6 @@ packages:
     resolution: {integrity: sha512-FFUtZMpoZ8RqHS3XeXEmHWLA4thH+ZxCv2lOiPIn1Xc7CxrqhWzNSDzD+/chS/zbYezmiwWLdQC09JdQKmthOw==}
     engines: {node: '>=20'}
 
-  iso-datestring-validator@2.2.2:
-    resolution: {integrity: sha512-yLEMkBbLZTlVQqOnQ4FiMujR6T4DEcCb1xizmvXS+OxuhwcbtynoosRzdMA69zZCShCNAbi+gJ71FxZBBXx1SA==}
-
   jackspeak@3.4.3:
     resolution: {integrity: sha512-OGlZQpz2yfahA/Rd1Y8Cd9SIEsqvXkLVoSw/cgwhnhFMDbsQFeZYoJJ7bIZBS9BcamUW96asq/npPWugM+RQBw==}
 
@@ -6661,11 +6651,6 @@ snapshots:
       '@babel/runtime': 7.29.10
       bind-event-listener: 3.0.0
       raf-schd: 4.0.3
-
-  '@atproto/syntax@0.7.7':
-    dependencies:
-      iso-datestring-validator: 2.2.2
-      tslib: 2.8.1
 
   '@axe-core/playwright@4.14.0(playwright-core@1.64.1)':
     dependencies:
@@ -10409,8 +10394,6 @@ snapshots:
   isexe@3.1.5: {}
 
   isexe@4.0.0: {}
-
-  iso-datestring-validator@2.2.2: {}
 
   jackspeak@3.4.3:
     dependencies:

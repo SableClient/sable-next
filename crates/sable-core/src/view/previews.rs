@@ -29,11 +29,14 @@ pub(super) fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<
             bundles
                 .iter()
                 .filter_map(|bundle| {
-                    let data = sable_link_preview::PreviewData::read(bundle)?;
+                    let mut data = sable_link_preview::PreviewData::read(bundle)?;
                     let video = data
                         .video(crate::link_previews::is_mxc)
                         .map(crate::link_previews::video_view);
                     let encrypted = crate::link_previews::encrypted_image(&data);
+                    let post = data.post.take().map(|post| {
+                        crate::link_previews::post_view(post, crate::link_previews::is_mxc)
+                    });
                     let theme_color = data.valid_theme_color();
                     let card = data.valid_card();
                     let url = data.stable_matched_url.or(data.legacy_matched_url)?;
@@ -60,6 +63,7 @@ pub(super) fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<
                         theme_color,
                         card,
                         author_name: data.author_name,
+                        post,
                     })
                 })
                 .filter(|preview| seen.insert(preview.url.clone()))
@@ -113,6 +117,24 @@ mod tests {
 
         let absent = json!({ "body": "see https://example.org" });
         assert_eq!(link_previews_removed(Some(&absent)), None);
+    }
+
+    #[test]
+    fn reads_a_bundled_post() {
+        let previews = bundled_link_previews(Some(&json!({
+            "body": "https://bsky.app/profile/alice.test/post/3abc",
+            "m.url_previews": [{
+                "matrix:matched_url": "https://bsky.app/profile/alice.test/post/3abc",
+                "og:type": "note",
+                "note:author:handle": "alice.test",
+                "note:content": "hello",
+                "og:image": "https://cdn/x.png",
+            }],
+        })));
+
+        let post = previews[0].post.as_ref().unwrap();
+        assert_eq!(post.text.as_deref(), Some("hello"));
+        assert!(post.media.is_empty());
     }
 
     #[test]

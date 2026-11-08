@@ -42,6 +42,7 @@ function preview(overrides: Partial<UrlPreviewView> = {}): UrlPreviewView {
     theme_color: null,
     card: null,
     author_name: null,
+    post: null,
     ...overrides,
   };
 }

@@ -342,7 +342,6 @@ export interface Preferences {
   youtubeThumbnailPosition: YoutubeThumbnailPosition;
   tiktokEmbeds: boolean;
   instagramEmbeds: boolean;
-  blueskyEmbeds: boolean;
 
   systemNotifications: boolean;
   badgeDefaultDirect: BadgeNotificationMode;
@@ -711,7 +710,6 @@ const DEFAULTS: Preferences = {
   youtubeThumbnailPosition: 'middle',
   tiktokEmbeds: false,
   instagramEmbeds: false,
-  blueskyEmbeds: false,
 
   systemNotifications: true,
   badgeDefaultDirect: 'all',

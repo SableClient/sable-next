@@ -2078,7 +2078,6 @@
     "youtubeThumbnailPositionStart": "开头",
     "youtubeThumbnailPositionMiddle": "中间",
     "youtubeThumbnailPositionEnd": "结尾",
-    "blueskyEmbeds": "嵌入 Bluesky 链接",
     "callDevicesFailed": "麦克风访问失败：{{reason}}",
     "callMode": "通话模式",
     "callModeHint": "加入通话时使用的 MatrixRTC 成员身份格式。自动模式会跟随通话中已有的人。",

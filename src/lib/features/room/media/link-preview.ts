@@ -4,9 +4,14 @@ import type { UrlPreviewView } from '#src/generated/protocol';
 import { parseSettingsLink } from '../settings/settings-link';
 
 export function hasPreviewData(preview: UrlPreviewView): boolean {
-  return [preview.title, preview.description, preview.site_name, preview.image, preview.video].some(
-    (value) => value !== null
-  );
+  return [
+    preview.title,
+    preview.description,
+    preview.site_name,
+    preview.image,
+    preview.video,
+    preview.post,
+  ].some((value) => value !== null);
 }
 
 export function previewWhitelistEntry(url: string): UrlPreviewView {
@@ -23,6 +28,7 @@ export function previewWhitelistEntry(url: string): UrlPreviewView {
     theme_color: null,
     card: null,
     author_name: null,
+    post: null,
   };
 }
 

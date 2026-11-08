@@ -30,6 +30,7 @@ Object.assign(core.rpc.messages, {
       theme_color: null,
       card: null,
       author_name: null,
+      post: null,
     })
   ),
 });
