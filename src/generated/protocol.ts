@@ -2841,6 +2841,7 @@ export type Rpc = {
 }) => Promise<null>;
     urlPreview: (params: {
 	url: string,
+	client?: boolean,
 	service?: string | null,
 }) => Promise<UrlPreviewView | null>;
     reactionShortcodes: (params: {

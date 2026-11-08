@@ -1,11 +1,12 @@
 use crate::Core;
 use crate::protocol::{RpcError, UrlPreviewVideoView, UrlPreviewView};
 use matrix_sdk::media::{MediaFormat, MediaRequestParameters};
-use matrix_sdk::ruma::events::room::MediaSource;
+use matrix_sdk::ruma::events::room::{EncryptedFile, MediaSource};
 use matrix_sdk::ruma::{OwnedMxcUri, OwnedRoomId};
-use sable_model::color::is_hex_color;
-use serde_with::{DefaultOnError, serde_as};
+use sable_link_preview::{BundleEntry, PreviewData, VideoData};
 use std::collections::HashMap;
+
+pub(crate) use sable_link_preview::{BUNDLED_LINK_PREVIEWS, LEGACY_BUNDLED_LINK_PREVIEWS};
 
 pub(crate) fn is_preview_url(value: &str) -> bool {
     url::Url::parse(value).is_ok_and(|url| matches!(url.scheme(), "http" | "https"))
@@ -17,6 +18,11 @@ pub(crate) fn preview_refused(error: &matrix_sdk::HttpError) -> bool {
         .is_some_and(|api_error| matches!(api_error.status_code.as_u16(), 400 | 403))
 }
 
+pub(crate) fn is_mxc(source: &str) -> bool {
+    source.starts_with("mxc://")
+}
+
+#[cfg(any(target_family = "wasm", test))]
 pub(crate) async fn soliditas_preview(
     base: &str,
     target: &str,
@@ -49,96 +55,28 @@ pub(crate) async fn soliditas_preview(
     Ok(serde_json::from_slice(&body).ok())
 }
 
-/// Every field reads as missing when absent or wrong-typed.
-#[serde_as]
-#[derive(Default, serde::Deserialize)]
-#[serde(default)]
-pub(crate) struct PreviewData {
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "matrix:matched_url")]
-    pub(crate) stable_matched_url: Option<String>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "matched_url")]
-    pub(crate) legacy_matched_url: Option<String>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "og:title")]
-    pub(crate) title: Option<String>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "og:description")]
-    pub(crate) description: Option<String>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "og:site_name")]
-    pub(crate) site_name: Option<String>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "matrix:image:encrypted", alias = "beeper:image:encryption")]
-    pub(crate) encrypted_image: Option<matrix_sdk::ruma::events::room::EncryptedFile>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "og:image")]
-    pub(crate) image: Option<String>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "og:image:type")]
-    pub(crate) image_type: Option<String>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "og:image:width")]
-    pub(crate) image_width: Option<u64>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "og:image:height")]
-    pub(crate) image_height: Option<u64>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "og:video")]
-    video: Option<String>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "og:video:type")]
-    video_type: Option<String>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "og:video:width")]
-    video_width: Option<u64>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "og:video:height")]
-    video_height: Option<u64>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "com.sable.theme_color")]
-    theme_color: Option<String>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "com.sable.card")]
-    card: Option<String>,
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(rename = "com.sable.author_name")]
-    pub(crate) author_name: Option<String>,
+pub(crate) fn video_view(video: VideoData) -> UrlPreviewVideoView {
+    UrlPreviewVideoView {
+        source: video.source,
+        mime: video.mime,
+        width: video.width,
+        height: video.height,
+    }
 }
 
-impl PreviewData {
-    pub(crate) fn read(data: &serde_json::Value) -> Option<Self> {
-        serde::Deserialize::deserialize(data).ok()
-    }
-
-    pub(crate) fn video(&self) -> Option<UrlPreviewVideoView> {
-        let source = self
-            .video
-            .as_deref()
-            .filter(|source| source.starts_with("mxc://"))?
-            .to_owned();
-        Some(UrlPreviewVideoView {
-            source,
-            mime: self.video_type.clone(),
-            width: self.video_width,
-            height: self.video_height,
-        })
-    }
-
-    pub(crate) fn valid_theme_color(&self) -> Option<String> {
-        let color = self.theme_color.as_deref()?;
-        is_hex_color(color, &[3, 4, 6, 8]).then(|| color.to_owned())
-    }
-
-    pub(crate) fn valid_card(&self) -> Option<String> {
-        let card = self.card.as_deref()?;
-        matches!(card, "summary" | "summary_large_image").then(|| card.to_owned())
-    }
+pub(crate) fn encrypted_image(data: &PreviewData) -> Option<EncryptedFile> {
+    serde_json::from_value(data.encrypted_image.clone()?).ok()
 }
 
 pub(crate) fn url_preview(url: String, data: &serde_json::Value) -> Option<UrlPreviewView> {
-    let data = PreviewData::read(data)?;
+    preview_view(url, &PreviewData::read(data)?, is_mxc)
+}
+
+fn preview_view(
+    url: String,
+    data: &PreviewData,
+    media: impl Fn(&str) -> bool,
+) -> Option<UrlPreviewView> {
     let text = |value: &Option<String>| {
         value
             .as_deref()
@@ -152,11 +90,11 @@ pub(crate) fn url_preview(url: String, data: &serde_json::Value) -> Option<UrlPr
         title: text(&data.title),
         description: text(&data.description),
         site_name: text(&data.site_name),
-        image: text(&data.image).filter(|image| image.starts_with("mxc://")),
+        image: text(&data.image).filter(|image| media(image)),
         image_mime: text(&data.image_type),
         image_width: data.image_width,
         image_height: data.image_height,
-        video: data.video(),
+        video: data.video(&media).map(video_view),
         theme_color: data.valid_theme_color(),
         card: data.valid_card(),
         author_name: text(&data.author_name),
@@ -172,6 +110,95 @@ pub(crate) fn url_preview(url: String, data: &serde_json::Value) -> Option<UrlPr
     Some(preview)
 }
 
+#[cfg(not(target_family = "wasm"))]
+mod local {
+    use std::sync::LazyLock;
+    use std::time::Duration;
+
+    use sable_link_preview::{Fetch as _, MAX_DIRECT_VIDEO_BYTES, ReqwestFetch, Response as _};
+
+    use crate::protocol::{RpcError, UrlPreviewView};
+
+    const USER_AGENT: &str = concat!(
+        "Sable/",
+        env!("SABLE_APP_VERSION"),
+        " (link preview) facebookexternalhit/1.1"
+    );
+
+    const MAX_IMAGE_BYTES: usize = 20 * 1024 * 1024;
+
+    const MAX_SCRAPED_MEDIA: usize = 512;
+
+    /// The media URLs a scrape handed out, with how many bytes each may take.
+    /// Only these reach the web, so an event naming a web URL as its media
+    /// cannot make the client fetch it.
+    static SCRAPED: LazyLock<parking_lot::Mutex<hashlink::LruCache<String, usize>>> =
+        LazyLock::new(|| parking_lot::Mutex::new(hashlink::LruCache::new(MAX_SCRAPED_MEDIA)));
+
+    fn client(timeout: Duration) -> Result<ReqwestFetch, RpcError> {
+        let builder = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
+            .user_agent(USER_AGENT)
+            .timeout(timeout);
+        ReqwestFetch::new(builder).map_err(|_| RpcError::Unavailable)
+    }
+
+    pub(crate) async fn scrape(url: &str) -> Result<Option<UrlPreviewView>, RpcError> {
+        let Some(target) = sable_link_preview::parse_public_url(url, None) else {
+            return Ok(None);
+        };
+        let fetch = client(Duration::from_secs(10))?;
+        let Some(preview) = sable_link_preview::scrape(&fetch, &target).await else {
+            return Ok(None);
+        };
+        {
+            let mut scraped = SCRAPED.lock();
+            if let Some(image) = preview.image() {
+                scraped.insert(image.url.to_string(), MAX_IMAGE_BYTES);
+            }
+            if let Some(video) = &preview.video {
+                let cap = usize::try_from(MAX_DIRECT_VIDEO_BYTES).unwrap_or(usize::MAX);
+                scraped.insert(video.url.to_string(), cap);
+            }
+        }
+        let data = serde_json::Value::Object(preview.to_matrix(ToString::to_string));
+        Ok(sable_link_preview::PreviewData::read(&data)
+            .and_then(|data| super::preview_view(url.to_owned(), &data, |_| true)))
+    }
+
+    pub(super) async fn scraped_media(
+        source: &str,
+        limit: usize,
+    ) -> Option<Result<Vec<u8>, RpcError>> {
+        let cap = SCRAPED.lock().get(source).copied()?;
+        Some(download(source, limit.min(cap)).await)
+    }
+
+    async fn download(source: &str, limit: usize) -> Result<Vec<u8>, RpcError> {
+        let url = url::Url::parse(source).map_err(|_| RpcError::InvalidMedia)?;
+        let fetch = client(Duration::from_secs(60))?;
+        let response = fetch
+            .get(&url, "image/*,video/*;q=0.9,*/*;q=0.5")
+            .await
+            .ok_or(RpcError::Unavailable)?;
+        let body = response
+            .body(limit.saturating_add(1))
+            .await
+            .ok_or(RpcError::Unavailable)?;
+        if body.is_empty() || body.len() > limit {
+            return Err(RpcError::InvalidMedia);
+        }
+        Ok(body)
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub(crate) use local::scrape as scrape_locally;
+
+#[cfg(not(target_family = "wasm"))]
+pub(crate) async fn scraped_media(source: &str) -> Option<Result<Vec<u8>, RpcError>> {
+    local::scraped_media(source, usize::MAX).await
+}
+
 const MAX_PREVIEW_IMAGE_BYTES: usize = 1024 * 1024;
 
 pub(crate) struct PreviewImage {
@@ -179,103 +206,45 @@ pub(crate) struct PreviewImage {
     size: u64,
 }
 
-pub(crate) const BUNDLED_LINK_PREVIEWS: &str = "m.url_previews";
-
-pub(crate) const LEGACY_BUNDLED_LINK_PREVIEWS: &str = "com.beeper.linkpreviews";
-
-#[derive(serde::Serialize)]
-struct LinkPreviewBundleOut {
-    #[serde(rename = "matrix:matched_url", skip_serializing_if = "Option::is_none")]
-    stable_matched_url: Option<String>,
-    #[serde(rename = "matched_url", skip_serializing_if = "Option::is_none")]
-    legacy_matched_url: Option<String>,
-    #[serde(rename = "og:url", skip_serializing_if = "Option::is_none")]
-    url: Option<String>,
-    #[serde(rename = "og:title", skip_serializing_if = "Option::is_none")]
-    title: Option<String>,
-    #[serde(rename = "og:description", skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
-    #[serde(rename = "og:site_name", skip_serializing_if = "Option::is_none")]
-    site_name: Option<String>,
-    #[serde(
-        rename = "matrix:image:encrypted",
-        skip_serializing_if = "Option::is_none"
-    )]
-    encrypted_image: Option<serde_json::Value>,
-    #[serde(
-        rename = "beeper:image:encryption",
-        skip_serializing_if = "Option::is_none"
-    )]
-    legacy_encrypted_image: Option<serde_json::Value>,
-    #[serde(rename = "matrix:image:size", skip_serializing_if = "Option::is_none")]
-    image_size: Option<u64>,
-    #[serde(rename = "og:image", skip_serializing_if = "Option::is_none")]
-    image: Option<String>,
-    #[serde(rename = "og:image:type", skip_serializing_if = "Option::is_none")]
-    image_type: Option<String>,
-    #[serde(rename = "og:image:width", skip_serializing_if = "Option::is_none")]
-    image_width: Option<u64>,
-    #[serde(rename = "og:image:height", skip_serializing_if = "Option::is_none")]
-    image_height: Option<u64>,
-    #[serde(rename = "og:video", skip_serializing_if = "Option::is_none")]
-    video: Option<String>,
-    #[serde(rename = "og:video:type", skip_serializing_if = "Option::is_none")]
-    video_type: Option<String>,
-    #[serde(rename = "og:video:width", skip_serializing_if = "Option::is_none")]
-    video_width: Option<u64>,
-    #[serde(rename = "og:video:height", skip_serializing_if = "Option::is_none")]
-    video_height: Option<u64>,
-    #[serde(
-        rename = "com.sable.theme_color",
-        skip_serializing_if = "Option::is_none"
-    )]
-    theme_color: Option<String>,
-    #[serde(rename = "com.sable.card", skip_serializing_if = "Option::is_none")]
-    card: Option<String>,
-    #[serde(
-        rename = "com.sable.author_name",
-        skip_serializing_if = "Option::is_none"
-    )]
-    author_name: Option<String>,
-}
-
-impl LinkPreviewBundleOut {
-    fn new(preview: &UrlPreviewView, image: Option<&PreviewImage>, stable: bool) -> Self {
-        let video = preview.video.as_ref();
-        let encrypted = image.and_then(|image| match &image.source {
-            MediaSource::Encrypted(file) => serde_json::to_value(file).ok(),
-            MediaSource::Plain(_) => None,
-        });
-        Self {
-            stable_matched_url: stable.then(|| preview.url.clone()),
-            legacy_matched_url: (!stable).then(|| preview.url.clone()),
-            url: (preview.title.is_some()
-                || preview.description.is_some()
-                || preview.site_name.is_some()
-                || image.is_some()
-                || video.is_some())
-            .then(|| preview.url.clone()),
-            title: preview.title.clone(),
-            description: preview.description.clone(),
-            site_name: preview.site_name.clone(),
-            encrypted_image: encrypted.clone().filter(|_| stable),
-            legacy_encrypted_image: encrypted.filter(|_| !stable),
-            image_size: image.map(|image| image.size),
-            image: image.and_then(|image| match &image.source {
-                MediaSource::Plain(uri) => Some(uri.to_string()),
-                MediaSource::Encrypted(_) => None,
-            }),
-            image_type: preview.image_mime.clone().filter(|_| image.is_some()),
-            image_width: preview.image_width.filter(|_| image.is_some()),
-            image_height: preview.image_height.filter(|_| image.is_some()),
-            video: video.map(|video| video.source.clone()),
-            video_type: video.and_then(|video| video.mime.clone()),
-            video_width: video.and_then(|video| video.width),
-            video_height: video.and_then(|video| video.height),
-            theme_color: preview.theme_color.clone(),
-            card: preview.card.clone(),
-            author_name: preview.author_name.clone(),
-        }
+fn bundle_entry(
+    preview: &UrlPreviewView,
+    image: Option<&PreviewImage>,
+    stable: bool,
+) -> BundleEntry {
+    let video = preview.video.as_ref().filter(|video| is_mxc(&video.source));
+    let encrypted = image.and_then(|image| match &image.source {
+        MediaSource::Encrypted(file) => serde_json::to_value(file).ok(),
+        MediaSource::Plain(_) => None,
+    });
+    BundleEntry {
+        stable_matched_url: stable.then(|| preview.url.clone()),
+        legacy_matched_url: (!stable).then(|| preview.url.clone()),
+        url: (preview.title.is_some()
+            || preview.description.is_some()
+            || preview.site_name.is_some()
+            || image.is_some()
+            || video.is_some())
+        .then(|| preview.url.clone()),
+        title: preview.title.clone(),
+        description: preview.description.clone(),
+        site_name: preview.site_name.clone(),
+        encrypted_image: encrypted.clone().filter(|_| stable),
+        legacy_encrypted_image: encrypted.filter(|_| !stable),
+        image_size: image.map(|image| image.size),
+        image: image.and_then(|image| match &image.source {
+            MediaSource::Plain(uri) => Some(uri.to_string()),
+            MediaSource::Encrypted(_) => None,
+        }),
+        image_type: preview.image_mime.clone().filter(|_| image.is_some()),
+        image_width: preview.image_width.filter(|_| image.is_some()),
+        image_height: preview.image_height.filter(|_| image.is_some()),
+        video: video.map(|video| video.source.clone()),
+        video_type: video.and_then(|video| video.mime.clone()),
+        video_width: video.and_then(|video| video.width),
+        video_height: video.and_then(|video| video.height),
+        theme_color: preview.theme_color.clone(),
+        card: preview.card.clone(),
+        author_name: preview.author_name.clone(),
     }
 }
 
@@ -289,12 +258,27 @@ pub(crate) fn bundled_link_previews(
     }
     let bundles: Vec<_> = previews
         .iter()
-        .map(|preview| LinkPreviewBundleOut::new(preview, images.get(&preview.url), stable))
+        .map(|preview| bundle_entry(preview, images.get(&preview.url), stable))
         .collect();
     serde_json::to_value(bundles).ok()
 }
 
 impl Core {
+    async fn preview_image_bytes(client: &matrix_sdk::Client, image: &str) -> Option<Vec<u8>> {
+        if is_mxc(image) {
+            let request = MediaRequestParameters {
+                source: MediaSource::Plain(OwnedMxcUri::from(image)),
+                format: MediaFormat::File,
+            };
+            return client.media().get_media_content(&request, false).await.ok();
+        }
+        #[cfg(not(target_family = "wasm"))]
+        if let Some(bytes) = local::scraped_media(image, MAX_PREVIEW_IMAGE_BYTES).await {
+            return bytes.ok();
+        }
+        None
+    }
+
     pub(crate) async fn prepare_preview_images(
         &self,
         room_id: &OwnedRoomId,
@@ -312,18 +296,10 @@ impl Core {
         };
         let client = room.client();
         for preview in previews {
-            let Some(image) = preview
-                .image
-                .as_deref()
-                .filter(|image| image.starts_with("mxc://"))
-            else {
+            let Some(image) = preview.image.as_deref() else {
                 continue;
             };
-            let request = MediaRequestParameters {
-                source: MediaSource::Plain(OwnedMxcUri::from(image)),
-                format: MediaFormat::File,
-            };
-            let Ok(data) = client.media().get_media_content(&request, false).await else {
+            let Some(data) = Self::preview_image_bytes(&client, image).await else {
                 continue;
             };
             if data.is_empty() || data.len() > MAX_PREVIEW_IMAGE_BYTES {
@@ -466,6 +442,51 @@ mod tests {
         let preview = super::url_preview("https://e".to_owned(), &data).expect("a preview");
         assert_eq!(preview.image.as_deref(), Some("mxc://example.org/1"));
         assert_eq!(preview.image_width, Some(640));
+    }
+
+    #[test]
+    fn bundles_keep_only_an_mxc_video() {
+        let previews = [preview("https://example.org/")];
+        let bundles =
+            super::bundled_link_previews(&previews, &std::collections::HashMap::new(), true)
+                .unwrap();
+        assert!(bundles[0].get("og:video").is_none());
+        assert!(bundles[0].get("og:video:height").is_none());
+
+        let mut proxied = preview("https://example.org/");
+        if let Some(video) = proxied.video.as_mut() {
+            video.source = "mxc://example.org/clip".to_owned();
+        }
+        let bundles =
+            super::bundled_link_previews(&[proxied], &std::collections::HashMap::new(), true)
+                .unwrap();
+        assert_eq!(bundles[0]["og:video"], "mxc://example.org/clip");
+        assert_eq!(bundles[0]["og:video:height"], 360);
+    }
+
+    #[tokio::test]
+    async fn only_scraped_media_reaches_the_web() {
+        assert!(
+            super::scraped_media("https://tracker.example/pixel.png")
+                .await
+                .is_none()
+        );
+        assert!(
+            super::scraped_media("mxc://example.org/media")
+                .await
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_local_scrape_refuses_non_public_urls() {
+        for url in [
+            "http://localhost/",
+            "http://192.168.1.1/",
+            "ftp://files.example/",
+        ] {
+            assert!(super::scrape_locally(url).await.unwrap().is_none());
+        }
     }
 
     #[tokio::test]

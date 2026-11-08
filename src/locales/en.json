@@ -2328,7 +2328,7 @@
     "encryptedUrlPreviews": "Server-side embeds in encrypted rooms",
     "encryptedUrlPreviewsHint": "Sends links from encrypted rooms to the homeserver to build embeds.",
     "clientEmbeds": "Client-side embeds",
-    "clientEmbedsHint": "Sends links to a preview service and loads supported embeds from third-party sites instead of using the homeserver. They can see the links and the device IP address.",
+    "clientEmbedsHint": "Previews links without the homeserver. The desktop and mobile apps load the linked page themselves, the web app asks a preview service. Supported embeds load from third-party sites. They can see the links and the device IP address.",
     "encryptedClientEmbedsHint": "Sends links from encrypted rooms to the preview service and third-party sites.",
     "encryptedClientEmbeds": "Client-side embeds in encrypted rooms",
     "youtubeEmbeds": "Embed YouTube links",

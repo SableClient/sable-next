@@ -46,6 +46,7 @@ ruma = { version = "0.17.2", git = "https://github.com/ruma/ruma", rev = "0ed7fb
   "unstable-msc4480",
   "unstable-msc4466",
 ] }
+sable-link-preview = { git = "https://git.sable.moe/SableClient/link-preview.git", rev = "19f24c8adeef9d7ec88c48d38c308f7b12ae5aad" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_with = "3"

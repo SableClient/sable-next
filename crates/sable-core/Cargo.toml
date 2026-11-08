@@ -30,6 +30,7 @@ harness = false
 [dependencies]
 sable-frostbite = { path = "../sable-frostbite", version = "0.1.0" }
 sable-model = { path = "../sable-model", version = "0.1.0" }
+sable-link-preview = { workspace = true }
 matrix-sdk = { workspace = true, features = ["qrcode", "unstable-msc4388"] }
 qrcode = { version = "0.14.1", default-features = false }
 matrix-sdk-ui = { workspace = true }
@@ -84,6 +85,7 @@ hmac = "0.13"
 zeroize = "1.9.1"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
+sable-link-preview = { workspace = true, features = ["reqwest"] }
 reqwest = { version = "0.13", default-features = false, features = ["socks", "gzip"] }
 matrix-sdk = { workspace = true, features = ["bundled-sqlite", "automatic-room-key-forwarding"] }
 tempfile = { workspace = true }

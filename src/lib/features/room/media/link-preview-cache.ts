@@ -18,16 +18,18 @@ export function resetUrlPreviews(): void {
 export function loadUrlPreview(
   messages: Pick<Rpc['messages'], 'urlPreview'>,
   url: string,
-  service: string | null
+  client: boolean,
+  service: string | null = null
 ): Promise<UrlPreviewView | null> {
-  if (service === null && !homeserverPreviews) return Promise.resolve(null);
+  if (!client && !homeserverPreviews) return Promise.resolve(null);
 
-  const key = `${service ?? 'homeserver'}:${url}`;
+  const key = client ? `client:${service ?? ''}:${url}` : `homeserver:${url}`;
   const cached = previews.get(key);
   if (cached) return cached;
 
-  const request = messages.urlPreview({ url, service }).catch((error: unknown) => {
-    if (service === null && error instanceof CoreError && error.detail.code === 'unsupported') {
+  const params = client ? { url, client, service } : { url, service: null };
+  const request = messages.urlPreview(params).catch((error: unknown) => {
+    if (!client && error instanceof CoreError && error.detail.code === 'unsupported') {
       homeserverPreviews = false;
     }
     console.warn('[sable link preview] unavailable', url, error);
@@ -65,8 +67,9 @@ export async function resolveUrlPreview(
   url: string,
   sources: PreviewSources
 ): Promise<UrlPreviewView | null> {
-  const service = sources.client ? (await runtimeConfig()).embeds.serviceUrl : null;
-  const fromService = service === null ? null : await loadUrlPreview(messages, url, service);
-  if (fromService !== null || !sources.server) return fromService;
-  return loadUrlPreview(messages, url, null);
+  const fromClient = sources.client
+    ? await loadUrlPreview(messages, url, true, (await runtimeConfig()).embeds.serviceUrl)
+    : null;
+  if (fromClient !== null || !sources.server) return fromClient;
+  return loadUrlPreview(messages, url, false);
 }

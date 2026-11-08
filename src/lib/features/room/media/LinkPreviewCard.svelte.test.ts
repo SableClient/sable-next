@@ -229,6 +229,7 @@ test('client-side embeds alone preview without asking the homeserver', async () 
   expect(core.rpc.messages.urlPreview).toHaveBeenCalledTimes(1);
   expect(core.rpc.messages.urlPreview).toHaveBeenCalledWith({
     url: 'https://example.org/c1',
+    client: true,
     service: 'https://embeds.test',
   });
   expect(screen.getByRole('link', { name: /Example/ })).toBeInTheDocument();
@@ -237,14 +238,14 @@ test('client-side embeds alone preview without asking the homeserver', async () 
 test('the homeserver is asked only when the client side has no answer', async () => {
   preferences.clientEmbeds = true;
   preferences.urlPreviews = true;
-  core.rpc.messages.urlPreview.mockImplementation(({ service }) =>
-    Promise.resolve(service !== null ? null : preview({ url: 'https://example.org/c2' }))
+  core.rpc.messages.urlPreview.mockImplementation(({ client }) =>
+    Promise.resolve(client ? null : preview({ url: 'https://example.org/c2' }))
   );
   render(LinkPreviewCard, { url: 'https://example.org/c2', encrypted: false });
   await settle();
 
   expect(core.rpc.messages.urlPreview.mock.calls).toEqual([
-    [{ url: 'https://example.org/c2', service: 'https://embeds.test' }],
+    [{ url: 'https://example.org/c2', client: true, service: 'https://embeds.test' }],
     [{ url: 'https://example.org/c2', service: null }],
   ]);
   expect(screen.getByRole('link', { name: /Example/ })).toBeInTheDocument();

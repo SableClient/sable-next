@@ -14,7 +14,6 @@ use crate::link_previews::BUNDLED_LINK_PREVIEWS;
 use crate::link_previews::LEGACY_BUNDLED_LINK_PREVIEWS;
 use crate::link_previews::bundled_link_previews;
 use crate::link_previews::preview_refused;
-use crate::link_previews::soliditas_preview;
 use crate::link_previews::url_preview;
 use crate::outgoing::IMAGE_SOURCE_PACKS;
 use crate::outgoing::REACTION_SHORTCODE;
@@ -1088,6 +1087,8 @@ impl Handler for SendGestureParams {
 pub struct UrlPreviewParams {
     pub url: String,
     #[serde(default)]
+    pub client: bool,
+    #[serde(default)]
     pub service: Option<String>,
 }
 
@@ -1096,9 +1097,17 @@ impl Handler for UrlPreviewParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<Option<UrlPreviewView>, RpcError> {
         let url = self.url;
-        if let Some(base) = self.service {
-            let data = soliditas_preview(&base, &url).await?;
-            return Ok(data.and_then(|data| url_preview(url, &data)));
+        if self.client {
+            #[cfg(not(target_family = "wasm"))]
+            return crate::link_previews::scrape_locally(&url).await;
+            #[cfg(target_family = "wasm")]
+            {
+                let Some(base) = self.service else {
+                    return Ok(None);
+                };
+                let data = crate::link_previews::soliditas_preview(&base, &url).await?;
+                return Ok(data.and_then(|data| url_preview(url, &data)));
+            }
         }
 
         let sent = core
