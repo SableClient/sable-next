@@ -272,6 +272,7 @@ export interface Preferences {
   showSingleReactionCount: boolean;
   showAllTimestamps: boolean;
   showRoleTooltip: boolean;
+  hideMessageShields: boolean;
   doubleTapReaction: string;
   hideTypingIndicators: boolean;
   memberSort: MemberSort;
@@ -641,6 +642,7 @@ const DEFAULTS: Preferences = {
   showSingleReactionCount: true,
   showAllTimestamps: false,
   showRoleTooltip: false,
+  hideMessageShields: false,
   doubleTapReaction: '❤️',
   hideTypingIndicators: false,
   memberSort: 'name-asc',

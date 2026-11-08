@@ -2236,6 +2236,8 @@
     "showSingleReactionCount": "Show the count on single reactions",
     "showAllTimestamps": "Show the time on every message",
     "showRoleTooltip": "Show role name on hover",
+    "hideMessageShields": "Hide minor security warnings",
+    "hideMessageShieldsHint": "Red warnings stay visible.",
     "doubleTapReaction": "Double tap reaction",
     "hideTypingIndicators": "Hide typing indicators",
     "groupMembersByPresence": "Group members by presence",

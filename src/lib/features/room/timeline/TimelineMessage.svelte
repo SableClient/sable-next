@@ -627,7 +627,7 @@
           <span class="receipt-tail" aria-hidden="true"></span>
         {/if}
       </div>
-      {#if item.shield}
+      {#if item.shield && (item.shield.critical || !preferences.hideMessageShields)}
         <MessageShieldNotice shield={item.shield} />
       {/if}
       {#if trailingReceiptBadge}
