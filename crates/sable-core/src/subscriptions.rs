@@ -630,17 +630,14 @@ impl Core {
                 ),
             )
         });
-        let (aggregations, aggregation_task) = if hidden_events {
-            self.watch_aggregations(
+        let (aggregations, aggregation_task) = self
+            .watch_aggregations(
                 subscription,
                 &room,
                 own_user_id.clone(),
                 AggregationScope::of(&focus),
             )
-            .await
-        } else {
-            (Vec::new(), None)
-        };
+            .await;
 
         let threads_task = self.watch_threads(&room_id).await?;
         let bridge_task = (encrypted && !stored_bridge).then(|| self.watch_bridge(&room));
