@@ -42,7 +42,6 @@
     "@arborium/arborium": "^2.18.2",
     "@atlaskit/pragmatic-drag-and-drop": "^4.0.0",
     "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "^3.2.1",
-    "@atproto/syntax": "^0.7.6",
     "@choochmeque/tauri-plugin-sharekit-api": "0.4.0-rc.7",
     "@fontsource-variable/cascadia-code": "^5.3.0",
     "@fontsource-variable/nunito": "5.3.0",

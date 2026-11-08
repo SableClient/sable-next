@@ -1135,6 +1135,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               theme_color: null,
               card: null,
               author_name: null,
+              post: null,
             }
           : null,
       'messages.schedule': () => 'e2e-delay',

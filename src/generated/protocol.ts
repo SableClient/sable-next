@@ -944,6 +944,44 @@ export type PollView = {
 	edited: boolean,
 };
 
+export type PostAuthorView = {
+	name: string | null,
+	handle: string | null,
+	avatar: string | null,
+	url: string | null,
+};
+
+export type PostMediaKindView = "image" | "video" | "gif";
+
+export type PostMediaView = {
+	kind: PostMediaKindView,
+	source: string,
+	mime: string | null,
+	width: number | null,
+	height: number | null,
+	alt: string | null,
+};
+
+export type PostSensitivityView = "graphic" | "inappropriate" | "spoiler";
+
+export type PostStatsView = {
+	replies: number | null,
+	reposts: number | null,
+	likes: number | null,
+};
+
+export type PostView = {
+	url: string | null,
+	author: PostAuthorView,
+	text: string | null,
+	created_at: number | null,
+	media: PostMediaView[],
+	stats: PostStatsView | null,
+	sensitivity: PostSensitivityView | null,
+	sensitivity_reason: string | null,
+	quote: PostView | null,
+};
+
 export type PowerLevelAction = "invite" | "kick" | "ban" | "redact";
 
 /**
@@ -2073,6 +2111,7 @@ export type UrlPreviewView = {
 	theme_color: string | null,
 	card: string | null,
 	author_name: string | null,
+	post: PostView | null,
 };
 
 export type UserDeviceView = {

@@ -1534,6 +1534,74 @@ pub struct UrlPreviewView {
     pub theme_color: Option<String>,
     pub card: Option<String>,
     pub author_name: Option<String>,
+    #[serde(default)]
+    pub post: Option<PostView>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct PostView {
+    pub url: Option<String>,
+    pub author: PostAuthorView,
+    pub text: Option<String>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub created_at: Option<u64>,
+    pub media: Vec<PostMediaView>,
+    pub stats: Option<PostStatsView>,
+    pub sensitivity: Option<PostSensitivityView>,
+    pub sensitivity_reason: Option<String>,
+    pub quote: Option<Box<PostView>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum PostSensitivityView {
+    Graphic,
+    Inappropriate,
+    Spoiler,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct PostAuthorView {
+    pub name: Option<String>,
+    pub handle: Option<String>,
+    pub avatar: Option<String>,
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum PostMediaKindView {
+    Image,
+    Video,
+    Gif,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct PostMediaView {
+    pub kind: PostMediaKindView,
+    pub source: String,
+    pub mime: Option<String>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub width: Option<u64>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub height: Option<u64>,
+    pub alt: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct PostStatsView {
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub replies: Option<u64>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub reposts: Option<u64>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub likes: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

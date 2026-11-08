@@ -654,6 +654,7 @@ test('a message whose embeds were removed renders none, bundled or found', async
         theme_color: null,
         card: null,
         author_name: null,
+        post: null,
       },
     ],
     link_previews_removed: true,
