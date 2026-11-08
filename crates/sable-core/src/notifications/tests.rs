@@ -1747,7 +1747,7 @@ async fn a_cold_push_never_uses_embedded_tokens_when_the_login_file_is_corrupt()
         refresh_token: Some("repaired-refresh".to_owned()),
     };
     logins.save("a1", OAUTH_DEVICE, &repaired).unwrap();
-    let path = std::fs::read_dir(store_dir.join("credentials"))
+    let path = std::fs::read_dir(store_dir.join("login-tokens"))
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .find(|path| {

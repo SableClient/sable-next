@@ -11,18 +11,66 @@ const ABANDONED_SAVE_AGE: std::time::Duration = std::time::Duration::from_hours(
 const SEAL_LABEL: &str = "sable.login_tokens";
 const SEALED: &str = "tokens";
 const LEGACY: &str = "json";
+const KEY: &str = "key";
 
 /// One file per login: whichever process refreshes a login rewrites only its file, under the
 /// SDK's cross-process refresh lock. A login's tokens leave the account registry once it holds them.
 /// Files are sealed with a key from the OS credential store.
+///
+/// Sealed files live outside `credentials/`: Sable 2.2 deletes any file there that is not plain
+/// JSON, so running an older install would sign every account out.
 pub(crate) struct LoginTokens {
     directory: PathBuf,
+    legacy_directory: PathBuf,
 }
 
 impl LoginTokens {
     pub(crate) fn new(base_store: &Path) -> Self {
-        Self {
-            directory: base_store.join("credentials"),
+        let logins = Self {
+            directory: base_store.join("login-tokens"),
+            legacy_directory: base_store.join("credentials"),
+        };
+        logins.move_sealed_files();
+        logins
+    }
+
+    fn create_directory(&self) -> std::io::Result<()> {
+        std::fs::create_dir_all(&self.directory)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&self.directory, std::fs::Permissions::from_mode(0o700))?;
+        }
+        Ok(())
+    }
+
+    /// A file already in the new directory is newer and wins.
+    fn move_sealed_files(&self) {
+        let Ok(entries) = std::fs::read_dir(&self.legacy_directory) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let sealed = name == KEY
+                || Path::new(&name)
+                    .extension()
+                    .is_some_and(|extension| extension == SEALED);
+            if !sealed {
+                continue;
+            }
+            let moved = self
+                .create_directory()
+                .and_then(|()| std::fs::hard_link(entry.path(), self.directory.join(&name)));
+            match moved {
+                Err(error) if error.kind() != std::io::ErrorKind::AlreadyExists => {
+                    tracing::warn!("could not move a sealed token file: {error}");
+                }
+                _ => {
+                    if let Err(error) = std::fs::remove_file(entry.path()) {
+                        tracing::warn!("could not remove a moved token file: {error}");
+                    }
+                }
+            }
         }
     }
 
@@ -37,14 +85,19 @@ impl LoginTokens {
     }
 
     fn path(&self, account_id: &str, device_id: &str, extension: &str) -> PathBuf {
-        self.directory.join(format!(
+        let directory = if extension == LEGACY {
+            &self.legacy_directory
+        } else {
+            &self.directory
+        };
+        directory.join(format!(
             "{}.{extension}",
             Self::file_stem(account_id, device_id)
         ))
     }
 
     fn key_reference(&self) -> PathBuf {
-        self.directory.join("key")
+        self.directory.join(KEY)
     }
 
     fn seal(&self, tokens: &SessionTokens) -> Result<Vec<u8>, StoreError> {
@@ -156,12 +209,7 @@ impl LoginTokens {
     ) -> Result<bool, StoreError> {
         use std::io::Write;
 
-        std::fs::create_dir_all(&self.directory)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&self.directory, std::fs::Permissions::from_mode(0o700))?;
-        }
+        self.create_directory()?;
         let sealed = self.seal(tokens)?;
         let mut temporary = tempfile::NamedTempFile::new_in(&self.directory)?;
         temporary.write_all(&sealed)?;
@@ -184,27 +232,31 @@ impl LoginTokens {
         matches!(extension, SEALED | LEGACY).then_some(stem)
     }
 
+    fn entries(&self) -> impl Iterator<Item = std::fs::DirEntry> {
+        [&self.directory, &self.legacy_directory]
+            .into_iter()
+            .filter_map(|directory| std::fs::read_dir(directory).ok())
+            .flatten()
+            .flatten()
+    }
+
+    /// Never removes a file it does not recognise, which may belong to another version.
     pub(crate) fn retain<'a>(&self, logins: impl IntoIterator<Item = (&'a str, &'a str)>) {
         let kept: std::collections::HashSet<_> = logins
             .into_iter()
             .map(|(account_id, device_id)| Self::file_stem(account_id, device_id))
             .collect();
-        let Ok(entries) = std::fs::read_dir(&self.directory) else {
-            return;
-        };
-        for entry in entries.flatten() {
+        for entry in self.entries() {
             let name = entry.file_name().to_string_lossy().into_owned();
-            if name == "key" {
-                continue;
-            }
             let stale = Self::login_stem(&name).map_or_else(
                 || {
-                    entry
-                        .metadata()
-                        .and_then(|metadata| metadata.modified())
-                        .ok()
-                        .and_then(|modified| modified.elapsed().ok())
-                        .is_some_and(|age| age > ABANDONED_SAVE_AGE)
+                    name.starts_with(".tmp")
+                        && entry
+                            .metadata()
+                            .and_then(|metadata| metadata.modified())
+                            .ok()
+                            .and_then(|modified| modified.elapsed().ok())
+                            .is_some_and(|age| age > ABANDONED_SAVE_AGE)
                 },
                 |stem| !kept.contains(stem),
             );
@@ -215,10 +267,7 @@ impl LoginTokens {
     }
 
     pub(crate) fn forget(&self, account_id: &str) {
-        let Ok(entries) = std::fs::read_dir(&self.directory) else {
-            return;
-        };
-        for entry in entries.flatten() {
+        for entry in self.entries() {
             let name = entry.file_name();
             let name = name.to_string_lossy();
             let matches_account = Self::login_stem(&name)
@@ -232,11 +281,13 @@ impl LoginTokens {
 
     pub(crate) fn forget_all(&self) {
         crate::secrets::forget(&self.key_reference());
-        match std::fs::remove_dir_all(&self.directory) {
-            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
-                tracing::warn!("could not forget the saved tokens: {error}");
+        for directory in [&self.directory, &self.legacy_directory] {
+            match std::fs::remove_dir_all(directory) {
+                Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                    tracing::warn!("could not forget the saved tokens: {error}");
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
 }
@@ -343,15 +394,79 @@ mod tests {
         logins.save("a1", "OLD", &tokens("old")).unwrap();
         logins.save("a1", "NEW", &tokens("new")).unwrap();
         logins.save("a2", "D", &tokens("removed")).unwrap();
-        std::fs::write(base.path().join("credentials/.tmp-in-progress"), b"").unwrap();
+        std::fs::write(base.path().join("login-tokens/.tmp-in-progress"), b"").unwrap();
 
         logins.retain([("a1", "NEW")]);
 
         assert!(logins.read("a1", "NEW").unwrap().is_some());
         assert!(logins.read("a1", "OLD").unwrap().is_none());
         assert!(logins.read("a2", "D").unwrap().is_none());
-        assert!(base.path().join("credentials/.tmp-in-progress").exists());
-        assert!(base.path().join("credentials/key").exists());
+        assert!(base.path().join("login-tokens/.tmp-in-progress").exists());
+        assert!(base.path().join("login-tokens/key").exists());
+    }
+
+    #[test]
+    fn an_unknown_file_is_never_removed() {
+        let base = tempfile::tempdir().unwrap();
+        let logins = LoginTokens::new(base.path());
+        logins.save("a1", "D", &tokens("saved")).unwrap();
+        let unknown = base.path().join("login-tokens/from-a-newer-version");
+        std::fs::write(&unknown, b"").unwrap();
+        let old = std::time::SystemTime::now() - std::time::Duration::from_hours(2);
+        std::fs::File::options()
+            .write(true)
+            .open(&unknown)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+
+        logins.retain([("a1", "D")]);
+
+        assert!(unknown.exists());
+    }
+
+    #[test]
+    fn sealed_files_move_out_of_the_directory_sable_2_2_cleans() {
+        let base = tempfile::tempdir().unwrap();
+        LoginTokens::new(base.path())
+            .save("a1", "D", &tokens("saved"))
+            .unwrap();
+        let legacy = base.path().join("credentials");
+        std::fs::rename(base.path().join("login-tokens"), &legacy).unwrap();
+        std::fs::write(legacy.join("a2.D.json"), b"{}").unwrap();
+
+        let logins = LoginTokens::new(base.path());
+
+        assert_eq!(
+            logins.read("a1", "D").unwrap().unwrap().access_token,
+            "saved"
+        );
+        assert!(base.path().join("login-tokens/key").exists());
+        let left: Vec<_> = std::fs::read_dir(&legacy)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(left, ["a2.D.json"]);
+    }
+
+    #[test]
+    fn a_moved_file_never_replaces_a_newer_one() {
+        let base = tempfile::tempdir().unwrap();
+        let logins = LoginTokens::new(base.path());
+        logins.save("a1", "D", &tokens("old")).unwrap();
+        let legacy = base.path().join("credentials");
+        std::fs::create_dir_all(&legacy).unwrap();
+        let name = logins.path("a1", "D", super::SEALED);
+        std::fs::copy(&name, legacy.join(name.file_name().unwrap())).unwrap();
+        logins.save("a1", "D", &tokens("rotated")).unwrap();
+
+        let logins = LoginTokens::new(base.path());
+
+        assert_eq!(
+            logins.read("a1", "D").unwrap().unwrap().access_token,
+            "rotated"
+        );
+        assert!(!legacy.join(name.file_name().unwrap()).exists());
     }
 
     #[test]
@@ -394,6 +509,7 @@ mod tests {
         let logins = LoginTokens::new(base.path());
         logins.save("a1", "D", &tokens("rotated")).unwrap();
         let legacy = logins.path("a1", "D", super::LEGACY);
+        std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
         std::fs::write(&legacy, serde_json::to_vec(&tokens("plain")).unwrap()).unwrap();
 
         assert_eq!(
@@ -407,7 +523,7 @@ mod tests {
         let base = tempfile::tempdir().unwrap();
         let logins = LoginTokens::new(base.path());
         logins.save("a1", "D", &tokens("saved")).unwrap();
-        std::fs::write(base.path().join("credentials/key"), "another-device").unwrap();
+        std::fs::write(base.path().join("login-tokens/key"), "another-device").unwrap();
 
         assert!(logins.read("a1", "D").unwrap().is_none());
     }

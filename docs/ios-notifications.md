@@ -3,7 +3,7 @@
 `SableNotificationService` links `sable-push` and shares
 `group.<bundle identifier>/Sable` with the app, using a separate SDK lock owner.
 Neither process holds a file lock there. Each login's tokens live in their own file
-under `credentials/`, rewritten by whichever process refreshes them under the SDK's
+under `login-tokens/`, rewritten by whichever process refreshes them under the SDK's
 cross-process refresh lock; only the app writes the account registry.
 Decryption checks account/preview policy and times out after 20 seconds. Failure
 uses a generic alert, never older plaintext. A push the extension never handles still

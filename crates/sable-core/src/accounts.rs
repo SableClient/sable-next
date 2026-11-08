@@ -2719,7 +2719,7 @@ mod regression_tests {
         let (_server, _base, core, account) = restorable_core().await;
         let mut registry = core.accounts().await.unwrap();
         let before = core.sessions.load().await.unwrap().unwrap();
-        let path = std::fs::read_dir(std::path::Path::new(&core.store_id).join("credentials"))
+        let path = std::fs::read_dir(std::path::Path::new(&core.store_id).join("login-tokens"))
             .unwrap()
             .map(|entry| entry.unwrap().path())
             .find(|path| {
@@ -2754,7 +2754,7 @@ mod regression_tests {
         core.save_login_tokens(&second).await.unwrap();
         core.write_registry(&registry).await.unwrap();
         *core.accounts.lock().await = None;
-        let path = std::fs::read_dir(std::path::Path::new(&core.store_id).join("credentials"))
+        let path = std::fs::read_dir(std::path::Path::new(&core.store_id).join("login-tokens"))
             .unwrap()
             .map(|entry| entry.unwrap().path())
             .find(|path| {
