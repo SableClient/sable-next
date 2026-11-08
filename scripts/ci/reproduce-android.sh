@@ -15,7 +15,7 @@ node_sha256=cc2f601cee82d9a5a233302fe307abc600727035fd7d2c3a3571755989e95008
 tools_url=https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip
 tools_sha256=4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583
 ndk_version="$(sed -n 's/^ANDROID_NDK_VERSION = "\(.*\)"$/\1/p' .mise/config.toml)"
-build_tools=36.0.0
+build_tools="$(sed -n 's/^ANDROID_BUILD_TOOLS_VERSION = "\(.*\)"$/\1/p' .mise/config.toml)"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update

@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -24,7 +32,7 @@ function usage() {
 Builds the FOSS, per-ABI Android APKs exactly as the release workflow does.
 The version defaults to package.json, the target to aarch64 (also: armv7, i686, x86_64).
 --web-dist takes web assets already built without Sentry instead of building them.
-Requires pnpm, Rust, an Android SDK with the NDK pinned in .mise/config.toml, and tar.
+Requires pnpm, Rust, an Android SDK with the NDK and build-tools pinned in .mise/config.toml, and tar.
 Installs wasm-bindgen-cli from Cargo.lock and Binaryen from .mise/mise.lock as needed.`);
 }
 
@@ -63,8 +71,20 @@ for (const target of targets) {
   if (!rustTargets[target]) throw new Error(`Unknown --target ${target}`);
 }
 
-const ndkVersion = parse(readFileSync('.mise/config.toml', 'utf8')).env?.ANDROID_NDK_VERSION;
+const miseEnv = parse(readFileSync('.mise/config.toml', 'utf8')).env ?? {};
+const ndkVersion = miseEnv.ANDROID_NDK_VERSION;
 if (!ndkVersion) throw new Error('.mise/config.toml does not pin ANDROID_NDK_VERSION');
+const buildToolsVersion = miseEnv.ANDROID_BUILD_TOOLS_VERSION;
+if (!buildToolsVersion)
+  throw new Error('.mise/config.toml does not pin ANDROID_BUILD_TOOLS_VERSION');
+// Gradle installs missing build-tools itself, which fails on a read-only SDK.
+const androidHome = process.env.ANDROID_HOME ?? process.env.ANDROID_SDK_ROOT;
+if (!androidHome) throw new Error('ANDROID_HOME is not set');
+if (!existsSync(join(androidHome, 'build-tools', buildToolsVersion))) {
+  throw new Error(
+    `Android SDK Build-Tools ${buildToolsVersion} is missing: sdkmanager "build-tools;${buildToolsVersion}"`
+  );
+}
 
 const projectRoot = process.cwd();
 const cargoHome = process.env.CARGO_HOME ?? join(homedir(), '.cargo');
