@@ -20,7 +20,8 @@ protocol version, currently `3`. Devices ignore events with another version or n
 - `info` (`documents`, `complete_rooms`, `busy`): each device that can serve answers with
   the size of its index. `busy` is set while it is already sending or receiving a copy.
 - `request`: after 10 seconds, the requesting device picks the device with the most indexed
-  messages, then the most fully indexed rooms. `session` is the Frostbite session ID.
+  messages, then the most fully indexed rooms. It only picks devices that rank above itself.
+  `session` is the Frostbite session ID.
 
 A device takes part in one copy at a time. If the best device is busy, the requesting device
 asks every device again 30 seconds later, until that device is free. A busy device refuses a

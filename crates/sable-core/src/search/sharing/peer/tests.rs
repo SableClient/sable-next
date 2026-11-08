@@ -96,6 +96,32 @@ fn deep_history_is_tried_first_and_failures_move_to_the_next_device() {
 }
 
 #[test]
+fn devices_ranked_below_this_one_are_not_copied_from() {
+    let mut state = state_with(&[
+        ("BUSY_SMALL", 40, 9, true),
+        ("SMALL", 100, 1, false),
+        ("SAME", 100, 2, false),
+    ]);
+    state.own = (100, 2);
+    assert!(matches!(
+        state.next(None, "s1".into(), Instant::now()),
+        Next::Finished(SearchPeerOutcome::NothingToCopy)
+    ));
+
+    let mut state = state_with(&[("SMALL", 10, 0, false), ("BIG", 500, 0, false)]);
+    state.own = (100, 0);
+    let now = Instant::now();
+    assert_eq!(
+        tried(state.next(None, "s1".into(), now)),
+        Some("BIG".into())
+    );
+    assert!(matches!(
+        state.next(Some("s1"), "s2".into(), now),
+        Next::Finished(SearchPeerOutcome::Failed)
+    ));
+}
+
+#[test]
 fn a_slow_connection_moves_on_to_the_next_device() {
     let mut state = state_with(&[("FAST", 10, 0, false), ("SLOW", 50, 0, false)]);
     let started = Instant::now();

@@ -150,6 +150,12 @@ struct Candidate {
     status: SearchPeerCandidateStatus,
 }
 
+impl Candidate {
+    const fn score(&self) -> (u64, u64) {
+        (self.documents, self.complete_rooms)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum Overdue {
     Discovery,
@@ -171,6 +177,9 @@ struct State {
     phase: Phase,
     asked: Vec<(OwnedDeviceId, Option<String>)>,
     candidates: Vec<Candidate>,
+    /// This device's `(documents, complete_rooms)` when discovery ended. Only
+    /// devices with more are copied from.
+    own: (u64, u64),
     outcome: Option<SearchPeerOutcome>,
     rooms: usize,
     /// Loaded from the store on first use.
@@ -263,9 +272,8 @@ impl State {
     fn next(&mut self, failed: Option<&str>, session: String, now: Instant) -> Next {
         match (&self.phase, failed) {
             (Phase::Discovering { .. }, None) => {
-                self.candidates.sort_by_key(|candidate| {
-                    std::cmp::Reverse((candidate.documents, candidate.complete_rooms))
-                });
+                self.candidates
+                    .sort_by_key(|candidate| std::cmp::Reverse(candidate.score()));
             }
             (Phase::Connecting { session, .. } | Phase::Receiving(session), Some(failed))
                 if session.id == failed =>
@@ -279,18 +287,20 @@ impl State {
             }
             _ => return Next::Ignore,
         }
+        let own = self.own;
         let Some(candidate) = self.candidates.iter_mut().find(|candidate| {
             matches!(
                 candidate.status,
                 SearchPeerCandidateStatus::Waiting | SearchPeerCandidateStatus::Busy
             ) && candidate.documents > 0
+                && candidate.score() > own
         }) else {
             let outcome = if self.candidates.is_empty() {
                 SearchPeerOutcome::NoAnswer
             } else if self
                 .candidates
                 .iter()
-                .all(|candidate| candidate.documents == 0)
+                .all(|candidate| candidate.documents == 0 || candidate.score() <= own)
             {
                 SearchPeerOutcome::NothingToCopy
             } else if self.rooms > 0 {
@@ -600,10 +610,18 @@ impl Core {
         }
     }
 
+    async fn search_score(&self) -> (u64, u64) {
+        (
+            self.search_index.lock().await.stored_documents() as u64,
+            self.search_crawl.lock().await.complete_rooms() as u64,
+        )
+    }
+
     async fn send_info(&self, client: &Client, device: &DeviceId, session: &str, busy: bool) {
+        let (documents, complete_rooms) = self.search_score().await;
         let info = Discovery::Info {
-            documents: self.search_index.lock().await.stored_documents() as u64,
-            complete_rooms: self.search_crawl.lock().await.complete_rooms() as u64,
+            documents,
+            complete_rooms,
             busy,
         };
         if send_discovery(client, device, session, info).await.is_err() {
@@ -768,7 +786,11 @@ impl Core {
         let overdue = self.search_sharing.state.lock().overdue(Instant::now());
         match overdue {
             None => {}
-            Some(Overdue::Discovery) => self.next_search_peer(None).await,
+            Some(Overdue::Discovery) => {
+                let own = self.search_score().await;
+                self.search_sharing.state.lock().own = own;
+                self.next_search_peer(None).await;
+            }
             Some(Overdue::Retry) => {
                 if let Ok(client) = self.client().await
                     && let Err(error) = self.discover_search_peers(&client).await
