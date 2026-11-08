@@ -114,6 +114,10 @@ test('mobile: Back closes dialogs before returning to the list', async ({ page }
   await page.goBack();
   await expect(page.locator('#drawer-toggle')).toHaveAttribute('aria-pressed', 'true');
   await expect(nav.getByRole('heading', { name: 'Alpha', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`${general('Alpha')}$`));
+
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`${root('Alpha')}$`));
 });
 
 test('desktop Back keeps the selected space', async ({ page }) => {

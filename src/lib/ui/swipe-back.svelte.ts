@@ -49,6 +49,7 @@ export class SwipeBack {
     if (!this.#gesture) return;
     const update = updateSwipeGesture(this.#gesture, event);
     if (!update || update.mode !== 'horizontal') return;
+    event.stopPropagation();
     this.swiping = true;
     this.offset = Math.max(0, update.distanceX);
   };

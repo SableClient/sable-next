@@ -109,7 +109,9 @@ test.describe('on mobile', () => {
   }) => {
     test.skip(browserName !== 'chromium', 'touch is driven over CDP');
     await installRoomCore('ready');
-    await app.openRoom('!room:example.test');
+    await app.openRooms();
+    await page.locator('a.room-row[href="/rooms/!room%3Aexample.test"]').click();
+    await expect(page).toHaveURL(/\/rooms\/!room%3Aexample\.test$/);
     const subscription = await core.subscription();
     await core.emitTimelineDiff(subscription, [
       {
@@ -148,6 +150,8 @@ test.describe('on mobile', () => {
     await touch('touchEnd', 300);
 
     await expect(panel).toBeHidden();
+    await expect(page.locator('#drawer-toggle')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page).toHaveURL(/\/rooms\/!room%3Aexample\.test$/);
   });
 });
 

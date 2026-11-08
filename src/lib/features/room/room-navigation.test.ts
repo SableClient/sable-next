@@ -164,15 +164,34 @@ test.each(['/space/space/lobby', '/rooms'])('on a phone, opening %s from a room 
   expect(goto).toHaveBeenLastCalledWith(href, { replace: false, state: {}, persistState: true });
 });
 
-test('on a phone, opening a room from the room list pushes', () => {
-  page.url = new URL('https://app.test/rooms');
-  page.params = {};
+test.each([
+  ['/rooms', {}, '/rooms/room'],
+  ['/direct', {}, '/direct/room'],
+  ['/space/space', {}, '/space/space/room'],
+  ['/space/space/lobby', { mobileDrawer: 'open' as const }, '/space/space/room'],
+])('on a phone, opening a room from %s keeps it behind the drawer', async (from, state, href) => {
+  visit(from);
+  Object.assign(page.state, state);
+  goto.mockImplementationOnce((path, options) => {
+    visit(path, { roomId: 'room' });
+    Object.assign(page.state, options?.state);
+    return Promise.resolve();
+  });
 
-  goToPage('/rooms/other');
+  goToPage(href);
+  await vi.waitFor(() => {
+    expect(goto).toHaveBeenCalledTimes(2);
+  });
 
-  expect(goto).toHaveBeenLastCalledWith('/rooms/other', {
+  expect(goto).toHaveBeenNthCalledWith(1, href, {
     replace: false,
-    state: { mobileDrawerBack: true },
+    state: { mobileDrawer: 'open' },
+    persistState: true,
+  });
+  expect(goto).toHaveBeenNthCalledWith(2, '', {
+    shallow: true,
+    replace: false,
+    state: { mobileDrawer: 'closed', mobileDrawerBack: true },
     persistState: true,
   });
 });

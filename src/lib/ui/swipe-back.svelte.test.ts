@@ -9,12 +9,13 @@ vi.mock('./motion.js', () => ({
 
 import { SwipeBack } from './swipe-back.svelte';
 
-function touch(clientX: number, timeStamp: number): TouchEvent {
+function touch(clientX: number, timeStamp: number, stopPropagation = vi.fn()): TouchEvent {
   return {
     timeStamp,
     target: null,
     currentTarget: null,
     touches: [{ clientX, clientY: 100 }] as unknown as TouchList,
+    stopPropagation,
   } as unknown as TouchEvent;
 }
 
@@ -57,6 +58,18 @@ describe('SwipeBack', () => {
     vi.advanceTimersByTime(350);
     expect(swipe.moved).toBe(false);
     expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it('keeps a horizontal drag from reaching the drawer behind it', () => {
+    const swipe = new SwipeBack({ width: () => 400, onDismiss: vi.fn() });
+    swipe.start(touch(0, 0));
+    const pending = vi.fn();
+    swipe.move(touch(4, 5, pending));
+    const claimed = vi.fn();
+    swipe.move(touch(40, 10, claimed));
+
+    expect(pending).not.toHaveBeenCalled();
+    expect(claimed).toHaveBeenCalledOnce();
   });
 
   it('dismisses at once under reduced motion', () => {

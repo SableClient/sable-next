@@ -145,22 +145,24 @@ export function goToPage(href: string): void {
     setMobileDrawerOpen(false);
     return;
   }
-  if (isRoomSwitch(href)) {
-    // The list entry must hold the open room, or Back reloads the previous one under the drawer.
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- callers pass a resolved href
-    void goto(href, { replace: true, state: { mobileDrawer: 'open' }, persistState: true }).then(
-      () => {
-        if (page.url.pathname === target) setMobileDrawerOpen(false);
-      }
-    );
-    return;
-  }
+  const roomSwitch = isRoomSwitch(href);
   const fromList =
     page.state.mobileDrawer === 'open' ||
     /^\/(?:home|rooms|direct|space\/[^/]+)$/.test(page.url.pathname);
-  const state = mobile && ROOM_PATH.test(target) && fromList ? { mobileDrawerBack: true } : {};
+  if (roomSwitch || (mobile && ROOM_PATH.test(target) && fromList)) {
+    // The list entry must hold the open room, or Back reloads the previous one under the drawer.
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- callers pass a resolved href
+    void goto(href, {
+      replace: roomSwitch,
+      state: { mobileDrawer: 'open' },
+      persistState: true,
+    }).then(() => {
+      if (page.url.pathname === target) setMobileDrawerOpen(false);
+    });
+    return;
+  }
   // eslint-disable-next-line svelte/no-navigation-without-resolve -- callers pass a resolved href
-  void goto(href, { replace: false, state, persistState: true });
+  void goto(href, { replace: false, state: {}, persistState: true });
 }
 
 export function scopedSearchQuery(
