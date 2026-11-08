@@ -13,6 +13,22 @@ static JAVA_VM: OnceLock<JavaVM> = OnceLock::new();
 static MAIN_ACTIVITY: OnceLock<Global<JClass<'static>>> = OnceLock::new();
 static ACTIVITY: Mutex<(bool, Option<Weak<sable_core::Core>>)> = Mutex::new((true, None));
 
+/// Takes the pending Java exception, which would otherwise abort the next JNI call.
+pub(crate) fn caught<T>(env: &jni::Env, result: jni::errors::Result<T>) -> jni::errors::Result<T> {
+    result.map_err(|error| env.exception_catch().err().unwrap_or(error))
+}
+
+pub(crate) fn describe(error: &jni::errors::Error) -> String {
+    if let jni::errors::Error::CaughtJavaException {
+        name, msg, stack, ..
+    } = error
+    {
+        tracing::warn!("java call threw {name}: {msg}\n{stack}");
+        return format!("{name}: {msg}");
+    }
+    error.to_string()
+}
+
 pub(crate) fn attach_activity(core: &Arc<sable_core::Core>) {
     let mut activity = ACTIVITY
         .lock()
@@ -70,12 +86,9 @@ pub(crate) async fn open_in_app_auth_url(
                     ],
                 )
                 .and_then(jni::JValueOwned::z);
-            if result.is_err() {
-                env.exception_clear();
-            }
-            result
+            caught(env, result)
         })
-        .map_err(|error| error.to_string())
+        .map_err(|error| describe(&error))
     })
     .await
     .map_err(|error| error.to_string())?
@@ -96,12 +109,9 @@ pub(crate) async fn close_in_app_auth_window(id: String) -> Result<(), String> {
                 jni_sig!("(Ljava/lang/String;)V"),
                 &[JValue::Object(&id)],
             );
-            if result.is_err() {
-                env.exception_clear();
-            }
-            result.map(|_| ())
+            caught(env, result.map(|_| ()))
         })
-        .map_err(|error| error.to_string())
+        .map_err(|error| describe(&error))
     })
     .await
     .map_err(|error| error.to_string())?
@@ -122,12 +132,9 @@ pub(crate) async fn copy_image_to_clipboard(image: String) -> Result<(), String>
                 jni_sig!("(Ljava/lang/String;)V"),
                 &[JValue::Object(&image)],
             );
-            if result.is_err() {
-                env.exception_clear();
-            }
-            result.map(|_| ())
+            caught(env, result.map(|_| ()))
         })
-        .map_err(|error| error.to_string())
+        .map_err(|error| describe(&error))
     })
     .await
     .map_err(|error| error.to_string())?
@@ -218,10 +225,7 @@ fn call_activity(
         .ok_or("activity class not initialized")?;
     vm.attach_current_thread(|env| {
         let result = env.call_static_method(class, JNIString::new(method), signature, &[value]);
-        if result.is_err() {
-            env.exception_clear();
-        }
-        result.map(|_| ())
+        caught(env, result.map(|_| ()))
     })
-    .map_err(|error| error.to_string())
+    .map_err(|error| describe(&error))
 }

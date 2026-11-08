@@ -11,7 +11,7 @@ struct KeystoreSecrets {
 }
 
 fn failure(error: &jni::errors::Error) -> StoreError {
-    StoreError::Message(error.to_string())
+    StoreError::Message(crate::mobile::describe(error))
 }
 
 impl SecretBackend for KeystoreSecrets {
@@ -25,13 +25,7 @@ impl SecretBackend for KeystoreSecrets {
                     jni_sig!("(Landroid/content/Context;Ljava/lang/String;)[B"),
                     &[JValue::Object(&self.context), JValue::Object(&name)],
                 );
-                let secret = match result {
-                    Ok(secret) => secret.l()?,
-                    Err(error) => {
-                        env.exception_clear();
-                        return Err(error);
-                    }
-                };
+                let secret = crate::mobile::caught(env, result)?.l()?;
                 if secret.is_null() {
                     return Ok(None);
                 }
@@ -56,10 +50,7 @@ impl SecretBackend for KeystoreSecrets {
                         JValue::Object(&secret),
                     ],
                 );
-                if result.is_err() {
-                    env.exception_clear();
-                }
-                result.map(drop)
+                crate::mobile::caught(env, result.map(drop))
             })
             .map_err(|error| failure(&error))
     }
@@ -74,10 +65,7 @@ impl SecretBackend for KeystoreSecrets {
                     jni_sig!("(Landroid/content/Context;Ljava/lang/String;)V"),
                     &[JValue::Object(&self.context), JValue::Object(&name)],
                 );
-                if result.is_err() {
-                    env.exception_clear();
-                }
-                result.map(drop)
+                crate::mobile::caught(env, result.map(drop))
             })
             .map_err(|error| failure(&error))
     }
