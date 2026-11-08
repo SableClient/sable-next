@@ -1,5 +1,24 @@
 # Sable Changelog
 
+## 2.3.8 (2026-11-08)
+
+### Features
+
+* A setting hides the grey security shield on messages. Red warnings stay visible.
+* The desktop and mobile apps now load link previews themselves with client-side embeds on, instead of going through the embed service.
+* Links to posts preview as posts, with the author, text, images and videos, the quoted post, counts and content warnings. This covers X, Bluesky, the fediverse, Tumblr, Reddit, TikTok and any page that describes itself as a note. The separate Bluesky embed setting is gone.
+* Devices copy search history from each other with a simpler protocol, once per launch when their last copy is over a week old. A device copies with one other device at a time and waits when the best one is busy. Settings update live and can reset what this device copied. Devices on older versions no longer copy with updated ones.
+
+### Fixes
+
+* Signing in on Android opens the browser again, and haptics, system bar colours and copying images work again.
+* Android errors from native calls now say what went wrong instead of "Java exception was thrown".
+* Animated avatars no longer show their still picture behind the animation on hover.
+* Videos sent from iOS are now converted to H.264, so they play on Linux and other devices that can't decode HEVC.
+* Opening an older Sable 2.2 install no longer signs every account out of Sable 2.3.
+* Rooms removed from a space no longer come back when the space lobby is reopened.
+* The session restore error screen can now sign an account in again when its saved login is lost.
+
 ## 2.3.7 (2026-11-08)
 
 ### Fixes
