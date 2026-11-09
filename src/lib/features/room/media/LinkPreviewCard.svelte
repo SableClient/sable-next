@@ -6,7 +6,7 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
-  import { hasPreviewData, imageMimeFromUrl } from './link-preview.js';
+  import { GIF_PLAYBACK, hasPreviewData, imageMimeFromUrl } from './link-preview.js';
   import { previewSources, resolveUrlPreview } from './link-preview-cache';
   import { findLinkPresentation } from './link-presentations';
   import { hasRoomMediaPreviews, useRoomMediaPreviews } from './room-media-previews.svelte.js';
@@ -65,6 +65,12 @@
   const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
   let mediaHidden = $derived(roomMedia?.hidden ?? false);
   let Presentation = $derived(preview && findLinkPresentation(url, preview));
+  let videoPlayback = $derived.by(() => {
+    if (!preview?.video?.gif && preview?.image_mime !== 'image/gif') return null;
+    return preferences.autoplayGifs
+      ? GIF_PLAYBACK
+      : { ...GIF_PLAYBACK, gif: false, autoplay: false };
+  });
   let imageHidden = $derived.by(() => {
     void url;
     void preview?.image;
@@ -98,6 +104,7 @@
       height={view.video.height}
       thumbnail={view.image}
       thumbnailMime={view.image_mime}
+      playback={videoPlayback}
     />
   {:else if view.image && !mediaHidden && view.title === null && view.site_name === null}
     <MediaImage
@@ -132,6 +139,7 @@
           height={view.video.height}
           thumbnail={view.image}
           thumbnailMime={view.image_mime}
+          playback={videoPlayback}
         />
       {:else if view.image && !mediaHidden}
         <MediaImage

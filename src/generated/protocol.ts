@@ -2105,6 +2105,7 @@ export type UrlPreviewVideoView = {
 	mime: string | null,
 	width: number | null,
 	height: number | null,
+	gif: boolean,
 };
 
 export type UrlPreviewView = {

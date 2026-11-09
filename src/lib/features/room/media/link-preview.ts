@@ -1,7 +1,15 @@
 import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
-import type { UrlPreviewView } from '#src/generated/protocol';
+import type { UrlPreviewView, VideoPlaybackView } from '#src/generated/protocol';
 
 import { parseSettingsLink } from '../settings/settings-link';
+
+export const GIF_PLAYBACK: VideoPlaybackView = {
+  gif: true,
+  autoplay: true,
+  looping: true,
+  hide_controls: true,
+  no_audio: true,
+};
 
 export function hasPreviewData(preview: UrlPreviewView): boolean {
   return [

@@ -67,6 +67,7 @@ pub(crate) fn video_view(video: VideoData) -> UrlPreviewVideoView {
         mime: video.mime,
         width: video.width,
         height: video.height,
+        gif: video.gif,
     }
 }
 
@@ -385,6 +386,7 @@ fn bundle_entry(
         video_type: video.and_then(|video| video.mime.clone()),
         video_width: video.and_then(|video| video.width),
         video_height: video.and_then(|video| video.height),
+        video_gif: video.and_then(|video| video.gif.then_some(true)),
         theme_color: preview.theme_color.clone(),
         card: preview.card.clone(),
         author_name: preview.author_name.clone(),
@@ -663,12 +665,19 @@ mod tests {
         let mut proxied = preview("https://example.org/");
         if let Some(video) = proxied.video.as_mut() {
             video.source = "mxc://example.org/clip".to_owned();
+            video.gif = true;
         }
         let bundles =
             super::bundled_link_previews(&[proxied], &std::collections::HashMap::new(), true)
                 .unwrap();
         assert_eq!(bundles[0]["og:video"], "mxc://example.org/clip");
         assert_eq!(bundles[0]["og:video:height"], 360);
+        assert_eq!(bundles[0]["og:video:com.sable.gif"], true);
+        let read = super::url_preview("https://example.org/".to_owned(), &bundles[0]);
+        assert!(
+            read.and_then(|preview| preview.video)
+                .is_some_and(|video| video.gif)
+        );
     }
 
     #[test]
@@ -973,6 +982,7 @@ mod tests {
                 mime: Some("video/mp4".to_owned()),
                 width: None,
                 height: Some(360),
+                gif: false,
             }),
             theme_color: Some("#fff".to_owned()),
             card: None,

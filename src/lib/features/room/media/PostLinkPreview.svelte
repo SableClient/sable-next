@@ -17,6 +17,8 @@
   import { formatMessageTimestamp } from '#lib/ui/date-time.js';
   import Button from '#lib/ui/primitives/Button.svelte';
 
+  import { GIF_PLAYBACK } from './link-preview.js';
+
   interface Props {
     url: string;
     preview: UrlPreviewView;
@@ -73,9 +75,7 @@
             kind="video"
             width={item.width}
             height={item.height}
-            playback={item.kind === 'gif'
-              ? { gif: true, autoplay: true, looping: true, hide_controls: true, no_audio: true }
-              : null}
+            playback={item.kind === 'gif' ? GIF_PLAYBACK : null}
           />
         {/if}
       {/each}

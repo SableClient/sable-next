@@ -7919,7 +7919,7 @@ dependencies = [
 [[package]]
 name = "sable-link-preview"
 version = "0.1.0"
-source = "git+https://git.sable.moe/SableClient/link-preview.git?rev=69f027992da8717d0f9485344d59ba4d0e2283b1#69f027992da8717d0f9485344d59ba4d0e2283b1"
+source = "git+https://git.sable.moe/SableClient/link-preview.git?rev=6e3d8d5bc168384d6d09be8b1c4bd10c2eff6873#6e3d8d5bc168384d6d09be8b1c4bd10c2eff6873"
 dependencies = [
  "futures-util",
  "lol_html",

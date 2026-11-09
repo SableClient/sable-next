@@ -1628,6 +1628,8 @@ pub struct UrlPreviewVideoView {
     pub width: Option<u64>,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub height: Option<u64>,
+    #[serde(default)]
+    pub gif: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
