@@ -11,6 +11,8 @@ use crate::html::nests_too_deeply;
 use crate::text::{is_space, trim};
 
 const JUMBO_MAX: usize = 8;
+const KEYCAP: char = '\u{20E3}';
+const REGIONAL_INDICATORS: std::ops::RangeInclusive<char> = '\u{1F1E6}'..='\u{1F1FF}';
 
 const fn level(count: usize) -> Option<u8> {
     match count {
@@ -26,7 +28,6 @@ const fn level(count: usize) -> Option<u8> {
 /// a keycap or a flag, so a bare digit next to an emoji keeps the normal size.
 #[must_use]
 pub fn emoji_level(body: &str) -> Option<u8> {
-    const KEYCAP: char = '\u{20E3}';
     let extended_pictographic = CodePointSetData::new::<ExtendedPictographic>();
     let emoji_component = CodePointSetData::new::<EmojiComponent>();
     let mut count = 0;
@@ -38,9 +39,7 @@ pub fn emoji_level(body: &str) -> Option<u8> {
             .chars()
             .all(|c| extended_pictographic.contains(c) || emoji_component.contains(c))
             && grapheme.chars().any(|c| {
-                extended_pictographic.contains(c)
-                    || c == KEYCAP
-                    || ('\u{1F1E6}'..='\u{1F1FF}').contains(&c)
+                extended_pictographic.contains(c) || c == KEYCAP || REGIONAL_INDICATORS.contains(&c)
             });
         if !emoji {
             return None;
@@ -55,7 +54,6 @@ pub fn emoji_level(body: &str) -> Option<u8> {
 #[must_use]
 pub fn emoji_runs(text: &str) -> Vec<(usize, usize)> {
     const VARIATION_SELECTOR_16: char = '\u{FE0F}';
-    const KEYCAP: char = '\u{20E3}';
     let presentation = CodePointSetData::new::<EmojiPresentation>();
     let mut runs: Vec<(usize, usize)> = Vec::new();
     for (start, grapheme) in text.grapheme_indices(true) {
