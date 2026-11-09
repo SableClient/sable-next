@@ -28,7 +28,7 @@ internal object MatrixPushPayload {
         return notification
     }
 
-    /** Without content, the event is fetched from the homeserver, so a forged push shows nothing. */
+    /** Without content, the device fetches the event from the homeserver. */
     fun routingOnly(raw: String): String {
         val notification = parse(raw) ?: return raw
         val kept = JSONObject()

@@ -265,7 +265,7 @@ async fn register_account_push<R: Runtime>(
         return Err(PushRegistrationError::NoAppId);
     };
 
-    // Plain pushes are readable by the push server and forgeable by anyone who knows the endpoint.
+    // Anyone who knows the endpoint can read and forge a plain push.
     let event_id_only = config.event_id_only || is_direct_pusher(&app_id);
     let pusher = PusherView {
         pushkey: pushkey.clone(),
