@@ -336,12 +336,14 @@ impl Core {
                     view,
                     VerificationView::Done | VerificationView::Cancelled { .. }
                 );
+                let view = if sas.is_done() && !core.verified_after_done(&user_id).await {
+                    not_cross_signed()
+                } else {
+                    view
+                };
                 core.emit_verification(&user_id, &flow_id, view);
 
                 if done {
-                    if sas.is_done() {
-                        core.refresh_verification_status(&user_id).await;
-                    }
                     break;
                 }
             }
@@ -376,12 +378,14 @@ impl Core {
                     view,
                     VerificationView::Done | VerificationView::Cancelled { .. }
                 );
+                let view = if qr.is_done() && !core.verified_after_done(&user_id).await {
+                    not_cross_signed()
+                } else {
+                    view
+                };
                 core.emit_verification(&user_id, &flow_id, view);
 
                 if done {
-                    if qr.is_done() {
-                        core.refresh_verification_status(&user_id).await;
-                    }
                     break;
                 }
             }
@@ -403,21 +407,20 @@ impl Core {
         });
     }
 
-    async fn refresh_verification_status(&self, user_id: &UserId) {
+    pub(crate) async fn verified_after_done(&self, user_id: &UserId) -> bool {
         let Ok(client) = self.client().await else {
-            return;
+            return false;
         };
         if client.user_id() != Some(user_id) {
-            return;
+            return true;
         }
         // Done can arrive before the other device uploads our cross-signature.
-        for delay_ms in [0, 250, 500, 1000, 2000] {
+        for delay_ms in [0, 250, 500, 1000, 2000, 4000, 4000, 8000] {
             if delay_ms > 0 {
                 matrix_sdk::sleep::sleep(Duration::from_millis(delay_ms)).await;
             }
             if let Err(error) = client.encryption().request_user_identity(user_id).await {
                 self.failed("verification_refresh_identity", error);
-                return;
             }
             if client
                 .encryption()
@@ -425,9 +428,10 @@ impl Core {
                 .await
                 .is_ok_and(|device| device.is_some_and(|device| device.is_cross_signed_by_owner()))
             {
-                return;
+                return true;
             }
         }
+        false
     }
 
     pub(crate) async fn verification_request(
@@ -744,6 +748,13 @@ pub(crate) async fn set_device_blocked(
         })
         .await
         .or_failed(core, "set_device_blocked")
+}
+
+fn not_cross_signed() -> VerificationView {
+    VerificationView::Cancelled {
+        reason: "The other device did not sign this session, use your recovery key instead"
+            .to_owned(),
+    }
 }
 
 pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> EncryptionStatusView {

@@ -236,6 +236,21 @@ async fn current_device_verification_requires_cross_signing() {
 }
 
 #[tokio::test]
+async fn an_unsigned_session_is_not_verified_after_done() {
+    let server = MatrixMockServer::new().await;
+    let (_old, new, _queue) = two_devices(&server, true).await;
+    let user_id = new.client.user_id().unwrap().to_owned();
+    tokio::time::pause();
+
+    assert!(!new.core.verified_after_done(&user_id).await);
+    assert!(
+        new.core
+            .verified_after_done(&owned_user_id!("@bob:example.org"))
+            .await
+    );
+}
+
+#[tokio::test]
 async fn history_bundles_require_owner_signed_recipient_devices() {
     use matrix_sdk::ruma::{
         events::{ToDeviceEventType, room::EncryptedFile},
