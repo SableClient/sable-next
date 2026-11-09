@@ -97,16 +97,19 @@
         />
         <Button type="submit" loading={saving === 'block'}>{i18n.t('common.block')}</Button>
       </form>
-      {#if ignored.length}<ul class="ignored-users">
-          {#each ignored as userId (userId)}<li>
-              <code>{userId}</code><Button
-                variant="danger"
-                size="small"
-                loading={saving === userId}
-                onclick={() => void unblock(userId)}>{i18n.t('common.unblock')}</Button
-              >
-            </li>{/each}
-        </ul>{/if}
+      {#if ignored.length}<details>
+          <summary>{i18n.t('settings.blockedUsersList', { count: ignored.length })}</summary>
+          <ul class="ignored-users">
+            {#each ignored as userId (userId)}<li>
+                <code>{userId}</code><Button
+                  variant="danger"
+                  size="small"
+                  loading={saving === userId}
+                  onclick={() => void unblock(userId)}>{i18n.t('common.unblock')}</Button
+                >
+              </li>{/each}
+          </ul>
+        </details>{/if}
     </div>
   </SettingsSection>
 </div>
@@ -136,11 +139,15 @@
     overflow-wrap: anywhere;
   }
 
+  summary {
+    cursor: pointer;
+  }
+
   .ignored-users {
     display: grid;
     gap: var(--space-300);
     list-style: none;
-    margin: 0;
+    margin: var(--space-300) 0 0;
     padding: 0;
   }
 

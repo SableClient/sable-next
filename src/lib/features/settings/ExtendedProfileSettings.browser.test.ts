@@ -64,3 +64,24 @@ test('a long blocked user ID stays inside its settings section', async () => {
   if (!section) throw new Error('the blocked list has no section');
   expect(section.scrollWidth).toBeLessThanOrEqual(section.clientWidth);
 });
+
+test('blocked user IDs stay hidden until the list is opened', async () => {
+  Object.assign(core, {
+    session: { user_id: '@me:example.org' },
+    rpc: {
+      account: {
+        contacts: vi.fn().mockResolvedValue([]),
+        ignoredUsers: vi.fn().mockResolvedValue(['@troll:example.org']),
+      },
+    },
+  });
+  const screen = await render(ExtendedProfileSettings, { profile });
+
+  const summary = screen.getByText('1 blocked user');
+  await expect.element(summary).toBeVisible();
+  await expect.element(screen.getByText('@troll:example.org')).not.toBeVisible();
+
+  await userEvent.click(summary);
+
+  await expect.element(screen.getByText('@troll:example.org')).toBeVisible();
+});

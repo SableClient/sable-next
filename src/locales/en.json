@@ -2724,6 +2724,8 @@
     "contactInformationNoEmail": "No email addresses attached to this account.",
     "blockedUsers": "Blocked users",
     "blockedUsersPlaceholder": "@user:example.org",
+    "blockedUsersList_one": "{{count, number}} blocked user",
+    "blockedUsersList_other": "{{count, number}} blocked users",
     "customThemesImport": "Import file",
     "customThemesLightTheme": "Light theme",
     "customThemesDarkTheme": "Dark theme",
