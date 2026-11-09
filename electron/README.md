@@ -50,6 +50,7 @@ manifest unchanged. Nightly pruning preserves releases referenced by those manif
 
 The main process uses `electron-updater` with the feed for the channel chosen in
 Settings → About. Stable macOS releases are signed and notarized, so they can install updates. Nightlies built without the signing secrets are unsigned and cannot.
+Pass `-c.extraMetadata.autoUpdate=false` to disable it.
 
 ## Proxy
 

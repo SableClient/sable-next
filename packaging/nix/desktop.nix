@@ -69,7 +69,8 @@ stdenv.mkDerivation (finalAttrs: {
     chmod -R u+w electron-dist
     pnpm --dir electron package --linux --dir \
       -c.electronDist=$PWD/electron-dist \
-      -c.electronVersion=${electron.version}
+      -c.electronVersion=${electron.version} \
+      -c.extraMetadata.autoUpdate=false
 
     runHook postBuild
   '';

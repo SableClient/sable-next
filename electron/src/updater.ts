@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { app, ipcMain, type WebFrameMain } from 'electron';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
 
@@ -15,9 +17,14 @@ const FEEDS = {
 const builtChannel = app.getVersion().includes('-nightly.') ? 'nightly' : 'stable';
 const feedChannel = (channel: keyof typeof FEEDS) => (channel === 'stable' ? 'latest' : 'nightly');
 
+const { autoUpdate } = JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')) as {
+  autoUpdate?: boolean;
+};
+
 export function supportsAutoUpdate(): boolean {
   return (
     app.isPackaged &&
+    autoUpdate !== false &&
     !process.mas &&
     !process.env.FLATPAK_ID &&
     (process.platform !== 'linux' || Boolean(process.env.APPIMAGE))
