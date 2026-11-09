@@ -175,8 +175,10 @@
   }
 
   function publishComposerClearance(node: HTMLElement): () => void {
+    const host = node.parentElement;
     const update = (): void => {
       composerClearance.px = Math.max(0, window.innerHeight - node.getBoundingClientRect().top);
+      host?.style.setProperty('--composer-height', `${String(node.offsetHeight)}px`);
     };
     const observer = new ResizeObserver(update);
     observer.observe(node);
@@ -185,6 +187,7 @@
       observer.disconnect();
       stopResize();
       composerClearance.px = 0;
+      host?.style.removeProperty('--composer-height');
     };
   }
 
