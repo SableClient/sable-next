@@ -737,7 +737,8 @@
       seeded &&
       (timeline.mode.kind === 'live' || timeline.mode.kind === 'thread') &&
       last?.is_own &&
-      untrack(() => nearLatest)
+      ((preferences.jumpToLatestOnSend && last.transaction_id !== null) ||
+        untrack(() => nearLatest))
     )
       void engine.jumpTo(null, 'start');
   });

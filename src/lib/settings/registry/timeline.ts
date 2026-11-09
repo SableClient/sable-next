@@ -13,6 +13,7 @@ import LayoutIcon from 'phosphor-svelte/lib/LayoutIcon';
 import DatabaseIcon from 'phosphor-svelte/lib/DatabaseIcon';
 import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
 import MegaphoneIcon from 'phosphor-svelte/lib/MegaphoneIcon';
+import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
 import QuotesIcon from 'phosphor-svelte/lib/QuotesIcon';
 import ShieldIcon from 'phosphor-svelte/lib/ShieldIcon';
 import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
@@ -254,6 +255,14 @@ export const timelineCategory: SettingsCategory = {
       icon: ArrowLineDownIcon,
       name: 'settings.openRoomsAtUnread',
       description: 'settings.openRoomsAtUnreadHint',
+      type: 'boolean',
+    },
+    {
+      key: 'jumpToLatestOnSend',
+      section: 'messages',
+      icon: PaperPlaneTiltIcon,
+      name: 'settings.jumpToLatestOnSend',
+      description: 'settings.jumpToLatestOnSendHint',
       type: 'boolean',
     },
     {

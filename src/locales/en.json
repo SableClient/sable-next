@@ -1953,6 +1953,8 @@
     "showTombstoneEvents": "Show removed-message placeholders",
     "openRoomsAtUnread": "Open rooms at the first unread message",
     "openRoomsAtUnreadHint": "When off, rooms open at the latest message and the unread bar stays until you jump to it or dismiss it.",
+    "jumpToLatestOnSend": "Jump to your message when you send",
+    "jumpToLatestOnSendHint": "When off, sending while you read older messages keeps your place.",
     "appearanceTitle": "Appearance",
     "layout": "Layout",
     "layoutHint": "Modern keeps a full avatar column. Compact and Bubble are denser.",

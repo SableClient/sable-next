@@ -1697,6 +1697,57 @@ test('follows an own message that arrives already sent while the reader is near 
   expect(document.querySelector('.jump-to-latest')).toBeNull();
 });
 
+test('with jump on send turned on, a message sent from this device jumps to it', async () => {
+  setPreference('jumpToLatestOnSend', true);
+  onTestFinished(() => {
+    setPreference('jumpToLatestOnSend', false);
+  });
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { element, end, setScrollHeight } = await mountLive(roomTimeline);
+
+  await dragTo(element, end, end - 900);
+  touch(element, 'touchend', 170);
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  await flushed();
+  expect(followingLive()).toBe(false);
+
+  roomTimeline.items = [
+    ...roomTimeline.items,
+    { ...item('own-sent'), event_id: '$own-sent', transaction_id: 'txn-own-sent', is_own: true },
+  ];
+  setScrollHeight(2_100);
+  await flushed();
+  await runAnimationFrames();
+
+  expect(followingLive()).toBe(true);
+});
+
+test('with jump on send turned on, a message sent from another device keeps the reader in place', async () => {
+  setPreference('jumpToLatestOnSend', true);
+  onTestFinished(() => {
+    setPreference('jumpToLatestOnSend', false);
+  });
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { element, end, setScrollHeight } = await mountLive(roomTimeline);
+
+  await dragTo(element, end, end - 900);
+  touch(element, 'touchend', 170);
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  await flushed();
+
+  roomTimeline.items = [
+    ...roomTimeline.items,
+    { ...item('own-elsewhere'), event_id: '$own-elsewhere', is_own: true },
+  ];
+  setScrollHeight(2_100);
+  await flushed();
+  await runAnimationFrames();
+
+  expect(followingLive()).toBe(false);
+});
+
 function focusComposer(): void {
   const composer = document.querySelector<HTMLTextAreaElement>('.harness-composer textarea');
   if (!composer) throw new Error('composer missing');
