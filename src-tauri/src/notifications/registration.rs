@@ -1,7 +1,9 @@
 #[cfg(target_os = "android")]
 use super::android::declare_push_accounts;
 #[cfg(mobile)]
-use super::gateway::{pusher, register_with_distributor, registration_gateway, server_web_pusher};
+use super::gateway::{
+    is_direct_pusher, pusher, register_with_distributor, registration_gateway, server_web_pusher,
+};
 #[cfg(mobile)]
 use sable_core::api::push::WebPusherView;
 use sable_core::protocol::RpcError;
@@ -217,8 +219,14 @@ async fn register_account_push<R: Runtime>(
             .await
             .map_err(|_| PushRegistrationError::Capabilities)?
     };
+    let was_direct = registered_pushers(root).is_ok_and(|pushers| {
+        pushers.iter().any(|entry| {
+            entry.belongs_to(&identity.0, &identity.1) && is_direct_pusher(&entry.app_id)
+        })
+    });
     let (registration, distributor_gateway) =
-        register_with_distributor(app, config, server_vapid.as_deref(), identity).await?;
+        register_with_distributor(app, config, server_vapid.as_deref(), identity, was_direct)
+            .await?;
     let instance = registration.instance.clone();
     if server_vapid.is_some()
         && let Some(pusher) = server_web_pusher(&registration, config.event_id_only)

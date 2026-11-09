@@ -162,13 +162,46 @@ fn without_keys(registration: Registration) -> Registration {
     }
 }
 
+#[cfg(mobile)]
+pub(super) fn is_direct_pusher(app_id: &str) -> bool {
+    app_id == DIRECT_PUSH_APP_ID
+}
+
+/// Skipping the keyed registration keeps the same subscription across launches.
+#[cfg(any(target_os = "android", test))]
+fn reuses_direct_registration(
+    config: &PushConfig,
+    server_vapid: Option<&str>,
+    was_direct: bool,
+    active_provider: Option<&str>,
+) -> bool {
+    was_direct
+        && server_vapid.is_none()
+        && !config.gateway_override
+        && matches!(
+            config.provider,
+            None | Some(PushProvider::Auto | PushProvider::UnifiedPush)
+        )
+        && active_provider == Some("unifiedpush")
+}
+
+#[cfg(target_os = "android")]
+async fn retire_instance<R: Runtime>(app: &AppHandle<R>, instance: Option<&str>) {
+    let Some(instance) = instance else { return };
+    if let Err(error) = app.notifications().unregister_push_instance(instance).await {
+        log::warn!("could not retire a push subscription: {error}");
+    }
+}
+
 /// A direct endpoint with a Matrix gateway is registered again without the VAPID key, which such gateways reject.
+/// A distributor that requires VAPID refuses it, so the keyed one stays.
 #[cfg(mobile)]
 pub(super) async fn register_with_distributor<R: Runtime>(
     app: &AppHandle<R>,
     config: &PushConfig,
     server_vapid: Option<&str>,
     identity: &(String, String),
+    was_direct: bool,
 ) -> Result<(Registration, Option<String>), PushRegistrationError> {
     let register = |vapid: Option<String>| async {
         let registered = app
@@ -194,6 +227,23 @@ pub(super) async fn register_with_distributor<R: Runtime>(
             instance: registered.instance,
         })
     };
+    #[cfg(target_os = "android")]
+    if reuses_direct_registration(
+        config,
+        server_vapid,
+        was_direct,
+        active_provider(app).await.as_deref(),
+    ) && let Ok(direct) = register(None).await
+    {
+        let direct = without_keys(direct);
+        if let Some(gateway) = sable_core::push_check::discover_gateway(&direct.token).await {
+            return Ok((direct, Some(gateway)));
+        }
+        retire_instance(app, direct.instance.as_deref()).await;
+    }
+    #[cfg(not(target_os = "android"))]
+    let _ = was_direct;
+
     let registration = register(Some(
         server_vapid.map_or_else(|| config.vapid_key.clone(), str::to_owned),
     ))
@@ -201,7 +251,14 @@ pub(super) async fn register_with_distributor<R: Runtime>(
     let Some(gateway) = distributor_gateway(app, &registration, config, server_vapid).await else {
         return Ok((registration, None));
     };
-    Ok((without_keys(register(None).await?), Some(gateway)))
+    let Ok(direct) = register(None).await else {
+        return Ok((registration, None));
+    };
+    #[cfg(target_os = "android")]
+    if direct.instance != registration.instance {
+        retire_instance(app, registration.instance.as_deref()).await;
+    }
+    Ok((without_keys(direct), Some(gateway)))
 }
 
 #[cfg(test)]
@@ -524,5 +581,31 @@ mod tests {
         assert_eq!(pusher.auth, "auth-secret");
         assert_eq!(pusher.app_id, super::SERVER_PUSH_APP_ID);
         assert!(pusher.event_id_only);
+    }
+
+    #[test]
+    fn only_a_unifiedpush_account_already_on_a_matrix_gateway_skips_the_keyed_registration() {
+        let mut config: PushConfig = serde_json::from_value(serde_json::json!({
+            "gateway_url": "https://sygnal.example/_matrix/push/v1/notify",
+            "vapid_key": "key", "web_app_id": "web", "event_id_only": true,
+        }))
+        .expect("push config");
+        let reuses = super::reuses_direct_registration;
+        assert!(reuses(&config, None, true, Some("unifiedpush")));
+        assert!(!reuses(&config, None, false, Some("unifiedpush")));
+        assert!(!reuses(
+            &config,
+            Some("server-key"),
+            true,
+            Some("unifiedpush")
+        ));
+        assert!(!reuses(&config, None, true, Some("embedded")));
+        assert!(!reuses(&config, None, true, Some("fcm")));
+        assert!(!reuses(&config, None, true, None));
+        config.provider = Some(PushProvider::Embedded);
+        assert!(!reuses(&config, None, true, Some("unifiedpush")));
+        config.provider = Some(PushProvider::UnifiedPush);
+        config.gateway_override = true;
+        assert!(!reuses(&config, None, true, Some("unifiedpush")));
     }
 }
