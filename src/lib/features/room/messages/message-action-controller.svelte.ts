@@ -118,7 +118,8 @@ export class MessageActionExecutor {
             item.content.width,
             item.content.height,
             item.content.size,
-            item.content.mime
+            item.content.mime,
+            item.content.animated
           ))
         : undefined;
     const downloadMedia = async (media: {

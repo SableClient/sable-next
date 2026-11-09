@@ -283,3 +283,15 @@ test('only plain mxc gifs count as uploaded', () => {
     gifFromUploadedMxc('mxc://gifs.example/tenor_YWJj', 'a.gif', 1, 1, 1, 'image/gif')
   ).toBeUndefined();
 });
+
+test('an animated webp can be saved like a gif, a still one cannot', () => {
+  expect(
+    gifFromUploadedMxc('mxc://example.org/abc', 'cat.webp', 4, 3, 10, 'image/webp', true)
+  ).toMatchObject({ mediaUrl: 'mxc://example.org/abc', mimetype: 'image/webp' });
+  expect(
+    gifFromUploadedMxc('mxc://example.org/abc', 'cat.webp', 4, 3, 10, 'image/webp', false)
+  ).toBeUndefined();
+  expect(
+    gifFromUploadedMxc('mxc://example.org/abc', 'cat.webp', 4, 3, 10, 'image/webp')
+  ).toBeUndefined();
+});

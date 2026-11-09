@@ -58,6 +58,7 @@ function urlExtension(url: URL): string {
 }
 
 const gifMimetypes = new Set(['image/gif', 'image/webp']);
+const animatedImageMimetypes = new Set(['image/webp', 'image/apng', 'image/avif']);
 
 function mimetypeOf(mediaUrl: string): string {
   try {
@@ -275,9 +276,12 @@ export function gifFromUploadedMxc(
   width: number | null,
   height: number | null,
   size: number | null,
-  mimetype: string | null
+  mimetype: string | null,
+  animated: boolean | null = null
 ): GifResult | undefined {
-  if (mimetype !== 'image/gif' || !isUploadedGifSource(source)) return undefined;
+  const moving =
+    mimetype === 'image/gif' || (animated === true && animatedImageMimetypes.has(mimetype ?? ''));
+  if (!moving || mimetype === null || !isUploadedGifSource(source)) return undefined;
 
   return {
     id: '',
