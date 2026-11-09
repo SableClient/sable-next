@@ -8,9 +8,9 @@ export const FOCUS_REGIONS = ['spaces', 'rooms', 'timeline', 'composer', 'panel'
 export type FocusRegionId = (typeof FOCUS_REGIONS)[number];
 
 const isUsable = (element: HTMLElement) =>
-  isRendered(element) &&
   (element.tabIndex >= 0 || element.isContentEditable) &&
-  !element.matches(':disabled, [role="separator"]');
+  !element.matches(':disabled, [role="separator"]') &&
+  isRendered(element);
 
 function containers(region: FocusRegionId, root: ParentNode): HTMLElement[] {
   if (region === 'timeline') {

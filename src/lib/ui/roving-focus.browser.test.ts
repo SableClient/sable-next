@@ -201,3 +201,28 @@ test('initial picks the first tab stop', () => {
   });
   expect(tabStops(root).map((stop) => stop.id)).toEqual(['d']);
 });
+
+test('hidden items are skipped and never become the tab stop', async () => {
+  const root = mount(
+    '<button id="a" hidden>a</button><button id="b">b</button><button id="c" hidden>c</button><button id="d">d</button>'
+  );
+  expect(tabStops(root).map((stop) => stop.id)).toEqual(['b']);
+  root.querySelector<HTMLElement>('#b')?.focus();
+  await userEvent.keyboard('{ArrowRight}');
+  expect(document.activeElement?.id).toBe('d');
+  await userEvent.keyboard('{Home}');
+  expect(document.activeElement?.id).toBe('b');
+});
+
+test('a change in a long list does not check the visibility of every item', async () => {
+  const root = mount(
+    Array.from({ length: 200 }, (_, at) => `<button id="i${at}">${at}</button>`).join('')
+  );
+  const check = vi.spyOn(HTMLElement.prototype, 'checkVisibility');
+  root.append(document.createElement('button'));
+  await vi.waitFor(() => {
+    expect(root.lastElementChild?.getAttribute('tabindex')).toBe('-1');
+  });
+  expect(check.mock.calls.length).toBeLessThan(5);
+  check.mockRestore();
+});

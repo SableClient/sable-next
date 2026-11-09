@@ -54,21 +54,44 @@ export function rovingFocus({
     let current: HTMLElement | undefined;
     let order: HTMLElement[] = [];
 
+    // Checked lazily: isRendered on every item forces a layout per content-visibility row.
     const items = () =>
       [...container.querySelectorAll<HTMLElement>(itemSelector)].filter(
-        (item) => !item.matches(':disabled') && isRendered(item)
+        (item) => !item.matches(':disabled')
       );
+
+    const walk = (all: HTMLElement[], from: number, step: 1 | -1, count = 1) => {
+      let found: HTMLElement | undefined;
+      for (let at = from; at >= 0 && at < all.length && count > 0; at += step) {
+        if (isRendered(all[at])) {
+          found = all[at];
+          count -= 1;
+        }
+      }
+      return found;
+    };
+
+    const near = (all: HTMLElement[], item: HTMLElement | undefined) => {
+      const at = item ? all.indexOf(item) : -1;
+      return at < 0 ? undefined : (walk(all, at, -1) ?? walk(all, at, 1));
+    };
 
     const sync = () => {
       const all = items();
-      if (current && !all.includes(current)) {
+      if (current && !(all.includes(current) && isRendered(current))) {
         const focusLost = document.activeElement === document.body;
-        const removedAt = Math.min(order.indexOf(current), all.length - 1);
-        const replacement = all.at(removedAt);
+        const at = Math.min(order.indexOf(current), all.length - 1);
+        const replacement = walk(all, at, 1) ?? walk(all, at, -1);
         current = replacement;
         if (focusLost && restoreFocus) replacement?.focus();
       }
-      current ??= all.find((item) => item.matches(SELECTED)) ?? initial?.(all) ?? all[0];
+      current ??=
+        near(
+          all,
+          all.find((item) => item.matches(SELECTED))
+        ) ??
+        near(all, initial?.(all)) ??
+        walk(all, 0, 1);
       order = all;
       for (const item of all) {
         item.tabIndex = item === current ? 0 : -1;
@@ -110,7 +133,7 @@ export function rovingFocus({
     const onFocusIn = (event: FocusEvent) => {
       const target = event.target;
       const item = target instanceof HTMLElement ? target.closest<HTMLElement>(itemSelector) : null;
-      if (item && items().includes(item)) {
+      if (item && container.contains(item) && !item.matches(':disabled')) {
         current = item;
         sync();
       }
@@ -122,10 +145,9 @@ export function rovingFocus({
       const all = items();
       const index = all.indexOf(event.target);
       if (index < 0) return;
-      const step = (offset: number) => {
-        const at = index + offset;
-        return loop ? all[(at + all.length) % all.length] : all[at];
-      };
+      const step = (direction: 1 | -1) =>
+        walk(all, index + direction, direction) ??
+        (loop ? walk(all, direction === 1 ? 0 : all.length - 1, direction) : undefined);
       const focused = event.target;
       if (tree && event.key === 'ArrowRight') {
         const expanded = focused.getAttribute('aria-expanded');
@@ -134,7 +156,7 @@ export function rovingFocus({
           focused.click();
           return;
         }
-        const child = all.at(index + 1);
+        const child = walk(all, index + 1, 1);
         if (expanded === 'true' && child && level(child) > level(focused)) {
           event.preventDefault();
           child.focus();
@@ -150,7 +172,7 @@ export function rovingFocus({
         const parent = all
           .slice(0, index)
           .reverse()
-          .find((item) => level(item) < level(focused));
+          .find((item) => level(item) < level(focused) && isRendered(item));
         if (parent) {
           event.preventDefault();
           parent.focus();
@@ -169,12 +191,13 @@ export function rovingFocus({
         distance = page;
       else return;
       const toEnd = event.key === next || event.key === 'End' || event.key === 'PageDown';
+      const direction = toEnd ? 1 : -1;
       const target =
         distance === 1
-          ? step(toEnd ? 1 : -1)
-          : all.at(
-              toEnd ? Math.min(index + distance, all.length - 1) : Math.max(index - distance, 0)
-            );
+          ? step(direction)
+          : distance === Infinity
+            ? walk(all, toEnd ? all.length - 1 : 0, toEnd ? -1 : 1)
+            : walk(all, index + direction, direction, distance);
       if (onBoundary && (distance > 1 || !target)) {
         event.preventDefault();
         onBoundary(toEnd ? 'end' : 'start', event.target, distance);
