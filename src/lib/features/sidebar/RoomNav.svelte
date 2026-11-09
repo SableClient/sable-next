@@ -568,6 +568,20 @@
                   <span class="avatar-fallback">{@render glyph()}</span>
                 </div>
               {/if}
+              {#if room?.bridge}
+                {@const bridgeLabel = i18n.t('nav.bridgedFrom', { network: room.bridge.network })}
+                <Tooltip label={bridgeLabel}>
+                  {#snippet trigger({ props })}
+                    <span {...props} class="room-bridge" role="img" aria-label={bridgeLabel}>
+                      <Avatar
+                        src={room.bridge?.avatar_url ?? null}
+                        name={room.bridge?.network}
+                        size="tiny"
+                      />
+                    </span>
+                  {/snippet}
+                </Tooltip>
+              {/if}
               {#if peerPresence && peerPresence.presence !== 'offline'}
                 <PresenceDot
                   presence={peerPresence.presence}
@@ -1279,6 +1293,19 @@
 
   :global(.room-avatar-icon) {
     --avatar-size: 1.5rem;
+  }
+
+  .room-bridge {
+    border-radius: 50%;
+    bottom: calc(-1 * var(--space-050));
+    box-shadow: 0 0 0 var(--border-width-500) var(--presence-ring, var(--bg-container));
+    display: flex;
+    left: calc(-1 * var(--space-050));
+    position: absolute;
+  }
+
+  .room-bridge :global(.avatar-tiny) {
+    --avatar-size: var(--space-400);
   }
 
   :global(.room-avatar .room-presence) {

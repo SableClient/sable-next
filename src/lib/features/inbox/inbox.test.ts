@@ -43,6 +43,7 @@ function room(overrides: Partial<RoomListItemView>): RoomListItemView {
     supports_restricted: true,
     supports_knock_restricted: true,
     space_children: [],
+    bridge: null,
     unread: 0,
     notifying: 0,
     highlight: 0,

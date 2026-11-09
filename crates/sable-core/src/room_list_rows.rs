@@ -230,6 +230,7 @@ mod tests {
             supports_restricted: false,
             supports_knock_restricted: false,
             space_children: Vec::new(),
+            bridge: None,
             unread: 4,
             notifying: 4,
             highlight: 1,
@@ -276,6 +277,7 @@ mod tests {
             tags: Vec::new(),
             screen_sharers: Vec::new(),
             avatar_override: None,
+            bridge: None,
         };
         let mut cache = HashMap::from([(kept.to_owned(), info()), (gone.to_owned(), info())]);
         let mut rows = RoomListRows::default();
@@ -306,6 +308,7 @@ mod tests {
             tags: Vec::new(),
             screen_sharers: Vec::new(),
             avatar_override: None,
+            bridge: None,
         }
     }
 

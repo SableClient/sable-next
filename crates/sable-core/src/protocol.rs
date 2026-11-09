@@ -848,6 +848,8 @@ pub struct RoomListItemView {
     pub supports_knock_restricted: bool,
     /// Already sorted by `order`, then the child event's age.
     pub space_children: Vec<SpaceChildEdge>,
+    /// The network a bridge relays this room from, per its `m.bridge` state.
+    pub bridge: Option<BridgeView>,
     pub unread: u32,
     pub notifying: u32,
     pub highlight: u32,
@@ -856,6 +858,14 @@ pub struct RoomListItemView {
     /// The counts above under the room's mode.
     pub counts: RoomUnreadView,
     pub latest_event: Option<LatestEventView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct BridgeView {
+    /// `protocol.displayname`, or `protocol.id` when the bridge gives no name.
+    pub network: String,
+    pub avatar_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]

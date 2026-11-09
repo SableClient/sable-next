@@ -113,6 +113,7 @@ function makeRoom(overrides: Partial<RoomListItemView>): RoomListItemView {
     supports_restricted: true,
     supports_knock_restricted: true,
     space_children: [],
+    bridge: null,
     unread: 0,
     notifying: 0,
     highlight: 0,
@@ -1279,4 +1280,24 @@ test('the room list is one tree with a single tab stop and the row actions out o
     'aria-expanded',
     'false'
   );
+});
+
+test('a bridged room carries its network on the avatar, a native one does not', async () => {
+  visit('/direct');
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!discord:example.org',
+      name: 'Friend',
+      is_direct: true,
+      bridge: { network: 'Discord', avatar_url: 'mxc://example.org/discord' },
+    }),
+    makeRoom({ room_id: '!native:example.org', name: 'Native', is_direct: true }),
+  ];
+  await mountNav();
+
+  const rowOf = (name: string) => screen.getByText(name).closest<HTMLElement>('[role="treeitem"]');
+  expect(
+    within(rowOf('Friend') as HTMLElement).getByRole('img', { name: 'nav.bridgedFrom:Discord' })
+  ).toBeInTheDocument();
+  expect(rowOf('Native')?.querySelector('.room-bridge')).toBeNull();
 });

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::hash::BuildHasher;
 
 use matrix_sdk::EncryptionState;
+use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
 use matrix_sdk::latest_events::{LatestEventValue, LocalLatestEventValue, RemoteLatestEventValue};
 use matrix_sdk::room::{Room, RoomMember};
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
@@ -11,7 +12,8 @@ use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
 use matrix_sdk::ruma::events::room::topic::PossiblyRedactedRoomTopicEventContent;
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::{
-    AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
+    AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnySyncTimelineEvent, StateEventType,
+    SyncMessageLikeEvent,
 };
 use matrix_sdk::ruma::push::Ruleset;
 use matrix_sdk::ruma::{EventId, OwnedMxcUri, OwnedRoomId, OwnedUserId, RoomId};
@@ -19,8 +21,9 @@ use matrix_sdk_ui::{eyeball_im, room_list_service::RoomListItem};
 
 use crate::api::rooms::RoomKind;
 use crate::protocol::{
-    LatestEventView, NotificationModeView, NotificationSettingsView, PredecessorRoomView,
-    RoomJoinRuleView, RoomListItemView, RoomTag, RoomUnreadView, SpaceChildEdge,
+    BridgeView, LatestEventView, NotificationModeView, NotificationSettingsView,
+    PredecessorRoomView, RoomJoinRuleView, RoomListItemView, RoomTag, RoomUnreadView,
+    SpaceChildEdge,
 };
 
 use super::diff::diff_values;
@@ -49,6 +52,8 @@ pub struct RoomInfo {
     pub tags: Vec<RoomTag>,
     pub screen_sharers: Vec<OwnedUserId>,
     pub avatar_override: Option<String>,
+    /// Read once per row, as a bridge sets it when it creates the room.
+    pub bridge: Option<BridgeView>,
 }
 
 pub(crate) fn apply_avatar_override(view: &mut RoomListItemView, info: Option<&RoomInfo>) {
@@ -114,6 +119,7 @@ pub fn room_list_item<S: BuildHasher>(
         supports_restricted: info.is_some_and(|i| i.supports_restricted),
         supports_knock_restricted: info.is_some_and(|i| i.supports_knock_restricted),
         space_children: info.map(|i| i.children.clone()).unwrap_or_default(),
+        bridge: info.and_then(|i| i.bridge.clone()),
         unread,
         notifying,
         highlight,
@@ -390,6 +396,48 @@ pub fn predecessor(room: &Room) -> Option<PredecessorRoomView> {
     })
 }
 
+/// The stable type first, then the name bridges used before MSC2346.
+const BRIDGE_EVENT_TYPES: [&str; 2] = ["m.bridge", "uk.half-shot.bridge"];
+
+fn bridge_view(event: &str) -> Option<BridgeView> {
+    let event: serde_json::Value = serde_json::from_str(event).ok()?;
+    let protocol = event.get("content")?.get("protocol")?;
+    let text = |key: &str| {
+        protocol
+            .get(key)
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+    };
+    Some(BridgeView {
+        network: text("displayname").or_else(|| text("id"))?.to_owned(),
+        avatar_url: text("avatar_url")
+            .filter(|url| url.starts_with("mxc://"))
+            .map(str::to_owned),
+    })
+}
+
+async fn room_bridge(room: &Room) -> Option<BridgeView> {
+    for event_type in BRIDGE_EVENT_TYPES {
+        let Ok(events) = room
+            .get_state_events(StateEventType::from(event_type))
+            .await
+        else {
+            continue;
+        };
+        if let Some(bridge) = events.iter().find_map(|event| {
+            let json = match event {
+                RawAnySyncOrStrippedState::Sync(raw) => raw.json(),
+                RawAnySyncOrStrippedState::Stripped(raw) => raw.json(),
+            };
+            bridge_view(json.get())
+        }) {
+            return Some(bridge);
+        }
+    }
+    None
+}
+
 async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
     let room_kind = RoomKind::from_room_type(room.room_type().as_ref());
     let is_tombstoned = room.is_tombstoned();
@@ -439,6 +487,10 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
         children,
         children_stale,
         tags: room_tags(room),
+        bridge: match previous {
+            Some(previous) => previous.bridge.clone(),
+            None => room_bridge(room).await,
+        },
         screen_sharers: if room.is_call() {
             crate::calls::screen_sharers(room).await
         } else {
@@ -562,6 +614,39 @@ mod tests {
     use super::*;
 
     use crate::protocol::{NotificationModeView, NotificationSettingsView};
+
+    #[test]
+    fn a_bridge_names_its_network_and_only_an_mxc_avatar() {
+        let event = |protocol: serde_json::Value| {
+            serde_json::json!({"type": "m.bridge", "content": {"protocol": protocol}}).to_string()
+        };
+        assert_eq!(
+            bridge_view(&event(serde_json::json!({
+                "id": "discord",
+                "displayname": "Discord",
+                "avatar_url": "mxc://example.org/discord"
+            }))),
+            Some(BridgeView {
+                network: "Discord".to_owned(),
+                avatar_url: Some("mxc://example.org/discord".to_owned()),
+            })
+        );
+        assert_eq!(
+            bridge_view(&event(serde_json::json!({
+                "id": "whatsapp",
+                "avatar_url": "https://example.org/logo.png"
+            }))),
+            Some(BridgeView {
+                network: "whatsapp".to_owned(),
+                avatar_url: None,
+            })
+        );
+        assert_eq!(
+            bridge_view(&event(serde_json::json!({"displayname": " "}))),
+            None
+        );
+        assert_eq!(bridge_view(r#"{"type":"m.bridge","content":{}}"#), None);
+    }
 
     #[test]
     fn a_room_preview_uses_valid_forwarded_content() {

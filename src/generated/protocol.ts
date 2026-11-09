@@ -107,6 +107,12 @@ export type BotCommandParameter = {
 	flag: string | null,
 };
 
+export type BridgeView = {
+	/**  `protocol.displayname`, or `protocol.id` when the bridge gives no name. */
+	network: string,
+	avatar_url: string | null,
+};
+
 export type BrightnessView = "light" | "dark";
 
 /**  One `JSCalendar` event from a `chat.commet.calendar_events` room event. */
@@ -1315,6 +1321,8 @@ export type RoomListItemView = {
 	supports_knock_restricted: boolean,
 	/**  Already sorted by `order`, then the child event's age. */
 	space_children: SpaceChildEdge[],
+	/**  The network a bridge relays this room from, per its `m.bridge` state. */
+	bridge: BridgeView | null,
 	unread: number,
 	notifying: number,
 	highlight: number,

@@ -35,6 +35,7 @@ fn row(room_id: &str) -> Row {
         supports_restricted: false,
         supports_knock_restricted: false,
         space_children: Vec::new(),
+        bridge: None,
         unread: 0,
         notifying: 0,
         highlight: 0,

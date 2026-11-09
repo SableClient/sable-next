@@ -94,6 +94,7 @@
     "quickTools": "Quick tools",
     "navigation": "Navigation",
     "home": "Home",
+    "bridgedFrom": "Bridged from {{network}}",
     "messages": "Messages",
     "inbox": "Inbox",
     "explore": "Explore",
