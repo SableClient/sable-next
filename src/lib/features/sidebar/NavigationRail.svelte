@@ -959,18 +959,20 @@
     </ul>
   </div>
   {#if !mobile && compact}
-    <ResponsivePopover
-      label={i18n.t('nav.alerts')}
-      closeLabel={i18n.t('common.close')}
-      side="right"
-      align="start"
-      class="sidebar-popover alert-popover menu-surface"
-      sideOffset={8}
-      anchor={alertListPopoverAnchor}
-      bind:open={alertListState.open}
-    >
-      <AlertList isDrawer={false} />
-    </ResponsivePopover>
+    {#if alertListPopoverAnchor}
+      <ResponsivePopover
+        label={i18n.t('nav.alerts')}
+        closeLabel={i18n.t('common.close')}
+        side="right"
+        align="start"
+        class="sidebar-popover alert-popover menu-surface"
+        sideOffset={8}
+        anchor={alertListPopoverAnchor}
+        bind:open={alertListState.open}
+      >
+        <AlertList isDrawer={false} />
+      </ResponsivePopover>
+    {/if}
     <div bind:this={alertListPopoverAnchor}>
       <UserQuickTools compact />
     </div>

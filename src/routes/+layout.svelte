@@ -47,7 +47,6 @@
     resolveTheme,
   } from '#lib/settings/theme.js';
   import { shouldReduceMotion } from '#lib/ui/motion.js';
-  import { ALERT_MODULES, provideAlertProviders } from '#lib/features/sidebar/alerts.js';
   import ServerLogin from './ServerLogin.svelte';
   import {
     bindServerNotificationIdentity,
@@ -68,8 +67,6 @@
   let serverAuthenticated = $state(!serverMode);
   let mounted = $state(false);
   provideCoreClient(core);
-  const alertProviders = ALERT_MODULES.map((component) => component.priorityProvider());
-  provideAlertProviders(alertProviders);
   let titlebar = $derived(titleBarKind(preferences.useCustomTitleBar));
 
   onMount(watchThemeFiles);

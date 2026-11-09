@@ -105,7 +105,6 @@
           onclick={() => {
             alertListState.open = !alertListState.open;
           }}
-          aria-current={alertListState.open ? 'page' : undefined}
           style:--progress={mainProgress?.value ?? 1}
           transition:fly|global={{ duration: motionMs(MOTION_MS.fast), easing: backOut, y: 50 }}
         >
