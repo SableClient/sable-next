@@ -256,7 +256,7 @@ mod local {
     const USER_AGENT: &str = concat!(
         "Sable/",
         env!("SABLE_APP_VERSION"),
-        " (link preview) facebookexternalhit/1.1"
+        " (link preview; +https://sable.moe)"
     );
 
     const MAX_IMAGE_BYTES: usize = 20 * 1024 * 1024;
