@@ -59,16 +59,23 @@ test('account locks restore explicit choices and deployment locks take precedenc
 
 test('account policy ignores unsupported and invalid preferences', async () => {
   const settings = await loadWith();
-  const clock = settings.preferences.hour24Clock;
   settings.applyAccountPreferences(
-    { hour24Clock: !clock, theme: 'invalid' },
-    { hour24Clock: !clock, urlPreviews: 'yes', errorReporting: true }
+    { quickCss: 'body { display: none }', theme: 'invalid' },
+    { pushGatewayUrl: 'https://push.example.org', urlPreviews: 'yes', errorReporting: true }
   );
-  expect(settings.preferences.hour24Clock).toBe(clock);
+  expect(settings.preferences.quickCss).toBe('');
   expect(settings.preferences.theme).toBe('system');
-  expect(settings.isLockedPreference('hour24Clock')).toBe(false);
+  expect(settings.preferences.pushGatewayUrl).toBe('');
+  expect(settings.isLockedPreference('pushGatewayUrl')).toBe(false);
   expect(settings.isLockedPreference('urlPreviews')).toBe(false);
   expect(settings.isLockedPreference('errorReporting')).toBe(false);
+});
+
+test('account defaults apply hour24Clock', async () => {
+  const settings = await loadWith();
+  const clock = settings.preferences.hour24Clock;
+  settings.applyAccountPreferences({ hour24Clock: !clock }, {});
+  expect(settings.preferences.hour24Clock).toBe(!clock);
 });
 
 test('account locks and defaults stay out of settings sync and persisted user choices', async () => {

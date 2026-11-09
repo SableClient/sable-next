@@ -16,7 +16,11 @@ test('filters account fields and resolves asset URLs', () => {
     parseAccountConfig(
       {
         branding: { logoUrl: '/logo.svg', themeUrl: 'theme.json' },
-        settingsLocked: { hour24Clock: true, sendReadReceipts: false, updateChannel: 'nightly' },
+        settingsLocked: {
+          hour24Clock: true,
+          pushGatewayUrl: 'https://push.example.org',
+          updateChannel: 'nightly',
+        },
         disableAccountSwitcher: true,
         pushNotificationDetails: {},
       },
@@ -27,7 +31,7 @@ test('filters account fields and resolves asset URLs', () => {
       logoUrl: 'https://example.org/logo.svg',
       themeUrl: 'https://example.org/.well-known/theme.json',
     },
-    settingsLocked: { sendReadReceipts: false },
+    settingsLocked: { hour24Clock: true },
   });
 });
 

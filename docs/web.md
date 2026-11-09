@@ -238,11 +238,9 @@ Supported fields: `branding`, `links`, `hideCommunityLinks`, `auth`,
 Relative branding URLs resolve against the configuration URL. Validate the document
 with [`well-known-sable.schema.json`](../static/well-known-sable.schema.json).
 
-Account defaults and locks accept `theme`, `hideTypingIndicators`,
-`sendTypingNotifications`, `sendReadReceipts`, `hideReadReceipts` and
-`urlPreviews`. Locking `sendReadReceipts` to `false` also hides receipt indicators
-and controls. Other settings, account switching and service endpoints remain
-controlled by the deployment and user.
+Account defaults and locks accept the settings not marked deployment only in the
+[settings reference](settings.md). Locking `sendReadReceipts` to `false` also hides
+receipt indicators and controls.
 
 Account branding and links override deployment values. Login options apply to
 the selected homeserver. Settings use this precedence: deployment locks,

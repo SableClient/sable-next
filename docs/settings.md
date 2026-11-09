@@ -7,16 +7,8 @@ These names and values are accepted by `settingsDefaults` and `settingsLocked` i
 [`config.json`](web.md#configuration). Invalid values are ignored, and numbers outside
 their range are clamped.
 
-`/.well-known/sable` accepts only these settings:
-
-- `theme`
-- `hideTypingIndicators`
-- `sendTypingNotifications`
-- `sendReadReceipts`
-- `hideReadReceipts`
-- `urlPreviews`
-
-See [homeserver configuration](web.md#homeserver-configuration).
+[`/.well-known/sable`](web.md#homeserver-configuration) accepts the same settings
+except those marked deployment only.
 
 ## Appearance
 
@@ -54,17 +46,17 @@ See [homeserver configuration](web.md#homeserver-configuration).
 - `avatarsInMessageHeaders` (Display avatars in message headers): `true` or `false`. Default `true`.
 - `messageSpacing` (Message spacing): One of `none`, `compact`, `cozy`, `roomy`. Default `cozy`.
 - `timelineEmoteSize` (Emote size): One of `default`, `20`, `24`, `32`, `48`, `64`. Default `default`.
-- `searchIndexLimit` (Search index size): One of `128`, `256`, `512`, `1024`, `2048`, `4096`. Default `512`.
-- `searchCrawlPause` (Crawl request interval): One of `1`, `2`, `3`, `5`, `10`, `30`. Default `3`.
-- `searchTricklePause` (Slow-crawl request interval): One of `5`, `10`, `30`, `60`. Default `10`.
-- `searchFlushInterval` (Index save interval): One of `20`, `60`, `120`, `300`. Default `60`.
-- `searchBatchSize` (Events per crawl request): One of `25`, `50`, `100`. Default `50`.
-- `searchBaseEvents` (Events before slow indexing): One of `5000`, `10000`, `20000`, `50000`. Default `20000`.
-- `searchMaxEvents` (Session crawl cap): One of `50000`, `100000`, `200000`, `500000`. Default `50000`.
-- `searchCrawler` (Index message history): `true` or `false`. Default `true`.
-- `searchUnmeteredOnly` (Only transfer search history on unmetered networks): `true` or `false`. Default `true`.
-- `searchSharing` (Share the search index between devices): `true` or `false`. Default `true`.
-- `serverSearch` (Search on the server): `true` or `false`. Default `true`.
+- `searchIndexLimit` (Search index size): One of `128`, `256`, `512`, `1024`, `2048`, `4096`. Default `512`. Deployment only.
+- `searchCrawlPause` (Crawl request interval): One of `1`, `2`, `3`, `5`, `10`, `30`. Default `3`. Deployment only.
+- `searchTricklePause` (Slow-crawl request interval): One of `5`, `10`, `30`, `60`. Default `10`. Deployment only.
+- `searchFlushInterval` (Index save interval): One of `20`, `60`, `120`, `300`. Default `60`. Deployment only.
+- `searchBatchSize` (Events per crawl request): One of `25`, `50`, `100`. Default `50`. Deployment only.
+- `searchBaseEvents` (Events before slow indexing): One of `5000`, `10000`, `20000`, `50000`. Default `20000`. Deployment only.
+- `searchMaxEvents` (Session crawl cap): One of `50000`, `100000`, `200000`, `500000`. Default `50000`. Deployment only.
+- `searchCrawler` (Index message history): `true` or `false`. Default `true`. Deployment only.
+- `searchUnmeteredOnly` (Only transfer search history on unmetered networks): `true` or `false`. Default `true`. Deployment only.
+- `searchSharing` (Share the search index between devices): `true` or `false`. Default `true`. Deployment only.
+- `serverSearch` (Search on the server): `true` or `false`. Default `true`. Deployment only.
 - `showSearch` (Show search in the sidebar): `true` or `false`. Default `false`.
 - `hour24Clock` (24-hour clock): `true` or `false`. Default `false`.
 - `dateFormat` (Date format): One of `auto`, `dmy`, `mdy`, `ymd`. Default `auto`.
@@ -100,21 +92,21 @@ See [homeserver configuration](web.md#homeserver-configuration).
 
 - `twitterEmoji` (Twitter emoji): `true` or `false`. Default `true`.
 - `pixelatedImages` (Pixelated image scaling): One of `always`, `smart`, `never`. Default `never`.
-- `gifProvider` (GIF search provider): One of `default`, `klipy`, `tenor`, `giphy`. Default `default`.
+- `gifProvider` (GIF search provider): One of `default`, `klipy`, `tenor`, `giphy`. Default `default`. Deployment only.
 
 ## Developer
 
-- `coreLogLevel` (Core console log level): One of `default`, `debug`. Default `default`.
-- `developerTools` (Enable developer tools): `true` or `false`. Default `false`.
-- `callStatsOverlay` (Show screen share statistics in calls): `true` or `false`. Default `false`.
-- `callDebugOverlay` (Show call debug information in calls): `true` or `false`. Default `true`.
-- `showHiddenEvents` (Show hidden events): `true` or `false`. Default `false`.
-- `hiddenEventsHeaderToggle` (Show a hidden events toggle in the room header): `true` or `false`. Default `false`.
-- `hiddenEventEdits` (Show edit events): `true` or `false`. Default `true`.
-- `hiddenEventReactions` (Show reaction events): `true` or `false`. Default `true`.
-- `hiddenEventRedactions` (Show redaction events): `true` or `false`. Default `true`.
-- `hiddenEventOther` (Show other hidden events): `true` or `false`. Default `true`.
-- `showTranslationStrings` (Show translation strings): `true` or `false`. Default `false`.
+- `coreLogLevel` (Core console log level): One of `default`, `debug`. Default `default`. Deployment only.
+- `developerTools` (Enable developer tools): `true` or `false`. Default `false`. Deployment only.
+- `callStatsOverlay` (Show screen share statistics in calls): `true` or `false`. Default `false`. Deployment only.
+- `callDebugOverlay` (Show call debug information in calls): `true` or `false`. Default `true`. Deployment only.
+- `showHiddenEvents` (Show hidden events): `true` or `false`. Default `false`. Deployment only.
+- `hiddenEventsHeaderToggle` (Show a hidden events toggle in the room header): `true` or `false`. Default `false`. Deployment only.
+- `hiddenEventEdits` (Show edit events): `true` or `false`. Default `true`. Deployment only.
+- `hiddenEventReactions` (Show reaction events): `true` or `false`. Default `true`. Deployment only.
+- `hiddenEventRedactions` (Show redaction events): `true` or `false`. Default `true`. Deployment only.
+- `hiddenEventOther` (Show other hidden events): `true` or `false`. Default `true`. Deployment only.
+- `showTranslationStrings` (Show translation strings): `true` or `false`. Default `false`. Deployment only.
 
 ## Composer
 
@@ -134,10 +126,10 @@ See [homeserver configuration](web.md#homeserver-configuration).
 - `composerStickerButton` (Sticker button): `true` or `false`. Default `true`.
 - `composerEmoteButton` (Emote button): `true` or `false`. Default `true`.
 - `composerVoiceButton` (Voice message button): `true` or `false`. Default `true`.
-- `scheduleInEncryptedRooms` (Allow scheduling in encrypted rooms): `true` or `false`. Default `true`.
+- `scheduleInEncryptedRooms` (Allow scheduling in encrypted rooms): `true` or `false`. Default `true`. Deployment only.
 - `sendAttachmentAsCaption` (Use message text as attachment caption): `true` or `false`. Default `true`.
 - `sendAttachmentsAsGallery` (Combine attachments into a gallery): `true` or `false`. Default `false`.
-- `imageMetadata` (Image metadata): One of `location`, `all`, `keep`. Default `location`.
+- `imageMetadata` (Image metadata): One of `location`, `all`, `keep`. Default `location`. Deployment only.
 
 ## Per-message profiles
 
@@ -157,8 +149,8 @@ See [homeserver configuration](web.md#homeserver-configuration).
 - `blurMedia` (Blur media until hovered): `true` or `false`. Default `false`.
 - `blurAvatars` (Blur profile pictures until hovered): `true` or `false`. Default `false`.
 - `blurEmotes` (Blur emotes until hovered): `true` or `false`. Default `false`.
-- `errorReporting` (Error reports): `true` or `false`. Default `false`.
-- `sessionReplay` (Session replay on errors): `true` or `false`. Default `false`.
+- `errorReporting` (Error reports): `true` or `false`. Default `false`. Deployment only.
+- `sessionReplay` (Session replay on errors): `true` or `false`. Default `false`. Deployment only.
 
 ## Media
 
@@ -168,27 +160,27 @@ See [homeserver configuration](web.md#homeserver-configuration).
 - `autoplayStickers` (Autoplay stickers and emoji): `true` or `false`. Default `true`.
 - `urlPreviews` (Server-side embeds): `true` or `false`. Default `false`.
 - `themeFileCards` (Show install cards for theme files): `true` or `false`. Default `true`.
-- `encryptedUrlPreviews` (Server-side embeds in encrypted rooms): `true` or `false`. Default `false`.
-- `clientEmbeds` (Client-side embeds): `true` or `false`. Default `false`.
-- `encryptedClientEmbeds` (Client-side embeds in encrypted rooms): `true` or `false`. Default `false`.
-- `youtubeEmbeds` (Embed YouTube links): `true` or `false`. Default `false`.
-- `useDearrow` (Use DeArrow titles and thumbnails): `true` or `false`. Default `false`.
-- `dearrowThumbnailFallback` (Fallback thumbnail type): One of `random`, `original`, `youtube_autogen`. Default `youtube_autogen`.
-- `youtubeThumbnailPosition` (Autogenerated thumbnail type): One of `start`, `middle`, `end`. Default `middle`.
-- `tiktokEmbeds` (Embed TikTok links): `true` or `false`. Default `false`.
-- `instagramEmbeds` (Embed Instagram links): `true` or `false`. Default `false`.
+- `encryptedUrlPreviews` (Server-side embeds in encrypted rooms): `true` or `false`. Default `false`. Deployment only.
+- `clientEmbeds` (Client-side embeds): `true` or `false`. Default `false`. Deployment only.
+- `encryptedClientEmbeds` (Client-side embeds in encrypted rooms): `true` or `false`. Default `false`. Deployment only.
+- `youtubeEmbeds` (Embed YouTube links): `true` or `false`. Default `false`. Deployment only.
+- `useDearrow` (Use DeArrow titles and thumbnails): `true` or `false`. Default `false`. Deployment only.
+- `dearrowThumbnailFallback` (Fallback thumbnail type): One of `random`, `original`, `youtube_autogen`. Default `youtube_autogen`. Deployment only.
+- `youtubeThumbnailPosition` (Autogenerated thumbnail type): One of `start`, `middle`, `end`. Default `middle`. Deployment only.
+- `tiktokEmbeds` (Embed TikTok links): `true` or `false`. Default `false`. Deployment only.
+- `instagramEmbeds` (Embed Instagram links): `true` or `false`. Default `false`. Deployment only.
 
 ## Notifications
 
-- `systemNotifications` (System alerts): `true` or `false`. Default `true`.
-- `notificationSounds` (Play notification sounds): `true` or `false`. Default `true`.
+- `systemNotifications` (System alerts): `true` or `false`. Default `true`. Deployment only.
+- `notificationSounds` (Play notification sounds): `true` or `false`. Default `true`. Deployment only.
 - `notifyOnce` (One alert per room): `true` or `false`. Default `true`.
-- `pushInactiveTimeout` (Alert other devices after): One of `off`, `1`, `5`, `10`, `15`, `30`. Default `1`.
-- `backgroundNotificationSounds` (Sounds while backgrounded): `true` or `false`. Default `true`.
-- `notificationContent` (Show message text): `true` or `false`. Default `false`.
-- `notificationEncryptedContent` (Show encrypted room text): `true` or `false`. Default `false`.
-- `richPushPayloads` (Include message text in push): `true` or `false`. Default `true`.
-- `clearNotificationsOnRead` (Clear alerts when read): `true` or `false`. Default `true`.
+- `pushInactiveTimeout` (Alert other devices after): One of `off`, `1`, `5`, `10`, `15`, `30`. Default `1`. Deployment only.
+- `backgroundNotificationSounds` (Sounds while backgrounded): `true` or `false`. Default `true`. Deployment only.
+- `notificationContent` (Show message text): `true` or `false`. Default `false`. Deployment only.
+- `notificationEncryptedContent` (Show encrypted room text): `true` or `false`. Default `false`. Deployment only.
+- `richPushPayloads` (Include message text in push): `true` or `false`. Default `true`. Deployment only.
+- `clearNotificationsOnRead` (Clear alerts when read): `true` or `false`. Default `true`. Deployment only.
 - `highlightMentions` (Highlight mentions): `true` or `false`. Default `true`.
 - `faviconForMentionsOnly` (Tab badge for mentions and keywords): `true` or `false`. Default `false`.
 
@@ -197,48 +189,48 @@ See [homeserver configuration](web.md#homeserver-configuration).
 - `ringForGroupCalls` (Show call screen for groups and voice channels): `true` or `false`. Default `false`.
 - `alwaysShowCallButton` (Show call button in rooms with more than 10 members): `true` or `false`. Default `false`.
 - `callScreenPreview` (Show a shared screen outside the call): `true` or `false`. Default `true`.
-- `callMode` (Call mode): One of `auto`, `legacy`, `compatibility`, `matrix_2`. Default `auto`.
+- `callMode` (Call mode): One of `auto`, `legacy`, `compatibility`, `matrix_2`. Default `auto`. Deployment only.
 - `incomingCallSound` (In-app incoming call sound): `true` or `false`. Default `true`.
 - `outgoingRingback` (Play a ringing tone while calling): `true` or `false`. Default `true`.
-- `callInputMode` (Input mode): One of `voice-activity`, `push-to-talk`. Default `voice-activity`.
-- `callGlobalShortcuts` (Global microphone shortcuts): `true` or `false`. Default `true`.
-- `noiseSuppression` (Filter microphone background noise): `true` or `false`. Default `true`.
-- `voiceIsolation` (Voice isolation): `true` or `false`. Default `false`.
-- `incomingVoiceIsolation` (Voice isolation for others): `true` or `false`. Default `false`.
-- `echoCancellation` (Remove call echo from the microphone): `true` or `false`. Default `true`.
-- `autoGainControl` (Adjust microphone level automatically): `true` or `false`. Default `true`.
-- `callCameraResolution` (Camera resolution): One of `auto`, `360`, `480`, `720`, `1080`, `1440`, `2160`. Default `auto`.
-- `callCameraBitrate` (Camera maximum bitrate): One of `auto`, `250`, `500`, `1000`, `2000`, `4000`, `8000`, `16000`. Default `auto`.
-- `callCameraCodec` (Camera codec): One of `auto`, `vp8`, `h264`, `vp9`, `av1`. Default `auto`.
-- `callScreenResolution` (Screen sharing resolution): One of `auto`, `360`, `480`, `720`, `1080`, `1440`, `2160`. Default `720`.
-- `callScreenBitrate` (Screen sharing maximum bitrate): One of `auto`, `250`, `500`, `1000`, `2000`, `4000`, `8000`, `16000`. Default `auto`.
-- `callScreenFramerate` (Screen sharing frame rate): One of `auto`, `15`, `30`, `60`. Default `30`.
-- `callScreenCodec` (Screen sharing codec): One of `auto`, `vp8`, `h264`, `vp9`, `av1`. Default `h264`.
-- `callSimulcast` (Use simulcast): `true` or `false`. Default `true`.
-- `webRtcIpPolicy` (Network interfaces for calls): One of `default`, `default_public_and_private_interfaces`, `default_public_interface_only`, `disable_non_proxied_udp`. Default `default`.
+- `callInputMode` (Input mode): One of `voice-activity`, `push-to-talk`. Default `voice-activity`. Deployment only.
+- `callGlobalShortcuts` (Global microphone shortcuts): `true` or `false`. Default `true`. Deployment only.
+- `noiseSuppression` (Filter microphone background noise): `true` or `false`. Default `true`. Deployment only.
+- `voiceIsolation` (Voice isolation): `true` or `false`. Default `false`. Deployment only.
+- `incomingVoiceIsolation` (Voice isolation for others): `true` or `false`. Default `false`. Deployment only.
+- `echoCancellation` (Remove call echo from the microphone): `true` or `false`. Default `true`. Deployment only.
+- `autoGainControl` (Adjust microphone level automatically): `true` or `false`. Default `true`. Deployment only.
+- `callCameraResolution` (Camera resolution): One of `auto`, `360`, `480`, `720`, `1080`, `1440`, `2160`. Default `auto`. Deployment only.
+- `callCameraBitrate` (Camera maximum bitrate): One of `auto`, `250`, `500`, `1000`, `2000`, `4000`, `8000`, `16000`. Default `auto`. Deployment only.
+- `callCameraCodec` (Camera codec): One of `auto`, `vp8`, `h264`, `vp9`, `av1`. Default `auto`. Deployment only.
+- `callScreenResolution` (Screen sharing resolution): One of `auto`, `360`, `480`, `720`, `1080`, `1440`, `2160`. Default `720`. Deployment only.
+- `callScreenBitrate` (Screen sharing maximum bitrate): One of `auto`, `250`, `500`, `1000`, `2000`, `4000`, `8000`, `16000`. Default `auto`. Deployment only.
+- `callScreenFramerate` (Screen sharing frame rate): One of `auto`, `15`, `30`, `60`. Default `30`. Deployment only.
+- `callScreenCodec` (Screen sharing codec): One of `auto`, `vp8`, `h264`, `vp9`, `av1`. Default `h264`. Deployment only.
+- `callSimulcast` (Use simulcast): `true` or `false`. Default `true`. Deployment only.
+- `webRtcIpPolicy` (Network interfaces for calls): One of `default`, `default_public_and_private_interfaces`, `default_public_interface_only`, `disable_non_proxied_udp`. Default `default`. Deployment only.
 
 ## Desktop app
 
-- `closeToTray` (Close to the tray): `true` or `false`. Default `false`.
-- `minimizeToTray` (Minimize to the tray): `true` or `false`. Default `false`.
-- `showSystemTrayIcon` (Show a tray icon): `true` or `false`. Default `true`.
-- `useCustomTitleBar` (Use {{appName}}’s title bar): `true` or `false`. The default depends on the platform.
-- `hardwareAcceleration` (Hardware acceleration): `true` or `false`. Default `true`.
-- `hardwareVideoEncode` (Hardware video encoding): `true` or `false`. Default `true`.
-- `hardwareVideoDecode` (Hardware video decoding): `true` or `false`. Default `true`.
-- `smoothScrolling` (Smooth scrolling): `true` or `false`. Default `true`.
-- `launchAtLogin` (Open {{appName}} when you sign in): `true` or `false`. Default `false`.
-- `startMinimized` (Start hidden): `true` or `false`. Default `false`.
+- `closeToTray` (Close to the tray): `true` or `false`. Default `false`. Deployment only.
+- `minimizeToTray` (Minimize to the tray): `true` or `false`. Default `false`. Deployment only.
+- `showSystemTrayIcon` (Show a tray icon): `true` or `false`. Default `true`. Deployment only.
+- `useCustomTitleBar` (Use {{appName}}’s title bar): `true` or `false`. The default depends on the platform. Deployment only.
+- `hardwareAcceleration` (Hardware acceleration): `true` or `false`. Default `true`. Deployment only.
+- `hardwareVideoEncode` (Hardware video encoding): `true` or `false`. Default `true`. Deployment only.
+- `hardwareVideoDecode` (Hardware video decoding): `true` or `false`. Default `true`. Deployment only.
+- `smoothScrolling` (Smooth scrolling): `true` or `false`. Default `true`. Deployment only.
+- `launchAtLogin` (Open {{appName}} when you sign in): `true` or `false`. Default `false`. Deployment only.
+- `startMinimized` (Start hidden): `true` or `false`. Default `false`. Deployment only.
 
 ## Account
 
-- `settingsSync` (Sync settings across devices): `true` or `false`. Default `false`.
-- `syncDrafts` (Include unsent drafts): `true` or `false`. Default `true`.
+- `settingsSync` (Sync settings across devices): `true` or `false`. Default `false`. Deployment only.
+- `syncDrafts` (Include unsent drafts): `true` or `false`. Default `true`. Deployment only.
 - `profileChangePropagation` (Apply name and avatar changes to): One of `all`, `unchanged`, `none`. Default `unchanged`.
 
 ## Other
 
-- `quickCss`: Text. Default empty.
+- `quickCss`: Text. Default empty. Deployment only.
 - `fontFamily`: Text. Default empty.
 - `fontFamilyMono`: Text. Default empty.
 - `codeLigatures`: `true` or `false`. Default `true`.
@@ -250,34 +242,34 @@ See [homeserver configuration](web.md#homeserver-configuration).
 - `composerButtonOrder`: List of `gif`, `sticker`, `emoticon`, `persona`, `format`, `separator:0`, `separator:1`, `separator:2`, `separator:3`, `separator:4`, `separator:5`, `separator:6`, `separator:7`, `separator:8`. Default `["gif","sticker","emoticon","separator:0","persona","format"]`.
 - `personaGrid`: `true` or `false`. Default `true`.
 - `personaAlternateAvatar`: `true` or `false`. Default `false`.
-- `presence`: One of `online`, `unavailable`, `offline`. Default `online`.
-- `presenceStatusMessage`: Text. Default empty.
+- `presence`: One of `online`, `unavailable`, `offline`. Default `online`. Deployment only.
+- `presenceStatusMessage`: Text. Default empty. Deployment only.
 - `loadingAnimal`: Text. Default empty.
 - `badgeDefaultDirect`: One of `all`, `mentions`, `quiet`. Default `all`.
 - `badgeDefaultGroup`: One of `all`, `mentions`, `quiet`. Default `mentions`.
-- `callServiceUrl`: Text. Default empty.
-- `callMicrophoneMuted`: `true` or `false`. Default `false`.
-- `audioInputDevice`: Text. Default empty.
-- `audioOutputDevice`: Text. Default empty.
-- `videoInputDevice`: Text. Default empty.
-- `pushGatewayUrl`: Text. Default empty.
-- `pushVapidKey`: Text. Default empty.
-- `pushAppId`: Text. Default empty.
-- `pushEmbeddedServerUrl`: Text. Default empty.
-- `soundsNotificationVolume`: Number from 0 to 2. Default `1`.
-- `soundsCameraOnVolume`: Number from 0 to 2. Default `1`.
-- `soundsCameraOffVolume`: Number from 0 to 2. Default `1`.
-- `soundsMicOnVolume`: Number from 0 to 2. Default `1`.
-- `soundsMicOffVolume`: Number from 0 to 2. Default `1`.
-- `soundsDeafenOnVolume`: Number from 0 to 2. Default `1`.
-- `soundsDeafenOffVolume`: Number from 0 to 2. Default `1`.
-- `soundsScreenshareStartVolume`: Number from 0 to 2. Default `1`.
-- `soundsScreenshareStopVolume`: Number from 0 to 2. Default `1`.
-- `soundsCallJoinVolume`: Number from 0 to 2. Default `1`.
-- `soundsCallLeaveVolume`: Number from 0 to 2. Default `1`.
-- `soundsIncomingCallVolume`: Number from 0 to 2. Default `1`.
-- `soundsOutgoingCallVolume`: Number from 0 to 2. Default `1`.
-- `telemetryAsked`: `true` or `false`. Default `false`.
-- `autoUpdateCheck`: `true` or `false`. Default `true`.
-- `updateChannel`: One of `stable`, `nightly`. The default depends on the platform.
-- `askDownloadLocation`: `true` or `false`. Default `true`.
+- `callServiceUrl`: Text. Default empty. Deployment only.
+- `callMicrophoneMuted`: `true` or `false`. Default `false`. Deployment only.
+- `audioInputDevice`: Text. Default empty. Deployment only.
+- `audioOutputDevice`: Text. Default empty. Deployment only.
+- `videoInputDevice`: Text. Default empty. Deployment only.
+- `pushGatewayUrl`: Text. Default empty. Deployment only.
+- `pushVapidKey`: Text. Default empty. Deployment only.
+- `pushAppId`: Text. Default empty. Deployment only.
+- `pushEmbeddedServerUrl`: Text. Default empty. Deployment only.
+- `soundsNotificationVolume`: Number from 0 to 2. Default `1`. Deployment only.
+- `soundsCameraOnVolume`: Number from 0 to 2. Default `1`. Deployment only.
+- `soundsCameraOffVolume`: Number from 0 to 2. Default `1`. Deployment only.
+- `soundsMicOnVolume`: Number from 0 to 2. Default `1`. Deployment only.
+- `soundsMicOffVolume`: Number from 0 to 2. Default `1`. Deployment only.
+- `soundsDeafenOnVolume`: Number from 0 to 2. Default `1`. Deployment only.
+- `soundsDeafenOffVolume`: Number from 0 to 2. Default `1`. Deployment only.
+- `soundsScreenshareStartVolume`: Number from 0 to 2. Default `1`. Deployment only.
+- `soundsScreenshareStopVolume`: Number from 0 to 2. Default `1`. Deployment only.
+- `soundsCallJoinVolume`: Number from 0 to 2. Default `1`. Deployment only.
+- `soundsCallLeaveVolume`: Number from 0 to 2. Default `1`. Deployment only.
+- `soundsIncomingCallVolume`: Number from 0 to 2. Default `1`. Deployment only.
+- `soundsOutgoingCallVolume`: Number from 0 to 2. Default `1`. Deployment only.
+- `telemetryAsked`: `true` or `false`. Default `false`. Deployment only.
+- `autoUpdateCheck`: `true` or `false`. Default `true`. Deployment only.
+- `updateChannel`: One of `stable`, `nightly`. The default depends on the platform. Deployment only.
+- `askDownloadLocation`: `true` or `false`. Default `true`. Deployment only.

@@ -103,17 +103,16 @@ function settingsMarkdown({ specs, placement }: Settings): string {
     '[`config.json`](web.md#configuration). Invalid values are ignored, and numbers outside',
     'their range are clamped.',
     '',
-    '`/.well-known/sable` accepts only these settings:',
-    '',
-    ...ACCOUNT_PREFERENCES.map((key) => `- \`${key}\``),
-    '',
-    'See [homeserver configuration](web.md#homeserver-configuration).',
+    '[`/.well-known/sable`](web.md#homeserver-configuration) accepts the same settings',
+    'except those marked deployment only.',
   ];
+  const accountKeys = new Set<string>(ACCOUNT_PREFERENCES);
   for (const [category, entries] of groups) {
     lines.push('', `## ${category}`, '');
     for (const spec of entries) {
       const label = placement.get(spec.key)?.label;
-      lines.push(`- \`${spec.key}\`${label ? ` (${label})` : ''}: ${describeValues(spec)}`);
+      const scope = accountKeys.has(spec.key) ? '' : ' Deployment only.';
+      lines.push(`- \`${spec.key}\`${label ? ` (${label})` : ''}: ${describeValues(spec)}${scope}`);
     }
   }
   return `${lines.join('\n')}\n`;
