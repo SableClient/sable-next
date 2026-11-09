@@ -331,6 +331,21 @@ test('right-clicking the image offers to copy it and confirms the copy', async (
   expect(write).toHaveBeenCalledOnce();
 });
 
+test('Ctrl+C copies the open image', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    new Response(new Blob(['x'], { type: 'image/png' }))
+  );
+  const write = vi.spyOn(navigator.clipboard, 'write').mockResolvedValue();
+  await openImage();
+
+  await user.keyboard('{Control>}c{/Control}');
+
+  await vi.waitFor(() => {
+    expect(write).toHaveBeenCalledOnce();
+  });
+});
+
 test('escape in the image menu closes the menu, not the viewer', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   const onClose = vi.fn();

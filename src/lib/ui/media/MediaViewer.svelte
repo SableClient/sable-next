@@ -21,6 +21,7 @@
   import { mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import { pixelatedImage } from '#lib/ui/pixelated.js';
   import { wheelZoomFactor } from '#lib/ui/wheel-zoom.js';
+  import { isEditableTarget } from '#lib/ui/shortcuts/binding.js';
   import {
     AXIS_LOCK_THRESHOLD,
     SWIPE_THRESHOLD,
@@ -324,6 +325,19 @@
   function handleKeydown(event: KeyboardEvent): void {
     if (event.defaultPrevented || imageMenuOpen) return;
     if (event.key === 'Escape') onClose();
+    if (
+      isImage &&
+      !spoilerHidden &&
+      (event.ctrlKey || event.metaKey) &&
+      !event.altKey &&
+      !event.shiftKey &&
+      event.key.toLowerCase() === 'c' &&
+      !isEditableTarget(event.target) &&
+      (window.getSelection()?.isCollapsed ?? true)
+    ) {
+      event.preventDefault();
+      return void mediaActions.copyImage();
+    }
     if (isImage && !spoilerHidden && pannable) {
       if (event.key === 'ArrowLeft') return panBy(PAN_STEP, 0);
       if (event.key === 'ArrowRight') return panBy(-PAN_STEP, 0);
