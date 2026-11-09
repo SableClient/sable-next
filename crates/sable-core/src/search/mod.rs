@@ -25,6 +25,7 @@ pub(crate) use persist::reset_state_cache;
 pub(crate) use server::ServerSearch;
 pub(crate) use sharing::SearchSharing;
 
+use crate::now_ms;
 use std::time::Duration;
 
 use matrix_sdk::deserialized_responses::TimelineEvent;
@@ -58,12 +59,6 @@ const PINNED_FETCH_CONCURRENCY: usize = 4;
 const INITIAL_DOCUMENTS: usize = 64;
 const CHANGES_BEFORE_FLUSH: usize = 32;
 const TICKS_BEFORE_FLUSH: u32 = 5;
-fn now_ms() -> u64 {
-    matrix_sdk::ruma::MilliSecondsSinceUnixEpoch::now()
-        .get()
-        .into()
-}
-
 pub(super) fn edited_or_own_event_id(original: &OriginalSyncRoomMessageEvent) -> OwnedEventId {
     match &original.content.relates_to {
         Some(Relation::Replacement(replacement)) => replacement.event_id.clone(),

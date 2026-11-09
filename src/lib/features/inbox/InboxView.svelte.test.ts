@@ -165,7 +165,6 @@ test('a room behind the badge with nothing in the feed still gets a row', async 
   expect(core.rpc.timeline.markRead).toHaveBeenCalledWith({
     room_id: '!room:example.org',
     event_id: null,
-    private_receipt: false,
     thread_root: null,
     subscription: null,
     fully_read: true,

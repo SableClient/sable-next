@@ -321,7 +321,7 @@ pub(super) async fn prepare_invite(room: &matrix_sdk::Room, event: &mut serde_js
     let Some(invite) = crate::calls::validate_invite(room, event).await else {
         return false;
     };
-    let now = u64::from(MilliSecondsSinceUnixEpoch::now().get());
+    let now = crate::now_ms();
     let remaining = invite.expires_at_ms.saturating_sub(now);
     if remaining == 0 {
         return false;

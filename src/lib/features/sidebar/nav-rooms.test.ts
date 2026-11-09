@@ -92,7 +92,6 @@ test('marks only rooms that are actually unread', () => {
       {
         room_id: '!unread',
         event_id: null,
-        private_receipt: false,
         thread_root: null,
         subscription: null,
         fully_read: true,
@@ -102,30 +101,6 @@ test('marks only rooms that are actually unread', () => {
       {
         room_id: '!highlighted',
         event_id: null,
-        private_receipt: false,
-        thread_root: null,
-        subscription: null,
-        fully_read: true,
-      },
-    ],
-  ]);
-});
-
-test('a private reader still marks rooms read, just without telling them', () => {
-  const markRead = vi.fn(() => Promise.resolve(null));
-
-  markRoomsRead(
-    [room({ room_id: '!unread', unread: 1, latest_event: { event_id: '$a' } as never })],
-    { markRead },
-    true
-  );
-
-  expect(markRead.mock.calls).toEqual([
-    [
-      {
-        room_id: '!unread',
-        event_id: null,
-        private_receipt: true,
         thread_root: null,
         subscription: null,
         fully_read: true,

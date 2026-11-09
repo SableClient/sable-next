@@ -28,6 +28,8 @@ domain! {
     server_features,
     delayed_events_supported,
     set_search_options,
+    set_network_conditions,
+    set_app_in_foreground,
     set_read_room,
     integration_manager_url,
     integration_manager_terms,
@@ -347,15 +349,12 @@ pub struct SetSearchOptionsParams {
     pub unmetered_only: bool,
     pub server_search: bool,
     pub tuning: SearchTuning,
-    pub foreground: bool,
 }
 
 impl Handler for SetSearchOptionsParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.search_foreground
-            .store(self.foreground, Ordering::Relaxed);
         let was_sharing = core
             .search_sharing
             .enabled
@@ -368,9 +367,7 @@ impl Handler for SetSearchOptionsParams {
             core.search_sharing.reset_session();
         }
         core.search_network.set_unmetered_only(self.unmetered_only);
-        if !self.foreground || !core.search_network.allows_crawl() {
-            core.cancel_search_peers();
-        }
+        core.refresh_search_peers();
         core.search_crawl.lock().await.tuning = self.tuning.clamped();
         core.search_crawler_enabled
             .store(self.crawler, Ordering::Relaxed);
@@ -381,6 +378,38 @@ impl Handler for SetSearchOptionsParams {
             .await
             .set_disk_budget_mb(self.disk_budget_mb);
         Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetNetworkConditionsParams {
+    pub available: bool,
+    pub unmetered: bool,
+}
+
+impl Handler for SetNetworkConditionsParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.update_network_conditions(self.available, self.unmetered)
+            .await;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetAppInForegroundParams {
+    pub foreground: bool,
+}
+
+impl Handler for SetAppInForegroundParams {
+    type Ok = ();
+
+    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
+        core.update_app_in_foreground(self.foreground);
+        std::future::ready(Ok(()))
     }
 }
 

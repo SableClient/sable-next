@@ -17,6 +17,7 @@ import { installUploadDeadline } from './upload-deadline';
 import type { WasmDebugImage } from './protocol';
 import wasmDebug from '#src/generated/wasm/sable_wasm_build_id.js';
 import wasmUrl from '#src/generated/wasm/sable_wasm_bg.wasm?url';
+import { sleep } from '#lib/sleep.js';
 
 declare const self: SharedWorkerGlobalScope;
 
@@ -36,10 +37,7 @@ const wasm: WasmDebugImage | undefined = wasmDebug
 
 async function stopCore(): Promise<void> {
   if (!started) return;
-  await Promise.race([
-    started.shutdown(),
-    new Promise((resolve) => setTimeout(resolve, SHUTDOWN_LIMIT_MS)),
-  ]);
+  await Promise.race([started.shutdown(), sleep(SHUTDOWN_LIMIT_MS)]);
 }
 
 const core = claimStore(() => {
@@ -110,9 +108,6 @@ self.addEventListener('error', (event) => {
     errorStack(event.error) ??
       (event.filename ? `    at ${event.filename}:${event.lineno}:${event.colno}` : undefined)
   );
-});
-self.addEventListener('online', () => {
-  boundary.handleOnline();
 });
 self.addEventListener('unhandledrejection', (event) => {
   if (!(event.reason instanceof WebAssembly.RuntimeError)) {

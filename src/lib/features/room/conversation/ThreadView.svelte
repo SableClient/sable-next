@@ -10,7 +10,6 @@
   import { readText, writeText } from '#lib/platform/local-json.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { personaSpaces } from '#lib/features/composer/persona-spaces.js';
-  import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
@@ -181,7 +180,6 @@
     await core.rpc.timeline.markRead({
       room_id: roomId,
       event_id: eventId,
-      private_receipt: readReceiptIsPrivate(),
       thread_root: rootEventId,
       subscription: timeline.subscriptionId,
       fully_read: false,

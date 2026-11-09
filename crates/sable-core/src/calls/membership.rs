@@ -1251,7 +1251,7 @@ mod tests {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let room_id = room_id!("!call:example.org");
-        let now = super::super::keys::now_ms();
+        let now = crate::now_ms();
         let mut builder = JoinedRoomBuilder::new(room_id);
         for (device, selection) in [("LEGACY", "oldest_membership"), ("COMPAT", "multi_sfu")] {
             let event = json!({
@@ -1308,7 +1308,7 @@ mod tests {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let room_id = room_id!("!call:example.org");
-        let now = super::super::keys::now_ms();
+        let now = crate::now_ms();
         let event = json!({
             "type": "org.matrix.msc3401.call.member",
             "state_key": "_@user:example.org_DEVICE_m.call",

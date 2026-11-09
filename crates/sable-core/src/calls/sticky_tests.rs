@@ -541,7 +541,7 @@ async fn test_delayed_send_refreshes_expired_credentials_and_preserves_sticky_qu
 #[async_test]
 async fn test_members_in_the_sdk_sticky_map_feed_the_call() {
     let (_server, room) = room().await;
-    let now = super::super::keys::now_ms();
+    let now = crate::now_ms();
     let mut response = ruma::api::client::sync::sync_events::v5::Response::new("1".to_owned());
     let mut sticky_room =
         ruma::api::client::sync::sync_events::v5::response::StickyEventsRoom::default();

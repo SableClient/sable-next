@@ -6,10 +6,8 @@ use serde::{Deserialize, Serialize};
 use super::Handler;
 use crate::Core;
 use crate::protocol::{RpcError, LoginFlowsView, RegistrationFlowsView, RegistrationResultView};
-use crate::session;
 
 domain! {
-    discover_homeserver,
     login,
     login_flows,
     registration_flows,
@@ -45,23 +43,6 @@ pub enum LoginIdentifier {
 pub enum AuthIntent {
     Login,
     Register,
-}
-
-#[derive(Debug, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
-pub struct DiscoverHomeserverParams {
-    pub server_name: String,
-}
-
-impl Handler for DiscoverHomeserverParams {
-    type Ok = String;
-
-    async fn run(self, _core: &Arc<Core>) -> Result<String, RpcError> {
-        let client = session::discovery_client(&self.server_name)
-            .await
-            .map_err(|_| RpcError::UnknownHomeserver)?;
-        Ok(client.homeserver().to_string())
-    }
 }
 
 #[derive(Debug, Deserialize)]

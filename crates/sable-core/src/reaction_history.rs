@@ -224,12 +224,7 @@ impl Core {
     ) -> Result<Vec<String>, RpcError> {
         let _guard = self.account_data_lock.lock().await;
         let client = self.client().await?;
-        let now = web_time::SystemTime::now()
-            .duration_since(web_time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis()
-            .try_into()
-            .unwrap_or(u64::MAX);
+        let now = crate::now_ms();
         let local = client
             .state_store()
             .get_custom_value(STORE_KEY)
@@ -568,12 +563,7 @@ mod tests {
         assert_eq!(core.frequent_reactions(None).await.unwrap(), ["🔥"]);
         drop(unavailable);
 
-        let now = web_time::SystemTime::now()
-            .duration_since(web_time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis()
-            .try_into()
-            .unwrap();
+        let now = crate::now_ms();
         let mut remote = History::default();
         remote.remember("🔥", "other-device", now);
         remote.remember("🔥", "other-device", now);

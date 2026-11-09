@@ -184,6 +184,10 @@ impl Core {
         self.account_locked.load(Ordering::SeqCst) || self.sync_suspended.load(Ordering::SeqCst)
     }
 
+    pub(crate) fn sync_allowed(&self) -> bool {
+        !self.sync_paused() && self.network_available.load(Ordering::SeqCst)
+    }
+
     pub(crate) async fn claim_session_generation(&self) -> SessionGeneration<'_> {
         let guard = self.session_activation_lock.lock().await;
         SessionGeneration {
@@ -1290,7 +1294,7 @@ impl Core {
         generation: u64,
     ) -> bool {
         let matrix_sdk::SessionChange::UnknownToken(data) = change else {
-            if self.session_generation.load(Ordering::SeqCst) == generation {
+            if self.is_current(generation) {
                 tracing::info!("session tokens: refreshed");
                 self.emit(CoreEvent::SessionTokensRefreshed);
             }
@@ -1298,14 +1302,14 @@ impl Core {
         };
         let soft_logout = data.soft_logout;
 
-        if self.session_generation.load(Ordering::SeqCst) != generation {
+        if !self.is_current(generation) {
             return true;
         }
 
         let core = self.clone();
         drop(spawn(async move {
             let _transition = core.lock_session_transition().await;
-            if core.session_generation.load(Ordering::SeqCst) != generation {
+            if !core.is_current(generation) {
                 return;
             }
             let invalidated = core
@@ -1909,8 +1913,7 @@ mod regression_tests {
         let sync_service = core.sync_service().await.unwrap();
         assert!(matches!(sync_service.state().get(), State::Idle));
 
-        core.set_app_active(true);
-        core.apply_app_activity(true).await;
+        core.update_app_active(true).await;
         assert!(!matches!(sync_service.state().get(), State::Idle));
         assert!(
             !core
@@ -1918,8 +1921,7 @@ mod regression_tests {
                 .load(std::sync::atomic::Ordering::SeqCst)
         );
 
-        core.set_app_active(false);
-        core.apply_app_activity(false).await;
+        core.update_app_active(false).await;
         assert!(matches!(sync_service.state().get(), State::Idle));
         assert!(
             core.sync_suspended
@@ -1933,13 +1935,12 @@ mod regression_tests {
 
         let (_store, _server, core, _room) = core_with_room().await;
         let sync_service = core.sync_service().await.unwrap();
-        core.set_network_available(false).await;
+        core.update_network_conditions(false, true).await;
 
-        core.set_app_active(true);
-        core.apply_app_activity(true).await;
+        core.update_app_active(true).await;
         assert!(matches!(sync_service.state().get(), State::Idle));
 
-        core.set_network_available(true).await;
+        core.update_network_conditions(true, true).await;
         assert!(!matches!(sync_service.state().get(), State::Idle));
     }
 
@@ -1949,24 +1950,21 @@ mod regression_tests {
 
         let (_store, _server, core, _room) = core_with_room().await;
         let sync_service = core.sync_service().await.unwrap();
-        core.set_app_active(false);
-        core.apply_app_activity(false).await;
-        core.set_network_available(false).await;
+        core.update_app_active(false).await;
+        core.update_network_conditions(false, true).await;
 
-        core.set_network_available(true).await;
+        core.update_network_conditions(true, true).await;
         assert!(matches!(sync_service.state().get(), State::Idle));
     }
 
     #[tokio::test]
     async fn foregrounding_without_a_session_clears_the_previous_pause() {
         let (_store, _server, core, _room) = core_with_room().await;
-        core.set_app_active(false);
-        core.apply_app_activity(false).await;
+        core.update_app_active(false).await;
         assert!(core.sync_paused());
         core.take_session().await;
 
-        core.set_app_active(true);
-        core.apply_app_activity(true).await;
+        core.update_app_active(true).await;
 
         assert!(!core.sync_paused());
     }
@@ -1989,8 +1987,7 @@ mod regression_tests {
             .mount()
             .await;
         core.lock_account(core.session_generation.load(Ordering::SeqCst));
-        core.set_app_active(false);
-        core.apply_app_activity(false).await;
+        core.update_app_active(false).await;
 
         tokio::time::timeout(Duration::from_secs(35), async {
             while core.account_locked.load(Ordering::SeqCst) {
@@ -2066,8 +2063,7 @@ mod regression_tests {
         use matrix_sdk_ui::sync_service::State;
 
         let (_store, _server, core, _room) = core_with_room().await;
-        core.set_app_active(true);
-        core.apply_app_activity(true).await;
+        core.update_app_active(true).await;
         let sync = core.sync_service().await.unwrap();
 
         let serial = core.activity_lock.lock().await;

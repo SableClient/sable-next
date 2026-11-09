@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, expect, test, vi, type Mock } from 'vitest';
 
-import type { RtcEvent } from '#lib/rtc/connect.js';
+import type { CoreEvent, SearchPeerPause } from '#src/generated/protocol';
 import { watchSearchPeers, type SearchPeerCore } from './search-peer';
 
 class Channel extends EventTarget {
@@ -56,18 +56,16 @@ class Peer extends EventTarget {
   }
 }
 
-let listener: (event: RtcEvent) => void;
+let listener: (event: CoreEvent) => void;
 let subscribeEvents: Mock<SearchPeerCore['subscribeEvents']>;
 let rtcData: Mock<SearchPeerCore['rtcData']>;
 let core: SearchPeerCore;
 let stop: (() => void) | undefined;
-let connection: EventTarget & { type: string };
 
 beforeEach(() => {
   Peer.instances = [];
   vi.stubGlobal('RTCPeerConnection', Peer);
-  connection = Object.assign(new EventTarget(), { type: 'wifi' });
-  vi.stubGlobal('navigator', { onLine: true, connection });
+  vi.stubGlobal('navigator', {});
   subscribeEvents = vi.fn<SearchPeerCore['subscribeEvents']>((callback) => {
     listener = callback;
     return vi.fn();
@@ -98,7 +96,7 @@ afterEach(() => {
 });
 
 function start(): Channel {
-  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
+  stop = watchSearchPeers(core, { stunServers: [] });
   listener({
     type: 'rtc',
     purpose: 'search_sharing',
@@ -110,7 +108,7 @@ function start(): Channel {
 }
 
 function receive(): Channel {
-  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
+  stop = watchSearchPeers(core, { stunServers: [] });
   listener({
     type: 'rtc',
     purpose: 'search_sharing',
@@ -125,7 +123,7 @@ function receive(): Channel {
 
 test('unsupported browsers do not start discovery', () => {
   vi.stubGlobal('RTCPeerConnection', undefined);
-  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
+  stop = watchSearchPeers(core, { stunServers: [] });
   expect(core.rpc.search.peerStart).not.toHaveBeenCalled();
   expect(subscribeEvents).not.toHaveBeenCalled();
 });
@@ -133,7 +131,6 @@ test('unsupported browsers do not start discovery', () => {
 test('foreground options finish applying before discovery starts', async () => {
   const ready = Promise.withResolvers<null>();
   stop = watchSearchPeers(core, {
-    unmeteredOnly: true,
     stunServers: [],
     beforeStart: () => ready.promise,
   });
@@ -148,7 +145,6 @@ test('foreground options finish applying before discovery starts', async () => {
 test('an account switch cancels startup while foreground options are pending', async () => {
   const ready = Promise.withResolvers<null>();
   stop = watchSearchPeers(core, {
-    unmeteredOnly: true,
     stunServers: [],
     beforeStart: () => ready.promise,
   });
@@ -167,7 +163,7 @@ test('a visibility change during startup closes the connection', () => {
     document.dispatchEvent(new Event('visibilitychange'));
     return unsubscribe;
   });
-  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
+  stop = watchSearchPeers(core, { stunServers: [] });
   expect(unsubscribe).toHaveBeenCalledOnce();
   expect(core.rpc.search.peerStart).not.toHaveBeenCalled();
   visibility.mockRestore();
@@ -176,7 +172,7 @@ test('a visibility change during startup closes the connection', () => {
 test('a failed foreground update can retry on the next activation', async () => {
   const ready = Promise.withResolvers<null>();
   const beforeStart = vi.fn(() => ready.promise);
-  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [], beforeStart });
+  stop = watchSearchPeers(core, { stunServers: [], beforeStart });
   ready.reject(new Error('options unavailable'));
   await ready.promise.catch(() => {});
   await Promise.resolve();
@@ -199,7 +195,7 @@ test('a datachannel setup failure releases the peer immediately', () => {
       }
     }
   );
-  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
+  stop = watchSearchPeers(core, { stunServers: [] });
   listener({
     type: 'rtc',
     purpose: 'search_sharing',
@@ -242,7 +238,7 @@ test('a deferred exchange rejection after an account switch cannot call the new 
 });
 
 test('rtc sessions of other features are left alone', () => {
-  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
+  stop = watchSearchPeers(core, { stunServers: [] });
   listener({
     type: 'rtc',
     purpose: 'file_transfer' as 'search_sharing',
@@ -277,7 +273,7 @@ test('a negotiation timeout releases the connection', async () => {
 test('the core is started on resume and at regular intervals', async () => {
   vi.useFakeTimers();
   const visibility = vi.spyOn(document, 'visibilityState', 'get');
-  stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
+  stop = watchSearchPeers(core, { stunServers: [] });
   await vi.advanceTimersByTimeAsync(1000);
   visibility.mockReturnValue('hidden');
   document.dispatchEvent(new Event('visibilitychange'));
@@ -301,13 +297,29 @@ test('idle channels close after two minutes', async () => {
   expect(channel.close).toHaveBeenCalledOnce();
 });
 
-test('metered and offline transitions close active transfers', () => {
+function pauseSharing(pause: SearchPeerPause | null): void {
+  listener({
+    type: 'search_sharing',
+    sharing: {
+      state: 'idle',
+      pause,
+      outcome: null,
+      peer: null,
+      rooms_copied: 0,
+      last_copy: null,
+      automatic: false,
+      asked: 0,
+      candidates: [],
+    },
+  });
+}
+
+test('a core pause closes the transfer and its end restarts discovery', async () => {
   start();
-  connection.type = 'cellular';
-  connection.dispatchEvent(new Event('change'));
+  expect(core.rpc.search.peerStart).toHaveBeenCalledOnce();
+  pauseSharing('metered');
   expect(Peer.instances[0].close).toHaveBeenCalledOnce();
   expect(core.rpc.rtc.close).toHaveBeenCalledOnce();
-  connection.type = 'wifi';
   listener({
     type: 'rtc',
     purpose: 'search_sharing',
@@ -315,9 +327,10 @@ test('metered and offline transitions close active transfers', () => {
     sender: true,
     signal: { kind: 'open' },
   });
-  vi.stubGlobal('navigator', { onLine: false, connection });
-  window.dispatchEvent(new Event('offline'));
-  expect(Peer.instances[1].close).toHaveBeenCalledOnce();
+  expect(Peer.instances).toHaveLength(1);
+  await new Promise((resolve) => setTimeout(resolve));
+  pauseSharing(null);
+  expect(core.rpc.search.peerStart).toHaveBeenCalledTimes(2);
 });
 
 test('late account cleanup does not send old session RPCs to the new account', () => {

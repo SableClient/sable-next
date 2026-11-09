@@ -424,7 +424,7 @@ async fn the_automatic_copy_runs_once_and_a_failed_start_does_not_count() {
     );
     core.search_sharing.enabled.store(true, Ordering::Relaxed);
     core.search_foreground.store(true, Ordering::Relaxed);
-    core.set_search_network_unmetered(true);
+    core.update_network_conditions(true, true).await;
     core.start_search_peers().await.unwrap_err();
     core.start_search_peers().await.unwrap_err();
     core.search_sharing.state.lock().auto_tried = true;
@@ -441,7 +441,7 @@ async fn metered_policy_interrupts_a_copy_and_reports_the_pause() {
     );
     let sharing = &core.search_sharing;
     sharing.enabled.store(true, Ordering::Relaxed);
-    core.set_search_network_unmetered(true);
+    core.update_network_conditions(true, true).await;
     {
         let mut state = sharing.state.lock();
         *state = state_with(&[("DEVICE", 5, 0, false)]);
@@ -453,7 +453,7 @@ async fn metered_policy_interrupts_a_copy_and_reports_the_pause() {
         "DEVICE".into(),
         false,
     );
-    core.set_search_network_unmetered(false);
+    core.update_network_conditions(true, false).await;
     assert!(sharing.state.lock().phase.session().is_none());
     assert_eq!(
         rtc_signals(&mut events),
@@ -466,6 +466,40 @@ async fn metered_policy_interrupts_a_copy_and_reports_the_pause() {
     core.exchange_search_peer("session", None)
         .await
         .unwrap_err();
+}
+
+fn shown_pauses(
+    events: &mut tokio::sync::mpsc::UnboundedReceiver<CoreEvent>,
+) -> Vec<Option<SearchPeerPause>> {
+    std::iter::from_fn(|| events.try_recv().ok())
+        .filter_map(|event| match event {
+            CoreEvent::SearchSharing { sharing } => Some(sharing.pause),
+            _ => None,
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn returning_conditions_tell_the_page_that_peers_may_resume() {
+    let (core, mut events) = Core::new(
+        "peer-resume",
+        Box::new(crate::store::MemorySessionStore::default()),
+    );
+    core.search_sharing.enabled.store(true, Ordering::Relaxed);
+
+    core.update_network_conditions(false, true).await;
+    core.update_network_conditions(true, true).await;
+    assert_eq!(
+        shown_pauses(&mut events),
+        [Some(SearchPeerPause::Offline), None]
+    );
+
+    core.update_app_in_foreground(false);
+    core.update_app_in_foreground(true);
+    assert_eq!(
+        shown_pauses(&mut events),
+        [Some(SearchPeerPause::Background), None]
+    );
 }
 
 async fn live_core(

@@ -62,9 +62,8 @@ export function createCoreWorkerBoundary(
 
   const ports = new Set<WorkerPort>();
   const visibility = new Map<WorkerPort, boolean>();
-  type SearchOptions = Parameters<Rpc['session']['setSearchOptions']>[0];
-  let searchOptions: SearchOptions | undefined;
-  let searchOptionsTask = Promise.resolve('null');
+  let foreground: boolean | undefined;
+  let foregroundTask = Promise.resolve();
   const timelineEvents = new TimelineEventRouter<WorkerPort>();
   let panic: string | null = null;
   let logs: string[] = [];
@@ -84,26 +83,21 @@ export function createCoreWorkerBoundary(
     return [...visibility.values()].some(Boolean);
   }
 
-  function applySearchOptions(options: SearchOptions): Promise<string> {
-    searchOptions = { ...options, foreground: anyVisible() };
-    const pending = searchOptions;
-    searchOptionsTask = searchOptionsTask
-      .catch(() => 'null')
+  function updateForeground(): void {
+    const visible = anyVisible();
+    if (foreground === visible || (foreground === undefined && visibility.size === 0)) return;
+    foreground = visible;
+    foregroundTask = foregroundTask
       .then(async () => {
         const instance = await core;
-        return instance.call(
-          'session.set_search_options',
-          JSON.stringify({ ...pending, foreground: anyVisible() })
+        await instance.call(
+          'session.set_app_in_foreground',
+          JSON.stringify({ foreground: visible })
         );
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable worker] foreground not applied', error);
       });
-    return searchOptionsTask;
-  }
-
-  function updateSearchForeground(): void {
-    if (!searchOptions || searchOptions.foreground === anyVisible()) return;
-    void applySearchOptions(searchOptions).catch((error: unknown) => {
-      console.debug('[sable worker] search activity not applied', error);
-    });
   }
 
   function closePort(port: WorkerPort): void {
@@ -111,7 +105,7 @@ export function createCoreWorkerBoundary(
     visibility.delete(port);
     port.onmessage = null;
     port.onmessageerror = null;
-    updateSearchForeground();
+    updateForeground();
     const subscriptions = timelineEvents.removeOwner(port);
     if (subscriptions.length === 0) return;
 
@@ -233,10 +227,9 @@ export function createCoreWorkerBoundary(
           });
           return;
         }
-        searchOptions = undefined;
         closePort(port);
         // The page clears the stores once answered, so nothing may still write to them.
-        await searchOptionsTask.catch(() => 'null');
+        await foregroundTask;
         await stop();
         port.postMessage({ id: request.id, uri: null });
         terminate();
@@ -254,7 +247,7 @@ export function createCoreWorkerBoundary(
       }
       if ('visible' in request) {
         visibility.set(port, request.visible);
-        updateSearchForeground();
+        updateForeground();
         if (request.visible) resumeSync();
         return;
       }
@@ -386,12 +379,9 @@ export function createCoreWorkerBoundary(
         }
         if ('call' in request) {
           const { method } = request.call;
-          if (method === 'session.set_search_options') {
-            if (!ports.has(port)) return;
-            const options = request.call.params as SearchOptions;
-            if (!visibility.has(port)) visibility.set(port, options.foreground);
-            const ok: unknown = JSON.parse(await applySearchOptions(options));
-            if (ports.has(port)) port.postMessage({ id, ok } satisfies WorkerMessage);
+          // Pages report visibility on connect; the worker owns the aggregate across tabs.
+          if (method === 'session.set_app_in_foreground') {
+            port.postMessage({ id, ok: null } satisfies WorkerMessage);
             return;
           }
           const params = JSON.stringify(request.call.params);
@@ -469,6 +459,5 @@ export function createCoreWorkerBoundary(
     handleSpan,
     handlePanic,
     handleSuperseded,
-    handleOnline: resumeSync,
   };
 }

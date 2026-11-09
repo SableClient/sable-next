@@ -51,12 +51,9 @@ pub(crate) async fn set_device_activity(core: &crate::Core, active: bool) {
             return;
         }
     };
-    let Some(content) = update_device_activity(
-        current,
-        device_id.as_str(),
-        active,
-        crate::probed_state::now_ms(),
-    ) else {
+    let Some(content) =
+        update_device_activity(current, device_id.as_str(), active, crate::now_ms())
+    else {
         return;
     };
     let Ok(raw) = serde_json::value::to_raw_value(&content)

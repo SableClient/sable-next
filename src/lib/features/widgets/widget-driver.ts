@@ -23,6 +23,7 @@ import {
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { CoreError } from '#src/transport';
+import { sleep } from '#lib/sleep.js';
 
 export type CapabilityApproval = (requested: Set<Capability>) => Promise<Set<Capability>>;
 
@@ -343,7 +344,7 @@ export class SableWidgetDriver extends WidgetDriver {
       if (server.uris.length === 0) return;
       yield { uris: server.uris, username: server.username, password: server.password };
       const refreshIn = Math.max(TURN_MIN_REFRESH_MS, server.ttl_ms * TURN_REFRESH_FRACTION);
-      await new Promise((resolve) => setTimeout(resolve, refreshIn));
+      await sleep(refreshIn);
     }
   }
 

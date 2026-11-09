@@ -100,8 +100,8 @@ async fn setup_room(
         member_id: Some("own-member".to_owned()),
         identity: "own-identity".to_owned(),
         mode: CallMode::Matrix2,
-        created_ts: super::keys::now_ms(),
-        joined_ts: super::keys::now_ms(),
+        created_ts: crate::now_ms(),
+        joined_ts: crate::now_ms(),
         expires_at_ms: None,
         foci: vec!["wss://focus.example.org".to_owned()],
         screen_sharing: false,
@@ -159,7 +159,7 @@ async fn invite_sent(room: &Room, own: &CallMember, wire: RtcWire) {
         room,
         json!({
             "type":super::notify::NOTIFICATION_EVENT_TYPE, "event_id":"$own-invite",
-            "sender":own.user_id, "origin_server_ts":super::keys::now_ms(),
+            "sender":own.user_id, "origin_server_ts":crate::now_ms(),
             "msc4354_sticky":{"duration_ms":300_000},
             "content":super::invites::content(wire.slot(), false, &[], "$own-member")
         }),
@@ -309,18 +309,22 @@ async fn a_current_invitation_is_not_sent_again_to_the_same_recipients() {
         );
         let event = json!({
             "type":event_type, "event_id":"$previous", "sender":own.user_id,
-            "origin_server_ts":super::keys::now_ms(), "msc4354_sticky":{"duration_ms":300_000},
+            "origin_server_ts":crate::now_ms(), "msc4354_sticky":{"duration_ms":300_000},
             "content":content
         });
         sticky_update(&room, event).await;
         core.announce_call(&room, event_id!("$membership"), &own)
             .await;
         assert!(sends(&server).await.is_empty());
-        sticky_update(&room, json!({
-            "type":event_type, "event_id":"$withdrawn", "sender":own.user_id,
-            "origin_server_ts":super::keys::now_ms()+1, "msc4354_sticky":{"duration_ms":300_000},
-            "content":{"msc4354_sticky_key":wire.slot()}
-        })).await;
+        sticky_update(
+            &room,
+            json!({
+                "type":event_type, "event_id":"$withdrawn", "sender":own.user_id,
+                "origin_server_ts":crate::now_ms()+1, "msc4354_sticky":{"duration_ms":300_000},
+                "content":{"msc4354_sticky_key":wire.slot()}
+            }),
+        )
+        .await;
         core.announce_call(&room, event_id!("$membership"), &own)
             .await;
         assert_eq!(sends(&server).await.len(), 1);
@@ -344,7 +348,7 @@ async fn withdrawal_keeps_other_participants_invited_until_the_slot_closes() {
         }] = "peer-member".into();
         sticky_update(&room, json!({
             "type":if stable { "m.rtc.member" } else { "org.matrix.msc4143.rtc.member" },
-            "event_id":"$peer-member", "sender":"@peer:example.org", "origin_server_ts":super::keys::now_ms(),
+            "event_id":"$peer-member", "sender":"@peer:example.org", "origin_server_ts":crate::now_ms(),
             "msc4354_sticky":{"duration_ms":300_000}, "content":content
         })).await;
         invite_sent(&room, &own, wire).await;
@@ -382,7 +386,7 @@ async fn withdrawal_preserves_the_current_invitation_sticky_duration() {
             &room,
             json!({
                 "type":super::notify::NOTIFICATION_EVENT_TYPE, "event_id":"$long-invite",
-                "sender":own.user_id, "origin_server_ts":super::keys::now_ms(),
+                "sender":own.user_id, "origin_server_ts":crate::now_ms(),
                 "msc4354_sticky":{"duration_ms":900_000}, "content":content
             }),
         )

@@ -34,7 +34,7 @@
   import { formatDate, formatTime } from '#lib/ui/date-time.js';
   import { currentLocale, i18n } from '#lib/i18n.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
@@ -314,7 +314,6 @@
       .markRead({
         room_id: resolvedRoomId,
         event_id: null,
-        private_receipt: readReceiptIsPrivate(),
         thread_root: null,
         subscription: null,
         fully_read: true,

@@ -1,4 +1,5 @@
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { isRecord } from '#lib/guards.js';
 
 const WIDGET_STATE_TYPE = 'im.vector.modular.widgets';
 const READABLE_STATE_TYPES = new Set([
@@ -16,10 +17,6 @@ type Request = Record<string, unknown>;
 type StateEvent = { content?: Record<string, unknown> };
 
 export class ScalarError extends Error {}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 async function stateEvents(
   rpc: Rpc,

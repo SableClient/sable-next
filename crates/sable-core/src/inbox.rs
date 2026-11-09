@@ -123,7 +123,7 @@ fn merge(entries: &mut Vec<Entry>, fresh: Vec<Entry>) -> usize {
     changed
 }
 
-fn preview(body: String) -> String {
+pub(crate) fn preview(body: String) -> String {
     if body.chars().count() <= PREVIEW_LIMIT {
         body
     } else {

@@ -3527,11 +3527,12 @@ async fn dispatch_mark_read(
         homeserver: server.server().uri(),
         oauth: false,
     });
+    core.private_receipts
+        .store(private_receipt, std::sync::atomic::Ordering::Relaxed);
 
     core.run(MarkReadParams {
         room_id,
         event_id,
-        private_receipt,
         thread_root: None,
         subscription: None,
         fully_read,

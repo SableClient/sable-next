@@ -8,7 +8,6 @@ use matrix_sdk::ruma::events::rtc::notification::CallIntent as RumaCallIntent;
 use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, OwnedDeviceId, OwnedRoomId, OwnedUserId, UInt};
 use serde::Serialize;
 
-use super::keys;
 use super::membership::{self, CallMember};
 use crate::protocol::{CallIntent, CallMode};
 
@@ -17,7 +16,7 @@ pub(super) fn content(
     own: &CallMember,
     intent: Option<CallIntent>,
 ) -> MembershipContent {
-    content_at(room_id, own, intent, keys::now_ms())
+    content_at(room_id, own, intent, crate::now_ms())
 }
 
 #[expect(

@@ -1290,16 +1290,11 @@ mod tests {
         use matrix_sdk::test_utils::mocks::MatrixMockServer;
         let server = MatrixMockServer::new().await;
         server.mock_versions().ok().mount().await;
-        let (core, _events) = Core::new(
-            "sable-discovery",
-            Box::new(crate::store::MemorySessionStore::default()),
-        );
-        let found = core
-            .run(crate::api::auth::DiscoverHomeserverParams {
-                server_name: server.server().uri(),
-            })
+        let found = crate::session::discovery_client(&server.server().uri())
             .await
-            .expect("discovery succeeds");
+            .expect("discovery succeeds")
+            .homeserver()
+            .to_string();
         assert!(found.contains(&server.server().uri()), "{found}");
     }
 

@@ -6,6 +6,7 @@ import {
   startScreenAudioStream,
   stopScreenAudioStream,
 } from './screen-audio-stream';
+import { sleep } from '#lib/sleep.js';
 
 export const SCREEN_AUDIO_LABELS = ['Sable screen audio', 'vencord-screen-share'];
 
@@ -82,7 +83,7 @@ async function findInput(label: string): Promise<MediaDeviceInfo | null> {
       (candidate) => candidate.kind === 'audioinput' && candidate.label.includes(label)
     );
     if (device) return device;
-    await new Promise((resolve) => setTimeout(resolve, DEVICE_POLL_MS));
+    await sleep(DEVICE_POLL_MS);
   }
   return null;
 }

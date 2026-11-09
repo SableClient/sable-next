@@ -18,6 +18,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { geoUriFor } from './composer-location.js';
 import { rainbowFormatted, rainbowHtml } from './rainbow.js';
+import { isRecord } from '#lib/guards.js';
 
 export { parseSlash, pronounSets, slashCommandNames } from '#lib/model/model.js';
 
@@ -165,9 +166,7 @@ async function eachUser(
 }
 
 function objectValue(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+  return isRecord(value) ? value : {};
 }
 
 function locationParams(roomId: string, geoUri: string) {

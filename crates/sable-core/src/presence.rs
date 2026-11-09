@@ -107,11 +107,7 @@ impl Core {
                         }
                     }
 
-                    if core
-                        .session_generation
-                        .load(std::sync::atomic::Ordering::SeqCst)
-                        != generation
-                    {
+                    if !core.is_current(generation) {
                         break;
                     }
 

@@ -2090,11 +2090,11 @@ async fn an_original_streams_with_progress_and_is_cached() {
     let source = "mxc://example.org/original".to_owned();
 
     assert_eq!(
-        core.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        core.fetch_media(source.clone(), 0, 0, false).await.unwrap(),
         bytes
     );
     assert_eq!(
-        core.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        core.fetch_media(source.clone(), 0, 0, false).await.unwrap(),
         bytes
     );
 
@@ -2156,12 +2156,15 @@ async fn an_encrypted_thumbnail_downloads_the_original() {
     .unwrap();
 
     assert_eq!(
-        core.media_thumbnail(source.clone(), 800, 600)
+        core.fetch_media(source.clone(), 800, 600, false)
             .await
             .unwrap(),
         plaintext
     );
-    assert_eq!(core.media_thumbnail(source, 0, 0).await.unwrap(), plaintext);
+    assert_eq!(
+        core.fetch_media(source, 0, 0, false).await.unwrap(),
+        plaintext
+    );
 }
 
 fn remote_media_error(status: u16) -> ResponseTemplate {
@@ -2205,7 +2208,7 @@ async fn corrupt_encrypted_media_is_rejected_before_returning_plaintext() {
     ))
     .unwrap();
     assert!(matches!(
-        core.media_thumbnail(source, 0, 0).await,
+        core.fetch_media(source, 0, 0, false).await,
         Err(RpcError::Unavailable)
     ));
 }
@@ -2241,7 +2244,7 @@ async fn sticker_previews_reuse_a_cached_original_without_retrying_thumbnails() 
     let source = "mxc://example.org/sticker".to_owned();
     assert_eq!(
         first
-            .media_thumbnail(source.clone(), 144, 144)
+            .fetch_media(source.clone(), 144, 144, false)
             .await
             .unwrap(),
         bytes
@@ -2259,7 +2262,7 @@ async fn sticker_previews_reuse_a_cached_original_without_retrying_thumbnails() 
     for size in [144, 96, 48] {
         assert_eq!(
             restored
-                .media_thumbnail(source.clone(), size, size)
+                .fetch_media(source.clone(), size, size, false)
                 .await
                 .unwrap(),
             bytes
@@ -2299,13 +2302,16 @@ async fn sticker_previews_prefer_the_persisted_thumbnail_over_the_original() {
     let source = "mxc://example.org/preview".to_owned();
     assert_eq!(
         first
-            .media_thumbnail(source.clone(), 144, 144)
+            .fetch_media(source.clone(), 144, 144, false)
             .await
             .unwrap(),
         thumbnail
     );
     assert_eq!(
-        first.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        first
+            .fetch_media(source.clone(), 0, 0, false)
+            .await
+            .unwrap(),
         original
     );
     drop(first);
@@ -2319,13 +2325,13 @@ async fn sticker_previews_prefer_the_persisted_thumbnail_over_the_original() {
     let restored = core(&server, client).await;
     assert_eq!(
         restored
-            .media_thumbnail(source.clone(), 144, 144)
+            .fetch_media(source.clone(), 144, 144, false)
             .await
             .unwrap(),
         thumbnail
     );
     assert_eq!(
-        restored.media_thumbnail(source, 48, 48).await.unwrap(),
+        restored.fetch_media(source, 48, 48, false).await.unwrap(),
         original
     );
 }
@@ -2364,7 +2370,7 @@ async fn cached_sticker_reads_bypass_six_stalled_downloads() {
     let core = core(&server, client).await;
     let source = "mxc://example.org/cached-sticker".to_owned();
     assert_eq!(
-        core.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        core.fetch_media(source.clone(), 0, 0, false).await.unwrap(),
         bytes
     );
 
@@ -2372,7 +2378,7 @@ async fn cached_sticker_reads_bypass_six_stalled_downloads() {
         .map(|index| {
             let core = core.clone();
             tokio::spawn(async move {
-                core.media_thumbnail(format!("mxc://example.org/stalled-{index}"), 0, 0)
+                core.fetch_media(format!("mxc://example.org/stalled-{index}"), 0, 0, false)
                     .await
             })
         })
@@ -2397,7 +2403,7 @@ async fn cached_sticker_reads_bypass_six_stalled_downloads() {
         assert_eq!(core.media_downloads.available_permits(), 0);
         tokio::time::timeout(
             std::time::Duration::from_secs(1),
-            core.media_thumbnail(source, 144, 144),
+            core.fetch_media(source, 144, 144, false),
         )
         .await
     }
@@ -2441,18 +2447,21 @@ async fn large_cached_photos_do_not_replace_plain_thumbnails() {
     let core = core(&server, client).await;
     let source = "mxc://example.org/photo".to_owned();
     assert_eq!(
-        core.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        core.fetch_media(source.clone(), 0, 0, false).await.unwrap(),
         original
     );
     for (width, height) in [(800, 600), (144, 144), (800, 600)] {
         let preview = core
-            .media_thumbnail(source.clone(), width, height)
+            .fetch_media(source.clone(), width, height, false)
             .await
             .unwrap();
         assert_eq!(preview.len(), thumbnail.len());
         assert_eq!(preview, thumbnail);
     }
-    assert_eq!(core.media_thumbnail(source, 0, 0).await.unwrap(), original);
+    assert_eq!(
+        core.fetch_media(source, 0, 0, false).await.unwrap(),
+        original
+    );
 }
 
 #[tokio::test]
@@ -2509,7 +2518,7 @@ async fn bulk_original_downloads_leave_all_preview_slots_available() {
     let slots = core.media_downloads.available_permits();
     let visible = tokio::time::timeout(
         std::time::Duration::from_secs(1),
-        core.media_thumbnail("mxc://example.org/visible".to_owned(), 144, 144),
+        core.fetch_media("mxc://example.org/visible".to_owned(), 144, 144, false),
     )
     .await;
     for download in &downloads {
@@ -2552,7 +2561,7 @@ async fn queued_previews_recheck_the_original_cache() {
         .await
         .unwrap();
     let source = "mxc://example.org/queued".to_owned();
-    let mut preview = Box::pin(core.media_thumbnail(source.clone(), 144, 144));
+    let mut preview = Box::pin(core.fetch_media(source.clone(), 144, 144, false));
     tokio::time::timeout(std::time::Duration::from_millis(50), &mut preview)
         .await
         .unwrap_err();
@@ -2594,7 +2603,7 @@ async fn a_transient_download_failure_is_retried() {
     let core = core(&server, client).await;
 
     assert_eq!(
-        core.media_thumbnail("mxc://example.org/blip".to_owned(), 0, 0)
+        core.fetch_media("mxc://example.org/blip".to_owned(), 0, 0, false)
             .await
             .unwrap(),
         bytes
@@ -2627,7 +2636,7 @@ async fn a_refused_authenticated_download_falls_back_to_the_legacy_endpoint() {
     let core = core(&server, client).await;
 
     assert_eq!(
-        core.media_thumbnail("mxc://example.org/legacy-only".to_owned(), 0, 0)
+        core.fetch_media("mxc://example.org/legacy-only".to_owned(), 0, 0, false)
             .await
             .unwrap(),
         bytes
@@ -2656,10 +2665,10 @@ async fn legacy_original_downloads_can_take_longer_than_thirty_seconds() {
     let core = core(&server, client).await;
     let source = "mxc://example.org/slow".to_owned();
     assert_eq!(
-        core.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        core.fetch_media(source.clone(), 0, 0, false).await.unwrap(),
         bytes
     );
-    assert_eq!(core.media_thumbnail(source, 0, 0).await.unwrap(), bytes);
+    assert_eq!(core.fetch_media(source, 0, 0, false).await.unwrap(), bytes);
 }
 
 #[tokio::test]
@@ -2697,10 +2706,10 @@ async fn sdk_original_retry_can_take_longer_than_thirty_seconds() {
     let core = core(&server, client).await;
     let source = "mxc://example.org/slow-retry".to_owned();
     assert_eq!(
-        core.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        core.fetch_media(source.clone(), 0, 0, false).await.unwrap(),
         bytes
     );
-    assert_eq!(core.media_thumbnail(source, 0, 0).await.unwrap(), bytes);
+    assert_eq!(core.fetch_media(source, 0, 0, false).await.unwrap(), bytes);
 }
 
 #[tokio::test]
@@ -2731,14 +2740,14 @@ async fn a_server_whose_media_keeps_failing_is_refused_without_a_request() {
 
     for id in ["one", "two", "three"] {
         assert!(matches!(
-            core.media_thumbnail(format!("mxc://dead.example/{id}"), 64, 64)
+            core.fetch_media(format!("mxc://dead.example/{id}"), 64, 64, false)
                 .await,
             Err(RpcError::Unavailable)
         ));
     }
 
     assert!(matches!(
-        core.media_thumbnail("mxc://dead.example/four".to_owned(), 64, 64)
+        core.fetch_media("mxc://dead.example/four".to_owned(), 64, 64, false)
             .await,
         Err(RpcError::MediaServerUnavailable { retry_after_ms }) if retry_after_ms > 0
     ));
@@ -2769,17 +2778,17 @@ async fn a_refused_server_still_serves_what_is_cached() {
         .await;
     let core = core(&server, client).await;
 
-    core.media_thumbnail("mxc://dead.example/kept".to_owned(), 0, 0)
+    core.fetch_media("mxc://dead.example/kept".to_owned(), 0, 0, false)
         .await
         .unwrap();
     for id in ["gone1", "gone2", "gone3"] {
-        core.media_thumbnail(format!("mxc://dead.example/{id}"), 0, 0)
+        core.fetch_media(format!("mxc://dead.example/{id}"), 0, 0, false)
             .await
             .unwrap_err();
     }
 
     assert_eq!(
-        core.media_thumbnail("mxc://dead.example/kept".to_owned(), 0, 0)
+        core.fetch_media("mxc://dead.example/kept".to_owned(), 0, 0, false)
             .await
             .unwrap(),
         bytes
@@ -2806,7 +2815,7 @@ async fn forbidden_media_never_opens_the_circuit() {
 
     for id in ["a", "b", "c", "d"] {
         assert!(matches!(
-            core.media_thumbnail(format!("mxc://policy.example/{id}"), 0, 0)
+            core.fetch_media(format!("mxc://policy.example/{id}"), 0, 0, false)
                 .await,
             Err(RpcError::Unavailable)
         ));
@@ -2839,12 +2848,12 @@ async fn missing_media_never_opens_the_circuit() {
 
     for id in ["a", "b", "c", "d"] {
         assert!(matches!(
-            core.media_thumbnail(format!("mxc://gone.example/{id}"), 0, 0)
+            core.fetch_media(format!("mxc://gone.example/{id}"), 0, 0, false)
                 .await,
             Err(RpcError::MediaNotFound)
         ));
     }
-    core.media_thumbnail("mxc://gone.example/ok".to_owned(), 0, 0)
+    core.fetch_media("mxc://gone.example/ok".to_owned(), 0, 0, false)
         .await
         .unwrap();
 }
@@ -2868,10 +2877,10 @@ async fn forgotten_media_is_fetched_again() {
     let core = core(&server, client).await;
     let source = "mxc://example.org/forgotten".to_owned();
 
-    core.media_thumbnail(source.clone(), 0, 0).await.unwrap();
-    core.media_thumbnail(source.clone(), 0, 0).await.unwrap();
+    core.fetch_media(source.clone(), 0, 0, false).await.unwrap();
+    core.fetch_media(source.clone(), 0, 0, false).await.unwrap();
     core.forget_media(source.clone()).await.unwrap();
-    core.media_thumbnail(source, 0, 0).await.unwrap();
+    core.fetch_media(source, 0, 0, false).await.unwrap();
 }
 
 #[expect(clippy::unwrap_used, reason = "test code")]

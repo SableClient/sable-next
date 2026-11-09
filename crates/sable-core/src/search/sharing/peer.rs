@@ -476,6 +476,14 @@ impl Core {
         }
     }
 
+    pub(crate) fn refresh_search_peers(&self) {
+        if self.search_peer_pause().is_some() {
+            self.cancel_search_peers();
+        } else {
+            self.update_sharing(|_| {});
+        }
+    }
+
     pub(crate) fn cancel_search_peers(&self) {
         self.update_sharing(|state| {
             state.available = false;
@@ -532,7 +540,7 @@ impl Core {
                 loop {
                     matrix_sdk::sleep::sleep(Duration::from_secs(1)).await;
                     let Some(core) = weak.upgrade() else { return };
-                    if core.session_generation.load(Ordering::SeqCst) != generation {
+                    if !core.is_current(generation) {
                         return;
                     }
                     core.tick_search_peers(generation).await;
@@ -567,7 +575,7 @@ impl Core {
         encryption: Option<EncryptionInfo>,
     ) {
         let content = event.content;
-        if self.session_generation.load(Ordering::SeqCst) != generation
+        if !self.is_current(generation)
             || !self.peers_allowed()
             || !self.search_sharing.state.lock().available
             || content.version != PROTOCOL_VERSION
@@ -580,7 +588,7 @@ impl Core {
             return;
         };
         let _session = self.session.read().await;
-        if self.session_generation.load(Ordering::SeqCst) != generation {
+        if !self.is_current(generation) {
             return;
         }
         let id = device.device_id().to_owned();

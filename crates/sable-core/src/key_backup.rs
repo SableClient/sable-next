@@ -203,7 +203,7 @@ impl Core {
     }
 
     fn report_key_backup_download(&self, generation: u64, download: KeyBackupDownloadView) {
-        if self.session_generation.load(Ordering::SeqCst) != generation {
+        if !self.is_current(generation) {
             return;
         }
         *self.key_backup_download.lock() = Some(download.clone());

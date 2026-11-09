@@ -611,7 +611,7 @@ impl Core {
             event_type,
             state_key,
             content.clone(),
-            crate::probed_state::now_ms(),
+            crate::now_ms(),
         );
         if self.note_cosmetic_state(&room_id, event_type, state_key, content) {
             self.emit(CoreEvent::RoomCosmeticsChanged {
@@ -744,12 +744,9 @@ impl Core {
         event_type: String,
         state_key: String,
     ) -> Result<Option<serde_json::Value>, RpcError> {
-        let written = self.probed_state().written(
-            &room_id,
-            &event_type,
-            &state_key,
-            crate::probed_state::now_ms(),
-        );
+        let written =
+            self.probed_state()
+                .written(&room_id, &event_type, &state_key, crate::now_ms());
         if written.is_some() {
             return Ok(written);
         }

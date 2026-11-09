@@ -25,14 +25,7 @@ export interface SearchPeerCore {
   subscribeEvents(callback: (event: CoreEvent) => void): () => void;
 }
 
-interface NetworkConnection extends EventTarget {
-  type?: string;
-  metered?: boolean;
-  saveData?: boolean;
-}
-
 interface SearchPeerOptions {
-  unmeteredOnly: boolean;
   stunServers: string[];
   beforeStart?: () => Promise<unknown>;
 }
@@ -101,20 +94,14 @@ function connectSearchPeers(
   // The core runs one copy at a time, as sender or receiver.
   let session: { id: string; receive(event: RtcEvent): Promise<void>; close: () => void } | null =
     null;
-  const connection = (navigator as Navigator & { connection?: NetworkConnection }).connection;
   const rpc = core.rpc.search;
   let stopped = false;
   let discovering = false;
+  let paused = false;
   let servers: RTCIceServer[] = options.stunServers.map((urls) => ({ urls }));
 
   const current = (): boolean => !stopped && core.session?.account_id === account;
-  const allowed = (): boolean =>
-    current() &&
-    navigator.onLine &&
-    (!options.unmeteredOnly ||
-      (connection?.type !== 'cellular' &&
-        connection?.metered !== true &&
-        connection?.saveData !== true));
+  const allowed = (): boolean => current() && !paused;
 
   // The sender creates the channel. Framing and turn-taking live in the core.
   function create(sessionId: string, initiator: boolean) {
@@ -240,6 +227,13 @@ function connectSearchPeers(
   }
 
   const unsubscribe = core.subscribeEvents((event) => {
+    if (event.type === 'search_sharing') {
+      const resumed = paused && event.sharing.pause === null;
+      paused = event.sharing.pause !== null;
+      if (paused) session?.close();
+      else if (resumed) discover();
+      return;
+    }
     if (!isRtcEvent(event, 'search_sharing') || !current()) return;
     let target = session?.id === event.session_id ? session : null;
     if (!allowed() || event.signal.kind === 'close') {
@@ -276,23 +270,13 @@ function connectSearchPeers(
         discovering = false;
       });
   };
-  const networkChanged = (): void => {
-    if (!allowed()) session?.close();
-    else discover();
-  };
   const timer = setInterval(discover, START_INTERVAL_MS);
-  window.addEventListener('online', networkChanged);
-  window.addEventListener('offline', networkChanged);
-  connection?.addEventListener('change', networkChanged);
   discover();
 
   return () => {
     if (stopped) return;
     unsubscribe();
     clearInterval(timer);
-    window.removeEventListener('online', networkChanged);
-    window.removeEventListener('offline', networkChanged);
-    connection?.removeEventListener('change', networkChanged);
     session?.close();
     stopped = true;
   };

@@ -10,6 +10,7 @@ import { runtimeConfig } from '#lib/config/runtime-config.js';
 import { DEFAULT_APP_NAME } from '#lib/deployment/default-app-name.js';
 import favicon from '#lib/assets/favicon.png';
 import { alertCooling } from '#lib/features/notifications/alert-cooldown.js';
+import { isRingingCall, type PresentedAlertData } from '#lib/features/notifications/call-alert.js';
 import { notificationPermalink } from '#lib/features/notifications/notification-link.js';
 import {
   activeElsewhere,
@@ -470,10 +471,8 @@ async function closeRead(pushed: PushNotification): Promise<void> {
   if (!('getNotifications' in worker.registration)) return;
   const userId = pushed.user_id;
   for (const notification of await worker.registration.getNotifications()) {
-    const data = notification.data as
-      | { roomId?: unknown; userId?: unknown; call?: boolean; callExpiresAtMs?: number }
-      | undefined;
-    if (data?.call && (data.callExpiresAtMs ?? 0) > Date.now()) continue;
+    const data = notification.data as PresentedAlertData | undefined;
+    if (isRingingCall(data)) continue;
     if (pushed.room_id !== null && data?.roomId !== pushed.room_id) continue;
     if (userId !== null && typeof data?.userId === 'string' && data.userId !== userId) {
       continue;
@@ -494,10 +493,8 @@ async function reconcileRead(pushed: PushNotification): Promise<boolean> {
   const readRooms = new Set(read);
   let closed = false;
   for (const notification of notifications) {
-    const data = notification.data as
-      | { roomId?: unknown; userId?: unknown; call?: boolean; callExpiresAtMs?: number }
-      | undefined;
-    if (data?.call && (data.callExpiresAtMs ?? 0) > Date.now()) continue;
+    const data = notification.data as PresentedAlertData | undefined;
+    if (isRingingCall(data)) continue;
     if (data?.userId !== userId || typeof data.roomId !== 'string' || !readRooms.has(data.roomId)) {
       continue;
     }

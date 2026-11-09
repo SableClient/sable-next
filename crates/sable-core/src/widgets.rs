@@ -1549,7 +1549,7 @@ mod tests {
         let client = server.client_builder().build().await;
         let room_id = room_id!("!stickyread:example.org");
         server.sync_joined_room(&client, room_id).await;
-        let now = u64::from(matrix_sdk::ruma::MilliSecondsSinceUnixEpoch::now().get());
+        let now = crate::now_ms();
         let mut response = ruma::api::client::sync::sync_events::v5::Response::new("1".to_owned());
         let mut sticky_room =
             ruma::api::client::sync::sync_events::v5::response::StickyEventsRoom::default();

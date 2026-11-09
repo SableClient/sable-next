@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use matrix_sdk::executor::{JoinHandleExt, spawn};
@@ -16,7 +15,7 @@ pub(crate) const SYNC_STALL: Duration = Duration::from_secs(90);
 impl Core {
     pub(crate) async fn resume_sync(&self, sync_service: &SyncService) {
         let _serial = self.activity_lock.lock().await;
-        if !self.sync_paused() && self.network_available.load(Ordering::SeqCst) {
+        if self.sync_allowed() {
             sync_service.start().await;
         }
     }
@@ -44,10 +43,7 @@ impl Core {
                         continue;
                     }
                     let _serial = core.activity_lock.lock().await;
-                    if matches!(sync_service.state().get(), State::Running)
-                        && !core.sync_paused()
-                        && core.network_available.load(Ordering::SeqCst)
-                    {
+                    if matches!(sync_service.state().get(), State::Running) && core.sync_allowed() {
                         tracing::warn!("no sync response for {stall:?}, restarting sync");
                         sync_service.stop().await;
                         sync_service.start().await;
@@ -78,7 +74,7 @@ impl Core {
                         tracing::warn!(%error, "clearing the event cache after an ignore change");
                     }
                     sync_service.expire_sessions().await;
-                    if !core.sync_paused() && core.network_available.load(Ordering::SeqCst) {
+                    if core.sync_allowed() {
                         sync_service.start().await;
                     }
                 }

@@ -2,7 +2,7 @@ use sable_model::text::visible_name;
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::deserialized_responses::TimelineEvent;
@@ -137,7 +137,7 @@ impl Core {
                         );
                     }
 
-                    if !core.network_available.load(Ordering::SeqCst) {
+                    if !core.sync_allowed() {
                         continue;
                     }
                     if idle {
@@ -184,11 +184,7 @@ impl Core {
             move |event: AnyGlobalAccountDataEvent, client: matrix_sdk::Client| {
                 let core = core.clone();
                 async move {
-                    if core
-                        .session_generation
-                        .load(std::sync::atomic::Ordering::SeqCst)
-                        == generation
-                    {
+                    if core.is_current(generation) {
                         let event_type = event.event_type().to_string();
                         crate::dehydrated_device::on_account_data(&client, &event).await;
                         core.remember_account_data_type(event_type.clone()).await;

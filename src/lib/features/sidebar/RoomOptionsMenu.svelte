@@ -34,7 +34,7 @@
   import { copyRoomLink } from '#lib/rooms/permalink.js';
   import { isQuiet, setQuiet } from '#lib/rooms/quiet-rooms.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
@@ -262,7 +262,7 @@
   }
 
   function markRead(): void {
-    markRoomsRead(readable, core.rpc.timeline, readReceiptIsPrivate());
+    markRoomsRead(readable, core.rpc.timeline);
   }
 
   function markUnread(): void {

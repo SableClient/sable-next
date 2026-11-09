@@ -64,9 +64,7 @@ test(
         calls: { turnServer: vi.fn(() => Promise.reject(new Error('no turn'))) },
       },
     }));
-    const stops = cores.map((core) =>
-      watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] })
-    );
+    const stops = cores.map((core) => watchSearchPeers(core, { stunServers: [] }));
     try {
       await vi.waitFor(() => {
         expect(cores[0].rpc.search.peerStart).toHaveBeenCalledOnce();
@@ -128,7 +126,7 @@ test('a hidden lock owner releases peer handling to a waiting visible tab', asyn
       calls: { turnServer: vi.fn(() => Promise.reject(new Error('no turn'))) },
     },
   };
-  const stop = watchSearchPeers(core, { unmeteredOnly: true, stunServers: [] });
+  const stop = watchSearchPeers(core, { stunServers: [] });
   const visibility = vi.spyOn(document, 'visibilityState', 'get');
   const abort = new AbortController();
   let acquired = false;
@@ -178,8 +176,8 @@ test('only one tab handles shared-worker peer sessions for an account', async ()
   });
   const first = core();
   const second = core();
-  const stopFirst = watchSearchPeers(first, { unmeteredOnly: true, stunServers: [] });
-  const stopSecond = watchSearchPeers(second, { unmeteredOnly: true, stunServers: [] });
+  const stopFirst = watchSearchPeers(first, { stunServers: [] });
+  const stopSecond = watchSearchPeers(second, { stunServers: [] });
   try {
     await vi.waitFor(() => {
       expect(first.rpc.search.peerStart).toHaveBeenCalledOnce();

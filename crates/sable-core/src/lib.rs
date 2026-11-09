@@ -199,6 +199,7 @@ pub struct Core {
     notification_encrypted_content: AtomicBool,
     notification_sounds: AtomicBool,
     notify_once: AtomicBool,
+    private_receipts: AtomicBool,
     widget_feed: AtomicBool,
     notifications_enabled: AtomicBool,
     search_crawler_enabled: AtomicBool,
@@ -286,6 +287,12 @@ enum SubscriptionKind {
     FocusedTimeline(OwnedRoomId),
 }
 
+pub(crate) fn now_ms() -> u64 {
+    matrix_sdk::ruma::MilliSecondsSinceUnixEpoch::now()
+        .get()
+        .into()
+}
+
 impl Core {
     pub fn new(
         store_id: impl Into<String>,
@@ -317,6 +324,7 @@ impl Core {
             notification_encrypted_content: AtomicBool::new(false),
             notification_sounds: AtomicBool::new(true),
             notify_once: AtomicBool::new(true),
+            private_receipts: AtomicBool::new(true),
             widget_feed: AtomicBool::new(false),
             notifications_enabled: AtomicBool::new(true),
             search_crawler_enabled: AtomicBool::new(true),
@@ -511,8 +519,12 @@ impl Core {
             .push(client.event_handler_drop_guard(handle));
     }
 
+    pub(crate) fn is_current(&self, generation: u64) -> bool {
+        self.session_generation.load(Ordering::SeqCst) == generation
+    }
+
     pub(crate) fn emit_if_current(&self, generation: u64, event: CoreEvent) {
-        if self.session_generation.load(Ordering::SeqCst) == generation {
+        if self.is_current(generation) {
             self.emit(event);
         }
     }
@@ -530,7 +542,12 @@ impl Core {
         revision
     }
 
-    pub async fn apply_app_activity(self: &Arc<Self>, active: bool) {
+    pub async fn update_app_active(self: &Arc<Self>, active: bool) {
+        self.set_app_active(active);
+        self.apply_activity(active, None).await;
+    }
+
+    pub(crate) async fn apply_app_activity(self: &Arc<Self>, active: bool) {
         self.apply_activity(active, None).await;
     }
 
@@ -564,9 +581,7 @@ impl Core {
             // Starting a running service is a no-op, but from `Offline` it retries at once.
             self.set_sync_presence(presence::state(self.desired_presence()))
                 .await;
-            if !self.account_locked.load(Ordering::SeqCst)
-                && self.network_available.load(Ordering::SeqCst)
-            {
+            if self.sync_allowed() {
                 sync_service.start().await;
             }
             self.retry_cached_decryption().await;
@@ -583,11 +598,10 @@ impl Core {
         }
     }
 
-    pub async fn set_network_available(self: &Arc<Self>, available: bool) {
+    pub async fn update_network_conditions(self: &Arc<Self>, available: bool, unmetered: bool) {
         let was_available = self.network_available.swap(available, Ordering::SeqCst);
-        if !available {
-            self.cancel_search_peers();
-        }
+        self.search_network.set_unmetered(unmetered);
+        self.refresh_search_peers();
         if available && !was_available && !self.sync_paused() {
             self.apply_activity(self.app_active.load(Ordering::Relaxed), None)
                 .await;
@@ -684,11 +698,9 @@ impl Core {
         }
     }
 
-    pub fn set_search_network_unmetered(&self, unmetered: bool) {
-        self.search_network.set_unmetered(unmetered);
-        if !self.search_network.allows_crawl() {
-            self.cancel_search_peers();
-        }
+    pub fn update_app_in_foreground(&self, foreground: bool) {
+        self.search_foreground.store(foreground, Ordering::Relaxed);
+        self.refresh_search_peers();
     }
 
     pub(crate) fn search_crawl_active(&self) -> bool {
@@ -1018,7 +1030,7 @@ mod tests {
     #[test]
     fn app_activity_gates_the_search_crawler() {
         let (core, _rx) = Core::new("test", Box::new(store::MemorySessionStore::default()));
-        core.set_search_network_unmetered(true);
+        core.search_network.set_unmetered(true);
         assert!(core.search_crawl_active());
 
         core.set_app_active(false);
@@ -1026,7 +1038,7 @@ mod tests {
 
         core.set_app_active(true);
         assert!(core.search_crawl_active());
-        core.search_foreground.store(false, Ordering::Relaxed);
+        core.update_app_in_foreground(false);
         assert!(!core.search_crawl_active());
     }
 

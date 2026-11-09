@@ -32,7 +32,6 @@
   import InboxSectionHeader from './InboxSectionHeader.svelte';
   import { markRoomUnread, markRoomsRead } from '#lib/features/sidebar/nav-rooms.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
@@ -125,8 +124,7 @@
     const listed = new Set(unreadGroups.map((group) => group.roomId));
     markRoomsRead(
       unreadRooms.filter((room) => !listed.has(room.room_id)),
-      core.rpc.timeline,
-      readReceiptIsPrivate()
+      core.rpc.timeline
     );
     await Promise.all(
       unreadGroups.map(async (group) => {
@@ -198,7 +196,6 @@
       await core.rpc.timeline.markRead({
         room_id: roomId,
         event_id: null,
-        private_receipt: readReceiptIsPrivate(),
         thread_root: null,
         subscription: null,
         fully_read: true,
@@ -225,7 +222,6 @@
       await core.rpc.timeline.markRead({
         room_id: item.room_id,
         event_id: item.event_id,
-        private_receipt: readReceiptIsPrivate(),
         thread_root: null,
         subscription: null,
         fully_read: true,

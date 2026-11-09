@@ -907,7 +907,6 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     };
 
     const rpcHandlers: RpcHandlers = {
-      'auth.discover_homeserver': () => 'https://example.test',
       'auth.login': () => {
         signedOut = false;
         saveOnboarding();
@@ -1237,7 +1236,6 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'push.web_pushers': () => [],
       'push.ping_gateway': () => null,
       'push.send_diagnostic': () => ({ kind: 'no_pusher' }),
-      'push.discover_gateway': () => null,
       'session.restore': () => {
         if (workerMode === 'loading') return NO_REPLY;
         if (workerMode === 'error') throw new FakeCoreError('failed');

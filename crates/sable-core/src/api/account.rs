@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use matrix_sdk::ruma::api::client::membership::get_mutual_rooms;
 use matrix_sdk::ruma::api::client::profile::{PropagateTo, set_profile_field};
@@ -14,6 +15,7 @@ use crate::protocol::{BookmarkView, NotificationModeView, RpcError, FieldEdit, I
 use crate::{Core, ResultExt, presence};
 
 domain! {
+    set_read_receipts,
     user_profile,
     user_relations,
     well_known,
@@ -646,6 +648,21 @@ impl Handler for SetPresenceParams {
             core.fetch_presence(vec![user_id.to_owned()]).await;
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetReadReceiptsParams {
+    pub public: bool,
+}
+
+impl Handler for SetReadReceiptsParams {
+    type Ok = ();
+
+    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
+        core.private_receipts.store(!self.public, Ordering::Relaxed);
+        std::future::ready(Ok(()))
     }
 }
 

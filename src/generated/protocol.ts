@@ -2232,6 +2232,9 @@ export type ZonedInstant = {
 /** The core's methods by domain. */
 export type Rpc = {
   account: {
+    setReadReceipts: (params: {
+	public: boolean,
+}) => Promise<null>;
     userProfile: (params: {
 	user_id: string,
 }) => Promise<ProfileView>;
@@ -2352,9 +2355,6 @@ export type Rpc = {
 }) => Promise<ProfileOverridesView>;
   };
   auth: {
-    discoverHomeserver: (params: {
-	server_name: string,
-}) => Promise<string>;
     login: (params: {
 	reauth_account_id?: string | null,
 	homeserver: string,
@@ -2978,18 +2978,12 @@ export type Rpc = {
 	recorded: number,
 	has_more: boolean,
 }>;
-    setContent: (params: {
-	visible: boolean,
-	encrypted: boolean,
-}) => Promise<null>;
-    setSounds: (params: {
+    setOptions: (params: {
 	enabled: boolean,
-}) => Promise<null>;
-    setNotifyOnce: (params: {
-	enabled: boolean,
-}) => Promise<null>;
-    setEnabled: (params: {
-	enabled: boolean,
+	content: boolean,
+	encrypted_content: boolean,
+	sounds: boolean,
+	notify_once: boolean,
 }) => Promise<null>;
     pushRules: (params?: Record<string, never>) => Promise<unknown>;
     setPushRuleEnabled: (params: {
@@ -3098,9 +3092,6 @@ export type Rpc = {
     pingGateway: (params: {
 	url: string,
 }) => Promise<boolean | null>;
-    discoverGateway: (params: {
-	endpoint: string,
-}) => Promise<string | null>;
     sendDiagnostic: (params: {
 	pushkey: string,
 	app_id: string,
@@ -3412,6 +3403,12 @@ export type Rpc = {
 	unmetered_only: boolean,
 	server_search: boolean,
 	tuning: SearchTuning,
+}) => Promise<null>;
+    setNetworkConditions: (params: {
+	available: boolean,
+	unmetered: boolean,
+}) => Promise<null>;
+    setAppInForeground: (params: {
 	foreground: boolean,
 }) => Promise<null>;
     setReadRoom: (params: {
@@ -3555,7 +3552,6 @@ export type Rpc = {
     markRead: (params: {
 	room_id: string,
 	event_id?: string | null,
-	private_receipt?: boolean,
 	thread_root?: string | null,
 	subscription?: SubscriptionId | null,
 	fully_read?: boolean,
@@ -3575,12 +3571,6 @@ export type Rpc = {
 	thread_roots?: string[],
 	room_id: string,
 }) => Promise<UnreadDiagnosticsView>;
-    retryDecryption: (params: {
-	room_id: string,
-	session_id: string,
-	sender: string,
-	thread_root?: string | null,
-}) => Promise<null>;
     roomEventRelations: (params: {
 	room_id: string,
 	event_id: string,
@@ -3647,6 +3637,7 @@ export type RpcResult<M extends RpcMethod> = Awaited<ReturnType<M>>;
 
 /** Each method by its wire name, for code that speaks the wire format. */
 export type RpcMethods = {
+  'account.set_read_receipts': Rpc['account']['setReadReceipts'];
   'account.user_profile': Rpc['account']['userProfile'];
   'account.user_relations': Rpc['account']['userRelations'];
   'account.well_known': Rpc['account']['wellKnown'];
@@ -3684,7 +3675,6 @@ export type RpcMethods = {
   'account.set_space_notification_exempt': Rpc['account']['setSpaceNotificationExempt'];
   'account.profile_overrides': Rpc['account']['profileOverrides'];
   'account.set_profile_override': Rpc['account']['setProfileOverride'];
-  'auth.discover_homeserver': Rpc['auth']['discoverHomeserver'];
   'auth.login': Rpc['auth']['login'];
   'auth.login_flows': Rpc['auth']['loginFlows'];
   'auth.registration_flows': Rpc['auth']['registrationFlows'];
@@ -3813,10 +3803,7 @@ export type RpcMethods = {
   'notifications.set_master_mute': Rpc['notifications']['setMasterMute'];
   'notifications.inbox': Rpc['notifications']['inbox'];
   'notifications.backfill_inbox': Rpc['notifications']['backfillInbox'];
-  'notifications.set_content': Rpc['notifications']['setContent'];
-  'notifications.set_sounds': Rpc['notifications']['setSounds'];
-  'notifications.set_notify_once': Rpc['notifications']['setNotifyOnce'];
-  'notifications.set_enabled': Rpc['notifications']['setEnabled'];
+  'notifications.set_options': Rpc['notifications']['setOptions'];
   'notifications.push_rules': Rpc['notifications']['pushRules'];
   'notifications.set_push_rule_enabled': Rpc['notifications']['setPushRuleEnabled'];
   'notifications.set_push_rule_actions': Rpc['notifications']['setPushRuleActions'];
@@ -3848,7 +3835,6 @@ export type RpcMethods = {
   'push.set_web_pusher': Rpc['push']['setWebPusher'];
   'push.web_pushers': Rpc['push']['webPushers'];
   'push.ping_gateway': Rpc['push']['pingGateway'];
-  'push.discover_gateway': Rpc['push']['discoverGateway'];
   'push.send_diagnostic': Rpc['push']['sendDiagnostic'];
   'push.ack_web_pusher': Rpc['push']['ackWebPusher'];
   'room_state.set_name': Rpc['room_state']['setName'];
@@ -3926,6 +3912,8 @@ export type RpcMethods = {
   'session.server_features': Rpc['session']['serverFeatures'];
   'session.delayed_events_supported': Rpc['session']['delayedEventsSupported'];
   'session.set_search_options': Rpc['session']['setSearchOptions'];
+  'session.set_network_conditions': Rpc['session']['setNetworkConditions'];
+  'session.set_app_in_foreground': Rpc['session']['setAppInForeground'];
   'session.set_read_room': Rpc['session']['setReadRoom'];
   'session.integration_manager_url': Rpc['session']['integrationManagerUrl'];
   'session.integration_manager_terms': Rpc['session']['integrationManagerTerms'];
@@ -3959,7 +3947,6 @@ export type RpcMethods = {
   'timeline.mark_unread': Rpc['timeline']['markUnread'];
   'timeline.read_marker': Rpc['timeline']['readMarker'];
   'timeline.unread_diagnostics': Rpc['timeline']['unreadDiagnostics'];
-  'timeline.retry_decryption': Rpc['timeline']['retryDecryption'];
   'timeline.room_event_relations': Rpc['timeline']['roomEventRelations'];
   'timeline.pinned_events': Rpc['timeline']['pinnedEvents'];
   'timeline.set_pinned': Rpc['timeline']['setPinned'];
@@ -3979,6 +3966,7 @@ export type RpcCall = (method: keyof RpcMethods, params: unknown) => Promise<unk
 export function createRpc(call: RpcCall): Rpc {
   return {
     account: {
+      setReadReceipts: (params) => call('account.set_read_receipts', params) as ReturnType<Rpc['account']['setReadReceipts']>,
       userProfile: (params) => call('account.user_profile', params) as ReturnType<Rpc['account']['userProfile']>,
       userRelations: (params) => call('account.user_relations', params) as ReturnType<Rpc['account']['userRelations']>,
       wellKnown: (params = {}) => call('account.well_known', params) as ReturnType<Rpc['account']['wellKnown']>,
@@ -4018,7 +4006,6 @@ export function createRpc(call: RpcCall): Rpc {
       setProfileOverride: (params) => call('account.set_profile_override', params) as ReturnType<Rpc['account']['setProfileOverride']>,
     },
     auth: {
-      discoverHomeserver: (params) => call('auth.discover_homeserver', params) as ReturnType<Rpc['auth']['discoverHomeserver']>,
       login: (params) => call('auth.login', params) as ReturnType<Rpc['auth']['login']>,
       loginFlows: (params) => call('auth.login_flows', params) as ReturnType<Rpc['auth']['loginFlows']>,
       registrationFlows: (params) => call('auth.registration_flows', params) as ReturnType<Rpc['auth']['registrationFlows']>,
@@ -4159,10 +4146,7 @@ export function createRpc(call: RpcCall): Rpc {
       setMasterMute: (params) => call('notifications.set_master_mute', params) as ReturnType<Rpc['notifications']['setMasterMute']>,
       inbox: (params) => call('notifications.inbox', params) as ReturnType<Rpc['notifications']['inbox']>,
       backfillInbox: (params) => call('notifications.backfill_inbox', params) as ReturnType<Rpc['notifications']['backfillInbox']>,
-      setContent: (params) => call('notifications.set_content', params) as ReturnType<Rpc['notifications']['setContent']>,
-      setSounds: (params) => call('notifications.set_sounds', params) as ReturnType<Rpc['notifications']['setSounds']>,
-      setNotifyOnce: (params) => call('notifications.set_notify_once', params) as ReturnType<Rpc['notifications']['setNotifyOnce']>,
-      setEnabled: (params) => call('notifications.set_enabled', params) as ReturnType<Rpc['notifications']['setEnabled']>,
+      setOptions: (params) => call('notifications.set_options', params) as ReturnType<Rpc['notifications']['setOptions']>,
       pushRules: (params = {}) => call('notifications.push_rules', params) as ReturnType<Rpc['notifications']['pushRules']>,
       setPushRuleEnabled: (params) => call('notifications.set_push_rule_enabled', params) as ReturnType<Rpc['notifications']['setPushRuleEnabled']>,
       setPushRuleActions: (params) => call('notifications.set_push_rule_actions', params) as ReturnType<Rpc['notifications']['setPushRuleActions']>,
@@ -4200,7 +4184,6 @@ export function createRpc(call: RpcCall): Rpc {
       setWebPusher: (params) => call('push.set_web_pusher', params) as ReturnType<Rpc['push']['setWebPusher']>,
       webPushers: (params = {}) => call('push.web_pushers', params) as ReturnType<Rpc['push']['webPushers']>,
       pingGateway: (params) => call('push.ping_gateway', params) as ReturnType<Rpc['push']['pingGateway']>,
-      discoverGateway: (params) => call('push.discover_gateway', params) as ReturnType<Rpc['push']['discoverGateway']>,
       sendDiagnostic: (params) => call('push.send_diagnostic', params) as ReturnType<Rpc['push']['sendDiagnostic']>,
       ackWebPusher: (params) => call('push.ack_web_pusher', params) as ReturnType<Rpc['push']['ackWebPusher']>,
     },
@@ -4288,6 +4271,8 @@ export function createRpc(call: RpcCall): Rpc {
       serverFeatures: (params = {}) => call('session.server_features', params) as ReturnType<Rpc['session']['serverFeatures']>,
       delayedEventsSupported: (params = {}) => call('session.delayed_events_supported', params) as ReturnType<Rpc['session']['delayedEventsSupported']>,
       setSearchOptions: (params) => call('session.set_search_options', params) as ReturnType<Rpc['session']['setSearchOptions']>,
+      setNetworkConditions: (params) => call('session.set_network_conditions', params) as ReturnType<Rpc['session']['setNetworkConditions']>,
+      setAppInForeground: (params) => call('session.set_app_in_foreground', params) as ReturnType<Rpc['session']['setAppInForeground']>,
       setReadRoom: (params) => call('session.set_read_room', params) as ReturnType<Rpc['session']['setReadRoom']>,
       integrationManagerUrl: (params) => call('session.integration_manager_url', params) as ReturnType<Rpc['session']['integrationManagerUrl']>,
       integrationManagerTerms: (params = {}) => call('session.integration_manager_terms', params) as ReturnType<Rpc['session']['integrationManagerTerms']>,
@@ -4325,7 +4310,6 @@ export function createRpc(call: RpcCall): Rpc {
       markUnread: (params) => call('timeline.mark_unread', params) as ReturnType<Rpc['timeline']['markUnread']>,
       readMarker: (params) => call('timeline.read_marker', params) as ReturnType<Rpc['timeline']['readMarker']>,
       unreadDiagnostics: (params) => call('timeline.unread_diagnostics', params) as ReturnType<Rpc['timeline']['unreadDiagnostics']>,
-      retryDecryption: (params) => call('timeline.retry_decryption', params) as ReturnType<Rpc['timeline']['retryDecryption']>,
       roomEventRelations: (params) => call('timeline.room_event_relations', params) as ReturnType<Rpc['timeline']['roomEventRelations']>,
       pinnedEvents: (params) => call('timeline.pinned_events', params) as ReturnType<Rpc['timeline']['pinnedEvents']>,
       setPinned: (params) => call('timeline.set_pinned', params) as ReturnType<Rpc['timeline']['setPinned']>,

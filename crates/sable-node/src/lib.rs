@@ -216,8 +216,7 @@ impl SableCore {
     ) -> napi::Result<PromiseRaw<'env, ()>> {
         let core = self.core.clone();
         env.spawn_future(async move {
-            core.set_app_active(active);
-            core.apply_app_activity(active).await;
+            core.update_app_active(active).await;
             Ok(())
         })
     }

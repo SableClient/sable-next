@@ -45,7 +45,7 @@
   import { providePanelStage } from '#lib/ui/motion.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
-  import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import VoiceLobby from '#lib/features/call/VoiceLobby.svelte';
   import { useCallSession, type CallMedia } from '#lib/features/call/call-session.svelte.js';
   import {
@@ -649,7 +649,6 @@
     await core.rpc.timeline.markRead({
       room_id: resolvedRoomId,
       event_id: eventId,
-      private_receipt: readReceiptIsPrivate(),
       thread_root: null,
       subscription: timeline.subscriptionId,
       fully_read: fullyRead,
@@ -685,7 +684,6 @@
     await core.rpc.timeline.markRead({
       room_id: resolvedRoomId,
       event_id: null,
-      private_receipt: readReceiptIsPrivate(),
       thread_root: null,
       subscription: null,
       fully_read: true,

@@ -113,7 +113,7 @@ impl State {
             intent,
             slot_closed,
             slot_closed_midcall: false,
-            slot_checked_ms: keys::now_ms(),
+            slot_checked_ms: crate::now_ms(),
             publisher_attempt_ms: 0,
         }
     }
@@ -542,7 +542,7 @@ pub(super) async fn join(
     }
     let mode = own.mode;
     let state_key = state_key(&room, &own);
-    if core.session_generation.load(Ordering::SeqCst) != generation {
+    if !core.is_current(generation) {
         abort_join(core, &room, &own, delay, postpone).await;
         return Err(RpcError::NotLoggedIn);
     }
@@ -561,7 +561,7 @@ pub(super) async fn join(
         return Err(core.failed("join_call", "call membership was not confirmed"));
     };
     let mut calls = core.call_sessions.lock().await;
-    if core.session_generation.load(Ordering::SeqCst) != generation {
+    if !core.is_current(generation) {
         drop(calls);
         abort_join(core, &room, &own, delay, postpone).await;
         return Err(RpcError::NotLoggedIn);
@@ -599,7 +599,7 @@ pub(super) async fn join(
     drop(calls);
     core.apply_app_activity(core.app_active.load(Ordering::Relaxed))
         .await;
-    if core.session_generation.load(Ordering::SeqCst) != generation {
+    if !core.is_current(generation) {
         return Err(RpcError::NotLoggedIn);
     }
     Ok(join_ok(
@@ -683,7 +683,7 @@ async fn current_members(
     let mut members = membership::active_members(room).await;
     let own = {
         let mut state = shared.lock().await;
-        let mut sticky = state.sticky.members(keys::now_ms());
+        let mut sticky = state.sticky.members(crate::now_ms());
         sticky.retain(|member| member.wire == state.own.wire);
         if state.own.mode == CallMode::Matrix2 && state.own.wire == membership::RtcWire::Stable {
             members.clear();
@@ -696,7 +696,7 @@ async fn current_members(
         if !present && state.own_observed {
             return Err(Refreshed::Absent);
         }
-        if !present && keys::now_ms().saturating_sub(state.own.created_ts) > 30_000 {
+        if !present && crate::now_ms().saturating_sub(state.own.created_ts) > 30_000 {
             return Err(Refreshed::Ended);
         }
         state.own_observed |= present;
@@ -821,7 +821,7 @@ async fn refresh(
 }
 
 async fn recheck_slot(room: &Room, shared: &Mutex<State>) {
-    let now = keys::now_ms();
+    let now = crate::now_ms();
     let (due, encrypted) = {
         let state = shared.lock().await;
         (
@@ -912,7 +912,7 @@ async fn follow_oldest_focus(
     {
         return own;
     }
-    let now = keys::now_ms();
+    let now = crate::now_ms();
     let intent = {
         let mut state = shared.lock().await;
         if now.saturating_sub(state.publisher_attempt_ms) < PUBLISHER_RETRY_MS {
@@ -1002,7 +1002,7 @@ async fn emit_roster(
         &room.room_id().to_owned(),
         state.own.foci.first().map_or("", String::as_str),
     );
-    report_silent_members(&mut state, keys::now_ms());
+    report_silent_members(&mut state, crate::now_ms());
     state.revision = state.revision.saturating_add(1);
     core.emit_if_current(
         generation,
@@ -1062,7 +1062,7 @@ async fn publish_update(
     };
     let rolled = distributor.lock().await.roll(room, &verified).await;
     shared.lock().await.rotation_due_ms = match &rolled {
-        Rolled::Deferred { wait_ms } => Some(keys::now_ms().saturating_add(*wait_ms)),
+        Rolled::Deferred { wait_ms } => Some(crate::now_ms().saturating_add(*wait_ms)),
         _ => None,
     };
     log_rolled(&rolled, verified.len());
@@ -1158,7 +1158,7 @@ fn emit_pending(
             if repeated {
                 continue;
             }
-            let waited = keys::now_ms().saturating_sub(pending.received);
+            let waited = crate::now_ms().saturating_sub(pending.received);
             if pending.reported {
                 tracing::warn!("a call media key resolved after {waited}ms");
             }
@@ -1176,7 +1176,7 @@ fn emit_pending(
         } else {
             let mut pending = pending;
             if !pending.reported
-                && keys::now_ms().saturating_sub(pending.received) >= UNRESOLVED_KEY_REPORT_MS
+                && crate::now_ms().saturating_sub(pending.received) >= UNRESOLVED_KEY_REPORT_MS
             {
                 pending.reported = true;
                 tracing::warn!(
@@ -1350,7 +1350,7 @@ async fn receive_call_key(
         sender,
         device,
         content,
-        received: keys::now_ms(),
+        received: crate::now_ms(),
         reported: false,
     });
     emit_pending(&core, generation, session, &room_id, &mut state);
@@ -1439,7 +1439,7 @@ fn watch_redactions(
                         .lock()
                         .await
                         .sticky
-                        .redact(event_id.as_str(), keys::now_ms());
+                        .redact(event_id.as_str(), crate::now_ms());
                     wake.notify_one();
                 }
             }
@@ -1585,7 +1585,7 @@ impl UpdateContext {
                     .unwrap_or(true);
                 let mut state = self.state.lock().await;
                 for event in events {
-                    event.apply(&mut state.sticky, encrypted, keys::now_ms());
+                    event.apply(&mut state.sticky, encrypted, crate::now_ms());
                 }
             }
             Some(Err(_)) => {
@@ -1611,7 +1611,7 @@ impl UpdateContext {
             .unwrap_or(true);
         let mut state = self.state.lock().await;
         for event in sticky::live_events(&self.room) {
-            event.apply(&mut state.sticky, encrypted, keys::now_ms());
+            event.apply(&mut state.sticky, encrypted, crate::now_ms());
         }
     }
 
@@ -1665,7 +1665,7 @@ impl UpdateContext {
         } else {
             RENEW_INTERVAL_MS
         };
-        if absent || keys::now_ms().saturating_sub(*renewed) >= renew_interval {
+        if absent || crate::now_ms().saturating_sub(*renewed) >= renew_interval {
             match protect_membership_renewal(&self.core, &self.delay).await {
                 super::Postponed::Gone => {
                     self.terminate_membership();
@@ -1676,7 +1676,7 @@ impl UpdateContext {
             }
             match publish_membership(&self.room, &own, intent).await {
                 Ok(_) => {
-                    *renewed = keys::now_ms();
+                    *renewed = crate::now_ms();
                     refresh_delay |= self.encrypted && own.mode == CallMode::Matrix2;
                 }
                 Err(error) => {
@@ -1695,7 +1695,7 @@ impl UpdateContext {
     }
 
     async fn run(self, mut sync: Option<sticky::StickySync>) {
-        let mut renewed = keys::now_ms();
+        let mut renewed = crate::now_ms();
         let mut delay_roster = HashSet::new();
         let mut watch = StickyWatch {
             receiver: self.room.sticky_events().subscribe(),
@@ -1706,7 +1706,7 @@ impl UpdateContext {
                 let due = self.state.lock().await.rotation_due_ms;
                 due.map_or(UPDATE_INTERVAL, |due| {
                     UPDATE_INTERVAL.min(Duration::from_millis(
-                        due.saturating_sub(keys::now_ms()).max(100),
+                        due.saturating_sub(crate::now_ms()).max(100),
                     ))
                 })
             };

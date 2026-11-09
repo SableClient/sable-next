@@ -293,7 +293,7 @@ impl Core {
     }
 
     pub(crate) async fn retry_rule_cleanup(&self, generation: u64, completed: &AtomicBool) {
-        while self.session_generation.load(Ordering::SeqCst) == generation && !self.sync_paused() {
+        while self.is_current(generation) && !self.sync_paused() {
             if self.cleanup_notification_rules().await {
                 completed.store(true, Ordering::SeqCst);
                 return;

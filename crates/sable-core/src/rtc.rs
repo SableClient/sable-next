@@ -10,7 +10,7 @@ use sable_frostbite::{
 };
 
 use crate::Core;
-use crate::probed_state::now_ms;
+use crate::now_ms;
 use crate::protocol::{CoreEvent, RpcError, RtcSignal};
 use crate::sealed_account_data::verified_own_sender;
 
@@ -310,7 +310,7 @@ impl Core {
             signal,
         }: Incoming,
     ) {
-        if self.session_generation.load(Ordering::SeqCst) != generation
+        if !self.is_current(generation)
             || timestamp.is_some_and(|ts| now_ms().abs_diff(ts) > SESSION_MS)
             || !self.rtc.0.lock().contains_key(&session)
         {

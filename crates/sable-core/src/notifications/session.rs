@@ -181,11 +181,7 @@ impl PushSession {
         ) else {
             return false;
         };
-        sable_model::notifications::active_elsewhere(
-            &content,
-            device_id.as_str(),
-            crate::probed_state::now_ms(),
-        )
+        sable_model::notifications::active_elsewhere(&content, device_id.as_str(), crate::now_ms())
     }
 
     pub async fn read_rooms(&self, room_ids: &[String]) -> Option<Vec<String>> {

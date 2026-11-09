@@ -241,8 +241,7 @@ impl SableCore {
 
     #[wasm_bindgen(js_name = setActive)]
     pub async fn set_active(&self, active: bool) {
-        self.core.set_app_active(active);
-        self.core.apply_app_activity(active).await;
+        self.core.update_app_active(active).await;
     }
 
     /// Resolves with the raw thumbnail bytes.

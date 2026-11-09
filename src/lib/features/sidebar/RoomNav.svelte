@@ -43,11 +43,7 @@
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import { rovingFocus } from '#lib/ui/roving-focus.js';
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
-  import {
-    preferences,
-    readReceiptIsPrivate,
-    setPreference,
-  } from '#lib/settings/preferences.svelte.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { roomIconOverride, showsRoomAvatar } from '#lib/rooms/room-appearance.svelte.js';
   import RoomSettingsDialog from '#lib/features/room/settings/RoomSettingsDialog.svelte';
   import { goToPage } from '#lib/features/room/room-navigation.js';
@@ -352,8 +348,7 @@
   function markSectionRead(): void {
     markRoomsRead(
       sectionRooms.map((item) => item.room),
-      core.rpc.timeline,
-      readReceiptIsPrivate()
+      core.rpc.timeline
     );
   }
 

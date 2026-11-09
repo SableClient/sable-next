@@ -3,6 +3,7 @@ import {
   dismissNativeRoomNotifications,
 } from '#lib/platform/native-notifications.js';
 
+import { isRingingCall, type PresentedAlertData } from './call-alert';
 import { roomTag } from './tag';
 
 export async function retireRoomAlerts(userId: string, roomIds: readonly string[]): Promise<void> {
@@ -34,10 +35,8 @@ async function closePresented(userId: string, roomIds: ReadonlySet<string>): Pro
 
   const tags = new Set([...roomIds].map((roomId) => roomTag(userId, roomId)));
   for (const notification of await registration.getNotifications()) {
-    const data = notification.data as
-      | { roomId?: unknown; userId?: unknown; call?: boolean; callExpiresAtMs?: number }
-      | undefined;
-    if (data?.call && (data.callExpiresAtMs ?? 0) > Date.now()) continue;
+    const data = notification.data as PresentedAlertData | undefined;
+    if (isRingingCall(data)) continue;
     const postedForRoom =
       typeof data?.roomId === 'string' &&
       roomIds.has(data.roomId) &&

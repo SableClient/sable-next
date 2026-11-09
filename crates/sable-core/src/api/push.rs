@@ -13,7 +13,6 @@ domain! {
     set_web_pusher,
     web_pushers,
     ping_gateway,
-    discover_gateway,
     send_diagnostic,
     ack_web_pusher,
 }
@@ -137,20 +136,6 @@ impl Handler for PingGatewayParams {
 
     async fn run(self, _core: &Arc<Core>) -> Result<Option<bool>, RpcError> {
         Ok(push_check::ping_gateway(&self.url).await)
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
-pub struct DiscoverGatewayParams {
-    pub endpoint: String,
-}
-
-impl Handler for DiscoverGatewayParams {
-    type Ok = Option<String>;
-
-    async fn run(self, _core: &Arc<Core>) -> Result<Option<String>, RpcError> {
-        Ok(push_check::discover_gateway(&self.endpoint).await)
     }
 }
 

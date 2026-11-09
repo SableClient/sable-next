@@ -28,7 +28,6 @@
     type LayoutRef,
     type SidebarFolder,
   } from '#lib/spaces/sidebar-layout.js';
-  import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { useSpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import FolderRenameDialog from './FolderRenameDialog.svelte';
@@ -139,11 +138,7 @@
   function markSectionRead(key: 'home' | 'unspaced' | 'direct'): void {
     const section = roomList.section(key);
     if (!section) return;
-    markRoomsRead(
-      sectionRooms([...section.favourites, ...section.rooms]),
-      core.rpc.timeline,
-      readReceiptIsPrivate()
-    );
+    markRoomsRead(sectionRooms([...section.favourites, ...section.rooms]), core.rpc.timeline);
   }
 
   function markFolderRead(folder: SidebarFolder): void {
@@ -151,8 +146,7 @@
       sectionRooms(
         folder.content.flatMap((spaceId) => roomList.section(spaceId)?.descendants ?? [])
       ),
-      core.rpc.timeline,
-      readReceiptIsPrivate()
+      core.rpc.timeline
     );
   }
 

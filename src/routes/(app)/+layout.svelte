@@ -65,6 +65,8 @@
   import { hostsServiceWorker } from '#lib/platform/service-worker.js';
   import { followExternalLink } from '#lib/platform/external-links.js';
   import { windowActivity } from '#lib/platform/window-activity.js';
+  import { watchNetworkConditions } from '#lib/platform/network-conditions.js';
+  import { isNativeMobile } from '#lib/platform/os.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
   import { keepStorage } from '#lib/platform/persistent-storage.js';
   import { electronBridge, type ScreenShareCandidate } from '#lib/platform/electron.js';
@@ -510,30 +512,15 @@
     if (core.status !== 'ready') return;
 
     void core.rpc.notifications
-      .setContent({
-        visible: preferences.notificationContent,
-        encrypted: preferences.notificationEncryptedContent,
+      .setOptions({
+        enabled: preferences.systemNotifications,
+        content: preferences.notificationContent,
+        encrypted_content: preferences.notificationEncryptedContent,
+        sounds: preferences.notificationSounds,
+        notify_once: preferences.notifyOnce,
       })
       .catch((error: unknown) => {
-        console.warn('[sable notifications] content setting not applied', error);
-      });
-
-    void core.rpc.notifications
-      .setSounds({ enabled: preferences.notificationSounds })
-      .catch((error: unknown) => {
-        console.warn('[sable notifications] sounds setting not applied', error);
-      });
-
-    void core.rpc.notifications
-      .setNotifyOnce({ enabled: preferences.notifyOnce })
-      .catch((error: unknown) => {
-        console.warn('[sable notifications] notify-once setting not applied', error);
-      });
-
-    void core.rpc.notifications
-      .setEnabled({ enabled: preferences.systemNotifications })
-      .catch((error: unknown) => {
-        console.warn('[sable notifications] enabled setting not applied', error);
+        console.warn('[sable notifications] notification settings not applied', error);
       });
 
     void setNativeNotificationPolicy({
@@ -561,10 +548,9 @@
   $effect(() => {
     void core.accountRevision;
     const sharing = preferences.searchSharing && typeof RTCPeerConnection !== 'undefined';
-    const unmeteredOnly = preferences.searchUnmeteredOnly;
     const peerKey =
       core.status === 'ready' && sharing
-        ? `${core.session?.account_id}:${core.accountRevision}:${unmeteredOnly}`
+        ? `${core.session?.account_id}:${core.accountRevision}`
         : null;
     if (peerKey !== searchPeerKey) {
       stopSearchPeers?.();
@@ -578,7 +564,7 @@
       disk_budget_mb: Number(preferences.searchIndexLimit),
       crawler: preferences.searchCrawler,
       sharing,
-      unmetered_only: unmeteredOnly,
+      unmetered_only: preferences.searchUnmeteredOnly,
       server_search: preferences.serverSearch,
       tuning: {
         crawl_pause_ms: Number(preferences.searchCrawlPause) * 1000,
@@ -588,13 +574,11 @@
         base_events: Number(preferences.searchBaseEvents),
         max_events: Number(preferences.searchMaxEvents),
       },
-      foreground: documentVisible,
     });
     void Promise.all([searchOptionsReady, runtimeConfig()])
       .then(([, config]) => {
         if (current && peerKey !== null && stopSearchPeers === null) {
           stopSearchPeers = watchSearchPeers(core, {
-            unmeteredOnly,
             stunServers: config.searchSharing.stunServers,
             beforeStart: async () => {
               await tick();
@@ -609,6 +593,33 @@
     return () => {
       current = false;
     };
+  });
+
+  $effect(() => {
+    if (core.status !== 'ready') return;
+    void core.rpc.account
+      .setReadReceipts({ public: preferences.sendReadReceipts })
+      .catch((error: unknown) => {
+        console.warn('[sable receipts] read receipt setting not applied', error);
+      });
+  });
+
+  $effect(() => {
+    if (core.status !== 'ready') return;
+    void core.rpc.session
+      .setAppInForeground({ foreground: documentVisible })
+      .catch((error: unknown) => {
+        console.debug('[sable activity] foreground not applied', error);
+      });
+  });
+
+  $effect(() => {
+    if (core.status !== 'ready' || isNativeMobile()) return;
+    return watchNetworkConditions((conditions) => {
+      void core.rpc.session.setNetworkConditions(conditions).catch((error: unknown) => {
+        console.debug('[sable network] network conditions not applied', error);
+      });
+    });
   });
 
   $effect(() => {
@@ -1101,11 +1112,9 @@
           });
           return;
         }
-        void performNotificationAction(core, action, readReceiptIsPrivate).catch(
-          (error: unknown) => {
-            console.debug('[sable notifications] action not performed', error);
-          }
-        );
+        void performNotificationAction(core, action).catch((error: unknown) => {
+          console.debug('[sable notifications] action not performed', error);
+        });
       }, controller.signal),
       watchNativeNotificationClicks((target) => {
         void openFromNotification(target, openNotification).catch((error: unknown) => {
@@ -1197,10 +1206,10 @@
         },
         'room.markRead': () => {
           const room = roomList.byId(openRoomId);
-          markRoomsRead([room], core.rpc.timeline, readReceiptIsPrivate());
+          markRoomsRead([room], core.rpc.timeline);
         },
         'room.markAllRead': () => {
-          markRoomsRead(roomList.rooms, core.rpc.timeline, readReceiptIsPrivate());
+          markRoomsRead(roomList.rooms, core.rpc.timeline);
         },
         'room.close': () => {
           if (openRoomId) backToRoomList();

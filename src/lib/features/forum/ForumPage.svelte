@@ -35,7 +35,7 @@
   import RoomBannerStrip from '#lib/features/room/RoomBannerStrip.svelte';
   import { copyRoomLink } from '#lib/rooms/permalink.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
-  import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -159,7 +159,6 @@
     await core.rpc.timeline.markRead({
       room_id: resolvedRoomId,
       event_id: eventId,
-      private_receipt: readReceiptIsPrivate(),
       thread_root: null,
       subscription: forumThreads.roomTimeline.subscriptionId,
       fully_read: false,

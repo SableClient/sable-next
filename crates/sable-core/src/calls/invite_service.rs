@@ -25,7 +25,7 @@ use web_time::Instant;
 use super::{
     ValidatedInvite,
     invites::{Invitations, Invite},
-    keys, notify, sticky,
+    notify, sticky,
 };
 use crate::{Core, protocol::CoreEvent};
 
@@ -253,7 +253,7 @@ impl Watcher {
             .or_insert_with(|| WatchedRoom::new(room));
         watched.observe_state(value, received);
         let allowed = watched.allowed(room, value).await;
-        watched.invitations.apply(value, keys::now_ms(), allowed);
+        watched.invitations.apply(value, crate::now_ms(), allowed);
     }
 
     #[tracing::instrument(skip_all, target = "sable_core::tasks", name = "calls.invite.step")]
@@ -279,10 +279,10 @@ impl Watcher {
             let reread = !watched.members_read
                 || !watched.sticky.is_empty()
                 || changed.contains(room.room_id());
-            watched.reconcile_sticky(&values, keys::now_ms());
+            watched.reconcile_sticky(&values, crate::now_ms());
             for value in values {
                 let allowed = watched.allowed(&room, &value).await;
-                watched.invitations.apply(&value, keys::now_ms(), allowed);
+                watched.invitations.apply(&value, crate::now_ms(), allowed);
             }
             if reread {
                 read_call_members(&room, watched).await;
@@ -332,7 +332,7 @@ fn slot_types(slot: &str) -> &[&str] {
 }
 
 async fn refresh_slots(room: &Room, watched: &mut WatchedRoom) {
-    for slot in watched.invitations.slots_to_check(keys::now_ms()) {
+    for slot in watched.invitations.slots_to_check(crate::now_ms()) {
         let now = Instant::now();
         if watched
             .slot_checked
@@ -360,7 +360,7 @@ async fn refresh_slots(room: &Room, watched: &mut WatchedRoom) {
 async fn withdraw_closed(room: &Room, watched: &mut WatchedRoom) {
     for invite in watched
         .invitations
-        .outgoing(room.own_user_id().as_str(), keys::now_ms())
+        .outgoing(room.own_user_id().as_str(), crate::now_ms())
     {
         if !watched.closed_slots.contains(&invite.slot)
             || !watched.withdrawn.insert(invite.id.clone())
@@ -455,7 +455,7 @@ async fn present_invite(core: &Core, room: &Room, invite: &Invite, generation: u
 async fn read_call_members(room: &Room, watched: &mut WatchedRoom) {
     for kind in ["org.matrix.msc3401.call.member", "m.call.member"] {
         for event in cached_state(room, kind).await {
-            watched.invitations.apply(&event, keys::now_ms(), false);
+            watched.invitations.apply(&event, crate::now_ms(), false);
         }
     }
     watched.members_read = true;
@@ -466,7 +466,7 @@ async fn reconcile_room(core: &Core, room: &Room, watched: &mut WatchedRoom, gen
     withdraw_closed(room, watched).await;
     let (starts, ends) = watched
         .invitations
-        .reconcile(room.own_user_id().as_str(), keys::now_ms());
+        .reconcile(room.own_user_id().as_str(), crate::now_ms());
     emit_ended(core, generation, ends);
     for invite in starts {
         if !present_invite(core, room, &invite, generation).await {
@@ -525,7 +525,7 @@ pub(super) async fn active_invite(
     room: &Room,
     event: &Value,
 ) -> Option<(super::invites::Invite, Vec<Value>)> {
-    let now = keys::now_ms();
+    let now = crate::now_ms();
     let event = &invite_event(room, event).await?;
     let modern = Invite::parse(event, now)?.modern;
     let mut values = if modern {
@@ -617,7 +617,7 @@ mod tests {
 
     use std::collections::HashSet;
 
-    use super::{WatchedRoom, Watcher, keys, refresh_slots};
+    use super::{WatchedRoom, Watcher, refresh_slots};
     use crate::store_reads::counting_client;
 
     async fn cached_open_room(server: &MatrixMockServer) -> matrix_sdk::Room {
@@ -636,7 +636,7 @@ mod tests {
     async fn decrypted_invites_recover_their_original_sticky_envelope() {
         let server = MatrixMockServer::new().await;
         let room = cached_open_room(&server).await;
-        let now = keys::now_ms();
+        let now = crate::now_ms();
         let clear = json!({"type":"org.matrix.msc4075.rtc.notification", "event_id":"$encrypted",
             "sender":"@caller:example.org", "origin_server_ts":now,
             "content":{"slot_id":"m.call#ROOM", "msc4354_sticky_key":"m.call#ROOM",
@@ -676,7 +676,7 @@ mod tests {
 
     fn pending(room: &matrix_sdk::Room) -> WatchedRoom {
         let mut watched = WatchedRoom::new(room);
-        let now = keys::now_ms();
+        let now = crate::now_ms();
         watched.invitations.apply(
             &json!({
                 "type":"m.rtc.invite", "event_id":"$invite", "sender":"@caller:example.org",
@@ -737,7 +737,7 @@ mod tests {
         assert!(
             watched
                 .invitations
-                .reconcile(room.own_user_id().as_str(), keys::now_ms())
+                .reconcile(room.own_user_id().as_str(), crate::now_ms())
                 .0
                 .is_empty()
         );

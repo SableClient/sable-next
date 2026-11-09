@@ -174,7 +174,7 @@ impl StickySync {
                     .filter_map(|event| serde_json::from_str(event.json().get()).ok()),
             );
         }
-        let now = super::keys::now_ms();
+        let now = crate::now_ms();
         let mut candidates = std::mem::take(&mut self.pending);
         candidates.retain(|(_, expires)| *expires > now);
         for value in events {

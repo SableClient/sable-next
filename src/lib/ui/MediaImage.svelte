@@ -34,6 +34,7 @@
   import ImageSpoilerControl from './ImageSpoilerControl.svelte';
   import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
+  import { sleep } from '#lib/sleep.js';
 
   const BLURHASH_DECODE_WIDTH = 32;
   const ORIENTATION_TOLERANCE = 0.05;
@@ -445,7 +446,7 @@
     const stopped = (): boolean => !running;
     const step = async (): Promise<void> => {
       while (!stopped()) {
-        await new Promise((resolve) => setTimeout(resolve, gifFrameMs));
+        await sleep(gifFrameMs);
         if (stopped()) return;
         await paintFrame(playback, (gifFrameIndex + 1) % playback.frameCount);
       }

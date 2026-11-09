@@ -148,7 +148,7 @@ async fn deployed_non_sticky_invites_reach_the_call_handler_and_push_validation(
         core.session_generation
             .load(std::sync::atomic::Ordering::SeqCst),
     );
-    let now = super::keys::now_ms();
+    let now = crate::now_ms();
     let event = json!({
         "type":"org.matrix.msc4075.rtc.notification", "event_id":"$fallback",
         "room_id":room_id, "sender":"@caller:example.org", "origin_server_ts":now,
@@ -246,7 +246,7 @@ async fn sticky_only_invites_are_cancelled_by_withdrawals_and_cross_device_actio
         core.session_generation
             .load(std::sync::atomic::Ordering::SeqCst),
     );
-    let now = super::keys::now_ms();
+    let now = crate::now_ms();
     for (index, action) in ["withdraw", "join", "leave", "decline", "close"]
         .into_iter()
         .enumerate()
@@ -325,7 +325,7 @@ async fn declining_a_draft_invite_sends_a_sticky_reference_without_a_local_echo(
     let room_id = room_id!("!decline:example.org");
     let room = server.sync_joined_room(&client, room_id).await;
     let (_, mut updates) = room.send_queue().subscribe().await.unwrap();
-    let now = super::keys::now_ms();
+    let now = crate::now_ms();
     let invite = json!({
         "type":"m.rtc.invite", "event_id":"$invite", "room_id":room_id,
         "sender":"@caller:example.org", "origin_server_ts":now,

@@ -923,7 +923,7 @@ pub(crate) async fn notification_profile(
         .unwrap_or_default();
     let mut selections = space_associations(client, room_id, &associations).await;
     selections.extend(account.map(RoomAssociation::Persona));
-    let now = u64::from(matrix_sdk::ruma::MilliSecondsSinceUnixEpoch::now().0);
+    let now = crate::now_ms();
     for association in selections {
         let selection = match association {
             RoomAssociation::Account | RoomAssociation::Disabled => return Ok(None),

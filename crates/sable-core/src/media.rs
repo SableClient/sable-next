@@ -1,3 +1,4 @@
+use crate::now_ms;
 use backon::Retryable;
 use std::io::Read;
 use std::time::Duration;
@@ -14,8 +15,7 @@ use matrix_sdk::ruma::api::Metadata;
 use matrix_sdk::ruma::api::client::authenticated_media;
 use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::{
-    MilliSecondsSinceUnixEpoch, OwnedMxcUri, OwnedServerName, ServerName, UInt,
-    events::room::message::TextMessageEventContent,
+    OwnedMxcUri, OwnedServerName, ServerName, UInt, events::room::message::TextMessageEventContent,
 };
 use matrix_sdk_base::media::store::IgnoreMediaRetentionPolicy;
 use mime::Mime;
@@ -108,21 +108,6 @@ impl Core {
         self.client().await?;
         let (mime, bytes) = download_persona_avatar(&url).await?;
         self.upload_media(mime, bytes).await
-    }
-
-    /// Authenticated media needs the access token, so the fetch happens here.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the media URI is invalid, the user is logged out,
-    /// or the homeserver rejects the request.
-    pub async fn media_thumbnail(
-        &self,
-        source: String,
-        width: u32,
-        height: u32,
-    ) -> Result<Vec<u8>, RpcError> {
-        self.fetch_media(source, width, height, false).await
     }
 
     /// # Errors
@@ -971,10 +956,6 @@ async fn cached_media(
         }
     }
     None
-}
-
-fn now_ms() -> u64 {
-    MilliSecondsSinceUnixEpoch::now().get().into()
 }
 
 fn media_origin(source: &MediaSource) -> Option<(OwnedServerName, String)> {

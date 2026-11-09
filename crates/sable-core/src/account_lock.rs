@@ -17,9 +17,7 @@ use crate::{Core, protocol::CoreEvent};
 
 impl Core {
     pub(crate) fn lock_account(self: &Arc<Self>, generation: u64) {
-        if self.session_generation.load(Ordering::SeqCst) != generation
-            || self.account_locked.swap(true, Ordering::SeqCst)
-        {
+        if !self.is_current(generation) || self.account_locked.swap(true, Ordering::SeqCst) {
             return;
         }
         let core = self.clone();
@@ -36,7 +34,7 @@ impl Core {
                         session.account_id.clone(),
                     )
                 };
-                if core.session_generation.load(Ordering::SeqCst) != generation {
+                if !core.is_current(generation) {
                     return;
                 }
                 client.send_queue().set_enabled(false).await;
@@ -54,7 +52,7 @@ impl Core {
                 let mut delay = Duration::from_secs(30);
                 loop {
                     matrix_sdk::sleep::sleep(delay).await;
-                    if core.session_generation.load(Ordering::SeqCst) != generation {
+                    if !core.is_current(generation) {
                         return;
                     }
                     let outcome = probe(&client).await;
@@ -66,7 +64,7 @@ impl Core {
                     }
                     if matches!(outcome, Ok(true)) {
                         let _transition = core.lock_session_transition().await;
-                        if core.session_generation.load(Ordering::SeqCst) != generation {
+                        if !core.is_current(generation) {
                             return;
                         }
                         core.account_locked.store(false, Ordering::SeqCst);

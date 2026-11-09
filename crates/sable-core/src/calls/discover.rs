@@ -8,7 +8,7 @@ use matrix_sdk::ruma::{
 
 use super::membership::{self, CallMember, StickyMemberships};
 use super::runtime::merge_sticky;
-use super::{keys, sfu, sticky};
+use super::{sfu, sticky};
 use crate::Core;
 use crate::protocol::{CallMode, CallModeReason, CallSessionId, RpcError};
 
@@ -79,7 +79,7 @@ async fn sync_sticky(
     match sync.sync(room, Duration::ZERO).await {
         Ok(events) => {
             for event in events {
-                event.apply(&mut sticky_members, encrypted, keys::now_ms());
+                event.apply(&mut sticky_members, encrypted, crate::now_ms());
             }
             sticky_sync = Some(sync);
         }
@@ -172,7 +172,7 @@ fn own_member(
     focus_server: Option<OwnedServerName>,
 ) -> CallMember {
     let (identity, member_id) = own_identity(&user, &device, mode, wire);
-    let now = keys::now_ms();
+    let now = crate::now_ms();
     CallMember {
         user_id: user,
         device_id: Some(device),
@@ -209,9 +209,9 @@ pub(super) async fn discover(
         (StickyMemberships::default(), None)
     };
     for event in sticky::live_events(room) {
-        event.apply(&mut sticky_members, encrypted, keys::now_ms());
+        event.apply(&mut sticky_members, encrypted, crate::now_ms());
     }
-    let sticky_candidates = sticky_members.members(keys::now_ms());
+    let sticky_candidates = sticky_members.members(crate::now_ms());
     let stable_supported = features.contains(&"org.matrix.msc4143.stable".into());
     let stable_services = if stable_supported {
         super::stable_transports(&client).await

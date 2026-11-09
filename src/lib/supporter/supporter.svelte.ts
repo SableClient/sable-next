@@ -14,6 +14,7 @@ import {
   supporterAppearance,
   type SupporterAppearance,
 } from './variants.js';
+import { sleep } from '#lib/sleep.js';
 
 const POLL_INTERVAL_MS = 2_000;
 const POLL_TIMEOUT_MS = 10 * 60 * 1000;
@@ -28,20 +29,6 @@ export type SupporterStatus =
   | 'none'
   | 'failed'
   | 'error';
-
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true }
-    );
-  });
-}
 
 function withTimeout<T>(work: Promise<T>): Promise<T> {
   return new Promise((resolve, reject) => {

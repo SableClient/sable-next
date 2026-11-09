@@ -30,10 +30,7 @@ domain! {
     set_master_mute,
     inbox,
     backfill_inbox,
-    set_content,
-    set_sounds,
-    set_notify_once,
-    set_enabled,
+    set_options,
     push_rules,
     set_push_rule_enabled,
     set_push_rule_actions,
@@ -496,72 +493,33 @@ impl Handler for BackfillInboxParams {
     }
 }
 
-/// Mirrors the reader's choice so a native shell can apply it too.
 #[derive(Debug, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
-pub struct SetContentParams {
-    pub visible: bool,
-    pub encrypted: bool,
-}
-
-impl Handler for SetContentParams {
-    type Ok = ();
-
-    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
-        core.notification_content
-            .store(self.visible, Ordering::Relaxed);
-        core.notification_encrypted_content
-            .store(self.encrypted, Ordering::Relaxed);
-
-        std::future::ready(Ok(()))
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
-pub struct SetSoundsParams {
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "wire type mirroring the notification preferences"
+)]
+pub struct SetOptionsParams {
     pub enabled: bool,
+    pub content: bool,
+    pub encrypted_content: bool,
+    pub sounds: bool,
+    pub notify_once: bool,
 }
 
-impl Handler for SetSoundsParams {
-    type Ok = ();
-
-    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
-        core.notification_sounds
-            .store(self.enabled, Ordering::Relaxed);
-
-        std::future::ready(Ok(()))
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
-pub struct SetNotifyOnceParams {
-    pub enabled: bool,
-}
-
-impl Handler for SetNotifyOnceParams {
-    type Ok = ();
-
-    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
-        core.notify_once.store(self.enabled, Ordering::Relaxed);
-
-        std::future::ready(Ok(()))
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
-pub struct SetEnabledParams {
-    pub enabled: bool,
-}
-
-impl Handler for SetEnabledParams {
+impl Handler for SetOptionsParams {
     type Ok = ();
 
     fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
         core.notifications_enabled
             .store(self.enabled, Ordering::Relaxed);
+        core.notification_content
+            .store(self.content, Ordering::Relaxed);
+        core.notification_encrypted_content
+            .store(self.encrypted_content, Ordering::Relaxed);
+        core.notification_sounds
+            .store(self.sounds, Ordering::Relaxed);
+        core.notify_once.store(self.notify_once, Ordering::Relaxed);
 
         std::future::ready(Ok(()))
     }

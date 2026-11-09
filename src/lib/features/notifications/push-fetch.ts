@@ -7,6 +7,7 @@ import { validateRtcInviteSnapshot, visibleName } from '#lib/model/model.js';
 
 import { pushContent, type PushNotification } from '#lib/notifications/push-payload.js';
 import type { PushSession } from '#lib/notifications/room-names.js';
+import { sleep } from '#lib/sleep.js';
 
 const REQUEST_TIMEOUT_MS = 8000;
 const READ_ROOMS_TIMEOUT_MS = 5000;
@@ -303,12 +304,6 @@ async function request(
 }
 
 const ACK_ATTEMPTS = 3;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((settle) => {
-    setTimeout(settle, ms);
-  });
-}
 
 export async function acknowledgeWebPusher(
   session: PushSession,

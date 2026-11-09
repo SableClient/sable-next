@@ -32,7 +32,7 @@ async fn discover_with_peers(
         .build()
         .await;
     let room_id = owned_room_id!("!call:example.org");
-    let now = super::keys::now_ms();
+    let now = crate::now_ms();
     let mut builder = JoinedRoomBuilder::new(&room_id);
     let mut sticky_events = Vec::new();
     for (age, service) in peers {

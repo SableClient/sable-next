@@ -16,8 +16,7 @@ export function isActiveSpace(room: RoomListItemView): boolean {
 
 export function markRoomsRead(
   rooms: Iterable<RoomListItemView | null | undefined>,
-  timeline: Pick<Rpc['timeline'], 'markRead'>,
-  privateReceipt = false
+  timeline: Pick<Rpc['timeline'], 'markRead'>
 ): void {
   for (const room of rooms) {
     if (!room) continue;
@@ -28,7 +27,6 @@ export function markRoomsRead(
       .markRead({
         room_id: room.room_id,
         event_id: null,
-        private_receipt: privateReceipt,
         thread_root: null,
         subscription: null,
         fully_read: true,

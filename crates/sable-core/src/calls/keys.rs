@@ -1,9 +1,10 @@
+use crate::now_ms;
 use base64::Engine as _;
 use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD};
 use matrix_sdk::Room;
 use matrix_sdk::ruma::events::macros::EventContent;
 use matrix_sdk::ruma::serde::Raw;
-use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, OwnedDeviceId, OwnedRoomId, OwnedUserId};
+use matrix_sdk::ruma::{OwnedDeviceId, OwnedRoomId, OwnedUserId};
 use matrix_sdk_base::crypto::CollectStrategy;
 use serde::{Deserialize, Serialize};
 
@@ -506,10 +507,6 @@ pub(crate) fn decode_key_for_wire(
 ) -> Option<Vec<u8>> {
     decode_key(encoded)
         .filter(|key| wire != super::membership::RtcWire::Stable || key.len() >= KEY_BYTES)
-}
-
-pub(crate) fn now_ms() -> u64 {
-    MilliSecondsSinceUnixEpoch::now().get().into()
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use matrix_sdk::room::{ListThreadsOptions, Receipts};
 use matrix_sdk::ruma::api::Direction;
@@ -6,7 +7,7 @@ use matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType;
 use matrix_sdk::ruma::api::client::room::get_event_by_timestamp;
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::fully_read::FullyReadEventContent;
-use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedUserId, UInt};
+use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, UInt};
 use matrix_sdk_base::read_receipts::ReadReceipts;
 use matrix_sdk_ui::timeline::{RoomExt, TimelineFocus};
 use serde::{Deserialize, Serialize};
@@ -40,7 +41,6 @@ domain! {
     mark_unread,
     read_marker,
     unread_diagnostics,
-    retry_decryption,
     room_event_relations,
     pinned_events,
     set_pinned,
@@ -446,8 +446,6 @@ pub struct MarkReadParams {
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
     pub event_id: Option<OwnedEventId>,
     #[serde(default)]
-    pub private_receipt: bool,
-    #[serde(default)]
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
     pub thread_root: Option<OwnedEventId>,
     #[serde(default)]
@@ -476,7 +474,7 @@ impl Handler for MarkReadParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        let receipt_type = if self.private_receipt {
+        let receipt_type = if core.private_receipts.load(Ordering::Relaxed) {
             ReceiptType::ReadPrivate
         } else {
             ReceiptType::Read
@@ -686,41 +684,6 @@ impl Handler for UnreadDiagnosticsParams {
                 })
                 .collect(),
         })
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
-pub struct RetryDecryptionParams {
-    #[cfg_attr(feature = "typegen", specta(type = String))]
-    pub room_id: OwnedRoomId,
-    pub session_id: String,
-    #[cfg_attr(feature = "typegen", specta(type = String))]
-    pub sender: OwnedUserId,
-    #[serde(default)]
-    #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
-    pub thread_root: Option<OwnedEventId>,
-}
-
-impl Handler for RetryDecryptionParams {
-    type Ok = ();
-
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        let sender = self.sender;
-        let timeline = core
-            .timeline_for(&self.room_id, self.thread_root.as_ref())
-            .await?;
-        if let Err(error) = core
-            .client()
-            .await?
-            .encryption()
-            .request_user_identity(&sender)
-            .await
-        {
-            tracing::warn!(%error, %sender, "refreshing sender identity before decryption retry failed");
-        }
-        timeline.retry_decryption([self.session_id]).await;
-        Ok(())
     }
 }
 

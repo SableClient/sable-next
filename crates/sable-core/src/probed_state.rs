@@ -1,3 +1,4 @@
+use crate::now_ms;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -265,14 +266,6 @@ impl crate::Core {
     fn recent_state(&self) -> parking_lot::MutexGuard<'_, RecentState> {
         self.recent_state.lock()
     }
-}
-
-pub(crate) fn now_ms() -> u64 {
-    web_time::SystemTime::now()
-        .duration_since(web_time::UNIX_EPOCH)
-        .map_or(0, |elapsed| {
-            u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX)
-        })
 }
 
 #[cfg(test)]

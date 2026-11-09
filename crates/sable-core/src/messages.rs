@@ -3053,10 +3053,11 @@ mod tests {
                 kind: crate::SubscriptionKind::FocusedTimeline(room_id.to_owned()),
             },
         );
+        core.private_receipts
+            .store(false, std::sync::atomic::Ordering::Relaxed);
         core.run(MarkReadParams {
             room_id: room_id.to_owned(),
             event_id: Some(event_id!("$reply").to_owned()),
-            private_receipt: false,
             thread_root: Some(root.to_owned()),
             subscription: Some(subscription),
             fully_read: false,
@@ -3101,10 +3102,11 @@ mod tests {
             .mount(server.server())
             .await;
         let core = core(&server, client).await;
+        core.private_receipts
+            .store(false, std::sync::atomic::Ordering::Relaxed);
         core.run(MarkReadParams {
             room_id: room_id.to_owned(),
             event_id: Some(read.try_into().unwrap()),
-            private_receipt: false,
             thread_root: viewed.map(|root| root.try_into().unwrap()),
             subscription: None,
             fully_read: false,

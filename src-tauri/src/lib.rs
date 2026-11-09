@@ -569,6 +569,7 @@ fn session_store(data_dir: &std::path::Path) -> Box<dyn sable_core::store::Sessi
 
 #[cfg(mobile)]
 fn set_mobile_activity(core: Arc<Core>, active: bool) {
+    core.update_app_in_foreground(active);
     let revision = core.set_app_active(active);
     #[cfg(target_os = "ios")]
     let background_task = (!active).then(|| ios::BackgroundTask::begin("Pause sync"));

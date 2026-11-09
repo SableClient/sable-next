@@ -1,4 +1,5 @@
 import type { MemberView } from '#src/generated/protocol';
+import { sleep } from '#lib/sleep.js';
 
 export const MEMBER_RETRY_DELAYS_MS = [2000, 5000, 15_000];
 
@@ -43,7 +44,7 @@ export class RoomMemberLoader {
           console.debug('[sable room] members unavailable', error);
           if (last) return;
         }
-        await new Promise((resolve) => setTimeout(resolve, MEMBER_RETRY_DELAYS_MS[attempt]));
+        await sleep(MEMBER_RETRY_DELAYS_MS[attempt]);
         if (generation !== this.generation) return;
       }
     } finally {

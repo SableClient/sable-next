@@ -12,6 +12,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 import { loadMediaUrl } from '#lib/ui/media-url.js';
 
 import { parsePushPayload, webPushValidation } from '#lib/notifications/push-payload.js';
+import { isRingingCall, type PresentedAlertData } from './call-alert';
 import { body, enabled, title } from './present';
 import { retireReadAlerts, retireRoomAlerts } from './retire';
 import { playNotificationSound } from './sound';
@@ -427,8 +428,8 @@ async function closeExpiredCalls(): Promise<void> {
   const registration = await navigator.serviceWorker.getRegistration();
   if (!registration || !('getNotifications' in registration)) return;
   for (const notification of await registration.getNotifications()) {
-    const data = notification.data as { call?: boolean; callExpiresAtMs?: number } | undefined;
-    if (data?.call && (data.callExpiresAtMs ?? 0) <= Date.now()) notification.close();
+    const data = notification.data as PresentedAlertData | undefined;
+    if (data?.call && !isRingingCall(data)) notification.close();
   }
 }
 
