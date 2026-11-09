@@ -647,6 +647,7 @@ jobs:
       - publish-latest
       - distribute-aur
       - distribute-homebrew
+      - distribute-gentoo
       - distribute-playstore
     if: ${{ !cancelled() && needs.android.result == 'success' && needs.setup-release.outputs.nightly != 'true' }}
     # The pinned image is amd64.
@@ -1311,6 +1312,45 @@ jobs:
           )
 
           push_tap Forgejo "${HOMEBREW_TAP_TOKEN:-}" git.sable.moe/SableClient/homebrew-sable.git
+  distribute-gentoo:
+    name: Publish the Gentoo overlay
+    needs: [setup-release, electron-linux]
+    if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Download the debs
+        run: |
+          mkdir debs
+          node scripts/ci/forgejo-release.mjs download \
+            --pattern "sable-${VERSION}-amd64.deb" --dir debs
+          node scripts/ci/forgejo-release.mjs download \
+            --pattern "sable-${VERSION}-arm64.deb" --dir debs --optional
+      - name: Push the ebuild to the overlay
+        env:
+          GENTOO_OVERLAY_TOKEN: ${{ secrets.GENTOO_OVERLAY_TOKEN }}
+        run: |
+          if [ -z "$GENTOO_OVERLAY_TOKEN" ]; then
+            echo '::notice::GENTOO_OVERLAY_TOKEN is not set; skipping the Gentoo overlay.'
+            exit 0
+          fi
+          git clone --depth 1 "https://x-access-token:${GENTOO_OVERLAY_TOKEN}@git.sable.moe/SableClient/gentoo-sable.git" overlay
+          scripts/ci/render-gentoo.sh "$VERSION" debs overlay
+          cd overlay
+          git add -A
+          git diff --cached --quiet && exit 0
+          git -c user.name='Sable release' -c user.email='release@sable.moe' commit -m "net-im/sable-bin: add ${VERSION}"
+          git push
   distribute-playstore:
     name: Publish to Google Play
     needs: [setup-release, android]
