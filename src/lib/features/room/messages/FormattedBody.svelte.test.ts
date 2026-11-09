@@ -165,7 +165,7 @@ test('keeps the emoji span out of the copied text', async () => {
   await tick();
 
   expect(screen.getByText('👍')).toHaveAttribute('data-emoji');
-  expect(container.textContent).toBe('nice 👍');
+  expect(container.querySelector('.formatted-body')?.textContent).toBe('nice 👍');
 });
 
 test('resolves a room permalink name through its via server', async () => {
