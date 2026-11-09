@@ -86,7 +86,7 @@ if (initialLanguage !== undefined) {
 
 export const i18n = {
   get t() {
-    if (preferences.showTranslationStrings)
+    if (preferences.developerTools && preferences.showTranslationStrings)
       return (key: string, options?: Record<string, unknown>) =>
         `${key}${options ? JSON.stringify(options) : ''}`;
     trackTranslations();

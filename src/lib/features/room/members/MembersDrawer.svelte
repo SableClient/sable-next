@@ -112,7 +112,7 @@
       sort,
       preferences.groupMembersByPresence,
       currentLocale(),
-      preferences.showTranslationStrings,
+      preferences.developerTools && preferences.showTranslationStrings,
     ])
   );
   let preview = $derived(

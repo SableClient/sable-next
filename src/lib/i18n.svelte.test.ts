@@ -5,6 +5,7 @@ import { flushSync } from 'svelte';
 import { expect, test } from 'vitest';
 
 import { currentLocale, i18n, setAppName, setLanguage, t } from './i18n.js';
+import { preferences } from './settings/preferences.svelte.js';
 
 test('a language change re-runs t() and currentLocale() reads', async () => {
   const seen: string[] = [];
@@ -72,5 +73,17 @@ test('setAppName re-runs t() reads that use {{appName}}', () => {
   } finally {
     stop();
     setAppName('Sable');
+  }
+});
+
+test('translation keys only show while developer tools are on', () => {
+  preferences.showTranslationStrings = true;
+  try {
+    expect(i18n.t('timeline.members')).toBe('Members');
+    preferences.developerTools = true;
+    expect(i18n.t('timeline.members')).toBe('timeline.members');
+  } finally {
+    preferences.showTranslationStrings = false;
+    preferences.developerTools = false;
   }
 });
