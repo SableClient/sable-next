@@ -22,13 +22,14 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
-  import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { hexColorOrEmpty } from '#lib/ui/hex-color.js';
   import ColorSetting from '#lib/ui/ColorSetting.svelte';
   import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
   import Select from '#lib/ui/primitives/Select.svelte';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
+  import BioEditor from './BioEditor.svelte';
+  import { bioContent, bioHtml, type BioContent } from './bio-content';
 
   interface Props {
     open?: boolean;
@@ -53,7 +54,7 @@
   let alternateAvatars = $state<{ id: string; avatar_url: string | null }[]>([]);
   let saving = $state(false);
   let error = $state<string | null>(null);
-  let biography = $state('');
+  let biography: BioContent = $state({ body: '', formatted: '' });
   let banner_url = $state('');
   let is_animal = $state('');
   let has_animal = $state('');
@@ -71,7 +72,7 @@
       triggers =
         persona?.triggers.map((trigger) => ({ ...trigger, id: crypto.randomUUID() })) ?? [];
       alternateAvatars = persona?.alternate_avatars ?? [];
-      biography = persona?.biography ?? '';
+      biography = bioContent(persona?.biography ?? '');
       banner_url = persona?.banner_url ?? '';
       is_animal = persona?.is_animal ?? '';
       has_animal = persona?.has_animal ?? '';
@@ -183,6 +184,7 @@
     saving = true;
     error = null;
     try {
+      const htmlBio = bioHtml(biography);
       await onSave(
         {
           id: persona?.id ?? crypto.randomUUID(),
@@ -204,7 +206,7 @@
           ),
           pluralkit: persona?.pluralkit ?? null,
           last_used: persona?.last_used ?? null,
-          biography: biography && biography.length < 2048 ? biography : null,
+          biography: htmlBio && htmlBio.length < 2048 ? htmlBio : null,
           banner_url: banner_url ?? null,
           is_animal: is_animal ?? null,
           has_animal: has_animal ?? null,
@@ -428,12 +430,7 @@
 
       <label class="field">
         <span>{i18n.t('settings.biography')}</span>
-        <TextArea
-          name="persona-biography"
-          bind:value={biography}
-          autocomplete="off"
-          maxlength={2048}
-        />
+        <BioEditor id="persona-biography" bind:value={biography} />
       </label>
 
       <label class="field">
