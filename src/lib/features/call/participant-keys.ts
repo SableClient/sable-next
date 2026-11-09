@@ -11,3 +11,11 @@ export function numberedName(name: string, key: string): string {
   const copy = key.match(/#(\d+)$/)?.[1];
   return copy === undefined ? name : `${name} (${String(Number(copy) + 1)})`;
 }
+
+export function byName(
+  userIds: readonly string[],
+  nameOf: (userId: string) => string | null | undefined
+): string[] {
+  const label = (userId: string) => nameOf(userId) ?? userId;
+  return [...userIds].sort((left, right) => label(left).localeCompare(label(right)));
+}

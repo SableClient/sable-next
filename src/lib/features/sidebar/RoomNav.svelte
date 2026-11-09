@@ -57,7 +57,7 @@
   import type { CallVoiceState } from '#lib/features/call/call-session.svelte.js';
   import CallVolumePopover from '#lib/features/call/CallVolumePopover.svelte';
   import MentionProfile from '#lib/features/room/members/MentionProfile.svelte';
-  import { participantKeys } from '#lib/features/call/participant-keys.js';
+  import { byName, participantKeys } from '#lib/features/call/participant-keys.js';
   import CallParticipantList from './CallParticipantList.svelte';
   import ReplacedRooms from './ReplacedRooms.svelte';
   import RoomInvites from './RoomInvites.svelte';
@@ -610,7 +610,10 @@
               {/if}
             </span>
             {#if room && live > 0}
-              {@const faces = room.call_participants.slice(0, MAX_VOICE_FACES)}
+              {@const faces = byName(
+                room.call_participants,
+                (userId) => peerProfiles.get(userId)?.display_name
+              ).slice(0, MAX_VOICE_FACES)}
               {@const faceKeys = participantKeys(faces)}
               <span
                 class="voice-live"
