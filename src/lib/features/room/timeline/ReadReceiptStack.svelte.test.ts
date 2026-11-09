@@ -10,6 +10,7 @@ import { core } from '#lib/core/__mocks__/context.js';
 import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 import { formatMessageTimestamp } from '#lib/ui/date-time.js';
 
+import { mockStillFrames, STILL } from '#lib/test-support/still-frame.js';
 import ReadReceiptStack from './ReadReceiptStack.svelte';
 
 afterEach(() => {
@@ -50,10 +51,9 @@ test.each(['article', 'div'])('receipt avatars play only on hover inside <%s>', 
   vi.spyOn(globalThis, 'fetch').mockResolvedValue({
     blob: () => Promise.resolve(new Blob([gif])),
   } as Response);
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    drawImage: vi.fn(),
-  } as unknown as CanvasRenderingContext2D);
-  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;still');
+  mockStillFrames(URL.createObjectURL.bind(URL));
+  vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(32);
+  vi.spyOn(HTMLImageElement.prototype, 'naturalHeight', 'get').mockReturnValue(32);
   const container = document.body.appendChild(document.createElement(tag));
   onTestFinished(() => {
     container.remove();
@@ -78,13 +78,10 @@ test.each(['article', 'div'])('receipt avatars play only on hover inside <%s>', 
   });
   const thumbnail = layers()[0].querySelector('img');
   if (!thumbnail) throw new Error('receipt picture not rendered');
-  Object.defineProperties(thumbnail, {
-    complete: { value: true },
-    naturalWidth: { value: 32 },
-    naturalHeight: { value: 32 },
-  });
   await fireEvent.load(thumbnail);
-  expect(thumbnail.getAttribute('src')).toBe('data:image/png;still');
+  await vi.waitFor(() => {
+    expect(thumbnail.getAttribute('src')).toBe(STILL);
+  });
   expect(layers()).toHaveLength(1);
   expect(core.fetchMedia).not.toHaveBeenCalledWith(source, 0, 0);
 
@@ -108,7 +105,7 @@ test.each(['article', 'div'])('receipt avatars play only on hover inside <%s>', 
 
   await fireEvent.pointerLeave(hoverTarget, { pointerType: 'mouse' });
   expect(layers()).toHaveLength(1);
-  expect(thumbnail.getAttribute('src')).toBe('data:image/png;still');
+  expect(thumbnail.getAttribute('src')).toBe(STILL);
 });
 
 test('opens profiles from each face', async () => {
