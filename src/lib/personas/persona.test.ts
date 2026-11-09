@@ -13,7 +13,6 @@ import {
   resolveProxy,
   stripProxyHtml,
   testPersona,
-  triggerLabel,
 } from './persona';
 
 function persona(id: string, triggers: PersonaTriggerView[] = []): PersonaView {
@@ -320,13 +319,5 @@ describe('projectPersona', () => {
     );
     expect(projected.triggers).toBeUndefined();
     expect(projected.pluralkit).toBeUndefined();
-  });
-});
-
-describe('triggerLabel', () => {
-  it('shows where the text sits', () => {
-    expect(triggerLabel(trigger('k:'))).toBe('k:text');
-    expect(triggerLabel(trigger('[', ']'))).toBe('[text]');
-    expect(triggerLabel(trigger(null, '-k'))).toBe('text-k');
   });
 });

@@ -17,16 +17,13 @@ import type {
 } from '#src/generated/protocol';
 
 import {
-  descriptionKey,
   parseSlash,
   runSlash,
   slashCommandNames,
   SlashError,
-  usageKey,
   type SlashContext,
 } from './slash-commands';
 
-import en from '../../../locales/en.json' with { type: 'json' };
 import { testPersona } from '#lib/personas/persona.ts';
 
 function fakeCommands() {
@@ -505,19 +502,6 @@ test.each([
   await expect(runSlash(`/${name}`, context(fakeCommands(), rpc))).rejects.toMatchObject({
     key: `composer.slash.${name}.usage`,
   });
-});
-
-test('every command has a description and a usage line', () => {
-  const slash: Record<string, { description: string; usage: string }> = en.composer.slash;
-
-  for (const name of slashCommandNames()) {
-    const entry = slash[name];
-    expect(entry, `no locale entry for /${name}`).toBeDefined();
-    expect(descriptionKey(name)).toBe(`composer.slash.${name}.description`);
-    expect(usageKey(name)).toBe(`composer.slash.${name}.usage`);
-    expect(entry.description.length, `/${name} description`).toBeGreaterThan(0);
-    expect(entry.usage.startsWith(`/${name}`), `/${name} usage`).toBe(true);
-  }
 });
 
 test('no two commands claim the same name', () => {

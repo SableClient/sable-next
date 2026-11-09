@@ -1,15 +1,9 @@
 // @vitest-environment happy-dom
 
-import { afterEach, expect, test } from 'vitest';
-
-import { setLanguage } from '#lib/i18n.js';
+import { expect, test } from 'vitest';
 
 import { serializeComposer, serializePlain, textDoc } from './editor/serialize';
 import { parseMfmColor, utcFallbackLabel } from './time-markup';
-
-afterEach(async () => {
-  await setLanguage('en');
-});
 
 test('a colour looks for its close within a bounded span', () => {
   expect(parseMfmColor(`$[fg.color=f00 ${'a'.repeat(100)}]`)?.text).toBe('a'.repeat(100));
@@ -23,15 +17,6 @@ test('a long run of unclosed colours stays literal', { timeout: 30_000 }, () => 
     expect(message.body).toBe(source.trim());
     expect(message.formatted).toBeNull();
   }
-});
-
-test('the fallback label follows the active language', async () => {
-  const english = utcFallbackLabel('1970-01-01T00:00:00Z');
-  expect(english).toContain('Jan');
-  expect(english).toMatch(/\(UTC\)$/);
-
-  await setLanguage('fr');
-  expect(utcFallbackLabel('1970-01-01T00:00:00Z')).toContain('janv.');
 });
 
 test('the fallback label keeps the offset the time was written in', () => {

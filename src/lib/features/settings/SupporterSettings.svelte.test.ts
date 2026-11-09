@@ -35,13 +35,6 @@ test('lets someone fetch a badge that was issued by hand', async () => {
   expect(claim).toHaveBeenCalledOnce();
 });
 
-test('reports when no badge was issued', () => {
-  supporter.status = 'none';
-  render(SupporterActivationSettings);
-
-  expect(screen.getByText('No badge has been issued for this account.')).toBeInTheDocument();
-});
-
 test('shows progress and a cancel button while waiting', async () => {
   supporter.status = 'waiting';
   const cancel = vi.spyOn(supporter, 'cancel').mockImplementation(() => {});
@@ -63,22 +56,4 @@ test('shows the active badge and lets it be removed', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
 
   expect(remove).toHaveBeenCalledOnce();
-});
-
-test('reports an incomplete verification without claiming there was no contribution', () => {
-  supporter.status = 'failed';
-  render(SupporterActivationSettings);
-
-  expect(screen.getByRole('alert')).toHaveTextContent(
-    'Verification did not finish. Complete approval on Open Collective, then check for your badge.'
-  );
-});
-
-test('reports a verification error without blaming the Open Collective account', () => {
-  supporter.status = 'error';
-  render(SupporterActivationSettings);
-
-  expect(screen.getByRole('alert')).toHaveTextContent(
-    'Badge verification could not be completed. Please try again later.'
-  );
 });

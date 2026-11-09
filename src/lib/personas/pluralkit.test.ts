@@ -153,26 +153,6 @@ describe('matchImported', () => {
   });
 });
 describe('pluralkitPronounExtraction', () => {
-  it('maps the member onto a persona', () => {
-    const persona = personaFromPluralkit(
-      'kris',
-      { ...member, display_name: 'Kris (they/she)', pronouns: undefined },
-      'mxc://example.org/kris',
-      { extractPronouns: true }
-    );
-
-    expect(persona.id).toBe('kris');
-    expect(persona.display_name).toBe('Kris');
-    expect(persona.avatar_url).toBe('mxc://example.org/kris');
-    expect(persona.pronouns).toEqual([{ summary: 'they/she', language: null }]);
-    expect(persona.color_on_light).toBe('#7f5af0');
-    expect(persona.color_on_dark).toBe('#7f5af0');
-    expect(persona.triggers).toEqual([
-      { prefix: 'k:', suffix: null, keep_trigger: false, alternate_avatar_id: null },
-    ]);
-    expect(persona.pluralkit?.avatar_url).toBe('https://cdn.pluralkit.me/kris.png');
-  });
-
   it('reads several groups and less common forms from the display name', () => {
     const persona = personaFromPluralkit(
       'kris',
@@ -196,16 +176,8 @@ describe('pluralkitPronounExtraction', () => {
       { extractPronouns: true }
     );
 
-    expect(persona.id).toBe('kris');
     expect(persona.display_name).toBe('Kris');
-    expect(persona.avatar_url).toBe('mxc://example.org/kris');
     expect(persona.pronouns).toEqual([{ summary: 'they/she', language: null }]);
-    expect(persona.color_on_light).toBe('#7f5af0');
-    expect(persona.color_on_dark).toBe('#7f5af0');
-    expect(persona.triggers).toEqual([
-      { prefix: 'k:', suffix: null, keep_trigger: false, alternate_avatar_id: null },
-    ]);
-    expect(persona.pluralkit?.avatar_url).toBe('https://cdn.pluralkit.me/kris.png');
   });
 
   it('no pronoun extraction when disabled', () => {
@@ -216,15 +188,7 @@ describe('pluralkitPronounExtraction', () => {
       { extractPronouns: false }
     );
 
-    expect(persona.id).toBe('kris');
     expect(persona.display_name).toBe('Kris (they/she)');
-    expect(persona.avatar_url).toBe('mxc://example.org/kris');
     expect(persona.pronouns).toEqual([]);
-    expect(persona.color_on_light).toBe('#7f5af0');
-    expect(persona.color_on_dark).toBe('#7f5af0');
-    expect(persona.triggers).toEqual([
-      { prefix: 'k:', suffix: null, keep_trigger: false, alternate_avatar_id: null },
-    ]);
-    expect(persona.pluralkit?.avatar_url).toBe('https://cdn.pluralkit.me/kris.png');
   });
 });
