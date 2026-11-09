@@ -10,6 +10,7 @@ const STORE_KEY: &[u8] = b"sable.reaction_history";
 const DAY_MS: u64 = 86_400_000;
 const HISTORY_DAYS: u64 = 30;
 const MAX_ENTRIES: usize = 100;
+const MAX_TOTAL: u64 = (1 << 53) - 1;
 
 #[derive(Deserialize, Serialize)]
 struct Usage {
@@ -30,6 +31,7 @@ struct Entry {
 #[derive(Default)]
 struct History {
     entries: Vec<Entry>,
+    foreign: Vec<Value>,
 }
 
 impl History {
@@ -37,6 +39,16 @@ impl History {
         let mut history = Self::default();
         let entries = content.get("recent_emoji").unwrap_or(content);
         for value in entries.as_array().into_iter().flatten() {
+            if foreign(value) {
+                if !history
+                    .foreign
+                    .iter()
+                    .any(|kept| kept["emoji"] == value["emoji"])
+                {
+                    history.foreign.push(value.clone());
+                }
+                continue;
+            }
             let key = value
                 .as_str()
                 .or_else(|| value.get("emoji")?.as_str())
@@ -46,14 +58,7 @@ impl History {
             };
             // Old totals have no dates, so seed them with one use.
             let usage = value.get("moe.sable.usage").map_or_else(
-                || {
-                    vec![Usage {
-                        day: now / DAY_MS,
-                        device: "legacy".to_owned(),
-                        count: 1,
-                        last_used: now,
-                    }]
-                },
+                || vec![legacy_usage(now)],
                 |value| {
                     value
                         .as_array()
@@ -108,7 +113,25 @@ impl History {
         for entry in other.entries {
             self.merge_entry(entry);
         }
+        self.foreign = other.foreign;
         self.prune(now);
+    }
+
+    fn seed(&mut self, key: &str, now: u64) {
+        let key_id = identity(key);
+        if rememberable_reaction(key)
+            && !self
+                .entries
+                .iter()
+                .any(|entry| identity(&entry.emoji) == key_id)
+        {
+            self.merge_entry(Entry {
+                emoji: key.to_owned(),
+                total: 0,
+                usage: vec![legacy_usage(now)],
+            });
+            self.prune(now);
+        }
     }
 
     fn prune(&mut self, now: u64) {
@@ -174,7 +197,14 @@ impl History {
     }
 
     fn content(&self) -> Value {
-        json!({ "recent_emoji": self.entries })
+        let mut entries: Vec<Value> = self
+            .entries
+            .iter()
+            .filter_map(|entry| serde_json::to_value(entry).ok())
+            .collect();
+        entries.extend(self.foreign.iter().cloned());
+        entries.truncate(MAX_ENTRIES);
+        json!({ "recent_emoji": entries })
     }
 
     fn keys(&self) -> Vec<String> {
@@ -182,6 +212,26 @@ impl History {
             .iter()
             .map(|entry| entry.emoji.clone())
             .collect()
+    }
+}
+
+fn foreign(value: &Value) -> bool {
+    value
+        .get("emoji")
+        .and_then(Value::as_str)
+        .is_some_and(|emoji| !rememberable_reaction(emoji))
+        && value
+            .get("total")
+            .and_then(Value::as_u64)
+            .is_some_and(|total| total <= MAX_TOTAL)
+}
+
+fn legacy_usage(now: u64) -> Usage {
+    Usage {
+        day: now / DAY_MS,
+        device: "legacy".to_owned(),
+        count: 1,
+        last_used: now,
     }
 }
 
@@ -207,12 +257,13 @@ impl Core {
     pub(crate) async fn frequent_reactions(
         &self,
         legacy: Option<Value>,
+        recent: &[String],
     ) -> Result<Vec<String>, RpcError> {
-        self.update_reaction_history(None, legacy).await
+        self.update_reaction_history(None, legacy, recent).await
     }
 
     pub(crate) async fn remember_reaction(&self, key: &str) -> Result<(), RpcError> {
-        self.update_reaction_history(Some(key), None)
+        self.update_reaction_history(Some(key), None, &[])
             .await
             .map(|_| ())
     }
@@ -221,6 +272,7 @@ impl Core {
         &self,
         key: Option<&str>,
         legacy: Option<Value>,
+        recent: &[String],
     ) -> Result<Vec<String>, RpcError> {
         let _guard = self.account_data_lock.lock().await;
         let client = self.client().await?;
@@ -244,7 +296,8 @@ impl Core {
                         .get_mut("recent_emoji")
                         .and_then(Value::as_array_mut)
                 {
-                    entries.retain(|entry| entry.get("moe.sable.usage").is_some());
+                    entries
+                        .retain(|entry| entry.get("moe.sable.usage").is_some() || foreign(entry));
                 }
                 history.merge(History::read(&content, now), now);
             }
@@ -253,6 +306,9 @@ impl Core {
             && let Some(legacy) = legacy
         {
             history = History::read(&legacy, now);
+        }
+        for key in recent {
+            history.seed(key, now);
         }
         if let Some(key) = key {
             let device = client.device_id().ok_or(RpcError::Unavailable)?;
@@ -374,18 +430,66 @@ mod tests {
     }
 
     #[test]
-    fn text_reactions_are_never_stored_and_old_ones_are_purged() {
-        let key = "EsTc 1234 abcd efgh";
+    fn text_reactions_are_never_stored_but_other_clients_entries_are_kept() {
+        let foreign = json!({"emoji": "EsTc 1234 abcd efgh", "total": 3, "x.other": true});
         let mut history = History::read(
             &json!({"recent_emoji": [
-                {"emoji": key, "total": 3}, {"emoji": "🔥", "total": 1}, "+1", "1"
+                foreign, {"emoji": "🔥", "total": 1}, "+1", "1",
+                {"emoji": "negative", "total": -1}, {"emoji": "huge", "total": MAX_TOTAL + 1},
+                {"emoji": "EsTc 1234 abcd efgh", "total": 9}
             ]}),
             NOW,
         );
         history.remember("hello", "phone", NOW);
         history.remember("😂😂", "phone", NOW);
         assert_eq!(history.keys(), ["🔥"]);
-        assert!(!history.content().to_string().contains(key));
+        let content = history.content();
+        assert_eq!(content["recent_emoji"].as_array().unwrap().len(), 2);
+        assert_eq!(content["recent_emoji"][1], foreign);
+        assert_eq!(History::read(&content, NOW).content(), content);
+    }
+
+    #[test]
+    fn the_server_copy_decides_which_foreign_entries_remain() {
+        let mut local = History::read(
+            &json!({"recent_emoji": [{"emoji": "gone", "total": 1}]}),
+            NOW,
+        );
+        local.merge(
+            History::read(
+                &json!({"recent_emoji": [{"emoji": "kept", "total": 1}]}),
+                NOW,
+            ),
+            NOW,
+        );
+        assert_eq!(
+            local.content()["recent_emoji"],
+            json!([{"emoji": "kept", "total": 1}])
+        );
+    }
+
+    #[test]
+    fn foreign_entries_yield_their_slots_to_ours_at_the_cap() {
+        let mut history = History::read(
+            &json!({"recent_emoji": [{"emoji": "other", "total": 1}]}),
+            NOW,
+        );
+        for index in 0..MAX_ENTRIES {
+            history.remember(&format!("mxc://example.org/{index}"), "phone", NOW);
+        }
+        assert!(!history.content().to_string().contains("other"));
+    }
+
+    #[test]
+    fn seeding_adds_missing_picks_once_without_inflating_counted_ones() {
+        let mut history = History::default();
+        history.remember("🔥", "phone", NOW);
+        history.seed("🔥", NOW);
+        history.seed("mxc://example.org/wave", NOW);
+        history.seed("mxc://example.org/wave", NOW);
+        history.seed("blobwave", NOW);
+        assert_eq!(history.keys(), ["mxc://example.org/wave", "🔥"]);
+        assert!(history.entries.iter().all(|entry| entry.total == 1));
     }
 
     #[test]
@@ -463,7 +567,8 @@ mod tests {
             .mount(server.server())
             .await;
 
-        let stored = Arc::new(Mutex::new(json!({"recent_emoji": []})));
+        let other = json!({"emoji": "x-other-client", "total": 4});
+        let stored = Arc::new(Mutex::new(json!({"recent_emoji": [other]})));
         let get = stored.clone();
         Mock::given(method("GET"))
             .and(path_regex("/account_data/m.recent_emoji$"))
@@ -500,10 +605,11 @@ mod tests {
             persona: None,
         };
         core.run(react()).await.unwrap();
-        assert_eq!(core.frequent_reactions(None).await.unwrap(), ["🔥"]);
+        assert_eq!(core.frequent_reactions(None, &[]).await.unwrap(), ["🔥"]);
         assert_eq!(stored.lock()["recent_emoji"][0]["total"], 1);
         core.run(react()).await.unwrap();
         assert_eq!(stored.lock()["recent_emoji"][0]["total"], 1);
+        assert_eq!(stored.lock()["recent_emoji"][1], other);
         assert!(
             core.run(ReactParams {
                 event_id: event_id!("$missing").to_owned(),
@@ -523,7 +629,10 @@ mod tests {
             homeserver: server.server().uri(),
             oauth: false,
         });
-        assert_eq!(restored.frequent_reactions(None).await.unwrap(), ["🔥"]);
+        assert_eq!(
+            restored.frequent_reactions(None, &[]).await.unwrap(),
+            ["🔥"]
+        );
     }
 
     #[tokio::test]
@@ -560,7 +669,7 @@ mod tests {
             .mount_as_scoped(server.server())
             .await;
         core.remember_reaction("🔥").await.unwrap();
-        assert_eq!(core.frequent_reactions(None).await.unwrap(), ["🔥"]);
+        assert_eq!(core.frequent_reactions(None, &[]).await.unwrap(), ["🔥"]);
         drop(unavailable);
 
         let now = crate::now_ms();
@@ -584,6 +693,6 @@ mod tests {
             .expect(1)
             .mount(server.server())
             .await;
-        assert_eq!(core.frequent_reactions(None).await.unwrap(), ["🔥"]);
+        assert_eq!(core.frequent_reactions(None, &[]).await.unwrap(), ["🔥"]);
     }
 }

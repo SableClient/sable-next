@@ -4,7 +4,6 @@ import { render } from 'vitest-browser-svelte';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
-import { writeRecent } from '#lib/emoji/recent-packs.svelte.js';
 import { isMacPlatform } from '#lib/ui/shortcuts/global-shortcuts.js';
 import { CoreError } from '#src/transport';
 
@@ -31,6 +30,8 @@ afterEach(async () => {
   setPreference('enterForNewline', 'adaptive');
 });
 
+let frequentReactions: string[] = [];
+
 function client(): CoreClient {
   return {
     subscribeEvents: () => () => {},
@@ -41,7 +42,8 @@ function client(): CoreClient {
     rpc: {
       messages: {
         mediaConfig: () => Promise.resolve({ upload_size: 100 * 1024 * 1024 }),
-        frequentReactions: () => Promise.resolve([]),
+        frequentReactions: () => Promise.resolve(frequentReactions),
+        rememberEmoji: () => Promise.resolve(null),
       },
       room_state: { botCommands: () => Promise.resolve([]) },
       personas: { list: () => Promise.resolve({ personas: [], selections: [] }) },
@@ -95,7 +97,7 @@ test.each(['search', 'cell'])(
   'shift+enter keeps focus on the recent emote from %s',
   async (from) => {
     await page.viewport(1280, 900);
-    writeRecent(['🔥', '👍']);
+    frequentReactions = ['🔥', '👍'];
     try {
       const { screen, composer, editor } = await mount(true);
       await userEvent.click(composer);
@@ -118,7 +120,7 @@ test.each(['search', 'cell'])(
       await userEvent.keyboard(NEWLINE);
       await expect.poll(() => editor().textContent.split('👍').length).toBe(3);
     } finally {
-      writeRecent([]);
+      frequentReactions = [];
     }
   }
 );

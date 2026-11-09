@@ -2900,7 +2900,11 @@ export type Rpc = {
 }) => Promise<ReactionShortcodeView[]>;
     frequentReactions: (params: {
 	legacy?: unknown | null,
+	recent?: string[],
 }) => Promise<string[]>;
+    rememberEmoji: (params: {
+	key: string,
+}) => Promise<null>;
     setTyping: (params: {
 	room_id: string,
 	typing: boolean,
@@ -3782,6 +3786,7 @@ export type RpcMethods = {
   'messages.url_preview': Rpc['messages']['urlPreview'];
   'messages.reaction_shortcodes': Rpc['messages']['reactionShortcodes'];
   'messages.frequent_reactions': Rpc['messages']['frequentReactions'];
+  'messages.remember_emoji': Rpc['messages']['rememberEmoji'];
   'messages.set_typing': Rpc['messages']['setTyping'];
   'messages.media_config': Rpc['messages']['mediaConfig'];
   'notifications.settings': Rpc['notifications']['settings'];
@@ -4123,6 +4128,7 @@ export function createRpc(call: RpcCall): Rpc {
       urlPreview: (params) => call('messages.url_preview', params) as ReturnType<Rpc['messages']['urlPreview']>,
       reactionShortcodes: (params) => call('messages.reaction_shortcodes', params) as ReturnType<Rpc['messages']['reactionShortcodes']>,
       frequentReactions: (params) => call('messages.frequent_reactions', params) as ReturnType<Rpc['messages']['frequentReactions']>,
+      rememberEmoji: (params) => call('messages.remember_emoji', params) as ReturnType<Rpc['messages']['rememberEmoji']>,
       setTyping: (params) => call('messages.set_typing', params) as ReturnType<Rpc['messages']['setTyping']>,
       mediaConfig: (params = {}) => call('messages.media_config', params) as ReturnType<Rpc['messages']['mediaConfig']>,
     },

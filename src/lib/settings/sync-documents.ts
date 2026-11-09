@@ -18,7 +18,11 @@ import {
 } from '#lib/rooms/favourite-grouping.svelte.js';
 import { adoptQueue, parseQueue, scheduledQueue } from '#lib/composer/scheduled-queue.svelte.js';
 import { adoptQuietRooms, parseQuietRooms, quietRooms } from '#lib/rooms/quiet-rooms.svelte.js';
-import { parseShortcodes, readRecent, writeRecent } from '#lib/emoji/recent-packs.svelte.js';
+import {
+  parseShortcodes,
+  readRecentStickers,
+  writeRecentStickers,
+} from '#lib/emoji/recent-packs.svelte.js';
 import type { SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
 
 import type { SyncedDocument } from './account-sync.svelte.js';
@@ -79,8 +83,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
     snapshot: () => ({
       content: {
         v: DOCUMENT_VERSION,
-        recentEmotes: readRecent(),
-        recentStickers: readRecent('sticker'),
+        recentStickers: readRecentStickers(),
         favoriteGifs: favoriteGifs(),
         recentGifs: recentGifs(),
         roomIcons: roomIconOverrides(),
@@ -94,8 +97,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
       const body = versioned(content);
       if (body === null) {
         return (
-          readRecent().length === 0 &&
-          readRecent('sticker').length === 0 &&
+          readRecentStickers().length === 0 &&
           favoriteGifs().length === 0 &&
           recentGifs().length === 0 &&
           Object.keys(roomIconOverrides()).length === 0 &&
@@ -105,8 +107,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
         );
       }
 
-      writeRecent(parseShortcodes(body.recentEmotes));
-      writeRecent(parseShortcodes(body.recentStickers), 'sticker');
+      writeRecentStickers(parseShortcodes(body.recentStickers));
       adoptFavorites(parseFavorites(body.favoriteGifs));
       adoptRecentGifs(parseFavorites(body.recentGifs));
       adoptRoomIconOverrides(parseRoomIconOverrides(body.roomIcons));

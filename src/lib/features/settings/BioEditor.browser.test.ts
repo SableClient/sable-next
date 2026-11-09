@@ -50,6 +50,7 @@ function client(): CoreClient {
       packs: { listAll: () => Promise.resolve(packs) },
       messages: {
         frequentReactions: () => Promise.resolve([]),
+        rememberEmoji: () => Promise.resolve(null),
         reactionShortcodes: () => Promise.resolve([]),
       },
     },

@@ -59,6 +59,7 @@ export function createCoreStub<T extends Record<string, unknown> & { rpc?: RpcOv
         messages: {
           reactionShortcodes: vi.fn(() => Promise.resolve([])),
           frequentReactions: vi.fn(() => Promise.resolve([])),
+          rememberEmoji: vi.fn(() => Promise.resolve(null)),
         },
         room_state: {
           event: vi.fn(() => Promise.resolve(null)),

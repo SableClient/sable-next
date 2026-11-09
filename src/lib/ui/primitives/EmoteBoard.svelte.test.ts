@@ -48,7 +48,7 @@ vi.mock('#lib/emoji/load-packs.js', () => ({
 }));
 
 import { core } from '#lib/core/__mocks__/context.js';
-import { rememberEmote, writeRecent } from '#lib/emoji/recent-packs.svelte.js';
+import { rememberSticker, writeRecentStickers } from '#lib/emoji/recent-packs.svelte.js';
 
 import EmoteBoard from './EmoteBoard.svelte';
 
@@ -61,9 +61,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  writeRecent([]);
-  writeRecent([], 'sticker');
+  writeRecentStickers([]);
   core.rpc.messages.frequentReactions.mockResolvedValue([]);
+  core.rpc.messages.rememberEmoji.mockClear();
   core.fetchMedia.mockReset();
   vi.restoreAllMocks();
 });
@@ -98,7 +98,7 @@ test('previews a search result on hover', async () => {
 
 test('previews a recent sticker on hover', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
-  rememberEmote('wave', 'sticker');
+  rememberSticker('mxc://example.org/wave');
   const { findAllByRole, container } = render(EmoteBoard, {
     props: { roomId: '!room:example.org', tab: 'sticker', onPick: vi.fn() },
   });
@@ -111,7 +111,7 @@ test('previews a recent sticker on hover', async () => {
 
 test('previews a recent emote on focus', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
-  rememberEmote('wave', 'emoticon');
+  core.rpc.messages.frequentReactions.mockResolvedValue(['mxc://example.org/wave']);
   const { findAllByRole, container } = render(EmoteBoard, {
     props: { roomId: '!room:example.org', unicode: true, onPick: vi.fn() },
   });
@@ -123,7 +123,6 @@ test('previews a recent emote on focus', async () => {
 });
 
 async function mountSearching(onPick = vi.fn()) {
-  writeRecent([]);
   core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
   const view = render(EmoteBoard, { props: { roomId: '!room:example.org', onPick } });
   const search = await view.findByRole('searchbox');
@@ -219,6 +218,7 @@ test('enter picks the selected emote and closes', async () => {
     'emoticon',
     false
   );
+  expect(core.rpc.messages.rememberEmoji).toHaveBeenCalledWith({ key: 'mxc://example.org/wink' });
 });
 
 test('shift+enter picks the selected emote and keeps the board open', async () => {
@@ -242,7 +242,6 @@ test('shift+enter picks the selected emote and keeps the board open', async () =
 });
 
 test('enter reacts with the typed text over a matching emote', async () => {
-  writeRecent([]);
   core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
   const onPickUnicode = vi.fn();
   const view = render(EmoteBoard, {
@@ -265,7 +264,6 @@ test('enter reacts with the typed text over a matching emote', async () => {
 });
 
 test('announces what enter will react with', async () => {
-  writeRecent([]);
   core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
   const view = render(EmoteBoard, {
     props: {
@@ -288,22 +286,8 @@ test('announces what enter will react with', async () => {
   expect(status?.textContent).not.toContain('React with');
 });
 
-test('recent custom emotes saved under both a shortcode and a URL appear once', async () => {
+test('the reaction picker uses the core ranking beyond six entries', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
-  writeRecent(['wave', 'mxc://example.org/wave']);
-  const view = render(EmoteBoard, {
-    props: { roomId: '!room:example.org', unicode: true, onPick: vi.fn() },
-  });
-  await vi.waitFor(() => {
-    expect(
-      view.container.querySelectorAll('[data-section="recent"] [aria-label=":wave:"]')
-    ).toHaveLength(1);
-  });
-});
-
-test('the reaction picker uses the core ranking beyond six entries without composer history', async () => {
-  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
-  writeRecent(['mxc://example.org/wink']);
   const keys = ['😂', '❤️', '👍', '✅', '🔥', '🎉', 'mxc://example.org/wave'];
   core.rpc.messages.frequentReactions.mockResolvedValue(keys);
   const view = render(EmoteBoard, {
@@ -314,5 +298,4 @@ test('the reaction picker uses the core ranking beyond six entries without compo
     expect(cells).toHaveLength(7);
     expect(cells[6]).toHaveAttribute('aria-label', ':wave:');
   });
-  expect(view.container.querySelector('[data-section="recent"] [aria-label=":wink:"]')).toBeNull();
 });

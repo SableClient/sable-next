@@ -16,7 +16,7 @@ import {
 } from '#lib/gif/favorites.svelte.js';
 import { adoptRoomIconOverrides, roomIconOverrides } from '#lib/rooms/room-appearance.svelte.js';
 import { adoptQuietRooms, quietRooms } from '#lib/rooms/quiet-rooms.svelte.js';
-import { readRecent, writeRecent } from '#lib/emoji/recent-packs.svelte.js';
+import { readRecentStickers, writeRecentStickers } from '#lib/emoji/recent-packs.svelte.js';
 import { SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
 
 import { customThemes, installCustomTheme, replaceCustomThemes } from './custom-themes.svelte';
@@ -36,8 +36,7 @@ const gif = {
 };
 
 function reset(): void {
-  writeRecent([]);
-  writeRecent([], 'sticker');
+  writeRecentStickers([]);
   adoptFavorites([]);
   adoptRecentGifs([]);
   adoptRoomIconOverrides([]);
@@ -54,8 +53,7 @@ describe('the workspace document', () => {
     const sidebar = new SpaceSidebar();
     const document = workspaceDocument(sidebar);
 
-    writeRecent(['blobwave']);
-    writeRecent(['party'], 'sticker');
+    writeRecentStickers(['party']);
     adoptFavorites([gif]);
     adoptRecentGifs([gif]);
     adoptRoomIconOverrides([['!room:example.org', 'never']]);
@@ -67,8 +65,8 @@ describe('the workspace document', () => {
     sidebar.adoptOpenFolders([]);
     expect(document.adopt(content)).toBe(true);
 
-    expect(readRecent()).toEqual(['blobwave']);
-    expect(readRecent('sticker')).toEqual(['party']);
+    expect(content).not.toHaveProperty('recentEmotes');
+    expect(readRecentStickers()).toEqual(['party']);
     expect(favoriteGifs()).toEqual([gif]);
     expect(recentGifs()).toEqual([gif]);
     expect(roomIconOverrides()).toEqual({ '!room:example.org': 'never' });
@@ -93,10 +91,10 @@ describe('the workspace document', () => {
 
     expect(document.adopt(null)).toBe(true);
 
-    writeRecent(['blobwave']);
+    writeRecentStickers(['party']);
     expect(document.adopt(null)).toBe(false);
 
-    writeRecent([]);
+    writeRecentStickers([]);
     adoptRecentGifs([gif]);
     expect(document.adopt(null)).toBe(false);
   });

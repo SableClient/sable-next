@@ -60,10 +60,18 @@ test('displays the core ranking and refreshes it when history changes', async ()
 
 test('passes old local history to the core for migration', async () => {
   localStorage.setItem('sable-recent-reactions', JSON.stringify([['🐈', 4]]));
+  localStorage.setItem(
+    'sable.composer.recentEmotes',
+    JSON.stringify(['mxc://example.org/wave', '🔥', 3])
+  );
   const fixture = setup();
-  expect(fixture.frequentReactions).toHaveBeenCalledWith({ legacy: [['🐈', 4]] });
+  expect(fixture.frequentReactions).toHaveBeenCalledWith({
+    legacy: [['🐈', 4]],
+    recent: ['mxc://example.org/wave', '🔥'],
+  });
   await vi.waitFor(() => {
     expect(localStorage.getItem('sable-recent-reactions')).toBeNull();
+    expect(localStorage.getItem('sable.composer.recentEmotes')).toBeNull();
   });
 });
 

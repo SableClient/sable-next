@@ -1,4 +1,5 @@
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { parseShortcodes } from '#lib/emoji/recent-packs.svelte.js';
 import { readJson, removeLocalValue } from '#lib/platform/local-json.js';
 
 export const REACTION_HISTORY_EVENT = 'm.recent_emoji';
@@ -16,9 +17,13 @@ export class RecentReactions {
       const load = (): void => {
         const request = ++revision;
         void core.rpc.messages
-          .frequentReactions({ legacy: readJson('sable-recent-reactions', (value) => value, null) })
+          .frequentReactions({
+            legacy: readJson('sable-recent-reactions', (value) => value, null),
+            recent: readJson('sable.composer.recentEmotes', parseShortcodes, []),
+          })
           .then((entries) => {
             removeLocalValue('sable-recent-reactions');
+            removeLocalValue('sable.composer.recentEmotes');
             if (live && request === revision) this.current = entries;
           })
           .catch((error: unknown) => {

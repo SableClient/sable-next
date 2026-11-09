@@ -132,7 +132,11 @@ function core(): CoreClient {
     },
     rpc: {
       members: { list: () => Promise.resolve(members) },
-      messages: { mediaConfig, frequentReactions: () => Promise.resolve([]) },
+      messages: {
+        mediaConfig,
+        frequentReactions: () => Promise.resolve([]),
+        rememberEmoji: () => Promise.resolve(null),
+      },
       room_state: { botCommands: () => Promise.resolve(botCommands) },
       personas: {
         list: () =>

@@ -65,6 +65,7 @@ domain! {
     url_preview,
     reaction_shortcodes,
     frequent_reactions,
+    remember_emoji,
     set_typing,
     media_config,
 }
@@ -1146,13 +1147,29 @@ pub struct FrequentReactionsParams {
     #[serde(default)]
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Unknown>))]
     pub legacy: Option<serde_json::Value>,
+    #[serde(default)]
+    pub recent: Vec<String>,
 }
 
 impl Handler for FrequentReactionsParams {
     type Ok = Vec<String>;
 
     async fn run(self, core: &Arc<Core>) -> Result<Self::Ok, RpcError> {
-        core.frequent_reactions(self.legacy).await
+        core.frequent_reactions(self.legacy, &self.recent).await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct RememberEmojiParams {
+    pub key: String,
+}
+
+impl Handler for RememberEmojiParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<Self::Ok, RpcError> {
+        core.remember_reaction(&self.key).await
     }
 }
 

@@ -2,7 +2,7 @@
 
 import { afterEach, expect, test, vi } from 'vitest';
 
-const STORAGE_KEY = 'sable.composer.recentEmotes';
+const STORAGE_KEY = 'sable.composer.recentStickers';
 
 async function loadStore(stored?: string) {
   localStorage.clear();
@@ -16,34 +16,26 @@ afterEach(() => {
 });
 
 test('recents round-trip', async () => {
-  const { readRecent, writeRecent } = await loadStore();
-  writeRecent(['blobwave', 'party']);
-  expect(readRecent()).toEqual(['blobwave', 'party']);
+  const { readRecentStickers, writeRecentStickers } = await loadStore();
+  writeRecentStickers(['mxc://example.org/wave', 'mxc://example.org/party']);
+  expect(readRecentStickers()).toEqual(['mxc://example.org/wave', 'mxc://example.org/party']);
 });
 
 test('the newest pick leads and never repeats', async () => {
-  const { readRecent, rememberEmote } = await loadStore();
-  rememberEmote('blobwave');
-  rememberEmote('party');
-  rememberEmote('blobwave');
-  expect(readRecent()).toEqual(['blobwave', 'party']);
+  const { readRecentStickers, rememberSticker } = await loadStore();
+  rememberSticker('mxc://example.org/wave');
+  rememberSticker('mxc://example.org/party');
+  rememberSticker('mxc://example.org/wave');
+  expect(readRecentStickers()).toEqual(['mxc://example.org/wave', 'mxc://example.org/party']);
 });
 
 test('a store holding something else does not break the picker', async () => {
-  expect((await loadStore('{"not":"an array"}')).readRecent()).toEqual([]);
-  expect((await loadStore('not json at all')).readRecent()).toEqual([]);
-  expect((await loadStore('["ok", 3, null]')).readRecent()).toEqual(['ok']);
+  expect((await loadStore('{"not":"an array"}')).readRecentStickers()).toEqual([]);
+  expect((await loadStore('not json at all')).readRecentStickers()).toEqual([]);
+  expect((await loadStore('["ok", 3, null]')).readRecentStickers()).toEqual(['ok']);
 });
 
 test('a synced list that repeats a shortcode keeps its first place', async () => {
   const { parseShortcodes } = await loadStore();
   expect(parseShortcodes(['party', 'blobwave', 'party', 7])).toEqual(['party', 'blobwave']);
-});
-
-test('stickers and emotes keep separate recents', async () => {
-  const { readRecent, rememberEmote } = await loadStore();
-  rememberEmote('blobwave');
-  rememberEmote('party', 'sticker');
-  expect(readRecent()).toEqual(['blobwave']);
-  expect(readRecent('sticker')).toEqual(['party']);
 });
