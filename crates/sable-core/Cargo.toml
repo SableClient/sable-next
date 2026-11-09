@@ -87,6 +87,8 @@ hmac = "0.13"
 zeroize = "1.9.1"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
+aes-gcm = "0.11"
+p256 = { version = "0.14", default-features = false, features = ["alloc", "ecdh"] }
 sable-link-preview = { workspace = true, features = ["reqwest"] }
 reqwest = { version = "0.13", default-features = false, features = ["socks", "gzip"] }
 matrix-sdk = { workspace = true, features = ["bundled-sqlite", "automatic-room-key-forwarding"] }

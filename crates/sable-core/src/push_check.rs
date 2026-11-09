@@ -96,20 +96,20 @@ pub enum GatewayAnswer {
 }
 
 #[cfg(not(target_family = "wasm"))]
-async fn notify_endpoint(url: &str, body: &impl Serialize) -> Result<bool, CoreError> {
+async fn notify_endpoint(url: &str, sealed: Vec<u8>) -> Result<bool, CoreError> {
     let http = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
         .build()
         .map_err(CoreError::backend)?;
-    let body = serde_json::to_string(body).map_err(CoreError::backend)?;
     let response = retry_transient(
         || async {
             http.post(url)
                 .header(
                     matrix_sdk::reqwest::header::CONTENT_TYPE,
-                    "application/json",
+                    "application/octet-stream",
                 )
+                .header(matrix_sdk::reqwest::header::CONTENT_ENCODING, "aes128gcm")
                 .header("TTL", "60")
-                .body(body.clone())
+                .body(sealed.clone())
                 .send()
                 .await
         },
@@ -117,6 +117,76 @@ async fn notify_endpoint(url: &str, body: &impl Serialize) -> Result<bool, CoreE
     )
     .await?;
     Ok(response.status().is_success())
+}
+
+/// Encrypts to the subscription keys (RFC 8291) as the homeserver does: distributors
+/// drop plaintext once keys are published.
+#[cfg(not(target_family = "wasm"))]
+fn seal(p256dh: &str, auth: &str, plaintext: &[u8]) -> Result<Vec<u8>, CoreError> {
+    let mut secret = [0u8; 32];
+    let mut salt = [0u8; 16];
+    getrandom::fill(&mut secret).map_err(CoreError::backend)?;
+    getrandom::fill(&mut salt).map_err(CoreError::backend)?;
+    seal_with(p256dh, auth, plaintext, &secret, salt)
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn seal_with(
+    p256dh: &str,
+    auth: &str,
+    plaintext: &[u8],
+    secret: &[u8; 32],
+    salt: [u8; 16],
+) -> Result<Vec<u8>, CoreError> {
+    use aes_gcm::aead::{Aead, KeyInit};
+    use base64::Engine as _;
+    use hkdf::Hkdf;
+    use sha2::Sha256;
+
+    let decode = |value: &str| {
+        base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(value.trim_end_matches('='))
+            .or_else(|_| {
+                base64::engine::general_purpose::STANDARD_NO_PAD.decode(value.trim_end_matches('='))
+            })
+            .map_err(|_| CoreError::from("the web push keys are not base64"))
+    };
+    let receiver = p256::PublicKey::from_sec1_bytes(&decode(p256dh)?)
+        .map_err(|_| "the web push key is not a P-256 point")?;
+    let auth = decode(auth)?;
+    let sender = p256::SecretKey::from_slice(secret).map_err(|_| "no usable web push key")?;
+    let sender_public = sender.public_key().to_sec1_bytes();
+    let receiver_public = receiver.to_sec1_bytes();
+    let shared = p256::ecdh::diffie_hellman(sender.to_nonzero_scalar(), receiver.as_affine());
+
+    let mut key_info = b"WebPush: info\0".to_vec();
+    key_info.extend_from_slice(&receiver_public);
+    key_info.extend_from_slice(&sender_public);
+    let mut ikm = [0u8; 32];
+    Hkdf::<Sha256>::new(Some(&auth), shared.raw_secret_bytes())
+        .expand(&key_info, &mut ikm)
+        .map_err(|_| "web push key derivation failed")?;
+    let prk = Hkdf::<Sha256>::new(Some(&salt), &ikm);
+    let mut cek = [0u8; 16];
+    let mut nonce = [0u8; 12];
+    prk.expand(b"Content-Encoding: aes128gcm\0", &mut cek)
+        .and_then(|()| prk.expand(b"Content-Encoding: nonce\0", &mut nonce))
+        .map_err(|_| "web push key derivation failed")?;
+
+    let mut record = plaintext.to_vec();
+    record.push(2);
+    let ciphertext = aes_gcm::Aes128Gcm::new(&cek.into())
+        .encrypt(&nonce.into(), record.as_slice())
+        .map_err(|_| "web push encryption failed")?;
+
+    let record_size =
+        u32::try_from(ciphertext.len().max(4096)).map_err(|_| "web push body is too large")?;
+    let mut sealed = salt.to_vec();
+    sealed.extend_from_slice(&record_size.to_be_bytes());
+    sealed.push(u8::try_from(sender_public.len()).map_err(|_| "web push key is too long")?);
+    sealed.extend_from_slice(&sender_public);
+    sealed.extend_from_slice(&ciphertext);
+    Ok(sealed)
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -270,10 +340,17 @@ pub async fn send_diagnostic_push(
         if endpoint.scheme() != "https" {
             return Err("the web push endpoint must use https".into());
         }
+        let auth = pusher
+            .data
+            .get("auth")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("the web pusher has no auth secret")?
+            .to_owned();
         let event_id = format!("{DIAGNOSTIC_EVENT_PREFIX}{}", TransactionId::new());
         let body = notify_body(&event_id, app_id, pushkey, pusher.data);
+        let body = serde_json::to_vec(&body).map_err(CoreError::backend)?;
         return Ok(direct_delivery(
-            notify_endpoint(endpoint.as_str(), &body).await?,
+            notify_endpoint(endpoint.as_str(), seal(pushkey, &auth, &body)?).await?,
             event_id,
         ));
     }
@@ -379,6 +456,35 @@ mod tests {
         }
     }
 
+    #[cfg(not(target_family = "wasm"))]
+    #[test]
+    fn diagnostics_are_sealed_like_the_rfc_8291_example() {
+        use base64::Engine as _;
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let secret: [u8; 32] = b64
+            .decode("yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw")
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let salt: [u8; 16] = b64
+            .decode("DGv6ra1nlYgDCS1FRnbzlw")
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let sealed = super::seal_with(
+            "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
+            "BTBZMqHH6r4Tts7J_aSIgg",
+            b"When I grow up, I want to be a watermelon",
+            &secret,
+            salt,
+        )
+        .unwrap();
+        assert_eq!(
+            b64.encode(sealed),
+            "DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPTpK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN"
+        );
+    }
+
     #[test]
     fn a_diagnostic_notify_carries_the_devices_own_pusher_data() {
         let body = notify_body(
@@ -473,37 +579,22 @@ mod tests {
 
     #[cfg(not(target_family = "wasm"))]
     #[tokio::test]
-    async fn a_direct_push_is_sent_with_its_diagnostic_event_id() {
-        use wiremock::matchers::{body_json, header, method};
+    async fn a_direct_push_is_sent_sealed_with_its_diagnostic_event_id() {
+        use wiremock::matchers::{body_bytes, header, method};
 
         let server = MockServer::start().await;
         let event_id = format!("{DIAGNOSTIC_EVENT_PREFIX}direct");
-        let body = notify_body(
-            &event_id,
-            "moe.sable.webpush",
-            "key",
-            serde_json::Map::new(),
-        );
+        let body = b"sealed".to_vec();
         Mock::given(method("POST"))
-            .and(header("content-type", "application/json"))
+            .and(header("content-type", "application/octet-stream"))
+            .and(header("content-encoding", "aes128gcm"))
             .and(header("ttl", "60"))
-            .and(body_json(serde_json::json!({
-                "notification": {
-                    "event_id": event_id.clone(),
-                    "room_id": "!sable-diagnostic:sable.invalid",
-                    "prio": "high",
-                    "devices": [{
-                        "app_id": "moe.sable.webpush",
-                        "pushkey": "key",
-                        "data": {}
-                    }]
-                }
-            })))
+            .and(body_bytes(body.clone()))
             .respond_with(ResponseTemplate::new(201))
             .mount(&server)
             .await;
 
-        let accepted = super::notify_endpoint(&server.uri(), &body).await.unwrap();
+        let accepted = super::notify_endpoint(&server.uri(), body).await.unwrap();
         assert!(accepted);
         assert!(matches!(
             super::direct_delivery(accepted, event_id),
@@ -524,8 +615,9 @@ mod tests {
             .await;
 
         let event_id = "$sable-diagnostic-refused";
-        let body = notify_body(event_id, "moe.sable.webpush", "key", serde_json::Map::new());
-        let accepted = super::notify_endpoint(&server.uri(), &body).await.unwrap();
+        let accepted = super::notify_endpoint(&server.uri(), Vec::new())
+            .await
+            .unwrap();
         assert!(!accepted);
         assert!(matches!(
             super::direct_delivery(accepted, event_id.to_owned()),
