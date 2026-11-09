@@ -56,7 +56,7 @@ async fn test_search_watcher_releases_paginated_room_cache() {
     );
     core.foreground_paginations
         .store(1, std::sync::atomic::Ordering::Relaxed);
-    core.watch_search_index(&client, "");
+    core.watch_search_index("", &client, "");
     wait_for_hits(&core, &room_id, "latest", 1).await;
 
     let history = (0..300)

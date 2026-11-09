@@ -935,3 +935,44 @@ fn test_a_room_whose_latest_event_is_classified_needs_no_priming() {
         .mark_classified(event_id!("$latest").to_owned(), 1);
     assert!(index.latest_indexed(&room, &latest));
 }
+
+#[async_test]
+async fn test_a_switched_away_index_saves_in_the_background_before_its_account_restores() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!retired:localhost").to_owned();
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(&client, JoinedRoomBuilder::new(&room_id))
+        .await;
+    let mut index = MessageIndex::new();
+    index.rooms.insert(room_id.clone(), chunked_room(10));
+
+    let (core, _events) = crate::Core::new(
+        "search-retired",
+        Box::new(crate::store::MemorySessionStore::default()),
+    );
+    core.retire_search_index("first", &client, index).await;
+    let gate = core.retiring_search.lock()["first"].clone();
+    gate.try_lock().unwrap_err();
+    core.settle_retired_search(Some("first")).await;
+
+    let (restored, _restored_events) = crate::Core::new(
+        "search-retired-restored",
+        Box::new(crate::store::MemorySessionStore::default()),
+    );
+    restored.restore_persisted_index(&client).await;
+    assert_eq!(
+        in_restored_room(
+            &mut *restored.search_index.lock().await,
+            &room_id,
+            "message",
+            50
+        )
+        .await
+        .len(),
+        10
+    );
+
+    drop(room);
+}

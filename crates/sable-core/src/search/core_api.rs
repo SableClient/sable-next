@@ -373,6 +373,7 @@ impl Core {
         );
     }
 
+    #[cfg(test)]
     pub(crate) async fn flush_search_index(&self, client: &matrix_sdk::Client) {
         let dirty = self.search_index.lock().await.dirty_rooms();
         self.save_rooms(client, dirty).await;
@@ -391,26 +392,43 @@ impl Core {
     }
 
     pub(super) async fn save_rooms(&self, client: &matrix_sdk::Client, rooms: Vec<OwnedRoomId>) {
-        for room_id in rooms {
-            let Some((flush, revision, listed)) =
-                self.search_index.lock().await.take_flush(&room_id)
-            else {
-                continue;
-            };
-
-            let saved = if listed || persist::list_room(client, &room_id).await {
-                save_room(client, &room_id, flush).await
-            } else {
-                Err(Box::new(flush))
-            };
-            let mut index = self.search_index.lock().await;
-            match saved {
-                Ok(saved) => index.flushed(&room_id, saved, revision),
-                Err(flush) => index.flush_failed(&room_id, &flush),
-            }
-            index.unload_to_budget();
-        }
+        let _flushing = self.search_flush.lock().await;
+        save_rooms_of(&self.search_index, client, rooms).await;
         self.enforce_disk_budget(client).await;
+    }
+
+    /// Restoring this account must first wait in `settle_retired_search`.
+    pub(crate) async fn retire_search_index(
+        &self,
+        account_id: &str,
+        client: &matrix_sdk::Client,
+        index: MessageIndex,
+    ) {
+        let gate = self
+            .retiring_search
+            .lock()
+            .entry(account_id.to_owned())
+            .or_default()
+            .clone();
+        let saving = gate.lock_owned().await;
+        let client = client.clone();
+        drop(spawn(async move {
+            save_index(&client, index).await;
+            drop(saving);
+        }));
+    }
+
+    pub(crate) async fn settle_retired_search(&self, account_id: Option<&str>) {
+        let gates: Vec<_> = self
+            .retiring_search
+            .lock()
+            .iter()
+            .filter(|(retired, _)| account_id.is_none_or(|account_id| *retired == account_id))
+            .map(|(_, gate)| gate.clone())
+            .collect();
+        for gate in gates {
+            drop(gate.lock().await);
+        }
     }
 
     pub(crate) async fn attachment_page(
@@ -587,11 +605,13 @@ impl Core {
     )]
     pub(crate) fn watch_search_index(
         self: &Arc<Self>,
+        account_id: &str,
         client: &matrix_sdk::Client,
         store_id: &str,
     ) {
         let core = self.clone();
         let client = client.clone();
+        let account_id = account_id.to_owned();
         #[cfg(target_family = "wasm")]
         let store_id = store_id.to_owned();
 
@@ -602,6 +622,7 @@ impl Core {
                 };
                 let mut updates = event_cache.subscribe_to_room_generic_updates();
 
+                core.settle_retired_search(Some(&account_id)).await;
                 #[cfg(target_family = "wasm")]
                 persist::attach(&client, &store_id).await;
                 core.restore_persisted_index(&client).await;
@@ -705,5 +726,35 @@ impl Core {
                 }
             };
         }
+    }
+}
+
+pub(crate) async fn save_index(client: &matrix_sdk::Client, index: MessageIndex) {
+    let index = tokio::sync::Mutex::new(index);
+    let dirty = index.lock().await.dirty_rooms();
+    save_rooms_of(&index, client, dirty).await;
+}
+
+async fn save_rooms_of(
+    index: &tokio::sync::Mutex<MessageIndex>,
+    client: &matrix_sdk::Client,
+    rooms: Vec<OwnedRoomId>,
+) {
+    for room_id in rooms {
+        let Some((flush, revision, listed)) = index.lock().await.take_flush(&room_id) else {
+            continue;
+        };
+
+        let saved = if listed || persist::list_room(client, &room_id).await {
+            save_room(client, &room_id, flush).await
+        } else {
+            Err(Box::new(flush))
+        };
+        let mut index = index.lock().await;
+        match saved {
+            Ok(saved) => index.flushed(&room_id, saved, revision),
+            Err(flush) => index.flush_failed(&room_id, &flush),
+        }
+        index.unload_to_budget();
     }
 }

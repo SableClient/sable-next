@@ -408,6 +408,7 @@ impl Core {
         if let Some(session) = self.take_session().await {
             session.sync_service.stop().await;
         }
+        self.settle_retired_search(None).await;
         let accounts: Vec<String> = self.account_clients.lock().await.keys().cloned().collect();
         for account_id in accounts {
             self.invalidate_account_client(&account_id).await;
@@ -427,6 +428,7 @@ impl Core {
             if let Some(session) = self.take_session().await {
                 session.sync_service.stop().await;
             }
+            self.settle_retired_search(None).await;
             let accounts = self.accounts().await?;
             let mut outcome = Ok(());
             for account in &accounts.accounts {
@@ -901,6 +903,7 @@ impl Core {
         let Some(account_id) = account_id else {
             return self.clear_persisted_session().await;
         };
+        self.settle_retired_search(Some(account_id)).await;
 
         let _guard = self.session_store_lock.lock().await;
         let mut accounts = self.accounts.lock().await;
@@ -962,6 +965,23 @@ impl Core {
     }
 
     pub(crate) async fn take_session(&self) -> Option<Session> {
+        let (session, index) = self.detach_session().await;
+        if let Some(session) = &session {
+            search::save_index(&session.client, index).await;
+        }
+        session
+    }
+
+    async fn retire_session(&self) -> Option<Session> {
+        let (session, index) = self.detach_session().await;
+        if let Some(session) = &session {
+            self.retire_search_index(&session.account_id, &session.client, index)
+                .await;
+        }
+        session
+    }
+
+    async fn detach_session(&self) -> (Option<Session>, search::MessageIndex) {
         self.end_all_calls().await;
         let client = self
             .session
@@ -970,9 +990,10 @@ impl Core {
             .as_ref()
             .map(|session| session.client.clone());
         if let Some(client) = client {
-            self.flush_search_index(&client).await;
             self.flush_inbox(&client).await;
         }
+        // An aborted task must not be holding a flush it took from the index.
+        let flushing = self.search_flush.lock().await;
         let mut session = self.session.write().await;
         self.session_handlers.lock().clear();
         self.session_tasks.lock().clear();
@@ -997,10 +1018,14 @@ impl Core {
             .send_replace(crate::nicknames::Nicknames::default());
         *self.probed_state() = crate::probed_state::ProbedState::default();
         *self.recent_state.lock() = crate::probed_state::RecentState::default();
-        *self.search_index.lock().await = search::MessageIndex::new();
+        let index = std::mem::replace(
+            &mut *self.search_index.lock().await,
+            search::MessageIndex::new(),
+        );
+        drop(flushing);
         self.search_crawl.lock().await.reset();
         self.server_search.lock().await.reset();
-        session.take()
+        (session.take(), index)
     }
 
     pub(crate) async fn finish_sign_in(
@@ -1068,8 +1093,8 @@ impl Core {
             .await?;
 
         // Do not disrupt the active session unless its replacement started
-        // successfully. `take_session` also aborts its owned watcher tasks.
-        if let Some(previous) = self.take_session().await {
+        // successfully. `retire_session` also aborts its owned watcher tasks.
+        if let Some(previous) = self.retire_session().await {
             previous.sync_service.stop().await;
         }
 
@@ -1137,7 +1162,7 @@ impl Core {
             .registered_store_id(&account_id)
             .await
             .unwrap_or_else(|| self.store_id.clone());
-        self.watch_search_index(&client, &store_id);
+        self.watch_search_index(&account_id, &client, &store_id);
         self.watch_ignored_users(&client);
         self.watch_ignored_history(&client, &sync_service);
         #[cfg(target_family = "wasm")]
