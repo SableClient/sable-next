@@ -489,6 +489,11 @@ impl Handler for CreateDmParams {
             Some(room) => room,
             None if encrypted == Some(false) || (encrypted.is_none() && !encrypt_new) => {
                 let mut request = create_room::v3::Request::new();
+                request.creation_content = Some(
+                    Raw::new(&serde_json::json!({ "additional_creators": [&user_id] }))
+                        .or_failed(core, "create_dm_creation_content")?
+                        .cast_unchecked(),
+                );
                 request.invite = vec![user_id];
                 request.is_direct = true;
                 request.preset = Some(RoomPreset::TrustedPrivateChat);

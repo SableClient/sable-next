@@ -1925,6 +1925,34 @@ async fn an_unencrypted_dm_request_reuses_an_unencrypted_dm() {
 }
 
 #[tokio::test]
+async fn a_new_dm_makes_the_invitee_a_creator() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    Mock::given(method("POST"))
+        .and(path("/_matrix/client/v3/createRoom"))
+        .and(wiremock::matchers::body_partial_json(json!({
+            "creation_content": { "additional_creators": ["@bob:example.org"] }
+        })))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({"room_id": "!new-dm:example.org"})),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(wiremock::matchers::path_regex(r"/account_data/m\.direct$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let params: crate::api::rooms::CreateDmParams =
+        serde_json::from_value(json!({"user_id": "@bob:example.org", "encrypt_new": false}))
+            .unwrap();
+    let created = core.run(params).await.unwrap();
+    assert_eq!(created, "!new-dm:example.org");
+}
+
+#[tokio::test]
 async fn memberships_follow_the_server_joined_rooms() {
     use matrix_sdk::RoomState;
     use matrix_sdk_test::{InvitedRoomBuilder, LeftRoomBuilder};
