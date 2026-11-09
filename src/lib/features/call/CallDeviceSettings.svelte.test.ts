@@ -114,3 +114,56 @@ test('shows why microphone access failed', async () => {
   ).toBeInTheDocument();
   expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
 });
+
+test('plays the microphone test through the output device and restarts it on new settings', async () => {
+  const enumerateDevices = vi.fn(() =>
+    Promise.resolve([
+      { deviceId: 'mixer-a', kind: 'audioinput', label: 'Mixer A' },
+      { deviceId: 'mixer-b', kind: 'audioinput', label: 'Mixer B' },
+      { deviceId: 'speakers', kind: 'audiooutput', label: 'USB speakers' },
+    ])
+  );
+  vi.stubGlobal('navigator', {
+    mediaDevices: Object.assign(new EventTarget(), { enumerateDevices }),
+  });
+  const { preferences } = await import('#lib/settings/preferences.svelte.js');
+  preferences.audioInputDevice = 'mixer-a';
+  preferences.audioOutputDevice = 'speakers';
+  const stop = vi.fn();
+  const start = vi.spyOn(inputMeter, 'startInputMeter').mockResolvedValue(stop);
+  const user = userEvent.setup();
+  const instance = render(CallDeviceSettings);
+
+  await user.click(screen.getByRole('button', { name: 'settings.callMicTest' }));
+  await waitFor(() => {
+    expect(start).toHaveBeenCalledWith(
+      'mixer-a',
+      expect.any(Function),
+      expect.objectContaining({ outputDevice: 'speakers' })
+    );
+  });
+
+  await user.click(screen.getByRole('combobox', { name: 'settings.callInputDevice' }));
+  await user.click(await screen.findByRole('option', { name: 'Mixer B' }));
+  await waitFor(() => {
+    expect(start).toHaveBeenLastCalledWith(
+      'mixer-b',
+      expect.any(Function),
+      expect.objectContaining({ outputDevice: 'speakers' })
+    );
+  });
+  expect(stop).toHaveBeenCalledOnce();
+
+  const echoCancellation = preferences.echoCancellation;
+  preferences.echoCancellation = !echoCancellation;
+  await waitFor(() => {
+    expect(start.mock.lastCall?.[2]?.constraints.echoCancellation).toBe(!echoCancellation);
+  });
+  expect(stop).toHaveBeenCalledTimes(2);
+
+  instance.unmount();
+  expect(stop).toHaveBeenCalledTimes(3);
+  preferences.echoCancellation = echoCancellation;
+  preferences.audioInputDevice = '';
+  preferences.audioOutputDevice = '';
+});

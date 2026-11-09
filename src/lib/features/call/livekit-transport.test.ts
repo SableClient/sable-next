@@ -1123,7 +1123,10 @@ test('falls back to browser noise suppression if the microphone processor fails'
   const previousSuppression = preferences.noiseSuppression;
   preferences.voiceIsolation = true;
   preferences.noiseSuppression = true;
-  vi.spyOn(voiceFilter, 'supportsVoiceFilter').mockReturnValue(true);
+  vi.spyOn(voiceFilter, 'microphoneProcessing').mockReturnValue({
+    filter: true,
+    constraints: { echoCancellation: true, noiseSuppression: false, autoGainControl: true },
+  });
   const filter = {
     name: 'rnnoise',
     init: vi.fn(() => Promise.resolve()),

@@ -36,7 +36,7 @@ import type {
 } from './call-transport';
 import { idleTransportState, ignoreError, ScreenAudioError } from './call-transport';
 import { MatrixKeyProvider } from './key-provider';
-import { createMicrophoneFilter, supportsVoiceFilter } from './voice-filter';
+import { createMicrophoneFilter, microphoneProcessing } from './voice-filter';
 import {
   resolveVideoCodec,
   screenCaptureOptions,
@@ -139,8 +139,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
   routeLivekitLogs();
   const keyProvider = options.encryptMedia ? new MatrixKeyProvider() : undefined;
   const worker = keyProvider ? (options.createWorker ?? defaultWorker)() : undefined;
-  const voiceIsolation = preferences.noiseSuppression && preferences.voiceIsolation;
-  const filterMicrophone = voiceIsolation && supportsVoiceFilter();
+  const { filter: filterMicrophone, constraints: microphoneConstraints } = microphoneProcessing();
   const cameraCapture = () => ({
     ...(preferences.videoInputDevice ? { deviceId: preferences.videoInputDevice } : {}),
     ...(preferences.callCameraResolution !== 'auto'
@@ -169,10 +168,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     adaptiveStream: true,
     dynacast: false,
     audioCaptureDefaults: {
-      echoCancellation: preferences.echoCancellation,
-      noiseSuppression: preferences.noiseSuppression && !filterMicrophone,
-      autoGainControl: preferences.autoGainControl,
-      ...(voiceIsolation && !filterMicrophone ? { voiceIsolation: true } : {}),
+      ...microphoneConstraints,
       ...(preferences.audioInputDevice ? { deviceId: preferences.audioInputDevice } : {}),
     },
     videoCaptureDefaults: cameraCapture(),

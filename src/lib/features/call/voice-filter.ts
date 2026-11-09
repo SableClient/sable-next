@@ -3,6 +3,7 @@ import type { RnnoiseWorkletNode } from '@sapphi-red/web-noise-suppressor';
 import workletUrl from '@sapphi-red/web-noise-suppressor/rnnoiseWorklet.js?url';
 import wasmUrl from '@sapphi-red/web-noise-suppressor/rnnoise.wasm?url';
 import simdUrl from '@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 import { ignoreError } from './call-transport';
 
 const SAMPLE_RATE = 48000;
@@ -33,6 +34,22 @@ export const supportsVoiceFilter = (): boolean =>
   typeof AudioContext !== 'undefined' &&
   typeof AudioWorkletNode !== 'undefined' &&
   typeof WebAssembly !== 'undefined';
+
+export function microphoneProcessing() {
+  const voiceIsolation = preferences.noiseSuppression && preferences.voiceIsolation;
+  const filter = voiceIsolation && supportsVoiceFilter();
+  return {
+    filter,
+    constraints: {
+      echoCancellation: preferences.echoCancellation,
+      noiseSuppression: preferences.noiseSuppression && !filter,
+      autoGainControl: preferences.autoGainControl,
+      ...(voiceIsolation && !filter ? { voiceIsolation: true } : {}),
+    },
+  };
+}
+
+export type MicrophoneProcessing = ReturnType<typeof microphoneProcessing>;
 
 export function createVoiceFilterBank(): VoiceFilterBank {
   const context = new AudioContext({ sampleRate: SAMPLE_RATE });

@@ -20,6 +20,7 @@
     unlockCallDevices,
     type CallDevice,
   } from './devices.js';
+  import { microphoneProcessing } from './voice-filter';
   import '#lib/ui/primitives/settings-row.css';
 
   let devices = $state.raw<CallDevice[]>([]);
@@ -27,8 +28,6 @@
   let unlockError = $state<string | null>(null);
   let level = $state(0);
   let testing = $state(false);
-  let stopTest: (() => void) | undefined;
-  let testGeneration = 0;
 
   const supported = supportsDeviceSelection();
   const SYSTEM_DEFAULT = 'system';
@@ -56,42 +55,39 @@
     return off;
   });
 
-  $effect(() => stopTesting);
+  $effect(() => {
+    if (!testing) return;
+    const input = preferences.audioInputDevice;
+    const playback = { outputDevice: preferences.audioOutputDevice, ...microphoneProcessing() };
+    let cancelled = false;
+    let stop: (() => void) | null = null;
+    void import('./input-meter')
+      .then(({ startInputMeter }) =>
+        cancelled ? null : startInputMeter(input, (next) => (level = next), playback)
+      )
+      .then((dispose) => {
+        if (cancelled) {
+          dispose?.();
+          return;
+        }
+        if (!dispose) {
+          testing = false;
+          denied = true;
+          return;
+        }
+        stop = dispose;
+        void refresh();
+      });
+    return () => {
+      cancelled = true;
+      stop?.();
+      level = 0;
+    };
+  });
 
   async function unlock(): Promise<void> {
     unlockError = await unlockCallDevices();
     await refresh();
-  }
-
-  function stopTesting(): void {
-    testGeneration += 1;
-    stopTest?.();
-    stopTest = undefined;
-    testing = false;
-    level = 0;
-  }
-
-  async function toggleTest(): Promise<void> {
-    if (testing) {
-      stopTesting();
-      return;
-    }
-    testing = true;
-    const generation = ++testGeneration;
-    const { startInputMeter } = await import('./input-meter');
-    if (generation !== testGeneration) return;
-    const meter = await startInputMeter(preferences.audioInputDevice, (next) => (level = next));
-    if (generation !== testGeneration) {
-      meter?.();
-      return;
-    }
-    if (!meter) {
-      testing = false;
-      denied = true;
-      return;
-    }
-    void refresh();
-    stopTest = meter;
   }
 </script>
 
@@ -187,7 +183,7 @@
           >
             <div class="fill" style={`inline-size: ${String(Math.round(level * 100))}%`}></div>
           </div>
-          <Button variant="secondary" size="small" onclick={() => void toggleTest()}>
+          <Button variant="secondary" size="small" onclick={() => (testing = !testing)}>
             {i18n.t(testing ? 'common.stopTest' : 'settings.callMicTest')}
           </Button>
         </div>
