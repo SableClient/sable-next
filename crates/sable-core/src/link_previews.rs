@@ -276,12 +276,15 @@ mod local {
         ReqwestFetch::new(builder).map_err(|_| RpcError::Unavailable)
     }
 
-    pub(crate) async fn scrape(url: &str) -> Result<Option<UrlPreviewView>, RpcError> {
+    pub(crate) async fn scrape(
+        url: &str,
+        options: &sable_link_preview::ScrapeOptions,
+    ) -> Result<Option<UrlPreviewView>, RpcError> {
         let Some(target) = sable_link_preview::parse_public_url(url, None) else {
             return Ok(None);
         };
         let fetch = client(Duration::from_secs(10))?;
-        let Some(preview) = sable_link_preview::scrape(&fetch, &target).await else {
+        let Some(preview) = sable_link_preview::scrape(&fetch, &target, options).await else {
             return Ok(None);
         };
         {
@@ -886,7 +889,12 @@ mod tests {
             "http://192.168.1.1/",
             "ftp://files.example/",
         ] {
-            assert!(super::scrape_locally(url).await.unwrap().is_none());
+            assert!(
+                super::scrape_locally(url, &sable_link_preview::ScrapeOptions::default())
+                    .await
+                    .unwrap()
+                    .is_none()
+            );
         }
     }
 

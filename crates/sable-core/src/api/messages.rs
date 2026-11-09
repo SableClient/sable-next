@@ -1090,6 +1090,8 @@ pub struct UrlPreviewParams {
     pub client: bool,
     #[serde(default)]
     pub service: Option<String>,
+    #[serde(default)]
+    pub klipy_api_key: Option<String>,
 }
 
 impl Handler for UrlPreviewParams {
@@ -1099,7 +1101,13 @@ impl Handler for UrlPreviewParams {
         let url = self.url;
         if self.client {
             #[cfg(not(target_family = "wasm"))]
-            return crate::link_previews::scrape_locally(&url).await;
+            return crate::link_previews::scrape_locally(
+                &url,
+                &sable_link_preview::ScrapeOptions {
+                    klipy_api_key: self.klipy_api_key,
+                },
+            )
+            .await;
             #[cfg(target_family = "wasm")]
             {
                 let Some(base) = self.service else {
