@@ -39,7 +39,7 @@
     return new Set();
   });
   let pendingRemoval = $state.raw<readonly string[]>([]);
-  let outcome = $state<'invalid' | 'failed' | null>(null);
+  let outcome = $state<'invalid' | 'foreign' | 'failed' | null>(null);
   let run = 0;
 
   let roomId = $derived(room?.room_id ?? null);
@@ -123,6 +123,10 @@
     if (!target || busy) return;
     if (alias === null) {
       outcome = 'invalid';
+      return;
+    }
+    if (alias.slice(alias.indexOf(':') + 1) !== server) {
+      outcome = 'foreign';
       return;
     }
 
@@ -330,6 +334,10 @@
     <div class="settings-form">
       {#if outcome === 'invalid'}
         <Alert variant="critical" role="alert">{i18n.t('room.addressesInvalid')}</Alert>
+      {:else if outcome === 'foreign'}
+        <Alert variant="critical" role="alert">
+          {i18n.t('room.addressesForeignServer', { server })}
+        </Alert>
       {:else if outcome === 'failed'}
         <Alert variant="critical" role="alert">{i18n.t('room.addressesFailed')}</Alert>
       {/if}

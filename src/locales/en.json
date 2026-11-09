@@ -728,6 +728,7 @@
     "addressesEmpty": "This room has no addresses on your server.",
     "addressesPlaceholder": "my-room",
     "addressesInvalid": "An address looks like #room:server.",
+    "addressesForeignServer": "You can only add addresses on {{server}}.",
     "addressesFailed": "That address could not be changed.",
     "addressesMain": "Main",
     "addressesSetMain": "Set as main",

@@ -50,3 +50,18 @@ test('a bare address is created on your own server, not the room id', async () =
     alias: '#lounge:home.example',
   });
 });
+
+test('an address on another server is refused before reaching the server', async () => {
+  const user = userEvent.setup();
+  core.session = { user_id: '@me:home.example' };
+  const room = { room_id: '!room' } as RoomListItemView;
+  render(RoomAddressSettings, { room, levels, ownPowerLevel: 100 });
+
+  await user.type(
+    await screen.findByRole('textbox', { name: 'common.add' }),
+    '#lounge:elsewhere.example{Enter}'
+  );
+
+  expect(core.rpc.rooms.createAlias).not.toHaveBeenCalled();
+  expect(screen.getByRole('alert')).toHaveTextContent('room.addressesForeignServer');
+});
