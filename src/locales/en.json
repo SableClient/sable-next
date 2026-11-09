@@ -2199,6 +2199,7 @@
     "hiddenEventRedactions": "Show redaction events",
     "hiddenEventOther": "Show other hidden events",
     "showTranslationStrings": "Show translation strings",
+    "showAlertZoo": "Show alert zoo",
     "stateEventTitle": "Send a state event",
     "stateEventDescription": "Writes raw room state. The server is the only thing validating it, so prefer the typed controls in room settings.",
     "stateEventRoom": "Room id",

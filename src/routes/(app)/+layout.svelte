@@ -163,6 +163,7 @@
   import { roomAtOffset } from '#lib/features/sidebar/visible-rooms.svelte.js';
   import { playSound, type NotificationSound } from '#lib/features/notifications/sound.js';
   import MediaViewerHost from '#lib/ui/media/MediaViewerHost.svelte';
+  import ZooAlertControls from '#lib/features/sidebar/ZooAlertControls.svelte';
 
   interface Props {
     children: Snippet;
@@ -1373,6 +1374,9 @@
     <ShortcutsHelpDialog bind:open={shortcutsHelpState.open} />
     <ShareTargetSheet inbox={shareInbox} />
     <ToastRegion dismissLabel={i18n.t('common.dismiss')} />
+    {#if preferences.showAlertZoo}
+      <ZooAlertControls />
+    {/if}
   {/key}
 {:else if core.status === 'error'}
   <main class="app-status" aria-labelledby="app-status-title">

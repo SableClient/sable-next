@@ -21,7 +21,7 @@
   import '#lib/ui/primitives/nav-tab.css';
   import './sidebar-tools.css';
   import { useAlertProviders } from './alerts.js';
-  import AlertDrawerButton from './AlertDrawerButton.svelte';
+  import AlertListButton from './AlertListButton.svelte';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import AlertList, { alertListState } from './AlertList.svelte';
 
@@ -164,13 +164,13 @@
         <AccountSwitcher mode="mobile" />
       </div>
       <div class="mobile-tool-slot" style:display={hasAlerts ? undefined : 'none'}>
-        <AlertDrawerButton mode="mobile" />
+        <AlertListButton mode="mobile" />
       </div>
     </div>
   </nav>
 {:else if compact}
   <nav class="compact-tools" aria-label={i18n.t('nav.quickTools')}>
-    <AlertDrawerButton mode="compact" />
+    <AlertListButton mode="compact" />
     {@render roomSwitcher('compact-tool nav-tab-side', 'right')}
     {#each desktopTools as item (item.href)}
       {@const toolActive = isToolActive(item.href)}
@@ -206,7 +206,7 @@
   <nav class="desktop-tools" aria-label={i18n.t('nav.quickTools')}>
     <AccountSwitcher mode="desktop" />
     <div class="desktop-tool-actions">
-      <AlertDrawerButton mode="desktop" />
+      <AlertListButton mode="desktop" />
       {@render roomSwitcher('desktop-tool nav-tab-bottom', 'top')}
       {#each desktopTools as item (item.href)}
         {@const toolActive = isToolActive(item.href)}

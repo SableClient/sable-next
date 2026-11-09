@@ -118,5 +118,13 @@ export const developerCategory: SettingsCategory = {
       type: 'boolean',
       gatedBy: 'developerTools',
     },
+    {
+      key: 'showAlertZoo',
+      section: 'developer-options',
+      icon: CodeIcon,
+      name: 'settings.showAlertZoo',
+      type: 'boolean',
+      gatedBy: 'developerTools',
+    },
   ],
 };

@@ -5,11 +5,15 @@ import * as WebUpdateAlert from '#lib/features/sidebar/WebUpdateAlert.svelte';
 import * as SearchIndexTransferAlert from '#lib/features/sidebar/SearchSharingAlert.svelte';
 import type { IconComponentProps } from 'phosphor-svelte';
 import { createContext, type Component } from 'svelte';
+import * as ZooAlert from './ZooAlert.svelte';
+
+export type PriorityLevel = 'task' | 'update' | 'warning' | 'security' | 'critical';
 
 export type Priority = {
-  level: 'task' | 'update' | 'warning' | 'security';
+  level: PriorityLevel;
   icon: Component<IconComponentProps>;
 } | null;
+
 export type AlertProgress = {
   value: number | null;
 };
@@ -32,6 +36,7 @@ type BannerModule<S> = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const ALERT_MODULES: BannerModule<any>[] = [
+  ZooAlert,
   UnverifiedDeviceAlert,
   RecoveryIncompleteAlert,
   WebUpdateAlert,

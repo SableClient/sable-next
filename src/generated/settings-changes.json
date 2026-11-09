@@ -2,6 +2,7 @@
   "upcoming": {
     "added": [
       "showBridgeBadges",
+      "showAlertZoo",
       "personaPickerShowAccountWhenDeselected",
       "jumpToLatestOnSend"
     ],
