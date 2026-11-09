@@ -275,7 +275,7 @@ mod tests {
             children: Vec::new(),
             children_stale: false,
             tags: Vec::new(),
-            screen_sharers: Vec::new(),
+            voice_roster: None,
             avatar_override: None,
             bridge: None,
         };
@@ -306,7 +306,7 @@ mod tests {
             children,
             children_stale: false,
             tags: Vec::new(),
-            screen_sharers: Vec::new(),
+            voice_roster: None,
             avatar_override: None,
             bridge: None,
         }

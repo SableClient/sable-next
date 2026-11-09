@@ -1,1 +1,7 @@
-{}
+{
+  "settings": {
+    "voiceParticipantPlacement": "Ngā kaiuru o te rūma kōrerorero ā-reo",
+    "voiceParticipantsBelow": "Kei raro i te ingoa o te rūma",
+    "voiceParticipantsInline": "Kei te taha o te ingoa o te rūma"
+  }
+}

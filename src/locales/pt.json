@@ -1,4 +1,9 @@
 {
+  "settings": {
+    "voiceParticipantPlacement": "Participantes das salas de voz",
+    "voiceParticipantsBelow": "Por baixo do nome da sala",
+    "voiceParticipantsInline": "Ao lado do nome da sala"
+  },
   "common": {
     "userIdFormatHint": "Um id de usuário está no formato @alguém:servidor.",
     "changeBanner": "Mudar banner",

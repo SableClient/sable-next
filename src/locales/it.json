@@ -1,4 +1,9 @@
 {
+  "settings": {
+    "voiceParticipantPlacement": "Partecipanti alle stanze vocali",
+    "voiceParticipantsBelow": "Sotto il nome della stanza",
+    "voiceParticipantsInline": "Accanto al nome della stanza"
+  },
   "nav": {
     "messages": "Messaggi",
     "inbox": "Messaggi in arrivo",

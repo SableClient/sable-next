@@ -8,6 +8,7 @@ use wiremock::{
     matchers::{body_json, method, path, path_regex},
 };
 
+use crate::test_support::sticky_update;
 use crate::{Core, api::calls::DeclineParams, session::Session, store::MemorySessionStore};
 
 #[tokio::test]
@@ -78,28 +79,6 @@ async fn core_declines_legacy_notifications_but_rejects_invalid_and_own_events()
         updates.try_recv().is_err(),
         "a decline must not leave a local echo the timeline filter never replaces"
     );
-}
-
-async fn sticky_update(room: &matrix_sdk::Room, events: Vec<serde_json::Value>) {
-    use ruma::{api::client::sync::sync_events::msc4186 as v5, serde::Raw};
-    let mut response = v5::Response::new("invites".to_owned());
-    let mut sticky = v5::response::StickyEventsRoom::default();
-    sticky.events = events
-        .iter()
-        .map(|event| Raw::new(event).unwrap().cast_unchecked())
-        .collect();
-    response
-        .extensions
-        .sticky_events
-        .rooms
-        .insert(room.room_id().to_owned(), sticky);
-    room.client()
-        .process_sliding_sync_test_helper(
-            &response,
-            &matrix_sdk_base::RequestedRequiredStates::default(),
-        )
-        .await
-        .unwrap();
 }
 
 async fn incoming_event(

@@ -41,7 +41,7 @@ pub(crate) use media::{
 pub(crate) use member::clamp_power_level;
 pub(crate) use profile::{authored_body, per_message_profile};
 pub(crate) use raw::ObjectOnly;
-pub(crate) use room::enrich_rooms;
+pub(crate) use room::{enrich_rooms, latest_items};
 pub(crate) use search::search_hit_view;
 pub(crate) use state::{
     CALL_MEMBER_TYPE, CALL_SLOT_ID, CALL_TYPE, FORUM_ROOM_TYPE, FORUM_TITLE, RTC_SLOT_TYPE,

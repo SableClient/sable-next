@@ -159,6 +159,7 @@ afterEach(() => {
   setPreference('roomSort', 'recent');
   setPreference('directSort', 'recent');
   setPreference('showRoomIcon', 'always');
+  setPreference('voiceParticipantPlacement', 'below');
   setPreference('showDmTopics', true);
   setPreference('messagePreviews', 'off');
   globalThis.IntersectionObserver = realObserver;
@@ -865,7 +866,7 @@ test('direct messages and unspaced rooms without an avatar show their initial', 
   expect(icon?.querySelector('svg')).toBeNull();
 });
 
-test('an active call in a text room shows the live count without the voice icon', async () => {
+test('an active call in a text room shows its participants and count in the room row', async () => {
   roomsFixture.rooms = [
     makeRoom({
       room_id: '!plain:example.org',
@@ -878,16 +879,17 @@ test('an active call in a text room shows the live count without the voice icon'
   expect(document.querySelector('.room-list .room-avatar-icon')?.classList.contains('voice')).toBe(
     false
   );
+  expect(row('Plain').querySelectorAll('.voice-face')).toHaveLength(1);
   expect(document.querySelector('.voice-live .status-badge')?.textContent).toBe('1');
 });
 
-test('a live voice room lists its call members', async () => {
+test('a live voice room shows each participant avatar once in the list beneath it', async () => {
   observeImmediately();
   core.userProfile.mockImplementation((userId: string) =>
     Promise.resolve({
       user_id: userId,
       display_name: userId === '@alice:example.org' ? 'Alice' : 'Bob',
-      avatar_url: null,
+      avatar_url: `https://example.org/avatars/${userId}.png`,
     })
   );
   roomsFixture.rooms = [
@@ -904,9 +906,43 @@ test('a live voice room lists its call members', async () => {
     expect(document.querySelector('.call-participant-list')?.textContent).toContain('Alice');
   });
 
-  expect(document.querySelectorAll('.call-participant-list .avatar-root')).toHaveLength(2);
-  expect(core.userProfile).toHaveBeenCalledWith('@alice:example.org');
-  expect(core.userProfile).toHaveBeenCalledWith('@bob:example.org');
+  const list = screen.getByRole('list', { name: 'nav.voiceLive:2' });
+  for (const name of ['Alice', 'Bob']) {
+    const avatarUrl = `https://example.org/avatars/@${name.toLowerCase()}:example.org.png`;
+    const avatar = within(list).getByRole('button', { name }).querySelector('img');
+    expect(avatar).toHaveAttribute('src', avatarUrl);
+    expect(document.querySelectorAll(`img[src="${avatarUrl}"]`)).toHaveLength(1);
+  }
+});
+
+test('switching the voice participant layout moves the avatars and keeps the full count', async () => {
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!voice:example.org',
+      name: 'Voice',
+      room_kind: 'voice',
+      call_participants: [
+        '@alice:example.org',
+        '@bob:example.org',
+        '@cam:example.org',
+        '@dee:example.org',
+      ],
+    }),
+  ];
+  await mountNav();
+
+  setPreference('voiceParticipantPlacement', 'inline');
+  await tick();
+  expect(screen.queryByRole('list', { name: 'nav.voiceLive:4' })).toBeNull();
+  const summary = within(row('Voice')).getByRole('img', { name: 'nav.voiceLive:4' });
+  expect(summary.querySelectorAll('.voice-face')).toHaveLength(3);
+  expect(summary.querySelector('.status-badge')).toHaveTextContent('4');
+
+  setPreference('voiceParticipantPlacement', 'below');
+  await tick();
+  const list = screen.getByRole('list', { name: 'nav.voiceLive:4' });
+  expect(within(list).getAllByRole('button')).toHaveLength(4);
+  expect(row('Voice').querySelector('.voice-face')).toBeNull();
 });
 
 test('a participant sharing their screen is tagged live to people outside the call', async () => {
@@ -939,7 +975,7 @@ test('a participant sharing their screen is tagged live to people outside the ca
   });
 });
 
-test('a collapsed live voice room keeps participant avatars labelled', async () => {
+test('a collapsed live voice room keeps participants visible in either layout', async () => {
   observeImmediately();
   core.userProfile.mockResolvedValue({ display_name: 'Alice', avatar_url: null });
   roomsFixture.rooms = [
@@ -957,6 +993,12 @@ test('a collapsed live voice room keeps participant avatars labelled', async () 
       document.querySelector('.call-participant-list .avatar-root')?.getAttribute('aria-label')
     ).toBe('Alice');
   });
+
+  setPreference('voiceParticipantPlacement', 'inline');
+  await tick();
+  expect(screen.queryByRole('list', { name: 'nav.voiceLive:1' })).toBeNull();
+  const roomLink = screen.getByRole('treeitem', { name: 'Voice, nav.voiceLive:1' });
+  expect(roomLink.querySelector('.voice-face')).toBeInTheDocument();
 });
 
 test('a user in a voice room on two devices is listed once per device', async () => {

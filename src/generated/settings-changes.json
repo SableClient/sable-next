@@ -1,7 +1,9 @@
 {
   "upcoming": {
     "added": [
+      "voiceParticipantPlacement",
       "showBridgeBadges",
+      "messagePreviews",
       "showAlertZoo",
       "personaPickerShowAccountWhenDeselected",
       "jumpToLatestOnSend",

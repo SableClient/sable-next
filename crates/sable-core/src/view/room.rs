@@ -50,7 +50,7 @@ pub struct RoomInfo {
     /// The last read of `children` failed, so they are the previous ones.
     pub children_stale: bool,
     pub tags: Vec<RoomTag>,
-    pub screen_sharers: Vec<OwnedUserId>,
+    pub(crate) voice_roster: Option<crate::calls::VoiceRoomRoster>,
     pub avatar_override: Option<String>,
     /// Read once per row, as a bridge sets it when it creates the room.
     pub bridge: Option<BridgeView>,
@@ -70,6 +70,7 @@ pub fn room_list_item<S: BuildHasher>(
     nicknames: &crate::nicknames::Nicknames,
 ) -> RoomListItemView {
     let info = room_cache.get(item.room_id());
+    let voice_roster = info.and_then(|info| info.voice_roster.as_ref());
     let latest_event = latest_event(item);
     let latest_event_id = latest_event
         .as_ref()
@@ -113,8 +114,13 @@ pub fn room_list_item<S: BuildHasher>(
         state: item.state().into(),
         is_tombstoned: info.is_some_and(|i| i.is_tombstoned),
         room_kind: RoomKind::from_room_type(item.room_type().as_ref()),
-        call_participants: item.active_room_call_participants(),
-        screen_sharers: info.map(|i| i.screen_sharers.clone()).unwrap_or_default(),
+        call_participants: voice_roster.map_or_else(
+            || item.active_room_call_participants(),
+            |roster| roster.participants.clone(),
+        ),
+        screen_sharers: voice_roster
+            .map(|roster| roster.screen_sharers.clone())
+            .unwrap_or_default(),
         supports_knock: info.is_some_and(|i| i.supports_knock),
         supports_restricted: info.is_some_and(|i| i.supports_restricted),
         supports_knock_restricted: info.is_some_and(|i| i.supports_knock_restricted),
@@ -359,7 +365,7 @@ pub(crate) async fn enrich_rooms<'a, S: BuildHasher>(
     }
 }
 
-pub(super) fn latest_items(diffs: &[eyeball_im::VectorDiff<RoomListItem>]) -> Vec<&RoomListItem> {
+pub(crate) fn latest_items(diffs: &[eyeball_im::VectorDiff<RoomListItem>]) -> Vec<&RoomListItem> {
     let mut latest: HashMap<&RoomId, &RoomListItem> = HashMap::new();
     for item in diffs.iter().flat_map(diff_values) {
         latest.insert(item.room_id(), item);
@@ -496,10 +502,10 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
             Some(previous) => previous.bridge.clone(),
             None => room_bridge(room).await,
         },
-        screen_sharers: if room.is_call() {
-            crate::calls::screen_sharers(room).await
+        voice_roster: if room.is_call() {
+            Some(crate::calls::voice_room_roster(room).await)
         } else {
-            Vec::new()
+            None
         },
         avatar_override,
     }

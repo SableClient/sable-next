@@ -1,4 +1,9 @@
 {
+  "settings": {
+    "voiceParticipantPlacement": "Teilnehmende in Sprachräumen",
+    "voiceParticipantsBelow": "Unter dem Raumnamen",
+    "voiceParticipantsInline": "Neben dem Raumnamen"
+  },
   "nav": {
     "primary": "Primärnavigation",
     "messages": "Nachrichten",

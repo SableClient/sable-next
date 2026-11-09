@@ -19,6 +19,7 @@ import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
 import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
 import TranslateIcon from 'phosphor-svelte/lib/TranslateIcon';
 import TreeStructureIcon from 'phosphor-svelte/lib/TreeStructureIcon';
+import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
 import WheelchairMotionIcon from 'phosphor-svelte/lib/WheelchairMotionIcon';
 import { setLanguage } from '#lib/i18n.js';
 import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
@@ -81,6 +82,17 @@ export const appearanceCategory: SettingsCategory = {
         { value: 'sometimes', label: 'settings.showRoomIconSometimes' },
         { value: 'collapsed', label: 'settings.showRoomIconCollapsed' },
         { value: 'never', label: 'common.never' },
+      ],
+    },
+    {
+      key: 'voiceParticipantPlacement',
+      section: 'sidebar',
+      icon: UsersIcon,
+      name: 'settings.voiceParticipantPlacement',
+      type: 'select',
+      options: [
+        { value: 'below', label: 'settings.voiceParticipantsBelow' },
+        { value: 'inline', label: 'settings.voiceParticipantsInline' },
       ],
     },
     {

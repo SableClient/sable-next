@@ -291,6 +291,7 @@ const SETTINGS = {
   showRoomIcon: choice<ShowRoomIcon>(['always', 'sometimes', 'collapsed', 'never'], 'always', {
     account: true,
   }),
+  voiceParticipantPlacement: choice(['below', 'inline'], 'below', { account: true }),
   showRoomBanners: toggle(true, { account: true }),
   showDmTopics: toggle(true, { account: true }),
   messagePreviews: choice<MessagePreviews>(['off', 'direct', 'rooms', 'all'], 'off', {

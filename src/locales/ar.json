@@ -1,4 +1,9 @@
 {
+  "settings": {
+    "voiceParticipantPlacement": "المشاركون في الغرف الصوتية",
+    "voiceParticipantsBelow": "أسفل اسم الغرفة",
+    "voiceParticipantsInline": "بجانب اسم الغرفة"
+  },
   "nav": {
     "alerts": "تنبيهات",
     "chatsEmpty": "لا توجد مراسلات خاصة.",

@@ -106,6 +106,7 @@
     )
   );
   let callRoom = $derived(roomList.byId(call.roomId));
+  let callParticipants = $derived(call.active ? call.members.map((member) => member.user_id) : []);
   let spaceUnread = $derived(
     new Map(
       spaces.flatMap((space) => {
@@ -295,6 +296,7 @@
           {roomId}
           {onNavigate}
           callRoomId={call.active ? call.roomId : null}
+          {callParticipants}
           callVoiceStates={call.voiceStates}
         />
       </div>
@@ -325,6 +327,7 @@
           width={roomNavWidth}
           {collapsed}
           callRoomId={call.active ? call.roomId : null}
+          {callParticipants}
           callVoiceStates={call.voiceStates}
         />
         <ResizeHandle

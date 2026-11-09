@@ -1,5 +1,4 @@
 <script lang="ts">
-  import type { RoomListItemView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import MicrophoneSlashIcon from 'phosphor-svelte/lib/MicrophoneSlashIcon';
@@ -13,7 +12,8 @@
   import type { PeerProfiles } from './peer-profiles.svelte.js';
 
   interface Props {
-    room: RoomListItemView;
+    participants: readonly string[];
+    screenSharers: readonly string[];
     collapsed: boolean;
     closed: boolean;
     voiceStates?: ReadonlyMap<string, CallVoiceState>;
@@ -22,24 +22,32 @@
     onParticipant: (event: MouseEvent, userId: string) => void;
   }
 
-  let { room, collapsed, closed, voiceStates, profiles, onVolume, onParticipant }: Props = $props();
+  let {
+    participants: participantIds,
+    screenSharers,
+    collapsed,
+    closed,
+    voiceStates,
+    profiles,
+    onVolume,
+    onParticipant,
+  }: Props = $props();
 
   const core = useCoreClient();
-  let live = $derived(room.call_participants.length);
   let participants = $derived(
-    byName(room.call_participants, (userId) => profiles.get(userId)?.display_name)
+    byName(participantIds, (userId) => profiles.get(userId)?.display_name)
   );
   let rowKeys = $derived(participantKeys(participants));
 </script>
 
 <ul
   class={['call-participant-list', { collapsed, 'closed-row': closed }]}
-  aria-label={i18n.t('nav.voiceLive', { count: live })}
+  aria-label={i18n.t('nav.voiceLive', { count: participants.length })}
 >
   {#each participants as userId, index (rowKeys[index])}
     {@const profile = profiles.get(userId)}
     {@const voice = voiceStates?.get(rowKeys[index] ?? userId)}
-    {@const sharing = voice ? voice.screen : room.screen_sharers.includes(userId)}
+    {@const sharing = voice ? voice.screen : screenSharers.includes(userId)}
     {@const name = profile?.display_name ?? userId}
     {@const displayName = numberedName(name, rowKeys[index] ?? userId)}
     <li

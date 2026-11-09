@@ -1,5 +1,8 @@
 {
   "settings": {
+    "voiceParticipantPlacement": "Uczestnicy pokoi głosowych",
+    "voiceParticipantsBelow": "Pod nazwą pokoju",
+    "voiceParticipantsInline": "Obok nazwy pokoju",
     "cancelVerification": "Anuluj weryfikację",
     "verificationCancelled": "Weryfikacja została anulowana: {{reason}}"
   },
