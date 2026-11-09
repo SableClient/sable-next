@@ -322,14 +322,26 @@ impl Core {
             device_display_name,
         }: StartOidcLoginParams,
     ) -> Result<String, RpcError> {
-        let reauth = self.reauthentication_account(reauth_account_id).await?;
+        let redirect_uri =
+            Url::parse(&redirect_uri).or_failed(self, "start_oidc_login_redirect_uri")?;
+        let mut reauth = self.reauthentication_account(reauth_account_id).await?;
+        if let Some(account) = reauth.as_mut()
+            && !account.device_invalidated
+            && matches!(account.session.credentials, Credentials::OAuth { .. })
+            && !reuses_oauth_client(&account.session, &redirect_uri)
+        {
+            // The server ties the device to the client that created it.
+            tracing::warn!("reauthenticating on a new device: the OAuth client cannot be reused");
+            self.mark_account_needs_reauth(Some(&account.account_id), true)
+                .await?;
+            account.device_invalidated = true;
+            account.session.credentials.discard_tokens();
+        }
         let homeserver = reauth
             .as_ref()
             .map_or(homeserver, |account| account.session.homeserver.clone());
         let (account_id, account_store_id) = self.authentication_store(reauth.as_ref()).await?;
         tracing::info!(operation = "oidc_login", intent = ?intent, "starting OAuth login");
-        let redirect_uri =
-            Url::parse(&redirect_uri).or_failed(self, "start_oidc_login_redirect_uri")?;
 
         let client = self
             .login_client(&account_store_id, &homeserver, reauth.as_ref())
@@ -342,8 +354,7 @@ impl Core {
                 return Err(RpcError::Denied);
             }
             if let Credentials::OAuth { client_id, .. } = &account.session.credentials
-                && session::registered_redirect_uri(&account.session, &redirect_uri)
-                    == session::registration_redirect_uri(&redirect_uri)
+                && reuses_oauth_client(&account.session, &redirect_uri)
             {
                 client.oauth().restore_registered_client(
                     matrix_sdk::authentication::oauth::ClientId::new(client_id.clone()),
@@ -721,6 +732,11 @@ fn has_single_nonempty_query_parameter(url: &Url, name: &str) -> bool {
     matches!(values.next(), Some(value) if !value.is_empty()) && values.next().is_none()
 }
 
+fn reuses_oauth_client(session: &session::PersistedSession, redirect_uri: &Url) -> bool {
+    session::registered_redirect_uri(session, redirect_uri)
+        == session::registration_redirect_uri(redirect_uri)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -891,6 +907,107 @@ mod tests {
     }
 
     #[cfg(not(target_family = "wasm"))]
+    async fn oauth_reauthentication_url(registered: &str, requested: &str) -> (String, bool) {
+        use matrix_sdk::authentication::oauth::UserSession;
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use matrix_sdk::{SessionMeta, SessionTokens};
+
+        let server = MatrixMockServer::new().await;
+        server
+            .mock_versions()
+            .with_simplified_sliding_sync()
+            .ok()
+            .mount()
+            .await;
+        let oauth = server.oauth();
+        oauth.mock_server_metadata().ok().mount().await;
+        oauth.mock_registration().ok().mount().await;
+        let directory = std::env::temp_dir().join(format!(
+            "sable-oauth-reauth-{}",
+            matrix_sdk::ruma::TransactionId::new()
+        ));
+        let store_id = directory.to_str().unwrap();
+        let (core, _events) = Core::new(
+            store_id,
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        let persisted = session::PersistedSession {
+            oauth_issuer: Some(Url::parse(&server.server().uri()).unwrap()),
+            oauth_redirect_uri: Some(Url::parse(registered).unwrap()),
+            resolved_homeserver: Some(Url::parse(&server.server().uri()).unwrap()),
+            homeserver: server.server().uri(),
+            credentials: Credentials::OAuth {
+                client_id: "OLD_CLIENT".to_owned(),
+                user: UserSession {
+                    meta: SessionMeta {
+                        user_id: matrix_sdk::ruma::owned_user_id!("@alice:example.org"),
+                        device_id: matrix_sdk::ruma::owned_device_id!("EXISTING"),
+                    },
+                    tokens: SessionTokens {
+                        access_token: "old".to_owned(),
+                        refresh_token: None,
+                    },
+                },
+            },
+        };
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "version": 1, "active_account_id": null, "next_account_id": 2,
+            "accounts": [{"account_id": "a1", "store_id": store_id, "needs_reauth": true,
+                "session": persisted}]
+        }))
+        .unwrap();
+        *core.accounts.lock().await = Some(
+            session::AccountRegistry::from_bytes(&bytes, store_id)
+                .unwrap()
+                .0,
+        );
+        let client = session::restore_client(store_id, &persisted, true)
+            .await
+            .unwrap();
+        session::restore_credentials(&client, &persisted)
+            .await
+            .unwrap();
+        drop(client);
+
+        let url = core
+            .start_oidc_login(crate::api::auth::StartOidcLoginParams {
+                homeserver: "ignored.invalid".to_owned(),
+                redirect_uri: requested.to_owned(),
+                intent: AuthIntent::Login,
+                reauth_account_id: Some("a1".to_owned()),
+                device_display_name: None,
+            })
+            .await
+            .unwrap();
+        let invalidated = core
+            .accounts()
+            .await
+            .unwrap()
+            .accounts
+            .iter()
+            .any(|account| account.account_id == "a1" && account.device_invalidated);
+        *core.pending_login.lock().await = None;
+        drop(core);
+        std::fs::remove_dir_all(directory).unwrap();
+        (url, invalidated)
+    }
+
+    #[tokio::test]
+    async fn oauth_reauthentication_keeps_the_device_of_the_same_client() {
+        let (url, invalidated) =
+            oauth_reauthentication_url("moe.sable.next:/login", "moe.sable.next:/login").await;
+        assert!(url.contains("EXISTING"), "{url}");
+        assert!(!invalidated);
+    }
+
+    #[tokio::test]
+    async fn oauth_reauthentication_with_a_new_client_moves_to_a_new_device() {
+        let (url, invalidated) =
+            oauth_reauthentication_url("moe.sable.app:/login", "moe.sable.next:/login").await;
+        assert!(!url.contains("EXISTING"), "{url}");
+        assert!(invalidated);
+    }
+
     #[tokio::test]
     async fn password_reauthentication_reuses_account_device_and_identity() {
         use matrix_sdk::test_utils::mocks::MatrixMockServer;
