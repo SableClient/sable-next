@@ -27,4 +27,14 @@ internal object MatrixPushPayload {
         recipients.singleOrNull()?.let { notification.put("user_id", it) }
         return notification
     }
+
+    /** Without content, the event is fetched from the homeserver, so a forged push shows nothing. */
+    fun routingOnly(raw: String): String {
+        val notification = parse(raw) ?: return raw
+        val kept = JSONObject()
+        ROUTING_KEYS.forEach { key -> notification.opt(key)?.let { kept.put(key, it) } }
+        return JSONObject().put("notification", kept).toString()
+    }
+
+    private val ROUTING_KEYS = listOf("event_id", "room_id", "user_id", "counts", "prio", "devices")
 }

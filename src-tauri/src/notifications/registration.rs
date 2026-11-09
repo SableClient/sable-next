@@ -265,13 +265,15 @@ async fn register_account_push<R: Runtime>(
         return Err(PushRegistrationError::NoAppId);
     };
 
+    // Plain pushes are readable by the push server and forgeable by anyone who knows the endpoint.
+    let event_id_only = config.event_id_only || is_direct_pusher(&app_id);
     let pusher = PusherView {
         pushkey: pushkey.clone(),
         app_id: app_id.clone(),
         url: gateway_url.clone(),
         device_display_name: format!("Sable on {}", std::env::consts::OS),
         web_push,
-        event_id_only: config.event_id_only,
+        event_id_only,
         append: true,
     };
 
@@ -287,7 +289,7 @@ async fn register_account_push<R: Runtime>(
         pushkey,
         app_id,
         Some(gateway_url),
-        config.event_id_only,
+        event_id_only,
         instance,
     )
     .map_err(|_| PushRegistrationError::Ledger)?;
