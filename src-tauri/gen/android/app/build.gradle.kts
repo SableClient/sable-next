@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.io.FileInputStream
 import java.util.Properties
 
@@ -135,6 +136,12 @@ android {
             "SENTRY_RELEASE",
             "\"${sentryBuildConfigValue("VITE_APP_VERSION")}\""
         )
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
     }
 }
 
