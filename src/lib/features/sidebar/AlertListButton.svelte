@@ -102,14 +102,16 @@
             mode === 'compact' ? 'compact-tool nav-tab-side' : 'desktop-tool nav-tab-bottom',
           ]}
           aria-label={i18n.t('nav.alerts')}
+          data-current={alertListState.open}
           onclick={() => {
             alertListState.open = !alertListState.open;
           }}
-          style:--progress={mainProgress?.value ?? 1}
+          style:--progress={mainProgress?.value ?? 0}
           transition:fly|global={{ duration: motionMs(MOTION_MS.fast), easing: backOut, y: 50 }}
         >
           <span class="nav-tab-hit-area" aria-hidden="true"></span>
           <span class="progress"></span>
+          <span class="progress indeterminate"></span>
           <Icon weight={alertListState.open ? 'fill' : 'regular'} />
           {#if pendingAlerts > 1}
             <UnreadBadge counts={{ unread: 0, highlight: pendingAlerts }} aria-hidden="true" />
@@ -122,46 +124,45 @@
 
 <style>
   .quick-tool {
+    border-color: var(--alert-main-color);
+    color: var(--alert-main-color);
     position: relative;
 
+    --alert-main-color: var(--surface-on-container);
+
     :global(.unread-badge) {
-      background: var(--primary-main);
-      color: var(--success-on-main);
+      background-color: var(--alert-main-color);
     }
   }
 
-  .priority-critical,
-  .priority-critical:hover {
-    background-color: var(--crit-container);
-    border-color: var(--crit-main);
-    color: var(--crit-main);
+  .quick-tool[data-current='true'],
+  .quick-tool[data-current='true']:hover {
+    background-color: var(--bg-container-active);
+  }
 
-    :global(.unread-badge) {
-      background-color: var(--crit-main);
-    }
+  .priority-critical {
+    --alert-main-color: var(--crit-main);
+
+    background-color: var(--crit-container);
   }
 
   .priority-warning,
-  .priority-warning:hover,
-  .priority-security,
-  .priority-security:hover {
-    background-color: var(--warn-container);
-    border-color: var(--warn-main);
-    color: var(--warn-main);
+  .priority-security {
+    --alert-main-color: var(--warn-main);
 
-    :global(.unread-badge) {
-      background-color: var(--warn-main);
-    }
+    background-color: var(--warn-container);
   }
 
   .priority-update,
   .priority-update:hover {
-    border-color: var(--success-main);
-    color: var(--success-main);
+    --alert-main-color: var(--success-main);
+  }
 
-    :global(.unread-badge) {
-      background-color: var(--success-main);
-    }
+  .priority-task,
+  .priority-task:hover {
+    --alert-main-color: var(--primary-main);
+
+    border-color: var(--bg-container-line);
   }
 
   .desktop-tool {
@@ -178,21 +179,29 @@
     }
 
     .progress::after {
-      background-color: var(--primary-main);
+      background-color: var(--alert-main-color);
       bottom: 0;
       content: '';
-      height: 0%;
       left: 0;
       position: absolute;
+    }
+
+    .progress:not(.indeterminate)::after {
+      height: 0%;
       width: calc(var(--progress) * 100%);
     }
 
-    &.has-progress .progress::after {
+    .progress.indeterminate::after {
+      height: 10%;
+      width: 100%;
+    }
+
+    &.has-progress:not(.indeterminate) .progress:not(.indeterminate)::after {
       height: 10%;
     }
 
-    .priority-update .progress::after {
-      background-color: var(--success-main);
+    &.has-progress:not(.indeterminate) .progress.indeterminate::after {
+      display: none;
     }
   }
 
@@ -216,7 +225,7 @@
 
     .progress-circle {
       fill: transparent;
-      stroke: var(--primary-main);
+      stroke: var(--alert-main-color);
       stroke-dasharray: var(--circumference);
       stroke-dashoffset: calc(var(--circumference) - (var(--circumference) * var(--progress)));
       stroke-width: 0;
@@ -242,9 +251,8 @@
       transition: stroke-dashoffset var(--motion-normal) var(--ease-smooth-out);
     }
 
-    :global(html:not([data-reduced-motion='on']) .desktop-tool.indeterminate .progress::after) {
+    :global(html:not([data-reduced-motion='on']) .desktop-tool .progress.indeterminate::after) {
       animation: progress-linear-indeterminate 1.4s var(--motion-easing-standard) infinite;
-      width: 100%;
     }
 
     :global(html:not([data-reduced-motion='on']) .mobile-tool.indeterminate .progress) {
