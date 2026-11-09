@@ -92,6 +92,30 @@ export function inheritedNotificationModes(
   return inherited;
 }
 
+/** The top-level space each room sits under, which tells apart rooms sharing a name. */
+export function rootSpaceNames(rooms: readonly RoomListItemView[]): Map<string, string> {
+  const parents = new Map<string, RoomListItemView>();
+  for (const space of rooms) {
+    if (space.room_kind !== 'space' || space.state !== 'joined' || space.is_tombstoned) continue;
+    for (const child of space.space_children) {
+      if (!parents.has(child.room_id)) parents.set(child.room_id, space);
+    }
+  }
+  const names = new Map<string, string>();
+  for (const roomId of parents.keys()) {
+    const seen = new Set([roomId]);
+    let root = parents.get(roomId);
+    while (root !== undefined && !seen.has(root.room_id)) {
+      seen.add(root.room_id);
+      const parent = parents.get(root.room_id);
+      if (parent === undefined || seen.has(parent.room_id)) break;
+      root = parent;
+    }
+    if (root !== undefined) names.set(roomId, root.display_name);
+  }
+  return names;
+}
+
 export type ChildRouting = { via: string[]; parentId: string | null };
 
 export function childRouting(rooms: readonly RoomListItemView[], roomId: string): ChildRouting {

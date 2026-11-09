@@ -7,6 +7,7 @@ import type {
 
 import { REACTION_EMOJI, searchReactionEmoji } from '#lib/emoji/emoji.js';
 import { packName } from '#lib/emoji/pack-name.js';
+import { rootSpaceNames } from '#lib/rooms/spaces.js';
 import { t } from '#lib/i18n.js';
 
 import { adminSuggestions, type AdminCommand, type AdminScope } from './admin-commands';
@@ -148,6 +149,7 @@ function roomSuggestions(needle: string, rooms: readonly RoomListItemView[]): Su
   const normalizedNeedle = normalized(needle);
   if (!normalizedNeedle) return [];
   const seen = new Set<string>();
+  const spaceNames = rootSpaceNames(rooms);
   return rooms
     .map((room) => {
       const name = room.name ?? room.canonical_alias ?? room.room_id;
@@ -181,7 +183,8 @@ function roomSuggestions(needle: string, rooms: readonly RoomListItemView[]): Su
       id: room.canonical_alias ?? room.room_id,
       insert: name.startsWith('#') ? name : `#${name}`,
       label: label.startsWith('#') ? label : `#${label}`,
-      detail: room.canonical_alias,
+      detail:
+        [spaceNames.get(room.room_id), room.canonical_alias].filter(Boolean).join(' · ') || null,
       avatarUrl: room.display_avatar_url,
     }))
     .filter(({ id }) => {

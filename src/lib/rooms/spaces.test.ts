@@ -8,6 +8,7 @@ import {
   descendantRoomIds,
   inheritedNotificationModes,
   joinedSpaceRooms,
+  rootSpaceNames,
   spacesContainingRoom,
 } from './spaces';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
@@ -219,4 +220,28 @@ test('walks every joined room and subspace below a space, nearest first', () => 
     '!a:example.org',
     '!b:example.org',
   ]);
+});
+
+test('names the top-level space of each room, through nested spaces and cycles', () => {
+  const space = (roomId: string, name: string, children: string[]) =>
+    room({
+      room_id: roomId,
+      name,
+      room_kind: 'space',
+      space_children: children.map(child),
+    });
+  const names = rootSpaceNames([
+    space('!community:example.org', 'Community', ['!games:example.org']),
+    space('!games:example.org', 'Games', ['!general:example.org']),
+    space('!other:example.org', 'Other', ['!general-2:example.org']),
+    space('!a:example.org', 'A', ['!b:example.org']),
+    space('!b:example.org', 'B', ['!a:example.org']),
+    room({ room_id: '!loose:example.org' }),
+  ]);
+
+  expect(names.get('!general:example.org')).toBe('Community');
+  expect(names.get('!games:example.org')).toBe('Community');
+  expect(names.get('!general-2:example.org')).toBe('Other');
+  expect(names.get('!a:example.org')).toBe('B');
+  expect(names.has('!loose:example.org')).toBe(false);
 });

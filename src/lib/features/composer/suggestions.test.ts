@@ -190,6 +190,27 @@ test('rooms match their name or alias and insert a # label', () => {
   ]);
 });
 
+test('rooms with the same name show the space they are in', () => {
+  const space = {
+    ...room('!space:example.org', 'Community'),
+    room_kind: 'space',
+    state: 'joined',
+    is_tombstoned: false,
+    space_children: [
+      { room_id: '!one:example.org', via: [], order: null, origin_server_ts: 1, suggested: false },
+    ],
+  } as RoomListItemView;
+
+  const suggestions = suggestionsFor(
+    roomQuery('gen'),
+    [],
+    [],
+    [space, room('!one:example.org', 'General'), room('!two:example.org', 'General')]
+  );
+
+  expect(suggestions.map((item) => item.detail)).toEqual(['Community', null]);
+});
+
 test('a room name that already starts with # keeps a single #', () => {
   const [suggestion] = suggestionsFor(
     roomQuery('gen'),
