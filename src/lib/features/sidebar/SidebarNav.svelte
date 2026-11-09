@@ -196,6 +196,9 @@
     onToggleFolder: (folderId: string) => {
       spaceSidebar.toggleFolder(folderId);
     },
+    onCollapseFolders: () => {
+      spaceSidebar.collapseAllFolders();
+    },
     onRenameFolder: (folder: SidebarFolder) => {
       renamingFolder = folder;
     },

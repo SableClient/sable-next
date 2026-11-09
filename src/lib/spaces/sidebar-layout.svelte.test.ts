@@ -211,6 +211,17 @@ test('persists which folders are open and forgets ones that are gone', async () 
   expect(localStorage.getItem('sable-open-space-folders')).toBe('[]');
 });
 
+test('collapses every open folder at once', () => {
+  const sidebar = new SpaceSidebar();
+  sidebar.toggleFolder('f');
+  sidebar.toggleFolder('g');
+
+  sidebar.collapseAllFolders();
+
+  expect(sidebar.openFolders.size).toBe(0);
+  expect(localStorage.getItem('sable-open-space-folders')).toBe('[]');
+});
+
 test('drops its subscription and layout on stop', async () => {
   const harness = fakeCore({ sidebar: vi.fn(() => Promise.resolve([folder])) });
   const sidebar = new SpaceSidebar();

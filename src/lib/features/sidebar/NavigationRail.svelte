@@ -98,6 +98,7 @@
     layout?: readonly SidebarItem[];
     openFolders?: ReadonlySet<string>;
     onToggleFolder?: (folderId: string) => void;
+    onCollapseFolders?: () => void;
     onRenameFolder?: (folder: SidebarFolder) => void;
     onUngroupFolder?: (folderId: string) => void;
     onMarkFolderRead?: (folder: SidebarFolder) => void;
@@ -124,6 +125,7 @@
     layout = [],
     openFolders = new Set(),
     onToggleFolder,
+    onCollapseFolders,
     onRenameFolder,
     onUngroupFolder,
     onMarkFolderRead,
@@ -946,6 +948,14 @@
         <span>{i18n.t(toggle.label)}</span>
       </ActionMenuItem>
     {/each}
+
+    {#if onCollapseFolders}
+      <ActionMenuSeparator />
+      <ActionMenuItem disabled={openFolders.size === 0} onSelect={onCollapseFolders}>
+        <span class="menu-check" aria-hidden="true"></span>
+        <span>{i18n.t('nav.folderCollapseAll')}</span>
+      </ActionMenuItem>
+    {/if}
   </ActionMenu>
 {/if}
 
@@ -1023,6 +1033,12 @@
       <FolderOpenIcon />
       {i18n.t('nav.folderUngroup')}
     </ActionMenuItem>
+    {#if onCollapseFolders}
+      <ActionMenuItem disabled={openFolders.size === 0} onSelect={onCollapseFolders}>
+        <CaretUpIcon />
+        {i18n.t('nav.folderCollapseAll')}
+      </ActionMenuItem>
+    {/if}
   </ActionMenu>
 {/if}
 

@@ -102,6 +102,13 @@ export class SpaceSidebar {
     this.persistOpenFolders();
   }
 
+  collapseAllFolders(): void {
+    if (this.openFolders.size === 0) return;
+
+    this.openFolders.clear();
+    this.persistOpenFolders();
+  }
+
   private receive(items: SidebarItem[]): void {
     const pending = this.pending;
     if (pending !== null) {

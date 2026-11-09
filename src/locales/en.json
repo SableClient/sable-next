@@ -153,6 +153,7 @@
     "folderRenameDescription": "Choose a short label. Leave it empty to show the space names again.",
     "folderName": "Folder name",
     "folderCollapse": "Collapse {{name}}",
+    "folderCollapseAll": "Collapse all folders",
     "folderUngroup": "Ungroup folder",
     "folderRemoveSpace": "Remove from folder",
     "folderExpand": "Folder {{name}}",
