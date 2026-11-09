@@ -143,13 +143,15 @@ fn seal_with(
     use hkdf::Hkdf;
     use sha2::Sha256;
 
+    let base64url = base64::engine::GeneralPurpose::new(
+        &base64::alphabet::URL_SAFE,
+        base64::engine::GeneralPurposeConfig::new()
+            .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent),
+    );
     let decode = |value: &str| {
-        base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .decode(value.trim_end_matches('='))
-            .or_else(|_| {
-                base64::engine::general_purpose::STANDARD_NO_PAD.decode(value.trim_end_matches('='))
-            })
-            .map_err(|_| CoreError::from("the web push keys are not base64"))
+        base64url
+            .decode(value)
+            .map_err(|_| CoreError::from("the web push keys are not base64url"))
     };
     let receiver = p256::PublicKey::from_sec1_bytes(&decode(p256dh)?)
         .map_err(|_| "the web push key is not a P-256 point")?;
@@ -183,7 +185,7 @@ fn seal_with(
         u32::try_from(ciphertext.len().max(4096)).map_err(|_| "web push body is too large")?;
     let mut sealed = salt.to_vec();
     sealed.extend_from_slice(&record_size.to_be_bytes());
-    sealed.push(u8::try_from(sender_public.len()).map_err(|_| "web push key is too long")?);
+    sealed.push(65);
     sealed.extend_from_slice(&sender_public);
     sealed.extend_from_slice(&ciphertext);
     Ok(sealed)
