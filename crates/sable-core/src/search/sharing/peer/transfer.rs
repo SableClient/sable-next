@@ -284,7 +284,10 @@ impl Core {
                     rooms: index.rooms.keys().cloned().collect(),
                 })
             }
-            (Transfer::Receiving(_), None) => None,
+            (Transfer::Receiving(_), None) => {
+                // We need to wait on the sender to kick things off by sending the room list.
+                return Ok(None);
+            }
             (Transfer::Receiving(download), Some(message)) => {
                 self.handle_as_receiver(&client, session_id, download, message)
                     .await?
@@ -885,7 +888,8 @@ mod tests {
                 .windows(5)
                 .any(|window| window == [0xc4, 3, 0, 159, 255])
         );
-        let Message::PartData(PartData { part, data, .. }) = rmp_serde::from_slice(&bytes).unwrap() else {
+        let Message::PartData(PartData { part, data, .. }) = rmp_serde::from_slice(&bytes).unwrap()
+        else {
             panic!("expected data");
         };
         assert_eq!((part, data), (3, vec![0, 159, 255]));

@@ -23,6 +23,7 @@ import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
 import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 import UserQuickToolsHarness from './UserQuickToolsHarness.test.svelte';
 import type { Priority, PriorityProvider } from './alerts';
+import { CircleIcon } from 'phosphor-svelte';
 
 beforeEach(() => {
   visit('/rooms');
@@ -65,7 +66,12 @@ test('the mobile bar keeps a slot per tool', () => {
 });
 
 test('the mobile bar gives a pending alert its own slot', () => {
-  setup({ mobile: true, alertProviders: [{ priority: 'update', dismiss: () => {} }] });
+  setup({
+    mobile: true,
+    alertProviders: [
+      { priority: { level: 'update', icon: CircleIcon }, progress: undefined, dismiss: () => {} },
+    ],
+  });
 
   const bar = screen.getByRole('navigation', { name: 'nav.quickTools' });
   expect(bar.style.getPropertyValue('--mobile-slot-count')).toBe('5');
@@ -74,13 +80,16 @@ test('the mobile bar gives a pending alert its own slot', () => {
 
 test('clearing the last alert leaves the alerts page for the rooms list', () => {
   visit('/alerts');
-  let priority = $state<Priority>('update');
+  let priority = $state<Priority>({ level: 'update', icon: CircleIcon });
   setup({
     mobile: true,
     alertProviders: [
       {
         get priority() {
           return priority;
+        },
+        get progress() {
+          return undefined;
         },
         dismiss: () => {
           priority = null;

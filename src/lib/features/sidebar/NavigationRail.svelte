@@ -62,6 +62,8 @@
   import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
   import BridgeBadge from './BridgeBadge.svelte';
   import UserQuickTools from './UserQuickTools.svelte';
+  import ResponsivePopover from '#lib/ui/primitives/ResponsivePopover.svelte';
+  import AlertList, { alertListState } from './AlertList.svelte';
 
   type RailSection = 'home' | 'unspaced' | 'direct';
 
@@ -314,6 +316,8 @@
   function outlined(item: RailItem): boolean {
     return item.icon !== undefined || item.dm === true;
   }
+
+  let alertListPopoverAnchor = $state.raw<HTMLElement | null>(null);
 
   let displayAnchor = $state.raw<CursorAnchor | null>(null);
   let displayOpen = $state(false);
@@ -955,7 +959,21 @@
     </ul>
   </div>
   {#if !mobile && compact}
-    <UserQuickTools compact />
+    <ResponsivePopover
+      label={i18n.t('nav.alerts')}
+      closeLabel={i18n.t('common.close')}
+      side="right"
+      align="start"
+      class="sidebar-popover alert-popover menu-surface"
+      sideOffset={8}
+      anchor={alertListPopoverAnchor}
+      bind:open={alertListState.open}
+    >
+      <AlertList isDrawer={false} />
+    </ResponsivePopover>
+    <div bind:this={alertListPopoverAnchor}>
+      <UserQuickTools compact />
+    </div>
   {/if}
 </nav>
 
@@ -1368,5 +1386,9 @@
   .folder-collapse:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
+  }
+
+  :global(.sidebar-popover) {
+    margin-bottom: var(--space-200);
   }
 </style>

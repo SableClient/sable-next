@@ -22,7 +22,10 @@
     return {
       get priority(): Priority {
         if (show) {
-          return 'security';
+          return {
+            level: 'security',
+            icon: ShieldWarningIcon,
+          };
         } else {
           return null;
         }

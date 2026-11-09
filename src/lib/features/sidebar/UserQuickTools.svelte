@@ -20,8 +20,10 @@
   import AccountSwitcher from './AccountSwitcher.svelte';
   import '#lib/ui/primitives/nav-tab.css';
   import './sidebar-tools.css';
-  import AlertPopover from './AlertPopover.svelte';
   import { useAlertProviders } from './alerts.js';
+  import AlertDrawerButton from './AlertDrawerButton.svelte';
+  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
+  import AlertList, { alertListState } from './AlertList.svelte';
 
   interface Props {
     mobile?: boolean;
@@ -96,10 +98,6 @@
       return mobileTools.length;
     }
 
-    if (page.url.pathname === '/alerts') {
-      return mobileTools.length + 1;
-    }
-
     return mobileTools.findIndex((item) => isToolActive(item.href));
   });
 </script>
@@ -121,6 +119,15 @@
 {/snippet}
 
 {#if mobile}
+  <BottomSheet
+    bind:open={alertListState.open}
+    contentInset={false}
+    background="transparent"
+    label=""
+    closeLabel=""
+  >
+    <AlertList />
+  </BottomSheet>
   <nav
     class={['mobile-tools', { 'selection-active': mobileSelectedIndex >= 0 }]}
     style:--mobile-selected-index={String(Math.max(mobileSelectedIndex, 0))}
@@ -157,13 +164,13 @@
         <AccountSwitcher mode="mobile" />
       </div>
       <div class="mobile-tool-slot" style:display={hasAlerts ? undefined : 'none'}>
-        <AlertPopover mode="mobile" />
+        <AlertDrawerButton mode="mobile" />
       </div>
     </div>
   </nav>
 {:else if compact}
   <nav class="compact-tools" aria-label={i18n.t('nav.quickTools')}>
-    <AlertPopover mode="compact" />
+    <AlertDrawerButton mode="compact" />
     {@render roomSwitcher('compact-tool nav-tab-side', 'right')}
     {#each desktopTools as item (item.href)}
       {@const toolActive = isToolActive(item.href)}
@@ -199,7 +206,7 @@
   <nav class="desktop-tools" aria-label={i18n.t('nav.quickTools')}>
     <AccountSwitcher mode="desktop" />
     <div class="desktop-tool-actions">
-      <AlertPopover mode="desktop" />
+      <AlertDrawerButton mode="desktop" />
       {@render roomSwitcher('desktop-tool nav-tab-bottom', 'top')}
       {#each desktopTools as item (item.href)}
         {@const toolActive = isToolActive(item.href)}

@@ -23,7 +23,10 @@
     return {
       get priority(): Priority {
         if (visible) {
-          return 'update';
+          return {
+            level: 'update',
+            icon: ArrowCircleUpIcon,
+          };
         } else {
           return null;
         }
@@ -76,7 +79,7 @@
     <Button variant="ghost" size="small" onclick={() => dismiss()}>
       {i18n.t('settings.updateBannerLater')}
     </Button>
-    <Button variant="primary" size="small" onclick={refresh}>
+    <Button variant="success" size="small" onclick={refresh}>
       {i18n.t('common.install')}
     </Button>
   {/snippet}

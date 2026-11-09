@@ -58,7 +58,8 @@ function idle(overrides: Partial<SearchSharingView> = {}): SearchSharingView {
     pause: null,
     outcome: null,
     peer: null,
-    rooms_copied: 0,
+    transferred_rooms: 0,
+    total_rooms: 0,
     last_copy: null,
     automatic: false,
     asked: 0,
@@ -141,7 +142,8 @@ test('progress names the device being copied from', async () => {
     withSharing({
       state: 'receiving',
       peer: { device_id: 'MAC', name: 'MacBook' },
-      rooms_copied: 3,
+      transferred_rooms: 3,
+      total_rooms: 3,
     })
   );
   render(SearchSharingStatus);

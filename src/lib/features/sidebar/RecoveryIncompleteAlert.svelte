@@ -14,7 +14,10 @@
     return {
       get priority(): Priority {
         if (show) {
-          return 'security';
+          return {
+            level: 'security',
+            icon: ShieldWarningIcon,
+          };
         } else {
           return null;
         }
@@ -29,6 +32,7 @@
 
 <script lang="ts">
   import KeyIcon from 'phosphor-svelte/lib/KeyIcon';
+  import ShieldWarningIcon from 'phosphor-svelte/lib/ShieldWarningIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { openSettingsOver } from '#lib/features/settings/settings-navigation.js';

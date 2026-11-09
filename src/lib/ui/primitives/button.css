@@ -102,6 +102,14 @@
   --button-on-container: var(--crit-on-container);
 }
 
+.btn-success {
+  --button-container: var(--success-container);
+  --button-container-hover: var(--success-container-hover);
+  --button-container-active: var(--success-container-active);
+  --button-line: var(--success-container-line);
+  --button-on-container: var(--success-on-container);
+}
+
 .btn-small {
   --button-default-height: var(--control-height-300);
   --button-gap: var(--space-100);

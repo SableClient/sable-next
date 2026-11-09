@@ -37,6 +37,7 @@
   import UserQuickTools from './UserQuickTools.svelte';
   import { isActiveSpace, markRoomsRead } from './nav-rooms.js';
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
+  import AlertDrawer from './AlertDrawer.svelte';
 
   interface Props {
     mobile?: boolean;
@@ -335,6 +336,9 @@
           onResize={(next) => (roomNavWidth = clampRoomNavWidth(next))}
           onCommit={persistRoomNavWidth}
         />
+        {#if !collapsed}
+          <AlertDrawer />
+        {/if}
       </div>
       {@render callBar()}
       {#if !collapsed}
@@ -370,6 +374,7 @@
     display: flex;
     flex: 1;
     min-height: 0;
+    position: relative;
   }
 
   .mobile-navigation,

@@ -2931,6 +2931,23 @@
     "searchPeerDebugOutcome": "Last outcome",
     "searchPeerDebugSending": "Sending",
     "searchPeerDebugReceiving": "Receiving",
+    "searchTransferAlert": {
+      "title": {
+        "busy": "Transferring search index",
+        "complete": "Search index transfer complete",
+        "failed": "Search index transfer failed"
+      },
+      "body": {
+        "sending": "This device is sending its search index to another device.",
+        "receiving": "{{transferred}} of {{total}} rooms transferred",
+        "discovering": "Searching for devices…",
+        "waiting": "Waiting for a device to be available…",
+        "connecting": "Connecting to another device…",
+        "complete": "{{transferred}} rooms transferred",
+        "failed": "An error occurred during the transfer."
+      },
+      "transferProgress": "Transfer progress"
+    },
     "searchIndexLimit": "Search index size",
     "usernameClick": "Name click action",
     "usernameClickMention": "Mention user",
