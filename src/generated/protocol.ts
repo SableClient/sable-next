@@ -1790,7 +1790,7 @@ export type SessionInfo = {
 
 export type ShareHistoryView = "shared" | "unencrypted" | "no_cross_signing" | "history_not_shared";
 
-export type SidebarItemView = { kind: "space"; room_id: string } | { kind: "folder"; id: string; name: string | null; content: string[] };
+export type SidebarItemView = { kind: "space"; room_id: string } | { kind: "folder"; id: string; name: string | null; icon: string | null; content: string[] };
 
 export type SignOutSafetyView = {
 	encryption: EncryptionStatusView,
@@ -3450,6 +3450,10 @@ export type Rpc = {
     setSidebar: (params: {
 	items: SidebarItemView[],
 }) => Promise<null>;
+    setAvatarOverride: (params: {
+	room_id: string,
+	url: string | null,
+}) => Promise<null>;
     roomHasSpaceParent: (params: {
 	room_id: string,
 }) => Promise<boolean>;
@@ -3924,6 +3928,7 @@ export type RpcMethods = {
   'spaces.remove': Rpc['spaces']['remove'];
   'spaces.sidebar': Rpc['spaces']['sidebar'];
   'spaces.set_sidebar': Rpc['spaces']['setSidebar'];
+  'spaces.set_avatar_override': Rpc['spaces']['setAvatarOverride'];
   'spaces.room_has_space_parent': Rpc['spaces']['roomHasSpaceParent'];
   'spaces.unjoined_space_parents': Rpc['spaces']['unjoinedSpaceParents'];
   'timeline.subscribe_room_list': Rpc['timeline']['subscribeRoomList'];
@@ -4287,6 +4292,7 @@ export function createRpc(call: RpcCall): Rpc {
       remove: (params) => call('spaces.remove', params) as ReturnType<Rpc['spaces']['remove']>,
       sidebar: (params = {}) => call('spaces.sidebar', params) as ReturnType<Rpc['spaces']['sidebar']>,
       setSidebar: (params) => call('spaces.set_sidebar', params) as ReturnType<Rpc['spaces']['setSidebar']>,
+      setAvatarOverride: (params) => call('spaces.set_avatar_override', params) as ReturnType<Rpc['spaces']['setAvatarOverride']>,
       roomHasSpaceParent: (params) => call('spaces.room_has_space_parent', params) as ReturnType<Rpc['spaces']['roomHasSpaceParent']>,
       unjoinedSpaceParents: (params) => call('spaces.unjoined_space_parents', params) as ReturnType<Rpc['spaces']['unjoinedSpaceParents']>,
     },

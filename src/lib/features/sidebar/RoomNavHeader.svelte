@@ -102,7 +102,7 @@
               {#if activeSpace}
                 <Avatar
                   id={activeSpace.room_id}
-                  src={activeSpace.avatar_url}
+                  src={activeSpace.display_avatar_url}
                   name={title}
                   size="small"
                 />

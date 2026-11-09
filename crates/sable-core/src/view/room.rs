@@ -48,6 +48,13 @@ pub struct RoomInfo {
     pub children_stale: bool,
     pub tags: Vec<RoomTag>,
     pub screen_sharers: Vec<OwnedUserId>,
+    pub avatar_override: Option<String>,
+}
+
+pub(crate) fn apply_avatar_override(view: &mut RoomListItemView, info: Option<&RoomInfo>) {
+    if let Some(url) = info.and_then(|info| info.avatar_override.as_ref()) {
+        view.display_avatar_url = Some(url.clone());
+    }
 }
 
 #[must_use]
@@ -118,6 +125,7 @@ pub fn room_list_item<S: BuildHasher>(
         display_avatar_url: None,
     };
     nicknames.apply_room(&mut view);
+    apply_avatar_override(&mut view, info);
     view
 }
 
@@ -403,6 +411,13 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
         None
     };
     let avatar_source = AvatarSource::of(room);
+    let avatar_override = if room_kind == Some(RoomKind::Space) {
+        crate::spaces::avatar_override(room)
+            .await
+            .unwrap_or_else(|()| previous.and_then(|info| info.avatar_override.clone()))
+    } else {
+        None
+    };
     let avatar_url = match (previous, &avatar_source) {
         (Some(previous), Some(source)) if previous.avatar_source.as_ref() == Some(source) => {
             previous.avatar_url.clone()
@@ -429,6 +444,7 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
         } else {
             Vec::new()
         },
+        avatar_override,
     }
 }
 

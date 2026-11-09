@@ -9,6 +9,7 @@ export {
   rememberSpaceIds,
   removeFromFolder,
   renameFolder,
+  setFolderIcon,
   ungroupFolder,
   withoutSpace,
   withSpace,
@@ -49,6 +50,7 @@ export function sameLayout(left: readonly SidebarItem[], right: readonly Sidebar
     return (
       item.id === other.id &&
       item.name === other.name &&
+      item.icon === other.icon &&
       item.content.length === other.content.length &&
       item.content.every((roomId, at) => roomId === other.content[at])
     );

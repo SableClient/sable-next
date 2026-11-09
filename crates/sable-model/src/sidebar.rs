@@ -15,6 +15,8 @@ pub enum SidebarItemView {
     Folder {
         id: String,
         name: Option<String>,
+        #[serde(default)]
+        icon: Option<String>,
         content: Vec<String>,
     },
 }
@@ -71,7 +73,12 @@ pub fn merge_spaces(items: &[SidebarItemView], space_ids: &[String]) -> Items {
                     merged.push(item.clone());
                 }
             }
-            SidebarItemView::Folder { id, name, content } => {
+            SidebarItemView::Folder {
+                id,
+                name,
+                icon,
+                content,
+            } => {
                 let content: Vec<String> = content
                     .iter()
                     .filter(|room_id| {
@@ -86,6 +93,7 @@ pub fn merge_spaces(items: &[SidebarItemView], space_ids: &[String]) -> Items {
                 merged.push(SidebarItemView::Folder {
                     id: id.clone(),
                     name: name.clone(),
+                    icon: icon.clone(),
                     content,
                 });
             }
@@ -118,7 +126,12 @@ fn without_rooms(items: &[SidebarItemView], rooms: &[String]) -> Items {
         .iter()
         .filter_map(|item| match item {
             SidebarItemView::Space { room_id } => (!rooms.contains(room_id)).then(|| item.clone()),
-            SidebarItemView::Folder { id, name, content } => {
+            SidebarItemView::Folder {
+                id,
+                name,
+                icon,
+                content,
+            } => {
                 let content: Vec<String> = content
                     .iter()
                     .filter(|room_id| !rooms.contains(*room_id))
@@ -127,6 +140,7 @@ fn without_rooms(items: &[SidebarItemView], rooms: &[String]) -> Items {
                 (!content.is_empty()).then(|| SidebarItemView::Folder {
                     id: id.clone(),
                     name: name.clone(),
+                    icon: icon.clone(),
                     content,
                 })
             }
@@ -176,13 +190,32 @@ pub fn rename_folder(items: &[SidebarItemView], folder_id: &str, name: &str) -> 
     items
         .iter()
         .map(|item| match item {
-            SidebarItemView::Folder { id, content, .. } if id == folder_id => {
-                SidebarItemView::Folder {
-                    id: id.clone(),
-                    name: (!trimmed.is_empty()).then(|| trimmed.to_owned()),
-                    content: content.clone(),
-                }
-            }
+            SidebarItemView::Folder {
+                id, icon, content, ..
+            } if id == folder_id => SidebarItemView::Folder {
+                id: id.clone(),
+                name: (!trimmed.is_empty()).then(|| trimmed.to_owned()),
+                icon: icon.clone(),
+                content: content.clone(),
+            },
+            _ => item.clone(),
+        })
+        .collect()
+}
+
+#[must_use]
+pub fn set_folder_icon(items: &[SidebarItemView], folder_id: &str, icon: Option<&str>) -> Items {
+    items
+        .iter()
+        .map(|item| match item {
+            SidebarItemView::Folder {
+                id, name, content, ..
+            } if id == folder_id => SidebarItemView::Folder {
+                id: id.clone(),
+                name: name.clone(),
+                icon: icon.map(str::to_owned),
+                content: content.clone(),
+            },
             _ => item.clone(),
         })
         .collect()
@@ -270,12 +303,18 @@ fn without_source(items: &[SidebarItemView], source: &LayoutRef) -> Items {
         } => items
             .iter()
             .filter_map(|item| match item {
-                SidebarItemView::Folder { id, name, content } if id == folder_id => {
+                SidebarItemView::Folder {
+                id,
+                name,
+                icon,
+                content,
+            } if id == folder_id => {
                     let content: Vec<String> =
                         content.iter().filter(|id| *id != room_id).cloned().collect();
                     (!content.is_empty()).then(|| SidebarItemView::Folder {
                         id: id.clone(),
                         name: name.clone(),
+                    icon: icon.clone(),
                         content,
                     })
                 }
@@ -352,19 +391,28 @@ pub fn apply_drop(
             return remaining;
         };
         *entry = match entry {
-            SidebarItemView::Folder { id, name, content } => SidebarItemView::Folder {
+            SidebarItemView::Folder {
+                id,
+                name,
+                icon,
+                content,
+            } => SidebarItemView::Folder {
                 id: id.clone(),
                 name: name.clone(),
+                icon: icon.clone(),
                 content: [content.as_slice(), moved.as_slice()].concat(),
             },
             SidebarItemView::Space { room_id } => {
-                let (id, name) = match source_folder {
-                    Some(SidebarItemView::Folder { id, name, .. }) => (id.clone(), name.clone()),
-                    _ => (new_folder_id.to_owned(), None),
+                let (id, name, icon) = match source_folder {
+                    Some(SidebarItemView::Folder { id, name, icon, .. }) => {
+                        (id.clone(), name.clone(), icon.clone())
+                    }
+                    _ => (new_folder_id.to_owned(), None, None),
                 };
                 SidebarItemView::Folder {
                     id,
                     name,
+                    icon,
                     content: [std::slice::from_ref(room_id), moved.as_slice()].concat(),
                 }
             }
@@ -404,6 +452,7 @@ mod tests {
         SidebarItemView::Folder {
             id: id.to_owned(),
             name: None,
+            icon: None,
             content: content
                 .iter()
                 .map(|room_id| (*room_id).to_owned())
@@ -451,10 +500,11 @@ mod tests {
     }
 
     #[test]
-    fn a_folder_dropped_into_a_space_dissolves_and_keeps_its_name() {
+    fn a_folder_dropped_into_a_space_dissolves_and_keeps_its_name_and_icon() {
         let named = SidebarItemView::Folder {
             id: "f".to_owned(),
             name: Some("Work".to_owned()),
+            icon: Some("mxc://example.org/icon".to_owned()),
             content: ids(&["!b", "!c"]),
         };
         let items = [space("!a"), named];
@@ -471,9 +521,26 @@ mod tests {
             [SidebarItemView::Folder {
                 id: "f".to_owned(),
                 name: Some("Work".to_owned()),
+                icon: Some("mxc://example.org/icon".to_owned()),
                 content: ids(&["!a", "!b", "!c"]),
             }]
         );
+    }
+
+    #[test]
+    fn a_folder_icon_is_set_kept_on_rename_and_cleared() {
+        let items = [folder("f", &["!a"]), space("!b")];
+        let iconed = set_folder_icon(&items, "f", Some("mxc://example.org/icon"));
+        let renamed = rename_folder(&iconed, "f", "Work");
+        assert!(
+            matches!(&renamed[0], SidebarItemView::Folder { name: Some(name), icon: Some(icon), .. }
+            if name == "Work" && icon == "mxc://example.org/icon")
+        );
+        assert!(matches!(
+            &set_folder_icon(&renamed, "f", None)[0],
+            SidebarItemView::Folder { icon: None, .. }
+        ));
+        assert_eq!(iconed[1], space("!b"));
     }
 
     #[test]

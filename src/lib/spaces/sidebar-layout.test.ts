@@ -23,7 +23,7 @@ function space(roomId: string): SidebarItem {
 }
 
 function folder(id: string, content: string[], name: string | null = null): SidebarItem {
-  return { kind: 'folder', id, name, content };
+  return { kind: 'folder', id, name, icon: null, content };
 }
 
 function spaceRef(roomId: string, folderId: string | null = null): LayoutRef {
@@ -291,18 +291,20 @@ describe('folderName', () => {
   const nameOf = (roomId: string): string | null => names[roomId] ?? null;
 
   it('prefers its own name', () => {
-    expect(folderName({ kind: 'folder', id: 'f', name: 'Work', content: ['!a'] }, nameOf)).toBe(
-      'Work'
-    );
+    expect(
+      folderName({ kind: 'folder', id: 'f', name: 'Work', icon: null, content: ['!a'] }, nameOf)
+    ).toBe('Work');
   });
 
   it('falls back to the spaces it holds', () => {
-    expect(folderName({ kind: 'folder', id: 'f', name: null, content: ['!a', '!b'] }, nameOf)).toBe(
-      'Alpha, Beta'
-    );
+    expect(
+      folderName({ kind: 'folder', id: 'f', name: null, icon: null, content: ['!a', '!b'] }, nameOf)
+    ).toBe('Alpha, Beta');
   });
 
   it('has no name when nothing inside is named', () => {
-    expect(folderName({ kind: 'folder', id: 'f', name: null, content: ['!z'] }, nameOf)).toBeNull();
+    expect(
+      folderName({ kind: 'folder', id: 'f', name: null, icon: null, content: ['!z'] }, nameOf)
+    ).toBeNull();
   });
 });

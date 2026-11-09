@@ -710,7 +710,14 @@ fn a_nickname_renames_and_re_sorts_a_direct_message() {
         }],
         None,
     );
-    assert_eq!(rows.rename(&nicknames).len(), 1);
+    assert_eq!(
+        rows.rename(
+            &nicknames,
+            &HashMap::<OwnedRoomId, crate::view::RoomInfo>::new()
+        )
+        .len(),
+        1
+    );
     let update = sections
         .update(RoomSections::build(rows.rows(), &options))
         .expect("the direct section changed");

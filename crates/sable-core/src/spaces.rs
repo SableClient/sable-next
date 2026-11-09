@@ -32,6 +32,28 @@ impl SidebarPatch {
 
 const SIDEBAR_EVENT_TYPE: &str = "in.cinny.spaces";
 
+pub(crate) const AVATAR_OVERRIDE_EVENT: &str = "org.matrix.msc3015.m.room.avatar.override";
+
+fn override_url(content: &serde_json::Value) -> Option<String> {
+    content
+        .get("url")
+        .and_then(serde_json::Value::as_str)
+        .filter(|url| url.starts_with("mxc://"))
+        .map(str::to_owned)
+}
+
+/// `Err` when the store could not be read, so the caller can keep what it had.
+pub(crate) async fn avatar_override(room: &matrix_sdk::Room) -> Result<Option<String>, ()> {
+    let raw = room
+        .account_data(AVATAR_OVERRIDE_EVENT.into())
+        .await
+        .map_err(|_| ())?;
+    Ok(raw
+        .and_then(|raw| raw.get_field::<serde_json::Value>("content").ok().flatten())
+        .as_ref()
+        .and_then(override_url))
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize, EventContent)]
 #[ruma_event(type = "in.cinny.spaces", kind = GlobalAccountData)]
 pub struct SidebarSpacesEventContent {
@@ -49,6 +71,12 @@ pub enum StoredItem {
         id: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         name: Option<String>,
+        #[serde(
+            default,
+            rename = "moe.sable.icon",
+            skip_serializing_if = "Option::is_none"
+        )]
+        icon: Option<String>,
         content: Vec<String>,
     },
     Unknown(serde_json::Value),
@@ -80,7 +108,12 @@ pub fn items(content: &SidebarSpacesEventContent) -> Vec<SidebarItemView> {
                 });
             }
             StoredItem::Unknown(_) => {}
-            StoredItem::Folder { id, name, content } => {
+            StoredItem::Folder {
+                id,
+                name,
+                icon,
+                content,
+            } => {
                 if id.is_empty() || seen_folders.contains(&id) {
                     continue;
                 }
@@ -98,6 +131,7 @@ pub fn items(content: &SidebarSpacesEventContent) -> Vec<SidebarItemView> {
                 items.push(SidebarItemView::Folder {
                     id,
                     name: name.filter(|name| !name.trim().is_empty()),
+                    icon: icon.filter(|icon| icon.starts_with("mxc://")),
                     content,
                 });
             }
@@ -122,9 +156,15 @@ fn stored_items(items: &[SidebarItemView]) -> Vec<StoredItem> {
         .iter()
         .map(|item| match item {
             SidebarItemView::Space { room_id } => StoredItem::Space(room_id.clone()),
-            SidebarItemView::Folder { id, name, content } => StoredItem::Folder {
+            SidebarItemView::Folder {
+                id,
+                name,
+                icon,
+                content,
+            } => StoredItem::Folder {
                 id: id.clone(),
                 name: name.clone(),
+                icon: icon.clone(),
                 content: content.clone(),
             },
         })
@@ -146,6 +186,29 @@ impl Core {
         set_sidebar(&self.client().await?, items)
             .await
             .or_failed(self, "set_space_sidebar")
+    }
+
+    /// `None` writes `{}`, which MSC3015 reads as no override.
+    pub(crate) async fn set_avatar_override(
+        &self,
+        room_id: &OwnedRoomId,
+        url: Option<&str>,
+    ) -> Result<(), RpcError> {
+        if url.is_some_and(|url| !url.starts_with("mxc://")) {
+            return Err(RpcError::InvalidMedia);
+        }
+        let room = self.room(room_id).await?;
+        let content = url.map_or_else(
+            || serde_json::json!({}),
+            |url| serde_json::json!({ "url": url }),
+        );
+        let raw = Raw::new(&content)
+            .or_failed(self, "set_avatar_override")?
+            .cast_unchecked();
+        room.set_account_data_raw(AVATAR_OVERRIDE_EVENT.into(), raw)
+            .await
+            .or_failed(self, "set_avatar_override")?;
+        Ok(())
     }
 }
 
@@ -202,11 +265,32 @@ mod tests {
     }
 
     #[test]
+    fn an_avatar_override_must_be_an_mxc_url() {
+        use super::override_url;
+        use serde_json::json;
+
+        assert_eq!(
+            override_url(&json!({ "url": "mxc://example.org/a" })).as_deref(),
+            Some("mxc://example.org/a")
+        );
+        assert_eq!(override_url(&json!({})), None);
+        assert_eq!(
+            override_url(&json!({ "url": "https://example.org/a" })),
+            None
+        );
+    }
+
+    #[test]
     fn reads_spaces_and_folders_in_order() {
         let parsed = parse(serde_json::json!({
             "sidebar": [
                 "!one:example.org",
-                { "id": "f1", "name": "Work", "content": ["!two:example.org"] },
+                {
+                    "id": "f1",
+                    "name": "Work",
+                    "moe.sable.icon": "mxc://example.org/icon",
+                    "content": ["!two:example.org"],
+                },
                 "!three:example.org",
             ]
         }));
@@ -216,9 +300,10 @@ mod tests {
             matches!(&parsed[0], SidebarItemView::Space { room_id } if room_id == "!one:example.org")
         );
         assert!(
-            matches!(&parsed[1], SidebarItemView::Folder { id, name, content }
+            matches!(&parsed[1], SidebarItemView::Folder { id, name, icon, content }
                 if id == "f1"
                     && name.as_deref() == Some("Work")
+                    && icon.as_deref() == Some("mxc://example.org/icon")
                     && content.first().is_some_and(|room_id| room_id == "!two:example.org"))
         );
         assert!(
@@ -284,16 +369,17 @@ mod tests {
                 "not-a-room-id",
                 { "id": "f1", "content": ["also-not-one"] },
                 { "id": "", "content": ["!one:example.org"] },
-                { "id": "f2", "name": "   ", "content": ["!two:example.org"] },
+                { "id": "f2", "name": "   ", "moe.sable.icon": "https://example.org/x.png", "content": ["!two:example.org"] },
                 { "id": "f2", "content": ["!three:example.org"] },
             ]
         }));
 
         assert_eq!(parsed.len(), 1);
         assert!(
-            matches!(&parsed[0], SidebarItemView::Folder { id, name, content }
+            matches!(&parsed[0], SidebarItemView::Folder { id, name, icon, content }
                 if id == "f2"
                     && name.is_none()
+                    && icon.is_none()
                     && content.first().is_some_and(|room_id| room_id == "!two:example.org"))
         );
     }
@@ -485,6 +571,7 @@ mod server_tests {
             &[SidebarItemView::Folder {
                 id: "f1".to_owned(),
                 name: Some("Work".to_owned()),
+                icon: None,
                 content: vec!["!two:example.org".parse().expect("room id")],
             }],
         )

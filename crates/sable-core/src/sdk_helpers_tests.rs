@@ -3651,6 +3651,7 @@ async fn a_sidebar_naming_something_that_is_not_a_room_is_refused() {
             items: vec![sable_model::sidebar::SidebarItemView::Folder {
                 id: "folder".to_owned(),
                 name: None,
+                icon: None,
                 content: vec!["not a room".to_owned()],
             }],
         })

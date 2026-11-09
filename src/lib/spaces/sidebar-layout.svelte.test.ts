@@ -39,7 +39,13 @@ function fakeCore(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-const folder: SidebarItem = { kind: 'folder', id: 'f', name: 'Work', content: ['!a:example.org'] };
+const folder: SidebarItem = {
+  kind: 'folder',
+  id: 'f',
+  name: 'Work',
+  icon: null,
+  content: ['!a:example.org'],
+};
 const lifted: SidebarItem[] = [{ kind: 'space', room_id: '!a:example.org' }];
 
 test('loads the stored layout', async () => {

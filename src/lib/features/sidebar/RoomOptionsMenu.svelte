@@ -14,6 +14,7 @@
   import FingerprintIcon from 'phosphor-svelte/lib/FingerprintIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
+  import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import ListBulletsIcon from 'phosphor-svelte/lib/ListBulletsIcon';
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
@@ -64,6 +65,7 @@
     onMoveDown?: () => void;
     onUnpin?: () => void;
     onRemoveFromFolder?: () => void;
+    onChangeIcon?: () => void;
   }
 
   let {
@@ -80,6 +82,7 @@
     onMoveDown,
     onUnpin,
     onRemoveFromFolder,
+    onChangeIcon,
   }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
@@ -422,6 +425,12 @@
       <ActionMenuItem onSelect={onRemoveFromFolder}>
         <ArrowLineUpIcon />
         {i18n.t('nav.folderRemoveSpace')}
+      </ActionMenuItem>
+    {/if}
+    {#if onChangeIcon}
+      <ActionMenuItem onSelect={onChangeIcon}>
+        <ImageIcon />
+        {i18n.t('nav.changeIcon')}
       </ActionMenuItem>
     {/if}
 

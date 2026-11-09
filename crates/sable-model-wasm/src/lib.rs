@@ -457,6 +457,19 @@ pub fn rename_folder(items: &str, folder_id: &str, name: &str) -> Result<String,
     ))
 }
 
+#[wasm_bindgen(js_name = setFolderIcon)]
+pub fn set_folder_icon(
+    items: &str,
+    folder_id: &str,
+    icon: Option<String>,
+) -> Result<String, JsError> {
+    json(&sidebar::set_folder_icon(
+        &sidebar_items(items)?,
+        folder_id,
+        icon.as_deref(),
+    ))
+}
+
 #[wasm_bindgen(js_name = ungroupFolder)]
 pub fn ungroup_folder(items: &str, folder_id: &str) -> Result<String, JsError> {
     json(&sidebar::ungroup_folder(&sidebar_items(items)?, folder_id))

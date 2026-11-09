@@ -550,7 +550,13 @@ test('shows a collapsed folder as one tab, with the names of the spaces inside',
     props: {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
       layout: [
-        { kind: 'folder', id: 'f', name: null, content: ['!a:example.org', '!b:example.org'] },
+        {
+          kind: 'folder',
+          id: 'f',
+          name: null,
+          icon: null,
+          content: ['!a:example.org', '!b:example.org'],
+        },
       ],
       spaceUnread: new Map([['!b:example.org', { unread: 3, highlight: 0 }]]),
       openFolders: new Set<string>(),
@@ -577,7 +583,13 @@ test('shows the spaces of an open folder, and a way to shut it', async () => {
     props: {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
       layout: [
-        { kind: 'folder', id: 'f', name: 'Work', content: ['!a:example.org', '!b:example.org'] },
+        {
+          kind: 'folder',
+          id: 'f',
+          name: 'Work',
+          icon: null,
+          content: ['!a:example.org', '!b:example.org'],
+        },
       ],
       openFolders: new Set(['f']),
       onToggleFolder: (folderId: string) => toggled.push(folderId),
@@ -602,7 +614,13 @@ test('marks every space in a folder as read even when no badge is shown', async 
     props: {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
       layout: [
-        { kind: 'folder', id: 'f', name: null, content: ['!a:example.org', '!b:example.org'] },
+        {
+          kind: 'folder',
+          id: 'f',
+          name: null,
+          icon: null,
+          content: ['!a:example.org', '!b:example.org'],
+        },
       ],
       onMarkFolderRead: (folder: SidebarFolder) => marked.push(...folder.content),
       mobile: true,
@@ -621,7 +639,13 @@ test('a space that left the room list drops out of its folder', async () => {
     props: {
       spaces: [space('!a:example.org', 'Alpha')],
       layout: [
-        { kind: 'folder', id: 'f', name: null, content: ['!a:example.org', '!gone:example.org'] },
+        {
+          kind: 'folder',
+          id: 'f',
+          name: null,
+          icon: null,
+          content: ['!a:example.org', '!gone:example.org'],
+        },
       ],
       openFolders: new Set(['f']),
       mobile: true,
@@ -637,7 +661,7 @@ test('offers a way out of a folder holding a single space', async () => {
   renderRail({
     props: {
       spaces: [space('!a:example.org', 'Alpha')],
-      layout: [{ kind: 'folder', id: 'f', name: null, content: ['!a:example.org'] }],
+      layout: [{ kind: 'folder', id: 'f', name: null, icon: null, content: ['!a:example.org'] }],
       openFolders: new Set(['f']),
       onRemoveFromFolder: (roomId: string, folderId: string) => removed.push([roomId, folderId]),
       mobile: true,
@@ -663,7 +687,7 @@ test('a folder whose spaces are all unresolved renders nothing', async () => {
     props: {
       spaces: [space('!a:example.org', 'Alpha')],
       layout: [
-        { kind: 'folder', id: 'f', name: null, content: ['!gone:example.org'] },
+        { kind: 'folder', id: 'f', name: null, icon: null, content: ['!gone:example.org'] },
         { kind: 'space', room_id: '!a:example.org' },
       ],
       mobile: true,
@@ -877,7 +901,13 @@ test('arrows walk the rail and an open folder nests its spaces one level down', 
     props: {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
       layout: [
-        { kind: 'folder', id: 'f', name: 'Work', content: ['!a:example.org', '!b:example.org'] },
+        {
+          kind: 'folder',
+          id: 'f',
+          name: 'Work',
+          icon: null,
+          content: ['!a:example.org', '!b:example.org'],
+        },
       ],
       openFolders: new Set(['f']),
       onToggleFolder: (folderId: string) => toggled.push(folderId),

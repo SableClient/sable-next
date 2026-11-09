@@ -15,6 +15,7 @@ domain! {
     remove,
     sidebar,
     set_sidebar,
+    set_avatar_override,
     room_has_space_parent,
     unjoined_space_parents,
 }
@@ -164,6 +165,23 @@ impl Handler for SetSidebarParams {
             return Err(RpcError::UnknownRoom);
         }
         core.set_space_sidebar(&self.items).await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetAvatarOverrideParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub url: Option<String>,
+}
+
+impl Handler for SetAvatarOverrideParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.set_avatar_override(&self.room_id, self.url.as_deref())
+            .await
     }
 }
 

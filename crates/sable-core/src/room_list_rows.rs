@@ -152,11 +152,16 @@ impl RoomListRows {
         diffs
     }
 
-    pub(crate) fn rename(&mut self, nicknames: &Nicknames) -> Vec<VectorDiff<RoomListItemView>> {
+    pub(crate) fn rename<S: BuildHasher>(
+        &mut self,
+        nicknames: &Nicknames,
+        cache: &HashMap<OwnedRoomId, RoomInfo, S>,
+    ) -> Vec<VectorDiff<RoomListItemView>> {
         let mut diffs = Vec::new();
         for (index, row) in self.rows.iter_mut().enumerate() {
             let (name, avatar) = (row.display_name.clone(), row.display_avatar_url.clone());
             nicknames.apply_room(row);
+            crate::view::apply_avatar_override(row, cache.get(&row.room_id));
             if row.display_name != name || row.display_avatar_url != avatar {
                 diffs.push(VectorDiff::Set {
                     index,
@@ -270,6 +275,7 @@ mod tests {
             children_stale: false,
             tags: Vec::new(),
             screen_sharers: Vec::new(),
+            avatar_override: None,
         };
         let mut cache = HashMap::from([(kept.to_owned(), info()), (gone.to_owned(), info())]);
         let mut rows = RoomListRows::default();
@@ -299,6 +305,7 @@ mod tests {
             children_stale: false,
             tags: Vec::new(),
             screen_sharers: Vec::new(),
+            avatar_override: None,
         }
     }
 
@@ -440,13 +447,16 @@ mod tests {
             None,
         );
 
-        let diffs = rows.rename(&nicknames);
+        let diffs = rows.rename(&nicknames, &HashMap::<OwnedRoomId, RoomInfo>::new());
 
         let [VectorDiff::Set { index: 0, value }] = diffs.as_slice() else {
             panic!("one set, got {diffs:?}");
         };
         assert_eq!(value.display_name, "Bobby");
         assert_eq!(value.name.as_deref(), Some("Bob"));
-        assert!(rows.rename(&nicknames).is_empty());
+        assert!(
+            rows.rename(&nicknames, &HashMap::<OwnedRoomId, RoomInfo>::new())
+                .is_empty()
+        );
     }
 }

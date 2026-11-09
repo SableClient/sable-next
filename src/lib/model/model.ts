@@ -394,6 +394,14 @@ export function renameFolder(
   return items(wasm.renameFolder(JSON.stringify(layout), folderId, name));
 }
 
+export function setFolderIcon(
+  layout: readonly SidebarItemView[],
+  folderId: string,
+  icon: string | null
+): SidebarItemView[] {
+  return items(wasm.setFolderIcon(JSON.stringify(layout), folderId, icon));
+}
+
 export function ungroupFolder(
   layout: readonly SidebarItemView[],
   folderId: string
