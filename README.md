@@ -141,15 +141,17 @@ The cask is published to the GitHub tap, which `brew install` taps by default, a
 
 ### App Store
 
-There is a [Testflight](https://testflight.apple.com/join/PT2DSC3f) you can join while the app is under review. It will be available on the App Store soon™.
+<a href="https://apps.apple.com/us/app/sable-chat/id6820482696"><img alt="Download on the App Store" src="https://img.shields.io/badge/App_Store-0D96F6?style=for-the-badge&logo=appstore&logoColor=white"></a>
+
+To try new versions early, join the [TestFlight beta](https://testflight.apple.com/join/PT2DSC3f).
 
 ### AltStore PAL
 
-In the EU, [AltStore PAL](https://altstore.io) installs the notarized App Store build. Open AltStore PAL, go to Sources, tap +, and paste:
+In the EU, [AltStore PAL](https://altstore.io) installs the same notarized build as the App Store.
 
+<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore-pal://source?url=https://git.sable.moe/SableClient/sable-next/releases/download/latest/altstore-pal-source.json"><img alt="Add to AltStore PAL" src="https://img.shields.io/badge/Add_to_AltStore_PAL-7C3AED?style=for-the-badge"></a>
+&nbsp;
 <a href="https://git.sable.moe/SableClient/sable-next/releases/download/latest/altstore-pal-source.json"><img alt="Direct URL" src="https://img.shields.io/badge/Direct_URL-6B7280?style=for-the-badge"></a>
-
-`https://git.sable.moe/SableClient/sable-next/releases/download/latest/altstore-pal-source.json`
 
 The [`altstore-pal.yml`](.forgejo/workflows/altstore-pal.yml) workflow publishes each App Store release once AltStore has processed it.
 
