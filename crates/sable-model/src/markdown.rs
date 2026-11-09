@@ -804,6 +804,8 @@ mod tests {
         for typed in [
             "https://en.wikipedia.org/wiki/Dr._Who_(Dalek_films)",
             "see https://example.org/a_b_c and http://example.org/*x*",
+            "HTTPS://example.org/a_b_c",
+            "été https://example.org/a_b_c",
         ] {
             let content = markdown_to_content(typed, &[]);
             assert_eq!(content.body, typed);

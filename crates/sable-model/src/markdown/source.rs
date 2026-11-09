@@ -103,11 +103,12 @@ fn is_autolink(content: &str) -> bool {
 
 /// The length of the bare web address that opens `rest`, when it is one.
 fn bare_address(rest: &str) -> Option<usize> {
-    let scheme = rest.get(..8).unwrap_or(rest).to_ascii_lowercase();
-    if !["http://", "https://", "ftp://"]
-        .iter()
-        .any(|prefix| scheme.starts_with(prefix))
-    {
+    let web = ["http://", "https://", "ftp://"].iter().any(|scheme| {
+        rest.as_bytes()
+            .get(..scheme.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(scheme.as_bytes()))
+    });
+    if !web {
         return None;
     }
     let mut finder = LinkFinder::new();
