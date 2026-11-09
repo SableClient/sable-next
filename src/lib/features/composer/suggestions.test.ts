@@ -324,3 +324,10 @@ test('a frequently accepted suggestion comes first, and unicode precedes custom 
     ids.indexOf('emoji:🥺')
   );
 });
+
+test('a fully typed shortcode outranks a more used emoji', () => {
+  rememberSuggestion('emoji:😃');
+  rememberSuggestion('emoji:😃');
+  const ids = suggestionsFor(emoteQuery('smile'), [], [], []).map((item) => item.id);
+  expect(ids[0]).toBe('emoji:😄');
+});

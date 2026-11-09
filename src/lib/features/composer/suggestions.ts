@@ -135,8 +135,8 @@ function emoteSuggestions(
     .map((suggestion, index) => ({ suggestion, index }))
     .sort(
       (left, right) =>
-        byUsage(left.suggestion.id, right.suggestion.id) ||
         rank(isExact(left.suggestion), isExact(right.suggestion)) ||
+        byUsage(left.suggestion.id, right.suggestion.id) ||
         left.index - right.index
     )
     .slice(0, limit)
