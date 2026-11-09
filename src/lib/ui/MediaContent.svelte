@@ -208,6 +208,7 @@
     {thumbnail}
     {thumbnailMime}
     {playback}
+    {size}
     class={className}
   />
 {:else}

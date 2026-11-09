@@ -4,6 +4,7 @@
 
   import type { VideoPlaybackView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
+  import { formatByteSize } from '#lib/ui/byte-size.js';
   import { i18n } from '#lib/i18n.js';
   import { savesNatively } from '#lib/platform/files.js';
   import { blurhashDataUrl } from '#lib/ui/blurhash.js';
@@ -17,6 +18,7 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { animationsPaused } from '#lib/ui/still-frame.js';
   import { videoPlayback } from '#lib/ui/video-playback.js';
+  import '#lib/ui/media-size.css';
 
   const BLURHASH_POSTER_WIDTH = 32;
 
@@ -30,6 +32,7 @@
     thumbnail?: string | null;
     thumbnailMime?: string | null;
     playback?: VideoPlaybackView | null;
+    size?: number | null;
     class?: string;
   }
 
@@ -43,6 +46,7 @@
     thumbnail = null,
     thumbnailMime = null,
     playback = null,
+    size = null,
     class: className = '',
   }: Props = $props();
   const core = useCoreClient();
@@ -259,6 +263,7 @@
         <PlayIcon weight="fill" />
       </span>
     </button>
+    {#if size !== null && size > 0}<span class="media-image-size">{formatByteSize(size)}</span>{/if}
   {:else if !failed && !url && !!started}
     <span class="media-loading">
       <span class="media-loading-status">

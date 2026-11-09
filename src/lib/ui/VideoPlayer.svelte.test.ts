@@ -71,3 +71,15 @@ test('a GIF the user paused stays paused when the window comes back', async () =
 
   expect(play).not.toHaveBeenCalled();
 });
+
+test('a video waiting to be played shows how much it will download', () => {
+  const { container } = render(VideoPlayer, {
+    source: 'mxc://example.org/clip',
+    mime: 'video/mp4',
+    filename: 'clip.mp4',
+    size: 5_000_000,
+  });
+
+  expect(container.querySelector('.media-play')).not.toBeNull();
+  expect(container.querySelector('.media-image-size')?.textContent).toBe('5.0 MB');
+});

@@ -1,0 +1,10 @@
+.media-image-size {
+  background: var(--surface-container);
+  border-radius: var(--radius-pill);
+  bottom: var(--space-100);
+  color: var(--surface-on-container);
+  font-size: var(--font-size-small);
+  padding: var(--space-050) var(--space-100);
+  position: absolute;
+  right: var(--space-100);
+}

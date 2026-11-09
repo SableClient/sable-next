@@ -28,6 +28,7 @@
   import { animationsPaused, stillFrame } from '#lib/ui/still-frame.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
+  import '#lib/ui/media-size.css';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import ImageBrokenIcon from 'phosphor-svelte/lib/ImageBrokenIcon';
   import ImageSpoilerControl from './ImageSpoilerControl.svelte';
@@ -894,17 +895,6 @@
     inset: 0;
     justify-content: center;
     position: absolute;
-  }
-
-  .media-image-size {
-    background: var(--surface-container);
-    border-radius: var(--radius-pill);
-    bottom: var(--space-100);
-    color: var(--surface-on-container);
-    font-size: var(--font-size-small);
-    padding: var(--space-050) var(--space-100);
-    position: absolute;
-    right: var(--space-100);
   }
 
   @container (max-width: 8rem) {
