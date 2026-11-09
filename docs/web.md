@@ -46,6 +46,9 @@ The configuration is public to browsers, so do not put secrets in it. Reload
 the page after changing it.
 
 This example shows the supported fields. Omit the ones you do not need.
+[`config.schema.json`](../static/config.schema.json) describes the same fields
+for editors that validate JSON. The image serves it next to `config.json`, and
+the shipped file refers to it with `"$schema": "./config.schema.json"`.
 
 ```json
 {
@@ -117,10 +120,8 @@ This example shows the supported fields. Omit the ones you do not need.
   local network.
 - `disableAccountSwitcher` and `hideUsernamePasswordFields` default to `false`.
 - `settingsDefaults` sets initial client preferences. Existing user choices take
-  precedence. The example shows three settings; all accepted preference names,
-  defaults, value sets and numeric ranges are defined in
-  [preferences.svelte.ts](../src/lib/settings/preferences.svelte.ts). Invalid
-  values are ignored or, for numeric ranges, clamped.
+  precedence. The [settings reference](settings.md) lists every accepted name,
+  value and default. Invalid values are ignored or, for numeric ranges, clamped.
 
 The shipped `config.json` includes Sable's service endpoints. Remove or replace
 them if you do not intend to use them.
@@ -234,7 +235,8 @@ Use the same format as `config.json`:
 
 Supported fields: `branding`, `links`, `hideCommunityLinks`, `auth`,
 `hideUsernamePasswordFields`, `settingsDefaults` and `settingsLocked`.
-Relative branding URLs resolve against the configuration URL.
+Relative branding URLs resolve against the configuration URL. Validate the document
+with [`well-known-sable.schema.json`](../static/well-known-sable.schema.json).
 
 Account defaults and locks accept `theme`, `hideTypingIndicators`,
 `sendTypingNotifications`, `sendReadReceipts`, `hideReadReceipts` and

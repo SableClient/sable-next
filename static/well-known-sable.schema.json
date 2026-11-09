@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sable /.well-known/sable",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "branding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "appName": {
+          "type": "string"
+        },
+        "logoUrl": {
+          "type": "string",
+          "pattern": "^(https://|[^:]*$)"
+        },
+        "faviconUrl": {
+          "type": "string",
+          "pattern": "^(https://|[^:]*$)"
+        },
+        "themeUrl": {
+          "type": "string",
+          "pattern": "^(https://|[^:]*$)"
+        }
+      }
+    },
+    "links": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "help": {
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "privacy": {
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "terms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "pattern": "^https?://"
+              }
+            },
+            "required": [
+              "text",
+              "url"
+            ]
+          }
+        },
+        "supportRoom": {
+          "type": "string"
+        },
+        "bugReport": {
+          "type": "string",
+          "pattern": "^https?://"
+        }
+      }
+    },
+    "hideCommunityLinks": {
+      "type": "boolean",
+      "default": false
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ssoRedirect": {
+          "enum": [
+            "immediate",
+            "loginPage",
+            null
+          ]
+        },
+        "disableRegistration": {
+          "type": "boolean",
+          "default": false
+        },
+        "logoutRedirectUrl": {
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "deviceDisplayName": {
+          "type": "string"
+        }
+      }
+    },
+    "hideUsernamePasswordFields": {
+      "type": "boolean",
+      "default": false
+    },
+    "settingsDefaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "theme": {
+          "title": "Light or dark",
+          "enum": [
+            "system",
+            "dark",
+            "light"
+          ],
+          "default": "system"
+        },
+        "hideReadReceipts": {
+          "title": "Hide read receipts",
+          "type": "boolean",
+          "default": false
+        },
+        "hideTypingIndicators": {
+          "title": "Hide typing indicators",
+          "type": "boolean",
+          "default": false
+        },
+        "sendTypingNotifications": {
+          "title": "Send typing notifications",
+          "type": "boolean",
+          "default": true
+        },
+        "sendReadReceipts": {
+          "title": "Read receipts",
+          "type": "boolean",
+          "default": true
+        },
+        "urlPreviews": {
+          "title": "Server-side embeds",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "settingsLocked": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "theme": {
+          "title": "Light or dark",
+          "enum": [
+            "system",
+            "dark",
+            "light"
+          ],
+          "default": "system"
+        },
+        "hideReadReceipts": {
+          "title": "Hide read receipts",
+          "type": "boolean",
+          "default": false
+        },
+        "hideTypingIndicators": {
+          "title": "Hide typing indicators",
+          "type": "boolean",
+          "default": false
+        },
+        "sendTypingNotifications": {
+          "title": "Send typing notifications",
+          "type": "boolean",
+          "default": true
+        },
+        "sendReadReceipts": {
+          "title": "Read receipts",
+          "type": "boolean",
+          "default": true
+        },
+        "urlPreviews": {
+          "title": "Server-side embeds",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}

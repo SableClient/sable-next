@@ -824,6 +824,33 @@ function read(key: string): Record<string, unknown> | null {
 
 export const PREFERENCE_KEYS = Object.keys(DEFAULTS) as (keyof Preferences)[];
 
+export type PreferenceSpec = { key: keyof Preferences; default: unknown } & (
+  | { type: 'boolean' | 'text' }
+  | { type: 'enum'; values: readonly string[] }
+  | { type: 'number'; min: number; max: number }
+  | { type: 'list'; values: readonly string[] }
+);
+
+export function preferenceSpecs(): PreferenceSpec[] {
+  return PREFERENCE_KEYS.map((key): PreferenceSpec => {
+    const base = { key, default: DEFAULTS[key] };
+    if (key in ENUMS) return { ...base, type: 'enum', values: ENUMS[key as keyof typeof ENUMS] };
+    if (key in PREFERENCE_RANGES)
+      return { ...base, type: 'number', ...PREFERENCE_RANGES[key as RangePreference] };
+    if (key === 'composerButtonOrder')
+      return {
+        ...base,
+        type: 'list',
+        values: [
+          ...COMPOSER_ACTIONS,
+          ...Array.from({ length: COMPOSER_SEPARATOR_MAX }, (_, i) => composerSeparatorId(i)),
+        ],
+      };
+    if ((FREE_TEXT as readonly string[]).includes(key)) return { ...base, type: 'text' };
+    return { ...base, type: 'boolean' };
+  });
+}
+
 function legacyEnterKey(value: unknown): unknown {
   return typeof value === 'boolean' ? (value ? 'newline' : 'adaptive') : value;
 }

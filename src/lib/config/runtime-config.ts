@@ -118,7 +118,7 @@ const StunUrl = v.pipe(NonBlankText, v.regex(/^stuns?:/));
 const SearchSharingSchema = v.object({
   stunServers: v.fallback(v.array(StunUrl), ['stun:stun.sable.moe:3478']),
 });
-const RuntimeSchema = v.pipe(
+export const RuntimeSchema = v.pipe(
   v.object({
     pushNotificationDetails: v.fallback(v.nullable(PushSchema), null),
     supporterAwards: v.fallback(v.nullable(SupporterSchema), null),

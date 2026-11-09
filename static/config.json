@@ -1,4 +1,5 @@
 {
+  "$schema": "./config.schema.json",
   "homeserverList": [
     "matrix.org",
     "mozilla.org",

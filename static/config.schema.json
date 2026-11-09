@@ -1,0 +1,3137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sable config.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "homeserverList": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "defaultHomeserver": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "allowCustomHomeservers": {
+      "type": "boolean",
+      "default": true
+    },
+    "featuredCommunities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "servers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pushNotificationDetails": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "pushNotifyUrl": {
+          "type": "string"
+        },
+        "vapidPublicKey": {
+          "type": "string"
+        },
+        "webPushAppID": {
+          "type": "string"
+        },
+        "nativePushAppID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "iosPushAppID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unifiedPushGatewayUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unifiedPushEmbeddedServerUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "pushNotifyUrl",
+        "vapidPublicKey",
+        "webPushAppID"
+      ]
+    },
+    "embeds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "serviceUrl": {
+          "type": "string",
+          "pattern": "^https?://"
+        }
+      }
+    },
+    "supporterAwards": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "serviceUrl": {
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "keys": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9+/_-]{43}$"
+          }
+        }
+      },
+      "required": [
+        "serviceUrl",
+        "keys"
+      ]
+    },
+    "gifs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "enum": [
+            "klipy",
+            "tenor",
+            "giphy"
+          ],
+          "default": "tenor"
+        },
+        "proxyUrl": {
+          "type": "string"
+        },
+        "klipyApiKey": {
+          "type": "string"
+        },
+        "tenorApiKey": {
+          "type": "string"
+        },
+        "giphyApiKey": {
+          "type": "string"
+        }
+      }
+    },
+    "calls": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "livekitServiceUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "searchSharing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stunServers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^stuns?:"
+          },
+          "default": [
+            "stun:stun.sable.moe:3478"
+          ]
+        }
+      }
+    },
+    "disableAccountSwitcher": {
+      "type": "boolean",
+      "default": false
+    },
+    "branding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "appName": {
+          "type": "string"
+        },
+        "logoUrl": {
+          "type": "string",
+          "pattern": "^(https?://|/)"
+        },
+        "faviconUrl": {
+          "type": "string",
+          "pattern": "^(https?://|/)"
+        },
+        "themeUrl": {
+          "type": "string",
+          "pattern": "^(https?://|/)"
+        }
+      }
+    },
+    "links": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "help": {
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "privacy": {
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "terms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "pattern": "^https?://"
+              }
+            },
+            "required": [
+              "text",
+              "url"
+            ]
+          }
+        },
+        "supportRoom": {
+          "type": "string"
+        },
+        "bugReport": {
+          "type": "string",
+          "pattern": "^https?://"
+        }
+      }
+    },
+    "hideCommunityLinks": {
+      "type": "boolean",
+      "default": false
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ssoRedirect": {
+          "enum": [
+            "immediate",
+            "loginPage",
+            null
+          ]
+        },
+        "disableRegistration": {
+          "type": "boolean",
+          "default": false
+        },
+        "logoutRedirectUrl": {
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "deviceDisplayName": {
+          "type": "string"
+        }
+      }
+    },
+    "hideUsernamePasswordFields": {
+      "type": "boolean",
+      "default": false
+    },
+    "settingsDefaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "title": "Language",
+          "enum": [
+            "system",
+            "ar",
+            "bg",
+            "cs",
+            "de",
+            "en",
+            "es",
+            "fi",
+            "fr",
+            "hu",
+            "it",
+            "mi",
+            "nl",
+            "pl",
+            "pt",
+            "pt-BR",
+            "ro",
+            "ru",
+            "th",
+            "tok",
+            "tr",
+            "uk",
+            "zh-Hans"
+          ],
+          "default": "system"
+        },
+        "layout": {
+          "title": "Layout",
+          "enum": [
+            "modern",
+            "compact",
+            "bubble"
+          ],
+          "default": "modern"
+        },
+        "threadPresentation": {
+          "title": "Threads and discussions",
+          "enum": [
+            "timeline",
+            "panel"
+          ],
+          "default": "timeline"
+        },
+        "alignOwnMessages": {
+          "title": "Right-align own messages",
+          "type": "boolean",
+          "default": true
+        },
+        "avatarsInMessageHeaders": {
+          "title": "Display avatars in message headers",
+          "type": "boolean",
+          "default": true
+        },
+        "messageSpacing": {
+          "title": "Message spacing",
+          "enum": [
+            "none",
+            "compact",
+            "cozy",
+            "roomy"
+          ],
+          "default": "cozy"
+        },
+        "timelineEmoteSize": {
+          "title": "Emote size",
+          "enum": [
+            "default",
+            "20",
+            "24",
+            "32",
+            "48",
+            "64"
+          ],
+          "default": "default"
+        },
+        "theme": {
+          "title": "Light or dark",
+          "enum": [
+            "system",
+            "dark",
+            "light"
+          ],
+          "default": "system"
+        },
+        "quickCss": {
+          "type": "string",
+          "default": ""
+        },
+        "fontFamily": {
+          "type": "string",
+          "default": ""
+        },
+        "fontFamilyMono": {
+          "type": "string",
+          "default": ""
+        },
+        "codeLigatures": {
+          "type": "boolean",
+          "default": true
+        },
+        "underlineLinks": {
+          "title": "Always underline links",
+          "type": "boolean",
+          "default": true
+        },
+        "renderRoomColors": {
+          "title": "Use room colours instead of profile colours",
+          "type": "boolean",
+          "default": true
+        },
+        "renderProfileColors": {
+          "title": "Show profile name colours",
+          "type": "boolean",
+          "default": true
+        },
+        "reducedMotion": {
+          "title": "Reduce motion",
+          "type": "boolean"
+        },
+        "pageZoom": {
+          "title": "Interface scale",
+          "type": "number",
+          "minimum": 0.75,
+          "maximum": 1.5,
+          "default": 1
+        },
+        "textScale": {
+          "title": "Text size",
+          "type": "number",
+          "minimum": 0.75,
+          "maximum": 1.5,
+          "default": 1
+        },
+        "highContrast": {
+          "title": "Increase contrast",
+          "type": "boolean",
+          "default": false
+        },
+        "alwaysShowAltText": {
+          "title": "Always show image descriptions",
+          "type": "boolean",
+          "default": false
+        },
+        "twitterEmoji": {
+          "title": "Twitter emoji",
+          "type": "boolean",
+          "default": true
+        },
+        "pixelatedImages": {
+          "title": "Pixelated image scaling",
+          "enum": [
+            "always",
+            "smart",
+            "never"
+          ],
+          "default": "never"
+        },
+        "nameColorCorrection": {
+          "title": "Improve name colour readability",
+          "enum": [
+            "strong",
+            "weak",
+            "off"
+          ],
+          "default": "strong"
+        },
+        "showRoomIcon": {
+          "title": "Room icons",
+          "enum": [
+            "always",
+            "sometimes",
+            "collapsed",
+            "never"
+          ],
+          "default": "always"
+        },
+        "showRoomBanners": {
+          "title": "Room banners above the list",
+          "type": "boolean",
+          "default": true
+        },
+        "showDmTopics": {
+          "title": "Show topics in direct messages",
+          "type": "boolean",
+          "default": true
+        },
+        "roomBannerHeight": {
+          "type": "number",
+          "minimum": 56,
+          "maximum": 500,
+          "default": 190
+        },
+        "subspaceHierarchyLimit": {
+          "title": "Subspace nesting depth",
+          "enum": [
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10"
+          ],
+          "default": "3"
+        },
+        "searchIndexLimit": {
+          "title": "Search index size",
+          "enum": [
+            "128",
+            "256",
+            "512",
+            "1024",
+            "2048",
+            "4096"
+          ],
+          "default": "512"
+        },
+        "coreLogLevel": {
+          "title": "Core console log level",
+          "enum": [
+            "default",
+            "debug"
+          ],
+          "default": "default"
+        },
+        "searchCrawlPause": {
+          "title": "Crawl request interval",
+          "enum": [
+            "1",
+            "2",
+            "3",
+            "5",
+            "10",
+            "30"
+          ],
+          "default": "3"
+        },
+        "searchTricklePause": {
+          "title": "Slow-crawl request interval",
+          "enum": [
+            "5",
+            "10",
+            "30",
+            "60"
+          ],
+          "default": "10"
+        },
+        "searchFlushInterval": {
+          "title": "Index save interval",
+          "enum": [
+            "20",
+            "60",
+            "120",
+            "300"
+          ],
+          "default": "60"
+        },
+        "searchBatchSize": {
+          "title": "Events per crawl request",
+          "enum": [
+            "25",
+            "50",
+            "100"
+          ],
+          "default": "50"
+        },
+        "searchBaseEvents": {
+          "title": "Events before slow indexing",
+          "enum": [
+            "5000",
+            "10000",
+            "20000",
+            "50000"
+          ],
+          "default": "20000"
+        },
+        "searchMaxEvents": {
+          "title": "Session crawl cap",
+          "enum": [
+            "50000",
+            "100000",
+            "200000",
+            "500000"
+          ],
+          "default": "50000"
+        },
+        "searchCrawler": {
+          "title": "Index message history",
+          "type": "boolean",
+          "default": true
+        },
+        "searchUnmeteredOnly": {
+          "title": "Only transfer search history on unmetered networks",
+          "type": "boolean",
+          "default": true
+        },
+        "searchSharing": {
+          "title": "Share the search index between devices",
+          "type": "boolean",
+          "default": true
+        },
+        "serverSearch": {
+          "title": "Search on the server",
+          "type": "boolean",
+          "default": true
+        },
+        "showHome": {
+          "title": "All rooms in the sidebar",
+          "type": "boolean",
+          "default": false
+        },
+        "restoreLastRoom": {
+          "title": "Restore last viewed room",
+          "type": "boolean",
+          "default": true
+        },
+        "showSearch": {
+          "title": "Show search in the sidebar",
+          "type": "boolean",
+          "default": false
+        },
+        "showUnreadCounts": {
+          "title": "Show counts on quiet rooms",
+          "type": "boolean",
+          "default": false
+        },
+        "badgeCountDMsOnly": {
+          "title": "Show counts on quiet direct messages",
+          "type": "boolean",
+          "default": true
+        },
+        "showEasterEggs": {
+          "title": "Show :3 instead of 1k+ on huge counts",
+          "type": "boolean",
+          "default": true
+        },
+        "showPingCounts": {
+          "title": "Show counts on mentions",
+          "type": "boolean",
+          "default": true
+        },
+        "showUnreadDots": {
+          "title": "Show dots on rooms with unread messages but no mention",
+          "type": "boolean",
+          "default": true
+        },
+        "uniformIcons": {
+          "title": "Fill transparent room icons",
+          "type": "boolean",
+          "default": false
+        },
+        "tintRoomIcons": {
+          "title": "Theme vector room icons",
+          "type": "boolean",
+          "default": false
+        },
+        "showSpaceEvents": {
+          "title": "Show today’s events in spaces",
+          "type": "boolean",
+          "default": true
+        },
+        "hour24Clock": {
+          "title": "24-hour clock",
+          "type": "boolean",
+          "default": false
+        },
+        "dateFormat": {
+          "title": "Date format",
+          "enum": [
+            "auto",
+            "dmy",
+            "mdy",
+            "ymd"
+          ],
+          "default": "auto"
+        },
+        "timeZone": {
+          "title": "Time zone",
+          "type": "string",
+          "default": "auto"
+        },
+        "weekStart": {
+          "title": "First day of the calendar week",
+          "enum": [
+            "sunday",
+            "monday",
+            "saturday"
+          ],
+          "default": "sunday"
+        },
+        "hideMembershipEvents": {
+          "title": "Hide joins and leaves",
+          "type": "boolean",
+          "default": false
+        },
+        "hideProfileChanges": {
+          "title": "Hide name and avatar changes",
+          "type": "boolean",
+          "default": true
+        },
+        "hideTopicChanges": {
+          "title": "Hide topic changes",
+          "type": "boolean",
+          "default": false
+        },
+        "hideMemberInReadOnly": {
+          "title": "Hide members in read-only rooms",
+          "type": "boolean",
+          "default": true
+        },
+        "showTombstoneEvents": {
+          "title": "Show removed-message placeholders",
+          "type": "boolean",
+          "default": true
+        },
+        "openRoomsAtUnread": {
+          "title": "Open rooms at the first unread message",
+          "type": "boolean",
+          "default": true
+        },
+        "jumpToLatestOnSend": {
+          "title": "Jump to your message when you send",
+          "type": "boolean",
+          "default": false
+        },
+        "hideReadReceipts": {
+          "title": "Hide read receipts",
+          "type": "boolean",
+          "default": false
+        },
+        "readReceiptPlacement": {
+          "title": "Receipt position",
+          "enum": [
+            "message",
+            "room"
+          ],
+          "default": "message"
+        },
+        "replyPreviewStyle": {
+          "title": "Reply preview",
+          "enum": [
+            "connected",
+            "compact",
+            "expanded"
+          ],
+          "default": "connected"
+        },
+        "captionPosition": {
+          "title": "Caption placement",
+          "enum": [
+            "above",
+            "below",
+            "inline",
+            "hidden"
+          ],
+          "default": "below"
+        },
+        "usernameClick": {
+          "title": "Name click action",
+          "enum": [
+            "mention",
+            "profile"
+          ],
+          "default": "mention"
+        },
+        "doubleTapReact": {
+          "title": "Double tap to react",
+          "type": "boolean",
+          "default": true
+        },
+        "messageSwipeAction": {
+          "title": "Swipe left on a message to",
+          "enum": [
+            "reply",
+            "members"
+          ],
+          "default": "reply"
+        },
+        "showSingleReactionCount": {
+          "title": "Show the count on single reactions",
+          "type": "boolean",
+          "default": true
+        },
+        "showAllTimestamps": {
+          "title": "Show the time on every message",
+          "type": "boolean",
+          "default": false
+        },
+        "showRoleTooltip": {
+          "title": "Show role name on hover",
+          "type": "boolean",
+          "default": false
+        },
+        "hideMessageShields": {
+          "title": "Hide minor security warnings",
+          "type": "boolean",
+          "default": false
+        },
+        "doubleTapReaction": {
+          "type": "string",
+          "default": "❤️"
+        },
+        "hideTypingIndicators": {
+          "title": "Hide typing indicators",
+          "type": "boolean",
+          "default": false
+        },
+        "memberSort": {
+          "enum": [
+            "name-asc",
+            "name-desc",
+            "newest",
+            "oldest"
+          ],
+          "default": "name-asc"
+        },
+        "roomSort": {
+          "enum": [
+            "recent",
+            "name-asc",
+            "name-desc"
+          ],
+          "default": "recent"
+        },
+        "directSort": {
+          "enum": [
+            "recent",
+            "name-asc",
+            "name-desc"
+          ],
+          "default": "recent"
+        },
+        "groupMembersByPresence": {
+          "title": "Group members by presence",
+          "type": "boolean",
+          "default": true
+        },
+        "filterPronounsByLanguage": {
+          "title": "Match pronouns to interface language",
+          "type": "boolean",
+          "default": true
+        },
+        "showPronouns": {
+          "title": "Show pronouns",
+          "type": "boolean",
+          "default": true
+        },
+        "showPronounPills": {
+          "title": "Show pronoun pills",
+          "type": "boolean",
+          "default": true
+        },
+        "pronounPillLimit": {
+          "title": "Pronoun pills per message",
+          "enum": [
+            "1",
+            "2",
+            "3",
+            "all"
+          ],
+          "default": "3"
+        },
+        "pronounPillLength": {
+          "title": "Pronoun pill length",
+          "enum": [
+            "12",
+            "16",
+            "24",
+            "all"
+          ],
+          "default": "all"
+        },
+        "composerForm": {
+          "title": "Composer height",
+          "enum": [
+            "short",
+            "adaptive",
+            "tall"
+          ],
+          "default": "tall"
+        },
+        "alwaysInlineEditor": {
+          "title": "Always inline editor",
+          "type": "boolean",
+          "default": false
+        },
+        "enterForNewline": {
+          "title": "Newline on touch screens, send otherwise",
+          "enum": [
+            "adaptive",
+            "newline",
+            "send"
+          ],
+          "default": "adaptive"
+        },
+        "sedEdits": {
+          "title": "Edit your last message with s/old/new",
+          "type": "boolean",
+          "default": false
+        },
+        "inlineEditing": {
+          "title": "Edit messages in the timeline",
+          "type": "boolean",
+          "default": false
+        },
+        "mentionInReplies": {
+          "title": "Default reply notifications",
+          "type": "boolean",
+          "default": true
+        },
+        "formattingToolbar": {
+          "title": "Keep formatting toolbar open",
+          "type": "boolean",
+          "default": false
+        },
+        "composerFormatButton": {
+          "title": "Formatting button",
+          "type": "boolean",
+          "default": true
+        },
+        "richTextComposer": {
+          "title": "Format text as you type",
+          "type": "boolean",
+          "default": false
+        },
+        "composerSpellcheck": {
+          "title": "Spell check",
+          "type": "boolean",
+          "default": true
+        },
+        "composerAutocapitalize": {
+          "title": "Capitalize sentences",
+          "type": "boolean",
+          "default": true
+        },
+        "emoticonToEmoji": {
+          "title": "Convert emoticons to emoji",
+          "type": "boolean",
+          "default": false
+        },
+        "composerGifButton": {
+          "title": "GIF button",
+          "type": "boolean",
+          "default": true
+        },
+        "composerStickerButton": {
+          "title": "Sticker button",
+          "type": "boolean",
+          "default": true
+        },
+        "composerEmoteButton": {
+          "title": "Emote button",
+          "type": "boolean",
+          "default": true
+        },
+        "composerVoiceButton": {
+          "title": "Voice message button",
+          "type": "boolean",
+          "default": true
+        },
+        "composerButtonOrder": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "gif",
+              "sticker",
+              "emoticon",
+              "persona",
+              "format",
+              "separator:0",
+              "separator:1",
+              "separator:2",
+              "separator:3",
+              "separator:4",
+              "separator:5",
+              "separator:6",
+              "separator:7",
+              "separator:8"
+            ]
+          },
+          "default": [
+            "gif",
+            "sticker",
+            "emoticon",
+            "separator:0",
+            "persona",
+            "format"
+          ]
+        },
+        "scheduleInEncryptedRooms": {
+          "title": "Allow scheduling in encrypted rooms",
+          "type": "boolean",
+          "default": true
+        },
+        "sendAttachmentAsCaption": {
+          "title": "Use message text as attachment caption",
+          "type": "boolean",
+          "default": true
+        },
+        "sendAttachmentsAsGallery": {
+          "title": "Combine attachments into a gallery",
+          "type": "boolean",
+          "default": false
+        },
+        "imageMetadata": {
+          "title": "Image metadata",
+          "enum": [
+            "location",
+            "all",
+            "keep"
+          ],
+          "default": "location"
+        },
+        "personaPicker": {
+          "title": "Show profile picker in the composer",
+          "type": "boolean",
+          "default": true
+        },
+        "personaPickerSortOrder": {
+          "title": "Profile picker sort order",
+          "enum": [
+            "manual",
+            "alphabetical-asc",
+            "alphabetical-desc",
+            "recent"
+          ],
+          "default": "recent"
+        },
+        "personaPickerLeftSide": {
+          "title": "Pin picker to left side of composer",
+          "type": "boolean",
+          "default": false
+        },
+        "personaProxying": {
+          "title": "Shorthand triggers",
+          "type": "boolean",
+          "default": false
+        },
+        "personaSelectionScope": {
+          "title": "Remember the selected profile",
+          "enum": [
+            "account",
+            "space",
+            "room",
+            "picker"
+          ],
+          "default": "picker"
+        },
+        "personaKeepAfterShorthand": {
+          "title": "Keep the profile selected after shorthand",
+          "type": "boolean",
+          "default": false
+        },
+        "personaFallback": {
+          "title": "Prefix messages with profile names for older clients",
+          "type": "boolean",
+          "default": true
+        },
+        "personaGrid": {
+          "type": "boolean",
+          "default": true
+        },
+        "personaAlternateAvatar": {
+          "type": "boolean",
+          "default": false
+        },
+        "sendTypingNotifications": {
+          "title": "Send typing notifications",
+          "type": "boolean",
+          "default": true
+        },
+        "sendReadReceipts": {
+          "title": "Read receipts",
+          "type": "boolean",
+          "default": true
+        },
+        "sendPresence": {
+          "title": "Online status",
+          "type": "boolean",
+          "default": true
+        },
+        "blurMedia": {
+          "title": "Blur media until hovered",
+          "type": "boolean",
+          "default": false
+        },
+        "blurAvatars": {
+          "title": "Blur profile pictures until hovered",
+          "type": "boolean",
+          "default": false
+        },
+        "blurEmotes": {
+          "title": "Blur emotes until hovered",
+          "type": "boolean",
+          "default": false
+        },
+        "presence": {
+          "enum": [
+            "online",
+            "unavailable",
+            "offline"
+          ],
+          "default": "online"
+        },
+        "presenceStatusMessage": {
+          "type": "string",
+          "default": ""
+        },
+        "loadingAnimal": {
+          "type": "string",
+          "default": ""
+        },
+        "mediaAutoLoad": {
+          "title": "Load media automatically",
+          "enum": [
+            "on",
+            "private",
+            "off"
+          ],
+          "default": "on"
+        },
+        "autoplayGifs": {
+          "title": "Autoplay animated images",
+          "type": "boolean",
+          "default": true
+        },
+        "pauseAnimationsWhenInactive": {
+          "title": "Pause animations when the window is inactive",
+          "type": "boolean",
+          "default": false
+        },
+        "autoplayStickers": {
+          "title": "Autoplay stickers and emoji",
+          "type": "boolean",
+          "default": true
+        },
+        "gifProvider": {
+          "title": "GIF search provider",
+          "enum": [
+            "default",
+            "klipy",
+            "tenor",
+            "giphy"
+          ],
+          "default": "default"
+        },
+        "urlPreviews": {
+          "title": "Server-side embeds",
+          "type": "boolean",
+          "default": false
+        },
+        "themeFileCards": {
+          "title": "Show install cards for theme files",
+          "type": "boolean",
+          "default": true
+        },
+        "encryptedUrlPreviews": {
+          "title": "Server-side embeds in encrypted rooms",
+          "type": "boolean",
+          "default": false
+        },
+        "clientEmbeds": {
+          "title": "Client-side embeds",
+          "type": "boolean",
+          "default": false
+        },
+        "encryptedClientEmbeds": {
+          "title": "Client-side embeds in encrypted rooms",
+          "type": "boolean",
+          "default": false
+        },
+        "youtubeEmbeds": {
+          "title": "Embed YouTube links",
+          "type": "boolean",
+          "default": false
+        },
+        "useDearrow": {
+          "title": "Use DeArrow titles and thumbnails",
+          "type": "boolean",
+          "default": false
+        },
+        "dearrowThumbnailFallback": {
+          "title": "Fallback thumbnail type",
+          "enum": [
+            "random",
+            "original",
+            "youtube_autogen"
+          ],
+          "default": "youtube_autogen"
+        },
+        "youtubeThumbnailPosition": {
+          "title": "Autogenerated thumbnail type",
+          "enum": [
+            "start",
+            "middle",
+            "end"
+          ],
+          "default": "middle"
+        },
+        "tiktokEmbeds": {
+          "title": "Embed TikTok links",
+          "type": "boolean",
+          "default": false
+        },
+        "instagramEmbeds": {
+          "title": "Embed Instagram links",
+          "type": "boolean",
+          "default": false
+        },
+        "systemNotifications": {
+          "title": "System alerts",
+          "type": "boolean",
+          "default": true
+        },
+        "badgeDefaultDirect": {
+          "enum": [
+            "all",
+            "mentions",
+            "quiet"
+          ],
+          "default": "all"
+        },
+        "badgeDefaultGroup": {
+          "enum": [
+            "all",
+            "mentions",
+            "quiet"
+          ],
+          "default": "mentions"
+        },
+        "notificationSounds": {
+          "title": "Play notification sounds",
+          "type": "boolean",
+          "default": true
+        },
+        "notifyOnce": {
+          "title": "One alert per room",
+          "type": "boolean",
+          "default": true
+        },
+        "pushInactiveTimeout": {
+          "title": "Alert other devices after",
+          "enum": [
+            "off",
+            "1",
+            "5",
+            "10",
+            "15",
+            "30"
+          ],
+          "default": "1"
+        },
+        "backgroundNotificationSounds": {
+          "title": "Sounds while backgrounded",
+          "type": "boolean",
+          "default": true
+        },
+        "notificationContent": {
+          "title": "Show message text",
+          "type": "boolean",
+          "default": false
+        },
+        "notificationEncryptedContent": {
+          "title": "Show encrypted room text",
+          "type": "boolean",
+          "default": false
+        },
+        "richPushPayloads": {
+          "title": "Include message text in push",
+          "type": "boolean",
+          "default": true
+        },
+        "clearNotificationsOnRead": {
+          "title": "Clear alerts when read",
+          "type": "boolean",
+          "default": true
+        },
+        "highlightMentions": {
+          "title": "Highlight mentions",
+          "type": "boolean",
+          "default": true
+        },
+        "faviconForMentionsOnly": {
+          "title": "Tab badge for mentions and keywords",
+          "type": "boolean",
+          "default": false
+        },
+        "ringForGroupCalls": {
+          "title": "Show call screen for groups and voice channels",
+          "type": "boolean",
+          "default": false
+        },
+        "alwaysShowCallButton": {
+          "title": "Show call button in rooms with more than 10 members",
+          "type": "boolean",
+          "default": false
+        },
+        "callScreenPreview": {
+          "title": "Show a shared screen outside the call",
+          "type": "boolean",
+          "default": true
+        },
+        "callMode": {
+          "title": "Call mode",
+          "enum": [
+            "auto",
+            "legacy",
+            "compatibility",
+            "matrix_2"
+          ],
+          "default": "auto"
+        },
+        "callServiceUrl": {
+          "type": "string",
+          "default": ""
+        },
+        "incomingCallSound": {
+          "title": "In-app incoming call sound",
+          "type": "boolean",
+          "default": true
+        },
+        "outgoingRingback": {
+          "title": "Play a ringing tone while calling",
+          "type": "boolean",
+          "default": true
+        },
+        "callMicrophoneMuted": {
+          "type": "boolean",
+          "default": false
+        },
+        "callInputMode": {
+          "title": "Input mode",
+          "enum": [
+            "voice-activity",
+            "push-to-talk"
+          ],
+          "default": "voice-activity"
+        },
+        "callGlobalShortcuts": {
+          "title": "Global microphone shortcuts",
+          "type": "boolean",
+          "default": true
+        },
+        "noiseSuppression": {
+          "title": "Filter microphone background noise",
+          "type": "boolean",
+          "default": true
+        },
+        "voiceIsolation": {
+          "title": "Voice isolation",
+          "type": "boolean",
+          "default": false
+        },
+        "incomingVoiceIsolation": {
+          "title": "Voice isolation for others",
+          "type": "boolean",
+          "default": false
+        },
+        "echoCancellation": {
+          "title": "Remove call echo from the microphone",
+          "type": "boolean",
+          "default": true
+        },
+        "autoGainControl": {
+          "title": "Adjust microphone level automatically",
+          "type": "boolean",
+          "default": true
+        },
+        "audioInputDevice": {
+          "type": "string",
+          "default": ""
+        },
+        "audioOutputDevice": {
+          "type": "string",
+          "default": ""
+        },
+        "videoInputDevice": {
+          "type": "string",
+          "default": ""
+        },
+        "callCameraResolution": {
+          "title": "Camera resolution",
+          "enum": [
+            "auto",
+            "360",
+            "480",
+            "720",
+            "1080",
+            "1440",
+            "2160"
+          ],
+          "default": "auto"
+        },
+        "callCameraBitrate": {
+          "title": "Camera maximum bitrate",
+          "enum": [
+            "auto",
+            "250",
+            "500",
+            "1000",
+            "2000",
+            "4000",
+            "8000",
+            "16000"
+          ],
+          "default": "auto"
+        },
+        "callCameraCodec": {
+          "title": "Camera codec",
+          "enum": [
+            "auto",
+            "vp8",
+            "h264",
+            "vp9",
+            "av1"
+          ],
+          "default": "auto"
+        },
+        "callScreenResolution": {
+          "title": "Screen sharing resolution",
+          "enum": [
+            "auto",
+            "360",
+            "480",
+            "720",
+            "1080",
+            "1440",
+            "2160"
+          ],
+          "default": "720"
+        },
+        "callScreenBitrate": {
+          "title": "Screen sharing maximum bitrate",
+          "enum": [
+            "auto",
+            "250",
+            "500",
+            "1000",
+            "2000",
+            "4000",
+            "8000",
+            "16000"
+          ],
+          "default": "auto"
+        },
+        "callScreenFramerate": {
+          "title": "Screen sharing frame rate",
+          "enum": [
+            "auto",
+            "15",
+            "30",
+            "60"
+          ],
+          "default": "30"
+        },
+        "callScreenCodec": {
+          "title": "Screen sharing codec",
+          "enum": [
+            "auto",
+            "vp8",
+            "h264",
+            "vp9",
+            "av1"
+          ],
+          "default": "h264"
+        },
+        "callSimulcast": {
+          "title": "Use simulcast",
+          "type": "boolean",
+          "default": true
+        },
+        "pushGatewayUrl": {
+          "type": "string",
+          "default": ""
+        },
+        "pushVapidKey": {
+          "type": "string",
+          "default": ""
+        },
+        "pushAppId": {
+          "type": "string",
+          "default": ""
+        },
+        "pushEmbeddedServerUrl": {
+          "type": "string",
+          "default": ""
+        },
+        "soundsNotificationVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsCameraOnVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsCameraOffVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsMicOnVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsMicOffVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsDeafenOnVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsDeafenOffVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsScreenshareStartVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsScreenshareStopVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsCallJoinVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsCallLeaveVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsIncomingCallVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsOutgoingCallVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "errorReporting": {
+          "title": "Error reports",
+          "type": "boolean",
+          "default": false
+        },
+        "sessionReplay": {
+          "title": "Session replay on errors",
+          "type": "boolean",
+          "default": false
+        },
+        "telemetryAsked": {
+          "type": "boolean",
+          "default": false
+        },
+        "autoUpdateCheck": {
+          "type": "boolean",
+          "default": true
+        },
+        "updateChannel": {
+          "enum": [
+            "stable",
+            "nightly"
+          ]
+        },
+        "closeToTray": {
+          "title": "Close to the tray",
+          "type": "boolean",
+          "default": false
+        },
+        "askDownloadLocation": {
+          "type": "boolean",
+          "default": true
+        },
+        "minimizeToTray": {
+          "title": "Minimize to the tray",
+          "type": "boolean",
+          "default": false
+        },
+        "showSystemTrayIcon": {
+          "title": "Show a tray icon",
+          "type": "boolean",
+          "default": true
+        },
+        "useCustomTitleBar": {
+          "title": "Use {{appName}}’s title bar",
+          "type": "boolean"
+        },
+        "hardwareAcceleration": {
+          "title": "Hardware acceleration",
+          "type": "boolean",
+          "default": true
+        },
+        "hardwareVideoEncode": {
+          "title": "Hardware video encoding",
+          "type": "boolean",
+          "default": true
+        },
+        "hardwareVideoDecode": {
+          "title": "Hardware video decoding",
+          "type": "boolean",
+          "default": true
+        },
+        "smoothScrolling": {
+          "title": "Smooth scrolling",
+          "type": "boolean",
+          "default": true
+        },
+        "webRtcIpPolicy": {
+          "title": "Network interfaces for calls",
+          "enum": [
+            "default",
+            "default_public_and_private_interfaces",
+            "default_public_interface_only",
+            "disable_non_proxied_udp"
+          ],
+          "default": "default"
+        },
+        "launchAtLogin": {
+          "title": "Open {{appName}} when you sign in",
+          "type": "boolean",
+          "default": false
+        },
+        "startMinimized": {
+          "title": "Start hidden",
+          "type": "boolean",
+          "default": false
+        },
+        "settingsSync": {
+          "title": "Sync settings across devices",
+          "type": "boolean",
+          "default": false
+        },
+        "syncDrafts": {
+          "title": "Include unsent drafts",
+          "type": "boolean",
+          "default": true
+        },
+        "profileChangePropagation": {
+          "title": "Apply name and avatar changes to",
+          "enum": [
+            "all",
+            "unchanged",
+            "none"
+          ],
+          "default": "unchanged"
+        },
+        "developerTools": {
+          "title": "Enable developer tools",
+          "type": "boolean",
+          "default": false
+        },
+        "callStatsOverlay": {
+          "title": "Show screen share statistics in calls",
+          "type": "boolean",
+          "default": false
+        },
+        "callDebugOverlay": {
+          "title": "Show call debug information in calls",
+          "type": "boolean",
+          "default": true
+        },
+        "showHiddenEvents": {
+          "title": "Show hidden events",
+          "type": "boolean",
+          "default": false
+        },
+        "hiddenEventsHeaderToggle": {
+          "title": "Show a hidden events toggle in the room header",
+          "type": "boolean",
+          "default": false
+        },
+        "hiddenEventEdits": {
+          "title": "Show edit events",
+          "type": "boolean",
+          "default": true
+        },
+        "hiddenEventReactions": {
+          "title": "Show reaction events",
+          "type": "boolean",
+          "default": true
+        },
+        "hiddenEventRedactions": {
+          "title": "Show redaction events",
+          "type": "boolean",
+          "default": true
+        },
+        "hiddenEventOther": {
+          "title": "Show other hidden events",
+          "type": "boolean",
+          "default": true
+        },
+        "showTranslationStrings": {
+          "title": "Show translation strings",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "settingsLocked": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "title": "Language",
+          "enum": [
+            "system",
+            "ar",
+            "bg",
+            "cs",
+            "de",
+            "en",
+            "es",
+            "fi",
+            "fr",
+            "hu",
+            "it",
+            "mi",
+            "nl",
+            "pl",
+            "pt",
+            "pt-BR",
+            "ro",
+            "ru",
+            "th",
+            "tok",
+            "tr",
+            "uk",
+            "zh-Hans"
+          ],
+          "default": "system"
+        },
+        "layout": {
+          "title": "Layout",
+          "enum": [
+            "modern",
+            "compact",
+            "bubble"
+          ],
+          "default": "modern"
+        },
+        "threadPresentation": {
+          "title": "Threads and discussions",
+          "enum": [
+            "timeline",
+            "panel"
+          ],
+          "default": "timeline"
+        },
+        "alignOwnMessages": {
+          "title": "Right-align own messages",
+          "type": "boolean",
+          "default": true
+        },
+        "avatarsInMessageHeaders": {
+          "title": "Display avatars in message headers",
+          "type": "boolean",
+          "default": true
+        },
+        "messageSpacing": {
+          "title": "Message spacing",
+          "enum": [
+            "none",
+            "compact",
+            "cozy",
+            "roomy"
+          ],
+          "default": "cozy"
+        },
+        "timelineEmoteSize": {
+          "title": "Emote size",
+          "enum": [
+            "default",
+            "20",
+            "24",
+            "32",
+            "48",
+            "64"
+          ],
+          "default": "default"
+        },
+        "theme": {
+          "title": "Light or dark",
+          "enum": [
+            "system",
+            "dark",
+            "light"
+          ],
+          "default": "system"
+        },
+        "quickCss": {
+          "type": "string",
+          "default": ""
+        },
+        "fontFamily": {
+          "type": "string",
+          "default": ""
+        },
+        "fontFamilyMono": {
+          "type": "string",
+          "default": ""
+        },
+        "codeLigatures": {
+          "type": "boolean",
+          "default": true
+        },
+        "underlineLinks": {
+          "title": "Always underline links",
+          "type": "boolean",
+          "default": true
+        },
+        "renderRoomColors": {
+          "title": "Use room colours instead of profile colours",
+          "type": "boolean",
+          "default": true
+        },
+        "renderProfileColors": {
+          "title": "Show profile name colours",
+          "type": "boolean",
+          "default": true
+        },
+        "reducedMotion": {
+          "title": "Reduce motion",
+          "type": "boolean"
+        },
+        "pageZoom": {
+          "title": "Interface scale",
+          "type": "number",
+          "minimum": 0.75,
+          "maximum": 1.5,
+          "default": 1
+        },
+        "textScale": {
+          "title": "Text size",
+          "type": "number",
+          "minimum": 0.75,
+          "maximum": 1.5,
+          "default": 1
+        },
+        "highContrast": {
+          "title": "Increase contrast",
+          "type": "boolean",
+          "default": false
+        },
+        "alwaysShowAltText": {
+          "title": "Always show image descriptions",
+          "type": "boolean",
+          "default": false
+        },
+        "twitterEmoji": {
+          "title": "Twitter emoji",
+          "type": "boolean",
+          "default": true
+        },
+        "pixelatedImages": {
+          "title": "Pixelated image scaling",
+          "enum": [
+            "always",
+            "smart",
+            "never"
+          ],
+          "default": "never"
+        },
+        "nameColorCorrection": {
+          "title": "Improve name colour readability",
+          "enum": [
+            "strong",
+            "weak",
+            "off"
+          ],
+          "default": "strong"
+        },
+        "showRoomIcon": {
+          "title": "Room icons",
+          "enum": [
+            "always",
+            "sometimes",
+            "collapsed",
+            "never"
+          ],
+          "default": "always"
+        },
+        "showRoomBanners": {
+          "title": "Room banners above the list",
+          "type": "boolean",
+          "default": true
+        },
+        "showDmTopics": {
+          "title": "Show topics in direct messages",
+          "type": "boolean",
+          "default": true
+        },
+        "roomBannerHeight": {
+          "type": "number",
+          "minimum": 56,
+          "maximum": 500,
+          "default": 190
+        },
+        "subspaceHierarchyLimit": {
+          "title": "Subspace nesting depth",
+          "enum": [
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10"
+          ],
+          "default": "3"
+        },
+        "searchIndexLimit": {
+          "title": "Search index size",
+          "enum": [
+            "128",
+            "256",
+            "512",
+            "1024",
+            "2048",
+            "4096"
+          ],
+          "default": "512"
+        },
+        "coreLogLevel": {
+          "title": "Core console log level",
+          "enum": [
+            "default",
+            "debug"
+          ],
+          "default": "default"
+        },
+        "searchCrawlPause": {
+          "title": "Crawl request interval",
+          "enum": [
+            "1",
+            "2",
+            "3",
+            "5",
+            "10",
+            "30"
+          ],
+          "default": "3"
+        },
+        "searchTricklePause": {
+          "title": "Slow-crawl request interval",
+          "enum": [
+            "5",
+            "10",
+            "30",
+            "60"
+          ],
+          "default": "10"
+        },
+        "searchFlushInterval": {
+          "title": "Index save interval",
+          "enum": [
+            "20",
+            "60",
+            "120",
+            "300"
+          ],
+          "default": "60"
+        },
+        "searchBatchSize": {
+          "title": "Events per crawl request",
+          "enum": [
+            "25",
+            "50",
+            "100"
+          ],
+          "default": "50"
+        },
+        "searchBaseEvents": {
+          "title": "Events before slow indexing",
+          "enum": [
+            "5000",
+            "10000",
+            "20000",
+            "50000"
+          ],
+          "default": "20000"
+        },
+        "searchMaxEvents": {
+          "title": "Session crawl cap",
+          "enum": [
+            "50000",
+            "100000",
+            "200000",
+            "500000"
+          ],
+          "default": "50000"
+        },
+        "searchCrawler": {
+          "title": "Index message history",
+          "type": "boolean",
+          "default": true
+        },
+        "searchUnmeteredOnly": {
+          "title": "Only transfer search history on unmetered networks",
+          "type": "boolean",
+          "default": true
+        },
+        "searchSharing": {
+          "title": "Share the search index between devices",
+          "type": "boolean",
+          "default": true
+        },
+        "serverSearch": {
+          "title": "Search on the server",
+          "type": "boolean",
+          "default": true
+        },
+        "showHome": {
+          "title": "All rooms in the sidebar",
+          "type": "boolean",
+          "default": false
+        },
+        "restoreLastRoom": {
+          "title": "Restore last viewed room",
+          "type": "boolean",
+          "default": true
+        },
+        "showSearch": {
+          "title": "Show search in the sidebar",
+          "type": "boolean",
+          "default": false
+        },
+        "showUnreadCounts": {
+          "title": "Show counts on quiet rooms",
+          "type": "boolean",
+          "default": false
+        },
+        "badgeCountDMsOnly": {
+          "title": "Show counts on quiet direct messages",
+          "type": "boolean",
+          "default": true
+        },
+        "showEasterEggs": {
+          "title": "Show :3 instead of 1k+ on huge counts",
+          "type": "boolean",
+          "default": true
+        },
+        "showPingCounts": {
+          "title": "Show counts on mentions",
+          "type": "boolean",
+          "default": true
+        },
+        "showUnreadDots": {
+          "title": "Show dots on rooms with unread messages but no mention",
+          "type": "boolean",
+          "default": true
+        },
+        "uniformIcons": {
+          "title": "Fill transparent room icons",
+          "type": "boolean",
+          "default": false
+        },
+        "tintRoomIcons": {
+          "title": "Theme vector room icons",
+          "type": "boolean",
+          "default": false
+        },
+        "showSpaceEvents": {
+          "title": "Show today’s events in spaces",
+          "type": "boolean",
+          "default": true
+        },
+        "hour24Clock": {
+          "title": "24-hour clock",
+          "type": "boolean",
+          "default": false
+        },
+        "dateFormat": {
+          "title": "Date format",
+          "enum": [
+            "auto",
+            "dmy",
+            "mdy",
+            "ymd"
+          ],
+          "default": "auto"
+        },
+        "timeZone": {
+          "title": "Time zone",
+          "type": "string",
+          "default": "auto"
+        },
+        "weekStart": {
+          "title": "First day of the calendar week",
+          "enum": [
+            "sunday",
+            "monday",
+            "saturday"
+          ],
+          "default": "sunday"
+        },
+        "hideMembershipEvents": {
+          "title": "Hide joins and leaves",
+          "type": "boolean",
+          "default": false
+        },
+        "hideProfileChanges": {
+          "title": "Hide name and avatar changes",
+          "type": "boolean",
+          "default": true
+        },
+        "hideTopicChanges": {
+          "title": "Hide topic changes",
+          "type": "boolean",
+          "default": false
+        },
+        "hideMemberInReadOnly": {
+          "title": "Hide members in read-only rooms",
+          "type": "boolean",
+          "default": true
+        },
+        "showTombstoneEvents": {
+          "title": "Show removed-message placeholders",
+          "type": "boolean",
+          "default": true
+        },
+        "openRoomsAtUnread": {
+          "title": "Open rooms at the first unread message",
+          "type": "boolean",
+          "default": true
+        },
+        "jumpToLatestOnSend": {
+          "title": "Jump to your message when you send",
+          "type": "boolean",
+          "default": false
+        },
+        "hideReadReceipts": {
+          "title": "Hide read receipts",
+          "type": "boolean",
+          "default": false
+        },
+        "readReceiptPlacement": {
+          "title": "Receipt position",
+          "enum": [
+            "message",
+            "room"
+          ],
+          "default": "message"
+        },
+        "replyPreviewStyle": {
+          "title": "Reply preview",
+          "enum": [
+            "connected",
+            "compact",
+            "expanded"
+          ],
+          "default": "connected"
+        },
+        "captionPosition": {
+          "title": "Caption placement",
+          "enum": [
+            "above",
+            "below",
+            "inline",
+            "hidden"
+          ],
+          "default": "below"
+        },
+        "usernameClick": {
+          "title": "Name click action",
+          "enum": [
+            "mention",
+            "profile"
+          ],
+          "default": "mention"
+        },
+        "doubleTapReact": {
+          "title": "Double tap to react",
+          "type": "boolean",
+          "default": true
+        },
+        "messageSwipeAction": {
+          "title": "Swipe left on a message to",
+          "enum": [
+            "reply",
+            "members"
+          ],
+          "default": "reply"
+        },
+        "showSingleReactionCount": {
+          "title": "Show the count on single reactions",
+          "type": "boolean",
+          "default": true
+        },
+        "showAllTimestamps": {
+          "title": "Show the time on every message",
+          "type": "boolean",
+          "default": false
+        },
+        "showRoleTooltip": {
+          "title": "Show role name on hover",
+          "type": "boolean",
+          "default": false
+        },
+        "hideMessageShields": {
+          "title": "Hide minor security warnings",
+          "type": "boolean",
+          "default": false
+        },
+        "doubleTapReaction": {
+          "type": "string",
+          "default": "❤️"
+        },
+        "hideTypingIndicators": {
+          "title": "Hide typing indicators",
+          "type": "boolean",
+          "default": false
+        },
+        "memberSort": {
+          "enum": [
+            "name-asc",
+            "name-desc",
+            "newest",
+            "oldest"
+          ],
+          "default": "name-asc"
+        },
+        "roomSort": {
+          "enum": [
+            "recent",
+            "name-asc",
+            "name-desc"
+          ],
+          "default": "recent"
+        },
+        "directSort": {
+          "enum": [
+            "recent",
+            "name-asc",
+            "name-desc"
+          ],
+          "default": "recent"
+        },
+        "groupMembersByPresence": {
+          "title": "Group members by presence",
+          "type": "boolean",
+          "default": true
+        },
+        "filterPronounsByLanguage": {
+          "title": "Match pronouns to interface language",
+          "type": "boolean",
+          "default": true
+        },
+        "showPronouns": {
+          "title": "Show pronouns",
+          "type": "boolean",
+          "default": true
+        },
+        "showPronounPills": {
+          "title": "Show pronoun pills",
+          "type": "boolean",
+          "default": true
+        },
+        "pronounPillLimit": {
+          "title": "Pronoun pills per message",
+          "enum": [
+            "1",
+            "2",
+            "3",
+            "all"
+          ],
+          "default": "3"
+        },
+        "pronounPillLength": {
+          "title": "Pronoun pill length",
+          "enum": [
+            "12",
+            "16",
+            "24",
+            "all"
+          ],
+          "default": "all"
+        },
+        "composerForm": {
+          "title": "Composer height",
+          "enum": [
+            "short",
+            "adaptive",
+            "tall"
+          ],
+          "default": "tall"
+        },
+        "alwaysInlineEditor": {
+          "title": "Always inline editor",
+          "type": "boolean",
+          "default": false
+        },
+        "enterForNewline": {
+          "title": "Newline on touch screens, send otherwise",
+          "enum": [
+            "adaptive",
+            "newline",
+            "send"
+          ],
+          "default": "adaptive"
+        },
+        "sedEdits": {
+          "title": "Edit your last message with s/old/new",
+          "type": "boolean",
+          "default": false
+        },
+        "inlineEditing": {
+          "title": "Edit messages in the timeline",
+          "type": "boolean",
+          "default": false
+        },
+        "mentionInReplies": {
+          "title": "Default reply notifications",
+          "type": "boolean",
+          "default": true
+        },
+        "formattingToolbar": {
+          "title": "Keep formatting toolbar open",
+          "type": "boolean",
+          "default": false
+        },
+        "composerFormatButton": {
+          "title": "Formatting button",
+          "type": "boolean",
+          "default": true
+        },
+        "richTextComposer": {
+          "title": "Format text as you type",
+          "type": "boolean",
+          "default": false
+        },
+        "composerSpellcheck": {
+          "title": "Spell check",
+          "type": "boolean",
+          "default": true
+        },
+        "composerAutocapitalize": {
+          "title": "Capitalize sentences",
+          "type": "boolean",
+          "default": true
+        },
+        "emoticonToEmoji": {
+          "title": "Convert emoticons to emoji",
+          "type": "boolean",
+          "default": false
+        },
+        "composerGifButton": {
+          "title": "GIF button",
+          "type": "boolean",
+          "default": true
+        },
+        "composerStickerButton": {
+          "title": "Sticker button",
+          "type": "boolean",
+          "default": true
+        },
+        "composerEmoteButton": {
+          "title": "Emote button",
+          "type": "boolean",
+          "default": true
+        },
+        "composerVoiceButton": {
+          "title": "Voice message button",
+          "type": "boolean",
+          "default": true
+        },
+        "composerButtonOrder": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "gif",
+              "sticker",
+              "emoticon",
+              "persona",
+              "format",
+              "separator:0",
+              "separator:1",
+              "separator:2",
+              "separator:3",
+              "separator:4",
+              "separator:5",
+              "separator:6",
+              "separator:7",
+              "separator:8"
+            ]
+          },
+          "default": [
+            "gif",
+            "sticker",
+            "emoticon",
+            "separator:0",
+            "persona",
+            "format"
+          ]
+        },
+        "scheduleInEncryptedRooms": {
+          "title": "Allow scheduling in encrypted rooms",
+          "type": "boolean",
+          "default": true
+        },
+        "sendAttachmentAsCaption": {
+          "title": "Use message text as attachment caption",
+          "type": "boolean",
+          "default": true
+        },
+        "sendAttachmentsAsGallery": {
+          "title": "Combine attachments into a gallery",
+          "type": "boolean",
+          "default": false
+        },
+        "imageMetadata": {
+          "title": "Image metadata",
+          "enum": [
+            "location",
+            "all",
+            "keep"
+          ],
+          "default": "location"
+        },
+        "personaPicker": {
+          "title": "Show profile picker in the composer",
+          "type": "boolean",
+          "default": true
+        },
+        "personaPickerSortOrder": {
+          "title": "Profile picker sort order",
+          "enum": [
+            "manual",
+            "alphabetical-asc",
+            "alphabetical-desc",
+            "recent"
+          ],
+          "default": "recent"
+        },
+        "personaPickerLeftSide": {
+          "title": "Pin picker to left side of composer",
+          "type": "boolean",
+          "default": false
+        },
+        "personaProxying": {
+          "title": "Shorthand triggers",
+          "type": "boolean",
+          "default": false
+        },
+        "personaSelectionScope": {
+          "title": "Remember the selected profile",
+          "enum": [
+            "account",
+            "space",
+            "room",
+            "picker"
+          ],
+          "default": "picker"
+        },
+        "personaKeepAfterShorthand": {
+          "title": "Keep the profile selected after shorthand",
+          "type": "boolean",
+          "default": false
+        },
+        "personaFallback": {
+          "title": "Prefix messages with profile names for older clients",
+          "type": "boolean",
+          "default": true
+        },
+        "personaGrid": {
+          "type": "boolean",
+          "default": true
+        },
+        "personaAlternateAvatar": {
+          "type": "boolean",
+          "default": false
+        },
+        "sendTypingNotifications": {
+          "title": "Send typing notifications",
+          "type": "boolean",
+          "default": true
+        },
+        "sendReadReceipts": {
+          "title": "Read receipts",
+          "type": "boolean",
+          "default": true
+        },
+        "sendPresence": {
+          "title": "Online status",
+          "type": "boolean",
+          "default": true
+        },
+        "blurMedia": {
+          "title": "Blur media until hovered",
+          "type": "boolean",
+          "default": false
+        },
+        "blurAvatars": {
+          "title": "Blur profile pictures until hovered",
+          "type": "boolean",
+          "default": false
+        },
+        "blurEmotes": {
+          "title": "Blur emotes until hovered",
+          "type": "boolean",
+          "default": false
+        },
+        "presence": {
+          "enum": [
+            "online",
+            "unavailable",
+            "offline"
+          ],
+          "default": "online"
+        },
+        "presenceStatusMessage": {
+          "type": "string",
+          "default": ""
+        },
+        "loadingAnimal": {
+          "type": "string",
+          "default": ""
+        },
+        "mediaAutoLoad": {
+          "title": "Load media automatically",
+          "enum": [
+            "on",
+            "private",
+            "off"
+          ],
+          "default": "on"
+        },
+        "autoplayGifs": {
+          "title": "Autoplay animated images",
+          "type": "boolean",
+          "default": true
+        },
+        "pauseAnimationsWhenInactive": {
+          "title": "Pause animations when the window is inactive",
+          "type": "boolean",
+          "default": false
+        },
+        "autoplayStickers": {
+          "title": "Autoplay stickers and emoji",
+          "type": "boolean",
+          "default": true
+        },
+        "gifProvider": {
+          "title": "GIF search provider",
+          "enum": [
+            "default",
+            "klipy",
+            "tenor",
+            "giphy"
+          ],
+          "default": "default"
+        },
+        "urlPreviews": {
+          "title": "Server-side embeds",
+          "type": "boolean",
+          "default": false
+        },
+        "themeFileCards": {
+          "title": "Show install cards for theme files",
+          "type": "boolean",
+          "default": true
+        },
+        "encryptedUrlPreviews": {
+          "title": "Server-side embeds in encrypted rooms",
+          "type": "boolean",
+          "default": false
+        },
+        "clientEmbeds": {
+          "title": "Client-side embeds",
+          "type": "boolean",
+          "default": false
+        },
+        "encryptedClientEmbeds": {
+          "title": "Client-side embeds in encrypted rooms",
+          "type": "boolean",
+          "default": false
+        },
+        "youtubeEmbeds": {
+          "title": "Embed YouTube links",
+          "type": "boolean",
+          "default": false
+        },
+        "useDearrow": {
+          "title": "Use DeArrow titles and thumbnails",
+          "type": "boolean",
+          "default": false
+        },
+        "dearrowThumbnailFallback": {
+          "title": "Fallback thumbnail type",
+          "enum": [
+            "random",
+            "original",
+            "youtube_autogen"
+          ],
+          "default": "youtube_autogen"
+        },
+        "youtubeThumbnailPosition": {
+          "title": "Autogenerated thumbnail type",
+          "enum": [
+            "start",
+            "middle",
+            "end"
+          ],
+          "default": "middle"
+        },
+        "tiktokEmbeds": {
+          "title": "Embed TikTok links",
+          "type": "boolean",
+          "default": false
+        },
+        "instagramEmbeds": {
+          "title": "Embed Instagram links",
+          "type": "boolean",
+          "default": false
+        },
+        "systemNotifications": {
+          "title": "System alerts",
+          "type": "boolean",
+          "default": true
+        },
+        "badgeDefaultDirect": {
+          "enum": [
+            "all",
+            "mentions",
+            "quiet"
+          ],
+          "default": "all"
+        },
+        "badgeDefaultGroup": {
+          "enum": [
+            "all",
+            "mentions",
+            "quiet"
+          ],
+          "default": "mentions"
+        },
+        "notificationSounds": {
+          "title": "Play notification sounds",
+          "type": "boolean",
+          "default": true
+        },
+        "notifyOnce": {
+          "title": "One alert per room",
+          "type": "boolean",
+          "default": true
+        },
+        "pushInactiveTimeout": {
+          "title": "Alert other devices after",
+          "enum": [
+            "off",
+            "1",
+            "5",
+            "10",
+            "15",
+            "30"
+          ],
+          "default": "1"
+        },
+        "backgroundNotificationSounds": {
+          "title": "Sounds while backgrounded",
+          "type": "boolean",
+          "default": true
+        },
+        "notificationContent": {
+          "title": "Show message text",
+          "type": "boolean",
+          "default": false
+        },
+        "notificationEncryptedContent": {
+          "title": "Show encrypted room text",
+          "type": "boolean",
+          "default": false
+        },
+        "richPushPayloads": {
+          "title": "Include message text in push",
+          "type": "boolean",
+          "default": true
+        },
+        "clearNotificationsOnRead": {
+          "title": "Clear alerts when read",
+          "type": "boolean",
+          "default": true
+        },
+        "highlightMentions": {
+          "title": "Highlight mentions",
+          "type": "boolean",
+          "default": true
+        },
+        "faviconForMentionsOnly": {
+          "title": "Tab badge for mentions and keywords",
+          "type": "boolean",
+          "default": false
+        },
+        "ringForGroupCalls": {
+          "title": "Show call screen for groups and voice channels",
+          "type": "boolean",
+          "default": false
+        },
+        "alwaysShowCallButton": {
+          "title": "Show call button in rooms with more than 10 members",
+          "type": "boolean",
+          "default": false
+        },
+        "callScreenPreview": {
+          "title": "Show a shared screen outside the call",
+          "type": "boolean",
+          "default": true
+        },
+        "callMode": {
+          "title": "Call mode",
+          "enum": [
+            "auto",
+            "legacy",
+            "compatibility",
+            "matrix_2"
+          ],
+          "default": "auto"
+        },
+        "callServiceUrl": {
+          "type": "string",
+          "default": ""
+        },
+        "incomingCallSound": {
+          "title": "In-app incoming call sound",
+          "type": "boolean",
+          "default": true
+        },
+        "outgoingRingback": {
+          "title": "Play a ringing tone while calling",
+          "type": "boolean",
+          "default": true
+        },
+        "callMicrophoneMuted": {
+          "type": "boolean",
+          "default": false
+        },
+        "callInputMode": {
+          "title": "Input mode",
+          "enum": [
+            "voice-activity",
+            "push-to-talk"
+          ],
+          "default": "voice-activity"
+        },
+        "callGlobalShortcuts": {
+          "title": "Global microphone shortcuts",
+          "type": "boolean",
+          "default": true
+        },
+        "noiseSuppression": {
+          "title": "Filter microphone background noise",
+          "type": "boolean",
+          "default": true
+        },
+        "voiceIsolation": {
+          "title": "Voice isolation",
+          "type": "boolean",
+          "default": false
+        },
+        "incomingVoiceIsolation": {
+          "title": "Voice isolation for others",
+          "type": "boolean",
+          "default": false
+        },
+        "echoCancellation": {
+          "title": "Remove call echo from the microphone",
+          "type": "boolean",
+          "default": true
+        },
+        "autoGainControl": {
+          "title": "Adjust microphone level automatically",
+          "type": "boolean",
+          "default": true
+        },
+        "audioInputDevice": {
+          "type": "string",
+          "default": ""
+        },
+        "audioOutputDevice": {
+          "type": "string",
+          "default": ""
+        },
+        "videoInputDevice": {
+          "type": "string",
+          "default": ""
+        },
+        "callCameraResolution": {
+          "title": "Camera resolution",
+          "enum": [
+            "auto",
+            "360",
+            "480",
+            "720",
+            "1080",
+            "1440",
+            "2160"
+          ],
+          "default": "auto"
+        },
+        "callCameraBitrate": {
+          "title": "Camera maximum bitrate",
+          "enum": [
+            "auto",
+            "250",
+            "500",
+            "1000",
+            "2000",
+            "4000",
+            "8000",
+            "16000"
+          ],
+          "default": "auto"
+        },
+        "callCameraCodec": {
+          "title": "Camera codec",
+          "enum": [
+            "auto",
+            "vp8",
+            "h264",
+            "vp9",
+            "av1"
+          ],
+          "default": "auto"
+        },
+        "callScreenResolution": {
+          "title": "Screen sharing resolution",
+          "enum": [
+            "auto",
+            "360",
+            "480",
+            "720",
+            "1080",
+            "1440",
+            "2160"
+          ],
+          "default": "720"
+        },
+        "callScreenBitrate": {
+          "title": "Screen sharing maximum bitrate",
+          "enum": [
+            "auto",
+            "250",
+            "500",
+            "1000",
+            "2000",
+            "4000",
+            "8000",
+            "16000"
+          ],
+          "default": "auto"
+        },
+        "callScreenFramerate": {
+          "title": "Screen sharing frame rate",
+          "enum": [
+            "auto",
+            "15",
+            "30",
+            "60"
+          ],
+          "default": "30"
+        },
+        "callScreenCodec": {
+          "title": "Screen sharing codec",
+          "enum": [
+            "auto",
+            "vp8",
+            "h264",
+            "vp9",
+            "av1"
+          ],
+          "default": "h264"
+        },
+        "callSimulcast": {
+          "title": "Use simulcast",
+          "type": "boolean",
+          "default": true
+        },
+        "pushGatewayUrl": {
+          "type": "string",
+          "default": ""
+        },
+        "pushVapidKey": {
+          "type": "string",
+          "default": ""
+        },
+        "pushAppId": {
+          "type": "string",
+          "default": ""
+        },
+        "pushEmbeddedServerUrl": {
+          "type": "string",
+          "default": ""
+        },
+        "soundsNotificationVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsCameraOnVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsCameraOffVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsMicOnVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsMicOffVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsDeafenOnVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsDeafenOffVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsScreenshareStartVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsScreenshareStopVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsCallJoinVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsCallLeaveVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsIncomingCallVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "soundsOutgoingCallVolume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "errorReporting": {
+          "title": "Error reports",
+          "type": "boolean",
+          "default": false
+        },
+        "sessionReplay": {
+          "title": "Session replay on errors",
+          "type": "boolean",
+          "default": false
+        },
+        "telemetryAsked": {
+          "type": "boolean",
+          "default": false
+        },
+        "autoUpdateCheck": {
+          "type": "boolean",
+          "default": true
+        },
+        "updateChannel": {
+          "enum": [
+            "stable",
+            "nightly"
+          ]
+        },
+        "closeToTray": {
+          "title": "Close to the tray",
+          "type": "boolean",
+          "default": false
+        },
+        "askDownloadLocation": {
+          "type": "boolean",
+          "default": true
+        },
+        "minimizeToTray": {
+          "title": "Minimize to the tray",
+          "type": "boolean",
+          "default": false
+        },
+        "showSystemTrayIcon": {
+          "title": "Show a tray icon",
+          "type": "boolean",
+          "default": true
+        },
+        "useCustomTitleBar": {
+          "title": "Use {{appName}}’s title bar",
+          "type": "boolean"
+        },
+        "hardwareAcceleration": {
+          "title": "Hardware acceleration",
+          "type": "boolean",
+          "default": true
+        },
+        "hardwareVideoEncode": {
+          "title": "Hardware video encoding",
+          "type": "boolean",
+          "default": true
+        },
+        "hardwareVideoDecode": {
+          "title": "Hardware video decoding",
+          "type": "boolean",
+          "default": true
+        },
+        "smoothScrolling": {
+          "title": "Smooth scrolling",
+          "type": "boolean",
+          "default": true
+        },
+        "webRtcIpPolicy": {
+          "title": "Network interfaces for calls",
+          "enum": [
+            "default",
+            "default_public_and_private_interfaces",
+            "default_public_interface_only",
+            "disable_non_proxied_udp"
+          ],
+          "default": "default"
+        },
+        "launchAtLogin": {
+          "title": "Open {{appName}} when you sign in",
+          "type": "boolean",
+          "default": false
+        },
+        "startMinimized": {
+          "title": "Start hidden",
+          "type": "boolean",
+          "default": false
+        },
+        "settingsSync": {
+          "title": "Sync settings across devices",
+          "type": "boolean",
+          "default": false
+        },
+        "syncDrafts": {
+          "title": "Include unsent drafts",
+          "type": "boolean",
+          "default": true
+        },
+        "profileChangePropagation": {
+          "title": "Apply name and avatar changes to",
+          "enum": [
+            "all",
+            "unchanged",
+            "none"
+          ],
+          "default": "unchanged"
+        },
+        "developerTools": {
+          "title": "Enable developer tools",
+          "type": "boolean",
+          "default": false
+        },
+        "callStatsOverlay": {
+          "title": "Show screen share statistics in calls",
+          "type": "boolean",
+          "default": false
+        },
+        "callDebugOverlay": {
+          "title": "Show call debug information in calls",
+          "type": "boolean",
+          "default": true
+        },
+        "showHiddenEvents": {
+          "title": "Show hidden events",
+          "type": "boolean",
+          "default": false
+        },
+        "hiddenEventsHeaderToggle": {
+          "title": "Show a hidden events toggle in the room header",
+          "type": "boolean",
+          "default": false
+        },
+        "hiddenEventEdits": {
+          "title": "Show edit events",
+          "type": "boolean",
+          "default": true
+        },
+        "hiddenEventReactions": {
+          "title": "Show reaction events",
+          "type": "boolean",
+          "default": true
+        },
+        "hiddenEventRedactions": {
+          "title": "Show redaction events",
+          "type": "boolean",
+          "default": true
+        },
+        "hiddenEventOther": {
+          "title": "Show other hidden events",
+          "type": "boolean",
+          "default": true
+        },
+        "showTranslationStrings": {
+          "title": "Show translation strings",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}
