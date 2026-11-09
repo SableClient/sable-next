@@ -9,6 +9,10 @@
   import { takeAfterLogin } from '#lib/auth/after-login.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { permissionState } from '#lib/features/notifications/present.js';
+  import { logoutWithPush } from '#lib/features/notifications/web-push.js';
+  import { SignOutGuard } from '#lib/features/sidebar/sign-out-guard.svelte.js';
+  import SignOutWarningDialog from '#lib/features/sidebar/SignOutWarningDialog.svelte';
+  import { pushOverride } from '#lib/notifications/push-config.js';
   import { i18n } from '#lib/i18n.js';
   import { telemetryConsentPending } from '#lib/platform/telemetry.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -46,6 +50,7 @@
   } from './setup-record';
 
   const core = useCoreClient();
+  const signOut = new SignOutGuard(core);
   let record = $state<SetupRecord | null>(null);
   let accountFinished = $state.raw<AccountStep[]>([]);
   let permissionAskable = false;
@@ -174,6 +179,19 @@
     if (index <= pendingIndex)
       void goto(resolve('/(auth)/setup/[step]', { step }), { reset: false });
     else if (index === pendingIndex + 1 && canSkipAhead && pending) advance(pending);
+  }
+
+  async function logout(): Promise<void> {
+    const key = recordKey;
+    leaving = true;
+    try {
+      await logoutWithPush(core, pushOverride());
+    } catch (error) {
+      leaving = false;
+      throw error;
+    }
+    if (key) removeLocalValue(key);
+    await goto(resolve(core.session ? '/(app)/rooms' : '/(auth)/login'));
   }
 
   function skipChecking(): void {
@@ -343,6 +361,12 @@
     {/each}
   </AuthRail>
 {/if}
+<AuthSecondaryAction
+  label={i18n.t('settings.logout')}
+  disabled={signOut.checking || signOut.signingOut}
+  onclick={() => void signOut.request(logout)}
+/>
+<SignOutWarningDialog guard={signOut} />
 
 <style>
   .setup-checking {
