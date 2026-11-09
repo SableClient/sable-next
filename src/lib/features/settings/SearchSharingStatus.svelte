@@ -104,7 +104,11 @@
     if (sharing.state === 'waiting') return i18n.t('settings.searchPeerWaiting', { device });
     if (sharing.state === 'connecting') return i18n.t('settings.searchPeerConnecting', { device });
     if (sharing.state === 'receiving')
-      return i18n.t('settings.searchPeerTransferring', { device, count: sharing.rooms_copied });
+      return i18n.t('settings.searchPeerTransferring', {
+        device,
+        transferred: sharing.transferred_rooms,
+        total: sharing.total_rooms,
+      });
     if (sharing.state === 'sending') return i18n.t('settings.searchPeerSending', { device });
     if (sharing.outcome === 'no_answer' && sharing.automatic)
       return i18n.t('settings.searchPeerNoAnswerRetrying');

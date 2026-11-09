@@ -1,3 +1,15 @@
+//! Core logic for the search sharing WebRTC protocol.
+//!
+//! Once a WebRTC connection is established, communication proceeds as follows:
+//!
+//! - The sending device sends a `RoomList` message with every room it has in its search index.
+//! - For each room in the room list:
+//!   - The receiving device sends a `RequestRoom` message.
+//!   - The sending device sends a `ListParts` message with the search index parts for that room.
+//!   - For each part of the room:
+//!     - The receiving device sends a `RequestPart` message asking for the part.
+//!     - The sending device sends a `PartData` message with the part's data.
+
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Duration;
 
@@ -29,10 +41,6 @@ enum CopyError {
     InvalidParts(OwnedRoomId),
     #[error("part {part} of {room} failed its hash or range check")]
     BadPart { room: OwnedRoomId, part: usize },
-    #[error("{0} is no longer joined")]
-    NotJoined(OwnedRoomId),
-    #[error("could not read the event cache of {0}")]
-    EventCache(OwnedRoomId),
     #[error("the index could not save {0}")]
     NotDurable(OwnedRoomId),
     #[error("could not save the received parts")]
@@ -63,40 +71,35 @@ pub(super) struct SharedCover {
     anchor: Option<OwnedEventId>,
 }
 
-/// The receiver asks for one room at a time with `Room`, gets its part list
-/// with `Parts`, then fetches each part it does not have with `Get` and `Data`.
+/// A message transferred between peers over the WebRTC connection.
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(super) enum Message {
-    Room {
-        room: OwnedRoomId,
-    },
-    Parts {
-        room: OwnedRoomId,
-        parts: Vec<Part>,
-        cover: Option<SharedCover>,
-    },
-    Get {
-        room: OwnedRoomId,
-        part: usize,
-    },
-    Data {
-        room: OwnedRoomId,
-        part: usize,
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
-    },
+    RoomList { rooms: Vec<OwnedRoomId> },
+    RequestRoom { room: OwnedRoomId },
+    RequestPart { room: OwnedRoomId, part: usize },
+    ListParts(ListParts),
+    PartData(PartData),
 }
 
-impl Message {
-    const fn kind(&self) -> &'static str {
-        match self {
-            Self::Room { .. } => "room",
-            Self::Parts { .. } => "parts",
-            Self::Get { .. } => "get",
-            Self::Data { .. } => "data",
-        }
-    }
+#[derive(Deserialize, Serialize)]
+pub(super) struct ListParts {
+    room: OwnedRoomId,
+    parts: Vec<Part>,
+    cover: Option<SharedCover>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub(super) struct PartData {
+    room: OwnedRoomId,
+    part: usize,
+    #[serde(with = "serde_bytes")]
+    data: Vec<u8>,
+}
+
+enum PartMessagePayload {
+    ListParts(ListParts),
+    PartData(PartData),
 }
 
 #[derive(Default, Deserialize, Serialize)]
@@ -116,55 +119,112 @@ impl Saved {
 }
 
 pub(super) enum Transfer {
-    Sending(Option<Snapshot>),
-    Receiving(Download),
+    Sending(Option<SenderState>),
+    Receiving(ReceiverState),
 }
 
-pub(super) struct Snapshot {
+pub(super) struct SenderState {
     room: OwnedRoomId,
     history: History,
     parts: Vec<Part>,
     cover: Option<SharedCover>,
 }
 
-#[derive(Default)]
-pub(super) struct Download {
+/// The receiving device's state.
+pub(super) struct ReceiverState {
+    /// The current search sharing session epoch.
     epoch: u64,
-    rooms: VecDeque<OwnedRoomId>,
-    asked: Option<OwnedRoomId>,
-    fetch: Option<Fetch>,
+    /// The current state of the download state machine.
+    state: DownloadState,
 }
 
+impl ReceiverState {
+    pub(super) const fn new(epoch: u64) -> Self {
+        Self {
+            epoch,
+            state: DownloadState::WaitingForRoomList,
+        }
+    }
+}
+
+/// The state of the receiving device.
+enum DownloadState {
+    /// The device is waiting for the sending device to provide a room list.
+    WaitingForRoomList,
+    /// The device is downloading rooms.
+    DownloadingRooms(RoomDownloadState),
+}
+
+/// The state of a download task.
+struct RoomDownloadState {
+    pub queued_rooms: VecDeque<OwnedRoomId>,
+    pub total_rooms: usize,
+    step: RoomDownloadStep,
+}
+
+impl RoomDownloadState {
+    fn new(mut queued_rooms: VecDeque<OwnedRoomId>) -> Option<(Self, OwnedRoomId)> {
+        let pending_room = queued_rooms.pop_front()?;
+
+        Some((
+            Self {
+                total_rooms: queued_rooms.len(),
+                queued_rooms,
+                step: RoomDownloadStep::WaitingForParts {
+                    pending_room: pending_room.clone(),
+                },
+            },
+            pending_room,
+        ))
+    }
+}
+
+/// The step a download task is on.
+enum RoomDownloadStep {
+    /// The receiving device is waiting for the room's parts list.
+    WaitingForParts { pending_room: OwnedRoomId },
+    /// The receving device is downloading the room's parts.
+    DownloadingParts(PartsDownloadState),
+}
+
+/// The state of an individual room download.
 #[derive(Debug)]
-struct Fetch {
+struct PartsDownloadState {
     room: OwnedRoomId,
     parts: Vec<Part>,
     missing: VecDeque<usize>,
     cover: Option<SharedCover>,
 }
 
-impl Fetch {
+impl PartsDownloadState {
     fn new(
         room: OwnedRoomId,
         parts: Vec<Part>,
         cover: Option<SharedCover>,
         known: &HashSet<String>,
-    ) -> Result<Self, CopyError> {
+    ) -> Result<(Self, Option<usize>), CopyError> {
         if !valid_parts(&parts, cover.as_ref()) {
             return Err(CopyError::InvalidParts(room));
         }
-        let missing = parts
+
+        let mut missing: VecDeque<usize> = parts
             .iter()
             .enumerate()
             .filter(|(_, part)| !known.contains(&part.sha256))
             .map(|(index, _)| index)
             .collect();
-        Ok(Self {
-            room,
-            parts,
-            missing,
-            cover,
-        })
+
+        let first_missing_part = missing.pop_front();
+
+        Ok((
+            Self {
+                room,
+                parts,
+                missing,
+                cover,
+            },
+            first_missing_part,
+        ))
     }
 }
 
@@ -196,6 +256,7 @@ impl Core {
         Ok((session, client))
     }
 
+    /// Handle a message from the peer.
     async fn exchange(
         &self,
         session_id: &str,
@@ -209,56 +270,66 @@ impl Core {
             .search_session(&client, session_id)
             .await
             .map_err(CopyError::Session)?;
+
         let mut transfer = transfer.lock().await;
+
         self.load_saved(&client).await;
+
         let reply = match (&mut *transfer, message) {
-            (Transfer::Receiving(download), None) => {
-                *download = Download {
-                    epoch: self.search_sharing.state.lock().epoch,
-                    rooms: joined_rooms(&client),
-                    ..Download::default()
-                };
-                self.next_request(&client, session_id, download).await?
+            (Transfer::Sending(_), None) => {
+                // Send our room list to the receiver.
+                let index = self.search_index.lock().await;
+
+                Some(Message::RoomList {
+                    rooms: index.rooms.keys().cloned().collect(),
+                })
             }
+            (Transfer::Receiving(_), None) => None,
             (Transfer::Receiving(download), Some(message)) => {
-                self.receive(&client, session_id, download, message).await?
+                self.handle_as_receiver(&client, session_id, download, message)
+                    .await?
             }
             (Transfer::Sending(snapshot), Some(message)) => {
-                Some(self.send(&client, snapshot, message).await?)
+                Some(self.handle_as_sender(&client, snapshot, message).await?)
             }
-            (Transfer::Sending(_), None) => None,
         };
+
         let finished = reply.is_none() && matches!(*transfer, Transfer::Receiving(_));
         drop(transfer);
+
         if finished {
             self.complete_search_copy(&client, session_id).await;
         }
+
         reply
             .map(|reply| rmp_serde::to_vec_named(&reply).map_err(|_| CopyError::Malformed))
             .transpose()
     }
 
-    async fn send(
+    /// Handle a message from the receiver (this device is the sender).
+    async fn handle_as_sender(
         &self,
         client: &Client,
-        snapshot: &mut Option<Snapshot>,
+        state: &mut Option<SenderState>,
         message: Message,
     ) -> Result<Message, CopyError> {
+        // The sender's logic and state are a lot simpler than the receiver's:
+        // we just send whatever they ask us for.
         match message {
-            Message::Room { room } => {
-                *snapshot = if joined(client, &room) {
+            Message::RequestRoom { room } => {
+                *state = if joined(client, &room) {
                     self.peer_snapshot(client, room.clone()).await
                 } else {
                     None
                 };
-                let (parts, cover) = match snapshot {
+                let (parts, cover) = match state {
                     Some(snapshot) => (snapshot.parts.clone(), snapshot.cover.clone()),
                     None => (Vec::new(), None),
                 };
-                Ok(Message::Parts { room, parts, cover })
+                Ok(Message::ListParts(ListParts { room, parts, cover }))
             }
-            Message::Get { room, part } => {
-                let snapshot = snapshot
+            Message::RequestPart { room, part } => {
+                let snapshot = state
                     .as_ref()
                     .filter(|snapshot| snapshot.room == room)
                     .ok_or(CopyError::Unexpected("get"))?;
@@ -268,35 +339,109 @@ impl Core {
                     .and_then(|info| snapshot.history.part(info.start, info.end).json())
                     .ok_or(CopyError::Unexpected("get"))?;
                 let data = miniz_oxide::deflate::compress_to_vec_zlib(&json, 6);
-                Ok(Message::Data { room, part, data })
+                Ok(Message::PartData(PartData { room, part, data }))
             }
-            other => Err(CopyError::Unexpected(other.kind())),
+            _ => Err(CopyError::Unexpected(
+                "invalid message for current sender state",
+            )),
         }
     }
 
-    async fn receive(
+    /// Handle a message from the sender (this device is the receiver).
+    async fn handle_as_receiver(
         &self,
         client: &Client,
         session_id: &str,
-        download: &mut Download,
+        ReceiverState { state, epoch }: &mut ReceiverState,
         message: Message,
     ) -> Result<Option<Message>, CopyError> {
-        match message {
-            Message::Parts { room, parts, cover } => {
-                if download.asked.as_ref() != Some(&room) {
-                    return Err(CopyError::Unexpected("parts"));
+        let response = match (message, &mut *state) {
+            (Message::RoomList { rooms }, state @ DownloadState::WaitingForRoomList) => {
+                if let Some((download_state, first_room_to_request)) =
+                    RoomDownloadState::new(rooms.into())
+                {
+                    // Switch to DownloadingRooms state and ask for the first room in the queue
+                    *state = DownloadState::DownloadingRooms(download_state);
+
+                    Some(Message::RequestRoom {
+                        room: first_room_to_request,
+                    })
+                } else {
+                    // The peer has no rooms to offer us, we're done here.
+                    return Ok(None);
                 }
-                download.asked = None;
-                let known = self.known_parts(&room);
-                download.fetch = Some(Fetch::new(room, parts, cover, &known)?);
             }
-            Message::Data { room, part, data } => {
-                let fetch = download
-                    .fetch
-                    .as_mut()
-                    .filter(|fetch| fetch.room == room && fetch.missing.front() == Some(&part))
-                    .ok_or(CopyError::Unexpected("data"))?;
-                let payload = fetch
+            (Message::ListParts(part_list), DownloadState::DownloadingRooms(download_state)) => {
+                self.advance_download_state(
+                    client,
+                    *epoch,
+                    download_state,
+                    PartMessagePayload::ListParts(part_list),
+                )
+                .await?
+            }
+            (Message::PartData(part_data), DownloadState::DownloadingRooms(download_state)) => {
+                self.advance_download_state(
+                    client,
+                    *epoch,
+                    download_state,
+                    PartMessagePayload::PartData(part_data),
+                )
+                .await?
+            }
+            _ => {
+                return Err(CopyError::Unexpected(
+                    "invalid message for current receiver state",
+                ));
+            }
+        };
+
+        if let DownloadState::DownloadingRooms(download_state) = &*state {
+            self.update_sharing(|state| {
+                if matches!(&state.phase, super::Phase::Receiving(session) if session.id == session_id)
+                {
+                    state.transferred_rooms = download_state.total_rooms - download_state.queued_rooms.len();
+                    state.total_rooms = download_state.total_rooms;
+                }
+            });
+        }
+
+        Ok(response)
+    }
+
+    async fn advance_download_state(
+        &self,
+        client: &Client,
+        epoch: u64,
+        state: &mut RoomDownloadState,
+        message: PartMessagePayload,
+    ) -> Result<Option<Message>, CopyError> {
+        let (current_room, next_part) = match (&mut state.step, message) {
+            (
+                RoomDownloadStep::WaitingForParts { pending_room },
+                PartMessagePayload::ListParts(ListParts { room, parts, cover }),
+            ) => {
+                let pending_room = pending_room.to_owned();
+                if pending_room != room {
+                    return Err(CopyError::Unexpected("got parts list for unexpected room"));
+                }
+
+                let known = self.known_parts(&room);
+                let (parts, first_missing_part) =
+                    PartsDownloadState::new(room, parts, cover, &known)?;
+                state.step = RoomDownloadStep::DownloadingParts(parts);
+
+                (pending_room, first_missing_part)
+            }
+            (
+                RoomDownloadStep::DownloadingParts(parts),
+                PartMessagePayload::PartData(PartData { room, part, data }),
+            ) => {
+                if parts.room != room {
+                    return Err(CopyError::Unexpected("got parts data for unexpected room"));
+                }
+
+                let payload = parts
                     .parts
                     .get(part)
                     .and_then(|info| decode(info, &data))
@@ -305,50 +450,48 @@ impl Core {
                         part,
                     })?;
                 self.import_peer_payload(client, &room, payload).await?;
-                fetch.missing.pop_front();
+                (room, parts.missing.pop_front())
             }
-            other => return Err(CopyError::Unexpected(other.kind())),
-        }
-        self.next_request(client, session_id, download).await
-    }
-
-    async fn next_request(
-        &self,
-        client: &Client,
-        session_id: &str,
-        download: &mut Download,
-    ) -> Result<Option<Message>, CopyError> {
-        if let Some(fetch) = &download.fetch
-            && let Some(&part) = fetch.missing.front()
-        {
-            return Ok(Some(Message::Get {
-                room: fetch.room.clone(),
-                part,
-            }));
-        }
-        if let Some(fetch) = download.fetch.take() {
-            self.finish_peer_room(client, fetch, download.epoch).await?;
-            self.copied_room(session_id);
-        }
-        let Some(room) = download.rooms.pop_front() else {
-            return Ok(None);
+            _ => {
+                return Err(CopyError::Unexpected(
+                    "invalid message for current download step",
+                ));
+            }
         };
+
+        // Update the timer for this room so the crawler will ignore it.
         self.search_sharing
             .state
             .lock()
             .restoring
-            .insert(room.clone(), Instant::now() + RESTORING);
-        download.asked = Some(room.clone());
-        Ok(Some(Message::Room { room }))
-    }
+            .insert(current_room.clone(), Instant::now() + RESTORING);
 
-    fn copied_room(&self, session_id: &str) {
-        self.update_sharing(|state| {
-            if matches!(&state.phase, super::Phase::Receiving(session) if session.id == session_id)
-            {
-                state.rooms += 1;
-            }
-        });
+        if let Some(next_part) = next_part {
+            // We're done with this part, let's ask for the next one.
+            Ok(Some(Message::RequestPart {
+                room: current_room,
+                part: next_part,
+            }))
+        } else if let Some(next_room) = state.queued_rooms.pop_front() {
+            // We're out of parts for this room, let's ask for the next room.
+            let RoomDownloadStep::DownloadingParts(parts) = std::mem::replace(
+                &mut state.step,
+                RoomDownloadStep::WaitingForParts {
+                    pending_room: next_room.clone(),
+                },
+            ) else {
+                // We can't reach this point without either explicitly setting `state.step` to `DownloadingParts`
+                // or returning Err, but the compiler doesn't know that.
+                unreachable!();
+            };
+
+            self.finish_receiving_room(client, parts, epoch).await?;
+
+            Ok(Some(Message::RequestRoom { room: next_room }))
+        } else {
+            // We're out of rooms, the transfer is complete.
+            Ok(None)
+        }
     }
 
     pub(super) async fn mark_synced(&self, client: &Client, copy: Option<SearchPeerCopyView>) {
@@ -441,7 +584,7 @@ impl Core {
             .unwrap_or_default()
     }
 
-    async fn peer_snapshot(&self, client: &Client, room: OwnedRoomId) -> Option<Snapshot> {
+    async fn peer_snapshot(&self, client: &Client, room: OwnedRoomId) -> Option<SenderState> {
         self.save_rooms(client, vec![room.clone()]).await;
         self.save_changed_checkpoints(client).await;
         {
@@ -491,7 +634,7 @@ impl Core {
             resume,
             anchor: history.anchor(from, until),
         });
-        Some(Snapshot {
+        Some(SenderState {
             room,
             history,
             parts,
@@ -508,18 +651,24 @@ impl Core {
         if !self.peers_allowed() {
             return Err(CopyError::Session(RpcCode::Unavailable.into()));
         }
-        if !joined(client, room) {
-            return Err(CopyError::NotJoined(room.clone()));
-        }
-        let (cache, _guard) = match client.event_cache() {
+
+        // We might not have a cache for the room if it hasn't come down sync yet.
+        // That's mostly fine, it just means that we'll interpret redactions to replacement events
+        // as redactions on the root message instead. Since replacements don't get redacted a whole lot,
+        // this should be pretty uncommon.
+        let cache = match client.event_cache() {
             Some(event_cache) => event_cache.room(room).await.ok(),
             None => None,
-        }
-        .ok_or_else(|| CopyError::EventCache(room.clone()))?;
+        };
+
         let revision = {
             let mut index = self.search_index.lock().await;
             index
-                .import_redactions(room, payload.redacted, &cache)
+                .import_redactions(
+                    room,
+                    payload.redacted,
+                    cache.as_ref().map(|(cache, _)| cache),
+                )
                 .await;
             index
                 .import(room, payload.documents, payload.classified, payload.edits)
@@ -534,15 +683,17 @@ impl Core {
         }
     }
 
-    async fn finish_peer_room(
+    async fn finish_receiving_room(
         &self,
         client: &Client,
-        fetch: Fetch,
+        parts: PartsDownloadState,
         epoch: u64,
     ) -> Result<(), CopyError> {
-        let room = fetch.room;
+        let room = parts.room;
         self.search_sharing.state.lock().restoring.remove(&room);
-        if let Some(shared) = fetch.cover.filter(|_| joined(client, &room)) {
+
+        // If we know we're joined to this room, mark it as covered so crawling skips it.
+        if let Some(shared) = parts.cover.filter(|_| joined(client, &room)) {
             let mut cover = {
                 let crawl = self.search_crawl.lock().await;
                 super::super::merged_cover(
@@ -566,16 +717,18 @@ impl Core {
             self.search_crawl.lock().await.cover(&room, cover, revision);
             self.save_changed_checkpoints(client).await;
         }
-        if fetch.parts.is_empty() {
+
+        if parts.parts.is_empty() {
             return Ok(());
         }
+
         let kept = {
             let mut state = self.search_sharing.state.lock();
             let current = state.epoch == epoch;
             if current {
                 state.saved.get_or_insert_with(Saved::default).known.insert(
                     room,
-                    fetch.parts.into_iter().map(|part| part.sha256).collect(),
+                    parts.parts.into_iter().map(|part| part.sha256).collect(),
                 );
             }
             current
@@ -585,16 +738,6 @@ impl Core {
         }
         Ok(())
     }
-}
-
-fn joined_rooms(client: &Client) -> VecDeque<OwnedRoomId> {
-    let mut rooms: Vec<_> = client
-        .joined_rooms()
-        .into_iter()
-        .map(|room| room.room_id().to_owned())
-        .collect();
-    rooms.sort();
-    rooms.into()
 }
 
 fn joined(client: &Client, room: &OwnedRoomId) -> bool {
@@ -667,10 +810,12 @@ mod tests {
     fn only_parts_with_unknown_hashes_are_fetched() {
         let parts = vec![part(0, 0), part(1, 10), part(10, 20)];
         let known = HashSet::from([part(1, 10).sha256]);
-        let fetch = Fetch::new("!room:localhost".try_into().unwrap(), parts, None, &known).unwrap();
-        assert_eq!(fetch.missing, [0, 2]);
+        let (parts, _) =
+            PartsDownloadState::new("!room:localhost".try_into().unwrap(), parts, None, &known)
+                .unwrap();
+        assert_eq!(parts.missing, [0, 2]);
         assert!(matches!(
-            Fetch::new(
+            PartsDownloadState::new(
                 "!room:localhost".try_into().unwrap(),
                 vec![part(5, 10)],
                 None,
@@ -729,18 +874,18 @@ mod tests {
 
     #[test]
     fn part_data_travels_as_messagepack_binary() {
-        let message = Message::Data {
+        let message = Message::PartData(PartData {
             room: "!room:localhost".try_into().unwrap(),
             part: 3,
             data: vec![0, 159, 255],
-        };
+        });
         let bytes = rmp_serde::to_vec_named(&message).unwrap();
         assert!(
             bytes
                 .windows(5)
                 .any(|window| window == [0xc4, 3, 0, 159, 255])
         );
-        let Message::Data { part, data, .. } = rmp_serde::from_slice(&bytes).unwrap() else {
+        let Message::PartData(PartData { part, data, .. }) = rmp_serde::from_slice(&bytes).unwrap() else {
             panic!("expected data");
         };
         assert_eq!((part, data), (3, vec![0, 159, 255]));

@@ -1272,7 +1272,7 @@ impl MessageIndex {
         &mut self,
         room_id: &OwnedRoomId,
         redacted: Vec<OwnedEventId>,
-        cache: &RoomEventCache,
+        cache: Option<&RoomEventCache>,
     ) {
         let index = self
             .rooms
@@ -1357,7 +1357,7 @@ impl MessageIndex {
 
             if is_redacted(&event) {
                 if !index.redacted.contains(event_id) {
-                    apply_redacted(index, event_id.to_owned(), cache).await;
+                    apply_redacted(index, event_id.to_owned(), Some(cache)).await;
                     fresh += 1;
                     since_yield += 1;
                 }
@@ -1431,7 +1431,7 @@ async fn apply_event(
         }
         AnySyncMessageLikeEvent::RoomRedaction(redaction) => {
             if let Some(target) = redacted_event_id(&redaction, rules) {
-                apply_redacted(index, target, cache).await;
+                apply_redacted(index, target, Some(cache)).await;
             }
         }
         _ => {}
@@ -1518,7 +1518,11 @@ async fn apply_room_message(
     index.upsert(document);
 }
 
-async fn apply_redacted(index: &mut RoomIndex, redacted: OwnedEventId, cache: &RoomEventCache) {
+async fn apply_redacted(
+    index: &mut RoomIndex,
+    redacted: OwnedEventId,
+    cache: Option<&RoomEventCache>,
+) {
     if !index.redacted.insert(redacted.clone()) {
         return;
     }
@@ -1526,7 +1530,9 @@ async fn apply_redacted(index: &mut RoomIndex, redacted: OwnedEventId, cache: &R
     index.dirty = true;
     index.revision = index.revision.wrapping_add(1);
 
-    if let Some(target) = index.edits.remove(&redacted) {
+    if let Some(target) = index.edits.remove(&redacted)
+        && let Some(cache) = cache
+    {
         if let Some(document) = latest_content(cache, &target, &index.redacted).await {
             let document = adopt_edit(document, index.document(&target), &index.redacted);
             let document = index.apply_pending(document);

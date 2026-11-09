@@ -30,7 +30,7 @@ use crate::search::now_ms;
 
 mod transfer;
 
-use transfer::{Download, Saved, Transfer};
+use transfer::{ReceiverState, Saved, Transfer};
 
 const MAX_ASKED: usize = 32;
 const SESSION_TIMEOUT: Duration = Duration::from_secs(120);
@@ -181,7 +181,8 @@ struct State {
     /// devices with more are copied from.
     own: (u64, u64),
     outcome: Option<SearchPeerOutcome>,
-    rooms: usize,
+    transferred_rooms: usize,
+    total_rooms: usize,
     /// Loaded from the store on first use.
     saved: Option<Saved>,
     /// Bumped when `saved` is wiped, so a copy that started before does not
@@ -207,7 +208,8 @@ impl State {
         self.asked.clear();
         self.candidates.clear();
         self.outcome = None;
-        self.rooms = 0;
+        self.transferred_rooms = 0;
+        self.total_rooms = 0;
         true
     }
 
@@ -303,7 +305,7 @@ impl State {
                 .all(|candidate| candidate.documents == 0 || candidate.score() <= own)
             {
                 SearchPeerOutcome::NothingToCopy
-            } else if self.rooms > 0 {
+            } else if self.transferred_rooms > 0 {
                 SearchPeerOutcome::Interrupted
             } else {
                 SearchPeerOutcome::Failed
@@ -323,7 +325,7 @@ impl State {
             session: Session::new(
                 session,
                 device.clone(),
-                Transfer::Receiving(Download::default()),
+                Transfer::Receiving(ReceiverState::new(self.epoch)),
                 now,
             ),
             until: now + CONNECT_TIMEOUT,
@@ -400,8 +402,6 @@ impl Core {
             Some(SearchPeerPause::Offline)
         } else if !self.search_network.allows_crawl() {
             Some(SearchPeerPause::Metered)
-        } else if !self.search_foreground.load(Ordering::Relaxed) {
-            Some(SearchPeerPause::Background)
         } else {
             None
         }
@@ -455,7 +455,8 @@ impl Core {
                 device_id: device.to_string(),
                 name: state.name_of(device),
             }),
-            rooms_copied: state.rooms,
+            transferred_rooms: state.transferred_rooms,
+            total_rooms: state.total_rooms,
             last_copy: state
                 .saved
                 .as_ref()
@@ -869,7 +870,7 @@ impl Core {
                 device_id: device.to_string(),
                 name: state.name_of(&device),
                 at_ms: now_ms(),
-                rooms: state.rooms,
+                rooms: state.transferred_rooms,
             })
         });
         let Some(copy) = copy else { return };

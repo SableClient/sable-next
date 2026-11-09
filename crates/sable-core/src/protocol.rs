@@ -761,7 +761,10 @@ pub struct SearchSharingView {
     pub peer: Option<SearchPeerDeviceView>,
     /// Rooms copied by the current or last receiving attempt.
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub rooms_copied: usize,
+    pub transferred_rooms: usize,
+    /// Total rooms to transfer during the current or last receiving attempt.
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub total_rooms: usize,
     pub last_copy: Option<SearchPeerCopyView>,
     pub automatic: bool,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]

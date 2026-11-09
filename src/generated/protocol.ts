@@ -1771,7 +1771,9 @@ export type SearchSharingView = {
 	outcome: SearchPeerOutcome | null,
 	peer: SearchPeerDeviceView | null,
 	/**  Rooms copied by the current or last receiving attempt. */
-	rooms_copied: number,
+	transferred_rooms: number,
+	/**  Total rooms to transfer during the current or last receiving attempt. */
+	total_rooms: number,
 	last_copy: SearchPeerCopyView | null,
 	automatic: boolean,
 	asked: number,

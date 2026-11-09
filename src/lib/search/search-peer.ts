@@ -41,7 +41,7 @@ export function watchSearchPeers(core: SearchPeerCore, options: SearchPeerOption
     attempt = undefined;
   };
   const activate = (): void => {
-    if (stopped || document.visibilityState !== 'visible' || core.session?.account_id !== account) {
+    if (stopped || core.session?.account_id !== account) {
       relinquish();
       return;
     }
@@ -50,13 +50,7 @@ export function watchSearchPeers(core: SearchPeerCore, options: SearchPeerOption
     attempt = pending;
     const start = async (): Promise<void> => {
       if (options.beforeStart) await options.beforeStart();
-      if (
-        pending.signal.aborted ||
-        stopped ||
-        document.visibilityState !== 'visible' ||
-        core.session?.account_id !== account
-      )
-        return;
+      if (pending.signal.aborted || stopped || core.session?.account_id !== account) return;
       const stop = connectSearchPeers(core, options, account);
       await new Promise<void>((resolve) => {
         const finish = (): void => {
@@ -76,12 +70,10 @@ export function watchSearchPeers(core: SearchPeerCore, options: SearchPeerOption
       : start();
     void running.catch(() => {}).finally(finished);
   };
-  document.addEventListener('visibilitychange', activate);
   activate();
   return () => {
     if (stopped) return;
     stopped = true;
-    document.removeEventListener('visibilitychange', activate);
     relinquish();
   };
 }
@@ -257,7 +249,7 @@ function connectSearchPeers(
   });
 
   const discover = (): void => {
-    if (!allowed() || document.visibilityState !== 'visible' || discovering) return;
+    if (!allowed() || discovering) return;
     discovering = true;
     void Promise.all([
       iceServers(options.stunServers, () => core.rpc.calls.turnServer()).then((next) => {
