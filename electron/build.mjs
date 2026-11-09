@@ -33,10 +33,14 @@ for (const name of ['sable_node', 'sable_audiofox']) {
   copyFileSync(join(target, release ? 'release' : 'debug', library), join(out, `${name}.node`));
 }
 
-const venmic = join(here, 'node_modules/@vencord/venmic/prebuilds');
-for (const arch of ['x64', 'arm64']) {
-  const prebuild = join(venmic, `venmic-addon-linux-${arch}`, 'node-napi-v7.node');
-  if (existsSync(prebuild)) copyFileSync(prebuild, join(out, `venmic-${arch}.node`));
+if (process.platform === 'linux') {
+  const prebuild = join(
+    here,
+    'node_modules/@vencord/venmic/prebuilds',
+    `venmic-addon-linux-${process.arch}`,
+    'node-napi-v7.node'
+  );
+  if (existsSync(prebuild)) copyFileSync(prebuild, join(out, `venmic-${process.arch}.node`));
 }
 
 const { csp } = JSON.parse(readFileSync(join(root, 'src-tauri/tauri.conf.json'), 'utf8')).app
