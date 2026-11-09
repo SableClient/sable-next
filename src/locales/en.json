@@ -719,6 +719,8 @@
     "encryptionOn": "Messages in this room are end-to-end encrypted.",
     "encryptionOff": "Once enabled, encryption cannot be turned off.",
     "encryptionEnabled": "Enabled",
+    "encryptionNotEnabled": "Not encrypted",
+    "encryptionNotOn": "Messages in this room are not end-to-end encrypted.",
     "encryptionConfirm": "This cannot be undone. Once enabled, encryption stays on for good.",
     "encryptionFailed": "Encryption could not be enabled.",
     "addressesTitle": "Addresses on your server",
