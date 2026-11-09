@@ -3491,6 +3491,7 @@
     "triggerRemove": "Remove this trigger",
     "editorTitle": "Profile",
     "nameRequired": "A profile needs a name.",
+    "bioTooLong": "Profile biography is too long.",
     "saveFailed": "Could not save this profile.",
     "removeFailed": "Could not delete this profile.",
     "loadFailed": "Could not load your profiles.",

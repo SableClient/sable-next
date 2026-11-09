@@ -181,10 +181,15 @@
       return;
     }
 
+    const htmlBio = bioHtml(biography);
+    if ((htmlBio?.length ?? 0) >= 2048) {
+      error = i18n.t('personas.bioTooLong');
+      return;
+    }
+
     saving = true;
     error = null;
     try {
-      const htmlBio = bioHtml(biography);
       await onSave(
         {
           id: persona?.id ?? crypto.randomUUID(),
@@ -206,7 +211,7 @@
           ),
           pluralkit: persona?.pluralkit ?? null,
           last_used: persona?.last_used ?? null,
-          biography: htmlBio && htmlBio.length < 2048 ? htmlBio : null,
+          biography: htmlBio ? htmlBio : null,
           banner_url: banner_url ?? null,
           is_animal: is_animal ?? null,
           has_animal: has_animal ?? null,
