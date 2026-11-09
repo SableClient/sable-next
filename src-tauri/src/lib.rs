@@ -59,7 +59,7 @@ struct SinkState {
 }
 
 impl EventSink {
-    fn replace(&self, channel: Channel<Vec<CoreEvent>>) -> bool {
+    fn replace(&self, channel: Channel<Vec<CoreEvent>>) {
         let mut state = self
             .0
             .lock()
@@ -69,7 +69,16 @@ impl EventSink {
             let tail = pending.split_off(pending.len().min(EVENT_BATCH_LIMIT));
             let _ = channel.send(std::mem::replace(&mut pending, tail));
         }
-        state.channel.replace(channel).is_some()
+        state.channel = Some(channel);
+    }
+
+    fn detach(&self) -> bool {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .channel
+            .take()
+            .is_some()
     }
 
     fn send(&self, events: Vec<CoreEvent>) {
@@ -275,10 +284,7 @@ async fn upload_media_base64(
     reason = "tauri extracts command state by value"
 )]
 fn subscribe_events(state: State<'_, AppState>, channel: Channel<Vec<CoreEvent>>) {
-    if state.event_sink.replace(channel) {
-        let core = state.core.clone();
-        tauri::async_runtime::spawn(async move { core.end_all_calls().await });
-    }
+    state.event_sink.replace(channel);
 }
 
 #[tauri::command]
@@ -784,6 +790,18 @@ fn app_builder(sentry_client: Option<&::sentry::Client>) -> tauri::Builder<tauri
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_notifications::init())
         .register_asynchronous_uri_scheme_protocol(map_tiles::TILE_URI_SCHEME, map_tiles::respond)
+        .on_page_load(|webview, payload| {
+            if payload.event() != tauri::webview::PageLoadEvent::Started {
+                return;
+            }
+            debug_log::detach();
+            if let Some(state) = webview.try_state::<AppState>()
+                && state.event_sink.detach()
+            {
+                let core = state.core.clone();
+                tauri::async_runtime::spawn(async move { core.end_all_calls().await });
+            }
+        })
         .setup(setup)
 }
 
@@ -923,8 +941,8 @@ mod tests {
         });
 
         let sink = EventSink::default();
-        assert!(!sink.replace(first));
-        assert!(sink.replace(second));
+        sink.replace(first);
+        sink.replace(second);
         sink.send(vec![CoreEvent::SessionEnded {
             reason: "test".to_owned(),
         }]);

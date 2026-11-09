@@ -60,18 +60,23 @@ impl Drop for DebugLogWriter {
 
 #[tauri::command]
 pub(crate) fn set_debug_logs(enabled: bool, channel: Channel<Vec<String>>) {
-    *CHANNEL.lock().unwrap_or_else(PoisonError::into_inner) = enabled.then_some(channel);
     if !enabled {
-        CAPTURING.store(false, Ordering::SeqCst);
-        PENDING
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clear();
+        detach();
         return;
     }
+    *CHANNEL.lock().unwrap_or_else(PoisonError::into_inner) = Some(channel);
     if !CAPTURING.swap(true, Ordering::SeqCst) {
         tauri::async_runtime::spawn(forward());
     }
+}
+
+pub(crate) fn detach() {
+    *CHANNEL.lock().unwrap_or_else(PoisonError::into_inner) = None;
+    CAPTURING.store(false, Ordering::SeqCst);
+    PENDING
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clear();
 }
 
 async fn forward() {
