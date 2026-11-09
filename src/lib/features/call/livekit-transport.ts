@@ -92,7 +92,7 @@ export type LivekitTransportOptions = {
   encryptMedia: boolean;
   publishMedia?: boolean;
   ownIdentity?: string;
-  telemetry?: Pick<CallTelemetry, 'step' | 'event' | 'failure'>;
+  telemetry?: Pick<CallTelemetry, 'step' | 'event' | 'failure' | 'degraded'>;
   telemetryAttributes?: Record<string, string | number | boolean>;
   createRoom?: (options: ConstructorParameters<typeof LivekitRoom>[0]) => LivekitRoom;
   createWorker?: () => Worker;
@@ -576,7 +576,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     try {
       await step(stage, enable);
     } catch (error) {
-      fail(stage, error);
+      options.telemetry?.degraded(stage, error, { ...options.telemetryAttributes });
     }
     await checkConnection();
   };

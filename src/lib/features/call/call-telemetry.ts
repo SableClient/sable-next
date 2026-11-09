@@ -30,18 +30,27 @@ const expectedDisconnectReasons = new Set([
 export const isExpectedDeviceError = (name: string): boolean => expectedDeviceErrors.has(name);
 
 const safeCodes = new Set([
+  'busy',
+  'cancelled',
+  'connect_failed',
+  'disconnected',
   'failed',
+  'invalid_request',
+  'media_failed',
   'no_call_focus',
   'not_logged_in',
   'own-key-failed',
   'own-key-timeout',
+  'permission_denied',
   'transport-not-connected',
   'unavailable',
+  'unexpected',
 ]);
 
 const safeMessages = new Map([
   ['e2ee-unsupported', 'code.e2ee-unsupported'],
   ['key-import-failed', 'code.key-import-failed'],
+  ['native-transport-skipped', 'code.native-transport-skipped'],
   ['own-key-failed', 'code.own-key-failed'],
   ['own-key-timeout', 'code.own-key-timeout'],
   ['signaling-error', 'code.signaling-error'],
@@ -209,6 +218,31 @@ export class CallTelemetry {
         },
         fingerprint: ['call', failedStage, category],
         tags: { 'call.stage': failedStage, 'call.error_category': category },
+      });
+    });
+  }
+
+  // The call stays up but part of it does not work, like a microphone that never
+  // publishes. Reported once per stage and cause, as a warning when it was refused.
+  degraded(stage: string, error: unknown, attributes: Attributes = {}): void {
+    this.failure(stage, error, attributes);
+    const category = errorCategory(error);
+    const key = `degraded:${stage}:${category}`;
+    if (this.#reportedFailures.has(key)) return;
+    this.#reportedFailures.add(key);
+    Sentry.withActiveSpan(this.#root, () => {
+      Sentry.captureException(new Error(`Call degraded: ${stage}`), {
+        level: isExpected(error) ? 'warning' : 'error',
+        contexts: {
+          call: {
+            ...this.#attributes,
+            ...attributes,
+            'call.stage': stage,
+            'call.error_category': category,
+          },
+        },
+        fingerprint: ['call', 'degraded', stage, category],
+        tags: { 'call.stage': stage, 'call.error_category': category },
       });
     });
   }

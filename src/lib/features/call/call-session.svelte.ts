@@ -20,15 +20,16 @@ import {
   idleTransportState,
   ignoreError,
   ScreenAudioError,
+  NativeCallFailure,
   TransportDisconnectError,
 } from './call-transport';
 import { acquireCallOwner, type CallOwnerLease } from './call-owner';
 import type { LivekitTransport } from './livekit-transport';
 import { createNativeTransport } from './native-transport';
-import { hasNativeCalls } from '#lib/platform/calls.js';
+import { hasNativeCalls, nativeCallOwnsAudio, setNativeCallAudio } from '#lib/platform/calls.js';
 import { commandErrorCode } from './command-error';
 import { CallTelemetry } from './call-telemetry';
-import { recordCallDebug } from './call-debug.svelte.js';
+import { recordCallDebug, type CallDebug } from './call-debug.svelte.js';
 import { cameraVisible, screenShareVisible, type CallPin } from './call-layout';
 import { participantKeys } from './participant-keys';
 import {
@@ -38,7 +39,7 @@ import {
 } from '#lib/settings/preferences.svelte.js';
 import { DEVICE_PREFERENCE } from './devices';
 import type { CallBackendGrant, CallRemoteVideoOverlay, CallVideoOverlay } from './call-transport';
-import { playSound } from '../notifications/sound';
+import { playSound, releaseNotificationAudio } from '../notifications/sound';
 
 export type CallLifecycle = 'idle' | 'joining' | 'connecting' | 'active' | 'leaving' | 'failed';
 
@@ -171,6 +172,7 @@ export class CallSession {
     | { revision: number; publisherId: string; backends: CallBackendGrant[] }
     | undefined;
   #transportConnection: CallTransportState['connection'] | undefined;
+  #transportErrorCode: string | undefined;
   #teardownPromise: Promise<void> | undefined;
   #attemptGeneration = 0;
   #backendEnded = false;
@@ -267,6 +269,7 @@ export class CallSession {
     const telemetry = new CallTelemetry({
       'call.microphone_requested': media.microphone,
       'call.camera_requested': media.camera,
+      'call.native_expected': hasNativeCalls(),
     });
     this.#telemetry = telemetry;
     this.roomId = roomId;
@@ -311,26 +314,42 @@ export class CallSession {
         return;
       }
 
-      const transport = await telemetry.step(
+      const { transport, kind: transportKind } = await telemetry.step(
         'call.transport.create',
-        async () =>
-          this.#deps.createTransport?.(grant.encrypt_media) ??
-          (grant.mode === 'legacy'
-            ? await createNativeTransport(
-                String(grant.session),
-                grant.identity,
-                this.#deps.roomName?.(roomId) ?? roomId
-              )
-            : null) ??
-          (grant.backends.length
-            ? (await import('./multi-sfu-transport')).createMultiSfuTransport(
-                grant.encrypt_media,
-                telemetry
-              )
-            : (await import('./livekit-transport')).createLivekitTransport({
-                encryptMedia: grant.encrypt_media,
-                telemetry,
-              }))
+        async (): Promise<{ transport: CallTransport; kind: CallDebug['transport'] }> => {
+          const injected = this.#deps.createTransport?.(grant.encrypt_media);
+          if (injected) {
+            const kind = isLivekit(injected)
+              ? 'livekit-web'
+              : grant.backends.length
+                ? 'livekit-multi'
+                : 'native';
+            return { transport: injected, kind };
+          }
+          if (grant.mode === 'legacy') {
+            const native = await createNativeTransport(
+              String(grant.session),
+              grant.identity,
+              this.#deps.roomName?.(roomId) ?? roomId
+            );
+            if (native) return { transport: native, kind: 'native' };
+          }
+          if (grant.backends.length) {
+            const multi = await import('./multi-sfu-transport');
+            return {
+              transport: multi.createMultiSfuTransport(grant.encrypt_media, telemetry),
+              kind: 'livekit-multi',
+            };
+          }
+          const web = await import('./livekit-transport');
+          return {
+            transport: web.createLivekitTransport({
+              encryptMedia: grant.encrypt_media,
+              telemetry,
+            }),
+            kind: 'livekit-web',
+          };
+        }
       );
       if (attempt !== this.#attemptGeneration) {
         await transport.disconnect().catch(ignoreError);
@@ -338,11 +357,14 @@ export class CallSession {
       }
       this.#media = transport;
       this.#livekit = isLivekit(transport) ? transport : undefined;
-      const transportKind = this.#livekit
-        ? 'livekit-web'
-        : grant.backends.length
-          ? 'livekit-multi'
-          : 'native';
+      setNativeCallAudio(transportKind === 'native');
+      if (nativeCallOwnsAudio()) releaseNotificationAudio();
+      if (hasNativeCalls() && transportKind !== 'native') {
+        telemetry.degraded('call.native.skipped', new Error('native-transport-skipped'), {
+          'call.mode': grant.mode,
+          'call.transport': transportKind,
+        });
+      }
       recordCallDebug({
         requested: preferences.callMode,
         nativeForced: hasNativeCalls(),
@@ -375,6 +397,15 @@ export class CallSession {
         if (state.connection !== this.#transportConnection) {
           this.#transportConnection = state.connection;
           telemetry.event('call.transport.state', { 'call.connection': state.connection });
+        }
+        if (state.errorCode !== this.#transportErrorCode) {
+          this.#transportErrorCode = state.errorCode;
+          if (state.errorCode !== undefined) {
+            telemetry.degraded('call.native.error', new NativeCallFailure(state.errorCode), {
+              'call.connection': state.connection,
+              'call.microphone_effective': state.microphoneEnabled,
+            });
+          }
         }
         if (state.connection === 'disconnected' && this.lifecycle === 'active') {
           telemetry.terminal(
@@ -459,7 +490,7 @@ export class CallSession {
         if (attempt !== this.#attemptGeneration) return;
       }
       this.connectedAt = Date.now();
-      void playSound('call_join');
+      this.#cue('call_join');
       telemetry.finish('connected');
     } catch (error) {
       if (attempt !== this.#attemptGeneration) return;
@@ -481,7 +512,7 @@ export class CallSession {
     this.roomId = null;
     this.connectedAt = null;
     this.clearDeviceError();
-    void playSound('call_leave');
+    this.#cue('call_leave');
   }
 
   clearFailure(): void {
@@ -536,7 +567,7 @@ export class CallSession {
     }
     setPreference('callMicrophoneMuted', !enabled);
     await this.#setMicrophone(this.#canTransmit());
-    void playSound(enabled ? 'mic_on' : 'mic_off');
+    this.#cue(enabled ? 'mic_on' : 'mic_off');
   }
 
   toggleMicrophone(): Promise<void> {
@@ -631,7 +662,7 @@ export class CallSession {
     this.#clearTalking();
     this.deafened = deafened;
     if (!this.#media) return;
-    void playSound(deafened ? 'deafen_on' : 'deafen_off');
+    this.#cue(deafened ? 'deafen_on' : 'deafen_off');
     if (this.microphoneEnabled) void this.#setMicrophone(this.#canTransmit());
   }
 
@@ -651,13 +682,13 @@ export class CallSession {
 
   async setCameraEnabled(enabled: boolean): Promise<void> {
     await this.#device('camera', () => this.#media?.setCameraEnabled(enabled));
-    void playSound(enabled ? 'camera_on' : 'camera_off');
+    this.#cue(enabled ? 'camera_on' : 'camera_off');
   }
 
   async toggleScreenShare(): Promise<void> {
     if (this.transport.screenShareEnabled) {
       await this.#stopScreenShare();
-      void playSound('screenshare_stop');
+      this.#cue('screenshare_stop');
       return;
     }
     if (screenAudioSupported()) this.choosingScreenAudio = true;
@@ -674,7 +705,7 @@ export class CallSession {
     const shared = await this.#device('screen', () =>
       this.#media?.capabilities.screenShare?.setEnabled(true, audio)
     );
-    if (shared) void playSound('screenshare_start');
+    if (shared) this.#cue('screenshare_start');
   }
 
   async #stopScreenShare(): Promise<void> {
@@ -830,6 +861,12 @@ export class CallSession {
     });
   }
 
+  #cue(name: Parameters<typeof playSound>[0]): void {
+    void playSound(name).catch((error: unknown) => {
+      console.warn('[sable call] sound not played', name, error);
+    });
+  }
+
   async #teardown(): Promise<void> {
     if (this.#teardownPromise) return this.#teardownPromise;
 
@@ -856,6 +893,7 @@ export class CallSession {
     } catch (error) {
       this.#telemetry?.failure('call.transport.disconnect', error);
     }
+    setNativeCallAudio(false);
 
     const session = this.#session;
     if (session !== undefined && !this.#backendEnded) {
@@ -893,6 +931,7 @@ export class CallSession {
     this.#connected = false;
     this.#backendEnded = false;
     this.#transportConnection = undefined;
+    this.#transportErrorCode = undefined;
     this.members = [];
     this.transport = idleTransportState();
     this.deafened = false;

@@ -83,6 +83,7 @@ const stateOf = (snapshot: NativeCallSnapshot, identity: string): CallTransportS
   cameraEnabled: snapshot.cameraEnabled,
   screenShareEnabled: snapshot.screenShareEnabled,
   error: snapshot.lastError?.message,
+  errorCode: snapshot.lastError?.code,
 });
 
 export type NativeTransport = CallTransport & { readonly callId: string };

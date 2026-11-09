@@ -13,6 +13,7 @@ vi.mock('@sentry/sveltekit', async () => {
   return sdk;
 });
 import { CallTelemetry } from './call-telemetry';
+import { NativeCallFailure } from './call-transport';
 
 const envelopes: unknown[] = [];
 
@@ -54,4 +55,32 @@ test('sends sampled call traces without the transport secret', async () => {
   expect(sent).toContain('call.attempt_id');
   expect(sent).not.toContain('sfu.example.org');
   expect(sent).not.toContain('super-secret');
+});
+
+test('a microphone that never publishes is reported once while the call stays up', async () => {
+  Sentry.init({
+    dsn: 'https://public@example.invalid/1',
+    defaultIntegrations: false,
+    transport: () => ({
+      send: (envelope: unknown) => {
+        envelopes.push(envelope);
+        return Promise.resolve({});
+      },
+      flush: () => Promise.resolve(true),
+    }),
+  });
+
+  const telemetry = new CallTelemetry();
+  const denied = new DOMException('denied', 'NotAllowedError');
+  telemetry.degraded('call.microphone.set', denied);
+  telemetry.degraded('call.microphone.set', denied);
+  telemetry.degraded('call.native.error', new NativeCallFailure('media_failed'));
+  await Sentry.flush(0);
+
+  const sent = JSON.stringify(envelopes);
+  expect(sent.match(/Call degraded: call\.microphone\.set/g)).toHaveLength(1);
+  expect(sent).toContain('error.NotAllowedError');
+  expect(sent).toContain('Call degraded: call.native.error');
+  expect(sent).toContain('code.media_failed');
+  expect(sent).not.toContain('native-call-failed');
 });

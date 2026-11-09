@@ -1,4 +1,5 @@
 import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
+import { nativeCallOwnsAudio } from '#lib/platform/calls.js';
 import { isAndroid } from '#lib/platform/os.js';
 import { playNativeChime } from '#lib/platform/native-notifications.js';
 import { preferences, type RangePreference } from '#lib/settings/preferences.svelte.js';
@@ -74,6 +75,10 @@ async function start(
   name: keyof NotificationSounds,
   options: { exclusive: boolean; loop?: boolean }
 ): Promise<AudioBufferSourceNode | null> {
+  if (nativeCallOwnsAudio()) {
+    recordDebugLog('debug', 'notification', 'sound', 'skipped', { native_call: true });
+    return null;
+  }
   const audioContext = (context ??= new AudioContext());
   try {
     const buffer = await load(name, audioContext);
@@ -126,6 +131,14 @@ async function start(
   }
 }
 
+/** Closes the shared context, which otherwise keeps the WebView holding the audio session. */
+export function releaseNotificationAudio(): void {
+  const current = context;
+  context = undefined;
+  playing = undefined;
+  if (current && current.state !== 'closed') void current.close().catch(() => {});
+}
+
 /** On the web, skipped while another sound is playing. */
 export async function playNotificationSound(name: keyof NotificationSounds): Promise<void> {
   if (name === 'notification' && isAndroid()) {
@@ -140,7 +153,7 @@ export async function playSound(
   options: { blocking?: boolean; loop?: boolean } = {}
 ): Promise<NotificationSound> {
   const source = await start(name, { exclusive: false, loop: options.loop });
-  if (!source) throw new Error('AudioContext was changed mid-playback');
+  if (!source) return { stop: () => {} };
   if (options.blocking) await new Promise((resolve) => (source.onended = resolve));
   return {
     stop: () => {

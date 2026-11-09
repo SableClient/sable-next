@@ -115,7 +115,7 @@ test('reports missing keys only once they outlast the key rotation grace period'
   const transport = createLivekitTransport({
     encryptMedia: false,
     createRoom: () => room,
-    telemetry: { step: (_stage, action) => action(), event, failure },
+    telemetry: { step: (_stage, action) => action(), event, failure, degraded: failure },
   });
   const alice = { identity: '@alice:example.test:DEVICE' };
 
@@ -160,7 +160,7 @@ test('treats decryption failures during key rotation as a grace-period key fault
   createLivekitTransport({
     encryptMedia: false,
     createRoom: () => room,
-    telemetry: { step: (_stage, action) => action(), event, failure },
+    telemetry: { step: (_stage, action) => action(), event, failure, degraded: failure },
   });
   const alice = { identity: '@alice:example.test:DEVICE' };
   const invalid = () => new CryptorError('Decryption failed', CryptorErrorReason.InvalidKey);
@@ -188,7 +188,7 @@ test('gives other encryption errors the same grace period as key faults', () => 
   createLivekitTransport({
     encryptMedia: false,
     createRoom: () => room,
-    telemetry: { step: (_stage, action) => action(), event, failure },
+    telemetry: { step: (_stage, action) => action(), event, failure, degraded: failure },
   });
   const internal = new Error('InternalError: encryption failed');
 
@@ -226,7 +226,7 @@ test.each(['NotAllowedError', 'NotFoundError', 'AbortError'])(
     createLivekitTransport({
       encryptMedia: false,
       createRoom: () => room,
-      telemetry: { step: (_stage, action) => action(), event, failure },
+      telemetry: { step: (_stage, action) => action(), event, failure, degraded: failure },
     });
 
     room.emit(RoomEvent.MediaDevicesError, Object.assign(new Error('device'), { name }));
@@ -242,7 +242,7 @@ test('records other device errors as a step failure', () => {
   createLivekitTransport({
     encryptMedia: false,
     createRoom: () => room,
-    telemetry: { step: (_stage, action) => action(), event: vi.fn(), failure },
+    telemetry: { step: (_stage, action) => action(), event: vi.fn(), failure, degraded: failure },
   });
   const error = Object.assign(new Error('busy'), { name: 'NotReadableError' });
 
@@ -748,7 +748,7 @@ test.each(['missing', 'ended'])(
     const transport = createLivekitTransport({
       encryptMedia: false,
       createRoom: () => fixture.room,
-      telemetry: { step: (_stage, action) => action(), event: vi.fn(), failure },
+      telemetry: { step: (_stage, action) => action(), event: vi.fn(), failure, degraded: failure },
     });
 
     await transport.connect(connectOptions);
@@ -1020,9 +1020,10 @@ test('stops health snapshots and suppresses an in-flight result after disconnect
     track: { getSenderStats: () => senderStats },
   } as never);
   const event = vi.fn();
-  const telemetry: Pick<CallTelemetry, 'event' | 'failure' | 'step'> = {
+  const telemetry: Pick<CallTelemetry, 'event' | 'failure' | 'degraded' | 'step'> = {
     event,
     failure: vi.fn(),
+    degraded: vi.fn(),
     step: <T>(_stage: string, action: () => Promise<T>): Promise<T> => action(),
   };
   const transport = createLivekitTransport({
@@ -1061,9 +1062,10 @@ test('emits per-receiver health without the participant identity', async () => {
     })),
   } as never);
   const event = vi.fn();
-  const telemetry: Pick<CallTelemetry, 'event' | 'failure' | 'step'> = {
+  const telemetry: Pick<CallTelemetry, 'event' | 'failure' | 'degraded' | 'step'> = {
     event,
     failure: vi.fn(),
+    degraded: vi.fn(),
     step: <T>(_stage: string, action: () => Promise<T>): Promise<T> => action(),
   };
   const transport = createLivekitTransport({
@@ -1165,7 +1167,7 @@ test('connects audio-only when the camera permission was refused', async () => {
   const transport = createLivekitTransport({
     encryptMedia: false,
     createRoom: () => fixture.room,
-    telemetry: { step: (_stage, action) => action(), event: vi.fn(), failure },
+    telemetry: { step: (_stage, action) => action(), event: vi.fn(), failure, degraded: failure },
   });
 
   await transport.connect({ ...connectOptions, cameraEnabled: true });

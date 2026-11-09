@@ -40,6 +40,8 @@ export type CallTransportState = {
   cameraEnabled: boolean;
   screenShareEnabled: boolean;
   error?: string;
+  /** A native transport's failure code, such as `permission_denied` or `media_failed`. */
+  errorCode?: string;
   disconnectReason?: string;
 };
 
@@ -143,5 +145,12 @@ export class TransportDisconnectError extends Error {
   constructor(readonly reason: string) {
     super(`transport-disconnected: ${reason}`);
     this.name = 'TransportDisconnectError';
+  }
+}
+
+export class NativeCallFailure extends Error {
+  constructor(readonly code: string) {
+    super(`native-call-failed: ${code}`);
+    this.name = 'NativeCallFailure';
   }
 }

@@ -6,7 +6,7 @@ import type {
 import { isTauri } from '@tauri-apps/api/core';
 import { type as osType } from '@tauri-apps/plugin-os';
 
-import { isNativeMobile } from './os';
+import { isIos, isNativeMobile } from './os';
 
 export type SystemCallAction = NativeSystemCallAction & {
   notificationEventId?: string;
@@ -19,6 +19,17 @@ export function hasNativeCalls(): boolean {
   } catch {
     return false;
   }
+}
+
+let nativeCallAudio = false;
+
+export function setNativeCallAudio(active: boolean): void {
+  nativeCallAudio = active;
+}
+
+/** Web Audio started in the WebView during a native iOS call can take over the call's audio session. */
+export function nativeCallOwnsAudio(): boolean {
+  return nativeCallAudio && isIos();
 }
 
 export async function nativeCallCapabilities(): Promise<NativeCallCapabilities | null> {

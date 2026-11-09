@@ -98,3 +98,40 @@ test('plays through the native notification stream on Android', async () => {
   vi.doUnmock('#lib/platform/os.js');
   vi.doUnmock('#lib/platform/native-notifications.js');
 });
+
+test('stays silent while a native iOS call owns the audio session', async () => {
+  vi.resetModules();
+  vi.doMock('#lib/platform/calls.js', () => ({ nativeCallOwnsAudio: () => true }));
+  const created = vi.fn();
+  globalThis.AudioContext = class extends MockAudioContext {
+    constructor() {
+      super();
+      created();
+    }
+  } as unknown as typeof AudioContext;
+  const sound = await import('./sound');
+
+  (await sound.playSound('mic_on')).stop();
+  await sound.playNotificationSound('notification');
+
+  expect(created).not.toHaveBeenCalled();
+  expect(start).not.toHaveBeenCalled();
+  vi.doUnmock('#lib/platform/calls.js');
+});
+
+test('releasing the audio closes the shared context', async () => {
+  const contexts: MockAudioContext[] = [];
+  globalThis.AudioContext = class extends MockAudioContext {
+    constructor() {
+      super();
+      contexts.push(this);
+    }
+  } as unknown as typeof AudioContext;
+  const { playSound, releaseNotificationAudio } = await import('./sound');
+  await playSound('call_join');
+
+  releaseNotificationAudio();
+
+  expect(contexts).toHaveLength(1);
+  expect(contexts[0]?.close).toHaveBeenCalledOnce();
+});
