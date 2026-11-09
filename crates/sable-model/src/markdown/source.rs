@@ -7,7 +7,10 @@
 //!   ends at a line indented as code;
 //! - `-# text` is one line of subtext, which [`prepare`] sets apart with blank
 //!   lines so that nothing around it joins it;
-//! - a single `~` is text, and a run of three is a lone `~` beside a `~~`.
+//! - a single `~` is text, and a run of three is a lone `~` beside a `~~`;
+//! - a bare web address is one piece of text, so no emphasis opens or closes in it.
+
+use linkify::{LinkFinder, LinkKind};
 
 use crate::text::{head, span, tail};
 
@@ -98,6 +101,24 @@ fn is_autolink(content: &str) -> bool {
         .is_some_and(|(user, host)| !user.is_empty() && host.contains('.'))
 }
 
+/// The length of the bare web address that opens `rest`, when it is one.
+fn bare_address(rest: &str) -> Option<usize> {
+    let scheme = rest.get(..8).unwrap_or(rest).to_ascii_lowercase();
+    if !["http://", "https://", "ftp://"]
+        .iter()
+        .any(|prefix| scheme.starts_with(prefix))
+    {
+        return None;
+    }
+    let mut finder = LinkFinder::new();
+    finder.kinds(&[LinkKind::Url]);
+    finder
+        .links(rest)
+        .next()
+        .filter(|link| link.start() == 0)
+        .map(|link| link.end())
+}
+
 /// The length of the `](destination "title")` that opens `rest`, when it is one:
 /// what is inside it is no inline syntax of its own.
 fn link_tail(rest: &str) -> Option<usize> {
@@ -171,7 +192,8 @@ struct Line {
 }
 
 /// Tilde runs as markdown-it reads them: a single `~` is text, a run of three is a lone `~` beside `~~`.
-/// The lone ones are escaped; code spans and autolinks are left alone.
+/// The lone ones are escaped; code spans and autolinks are left alone, and the
+/// emphasis markers of a bare web address are escaped.
 fn split_tildes(content: &str) -> String {
     let mut out = String::with_capacity(content.len() + 2);
     let mut code: Option<usize> = None;
@@ -199,6 +221,22 @@ fn split_tildes(content: &str) -> String {
         {
             out.push_str(head(rest, tail_len));
             at += tail_len;
+            continue;
+        }
+        if code.is_none()
+            && !head(content, at)
+                .chars()
+                .next_back()
+                .is_some_and(char::is_alphanumeric)
+            && let Some(end) = bare_address(rest)
+        {
+            for c in head(rest, end).chars() {
+                if matches!(c, '_' | '*' | '~') {
+                    out.push('\\');
+                }
+                out.push(c);
+            }
+            at += end;
             continue;
         }
         if c == '`' {
