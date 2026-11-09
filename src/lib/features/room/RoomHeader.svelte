@@ -5,6 +5,8 @@
   import BugIcon from 'phosphor-svelte/lib/BugIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
+  import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
+  import LockSimpleOpenIcon from 'phosphor-svelte/lib/LockSimpleOpenIcon';
   import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
@@ -27,6 +29,7 @@
     roomName: string;
     roomAvatar: string | null;
     topic?: string | null;
+    encrypted?: boolean | null;
     isVoice: boolean;
     callParticipants: readonly string[];
     members: readonly MemberView[];
@@ -51,6 +54,7 @@
     roomName,
     roomAvatar,
     topic = null,
+    encrypted = null,
     isVoice,
     callParticipants,
     members,
@@ -78,6 +82,13 @@
           names: [...new Set(inVoice.map((entry) => entry.name))].join(', '),
         })
       : i18n.t('common.voiceRoom')
+  );
+  let encryptionLabel = $derived(
+    encrypted === null
+      ? null
+      : encrypted
+        ? i18n.t('room.encryptionOn')
+        : i18n.t('room.encryptionNotOn')
   );
   let topicShown = $derived(topic !== null && topic.trim() !== '' && onTopic !== null);
 </script>
@@ -130,6 +141,15 @@
   {/snippet}
 
   {#snippet suffix()}
+    {#if encryptionLabel !== null}
+      <Tooltip label={encryptionLabel}>
+        {#snippet trigger({ props })}
+          <span {...props} class="encryption-state" role="img" aria-label={encryptionLabel}>
+            {#if encrypted}<LockSimpleIcon />{:else}<LockSimpleOpenIcon />{/if}
+          </span>
+        {/snippet}
+      </Tooltip>
+    {/if}
     <PanelHeaderButton
       class="search-button"
       label={i18n.t('common.searchMessages')}
@@ -270,6 +290,18 @@
 
   .voice-faces {
     display: flex;
+  }
+
+  .encryption-state {
+    color: var(--surface-var-on-container);
+    display: flex;
+    opacity: var(--opacity-placeholder);
+    padding: var(--space-100);
+  }
+
+  .encryption-state :global(svg) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   .voice-faces :global(.avatar-root.voice-face) {

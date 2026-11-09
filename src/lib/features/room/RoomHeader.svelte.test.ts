@@ -41,6 +41,7 @@ function mountHeader(props: {
   chatOpen?: boolean;
   searchOpen?: boolean;
   membersOpen?: boolean;
+  encrypted?: boolean | null;
 }) {
   return renderWithTooltips(RoomHeader, {
     props: {
@@ -152,4 +153,23 @@ test('opens the room image from the header', async () => {
   });
   await userEvent.setup().click(screen.getByRole('button', { name: 'View avatar of General' }));
   expect(openStandaloneSpy).toHaveBeenCalledExactlyOnceWith('mxc://example.org/room', 'General');
+});
+
+test('the header shows whether the room is end-to-end encrypted', () => {
+  const { unmount } = mountHeader({ isVoice: false, callParticipants: [], encrypted: true });
+  expect(
+    screen.getByRole('img', { name: 'Messages in this room are end-to-end encrypted.' })
+  ).toBeInTheDocument();
+  unmount();
+
+  mountHeader({ isVoice: false, callParticipants: [], encrypted: false });
+  expect(
+    screen.getByRole('img', { name: 'Messages in this room are not end-to-end encrypted.' })
+  ).toBeInTheDocument();
+});
+
+test('the header claims nothing while encryption is unknown', () => {
+  const { container } = mountHeader({ isVoice: false, callParticipants: [], encrypted: null });
+
+  expect(container.querySelector('.encryption-state')).not.toBeInTheDocument();
 });
