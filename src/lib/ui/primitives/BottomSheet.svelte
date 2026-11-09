@@ -156,7 +156,10 @@
       if (canExpand() && (-moved >= threshold || velocity <= -dismissVelocity)) expanded = true;
       dragOffset = 0;
     } else if (moved >= threshold || velocity >= dismissVelocity) {
-      dismiss();
+      if (expanded) {
+        expanded = false;
+        dragOffset = 0;
+      } else dismiss();
     } else dragOffset = 0;
   }
 
