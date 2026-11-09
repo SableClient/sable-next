@@ -1,4 +1,5 @@
 import { hasNativeCalls } from '#lib/platform/calls.js';
+import { deliversDeepLinks } from '#lib/platform/deep-links.js';
 import { isAndroid, isNativeMobile, supportsTouch } from '#lib/platform/os.js';
 import { preferences } from '../preferences.svelte';
 import type { SettingsGate, SettingsTargetDefinition } from '../registry';
@@ -27,6 +28,8 @@ function targets(
   }));
 }
 
+const handlesMatrixLinksInBrowser = () =>
+  !deliversDeepLinks() && 'registerProtocolHandler' in navigator;
 const developerTools = () => preferences.developerTools;
 const settingsSync = () => preferences.settingsSync;
 
@@ -69,6 +72,14 @@ export const settingsPanels: Record<string, SettingsPanelDefinition[]> = {
   ],
   timeline: [
     { id: 'double-tap-reaction', section: 'messages', supported: supportsTouch },
+    {
+      id: 'matrix-link-handler',
+      section: 'messages',
+      supported: handlesMatrixLinksInBrowser,
+      targets: targets([
+        ['matrix-link-handler', 'settings.matrixLinkHandler', 'settings.matrixLinkHandlerHint'],
+      ]),
+    },
     {
       id: 'search-sharing-status',
       section: 'message-search',

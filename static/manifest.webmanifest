@@ -49,6 +49,7 @@
       "purpose": "maskable"
     }
   ],
+  "protocol_handlers": [{ "protocol": "matrix", "url": "/to/?uri=%s" }],
   "share_target": {
     "action": "/share",
     "method": "POST",

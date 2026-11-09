@@ -17,6 +17,7 @@ import FontSettings from '#lib/features/settings/FontSettings.svelte';
 import QuickCss from '#lib/features/settings/QuickCss.svelte';
 import LinkDeviceSetting from '#lib/features/settings/LinkDeviceSetting.svelte';
 import DoubleTapReaction from '#lib/features/settings/DoubleTapReaction.svelte';
+import MatrixLinkHandler from '#lib/features/settings/MatrixLinkHandler.svelte';
 import MediaPreviewPrivacy from '#lib/features/settings/MediaPreviewPrivacy.svelte';
 import MentionNotifications from '#lib/features/notifications/MentionNotifications.svelte';
 import NotificationTroubleshooter from '#lib/features/notifications/NotificationTroubleshooter.svelte';
@@ -56,6 +57,7 @@ export const panelComponents: Partial<Record<string, Component>> = {
   'composer-enter': ComposerEnterSetting,
   'composer-buttons': ComposerButtons,
   'double-tap-reaction': DoubleTapReaction,
+  'matrix-link-handler': MatrixLinkHandler,
   'developer-search-metrics': DeveloperSearchMetrics,
   'search-sharing-status': SearchSharingStatus,
   'notification-permission': NotificationPermission,

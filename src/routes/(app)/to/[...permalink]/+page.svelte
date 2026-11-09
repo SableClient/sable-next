@@ -7,7 +7,7 @@
   import { i18n } from '#lib/i18n.js';
   import { selectNotificationAccount } from '#lib/features/notifications/native-actions.js';
   import UserLinkCard from '#lib/features/profile/UserLinkCard.svelte';
-  import { permalinkTarget, type PermalinkTarget } from '#lib/rooms/permalink.js';
+  import { matrixLinkPath, permalinkTarget, type PermalinkTarget } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
@@ -21,6 +21,15 @@
   const routePrefix = resolve('/(app)/to/[...permalink]', { permalink: '' });
 
   $effect(() => {
+    const uri = page.url.searchParams.get('uri');
+    if (uri !== null) {
+      const path = matrixLinkPath(uri);
+      if (path === null) unresolved = true;
+      // eslint-disable-next-line svelte/no-navigation-without-resolve -- matrixLinkPath() resolves the route
+      else void goto(path, { replace: true });
+      return;
+    }
+
     // The still-encoded tail, rather than the rest param: the matrix.to parser
     // does its own decoding.
     const via = new URLSearchParams(
