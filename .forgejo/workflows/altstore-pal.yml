@@ -1,0 +1,116 @@
+name: AltStore PAL
+on:
+  schedule:
+    - cron: '17 */4 * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: altstore-pal
+  cancel-in-progress: false
+env:
+  FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+  BUNDLE_ID: moe.sable.app
+jobs:
+  publish:
+    name: Publish AltStore PAL source
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      APPLE_API_ISSUER: ${{ secrets.APP_STORE_API_ISSUER_ID }}
+      APPLE_API_KEY: ${{ secrets.APP_STORE_API_KEY_ID }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: https://github.com/actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.2
+      - name: Write the App Store Connect API key
+        uses: ./.forgejo/actions/app-store-connect-key
+        with:
+          key-id: ${{ secrets.APP_STORE_API_KEY_ID }}
+          key: ${{ secrets.APP_STORE_API_KEY_BASE64 }}
+      - name: Find the live App Store build
+        id: live
+        run: |
+          node scripts/ci/app-store-adp.mjs "$BUNDLE_ID" > live.json
+          cat live.json
+          node scripts/ci/forgejo-release.mjs download \
+            --tag latest --pattern altstore-pal-source.json --dir . --optional
+          [ -e altstore-pal-source.json ] || \
+            cp scripts/ci/templates/altstore-pal-source.json altstore-pal-source.json
+
+          # shellcheck disable=SC2016 # The template literals are JavaScript.
+          node -e '
+            const live = require("./live.json");
+            const published = require("./altstore-pal-source.json").apps[0].versions[0];
+            const fresh = published?.version !== live.version || published?.buildVersion !== live.build;
+            if (!fresh) console.log(`AltStore PAL already lists ${live.version} (${live.build}).`);
+            const out = [`publish=${fresh}`, ...Object.entries(live).map(([k, v]) => `${k}=${v}`)];
+            require("fs").appendFileSync(process.env.GITHUB_OUTPUT, out.join("\n") + "\n");
+          '
+      - name: Download the AltStore-processed package
+        id: adp
+        if: ${{ steps.live.outputs.publish == 'true' }}
+        env:
+          ADP_ID: ${{ steps.live.outputs.adpID }}
+        run: |
+          curl -fsS "https://api.altstore.io/adps/$ADP_ID" -o adp-status.json
+          url="$(node -p 'require("./adp-status.json").downloadURL ?? ""')"
+          if [ -z "$url" ]; then
+            echo "AltStore is still processing $ADP_ID: $(cat adp-status.json)"
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          curl -fsSL "$url" -o adp.zip
+          mkdir adp
+          unzip -q adp.zip -d adp
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+      - name: Read the app permissions
+        if: ${{ steps.adp.outputs.ready == 'true' }}
+        env:
+          VERSION: ${{ steps.live.outputs.version }}
+        # ADP variants are encrypted, so read the IPA the release uploaded to Apple.
+        run: |
+          ipa="sable-$VERSION-ios-arm64.ipa"
+          node scripts/ci/forgejo-release.mjs download --tag "v$VERSION" --pattern "$ipa" --dir .
+          mkdir release-ipa
+          unzip -q "$ipa" 'Payload/*' -d release-ipa
+          app="$(find release-ipa/Payload -maxdepth 1 -name '*.app' | head -n 1)"
+          mkdir entitlements
+          for bundle in "$app" "$app"/PlugIns/*.appex; do
+            name="$(basename "$bundle")"
+            codesign -d --entitlements - --xml "$bundle" > "entitlements/$name.plist"
+            plutil -convert json -o "entitlements/$name.json" "entitlements/$name.plist"
+          done
+          plutil -convert json -o info.json "$app/Info.plist"
+      - name: Publish the package and source
+        if: ${{ steps.adp.outputs.ready == 'true' }}
+        env:
+          VERSION: ${{ steps.live.outputs.version }}
+          BUILD: ${{ steps.live.outputs.build }}
+          MARKETPLACE_ID: ${{ steps.live.outputs.marketplaceID }}
+        run: |
+          tag="v$VERSION"
+          entitlements=()
+          for file in entitlements/*.json; do entitlements+=(--entitlements "$file"); done
+          node scripts/ci/update-altstore-pal-source.mjs \
+            --source altstore-pal-source.json \
+            --adp-dir adp \
+            --base-url "https://git.sable.moe/SableClient/sable-next/releases/download/$tag/" \
+            --version "$VERSION" \
+            --build "$BUILD" \
+            --marketplace-id "$MARKETPLACE_ID" \
+            "${entitlements[@]}" \
+            --info info.json \
+            --date "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --description "Sable $VERSION"
+          find adp -type f -print0 | xargs -0 node scripts/ci/forgejo-release.mjs upload --tag "$tag"
+          node scripts/ci/forgejo-release.mjs upload --tag latest altstore-pal-source.json

@@ -1,0 +1,25 @@
+{
+  "name": "Sable",
+  "identifier": "moe.sable.pal.source",
+  "subtitle": "Sable for iOS",
+  "description": "Notarized Sable releases for AltStore PAL.",
+  "iconURL": "https://git.sable.moe/SableClient/sable-next/raw/branch/main/src-tauri/icons/icon.png",
+  "website": "https://git.sable.moe/SableClient/sable-next",
+  "tintColor": "#5CA399",
+  "featuredApps": ["moe.sable.app"],
+  "apps": [
+    {
+      "name": "Sable",
+      "bundleIdentifier": "moe.sable.app",
+      "developerName": "SableClient",
+      "subtitle": "Sable for iOS",
+      "localizedDescription": "Sable, a Matrix client. Notarized by Apple and distributed through AltStore PAL.",
+      "iconURL": "https://git.sable.moe/SableClient/sable-next/raw/branch/main/src-tauri/icons/icon.png",
+      "tintColor": "#5CA399",
+      "category": "social",
+      "screenshots": [],
+      "versions": []
+    }
+  ],
+  "news": []
+}

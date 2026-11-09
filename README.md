@@ -143,6 +143,16 @@ The cask is published to the GitHub tap, which `brew install` taps by default, a
 
 There is a [Testflight](https://testflight.apple.com/join/PT2DSC3f) you can join while the app is under review. It will be available on the App Store soon™.
 
+### AltStore PAL
+
+In the EU, [AltStore PAL](https://altstore.io) installs the notarized App Store build. Open AltStore PAL, go to Sources, tap +, and paste:
+
+<a href="https://git.sable.moe/SableClient/sable-next/releases/download/latest/altstore-pal-source.json"><img alt="Direct URL" src="https://img.shields.io/badge/Direct_URL-6B7280?style=for-the-badge"></a>
+
+`https://git.sable.moe/SableClient/sable-next/releases/download/latest/altstore-pal-source.json`
+
+The [`altstore-pal.yml`](.forgejo/workflows/altstore-pal.yml) workflow publishes each App Store release once AltStore has processed it.
+
 ### AltStore / SideStore
 
 iOS builds are unsigned IPAs distributed through [AltStore](https://altstore.io) and [SideStore](https://sidestore.io). Each release publishes its IPA with an `altstore-source.json` that lists it.
