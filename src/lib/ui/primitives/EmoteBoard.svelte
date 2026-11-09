@@ -444,14 +444,22 @@
       const style = getComputedStyle(list);
       // Measure the row width after space is reserved for the scrollbar.
       const measured = size?.inlineSize ?? Number.parseFloat(style.width);
-      if (Number.isFinite(measured)) gridWidth = measured;
+      // Zoom makes sizes jitter by a fraction of a pixel, and storing that jitter remeasures forever.
+      const settled = (a: number, b: number): boolean => Math.abs(a - b) < 0.5;
+      const lastWidth = untrack(() => gridWidth);
+      if (Number.isFinite(measured) && !settled(measured, lastWidth)) gridWidth = measured;
       const bounds = cell.getBoundingClientRect();
       // Match fractional cell sizes to flex wrapping.
       const width = bounds.width;
       const gap = Number.parseFloat(style.columnGap) || 0;
       const row = bounds.height + (Number.parseFloat(style.marginBottom) || 0);
       const last = untrack(() => imageMeasure);
-      if (last?.tab === measuredTab && last.width === width && last.gap === gap && last.row === row)
+      if (
+        last?.tab === measuredTab &&
+        settled(last.width, width) &&
+        settled(last.gap, gap) &&
+        settled(last.row, row)
+      )
         return;
       imageMeasure = { tab: measuredTab, width, gap, row };
     };
