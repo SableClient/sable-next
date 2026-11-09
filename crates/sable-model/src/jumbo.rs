@@ -22,28 +22,32 @@ const fn level(count: usize) -> Option<u8> {
     }
 }
 
-/// A body of only emoji and whitespace, with at least one pictographic character.
+/// A body of only emoji and whitespace. Every grapheme must be a pictograph,
+/// a keycap or a flag, so a bare digit next to an emoji keeps the normal size.
 #[must_use]
 pub fn emoji_level(body: &str) -> Option<u8> {
-    let body = trim(body);
+    const KEYCAP: char = '\u{20E3}';
     let extended_pictographic = CodePointSetData::new::<ExtendedPictographic>();
     let emoji_component = CodePointSetData::new::<EmojiComponent>();
-    let mut pictographic = false;
-    for c in body.chars() {
-        if extended_pictographic.contains(c) {
-            pictographic = true;
-        } else if !is_space(c) && !emoji_component.contains(c) {
+    let mut count = 0;
+    for grapheme in trim(body).graphemes(true) {
+        if grapheme.chars().all(is_space) {
+            continue;
+        }
+        let emoji = grapheme
+            .chars()
+            .all(|c| extended_pictographic.contains(c) || emoji_component.contains(c))
+            && grapheme.chars().any(|c| {
+                extended_pictographic.contains(c)
+                    || c == KEYCAP
+                    || ('\u{1F1E6}'..='\u{1F1FF}').contains(&c)
+            });
+        if !emoji {
             return None;
         }
+        count += 1;
     }
-    if !pictographic {
-        return None;
-    }
-    level(
-        body.graphemes(true)
-            .filter(|grapheme| !trim(grapheme).is_empty())
-            .count(),
-    )
+    level(count)
 }
 
 /// Byte ranges of the runs of emoji graphemes in `text`. Symbols that default
@@ -150,6 +154,7 @@ mod tests {
         assert_eq!(emoji_level("👍🎉🔥"), Some(3));
         assert_eq!(emoji_level("👍🎉🔥😀😀"), Some(4));
         assert_eq!(emoji_level(" 👨‍👩‍👧 👍🏽 "), Some(2));
+        assert_eq!(emoji_level("🇫🇷 1️⃣"), Some(2));
     }
 
     #[test]
@@ -158,6 +163,9 @@ mod tests {
         assert_eq!(emoji_level(""), None);
         assert_eq!(emoji_level("123"), None);
         assert_eq!(emoji_level("👍👍👍👍👍👍👍👍👍"), None);
+        assert_eq!(emoji_level("1👍"), None);
+        assert_eq!(emoji_level("2 🎉"), None);
+        assert_eq!(emoji_level("#👍"), None);
     }
 
     #[test]
