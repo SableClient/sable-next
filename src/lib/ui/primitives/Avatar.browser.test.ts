@@ -23,13 +23,26 @@ const GIF = Uint8Array.from(
 afterEach(() => {
   core.fetchMedia.mockReset();
   preferences.autoplayGifs = true;
+  vi.restoreAllMocks();
 });
+
+function recordStills(): Set<string> {
+  const stills = new Set<string>();
+  const create = URL.createObjectURL.bind(URL);
+  vi.spyOn(URL, 'createObjectURL').mockImplementation((object) => {
+    const url = create(object);
+    if (object instanceof Blob && object.type === 'image/webp') stills.add(url);
+    return url;
+  });
+  return stills;
+}
 
 test.each(['thumbnail', 'encrypted', 'local', 'original', 'named-gif'])(
   'animated %s avatars play only on hover',
   async (kind) => {
     core.fetchMedia.mockResolvedValue(GIF);
     preferences.autoplayGifs = false;
+    const stills = recordStills();
     const local = URL.createObjectURL(new Blob([GIF], { type: 'image/gif' }));
     const source =
       kind === 'local'
@@ -48,7 +61,7 @@ test.each(['thumbnail', 'encrypted', 'local', 'original', 'named-gif'])(
       await userEvent.unhover(root);
       const thumbnail = () => root.querySelector<HTMLImageElement>('img');
       await vi.waitFor(() => {
-        expect(thumbnail()?.getAttribute('src')).toMatch(/^data:image\/png/);
+        expect(stills.has(thumbnail()?.getAttribute('src') ?? '')).toBe(true);
         expect(thumbnail()?.naturalWidth).toBe(1);
       });
       expect(root.querySelectorAll('img')).toHaveLength(1);
@@ -69,7 +82,7 @@ test.each(['thumbnail', 'encrypted', 'local', 'original', 'named-gif'])(
       await userEvent.unhover(root);
       await vi.waitFor(() => {
         expect(root.querySelectorAll('img')).toHaveLength(1);
-        expect(thumbnail()?.getAttribute('src')).toMatch(/^data:image\/png/);
+        expect(stills.has(thumbnail()?.getAttribute('src') ?? '')).toBe(true);
       });
     } finally {
       URL.revokeObjectURL(local);

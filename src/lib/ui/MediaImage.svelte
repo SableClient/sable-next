@@ -250,8 +250,20 @@
       ((animated || original) &&
         (animationsPaused() || (emoticon && !preferences.autoplayStickers)))
   );
-  let heldFrame = $derived(paused && imageLoaded && imageElement ? stillFrame(imageElement) : null);
-  let heldUrl = $derived(heldFrame ?? url);
+  let heldFrame = $state<{ url: string; still: string } | null>(null);
+  let heldUrl = $derived(paused && heldFrame && heldFrame.url === url ? heldFrame.still : url);
+  $effect(() => {
+    const image = imageElement;
+    const source = url;
+    if (!paused || !imageLoaded || !image || !source) return;
+    let current = true;
+    void stillFrame(image, source).then((still) => {
+      if (current && still) heldFrame = { url: source, still };
+    });
+    return () => {
+      current = false;
+    };
+  });
   let steppedGif = $derived(gifFrames !== null);
   let heldGif = $derived(manualGif && !gifPlaying && gifPreviewReady);
   let painted = $derived(manualGif ? gifPreviewReady : imageLoaded);

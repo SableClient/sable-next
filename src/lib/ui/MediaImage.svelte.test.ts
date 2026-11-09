@@ -14,6 +14,7 @@ import MediaImage from './MediaImage.svelte';
 import MediaOutroHarness from './MediaOutroHarness.test.svelte';
 import { cachedMediaUrl, loadMediaUrl } from './media-url.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
+import { mockStillFrames, STILL } from '#lib/test-support/still-frame.js';
 
 afterEach(() => {
   core.fetchMedia.mockReset();
@@ -1308,11 +1309,10 @@ async function mountLoadedEmote(
   image: () => HTMLImageElement | null;
 }> {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
-  vi.spyOn(URL, 'createObjectURL').mockReturnValue(`blob:${source}`);
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    drawImage: vi.fn(),
-  } as unknown as CanvasRenderingContext2D);
-  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;still');
+  mockStillFrames(() => `blob:${source}`);
+  vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(true);
+  vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(32);
+  vi.spyOn(HTMLImageElement.prototype, 'naturalHeight', 'get').mockReturnValue(32);
   render(MediaImage, {
     props: { source, alt: 'party', width: 32, height: 32, original: true, ...extra },
   });
@@ -1322,9 +1322,6 @@ async function mountLoadedEmote(
   });
   const loaded = image();
   if (!loaded) throw new Error('emote was not rendered');
-  Object.defineProperty(loaded, 'complete', { value: true });
-  Object.defineProperty(loaded, 'naturalWidth', { value: 32 });
-  Object.defineProperty(loaded, 'naturalHeight', { value: 32 });
   void fireEvent.load(loaded);
   await flushed();
   return { image };
@@ -1340,9 +1337,10 @@ test('holds an animated emote on a still frame while the window is inactive', as
 
   focused = false;
   window.dispatchEvent(new Event('blur'));
-  await flushed();
+  await vi.waitFor(() => {
+    expect(element?.getAttribute('src')).toBe(STILL);
+  });
   expect(image()).toBe(element);
-  expect(element?.getAttribute('src')).toBe('data:image/png;still');
 
   focused = true;
   window.dispatchEvent(new Event('focus'));
@@ -1474,7 +1472,9 @@ test('an emoticon holds a still frame when stickers and emoji do not autoplay', 
   preferences.autoplayStickers = false;
   const { image } = await mountLoadedEmote('mxc://example.org/held-emoji', { emoticon: true });
 
-  expect(image()?.getAttribute('src')).toBe('data:image/png;still');
+  await vi.waitFor(() => {
+    expect(image()?.getAttribute('src')).toBe(STILL);
+  });
 });
 
 test('an emoticon keeps animating when stickers and emoji autoplay', async () => {

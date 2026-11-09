@@ -7,6 +7,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { composerMarkViews, composerNodeViews, type EmoteMedia } from './node-views';
 import { composerSchema } from './schema';
+import { mockStillFrames, STILL } from '#lib/test-support/still-frame.js';
 
 const { mention, emoticon } = composerSchema.nodes;
 
@@ -193,10 +194,7 @@ test('a colour mark paints its colour in the editor', () => {
 });
 
 async function paintedEmoticon(): Promise<HTMLImageElement> {
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    drawImage: vi.fn(),
-  } as unknown as CanvasRenderingContext2D);
-  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;still');
+  mockStillFrames(URL.createObjectURL.bind(URL));
   const view = build(
     'emoticon',
     emoticon.create({ url: 'mxc://example.org/parrot', shortcode: 'parrot' }),
@@ -216,7 +214,9 @@ test('an emote holds a still frame when stickers and emoji do not autoplay', asy
 
   const image = await paintedEmoticon();
 
-  expect(image.getAttribute('src')).toBe('data:image/png;still');
+  await vi.waitFor(() => {
+    expect(image.getAttribute('src')).toBe(STILL);
+  });
 });
 
 test('an emote keeps animating when stickers and emoji autoplay', async () => {

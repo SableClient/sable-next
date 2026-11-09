@@ -33,6 +33,7 @@ import { markdownToContent } from '#lib/model/model.js';
 import FormattedBody from './FormattedBody.svelte';
 import FormattedBodyHarness from './FormattedBodyHarness.test.svelte';
 import FormattedBodyMediaHarness from './FormattedBodyMediaHarness.test.svelte';
+import { mockStillFrames, STILL } from '#lib/test-support/still-frame.js';
 
 const user = userEvent.setup();
 const link = () => screen.getByRole('link');
@@ -397,10 +398,7 @@ test('defers an mxc emoticon source until its Blob URL is ready', async () => {
 async function paintedEmote(
   source: string
 ): Promise<{ image: HTMLImageElement; instance: RenderResult<typeof FormattedBody> }> {
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    drawImage: vi.fn(),
-  } as unknown as CanvasRenderingContext2D);
-  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;still');
+  mockStillFrames(URL.createObjectURL.bind(URL));
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(1)));
   const instance = render(FormattedBody, {
     props: { html: `<img src="${source}" alt="party" data-mx-emoticon="">` },
@@ -429,8 +427,9 @@ test('holds inline emotes still while the window is inactive', async () => {
 
   focused = false;
   window.dispatchEvent(new Event('blur'));
-  await tick();
-  expect(image.src).toBe('data:image/png;still');
+  await vi.waitFor(() => {
+    expect(image.src).toBe(STILL);
+  });
 
   focused = true;
   window.dispatchEvent(new Event('focus'));
@@ -445,7 +444,9 @@ test('an emote that arrives while the window is inactive loads still', async () 
 
   image.dispatchEvent(new Event('load'));
 
-  expect(image.src).toBe('data:image/png;still');
+  await vi.waitFor(() => {
+    expect(image.src).toBe(STILL);
+  });
 });
 
 test('renders maths in place of the sender fallback', async () => {
