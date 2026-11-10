@@ -76,9 +76,9 @@ export function rovingFocus({
       return at < 0 ? undefined : (walk(all, at, -1) ?? walk(all, at, 1));
     };
 
-    const sync = () => {
+    const sync = (recheck = false) => {
       const all = items();
-      if (current && !(all.includes(current) && isRendered(current))) {
+      if (current && !(all.includes(current) && (!recheck || isRendered(current)))) {
         const focusLost = document.activeElement === document.body;
         const at = Math.min(order.indexOf(current), all.length - 1);
         const replacement = walk(all, at, 1) ?? walk(all, at, -1);
@@ -94,7 +94,8 @@ export function rovingFocus({
         walk(all, 0, 1);
       order = all;
       for (const item of all) {
-        item.tabIndex = item === current ? 0 : -1;
+        const tabIndex = item === current ? '0' : '-1';
+        if (item.getAttribute('tabindex') !== tabIndex) item.setAttribute('tabindex', tabIndex);
         annotate?.(item);
       }
       if (contain) park(all, contain);
@@ -126,9 +127,23 @@ export function rovingFocus({
       scheduled = true;
       queueMicrotask(() => {
         scheduled = false;
-        sync();
+        sync(true);
       });
     };
+
+    // A large room list changes several times a frame while its avatars load.
+    let frame = 0;
+    let recheck = false;
+    const observer = new MutationObserver((records) => {
+      recheck ||= records.some((record) => record.type === 'attributes');
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const check = recheck;
+        recheck = false;
+        sync(check);
+      });
+    });
 
     const onFocusIn = (event: FocusEvent) => {
       const target = event.target;
@@ -209,7 +224,6 @@ export function rovingFocus({
     };
 
     sync();
-    const observer = new MutationObserver(sync);
     observer.observe(container, {
       childList: true,
       subtree: true,
@@ -221,6 +235,7 @@ export function rovingFocus({
     container.addEventListener('keydown', onKeyDown);
     return () => {
       observer.disconnect();
+      cancelAnimationFrame(frame);
       container.removeEventListener('focusin', onFocusIn);
       container.removeEventListener('focusout', syncSoon);
       container.removeEventListener('keydown', onKeyDown);

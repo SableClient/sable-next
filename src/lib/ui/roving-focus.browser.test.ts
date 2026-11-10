@@ -223,6 +223,6 @@ test('a change in a long list does not check the visibility of every item', asyn
   await vi.waitFor(() => {
     expect(root.lastElementChild?.getAttribute('tabindex')).toBe('-1');
   });
-  expect(check.mock.calls.length).toBeLessThan(5);
+  expect(check).not.toHaveBeenCalled();
   check.mockRestore();
 });
