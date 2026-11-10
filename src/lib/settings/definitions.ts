@@ -394,6 +394,7 @@ const SETTINGS = {
     { account: true }
   ),
   personaPickerLeftSide: toggle(false, { account: true }),
+  personaPickerShowAccountWhenDeselected: toggle(true, { account: true }),
   personaProxying: toggle(false, { account: true }),
   personaSelectionScope: choice<PersonaSelectionScope>(
     ['account', 'space', 'room', 'picker'],

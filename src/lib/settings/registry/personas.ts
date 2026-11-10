@@ -10,7 +10,11 @@ export const personasCategory: SettingsCategory = {
   id: 'personas',
   name: 'personas.title',
   icon: UserSwitchIcon,
-  sections: [{ id: 'persona-sending', name: 'settings.groups.sending' }],
+  sections: [
+    { id: 'persona-sending', name: 'settings.groups.sending' },
+    { id: 'persona-picker', name: 'settings.groups.personaPicker' },
+    { id: 'persona-trigger', name: 'settings.groups.personaTrigger' },
+  ],
   items: [
     {
       key: 'personaSelectionScope',
@@ -27,14 +31,14 @@ export const personasCategory: SettingsCategory = {
     },
     {
       key: 'personaPicker',
-      section: 'persona-sending',
+      section: 'persona-picker',
       icon: UserSwitchIcon,
       name: 'personas.picker',
       type: 'boolean',
     },
     {
       key: 'personaPickerSortOrder',
-      section: 'persona-sending',
+      section: 'persona-picker',
       icon: ListNumbersIcon,
       name: 'personas.pickerSortOrder',
       type: 'select',
@@ -48,15 +52,23 @@ export const personasCategory: SettingsCategory = {
     },
     {
       key: 'personaPickerLeftSide',
-      section: 'persona-sending',
+      section: 'persona-picker',
       icon: PushPinIcon,
       name: 'personas.pickerLeftSide',
       type: 'boolean',
       gatedBy: 'personaPicker',
     },
     {
+      key: 'personaPickerShowAccountWhenDeselected',
+      section: 'persona-picker',
+      icon: UserSwitchIcon,
+      name: 'personas.pickerShowAccountWhenDeselected',
+      type: 'boolean',
+      gatedBy: 'personaPicker',
+    },
+    {
       key: 'personaProxying',
-      section: 'persona-sending',
+      section: 'persona-trigger',
       icon: ChatTextIcon,
       name: 'personas.proxying',
       description: 'personas.proxyingHint',
@@ -64,7 +76,7 @@ export const personasCategory: SettingsCategory = {
     },
     {
       key: 'personaKeepAfterShorthand',
-      section: 'persona-sending',
+      section: 'persona-trigger',
       icon: PushPinIcon,
       name: 'personas.latching',
       type: 'boolean',

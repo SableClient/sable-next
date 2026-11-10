@@ -227,43 +227,36 @@ version_prefix = "knope/v"
 
 [tools."github:knope-dev/knope"."platforms.linux-arm64"]
 checksum = "sha256:65ec774bd37d7d030100c896bd7fc635b11acade0fb039ffcb57c2b56be9da11"
-checksum_source = "mise-versions"
 url = "https://github.com/knope-dev/knope/releases/download/knope/v0.23.2/knope-aarch64-unknown-linux-musl.tgz"
 url_api = "https://api.github.com/repos/knope-dev/knope/releases/assets/666846723"
 
 [tools."github:knope-dev/knope"."platforms.linux-arm64-musl"]
 checksum = "sha256:65ec774bd37d7d030100c896bd7fc635b11acade0fb039ffcb57c2b56be9da11"
-checksum_source = "mise-versions"
 url = "https://github.com/knope-dev/knope/releases/download/knope/v0.23.2/knope-aarch64-unknown-linux-musl.tgz"
 url_api = "https://api.github.com/repos/knope-dev/knope/releases/assets/666846723"
 
 [tools."github:knope-dev/knope"."platforms.linux-x64"]
 checksum = "sha256:c64f6281e012fc8e046ebd6f30be76c583e88b9ad55b00c7b1809b030db92eee"
-checksum_source = "mise-versions"
 url = "https://github.com/knope-dev/knope/releases/download/knope/v0.23.2/knope-x86_64-unknown-linux-musl.tgz"
 url_api = "https://api.github.com/repos/knope-dev/knope/releases/assets/666846724"
 
 [tools."github:knope-dev/knope"."platforms.linux-x64-musl"]
 checksum = "sha256:c64f6281e012fc8e046ebd6f30be76c583e88b9ad55b00c7b1809b030db92eee"
-checksum_source = "mise-versions"
 url = "https://github.com/knope-dev/knope/releases/download/knope/v0.23.2/knope-x86_64-unknown-linux-musl.tgz"
 url_api = "https://api.github.com/repos/knope-dev/knope/releases/assets/666846724"
 
 [tools."github:knope-dev/knope"."platforms.macos-arm64"]
 checksum = "sha256:9ca0403d8e528af48b6451eb14ef4d3110b570a323e761bab8994fc14c04dc49"
-checksum_source = "mise-versions"
 url = "https://github.com/knope-dev/knope/releases/download/knope/v0.23.2/knope-aarch64-apple-darwin.tgz"
 url_api = "https://api.github.com/repos/knope-dev/knope/releases/assets/666846725"
 
 [tools."github:knope-dev/knope"."platforms.macos-x64"]
 checksum = "sha256:e35cd3857477134a0ebd9395fa97eddcdf41217f6f8e426369d44f1b9c16df63"
-checksum_source = "mise-versions"
 url = "https://github.com/knope-dev/knope/releases/download/knope/v0.23.2/knope-x86_64-apple-darwin.tgz"
 url_api = "https://api.github.com/repos/knope-dev/knope/releases/assets/666846726"
 
 [tools."github:knope-dev/knope"."platforms.windows-x64"]
 checksum = "sha256:ddde4b768353bde46aeacb4067f6ec50b5bccc6373afd4ac2c2396b144b5336a"
-checksum_source = "mise-versions"
 url = "https://github.com/knope-dev/knope/releases/download/knope/v0.23.2/knope-x86_64-pc-windows-msvc.tgz"
 url_api = "https://api.github.com/repos/knope-dev/knope/releases/assets/666846730"
 
@@ -404,43 +397,36 @@ specifiers = ["1.13.2"]
 
 [tools.opentofu."platforms.linux-arm64"]
 checksum = "sha256:88e2d9e3f94f97b76ab2faf55ade87578f56aed19c5e45fa139d70e994366d1f"
-checksum_source = "mise-versions"
 url = "https://github.com/opentofu/opentofu/releases/download/v1.13.2/tofu_1.13.2_linux_arm64.tar.gz"
 url_api = "https://api.github.com/repos/opentofu/opentofu/releases/assets/662742799"
 
 [tools.opentofu."platforms.linux-arm64-musl"]
 checksum = "sha256:88e2d9e3f94f97b76ab2faf55ade87578f56aed19c5e45fa139d70e994366d1f"
-checksum_source = "mise-versions"
 url = "https://github.com/opentofu/opentofu/releases/download/v1.13.2/tofu_1.13.2_linux_arm64.tar.gz"
 url_api = "https://api.github.com/repos/opentofu/opentofu/releases/assets/662742799"
 
 [tools.opentofu."platforms.linux-x64"]
 checksum = "sha256:ac05d9952662c7db28dd57e93f0a68018837bfdf9342384ec0987977c16a9645"
-checksum_source = "mise-versions"
 url = "https://github.com/opentofu/opentofu/releases/download/v1.13.2/tofu_1.13.2_linux_amd64.tar.gz"
 url_api = "https://api.github.com/repos/opentofu/opentofu/releases/assets/662742636"
 
 [tools.opentofu."platforms.linux-x64-musl"]
 checksum = "sha256:ac05d9952662c7db28dd57e93f0a68018837bfdf9342384ec0987977c16a9645"
-checksum_source = "mise-versions"
 url = "https://github.com/opentofu/opentofu/releases/download/v1.13.2/tofu_1.13.2_linux_amd64.tar.gz"
 url_api = "https://api.github.com/repos/opentofu/opentofu/releases/assets/662742636"
 
 [tools.opentofu."platforms.macos-arm64"]
 checksum = "sha256:0d1cdc85f38992055b48e7fb161304a2ddfe2e5ee0ff68ffec9d0349c8bd1b59"
-checksum_source = "mise-versions"
 url = "https://github.com/opentofu/opentofu/releases/download/v1.13.2/tofu_1.13.2_darwin_arm64.tar.gz"
 url_api = "https://api.github.com/repos/opentofu/opentofu/releases/assets/662742637"
 
 [tools.opentofu."platforms.macos-x64"]
 checksum = "sha256:dc6e4eb1d3ed6550c2ef052596f933dbcd8c806957665ea83ae7537147cb3074"
-checksum_source = "mise-versions"
 url = "https://github.com/opentofu/opentofu/releases/download/v1.13.2/tofu_1.13.2_darwin_amd64.tar.gz"
 url_api = "https://api.github.com/repos/opentofu/opentofu/releases/assets/662742982"
 
 [tools.opentofu."platforms.windows-x64"]
 checksum = "sha256:e74fc2bda0c81ce696b6b7016a4d5c1f557638161239e4101e9ee7d8e0faba59"
-checksum_source = "mise-versions"
 url = "https://github.com/opentofu/opentofu/releases/download/v1.13.2/tofu_1.13.2_windows_amd64.tar.gz"
 url_api = "https://api.github.com/repos/opentofu/opentofu/releases/assets/662742635"
 

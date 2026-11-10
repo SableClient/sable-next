@@ -77,7 +77,6 @@
   let selected = $derived(held && held !== 'account' ? held : null);
   let active = $derived(shorthandHint?.persona ?? resolvePersona(scopeSelections) ?? null);
   let sortedPersonas = $derived(
-    // (
     preferences.personaPickerSortOrder === 'recent'
       ? personas.personas.slice().sort((a, b) => (b.last_used ?? 0) - (a.last_used ?? 0))
       : preferences.personaPickerSortOrder === 'alphabetical-asc'
@@ -85,13 +84,14 @@
         : preferences.personaPickerSortOrder === 'alphabetical-desc'
           ? personas.personas.slice().sort((a, b) => b.display_name.localeCompare(a.display_name))
           : personas.personas
-    // ).filter((persona) => persona.id == active?.id || !(persona.sort_flags?.hidden) )
   );
   let shown = $derived(edit ? edit.current : active);
   let label = $derived(
     shown
       ? i18n.t('personas.sendingAs', { name: shown.display_name })
-      : i18n.t('personas.pickerLabel')
+      : account
+        ? i18n.t('personas.sendingAs', { name: account.name })
+        : i18n.t('personas.pickerLabel')
   );
   let editOpen = $state(false);
   let activeAvatarId = $derived(active && alternateAvatarId(active, shorthandHint?.trigger, held));
@@ -139,6 +139,29 @@
   }
 </script>
 
+{#snippet buttonContent(
+  persona: PerMessageProfileView | PersonaView | null,
+  personaAvatarOverride: string | null | undefined
+)}
+  {#if persona}
+    <Avatar
+      id={persona.id ?? null}
+      src={personaAvatarOverride ?? persona.avatar_url ?? null}
+      name={persona.display_name ?? null}
+      size="small"
+    />
+  {:else if !preferences.personaPickerShowAccountWhenDeselected}
+    <UserSwitchIcon />
+  {:else}
+    <Avatar
+      id={account?.id ?? null}
+      src={account?.avatarUrl}
+      name={account?.name ?? null}
+      size="small"
+    />
+  {/if}
+{/snippet}
+
 {#if edit}
   <IconButton
     variant="ghost"
@@ -153,11 +176,7 @@
       editOpen = true;
     }}
   >
-    {#if shown}
-      <Avatar id={shown.id} src={shown.avatar_url ?? null} name={shown.display_name} size="small" />
-    {:else}
-      <UserSwitchIcon />
-    {/if}
+    {@render buttonContent(shown, null)}
   </IconButton>
   <MessageReproxyDialog
     bind:open={editOpen}
@@ -178,16 +197,7 @@
               class="persona-button-format selection-open"
               {label}
             >
-              {#if active}
-                <Avatar
-                  id={active?.id ?? null}
-                  src={activeAvatarUrl}
-                  name={active?.display_name ?? null}
-                  size="small"
-                />
-              {:else}
-                <UserSwitchIcon />
-              {/if}
+              {@render buttonContent(active, activeAvatarUrl)}
             </IconButton>
           {/snippet}
         </Popover.Trigger>
@@ -236,16 +246,7 @@
     data-state={open ? 'open' : 'closed'}
     onclick={openSheet}
   >
-    {#if active}
-      <Avatar
-        id={active?.id ?? null}
-        src={activeAvatarUrl}
-        name={active?.display_name ?? null}
-        size="small"
-      />
-    {:else}
-      <UserSwitchIcon />
-    {/if}
+    {@render buttonContent(active, activeAvatarUrl)}
   </IconButton>
   <BottomSheet
     bind:open

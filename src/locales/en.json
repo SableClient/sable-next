@@ -1767,7 +1767,9 @@
       "callButton": "Call button",
       "callScreens": "Screen sharing",
       "callCompat": "Compatibility",
-      "messageSearch": "Message search"
+      "messageSearch": "Message search",
+      "personaPicker": "Profile picker",
+      "personaTrigger": "Trigger"
     },
     "account": "Account",
     "about": "About",
@@ -3532,6 +3534,7 @@
     "fallback": "Prefix messages with profile names for older clients",
     "manageTitle": "Your per-message profiles",
     "manageDescription": "Stored as encrypted account data, compatible with other supported clients.",
+    "pickerShowAccountWhenDeselected": "Preview account avatar when deselected",
     "empty": "No profiles yet.",
     "add": "New profile",
     "edit": "Edit {{name}}",
