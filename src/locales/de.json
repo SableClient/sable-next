@@ -1059,7 +1059,18 @@
     "deleteExplain": "Sie wird für alle in diesem Raum entfernt. Server, die bereits eine Kopie haben, werden um Löschung gebeten, aber {{appName}} kann diese nicht garantieren.",
     "linkCopied": "Link kopiert",
     "reactionPeopleMany_one": "{{names}} und {{count, number}} andere",
-    "reactionPeopleMany_other": "{{names}} und {{count, number}} andere"
+    "reactionPeopleMany_other": "{{names}} und {{count, number}} andere",
+    "profileEncryptionDescription": "",
+    "profileSupporter": "",
+    "profileOpenServer": "",
+    "profileShareLink": "",
+    "profileCopyId": "",
+    "profileUnavailable": "",
+    "closeProfile": "",
+    "profileCopyServer": "",
+    "profileEncryption": "",
+    "profileCopyLink": "",
+    "profileEncryptionTitle": ""
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden.",
