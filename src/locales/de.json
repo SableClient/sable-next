@@ -1088,16 +1088,16 @@
     "unableToStart": "Deine Sitzung konnte nicht wiederhergestellt werden."
   },
   "composer": {
-    "takePhoto": "",
-    "caption": "",
-    "separateMessage": "",
-    "metadataGroup": "",
-    "insert": "",
-    "photoOrVideo": "",
-    "attachFile": "",
-    "recordVideo": "",
-    "linkApply": "",
-    "imageOptions": "",
-    "linkTitle": ""
+    "takePhoto": "Bild aufnehmen",
+    "caption": "Beschriftung",
+    "separateMessage": "Separate Nachricht",
+    "metadataGroup": "Metadaten",
+    "insert": "Einfügen",
+    "photoOrVideo": "Bild oder Video",
+    "attachFile": "Datei anhängen",
+    "recordVideo": "Video aufnehmen",
+    "linkApply": "Einfügen",
+    "imageOptions": "Optionen für {{name}}",
+    "linkTitle": "Link einfügen"
   }
 }
