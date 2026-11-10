@@ -1009,6 +1009,30 @@ export type PredecessorRoomView = {
 	via: string[],
 };
 
+/**  A missing or unknown value is `forbid`. */
+export type PresenceHintView = "suggest" | "forbid";
+
+export type PresencePromptView = { kind: "user"; user_id: string } | { kind: "room"; room_id: string };
+
+export type PresenceSharingEdit = { kind: "share_locally"; enabled: boolean } |
+/**  `None` drops the user from the map. */
+{ kind: "user"; user_id: string; sharing: PresenceUserSharingView | null } | { kind: "room"; room_id: string; allowed: boolean } | { kind: "server"; server: string; denied: boolean };
+
+/**  Without `m.presence.sharing` a supporting server shares with nobody. */
+export type PresenceSharingView = {
+	hint_event_type: string,
+	configured: boolean,
+	share_locally: boolean,
+	allowed_users: string[],
+	denied_users: string[],
+	allowed_rooms: string[],
+	denied_servers: string[],
+	prompted_users: string[],
+	prompted_rooms: string[],
+};
+
+export type PresenceUserSharingView = "allow" | "deny";
+
 export type PresenceView = "online" | "offline" | "unavailable";
 
 export type PrimitiveType = "string" | "integer" | "boolean" | "user_id" | "server_name" | "room_alias" | "room_id" | "event_id";
@@ -2303,6 +2327,10 @@ export type Rpc = {
     fetchPresence: (params: {
 	user_ids: string[],
 }) => Promise<null>;
+    presenceSharing: (params?: Record<string, never>) => Promise<PresenceSharingView | null>;
+    editPresenceSharing: (params: {
+	edit: PresenceSharingEdit,
+}) => Promise<PresenceSharingView>;
     searchUserDirectory: (params: {
 	term: string,
 	limit?: number | null,
@@ -3146,6 +3174,13 @@ export type Rpc = {
 	room_id: string,
 	always_listed_from?: number | null,
 }) => Promise<null>;
+    presenceHint: (params: {
+	room_id: string,
+}) => Promise<PresenceHintView>;
+    setPresenceHint: (params: {
+	room_id: string,
+	hint: PresenceHintView,
+}) => Promise<null>;
     updateServerAcl: (params: {
 	room_id: string,
 	allow: string[],
@@ -3216,6 +3251,13 @@ export type Rpc = {
     open: (params: {
 	room_id: string,
 }) => Promise<RoomOpenView>;
+    presencePrompt: (params: {
+	room_id: string,
+}) => Promise<PresencePromptView | null>;
+    answerPresencePrompt: (params: {
+	prompt: PresencePromptView,
+	share: boolean,
+}) => Promise<null>;
     listItem: (params: {
 	room_id: string,
 }) => Promise<RoomListItemView>;
@@ -3664,6 +3706,8 @@ export type RpcMethods = {
   'account.set_presence': Rpc['account']['setPresence'];
   'account.set_device_activity': Rpc['account']['setDeviceActivity'];
   'account.fetch_presence': Rpc['account']['fetchPresence'];
+  'account.presence_sharing': Rpc['account']['presenceSharing'];
+  'account.edit_presence_sharing': Rpc['account']['editPresenceSharing'];
   'account.search_user_directory': Rpc['account']['searchUserDirectory'];
   'account.dismissed_invites': Rpc['account']['dismissedInvites'];
   'account.set_invite_dismissed': Rpc['account']['setInviteDismissed'];
@@ -3853,6 +3897,8 @@ export type RpcMethods = {
   'room_state.set_banner': Rpc['room_state']['setBanner'];
   'room_state.member_list_threshold': Rpc['room_state']['memberListThreshold'];
   'room_state.set_member_list_threshold': Rpc['room_state']['setMemberListThreshold'];
+  'room_state.presence_hint': Rpc['room_state']['presenceHint'];
+  'room_state.set_presence_hint': Rpc['room_state']['setPresenceHint'];
   'room_state.update_server_acl': Rpc['room_state']['updateServerAcl'];
   'room_state.abbreviations': Rpc['room_state']['abbreviations'];
   'room_state.set_abbreviations': Rpc['room_state']['setAbbreviations'];
@@ -3869,6 +3915,8 @@ export type RpcMethods = {
   'room_state.remove_widget': Rpc['room_state']['removeWidget'];
   'room_state.bot_commands': Rpc['room_state']['botCommands'];
   'rooms.open': Rpc['rooms']['open'];
+  'rooms.presence_prompt': Rpc['rooms']['presencePrompt'];
+  'rooms.answer_presence_prompt': Rpc['rooms']['answerPresencePrompt'];
   'rooms.list_item': Rpc['rooms']['listItem'];
   'rooms.preview': Rpc['rooms']['preview'];
   'rooms.join': Rpc['rooms']['join'];
@@ -3994,6 +4042,8 @@ export function createRpc(call: RpcCall): Rpc {
       setPresence: (params) => call('account.set_presence', params) as ReturnType<Rpc['account']['setPresence']>,
       setDeviceActivity: (params) => call('account.set_device_activity', params) as ReturnType<Rpc['account']['setDeviceActivity']>,
       fetchPresence: (params) => call('account.fetch_presence', params) as ReturnType<Rpc['account']['fetchPresence']>,
+      presenceSharing: (params = {}) => call('account.presence_sharing', params) as ReturnType<Rpc['account']['presenceSharing']>,
+      editPresenceSharing: (params) => call('account.edit_presence_sharing', params) as ReturnType<Rpc['account']['editPresenceSharing']>,
       searchUserDirectory: (params) => call('account.search_user_directory', params) as ReturnType<Rpc['account']['searchUserDirectory']>,
       dismissedInvites: (params = {}) => call('account.dismissed_invites', params) as ReturnType<Rpc['account']['dismissedInvites']>,
       setInviteDismissed: (params) => call('account.set_invite_dismissed', params) as ReturnType<Rpc['account']['setInviteDismissed']>,
@@ -4205,6 +4255,8 @@ export function createRpc(call: RpcCall): Rpc {
       setBanner: (params) => call('room_state.set_banner', params) as ReturnType<Rpc['room_state']['setBanner']>,
       memberListThreshold: (params) => call('room_state.member_list_threshold', params) as ReturnType<Rpc['room_state']['memberListThreshold']>,
       setMemberListThreshold: (params) => call('room_state.set_member_list_threshold', params) as ReturnType<Rpc['room_state']['setMemberListThreshold']>,
+      presenceHint: (params) => call('room_state.presence_hint', params) as ReturnType<Rpc['room_state']['presenceHint']>,
+      setPresenceHint: (params) => call('room_state.set_presence_hint', params) as ReturnType<Rpc['room_state']['setPresenceHint']>,
       updateServerAcl: (params) => call('room_state.update_server_acl', params) as ReturnType<Rpc['room_state']['updateServerAcl']>,
       abbreviations: (params) => call('room_state.abbreviations', params) as ReturnType<Rpc['room_state']['abbreviations']>,
       setAbbreviations: (params) => call('room_state.set_abbreviations', params) as ReturnType<Rpc['room_state']['setAbbreviations']>,
@@ -4223,6 +4275,8 @@ export function createRpc(call: RpcCall): Rpc {
     },
     rooms: {
       open: (params) => call('rooms.open', params) as ReturnType<Rpc['rooms']['open']>,
+      presencePrompt: (params) => call('rooms.presence_prompt', params) as ReturnType<Rpc['rooms']['presencePrompt']>,
+      answerPresencePrompt: (params) => call('rooms.answer_presence_prompt', params) as ReturnType<Rpc['rooms']['answerPresencePrompt']>,
       listItem: (params) => call('rooms.list_item', params) as ReturnType<Rpc['rooms']['listItem']>,
       preview: (params) => call('rooms.preview', params) as ReturnType<Rpc['rooms']['preview']>,
       join: (params) => call('rooms.join', params) as ReturnType<Rpc['rooms']['join']>,

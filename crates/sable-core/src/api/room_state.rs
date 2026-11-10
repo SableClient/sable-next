@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use sable_model::bot_commands::BotCommand;
 
 use super::{Handler, Json};
-use crate::protocol::{AbbreviationView, RpcError, HistoryVisibilityView, JoinRuleView, RoomStateEventView};
+use crate::protocol::{AbbreviationView, RpcError, HistoryVisibilityView, PresenceHintView, JoinRuleView, RoomStateEventView};
 use crate::{Core, ResultExt, account_data, presence};
 use crate::media::mxc_uri;
 use crate::room_settings::AclEdit;
@@ -26,6 +26,8 @@ domain! {
     set_banner,
     member_list_threshold,
     set_member_list_threshold,
+    presence_hint,
+    set_presence_hint,
     update_server_acl,
     abbreviations,
     set_abbreviations,
@@ -266,6 +268,37 @@ impl Handler for SetMemberListThresholdParams {
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         core.set_member_list_threshold(self)
             .await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PresenceHintParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+}
+
+impl Handler for PresenceHintParams {
+    type Ok = PresenceHintView;
+
+    async fn run(self, core: &Arc<Core>) -> Result<PresenceHintView, RpcError> {
+        core.presence_hint(&self.room_id).await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetPresenceHintParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub hint: PresenceHintView,
+}
+
+impl Handler for SetPresenceHintParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.set_presence_hint(self.room_id, self.hint).await
     }
 }
 

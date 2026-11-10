@@ -43,6 +43,7 @@ mod pin_marker;
 pub mod polls;
 mod power_levels;
 mod presence;
+mod presence_sharing;
 mod preview;
 mod probed_state;
 mod profile_overrides;

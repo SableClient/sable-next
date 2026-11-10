@@ -819,7 +819,21 @@
     "directoryKind": "Show",
     "directoryKindAll": "Rooms and spaces",
     "directoryKindRooms": "Rooms",
-    "directoryKindSpaces": "Spaces"
+    "directoryKindSpaces": "Spaces",
+    "presenceHintTitle": "Presence sharing",
+    "presenceHintHint": "Whether members are asked to share their online status with this room. Forbidding it stops all presence sharing here.",
+    "presenceHint": {
+      "suggest": "Suggest",
+      "forbid": "Forbid"
+    },
+    "presenceShareTitle": "Share my online status here",
+    "presenceShareHint": "Members of this room see when you are online.",
+    "presenceShareForbidden": "This room does not allow sharing online status.",
+    "presencePromptLabel": "Online status sharing",
+    "presencePromptUser": "Share your online status with {{name}}?",
+    "presencePromptRoom": "This room suggests sharing your online status with its members. Share it?",
+    "presencePromptShare": "Share",
+    "presencePromptDecline": "Not now"
   },
   "join": {
     "joining": "Joining…",
@@ -1405,7 +1419,11 @@
     "showImages": "Show images",
     "sendAnyway": "Send anyway",
     "sendBlockedIdentity": "{{names}} reset their encryption identity since you verified them. Sending anyway withdraws your verification.",
-    "sendBlockedVerify": "Verify this device before sending encrypted messages."
+    "sendBlockedVerify": "Verify this device before sending encrypted messages.",
+    "profilePresenceSharing": "Online status sharing",
+    "profilePresenceDefault": "No rule",
+    "profilePresenceAllow": "Always share",
+    "profilePresenceDeny": "Never share"
   },
   "viewer": {
     "title": "Media viewer",
@@ -1721,6 +1739,7 @@
       "sending": "Sending",
       "buttons": "Buttons",
       "activity": "Activity",
+      "presenceSharing": "Who sees your online status",
       "blurring": "Blurring",
       "diagnostics": "Diagnostics",
       "playback": "Loading & playback",
@@ -2918,7 +2937,27 @@
     },
     "composerOrderMoveSelected": "{{name}} selected. Choose a position or press Escape.",
     "composerOrderMoveCancelled": "Move cancelled.",
-    "composerOrderChanged": "{{name}}, position {{position}} of {{total}}"
+    "composerOrderChanged": "{{name}}, position {{position}} of {{total}}",
+    "presenceSharingHint": "Your homeserver only sends your online status to the people, rooms and servers you choose.",
+    "presenceSharingUnconfigured": "You have not chosen anyone yet, so nobody sees your online status.",
+    "presenceShareLocally": "Share with people on my homeserver",
+    "presenceShareLocallyHint": "Anyone on your homeserver who shares a room with you.",
+    "presenceSharingUsers": "People",
+    "presenceSharingUsersHint": "Named people override every other rule.",
+    "presenceSharingRooms": "Rooms",
+    "presenceSharingRoomsHint": "Turn sharing on for a room from its settings. Rooms that forbid sharing are skipped.",
+    "presenceSharingServers": "Blocked servers",
+    "presenceSharingServersHint": "Nobody on these servers sees your online status, unless you share with them by name.",
+    "presenceSharingEmpty": "None",
+    "presenceSharingRemove": "Remove {{name}}",
+    "presenceSharingUserLabel": "User ID",
+    "presenceSharingUserChoice": "Share or block",
+    "presenceSharingUserFor": "Sharing with {{name}}",
+    "presenceSharingServerLabel": "Server name",
+    "presenceSharingUser": {
+      "allow": "Always share",
+      "deny": "Never share"
+    }
   },
   "errors": {
     "pageTitle": "Something went wrong",

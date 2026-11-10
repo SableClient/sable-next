@@ -10,6 +10,7 @@
     MutualRoomView,
     ProfileFieldView,
     PerMessageProfileView,
+    PresenceUserSharingView,
   } from '#src/generated/protocol';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
@@ -28,6 +29,7 @@
   import PaperPlaneRightIcon from 'phosphor-svelte/lib/PaperPlaneRightIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
+  import PulseIcon from 'phosphor-svelte/lib/PulseIcon';
   import ShareNetworkIcon from 'phosphor-svelte/lib/ShareNetworkIcon';
   import ShieldIcon from 'phosphor-svelte/lib/ShieldIcon';
   import LockKeyIcon from 'phosphor-svelte/lib/LockKeyIcon';
@@ -49,6 +51,7 @@
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import { roleColorOnDark, roleColorOnLight } from '#lib/ui/primitives/readable-color.js';
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
+  import { presenceSharing } from '#lib/rooms/presence-sharing.svelte.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
@@ -318,6 +321,20 @@
 
   function openServer(): void {
     profileActions.openServer(homeserver);
+  }
+
+  let presenceChoices = $derived([
+    { sharing: null, label: i18n.t('timeline.profilePresenceDefault') },
+    { sharing: 'allow' as const, label: i18n.t('timeline.profilePresenceAllow') },
+    { sharing: 'deny' as const, label: i18n.t('timeline.profilePresenceDeny') },
+  ]);
+  let presenceChoice = $derived(presenceSharing.userSharing(userId));
+
+  function setPresenceSharing(sharing: PresenceUserSharingView | null): void {
+    presenceSharing.edit({ kind: 'user', user_id: userId, sharing }).catch((error: unknown) => {
+      console.warn('[sable profile] presence sharing not changed', error);
+      toasts.error(i18n.t('errors.actionFailed'));
+    });
   }
 
   async function toggleIgnored(): Promise<void> {
@@ -614,6 +631,24 @@
           <PencilSimpleIcon />
           {i18n.t('timeline.profileOverride')}
         </ActionMenuItem>
+        {#if presenceSharing.supported}
+          <ActionMenuSub label={i18n.t('timeline.profilePresenceSharing')}>
+            {#snippet trigger()}
+              <PulseIcon />
+              {i18n.t('timeline.profilePresenceSharing')}
+            {/snippet}
+            {#each presenceChoices as choice (choice.label)}
+              <ActionMenuItem
+                checked={presenceChoice === choice.sharing}
+                onSelect={() => {
+                  setPresenceSharing(choice.sharing);
+                }}
+              >
+                {choice.label}
+              </ActionMenuItem>
+            {/each}
+          </ActionMenuSub>
+        {/if}
         <ActionMenuSeparator />
         <ActionMenuItem destructive onSelect={toggleIgnored}>
           <ProhibitIcon />

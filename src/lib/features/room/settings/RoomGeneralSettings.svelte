@@ -37,6 +37,7 @@
   import RoomAddressSettings from './RoomAddressSettings.svelte';
   import RoomEncryptionSettings from './RoomEncryptionSettings.svelte';
   import RoomHistorySettings from './RoomHistorySettings.svelte';
+  import RoomPresenceSettings from './RoomPresenceSettings.svelte';
   import RoomPublishSettings from './RoomPublishSettings.svelte';
   import RoomSpacesSettings from './RoomSpacesSettings.svelte';
   import RoomUpgradeSettings from './RoomUpgradeSettings.svelte';
@@ -406,6 +407,7 @@
       {#if room?.room_kind !== 'space'}
         <RoomHistorySettings {room} {levels} {ownPowerLevel} />
         <RoomEncryptionSettings {room} {levels} {ownPowerLevel} />
+        <RoomPresenceSettings {room} {levels} {ownPowerLevel} />
       {/if}
       <RoomPublishSettings {room} {levels} {ownPowerLevel} />
       <RoomSpacesSettings {room} {levels} {ownPowerLevel} />

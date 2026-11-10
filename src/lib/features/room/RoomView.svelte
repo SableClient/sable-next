@@ -61,6 +61,7 @@
   import { canSendState } from './settings/permission-groups';
   import RoomPinMenu from './RoomPinMenu.svelte';
   import RoomPredecessorNotice from './RoomPredecessorNotice.svelte';
+  import RoomPresencePrompt from './RoomPresencePrompt.svelte';
   import RoomTombstoneBanner from './RoomTombstoneBanner.svelte';
   import RoomReadReceipts from './timeline/RoomReadReceipts.svelte';
   import TimelineList from './timeline/TimelineList.svelte';
@@ -860,6 +861,7 @@
         onJoin={() => void tombstoneJoin.join()}
       />
     {:else}
+      <RoomPresencePrompt roomId={resolvedRoomId} roomName={resolvedRoom?.display_name ?? ''} />
       {#if composerMounted}
         <ScheduledMessages
           roomId={resolvedRoomId}

@@ -11,7 +11,7 @@ use super::{Handler, Json};
 use crate::media::mxc_uri;
 use crate::profile_overrides::OverrideEdit;
 use crate::profiles::profile_view;
-use crate::protocol::{BookmarkView, NotificationModeView, RpcError, FieldEdit, InviteTriageView, MediaPreviewConfigView, MediaPreviewsView, MutualRoomView, PresenceView, ProfileOverridesView, ProfileView, SealedAccountDataView, UserDirectoryEntryView};
+use crate::protocol::{BookmarkView, NotificationModeView, RpcError, FieldEdit, InviteTriageView, MediaPreviewConfigView, MediaPreviewsView, MutualRoomView, PresenceSharingEdit, PresenceSharingView, PresenceView, ProfileOverridesView, ProfileView, SealedAccountDataView, UserDirectoryEntryView};
 use crate::{Core, ResultExt, presence};
 
 domain! {
@@ -38,6 +38,8 @@ domain! {
     set_presence,
     set_device_activity,
     fetch_presence,
+    presence_sharing,
+    edit_presence_sharing,
     search_user_directory,
     dismissed_invites,
     set_invite_dismissed,
@@ -1011,6 +1013,33 @@ impl Handler for SetProfileOverrideParams {
     }
 }
 
+/// `None` when the homeserver does not support MSC4495.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PresenceSharingParams {}
+
+impl Handler for PresenceSharingParams {
+    type Ok = Option<PresenceSharingView>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Option<PresenceSharingView>, RpcError> {
+        core.presence_sharing().await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct EditPresenceSharingParams {
+    pub edit: PresenceSharingEdit,
+}
+
+impl Handler for EditPresenceSharingParams {
+    type Ok = PresenceSharingView;
+
+    async fn run(self, core: &Arc<Core>) -> Result<PresenceSharingView, RpcError> {
+        core.edit_presence_sharing(&self.edit).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -1099,3 +1128,4 @@ mod tests {
         assert_eq!(keys(&edited), ["@a:x"]);
     }
 }
+

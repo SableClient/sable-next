@@ -41,6 +41,7 @@ import DeveloperPushHistory from '#lib/features/settings/DeveloperPushHistory.sv
 import DeveloperSearchMetrics from '#lib/features/settings/DeveloperSearchMetrics.svelte';
 import SearchSharingStatus from '#lib/features/settings/SearchSharingStatus.svelte';
 import DeveloperSentry from '#lib/features/settings/DeveloperSentry.svelte';
+import PresenceSharingSettings from '#lib/features/settings/PresenceSharingSettings.svelte';
 import DeveloperServerFeatures from '#lib/features/settings/DeveloperServerFeatures.svelte';
 import DeveloperSyncDiagnostics from '#lib/features/settings/DeveloperSyncDiagnostics.svelte';
 import SoundVolumeSettings from '../call/SoundVolumeSettings.svelte';
@@ -73,6 +74,7 @@ export const panelComponents: Partial<Record<string, Component>> = {
   'call-compat': CallCompatibilityDebug,
   'sound-volumes': SoundVolumeSettings,
   'media-preview-privacy': MediaPreviewPrivacy,
+  'presence-sharing': PresenceSharingSettings,
   personas: PersonaSettings,
   'link-device': LinkDeviceSetting,
   'settings-sync-status': SettingsSyncStatus,

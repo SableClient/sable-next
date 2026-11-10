@@ -1,6 +1,7 @@
 import { hasNativeCalls } from '#lib/platform/calls.js';
 import { deliversDeepLinks } from '#lib/platform/deep-links.js';
 import { isAndroid, isNativeMobile, supportsTouch } from '#lib/platform/os.js';
+import { presenceSharing } from '#lib/rooms/presence-sharing.svelte.js';
 import { preferences } from '../preferences.svelte';
 import type { SettingsGate, SettingsTargetDefinition } from '../registry';
 
@@ -245,6 +246,21 @@ export const settingsPanels: Record<string, SettingsPanelDefinition[]> = {
     },
   ],
   privacy: [
+    {
+      id: 'presence-sharing',
+      section: 'online-status',
+      supported: () => presenceSharing.supported,
+      targets: targets([
+        ['presence-share-locally', 'settings.presenceShareLocally', 'settings.presenceSharingHint'],
+        ['presence-people', 'settings.presenceSharingUsers', 'settings.presenceSharingUsersHint'],
+        ['presence-rooms', 'settings.presenceSharingRooms', 'settings.presenceSharingRoomsHint'],
+        [
+          'presence-servers',
+          'settings.presenceSharingServers',
+          'settings.presenceSharingServersHint',
+        ],
+      ]),
+    },
     {
       id: 'media-preview-privacy',
       section: 'blurring',

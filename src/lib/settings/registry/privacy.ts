@@ -51,6 +51,7 @@ export const privacyCategory: SettingsCategory = {
   icon: EyeSlashIcon,
   sections: [
     { id: 'activity', name: 'settings.groups.activity' },
+    { id: 'online-status', name: 'settings.groups.presenceSharing' },
     { id: 'blurring', name: 'settings.groups.blurring' },
     { id: 'diagnostics', name: 'settings.groups.diagnostics' },
   ],

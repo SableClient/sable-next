@@ -466,6 +466,77 @@ pub enum PresenceView {
     Unavailable,
 }
 
+/// A missing or unknown value is `forbid`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum PresenceHintView {
+    Suggest,
+    Forbid,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum PresenceUserSharingView {
+    Allow,
+    Deny,
+}
+
+/// Without `m.presence.sharing` a supporting server shares with nobody.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct PresenceSharingView {
+    pub hint_event_type: String,
+    pub configured: bool,
+    pub share_locally: bool,
+    pub allowed_users: Vec<String>,
+    pub denied_users: Vec<String>,
+    pub allowed_rooms: Vec<String>,
+    pub denied_servers: Vec<String>,
+    pub prompted_users: Vec<String>,
+    pub prompted_rooms: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PresenceSharingEdit {
+    ShareLocally {
+        enabled: bool,
+    },
+    /// `None` drops the user from the map.
+    User {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        user_id: OwnedUserId,
+        sharing: Option<PresenceUserSharingView>,
+    },
+    Room {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        allowed: bool,
+    },
+    Server {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        server: OwnedServerName,
+        denied: bool,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PresencePromptView {
+    User {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        user_id: OwnedUserId,
+    },
+    Room {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+}
+
 /// Mirrors `eyeball_im::VectorDiff`, which is not `Type` and whose `Vector<T>`
 /// has to flatten to a plain array on the wire.
 #[derive(Debug, Serialize)]

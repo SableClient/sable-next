@@ -24,7 +24,7 @@ use crate::search::MAX_SEARCH_RESULTS;
 use crate::room_settings::StateEventOut;
 use crate::room_settings::join_rule_content;
 use crate::room_settings::voice_power_level_override;
-use crate::protocol::{RpcError, CreateJoinRuleView, PublicRoomView, RoomAttachmentKind, RoomAttachmentView, RoomCosmeticsView, RoomOpenView, RoomPreviewView, RoomListItemView, RoomTag, RoomVersionView, RoomVersionsView};
+use crate::protocol::{RpcError, CreateJoinRuleView, PresenceHintView, PresencePromptView, PublicRoomView, RoomAttachmentKind, RoomAttachmentView, RoomCosmeticsView, RoomOpenView, RoomPreviewView, RoomListItemView, RoomTag, RoomVersionView, RoomVersionsView};
 use crate::view::FORUM_ROOM_TYPE;
 use crate::{Core, ResultExt, power_levels, view};
 
@@ -32,6 +32,8 @@ const WIDGETS_EVENT_TYPE: &str = "im.vector.modular.widgets";
 
 domain! {
     open,
+    presence_prompt,
+    answer_presence_prompt,
     list_item,
     preview,
     join,
@@ -220,9 +222,39 @@ impl Handler for JoinParams {
     type Ok = String;
 
     async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        core.join_room(&self.address, &self.via)
-            .await
-            .map(|room_id| room_id.to_string())
+        let room_id = core.join_room(&self.address, &self.via).await?;
+        core.follow_presence_upgrade(&room_id).await;
+        Ok(room_id.to_string())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PresencePromptParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+}
+
+impl Handler for PresencePromptParams {
+    type Ok = Option<PresencePromptView>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Option<PresencePromptView>, RpcError> {
+        core.presence_prompt(&self.room_id).await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct AnswerPresencePromptParams {
+    pub prompt: PresencePromptView,
+    pub share: bool,
+}
+
+impl Handler for AnswerPresencePromptParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.answer_presence_prompt(self.prompt, self.share).await
     }
 }
 
@@ -387,6 +419,16 @@ impl Handler for CreateParams {
         } else {
             RoomPreset::PrivateChat
         });
+        if let Some(hint) = core
+            .presence_hint_initial_state(if self.public {
+                PresenceHintView::Forbid
+            } else {
+                PresenceHintView::Suggest
+            })
+            .await
+        {
+            request.initial_state.push(hint);
+        }
 
         let room_type = self.kind.as_room_type();
         if room_type.is_some() || !self.federate || self.predecessor.is_some() {
@@ -485,27 +527,36 @@ impl Handler for CreateDmParams {
             !room.is_tombstoned()
                 && encrypted.is_none_or(|wanted| room.encryption_state().is_encrypted() == wanted)
         });
-        let room = match existing {
-            Some(room) => room,
-            None if encrypted == Some(false) || (encrypted.is_none() && !encrypt_new) => {
-                let mut request = create_room::v3::Request::new();
-                request.creation_content = Some(
-                    Raw::new(&serde_json::json!({ "additional_creators": [&user_id] }))
-                        .or_failed(core, "create_dm_creation_content")?
-                        .cast_unchecked(),
+        let room = if let Some(room) = existing {
+            room
+        } else {
+            let mut request = create_room::v3::Request::new();
+            request.creation_content = Some(
+                Raw::new(&serde_json::json!({ "additional_creators": [&user_id] }))
+                    .or_failed(core, "create_dm_creation_content")?
+                    .cast_unchecked(),
+            );
+            request.invite = vec![user_id];
+            request.is_direct = true;
+            request.preset = Some(RoomPreset::TrustedPrivateChat);
+            if encrypted == Some(true) || (encrypted.is_none() && encrypt_new) {
+                request.initial_state.push(
+                    InitialStateEvent::with_empty_state_key(
+                        RoomEncryptionEventContent::with_recommended_defaults(),
+                    )
+                    .to_raw_any(),
                 );
-                request.invite = vec![user_id];
-                request.is_direct = true;
-                request.preset = Some(RoomPreset::TrustedPrivateChat);
-                client
-                    .create_room(request)
-                    .await
-                    .or_failed(core, "create_dm")?
             }
-            None => client
-                .create_dm(&user_id)
+            if let Some(hint) = core
+                .presence_hint_initial_state(PresenceHintView::Suggest)
                 .await
-                .or_failed(core, "create_dm")?,
+            {
+                request.initial_state.push(hint);
+            }
+            client
+                .create_room(request)
+                .await
+                .or_failed(core, "create_dm")?
         };
 
         Ok(room.room_id().to_string())
@@ -570,6 +621,10 @@ impl Handler for UpgradeParams {
             .await
             .or_failed(core, "upgrade_room")?;
         core.copy_room_packs(&client, &old_room, &response.replacement_room)
+            .await;
+        core.copy_presence_hint(&old_room, &response.replacement_room)
+            .await;
+        core.carry_presence_sharing(&old_room, &response.replacement_room)
             .await;
 
         Ok(response.replacement_room.to_string())
