@@ -58,7 +58,7 @@ skip = [
   { crate = "wasapi@0.24.0", reason = "Audiofox 1.1 requires wasapi 0.24 while system audio capture uses 0.26" },
   { crate = "block-buffer@0.10.4", reason = "sha1/sha2 0.10 pull the digest 0.10 line while vodozemac uses digest 0.11" },
   { crate = "cfg-expr@0.15.8", reason = "system-deps 6, via the GTK/WebKit -sys crates, requires cfg-expr 0.15 while system-deps 7 uses 0.20" },
-  { crate = "crypto-common@0.1.6", reason = "paired with the digest 0.10 line above" },
+  { crate = "crypto-common@0.1.7", reason = "paired with the digest 0.10 line above" },
   { crate = "digest@0.10.7", reason = "ruma's headers dependency requires sha1 0.10 while vodozemac requires digest 0.11" },
   { crate = "nix@0.30.1", reason = "PipeWire's libspa requires nix 0.30 while sentry's os_info uses 0.31" },
   { crate = "nix@0.29.0", reason = "evdev, via handy-keys, requires nix 0.29" },
@@ -164,6 +164,19 @@ skip = [
   { crate = "windows_x86_64_msvc@0.42.2", reason = "paired with windows-targets 0.42.2 above" },
   { crate = "windows_x86_64_msvc@0.52.6", reason = "paired with windows-targets 0.52.6 above" },
   { crate = "winnow@0.5.40", reason = "legacy toml dependencies require winnow 0.5" },
+  { crate = "cssparser@0.36.0", reason = "lol_html requires cssparser 0.36 while Tauri and ammonia use newer versions" },
+  { crate = "cssparser-macros@0.6.1", reason = "paired with cssparser 0.36" },
+  { crate = "object@0.39.1", reason = "ar_archive_writer requires object 0.39 while backtrace uses 0.40" },
+  { crate = "pem-rfc7468@0.7.0", reason = "openidconnect uses der 0.7 while Matrix uses der 0.8" },
+  { crate = "selectors@0.37.0", reason = "lol_html requires selectors 0.37 while Tauri uses 0.38" },
+  { crate = "windows-core@0.62.2", reason = "Tauri requires windows-core 0.62 while generator uses 0.100" },
+  { crate = "windows-implement@0.60.2", reason = "paired with windows-core 0.61 and 0.62" },
+  { crate = "windows-interface@0.59.3", reason = "paired with windows-core 0.61 and 0.62" },
+  { crate = "windows-link@0.2.1", reason = "Tauri requires windows-link 0.2 while generator uses 0.100" },
+  { crate = "windows-result@0.4.1", reason = "paired with windows-core 0.62" },
+  { crate = "windows-strings@0.5.1", reason = "paired with windows-core 0.62" },
+  { crate = "zbus@5.19.0", reason = "ashpd and keyring require zbus 5 while notify-rust uses 6" },
+  { crate = "zbus_macros@5.19.0", reason = "paired with zbus 5.19.0" },
 ]
 skip-tree = []
 
@@ -172,6 +185,7 @@ unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = [
+  "https://git.sable.moe/SableClient/link-preview",
   "https://github.com/yanqianglu/tauri-plugin-auth-session",
   "https://github.com/ruma/ruma",
   "https://git.sable.moe/SableClient/matrix-rust-sdk",
