@@ -953,7 +953,7 @@ impl Core {
         self.timelines.lock().await.clear();
         self.thread_timelines.lock().await.clear();
         self.account_data_types.lock().await.clear();
-        *self.inbox.lock().await = crate::inbox::InboxCache::default();
+        self.inbox.lock().await.reset();
         *self.pack_cache.lock().await = image_packs::PackCache::default();
         self.calendars.lock().await.clear();
         *self.push_rules.lock().await = None;

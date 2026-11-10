@@ -184,18 +184,19 @@ pub(crate) struct InboxCache {
     stored: Option<Stored>,
     revision: u64,
     saved: u64,
+    resets: u64,
 }
 
 impl InboxCache {
-    async fn stored(
-        &mut self,
-        core: &Core,
-        client: &matrix_sdk::Client,
-    ) -> Result<&mut Stored, RpcError> {
-        if self.stored.is_none() {
-            self.stored = Some(core.with_open_stores(async || load(client).await).await?);
-        }
-        Ok(self.stored.get_or_insert_default())
+    fn stored(&mut self) -> &mut Stored {
+        self.stored.get_or_insert_default()
+    }
+
+    pub(crate) fn reset(&mut self) {
+        *self = Self {
+            resets: self.resets + 1,
+            ..Self::default()
+        };
     }
 }
 
@@ -528,8 +529,8 @@ impl Core {
         if fresh.is_empty() && cursors.is_empty() && unread_scans.is_empty() {
             return Ok(0);
         }
-        let mut inbox = self.inbox.lock().await;
-        let stored = inbox.stored(self, client).await?;
+        let mut inbox = self.loaded_inbox(client).await?;
+        let stored = inbox.stored();
         let added = merge(&mut stored.entries, fresh);
         stored.cursors.extend(cursors);
         stored.unread_scans.extend(unread_scans);
@@ -538,7 +539,30 @@ impl Core {
     }
 
     async fn stored_inbox(&self, client: &matrix_sdk::Client) -> Result<Stored, RpcError> {
-        self.inbox.lock().await.stored(self, client).await.cloned()
+        Ok(self.loaded_inbox(client).await?.stored().clone())
+    }
+
+    /// Suspension flushes the inbox inside its transition, so the store read must not hold the
+    /// inbox while it waits for one.
+    async fn loaded_inbox(
+        &self,
+        client: &matrix_sdk::Client,
+    ) -> Result<tokio::sync::MutexGuard<'_, InboxCache>, RpcError> {
+        let resets = {
+            let inbox = self.inbox.lock().await;
+            if inbox.stored.is_some() {
+                return Ok(inbox);
+            }
+            inbox.resets
+        };
+        let loaded = self.with_open_stores(async || load(client).await).await?;
+        let mut inbox = self.inbox.lock().await;
+        // The session changed during the read, so `loaded` belongs to the previous account.
+        if inbox.resets != resets {
+            return Err(RpcError::Unavailable);
+        }
+        inbox.stored.get_or_insert(loaded);
+        Ok(inbox)
     }
 
     pub(crate) async fn flush_inbox(&self, client: &matrix_sdk::Client) {
@@ -635,9 +659,9 @@ impl Core {
         };
         let client = room.client();
         let undecryptable = {
-            let mut inbox = self.inbox.lock().await;
-            inbox.stored(self, &client).await.is_ok_and(|stored| {
-                stored
+            self.loaded_inbox(&client).await.is_ok_and(|mut inbox| {
+                inbox
+                    .stored()
                     .entries
                     .iter()
                     .any(|entry| entry.event_id == event_id && entry.undecryptable)
@@ -994,6 +1018,30 @@ mod tests {
             .expect("suspending must not deadlock");
 
         assert_eq!(super::load(&client).await.unwrap().entries.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn suspending_during_the_first_inbox_load_does_not_deadlock() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, _room) = setup(&server, 1).await;
+        let held = core.activity.transition().await;
+        let suspend = core.update_app_active(false);
+        let record = core.record_inbox(
+            &client,
+            vec![entry("first", 100)],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        );
+        tokio::pin!(suspend, record);
+        assert!(futures_util::poll!(suspend.as_mut()).is_pending());
+        assert!(futures_util::poll!(record.as_mut()).is_pending());
+        drop(held);
+
+        let both = async { tokio::join!(suspend, record) };
+        let (_, recorded) = matrix_sdk::timeout::timeout(both, std::time::Duration::from_secs(5))
+            .await
+            .expect("suspending must not deadlock");
+        assert_eq!(recorded.unwrap(), 1);
     }
 
     #[tokio::test]
