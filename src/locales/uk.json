@@ -307,7 +307,7 @@
     "createAliasInvalidEmpty": "Введіть адресу або залиште поле порожнім.",
     "createAliasInvalidColon": "Адреса не може містити \":\".",
     "createVersionUnstable": "{{version}} (нестабільна)",
-    "createInvitePlaceholder": "@someone:server",
+    "createInvitePlaceholder": "@user:server",
     "directoryTitle": "Перегляд кімнат",
     "settingsBannerLabel": "Банер",
     "createAliasHint": "Опублікуйте адресу на цьому сервері, щоб за нею можна було приєднатися.",
@@ -529,7 +529,7 @@
     "status": "Статус",
     "banner": "Банер",
     "terms": {
-      "hour24Clock": "24-годинний і 12-годинний формат часу, AM/PM"
+      "hour24Clock": "24-годинний і 12-годинний формат часу, am/pm"
     }
   },
   "auth": {
