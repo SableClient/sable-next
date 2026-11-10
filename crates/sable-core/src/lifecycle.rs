@@ -1,8 +1,66 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use tokio::sync::{Mutex, MutexGuard};
+use tokio::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::Core;
+use crate::{Core, session::Session};
+
+/// The active session. Looking it up never waits, so code that pins the session, or runs while
+/// a teardown is queued behind such a pin, can still reach the client.
+pub(crate) struct SessionSlot {
+    pinned: RwLock<Option<Session>>,
+    current: parking_lot::RwLock<Option<Session>>,
+}
+
+pub(crate) struct SessionWrite<'a> {
+    session: RwLockWriteGuard<'a, Option<Session>>,
+    current: &'a parking_lot::RwLock<Option<Session>>,
+}
+
+impl SessionSlot {
+    pub(crate) fn new() -> Self {
+        Self {
+            pinned: RwLock::new(None),
+            current: parking_lot::RwLock::new(None),
+        }
+    }
+
+    pub(crate) fn current<T>(&self, read: impl FnOnce(&Session) -> T) -> Option<T> {
+        self.current.read().as_ref().map(read)
+    }
+
+    /// Keeps the session from being ended or replaced until the guard drops. Waiting for it
+    /// again while holding it deadlocks once a teardown is queued, use `current` for lookups.
+    pub(crate) async fn read(&self) -> RwLockReadGuard<'_, Option<Session>> {
+        self.pinned.read().await
+    }
+
+    pub(crate) async fn write(&self) -> SessionWrite<'_> {
+        SessionWrite {
+            session: self.pinned.write().await,
+            current: &self.current,
+        }
+    }
+}
+
+impl std::ops::Deref for SessionWrite<'_> {
+    type Target = Option<Session>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.session
+    }
+}
+
+impl std::ops::DerefMut for SessionWrite<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.session
+    }
+}
+
+impl Drop for SessionWrite<'_> {
+    fn drop(&mut self) {
+        self.current.write().clone_from(&self.session);
+    }
+}
 
 /// Lock order is `restore`, then `activation`, then `swap`.
 pub(crate) struct Lifecycle {

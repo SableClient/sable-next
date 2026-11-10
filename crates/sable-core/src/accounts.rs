@@ -158,7 +158,7 @@ impl Core {
 
     pub(crate) async fn restore(self: &Arc<Self>) -> Result<Option<SessionInfo>, RpcError> {
         let _restoring = self.lifecycle.restoring().await;
-        if let Some(session) = self.active_session_info().await {
+        if let Some(session) = self.active_session_info() {
             return Ok(Some(session));
         }
 
@@ -205,16 +205,18 @@ impl Core {
         Ok(Some(info))
     }
 
-    async fn active_session_info(&self) -> Option<SessionInfo> {
-        let session = self.session.read().await;
-        let session = session.as_ref()?;
-        Some(SessionInfo {
-            account_id: session.account_id.clone(),
-            user_id: session.client.user_id()?.to_owned(),
-            device_id: session.client.device_id()?.to_string(),
-            homeserver: session.homeserver.clone(),
-            needs_reauth: false,
-        })
+    fn active_session_info(&self) -> Option<SessionInfo> {
+        self.session
+            .current(|session| {
+                Some(SessionInfo {
+                    account_id: session.account_id.clone(),
+                    user_id: session.client.user_id()?.to_owned(),
+                    device_id: session.client.device_id()?.to_string(),
+                    homeserver: session.homeserver.clone(),
+                    needs_reauth: false,
+                })
+            })
+            .flatten()
     }
 
     pub(crate) async fn list_accounts(&self) -> Result<Vec<SessionInfo>, RpcError> {
@@ -245,7 +247,7 @@ impl Core {
         SwitchAccountParams { account_id }: SwitchAccountParams,
     ) -> Result<SessionInfo, RpcError> {
         let _restoring = self.lifecycle.restoring().await;
-        if let Some(session) = self.active_session_info().await
+        if let Some(session) = self.active_session_info()
             && session.account_id == account_id
         {
             return Ok(session);
@@ -331,7 +333,6 @@ impl Core {
     ) -> Result<(), RpcError> {
         if self
             .active_session_info()
-            .await
             .as_ref()
             .map(|session| &session.account_id)
             == Some(&account_id)
@@ -930,12 +931,7 @@ impl Core {
 
     async fn detach_session(&self) -> (Option<Session>, search::MessageIndex) {
         self.end_all_calls().await;
-        let client = self
-            .session
-            .read()
-            .await
-            .as_ref()
-            .map(|session| session.client.clone());
+        let client = self.session.current(|session| session.client.clone());
         if let Some(client) = client {
             self.flush_inbox(&client).await;
         }
@@ -1844,6 +1840,27 @@ mod regression_tests {
         assert_eq!(accounts.len(), 1);
         assert_eq!(accounts[0].account_id, "first");
         assert!(accounts[0].device_invalidated);
+    }
+
+    #[tokio::test]
+    async fn looking_up_the_session_never_waits_for_a_pending_teardown() {
+        use futures_util::FutureExt;
+
+        let (_store, _server, core, _room) = core_with_room().await;
+        let pinned = core.session.read().await;
+        let ending = core.take_session();
+        tokio::pin!(ending);
+        assert!(futures_util::poll!(ending.as_mut()).is_pending());
+
+        assert!(
+            core.client()
+                .now_or_never()
+                .is_some_and(|client| client.is_ok())
+        );
+        assert!(core.sync_service().now_or_never().is_some());
+        drop(pinned);
+        assert!(ending.await.is_some());
+        core.client().await.unwrap_err();
     }
 
     #[tokio::test]
@@ -2756,10 +2773,7 @@ mod regression_tests {
         })
         .await
         .unwrap_err();
-        assert_eq!(
-            core.active_session_info().await.unwrap().account_id,
-            "first"
-        );
+        assert_eq!(core.active_session_info().unwrap().account_id, "first");
         assert_eq!(core.sessions.load().await.unwrap().unwrap(), before);
         assert_eq!(std::fs::read(&path).unwrap(), b"unreadable tokens");
         assert!(!core.accounts().await.unwrap().accounts[1].needs_reauth);

@@ -250,13 +250,7 @@ impl Core {
         generation: u64,
     ) {
         let (sender, mut pending) = tokio::sync::mpsc::unbounded_channel();
-        let Some(account_id) = self
-            .session
-            .read()
-            .await
-            .as_ref()
-            .map(|session| session.account_id.clone())
-        else {
+        let Some(account_id) = self.session.current(|session| session.account_id.clone()) else {
             return;
         };
         let mut routes = self.notification_routes.lock().await;

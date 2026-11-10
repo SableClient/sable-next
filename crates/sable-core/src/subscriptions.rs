@@ -535,14 +535,7 @@ impl Core {
         options: RoomListOptionsView,
     ) -> Result<SubscribeRoomListOk, RpcError> {
         self.room_list_options.send_replace(options);
-        let sync_service = {
-            let guard = self.session.read().await;
-            guard
-                .as_ref()
-                .ok_or(RpcError::NotLoggedIn)?
-                .sync_service
-                .clone()
-        };
+        let sync_service = self.sync_service().await?;
 
         self.wait_for_stores().await;
         let client = self.client().await?;

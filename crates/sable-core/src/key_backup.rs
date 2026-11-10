@@ -17,11 +17,10 @@ use crate::{Core, ResultExt};
 
 impl Core {
     pub(crate) async fn key_backup_status(&self) -> Result<KeyBackupStatusView, RpcError> {
-        let (account_id, client) = {
-            let session = self.session.read().await;
-            let session = session.as_ref().ok_or(RpcError::NotLoggedIn)?;
-            (session.account_id.clone(), session.client.clone())
-        };
+        let (account_id, client) = self
+            .session
+            .current(|session| (session.account_id.clone(), session.client.clone()))
+            .ok_or(RpcError::NotLoggedIn)?;
         let status = self
             .backup_status(&client)
             .await
@@ -49,15 +48,11 @@ impl Core {
             .key_backup_downloads
             .try_acquire()
             .map_err(|_| RpcError::Unavailable)?;
-        let (account_id, client, generation) = {
-            let session = self.session.read().await;
-            let session = session.as_ref().ok_or(RpcError::NotLoggedIn)?;
-            (
-                session.account_id.clone(),
-                session.client.clone(),
-                self.lifecycle.current(),
-            )
-        };
+        let (account_id, client) = self
+            .session
+            .current(|session| (session.account_id.clone(), session.client.clone()))
+            .ok_or(RpcError::NotLoggedIn)?;
+        let generation = self.lifecycle.current();
         let initial = KeyBackupDownloadView {
             account_id,
             request_id,

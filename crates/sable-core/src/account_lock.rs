@@ -20,16 +20,14 @@ impl Core {
         let core = self.clone();
         self.track_session_task(
             spawn(async move {
-                let (client, sync, account_id) = {
-                    let session = core.session.read().await;
-                    let Some(session) = session.as_ref() else {
-                        return;
-                    };
+                let Some((client, sync, account_id)) = core.session.current(|session| {
                     (
                         session.client.clone(),
                         session.sync_service.clone(),
                         session.account_id.clone(),
                     )
+                }) else {
+                    return;
                 };
                 if !core.is_current(generation) {
                     return;

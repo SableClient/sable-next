@@ -114,11 +114,11 @@ use matrix_sdk::ruma::events::{AnyGlobalAccountDataEventContent, GlobalAccountDa
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId};
 use matrix_sdk_ui::timeline::Timeline;
-use tokio::sync::{Mutex, RwLock, mpsc, watch};
+use tokio::sync::{Mutex, mpsc, watch};
 use url::Url;
 
 use protocol::{CoreEvent, RpcError, SubscriptionId};
-use session::{AccountRegistry, Session};
+use session::AccountRegistry;
 use store::SessionStore;
 
 pub(crate) type Task = AbortOnDrop<()>;
@@ -172,7 +172,7 @@ pub struct Core {
     notification_routes: Mutex<HashMap<String, watchers::NotificationRoute>>,
     accounts: Mutex<Option<AccountRegistry>>,
     discovered_homeservers: Mutex<HashMap<String, Url>>,
-    session: RwLock<Option<Session>>,
+    session: lifecycle::SessionSlot,
     pending_login: Mutex<Option<PendingLogin>>,
     pending_registration: Mutex<Option<registration::PendingRegistration>>,
     qr_flow: Mutex<Option<qr_login::QrFlow>>,
@@ -354,7 +354,7 @@ impl Core {
             notification_routes: Mutex::new(HashMap::new()),
             accounts: Mutex::new(None),
             discovered_homeservers: Mutex::new(HashMap::new()),
-            session: RwLock::new(None),
+            session: lifecycle::SessionSlot::new(),
             pending_login: Mutex::new(None),
             pending_registration: Mutex::new(None),
             qr_flow: Mutex::new(None),
@@ -620,9 +620,15 @@ impl Core {
         Ok(accounts.allocate_account(&self.store_id))
     }
 
+    #[expect(
+        clippy::unused_async,
+        clippy::unused_async_trait_impl,
+        reason = "awaited at some 200 call sites, which a sync signature would all touch"
+    )]
     pub(crate) async fn client(&self) -> Result<matrix_sdk::Client, RpcError> {
-        let guard = self.session.read().await;
-        Ok(guard.as_ref().ok_or(RpcError::NotLoggedIn)?.client.clone())
+        self.session
+            .current(|session| session.client.clone())
+            .ok_or(RpcError::NotLoggedIn)
     }
 
     pub(crate) async fn account_data_types(&self) -> Result<Vec<String>, RpcError> {
@@ -744,15 +750,17 @@ impl Core {
         }
     }
 
+    #[expect(
+        clippy::unused_async,
+        clippy::unused_async_trait_impl,
+        reason = "awaited at some 200 call sites, which a sync signature would all touch"
+    )]
     pub(crate) async fn sync_service(
         &self,
     ) -> Result<Arc<matrix_sdk_ui::sync_service::SyncService>, RpcError> {
-        let guard = self.session.read().await;
-        Ok(guard
-            .as_ref()
-            .ok_or(RpcError::NotLoggedIn)?
-            .sync_service
-            .clone())
+        self.session
+            .current(|session| session.sync_service.clone())
+            .ok_or(RpcError::NotLoggedIn)
     }
 
     pub(crate) async fn room(&self, room_id: &OwnedRoomId) -> Result<matrix_sdk::Room, RpcError> {

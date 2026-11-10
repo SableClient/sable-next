@@ -118,12 +118,8 @@ impl Core {
     pub(crate) async fn base_client(&self) -> Result<crate::session::SharedBaseClient, RpcError> {
         let account_id = self
             .session
-            .read()
-            .await
-            .as_ref()
-            .ok_or(RpcError::NotLoggedIn)?
-            .account_id
-            .clone();
+            .current(|session| session.account_id.clone())
+            .ok_or(RpcError::NotLoggedIn)?;
         let store_id = self
             .registered_store_id(&account_id)
             .await

@@ -29,6 +29,7 @@ pub(crate) const THREADING_SUPPORT: ThreadingSupport = ThreadingSupport::Enabled
     with_subscriptions: false,
 };
 
+#[derive(Clone)]
 pub struct Session {
     pub account_id: String,
     pub client: Client,
