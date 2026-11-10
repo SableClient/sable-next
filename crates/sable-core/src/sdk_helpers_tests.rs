@@ -1308,7 +1308,7 @@ async fn local_read_waits_for_open_stores() {
 
     let pending = core.with_open_stores(async || {
         assert!(core.activity.stores_open());
-        assert!(core.activity.try_transition().is_none());
+        assert!(core.activity.reading_stores());
         ran.store(true, std::sync::atomic::Ordering::SeqCst);
         client.state_store().get_custom_value(b"missing").await
     });
@@ -1322,7 +1322,7 @@ async fn local_read_waits_for_open_stores() {
     core.activity.set_stores_open(true);
     assert_eq!(pending.await.unwrap(), None);
     assert!(ran.load(std::sync::atomic::Ordering::SeqCst));
-    assert!(core.activity.try_transition().is_some());
+    assert!(!core.activity.reading_stores());
 }
 
 #[tokio::test]
@@ -1385,22 +1385,38 @@ async fn space_sidebar_waits_for_stores_to_reopen() {
 }
 
 #[tokio::test]
+async fn a_local_read_does_not_wait_for_sync_to_start_or_stop() {
+    let server = MatrixMockServer::new().await;
+    let store = tempfile::tempdir().unwrap();
+    let client = space_client(&server, store.path()).await;
+    let core = core(&server, client.clone()).await;
+    let _starting_sync = core.activity.transition().await;
+
+    let read =
+        core.with_open_stores(async || client.state_store().get_custom_value(b"missing").await);
+    let read = tokio::time::timeout(std::time::Duration::from_secs(5), read)
+        .await
+        .expect("a store read must not queue behind a sync transition");
+    assert_eq!(read.unwrap(), None);
+}
+
+#[tokio::test]
 async fn space_sidebar_does_not_read_while_stores_are_closing() {
     let server = MatrixMockServer::new().await;
     let store = tempfile::tempdir().unwrap();
     let client = space_client(&server, store.path()).await;
     let core = core(&server, client.clone()).await;
-    let activity = core.activity.transition().await;
+    let closing = core.activity.closing_stores().await;
 
     let pending = core.run(SidebarParams {});
     tokio::pin!(pending);
     tokio::time::timeout(std::time::Duration::from_millis(200), &mut pending)
         .await
-        .expect_err("the layout read waits for the activity transition");
+        .expect_err("the layout read waits for the stores to finish closing");
 
     core.activity.set_stores_open(false);
     client.pause().await.unwrap();
-    drop(activity);
+    drop(closing);
     tokio::time::timeout(std::time::Duration::from_millis(200), &mut pending)
         .await
         .expect_err("the layout read waits for reopened stores");

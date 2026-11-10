@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use matrix_sdk_ui::sync_service::SyncService;
-use tokio::sync::{Mutex, MutexGuard, Notify, watch};
+use tokio::sync::{Mutex, MutexGuard, Notify, RwLock, watch};
 
 use crate::{Core, presence};
 
@@ -14,11 +14,12 @@ pub(crate) struct Activity {
     network_available: AtomicBool,
     account_locked: AtomicBool,
     stores_open: watch::Sender<bool>,
+    /// Separate from `transition`, so a store read never waits for sync to start or stop.
+    stores: RwLock<()>,
     transition: Mutex<()>,
 }
 
-/// Held while sync or the stores change state. Waiting for another transition while holding one
-/// deadlocks, which is why work that runs inside a transition takes this instead of locking.
+/// Waiting for another transition while holding one deadlocks.
 pub(crate) struct Transition<'a> {
     activity: &'a Activity,
     _serial: MutexGuard<'a, ()>,
@@ -34,6 +35,7 @@ impl Activity {
             network_available: AtomicBool::new(true),
             account_locked: AtomicBool::new(false),
             stores_open: watch::Sender::new(true),
+            stores: RwLock::new(()),
             transition: Mutex::new(()),
         }
     }
@@ -102,11 +104,13 @@ impl Activity {
     }
 
     #[cfg(test)]
-    pub(crate) fn try_transition(&self) -> Option<Transition<'_>> {
-        Some(Transition {
-            activity: self,
-            _serial: self.transition.try_lock().ok()?,
-        })
+    pub(crate) fn reading_stores(&self) -> bool {
+        self.stores.try_write().is_err()
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn closing_stores(&self) -> tokio::sync::RwLockWriteGuard<'_, ()> {
+        self.stores.write().await
     }
 }
 
@@ -260,7 +264,9 @@ impl Core {
     #[cfg(target_os = "ios")]
     async fn close_stores(&self, transition: &Transition<'_>) {
         transition.set_stores_open(false);
-        for client in self.store_clients().await {
+        let clients = self.store_clients().await;
+        let _closing = self.activity.stores.write().await;
+        for client in clients {
             if let Err(error) = client.pause().await {
                 tracing::warn!("closing the stores before suspension failed: {error}");
             }
@@ -269,7 +275,9 @@ impl Core {
 
     #[cfg(target_os = "ios")]
     async fn reopen_stores(&self, transition: &Transition<'_>) {
-        for client in self.store_clients().await {
+        let clients = self.store_clients().await;
+        let _reopening = self.activity.stores.write().await;
+        for client in clients {
             if let Err(error) = client.resume().await {
                 tracing::warn!("reopening the stores after suspension failed: {error}");
             }
@@ -285,13 +293,14 @@ impl Core {
             .await;
     }
 
-    /// Only short local reads belong here; network work would delay iOS suspension. Never call it
-    /// from a sync event handler: suspension holds the transition while it waits for sync to stop.
+    /// Only short local reads belong here; network work would delay iOS suspension. Never nest
+    /// it: a pending close between the two reads would block the inner one forever. Inside a
+    /// suspension it would wait for stores that only the next resume reopens.
     pub(crate) async fn with_open_stores<T>(&self, read: impl AsyncFnOnce() -> T) -> T {
         loop {
             self.wait_for_stores().await;
-            let transition = self.activity.transition().await;
-            if transition.stores_open() {
+            let _reading = self.activity.stores.read().await;
+            if *self.activity.stores_open.borrow() {
                 return read().await;
             }
         }

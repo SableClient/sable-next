@@ -542,8 +542,8 @@ impl Core {
         Ok(self.loaded_inbox(client).await?.stored().clone())
     }
 
-    /// Suspension flushes the inbox inside its transition, so the store read must not hold the
-    /// inbox while it waits for one.
+    /// Suspension flushes the inbox before it closes the stores, so the store read must not hold
+    /// the inbox while it waits for them.
     async fn loaded_inbox(
         &self,
         client: &matrix_sdk::Client,
@@ -573,7 +573,7 @@ impl Core {
         .await;
     }
 
-    /// For work already inside the transition that `with_open_stores` would wait for.
+    /// For a suspension, where `with_open_stores` would wait for stores it has already closed.
     pub(crate) async fn flush_inbox_locked(
         &self,
         client: &matrix_sdk::Client,
@@ -1024,23 +1024,24 @@ mod tests {
     async fn suspending_during_the_first_inbox_load_does_not_deadlock() {
         let server = MatrixMockServer::new().await;
         let (core, client, _room) = setup(&server, 1).await;
-        let held = core.activity.transition().await;
-        let suspend = core.update_app_active(false);
+        let closing = core.activity.closing_stores().await;
         let record = core.record_inbox(
             &client,
             vec![entry("first", 100)],
             BTreeMap::new(),
             BTreeMap::new(),
         );
-        tokio::pin!(suspend, record);
-        assert!(futures_util::poll!(suspend.as_mut()).is_pending());
+        tokio::pin!(record);
         assert!(futures_util::poll!(record.as_mut()).is_pending());
-        drop(held);
 
-        let both = async { tokio::join!(suspend, record) };
-        let ((), recorded) = matrix_sdk::timeout::timeout(both, std::time::Duration::from_secs(5))
-            .await
-            .expect("suspending must not deadlock");
+        matrix_sdk::timeout::timeout(
+            core.update_app_active(false),
+            std::time::Duration::from_secs(5),
+        )
+        .await
+        .expect("suspending must not wait for the inbox a pending load holds");
+        drop(closing);
+        let recorded = record.await;
         assert_eq!(recorded.unwrap(), 1);
     }
 
