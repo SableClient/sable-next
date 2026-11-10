@@ -302,7 +302,8 @@
     "cosmeticsApplyRooms": "Застосувати до всіх кімнат",
     "cosmeticsAvatar": "Зображення в цій кімнаті",
     "cosmeticsNameSpace": "Ім’я в цьому просторі",
-    "upgradeFailed": "Не вдалося оновити."
+    "upgradeFailed": "Не вдалося оновити.",
+    "createKindLabel": "Тип"
   },
   "inbox": {
     "inviteEncrypted": "Зашифроване",
