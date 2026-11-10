@@ -135,9 +135,13 @@
     }
   }
 
-  .quick-tool[data-current='true'],
+  .quick-tool[data-current='true'] {
+    background-color: var(--surface-container-active);
+    color: var(--alert-main-color);
+  }
+
   .quick-tool[data-current='true']:hover {
-    background-color: var(--bg-container-active);
+    background-color: var(--surface-container-hover);
   }
 
   .priority-critical {
@@ -149,17 +153,17 @@
   .priority-warning,
   .priority-security {
     --alert-main-color: var(--warn-main);
+  }
 
+  .priority-security {
     background-color: var(--warn-container);
   }
 
-  .priority-update,
-  .priority-update:hover {
+  .priority-update {
     --alert-main-color: var(--success-main);
   }
 
-  .priority-task,
-  .priority-task:hover {
+  .priority-task {
     --alert-main-color: var(--primary-main);
 
     border-color: var(--bg-container-line);
@@ -182,16 +186,17 @@
       background-color: var(--alert-main-color);
       bottom: 0;
       content: '';
+      height: 0%;
       left: 0;
       position: absolute;
     }
 
     .progress:not(.indeterminate)::after {
-      height: 0%;
       width: calc(var(--progress) * 100%);
     }
 
     .progress.indeterminate::after {
+      display: none;
       height: 10%;
       width: 100%;
     }
@@ -200,8 +205,8 @@
       height: 10%;
     }
 
-    &.has-progress:not(.indeterminate) .progress.indeterminate::after {
-      display: none;
+    &.has-progress.indeterminate .progress.indeterminate::after {
+      display: block;
     }
   }
 
