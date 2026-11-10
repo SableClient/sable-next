@@ -1023,14 +1023,18 @@
     "attachmentsOpenItem": "„{{name}}“, geteilt von {{sender}}, {{date}}",
     "attachmentsMoreLinks_one": "+ {{count}} weiterer Link",
     "attachmentsMoreLinks_other": "+ {{count}} weitere Links",
-    "deleteMessage": "",
-    "reproxyMessage": "",
-    "editMessage": "",
-    "reproxyFailed": "",
-    "threadOpen": "",
-    "replyToVerificationRequest": "Forderte Verifizierung an",
-    "replyToEvent": "Sendete ein Ereignis der Art {{type}}",
-    "replyToRedaction": "Löschte eine Nachricht"
+    "deleteMessage": "Nachricht löschen",
+    "reproxyMessage": "Mit anderem Profil senden",
+    "editMessage": "Nachricht bearbeiten",
+    "reproxyFailed": "Die Nachricht konnte nicht mit diesem Profil gesendet werden.",
+    "threadOpen": "Thread öffnen",
+    "replyToVerificationRequest": "Verifizierung wurde angefordert",
+    "replyToEvent": "Ein Ereignis der Art {{type}} wurde gesendet",
+    "replyToRedaction": "Eine Nachricht wurde gelöscht",
+    "attachmentsLoaded_one": "{{count}} angezeigter Anhang",
+    "attachmentsLoaded_other": "{{count}} angezeigte Anhänge",
+    "threadReplies_one": "{{count, number}} Antwort",
+    "threadReplies_other": "{{count, number}} Antworten"
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden.",
@@ -1081,7 +1085,7 @@
     "provenance": "Bereitgestellt von {{server}}",
     "uncertainProvenance": "Bereitgestellt von einem anderen Server",
     "untrustedProvenanceTooltip": "Diese Raumvorschau wurde von {{server}} bereitgestellt und könnte inkorrekt oder veraltet sein.",
-    "knocking": "Wird gesendet…"
+    "knocking": "Wird gesendet …"
   },
   "userLink": {
     "action": "Eine Nachricht senden",
@@ -1161,14 +1165,14 @@
     "aboutOptions": "Optionen",
     "aboutCheckForUpdates": "Nach Aktualisierungen suchen",
     "aboutUpdateAvailable": "Eine Aktualisierung steht bereit.",
-    "aboutUpdateCheckFailed": "Aktualisierungssuche fehlgeschlagen. Versuche es erneut.",
+    "aboutUpdateCheckFailed": "Suche nach Aktualisierungen fehlgeschlagen. Versuche es erneut.",
     "aboutHomeserverUrl": "Adresse",
     "aboutHomeserverSoftware": "Software",
     "aboutRunSetup": "Einrichtung",
-    "aboutRunSetupHint": "Wiederhole die Einrichtungsschritte: dieses Gerät bestätigen, Wiederherstellung, Benachrichtigungen, Erscheinung und Synchronisierung. Nichts, dass du bereits eingerichtet hast, geht verloren.",
-    "aboutRunSetupAction": "Wiederhole Einrichtung",
+    "aboutRunSetupHint": "Wiederhole die Einrichtungsschritte: Gerät bestätigen, Wiederherstellung, Benachrichtigungen, Aussehen und Synchronisierung. Nichts, das du bereits eingerichtet hast, geht verloren.",
+    "aboutRunSetupAction": "Einrichtung wiederholen",
     "aboutResetCache": "Lokalen Cache zurücksetzen",
-    "aboutResetCacheHint": "Bereinigt zwischengespeicherte Raumdaten und -medien. Erhält deinen Suchindex und deine Anmeldung.",
+    "aboutResetCacheHint": "Bereinigt zwischengespeicherte Raumdaten und -medien. Dein Suchindex und deine Anmeldung bleiben erhalten.",
     "aboutResetCacheConfirmTitle": "Lokalen Cache bereinigen?",
     "aboutResetCacheConfirmDescription": "Raumliste, Ungelesen-Zähler, Nachrichtenverlauf und zwischengespeicherte Medien werden bereinigt und erneut heruntergeladen. Dein Suchindex bleibt erhalten und du bleibst angemeldet. Bei umfangreichen Konten kann das Herunterladen eine Weile dauern.",
     "aboutHomeserverVersion": "Version",
@@ -1207,7 +1211,7 @@
     "desktopShortcutsUnavailable": "Globale Mikrofon-Tastenkürzel stehen nicht zur Verfügung. Ändere die Tasten in den Tastatureinstellungen oder nutze die Anrufsteuerung."
   },
   "setup": {
-    "confirmDescription": "Bestätige dieses Gerät mit einem anderen Gerät, auf dem du angemeldet bist oder mit deinem Wiederherstellungsschlüssel.",
+    "confirmDescription": "Bestätige dieses Gerät mit einem anderen angemeldeten Gerät oder mit deinem Wiederherstellungsschlüssel.",
     "profileTitle": "Dein Profil",
     "progress": "Schritt {{current}} von {{total}}",
     "title": "Dieses Gerät einrichten"
