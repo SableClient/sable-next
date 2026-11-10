@@ -125,6 +125,7 @@ pub(crate) fn device_model() -> Option<String> {
 
 /// Synchronizes the native SDK with the webview's telemetry preference.
 pub(crate) fn set_sentry_enabled(enabled: bool) -> Result<(), String> {
+    share_sentry_consent(enabled)?;
     let class = AnyClass::get(c"SableSentry").ok_or("Sentry Cocoa bridge is unavailable")?;
     let dsn = NSString::from_str(option_env!("SENTRY_DSN").unwrap_or_default());
     let environment = NSString::from_str(option_env!("SENTRY_ENVIRONMENT").unwrap_or_default());
@@ -138,7 +139,7 @@ pub(crate) fn set_sentry_enabled(enabled: bool) -> Result<(), String> {
             release: &*release
         ];
     }
-    share_sentry_consent(enabled)
+    Ok(())
 }
 
 /// The notification extension reports failures only while this file exists.

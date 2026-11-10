@@ -25,18 +25,6 @@ settingGroups:
         DEPLOYMENT_POSTPROCESSING: YES
         STRIP_INSTALLED_PRODUCT: YES
         STRIP_STYLE: all
-targetTemplates:
-  app:
-    type: application
-    sources:
-      - path: Sources
-      - path: ../../ios/Sentry
-    scheme:
-      environmentVariables:
-        RUST_BACKTRACE: full
-        RUST_LOG: info
-    settings:
-      groups: [app]
 targets:
   SableNotificationService:
     type: app-extension
@@ -129,6 +117,7 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: ../../ios/Sentry
       - path: ../../ios/Network
       - path: ../../ios/Auth
       - path: ../../ios/Conversations

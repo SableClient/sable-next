@@ -61,7 +61,22 @@ fn scrub_text(value: &str) -> String {
         })
 }
 
+const TAGGED_FIELDS: &[&str] = &["context", "cause", "age"];
+
+fn tag_fields(event: &mut Event<'static>) {
+    let Some(sentry::protocol::Context::Other(fields)) = event.contexts.get("Rust Tracing Fields")
+    else {
+        return;
+    };
+    let tags: Vec<_> = TAGGED_FIELDS
+        .iter()
+        .filter_map(|key| Some(((*key).to_owned(), fields.get(*key)?.as_str()?.to_owned())))
+        .collect();
+    event.tags.extend(tags);
+}
+
 fn scrub_event(mut event: Event<'static>) -> Event<'static> {
+    tag_fields(&mut event);
     if let Some(message) = event.message.as_mut() {
         *message = scrub_text(message);
     }
@@ -488,6 +503,10 @@ mod tests {
             .iter()
             .find_map(sentry::Envelope::event)
             .expect("the failure is reported");
+        assert_eq!(
+            event.tags.get("context").map(String::as_str),
+            Some("send_message")
+        );
         let sent = serde_json::to_string(&event).unwrap();
         assert!(sent.contains("send_message"), "{sent}");
         assert!(sent.contains("e7"), "{sent}");
