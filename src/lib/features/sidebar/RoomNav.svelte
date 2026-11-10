@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Component } from 'svelte';
+  import type { Attachment } from 'svelte/attachments';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import type { NotificationModeView, RoomListItemView } from '#src/generated/protocol';
@@ -80,6 +81,8 @@
 
   const MAX_VOICE_FACES = 3;
   const WARM_DWELL_MS = 300;
+  const EAGER_ROWS = 50;
+  const HYDRATE_MARGIN = '400px';
   let contextRoom = $state<RoomListItemView | null>(null);
   let contextParentSpaceId = $state<string | null>(null);
   let contextAnchor = $state.raw<HTMLElement | CursorAnchor | null>(null);
@@ -287,6 +290,32 @@
       keep: stillShownRow,
     })
   );
+  let eagerKeys = $derived(
+    new Set(
+      [...favourites, ...rooms, ...visibleSubspaces].slice(0, EAGER_ROWS).map((item) => item.key)
+    )
+  );
+  const hydrated = new SvelteSet<string>();
+  let rowObserver: IntersectionObserver | undefined;
+
+  function hydrateWhenNear(): Attachment<HTMLElement> {
+    return (node) => {
+      rowObserver ??= new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting || !(entry.target instanceof HTMLElement)) continue;
+            rowObserver?.unobserve(entry.target);
+            const rowKey = entry.target.dataset.rowKey;
+            if (rowKey) hydrated.add(rowKey);
+          }
+        },
+        { rootMargin: HYDRATE_MARGIN }
+      );
+      rowObserver.observe(node);
+      return () => rowObserver?.unobserve(node);
+    };
+  }
+
   function stillShownRow(item: RoomNavRow): boolean {
     const room = item.room;
     if (room === undefined) return false;
@@ -489,7 +518,12 @@
     {@const peerPresence = peerId ? presenceStore.peek(peerId) : null}
     {@const peerStatus = peerId ? resolveUserStatus(peerProfiles.get(peerId), peerPresence) : null}
     {@const closed = sectionClosed && !(room !== undefined && (active || hasUnread(counts)))}
-    <div class={['room-row-wrap', { 'closed-row': closed }]}>
+    {@const full = eagerKeys.has(item.key) || hydrated.has(item.key)}
+    <div
+      class={['room-row-wrap', { 'closed-row': closed }]}
+      data-row-key={item.key}
+      {@attach full ? undefined : hydrateWhenNear()}
+    >
       {@render threadLines(item.threads)}
       {#snippet roomTrigger({ props }: { props: Record<string, unknown> })}
         <!-- eslint-disable svelte/no-navigation-without-resolve -- roomHref() resolves the route itself -->
@@ -516,179 +550,186 @@
           onclick={() => onNavigate?.(href)}
           aria-label={collapsed ? (unreadLabel ? `${name}, ${unreadLabel}` : name) : undefined}
           aria-current={active ? 'page' : undefined}
-          {@attach peerId !== null && !collapsed
+          {@attach full && peerId !== null && !collapsed
             ? whenVisible(() => {
                 peerProfiles.request(peerId);
               })
             : undefined}
-          {@attach whenVisible(
-            () => {
-              roomList.warm(item.roomId);
-            },
-            '0px',
-            WARM_DWELL_MS
-          )}
+          {@attach full
+            ? whenVisible(
+                () => {
+                  roomList.warm(item.roomId);
+                },
+                '0px',
+                WARM_DWELL_MS
+              )
+            : undefined}
         >
-          {#if (room?.is_direct ?? false) || showsRoomAvatar(iconMode, collapsed, Boolean(avatarUrl))}
-            {#snippet glyph()}
-              <RoomIcon
-                roomKind={room?.room_kind ?? null}
-                hasParent={spacedRoomIds.has(item.roomId)}
-                joinRule={room?.join_rule ?? null}
-                weight={active ? 'fill' : 'regular'}
-              />
-            {/snippet}
-            <span class="room-avatar">
-              {#if avatarUrl}
-                <Avatar
-                  class={['room-avatar-icon', { voice: room?.room_kind === 'voice' }]}
-                  id={item.roomId}
-                  src={avatarUrl}
-                  size="small"
-                  uniform
-                  recolor={!room?.is_direct}
-                >
-                  {@render glyph()}
-                </Avatar>
-              {:else if room && (room.is_direct || unspacedSection)}
-                <Avatar class="room-avatar-icon" id={item.roomId} {name} size="small" />
-              {:else}
-                <div
-                  class={[
-                    'avatar-root avatar-small room-avatar-icon glyph',
-                    { voice: room?.room_kind === 'voice' },
-                  ]}
-                  aria-hidden="true"
-                >
-                  <span class="avatar-fallback">{@render glyph()}</span>
-                </div>
-              {/if}
-              {#if room?.bridge}
-                {@const bridgeLabel = i18n.t('nav.bridgedFrom', { network: room.bridge.network })}
-                <Tooltip label={bridgeLabel}>
-                  {#snippet trigger({ props })}
-                    <span {...props} class="room-bridge" role="img" aria-label={bridgeLabel}>
-                      <Avatar
-                        src={room.bridge?.avatar_url ?? null}
-                        name={room.bridge?.network}
-                        size="tiny"
-                      />
-                    </span>
-                  {/snippet}
-                </Tooltip>
-              {/if}
-              {#if peerPresence && peerPresence.presence !== 'offline'}
-                <PresenceDot
-                  presence={peerPresence.presence}
-                  label={i18n.t(`presence.${peerPresence.presence}`)}
-                  class="room-presence"
-                  size="medium"
-                />
-              {/if}
-            </span>
+          {#if !full}
+            {#if !collapsed}<span class="room-text"><span class="room-name">{name}</span></span
+              >{/if}
           {:else}
-            <span class="room-icon" aria-hidden="true">
-              <RoomIcon
-                roomKind={room?.room_kind ?? null}
-                hasParent={spacedRoomIds.has(item.roomId)}
-                joinRule={room?.join_rule ?? null}
-                weight={active ? 'fill' : 'regular'}
-              />
-            </span>
-          {/if}
-          {#if !collapsed}
-            <span class="room-text">
-              <span class="room-name">{name}</span>
-              {#if room?.is_direct && room.topic && preferences.showDmTopics}
-                <span class="room-topic">{room.topic}</span>
-              {:else if peerStatus}
-                {@const peerStatusLabel = [peerStatus?.emoji, peerStatus?.text]
-                  .filter(Boolean)
-                  .join(' ')}
-                <Tooltip label={peerStatusLabel}>
-                  {#snippet trigger({ props })}
-                    <span {...props} class="room-topic">
-                      {#if peerStatus?.emoji}<span class="room-status-emoji"
-                          >{peerStatus.emoji}</span
-                        >{/if}{peerStatus?.text}
-                    </span>
-                  {/snippet}
-                </Tooltip>
-              {:else if room?.room_kind === 'calendar' && preferences.showSpaceEvents}
-                <CalendarRowEvent roomId={room.room_id} />
-              {/if}
-            </span>
-            {#if room && live > 0}
-              {@const faces = byName(
-                room.call_participants,
-                (userId) => peerProfiles.get(userId)?.display_name
-              ).slice(0, MAX_VOICE_FACES)}
-              {@const faceKeys = participantKeys(faces)}
-              <span
-                class="voice-live"
-                role="img"
-                aria-label={i18n.t('nav.voiceLive', { count: live })}
-                {@attach whenVisible(() => {
-                  for (const userId of faces) peerProfiles.request(userId);
-                })}
-              >
-                <span class="voice-faces">
-                  {#each faces as userId, index (faceKeys[index])}
-                    {@const profile = peerProfiles.get(userId)}
-                    <Avatar
-                      class="voice-face"
-                      src={profile?.avatar_url ?? null}
-                      name={profile?.display_name ?? userId}
-                      id={userId}
-                    />
-                  {/each}
-                </span>
-                <StatusBadge label={String(live)} variant="primary" />
+            {#if (room?.is_direct ?? false) || showsRoomAvatar(iconMode, collapsed, Boolean(avatarUrl))}
+              {#snippet glyph()}
+                <RoomIcon
+                  roomKind={room?.room_kind ?? null}
+                  hasParent={spacedRoomIds.has(item.roomId)}
+                  joinRule={room?.join_rule ?? null}
+                  weight={active ? 'fill' : 'regular'}
+                />
+              {/snippet}
+              <span class="room-avatar">
+                {#if avatarUrl}
+                  <Avatar
+                    class={['room-avatar-icon', { voice: room?.room_kind === 'voice' }]}
+                    id={item.roomId}
+                    src={avatarUrl}
+                    size="small"
+                    uniform
+                    recolor={!room?.is_direct}
+                  >
+                    {@render glyph()}
+                  </Avatar>
+                {:else if room && (room.is_direct || unspacedSection)}
+                  <Avatar class="room-avatar-icon" id={item.roomId} {name} size="small" />
+                {:else}
+                  <div
+                    class={[
+                      'avatar-root avatar-small room-avatar-icon glyph',
+                      { voice: room?.room_kind === 'voice' },
+                    ]}
+                    aria-hidden="true"
+                  >
+                    <span class="avatar-fallback">{@render glyph()}</span>
+                  </div>
+                {/if}
+                {#if room?.bridge}
+                  {@const bridgeLabel = i18n.t('nav.bridgedFrom', { network: room.bridge.network })}
+                  <Tooltip label={bridgeLabel}>
+                    {#snippet trigger({ props })}
+                      <span {...props} class="room-bridge" role="img" aria-label={bridgeLabel}>
+                        <Avatar
+                          src={room.bridge?.avatar_url ?? null}
+                          name={room.bridge?.network}
+                          size="tiny"
+                        />
+                      </span>
+                    {/snippet}
+                  </Tooltip>
+                {/if}
+                {#if peerPresence && peerPresence.presence !== 'offline'}
+                  <PresenceDot
+                    presence={peerPresence.presence}
+                    label={i18n.t(`presence.${peerPresence.presence}`)}
+                    class="room-presence"
+                    size="medium"
+                  />
+                {/if}
+              </span>
+            {:else}
+              <span class="room-icon" aria-hidden="true">
+                <RoomIcon
+                  roomKind={room?.room_kind ?? null}
+                  hasParent={spacedRoomIds.has(item.roomId)}
+                  joinRule={room?.join_rule ?? null}
+                  weight={active ? 'fill' : 'regular'}
+                />
               </span>
             {/if}
-            <span class="room-status">
-              {#if typing}
-                <span class="room-typing"><TypingDots /></span>
-              {:else}
-                <UnreadBadge
-                  {counts}
-                  dm={room?.is_direct ?? false}
+            {#if !collapsed}
+              <span class="room-text">
+                <span class="room-name">{name}</span>
+                {#if room?.is_direct && room.topic && preferences.showDmTopics}
+                  <span class="room-topic">{room.topic}</span>
+                {:else if peerStatus}
+                  {@const peerStatusLabel = [peerStatus?.emoji, peerStatus?.text]
+                    .filter(Boolean)
+                    .join(' ')}
+                  <Tooltip label={peerStatusLabel}>
+                    {#snippet trigger({ props })}
+                      <span {...props} class="room-topic">
+                        {#if peerStatus?.emoji}<span class="room-status-emoji"
+                            >{peerStatus.emoji}</span
+                          >{/if}{peerStatus?.text}
+                      </span>
+                    {/snippet}
+                  </Tooltip>
+                {:else if room?.room_kind === 'calendar' && preferences.showSpaceEvents}
+                  <CalendarRowEvent roomId={room.room_id} />
+                {/if}
+              </span>
+              {#if room && live > 0}
+                {@const faces = byName(
+                  room.call_participants,
+                  (userId) => peerProfiles.get(userId)?.display_name
+                ).slice(0, MAX_VOICE_FACES)}
+                {@const faceKeys = participantKeys(faces)}
+                <span
+                  class="voice-live"
                   role="img"
-                  aria-label={mentions > 0
-                    ? i18n.t('nav.unreadMentions', { count: mentions })
-                    : unread > 0
-                      ? i18n.t('nav.unreadMessages', { count: unread })
-                      : i18n.t('nav.markedUnread')}
-                />
-              {/if}
-              {#if notifyMode}
-                {@const chip = notificationChip(notifyMode)}
-                <span class="room-mode" role="img" aria-label={i18n.t(chip.label)}>
-                  <chip.icon />
+                  aria-label={i18n.t('nav.voiceLive', { count: live })}
+                  {@attach whenVisible(() => {
+                    for (const userId of faces) peerProfiles.request(userId);
+                  })}
+                >
+                  <span class="voice-faces">
+                    {#each faces as userId, index (faceKeys[index])}
+                      {@const profile = peerProfiles.get(userId)}
+                      <Avatar
+                        class="voice-face"
+                        src={profile?.avatar_url ?? null}
+                        name={profile?.display_name ?? userId}
+                        id={userId}
+                      />
+                    {/each}
+                  </span>
+                  <StatusBadge label={String(live)} variant="primary" />
                 </span>
               {/if}
-            </span>
-          {:else if !typing}
-            <UnreadBadge
-              class="room-collapsed-badge"
-              {counts}
-              dm={room?.is_direct ?? false}
-              role="img"
-              aria-label={mentions > 0
-                ? i18n.t('nav.unreadMentions', { count: mentions })
-                : unread > 0
-                  ? i18n.t('nav.unreadMessages', { count: unread })
-                  : i18n.t('nav.markedUnread')}
-            />
+              <span class="room-status">
+                {#if typing}
+                  <span class="room-typing"><TypingDots /></span>
+                {:else}
+                  <UnreadBadge
+                    {counts}
+                    dm={room?.is_direct ?? false}
+                    role="img"
+                    aria-label={mentions > 0
+                      ? i18n.t('nav.unreadMentions', { count: mentions })
+                      : unread > 0
+                        ? i18n.t('nav.unreadMessages', { count: unread })
+                        : i18n.t('nav.markedUnread')}
+                  />
+                {/if}
+                {#if notifyMode}
+                  {@const chip = notificationChip(notifyMode)}
+                  <span class="room-mode" role="img" aria-label={i18n.t(chip.label)}>
+                    <chip.icon />
+                  </span>
+                {/if}
+              </span>
+            {:else if !typing}
+              <UnreadBadge
+                class="room-collapsed-badge"
+                {counts}
+                dm={room?.is_direct ?? false}
+                role="img"
+                aria-label={mentions > 0
+                  ? i18n.t('nav.unreadMentions', { count: mentions })
+                  : unread > 0
+                    ? i18n.t('nav.unreadMessages', { count: unread })
+                    : i18n.t('nav.markedUnread')}
+              />
+            {/if}
           {/if}
         </a>
         <!-- eslint-enable svelte/no-navigation-without-resolve -->
       {/snippet}
-      {#if collapsed}
+      {#if collapsed && full}
         <Tooltip label={name} side="right" trigger={roomTrigger} />
       {:else}
         {@render roomTrigger({ props: {} })}
-        {#if room}
+        {#if room && full && !collapsed}
           <span class="room-options-slot">
             {#if room.room_kind === 'voice'}
               <button
@@ -711,7 +752,7 @@
         {/if}
       {/if}
     </div>
-    {#if room?.room_kind === 'voice' && live > 0}
+    {#if full && room?.room_kind === 'voice' && live > 0}
       <CallParticipantList
         {room}
         {collapsed}
@@ -733,7 +774,12 @@
       spaceId: roomPathParam(room, roomList.rooms),
     })}
     {@const active = pathname === href}
-    <div class="room-row-wrap">
+    {@const full = eagerKeys.has(item.key) || hydrated.has(item.key)}
+    <div
+      class="room-row-wrap"
+      data-row-key={item.key}
+      {@attach full ? undefined : hydrateWhenNear()}
+    >
       {@render threadLines(item.threads)}
       {#snippet linkTrigger({ props }: { props: Record<string, unknown> })}
         <a
@@ -756,34 +802,39 @@
           aria-label={collapsed ? name : undefined}
           aria-current={active ? 'page' : undefined}
         >
-          <span class="room-avatar">
-            <Avatar
-              class={['room-avatar-icon', { glyph: !room.display_avatar_url }]}
-              id={room.display_avatar_url ? room.room_id : null}
-              src={room.display_avatar_url}
-              size="small"
-              uniform
-            >
-              <RoomIcon
-                roomKind={room.room_kind}
-                joinRule={room.join_rule}
-                weight={active ? 'fill' : 'regular'}
-              />
-            </Avatar>
-          </span>
+          {#if full}
+            <span class="room-avatar">
+              <Avatar
+                class={['room-avatar-icon', { glyph: !room.display_avatar_url }]}
+                id={room.display_avatar_url ? room.room_id : null}
+                src={room.display_avatar_url}
+                size="small"
+                uniform
+              >
+                <RoomIcon
+                  roomKind={room.room_kind}
+                  joinRule={room.join_rule}
+                  weight={active ? 'fill' : 'regular'}
+                />
+              </Avatar>
+            </span>
+          {/if}
           {#if !collapsed}
             <span class="room-text"><span class="room-name">{name}</span></span>
-            <span class="room-link-icon" aria-hidden="true"><SquaresFourIcon /></span>
+            {#if full}<span class="room-link-icon" aria-hidden="true"><SquaresFourIcon /></span
+              >{/if}
           {/if}
         </a>
       {/snippet}
-      {#if collapsed}
+      {#if collapsed && full}
         <Tooltip label={name} side="right" trigger={linkTrigger} />
       {:else}
         {@render linkTrigger({ props: {} })}
-        <span class="room-options-slot">
-          {@render optionsButton(room, null)}
-        </span>
+        {#if full && !collapsed}
+          <span class="room-options-slot">
+            {@render optionsButton(room, null)}
+          </span>
+        {/if}
       {/if}
     </div>
   {/snippet}

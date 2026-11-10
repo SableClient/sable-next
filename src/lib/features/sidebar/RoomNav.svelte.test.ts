@@ -383,6 +383,47 @@ test('each page renders its section in the order the core lists it', async () =>
   expect(roomNames()).toEqual(['D', 'C']);
 });
 
+test('rows past the first screens render their details once they come near the viewport', async () => {
+  const callbacks = new Map<Element, IntersectionObserverCallback>();
+  globalThis.IntersectionObserver = class {
+    #callback: IntersectionObserverCallback;
+    disconnect = () => {};
+    unobserve = () => {};
+    takeRecords = () => [];
+    root = null;
+    rootMargin = '';
+    thresholds = [];
+    constructor(callback: IntersectionObserverCallback) {
+      this.#callback = callback;
+    }
+    observe(node: Element) {
+      callbacks.set(node, this.#callback);
+    }
+  } as unknown as typeof IntersectionObserver;
+  const ids = Array.from({ length: 60 }, (_, at) => `!r${String(at)}:example.org`);
+  roomsFixture.rooms = ids.map((roomId, at) =>
+    makeRoom({ room_id: roomId, name: `Room ${String(at)}` })
+  );
+  listSections(sectionView('unspaced', { rooms: ids }));
+  visit('/rooms');
+  await mountNav();
+
+  const near = document.querySelector<HTMLElement>('[data-row-key="!r0:example.org"]');
+  const far = document.querySelector<HTMLElement>('[data-row-key="!r59:example.org"]');
+  if (!near || !far) throw new Error('the rows were not rendered');
+  expect(document.querySelectorAll('[data-row-key] .room-name')).toHaveLength(60);
+  expect(near.querySelector('.room-options-slot')).not.toBeNull();
+  expect(far.querySelector('.room-options-slot')).toBeNull();
+
+  callbacks.get(far)?.(
+    [{ isIntersecting: true, target: far }] as unknown as IntersectionObserverEntry[],
+    null as never
+  );
+  await tick();
+
+  expect(far.querySelector('.room-options-slot')).not.toBeNull();
+});
+
 test('favourites sit in their own section above the rest of the list', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!busy:example.org', name: 'Busy' }),
