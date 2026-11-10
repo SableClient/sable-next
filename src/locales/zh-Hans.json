@@ -153,8 +153,8 @@
     "back": "返回",
     "download": "下载",
     "close": "关闭",
-    "viewAvatar": "",
-    "viewBanner": ""
+    "viewAvatar": "查看 {{name}} 的头像",
+    "viewBanner": "查看 {{name}} 的横幅"
   },
   "call": {
     "live": "直播",
@@ -733,7 +733,7 @@
     "abbreviationsDefinitionPlaceholder": "Matrix 规范变更",
     "abbreviationsCased": "区分大小写",
     "abbreviationsRemove": "移除 {{term}}",
-    "cosmeticsApplying": "正在应用… {{done, number}} / {{total, number}} 个房间。",
+    "cosmeticsApplying_other": "正在应用… {{done, number}} / {{count, number}} 个房间。",
     "cosmeticsApplied_other": "已应用到 {{count, number}} 个房间。",
     "cosmeticsAppliedPartial": "已应用到 {{count, number}} 个房间，{{failed, number}} 个无法更改。",
     "cosmeticsReset": "重置为基础个人资料",
@@ -808,7 +808,7 @@
     "addToSpaceEmpty": "没有可用的空间。",
     "addToSpaceApply_other": "添加到 {{count, number}} 个空间",
     "permRoleColorPick": "选择颜色",
-    "permRoleColorHint": "十六进制颜色，例如 #0088ff",
+    "permRoleColorHint": "Hex 颜色，例如 #0088ff",
     "emojisDeletePack": "删除 {{name}}",
     "emojisUseEverywhere": "在每个房间中使用",
     "emojisUseEverywhereHint": "将此表情包添加到你在本房间之外的选择器中。",
@@ -844,9 +844,24 @@
     "devDiagServer": "服务器数量（通知、高亮）",
     "devDiagMain": "主要时间线（未读、通知、高亮）",
     "actionsLabel": "房间操作",
-    "mediaTitle": "",
-    "mediaHint": "",
-    "menuClose": ""
+    "mediaTitle": "加载媒体",
+    "mediaHint": "仅对你生效。会同步到你的其他设备和客户端。",
+    "menuClose": "关闭聊天",
+    "notifySpace": "空间（{{mode}}）",
+    "notificationsClose": "关闭通知",
+    "notificationsResize": "调整通知面板大小",
+    "notificationsEmpty": "此设备上还没有此房间的通知。",
+    "notificationsSearch": "按发送者或文本筛选",
+    "notificationsNoResults": "没有匹配“{{query}}”的通知。",
+    "notificationsOpen": "此房间的通知",
+    "notificationsRead": "已读",
+    "spaceModeApplied_other": "{{space}} 及其中的 {{count, number}} 个房间现在使用{{mode}}",
+    "spaceModeDefault": "你的默认设置",
+    "membersDenied": "服务器拒绝了该操作，该成员可能已经离开。",
+    "exportKeys": "导出此房间的密钥",
+    "exportKeysHint": "把此房间的消息密钥保存到受口令保护的文件中。",
+    "exportKeysDescription": "该文件存放此设备上属于此房间的密钥，选择口令以保护它。",
+    "spaceMakeCanonical": "设为规范"
   },
   "inbox": {
     "invitesSpamShow": "显示",
@@ -910,9 +925,11 @@
     "inviteMessageShow": "显示来自 {{name}} 的消息",
     "markAllRead": "全部标为已读",
     "unlistedNotifications_other": "{{count, number}} 条未读通知",
-    "filterThreads": "",
-    "inThread": "",
-    "notificationsEmptyThreads": ""
+    "filterThreads": "消息列",
+    "inThread": "在消息列中",
+    "notificationsEmptyThreads": "没有未读的消息列回复。",
+    "reply": "回复",
+    "repliedToYou": "回复了你"
   },
   "timeline": {
     "profileNameRemoved": "{{user}} 的显示名称已被移除",
@@ -1164,7 +1181,7 @@
     "oneTyping": "{{name}} 正在输入…",
     "twoTyping": "{{name1}} 和 {{name2}} 正在输入…",
     "threeTyping": "{{name1}}、{{name2}} 和 {{name3}} 正在输入…",
-    "manyTyping": "{{name1}}、{{name2}} 和其他 {{count, number}} 人正在输入…",
+    "manyTyping_other": "{{name1}}、{{name2}} 和其他 {{count, number}} 人正在输入…",
     "unknownSender": "未知发送者",
     "messageTimestamp": "{{date}} {{time}}",
     "timeMarkupDetail": "本地：{{local}}\nUTC：{{utc}}",
@@ -1305,27 +1322,72 @@
       "other": "{{user}} 发送了 {{body}}"
     },
     "audioSeek": "播放进度",
-    "audioVolume": "",
-    "sourceEncryption": "",
+    "audioVolume": "音量",
+    "sourceEncryption": "加密详情",
     "shield": {
       "title": {
-        "authenticityNotGuaranteed": "",
-        "unknownDevice": "",
-        "unsignedDevice": "",
-        "unverifiedIdentity": "",
-        "verificationViolation": "",
-        "mismatchedSender": "",
-        "sentInClear": ""
+        "authenticityNotGuaranteed": "无法保证真实性",
+        "unknownDevice": "未知设备",
+        "unsignedDevice": "未验证的设备",
+        "unverifiedIdentity": "用户未验证",
+        "verificationViolation": "身份已重置",
+        "mismatchedSender": "发送者不符",
+        "sentInClear": "未加密"
       },
       "body": {
-        "authenticityNotGuaranteed": "",
-        "unknownDevice": "",
-        "unsignedDevice": "",
-        "unverifiedIdentity": "",
-        "verificationViolation": "",
-        "mismatchedSender": "",
-        "sentInClear": ""
+        "authenticityNotGuaranteed": "此设备无法保证这条加密消息的真实性。用于解锁它的消息密钥是从另一台设备下载的，或从备份导入的。",
+        "unknownDevice": "这条消息由一个未知或已删除的设备加密。",
+        "unsignedDevice": "这条消息由一个尚未被其所有者验证的设备加密。",
+        "unverifiedIdentity": "这条消息由一个未验证的用户加密。",
+        "verificationViolation": "发送者已验证的身份已被重置。",
+        "mismatchedSender": "这条消息的发送者与加密它的设备不符。消息可能已被篡改。",
+        "sentInClear": "这条消息未加密。任何人都能读到它，包括你的家服务器管理员。"
       }
+    },
+    "videoUnsupported": "此设备无法播放该视频格式",
+    "noJoinedMembers": "没有已加入的成员",
+    "noInvitedMembers": "没有已邀请的成员",
+    "noJoinRequests": "没有加入申请",
+    "noLeftMembers": "没有已离开的成员",
+    "noKickedMembers": "没有已移除的成员",
+    "noBannedMembers": "没有已封禁的成员",
+    "forwardIncludeMetadata": "包含事件的原始元数据",
+    "forwardMetadataPreserved": "已有的转发保留其原始元数据。",
+    "redactedBy": "消息已由 {{name}} 删除",
+    "redactedByWithReason": "消息已由 {{name}} 删除：{{reason}}",
+    "utd": {
+      "title": {
+        "waiting": "正在等待此消息",
+        "sentBeforeWeJoined": "你无权查看此消息",
+        "unsignedDevice": "发自未验证的设备",
+        "unknownDevice": "正在等待此设备",
+        "historicalMessageBackupDisabled": "无法查看历史消息",
+        "historicalMessageDeviceUnverified": "验证此设备以阅读历史消息",
+        "withheldUnverified": "此设备未验证",
+        "withheld": "无法查看此消息"
+      },
+      "details": {
+        "waiting": "此消息的消息密钥尚未送达。",
+        "sentBeforeWeJoined": "此消息发送于你加入此房间之前，因此无法查看。",
+        "verificationViolation": "你此前验证过 {{name}} 的数字身份，但它已被重置。此消息可能不可信。",
+        "unknownDevice": "发送此消息的设备尚未被本客户端识别。",
+        "historicalMessageBackupDisabled": "此设备上没有可用的加密消息历史。",
+        "historicalMessageDeviceUnverified": "此设备未验证，因此无法获取加密消息历史。",
+        "withheldUnverified": "此设备未验证，因此 {{name}} 未向你发送此消息的消息密钥。",
+        "withheld": "{{name}} 未向你发送此消息的消息密钥，因此无法查看。对方可能已屏蔽此设备，也可能遇到了技术问题。"
+      },
+      "causeHeader": "我能做什么？",
+      "cause": {
+        "waiting": "密钥送达后，此消息就会显示。若迟迟不显示，可能是 {{name}} 的家服务器连接你的家服务器时出现问题，请联系你的家服务器管理员寻求帮助。",
+        "unsignedDevice": "{{name}} 需要验证其设备，才能证明此消息可信。",
+        "unknownDevice": "设备信息送达后，此消息就会显示。若迟迟不显示，可能是 {{name}} 的家服务器连接你的家服务器时出现问题，请联系你的家服务器管理员寻求帮助。",
+        "historicalMessageBackupDisabled": "启用密钥存储，即可在你的设备间共享加密消息历史。",
+        "historicalMessageDeviceUnverified": "验证此设备，即可从密钥存储下载加密消息历史。",
+        "withheldUnverified": "验证此设备即可接收消息密钥。"
+      },
+      "openIdentitySettings": "打开身份设置",
+      "enableKeyBackup": "启用密钥存储",
+      "confirmThisDevice": "确认此设备"
     }
   },
   "emoji": {
@@ -1350,9 +1412,9 @@
     "startRoomDescription": "为你自己的好友群或社区创建一个房间或空间。",
     "joinConversationTitle": "加入房间或私聊",
     "joinConversationDescription": "输入房间地址或 Matrix 用户 ID 开始聊天。",
-    "settingsChangesTitle": "",
-    "settingsChangesNew": "",
-    "settingsChangesDefault": ""
+    "settingsChangesTitle": "新增和更改的设置",
+    "settingsChangesNew": "新增",
+    "settingsChangesDefault": "默认值已更改"
   },
   "join": {
     "knocking": "正在发送…",
@@ -1377,7 +1439,7 @@
     "withdraw": "撤销加入申请",
     "knockReason": "你为什么想要加入这个房间？（可选）",
     "withdrawFailed": "无法撤回加入申请。",
-    "bannedReason": ""
+    "bannedReason": "你已被该房间封禁。原因：{{reason}}"
   },
   "app": {
     "accountLocked": "账户已锁定",
@@ -1385,7 +1447,8 @@
     "pettingAnimal": "正在抚摸 {{animal}}",
     "unableToStart": "无法恢复你的会话。",
     "startFailed": "请检查你的网络连接和设备存储，然后重试。",
-    "signInRecoveryHint": "登录会创建一个新设备，并保留你已保存的账户数据。"
+    "signInRecoveryHint": "登录会创建一个新设备，并保留你已保存的账户数据。",
+    "startSlow": "这比平时更久。"
   },
   "userLink": {
     "action": "发送消息",
@@ -1418,12 +1481,15 @@
     "zoomOut": "缩小"
   },
   "direct": {
-    "description": "输入用户 ID 以开始私密、加密的聊天。",
+    "description": "输入用户 ID 开始私密、加密的聊天，或按房间地址加入房间。",
     "failed": "无法创建聊天。",
-    "encryptionHint": "对于桥接联系人请关闭，之后无法再开启。",
+    "encryptionHint": "仅当桥接不支持加密时才可关闭。一旦启用，加密就无法关闭。",
     "submit": "开始聊天",
     "confirmTitle": "开始与 {{name}} 聊天？",
-    "confirmBody": "你还没有与对方聊天，将创建一个新聊天并邀请对方。"
+    "confirmBody": "你还没有与对方聊天，将创建一个新聊天并邀请对方。",
+    "addressLabel": "用户 ID 或房间地址",
+    "addressPlaceholder": "@someone:server 或 #room:server",
+    "addressInvalid": "请输入形如 @someone:server 的用户 ID，或形如 #room:server 的房间地址。"
   },
   "permalink": {
     "opening": "正在打开链接…",
@@ -1603,12 +1669,12 @@
     "keyBackupDisabled": "无云端密钥备份，请设置恢复以备份你的消息密钥。",
     "keyBackupCloudCount_other": "云端有 {{count, number}} 个密钥",
     "keyBackupLocalCount_other": "此设备上有 {{count, number}} 个密钥",
-    "keyBackupUploadCount": "已备份 {{backedUp, number}} / {{total, number}} 个本地密钥",
+    "keyBackupUploadCount_other": "已备份 {{backedUp, number}} / {{count, number}} 个本地密钥",
     "keyBackupLocked": "使用你的恢复密钥或已验证设备来解锁此备份。",
     "developerSyncLive": "实时",
     "keyBackupDownloading": "正在下载密钥…",
-    "keyBackupProgress": "正在恢复 {{processed, number}} / {{total, number}} 个密钥…",
-    "keyBackupRestored": "已恢复 {{downloaded, number}} / {{total, number}} 个密钥。",
+    "keyBackupProgress_other": "正在恢复 {{processed, number}} / {{count, number}} 个密钥…",
+    "keyBackupRestored_other": "已恢复 {{downloaded, number}} / {{count, number}} 个密钥。",
     "keyBackupImported_other": "已在此设备上添加或更新 {{count, number}} 个密钥。",
     "keyBackupInvalidKeys_other": "{{count, number}} 个密钥无法读取，请尝试再次下载或使用其他设备。",
     "keyBackupStatusFailed": "无法加载密钥备份状态，请重试。",
@@ -1617,7 +1683,7 @@
     "roomKeysExportAction": "导出",
     "roomKeysExported": "密钥已保存到 {{name}}。",
     "roomKeysImportDescription": "加载从 {{appName}} 或其他 Matrix 客户端导出的密钥文件。",
-    "roomKeysImported": "已导入 {{imported}} / {{total}} 个密钥。",
+    "roomKeysImported_other": "已导入 {{imported}} / {{count}} 个密钥。",
     "roomKeysImportFailed": "无法导入密钥。",
     "roomKeysPassphrase": "口令",
     "roomKeysConfirmPassphrase": "确认口令",
@@ -1755,7 +1821,7 @@
     "syncTitle": "同步",
     "settingsSync": "跨设备同步设置",
     "settingsSyncHint": "偏好设置、主题、表情、GIF 和侧边栏布局作为未加密的账户数据同步。通知权限、遥测同意和开发者设置保留在本地。",
-    "syncDraftsHint": "草稿作为未加密的账户数据同步，家服务器可读取。",
+    "syncDraftsHint": "将未发送的消息带到你的其他设备。下方的草稿加密会显示你的家服务器能否读取它们。",
     "syncEncryptionOn": "你的草稿在离开此设备前会被加密。",
     "syncEncryptionLocked": "输入一次你的恢复密钥，以便此设备能读取并加密你同步的草稿。在此之前它们会保留在此设备上。",
     "syncStatusSyncing": "正在同步…",
@@ -2168,7 +2234,7 @@
     "notificationBadgesHint": "房间列表何时显示数字，有自己通知设置的房间会遵循该设置。",
     "notificationPushHint": "对没有逐房间覆盖设置的房间的提醒和推送，保存到你的账户。",
     "notificationDefaultGroup": "房间",
-    "notificationReactions": "回应",
+    "notificationReactions": "对你消息的回应",
     "mentionsLoud": "响亮",
     "mentionsFailed": "无法保存这些提及通知设置。",
     "pushGatewayUnsupported": "此浏览器无法接收推送通知，因此不使用网关。",
@@ -2253,7 +2319,12 @@
       "bigendergradient": "双性别（渐变）",
       "demigender": "半性别",
       "demigendergradient": "半性别（渐变）",
-      "nonbinary": "非二元"
+      "nonbinary": "非二元",
+      "pluraljourney": "多意识体",
+      "pluraljourneygradient": "多意识体（渐变）",
+      "ukraine": "乌克兰",
+      "palestine": "巴勒斯坦",
+      "cuba": "古巴"
     },
     "themeShowingNow": "正在显示",
     "profilePreviewTab": "预览",
@@ -2342,8 +2413,8 @@
     "status": "状态",
     "colorChoose": "选择 {{label}}",
     "colorSaturation": "{{label}}饱和度和亮度",
-    "colorHexLabel": "{{label}}十六进制值",
-    "colorHexPlaceholder": "十六进制值",
+    "colorHexLabel": "{{label}} Hex 值",
+    "colorHexPlaceholder": "Hex",
     "profileColors": "个人资料颜色",
     "profileColorsOnDark": "深色主题名称颜色",
     "otherProfileFieldsCancel": "取消编辑此字段",
@@ -2499,39 +2570,75 @@
     "updateChannel": "更新频道",
     "timeZoneHint": "以该时区显示消息时间，当你的浏览器隐藏你的真实时区时很有用。",
     "timeZoneAuto": "自动（此设备）",
-    "showSingleReactionCount": "",
-    "troubleshootAlarmsEmbeddedOnly": "",
-    "troubleshootCheckBackground": "",
-    "developerAccountDataServerManaged": "",
-    "developerPushRulesTitle": "",
-    "developerPushRulesDescription": "",
-    "developerPushRulesEmpty": "",
-    "developerPushRulesEnabled": "",
-    "developerPushRulesRule": "",
-    "developerPushRulesActions": "",
-    "developerPushRulesInvalidActions": "",
-    "developerPushRulesFailed": "",
-    "developerPushRulesSaved": "",
-    "developerPushRulesDelete": "",
-    "developerPushRulesDeleteConfirm": "",
-    "developerPushRulesDeleteDescription": "",
-    "needsServerFeature": "",
-    "messageSwipeAction": "",
-    "messageSwipeActionReply": "",
-    "messageSwipeActionMembers": "",
-    "showAllTimestamps": "",
-    "emoticonToEmojiHint": "",
-    "pushEmbeddedServer": "",
-    "pushEmbeddedServerHint": "",
-    "pushEmbeddedServerInvalid": "",
-    "troubleshootAndroidOnly": "",
-    "troubleshootBackgroundUnknown": "",
-    "troubleshootAlarmsDenied": "",
-    "troubleshootAlarmsUnknown": "",
-    "troubleshootCheckAlarms": "",
-    "startMinimized": "",
-    "aboutDataFolder": "",
-    "emoticonToEmoji": ""
+    "showSingleReactionCount": "显示单个表情回应上的计数",
+    "troubleshootAlarmsEmbeddedOnly": "仅内置连接需要。",
+    "troubleshootCheckBackground": "后台活动",
+    "developerAccountDataServerManaged": "由家服务器管理。在“推送规则”一节中修改推送规则。",
+    "developerPushRulesTitle": "推送规则",
+    "developerPushRulesDescription": "家服务器应用于此账户的推送规则。",
+    "developerPushRulesEmpty": "没有加载任何推送规则。",
+    "developerPushRulesEnabled": "已启用",
+    "developerPushRulesRule": "规则",
+    "developerPushRulesActions": "动作",
+    "developerPushRulesInvalidActions": "动作必须是 JSON 数组。",
+    "developerPushRulesFailed": "家服务器拒绝了该更改。",
+    "developerPushRulesSaved": "推送规则已保存。",
+    "developerPushRulesDelete": "删除规则",
+    "developerPushRulesDeleteConfirm": "删除 {{rule}}？",
+    "developerPushRulesDeleteDescription": "家服务器将在所有客户端上停止应用此规则。",
+    "needsServerFeature": "家服务器不支持",
+    "messageSwipeAction": "左滑消息时",
+    "messageSwipeActionReply": "回复",
+    "messageSwipeActionMembers": "打开成员列表",
+    "showAllTimestamps": "在每条消息上显示时间",
+    "emoticonToEmojiHint": "输入时将 <3 转换为 ❤️、将 :) 转换为 🙂。按退格键可撤销替换。",
+    "pushEmbeddedServer": "ntfy 服务器",
+    "pushEmbeddedServerHint": "留空则使用 {{server}}。",
+    "pushEmbeddedServerInvalid": "ntfy 服务器是不含用户名、查询和片段的 https 地址。",
+    "troubleshootAndroidOnly": "仅在 Android 上检查。",
+    "troubleshootBackgroundUnknown": "无法读取此设置。",
+    "troubleshootAlarmsDenied": "缺少此项时，Android 可能不允许内置连接在停止后重新启动。",
+    "troubleshootAlarmsUnknown": "无法读取此设置。",
+    "troubleshootCheckAlarms": "重连闹钟",
+    "startMinimized": "启动时隐藏",
+    "aboutDataFolder": "数据文件夹",
+    "emoticonToEmoji": "将表情符号转换为 emoji",
+    "supporterThanksTitle": "感谢你向 Sable 捐赠！",
+    "supporterThanksDescription": "你可以在账户设置中自定义你的徽章。",
+    "supporterThanksButton": "自定义徽章",
+    "supporterBegTitle": "你可以通过捐赠帮助开发 Sable",
+    "supporterBegDescription": "捐赠即可获得一枚永久徽章，是否展示由你决定，且可自定义！",
+    "supporterVerifyTitle": "已经捐赠过了？",
+    "supporterVerifyDescription": "在 Open Collective 上验证，或检查是否已有徽章分配给你，即可领取你的徽章。",
+    "supporterVerifyButton": "通过 Open Collective 验证",
+    "supporterVerifyClaim": "检查",
+    "logoutServer": "退出 Sable 服务器",
+    "logoutServerFailed": "无法退出 Sable 服务器。",
+    "dehydratedDevice": "离线时接收密钥",
+    "dehydratedDeviceHint": "在你的服务器上保留一台离线设备，这样所有会话都关闭时收到的消息仍可解密。",
+    "dehydratedDeviceNeedsRecoveryKey": "用恢复密钥解锁恢复，才能设置离线设备。",
+    "dehydratedDeviceFailed": "无法更新离线设备。",
+    "devicesDashboard": "设备面板",
+    "developerPushRulesNew": "新建规则",
+    "developerPushRulesKind": "规则类型",
+    "developerPushRulesCreate": "创建规则",
+    "developerPushRulesInvalidRule": "规则必须是 JSON 对象。",
+    "developerPushRulesNeedsId": "规则需要“rule_id”。",
+    "developerPushRulesNeedsRoomId": "房间规则的“rule_id”是房间 ID，以 ! 开头。",
+    "developerPushRulesNeedsUserId": "发送者规则的“rule_id”是用户 ID，以 @ 开头。",
+    "developerPushRulesNeedsPattern": "内容规则需要“pattern”字符串。",
+    "developerPushRulesNeedsConditions": "“conditions”必须是 JSON 数组。",
+    "showTranslationStrings": "显示翻译字符串",
+    "pushInactiveTimeout": "闲置后提醒其他设备",
+    "notificationRooms": "有自定义设置的房间",
+    "notificationRoomsHint": "不使用你默认设置的空间和房间。空间的设置也会应用到其中的房间。",
+    "notificationRoomsEmpty": "每个房间都使用你的默认设置。",
+    "notificationRoomsMode": "{{room}} 的通知设置",
+    "notificationRoomsReset": "{{room}} 改用默认设置",
+    "troubleshootDesktop": "桌面应用在运行时提醒，且不使用推送服务。",
+    "troubleshootGatewayActivated": "你的家服务器已通过 {{host}} 到达此设备。",
+    "troubleshootLoopbackUnforwarded": "{{host}} 无法将测试推送转发给你的推送服务，后者可能已宕机或正在限流。若此问题持续出现，请改用自带 Matrix 网关的推送服务，例如 ntfy 或 NextPush。",
+    "settingExcludedFromSync": "此设置不会在设备间同步"
   },
   "supporter": {
     "shapes": {
@@ -2749,7 +2856,7 @@
     "enterRegistrationToken": "请输入你的注册令牌。",
     "passwordResetComplete": "密码已重置",
     "noAccountYet": "还没有账户吗？",
-    "openInBrowser": ""
+    "openInBrowser": "在浏览器中打开"
   },
   "footer": {
     "poweredBy": "基于"
@@ -2993,6 +3100,10 @@
       "myroomnick": {
         "description": "仅在此房间更改你的显示名称",
         "usage": "/myroomnick <名称>"
+      },
+      "sharehistory": {
+        "description": "与刚加入的人分享此房间的加密历史",
+        "usage": "/sharehistory <@user:server>"
       }
     },
     "locationExplain": "以坐标形式发送，仅当阅读者请求时才绘制地图，因此不会主动向地图瓦片提供商发送任何内容。",
@@ -3157,7 +3268,7 @@
     "colorPink": "粉色",
     "colorBrown": "棕色",
     "colorGrey": "灰色",
-    "colorHex": "十六进制颜色",
+    "colorHex": "Hex 颜色",
     "colorRemove": "移除颜色",
     "colorClose": "关闭颜色",
     "scheduleIn1Hour": "1 小时后",
@@ -3165,7 +3276,13 @@
     "scheduleEmpty": "先写好消息，再选择时间。",
     "highlightColor": "高亮颜色",
     "resizeBoard": "调整表情和贴纸区域大小",
-    "sedNoMatch": "你的上一条消息不包含该文本。"
+    "sedNoMatch": "你的上一条消息不包含该文本。",
+    "sendTooLarge": "此消息过大，无法发送，请精简后重试。",
+    "slashShareHistory": {
+      "unencrypted": "此房间未加密，因此没有历史可分享。",
+      "no_cross_signing": "分享历史前先设置交叉签名。",
+      "history_not_shared": "此房间的历史可见性不允许分享过往消息。"
+    }
   },
   "errors": {
     "pageTitle": "出了点问题",
@@ -3309,7 +3426,23 @@
     "triggerPrefix": "前缀",
     "backup": "备份",
     "noMatches": "没有个人资料匹配该搜索。",
-    "pickerAccount": ""
+    "pickerAccount": "{{name}}（账户）",
+    "selectionScope": "记住所选的个人资料",
+    "selectionScopeAccount": "全局",
+    "selectionScopeSpace": "按空间",
+    "selectionScopeRoom": "按房间",
+    "selectionScopePicker": "在选择器中选择",
+    "rememberedAccount": "选择会被全局记住",
+    "rememberedSpace": "选择会在此空间中被记住",
+    "rememberedRoom": "选择会在此房间中被记住",
+    "alternateAvatars": "备用头像",
+    "alternateAvatarsHint": "添加更多头像，无需重新创建个人资料即可改变其外观。",
+    "alternateAvatarAdd": "添加备用头像",
+    "alternateAvatarLabel": "备用头像",
+    "alternateAvatarNone": "默认头像",
+    "alternateAvatarViewOn": "设置备用头像",
+    "alternateAvatarViewOff": "返回个人资料",
+    "triggerAlternateAvatar": "头像"
   },
   "shortcuts": {
     "openBookmarks": "打开书签",
@@ -3348,7 +3481,7 @@
     "toggleEmojiPicker": "切换表情选择器",
     "toggleGifPicker": "切换 GIF 选择器",
     "toggleStickerPicker": "切换贴纸选择器",
-    "closeRoom": ""
+    "closeRoom": "关闭当前打开的聊天"
   },
   "search": {
     "close": "关闭搜索",
@@ -3440,7 +3573,9 @@
     "resize": "调整挂件区域大小",
     "integrationManagerTermsBody": "集成管理器需要你接受这些文档，然后才能为你添加机器人、桥接和挂件。",
     "integrationManagerTermsFailed": "无法记录你的确认，请重试。",
-    "integrationManagerTermsTitle": "接受集成管理器的条款"
+    "integrationManagerTermsTitle": "接受集成管理器的条款",
+    "capabilitiesRemember": "记住此挂件的已批准权限",
+    "capabilitiesForget": "忘记挂件权限"
   },
   "calendar": {
     "end": "结束",
@@ -3539,7 +3674,7 @@
     "leaveDiscard": "放弃",
     "apply": "应用更改",
     "invalidShortcodeTitle": "重命名图片以应用",
-    "invalidShortcode": "\":{{shortcode}}:\" 不是有效的短代码，请仅使用字母、数字、- 和 _，并保持每个短代码唯一。",
+    "invalidShortcode": "\":{{shortcode}}:\" 不是有效的短代码，请仅使用字母、数字、.、- 和 _，并保持每个短代码唯一。",
     "transfer": "导出和导入",
     "transferHint": "表情包文件本身携带图片，因此它可以导入到无法访问本服务器的服务器上。",
     "export": "导出表情包",
@@ -3555,7 +3690,9 @@
     "stealMany": "将表情添加到我的表情包",
     "stealTitle": "添加到你的表情包",
     "stealExplain": "图片会复制到你的账户，因此即使消息或其房间消失，它仍然可用。",
-    "downloadMany": "下载表情"
+    "downloadMany": "下载表情",
+    "stopUsingAllEverywhere": "在所有地方停止使用全部",
+    "useAllEverywhere": "在所有地方使用全部"
   },
   "a11y": {
     "loading": "加载中"
@@ -3566,7 +3703,7 @@
     "checkCodeLabel": "两位数字",
     "showHintLogin": "在你已登录的设备上，打开 设置 → 账户，选择{{action}}并扫描此二维码。",
     "showHintGrant": "在新设备上，选择{{action}}并扫描此二维码。",
-    "linkDeviceAction": "关联",
+    "linkDeviceAction": "关联设备",
     "titleLogin": "使用二维码登录",
     "titleGrant": "关联新设备",
     "chooseGrant": "在另一台设备上登录，无需输入密码。",
@@ -3599,7 +3736,7 @@
     "announceCheckCode": "你的数字是 {{code}}，请在另一台设备上输入它。",
     "announceUserCode": "另一台设备显示 {{code}}，请在那里批准登录。",
     "chooseLogin": "使用你已登录的设备，例如手机上的 Sable 或 Element。",
-    "openApprovalFailed": ""
+    "openApprovalFailed": "无法打开批准页面，请重试。"
   },
   "share": {
     "files_other": "{{count, number}} 个文件",
