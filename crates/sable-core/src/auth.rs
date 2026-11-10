@@ -450,11 +450,25 @@ impl Core {
             ));
         }
 
-        client
+        if let Err(error) = client
             .oauth()
             .finish_login(authorization_response(&url))
             .await
-            .or_failed(self, "complete_oidc_login")?;
+        {
+            let refused = pending.take_if(|pending| {
+                refuses_device(&error)
+                    && matches!(&pending.reauth, Some(account) if !account.device_invalidated)
+            });
+            drop(pending);
+            if let Some(account) = refused.and_then(|pending| pending.reauth) {
+                tracing::warn!(
+                    "the server refused the saved device: the next sign-in uses a new one"
+                );
+                self.mark_account_needs_reauth(Some(&account.account_id), true)
+                    .await?;
+            }
+            return Err(self.rpc_error("complete_oidc_login", &error));
+        }
 
         let Some(PendingLogin {
             account_id,
@@ -732,6 +746,23 @@ fn has_single_nonempty_query_parameter(url: &Url, name: &str) -> bool {
     matches!(values.next(), Some(value) if !value.is_empty()) && values.next().is_none()
 }
 
+/// The device scope is the only one that differs between a reauthentication
+/// and a login the server accepts.
+fn refuses_device(error: &matrix_sdk::Error) -> bool {
+    use matrix_sdk::authentication::oauth::error::{
+        BasicErrorResponseType, OAuthAuthorizationCodeError, OAuthError, RequestTokenError,
+    };
+    let matrix_sdk::Error::OAuth(error) = error else {
+        return false;
+    };
+    matches!(
+        &**error,
+        OAuthError::AuthorizationCode(OAuthAuthorizationCodeError::RequestToken(
+            RequestTokenError::ServerResponse(response)
+        )) if *response.error() == BasicErrorResponseType::InvalidScope
+    )
+}
+
 fn reuses_oauth_client(session: &session::PersistedSession, redirect_uri: &Url) -> bool {
     session::registered_redirect_uri(session, redirect_uri)
         == session::registration_redirect_uri(redirect_uri)
@@ -907,7 +938,13 @@ mod tests {
     }
 
     #[cfg(not(target_family = "wasm"))]
-    async fn oauth_reauthentication_url(registered: &str, requested: &str) -> (String, bool) {
+    async fn oauth_reauthentication_core(
+        registered: &str,
+    ) -> (
+        matrix_sdk::test_utils::mocks::MatrixMockServer,
+        Arc<Core>,
+        std::path::PathBuf,
+    ) {
         use matrix_sdk::authentication::oauth::UserSession;
         use matrix_sdk::test_utils::mocks::MatrixMockServer;
         use matrix_sdk::{SessionMeta, SessionTokens};
@@ -968,24 +1005,37 @@ mod tests {
             .await
             .unwrap();
         drop(client);
+        (server, core, directory)
+    }
 
-        let url = core
-            .start_oidc_login(crate::api::auth::StartOidcLoginParams {
-                homeserver: "ignored.invalid".to_owned(),
-                redirect_uri: requested.to_owned(),
-                intent: AuthIntent::Login,
-                reauth_account_id: Some("a1".to_owned()),
-                device_display_name: None,
-            })
-            .await
-            .unwrap();
-        let invalidated = core
-            .accounts()
+    #[cfg(not(target_family = "wasm"))]
+    async fn start_oauth_reauthentication(core: &Arc<Core>, requested: &str) -> String {
+        core.start_oidc_login(crate::api::auth::StartOidcLoginParams {
+            homeserver: "ignored.invalid".to_owned(),
+            redirect_uri: requested.to_owned(),
+            intent: AuthIntent::Login,
+            reauth_account_id: Some("a1".to_owned()),
+            device_display_name: None,
+        })
+        .await
+        .unwrap()
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    async fn device_invalidated(core: &Core) -> bool {
+        core.accounts()
             .await
             .unwrap()
             .accounts
             .iter()
-            .any(|account| account.account_id == "a1" && account.device_invalidated);
+            .any(|account| account.account_id == "a1" && account.device_invalidated)
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    async fn oauth_reauthentication_url(registered: &str, requested: &str) -> (String, bool) {
+        let (_server, core, directory) = oauth_reauthentication_core(registered).await;
+        let url = start_oauth_reauthentication(&core, requested).await;
+        let invalidated = device_invalidated(&core).await;
         *core.pending_login.lock().await = None;
         drop(core);
         std::fs::remove_dir_all(directory).unwrap();
@@ -1006,6 +1056,47 @@ mod tests {
             oauth_reauthentication_url("moe.sable.app:/login", "moe.sable.next:/login").await;
         assert!(!url.contains("EXISTING"), "{url}");
         assert!(invalidated);
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn a_refused_device_moves_the_next_reauthentication_to_a_new_device() {
+        const REDIRECT: &str = "moe.sable.next:/login";
+        let (server, core, directory) = oauth_reauthentication_core(REDIRECT).await;
+        server
+            .oauth()
+            .mock_token()
+            .respond_with_code_and_json(
+                400,
+                serde_json::json!({
+                    "error": "invalid_scope",
+                    "error_description": "A device with the supplied ID already exists for this user"
+                }),
+            )
+            .mount()
+            .await;
+
+        let url = Url::parse(&start_oauth_reauthentication(&core, REDIRECT).await).unwrap();
+        assert!(url.as_str().contains("EXISTING"), "{url}");
+        let state = url
+            .query_pairs()
+            .find(|(key, _)| key == "state")
+            .unwrap()
+            .1
+            .into_owned();
+        core.complete_oidc_login(CompleteOidcLoginParams {
+            callback_url: format!("{REDIRECT}?state={state}&code=code"),
+        })
+        .await
+        .unwrap_err();
+        assert!(device_invalidated(&core).await);
+        assert!(core.pending_login.lock().await.is_none());
+
+        let url = start_oauth_reauthentication(&core, REDIRECT).await;
+        assert!(!url.contains("EXISTING"), "{url}");
+        *core.pending_login.lock().await = None;
+        drop(core);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[tokio::test]
