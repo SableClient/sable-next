@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  app: { isPackaged: true, getVersion: (): string => '2.0.0' },
+  app: {
+    isPackaged: true,
+    getVersion: (): string => '2.0.0',
+    getAppPath: (): string => 'electron',
+  },
   setFeedURL: vi.fn(),
   handle: vi.fn<(channel: string, handler: (event: { senderFrame: object }) => unknown) => void>(),
   checkForUpdates: vi.fn(),
