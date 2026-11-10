@@ -1156,7 +1156,13 @@
     "pinMessage": "Nachricht anheften",
     "sourceEncryption": "Verschlüsselungsdetails",
     "pollVotes_one": "{{count, number}} Stimme",
-    "pollVotes_other": "{{count, number}} Stimmen"
+    "pollVotes_other": "{{count, number}} Stimmen",
+    "forwardTitle": "",
+    "reportSend": "",
+    "reportReasonHint": "",
+    "forwardSend": "",
+    "forwardIncludeMetadata": "",
+    "forwardMetadataPreserved": ""
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden.",
