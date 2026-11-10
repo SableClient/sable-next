@@ -438,12 +438,12 @@
     "askToJoin": "Надіслати запит на приєднання",
     "changeAvatar": "Змінити аватар",
     "changeBanner": "Змінити банер",
-    "pronounsPlaceholder": "вони/їх, en:she/her",
+    "pronounsPlaceholder": "вони/їх, ua:вона/її",
     "removeAvatar": "Прибрати аватар",
     "removeBanner": "Прибрати банер",
     "statusPlaceholder": "Чим займаєтеся?",
     "endToEndEncryption": "Наскрізне шифрування",
-    "noRoomsMatch": "Для цього пошукового запиту кімнати не знайдені",
+    "noRoomsMatch": "Для цього пошукового запиту кімнати не знайдені.",
     "readReceipts": "Підтвердження прочитання",
     "system": "Системна"
   },
@@ -500,7 +500,7 @@
     "removeAccount": "Видалити обліковий запис",
     "removeAccountConfirm": "Видалити цей обліковий запис?",
     "removeAccountFailed": "Не вдалося видалити цей обліковий запис.",
-    "accountSignInAgain": "ійти знову",
+    "accountSignInAgain": "Увійти знову",
     "resizeRooms": "Змінити розмір списку кімнат"
   }
 }
