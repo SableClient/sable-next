@@ -110,14 +110,18 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
         );
       }
 
-      writeRecentStickers(parseShortcodes(body.recentStickers));
-      adoptFavorites(parseFavorites(body.favoriteGifs));
-      adoptRecentGifs(parseFavorites(body.recentGifs));
-      adoptRoomIconOverrides(parseRoomIconOverrides(body.roomIcons));
-      sidebar.adoptOpenFolders(stringList(body.openFolders));
-      adoptUngroupedFavourites(parseUngroupedFavourites(body.ungroupedFavourites));
-      adoptQuietRooms(parseQuietRooms(body.quietRooms));
-      adoptBridgedSpaces(stringList(body.bridgedSpaces));
+      // a missing field comes from a build that does not write it, so the local value stays
+      const has = (field: string): boolean => field in body;
+      if (has('recentStickers')) writeRecentStickers(parseShortcodes(body.recentStickers));
+      if (has('favoriteGifs')) adoptFavorites(parseFavorites(body.favoriteGifs));
+      if (has('recentGifs')) adoptRecentGifs(parseFavorites(body.recentGifs));
+      if (has('roomIcons')) adoptRoomIconOverrides(parseRoomIconOverrides(body.roomIcons));
+      if (has('openFolders')) sidebar.adoptOpenFolders(stringList(body.openFolders));
+      if (has('ungroupedFavourites')) {
+        adoptUngroupedFavourites(parseUngroupedFavourites(body.ungroupedFavourites));
+      }
+      if (has('quietRooms')) adoptQuietRooms(parseQuietRooms(body.quietRooms));
+      if (has('bridgedSpaces')) adoptBridgedSpaces(stringList(body.bridgedSpaces));
       return true;
     },
   };

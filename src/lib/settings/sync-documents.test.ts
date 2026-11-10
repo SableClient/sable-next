@@ -90,6 +90,16 @@ describe('the workspace document', () => {
     expect(favoriteGifs()).toEqual([gif]);
   });
 
+  it('keeps what it holds for a field an older build left out', () => {
+    const document = workspaceDocument(new SpaceSidebar());
+    adoptBridgedSpaces(['!bridged:example.org']);
+
+    expect(document.adopt({ v: 1, quietRooms: ['!space:example.org'] })).toBe(true);
+
+    expect(quietRooms()).toEqual(['!space:example.org']);
+    expect(bridgedSpaces()).toEqual(['!bridged:example.org']);
+  });
+
   it('asks to be seeded only when there is something local to seed with', () => {
     const document = workspaceDocument(new SpaceSidebar());
 

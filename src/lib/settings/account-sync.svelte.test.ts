@@ -230,6 +230,94 @@ describe('AccountSync', () => {
     stop();
   });
 
+  it('keeps the fields another build wrote and uploads them with its own', async () => {
+    const local = { value: 'shared' };
+    const document = stubDocument(local);
+    const { core, commands } = stubCore({
+      [document.eventType]: { v: 1, value: 'shared', later: ['kept'] },
+    });
+
+    const sync = new AccountSync();
+    sync.start(core, [document]);
+    await vi.runAllTimersAsync();
+    sync.push(document);
+    await vi.runAllTimersAsync();
+    expect(commands.setData).not.toHaveBeenCalled();
+
+    local.value = 'changed';
+    sync.push(document);
+    await vi.runAllTimersAsync();
+
+    expect(commands.setData).toHaveBeenCalledWith({
+      event_type: document.eventType,
+      content: { v: 1, value: 'changed', later: ['kept'] },
+    });
+  });
+
+  it('stops answering a build that keeps rewriting the document its own way', async () => {
+    const shaped = (local: { value: string }, extra: object) =>
+      stubDocument(local, {
+        snapshot: () => ({ content: { v: 1, value: local.value, nested: extra } }),
+      });
+    const mine = shaped({ value: 'shared' }, { mine: true });
+    const theirs = shaped({ value: 'shared' }, { theirs: true });
+    const { core, commands, announce } = stubCore({
+      [mine.eventType]: { v: 1, value: 'shared', nested: { theirs: true } },
+    });
+    const write = commands.setData.getMockImplementation();
+    commands.setData.mockImplementation((request) => {
+      const written = write?.(request);
+      announce(request.event_type);
+      return written ?? Promise.resolve(null);
+    });
+
+    new AccountSync().start(core, [mine]);
+    new AccountSync().start(core, [theirs]);
+    await vi.runAllTimersAsync();
+
+    expect(commands.setData).toHaveBeenCalledTimes(2);
+  });
+
+  it('reads once more after a burst of changes', async () => {
+    const document = stubDocument({ value: 'local' });
+    const { core, commands, announce } = stubCore({
+      [document.eventType]: { v: 1, value: 'remote' },
+    });
+
+    new AccountSync().start(core, [document]);
+    await vi.runAllTimersAsync();
+    commands.data.mockClear();
+
+    for (let change = 0; change < 5; change += 1) announce(document.eventType);
+    await vi.runAllTimersAsync();
+
+    expect(commands.data).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not repeat an upload that is still in flight', async () => {
+    const local = { value: 'shared' };
+    const document = stubDocument(local);
+    const { core, commands, announce } = stubCore({
+      [document.eventType]: { v: 1, value: 'shared' },
+    });
+    const sync = new AccountSync();
+    sync.start(core, [document]);
+    await vi.runAllTimersAsync();
+
+    const upload = Promise.withResolvers<null>();
+    commands.setData.mockImplementationOnce(() => upload.promise);
+    vi.spyOn(globalThis.document, 'visibilityState', 'get').mockReturnValue('hidden');
+    local.value = 'edited';
+    sync.push(document);
+    announce(document.eventType);
+    await vi.advanceTimersByTimeAsync(0);
+    sync.push(document);
+    upload.resolve(null);
+    await vi.runAllTimersAsync();
+
+    expect(commands.setData).toHaveBeenCalledTimes(1);
+  });
+
   it('uploads a local change once the debounce elapses', async () => {
     const local = { value: 'shared' };
     const document = stubDocument(local);
