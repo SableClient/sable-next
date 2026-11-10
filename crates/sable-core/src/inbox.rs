@@ -542,6 +542,26 @@ impl Core {
     }
 
     pub(crate) async fn flush_inbox(&self, client: &matrix_sdk::Client) {
+        self.save_inbox(async |bytes| {
+            self.with_open_stores(async || write(client, bytes).await)
+                .await
+        })
+        .await;
+    }
+
+    /// For the activity transition, which already holds the lock `with_open_stores` takes.
+    pub(crate) async fn flush_inbox_locked(
+        &self,
+        client: &matrix_sdk::Client,
+        _activity: &tokio::sync::MutexGuard<'_, ()>,
+    ) {
+        if *self.stores_open.borrow() {
+            self.save_inbox(async |bytes| write(client, bytes).await)
+                .await;
+        }
+    }
+
+    async fn save_inbox(&self, write: impl AsyncFnOnce(Vec<u8>) -> Result<(), RpcError>) {
         let _writing = self.inbox_flush.lock().await;
         let (revision, bytes) = {
             let mut inbox = self.inbox.lock().await;
@@ -556,11 +576,7 @@ impl Core {
             };
             (inbox.revision, bytes)
         };
-        if self
-            .with_open_stores(async || write(client, bytes).await)
-            .await
-            .is_ok()
-        {
+        if write(bytes).await.is_ok() {
             let mut inbox = self.inbox.lock().await;
             inbox.saved = inbox.saved.max(revision);
         }
@@ -954,6 +970,30 @@ mod tests {
         assert_eq!(stored.entries.len(), 2);
         *core.inbox.lock().await = super::InboxCache::default();
         assert_eq!(core.stored_inbox(&client).await.unwrap().entries.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn suspending_with_unsaved_notifications_saves_them_and_lets_sync_resume() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, _room) = setup(&server, 1).await;
+        core.record_inbox(
+            &client,
+            vec![entry("first", 100)],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+
+        let cycle = async {
+            core.update_app_active(false).await;
+            core.update_app_active(true).await;
+        };
+        matrix_sdk::timeout::timeout(cycle, std::time::Duration::from_secs(5))
+            .await
+            .expect("suspending must not deadlock");
+
+        assert_eq!(super::load(&client).await.unwrap().entries.len(), 1);
     }
 
     #[tokio::test]

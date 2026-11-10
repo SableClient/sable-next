@@ -560,7 +560,7 @@ impl Core {
         if self.app_active.load(Ordering::Relaxed) != active {
             return;
         }
-        let _serial = self.activity_lock.lock().await;
+        let serial = self.activity_lock.lock().await;
         if revision
             .is_some_and(|revision| self.app_activity_revision.load(Ordering::SeqCst) != revision)
         {
@@ -585,10 +585,12 @@ impl Core {
             if self.sync_allowed() {
                 sync_service.start().await;
             }
-            self.retry_cached_decryption().await;
+            drop(serial);
+            // Fetches replied-to events, which must not hold up local reads or the next pause.
+            Box::pin(self.until_stores_close(self.retry_cached_decryption())).await;
         } else {
             if let Ok(client) = self.client().await {
-                self.flush_inbox(&client).await;
+                self.flush_inbox_locked(&client, &serial).await;
             }
             // Background push fetches must not report the user online.
             self.set_sync_presence(matrix_sdk::ruma::presence::PresenceState::Offline)
@@ -665,7 +667,8 @@ impl Core {
     }
 
     /// Only short local reads belong here; network work would delay iOS suspension. Never call it
-    /// from a sync event handler: suspension holds the lock while it waits for sync to stop.
+    /// from a sync event handler: suspension holds the lock while it waits for sync to stop. Never
+    /// call it while holding the activity lock either, it takes that lock itself.
     pub(crate) async fn with_open_stores<T>(&self, read: impl AsyncFnOnce() -> T) -> T {
         loop {
             self.wait_for_stores().await;
