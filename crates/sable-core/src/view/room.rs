@@ -401,18 +401,23 @@ const BRIDGE_EVENT_TYPES: [&str; 2] = ["m.bridge", "uk.half-shot.bridge"];
 
 fn bridge_view(event: &str) -> Option<BridgeView> {
     let event: serde_json::Value = serde_json::from_str(event).ok()?;
-    let protocol = event.get("content")?.get("protocol")?;
-    let text = |key: &str| {
-        protocol
+    let content = event.get("content")?;
+    let text = |section: &str, key: &str| {
+        content
+            .get(section)?
             .get(key)
             .and_then(serde_json::Value::as_str)
             .map(str::trim)
             .filter(|value| !value.is_empty())
     };
+    let avatar =
+        |section: &str| text(section, "avatar_url").filter(|url| url.starts_with("mxc://"));
     Some(BridgeView {
-        network: text("displayname").or_else(|| text("id"))?.to_owned(),
-        avatar_url: text("avatar_url")
-            .filter(|url| url.starts_with("mxc://"))
+        network: text("protocol", "displayname")
+            .or_else(|| text("protocol", "id"))?
+            .to_owned(),
+        avatar_url: avatar("protocol")
+            .or_else(|| avatar("network"))
             .map(str::to_owned),
     })
 }
@@ -646,6 +651,21 @@ mod tests {
             None
         );
         assert_eq!(bridge_view(r#"{"type":"m.bridge","content":{}}"#), None);
+    }
+
+    #[test]
+    fn a_bridge_without_a_protocol_image_borrows_the_network_one() {
+        let event = serde_json::json!({"type": "m.bridge", "content": {
+            "protocol": {"id": "discord", "avatar_url": "https://example.org/logo.png"},
+            "network": {"id": "1234", "avatar_url": "mxc://example.org/guild"}
+        }});
+        assert_eq!(
+            bridge_view(&event.to_string()),
+            Some(BridgeView {
+                network: "discord".to_owned(),
+                avatar_url: Some("mxc://example.org/guild".to_owned()),
+            })
+        );
     }
 
     #[test]
