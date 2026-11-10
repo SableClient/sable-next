@@ -1156,24 +1156,24 @@
     "showCode": "QR-Code anzeigen",
     "titleGrant": "Neues Gerät verbinden",
     "chooseLogin": "Nutze ein Gerät, auf dem du bereits angemeldet bist, beispielsweise Sable oder Element auf deinem Telefon.",
-    "waitingForToken": "",
+    "waitingForToken": "Bestätige die Anmeldung auf deinem anderen Gerät. Es zeigt diesen Code an:",
     "failed": {
-      "device_in_use": "",
-      "declined": "",
-      "unsupported": ""
+      "device_in_use": "Dieses Gerät ist bereits angemeldet.",
+      "declined": "Die Anmeldung wurde abgelehnt.",
+      "unsupported": "Dein Homeserver unterstützt die Anmeldung mittels QR-Code nicht."
     },
-    "announceCheckCode": "",
-    "confirm": "",
-    "showCheckCode": "",
-    "doneGrant": "",
-    "checkCodeLabel": "",
-    "scanHintGrant": "",
-    "codeLabel": "",
-    "enterCheckCode": "",
-    "starting": "",
-    "syncing": "",
-    "waiting": "",
-    "linkDeviceAction": ""
+    "announceCheckCode": "Deine Zahl lautet {{code}}. Gib sie auf dem anderen Gerät ein.",
+    "confirm": "Bestätigen",
+    "showCheckCode": "Gib diese Zahl auf dem anderen Gerät ein.",
+    "doneGrant": "Dein neues Gerät ist angemeldet.",
+    "checkCodeLabel": "Zweistellige Zahl",
+    "scanHintGrant": "Wähle auf dem neuen Gerät {{action}} und scanne den angezeigten Code.",
+    "codeLabel": "QR-Code zum Anmelden",
+    "enterCheckCode": "Gib die zweistellige Zahl ein, die auf deinem anderen Gerät angezeigt wird.",
+    "starting": "Verbinde …",
+    "syncing": "Schließe Anmeldung ab und richte Verschlüsselung ein …",
+    "waiting": "Warte …",
+    "linkDeviceAction": "Gerät verbinden"
   },
   "call": {
     "desktopShortcutsUnavailable": "Globale Mikrofon-Tastenkürzel stehen nicht zur Verfügung. Ändere die Tasten in den Tastatureinstellungen oder nutze die Anrufsteuerung."
