@@ -587,13 +587,14 @@ mod tests {
             .mount(server.server())
             .await;
         let (core, _events) = Core::new("history-test", Box::new(MemorySessionStore::default()));
-        *core.session.write().await = Some(Session {
+        let session = Session {
             account_id: "test".into(),
             client: client.clone(),
             sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
             homeserver: server.server().uri(),
             oauth: false,
-        });
+        };
+        *core.session.write().await = Some(session.clone());
         let react = || ReactParams {
             room_id: room_id.to_owned(),
             event_id: target.to_owned(),
@@ -622,13 +623,7 @@ mod tests {
 
         let (restored, _events) =
             Core::new("history-test", Box::new(MemorySessionStore::default()));
-        *restored.session.write().await = Some(Session {
-            account_id: "test".into(),
-            client: client.clone(),
-            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
-            homeserver: server.server().uri(),
-            oauth: false,
-        });
+        *restored.session.write().await = Some(session);
         assert_eq!(
             restored.frequent_reactions(None, &[]).await.unwrap(),
             ["🔥"]

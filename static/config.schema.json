@@ -1015,6 +1015,11 @@
           "type": "boolean",
           "default": false
         },
+        "personaPickerShowAccountWhenDeselected": {
+          "title": "Preview account avatar when deselected",
+          "type": "boolean",
+          "default": true
+        },
         "personaProxying": {
           "title": "Shorthand triggers",
           "type": "boolean",
@@ -2452,6 +2457,11 @@
           "title": "Pin picker to left side of composer",
           "type": "boolean",
           "default": false
+        },
+        "personaPickerShowAccountWhenDeselected": {
+          "title": "Preview account avatar when deselected",
+          "type": "boolean",
+          "default": true
         },
         "personaProxying": {
           "title": "Shorthand triggers",

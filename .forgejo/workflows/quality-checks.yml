@@ -90,6 +90,8 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - name: Check out repository
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

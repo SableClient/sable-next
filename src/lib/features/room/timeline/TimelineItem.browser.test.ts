@@ -226,7 +226,7 @@ function layers(root: Element): number[][] {
 
 test('an avatar picture fills its frame exactly, however wide the image', async () => {
   await parkPointer();
-  Object.assign(core, { fetchMedia: vi.fn(widePng) });
+  Object.assign(core, { fetchMedia: vi.fn().mockResolvedValue(await widePng()) });
   await mountItem({
     ...message('wide', '@alice:example.test', 'Alice'),
     sender_avatar: 'mxc://example.test/wide-avatar',
@@ -240,10 +240,10 @@ test('an avatar picture fills its frame exactly, however wide the image', async 
 
 test('the hover animation stacks over the still picture inside the frame', async () => {
   await parkPointer();
-  Object.assign(core, { fetchMedia: vi.fn(widePng) });
+  Object.assign(core, { fetchMedia: vi.fn().mockResolvedValue(await widePng()) });
   await mountItem({
     ...message('hover', '@hover:example.test', 'Hover'),
-    sender_avatar: 'mxc://example.test/wide-avatar',
+    sender_avatar: 'mxc://example.test/hover-avatar',
   });
 
   await expect.poll(() => document.querySelector('.avatar-root img')).not.toBeNull();

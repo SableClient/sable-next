@@ -1103,6 +1103,7 @@ test.each([
 async function withDeniedMicrophone(run: () => Promise<void>): Promise<void> {
   vi.stubGlobal('AudioContext', vi.fn());
   vi.stubGlobal('Worker', vi.fn());
+  vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true });
   Object.defineProperty(navigator, 'mediaDevices', {
     configurable: true,
     value: { getUserMedia: () => Promise.reject(new DOMException('', 'NotAllowedError')) },

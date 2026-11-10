@@ -7,6 +7,7 @@ unmaintained = "workspace"
 ignore = [
   { id = "RUSTSEC-2023-0071", reason = "openidconnect uses RSA to verify provider signatures with public keys; Sable does not perform RSA private-key operations" },
   { id = "RUSTSEC-2026-0387", reason = "openidconnect uses p256 and p384 to verify provider signatures with public keys; Sable does not use them for secret-key operations" },
+  { id = "RUSTSEC-2026-0459", reason = "Sable opens its own account stores, not externally supplied SQLite/WAL files; rusqlite must remain compatible with the pinned Matrix SDK" },
 ]
 
 [licenses]

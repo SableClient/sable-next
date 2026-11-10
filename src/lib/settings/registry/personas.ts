@@ -12,7 +12,7 @@ export const personasCategory: SettingsCategory = {
   icon: UserSwitchIcon,
   sections: [
     { id: 'persona-sending', name: 'settings.groups.sending' },
-    { id: 'persona-picker', name: 'settings.groups.personaPicker' },
+    { id: 'persona-picker-options', name: 'settings.groups.personaPicker' },
     { id: 'persona-trigger', name: 'settings.groups.personaTrigger' },
   ],
   items: [
@@ -31,14 +31,14 @@ export const personasCategory: SettingsCategory = {
     },
     {
       key: 'personaPicker',
-      section: 'persona-picker',
+      section: 'persona-picker-options',
       icon: UserSwitchIcon,
       name: 'personas.picker',
       type: 'boolean',
     },
     {
       key: 'personaPickerSortOrder',
-      section: 'persona-picker',
+      section: 'persona-picker-options',
       icon: ListNumbersIcon,
       name: 'personas.pickerSortOrder',
       type: 'select',
@@ -52,7 +52,7 @@ export const personasCategory: SettingsCategory = {
     },
     {
       key: 'personaPickerLeftSide',
-      section: 'persona-picker',
+      section: 'persona-picker-options',
       icon: PushPinIcon,
       name: 'personas.pickerLeftSide',
       type: 'boolean',
@@ -60,7 +60,7 @@ export const personasCategory: SettingsCategory = {
     },
     {
       key: 'personaPickerShowAccountWhenDeselected',
-      section: 'persona-picker',
+      section: 'persona-picker-options',
       icon: UserSwitchIcon,
       name: 'personas.pickerShowAccountWhenDeselected',
       type: 'boolean',

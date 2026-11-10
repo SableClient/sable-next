@@ -137,6 +137,7 @@ except those marked deployment only.
 - `personaPicker` (Show profile picker in the composer): `true` or `false`. Default `true`.
 - `personaPickerSortOrder` (Profile picker sort order): One of `manual`, `alphabetical-asc`, `alphabetical-desc`, `recent`. Default `recent`.
 - `personaPickerLeftSide` (Pin picker to left side of composer): `true` or `false`. Default `false`.
+- `personaPickerShowAccountWhenDeselected` (Preview account avatar when deselected): `true` or `false`. Default `true`.
 - `personaProxying` (Shorthand triggers): `true` or `false`. Default `false`.
 - `personaSelectionScope` (Remember the selected profile): One of `account`, `space`, `room`, `picker`. Default `picker`.
 - `personaKeepAfterShorthand` (Keep the profile selected after shorthand): `true` or `false`. Default `false`.
