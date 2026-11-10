@@ -116,13 +116,13 @@ run = [
   "cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-test",
 ]
 raw = true
-tools = { "github:nextest-rs/nextest" = { version = "0.9.150", version_prefix = "cargo-nextest-" } }
+tools = { "github:nextest-rs/nextest" = { version = "0.9.151", version_prefix = "cargo-nextest-" } }
 
 [tasks.mutants]
 description = "Mutation-test Rust code, e.g. `mise run mutants -- --file crates/sable-core/src/messages.rs`"
 run = "cargo mutants --test-tool nextest --all-features"
 raw = true
-tools = { "cargo:cargo-mutants" = "27.1.0", "github:nextest-rs/nextest" = { version = "0.9.150", version_prefix = "cargo-nextest-" } }
+tools = { "cargo:cargo-mutants" = "27.1.0", "github:nextest-rs/nextest" = { version = "0.9.151", version_prefix = "cargo-nextest-" } }
 
 [tasks.doc]
 description = "Build Rust documentation with warnings denied"
