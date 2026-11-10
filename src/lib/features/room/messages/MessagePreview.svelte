@@ -9,7 +9,7 @@
 
   import MessageScope from './MessageScope.svelte';
   import TimelineItem from '../timeline/TimelineItem.svelte';
-  import { useEventItems } from './event-items.svelte.js';
+  import { undecrypted, useEventItems } from './event-items.svelte.js';
   import { opensFrom } from './message-preview';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import { TIMELINE_LAYOUT_STYLE, timelineLayoutStyle } from '../timeline/timeline-layout';
@@ -57,7 +57,11 @@
   }: Props = $props();
 
   const eventItems = useEventItems();
-  let shown = $derived(item ?? eventItems.get(roomId, eventId) ?? null);
+  let shown = $derived.by(() => {
+    if (item) return item;
+    const fetched = eventItems.get(roomId, eventId) ?? null;
+    return undecrypted(fetched) ? null : fetched;
+  });
   let previous = $derived(previousEventId ? eventItems.get(roomId, previousEventId) : null);
   let collapsed = $derived(
     shown && previous ? isCollapsed([previous, shown], 1, preferences.replyPreviewStyle) : false

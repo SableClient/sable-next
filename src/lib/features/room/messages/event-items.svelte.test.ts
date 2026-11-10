@@ -204,3 +204,44 @@ test('a lookup counts as pending until it resolves or runs out of retries', asyn
   stop();
   vi.useRealTimers();
 });
+
+test('an undecryptable event is looked up again and shows once its key arrives', async () => {
+  vi.useFakeTimers();
+  const utd = {
+    event_id: '$a',
+    content: { kind: 'unable_to_decrypt', reason: 'unknown', session_id: null },
+  } as TimelineItemView;
+  const decrypted = {
+    event_id: '$a',
+    content: { kind: 'message', body: 'hi' },
+  } as TimelineItemView;
+  const eventItems = vi
+    .fn<(params: { room_id: string; event_ids: string[] }) => Promise<TimelineItemView[]>>()
+    .mockResolvedValueOnce([utd])
+    .mockResolvedValue([decrypted]);
+  const items = new EventItems({ eventItems }, () => '@me:x');
+  let latest: TimelineItemView | null | undefined;
+  const stop = $effect.root(() => {
+    $effect(() => {
+      latest = items.get('!r', '$a');
+    });
+  });
+
+  flushSync();
+  await vi.advanceTimersByTimeAsync(0);
+  flushSync();
+  expect(latest).toEqual(utd);
+  expect(items.pending('!r', '$a')).toBe(false);
+
+  await vi.advanceTimersByTimeAsync(1000);
+  flushSync();
+  expect(items.pending('!r', '$a')).toBe(false);
+  await vi.advanceTimersByTimeAsync(0);
+  flushSync();
+
+  expect(latest).toEqual(decrypted);
+  await vi.advanceTimersByTimeAsync(60000);
+  expect(eventItems).toHaveBeenCalledTimes(2);
+  stop();
+  vi.useRealTimers();
+});

@@ -7,6 +7,9 @@ export type EventItemCommands = Pick<Rpc['timeline'], 'eventItems'>;
 export const MAX_EVENT_ITEMS = 512;
 const RETRY_DELAYS_MS = [1000, 5000, 15000];
 
+export const undecrypted = (item: TimelineItemView | null | undefined): boolean =>
+  item?.content.kind === 'unable_to_decrypt';
+
 class EventItemSlot {
   value = $state.raw<TimelineItemView | null | undefined>(undefined);
   pending = $state(false);
@@ -105,7 +108,7 @@ export class EventItems {
     });
   }
 
-  #retryLater(key: string): void {
+  #retryLater(key: string, roomId: string, eventId: string): void {
     const attempt = this.#failures.get(key) ?? 0;
     if (attempt >= RETRY_DELAYS_MS.length) {
       const slot = this.#items.get(key);
@@ -116,6 +119,7 @@ export class EventItems {
     setTimeout(() => {
       const slot = this.#items.get(key);
       if (slot?.value === null) slot.value = undefined;
+      else if (undecrypted(slot?.value)) this.#request(roomId, eventId);
     }, RETRY_DELAYS_MS[attempt]);
   }
 
@@ -125,14 +129,17 @@ export class EventItems {
     const owner = this.owner();
     await Promise.all(
       batches.map(async ([roomId, ids]) => {
-        const wanted = [...ids].filter(
-          (id) => this.#items.get(this.#key(roomId, id, owner))?.value === undefined
-        );
+        const wanted = [...ids].filter((id) => {
+          const value = this.#items.get(this.#key(roomId, id, owner))?.value;
+          return value === undefined || undecrypted(value);
+        });
         if (wanted.length === 0) return;
         for (const id of wanted) {
           const slot = this.#slot(this.#key(roomId, id, owner));
-          slot.value = null;
-          slot.pending = true;
+          if (slot.value === undefined) {
+            slot.value = null;
+            slot.pending = true;
+          }
         }
         // eslint-disable-next-line svelte/prefer-svelte-reactivity -- tracks this request's misses only
         const missing = new Set(wanted);
@@ -144,13 +151,14 @@ export class EventItems {
             const slot = this.#slot(key);
             slot.value = item;
             slot.pending = false;
-            this.#failures.delete(key);
             missing.delete(item.event_id);
+            if (undecrypted(item)) this.#retryLater(key, roomId, item.event_id);
+            else this.#failures.delete(key);
           }
         } catch (error) {
           console.debug('[sable room] event items unavailable', error);
         }
-        for (const id of missing) this.#retryLater(this.#key(roomId, id, owner));
+        for (const id of missing) this.#retryLater(this.#key(roomId, id, owner), roomId, id);
       })
     );
   }
