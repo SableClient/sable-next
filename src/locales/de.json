@@ -1000,7 +1000,8 @@
     "reactions": "Reaktionen",
     "threadsFailed": "Threads konnten nicht geladen werden.",
     "reply": "Antworten",
-    "replyInThread": "In Thread antworten"
+    "replyInThread": "In Thread antworten",
+    "threadsLoadMore": ""
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden."
