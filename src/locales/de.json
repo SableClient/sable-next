@@ -692,7 +692,8 @@
     "lobbyTopicTitle": "Thema",
     "lobbyLoading": "Räume werden geladen…",
     "cosmeticsResetHint": "Verwende auch hier wieder den Namen, das Bild und die Farben aus deinem Profil und leere die Liste deiner Pronomen.",
-    "permSync": "Synchronisieren"
+    "permSync": "Synchronisieren",
+    "cosmeticsAvatarReset": "Profilbild verwenden"
   },
   "common": {
     "directMessages": "Direktnachrichten",
@@ -1026,7 +1027,10 @@
     "reproxyMessage": "",
     "editMessage": "",
     "reproxyFailed": "",
-    "threadOpen": ""
+    "threadOpen": "",
+    "replyToVerificationRequest": "Forderte Verifizierung an",
+    "replyToEvent": "Sendete ein Ereignis der Art {{type}}",
+    "replyToRedaction": "Löschte eine Nachricht"
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden.",
@@ -1076,7 +1080,8 @@
     "banned": "Du wurdest von diesem Raum gebannt.",
     "provenance": "Bereitgestellt von {{server}}",
     "uncertainProvenance": "Bereitgestellt von einem anderen Server",
-    "untrustedProvenanceTooltip": "Diese Raumvorschau wurde von {{server}} bereitgestellt und könnte inkorrekt oder veraltet sein."
+    "untrustedProvenanceTooltip": "Diese Raumvorschau wurde von {{server}} bereitgestellt und könnte inkorrekt oder veraltet sein.",
+    "knocking": "Wird gesendet…"
   },
   "userLink": {
     "action": "Eine Nachricht senden",
@@ -1150,7 +1155,24 @@
     "profileChangePropagationNone": "Mein globales Profil",
     "biographyHint": "Markdown wird unterstützt.",
     "profileChangePropagationUnchanged": "Räume, die ich nicht angepasst habe",
-    "pronounsAdd": "Pronomen ergänzen …"
+    "pronounsAdd": "Pronomen ergänzen …",
+    "about": "Über",
+    "aboutTagline": "Ein nahezu stabiler Matrix-Client.",
+    "aboutOptions": "Optionen",
+    "aboutCheckForUpdates": "Nach Aktualisierungen suchen",
+    "aboutUpdateAvailable": "Eine Aktualisierung steht bereit.",
+    "aboutUpdateCheckFailed": "Aktualisierungssuche fehlgeschlagen. Versuche es erneut.",
+    "aboutHomeserverUrl": "Adresse",
+    "aboutHomeserverSoftware": "Software",
+    "aboutRunSetup": "Einrichtung",
+    "aboutRunSetupHint": "Wiederhole die Einrichtungsschritte: dieses Gerät bestätigen, Wiederherstellung, Benachrichtigungen, Erscheinung und Synchronisierung. Nichts, dass du bereits eingerichtet hast, geht verloren.",
+    "aboutRunSetupAction": "Wiederhole Einrichtung",
+    "aboutResetCache": "Lokalen Cache zurücksetzen",
+    "aboutResetCacheHint": "Bereinigt zwischengespeicherte Raumdaten und -medien. Erhält deinen Suchindex und deine Anmeldung.",
+    "aboutResetCacheConfirmTitle": "Lokalen Cache bereinigen?",
+    "aboutResetCacheConfirmDescription": "Raumliste, Ungelesen-Zähler, Nachrichtenverlauf und zwischengespeicherte Medien werden bereinigt und erneut heruntergeladen. Dein Suchindex bleibt erhalten und du bleibst angemeldet. Bei umfangreichen Konten kann das Herunterladen eine Weile dauern.",
+    "aboutHomeserverVersion": "Version",
+    "language": "Sprache"
   },
   "qrLogin": {
     "scanCode": "QR-Code scannen",
@@ -1183,5 +1205,11 @@
   },
   "call": {
     "desktopShortcutsUnavailable": "Globale Mikrofon-Tastenkürzel stehen nicht zur Verfügung. Ändere die Tasten in den Tastatureinstellungen oder nutze die Anrufsteuerung."
+  },
+  "setup": {
+    "confirmDescription": "Bestätige dieses Gerät mit einem anderen Gerät, auf dem du angemeldet bist oder mit deinem Wiederherstellungsschlüssel.",
+    "profileTitle": "Dein Profil",
+    "progress": "Schritt {{current}} von {{total}}",
+    "title": "Dieses Gerät einrichten"
   }
 }
