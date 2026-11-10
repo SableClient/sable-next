@@ -140,7 +140,7 @@
     "bookmarkRemoved": "Ein Lesezeichen in „{{room}}“ wurde entfernt",
     "unlistedNotifications_one": "{{count, number}} ungelesene Benachrichtigung",
     "unlistedNotifications_other": "{{count, number}} ungelesene Benachrichtigungen",
-    "notificationsEmptyThreads": ""
+    "notificationsEmptyThreads": "Keine ungelesenen Thread-Antworten."
   },
   "room": {
     "createDescription": "Räume enhalten eine Konversation. Ein Space enthält Räume.",
@@ -1024,9 +1024,9 @@
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden.",
-    "helpTitle": "",
-    "showShortcuts": "",
-    "paletteHint": ""
+    "helpTitle": "Tastenkürzel",
+    "showShortcuts": "Tastenkürzel anzeigen",
+    "paletteHint": "# Räume · * Spaces · @ Direktnachrichten"
   },
   "emoji": {
     "unicode": "Emoji",
@@ -1113,48 +1113,51 @@
     "linkTitle": "Link einfügen"
   },
   "auth": {
-    "emailVerified": "",
-    "welcomeBack": ""
+    "emailVerified": "E-Mail-Adresse bestätigt",
+    "welcomeBack": "Willkommen zurück"
   },
   "settings": {
-    "verified": "",
-    "notVerified": "",
-    "encryption": "",
-    "profileSaveFailed": "",
-    "security": "",
-    "profileChangePropagation": "",
-    "timeZone": "",
-    "timeZoneAuto": "",
-    "timezone": "",
-    "account": "",
-    "profilePreview": "",
-    "timezoneNotSet": "",
-    "profileColorsBackground": "",
-    "profileColorsBrightness": "",
-    "profileChangePropagationAll": "",
-    "profileChangesTitle": "",
-    "profileColors": "",
-    "profileScopeDefault": "",
-    "removeTimezone": "",
-    "profileScope": "",
-    "profilePreviewTab": "",
-    "profileSaved": "",
-    "verificationComplete": "",
-    "profile": "",
-    "profileChangePropagationNone": "",
-    "biographyHint": "",
-    "profileChangePropagationUnchanged": "",
-    "pronounsAdd": ""
+    "verified": "Bestätigt",
+    "notVerified": "Nicht bestätigt",
+    "encryption": "Verschlüsselung",
+    "profileSaveFailed": "Deine Profiländerungen konnten nicht gespeichert werden.",
+    "security": "Sicherheit",
+    "profileChangePropagation": "Namen- und Avataränderungen anwenden auf",
+    "timeZone": "Zeitzone",
+    "timeZoneAuto": "Automatisch (dieses Gerät)",
+    "timezone": "Zeitzone",
+    "account": "Konto",
+    "profilePreview": "Profilvorschau",
+    "timezoneNotSet": "Nicht festgelegt",
+    "profileColorsBackground": "Hintergrundfarbe der Profilkarte",
+    "profileColorsBrightness": "Helligkeit der Profilkarte",
+    "profileChangePropagationAll": "Alle Räume",
+    "profileChangesTitle": "Profiländerungen",
+    "profileColors": "Profilfarben",
+    "profileScopeDefault": "Überall (Standard)",
+    "removeTimezone": "Zeitzone entfernen",
+    "profileScope": "Profil für",
+    "profilePreviewTab": "Vorschau",
+    "profileSaved": "Profil gespeichert",
+    "verificationComplete": "Dein Gerät ist bestätigt.",
+    "profile": "Profil",
+    "profileChangePropagationNone": "Mein globales Profil",
+    "biographyHint": "Markdown wird unterstützt.",
+    "profileChangePropagationUnchanged": "Räume, die ich nicht angepasst habe",
+    "pronounsAdd": "Pronomen ergänzen …"
   },
   "qrLogin": {
-    "scanCode": "",
-    "chooseGrant": "",
-    "titleLogin": "",
-    "showHintLogin": "",
-    "showHintGrant": "",
-    "scanHintLogin": "",
-    "showCode": "",
-    "titleGrant": "",
-    "chooseLogin": ""
+    "scanCode": "QR-Code scannen",
+    "chooseGrant": "Melde dich auf einem anderen Gerät an, ohne dein Passwort eingeben zu müssen.",
+    "titleLogin": "Mit QR-Code anmelden",
+    "showHintLogin": "Öffne auf deinem angemeldeten Gerät Einstellungen → Konto, wähle {{action}} und scanne diesen Code.",
+    "showHintGrant": "Wähle auf einem neuen Gerät {{action}} und scanne diesen Code.",
+    "scanHintLogin": "Öffne auf deinem angemeldeten Gerät Einstellungen → Konto, wähle {{action}} und scanne den angezeigten Code.",
+    "showCode": "QR-Code anzeigen",
+    "titleGrant": "Neues Gerät verbinden",
+    "chooseLogin": "Nutze ein Gerät, auf dem du bereits angemeldet bist, beispielsweise Sable oder Element auf deinem Telefon."
+  },
+  "call": {
+    "desktopShortcutsUnavailable": "Globale Mikrofon-Tastenkürzel stehen nicht zur Verfügung. Ändere die Tasten in den Tastatureinstellungen oder nutze die Anrufsteuerung."
   }
 }
