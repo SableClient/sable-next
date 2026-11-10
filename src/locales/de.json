@@ -1162,7 +1162,54 @@
     "reportReasonHint": "Erkläre deinen Homeserver-Administratoren, warum diese Nachricht entfernt werden sollte.",
     "forwardSend": "Weiterleiten",
     "forwardIncludeMetadata": "Ursprüngliche Ereignismetadaten einschließen",
-    "forwardMetadataPreserved": "Bei bestehenden Weiterleitungen bleiben die ursprünglichen Metadaten erhalten."
+    "forwardMetadataPreserved": "Bei bestehenden Weiterleitungen bleiben die ursprünglichen Metadaten erhalten.",
+    "redactedWithReason": "",
+    "profileKickConfirm": "",
+    "membershipBy": {
+      "unbanned": "",
+      "invited": "",
+      "banned": "",
+      "kicked_and_banned": "",
+      "kicked": "",
+      "invitation_revoked": "",
+      "knock_accepted": "",
+      "knock_denied": ""
+    },
+    "profileBanConfirm": "",
+    "locationShowMap": "",
+    "withReason": "",
+    "profileModerationFailed": "",
+    "profileModerationDenied": "",
+    "redactedBy": "",
+    "redactedByWithReason": "",
+    "utd": {
+      "title": {
+        "unsignedDevice": "",
+        "historicalMessageBackupDisabled": "",
+        "historicalMessageDeviceUnverified": "",
+        "waiting": "",
+        "sentBeforeWeJoined": "",
+        "withheldUnverified": "",
+        "withheld": ""
+      },
+      "details": {
+        "verificationViolation": "",
+        "unknownDevice": "",
+        "historicalMessageBackupDisabled": "",
+        "historicalMessageDeviceUnverified": "",
+        "withheldUnverified": "",
+        "withheld": "",
+        "waiting": "",
+        "sentBeforeWeJoined": ""
+      },
+      "cause": {
+        "historicalMessageBackupDisabled": "",
+        "waiting": "",
+        "unsignedDevice": "",
+        "unknownDevice": ""
+      },
+      "causeHeader": ""
+    }
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden.",
