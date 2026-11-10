@@ -7,7 +7,7 @@ use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk_ui::sync_service::SyncService;
 use tokio::sync::{Mutex, MutexGuard, Notify, RwLock, watch};
 
-use crate::{Core, presence};
+use crate::Core;
 
 const HEALTH_INTERVAL: Duration = Duration::from_secs(30);
 const STUCK_AFTER: Duration = Duration::from_secs(60);
@@ -204,8 +204,7 @@ impl Core {
         };
         if should_sync {
             // Starting a running service is a no-op, but from `Offline` it retries at once.
-            self.set_sync_presence(presence::state(self.desired_presence()))
-                .await;
+            self.set_sync_presence(self.sync_presence().await).await;
             transition.start_sync(&sync_service).await;
             drop(transition);
             // Fetches replied-to events, which must not hold up local reads or the next pause.

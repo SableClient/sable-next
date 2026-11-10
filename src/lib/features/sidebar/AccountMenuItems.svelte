@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { PresenceView, SessionInfo } from '#src/generated/protocol';
+  import type { SessionInfo } from '#src/generated/protocol';
   import { signOutServer } from '#lib/platform/server-session.js';
   import { i18n } from '#lib/i18n.js';
   import type { AccountDirectory } from './account-directory.svelte.js';
@@ -15,11 +15,14 @@
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import { useActionMenuSurface } from '#lib/ui/primitives/action-menu.js';
-  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import {
+    ownPresence,
+    presenceChoices,
+    setOwnPresence,
+  } from '#lib/rooms/presence-override.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import QrCodeIcon from 'phosphor-svelte/lib/QrCodeIcon';
-
-  const PRESENCE_OPTIONS: readonly PresenceView[] = ['online', 'unavailable', 'offline'];
 
   interface Props {
     accounts: readonly SessionInfo[];
@@ -52,7 +55,7 @@
   }: Props = $props();
 
   const core = useCoreClient();
-  let presence = $derived(preferences.presence);
+  let presence = $derived(ownPresence());
   const surface = useActionMenuSurface();
 
   let serverSignOutFailed = $state(false);
@@ -72,11 +75,13 @@
       <PresenceDot {presence} size="large" label={i18n.t(`presence.${presence}`)} />
       <span class="presence-name">{i18n.t(`presence.${presence}`)}</span>
     {/snippet}
-    {#each PRESENCE_OPTIONS as option (option)}
+    {#each presenceChoices() as option (option)}
       <ActionMenuItem
         checked={option === presence}
         onSelect={() => {
-          setPreference('presence', option);
+          void setOwnPresence(option).catch((error: unknown) => {
+            console.warn('[sable presence] presence not saved', error);
+          });
         }}
       >
         <PresenceDot presence={option} label={i18n.t(`presence.${option}`)} size="medium" />

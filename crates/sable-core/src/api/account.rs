@@ -11,8 +11,8 @@ use super::{Handler, Json};
 use crate::media::mxc_uri;
 use crate::profile_overrides::OverrideEdit;
 use crate::profiles::profile_view;
-use crate::protocol::{BookmarkView, NotificationModeView, RpcError, FieldEdit, InviteTriageView, MediaPreviewConfigView, MediaPreviewsView, MutualRoomView, PresenceSharingEdit, PresenceSharingView, PresenceView, ProfileOverridesView, ProfileView, SealedAccountDataView, UserDirectoryEntryView};
-use crate::{Core, ResultExt, presence};
+use crate::protocol::{BookmarkView, NotificationModeView, RpcError, FieldEdit, InviteTriageView, MediaPreviewConfigView, MediaPreviewsView, MutualRoomView, PresenceSharingEdit, PresenceOverrideView, PresenceSharingView, PresenceView, ProfileOverridesView, ProfileView, SealedAccountDataView, UserDirectoryEntryView};
+use crate::{Core, ResultExt};
 
 domain! {
     set_read_receipts,
@@ -40,6 +40,8 @@ domain! {
     fetch_presence,
     presence_sharing,
     edit_presence_sharing,
+    presence_override,
+    set_presence_override,
     search_user_directory,
     dismissed_invites,
     set_invite_dismissed,
@@ -640,9 +642,10 @@ impl Handler for SetPresenceParams {
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         core.set_desired_presence(self.presence);
 
+        let presence = core.sync_presence().await;
         let client = core.client().await?;
         client
-            .set_presence(presence::state(self.presence), self.status_message, true)
+            .set_presence(presence, self.status_message, true)
             .await
             .or_failed(core, "set_presence")?;
 
@@ -1037,6 +1040,34 @@ impl Handler for EditPresenceSharingParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<PresenceSharingView, RpcError> {
         core.edit_presence_sharing(&self.edit).await
+    }
+}
+
+/// `None` when the homeserver does not support MSC4532.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PresenceOverrideParams {}
+
+impl Handler for PresenceOverrideParams {
+    type Ok = Option<PresenceOverrideView>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Option<PresenceOverrideView>, RpcError> {
+        core.presence_override().await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetPresenceOverrideParams {
+    #[serde(rename = "override")]
+    pub presence_override: PresenceOverrideView,
+}
+
+impl Handler for SetPresenceOverrideParams {
+    type Ok = PresenceOverrideView;
+
+    async fn run(self, core: &Arc<Core>) -> Result<PresenceOverrideView, RpcError> {
+        core.set_presence_override(&self.presence_override).await
     }
 }
 

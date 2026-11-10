@@ -598,6 +598,7 @@ pub(super) async fn join(
     );
     drop(calls);
     core.apply_app_activity(core.activity.app_active()).await;
+    core.refresh_presence().await;
     if !core.is_current(generation) {
         return Err(RpcError::NotLoggedIn);
     }

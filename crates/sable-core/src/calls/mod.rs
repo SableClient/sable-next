@@ -926,6 +926,7 @@ impl Core {
         drop(call.updates.take());
         drop(call.postpone.take());
         let result = self.hang_up(&call).await;
+        self.refresh_presence().await;
         // A call kept sync running past `Suspended`; stop it before the audio session ends.
         self.apply_app_activity(false).await;
         result

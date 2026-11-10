@@ -7469,6 +7469,7 @@ dependencies = [
  "assign",
  "js_int",
  "js_option",
+ "ruma-appservice-api",
  "ruma-client-api",
  "ruma-common",
  "ruma-events",
@@ -7476,6 +7477,19 @@ dependencies = [
  "ruma-html",
  "ruma-signatures",
  "web-time",
+]
+
+[[package]]
+name = "ruma-appservice-api"
+version = "0.17.1"
+source = "git+https://github.com/ruma/ruma?rev=0ed7fba34213f18a628a56f527c6cc795cd7eef5#0ed7fba34213f18a628a56f527c6cc795cd7eef5"
+dependencies = [
+ "http",
+ "js_int",
+ "ruma-common",
+ "ruma-events",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

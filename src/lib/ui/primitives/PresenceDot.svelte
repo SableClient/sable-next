@@ -27,6 +27,8 @@
   <svg viewBox="0 0 10 10" aria-hidden="true">
     {#if presence === 'unavailable'}
       <path d="M5 0A5 5 0 1 0 10 5A4 4 0 0 1 5 0Z" />
+    {:else if presence === 'busy'}
+      <path d="M5 0A5 5 0 1 0 5 10A5 5 0 1 0 5 0ZM2.5 4H7.5V6H2.5Z" fill-rule="evenodd" />
     {:else if presence === 'offline'}
       <circle cx="5" cy="5" r="3.5" fill="none" stroke="currentColor" stroke-width="2" />
     {:else}
@@ -84,5 +86,9 @@
 
   .presence-dot[data-presence='unavailable'] {
     color: var(--warn-main);
+  }
+
+  .presence-dot[data-presence='busy'] {
+    color: var(--crit-main);
   }
 </style>

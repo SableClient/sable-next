@@ -412,7 +412,7 @@ const SETTINGS = {
   blurMedia: toggle(false, { account: true }),
   blurAvatars: toggle(false, { account: true }),
   blurEmotes: toggle(false, { account: true }),
-  presence: choice<PresenceView>(['online', 'unavailable', 'offline'], 'online'),
+  presence: choice<PresenceView>(['online', 'unavailable', 'busy', 'offline'], 'online'),
   presenceStatusMessage: text(''),
   loadingAnimal: text('', { account: true }),
 

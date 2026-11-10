@@ -1012,6 +1012,11 @@ export type PredecessorRoomView = {
 /**  A missing or unknown value is `forbid`. */
 export type PresenceHintView = "suggest" | "forbid";
 
+export type PresenceOverrideView = {
+	state: PresenceView | null,
+	status_message: string | null,
+};
+
 export type PresencePromptView = { kind: "user"; user_id: string } | { kind: "room"; room_id: string };
 
 export type PresenceSharingEdit = { kind: "share_locally"; enabled: boolean } |
@@ -1033,7 +1038,7 @@ export type PresenceSharingView = {
 
 export type PresenceUserSharingView = "allow" | "deny";
 
-export type PresenceView = "online" | "offline" | "unavailable";
+export type PresenceView = "online" | "offline" | "unavailable" | "busy";
 
 export type PrimitiveType = "string" | "integer" | "boolean" | "user_id" | "server_name" | "room_alias" | "room_id" | "event_id";
 
@@ -2331,6 +2336,10 @@ export type Rpc = {
     editPresenceSharing: (params: {
 	edit: PresenceSharingEdit,
 }) => Promise<PresenceSharingView>;
+    presenceOverride: (params?: Record<string, never>) => Promise<PresenceOverrideView | null>;
+    setPresenceOverride: (params: {
+	override: PresenceOverrideView,
+}) => Promise<PresenceOverrideView>;
     searchUserDirectory: (params: {
 	term: string,
 	limit?: number | null,
@@ -3708,6 +3717,8 @@ export type RpcMethods = {
   'account.fetch_presence': Rpc['account']['fetchPresence'];
   'account.presence_sharing': Rpc['account']['presenceSharing'];
   'account.edit_presence_sharing': Rpc['account']['editPresenceSharing'];
+  'account.presence_override': Rpc['account']['presenceOverride'];
+  'account.set_presence_override': Rpc['account']['setPresenceOverride'];
   'account.search_user_directory': Rpc['account']['searchUserDirectory'];
   'account.dismissed_invites': Rpc['account']['dismissedInvites'];
   'account.set_invite_dismissed': Rpc['account']['setInviteDismissed'];
@@ -4044,6 +4055,8 @@ export function createRpc(call: RpcCall): Rpc {
       fetchPresence: (params) => call('account.fetch_presence', params) as ReturnType<Rpc['account']['fetchPresence']>,
       presenceSharing: (params = {}) => call('account.presence_sharing', params) as ReturnType<Rpc['account']['presenceSharing']>,
       editPresenceSharing: (params) => call('account.edit_presence_sharing', params) as ReturnType<Rpc['account']['editPresenceSharing']>,
+      presenceOverride: (params = {}) => call('account.presence_override', params) as ReturnType<Rpc['account']['presenceOverride']>,
+      setPresenceOverride: (params) => call('account.set_presence_override', params) as ReturnType<Rpc['account']['setPresenceOverride']>,
       searchUserDirectory: (params) => call('account.search_user_directory', params) as ReturnType<Rpc['account']['searchUserDirectory']>,
       dismissedInvites: (params = {}) => call('account.dismissed_invites', params) as ReturnType<Rpc['account']['dismissedInvites']>,
       setInviteDismissed: (params) => call('account.set_invite_dismissed', params) as ReturnType<Rpc['account']['setInviteDismissed']>,

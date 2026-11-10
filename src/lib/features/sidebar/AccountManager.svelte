@@ -46,7 +46,12 @@
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import StatusEmojiPicker from '#lib/features/settings/StatusEmojiPicker.svelte';
-  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import {
+    ownPresence,
+    presenceChoices,
+    setOwnPresence,
+  } from '#lib/rooms/presence-override.svelte.js';
   import { AccountDirectory } from './account-directory.svelte.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
   import QrCodeIcon from 'phosphor-svelte/lib/QrCodeIcon';
@@ -68,14 +73,13 @@
   let displayName = $derived(profile?.display_name ?? activeUserId);
   let userStatus = $derived(resolveUserStatus(profile, presenceStore.get(activeUserId)));
   let profileColor = $derived(profile?.hero_color ?? 'var(--primary-container)');
-  let presenceOptions = $derived<OptionCard<PresenceView>[]>([
-    { value: 'online', label: i18n.t('presence.online') },
-    { value: 'unavailable', label: i18n.t('presence.unavailable') },
-    { value: 'offline', label: i18n.t('presence.offline') },
-  ]);
+  let presence = $derived(ownPresence());
+  let presenceOptions = $derived<OptionCard<PresenceView>[]>(
+    presenceChoices().map((value) => ({ value, label: i18n.t(`presence.${value}`) }))
+  );
   let statusDraft = $state('');
   let statusEmojiDraft = $state('');
-  let presenceDraft = $state<PresenceView>(preferences.presence);
+  let presenceDraft = $state<PresenceView>(ownPresence());
   let statusOpen = $state(false);
   let statusSaving = $state(false);
   let statusError = $state<string | null>(null);
@@ -123,8 +127,7 @@
         }
         profile = profile ? { ...profile, status } : await core.userProfile(activeUserId);
       }
-      setPreference('presenceStatusMessage', text);
-      setPreference('presence', presenceDraft);
+      await setOwnPresence(presenceDraft, text);
       statusOpen = false;
     } catch (cause) {
       console.warn('[sable nav] saving status failed', cause);
@@ -183,18 +186,18 @@
     type="button"
     aria-haspopup="dialog"
     aria-expanded={statusOpen}
-    aria-label={`${i18n.t('presence.setStatus')}: ${i18n.t(`presence.${preferences.presence}`)}${ownStatus ? `, ${ownStatus}` : ''}`}
+    aria-label={`${i18n.t('presence.setStatus')}: ${i18n.t(`presence.${presence}`)}${ownStatus ? `, ${ownStatus}` : ''}`}
     onclick={() => {
       statusDraft = ownStatus;
       statusEmojiDraft = userStatus?.emoji ?? '';
-      presenceDraft = preferences.presence;
+      presenceDraft = presence;
       statusError = null;
       statusOpen = true;
     }}
   >
     <span class="status-bubble-presence">
-      <PresenceDot presence={preferences.presence} label="" size="medium" />
-      {i18n.t(`presence.${preferences.presence}`)}
+      <PresenceDot {presence} label="" size="medium" />
+      {i18n.t(`presence.${presence}`)}
     </span>
     <span class={['status-bubble-text', { placeholder: !ownStatus }]}
       >{#if userStatus?.emoji}<span>{userStatus.emoji}</span>
@@ -397,7 +400,7 @@
         loading={statusSaving}
         disabled={statusDraft.trim() === ownStatus &&
           statusEmojiDraft === (userStatus?.emoji ?? '') &&
-          presenceDraft === preferences.presence}>{i18n.t('common.save')}</Button
+          presenceDraft === presence}>{i18n.t('common.save')}</Button
       >
     </DialogActions>
   </form>

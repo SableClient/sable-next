@@ -457,13 +457,21 @@ pub enum CoreEvent {
     },
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
 pub enum PresenceView {
     Online,
     Offline,
     Unavailable,
+    Busy,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct PresenceOverrideView {
+    pub state: Option<PresenceView>,
+    pub status_message: Option<String>,
 }
 
 /// A missing or unknown value is `forbid`.

@@ -33,6 +33,7 @@
   import { InviteActions } from '#lib/rooms/invites.svelte.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
   import { presenceSharing } from '#lib/rooms/presence-sharing.svelte.js';
+  import { presenceOverride } from '#lib/rooms/presence-override.svelte.js';
   import { dmSpaces } from '#lib/rooms/dm-spaces.svelte.js';
   import { spaceNotifications } from '#lib/rooms/space-notifications.svelte.js';
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
@@ -627,8 +628,10 @@
     void core.accountRevision;
     if (core.status !== 'ready') return;
 
-    const message = preferences.presenceStatusMessage.trim();
-    const presence = preferences.sendPresence ? preferences.presence : 'offline';
+    const revised = presenceOverride.supported;
+    const message = revised ? '' : preferences.presenceStatusMessage.trim();
+    const picked = revised ? 'online' : preferences.presence;
+    const presence = preferences.sendPresence ? picked : 'offline';
     const away = presence === 'online' && (!active || idle);
     const status = preferences.sendPresence && message ? message : null;
     const timer = setTimeout(() => {
@@ -988,6 +991,7 @@
       presence.start(core);
       dismissedInvites.start(core);
       presenceSharing.start(core);
+      presenceOverride.start(core);
       dmSpaces.start(core);
       spaceNotifications.start(core);
       mediaPreviewSettings.start(core);
@@ -1001,6 +1005,7 @@
       presence.stop();
       dismissedInvites.stop();
       presenceSharing.stop();
+      presenceOverride.stop();
       dmSpaces.stop();
       spaceNotifications.stop();
       mediaPreviewSettings.stop();

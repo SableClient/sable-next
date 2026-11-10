@@ -638,7 +638,7 @@ impl Core {
             self.with_open_stores(async || account_data::stored_types(&client).await)
                 .await,
         );
-        match account_data::server_types(&client, presence::state(self.desired_presence())).await {
+        match account_data::server_types(&client, self.sync_presence().await).await {
             Ok(listed) => {
                 for event_type in listed {
                     if !types.contains(&event_type) {

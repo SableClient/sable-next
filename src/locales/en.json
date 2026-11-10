@@ -3783,6 +3783,7 @@
     "online": "Online",
     "offline": "Offline",
     "unavailable": "Away",
+    "busy": "Busy",
     "lastSeenNow": "Last seen just now",
     "lastSeenMinutes_one": "Last seen {{count, number}} minute ago",
     "lastSeenMinutes_other": "Last seen {{count, number}} minutes ago",

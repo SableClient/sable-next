@@ -21,6 +21,7 @@ test.each([
   ['online', 'circle', 'path'],
   ['unavailable', 'path', 'circle'],
   ['offline', 'circle[fill="none"]', 'path'],
+  ['busy', 'path[fill-rule="evenodd"]', 'circle'],
 ] as const)('draws %s with its own shape', (presence, shown, hidden) => {
   render(PresenceDot, { presence, label: presence });
 

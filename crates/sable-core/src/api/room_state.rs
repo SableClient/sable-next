@@ -10,7 +10,7 @@ use sable_model::bot_commands::BotCommand;
 
 use super::{Handler, Json};
 use crate::protocol::{AbbreviationView, RpcError, HistoryVisibilityView, PresenceHintView, JoinRuleView, RoomStateEventView};
-use crate::{Core, ResultExt, account_data, presence};
+use crate::{Core, ResultExt, account_data};
 use crate::media::mxc_uri;
 use crate::room_settings::AclEdit;
 
@@ -503,7 +503,7 @@ impl Handler for AccountDataTypesParams {
         let types = account_data::room_server_types(
             &client,
             &self.room_id,
-            presence::state(core.desired_presence()),
+            core.sync_presence().await,
         )
         .await
         .or_failed(core, "room_account_data_types")?;
