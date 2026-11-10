@@ -1155,7 +1155,25 @@
     "scanHintLogin": "Öffne auf deinem angemeldeten Gerät Einstellungen → Konto, wähle {{action}} und scanne den angezeigten Code.",
     "showCode": "QR-Code anzeigen",
     "titleGrant": "Neues Gerät verbinden",
-    "chooseLogin": "Nutze ein Gerät, auf dem du bereits angemeldet bist, beispielsweise Sable oder Element auf deinem Telefon."
+    "chooseLogin": "Nutze ein Gerät, auf dem du bereits angemeldet bist, beispielsweise Sable oder Element auf deinem Telefon.",
+    "waitingForToken": "",
+    "failed": {
+      "device_in_use": "",
+      "declined": "",
+      "unsupported": ""
+    },
+    "announceCheckCode": "",
+    "confirm": "",
+    "showCheckCode": "",
+    "doneGrant": "",
+    "checkCodeLabel": "",
+    "scanHintGrant": "",
+    "codeLabel": "",
+    "enterCheckCode": "",
+    "starting": "",
+    "syncing": "",
+    "waiting": "",
+    "linkDeviceAction": ""
   },
   "call": {
     "desktopShortcutsUnavailable": "Globale Mikrofon-Tastenkürzel stehen nicht zur Verfügung. Ändere die Tasten in den Tastatureinstellungen oder nutze die Anrufsteuerung."
