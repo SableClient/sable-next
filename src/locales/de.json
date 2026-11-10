@@ -1106,7 +1106,13 @@
     "profileDemoteSelfBody": "Wenn du dich selbst zu einer niedrigeren Berechtigungsstufe degradierst, kann das nicht rückgängig gemacht werden. Es ist niemand sonst auf deiner Stufe übrig, der dich wieder befördern könnte.",
     "profileMessage": "Nachricht",
     "profileIdentity": "Identität",
-    "profileDevicePolicy": "Verschlüsselte Nachrichten werden an alle Geräte dieses Nutzers gesendet, die du nicht ausdrücklich blockiert hast."
+    "profileDevicePolicy": "Verschlüsselte Nachrichten werden an alle Geräte dieses Nutzers gesendet, die du nicht ausdrücklich blockiert hast.",
+    "callJoined": "",
+    "locationFallback": "",
+    "callLeft": "",
+    "profileDemoteSelfConfirm": "",
+    "pinnedUnchanged": "",
+    "pinnedBoth": ""
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden.",
