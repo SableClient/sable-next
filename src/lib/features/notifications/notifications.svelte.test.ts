@@ -367,7 +367,10 @@ test('shows ordinary channel messages when browser notifications are enabled', a
       expect.objectContaining({ body: 'Alice: Hello everyone' })
     );
   });
-  expect(show.mock.calls[0]?.[1]).not.toHaveProperty('tag');
+  expect(show.mock.calls[0]?.[1]).toHaveProperty(
+    'tag',
+    '@me:example.org !room:example.org:$message'
+  );
   notifications.stop();
 });
 
@@ -403,8 +406,10 @@ test('each message posts its own banner instead of replacing a room alert', asyn
     'Alice: first',
     'Alice: second',
   ]);
-  expect(show.mock.calls[0]?.[1]).not.toHaveProperty('tag');
-  expect(show.mock.calls[1]?.[1]).not.toHaveProperty('tag');
+  expect(show.mock.calls.map((call) => (call[1] as NotificationOptions).tag)).toEqual([
+    '@me:example.org !room:example.org:$first',
+    '@me:example.org !room:example.org:$second',
+  ]);
   notifications.stop();
 });
 
@@ -461,7 +466,42 @@ test('a browser without the Notification constructor shows through the service w
       })
     );
   });
-  expect(showNotification.mock.calls[0]?.[1]).not.toHaveProperty('tag');
+  expect(showNotification.mock.calls[0]?.[1]).toHaveProperty(
+    'tag',
+    '@me:example.org !room:example.org:$message'
+  );
+  notifications.stop();
+});
+
+test('web push browsers show through the service worker', async () => {
+  const showNotification = vi.fn().mockResolvedValue(undefined);
+  const construct = vi.fn();
+  vi.stubGlobal(
+    'Notification',
+    Object.assign(
+      function () {
+        construct();
+      },
+      { permission: 'granted' }
+    )
+  );
+  vi.stubGlobal('PushManager', function () {});
+  vi.stubGlobal('navigator', {
+    serviceWorker: { getRegistration: () => Promise.resolve({ showNotification }) },
+  });
+  preferences.systemNotifications = true;
+  preferences.notificationContent = true;
+  const notifications = center();
+
+  notifications.present({ ...invite(), event_id: '$message', room_name: 'General' });
+
+  await vi.waitFor(() => {
+    expect(showNotification).toHaveBeenCalledWith(
+      'General',
+      expect.objectContaining({ tag: '@me:example.org !room:example.org:$message' })
+    );
+  });
+  expect(construct).not.toHaveBeenCalled();
   notifications.stop();
 });
 

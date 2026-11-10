@@ -6,6 +6,7 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 import { appName, faviconUrl } from '#lib/deployment/brand.js';
 import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { electronBridge } from '#lib/platform/electron.js';
+import { deliversWebPush } from '#lib/platform/notifications.js';
 import { watchNativePushMessages } from '#lib/platform/native-notifications.js';
 import { hasUnread, roomNotifications, type RoomUnread } from '#lib/rooms/unread.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -352,17 +353,27 @@ export class NotificationCenter {
 
     const options = {
       body: body(view),
+      tag:
+        view.event_id === null
+          ? roomTag(view.user_id, view.room_id)
+          : `${roomTag(view.user_id, view.room_id)}:${view.event_id}`,
       icon: await avatar(core, view),
       silent: true,
     };
+    const fromWorker = () =>
+      showFromWorker(title(view), {
+        ...options,
+        data: { roomId: view.room_id, userId: view.user_id, eventId: view.event_id },
+      });
+    if (deliversWebPush()) {
+      await fromWorker();
+      return;
+    }
     let notification: Notification;
     try {
       notification = new Notification(title(view), options);
     } catch {
-      await showFromWorker(title(view), {
-        ...options,
-        data: { roomId: view.room_id, userId: view.user_id, eventId: view.event_id },
-      });
+      await fromWorker();
       return;
     }
     const electron = electronBridge();

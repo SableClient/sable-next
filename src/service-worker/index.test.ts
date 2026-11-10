@@ -123,6 +123,31 @@ test('count-only read pushes close messages and retain active call banners', asy
   expect(call.close).not.toHaveBeenCalled();
 });
 
+test('a push for an already shown event is skipped', async () => {
+  const tag = '@me:example.org !room:example.org:$message';
+  mocks.notifications.mockImplementation((filter?: { tag?: string }) =>
+    Promise.resolve(filter?.tag === tag ? [{ tag, data: {} }] : [])
+  );
+  mocks.complete.mockResolvedValue(
+    pushNotification({
+      user_id: '@me:example.org',
+      room_id: '!room:example.org',
+      event_id: '$message',
+      unread: 1,
+      type: 'm.room.message',
+      content: { body: 'hello' },
+    })
+  );
+  await push({
+    user_id: '@me:example.org',
+    room_id: '!room:example.org',
+    event_id: '$message',
+    counts: { unread: 1 },
+  });
+  expect(mocks.show).not.toHaveBeenCalled();
+  mocks.notifications.mockResolvedValue([]);
+});
+
 test('install refuses an HTML response in place of the model', async () => {
   const put = vi.fn().mockResolvedValue(undefined);
   vi.stubGlobal('caches', { open: () => Promise.resolve({ put }) });

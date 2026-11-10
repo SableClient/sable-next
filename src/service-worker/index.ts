@@ -397,6 +397,13 @@ async function present(
     await showFallback();
     return;
   }
+  if (
+    'getNotifications' in worker.registration &&
+    (await worker.registration.getNotifications({ tag })).length > 0
+  ) {
+    await record('ALREADY_SHOWN', trace);
+    return;
+  }
   await worker.registration.showNotification(showing.title, options);
   await record('POSTED', trace);
 }
