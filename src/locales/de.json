@@ -1157,12 +1157,12 @@
     "sourceEncryption": "Verschlüsselungsdetails",
     "pollVotes_one": "{{count, number}} Stimme",
     "pollVotes_other": "{{count, number}} Stimmen",
-    "forwardTitle": "",
-    "reportSend": "",
-    "reportReasonHint": "",
-    "forwardSend": "",
-    "forwardIncludeMetadata": "",
-    "forwardMetadataPreserved": ""
+    "forwardTitle": "Weiterleiten an",
+    "reportSend": "Melden",
+    "reportReasonHint": "Erkläre deinen Homeserver-Administratoren, warum diese Nachricht entfernt werden sollte.",
+    "forwardSend": "Weiterleiten",
+    "forwardIncludeMetadata": "Ursprüngliche Ereignismetadaten einschließen",
+    "forwardMetadataPreserved": "Bei bestehenden Weiterleitungen bleiben die ursprünglichen Metadaten erhalten."
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden.",
