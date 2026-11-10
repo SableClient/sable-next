@@ -285,13 +285,19 @@
     "uncertainProvenance": "",
     "uncertainProvenanceTooltip": "",
     "untrustedProvenanceTooltip": "",
-    "trustedProvenanceTooltip": ""
+    "trustedProvenanceTooltip": "",
+    "bannedReason": ""
   },
   "direct": {
     "failed": "",
     "submit": "",
     "confirmTitle": "",
-    "confirmBody": ""
+    "confirmBody": "",
+    "encryptionHint": "",
+    "description": "",
+    "addressLabel": "",
+    "addressPlaceholder": "",
+    "addressInvalid": ""
   },
   "userLink": {
     "action": "",
@@ -655,7 +661,8 @@
         "verificationViolation": "",
         "historicalMessageBackupDisabled": "",
         "historicalMessageDeviceUnverified": "",
-        "withheldUnverified": ""
+        "withheldUnverified": "",
+        "withheld": ""
       },
       "title": {
         "waiting": "",
@@ -663,22 +670,49 @@
         "sentBeforeWeJoined": "",
         "unsignedDevice": "",
         "unknownDevice": "",
-        "historicalMessageBackupDisabled": ""
+        "historicalMessageBackupDisabled": "",
+        "historicalMessageDeviceUnverified": "",
+        "withheldUnverified": ""
       },
       "cause": {
         "waiting": "",
         "unsignedDevice": "",
         "unknownDevice": "",
         "historicalMessageBackupDisabled": "",
-        "historicalMessageDeviceUnverified": ""
+        "historicalMessageDeviceUnverified": "",
+        "withheldUnverified": ""
       },
       "enableKeyBackup": "",
-      "confirmThisDevice": ""
+      "confirmThisDevice": "",
+      "causeHeader": "",
+      "openIdentitySettings": ""
     },
     "audioVolume": "",
     "sourceEncryption": "",
     "forwardMetadataPreserved": "",
-    "forwardIncludeMetadata": ""
+    "forwardIncludeMetadata": "",
+    "threeTyping": "",
+    "videoUnsupported": "",
+    "shield": {
+      "title": {
+        "authenticityNotGuaranteed": "",
+        "unknownDevice": "",
+        "unsignedDevice": "",
+        "unverifiedIdentity": "",
+        "verificationViolation": "",
+        "mismatchedSender": "",
+        "sentInClear": ""
+      },
+      "body": {
+        "authenticityNotGuaranteed": "",
+        "unknownDevice": "",
+        "unsignedDevice": "",
+        "unverifiedIdentity": "",
+        "verificationViolation": "",
+        "mismatchedSender": "",
+        "sentInClear": ""
+      }
+    }
   },
   "viewer": {
     "title": "",
@@ -805,7 +839,8 @@
     "addressPreview": "",
     "addressExplained": "",
     "addressExplainedAfter": "",
-    "resetPasswordOpenedLink": ""
+    "resetPasswordOpenedLink": "",
+    "openInBrowser": ""
   },
   "setup": {
     "title": "",
@@ -1904,7 +1939,9 @@
       "pride": "",
       "pridegradient": "",
       "ceo": "",
-      "cuba": ""
+      "cuba": "",
+      "ukraine": "",
+      "palestine": ""
     },
     "serverSearch": "",
     "serverSearchHint": "",
@@ -1984,7 +2021,27 @@
     "supporterThanksTitle": "",
     "syncDraftsHint": "",
     "needsServerFeature": "",
-    "troubleshootGatewayActivated": ""
+    "troubleshootGatewayActivated": "",
+    "logoutServer": "",
+    "supporterVerifyTitle": "",
+    "emoticonToEmoji": "",
+    "startMinimized": "",
+    "showSingleReactionCount": "",
+    "supporterThanksDescription": "",
+    "supporterBegTitle": "",
+    "supporterBegDescription": "",
+    "supporterVerifyDescription": "",
+    "supporterVerifyButton": "",
+    "supporterVerifyClaim": "",
+    "devicesDashboard": "",
+    "supporterThanksButton": "",
+    "messageSwipeAction": "",
+    "messageSwipeActionReply": "",
+    "messageSwipeActionMembers": "",
+    "showAllTimestamps": "",
+    "pushInactiveTimeout": "",
+    "troubleshootLoopbackUnforwarded": "",
+    "settingExcludedFromSync": ""
   },
   "errors": {
     "pageTitle": "",
@@ -2464,7 +2521,8 @@
     "scheduleIn1Hour": "",
     "scheduleTomorrow9am": "",
     "skipLinkPreview": "",
-    "botCommandInvalid": ""
+    "botCommandInvalid": "",
+    "sendTooLarge": ""
   },
   "search": {
     "resize": "",
@@ -2577,7 +2635,9 @@
     "alternateAvatarLabel": "",
     "alternateAvatarViewOn": "",
     "alternateAvatarViewOff": "",
-    "triggerAlternateAvatar": ""
+    "triggerAlternateAvatar": "",
+    "pickerAccount": "",
+    "alternateAvatarNone": ""
   },
   "call": {
     "participantVolume": "",
@@ -2788,7 +2848,8 @@
     "capabilityLivekitLeave": "",
     "capabilityOther": "",
     "integrationManagerTermsTitle": "",
-    "capabilitiesForget": ""
+    "capabilitiesForget": "",
+    "capabilitiesRemember": ""
   },
   "pdf": {
     "documentLabel": "",
@@ -2834,7 +2895,8 @@
     "hangUp": "",
     "toggleEmojiPicker": "",
     "toggleGifPicker": "",
-    "toggleStickerPicker": ""
+    "toggleStickerPicker": "",
+    "closeRoom": ""
   },
   "calendar": {
     "label": "",
@@ -2949,7 +3011,10 @@
     "stealExplain": "",
     "stealFailed": "",
     "downloadOne": "",
-    "downloadMany": ""
+    "downloadMany": "",
+    "stopUsingAllEverywhere": "",
+    "invalidShortcode": "",
+    "useAllEverywhere": ""
   },
   "a11y": {
     "loading": ""
@@ -2992,7 +3057,8 @@
     "announceCheckCode": "",
     "announceUserCode": "",
     "chooseLogin": "",
-    "linkDeviceAction": ""
+    "linkDeviceAction": "",
+    "openApprovalFailed": ""
   },
   "sounds": {
     "notification": "",
