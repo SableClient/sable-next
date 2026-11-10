@@ -1,10 +1,17 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
+use std::time::Duration;
+
+use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk_ui::sync_service::SyncService;
 use tokio::sync::{Mutex, MutexGuard, Notify, RwLock, watch};
 
 use crate::{Core, presence};
+
+const HEALTH_INTERVAL: Duration = Duration::from_secs(30);
+const STUCK_AFTER: Duration = Duration::from_secs(60);
+const STUCK_CONFIRMED_AFTER: Duration = Duration::from_secs(10);
 
 pub(crate) struct Activity {
     app_active: AtomicBool,
@@ -45,6 +52,20 @@ impl Activity {
             activity: self,
             _serial: self.transition.lock().await,
         }
+    }
+
+    /// A process the OS froze wakes with the first wait already elapsed, so only a second one
+    /// proves the transition is stuck.
+    async fn stuck(&self, after: Duration, confirmed_after: Duration) -> bool {
+        for wait in [after, confirmed_after] {
+            if matrix_sdk::timeout::timeout(self.transition.lock(), wait)
+                .await
+                .is_ok()
+            {
+                return false;
+            }
+        }
+        true
     }
 
     pub(crate) fn app_active(&self) -> bool {
@@ -214,6 +235,26 @@ impl Core {
         }
     }
 
+    pub(crate) fn watch_activity_health(self: &Arc<Self>) {
+        let core = self.clone();
+        self.track_session_task(
+            spawn(async move {
+                loop {
+                    matrix_sdk::sleep::sleep(HEALTH_INTERVAL).await;
+                    if core
+                        .activity
+                        .stuck(STUCK_AFTER, STUCK_CONFIRMED_AFTER)
+                        .await
+                    {
+                        tracing::error!("sync has been unable to start or stop for over a minute");
+                        return;
+                    }
+                }
+            })
+            .abort_on_drop(),
+        );
+    }
+
     pub(crate) async fn resume_sync(&self, sync_service: &SyncService) {
         self.activity
             .transition()
@@ -327,5 +368,29 @@ impl Core {
             }
             woken.await;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::Activity;
+
+    #[tokio::test]
+    async fn only_a_transition_that_stays_held_counts_as_stuck() {
+        let activity = Activity::new();
+        let wait = Duration::from_millis(20);
+        assert!(!activity.stuck(wait, wait).await);
+
+        let held = activity.transition().await;
+        assert!(activity.stuck(wait, wait).await);
+
+        let release = async {
+            tokio::time::sleep(Duration::from_millis(30)).await;
+            drop(held);
+        };
+        let (stuck, ()) = tokio::join!(activity.stuck(wait, Duration::from_secs(5)), release);
+        assert!(!stuck);
     }
 }

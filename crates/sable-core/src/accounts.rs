@@ -1123,6 +1123,7 @@ impl Core {
             .await;
 
         self.watch_sync_state(&client, &sync_service, generation);
+        self.watch_activity_health();
 
         self.refresh_own_identity(&client);
 
