@@ -3019,6 +3019,7 @@
   "inbox": {
     "filterThreads": "",
     "inThread": "",
-    "notificationsEmptyThreads": ""
+    "notificationsEmptyThreads": "",
+    "inviteDeclined": ""
   }
 }
