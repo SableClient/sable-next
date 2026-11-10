@@ -777,7 +777,7 @@
     "verify": "Verifizieren",
     "unsavedChangesNotice": "Du hast ungespeicherte Änderungen.",
     "userIdFormatHint": "Eine Nutzer-ID sieht folgendermaßen aus: @jemand:server.",
-    "statusPlaceholder": ""
+    "statusPlaceholder": "Was machst du so?"
   },
   "timeline": {
     "viaAccount": "Öffne das Konto hinter diesem Profil, {{user}}",
