@@ -23,6 +23,8 @@
     isEncryptedMedia,
     loadMediaUrl,
     mediaAspectRatio,
+    mediaUrlShown,
+    recoverMediaUrl,
     retryMediaUrl,
   } from '#lib/ui/media-url.js';
   import { animationsPaused, stillFrame } from '#lib/ui/still-frame.js';
@@ -546,16 +548,34 @@
   }
 
   function freezeFrame(): void {
+    mediaUrlShown(core, requested, requestedWidth, requestedHeight);
     backoff = { ...backoff, manual: 0, automatic: 0, at: 0 };
     previewUrl = drawFrame() ? url : null;
   }
 
   function imageShown(): void {
+    mediaUrlShown(core, requested, requestedWidth, requestedHeight);
     backoff = { ...backoff, manual: 0, automatic: 0, at: 0 };
     loadedUrl = url;
   }
 
   function brokenImage(): void {
+    const recovery =
+      url && recoverMediaUrl(core, requested, requestedWidth, requestedHeight, url, mime);
+    if (recovery) {
+      const key = requestKey;
+      const shownSource = source;
+      void recovery.then(
+        (nextUrl) => {
+          outcome = { key, url: nextUrl };
+        },
+        () => {
+          outcome = { key, url: null };
+          onfailed?.(shownSource);
+        }
+      );
+      return;
+    }
     if (url) discardMediaUrl(core, requested, requestedWidth, requestedHeight, url);
     if (!asIs) {
       undecodableThumbnail = source;

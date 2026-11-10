@@ -29,6 +29,18 @@ afterEach(() => {
 
 const user = userEvent.setup({ delay: null });
 const retryButton = () => screen.getByRole('button', { name: /Retry/ });
+const shownImage = () => document.querySelector('img.media-image-content');
+
+async function breakShownImage(): Promise<void> {
+  await vi.waitFor(() => {
+    expect(shownImage()).not.toBeNull();
+  });
+  const broken = shownImage()?.getAttribute('src');
+  void fireEvent.error(find('img.media-image-content'));
+  await vi.waitFor(() => {
+    expect(shownImage()?.getAttribute('src')).not.toBe(broken);
+  });
+}
 
 test('refreshes the account image after a long background session', async () => {
   const now = vi.spyOn(Date, 'now');
@@ -90,9 +102,11 @@ test('recovers an undecodable account avatar when the app resumes', async () => 
     refreshOnResume: true,
   });
   await settle();
-  await fireEvent.error(screen.getByAltText('Account'));
-  await settle();
-  expect(core.fetchMedia).toHaveBeenCalledTimes(1);
+  for (let step = 0; step < 3; step += 1) {
+    await fireEvent.error(screen.getByAltText('Account'));
+    await settle();
+  }
+  expect(core.fetchMedia).toHaveBeenCalledTimes(3);
 
   window.dispatchEvent(new Event('pagehide'));
   await settle();
@@ -100,7 +114,7 @@ test('recovers an undecodable account avatar when the app resumes', async () => 
   window.dispatchEvent(new Event('pageshow'));
   await settle();
 
-  expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+  expect(core.fetchMedia).toHaveBeenCalledTimes(4);
   expect(screen.getByAltText('Account')).toHaveAttribute('src', expect.stringMatching(/^blob:/));
 });
 
@@ -962,13 +976,7 @@ test('an undecodable file falls back instead of spinning forever', async () => {
     },
   });
 
-  for (const request of ['thumbnail', 'original']) {
-    await vi.waitFor(() => {
-      expect(document.querySelector('img.media-image-content'), request).not.toBeNull();
-    });
-    void fireEvent.error(find('img.media-image-content'));
-    await flushed();
-  }
+  for (let step = 0; step < 6; step += 1) await breakShownImage();
 
   expect(onfailed).toHaveBeenCalledOnce();
   expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
@@ -986,17 +994,23 @@ test('an undecodable thumbnail falls back to the original, then stops', async ()
   const image = (): HTMLImageElement | null =>
     document.querySelector<HTMLImageElement>('img.media-image-content');
 
-  await vi.advanceTimersByTimeAsync(0);
-  void fireEvent.error(image() ?? find('img.media-image-content'));
+  for (let step = 0; step < 3; step += 1) {
+    await vi.advanceTimersByTimeAsync(0);
+    void fireEvent.error(image() ?? find('img.media-image-content'));
+  }
   await vi.advanceTimersByTimeAsync(0);
 
   expect(core.fetchMedia).toHaveBeenLastCalledWith(source, 0, 0);
   expect(onfailed).not.toHaveBeenCalled();
 
-  void fireEvent.error(image() ?? find('img.media-image-content'));
+  for (let step = 0; step < 3; step += 1) {
+    void fireEvent.error(image() ?? find('img.media-image-content'));
+    await vi.advanceTimersByTimeAsync(0);
+  }
   await vi.advanceTimersByTimeAsync(120_000);
 
-  expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+  expect(core.fetchMedia).toHaveBeenCalledTimes(6);
+  expect(core.forgetMedia).toHaveBeenCalledTimes(2);
   expect(onfailed).toHaveBeenCalledOnce();
   expect(image()).toBeNull();
   expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
@@ -1018,14 +1032,14 @@ test('an effect re-run after an undecodable original does not bring the retries 
   const image = (): HTMLImageElement | null =>
     document.querySelector<HTMLImageElement>('img.media-image-content');
 
-  for (let step = 0; step < 2; step += 1) {
+  for (let step = 0; step < 6; step += 1) {
     await vi.advanceTimersByTimeAsync(0);
     void fireEvent.error(image() ?? find('img.media-image-content'));
   }
   props.mime = 'image/jpeg';
   await vi.advanceTimersByTimeAsync(120_000);
 
-  expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+  expect(core.fetchMedia).toHaveBeenCalledTimes(6);
   expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
   instance.unmount();
   vi.useRealTimers();
@@ -1037,20 +1051,12 @@ test('a manual retry of an undecodable image drops the stored copy first', async
   render(MediaImage, {
     props: { source, alt: 'photo', width: 800, height: 600, retryable: true },
   });
-  const breakImage = async (): Promise<void> => {
-    await vi.waitFor(() => {
-      expect(document.querySelector('img.media-image-content')).not.toBeNull();
-    });
-    void fireEvent.error(find('img.media-image-content'));
-    await flushed();
-  };
-
-  await breakImage();
-  await breakImage();
+  for (let step = 0; step < 6; step += 1) await breakShownImage();
+  core.forgetMedia.mockClear();
   await user.click(retryButton());
 
   await vi.waitFor(() => {
-    expect(core.fetchMedia).toHaveBeenCalledTimes(3);
+    expect(core.fetchMedia).toHaveBeenCalledTimes(7);
   });
   expect(core.forgetMedia).toHaveBeenCalledWith(source);
   expect(core.fetchMedia).toHaveBeenLastCalledWith(source, 800, 600);
@@ -1597,4 +1603,47 @@ test('an image that finishes loading after its component is gone is ignored', as
   image.dispatchEvent(new Event('error'));
 
   expect(warn.mock.calls.flat().join(' ')).not.toContain('derived_inert');
+});
+
+test('an image that stops loading after the app was suspended is rebuilt from the core', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  const source = 'mxc://example.org/suspended';
+  render(MediaImage, { props: { source, alt: 'photo', width: 96, height: 96 } });
+
+  await breakShownImage();
+
+  expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+  expect(core.fetchMedia).toHaveBeenLastCalledWith(source, 96, 96);
+  expect(core.forgetMedia).not.toHaveBeenCalled();
+});
+
+test('a stored copy that still cannot be shown is dropped before asking the server', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  const source = 'mxc://example.org/bad-stored-copy';
+  render(MediaImage, { props: { source, alt: 'photo', width: 96, height: 96 } });
+
+  await breakShownImage();
+  await breakShownImage();
+
+  expect(core.forgetMedia).toHaveBeenCalledWith(source);
+  expect(core.fetchMedia).toHaveBeenCalledTimes(3);
+  expect(core.fetchMedia).toHaveBeenLastCalledWith(source, 96, 96);
+});
+
+test('a source that displays again gets every recovery step after its next failure', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  const source = 'mxc://example.org/recovered-twice';
+  render(MediaImage, { props: { source, alt: 'photo', width: 96, height: 96 } });
+
+  await breakShownImage();
+  await breakShownImage();
+  void fireEvent.load(find('img.media-image-content'));
+  await flushed();
+  core.forgetMedia.mockClear();
+  await breakShownImage();
+  await breakShownImage();
+
+  expect(core.forgetMedia).toHaveBeenCalledOnce();
+  expect(core.fetchMedia).toHaveBeenCalledTimes(5);
+  expect(shownImage()).not.toBeNull();
 });

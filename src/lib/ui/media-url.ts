@@ -34,6 +34,8 @@ const missing = new QuickLRU<string, true>({
   maxSize: MAX_MEDIA_METADATA,
   maxAge: MEDIA_FAILURE_MEMORY_MS,
 });
+const displayFailures = new QuickLRU<string, number>({ maxSize: MAX_MEDIA_METADATA });
+const DISPLAY_RECOVERY_STEPS = 2;
 const aspectRatios = new QuickLRU<string, number>({ maxSize: MAX_MEDIA_METADATA });
 let objectUrlBytes = 0;
 let evictQueued = false;
@@ -184,12 +186,56 @@ export function discardMediaUrl(
   url: string
 ): void {
   const key = cacheKey(core.session?.account_id, source, width, height);
+  if (dropObjectUrl(key, url)) recordFailure(key);
+}
+
+function dropObjectUrl(key: string, url: string): boolean {
   const cached = objectUrls.get(key);
-  if (cached?.url !== url) return;
+  if (cached?.url !== url) return false;
   URL.revokeObjectURL(cached.url);
   objectUrls.delete(key);
   objectUrlBytes -= cached.bytes;
-  recordFailure(key);
+  return true;
+}
+
+export function mediaUrlShown(
+  core: Pick<CoreClient, 'session'>,
+  source: string,
+  width: number,
+  height: number
+): void {
+  displayFailures.delete(cacheKey(core.session?.account_id, source, width, height));
+}
+
+export function recoverMediaUrl(
+  core: MediaFetcher & { media: Pick<CoreMedia, 'forgetMedia'> },
+  source: string,
+  width: number,
+  height: number,
+  url: string,
+  mime?: string | null
+): Promise<string> | null {
+  const key = cacheKey(core.session?.account_id, source, width, height);
+  const current = objectUrls.get(key)?.url;
+  if (current !== undefined && current !== url) return Promise.resolve(current);
+  const joined = pending.get(key);
+  if (joined !== undefined) return joined;
+  const step = displayFailures.get(key) ?? 0;
+  if (step >= DISPLAY_RECOVERY_STEPS) return null;
+  displayFailures.set(key, step + 1);
+  dropObjectUrl(key, url);
+  if (step === 0) return loadMediaUrl(core, source, width, height, mime);
+  const request = core.media
+    .forgetMedia(source)
+    .then(() => {
+      pending.delete(key);
+      return loadMediaUrl(core, source, width, height, mime);
+    })
+    .finally(() => {
+      if (pending.get(key) === request) pending.delete(key);
+    });
+  pending.set(key, request);
+  return request;
 }
 
 /**
@@ -280,6 +326,9 @@ export function retryMediaUrl(
   }
   for (const key of [...missing.keys()]) {
     if (key.startsWith(prefix)) missing.delete(key);
+  }
+  for (const key of [...displayFailures.keys()]) {
+    if (key.startsWith(prefix)) displayFailures.delete(key);
   }
   return loadMediaUrl(core, source, width, height, mime);
 }

@@ -92,7 +92,7 @@ test('an undecodable picture falls back to the initials', async () => {
     props: { src: 'mxc://example.org/undecodable-avatar', name: 'Sable' },
   });
 
-  for (let step = 0; step < 2; step += 1) {
+  for (let step = 0; step < 6; step += 1) {
     await vi.advanceTimersByTimeAsync(0);
     picture()?.querySelector('img')?.dispatchEvent(new Event('error'));
   }
