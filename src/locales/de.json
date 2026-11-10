@@ -1121,7 +1121,8 @@
     "pinnedRemovedPart_other": "hat {{count, number}} Nachrichten gelöst",
     "pinnedRemoved_one": "{{user}} hat eine Nachricht gelöst",
     "pinnedRemoved_other": "{{user}} hat {{count, number}} Nachrichten gelöst",
-    "pollClosed": "Abschließendes Ergebnis"
+    "pollClosed": "Abschließendes Ergebnis",
+    "pollEnd": ""
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden.",
