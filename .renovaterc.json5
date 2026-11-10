@@ -89,6 +89,18 @@
       allowedVersions: '<7',
     },
     {
+      description: 'Match ruma-html until the Ruma pin is updated',
+      matchManagers: ['cargo'],
+      matchPackageNames: ['html5ever'],
+      allowedVersions: '<0.40',
+    },
+    {
+      description: 'Share libsqlite3-sys with the pinned Matrix SDK',
+      matchManagers: ['cargo'],
+      matchPackageNames: ['rusqlite'],
+      allowedVersions: '<0.41',
+    },
+    {
       description: 'Keep PipeWire compatible with the Audiofox bindings',
       matchManagers: ['cargo'],
       matchPackageNames: ['pipewire'],
