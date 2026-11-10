@@ -311,7 +311,17 @@
     "directoryTitle": "Перегляд кімнат",
     "settingsBannerLabel": "Банер",
     "createAliasHint": "Опублікуйте адресу на цьому сервері, щоб за нею можна було приєднатися.",
-    "settingsAvatarLabel": "Аватар кімнати"
+    "settingsAvatarLabel": "Аватар кімнати",
+    "createNamePlaceholder": "Загальна",
+    "settingsDirectHint": "Перетворення зробить цю кімнату звичайною: можна буде запросити більше людей, і вона більше не виглядатиме як приватний чат удвох. Скасувати це тут не можна.",
+    "replacedLeaveLabel": "Залишити замінену кімнату {{room}}",
+    "replacedDismissLabel": "Приховати замінену кімнату {{room}}",
+    "lobbyLoadingMore": "Завантаження інших кімнат…",
+    "menuJumpToTime": "Перейти до часу",
+    "jumpMissing": "У цей час або пізніше нічого не надсилали.",
+    "jumpFailed": "Не вдалося виконати пошук у кімнаті.",
+    "permPingRoom": "Згадувати @room",
+    "permAvatar": "Аватар"
   },
   "inbox": {
     "inviteEncrypted": "Зашифроване",
@@ -517,9 +527,15 @@
   "settings": {
     "saveBanner": "Завантажити банер",
     "status": "Статус",
-    "banner": "Банер"
+    "banner": "Банер",
+    "terms": {
+      "hour24Clock": "24-годинний і 12-годинний формат часу, AM/PM"
+    }
   },
   "auth": {
     "banner": "Банер"
+  },
+  "emotes": {
+    "imageUsage": "Де можна використовувати :{{shortcode}}:"
   }
 }
