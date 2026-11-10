@@ -303,7 +303,15 @@
     "cosmeticsAvatar": "Зображення в цій кімнаті",
     "cosmeticsNameSpace": "Ім’я в цьому просторі",
     "upgradeFailed": "Не вдалося оновити.",
-    "createKindLabel": "Тип"
+    "createKindLabel": "Тип",
+    "createAliasInvalidEmpty": "Введіть адресу або залиште поле порожнім.",
+    "createAliasInvalidColon": "Адреса не може містити \":\".",
+    "createVersionUnstable": "{{version}} (нестабільна)",
+    "createInvitePlaceholder": "@someone:server",
+    "directoryTitle": "Перегляд кімнат",
+    "settingsBannerLabel": "Банер",
+    "createAliasHint": "Опублікуйте адресу на цьому сервері, щоб за нею можна було приєднатися.",
+    "settingsAvatarLabel": "Аватар кімнати"
   },
   "inbox": {
     "inviteEncrypted": "Зашифроване",
@@ -505,5 +513,9 @@
     "accountSignInAgain": "Увійти знову",
     "resizeRooms": "Змінити розмір списку кімнат",
     "mobilePanelInstructions": "Проведіть праворуч, щоб показати список кімнат, або ліворуч, щоб показати розмову. Перемикайте панелі клавішами зі стрілками ліворуч і праворуч."
+  },
+  "settings": {
+    "saveBanner": "Завантажити банер",
+    "status": "Статус"
   }
 }
