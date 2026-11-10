@@ -52,7 +52,7 @@ pub(crate) struct PendingIdentityReset {
 impl Core {
     pub(crate) async fn reset_identity(&self) -> Result<IdentityResetStep, RpcError> {
         let client = self.client().await?;
-        let generation = self.session_generation.load(Ordering::SeqCst);
+        let generation = self.lifecycle.current();
         self.cancel_identity_reset().await;
 
         let Some(handle) = client
@@ -92,7 +92,7 @@ impl Core {
         ContinueIdentityResetParams { password }: ContinueIdentityResetParams,
     ) -> Result<String, RpcError> {
         let client = self.client().await?;
-        let generation = self.session_generation.load(Ordering::SeqCst);
+        let generation = self.lifecycle.current();
         let handle = match &*self.pending_identity_reset.lock().await {
             Some(pending) if pending.generation == generation => pending.handle.clone(),
             _ => return Err(RpcError::Unavailable),

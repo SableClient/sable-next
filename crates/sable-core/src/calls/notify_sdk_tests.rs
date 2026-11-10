@@ -143,11 +143,7 @@ async fn deployed_non_sticky_invites_reach_the_call_handler_and_push_validation(
         )
         .await;
     let (core, mut events) = Core::new("fallback", Box::new(MemorySessionStore::default()));
-    core.watch_incoming_calls(
-        &client,
-        core.session_generation
-            .load(std::sync::atomic::Ordering::SeqCst),
-    );
+    core.watch_incoming_calls(&client, core.lifecycle.current());
     let now = crate::now_ms();
     let event = json!({
         "type":"org.matrix.msc4075.rtc.notification", "event_id":"$fallback",
@@ -241,11 +237,7 @@ async fn sticky_only_invites_are_cancelled_by_withdrawals_and_cross_device_actio
         )
         .await;
     let (core, mut events) = Core::new("invites", Box::new(MemorySessionStore::default()));
-    core.watch_incoming_calls(
-        &client,
-        core.session_generation
-            .load(std::sync::atomic::Ordering::SeqCst),
-    );
+    core.watch_incoming_calls(&client, core.lifecycle.current());
     let now = crate::now_ms();
     for (index, action) in ["withdraw", "join", "leave", "decline", "close"]
         .into_iter()

@@ -74,7 +74,6 @@ impl Core {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::Ordering;
 
     use matrix_sdk::test_utils::mocks::MatrixMockServer;
 
@@ -89,7 +88,7 @@ mod tests {
         server.mock_versions().ok().mount().await;
         let client = server.client_builder().no_server_versions().build().await;
         let (core, mut events) = signed_in_core(server, client.clone()).await;
-        core.watch_oauth_metadata(&client, core.session_generation.load(Ordering::SeqCst));
+        core.watch_oauth_metadata(&client, core.lifecycle.current());
         let metadata = tokio::time::timeout(std::time::Duration::from_secs(10), async {
             loop {
                 if let CoreEvent::OAuthMetadata { metadata } = events.recv().await.unwrap() {

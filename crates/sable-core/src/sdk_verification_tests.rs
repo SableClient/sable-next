@@ -693,8 +693,6 @@ async fn choosing_emoji_after_a_qr_scan_does_not_leave_either_side_waiting() {
 
 #[tokio::test]
 async fn the_account_data_key_is_shared_only_with_a_verified_own_device() {
-    use std::sync::atomic::Ordering;
-
     use matrix_sdk_base::crypto::LocalTrust;
     use serde_json::json;
 
@@ -725,7 +723,7 @@ async fn the_account_data_key_is_shared_only_with_a_verified_own_device() {
                     .await
                     .unwrap();
             }
-            let generation = device.core.session_generation.load(Ordering::SeqCst);
+            let generation = device.core.lifecycle.current();
             device
                 .core
                 .watch_account_data_key_sharing(&device.client, generation);

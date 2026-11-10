@@ -27,6 +27,7 @@ pub mod image_packs;
 mod inbox;
 mod invites;
 mod key_backup;
+mod lifecycle;
 mod link_previews;
 pub mod matrix_html;
 mod media;
@@ -138,9 +139,7 @@ pub struct Core {
     next_subscription: AtomicU32,
     next_log_id: AtomicU64,
     next_registration_attempt: AtomicU64,
-    session_generation: AtomicU64,
-    session_attempt_generation: AtomicU64,
-    session_activation_lock: Mutex<()>,
+    lifecycle: lifecycle::Lifecycle,
     session_store_lock: Mutex<()>,
     credential_writers: Mutex<HashMap<String, u64>>,
     next_credential_writer: AtomicU64,
@@ -171,8 +170,6 @@ pub struct Core {
     key_backup_downloads: tokio::sync::Semaphore,
     key_backup_download: parking_lot::Mutex<Option<protocol::KeyBackupDownloadView>>,
     notification_routes: Mutex<HashMap<String, watchers::NotificationRoute>>,
-    session_swap_lock: Mutex<()>,
-    restore_lock: Mutex<()>,
     accounts: Mutex<Option<AccountRegistry>>,
     discovered_homeservers: Mutex<HashMap<String, Url>>,
     session: RwLock<Option<Session>>,
@@ -334,11 +331,9 @@ impl Core {
             foreground_paginations: AtomicU32::new(0),
             next_log_id: AtomicU64::new(1),
             next_registration_attempt: AtomicU64::new(1),
-            session_generation: AtomicU64::new(1),
             key_backup_downloads: tokio::sync::Semaphore::new(1),
             key_backup_download: parking_lot::Mutex::new(None),
-            session_attempt_generation: AtomicU64::new(1),
-            session_activation_lock: Mutex::new(()),
+            lifecycle: lifecycle::Lifecycle::new(),
             session_store_lock: Mutex::new(()),
             credential_writers: Mutex::new(HashMap::new()),
             next_credential_writer: AtomicU64::new(1),
@@ -357,8 +352,6 @@ impl Core {
             media_health: parking_lot::Mutex::new(media_health::MediaHealth::default()),
             media_downloads: tokio::sync::Semaphore::new(media::MAX_MEDIA_DOWNLOADS),
             notification_routes: Mutex::new(HashMap::new()),
-            session_swap_lock: Mutex::new(()),
-            restore_lock: Mutex::new(()),
             accounts: Mutex::new(None),
             discovered_homeservers: Mutex::new(HashMap::new()),
             session: RwLock::new(None),
@@ -505,10 +498,6 @@ impl Core {
         self.session_handlers
             .lock()
             .push(client.event_handler_drop_guard(handle));
-    }
-
-    pub(crate) fn is_current(&self, generation: u64) -> bool {
-        self.session_generation.load(Ordering::SeqCst) == generation
     }
 
     pub(crate) fn emit_if_current(&self, generation: u64, event: CoreEvent) {

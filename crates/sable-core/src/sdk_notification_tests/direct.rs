@@ -159,9 +159,7 @@ async fn dm_defaults_apply_on_startup_to_bridged_and_group_dms_and_respect_room_
         settings(&core, room).await.default,
         NotificationModeView::Mentions
     );
-    let generation = core
-        .session_generation
-        .load(std::sync::atomic::Ordering::SeqCst);
+    let generation = core.lifecycle.current();
     core.watch_notification_settings(generation);
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
@@ -245,9 +243,7 @@ async fn a_partial_write_is_retried_and_dm_changes_reconcile_on_the_settings_wat
         .is_err()
     );
     assert_eq!(remote.0.lock().preference.as_ref().unwrap()["mode"], "all");
-    let generation = core
-        .session_generation
-        .load(std::sync::atomic::Ordering::SeqCst);
+    let generation = core.lifecycle.current();
     core.watch_notification_settings(generation);
     tokio::time::timeout(Duration::from_secs(5), async {
         while settings(&core, room_id!("!bridge:example.org"))
@@ -310,9 +306,7 @@ async fn a_dm_default_saved_in_another_session_is_loaded_and_reconciled() {
         .reconcile_direct_default()
         .await
         .unwrap();
-    let generation = core
-        .session_generation
-        .load(std::sync::atomic::Ordering::SeqCst);
+    let generation = core.lifecycle.current();
     core.watch_notification_settings(generation);
     for mode in ["mentions", "all"] {
         let content = {

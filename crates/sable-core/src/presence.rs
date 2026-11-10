@@ -122,9 +122,7 @@ impl Core {
         let Ok(client) = self.client().await else {
             return;
         };
-        let generation = self
-            .session_generation
-            .load(std::sync::atomic::Ordering::SeqCst);
+        let generation = self.lifecycle.current();
 
         stream::iter(user_ids)
             .for_each_concurrent(FETCH_CONCURRENCY, |user_id| {

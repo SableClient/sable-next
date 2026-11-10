@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::{Arc, atomic::Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD_NO_PAD};
@@ -513,7 +513,7 @@ pub(super) async fn join(
     requested: Option<CallMode>,
     intent: Option<CallIntent>,
 ) -> Result<JoinOk, RpcError> {
-    let generation = core.session_generation.load(Ordering::SeqCst);
+    let generation = core.lifecycle.current();
     let room = core.room(&room_id).await?;
     let encrypt_media = core.room_is_encrypted(&room).await?;
     let session = CallSessionId(core.allocate_subscription().0);
@@ -1711,7 +1711,7 @@ impl UpdateContext {
             };
             self.wait_for_change(&mut sync, &mut watch, interval).await;
             self.apply_live_events().await;
-            if self.core.session_generation.load(Ordering::SeqCst) != self.generation {
+            if self.core.lifecycle.current() != self.generation {
                 return;
             }
             if self.encryption_changed().await {

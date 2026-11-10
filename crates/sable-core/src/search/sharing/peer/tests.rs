@@ -296,7 +296,7 @@ async fn one_device_is_served_at_a_time() {
         .build()
         .await
         .unwrap();
-    let generation = core.session_generation.load(Ordering::SeqCst);
+    let generation = core.lifecycle.current();
     core.serve_search_peer(&client, generation, "a1".into(), "A".into())
         .await;
     core.serve_search_peer(&client, generation, "a2".into(), "A".into())
@@ -521,7 +521,7 @@ async fn live_core(
         homeserver: client.homeserver().to_string(),
         oauth: false,
     });
-    let generation = core.session_generation.load(Ordering::SeqCst);
+    let generation = core.lifecycle.current();
     core.watch_search_peers(client, generation);
     core.watch_rtc(client, generation);
     (core, events)

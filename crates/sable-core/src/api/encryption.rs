@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 
 use matrix_sdk::encryption::recovery::RecoveryError;
 use matrix_sdk::ruma::events::room::history_visibility::HistoryVisibility;
@@ -341,7 +340,7 @@ impl Handler for RenameDeviceParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         let client = core.client().await?;
-        let generation = core.session_generation.load(Ordering::SeqCst);
+        let generation = core.lifecycle.current();
         client
             .rename_device(&self.device_id, &self.display_name)
             .await

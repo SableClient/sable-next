@@ -1,5 +1,3 @@
-use std::sync::atomic::Ordering;
-
 use crate::errors::CoreError;
 use matrix_sdk::{
     Client,
@@ -57,7 +55,7 @@ impl Core {
             (
                 session.account_id.clone(),
                 session.client.clone(),
-                self.session_generation.load(Ordering::SeqCst),
+                self.lifecycle.current(),
             )
         };
         let initial = KeyBackupDownloadView {

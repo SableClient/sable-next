@@ -602,8 +602,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
         core.persist("other", &other_store, &persisted, None)
             .await
             .unwrap();
-        core.session_generation
-            .store(2, std::sync::atomic::Ordering::SeqCst);
+        core.lifecycle.set_current(2);
         *core.session.write().await = Some(Session {
             account_id: "other".to_owned(),
             homeserver: server.server().uri(),

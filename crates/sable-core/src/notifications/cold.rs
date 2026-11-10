@@ -291,7 +291,7 @@ pub(super) async fn push_host(
             .await
             .map(PushHost::Own);
     };
-    let _ = tokio::time::timeout(RESTORE_WAIT, core.restore_lock.lock()).await;
+    let _ = tokio::time::timeout(RESTORE_WAIT, core.lifecycle.restoring()).await;
     if let Some(host) = live_push_host(&core, user_id, device_id).await {
         return Some(host);
     }

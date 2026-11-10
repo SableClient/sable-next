@@ -164,8 +164,7 @@ mod tests {
             ),
             client: client.clone(),
         });
-        core.session_generation
-            .store(1, std::sync::atomic::Ordering::SeqCst);
+        core.lifecycle.set_current(1);
         assert!(core.detect_account_lock(&client, 1).await);
         assert_eq!(client.session_tokens().unwrap(), tokens);
         assert!(core.activity.account_locked());

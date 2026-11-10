@@ -42,12 +42,8 @@ async fn watching(
         homeserver: server.server().uri(),
         oauth: false,
     });
-    core.watch_notifications(
-        client,
-        core.session_generation
-            .load(std::sync::atomic::Ordering::SeqCst),
-    )
-    .await;
+    core.watch_notifications(client, core.lifecycle.current())
+        .await;
     (core, events)
 }
 
@@ -97,12 +93,8 @@ async fn stripped_invite_notifies_without_an_invented_event_id() {
         assert_eq!(view.body, "invited you");
         assert!(view.is_direct);
         core.session_tasks.lock().clear();
-        core.watch_notifications(
-            &client,
-            core.session_generation
-                .load(std::sync::atomic::Ordering::SeqCst),
-        )
-        .await;
+        core.watch_notifications(&client, core.lifecycle.current())
+            .await;
     }
     core.session_tasks.lock().clear();
 }
@@ -800,12 +792,8 @@ async fn notification_cleanup_reads_the_server_and_retries_a_partial_failure() {
         .mount(server.server())
         .await;
     let completed = std::sync::atomic::AtomicBool::new(false);
-    core.retry_rule_cleanup(
-        core.session_generation
-            .load(std::sync::atomic::Ordering::SeqCst),
-        &completed,
-    )
-    .await;
+    core.retry_rule_cleanup(core.lifecycle.current(), &completed)
+        .await;
     assert!(completed.load(std::sync::atomic::Ordering::SeqCst));
     assert!(
         server
@@ -835,13 +823,8 @@ async fn notification_cleanup_does_not_succeed_when_rules_cannot_be_fetched() {
         .await;
     assert!(!core.cleanup_notification_rules().await);
     let completed = std::sync::atomic::AtomicBool::new(false);
-    core.retry_rule_cleanup(
-        core.session_generation
-            .load(std::sync::atomic::Ordering::SeqCst)
-            + 1,
-        &completed,
-    )
-    .await;
+    core.retry_rule_cleanup(core.lifecycle.current() + 1, &completed)
+        .await;
     assert!(!completed.load(std::sync::atomic::Ordering::SeqCst));
     assert!(
         server
