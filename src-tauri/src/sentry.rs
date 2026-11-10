@@ -3,16 +3,6 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-#[cfg(target_os = "android")]
-fn consent_path() -> Option<std::path::PathBuf> {
-    let home = std::env::var_os("HOME")?;
-    let state = std::env::var_os("XDG_STATE_HOME").map_or_else(
-        || std::path::PathBuf::from(&home).join(".local/state"),
-        std::path::PathBuf::from,
-    );
-    Some(state.join("sable-next/sentry-consent"))
-}
-
 #[cfg(not(target_os = "android"))]
 fn consent_path() -> Option<std::path::PathBuf> {
     let home = std::env::var_os("HOME")?;
@@ -22,10 +12,12 @@ fn consent_path() -> Option<std::path::PathBuf> {
     )
 }
 
+#[cfg(not(target_os = "android"))]
 fn consent() -> bool {
     consent_path().is_some_and(|path| std::fs::read(path).is_ok_and(|value| value == b"1"))
 }
 
+#[cfg(not(target_os = "android"))]
 fn persist_consent(enabled: bool) {
     let Some(path) = consent_path() else { return };
     if let Some(parent) = path.parent() {
@@ -46,6 +38,7 @@ fn scrub_text(value: &str) -> String {
             (r"(?i)(access_token|password|token|refresh_token|session_id|sync_token|next_batch)([=:\s]+)([^\s&]+)", "$1$2[REDACTED]"),
             (r#"@[^\s:@]+:[^\s,'"(){}\[\]]+"#, "@[USER_ID]"),
             (r#"![^\s:]+:[^\s,'"(){}\[\]]+"#, "![ROOM_ID]"),
+            (r"![A-Za-z0-9_-]{43}", "![ROOM_ID]"),
             (r#"#[^\s:@]+:[^\s,'"(){}\[\]]+"#, "#[ROOM_ALIAS]"),
             (r"\$[A-Za-z0-9_+/-]{10,}", "$[EVENT_ID]"),
             (r"(?i)/(?:%21|!)[^/?#\s]*?(?:%3a|:)[^/?#\s]+", "/![ROOM_ID]"),
@@ -167,8 +160,10 @@ fn scrub_log(mut log: sentry::protocol::Log) -> sentry::protocol::Log {
     log.body = scrub_text(&log.body);
     log.attributes.retain(|key, _| {
         REPORTED_FIELDS.contains(&key.as_str())
-            || key == "sentry.origin"
+            || key.starts_with("sentry.")
             || key.starts_with("code.")
+            || key.starts_with("os.")
+            || key.starts_with("device.")
     });
     for attribute in log.attributes.values_mut() {
         scrub_value(&mut attribute.0);
@@ -216,10 +211,85 @@ where
         .and_then(LogLayer::new().with_filter(filter_fn(is_log)))
 }
 
+/// The SDK names the kernel, which files Android under Linux and iOS under Darwin.
+#[cfg(any(target_os = "android", target_os = "ios"))]
+struct Platform {
+    os: &'static str,
+    version: Option<String>,
+    model: Option<String>,
+}
+
+#[cfg(target_os = "android")]
+fn platform() -> &'static Platform {
+    static PLATFORM: std::sync::OnceLock<Platform> = std::sync::OnceLock::new();
+    PLATFORM.get_or_init(|| {
+        let properties = android_system_properties::AndroidSystemProperties::new();
+        Platform {
+            os: "Android",
+            version: properties.get("ro.build.version.release"),
+            model: properties.get("ro.product.model"),
+        }
+    })
+}
+
+#[cfg(target_os = "ios")]
+fn platform() -> &'static Platform {
+    static PLATFORM: std::sync::OnceLock<Platform> = std::sync::OnceLock::new();
+    PLATFORM.get_or_init(|| Platform {
+        os: "iOS",
+        version: Some(crate::ios::os_version()),
+        model: crate::ios::device_model(),
+    })
+}
+
+#[cfg(any(target_os = "android", target_os = "ios"))]
+fn name_platform(mut event: Event<'static>) -> Event<'static> {
+    use sentry::protocol::Context;
+
+    let platform = platform();
+    if let Some(Context::Os(os)) = event.contexts.get_mut("os") {
+        os.name = Some(platform.os.to_owned());
+        os.build = os.version.take();
+        os.version.clone_from(&platform.version);
+    }
+    if let Some(Context::Device(device)) = event.contexts.get_mut("device") {
+        device.model.clone_from(&platform.model);
+        device.family.clone_from(&platform.model);
+    }
+    event
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+const fn name_platform(event: Event<'static>) -> Event<'static> {
+    event
+}
+
+#[cfg(any(target_os = "android", target_os = "ios"))]
+fn name_log_platform(mut log: sentry::protocol::Log) -> sentry::protocol::Log {
+    let platform = platform();
+    let mut set = |key: &str, value: Option<&str>| {
+        if let Some(value) = value {
+            log.attributes
+                .insert(key.to_owned(), value.to_owned().into());
+        }
+    };
+    set("os.name", Some(platform.os));
+    set("os.version", platform.version.as_deref());
+    set("device.model", platform.model.as_deref());
+    log
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+const fn name_log_platform(log: sentry::protocol::Log) -> sentry::protocol::Log {
+    log
+}
+
 static CONSENT: AtomicBool = AtomicBool::new(false);
 
 pub(crate) fn init() -> Option<sentry::ClientInitGuard> {
     let dsn = option_env!("SENTRY_DSN")?;
+    // An Android process has no HOME: the activity hands over the saved choice instead.
+    #[cfg(not(target_os = "android"))]
     CONSENT.store(consent(), Ordering::Relaxed);
     #[cfg(target_os = "ios")]
     if let Err(error) = crate::ios::set_sentry_enabled(CONSENT.load(Ordering::Relaxed)) {
@@ -238,18 +308,28 @@ pub(crate) fn init() -> Option<sentry::ClientInitGuard> {
     options.release = option_env!("SENTRY_APP_VERSION").map(Into::into);
     options.send_default_pii = false;
     options.before_send = Some(Arc::new(|event: Event<'static>| {
-        CONSENT.load(Ordering::Relaxed).then(|| scrub_event(event))
+        CONSENT
+            .load(Ordering::Relaxed)
+            .then(|| scrub_event(name_platform(event)))
     }));
     options.before_send_log = Some(Arc::new(|log| {
-        CONSENT.load(Ordering::Relaxed).then(|| scrub_log(log))
+        CONSENT
+            .load(Ordering::Relaxed)
+            .then(|| name_log_platform(scrub_log(log)))
     }));
 
     Some(sentry::init(options))
 }
 
+#[cfg(target_os = "android")]
+pub(crate) fn restore_consent(enabled: bool) {
+    CONSENT.store(enabled, Ordering::Relaxed);
+}
+
 #[tauri::command]
 pub(crate) fn set_native_sentry_enabled(enabled: bool) {
     CONSENT.store(enabled, Ordering::Relaxed);
+    #[cfg(not(target_os = "android"))]
     persist_consent(enabled);
     #[cfg(target_os = "android")]
     if let Err(error) = crate::mobile::set_sentry_enabled(enabled) {
@@ -354,6 +434,48 @@ mod tests {
         assert_eq!(logs.len(), 5);
         assert!(logs.contains(&"update failed"));
         assert!(!logs.contains(&"Error while sending request"));
+    }
+
+    #[test]
+    fn a_room_id_without_a_server_is_scrubbed() {
+        let room = "!Rv2mqWrh8-DOEQqSV_YwY3bNsmQ5kwsjXrlAWoHIgLU";
+        assert_eq!(room.len(), 44);
+        let scrubbed = scrub_text(&format!(
+            "error sending request for url (https://example.org/_matrix/client/v3/rooms/{room}/receipt/m.read/$abcdefghijklmnop)"
+        ));
+        assert!(!scrubbed.contains("Rv2mqWrh8"), "{scrubbed}");
+        assert!(scrubbed.contains("/rooms/![ROOM_ID]/receipt"), "{scrubbed}");
+    }
+
+    #[test]
+    fn a_log_keeps_the_attributes_that_say_where_it_came_from() {
+        let transport = record(|| {
+            tracing::error!(target: "sable_core::errors", room_id = "!private:example.org", "core failed");
+        });
+        let envelopes = transport.0.lock().unwrap();
+        let mut attributes = Vec::new();
+        for envelope in envelopes.iter() {
+            for item in envelope.items() {
+                if let sentry::protocol::EnvelopeItem::ItemContainer(
+                    sentry::protocol::ItemContainer::Logs(batch),
+                ) = item
+                {
+                    for log in batch {
+                        attributes.extend(log.attributes.keys().cloned());
+                    }
+                }
+            }
+        }
+        for kept in ["sentry.sdk.name", "sentry.origin"] {
+            assert!(
+                attributes.iter().any(|key| key == kept),
+                "{kept} missing from {attributes:?}"
+            );
+        }
+        assert!(
+            !attributes.iter().any(|key| key == "room_id"),
+            "{attributes:?}"
+        );
     }
 
     #[test]

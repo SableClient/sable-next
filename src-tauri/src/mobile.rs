@@ -159,6 +159,19 @@ pub(crate) extern "system" fn Java_moe_sable_client_MainActivity_nativeNetworkCh
     unsafe_code,
     reason = "the export symbol is fixed by the JNI naming convention"
 )]
+pub(crate) extern "system" fn Java_moe_sable_client_MainActivity_nativeSentryConsent(
+    _env: EnvUnowned,
+    _this: JObject,
+    enabled: jni::sys::jboolean,
+) {
+    crate::sentry::restore_consent(enabled);
+}
+
+#[unsafe(no_mangle)]
+#[expect(
+    unsafe_code,
+    reason = "the export symbol is fixed by the JNI naming convention"
+)]
 pub(crate) extern "system" fn Java_moe_sable_client_MainActivity_nativeInitSystemBars(
     mut env: EnvUnowned,
     this: JObject,

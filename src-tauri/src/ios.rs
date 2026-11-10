@@ -102,6 +102,27 @@ pub(crate) fn watch_network() -> Result<(), String> {
     Ok(())
 }
 
+pub(crate) fn os_version() -> String {
+    let version = objc2_foundation::NSProcessInfo::processInfo().operatingSystemVersion();
+    format!(
+        "{}.{}.{}",
+        version.majorVersion, version.minorVersion, version.patchVersion
+    )
+}
+
+pub(crate) fn device_model() -> Option<String> {
+    let mut info = std::mem::MaybeUninit::<libc::utsname>::zeroed();
+    // SAFETY: uname fills the struct it is given and returns 0 on success
+    if unsafe { libc::uname(info.as_mut_ptr()) } != 0 {
+        return None;
+    }
+    // SAFETY: uname succeeded, so the struct is initialized
+    let info = unsafe { info.assume_init() };
+    // SAFETY: uname NUL-terminates `machine`, and `info` outlives the borrow
+    let machine = unsafe { std::ffi::CStr::from_ptr(info.machine.as_ptr()) };
+    Some(machine.to_string_lossy().into_owned()).filter(|model| !model.is_empty())
+}
+
 /// Synchronizes the native SDK with the webview's telemetry preference.
 pub(crate) fn set_sentry_enabled(enabled: bool) -> Result<(), String> {
     let class = AnyClass::get(c"SableSentry").ok_or("Sentry Cocoa bridge is unavailable")?;

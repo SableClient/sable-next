@@ -40,6 +40,7 @@ import androidx.core.graphics.drawable.toDrawable
 
 class MainActivity : TauriActivity() {
   private external fun nativeInitSystemBars()
+  private external fun nativeSentryConsent(enabled: Boolean)
   private external fun nativeNetworkChanged(available: Boolean, unmetered: Boolean)
   private var networkCallback: ConnectivityManager.NetworkCallback? = null
   private var fullscreenClient: FullscreenChromeClient? = null
@@ -54,9 +55,12 @@ class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     // Before Tauri starts the core, which reads saved logins.
     Secrets.install(this)
-    NativeSentry.apply(this, getSharedPreferences("sentry", MODE_PRIVATE).getBoolean("enabled", false))
+    val reporting = getSharedPreferences("sentry", MODE_PRIVATE).getBoolean("enabled", false)
+    NativeSentry.apply(this, reporting)
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+    // Until the webview loads, the core would otherwise drop what it reports.
+    runCatching { nativeSentryConsent(reporting) }
     
     instance = this
     onBackPressedDispatcher.addCallback(this, fullscreenBackCallback)
