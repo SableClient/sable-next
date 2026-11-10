@@ -549,7 +549,7 @@ impl Core {
         let push_rules = self.push_rules().await?;
         let subscription = self.allocate_subscription();
         let core = self.clone();
-        let stores_open = self.stores_open.subscribe();
+        let stores_open = self.activity.subscribe_stores();
         let task = spawn(async move {
             let room_list = match sync_service.room_list_service().all_rooms().await {
                 Ok(room_list) => room_list,

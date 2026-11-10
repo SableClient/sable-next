@@ -549,13 +549,13 @@ impl Core {
         .await;
     }
 
-    /// For the activity transition, which already holds the lock `with_open_stores` takes.
+    /// For work already inside the transition that `with_open_stores` would wait for.
     pub(crate) async fn flush_inbox_locked(
         &self,
         client: &matrix_sdk::Client,
-        _activity: &tokio::sync::MutexGuard<'_, ()>,
+        transition: &crate::activity::Transition<'_>,
     ) {
-        if *self.stores_open.borrow() {
+        if transition.stores_open() {
             self.save_inbox(async |bytes| write(client, bytes).await)
                 .await;
         }

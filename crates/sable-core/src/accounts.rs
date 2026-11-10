@@ -180,14 +180,6 @@ impl Core {
         );
     }
 
-    pub(crate) fn sync_paused(&self) -> bool {
-        self.account_locked.load(Ordering::SeqCst) || self.sync_suspended.load(Ordering::SeqCst)
-    }
-
-    pub(crate) fn sync_allowed(&self) -> bool {
-        !self.sync_paused() && self.network_available.load(Ordering::SeqCst)
-    }
-
     pub(crate) async fn claim_session_generation(&self) -> SessionGeneration<'_> {
         let guard = self.session_activation_lock.lock().await;
         SessionGeneration {
@@ -1108,7 +1100,7 @@ impl Core {
         self.watch_incoming_verifications(&client);
 
         self.session_generation.store(generation, Ordering::SeqCst);
-        self.account_locked.store(false, Ordering::SeqCst);
+        self.activity.unlock_account();
         self.emit_if_current(
             generation,
             CoreEvent::AccountLockChanged {
@@ -1915,18 +1907,11 @@ mod regression_tests {
 
         core.update_app_active(true).await;
         assert!(!matches!(sync_service.state().get(), State::Idle));
-        assert!(
-            !core
-                .sync_suspended
-                .load(std::sync::atomic::Ordering::SeqCst)
-        );
+        assert!(!core.activity.sync_suspended());
 
         core.update_app_active(false).await;
         assert!(matches!(sync_service.state().get(), State::Idle));
-        assert!(
-            core.sync_suspended
-                .load(std::sync::atomic::Ordering::SeqCst)
-        );
+        assert!(core.activity.sync_suspended());
     }
 
     #[tokio::test]
@@ -1990,7 +1975,7 @@ mod regression_tests {
         core.update_app_active(false).await;
 
         tokio::time::timeout(Duration::from_secs(35), async {
-            while core.account_locked.load(Ordering::SeqCst) {
+            while core.activity.account_locked() {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
         })
@@ -2045,7 +2030,7 @@ mod regression_tests {
         let (_store, _server, core, _room) = core_with_room().await;
         let sync = core.sync_service().await.unwrap();
         sync.start().await;
-        let serial = core.activity_lock.lock().await;
+        let serial = core.activity.transition().await;
         core.set_app_active(false);
         let mut pause = std::pin::pin!(core.apply_app_activity(false));
         assert!(futures_util::poll!(&mut pause).is_pending());
@@ -2066,7 +2051,7 @@ mod regression_tests {
         core.update_app_active(true).await;
         let sync = core.sync_service().await.unwrap();
 
-        let serial = core.activity_lock.lock().await;
+        let serial = core.activity.transition().await;
         let old_revision = core.set_app_active(false);
         let old_core = core.clone();
         let old_pause = tokio::spawn(async move {
@@ -2182,7 +2167,7 @@ mod regression_tests {
         drop(core.take_session().await);
         core.set_app_active(true);
 
-        let _activity = core.activity_lock.lock().await;
+        let _activity = core.activity.transition().await;
         let generation = core.claim_session_generation().await;
         tokio::time::timeout(
             Duration::from_secs(1),
@@ -2231,10 +2216,7 @@ mod regression_tests {
 
         let sync_service = core.sync_service().await.unwrap();
         assert!(matches!(sync_service.state().get(), State::Idle));
-        assert!(
-            core.sync_suspended
-                .load(std::sync::atomic::Ordering::SeqCst)
-        );
+        assert!(core.activity.sync_suspended());
     }
 
     async fn seed_search_index(

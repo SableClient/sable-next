@@ -4,6 +4,7 @@ mod account_data;
 mod account_documents;
 mod account_lock;
 mod accounts;
+mod activity;
 pub mod api;
 mod attachments;
 mod auth;
@@ -138,7 +139,6 @@ pub struct Core {
     next_log_id: AtomicU64,
     next_registration_attempt: AtomicU64,
     session_generation: AtomicU64,
-    account_locked: AtomicBool,
     session_attempt_generation: AtomicU64,
     session_activation_lock: Mutex<()>,
     session_store_lock: Mutex<()>,
@@ -208,14 +208,8 @@ pub struct Core {
     rtc: rtc::RtcSessions,
     search_network: search::CrawlNetwork,
     search_foreground: AtomicBool,
-    app_active: AtomicBool,
-    app_activity_revision: AtomicU64,
-    app_wake: tokio::sync::Notify,
-    sync_suspended: AtomicBool,
-    network_available: AtomicBool,
     shut_down: AtomicBool,
-    activity_lock: Mutex<()>,
-    stores_open: watch::Sender<bool>,
+    activity: activity::Activity,
     server_search_enabled: AtomicBool,
     read_room: parking_lot::Mutex<Option<OwnedRoomId>>,
     search_index: Mutex<search::MessageIndex>,
@@ -321,7 +315,6 @@ impl Core {
             sessions,
             events,
             notification_content: AtomicBool::new(false),
-            account_locked: AtomicBool::new(false),
             notification_encrypted_content: AtomicBool::new(false),
             notification_sounds: AtomicBool::new(true),
             notify_once: AtomicBool::new(true),
@@ -333,14 +326,8 @@ impl Core {
             rtc: rtc::RtcSessions::default(),
             search_network: search::CrawlNetwork::default(),
             search_foreground: AtomicBool::new(true),
-            app_active: AtomicBool::new(true),
-            app_activity_revision: AtomicU64::new(0),
-            app_wake: tokio::sync::Notify::new(),
-            sync_suspended: AtomicBool::new(false),
-            network_available: AtomicBool::new(true),
             shut_down: AtomicBool::new(false),
-            activity_lock: Mutex::new(()),
-            stores_open: watch::Sender::new(true),
+            activity: activity::Activity::new(),
             server_search_enabled: AtomicBool::new(true),
             read_room: parking_lot::Mutex::new(None),
             next_subscription: AtomicU32::new(1),
@@ -534,174 +521,6 @@ impl Core {
         self.foreground_paginations.load(Ordering::Relaxed)
     }
 
-    pub fn set_app_active(&self, active: bool) -> u64 {
-        self.app_active.store(active, Ordering::Relaxed);
-        let revision = self.app_activity_revision.fetch_add(1, Ordering::SeqCst) + 1;
-        if active {
-            self.app_wake.notify_waiters();
-        }
-        revision
-    }
-
-    pub async fn update_app_active(self: &Arc<Self>, active: bool) {
-        self.set_app_active(active);
-        self.apply_activity(active, None).await;
-    }
-
-    pub(crate) async fn apply_app_activity(self: &Arc<Self>, active: bool) {
-        self.apply_activity(active, None).await;
-    }
-
-    pub async fn apply_app_activity_if_current(self: &Arc<Self>, active: bool, revision: u64) {
-        self.apply_activity(active, Some(revision)).await;
-    }
-
-    async fn apply_activity(self: &Arc<Self>, active: bool, revision: Option<u64>) {
-        if self.app_active.load(Ordering::Relaxed) != active {
-            return;
-        }
-        let serial = self.activity_lock.lock().await;
-        if revision
-            .is_some_and(|revision| self.app_activity_revision.load(Ordering::SeqCst) != revision)
-        {
-            return;
-        }
-        if self.app_active.load(Ordering::Relaxed) != active {
-            return;
-        }
-        let should_sync = active || !self.call_sessions.lock().await.is_empty();
-        #[cfg(target_os = "ios")]
-        if should_sync && self.sync_suspended.load(Ordering::SeqCst) {
-            self.reopen_stores().await;
-        }
-        self.sync_suspended.store(!should_sync, Ordering::SeqCst);
-        let Ok(sync_service) = self.sync_service().await else {
-            return;
-        };
-        if should_sync {
-            // Starting a running service is a no-op, but from `Offline` it retries at once.
-            self.set_sync_presence(presence::state(self.desired_presence()))
-                .await;
-            if self.sync_allowed() {
-                sync_service.start().await;
-            }
-            drop(serial);
-            // Fetches replied-to events, which must not hold up local reads or the next pause.
-            Box::pin(self.until_stores_close(self.retry_cached_decryption())).await;
-        } else {
-            if let Ok(client) = self.client().await {
-                self.flush_inbox_locked(&client, &serial).await;
-            }
-            // Background push fetches must not report the user online.
-            self.set_sync_presence(matrix_sdk::ruma::presence::PresenceState::Offline)
-                .await;
-            sync_service.stop().await;
-            #[cfg(target_os = "ios")]
-            self.close_stores().await;
-        }
-    }
-
-    pub async fn update_network_conditions(self: &Arc<Self>, available: bool, unmetered: bool) {
-        let was_available = self.network_available.swap(available, Ordering::SeqCst);
-        self.search_network.set_unmetered(unmetered);
-        self.refresh_search_peers();
-        if available && !was_available && !self.sync_paused() {
-            self.apply_activity(self.app_active.load(Ordering::Relaxed), None)
-                .await;
-        }
-    }
-
-    async fn set_sync_presence(&self, presence: matrix_sdk::ruma::presence::PresenceState) {
-        if let Ok(client) = self.client().await
-            && let Err(error) = client.set_presence(presence, None, false).await
-        {
-            tracing::debug!("sync presence not applied: {error}");
-        }
-    }
-
-    #[cfg(target_os = "ios")]
-    async fn store_clients(&self) -> Vec<matrix_sdk::Client> {
-        let mut clients: Vec<_> = self
-            .account_clients
-            .lock()
-            .await
-            .values()
-            .cloned()
-            .collect();
-        clients.extend(self.client().await.ok());
-        if let Some(pending) = self.pending_login.lock().await.as_ref() {
-            clients.push(pending.client.clone());
-        }
-        clients.extend(
-            self.pending_registration
-                .lock()
-                .await
-                .as_ref()
-                .map(registration::PendingRegistration::client),
-        );
-        clients
-    }
-
-    #[cfg(target_os = "ios")]
-    async fn close_stores(&self) {
-        self.stores_open.send_replace(false);
-        for client in self.store_clients().await {
-            if let Err(error) = client.pause().await {
-                tracing::warn!("closing the stores before suspension failed: {error}");
-            }
-        }
-    }
-
-    #[cfg(target_os = "ios")]
-    async fn reopen_stores(&self) {
-        for client in self.store_clients().await {
-            if let Err(error) = client.resume().await {
-                tracing::warn!("reopening the stores after suspension failed: {error}");
-            }
-        }
-        self.stores_open.send_replace(true);
-    }
-
-    pub(crate) async fn wait_for_stores(&self) {
-        let _ = self.stores_open.subscribe().wait_for(|open| *open).await;
-    }
-
-    /// Only short local reads belong here; network work would delay iOS suspension. Never call it
-    /// from a sync event handler: suspension holds the lock while it waits for sync to stop. Never
-    /// call it while holding the activity lock either, it takes that lock itself.
-    pub(crate) async fn with_open_stores<T>(&self, read: impl AsyncFnOnce() -> T) -> T {
-        loop {
-            self.wait_for_stores().await;
-            let _activity = self.activity_lock.lock().await;
-            if *self.stores_open.borrow() {
-                return read().await;
-            }
-        }
-    }
-
-    /// Drops `work` once the stores close, so it must be started again after they reopen.
-    pub(crate) async fn until_stores_close<T>(
-        &self,
-        work: impl std::future::Future<Output = T>,
-    ) -> Option<T> {
-        let mut open = self.stores_open.subscribe();
-        tokio::select! {
-            biased;
-            _ = open.wait_for(|open| !*open) => None,
-            output = work => Some(output),
-        }
-    }
-
-    pub(crate) async fn wait_until_active(&self) {
-        loop {
-            let woken = self.app_wake.notified();
-            if self.app_active.load(Ordering::Relaxed) {
-                return;
-            }
-            woken.await;
-        }
-    }
-
     pub fn update_app_in_foreground(&self, foreground: bool) {
         self.search_foreground.store(foreground, Ordering::Relaxed);
         self.refresh_search_peers();
@@ -709,7 +528,7 @@ impl Core {
 
     pub(crate) fn search_crawl_active(&self) -> bool {
         !self.search_sharing.discovering()
-            && self.app_active.load(Ordering::Relaxed)
+            && self.activity.app_active()
             && self.search_foreground.load(Ordering::Relaxed)
             && self.search_network.allows_crawl()
     }

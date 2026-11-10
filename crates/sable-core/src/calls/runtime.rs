@@ -597,8 +597,7 @@ pub(super) async fn join(
         },
     );
     drop(calls);
-    core.apply_app_activity(core.app_active.load(Ordering::Relaxed))
-        .await;
+    core.apply_app_activity(core.activity.app_active()).await;
     if !core.is_current(generation) {
         return Err(RpcError::NotLoggedIn);
     }

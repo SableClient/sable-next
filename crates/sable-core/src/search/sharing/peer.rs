@@ -396,7 +396,7 @@ impl Core {
     }
 
     fn search_peer_pause(&self) -> Option<SearchPeerPause> {
-        if !self.network_available.load(Ordering::Relaxed) {
+        if !self.activity.network_available() {
             Some(SearchPeerPause::Offline)
         } else if !self.search_network.allows_crawl() {
             Some(SearchPeerPause::Metered)

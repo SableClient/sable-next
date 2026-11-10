@@ -13,13 +13,6 @@ use crate::{Core, ResultExt, protocol::RpcError};
 pub(crate) const SYNC_STALL: Duration = Duration::from_secs(90);
 
 impl Core {
-    pub(crate) async fn resume_sync(&self, sync_service: &SyncService) {
-        let _serial = self.activity_lock.lock().await;
-        if self.sync_allowed() {
-            sync_service.start().await;
-        }
-    }
-
     /// The wasm HTTP client ignores request timeouts, so a long-poll on a connection that died
     /// during sleep never returns.
     #[cfg(any(target_family = "wasm", test))]
@@ -42,8 +35,10 @@ impl Core {
                     {
                         continue;
                     }
-                    let _serial = core.activity_lock.lock().await;
-                    if matches!(sync_service.state().get(), State::Running) && core.sync_allowed() {
+                    let transition = core.activity.transition().await;
+                    if matches!(sync_service.state().get(), State::Running)
+                        && transition.sync_allowed()
+                    {
                         tracing::warn!("no sync response for {stall:?}, restarting sync");
                         sync_service.stop().await;
                         sync_service.start().await;
@@ -67,16 +62,14 @@ impl Core {
         self.track_session_task(
             spawn(async move {
                 while changes.next().await.is_some() {
-                    let _serial = core.activity_lock.lock().await;
+                    let transition = core.activity.transition().await;
                     if let Some(event_cache) = client.event_cache()
                         && let Err(error) = event_cache.clear_all_rooms().await
                     {
                         tracing::warn!(%error, "clearing the event cache after an ignore change");
                     }
                     sync_service.expire_sessions().await;
-                    if core.sync_allowed() {
-                        sync_service.start().await;
-                    }
+                    transition.start_sync(&sync_service).await;
                 }
             })
             .abort_on_drop(),

@@ -1302,13 +1302,13 @@ async fn local_read_waits_for_open_stores() {
     let store = tempfile::tempdir().unwrap();
     let client = space_client(&server, store.path()).await;
     let core = core(&server, client.clone()).await;
-    core.stores_open.send_replace(false);
+    core.activity.set_stores_open(false);
     client.pause().await.unwrap();
     let ran = std::sync::atomic::AtomicBool::new(false);
 
     let pending = core.with_open_stores(async || {
-        assert!(*core.stores_open.borrow());
-        core.activity_lock.try_lock().unwrap_err();
+        assert!(core.activity.stores_open());
+        assert!(core.activity.try_transition().is_none());
         ran.store(true, std::sync::atomic::Ordering::SeqCst);
         client.state_store().get_custom_value(b"missing").await
     });
@@ -1319,10 +1319,10 @@ async fn local_read_waits_for_open_stores() {
     assert!(!ran.load(std::sync::atomic::Ordering::SeqCst));
 
     client.resume().await.unwrap();
-    core.stores_open.send_replace(true);
+    core.activity.set_stores_open(true);
     assert_eq!(pending.await.unwrap(), None);
     assert!(ran.load(std::sync::atomic::Ordering::SeqCst));
-    drop(core.activity_lock.try_lock().unwrap());
+    assert!(core.activity.try_transition().is_some());
 }
 
 #[tokio::test]
@@ -1340,7 +1340,7 @@ async fn background_work_stops_when_the_stores_close() {
         .await
         .expect_err("the work keeps running while the stores are open");
 
-    core.stores_open.send_replace(false);
+    core.activity.set_stores_open(false);
     assert_eq!(work.await, None);
 }
 
@@ -1359,7 +1359,7 @@ async fn space_sidebar_waits_for_stores_to_reopen() {
         })
         .await;
     let core = core(&server, client.clone()).await;
-    core.stores_open.send_replace(false);
+    core.activity.set_stores_open(false);
     client.pause().await.unwrap();
 
     let pending = core.run(SidebarParams {});
@@ -1369,7 +1369,7 @@ async fn space_sidebar_waits_for_stores_to_reopen() {
         .expect_err("the layout read waits for reopened stores");
 
     client.resume().await.unwrap();
-    core.stores_open.send_replace(true);
+    core.activity.set_stores_open(true);
     let items = pending.await.unwrap();
     assert_eq!(
         items,
@@ -1390,7 +1390,7 @@ async fn space_sidebar_does_not_read_while_stores_are_closing() {
     let store = tempfile::tempdir().unwrap();
     let client = space_client(&server, store.path()).await;
     let core = core(&server, client.clone()).await;
-    let activity = core.activity_lock.lock().await;
+    let activity = core.activity.transition().await;
 
     let pending = core.run(SidebarParams {});
     tokio::pin!(pending);
@@ -1398,7 +1398,7 @@ async fn space_sidebar_does_not_read_while_stores_are_closing() {
         .await
         .expect_err("the layout read waits for the activity transition");
 
-    core.stores_open.send_replace(false);
+    core.activity.set_stores_open(false);
     client.pause().await.unwrap();
     drop(activity);
     tokio::time::timeout(std::time::Duration::from_millis(200), &mut pending)
@@ -1406,7 +1406,7 @@ async fn space_sidebar_does_not_read_while_stores_are_closing() {
         .expect_err("the layout read waits for reopened stores");
 
     client.resume().await.unwrap();
-    core.stores_open.send_replace(true);
+    core.activity.set_stores_open(true);
     assert_eq!(pending.await.unwrap(), []);
 }
 
@@ -1416,7 +1416,7 @@ async fn room_list_waits_for_stores_to_open() {
     let store = tempfile::tempdir().unwrap();
     let client = space_client(&server, store.path()).await;
     let (core, mut events) = core_with_events(&server, client.clone()).await;
-    core.stores_open.send_replace(false);
+    core.activity.set_stores_open(false);
     client.pause().await.unwrap();
 
     let subscribing = tokio::spawn({
@@ -1428,7 +1428,7 @@ async fn room_list_waits_for_stores_to_open() {
     assert!(core.push_rules.lock().await.is_none());
 
     client.resume().await.unwrap();
-    core.stores_open.send_replace(true);
+    core.activity.set_stores_open(true);
     let SubscribeRoomListOk { subscription, .. } = subscribing.await.unwrap().unwrap();
     let diffs = next_room_list_diff(&mut events, subscription).await;
     let [crate::protocol::VectorDiff::Reset { values }] = diffs.as_slice() else {
@@ -1447,7 +1447,7 @@ async fn timeline_waits_for_stores_to_open() {
     server.sync_joined_room(&client, room_id).await;
     server.mock_room_state_encryption().plain().mount().await;
     let core = core(&server, client).await;
-    core.stores_open.send_replace(false);
+    core.activity.set_stores_open(false);
 
     let pending = core.run(SubscribeParams {
         room_id: room_id.to_owned(),
@@ -1460,7 +1460,7 @@ async fn timeline_waits_for_stores_to_open() {
         .expect_err("subscribing waits for the stores");
     assert!(core.timelines.lock().await.is_empty());
 
-    core.stores_open.send_replace(true);
+    core.activity.set_stores_open(true);
     let SubscribeOk { subscription, .. } =
         tokio::time::timeout(std::time::Duration::from_secs(5), pending)
             .await
@@ -1490,19 +1490,19 @@ async fn room_list_retries_stale_spaces_when_stores_reopen() {
     assert_eq!(values.len(), 1);
     assert_eq!(values[0].space_children, Vec::new());
 
-    core.stores_open.send_replace(false);
+    core.activity.set_stores_open(false);
     database
         .execute_batch("ALTER TABLE state_event_gone RENAME TO state_event")
         .unwrap();
-    core.stores_open.send_replace(true);
+    core.activity.set_stores_open(true);
     let diffs = next_room_list_diff(&mut events, subscription).await;
     let [crate::protocol::VectorDiff::Set { index: 0, value }] = diffs.as_slice() else {
         panic!("expected recovered space, got {diffs:?}");
     };
     assert_eq!(value.space_children[0].room_id, "!child:example.org");
 
-    core.stores_open.send_replace(false);
-    core.stores_open.send_replace(true);
+    core.activity.set_stores_open(false);
+    core.activity.set_stores_open(true);
     tokio::time::timeout(
         std::time::Duration::from_millis(200),
         next_room_list_diff(&mut events, subscription),

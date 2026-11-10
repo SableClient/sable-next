@@ -938,7 +938,6 @@ async fn legacy_move_fixture(
 #[tokio::test]
 async fn rejoining_a_call_resumes_sync_after_a_background_leave() {
     use matrix_sdk_ui::sync_service::State as SyncState;
-    use std::sync::atomic::Ordering;
     use std::time::Duration;
 
     let (server, sfu, room, _, _, _) = legacy_move_fixture(true).await;
@@ -978,7 +977,7 @@ async fn rejoining_a_call_resumes_sync_after_a_background_leave() {
     core.apply_app_activity(false).await;
     core.leave_call(first.session).await.unwrap();
     assert!(matches!(sync_service.state().get(), SyncState::Idle));
-    assert!(core.sync_suspended.load(Ordering::SeqCst));
+    assert!(core.activity.sync_suspended());
 
     let second = core
         .join_call(
@@ -991,8 +990,8 @@ async fn rejoining_a_call_resumes_sync_after_a_background_leave() {
         .unwrap();
 
     assert!(matches!(sync_service.state().get(), SyncState::Running));
-    assert!(!core.sync_suspended.load(Ordering::SeqCst));
-    assert!(!core.app_active.load(Ordering::Relaxed));
+    assert!(!core.activity.sync_suspended());
+    assert!(!core.activity.app_active());
 
     core.update_network_conditions(false, true).await;
     sync_service.stop().await;
