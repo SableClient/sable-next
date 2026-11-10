@@ -152,7 +152,9 @@
     "yesterday": "昨天",
     "back": "返回",
     "download": "下载",
-    "close": "关闭"
+    "close": "关闭",
+    "viewAvatar": "",
+    "viewBanner": ""
   },
   "call": {
     "live": "直播",
@@ -841,7 +843,10 @@
     "directoryRemoveServer": "移除 {{server}}",
     "devDiagServer": "服务器数量（通知、高亮）",
     "devDiagMain": "主要时间线（未读、通知、高亮）",
-    "actionsLabel": "房间操作"
+    "actionsLabel": "房间操作",
+    "mediaTitle": "",
+    "mediaHint": "",
+    "menuClose": ""
   },
   "inbox": {
     "invitesSpamShow": "显示",
@@ -904,7 +909,10 @@
     "invitesStrangers": "来自陌生人",
     "inviteMessageShow": "显示来自 {{name}} 的消息",
     "markAllRead": "全部标为已读",
-    "unlistedNotifications_other": "{{count, number}} 条未读通知"
+    "unlistedNotifications_other": "{{count, number}} 条未读通知",
+    "filterThreads": "",
+    "inThread": "",
+    "notificationsEmptyThreads": ""
   },
   "timeline": {
     "profileNameRemoved": "{{user}} 的显示名称已被移除",
@@ -1296,7 +1304,29 @@
       "googly_eyes": "{{user}} 发送了咕噜眼 {{body}}",
       "other": "{{user}} 发送了 {{body}}"
     },
-    "audioSeek": "播放进度"
+    "audioSeek": "播放进度",
+    "audioVolume": "",
+    "sourceEncryption": "",
+    "shield": {
+      "title": {
+        "authenticityNotGuaranteed": "",
+        "unknownDevice": "",
+        "unsignedDevice": "",
+        "unverifiedIdentity": "",
+        "verificationViolation": "",
+        "mismatchedSender": "",
+        "sentInClear": ""
+      },
+      "body": {
+        "authenticityNotGuaranteed": "",
+        "unknownDevice": "",
+        "unsignedDevice": "",
+        "unverifiedIdentity": "",
+        "verificationViolation": "",
+        "mismatchedSender": "",
+        "sentInClear": ""
+      }
+    }
   },
   "emoji": {
     "people": "笑脸和人物",
@@ -1319,7 +1349,10 @@
     "findCommunityDescription": "浏览公开房间和空间，找到兴趣相投的群体。",
     "startRoomDescription": "为你自己的好友群或社区创建一个房间或空间。",
     "joinConversationTitle": "加入房间或私聊",
-    "joinConversationDescription": "输入房间地址或 Matrix 用户 ID 开始聊天。"
+    "joinConversationDescription": "输入房间地址或 Matrix 用户 ID 开始聊天。",
+    "settingsChangesTitle": "",
+    "settingsChangesNew": "",
+    "settingsChangesDefault": ""
   },
   "join": {
     "knocking": "正在发送…",
@@ -1343,7 +1376,8 @@
     "knockFailed": "无法发送加入申请。",
     "withdraw": "撤销加入申请",
     "knockReason": "你为什么想要加入这个房间？（可选）",
-    "withdrawFailed": "无法撤回加入申请。"
+    "withdrawFailed": "无法撤回加入申请。",
+    "bannedReason": ""
   },
   "app": {
     "accountLocked": "账户已锁定",
@@ -2464,7 +2498,40 @@
     "deleteAccountTypeUserId": "输入 {{userId}} 以确认",
     "updateChannel": "更新频道",
     "timeZoneHint": "以该时区显示消息时间，当你的浏览器隐藏你的真实时区时很有用。",
-    "timeZoneAuto": "自动（此设备）"
+    "timeZoneAuto": "自动（此设备）",
+    "showSingleReactionCount": "",
+    "troubleshootAlarmsEmbeddedOnly": "",
+    "troubleshootCheckBackground": "",
+    "developerAccountDataServerManaged": "",
+    "developerPushRulesTitle": "",
+    "developerPushRulesDescription": "",
+    "developerPushRulesEmpty": "",
+    "developerPushRulesEnabled": "",
+    "developerPushRulesRule": "",
+    "developerPushRulesActions": "",
+    "developerPushRulesInvalidActions": "",
+    "developerPushRulesFailed": "",
+    "developerPushRulesSaved": "",
+    "developerPushRulesDelete": "",
+    "developerPushRulesDeleteConfirm": "",
+    "developerPushRulesDeleteDescription": "",
+    "needsServerFeature": "",
+    "messageSwipeAction": "",
+    "messageSwipeActionReply": "",
+    "messageSwipeActionMembers": "",
+    "showAllTimestamps": "",
+    "emoticonToEmojiHint": "",
+    "pushEmbeddedServer": "",
+    "pushEmbeddedServerHint": "",
+    "pushEmbeddedServerInvalid": "",
+    "troubleshootAndroidOnly": "",
+    "troubleshootBackgroundUnknown": "",
+    "troubleshootAlarmsDenied": "",
+    "troubleshootAlarmsUnknown": "",
+    "troubleshootCheckAlarms": "",
+    "startMinimized": "",
+    "aboutDataFolder": "",
+    "emoticonToEmoji": ""
   },
   "supporter": {
     "shapes": {
@@ -2681,7 +2748,8 @@
     "continueWithProvider": "使用 {{name}} 继续",
     "enterRegistrationToken": "请输入你的注册令牌。",
     "passwordResetComplete": "密码已重置",
-    "noAccountYet": "还没有账户吗？"
+    "noAccountYet": "还没有账户吗？",
+    "openInBrowser": ""
   },
   "footer": {
     "poweredBy": "基于"
@@ -3240,7 +3308,8 @@
     "triggers": "触发器",
     "triggerPrefix": "前缀",
     "backup": "备份",
-    "noMatches": "没有个人资料匹配该搜索。"
+    "noMatches": "没有个人资料匹配该搜索。",
+    "pickerAccount": ""
   },
   "shortcuts": {
     "openBookmarks": "打开书签",
@@ -3278,7 +3347,8 @@
     "hangUp": "离开通话",
     "toggleEmojiPicker": "切换表情选择器",
     "toggleGifPicker": "切换 GIF 选择器",
-    "toggleStickerPicker": "切换贴纸选择器"
+    "toggleStickerPicker": "切换贴纸选择器",
+    "closeRoom": ""
   },
   "search": {
     "close": "关闭搜索",
@@ -3528,7 +3598,8 @@
     },
     "announceCheckCode": "你的数字是 {{code}}，请在另一台设备上输入它。",
     "announceUserCode": "另一台设备显示 {{code}}，请在那里批准登录。",
-    "chooseLogin": "使用你已登录的设备，例如手机上的 Sable 或 Element。"
+    "chooseLogin": "使用你已登录的设备，例如手机上的 Sable 或 Element。",
+    "openApprovalFailed": ""
   },
   "share": {
     "files_other": "{{count, number}} 个文件",
