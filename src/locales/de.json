@@ -139,7 +139,8 @@
     "markedRead": "„{{room}}“ wurde als gelesen markiert",
     "bookmarkRemoved": "Ein Lesezeichen in „{{room}}“ wurde entfernt",
     "unlistedNotifications_one": "{{count, number}} ungelesene Benachrichtigung",
-    "unlistedNotifications_other": "{{count, number}} ungelesene Benachrichtigungen"
+    "unlistedNotifications_other": "{{count, number}} ungelesene Benachrichtigungen",
+    "notificationsEmptyThreads": ""
   },
   "room": {
     "createDescription": "Räume enhalten eine Konversation. Ein Space enthält Räume.",
@@ -1022,7 +1023,10 @@
     "attachmentsMoreLinks_other": "+ {{count}} weitere Links"
   },
   "shortcuts": {
-    "paletteEmpty": "Keine Räume für diese Suche gefunden."
+    "paletteEmpty": "Keine Räume für diese Suche gefunden.",
+    "helpTitle": "",
+    "showShortcuts": "",
+    "paletteHint": ""
   },
   "emoji": {
     "unicode": "Emoji",
@@ -1107,5 +1111,50 @@
     "linkApply": "Einfügen",
     "imageOptions": "Optionen für {{name}}",
     "linkTitle": "Link einfügen"
+  },
+  "auth": {
+    "emailVerified": "",
+    "welcomeBack": ""
+  },
+  "settings": {
+    "verified": "",
+    "notVerified": "",
+    "encryption": "",
+    "profileSaveFailed": "",
+    "security": "",
+    "profileChangePropagation": "",
+    "timeZone": "",
+    "timeZoneAuto": "",
+    "timezone": "",
+    "account": "",
+    "profilePreview": "",
+    "timezoneNotSet": "",
+    "profileColorsBackground": "",
+    "profileColorsBrightness": "",
+    "profileChangePropagationAll": "",
+    "profileChangesTitle": "",
+    "profileColors": "",
+    "profileScopeDefault": "",
+    "removeTimezone": "",
+    "profileScope": "",
+    "profilePreviewTab": "",
+    "profileSaved": "",
+    "verificationComplete": "",
+    "profile": "",
+    "profileChangePropagationNone": "",
+    "biographyHint": "",
+    "profileChangePropagationUnchanged": "",
+    "pronounsAdd": ""
+  },
+  "qrLogin": {
+    "scanCode": "",
+    "chooseGrant": "",
+    "titleLogin": "",
+    "showHintLogin": "",
+    "showHintGrant": "",
+    "scanHintLogin": "",
+    "showCode": "",
+    "titleGrant": "",
+    "chooseLogin": ""
   }
 }
