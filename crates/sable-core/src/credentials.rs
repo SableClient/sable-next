@@ -58,18 +58,22 @@ impl LoginTokens {
             if !sealed {
                 continue;
             }
-            let moved = self
-                .create_directory()
-                .and_then(|()| std::fs::hard_link(entry.path(), self.directory.join(&name)));
+            // Android denies apps `link`, so this must be a rename that refuses to replace.
+            let moved = self.create_directory().and_then(|()| {
+                let mut source = tempfile::TempPath::try_from_path(entry.path())?;
+                source.disable_cleanup(true);
+                source
+                    .persist_noclobber(self.directory.join(&name))
+                    .map_err(|error| error.error)
+            });
             match moved {
-                Err(error) if error.kind() != std::io::ErrorKind::AlreadyExists => {
-                    tracing::warn!("could not move a sealed token file: {error}");
-                }
-                _ => {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
                     if let Err(error) = std::fs::remove_file(entry.path()) {
                         tracing::warn!("could not remove a moved token file: {error}");
                     }
                 }
+                Err(error) => tracing::warn!("could not move a sealed token file: {error}"),
             }
         }
     }
