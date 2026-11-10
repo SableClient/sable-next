@@ -87,7 +87,23 @@
     "memberCount": "{{count, number}} miembros"
   },
   "settings": {
-    "cancelVerification": "Cancelar verificación"
+    "cancelVerification": "Cancelar verificación",
+    "notificationEncryptedContent": "",
+    "composerTitle": "",
+    "notificationContentHint": "",
+    "notificationSounds": "",
+    "notificationEncryptedContentHint": "",
+    "notificationSoundVolume": "",
+    "keyboard": "",
+    "emotes": "",
+    "security": "",
+    "showHiddenEvents": "",
+    "appearanceTitle": "",
+    "timelineTitle": "",
+    "notifyOnce": "",
+    "privacyTitle": "",
+    "notificationContent": "",
+    "showTranslationStrings": ""
   },
   "emotes": {
     "stealExplain": "La imagen es copiada a tu propia cuenta, por lo que sigue funcionando si el mensaje o su sala desaparece."
