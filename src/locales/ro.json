@@ -145,7 +145,10 @@
     "notificationsEmptyAll": "Ai citit tot. Mențiunile, mesajele directe și notificările vor apărea aici.",
     "unlistedNotifications_one": "{{count, number}} notificare necitită",
     "unlistedNotifications_few": "{{count, number}} notificări necitite",
-    "unlistedNotifications_other": "{{count, number}} de notificări necitite"
+    "unlistedNotifications_other": "{{count, number}} de notificări necitite",
+    "filterThreads": "",
+    "inThread": "",
+    "notificationsEmptyThreads": ""
   },
   "room": {
     "createDescription": "Camerele conțin o conversații. Spațiile conțin camere.",
@@ -689,7 +692,8 @@
     "cosmeticsApplying_other": "Se aplică… {{done, number}} din {{count, number}} de camere.",
     "cosmeticsApplied_one": "Sa aplicat pentru o cameră.",
     "cosmeticsApplied_few": "Sa aplicat pentru {{count, number}} camere.",
-    "cosmeticsApplied_other": "Sa aplicat pentru {{count, number}} de camere."
+    "cosmeticsApplied_other": "Sa aplicat pentru {{count, number}} de camere.",
+    "menuClose": ""
   },
   "join": {
     "knocking": "Se trimite…",
@@ -2563,6 +2567,8 @@
     "sortNameDesc": "Z la A",
     "edit": "Editează",
     "sortManual": "Manuală",
-    "confirmIrreversible": "Înțeleg ca această acțiune este ireversibilă"
+    "confirmIrreversible": "Înțeleg ca această acțiune este ireversibilă",
+    "viewAvatar": "",
+    "viewBanner": ""
   }
 }
