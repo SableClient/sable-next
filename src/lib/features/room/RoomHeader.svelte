@@ -10,11 +10,12 @@
   import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
-  import type { MemberView } from '#src/generated/protocol';
+  import type { MemberView, PresenceView } from '#src/generated/protocol';
 
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
+  import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { participantKeys } from '#lib/features/call/participant-keys.js';
@@ -30,6 +31,7 @@
     roomAvatar: string | null;
     topic?: string | null;
     encrypted?: boolean | null;
+    presence?: PresenceView | null;
     isVoice: boolean;
     callParticipants: readonly string[];
     members: readonly MemberView[];
@@ -55,6 +57,7 @@
     roomAvatar,
     topic = null,
     encrypted = null,
+    presence = null,
     isVoice,
     callParticipants,
     members,
@@ -106,7 +109,12 @@
 
   {#snippet main()}
     <div class={['room-identity', { 'with-topic': topicShown }]}>
-      <h1 tabindex="-1" data-room-heading>{roomName}</h1>
+      <div class="room-title">
+        <h1 tabindex="-1" data-room-heading>{roomName}</h1>
+        {#if presence && presence !== 'offline'}
+          <PresenceDot {presence} label={i18n.t(`presence.${presence}`)} size="medium" />
+        {/if}
+      </div>
       {#if topicShown}
         <button class="room-topic" type="button" onclick={onTopic}>{topic}</button>
       {/if}
@@ -220,10 +228,18 @@
     min-width: 0;
   }
 
+  .room-title {
+    align-items: center;
+    display: flex;
+    gap: var(--space-150);
+    min-width: 0;
+  }
+
   h1 {
     font-size: var(--font-size-heading);
     line-height: var(--line-height-heading);
     margin: 0;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

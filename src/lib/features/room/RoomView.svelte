@@ -34,6 +34,7 @@
   import { matrixLinkPath, copyRoomLink, roomSectionPath } from '#lib/rooms/permalink.js';
   import { backToRoomList, searchInRoom, trackRoomEntry } from './room-navigation.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { provideRoomCosmetics, RoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import { activeRoomTimeline } from '#lib/rooms/timeline.svelte.js';
@@ -99,6 +100,7 @@
   trackRoomEntry();
   const personas = usePersonaStore();
   const roomList = useRoomList();
+  const presenceStore = usePresenceStore();
   const timelineOwner = Symbol('room-view');
   const activeTimeline = activeRoomTimeline(core);
   const timeline = activeTimeline.timeline;
@@ -113,6 +115,12 @@
   let receiptsOpen = $state(false);
   let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId) ?? room);
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
+  let dmPeers = $derived(
+    resolvedRoom?.is_direct && core.session
+      ? resolvedRoom.direct_targets.filter((target) => target !== core.session?.user_id)
+      : []
+  );
+  let dmPresence = $derived(dmPeers.length === 1 ? presenceStore.get(dmPeers[0]) : null);
   const conversation = new Conversation({
     core,
     personas,
@@ -917,6 +925,7 @@
       {roomAvatar}
       topic={roomTopic}
       encrypted={resolvedRoom?.encrypted ?? null}
+      presence={dmPresence?.presence ?? null}
       isVoice={resolvedRoom?.room_kind === 'voice'}
       callParticipants={resolvedRoom?.call_participants ?? []}
       members={memberLoader.members}
