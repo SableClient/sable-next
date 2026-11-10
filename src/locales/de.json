@@ -1122,7 +1122,11 @@
     "pinnedRemoved_one": "{{user}} hat eine Nachricht gelöst",
     "pinnedRemoved_other": "{{user}} hat {{count, number}} Nachrichten gelöst",
     "pollClosed": "Abschließendes Ergebnis",
-    "pollEnd": ""
+    "pollEnd": "Abstimmung schließen",
+    "pollMaxSelections_one": "Einfachauswahl",
+    "pollMaxSelections_other": "Mehrfachauswahl (bis zu {{count, number}})",
+    "pollTotalVotes_one": "{{count, number}} Stimme",
+    "pollTotalVotes_other": "{{count, number}} Stimmen"
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden.",
