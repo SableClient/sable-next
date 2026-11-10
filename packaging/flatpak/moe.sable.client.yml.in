@@ -18,6 +18,7 @@ finish-args:
   - --filesystem=xdg-run/pipewire-0
   - --device=all
   - --system-talk-name=org.freedesktop.RealtimeKit1
+  - --talk-name=org.a11y.Bus
   - --talk-name=org.freedesktop.secrets
   - --talk-name=org.freedesktop.Notifications
   - --talk-name=org.kde.StatusNotifierWatcher
