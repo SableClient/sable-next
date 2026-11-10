@@ -1011,7 +1011,13 @@
     "attachmentsFiles": "Dateien",
     "attachmentsLinksEmpty": "Auf diesem Gerät wurden noch keine Links indexiert.",
     "attachmentsMediaEmpty": "Auf diesem Gerät wurden noch keine Bilder oder Videos indexiert.",
-    "attachmentsFailed": "Der Suchindex dieses Geräts konnte nicht gelesen werden."
+    "attachmentsFailed": "Der Suchindex dieses Geräts konnte nicht gelesen werden.",
+    "attachmentsVideo": "",
+    "attachmentsVideoNamed": "",
+    "attachmentsIndexed": "",
+    "attachmentsSpoiler": "",
+    "attachmentsSpoilerReason": "",
+    "attachmentsOpenItem": ""
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden."
