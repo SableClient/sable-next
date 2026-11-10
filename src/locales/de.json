@@ -1001,7 +1001,17 @@
     "threadsFailed": "Threads konnten nicht geladen werden.",
     "reply": "Antworten",
     "replyInThread": "In Thread antworten",
-    "threadsLoadMore": "Weitere Threads laden"
+    "threadsLoadMore": "Weitere Threads laden",
+    "attachmentsMedia": "",
+    "attachmentsClose": "",
+    "attachmentsFilesEmpty": "",
+    "attachmentsTitle": "",
+    "attachmentsResize": "",
+    "attachmentsLinks": "",
+    "attachmentsFiles": "",
+    "attachmentsLinksEmpty": "",
+    "attachmentsMediaEmpty": "",
+    "attachmentsFailed": ""
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden."
@@ -1076,5 +1086,18 @@
     "startSlow": "Das scheint länger als sonst zu dauern.",
     "startFailed": "Überprüfe deine Netzwerkverbindung und ob auf dem Gerät genug Speicherplatz frei ist. Versuche es dann erneut.",
     "unableToStart": "Deine Sitzung konnte nicht wiederhergestellt werden."
+  },
+  "composer": {
+    "takePhoto": "",
+    "caption": "",
+    "separateMessage": "",
+    "metadataGroup": "",
+    "insert": "",
+    "photoOrVideo": "",
+    "attachFile": "",
+    "recordVideo": "",
+    "linkApply": "",
+    "imageOptions": "",
+    "linkTitle": ""
   }
 }
