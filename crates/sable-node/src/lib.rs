@@ -12,7 +12,7 @@ mod call_shortcuts;
 use std::{
     io::{self, Write},
     sync::{
-        Arc, Mutex, Once, PoisonError,
+        Arc, Mutex, Once, OnceLock, PoisonError,
         atomic::{AtomicBool, Ordering},
     },
 };
@@ -41,6 +41,18 @@ const PANIC_MARKER: &str = "SABLE_CORE_PANIC ";
 static LOG_HANDLER: Mutex<Option<Callback>> = Mutex::new(None);
 static LOG_CAPTURE: AtomicBool = AtomicBool::new(false);
 static INIT: Once = Once::new();
+static LOG_FILTER: OnceLock<
+    tracing_subscriber::reload::Handle<
+        tracing_subscriber::filter::Targets,
+        tracing_subscriber::Registry,
+    >,
+> = OnceLock::new();
+
+fn log_targets(filter: &str) -> tracing_subscriber::filter::Targets {
+    filter.parse().unwrap_or_else(|_| {
+        tracing_subscriber::filter::Targets::new().with_default(tracing::Level::INFO)
+    })
+}
 
 fn js_err(error: &RpcError) -> napi::Error {
     napi::Error::new(Status::GenericFailure, rpc_error_json(error))
@@ -107,7 +119,7 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeJsLogWriter {
 }
 
 fn init(filter: &str) {
-    use tracing_subscriber::{filter::Targets, prelude::*};
+    use tracing_subscriber::prelude::*;
 
     INIT.call_once(|| {
         let previous = std::panic::take_hook();
@@ -116,10 +128,9 @@ fn init(filter: &str) {
             eprintln!("{PANIC_MARKER}{}", info.to_string().replace('\n', " "));
         }));
 
-        let targets = filter
-            .parse::<Targets>()
-            .unwrap_or_else(|_| Targets::new().with_default(tracing::Level::INFO));
-        let _ = tracing_subscriber::registry()
+        let (targets, handle) = tracing_subscriber::reload::Layer::new(log_targets(filter));
+        if tracing_subscriber::registry()
+            .with(targets)
             .with(
                 tracing_subscriber::fmt::layer()
                     .with_ansi(false)
@@ -131,9 +142,20 @@ fn init(filter: &str) {
                     .without_time()
                     .with_writer(MakeJsLogWriter),
             )
-            .with(targets)
-            .try_init();
+            .try_init()
+            .is_ok()
+        {
+            let _ = LOG_FILTER.set(handle);
+        }
     });
+}
+
+#[napi]
+pub fn set_log_filter(filter: Option<String>) {
+    let filter = filter.unwrap_or_else(|| DEFAULT_LOG_FILTER.to_owned());
+    if let Some(handle) = LOG_FILTER.get() {
+        let _ = handle.reload(log_targets(&filter));
+    }
 }
 
 #[napi]

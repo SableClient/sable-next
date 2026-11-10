@@ -25,6 +25,7 @@ interface NativeModule {
   SableCore: new (dataDir: string, logFilter: string | null) => NativeCore;
   setLogHandler(notify: (line: string) => void): void;
   setLogCapture(enabled: boolean): void;
+  setLogFilter(filter: string | null): void;
   installKeyring(service: string, dataDir: string, logFilter: string | null): void;
   setProxy(url: string): void;
 }
@@ -46,6 +47,8 @@ function keyringFailure(service: string, directory: string): string | null {
     return error instanceof Error ? error.message : String(error);
   }
 }
+
+const pinnedLogFilter = process.env.SABLE_LOG !== undefined;
 
 function serve(directory: string): void {
   const instance = new native.SableCore(directory, process.env.SABLE_LOG ?? null);
@@ -76,6 +79,9 @@ function serve(directory: string): void {
     },
     () => {
       process.exit(0);
+    },
+    (filter) => {
+      if (!pinnedLogFilter) native.setLogFilter(filter);
     }
   );
   native.setLogHandler(boundary.handleLog);
@@ -123,6 +129,8 @@ function serve(directory: string): void {
   process.parentPort.on('message', (event) => {
     if (event.ports.length !== 1) return;
     const [port] = event.ports;
+    // A page that left debug logging sends no filter, and this process outlives its reload.
+    if (!pinnedLogFilter) native.setLogFilter(null);
     boundary.connect(wrap(port));
 
     const queued = backlog;
