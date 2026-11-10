@@ -520,7 +520,8 @@
     "devRoomId": "Szobaazonosító",
     "devDiagnosticsTitle": "Diagnosztika",
     "devDiagSync": "Szinkronizálás",
-    "devDiagMembership": "Tagság"
+    "devDiagMembership": "Tagság",
+    "memberListHint": "A megadott tagok akkor is látszanak a listában, ha offline állapotban vannak."
   },
   "join": {
     "joining": "Csatlakozás…",
@@ -905,7 +906,7 @@
     "sendBlockedIdentity": "{{names}} visszaállította a titkosítási identitását, mióta Ön ellenőrizte. A mindenképpen történő küldés visszavonja az ellenőrzését.",
     "sendBlockedVerify": "Titkosított üzenetek küldése előtt ellenőrizze ezt az eszközt.",
     "membership": {
-      "invitation_revoked": "{{user}} meghívása vissza lett vonva",
+      "invitation_revoked": "{{user}} meghívása visszavonva",
       "joined": "{{user}} csatlakozott a szobához",
       "left": "{{user}} kilépett a szobából",
       "banned": "{{user}} ki lett tiltva",
@@ -939,7 +940,8 @@
         "historicalMessageBackupDisabled": "A titkosított üzenet-előzmények ezen az eszközön nem érhetők el.",
         "historicalMessageDeviceUnverified": "A titkosított üzenet-előzmények nem érhetők el, mert ez az eszköz nincs ellenőrizve.",
         "withheldUnverified": "{{name}} nem küldte el Önnek ennek az üzenetnek a kulcsát, mert ez az eszköz nincs ellenőrizve.",
-        "withheld": "Nem tekintheti meg ezt az üzenetet, mert {{name}} nem küldte el Önnek az üzenetkulcsot. Lehet, hogy letiltotta ezt az eszközt, vagy technikai probléma lépett fel."
+        "withheld": "Nem tekintheti meg ezt az üzenetet, mert {{name}} nem küldte el Önnek az üzenetkulcsot. Lehet, hogy letiltotta ezt az eszközt, vagy technikai probléma lépett fel.",
+        "unsignedDevice": "Ez az üzenet nem megbízható, mert olyan eszközről küldték, amelyet {{name}} nem igazolt a sajátjaként."
       },
       "title": {
         "waiting": "Várakozás erre az üzenetre",
@@ -949,7 +951,8 @@
         "unknownDevice": "Várakozás erre az eszközre",
         "historicalMessageBackupDisabled": "Az előzmények nem érhetők el",
         "historicalMessageDeviceUnverified": "Az előzmények olvasásához ellenőrizze ezt az eszközt",
-        "withheldUnverified": "Ez az eszköz nincs ellenőrizve"
+        "withheldUnverified": "Ez az eszköz nincs ellenőrizve",
+        "verificationViolation": "{{name}} visszaállította a digitális identitását"
       },
       "cause": {
         "waiting": "Az üzenet megjelenik, amint az üzenetkulcs megérkezik. Ha nem jelenik meg hamarosan, lehet, hogy {{name}} homeserverének problémái vannak az Ön homeserverével való kapcsolódással. Segítségért forduljon a homeserver adminisztrátoraihoz.",
@@ -957,7 +960,8 @@
         "unknownDevice": "Az üzenet megjelenik, amint az eszköz adatai megérkeznek. Ha nem jelenik meg hamarosan, lehet, hogy {{name}} homeserverének problémái vannak az Ön homeserverével való kapcsolódással. Segítségért forduljon a homeserver adminisztrátoraihoz.",
         "historicalMessageBackupDisabled": "Kapcsolja be a kulcstárolást, hogy a titkosított üzenet-előzményeket megoszthassa az eszközei között.",
         "historicalMessageDeviceUnverified": "Ellenőrizze ezt az eszközt, hogy letölthesse a titkosított üzenet-előzményeket a kulcstárolóból.",
-        "withheldUnverified": "Ellenőrizze ezt az eszközt, hogy üzenetkulcsokat kaphasson."
+        "withheldUnverified": "Ellenőrizze ezt az eszközt, hogy üzenetkulcsokat kaphasson.",
+        "verificationViolation": "Ellenőrizze újra {{name}} digitális identitását, vagy válassza az új identitás megbízhatónak jelölését."
       },
       "enableKeyBackup": "Kulcstárolás bekapcsolása",
       "confirmThisDevice": "Ennek az eszköznek a megerősítése",
@@ -1028,7 +1032,16 @@
     "attachmentsSpoiler": "Spoiler",
     "attachmentsSpoilerReason": "Spoiler: {{reason}}",
     "attachmentsVideo": "Videó",
-    "deleteExplain": "A szoba minden tagja azt fogja látni, hogy el lett távolítva. A másolattal már rendelkező szervereket megkérjük a törlésre, de a(z) {{appName}} nem garantálhatja, hogy meg is teszik."
+    "deleteExplain": "A szoba minden tagja azt fogja látni, hogy el lett távolítva. A másolattal már rendelkező szervereket megkérjük a törlésre, de a(z) {{appName}} nem garantálhatja, hogy meg is teszik.",
+    "profileOverrideAvatarReset": "Kép visszaállítása",
+    "profileOverrideRemove": "Alapértelmezett profil megjelenítése",
+    "profileAvatarChanged": "{{user}} megváltoztatta a profilképét",
+    "profileAvatarRemoved": "{{user}} eltávolította a profilképét",
+    "cancelSend": "Küldés megszakítása",
+    "pauseAudio": "Megállít: {{name}}",
+    "playGif": "Animáció lejátszása",
+    "stopGif": "Animáció leállítása",
+    "linkCopied": "Hivatkozás átmásolva"
   },
   "viewer": {
     "title": "Médianéző",
@@ -1324,7 +1337,8 @@
       "twitterEmoji": "Twemoji, emoji stílus, emoji betűtípus",
       "typing": "Gépelésjelző, éppen ír",
       "urlPreviews": "Beágyazások, hivatkozáskártyák, URL-előnézet",
-      "weekStart": "Hétfő, vasárnap, naptár, hét"
+      "weekStart": "Hétfő, vasárnap, naptár, hét",
+      "autoplayGifs": "Animált, mozgó képek, GIF-ek lejátszása, WebP, APNG, AVIF"
     },
     "groups": {
       "themes": "Témák",
@@ -2431,7 +2445,32 @@
     "callGlobalShortcutsHint": "Használja a mikrofon gyorsbillentyűket akkor is, ha más alkalmazások vannak előtérben. macOS-en engedélyezze a Sable-t a Kisegítő lehetőségek (Accessibility) beállításokban, hogy a billentyűparancsok más alkalmazásokhoz is eljussanak. Linuxon az asztali környezet kérheti, hogy válassza ki a billentyűkombinációt.",
     "callInputModeHint": "Tartsa lenyomva a beszéd gombot vagy a gyorsbillentyűt a beszédhez. Állítsa be a gyorsbillentyűket a Billentyűzet beállításokban.",
     "callInputVoiceActivity": "Hang aktivitás",
-    "callInputPushToTalk": "Nyomja a beszédhez"
+    "callInputPushToTalk": "Nyomja a beszédhez",
+    "keyStorageOutOfSync": "A kulcs tároló nincs szinkronban. A javításhoz állítsa a személyazonosságát alaphelyzetbe.",
+    "replaceKeyBackupConfirmTitle": "Lecseréli a régi kulcs mentést?",
+    "replaceKeyBackupConfirmDescription": "Ez az eszköz nem tudja feloldani a szerverén tárolt kulcsmentést. Ha tudja, használja hozzá a helyreállítási kulcsát vagy egy másik eszközt. A lecserélése törli a benne tárolt előzményeket.",
+    "replaceKeyBackup": "Mentés cseréje",
+    "replaceKeyBackupUseExisting": "A helyreállítási kulcsom vagy másik eszköz használata",
+    "scanTheirCode": "Inkább kód beolvasása",
+    "scanWithCamera": "A kód beolvasása kamerával",
+    "autoplayGifs": "GIF-ek automatikus lejátszása",
+    "callServiceTitle": "Hívás szolgáltatás",
+    "callServiceUrl": "MatrixRTC tartalék URL",
+    "callServiceUrlHint": "Akkor használatos, ha sem a hívás, sem a matrix szerver nem biztosít szolgáltatást. Hagyja üresen az alapértelmezéshez.",
+    "callServiceUrlInvalid": "Használjon HTTP- vagy HTTPS-URL-t, hitelesítő adatok, lekérdezési paraméterek és töredék nélkül.",
+    "notificationPushHint": "Ezek a beállítások az Ön összes Matrix-alkalmazásában érvényesek. A szobáknak lehet saját riasztási szintjük.",
+    "notificationDefaultDirectRooms": "Közvetlen üzenetek és a kéttagú szobák",
+    "notificationDefaultOtherRooms": "Más szobák",
+    "notificationMemberCountHint": "A hidakon át összekapcsolt és a csoportos közvetlen üzenetek automatikusan az Ön közvetlen üzenet - alapértelmezését követik. A csevegés saját értesítési beállítása elsőbbséget élvez.",
+    "notificationRoomCalls": "Hívások, amelyek értesítik a szobát",
+    "notificationLegacyCalls": "Örökölt hívások",
+    "notificationRtcUnavailableHint": "A Matrix szervere nem kínál külön MatrixRTC-hívásbeállításokat. A meghívók az Ön említési beállításait követhetik.",
+    "notificationRulesCleanupHint": "A Sable által korábban hozzáadott régi értesítési szabályok automatikusan eltávolításra kerülnek. Az egyéni szabályok megmaradnak.",
+    "statusEmoji": "Státusz emoji",
+    "chooseStatusEmoji": "Státusz emoji kiválasztása",
+    "removeStatusEmoji": "Státusz emoji eltávolítása",
+    "usernameClickMention": "Felhasználó megemlítése",
+    "usernameClickProfile": "Profil megnyitása"
   },
   "errors": {
     "pageTitle": "Valami elromlott",
@@ -2963,7 +3002,11 @@
     "coverageIndexing": "A régebbi előzmények olvasása még folyamatban van.",
     "coverageComplete": "Minden szobát az elejéig beolvastunk.",
     "coverageUnknown": "Nem tudtuk ellenőrizni, mennyi előzmény van indexelve, ezért a találatok hiányosak lehetnek.",
-    "coverageStopped": "Az indexelés a munkamenet korlátjánál leállt."
+    "coverageStopped": "Az indexelés a munkamenet korlátjánál leállt.",
+    "loadFailed": "Nem tölthető be több találat.",
+    "refreshFailed": "A találatok nem frissíthetők.",
+    "refreshResults": "Találatok frissítése",
+    "editFilter": "Szerkeszt: {{filter}}"
   },
   "personas": {
     "search": "Profilok keresése",
@@ -3046,7 +3089,10 @@
     "selectionScopePicker": "Választás a választóban",
     "rememberedAccount": "A kiválasztás globálisan megjegyződik",
     "rememberedSpace": "A kiválasztás ebben a térben megjegyződik",
-    "rememberedRoom": "A kiválasztás ebben a szobában megjegyződik"
+    "rememberedRoom": "A kiválasztás ebben a szobában megjegyződik",
+    "manageDescription": "A fiókjában tárolódnak, így minden profilokat támogató kliens ugyanazt a listát látja.",
+    "editorSortFlags": "Profilválasztó rendezése",
+    "sortFlagsHidden": "Elrejtés a választóból"
   },
   "call": {
     "participantVolume": "{{name}} hangereje",
@@ -3713,6 +3759,7 @@
     "listOptions": "Lista beállításai",
     "displayOptions": "Oldalsáv megjelenítési beállításai",
     "alerts": "Riasztások",
-    "noAlerts": "Nincsenek riasztások"
+    "noAlerts": "Nincsenek riasztások",
+    "navigation": "Navigáció"
   }
 }
