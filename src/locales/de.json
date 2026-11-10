@@ -1210,13 +1210,13 @@
         "unsignedDevice": "{{name}} muss das Gerät bestätigen, von dem die Nachricht gesendet wurde. Damit wird bewiesen, dass sie vertrauenswürdig ist.",
         "unknownDevice": "Die Nachricht wird angezeigt, sobald die Information über das Gerät, von dem die Nachricht gesendet wurde, übermittelt worden ist. Falls das nicht passiert, könnte der Homeserver von {{name}} womöglich Probleme bei der Verbindung mit deinem Homeserver haben. Frage am besten deine Homeserver-Administratoren um Hilfe.",
         "verificationViolation": "Verifiziere die digitale Identität von {{name}} erneut oder triff die Entscheidung, ihr ohne Verifizierung zu vertrauen.",
-        "historicalMessageDeviceUnverified": "",
-        "withheldUnverified": ""
+        "historicalMessageDeviceUnverified": "Bestätige dieses Gerät, um den verschlüsselten Nachrichtenverlauf aus der Schlüsselspeicherung herunterzuladen.",
+        "withheldUnverified": "Bestätige dieses Gerät, um die Nachrichtenschlüssel zu erhalten."
       },
       "causeHeader": "Was kann ich tun?",
-      "confirmThisDevice": "",
-      "enableKeyBackup": "",
-      "openIdentitySettings": ""
+      "confirmThisDevice": "Bestätige dieses Gerät",
+      "enableKeyBackup": "Schlüsselspeicherung aktivieren",
+      "openIdentitySettings": "Identitätseinstellungen öffnen"
     },
     "postReplies_one": "{{count, number}} Antwort",
     "postReplies_other": "{{count, number}} Antworten",
@@ -1224,9 +1224,9 @@
     "showPost": "Beitrag anzeigen",
     "forwardSelected_one": "{{count, number}} Raum ausgewählt",
     "forwardSelected_other": "{{count, number}} Räume ausgewählt",
-    "profileOverrideTitle": "",
-    "profileOverride": "",
-    "profileOverrideHint": ""
+    "profileOverrideTitle": "Wie diese Person für dich aussieht",
+    "profileOverride": "Spitznamen ändern",
+    "profileOverrideHint": "Wird nur auf deinen Geräten angezeigt. Die Daten werden in deinem Konto gespeichert, können also von deinem Homeserver gelesen werden."
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden.",
