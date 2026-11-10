@@ -20,6 +20,7 @@
 
   import RoomAbbreviationsSettings from './RoomAbbreviationsSettings.svelte';
   import RoomAppearanceSettings from './RoomAppearanceSettings.svelte';
+  import RoomBridgesSettings from './RoomBridgesSettings.svelte';
   import RoomCosmeticsSettings from './RoomCosmeticsSettings.svelte';
   import RoomDeveloperSettings from './RoomDeveloperSettings.svelte';
   import RoomEmojiSettings from './RoomEmojiSettings.svelte';
@@ -49,7 +50,7 @@
 
   let roomId = $derived(room?.room_id ?? null);
   let roomName = $derived(room?.name ?? room?.room_id ?? '');
-  let sections = $derived(roomSettingsSections(room?.room_kind === 'space'));
+  let sections = $derived(roomSettingsSections(room?.room_kind === 'space', room?.bridge != null));
 
   $effect(() => {
     void roomId;
@@ -169,6 +170,12 @@
     </svelte:boundary>
   {:else if active === 'appearance'}
     <RoomAppearanceSettings {room} />
+  {:else if active === 'bridges'}
+    <svelte:boundary>
+      <RoomBridgesSettings {room} />
+
+      {#snippet pending()}{/snippet}
+    </svelte:boundary>
   {:else if active === 'cosmetics'}
     <RoomCosmeticsSettings {room} {permissions} {levels} />
   {:else if active === 'emojis-stickers'}

@@ -51,6 +51,7 @@ import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 import NavigationRail from './NavigationRail.svelte';
 import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { setBridgedSpace } from '#lib/rooms/bridged-spaces.svelte.js';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 import { savedSpacePaths, spaceNavigationHref } from './space-paths.js';
 import { reads as mediaImageReads } from './media-image-reads.test-support.js';
@@ -928,4 +929,33 @@ test('arrows walk the rail and an open folder nests its spaces one level down', 
   expect(collapse).toHaveFocus();
   await user.keyboard('{ArrowLeft}');
   expect(toggled).toEqual(['f']);
+});
+
+test('a space marked as bridged carries the network of its rooms', async () => {
+  const bridged = {
+    ...space('!a:example.org', 'Alpha'),
+    space_children: [
+      {
+        room_id: '!child:example.org',
+        via: [],
+        order: null,
+        origin_server_ts: 0,
+        suggested: false,
+      },
+    ],
+  };
+  listed.push({
+    ...space('!child:example.org', 'Child'),
+    room_kind: null,
+    bridge: { network: 'Discord', avatar_url: null },
+  });
+  setBridgedSpace('!a:example.org', true);
+  onTestFinished(() => {
+    setBridgedSpace('!a:example.org', false);
+  });
+  renderRail({ props: { spaces: [bridged, space('!b:example.org', 'Beta')] } });
+  await tick();
+
+  expect(within(tab('Alpha')).getByRole('img', { name: 'nav.bridgedFrom:Discord' })).toBeVisible();
+  expect(within(tab('Beta')).queryByRole('img', { name: /bridgedFrom/ })).toBeNull();
 });

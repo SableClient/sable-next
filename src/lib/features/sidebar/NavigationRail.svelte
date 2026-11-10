@@ -4,12 +4,13 @@
 
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import type { Component } from 'svelte';
-  import type { RoomListItemView } from '#src/generated/protocol';
+  import type { BridgeView, RoomListItemView } from '#src/generated/protocol';
   import { resolve } from '$app/paths';
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
   import { isRoomSwitch } from '#lib/features/room/room-navigation.js';
+  import { isBridgedSpace } from '#lib/rooms/bridged-spaces.svelte.js';
   import { findRoomByPathId, roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { addUnread } from '#lib/rooms/spaces.js';
   import type { UnreadCount } from '#lib/rooms/unread.js';
@@ -59,6 +60,7 @@
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
+  import BridgeBadge from './BridgeBadge.svelte';
   import UserQuickTools from './UserQuickTools.svelte';
 
   type RailSection = 'home' | 'unspaced' | 'direct';
@@ -410,6 +412,18 @@
     contextOpen = true;
   }
 
+  function spaceBridge(roomId: string): BridgeView | null {
+    if (!preferences.showBridgeBadges || !isBridgedSpace(roomId)) return null;
+    const space = spacesById.get(roomId);
+    if (space === undefined) return null;
+    if (space.bridge) return space.bridge;
+    for (const child of space.space_children) {
+      const bridge = roomList.byId(child.room_id)?.bridge;
+      if (bridge) return bridge;
+    }
+    return null;
+  }
+
   function spaceItem(roomId: string): SpaceRailItem | null {
     const space = spacesById.get(roomId);
     if (space === undefined) return null;
@@ -599,6 +613,10 @@
       item.dm ?? false,
       unreadId(item.roomId ?? item.href)
     )}
+  {/if}
+  {#if item.space && item.roomId}
+    {@const bridge = spaceBridge(item.roomId)}
+    {#if bridge}<BridgeBadge {bridge} />{/if}
   {/if}
   {#if item.space && item.roomId ? callSpaces.has(item.roomId) : item.inCall}
     <span class="call-mark" aria-hidden="true"><SpeakerHighIcon weight="fill" /></span>

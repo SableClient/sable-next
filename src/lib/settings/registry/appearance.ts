@@ -1,3 +1,4 @@
+import BridgeIcon from 'phosphor-svelte/lib/BridgeIcon';
 import CalendarBlankIcon from 'phosphor-svelte/lib/CalendarBlankIcon';
 import ChatTextIcon from 'phosphor-svelte/lib/ChatTextIcon';
 import ChatsCircleIcon from 'phosphor-svelte/lib/ChatsCircleIcon';
@@ -102,6 +103,13 @@ export const appearanceCategory: SettingsCategory = {
       icon: PaletteIcon,
       name: 'settings.tintRoomIcons',
       description: 'settings.tintRoomIconsHint',
+      type: 'boolean',
+    },
+    {
+      key: 'showBridgeBadges',
+      section: 'sidebar',
+      icon: BridgeIcon,
+      name: 'settings.showBridgeBadges',
       type: 'boolean',
     },
     {

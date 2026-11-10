@@ -17,6 +17,7 @@ import {
   ungroupedFavourites,
 } from '#lib/rooms/favourite-grouping.svelte.js';
 import { adoptQueue, parseQueue, scheduledQueue } from '#lib/composer/scheduled-queue.svelte.js';
+import { adoptBridgedSpaces, bridgedSpaces } from '#lib/rooms/bridged-spaces.svelte.js';
 import { adoptQuietRooms, parseQuietRooms, quietRooms } from '#lib/rooms/quiet-rooms.svelte.js';
 import {
   parseShortcodes,
@@ -90,6 +91,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
         openFolders: [...sidebar.openFolders],
         ungroupedFavourites: ungroupedFavourites(),
         quietRooms: quietRooms(),
+        bridgedSpaces: bridgedSpaces(),
       },
     }),
 
@@ -103,7 +105,8 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
           Object.keys(roomIconOverrides()).length === 0 &&
           sidebar.openFolders.size === 0 &&
           ungroupedFavourites().length === 0 &&
-          quietRooms().length === 0
+          quietRooms().length === 0 &&
+          bridgedSpaces().length === 0
         );
       }
 
@@ -114,6 +117,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
       sidebar.adoptOpenFolders(stringList(body.openFolders));
       adoptUngroupedFavourites(parseUngroupedFavourites(body.ungroupedFavourites));
       adoptQuietRooms(parseQuietRooms(body.quietRooms));
+      adoptBridgedSpaces(stringList(body.bridgedSpaces));
       return true;
     },
   };

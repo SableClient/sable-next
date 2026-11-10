@@ -41,6 +41,7 @@ export const ACCOUNT_PREFERENCES = [
   'showUnreadDots',
   'uniformIcons',
   'tintRoomIcons',
+  'showBridgeBadges',
   'showSpaceEvents',
   'hour24Clock',
   'dateFormat',

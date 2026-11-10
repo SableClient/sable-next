@@ -361,6 +361,11 @@
           "type": "boolean",
           "default": false
         },
+        "showBridgeBadges": {
+          "title": "Show the bridged network on room icons",
+          "type": "boolean",
+          "default": true
+        },
         "showSpaceEvents": {
           "title": "Show today’s events in spaces",
           "type": "boolean",
@@ -1152,6 +1157,11 @@
           "title": "Theme vector room icons",
           "type": "boolean",
           "default": false
+        },
+        "showBridgeBadges": {
+          "title": "Show the bridged network on room icons",
+          "type": "boolean",
+          "default": true
         },
         "showSpaceEvents": {
           "title": "Show today’s events in spaces",

@@ -249,6 +249,7 @@ export interface Preferences {
   showUnreadDots: boolean;
   uniformIcons: boolean;
   tintRoomIcons: boolean;
+  showBridgeBadges: boolean;
   showSpaceEvents: boolean;
 
   hour24Clock: boolean;
@@ -619,6 +620,7 @@ const DEFAULTS: Preferences = {
   showUnreadDots: true,
   uniformIcons: false,
   tintRoomIcons: false,
+  showBridgeBadges: true,
   showSpaceEvents: true,
 
   hour24Clock: false,

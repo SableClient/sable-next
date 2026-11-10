@@ -45,6 +45,7 @@
   import { rovingFocus } from '#lib/ui/roving-focus.js';
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { isBridgedSpace } from '#lib/rooms/bridged-spaces.svelte.js';
   import { roomIconOverride, showsRoomAvatar } from '#lib/rooms/room-appearance.svelte.js';
   import RoomSettingsDialog from '#lib/features/room/settings/RoomSettingsDialog.svelte';
   import { goToPage } from '#lib/features/room/room-navigation.js';
@@ -55,6 +56,7 @@
   import CallVolumePopover from '#lib/features/call/CallVolumePopover.svelte';
   import MentionProfile from '#lib/features/room/members/MentionProfile.svelte';
   import { byName, participantKeys } from '#lib/features/call/participant-keys.js';
+  import BridgeBadge from './BridgeBadge.svelte';
   import CallParticipantList from './CallParticipantList.svelte';
   import ReplacedRooms from './ReplacedRooms.svelte';
   import RoomInvites from './RoomInvites.svelte';
@@ -194,6 +196,7 @@
     activeSpace ? (findRoomByPathId(roomList.rooms, roomId) ?? null) : null
   );
   let iconMode = $derived(roomIconOverride(activeSpaceId) ?? preferences.showRoomIcon);
+  let showBridgeBadges = $derived(preferences.showBridgeBadges && !isBridgedSpace(activeSpaceId));
 
   function navigateTo(href: string): void {
     if (onNavigate) {
@@ -603,17 +606,11 @@
                     <span class="avatar-fallback">{@render glyph()}</span>
                   </div>
                 {/if}
-                {#if room?.bridge}
-                  {@const bridgeLabel = i18n.t('nav.bridgedFrom', { network: room.bridge.network })}
-                  <Tooltip label={bridgeLabel}>
+                {#if room?.bridge && showBridgeBadges}
+                  {@const bridge = room.bridge}
+                  <Tooltip label={i18n.t('nav.bridgedFrom', { network: bridge.network })}>
                     {#snippet trigger({ props })}
-                      <span {...props} class="room-bridge" role="img" aria-label={bridgeLabel}>
-                        <Avatar
-                          src={room.bridge?.avatar_url ?? null}
-                          name={room.bridge?.network}
-                          size="tiny"
-                        />
-                      </span>
+                      <BridgeBadge {...props} {bridge} />
                     {/snippet}
                   </Tooltip>
                 {/if}
@@ -1339,19 +1336,6 @@
 
   :global(.room-avatar-icon) {
     --avatar-size: 1.5rem;
-  }
-
-  .room-bridge {
-    border-radius: 50%;
-    bottom: calc(-1 * var(--space-050));
-    box-shadow: 0 0 0 var(--border-width-500) var(--presence-ring, var(--bg-container));
-    display: flex;
-    left: calc(-1 * var(--space-050));
-    position: absolute;
-  }
-
-  .room-bridge :global(.avatar-tiny) {
-    --avatar-size: var(--space-400);
   }
 
   :global(.room-avatar .room-presence) {

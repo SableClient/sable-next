@@ -11,9 +11,11 @@
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import type { ShowRoomIcon } from '#lib/settings/preferences.svelte.js';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import Switch from '#lib/ui/primitives/Switch.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
 
+  import { isBridgedSpace, setBridgedSpace } from '#lib/rooms/bridged-spaces.svelte.js';
   import { roomIconOverride, setRoomIconOverride } from '#lib/rooms/room-appearance.svelte.js';
 
   import '#lib/ui/primitives/settings-row.css';
@@ -123,6 +125,18 @@
           aria-label={i18n.t('room.appearanceIconTitle')}
           items={options}
           onValueChange={select}
+        />
+      </SettingsRow>
+      <SettingsRow
+        title={i18n.t('room.appearanceBridgedTitle')}
+        description={i18n.t('room.appearanceBridgedHint')}
+      >
+        <Switch
+          checked={isBridgedSpace(roomId)}
+          label={i18n.t('room.appearanceBridgedTitle')}
+          onCheckedChange={(checked) => {
+            if (roomId) setBridgedSpace(roomId, checked);
+          }}
         />
       </SettingsRow>
       <SettingsRow title={i18n.t('room.mediaTitle')} description={i18n.t('room.mediaHint')}>

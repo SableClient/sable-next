@@ -36,6 +36,7 @@ except those marked deployment only.
 - `showUnreadDots` (Show dots on rooms with unread messages but no mention): `true` or `false`. Default `true`.
 - `uniformIcons` (Fill transparent room icons): `true` or `false`. Default `false`.
 - `tintRoomIcons` (Theme vector room icons): `true` or `false`. Default `false`.
+- `showBridgeBadges` (Show the bridged network on room icons): `true` or `false`. Default `true`.
 - `showSpaceEvents` (Show today’s events in spaces): `true` or `false`. Default `true`.
 
 ## Timeline

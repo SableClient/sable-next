@@ -1342,3 +1342,21 @@ test('a bridged room carries its network on the avatar, a native one does not', 
   ).toBeInTheDocument();
   expect(rowOf('Native')?.querySelector('.room-bridge')).toBeNull();
 });
+
+test('bridge badges leave the room icons when the preference is off', async () => {
+  visit('/direct');
+  setPreference('showBridgeBadges', false);
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!discord:example.org',
+      name: 'Friend',
+      is_direct: true,
+      bridge: { network: 'Discord', avatar_url: null },
+    }),
+  ];
+  await mountNav();
+
+  expect(screen.getByText('Friend')).toBeInTheDocument();
+  expect(screen.queryByRole('img', { name: 'nav.bridgedFrom:Discord' })).toBeNull();
+  setPreference('showBridgeBadges', true);
+});
