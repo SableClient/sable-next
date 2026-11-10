@@ -64,7 +64,9 @@
     "sortRecent": "Activitate recentă",
     "home": "Acasă",
     "switchingAccount": "Se schimbă…",
-    "switchAccountFailed": "Schimbarea contului a eșuat. Încearcă din nou."
+    "switchAccountFailed": "Schimbarea contului a eșuat. Încearcă din nou.",
+    "navigation": "Navigație",
+    "notificationAccountMissing": "Această notificare este pentru un cont care nu mai este conectat."
   },
   "inbox": {
     "notifications": "Notificări",
@@ -146,9 +148,11 @@
     "unlistedNotifications_one": "{{count, number}} notificare necitită",
     "unlistedNotifications_few": "{{count, number}} notificări necitite",
     "unlistedNotifications_other": "{{count, number}} de notificări necitite",
-    "filterThreads": "",
-    "inThread": "",
-    "notificationsEmptyThreads": ""
+    "filterThreads": "Fire",
+    "inThread": "Într-un fir",
+    "notificationsEmptyThreads": "Nici un fir cu răspunsuri.",
+    "reply": "Răspuns",
+    "repliedToYou": "Ți-a răspuns"
   },
   "room": {
     "createDescription": "Camerele conțin o conversații. Spațiile conțin camere.",
@@ -274,7 +278,7 @@
       "restricted": "doar membrii spațiului",
       "knock_restricted": "membrii spațiului, sau cu cerere",
       "private": "privat",
-      "unknown": "o regulă pe care {{appName}} nu o recunoaște"
+      "unknown": "o regulă pe care aplicația asta nu o recunoaște"
     },
     "menuConvertToGroup": "Transformă în grup",
     "lobbyKnockSent": "Cerere trimisă",
@@ -693,7 +697,20 @@
     "cosmeticsApplied_one": "Sa aplicat pentru o cameră.",
     "cosmeticsApplied_few": "Sa aplicat pentru {{count, number}} camere.",
     "cosmeticsApplied_other": "Sa aplicat pentru {{count, number}} de camere.",
-    "menuClose": ""
+    "menuClose": "Închide conversația",
+    "notifySpace": "Spațiu ({{mode}})",
+    "notificationsClose": "Închide notificări",
+    "notificationsResize": "Redimensionează notificările",
+    "notificationsEmpty": "Încă nici o notificare din aceasta cameră pe acest dispozitiv.",
+    "notificationsSearch": "Filtrează după expeditor sau text",
+    "notificationsNoResults": "Nici o notificare nu se potrivește „{{query}}”.",
+    "notificationsOpen": "Notificările acestei camere",
+    "notificationsRead": "Deja am citit",
+    "spaceModeApplied_one": "{{space}} și {{count, number}} cameră a sa folosește acum {{mode}}",
+    "spaceModeApplied_few": "{{space}} și {{count, number}} camere ale sale folosesc acum {{mode}}",
+    "spaceModeApplied_other": "{{space}} și {{count, number}} de camere ale sale folosesc acum {{mode}}",
+    "spaceModeDefault": "implicit",
+    "menuJoinSpace": "Alătură-te"
   },
   "join": {
     "knocking": "Se trimite…",
@@ -2568,7 +2585,7 @@
     "edit": "Editează",
     "sortManual": "Manuală",
     "confirmIrreversible": "Înțeleg ca această acțiune este ireversibilă",
-    "viewAvatar": "",
-    "viewBanner": ""
+    "viewAvatar": "Vezi avatarul {{name}}",
+    "viewBanner": "Vezi banner-ul {{name}}"
   }
 }
