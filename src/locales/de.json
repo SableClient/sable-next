@@ -1176,7 +1176,10 @@
     "aboutResetCacheConfirmTitle": "Lokalen Cache bereinigen?",
     "aboutResetCacheConfirmDescription": "Raumliste, Ungelesen-Zähler, Nachrichtenverlauf und zwischengespeicherte Medien werden bereinigt und erneut heruntergeladen. Dein Suchindex bleibt erhalten und du bleibst angemeldet. Bei umfangreichen Konten kann das Herunterladen eine Weile dauern.",
     "aboutHomeserverVersion": "Version",
-    "language": "Sprache"
+    "language": "Sprache",
+    "aboutUpToDate": "{{appName}} ist aktuell.",
+    "aboutMobileUpdateAvailable": "Eine neuere Version is verfügbar. Aktualisiere {{appName}} über deinen App-Store.",
+    "aboutResetFailed": "Bereinigung des lokalen Caches fehlgeschlagen. Schließe andere {{appName}}-Tabs und versuche es erneut."
   },
   "qrLogin": {
     "scanCode": "QR-Code scannen",
@@ -1214,6 +1217,7 @@
     "confirmDescription": "Bestätige dieses Gerät mit einem anderen angemeldeten Gerät oder mit deinem Wiederherstellungsschlüssel.",
     "profileTitle": "Dein Profil",
     "progress": "Schritt {{current}} von {{total}}",
-    "title": "Dieses Gerät einrichten"
+    "title": "Dieses Gerät einrichten",
+    "confirmTitle": "Bestätige deine Identität"
   }
 }
