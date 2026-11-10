@@ -434,7 +434,18 @@
     "jumpToMessage": "Перейти до повідомлення",
     "confirmIrreversible": "Я розумію, що цю дію неможливо скасувати",
     "light": "Світла",
-    "loadMore": "Завантажити ще"
+    "loadMore": "Завантажити ще",
+    "askToJoin": "Надіслати запит на приєднання",
+    "changeAvatar": "Змінити аватар",
+    "changeBanner": "Змінити банер",
+    "pronounsPlaceholder": "вони/їх, en:she/her",
+    "removeAvatar": "Прибрати аватар",
+    "removeBanner": "Прибрати банер",
+    "statusPlaceholder": "Чим займаєтеся?",
+    "endToEndEncryption": "Наскрізне шифрування",
+    "noRoomsMatch": "Для цього пошукового запиту кімнати не знайдені",
+    "readReceipts": "Підтвердження прочитання",
+    "system": "Системна"
   },
   "nav": {
     "newChat": "Новий чат",
@@ -478,6 +489,18 @@
     "accountSignedOut": "Вихід виконано",
     "unspacedEmpty": "Тут з’являться кімнати, що не належать до жодного простору.",
     "displayOptions": "Параметри відображення бічної панелі",
-    "space": "Простір"
+    "space": "Простір",
+    "accounts": "Облікові записи",
+    "switchingAccount": "Перемикання…",
+    "switchAccount": "Перемкнути обліковий запис",
+    "switchAccountFailed": "Не вдалося перемкнути обліковий запис. Спробуйте ще раз.",
+    "switch": "Перемкнути",
+    "manageAccounts": "Керування обліковими записами",
+    "activeAccount": "Активний обліковий запис",
+    "removeAccount": "Видалити обліковий запис",
+    "removeAccountConfirm": "Видалити цей обліковий запис?",
+    "removeAccountFailed": "Не вдалося видалити цей обліковий запис.",
+    "accountSignInAgain": "ійти знову",
+    "resizeRooms": "Змінити розмір списку кімнат"
   }
 }
