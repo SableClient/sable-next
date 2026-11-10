@@ -105,7 +105,8 @@
       "invite": "лише за запрошенням",
       "restricted": "лише учасники простору",
       "private": "приватна",
-      "unknown": "правило, яке цей клієнт не розпізнає"
+      "unknown": "правило, яке цей клієнт не розпізнає",
+      "knock_restricted": "учасники простору або запит на приєднання"
     },
     "menuConvertToGroup": "Перетворити на груповий чат",
     "lobbyKnockSent": "Запит надіслано",
@@ -321,7 +322,11 @@
     "jumpMissing": "У цей час або пізніше нічого не надсилали.",
     "jumpFailed": "Не вдалося виконати пошук у кімнаті.",
     "permPingRoom": "Згадувати @room",
-    "permAvatar": "Аватар"
+    "permAvatar": "Аватар",
+    "createDescription": "У кімнатах спілкуються. Простір об’єднує кімнати.",
+    "createJoinRuleKnockRestricted": "Учасники простору; інші можуть подати запит",
+    "createJoinRuleKnockRestrictedHint": "Будь-хто з простору {{space}} може приєднатися; інші можуть подати запит.",
+    "settingsJoinRuleKnockRestrictedHint": "Учасники простору можуть приєднатися. Інші можуть подати запит."
   },
   "inbox": {
     "inviteEncrypted": "Зашифроване",
