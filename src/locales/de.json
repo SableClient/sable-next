@@ -1120,7 +1120,8 @@
     "pinnedRemovedPart_one": "hat eine Nachricht gelöst",
     "pinnedRemovedPart_other": "hat {{count, number}} Nachrichten gelöst",
     "pinnedRemoved_one": "{{user}} hat eine Nachricht gelöst",
-    "pinnedRemoved_other": "{{user}} hat {{count, number}} Nachrichten gelöst"
+    "pinnedRemoved_other": "{{user}} hat {{count, number}} Nachrichten gelöst",
+    "pollClosed": ""
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden.",
