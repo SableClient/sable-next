@@ -776,7 +776,8 @@
     "yesterday": "Gestern",
     "verify": "Verifizieren",
     "unsavedChangesNotice": "Du hast ungespeicherte Änderungen.",
-    "userIdFormatHint": "Eine Nutzer-ID sieht folgendermaßen aus: @jemand:server."
+    "userIdFormatHint": "Eine Nutzer-ID sieht folgendermaßen aus: @jemand:server.",
+    "statusPlaceholder": ""
   },
   "timeline": {
     "viaAccount": "Öffne das Konto hinter diesem Profil, {{user}}",
@@ -1020,7 +1021,12 @@
     "attachmentsSpoilerReason": "Spoiler: {{reason}}",
     "attachmentsOpenItem": "„{{name}}“, geteilt von {{sender}}, {{date}}",
     "attachmentsMoreLinks_one": "+ {{count}} weiterer Link",
-    "attachmentsMoreLinks_other": "+ {{count}} weitere Links"
+    "attachmentsMoreLinks_other": "+ {{count}} weitere Links",
+    "deleteMessage": "",
+    "reproxyMessage": "",
+    "editMessage": "",
+    "reproxyFailed": "",
+    "threadOpen": ""
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden.",
