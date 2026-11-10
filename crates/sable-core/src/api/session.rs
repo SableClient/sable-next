@@ -367,7 +367,6 @@ impl Handler for SetSearchOptionsParams {
             core.search_sharing.reset_session();
         }
         core.search_network.set_unmetered_only(self.unmetered_only);
-        core.refresh_search_peers();
         core.search_crawl.lock().await.tuning = self.tuning.clamped();
         core.search_crawler_enabled
             .store(self.crawler, Ordering::Relaxed);
@@ -377,6 +376,9 @@ impl Handler for SetSearchOptionsParams {
             .lock()
             .await
             .set_disk_budget_mb(self.disk_budget_mb);
+
+        core.refresh_search_peers().await;
+
         Ok(())
     }
 }
@@ -407,9 +409,9 @@ pub struct SetAppInForegroundParams {
 impl Handler for SetAppInForegroundParams {
     type Ok = ();
 
-    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
-        core.update_app_in_foreground(self.foreground);
-        std::future::ready(Ok(()))
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.update_app_in_foreground(self.foreground).await;
+        Ok(())
     }
 }
 

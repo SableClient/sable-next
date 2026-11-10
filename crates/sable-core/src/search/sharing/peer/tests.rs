@@ -423,7 +423,7 @@ async fn the_automatic_copy_runs_once_and_a_failed_start_does_not_count() {
         Box::new(crate::store::MemorySessionStore::default()),
     );
     core.search_sharing.enabled.store(true, Ordering::Relaxed);
-    core.search_foreground.store(true, Ordering::Relaxed);
+    core.app_in_foreground.store(true, Ordering::Relaxed);
     core.update_network_conditions(true, true).await;
     core.start_search_peers().await.unwrap_err();
     core.start_search_peers().await.unwrap_err();
@@ -494,8 +494,8 @@ async fn returning_conditions_tell_the_page_that_peers_may_resume() {
         [Some(SearchPeerPause::Offline), None]
     );
 
-    core.update_app_in_foreground(false);
-    core.update_app_in_foreground(true);
+    core.update_app_in_foreground(false).await;
+    core.update_app_in_foreground(true).await;
     assert_eq!(
         shown_pauses(&mut events),
         [Some(SearchPeerPause::Background), None]
@@ -508,7 +508,7 @@ async fn live_core(
 ) -> (Arc<Core>, tokio::sync::mpsc::UnboundedReceiver<CoreEvent>) {
     let (core, events) = Core::new(name, Box::new(crate::store::MemorySessionStore::default()));
     core.search_sharing.enabled.store(true, Ordering::Relaxed);
-    core.search_foreground.store(true, Ordering::Relaxed);
+    core.app_in_foreground.store(true, Ordering::Relaxed);
     *core.session.write().await = Some(crate::session::Session {
         account_id: name.into(),
         client: client.clone(),

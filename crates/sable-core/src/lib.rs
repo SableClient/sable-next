@@ -205,7 +205,7 @@ pub struct Core {
     search_sharing: search::SearchSharing,
     rtc: rtc::RtcSessions,
     search_network: search::CrawlNetwork,
-    search_foreground: AtomicBool,
+    app_in_foreground: AtomicBool,
     shut_down: AtomicBool,
     activity: activity::Activity,
     server_search_enabled: AtomicBool,
@@ -324,7 +324,7 @@ impl Core {
             search_sharing: search::SearchSharing::default(),
             rtc: rtc::RtcSessions::default(),
             search_network: search::CrawlNetwork::default(),
-            search_foreground: AtomicBool::new(true),
+            app_in_foreground: AtomicBool::new(true),
             shut_down: AtomicBool::new(false),
             activity: activity::Activity::new(),
             server_search_enabled: AtomicBool::new(true),
@@ -513,15 +513,15 @@ impl Core {
         self.foreground_paginations.load(Ordering::Relaxed)
     }
 
-    pub fn update_app_in_foreground(&self, foreground: bool) {
-        self.search_foreground.store(foreground, Ordering::Relaxed);
-        self.refresh_search_peers();
+    pub async fn update_app_in_foreground(&self, foreground: bool) {
+        self.app_in_foreground.store(foreground, Ordering::Relaxed);
+        self.refresh_search_peers().await;
     }
 
     pub(crate) fn search_crawl_active(&self) -> bool {
         !self.search_sharing.discovering()
             && self.activity.app_active()
-            && self.search_foreground.load(Ordering::Relaxed)
+            && self.app_in_foreground.load(Ordering::Relaxed)
             && self.search_network.allows_crawl()
     }
 
@@ -850,8 +850,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn app_activity_gates_the_search_crawler() {
+    #[tokio::test]
+    async fn app_activity_gates_the_search_crawler() {
         let (core, _rx) = Core::new("test", Box::new(store::MemorySessionStore::default()));
         core.search_network.set_unmetered(true);
         assert!(core.search_crawl_active());
@@ -861,7 +861,7 @@ mod tests {
 
         core.set_app_active(true);
         assert!(core.search_crawl_active());
-        core.update_app_in_foreground(false);
+        core.update_app_in_foreground(false).await;
         assert!(!core.search_crawl_active());
     }
 

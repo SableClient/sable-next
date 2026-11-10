@@ -244,10 +244,10 @@ impl Core {
             .network_available
             .swap(available, Ordering::SeqCst);
         self.search_network.set_unmetered(unmetered);
-        self.refresh_search_peers();
         if available && !was_available && !self.sync_paused() {
             self.apply_activity(self.activity.app_active(), None).await;
         }
+        self.refresh_search_peers().await;
     }
 
     pub(crate) fn watch_activity_health(self: &Arc<Self>) {

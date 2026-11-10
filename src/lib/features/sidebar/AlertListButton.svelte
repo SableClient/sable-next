@@ -234,6 +234,10 @@
       /* 2 * pi * 50 (radius of the circle) */
       --circumference: 314.1593px;
     }
+
+    .desktop-tool:not(.has-progress) .progress {
+      height: 0%;
+    }
   }
 
   .mobile-tool.has-progress .progress-circle {
