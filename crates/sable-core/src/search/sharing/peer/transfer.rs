@@ -180,6 +180,26 @@ impl Core {
         })
     }
 
+    /// Held for a whole exchange so a logout cannot reset the index while a copy still writes
+    /// into it.
+    pub(super) async fn copying_session(
+        &self,
+    ) -> Result<
+        (
+            tokio::sync::RwLockReadGuard<'_, Option<crate::session::Session>>,
+            Client,
+        ),
+        RpcError,
+    > {
+        let session = self.session.read().await;
+        let client = session
+            .as_ref()
+            .ok_or(RpcError::NotLoggedIn)?
+            .client
+            .clone();
+        Ok((session, client))
+    }
+
     async fn exchange(
         &self,
         session_id: &str,
@@ -188,14 +208,7 @@ impl Core {
         let message = data
             .map(|data| rmp_serde::from_slice::<Message>(&data).map_err(|_| CopyError::Malformed))
             .transpose()?;
-        // Held for the whole exchange so a logout cannot reset the index
-        // while this copy is still writing into it.
-        let session = self.session.read().await;
-        let client = session
-            .as_ref()
-            .ok_or(CopyError::Session(RpcError::NotLoggedIn))?
-            .client
-            .clone();
+        let (_copying, client) = self.copying_session().await.map_err(CopyError::Session)?;
         let transfer = self
             .search_session(&client, session_id)
             .await

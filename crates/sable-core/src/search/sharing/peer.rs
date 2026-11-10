@@ -608,7 +608,7 @@ impl Core {
                 });
                 if refused {
                     self.close_rtc(&session);
-                    self.next_search_peer(Some(session)).await;
+                    self.next_search_peer(client, Some(session)).await;
                 }
             }
             Discovery::Request => {
@@ -679,7 +679,7 @@ impl Core {
             self.end_rtc(generation, session_id, sender);
         }
         if !self.open_rtc(RtcPurpose::SearchSharing, session.clone(), device, true) {
-            self.close_search_peer(&session).await;
+            self.close_search_peer(client, &session).await;
             return;
         }
         self.emit_if_current(
@@ -797,7 +797,9 @@ impl Core {
             Some(Overdue::Discovery) => {
                 let own = self.search_score().await;
                 self.search_sharing.state.lock().own = own;
-                self.next_search_peer(None).await;
+                if let Ok(client) = self.client().await {
+                    self.next_search_peer(&client, None).await;
+                }
             }
             Some(Overdue::Retry) => {
                 if let Ok(client) = self.client().await
@@ -808,15 +810,16 @@ impl Core {
             }
             Some(Overdue::Session { id, sender }) => {
                 self.end_rtc(generation, id.clone(), sender);
-                self.close_search_peer(&id).await;
+                if let Ok(client) = self.client().await {
+                    self.close_search_peer(&client, &id).await;
+                }
             }
         }
     }
 
-    async fn next_search_peer(&self, mut failed: Option<String>) {
-        let Ok(client) = self.client().await else {
-            return;
-        };
+    /// Takes the client because the caller may hold the session, which a pending logout would
+    /// keep it from reading again.
+    async fn next_search_peer(&self, client: &Client, mut failed: Option<String>) {
         loop {
             let Some(session) = session_id() else {
                 self.update_sharing(|state| state.finish(Some(SearchPeerOutcome::Failed)));
@@ -827,7 +830,7 @@ impl Core {
             });
             let device = match next {
                 Next::Finished(SearchPeerOutcome::NothingToCopy) => {
-                    self.mark_synced(&client, None).await;
+                    self.mark_synced(client, None).await;
                     return;
                 }
                 Next::Ignore | Next::Wait | Next::Finished(_) => return,
@@ -838,7 +841,7 @@ impl Core {
                 session.clone(),
                 device.clone(),
                 false,
-            ) && send_discovery(&client, &device, &session, Discovery::Request)
+            ) && send_discovery(client, &device, &session, Discovery::Request)
                 .await
                 .is_ok()
             {
@@ -914,7 +917,7 @@ impl Core {
         Ok(transfer)
     }
 
-    pub(crate) async fn close_search_peer(&self, session_id: &str) {
+    pub(crate) async fn close_search_peer(&self, client: &Client, session_id: &str) {
         let sending = self.update_sharing(|state| match &state.phase {
             Phase::Sending(session) if session.id == session_id => {
                 state.phase = Phase::Idle;
@@ -923,7 +926,8 @@ impl Core {
             _ => false,
         });
         if !sending {
-            self.next_search_peer(Some(session_id.to_owned())).await;
+            self.next_search_peer(client, Some(session_id.to_owned()))
+                .await;
         }
     }
 }

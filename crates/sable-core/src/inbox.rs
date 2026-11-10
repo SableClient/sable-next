@@ -1038,7 +1038,7 @@ mod tests {
         drop(held);
 
         let both = async { tokio::join!(suspend, record) };
-        let (_, recorded) = matrix_sdk::timeout::timeout(both, std::time::Duration::from_secs(5))
+        let ((), recorded) = matrix_sdk::timeout::timeout(both, std::time::Duration::from_secs(5))
             .await
             .expect("suspending must not deadlock");
         assert_eq!(recorded.unwrap(), 1);

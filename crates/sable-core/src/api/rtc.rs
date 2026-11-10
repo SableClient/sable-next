@@ -35,7 +35,9 @@ impl Handler for CloseParams {
     type Ok = ();
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         core.close_rtc(&self.session_id);
-        core.close_search_peer(&self.session_id).await;
+        if let Ok(client) = core.client().await {
+            core.close_search_peer(&client, &self.session_id).await;
+        }
         Ok(())
     }
 }

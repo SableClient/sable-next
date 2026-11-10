@@ -939,16 +939,19 @@ impl Core {
         if let Some(client) = client {
             self.flush_inbox(&client).await;
         }
+        // Lock order: room subscriptions, then the session, then the search flush. Opening a room
+        // reads the session under the first, a search copy saves under the second.
+        let mut room_subscriptions = self.room_subscriptions.lock().await;
+        let mut session = self.session.write().await;
         // An aborted task must not be holding a flush it took from the index.
         let flushing = self.search_flush.lock().await;
-        let mut session = self.session.write().await;
         self.session_handlers.lock().clear();
         self.session_tasks.lock().clear();
         self.to_device_inbox.lock().take();
         self.search_sharing.reset_session();
         self.rtc.clear();
         self.subscriptions.lock().await.clear();
-        self.room_subscriptions.lock().await.clear();
+        room_subscriptions.clear();
         self.warm_rooms.lock().clear();
         self.timelines.lock().await.clear();
         self.thread_timelines.lock().await.clear();
@@ -1841,6 +1844,22 @@ mod regression_tests {
         assert_eq!(accounts.len(), 1);
         assert_eq!(accounts[0].account_id, "first");
         assert!(accounts[0].device_invalidated);
+    }
+
+    #[tokio::test]
+    async fn a_session_ending_while_a_room_opens_does_not_deadlock() {
+        let (_store, _server, core, _room) = core_with_room().await;
+        let opening = core.room_subscriptions.lock().await;
+        let ending = core.take_session();
+        tokio::pin!(ending);
+        assert!(futures_util::poll!(ending.as_mut()).is_pending());
+
+        tokio::time::timeout(std::time::Duration::from_secs(5), core.sync_service())
+            .await
+            .expect("opening a room must be able to read the session")
+            .unwrap();
+        drop(opening);
+        assert!(ending.await.is_some());
     }
 
     #[tokio::test]

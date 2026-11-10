@@ -312,7 +312,7 @@ async fn one_device_is_served_at_a_time() {
             ("a2".into(), RtcSignal::Open),
         ]
     );
-    core.close_search_peer("a2").await;
+    core.close_search_peer(&client, "a2").await;
     core.serve_search_peer(&client, generation, "b2".into(), "B".into())
         .await;
     assert_eq!(sending_to(&core), Some(("b2".into(), "B".into())));
@@ -525,6 +525,47 @@ async fn live_core(
     core.watch_search_peers(client, generation);
     core.watch_rtc(client, generation);
     (core, events)
+}
+
+#[tokio::test]
+async fn a_session_ending_during_a_copy_does_not_deadlock() {
+    let server = matrix_sdk::test_utils::mocks::MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let (core, _events) = live_core(&client, "peer-teardown").await;
+    let flushing = core.search_flush.lock().await;
+    let copying = core.copying_session().await.unwrap();
+    let ending = core.take_session();
+    tokio::pin!(ending);
+    assert!(futures_util::poll!(ending.as_mut()).is_pending());
+    drop(flushing);
+
+    let saving = core.save_rooms(&client, Vec::new());
+    tokio::pin!(saving);
+    tokio::time::timeout(std::time::Duration::from_secs(5), saving)
+        .await
+        .expect("a copy must be able to save while a session is ending");
+    drop(copying);
+    assert!(ending.await.is_some());
+}
+
+#[tokio::test]
+async fn a_peer_message_handled_while_a_session_ends_does_not_deadlock() {
+    let server = matrix_sdk::test_utils::mocks::MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let (core, _events) = live_core(&client, "peer-reentry").await;
+    let handling = core.session.read().await;
+    let ending = core.take_session();
+    tokio::pin!(ending);
+    assert!(futures_util::poll!(ending.as_mut()).is_pending());
+
+    tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        core.next_search_peer(&client, None),
+    )
+    .await
+    .expect("handling a peer message must not wait for the session it holds");
+    drop(handling);
+    assert!(ending.await.is_some());
 }
 
 async fn trust(client: &Client, other: &Client) {
