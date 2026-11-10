@@ -1,6 +1,6 @@
 import type { PronounView } from '#src/generated/protocol';
 
-import type { PronounPillLength, PronounPillLimit } from '#lib/settings/preferences.svelte.js';
+import type { PronounPillLength, PronounPillLimit } from '#lib/settings/definitions.js';
 
 export function parsePronouns(input: string): PronounView[] {
   return input

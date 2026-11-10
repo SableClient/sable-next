@@ -2,7 +2,7 @@ import { runtimeConfig } from '#lib/config/runtime-config.js';
 import type {
   DearrowThumbnailFallback,
   YoutubeThumbnailPosition,
-} from '#lib/settings/preferences.svelte.js';
+} from '#lib/settings/definitions.js';
 
 const VIDEO_HOSTS = new Set([
   'youtube.com',

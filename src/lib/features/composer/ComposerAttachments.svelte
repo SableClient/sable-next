@@ -9,11 +9,8 @@
   import { scale, slide } from 'svelte/transition';
 
   import { i18n } from '#lib/i18n.js';
-  import {
-    preferences,
-    setPreference,
-    type ImageMetadata,
-  } from '#lib/settings/preferences.svelte.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { type ImageMetadata } from '#lib/settings/definitions.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';

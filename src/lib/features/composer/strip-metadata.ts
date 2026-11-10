@@ -2,7 +2,7 @@ import { buf as crc32 } from 'crc-32';
 import { concatUint8Arrays as concat } from 'uint8array-extras';
 
 import { imageMime } from '#lib/media-signatures.js';
-import type { ImageMetadata } from '#lib/settings/preferences.svelte.js';
+import type { ImageMetadata } from '#lib/settings/definitions.js';
 
 type Bytes = Uint8Array<ArrayBuffer>;
 type Scope = Exclude<ImageMetadata, 'keep'>;

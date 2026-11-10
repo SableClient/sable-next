@@ -8,7 +8,8 @@ import {
 import type { Rgb as ColorRgb } from 'culori';
 
 import '#lib/culori.js';
-import { preferences, type NameColorCorrection } from '#lib/settings/preferences.svelte.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
+import { type NameColorCorrection } from '#lib/settings/definitions.js';
 
 type Rgb = [number, number, number];
 type Lab = [number, number, number];

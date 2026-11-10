@@ -1,6 +1,7 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
-  import { preferences, setPreference, type EnterKey } from '#lib/settings/preferences.svelte.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { type EnterKey } from '#lib/settings/definitions.js';
   import { settingFocusId } from '#lib/settings/registry.js';
   import Switcher from '#lib/ui/primitives/Switcher.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';

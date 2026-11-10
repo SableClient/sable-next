@@ -6,7 +6,7 @@
   import StatusBadge from './StatusBadge.svelte';
   import './settings-row.css';
   import SettingsNotSyncedBadge from './SettingsNotSyncedBadge.svelte';
-  import type { Preferences } from '#lib/settings/preferences.svelte.js';
+  import type { Preferences } from '#lib/settings/definitions.js';
 
   interface Props {
     title?: string;

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
-  import type { TimelineLayout } from '#lib/settings/preferences.svelte.js';
+  import type { TimelineLayout } from '#lib/settings/definitions.js';
   import { onMount } from 'svelte';
   import { innerHeight } from 'svelte/reactivity/window';
 

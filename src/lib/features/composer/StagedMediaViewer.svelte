@@ -11,7 +11,8 @@
 
   import { i18n } from '#lib/i18n.js';
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
-  import { preferences, type ImageMetadata } from '#lib/settings/preferences.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { type ImageMetadata } from '#lib/settings/definitions.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { mediaEvents } from '#lib/ui/media-events.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';

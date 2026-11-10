@@ -9,7 +9,7 @@ import type {
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
-import type { PersonaSelectionScope } from '#lib/settings/preferences.svelte.js';
+import type { PersonaSelectionScope } from '#lib/settings/definitions.js';
 
 import { reorderPersonas, type PersonaAssociation, type SelectionScope } from './persona.js';
 

@@ -2,7 +2,8 @@ import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { nativeCallOwnsAudio } from '#lib/platform/calls.js';
 import { isAndroid } from '#lib/platform/os.js';
 import { playNativeChime } from '#lib/platform/native-notifications.js';
-import { preferences, type RangePreference } from '#lib/settings/preferences.svelte.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
+import { type RangePreference } from '#lib/settings/definitions.js';
 
 export type NotificationSounds = {
   notification: { path: string; volumePreference: RangePreference };

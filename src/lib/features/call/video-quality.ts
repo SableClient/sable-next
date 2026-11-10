@@ -12,7 +12,7 @@ import type {
   CallVideoBitrate,
   CallVideoCodec,
   CallVideoResolution,
-} from '#lib/settings/preferences.svelte.js';
+} from '#lib/settings/definitions.js';
 
 export function videoResolution(value: CallVideoResolution): VideoResolution | undefined {
   if (value === 'auto') return undefined;

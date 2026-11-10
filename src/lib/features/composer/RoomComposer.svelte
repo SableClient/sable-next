@@ -36,11 +36,8 @@
   import { personaSpaces } from './persona-spaces.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { enterInsertsNewline } from '#lib/settings/enter-key.svelte.js';
-  import {
-    preferences,
-    setPreference,
-    type ImageMetadata,
-  } from '#lib/settings/preferences.svelte.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { type ImageMetadata } from '#lib/settings/definitions.js';
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';

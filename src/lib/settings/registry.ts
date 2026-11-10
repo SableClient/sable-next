@@ -7,7 +7,7 @@ import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
 import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
 import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
-import type { FreeTextPreference, Preferences, RangePreference } from './preferences.svelte';
+import type { FreeTextPreference, Preferences, RangePreference } from './definitions';
 import { appearanceCategory } from './registry/appearance';
 import { callsCategory } from './registry/calls';
 import { composerCategory } from './registry/composer';

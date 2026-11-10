@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import en from '../../locales/en.json';
-import { ACCOUNT_PREFERENCES, parseAccountConfig } from './account-config';
+import { ACCOUNT_PREFERENCES } from '#lib/settings/definitions.js';
+import { parseAccountConfig } from './account-config';
 import { RuntimeSchema } from './runtime-config';
 
 type Schema = Record<string, unknown>;
@@ -21,7 +22,7 @@ async function loadSettings() {
   // Telemetry and desktop settings are only registered where they apply.
   vi.stubEnv('VITE_SENTRY_DSN', 'https://key@example.org/1');
   vi.stubGlobal('sableElectron', {});
-  const { preferenceSpecs } = await import('#lib/settings/preferences.svelte.js');
+  const { preferenceSpecs } = await import('#lib/settings/definitions.js');
   const { settingsCategories } = await import('#lib/settings/registry.js');
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();

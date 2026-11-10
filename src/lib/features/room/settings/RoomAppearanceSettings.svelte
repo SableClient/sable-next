@@ -9,7 +9,7 @@
   import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
-  import type { ShowRoomIcon } from '#lib/settings/preferences.svelte.js';
+  import type { ShowRoomIcon } from '#lib/settings/definitions.js';
   import Select from '#lib/ui/primitives/Select.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';

@@ -1,7 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 import { readJson, writeJson } from '#lib/platform/local-json.js';
-import type { ShowRoomIcon } from '#lib/settings/preferences.svelte.js';
+import type { ShowRoomIcon } from '#lib/settings/definitions.js';
 
 const STORAGE_KEY = 'sable-room-appearance';
 const MODES: readonly ShowRoomIcon[] = ['always', 'sometimes', 'collapsed', 'never'];

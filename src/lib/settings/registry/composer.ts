@@ -13,7 +13,7 @@ import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
 import SubtitlesIcon from 'phosphor-svelte/lib/SubtitlesIcon';
 import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
 import { preferences } from '../preferences.svelte';
-import type { EnterKey } from '../preferences.svelte';
+import type { EnterKey } from '../definitions';
 import type { SettingsCategory } from '../registry';
 
 export function enterSettingLabels(mode: EnterKey): { name: string } {

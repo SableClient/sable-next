@@ -2,87 +2,14 @@ import { isCatalogReference, readThemes, type StoredThemes } from './custom-them
 import { fingerprint } from './fingerprint.js';
 import { migrateSettings, SETTINGS_SCHEMA } from './migrations.js';
 import { compressCss, decompressCss } from './theme-compression.js';
-import { PREFERENCE_KEYS, sanitize } from './preferences.svelte.js';
-import type { Preferences } from './preferences.svelte.js';
+import { NON_SYNCABLE_KEYS, PREFERENCE_KEYS, sanitize } from './definitions.js';
+import type { Preferences } from './definitions.js';
 
 export const SETTINGS_ACCOUNT_DATA_TYPE = 'moe.sable.next.settings';
 export const SETTINGS_SYNC_VERSION = 1;
 
 const MAX_SYNCED_THEME_CSS_BYTES = 10 * 1024 * 1024;
 export const SYNCED_THEME_LIMIT_MIB = MAX_SYNCED_THEME_CSS_BYTES / (1024 * 1024);
-
-export const NON_SYNCABLE_KEYS = new Set<keyof Preferences>([
-  'settingsSync',
-  'syncDrafts',
-  'enterForNewline',
-  'composerSpellcheck',
-  'composerAutocapitalize',
-  'reducedMotion',
-  'pageZoom',
-  'textScale',
-  'fontFamily',
-  'fontFamilyMono',
-  'timeZone',
-  'roomBannerHeight',
-  'searchIndexLimit',
-  'coreLogLevel',
-  'searchUnmeteredOnly',
-  'searchSharing',
-  'audioInputDevice',
-  'audioOutputDevice',
-  'videoInputDevice',
-  'layout',
-  'threadPresentation',
-  'messageSpacing',
-  'mediaAutoLoad',
-  'callMicrophoneMuted',
-  'noiseSuppression',
-  'echoCancellation',
-  'autoGainControl',
-  'voiceIsolation',
-  'incomingVoiceIsolation',
-  'systemNotifications',
-  'notificationContent',
-  'notificationEncryptedContent',
-  'richPushPayloads',
-  'notificationSounds',
-  'backgroundNotificationSounds',
-  'pushGatewayUrl',
-  'pushVapidKey',
-  'pushAppId',
-  'pushEmbeddedServerUrl',
-  'errorReporting',
-  'sessionReplay',
-  'telemetryAsked',
-  'autoUpdateCheck',
-  'updateChannel',
-  'closeToTray',
-  'askDownloadLocation',
-  'minimizeToTray',
-  'showSystemTrayIcon',
-  'useCustomTitleBar',
-  'hardwareAcceleration',
-  'hardwareVideoEncode',
-  'hardwareVideoDecode',
-  'smoothScrolling',
-  'webRtcIpPolicy',
-  'launchAtLogin',
-  'startMinimized',
-  'developerTools',
-  'soundsNotificationVolume',
-  'soundsCameraOnVolume',
-  'soundsCameraOffVolume',
-  'soundsMicOnVolume',
-  'soundsMicOffVolume',
-  'soundsDeafenOnVolume',
-  'soundsDeafenOffVolume',
-  'soundsScreenshareStartVolume',
-  'soundsScreenshareStopVolume',
-  'soundsCallJoinVolume',
-  'soundsCallLeaveVolume',
-  'soundsIncomingCallVolume',
-  'soundsOutgoingCallVolume',
-]);
 
 export interface SettingsSyncContent {
   v: number;

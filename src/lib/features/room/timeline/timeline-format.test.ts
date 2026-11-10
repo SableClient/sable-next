@@ -8,7 +8,7 @@ import type {
 } from '#src/generated/protocol';
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
-import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';
+import type { TimelinePreferences } from '#lib/settings/definitions.js';
 
 import { rowFields } from './row-fixtures';
 import { stateEventSubject, stateEventText, type Translate } from './state-event-text';

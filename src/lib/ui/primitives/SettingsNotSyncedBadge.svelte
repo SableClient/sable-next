@@ -2,9 +2,9 @@
   import CloudXIcon from 'phosphor-svelte/lib/CloudXIcon';
 
   import { i18n } from '#lib/i18n.js';
-  import { NON_SYNCABLE_KEYS } from '#lib/settings/sync.js';
   import Tooltip from './Tooltip.svelte';
-  import { preferences, type Preferences } from '#lib/settings/preferences.svelte.ts';
+  import { preferences } from '#lib/settings/preferences.svelte.ts';
+  import { NON_SYNCABLE_KEYS, type Preferences } from '#lib/settings/definitions.js';
 
   interface Props {
     key: keyof Preferences;

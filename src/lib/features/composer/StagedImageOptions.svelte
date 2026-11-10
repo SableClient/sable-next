@@ -3,7 +3,7 @@
   import type { Snippet } from 'svelte';
 
   import { i18n } from '#lib/i18n.js';
-  import type { ImageMetadata } from '#lib/settings/preferences.svelte.js';
+  import type { ImageMetadata } from '#lib/settings/definitions.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSub from '#lib/ui/primitives/ActionMenuSub.svelte';

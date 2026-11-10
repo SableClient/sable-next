@@ -1,11 +1,7 @@
 import { expect, test } from 'vitest';
 
-import {
-  composerSeparatorCount,
-  preferences,
-  sanitize,
-  withComposerSeparatorCount,
-} from './preferences.svelte.js';
+import { preferences } from './preferences.svelte.js';
+import { composerSeparatorCount, sanitize, withComposerSeparatorCount } from './definitions.js';
 
 test('keeps a saved call input mode and rejects unknown values', () => {
   expect(sanitize({ callInputMode: 'push-to-talk' }, preferences).callInputMode).toBe(

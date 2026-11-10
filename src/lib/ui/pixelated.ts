@@ -1,4 +1,4 @@
-import type { PixelatedImages } from '#lib/settings/preferences.svelte.js';
+import type { PixelatedImages } from '#lib/settings/definitions.js';
 
 export const SMART_PIXELATED_LIMIT = 192;
 

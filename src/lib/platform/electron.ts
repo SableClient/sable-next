@@ -1,4 +1,4 @@
-import type { UpdateChannel, WebRtcIpPolicy } from '#lib/settings/preferences.svelte.js';
+import type { UpdateChannel, WebRtcIpPolicy } from '#lib/settings/definitions.js';
 import type {
   PickedFile,
   PickFilesRequest,

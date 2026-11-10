@@ -14,12 +14,12 @@
   import { settingFocusId, settingsCategories, settingsContext } from '#lib/settings/registry.js';
   import type { SettingDefinition, SettingsCategory } from '#lib/settings/registry.js';
   import {
-    PREFERENCE_RANGES,
     isLockedPreference,
     preferences,
     setPreference,
   } from '#lib/settings/preferences.svelte.js';
-  import type { Preferences } from '#lib/settings/preferences.svelte.js';
+  import { PREFERENCE_RANGES } from '#lib/settings/definitions.js';
+  import type { Preferences } from '#lib/settings/definitions.js';
 
   interface Props {
     category: SettingsCategory;

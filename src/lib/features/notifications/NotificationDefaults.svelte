@@ -8,11 +8,8 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import {
-    type BadgeNotificationMode,
-    preferences,
-    setPreference,
-  } from '#lib/settings/preferences.svelte.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { type BadgeNotificationMode } from '#lib/settings/definitions.js';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsAnchorLink from '#lib/ui/primitives/SettingsAnchorLink.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';

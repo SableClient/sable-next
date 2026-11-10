@@ -6,7 +6,7 @@ import {
 } from '#lib/notifications/push-config.js';
 
 import type { StoredThemes } from './custom-themes.svelte.js';
-import type { Preferences } from './preferences.svelte.js';
+import type { Preferences } from './definitions.js';
 import {
   type AppliedSettings,
   applySettings,

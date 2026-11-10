@@ -10,7 +10,7 @@ import {
   CALL_VIDEO_BITRATES,
   CALL_VIDEO_CODECS,
   CALL_VIDEO_RESOLUTIONS,
-} from '../preferences.svelte';
+} from '../definitions';
 import type { SettingOption, SettingsCategory } from '../registry';
 
 const callResolutionOptions: SettingOption[] = CALL_VIDEO_RESOLUTIONS.map((value) =>

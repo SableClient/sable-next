@@ -1,4 +1,4 @@
-import type { ThemeMode } from './preferences.svelte.js';
+import type { ThemeMode } from './definitions.js';
 
 export type ResolvedTheme = Exclude<ThemeMode, 'system'>;
 

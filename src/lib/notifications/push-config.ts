@@ -1,5 +1,6 @@
 import { type PushDetails, runtimeConfig } from '#lib/config/runtime-config.js';
-import { type Preferences, preferences } from '#lib/settings/preferences.svelte.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
+import { type Preferences } from '#lib/settings/definitions.js';
 
 export type PushConfig = {
   gateway: string;

@@ -1,12 +1,11 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import {
     COMPOSER_SEPARATOR_MAX,
     composerSeparatorCount,
-    preferences,
-    setPreference,
     withComposerSeparatorCount,
-  } from '#lib/settings/preferences.svelte.js';
+  } from '#lib/settings/definitions.js';
   import { findCategory, settingFocusId, type BooleanSetting } from '#lib/settings/registry.js';
   import Pill from '#lib/ui/primitives/Pill.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';

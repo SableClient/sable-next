@@ -22,7 +22,7 @@ import TreeStructureIcon from 'phosphor-svelte/lib/TreeStructureIcon';
 import WheelchairMotionIcon from 'phosphor-svelte/lib/WheelchairMotionIcon';
 import { setLanguage } from '#lib/i18n.js';
 import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
-import { SUBSPACE_DEPTHS } from '../preferences.svelte';
+import { SUBSPACE_DEPTHS } from '../definitions';
 import type { SettingsCategory } from '../registry';
 
 export const appearanceCategory: SettingsCategory = {

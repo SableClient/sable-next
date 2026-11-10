@@ -69,9 +69,10 @@ describe('setting sections', () => {
 
 describe('select settings', () => {
   it('survive sanitization for every option value the registry declares', async () => {
-    const [{ settingsCategories }, { preferences, sanitize }] = await Promise.all([
+    const [{ settingsCategories }, { preferences }, { sanitize }] = await Promise.all([
       import('./registry'),
       import('./preferences.svelte'),
+      import('./definitions'),
     ]);
     const base = { ...preferences };
 
@@ -89,9 +90,10 @@ describe('select settings', () => {
   });
 
   it('survive sanitization for the member sort set outside the registry', async () => {
-    const [{ MEMBER_SORTS }, { preferences, sanitize }] = await Promise.all([
+    const [{ MEMBER_SORTS }, { preferences }, { sanitize }] = await Promise.all([
       import('#lib/rooms/member-listing.js'),
       import('./preferences.svelte'),
+      import('./definitions'),
     ]);
     const base = { ...preferences };
 

@@ -1,4 +1,4 @@
-import type { ImageMetadata } from '#lib/settings/preferences.svelte.js';
+import type { ImageMetadata } from '#lib/settings/definitions.js';
 
 export interface StagedFile {
   id: number;

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { StoredThemes } from './custom-themes.svelte';
 import { preferences } from './preferences.svelte';
-import type { Preferences } from './preferences.svelte';
+import type { Preferences } from './definitions';
 import { fingerprint } from './fingerprint';
 import { applySettings, mergeSettings, prepareSettings } from './sync';
 

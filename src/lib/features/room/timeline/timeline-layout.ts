@@ -1,5 +1,5 @@
 import type { TimelineItemContentView } from '#src/generated/protocol';
-import type { MessageSpacing } from '#lib/settings/preferences.svelte.js';
+import type { MessageSpacing } from '#lib/settings/definitions.js';
 
 export const TIMELINE_LAYOUT = {
   historyPrefetchItems: 25,

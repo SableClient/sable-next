@@ -34,7 +34,7 @@ import {
   SEARCH_INDEX_LIMITS,
   SEARCH_MAX_EVENTS,
   SEARCH_TRICKLE_PAUSES,
-} from '../preferences.svelte';
+} from '../definitions';
 import type { SettingsCategory } from '../registry';
 
 export const timelineCategory: SettingsCategory = {

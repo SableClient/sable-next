@@ -1,5 +1,5 @@
 import type { CallMode, CallModeReason } from '#src/generated/protocol';
-import type { CallModePreference } from '#lib/settings/preferences.svelte.js';
+import type { CallModePreference } from '#lib/settings/definitions.js';
 
 export type CallDebug = {
   requested: CallModePreference;

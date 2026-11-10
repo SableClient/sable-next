@@ -18,12 +18,8 @@
   import { i18n } from '#lib/i18n.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { RoomList, provideRoomList } from '#lib/rooms/room-list.svelte.js';
-  import {
-    preferences,
-    setPreference,
-    type ReplyPreviewStyle,
-    type TimelineLayout,
-  } from '#lib/settings/preferences.svelte.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { type ReplyPreviewStyle, type TimelineLayout } from '#lib/settings/definitions.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
   import AuthField from '../shared/AuthField.svelte';

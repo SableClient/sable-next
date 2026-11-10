@@ -4,7 +4,7 @@ import type {
   TimelineItemView,
 } from '#src/generated/protocol';
 import { preferences } from '#lib/settings/preferences.svelte.js';
-import type { ReplyPreviewStyle, TimelinePreferences } from '#lib/settings/preferences.svelte.js';
+import type { ReplyPreviewStyle, TimelinePreferences } from '#lib/settings/definitions.js';
 import { dayKey } from '#lib/ui/date-time.js';
 
 export { senderColor } from '#lib/ui/primitives/identity-color.js';

@@ -32,11 +32,8 @@ import { CallTelemetry } from './call-telemetry';
 import { recordCallDebug, type CallDebug } from './call-debug.svelte.js';
 import { cameraVisible, screenShareVisible, type CallPin } from './call-layout';
 import { participantKeys } from './participant-keys';
-import {
-  preferences,
-  setPreference,
-  type CallInputMode,
-} from '#lib/settings/preferences.svelte.js';
+import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+import { type CallInputMode } from '#lib/settings/definitions.js';
 import { DEVICE_PREFERENCE } from './devices';
 import type { CallBackendGrant, CallRemoteVideoOverlay, CallVideoOverlay } from './call-transport';
 import { playSound, releaseNotificationAudio } from '../notifications/sound';

@@ -8,11 +8,8 @@
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
-  import {
-    PREFERENCE_RANGES,
-    preferences,
-    setPreference,
-  } from '#lib/settings/preferences.svelte.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { PREFERENCE_RANGES } from '#lib/settings/definitions.js';
   import { bannerChanges, readRoomBanner } from '#lib/features/room/room-banner.svelte.js';
   import Banner from '#lib/ui/primitives/Banner.svelte';
 

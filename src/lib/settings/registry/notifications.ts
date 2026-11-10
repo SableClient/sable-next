@@ -8,7 +8,7 @@ import LockIcon from 'phosphor-svelte/lib/LockIcon';
 import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
 import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
 import { presentsInApp, pushPlatform } from '#lib/platform/notifications.js';
-import { PUSH_INACTIVE_TIMEOUTS } from '../preferences.svelte';
+import { PUSH_INACTIVE_TIMEOUTS } from '../definitions';
 import type { SettingOption, SettingsCategory } from '../registry';
 
 const pushInactiveTimeoutOptions: SettingOption[] = PUSH_INACTIVE_TIMEOUTS.map((value) =>

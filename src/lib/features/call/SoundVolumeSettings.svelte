@@ -1,12 +1,8 @@
 <script lang="ts">
   import { playSound, type NotificationSounds } from '#lib/features/notifications/sound.js';
   import { i18n } from '#lib/i18n.js';
-  import {
-    PREFERENCE_RANGES,
-    preferences,
-    setPreference,
-    type RangePreference,
-  } from '#lib/settings/preferences.svelte.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { PREFERENCE_RANGES, type RangePreference } from '#lib/settings/definitions.js';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import Slider from '#lib/ui/primitives/Slider.svelte';
 

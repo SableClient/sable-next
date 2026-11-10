@@ -2,11 +2,8 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { CoreEvent } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import {
-  preferences,
-  setPreference,
-  type CallInputMode,
-} from '#lib/settings/preferences.svelte.js';
+import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+import { type CallInputMode } from '#lib/settings/definitions.js';
 
 const screenAudio = vi.hoisted(() => ({ supported: vi.fn(() => false) }));
 vi.mock('#lib/platform/screen-audio.js', async (original) => ({
