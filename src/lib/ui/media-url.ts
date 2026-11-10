@@ -13,6 +13,7 @@ type CachedMediaUrl = {
   bytes: number;
   ratio: number | undefined;
   type: string;
+  animated: boolean;
 };
 
 const objectUrls = new Map<string, CachedMediaUrl>();
@@ -22,6 +23,7 @@ const displaced = new Map<string, string[]>();
 const MAX_OBJECT_URLS = 512;
 const MAX_OBJECT_URL_BYTES = 32 * 1024 * 1024;
 const MAX_MEDIA_METADATA = 512;
+const ANIMATION_HEADER_BYTES = 65536;
 const MEDIA_FAILURE_MEMORY_MS = 30 * 60_000;
 /* Failures expire at `until`; `Unavailable` covers a blip as well as a 404. */
 const failures = new QuickLRU<string, { count: number; until: number }>({
@@ -169,6 +171,15 @@ export function cachedMediaUrl(
   return objectUrls.get(cacheKey(core.session?.account_id, source, width, height))?.url;
 }
 
+export function cachedMediaAnimated(
+  core: Pick<CoreClient, 'session'>,
+  source: string,
+  width: number,
+  height: number
+): boolean | undefined {
+  return objectUrls.get(cacheKey(core.session?.account_id, source, width, height))?.animated;
+}
+
 export function cachedMediaType(
   core: Pick<CoreClient, 'session'>,
   source: string,
@@ -284,6 +295,7 @@ export function loadMediaUrl(
           bytes: blob.size,
           ratio: aspectRatios.get(key),
           type,
+          animated: isAnimatedImage(bytes.subarray(0, ANIMATION_HEADER_BYTES)),
         });
         objectUrlBytes += blob.size;
         failures.delete(key);

@@ -16,6 +16,7 @@
   import { mediaFailureHold, mediaRetryDelay } from '#lib/ui/media-retry.js';
   import { CoreError } from '#src/transport';
   import {
+    cachedMediaAnimated,
     cachedMediaType,
     cachedMediaUrl,
     discardMediaUrl,
@@ -259,6 +260,7 @@
     const image = imageElement;
     const source = url;
     if (!paused || !imageLoaded || !image || !source) return;
+    if (cachedMediaAnimated(core, requested, requestedWidth, requestedHeight) === false) return;
     let current = true;
     void stillFrame(image, source).then((still) => {
       if (current && still) heldFrame = { url: source, still };

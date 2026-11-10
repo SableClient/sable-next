@@ -1308,13 +1308,16 @@ test('retries a failed load on its own, without a retry button', async () => {
   vi.useRealTimers();
 });
 
+const GIF_HEADER = new TextEncoder().encode('GIF89a');
+
 async function mountLoadedEmote(
   source: string,
-  extra: Partial<ComponentProps<typeof MediaImage>> = {}
+  extra: Partial<ComponentProps<typeof MediaImage>> = {},
+  bytes: Uint8Array = GIF_HEADER
 ): Promise<{
   image: () => HTMLImageElement | null;
 }> {
-  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
+  core.fetchMedia.mockResolvedValue(bytes);
   mockStillFrames(() => `blob:${source}`);
   vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(true);
   vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(32);
@@ -1481,6 +1484,18 @@ test('an emoticon holds a still frame when stickers and emoji do not autoplay', 
   await vi.waitFor(() => {
     expect(image()?.getAttribute('src')).toBe(STILL);
   });
+});
+
+test('a frozen image that is not animated keeps its source', async () => {
+  const { image } = await mountLoadedEmote(
+    'mxc://example.org/static-avatar',
+    { freeze: true },
+    new Uint8Array(new ArrayBuffer(4))
+  );
+  await settle();
+
+  expect(image()?.getAttribute('src')).toBe('blob:mxc://example.org/static-avatar');
+  expect(vi.spyOn(HTMLCanvasElement.prototype, 'toBlob')).not.toHaveBeenCalled();
 });
 
 test('an emoticon keeps animating when stickers and emoji autoplay', async () => {
