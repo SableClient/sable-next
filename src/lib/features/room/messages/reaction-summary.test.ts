@@ -19,7 +19,7 @@ const t = (key: string, params: Record<string, unknown> = {}): string =>
 
 test('one sender is named directly', () => {
   expect(reactionSummary(['@a:x'], '👍', members, t)).toBe(
-    'timeline.reactedWith(people=Ana|key=👍)'
+    'timeline.reactedWith(people=Ana|key=👍|count=1)'
   );
 });
 

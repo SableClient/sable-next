@@ -27,5 +27,5 @@ export function reactionSummary(
               count: names.length - 3,
             });
 
-  return t('timeline.reactedWith', { people, key });
+  return t('timeline.reactedWith', { people, key, count: senders.length });
 }
