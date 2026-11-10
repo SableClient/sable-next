@@ -516,6 +516,10 @@
   },
   "settings": {
     "saveBanner": "Завантажити банер",
-    "status": "Статус"
+    "status": "Статус",
+    "banner": "Банер"
+  },
+  "auth": {
+    "banner": "Банер"
   }
 }
