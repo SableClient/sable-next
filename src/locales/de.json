@@ -1012,12 +1012,14 @@
     "attachmentsLinksEmpty": "Auf diesem Gerät wurden noch keine Links indexiert.",
     "attachmentsMediaEmpty": "Auf diesem Gerät wurden noch keine Bilder oder Videos indexiert.",
     "attachmentsFailed": "Der Suchindex dieses Geräts konnte nicht gelesen werden.",
-    "attachmentsVideo": "",
-    "attachmentsVideoNamed": "",
-    "attachmentsIndexed": "",
-    "attachmentsSpoiler": "",
-    "attachmentsSpoilerReason": "",
-    "attachmentsOpenItem": ""
+    "attachmentsVideo": "Video",
+    "attachmentsVideoNamed": "Video: {{name}}",
+    "attachmentsIndexed": "Indexierte Anhänge werden angezeigt. Ältere Historie könnte dabei nicht enthalten sein.",
+    "attachmentsSpoiler": "Spoiler",
+    "attachmentsSpoilerReason": "Spoiler: {{reason}}",
+    "attachmentsOpenItem": "„{{name}}“, geteilt von {{sender}}, {{date}}",
+    "attachmentsMoreLinks_one": "+ {{count}} weiterer Link",
+    "attachmentsMoreLinks_other": "+ {{count}} weitere Links"
   },
   "shortcuts": {
     "paletteEmpty": "Keine Räume für diese Suche gefunden."
