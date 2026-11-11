@@ -195,6 +195,7 @@
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+    position: relative;
   }
 
   ul {
