@@ -1,5 +1,6 @@
 import type {
   AttachmentInfoView,
+  ErrorReportView,
   RpcError,
   CoreEvent,
   PerMessageProfileView,
@@ -47,10 +48,56 @@ export type GalleryAttachment = Pick<
   'filename' | 'mime' | 'bytes' | 'info' | 'thumbnail' | 'spoiler'
 >;
 
-export class CoreError extends Error {
-  constructor(readonly detail: RpcError) {
-    super(detail.code);
+function describe(detail: RpcError): string {
+  const { code, report, ...fields } = detail;
+  const chain = (report?.frames ?? []).map((frame) => frame.message).join(': ');
+  if (detail.code === 'failed') {
+    return chain ? `failed [${detail.log_id}] ${chain}` : `failed: ${detail.log_id}`;
   }
+  const head = Object.keys(fields).length > 0 ? `${code} ${JSON.stringify(fields)}` : code;
+  return chain ? `${head}: ${chain}` : head;
+}
+
+export class CoreError extends Error {
+  name = 'CoreError';
+
+  constructor(
+    readonly detail: RpcError,
+    readonly method?: string
+  ) {
+    super(method ? `${method}: ${describe(detail)}` : describe(detail));
+  }
+
+  get report(): ErrorReportView | null {
+    return this.detail.report ?? null;
+  }
+}
+
+/**
+ * Sentry turns `console.error` and `console.warn` into events, and the core
+ * already reports a failure, so the report goes out on levels it leaves alone.
+ */
+function logReport(error: CoreError, report: ErrorReportView): void {
+  console.groupCollapsed(`[sable core] ${error.message}`);
+  for (const [depth, frame] of report.frames.entries()) {
+    const where = frame.location ? ` at ${frame.location}` : '';
+    console.log(`${'  '.repeat(depth)}${frame.message}${where}`);
+    if (frame.debug) console.log(frame.debug);
+  }
+  if (report.http) console.log('http', report.http);
+  if (report.span_trace) console.log(`spans\n${report.span_trace}`);
+  console.groupEnd();
+}
+
+export function commandFailed(detail: RpcError, method: string | undefined): CoreError {
+  const error = new CoreError(detail, method);
+  if (error.report) logReport(error, error.report);
+  else console.info(`[sable core] ${error.message}`, detail);
+  return error;
+}
+
+export function transportFailure(reason: string): RpcError {
+  return { code: 'failed', log_id: reason, report: null };
 }
 
 export interface Transport {

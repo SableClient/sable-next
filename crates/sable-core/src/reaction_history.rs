@@ -2,7 +2,7 @@ use sable_model::emote_picker::{reaction_identity as identity, rememberable_reac
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::protocol::{CoreEvent, RpcError};
+use crate::protocol::{CoreEvent, RpcCode, RpcError};
 use crate::{Core, ResultExt};
 
 const EVENT_TYPE: &str = "m.recent_emoji";
@@ -311,7 +311,7 @@ impl Core {
             history.seed(key, now);
         }
         if let Some(key) = key {
-            let device = client.device_id().ok_or(RpcError::Unavailable)?;
+            let device = client.device_id().ok_or(RpcCode::Unavailable)?;
             history.remember(key, device.as_str(), now);
         }
         let content = history.content();

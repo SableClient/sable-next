@@ -117,7 +117,7 @@ use matrix_sdk_ui::timeline::Timeline;
 use tokio::sync::{Mutex, mpsc, watch};
 use url::Url;
 
-use protocol::{CoreEvent, RpcError, SubscriptionId};
+use protocol::{CoreEvent, RpcCode, RpcError, SubscriptionId};
 use session::AccountRegistry;
 use store::SessionStore;
 
@@ -628,7 +628,7 @@ impl Core {
     pub(crate) async fn client(&self) -> Result<matrix_sdk::Client, RpcError> {
         self.session
             .current(|session| session.client.clone())
-            .ok_or(RpcError::NotLoggedIn)
+            .ok_or_else(|| RpcCode::NotLoggedIn.into())
     }
 
     pub(crate) async fn account_data_types(&self) -> Result<Vec<String>, RpcError> {
@@ -760,14 +760,14 @@ impl Core {
     ) -> Result<Arc<matrix_sdk_ui::sync_service::SyncService>, RpcError> {
         self.session
             .current(|session| session.sync_service.clone())
-            .ok_or(RpcError::NotLoggedIn)
+            .ok_or_else(|| RpcCode::NotLoggedIn.into())
     }
 
     pub(crate) async fn room(&self, room_id: &OwnedRoomId) -> Result<matrix_sdk::Room, RpcError> {
         self.client()
             .await?
             .get_room(room_id)
-            .ok_or(RpcError::UnknownRoom)
+            .ok_or_else(|| RpcCode::UnknownRoom.into())
     }
 }
 
@@ -868,7 +868,10 @@ mod tests {
         assert!(matches!(
             core.run(crate::api::timeline::SubscribeRoomListParams::default())
                 .await,
-            Err(RpcError::NotLoggedIn)
+            Err(RpcError {
+                code: RpcCode::NotLoggedIn,
+                ..
+            })
         ));
     }
 
@@ -877,7 +880,10 @@ mod tests {
         let (core, _rx) = Core::new("test", Box::new(FailingClearSessionStore));
         assert!(matches!(
             core.clear_persisted_session().await,
-            Err(RpcError::Failed { .. })
+            Err(RpcError {
+                code: RpcCode::Failed { .. },
+                ..
+            })
         ));
     }
 
@@ -1062,7 +1068,10 @@ mod tests {
                 account_id: "a1".to_owned()
             })
             .await,
-            Err(RpcError::NotLoggedIn)
+            Err(RpcError {
+                code: RpcCode::NotLoggedIn,
+                ..
+            })
         ));
     }
 

@@ -37,16 +37,28 @@ pub(crate) async fn soliditas_preview(
         "{}/_soliditas/preview_url",
         base.trim_end_matches('/')
     ))
-    .map_err(|_| RpcError::Unavailable)?;
+    .map_err(|error| {
+        crate::errors::coded(
+            "link_preview_url",
+            crate::protocol::RpcCode::Unavailable,
+            &error,
+        )
+    })?;
     endpoint.query_pairs_mut().append_pair("url", target);
 
     let builder = crate::tls::apply(matrix_sdk::reqwest::Client::builder());
     #[cfg(not(target_family = "wasm"))]
     let builder = builder.timeout(std::time::Duration::from_secs(10));
-    let http = builder.build().map_err(|_| RpcError::Unavailable)?;
+    let http = builder.build().map_err(|error| {
+        crate::errors::coded(
+            "link_preview_client",
+            crate::protocol::RpcCode::Unavailable,
+            &error,
+        )
+    })?;
     let response = http.get(endpoint).send().await.map_err(|error| {
         tracing::warn!("soliditas preview failed: {}", error.without_url());
-        RpcError::Unavailable
+        crate::protocol::RpcCode::Unavailable
     })?;
 
     let status = response.status();
@@ -55,9 +67,15 @@ pub(crate) async fn soliditas_preview(
     }
     if !status.is_success() {
         tracing::warn!("soliditas preview answered {status}");
-        return Err(RpcError::Unavailable);
+        return Err(crate::protocol::RpcCode::Unavailable.into());
     }
-    let body = response.bytes().await.map_err(|_| RpcError::Unavailable)?;
+    let body = response.bytes().await.map_err(|error| {
+        crate::errors::coded(
+            "link_preview_body",
+            crate::protocol::RpcCode::Unavailable,
+            &error,
+        )
+    })?;
     Ok(serde_json::from_slice(&body).ok())
 }
 
@@ -252,7 +270,7 @@ mod local {
         Fetch as _, MAX_DIRECT_VIDEO_BYTES, PostMediaKind, ReqwestFetch, Response as _,
     };
 
-    use crate::protocol::{RpcError, UrlPreviewView};
+    use crate::protocol::{RpcCode, RpcError, UrlPreviewView};
 
     const USER_AGENT: &str = concat!(
         "Sable/",
@@ -274,7 +292,9 @@ mod local {
         let builder = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
             .user_agent(USER_AGENT)
             .timeout(timeout);
-        ReqwestFetch::new(builder).map_err(|_| RpcError::Unavailable)
+        ReqwestFetch::new(builder).map_err(|error| {
+            crate::errors::coded("link_preview_fetcher", RpcCode::Unavailable, &error)
+        })
     }
 
     pub(crate) async fn scrape(
@@ -313,18 +333,18 @@ mod local {
     }
 
     async fn download(source: &str, limit: usize) -> Result<Vec<u8>, RpcError> {
-        let url = url::Url::parse(source).map_err(|_| RpcError::InvalidMedia)?;
+        let url = url::Url::parse(source).map_err(|_| RpcCode::InvalidMedia)?;
         let fetch = client(Duration::from_secs(60))?;
         let response = fetch
             .get(&url, "image/*,video/*;q=0.9,*/*;q=0.5")
             .await
-            .ok_or(RpcError::Unavailable)?;
+            .ok_or(RpcCode::Unavailable)?;
         let body = response
             .body(limit.saturating_add(1))
             .await
-            .ok_or(RpcError::Unavailable)?;
+            .ok_or(RpcCode::Unavailable)?;
         if body.is_empty() || body.len() > limit {
-            return Err(RpcError::InvalidMedia);
+            return Err(RpcCode::InvalidMedia.into());
         }
         Ok(body)
     }
@@ -964,7 +984,13 @@ mod tests {
         let error = super::soliditas_preview(&server.uri(), "https://example.org/a")
             .await
             .unwrap_err();
-        assert!(matches!(error, super::RpcError::Unavailable));
+        assert!(matches!(
+            error,
+            crate::protocol::RpcError {
+                code: crate::protocol::RpcCode::Unavailable,
+                ..
+            }
+        ));
     }
 
     fn preview(url: &str) -> crate::protocol::UrlPreviewView {

@@ -13,7 +13,7 @@ use serde::Serialize;
 use crate::Core;
 use crate::ResultExt;
 use crate::delayed_events::{self, DelayedEvent, DelayedEventsSupport};
-use crate::protocol::{AttachmentInfoView, RpcError, ScheduledMessageView};
+use crate::protocol::{AttachmentInfoView, RpcCode, RpcError, ScheduledMessageView};
 use crate::view::SPOILER_PROPERTY;
 
 #[derive(Serialize)]
@@ -126,11 +126,11 @@ impl Core {
     ) -> Result<String, RpcError> {
         let support = self.delayed_events_support().await?;
         if !support.can_list() {
-            return Err(RpcError::DelayedEventsUnsupported);
+            return Err(RpcCode::DelayedEventsUnsupported.into());
         }
         let room = self.room(room_id).await?;
         if self.room_is_encrypted(&room).await? {
-            return Err(RpcError::EncryptedScheduleUnsupported);
+            return Err(RpcCode::EncryptedScheduleUnsupported.into());
         }
 
         let event = DelayedEvent {
@@ -160,10 +160,10 @@ impl Core {
             persona,
         }: ScheduleAttachmentParams,
     ) -> Result<String, RpcError> {
-        let mime: Mime = mime.parse().map_err(|_| RpcError::InvalidMedia)?;
+        let mime: Mime = mime.parse().map_err(|_| RpcCode::InvalidMedia)?;
         let url = OwnedMxcUri::from(url);
         if url.parts().is_err() {
-            return Err(RpcError::InvalidMedia);
+            return Err(RpcCode::InvalidMedia.into());
         }
 
         let info = info.unwrap_or_default();

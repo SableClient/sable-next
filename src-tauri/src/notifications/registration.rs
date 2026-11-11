@@ -6,7 +6,7 @@ use super::gateway::{
 };
 #[cfg(mobile)]
 use sable_core::api::push::WebPusherView;
-use sable_core::protocol::RpcError;
+use sable_core::protocol::{RpcCode, RpcError};
 use tauri::{AppHandle, Runtime};
 #[cfg(mobile)]
 use tauri_plugin_notifications::NotificationsExt;
@@ -48,7 +48,7 @@ fn push_store<R: Runtime>(app: &AppHandle<R>) -> Result<std::path::PathBuf, RpcE
     use tauri::Manager;
     app.try_state::<PushStore>()
         .map(|store| store.0.clone())
-        .ok_or(RpcError::Unavailable)
+        .ok_or_else(|| RpcCode::Unavailable.into())
 }
 
 pub(crate) struct PushStore(pub std::path::PathBuf);
@@ -57,9 +57,9 @@ pub(super) fn registered_pushers(
     root: &std::path::Path,
 ) -> Result<Vec<RegisteredPusher>, RpcError> {
     match std::fs::read(root.join("pushers.json")) {
-        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|_| RpcError::Unavailable),
+        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|_| RpcCode::Unavailable.into()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
-        Err(_) => Err(RpcError::Unavailable),
+        Err(_) => Err(RpcCode::Unavailable.into()),
     }
 }
 
@@ -88,10 +88,10 @@ pub(crate) fn device_pusher<R: Runtime>(
 }
 
 fn save_pushers(root: &std::path::Path, pushers: &[RegisteredPusher]) -> Result<(), RpcError> {
-    std::fs::create_dir_all(root).map_err(|_| RpcError::Unavailable)?;
-    let bytes = serde_json::to_vec(pushers).map_err(|_| RpcError::Unavailable)?;
+    std::fs::create_dir_all(root).map_err(|_| RpcCode::Unavailable)?;
+    let bytes = serde_json::to_vec(pushers).map_err(|_| RpcCode::Unavailable)?;
     sable_core::store::write_atomic(&root.join("pushers.json"), &bytes)
-        .map_err(|_| RpcError::Unavailable)
+        .map_err(|_| RpcCode::Unavailable.into())
 }
 
 async fn remove_saved_pusher(
@@ -108,7 +108,7 @@ async fn remove_saved_pusher(
             )
         })
         .await
-        .map_err(|_| RpcError::Unavailable)
+        .map_err(|_| RpcCode::Unavailable.into())
 }
 
 pub(super) async fn pusher_client(
@@ -117,7 +117,7 @@ pub(super) async fn pusher_client(
 ) -> Result<sable_core::notifications::PushClient, RpcError> {
     sable_core::notifications::restore_push_client(root, &pusher.user_id, &pusher.device_id)
         .await
-        .ok_or(RpcError::Unavailable)
+        .ok_or_else(|| RpcCode::Unavailable.into())
 }
 
 #[derive(serde::Deserialize)]
@@ -280,8 +280,8 @@ async fn register_account_push<R: Runtime>(
     client
         .retry(|| sable_core::notifications::set_pusher(&client, pusher.clone()))
         .await
-        .map_err(|_| PushRegistrationError::Homeserver {
-            error: RpcError::Unavailable,
+        .map_err(|error| PushRegistrationError::Homeserver {
+            error: error.into_rpc("register_pusher", RpcCode::Unavailable),
         })?;
     remember_pusher(
         root,
@@ -313,9 +313,9 @@ async fn register_server_pusher<R: Runtime>(
         .retry(|| sable_core::webpush::set_pusher(client, pusher.clone()))
         .await
     {
-        log::warn!("homeserver rejected the MSC4174 pusher: {error:?}");
+        log::warn!("homeserver rejected the MSC4174 pusher: {error}");
         return Err(PushRegistrationError::Homeserver {
-            error: RpcError::Unavailable,
+            error: error.into_rpc("register_web_pusher", RpcCode::Unavailable),
         });
     }
     log::debug!("registered an MSC4174 pusher through the homeserver");
@@ -465,7 +465,7 @@ async fn retire_unused_subscriptions<R: Runtime>(
         app.notifications()
             .unregister_push_instance(instance)
             .await
-            .map_err(|_| RpcError::Unavailable)?;
+            .map_err(|_| RpcCode::Unavailable)?;
     }
     Ok(())
 }
@@ -481,7 +481,7 @@ pub(crate) async fn unregister_push<R: Runtime>(
     let identity = match (user_id, device_id) {
         (Some(user), Some(device)) => Some((user, device)),
         (None, None) => None,
-        _ => return Err(RpcError::Denied),
+        _ => return Err(RpcCode::Denied.into()),
     };
     let _guard = PUSH_REGISTRATION_LOCK.lock().await;
     let root = push_store(app)?;
@@ -507,11 +507,9 @@ pub(crate) async fn unregister_push<R: Runtime>(
         let push = app.sable_push();
         push.set_accounts(&accounts)
             .await
-            .map_err(|_| RpcError::Unavailable)?;
+            .map_err(|_| RpcCode::Unavailable)?;
         if accounts.is_empty() {
-            push.dismiss_all()
-                .await
-                .map_err(|_| RpcError::Unavailable)?;
+            push.dismiss_all().await.map_err(|_| RpcCode::Unavailable)?;
         }
     }
     save_pushers(&root, &remaining)?;
@@ -520,7 +518,7 @@ pub(crate) async fn unregister_push<R: Runtime>(
         app.notifications()
             .unregister_for_push_notifications()
             .await
-            .map_err(|_| RpcError::Unavailable)?;
+            .map_err(|_| RpcCode::Unavailable)?;
     }
     #[cfg(target_os = "android")]
     if !remaining.is_empty() {

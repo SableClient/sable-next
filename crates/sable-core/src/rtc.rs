@@ -11,7 +11,7 @@ use sable_frostbite::{
 
 use crate::Core;
 use crate::now_ms;
-use crate::protocol::{CoreEvent, RpcError, RtcSignal};
+use crate::protocol::{CoreEvent, RpcCode, RpcError, RtcSignal};
 use crate::sealed_account_data::verified_own_sender;
 
 const SESSION_MS: u64 = 120_000;
@@ -50,13 +50,13 @@ impl Channel {
     fn push(&mut self, frame: &[u8]) -> Result<Option<Inbound>, RpcError> {
         if frame.is_empty() {
             if self.opened {
-                return Err(RpcError::Unavailable);
+                return Err(RpcCode::Unavailable.into());
             }
             self.opened = true;
             return Ok(Some(Inbound::Opened));
         }
         if !self.opened || frame.len() > MAX_FRAME {
-            return Err(RpcError::Unavailable);
+            return Err(RpcCode::Unavailable.into());
         }
         self.inbox.extend_from_slice(frame);
         let Some(length) = self.inbox.first_chunk::<LENGTH_PREFIX>() else {
@@ -64,7 +64,7 @@ impl Channel {
         };
         let length = u32::from_be_bytes(*length) as usize;
         if length > MAX_MESSAGE {
-            return Err(RpcError::Unavailable);
+            return Err(RpcCode::Unavailable.into());
         }
         // A peer sends its next message only after the answer to the last one.
         match self.inbox.len().cmp(&(LENGTH_PREFIX + length)) {
@@ -74,7 +74,7 @@ impl Channel {
                 message.drain(..LENGTH_PREFIX);
                 Ok(Some(Inbound::Message(message)))
             }
-            std::cmp::Ordering::Greater => Err(RpcError::Unavailable),
+            std::cmp::Ordering::Greater => Err(RpcCode::Unavailable.into()),
         }
     }
 }
@@ -83,7 +83,7 @@ fn frame(message: &[u8]) -> Result<Vec<u8>, RpcError> {
     let length = u32::try_from(message.len())
         .ok()
         .filter(|_| message.len() <= MAX_MESSAGE)
-        .ok_or(RpcError::Unavailable)?;
+        .ok_or(RpcCode::Unavailable)?;
     let mut framed = Vec::with_capacity(LENGTH_PREFIX + message.len());
     framed.extend_from_slice(&length.to_be_bytes());
     framed.extend_from_slice(message);
@@ -145,14 +145,14 @@ impl Core {
         frame_bytes: &[u8],
     ) -> Result<Vec<u8>, RpcError> {
         if self.shut_down.load(Ordering::SeqCst) {
-            return Err(RpcError::Unavailable);
+            return Err(RpcCode::Unavailable.into());
         }
         let (purpose, inbound) = {
             let mut sessions = self.rtc.0.lock();
-            let entry = sessions.get_mut(session_id).ok_or(RpcError::Unavailable)?;
+            let entry = sessions.get_mut(session_id).ok_or(RpcCode::Unavailable)?;
             if now_ms().saturating_sub(entry.touched) > SESSION_MS {
                 sessions.remove(session_id);
-                return Err(RpcError::Unavailable);
+                return Err(RpcCode::Unavailable.into());
             }
             entry.touched = now_ms();
             (entry.purpose, entry.channel.push(frame_bytes)?)
@@ -212,7 +212,7 @@ impl Core {
         signal: RtcSignal,
     ) -> Result<(), RpcError> {
         let client = self.client().await?;
-        let (device, sender) = self.rtc_device(session).ok_or(RpcError::Unavailable)?;
+        let (device, sender) = self.rtc_device(session).ok_or(RpcCode::Unavailable)?;
         let sent = match signal {
             RtcSignal::Negotiate { description } if description.valid_from(sender) => {
                 sable_frostbite::send(
@@ -237,11 +237,11 @@ impl Core {
                 )
                 .await
             }
-            _ => return Err(RpcError::Unavailable),
+            _ => return Err(RpcCode::Unavailable.into()),
         };
         sent.map_err(|error| match error {
-            SendError::NotLoggedIn => RpcError::NotLoggedIn,
-            SendError::UnverifiedDevice | SendError::Failed => RpcError::Unavailable,
+            SendError::NotLoggedIn => RpcCode::NotLoggedIn.into(),
+            SendError::UnverifiedDevice | SendError::Failed => RpcCode::Unavailable.into(),
         })
     }
 

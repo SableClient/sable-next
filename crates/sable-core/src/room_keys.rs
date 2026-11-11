@@ -6,7 +6,7 @@ use tempfile::NamedTempFile;
 use crate::Core;
 use crate::ResultExt;
 use crate::api::encryption::ImportRoomKeysOk;
-use crate::protocol::RpcError;
+use crate::protocol::{RpcCode, RpcError};
 
 impl Core {
     #[cfg(not(target_family = "wasm"))]
@@ -72,7 +72,7 @@ impl Core {
     ) -> Result<String, RpcError> {
         let base = self.base_client().await?;
         let machine = base.olm_machine().await;
-        let machine = machine.as_ref().ok_or(RpcError::NotLoggedIn)?;
+        let machine = machine.as_ref().ok_or(RpcCode::NotLoggedIn)?;
 
         let keys = machine
             .store()
@@ -94,7 +94,7 @@ impl Core {
     ) -> Result<ImportRoomKeysOk, RpcError> {
         let base = self.base_client().await?;
         let machine = base.olm_machine().await;
-        let machine = machine.as_ref().ok_or(RpcError::NotLoggedIn)?;
+        let machine = machine.as_ref().ok_or(RpcCode::NotLoggedIn)?;
 
         let keys = matrix_sdk_base::crypto::decrypt_room_key_export(export.as_bytes(), passphrase)
             .map_err(|error| self.room_key_import_error(RoomKeyImportError::Export(error)))?;
@@ -119,12 +119,12 @@ impl Core {
         let account_id = self
             .session
             .current(|session| session.account_id.clone())
-            .ok_or(RpcError::NotLoggedIn)?;
+            .ok_or(RpcCode::NotLoggedIn)?;
         let store_id = self
             .registered_store_id(&account_id)
             .await
-            .ok_or(RpcError::NotLoggedIn)?;
-        crate::session::base_client(&store_id).ok_or(RpcError::Unavailable)
+            .ok_or(RpcCode::NotLoggedIn)?;
+        crate::session::base_client(&store_id).ok_or_else(|| RpcCode::Unavailable.into())
     }
 
     #[cfg(not(target_family = "wasm"))]
@@ -137,9 +137,9 @@ impl Core {
 
     fn room_key_import_error(&self, error: RoomKeyImportError) -> RpcError {
         match error {
-            RoomKeyImportError::Export(KeyExportError::InvalidMac) => RpcError::Denied,
-            RoomKeyImportError::Export(_) => RpcError::InvalidKeyExport,
-            error => self.failed("import_room_keys", error),
+            RoomKeyImportError::Export(KeyExportError::InvalidMac) => RpcCode::Denied.into(),
+            RoomKeyImportError::Export(_) => RpcCode::InvalidKeyExport.into(),
+            error => self.failed_with("import_room_keys", &error),
         }
     }
 }
@@ -170,8 +170,12 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::{
-        Core, api::encryption::ImportRoomKeysOk, api::timeline::TimelineFocusView,
-        protocol::RpcError, session::Session, store::MemorySessionStore,
+        Core,
+        api::encryption::ImportRoomKeysOk,
+        api::timeline::TimelineFocusView,
+        protocol::{RpcCode, RpcError},
+        session::Session,
+        store::MemorySessionStore,
         timelines::build_room_timeline,
     };
 
@@ -485,6 +489,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
         use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
         let server = MatrixMockServer::new().await;
         let (core, client, _store) = core_for(&server).await;
+        let base = core.base_client().await.unwrap();
         let key = BackupDecryptionKey::new();
         backup_metadata(&server, &key, 103).await;
         unlock_backup(&client, &key).await;
@@ -509,7 +514,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
             .await;
         let updates = parking_lot::Mutex::new(Vec::new());
         let result = core
-            .download_all_room_keys(&client, |update| updates.lock().push(update))
+            .download_all_room_keys(&base, &client, |update| updates.lock().push(update))
             .await
             .unwrap();
         assert_eq!(
@@ -523,7 +528,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
         );
         assert!(updates.lock().iter().any(|update| update.processed == 100));
         assert_eq!(session_ids(&client).await.len(), 102);
-        let status = core.backup_status(&client).await.unwrap();
+        let status = core.backup_status(&base, &client).await.unwrap();
         assert_eq!(
             (status.local_keys, status.backed_up_keys, status.cloud_keys),
             (102, 102, Some(103))
@@ -623,21 +628,37 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
         use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
         let server = MatrixMockServer::new().await;
         let (core, client, _store) = core_for(&server).await;
+        let base = core.base_client().await.unwrap();
         let server_key = BackupDecryptionKey::new();
         backup_metadata(&server, &server_key, 5).await;
-        assert!(!core.backup_status(&client).await.unwrap().can_restore);
-        core.download_all_room_keys(&client, |_| {})
+        assert!(
+            !core
+                .backup_status(&base, &client)
+                .await
+                .unwrap()
+                .can_restore
+        );
+        core.download_all_room_keys(&base, &client, |_| {})
             .await
             .unwrap_err();
         unlock_backup(&client, &BackupDecryptionKey::new()).await;
-        assert!(!core.backup_status(&client).await.unwrap().can_restore);
-        core.download_all_room_keys(&client, |_| {})
+        assert!(
+            !core
+                .backup_status(&base, &client)
+                .await
+                .unwrap()
+                .can_restore
+        );
+        core.download_all_room_keys(&base, &client, |_| {})
             .await
             .unwrap_err();
         let _permit = core.key_backup_downloads.acquire().await.unwrap();
         assert!(matches!(
             core.download_key_backup("duplicate".to_owned()).await,
-            Err(RpcError::Unavailable)
+            Err(RpcError {
+                code: RpcCode::Unavailable,
+                ..
+            })
         ));
         assert!(
             !server
@@ -654,6 +675,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
     async fn absent_cloud_backup_is_distinct_from_network_failure() {
         let server = MatrixMockServer::new().await;
         let (core, client, _store) = core_for(&server).await;
+        let base = core.base_client().await.unwrap();
         wiremock::Mock::given(wiremock::matchers::method("GET"))
             .and(wiremock::matchers::path_regex(
                 r"^/_matrix/client/(r0|v3)/room_keys/version$",
@@ -664,7 +686,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
             )
             .mount(server.server())
             .await;
-        let status = core.backup_status(&client).await.unwrap();
+        let status = core.backup_status(&base, &client).await.unwrap();
         assert_eq!(status.cloud_keys, None);
         assert!(!status.can_restore);
         server.server().reset().await;
@@ -678,7 +700,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
             )
             .mount(server.server())
             .await;
-        core.backup_status(&client).await.unwrap_err();
+        core.backup_status(&base, &client).await.unwrap_err();
     }
 
     #[tokio::test]
@@ -784,17 +806,26 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
 
         assert!(matches!(
             import(&core, ELEMENT_EXPORT, "wrong").await,
-            Err(RpcError::Denied)
+            Err(RpcError {
+                code: RpcCode::Denied,
+                ..
+            })
         ));
         assert!(matches!(
             import(&core, "not a key export", "element passphrase").await,
-            Err(RpcError::InvalidKeyExport)
+            Err(RpcError {
+                code: RpcCode::InvalidKeyExport,
+                ..
+            })
         ));
         let damaged =
             "-----BEGIN MEGOLM SESSION DATA-----\nnot*base64\n-----END MEGOLM SESSION DATA-----";
         assert!(matches!(
             import(&core, damaged, "element passphrase").await,
-            Err(RpcError::InvalidKeyExport)
+            Err(RpcError {
+                code: RpcCode::InvalidKeyExport,
+                ..
+            })
         ));
         assert_eq!(session_ids(&client).await, [] as [String; 0]);
         assert_eq!(listing(), before);

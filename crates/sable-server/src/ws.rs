@@ -11,7 +11,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use futures_util::{SinkExt, StreamExt};
-use sable_core::protocol::RpcError;
+use sable_core::protocol::{RpcCode, RpcError};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, value::RawValue};
 use tokio::sync::{broadcast, mpsc};
@@ -248,9 +248,10 @@ impl Connection {
         let Ok(request) = serde_json::from_str::<Request>(text) else {
             let reply = Reply::Error {
                 id: Value::Null,
-                error: RpcError::Failed {
+                error: RpcCode::Failed {
                     log_id: "invalid websocket request".to_owned(),
-                },
+                }
+                .into(),
             };
             return try_send_reply(outgoing, &reply);
         };
@@ -267,9 +268,10 @@ impl Connection {
         match event {
             Ok(event) => {
                 self.session_valid().await
-                    && outgoing
-                        .try_send(yawc::Frame::text(event.message.to_string()))
-                        .is_ok()
+                    && (!event.claim()
+                        || outgoing
+                            .try_send(yawc::Frame::text(event.message.to_string()))
+                            .is_ok())
             }
             Err(broadcast::error::RecvError::Lagged(_)) => {
                 let _ = outgoing.try_send(yawc::Frame::text(RESET_FRAME));
@@ -311,7 +313,7 @@ fn spawn_rpc(
         } else {
             Reply::Error {
                 id: request.id,
-                error: RpcError::Unsupported,
+                error: RpcCode::Unsupported.into(),
             }
         };
         send_reply(&outgoing, reply).await;
@@ -321,9 +323,10 @@ fn spawn_rpc(
 fn reject_rate_limited(outgoing: &mpsc::Sender<yawc::Frame>, id: Value) {
     let reply = Reply::Error {
         id,
-        error: RpcError::RateLimited {
+        error: RpcCode::RateLimited {
             retry_after_ms: Some(100),
-        },
+        }
+        .into(),
     };
     try_send_reply(outgoing, &reply);
 }
@@ -365,7 +368,7 @@ async fn greet(
         return send_text(outgoing, RESET_FRAME).await.then_some(receiver);
     }
     for event in replayed {
-        if !send_text(outgoing, &event.message).await {
+        if event.claim() && !send_text(outgoing, &event.message).await {
             return None;
         }
     }

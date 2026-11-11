@@ -10,7 +10,7 @@ use super::membership::{self, CallMember, StickyMemberships};
 use super::runtime::merge_sticky;
 use super::{sfu, sticky};
 use crate::Core;
-use crate::protocol::{CallMode, CallModeReason, CallSessionId, RpcError};
+use crate::protocol::{CallMode, CallModeReason, CallSessionId, RpcCode, RpcError};
 
 fn select_mode(
     requested: Option<CallMode>,
@@ -19,7 +19,7 @@ fn select_mode(
 ) -> Result<CallMode, RpcError> {
     if let Some(mode) = requested {
         return if mode == CallMode::Matrix2 && !sticky_available {
-            Err(RpcError::Unsupported)
+            Err(RpcCode::Unsupported.into())
         } else {
             Ok(mode)
         };
@@ -123,7 +123,7 @@ async fn resolve_service(
         let url = core
             .resolve_focus(members, configured, room)
             .await
-            .ok_or(RpcError::NoCallFocus)?;
+            .ok_or(RpcCode::NoCallFocus)?;
         return Ok((url, None));
     }
     if let Some(url) = stable_services.first() {
@@ -140,7 +140,7 @@ async fn resolve_service(
                     .map(|server| (url.clone(), server.clone()))
             })
         })
-        .ok_or(RpcError::NoCallFocus)?;
+        .ok_or(RpcCode::NoCallFocus)?;
     Ok((url, Some(server)))
 }
 
@@ -199,8 +199,8 @@ pub(super) async fn discover(
     requested: Option<CallMode>,
 ) -> Result<Discovered, RpcError> {
     let client = room.client();
-    let user = client.user_id().ok_or(RpcError::NotLoggedIn)?.to_owned();
-    let device = client.device_id().ok_or(RpcError::NotLoggedIn)?.to_owned();
+    let user = client.user_id().ok_or(RpcCode::NotLoggedIn)?.to_owned();
+    let device = client.device_id().ok_or(RpcCode::NotLoggedIn)?.to_owned();
     let encrypted = core.room_is_encrypted(room).await?;
     let features = client.unstable_features().await.unwrap_or_default();
     let (mut sticky_members, sticky_sync) = if features.contains(&"org.matrix.msc4354".into()) {

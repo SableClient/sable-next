@@ -21,7 +21,7 @@ use matrix_sdk_ui::sync_service::State as SyncState;
 use tracing::Instrument as _;
 use web_time::Instant;
 
-use crate::protocol::{CoreEvent, RpcError, SyncStatus};
+use crate::protocol::{CoreEvent, RpcCode, RpcError, SyncStatus};
 use matrix_sdk_base::deserialized_responses::RawAnySyncOrStrippedTimelineEvent;
 use matrix_sdk_base::sync::Notification;
 use matrix_sdk_ui::notification_client::{NotificationClient, NotificationProcessSetup};
@@ -149,7 +149,10 @@ impl Core {
                         }
                         if matches!(
                             core.require_sliding_sync(&support_client).await,
-                            Err(RpcError::SlidingSyncUnsupported)
+                            Err(RpcError {
+                                code: RpcCode::SlidingSyncUnsupported,
+                                ..
+                            })
                         ) {
                             restarted.stop().await;
                             core.emit_if_current(

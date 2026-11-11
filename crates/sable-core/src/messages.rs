@@ -37,7 +37,7 @@ use crate::matrix_html::{display_html, strip_profile_fallback_body, strip_profil
 use crate::outgoing::message_content;
 use crate::personas::PER_MESSAGE_PROFILE;
 use crate::protocol::{
-    EditVersionView, MessageKind, PerMessageProfileView, RpcError, TimelineItemView,
+    EditVersionView, MessageKind, PerMessageProfileView, RpcCode, RpcError, TimelineItemView,
 };
 use crate::view::{
     FAMEDLY_FORWARDED, FORWARDED, SABLE_FORWARDED, SPOILER_PROPERTY, SPOILER_REASON_PROPERTY,
@@ -283,7 +283,7 @@ impl Core {
                 )
                 .await
             }
-            _ => Err(RpcError::Unsupported),
+            _ => Err(RpcCode::Unsupported.into()),
         }
     }
 
@@ -347,12 +347,12 @@ impl Core {
             )
             .await
             .or_failed(self, "edit_message")?;
-        let original = raw_content(&event).ok_or(RpcError::Unsupported)?;
+        let original = raw_content(&event).ok_or(RpcCode::Unsupported)?;
         if [FORWARDED, FAMEDLY_FORWARDED, SABLE_FORWARDED]
             .iter()
             .any(|key| original.get(key).is_some())
         {
-            return Err(RpcError::Unsupported);
+            return Err(RpcCode::Unsupported.into());
         }
         let latest = latest_valid_replacement(&event, &replacements)
             .unwrap_or(&event)
@@ -362,7 +362,7 @@ impl Core {
         retain_reply_mention(
             room,
             &original,
-            latest_message(&latest).ok_or(RpcError::Unsupported)?,
+            latest_message(&latest).ok_or(RpcCode::Unsupported)?,
             &mut edited,
         )
         .await;
@@ -424,16 +424,16 @@ impl Core {
             .await?
             .item_by_event_id(event_id)
             .await
-            .ok_or(RpcError::Unsupported)?;
+            .ok_or(RpcCode::Unsupported)?;
         if !item.is_own() {
-            return Err(RpcError::Denied);
+            return Err(RpcCode::Denied.into());
         }
         let event = item
             .latest_json()
             .or_else(|| item.original_json())
             .and_then(|raw| raw.deserialize_as_unchecked::<serde_json::Value>().ok())
-            .ok_or(RpcError::Unsupported)?;
-        let edit = build(&event).ok_or(RpcError::Unsupported)?;
+            .ok_or(RpcCode::Unsupported)?;
+        let edit = build(&event).ok_or(RpcCode::Unsupported)?;
         let raw = Raw::<AnyMessageLikeEventContent>::from_json_string(edit.to_string())
             .or_failed(self, context)?;
         self.room(room_id)
@@ -796,15 +796,15 @@ impl Core {
             .or_failed(self, "forward_message")?;
 
         let AnySyncTimelineEvent::MessageLike(message) = raw else {
-            return Err(RpcError::Unsupported);
+            return Err(RpcCode::Unsupported.into());
         };
         let event_type = match message.original_content() {
             Some(AnyMessageLikeEventContent::RoomMessage(_)) => "m.room.message",
             Some(AnyMessageLikeEventContent::Sticker(_)) => "m.sticker",
-            _ => return Err(RpcError::Unsupported),
+            _ => return Err(RpcCode::Unsupported.into()),
         };
 
-        let original = raw_content(&event).ok_or(RpcError::Unsupported)?;
+        let original = raw_content(&event).ok_or(RpcCode::Unsupported)?;
         let is_forward = [FORWARDED, FAMEDLY_FORWARDED, SABLE_FORWARDED]
             .iter()
             .any(|key| original.get(key).is_some());
@@ -821,7 +821,7 @@ impl Core {
         let source_content = match (edited, original) {
             (Some(edited), _) => edited,
             (None, serde_json::Value::Object(original)) => original,
-            (None, _) => return Err(RpcError::Unsupported),
+            (None, _) => return Err(RpcCode::Unsupported.into()),
         };
 
         let public = matches!(source.join_rule(), Some(JoinRule::Public));

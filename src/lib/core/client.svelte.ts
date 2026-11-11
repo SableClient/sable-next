@@ -44,6 +44,7 @@ import { clearRoomListSnapshot } from '#lib/rooms/room-list-snapshot.js';
 import { clearRoomTimelines } from '#lib/rooms/timeline.svelte.js';
 import { MemberPreviews } from '#lib/rooms/member-previews.svelte.js';
 import { clearRecentSearches } from '#lib/search/recent-searches.svelte.js';
+import { reportCoreFailure } from '#lib/observability/core-failure.js';
 import { reportSessionFailure } from '#lib/observability/session-telemetry.js';
 import {
   browserGatesCoreNetwork,
@@ -1255,6 +1256,9 @@ export class CoreClient {
         return;
       case 'image_packs_changed':
         invalidatePacks(this.rpc);
+        return;
+      case 'failure':
+        reportCoreFailure(event);
         return;
       case 'session_ended':
         reportSessionFailure('session_ended', undefined, event.reason);

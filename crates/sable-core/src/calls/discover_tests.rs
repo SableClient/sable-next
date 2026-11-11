@@ -125,7 +125,10 @@ fn mode_selection_preserves_legacy_and_selects_sticky_only_when_available() {
     ));
     assert!(matches!(
         select_mode(Some(CallMode::Matrix2), &[], false),
-        Err(crate::protocol::RpcError::Unsupported)
+        Err(crate::protocol::RpcError {
+            code: crate::protocol::RpcCode::Unsupported,
+            ..
+        })
     ));
     assert!(matches!(
         select_mode(None, &[member(CallMode::Matrix2, 1, &[])], true),

@@ -26,7 +26,7 @@ use crate::messages::outgoing_mentions;
 use crate::outgoing::thread_reply;
 use crate::personas::profile_extra_content;
 use crate::protocol::{
-    AttachmentInfoView, AudioMetadataView, CoreEvent, PerMessageProfileView, RpcError,
+    AttachmentInfoView, AudioMetadataView, CoreEvent, PerMessageProfileView, RpcCode, RpcError,
     SendAttachmentRequest, SendGalleryRequest,
 };
 use crate::view::SPOILER_PROPERTY;
@@ -53,32 +53,32 @@ fn attachment_data(bytes: &mut &[u8]) -> Result<(Vec<u8>, Option<Thumbnail>), Rp
     let mut height = [0; 4];
     bytes
         .read_exact(&mut size)
-        .map_err(|_| RpcError::InvalidMedia)?;
+        .map_err(|_| RpcCode::InvalidMedia)?;
     bytes
         .read_exact(&mut thumbnail_size)
-        .map_err(|_| RpcError::InvalidMedia)?;
+        .map_err(|_| RpcCode::InvalidMedia)?;
     bytes
         .read_exact(&mut width)
-        .map_err(|_| RpcError::InvalidMedia)?;
+        .map_err(|_| RpcCode::InvalidMedia)?;
     bytes
         .read_exact(&mut height)
-        .map_err(|_| RpcError::InvalidMedia)?;
-    let size = usize::try_from(u64::from_le_bytes(size)).map_err(|_| RpcError::InvalidMedia)?;
+        .map_err(|_| RpcCode::InvalidMedia)?;
+    let size = usize::try_from(u64::from_le_bytes(size)).map_err(|_| RpcCode::InvalidMedia)?;
     let thumbnail_size = u64::from_le_bytes(thumbnail_size);
     let width = u32::from_le_bytes(width);
     let height = u32::from_le_bytes(height);
     let data = bytes
         .split_off(..size)
-        .ok_or(RpcError::InvalidMedia)?
+        .ok_or(RpcCode::InvalidMedia)?
         .to_vec();
     let thumbnail = if thumbnail_size == 0 {
         None
     } else {
         Some(Thumbnail {
-            size: UInt::try_from(thumbnail_size).map_err(|_| RpcError::InvalidMedia)?,
+            size: UInt::try_from(thumbnail_size).map_err(|_| RpcCode::InvalidMedia)?,
             data: bytes
-                .split_off(..usize::try_from(thumbnail_size).map_err(|_| RpcError::InvalidMedia)?)
-                .ok_or(RpcError::InvalidMedia)?
+                .split_off(..usize::try_from(thumbnail_size).map_err(|_| RpcCode::InvalidMedia)?)
+                .ok_or(RpcCode::InvalidMedia)?
                 .to_vec(),
             content_type: mime::IMAGE_JPEG,
             width: width.into(),
@@ -141,7 +141,7 @@ impl Core {
         if let MediaSource::Plain(uri) = &source
             && uri.parts().is_err()
         {
-            return Err(RpcError::InvalidMedia);
+            return Err(RpcCode::InvalidMedia.into());
         }
 
         let client = self.client().await?;
@@ -158,13 +158,15 @@ impl Core {
                         .media_downloads
                         .acquire()
                         .await
-                        .map_err(|_| RpcError::Unavailable)?;
+                        .map_err(|_| RpcCode::Unavailable)?;
                     if let Some(bytes) = cached_media(&client, &source, width, height).await {
                         return Ok(bytes);
                     }
                     permit
                 }
-                Err(tokio::sync::TryAcquireError::Closed) => return Err(RpcError::Unavailable),
+                Err(tokio::sync::TryAcquireError::Closed) => {
+                    return Err(RpcCode::Unavailable.into());
+                }
             };
             Some(permit)
         };
@@ -185,7 +187,7 @@ impl Core {
                         retry_after_ms,
                         "media refused by the breaker without a request"
                     );
-                    return Err(RpcError::MediaServerUnavailable { retry_after_ms });
+                    return Err(RpcCode::MediaServerUnavailable { retry_after_ms }.into());
                 }
                 Admission::Probe => {
                     probe = Some(ProbeGuard {
@@ -227,13 +229,7 @@ impl Core {
         if let Some(probe) = probe.as_mut() {
             probe.armed = false;
         }
-        result.map_err(|error| {
-            if is_not_found(&error) {
-                RpcError::MediaNotFound
-            } else {
-                RpcError::Unavailable
-            }
-        })
+        result.map_err(|error| media_code(&error).into())
     }
 
     async fn media_bytes(
@@ -297,7 +293,7 @@ impl Core {
             MediaSource::Encrypted(file) => file.url,
         };
         if uri.parts().is_err() {
-            return Err(RpcError::InvalidMedia);
+            return Err(RpcCode::InvalidMedia.into());
         }
         let client = self.client().await?;
         client
@@ -437,7 +433,7 @@ impl Core {
     /// Returns an error when the MIME type is invalid, the user is logged out,
     /// or the upload fails.
     pub async fn upload_media(&self, mime: String, bytes: Vec<u8>) -> Result<String, RpcError> {
-        let mime: Mime = mime.parse().map_err(|_| RpcError::InvalidMedia)?;
+        let mime: Mime = mime.parse().map_err(|_| RpcCode::InvalidMedia)?;
 
         let response = self
             .client()
@@ -465,13 +461,13 @@ impl Core {
         let mut body = payload.as_slice();
         let (bytes, thumbnail) = attachment_data(&mut body)?;
         if !body.is_empty() {
-            return Err(RpcError::InvalidMedia);
+            return Err(RpcCode::InvalidMedia.into());
         }
         drop(payload);
         if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > self.max_upload_size().await? {
-            return Err(RpcError::InvalidMedia);
+            return Err(RpcCode::InvalidMedia.into());
         }
-        let mime: Mime = request.mime.parse().map_err(|_| RpcError::InvalidMedia)?;
+        let mime: Mime = request.mime.parse().map_err(|_| RpcCode::InvalidMedia)?;
         let reply = thread_reply(
             request.outgoing.in_reply_to.clone(),
             request.outgoing.thread_root.clone(),
@@ -541,7 +537,7 @@ impl Core {
         bytes: Vec<u8>,
     ) -> Result<(), RpcError> {
         if request.attachments.len() < 2 {
-            return Err(RpcError::InvalidMedia);
+            return Err(RpcCode::InvalidMedia.into());
         }
         let max_upload_size = self.max_upload_size().await?;
         let mut body = bytes.as_slice();
@@ -551,13 +547,13 @@ impl Core {
             .map(|item| {
                 let (bytes, thumbnail) = attachment_data(&mut body)?;
                 if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > max_upload_size {
-                    return Err(RpcError::InvalidMedia);
+                    return Err(RpcCode::InvalidMedia.into());
                 }
                 Ok((item, bytes, thumbnail))
             })
             .collect::<Result<Vec<_>, RpcError>>()?;
         if !body.is_empty() {
-            return Err(RpcError::InvalidMedia);
+            return Err(RpcCode::InvalidMedia.into());
         }
         drop(bytes);
         let extra = request
@@ -581,7 +577,7 @@ impl Core {
                 request.outgoing.silent_reply,
             ));
         for (item, bytes, thumbnail) in attachments {
-            let mime: Mime = item.mime.parse().map_err(|_| RpcError::InvalidMedia)?;
+            let mime: Mime = item.mime.parse().map_err(|_| RpcCode::InvalidMedia)?;
             let info = attachment_info(&mime, &item.info.unwrap_or_default(), bytes.len());
             gallery = gallery.add_item(GalleryItemInfo {
                 filename: item.filename,
@@ -607,19 +603,21 @@ impl Core {
 #[cfg(not(target_family = "wasm"))]
 async fn download_persona_avatar(url: &str) -> Result<(String, Vec<u8>), RpcError> {
     const MAX_AVATAR_BYTES: usize = 20 * 1024 * 1024;
-    let url = url::Url::parse(url).map_err(|_| RpcError::InvalidMedia)?;
+    let url = url::Url::parse(url).map_err(|_| RpcCode::InvalidMedia)?;
     if !matches!(url.scheme(), "http" | "https")
         || !url.username().is_empty()
         || url.password().is_some()
     {
-        return Err(RpcError::InvalidMedia);
+        return Err(RpcCode::InvalidMedia.into());
     }
     // Do not send Matrix credentials to avatar hosts.
     let http = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
         .timeout(Duration::from_secs(30))
         .redirect(matrix_sdk::reqwest::redirect::Policy::limited(5))
         .build()
-        .map_err(|_| RpcError::Unavailable)?;
+        .map_err(|error| {
+            crate::errors::coded("persona_avatar_client", RpcCode::Unavailable, &error)
+        })?;
     let mut response = http
         .get(url)
         .send()
@@ -627,13 +625,13 @@ async fn download_persona_avatar(url: &str) -> Result<(String, Vec<u8>), RpcErro
         .and_then(matrix_sdk::reqwest::Response::error_for_status)
         .map_err(|error| {
             tracing::warn!("persona avatar download failed: {}", error.without_url());
-            RpcError::Unavailable
+            RpcCode::Unavailable
         })?;
     if response
         .content_length()
         .is_some_and(|size| size > MAX_AVATAR_BYTES as u64)
     {
-        return Err(RpcError::InvalidMedia);
+        return Err(RpcCode::InvalidMedia.into());
     }
     let mime = response
         .headers()
@@ -642,14 +640,16 @@ async fn download_persona_avatar(url: &str) -> Result<(String, Vec<u8>), RpcErro
         .unwrap_or("image/*")
         .to_owned();
     let mut bytes = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|_| RpcError::Unavailable)? {
+    while let Some(chunk) = response.chunk().await.map_err(|error| {
+        crate::errors::coded("persona_avatar_body", RpcCode::Unavailable, &error)
+    })? {
         if chunk.len() > MAX_AVATAR_BYTES - bytes.len() {
-            return Err(RpcError::InvalidMedia);
+            return Err(RpcCode::InvalidMedia.into());
         }
         bytes.extend_from_slice(&chunk);
     }
     if bytes.is_empty() {
-        return Err(RpcError::InvalidMedia);
+        return Err(RpcCode::InvalidMedia.into());
     }
     Ok((mime, bytes))
 }
@@ -972,6 +972,15 @@ fn media_origin(source: &MediaSource) -> Option<(OwnedServerName, String)> {
     Some((server.to_owned(), media_id.to_owned()))
 }
 
+/// Every missing thumbnail ends here, so the code goes out without a report.
+fn media_code(error: &matrix_sdk::Error) -> RpcCode {
+    if is_not_found(error) {
+        RpcCode::MediaNotFound
+    } else {
+        RpcCode::Unavailable
+    }
+}
+
 fn is_not_found(error: &matrix_sdk::Error) -> bool {
     match error {
         matrix_sdk::Error::Http(http) => match http.as_ref() {
@@ -1038,7 +1047,7 @@ fn media_label(source: &MediaSource) -> String {
 pub(crate) fn mxc_uri(url: &str) -> Result<OwnedMxcUri, RpcError> {
     let uri = OwnedMxcUri::from(url);
     if uri.parts().is_err() {
-        return Err(RpcError::InvalidMedia);
+        return Err(RpcCode::InvalidMedia.into());
     }
     Ok(uri)
 }

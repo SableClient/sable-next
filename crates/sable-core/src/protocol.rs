@@ -84,14 +84,12 @@ pub struct GalleryAttachmentView {
     pub spoiler: bool,
 }
 
-/// Stable serialized codes. Source chains, inputs and bodies stay native-side
-/// and are logged there, so nothing leaks across the wire. The last four words
-/// match the platform ports, so a core failure and a capability failure read
-/// alike.
-#[derive(Debug, Serialize)]
+/// Stable serialized codes. The last four words match the platform ports, so a
+/// core failure and a capability failure read alike.
+#[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "code", rename_all = "snake_case")]
-pub enum RpcError {
+pub enum RpcCode {
     NotLoggedIn,
     UnknownSubscription,
     UnknownCall,
@@ -173,10 +171,58 @@ pub enum RpcError {
     },
     /// The homeserver advertises OAuth endpoints that cannot be reached.
     AuthProviderUnreachable,
-    /// Detail is in the core's log under `log_id`.
+    /// Also in the core's log under `log_id`.
     Failed {
         log_id: String,
     },
+}
+
+/// What a command rejects with. The UI acts on the code, the report is the
+/// detail of the error the code came from, for the console and Sentry.
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RpcError {
+    #[serde(flatten)]
+    pub code: RpcCode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "typegen", specta(optional))]
+    pub report: Option<Box<ErrorReportView>>,
+}
+
+impl From<RpcCode> for RpcError {
+    fn from(code: RpcCode) -> Self {
+        Self { code, report: None }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct ErrorReportView {
+    pub frames: Vec<ErrorFrameView>,
+    pub http: Option<HttpFailureView>,
+    /// The `tracing` spans the failure happened in, innermost first.
+    pub span_trace: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct ErrorFrameView {
+    pub message: String,
+    pub location: Option<String>,
+    /// The error's `Debug` output, which names the variant and its fields.
+    pub debug: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct HttpFailureView {
+    pub status: Option<u16>,
+    pub errcode: Option<String>,
+    pub message: Option<String>,
+    /// A body that was not a standard Matrix error.
+    pub body: Option<String>,
+    /// Without its query, which can carry tokens.
+    pub url: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
@@ -229,6 +275,12 @@ pub enum RegistrationResultView {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CoreEvent {
+    /// A failure the core logged under `log_id`, for whoever reports errors.
+    Failure {
+        log_id: String,
+        context: String,
+        report: Box<ErrorReportView>,
+    },
     Rtc {
         session_id: String,
         purpose: RtcPurpose,

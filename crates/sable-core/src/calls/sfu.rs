@@ -298,6 +298,8 @@ impl std::fmt::Display for ProvisionError {
     }
 }
 
+impl std::error::Error for ProvisionError {}
+
 #[cfg(test)]
 mod tests {
     use matrix_sdk::ruma::{device_id, user_id};

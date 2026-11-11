@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use crate::errors::CoreError;
+use crate::errors::{CoreError, ReportExt};
 use matrix_sdk::{
     Client, ClientBuilder, ThreadingSupport,
     authentication::{
@@ -347,9 +347,7 @@ pub async fn restore_authenticated_client(
     persisted: &PersistedSession,
 ) -> Result<Client, CoreError> {
     validate_saved_crypto_store(store_id, persisted).await?;
-    let client = restore_client(store_id, persisted, true)
-        .await
-        .map_err(CoreError::backend)?;
+    let client = restore_client(store_id, persisted, true).await.backend()?;
 
     restore_credentials(&client, persisted).await?;
     Ok(client)
@@ -374,7 +372,7 @@ pub(crate) async fn restore_notification_client(
     );
     let client = build_account_client(builder, store_id, ClientRole::Notification, true)
         .await
-        .map_err(CoreError::backend)?;
+        .backend()?;
     // Fetching a push must not report the user online.
     client
         .set_presence(
@@ -383,7 +381,7 @@ pub(crate) async fn restore_notification_client(
             false,
         )
         .await
-        .map_err(CoreError::backend)?;
+        .backend()?;
     before_restore(&client);
     restore_credentials_with(&client, persisted, room_load).await?;
     Ok(client)
@@ -411,12 +409,12 @@ async fn restore_credentials_with(
         Credentials::Password(matrix) => client
             .restore_session_with(matrix, room_load)
             .await
-            .map_err(CoreError::backend)?,
+            .backend()?,
         Credentials::OAuth { client_id, user } => client
             .oauth()
             .restore_session(oauth_session(client_id, user), room_load)
             .await
-            .map_err(CoreError::backend)?,
+            .backend()?,
     }
     Ok(())
 }
@@ -448,13 +446,13 @@ pub(crate) async fn validate_saved_crypto_store(
         let path = std::path::Path::new(store_id).join("store");
         let metadata = tokio::fs::metadata(path.join("matrix-sdk-crypto.sqlite3"))
             .await
-            .map_err(|error| CoreError::context("saved crypto database is unavailable", error))?;
+            .context("saved crypto database is unavailable")?;
         if !metadata.is_file() {
             return Err("saved crypto database is not a file".into());
         }
         let key = match crate::store_encryption::saved_key(store_id) {
             Err(crate::store::StoreError::KeyMissing) => {
-                return Err(CoreError::Invalid("saved crypto database key is missing"));
+                return Err(CoreError::invalid("saved crypto database key is missing"));
             }
             key => key?,
         };
@@ -463,18 +461,18 @@ pub(crate) async fn validate_saved_crypto_store(
             key.as_ref(),
         ))
         .await
-        .map_err(|error| CoreError::context("saved crypto database could not be opened", error))?
+        .context("saved crypto database could not be opened")?
     };
     #[cfg(target_family = "wasm")]
     let store = matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None)
         .await
-        .map_err(|error| CoreError::context("saved crypto database could not be opened", error))?
+        .context("saved crypto database could not be opened")?
         .crypto;
 
     let account = store
         .load_account()
         .await
-        .map_err(|error| CoreError::context("saved crypto identity could not be read", error))?
+        .context("saved crypto identity could not be read")?
         .ok_or("saved crypto identity is missing")?;
     if account.user_id().as_str() != persisted.credentials.user_id()
         || account.device_id().as_str() != persisted.credentials.device_id()
@@ -489,7 +487,7 @@ pub(crate) async fn repair_room_key_sharing(client: &Client) -> Result<(), CoreE
     if store
         .get_custom_value(ROOM_KEY_SHARING_REPAIR_KEY)
         .await
-        .map_err(CoreError::backend)?
+        .backend()?
         .is_some()
     {
         return Ok(());
@@ -497,14 +495,14 @@ pub(crate) async fn repair_room_key_sharing(client: &Client) -> Result<(), CoreE
 
     for room in client.joined_rooms() {
         if room.encryption_state().is_encrypted() {
-            room.discard_room_key().await.map_err(CoreError::backend)?;
+            room.discard_room_key().await.backend()?;
         }
     }
 
     store
         .set_custom_value_no_read(ROOM_KEY_SHARING_REPAIR_KEY, vec![1])
         .await
-        .map_err(CoreError::backend)
+        .backend()
 }
 
 #[derive(Clone, Copy)]

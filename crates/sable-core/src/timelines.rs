@@ -24,7 +24,7 @@ use matrix_sdk_base::event_cache::Event;
 use matrix_sdk_common::serde_helpers::{extract_relation, extract_thread_root};
 
 use crate::ResultExt;
-use crate::protocol::{RpcError, SubscriptionId, TimelineItemView};
+use crate::protocol::{RpcCode, RpcError, SubscriptionId, TimelineItemView};
 use crate::view::{CUTE_EVENT_MSGTYPE, aggregation_item};
 
 use crate::{CachedTimeline, Core, SubscriptionKind, ThreadKey};
@@ -140,7 +140,7 @@ impl Core {
     pub(crate) async fn timeline(&self, room_id: &OwnedRoomId) -> Result<Arc<Timeline>, RpcError> {
         {
             let session = self.session.read().await;
-            session.as_ref().ok_or(RpcError::NotLoggedIn)?;
+            session.as_ref().ok_or(RpcCode::NotLoggedIn)?;
             if let Some(cached) = self.timelines.lock().await.get(room_id) {
                 return Ok(cached.timeline.clone());
             }
@@ -166,10 +166,10 @@ impl Core {
         let session = self.session.read().await;
         let room = session
             .as_ref()
-            .ok_or(RpcError::NotLoggedIn)?
+            .ok_or(RpcCode::NotLoggedIn)?
             .client
             .get_room(room_id)
-            .ok_or(RpcError::UnknownRoom)?;
+            .ok_or(RpcCode::UnknownRoom)?;
         {
             let mut timelines = self.timelines.lock().await;
             if let Some(cached) = timelines.get(room_id)
@@ -301,17 +301,17 @@ impl Core {
                     .clone()
                     .map(|timeline| (timeline, subscription.thread_root.clone()))
             })
-            .ok_or(RpcError::UnknownSubscription)?;
+            .ok_or(RpcCode::UnknownSubscription)?;
         if timeline.room().room_id() != room_id {
-            return Err(RpcError::UnknownSubscription);
+            return Err(RpcCode::UnknownSubscription.into());
         }
         if subscribed_root.as_ref() == thread_root {
             return Ok(timeline);
         }
         if subscribed_root.is_some() || !timeline.is_threaded() {
-            return Err(RpcError::UnknownSubscription);
+            return Err(RpcCode::UnknownSubscription.into());
         }
-        let root = thread_root.ok_or(RpcError::UnknownSubscription)?;
+        let root = thread_root.ok_or(RpcCode::UnknownSubscription)?;
         // Event-focused timelines infer their thread from the target event.
         let belongs = timeline
             .items()
@@ -327,7 +327,7 @@ impl Core {
                         == Some(root)
             });
         if !belongs {
-            return Err(RpcError::UnknownSubscription);
+            return Err(RpcCode::UnknownSubscription.into());
         }
         Ok(timeline)
     }
@@ -347,10 +347,10 @@ impl Core {
         let session = self.session.read().await;
         let room = session
             .as_ref()
-            .ok_or(RpcError::NotLoggedIn)?
+            .ok_or(RpcCode::NotLoggedIn)?
             .client
             .get_room(room_id)
-            .ok_or(RpcError::UnknownRoom)?;
+            .ok_or(RpcCode::UnknownRoom)?;
         let key: ThreadKey = (room_id.clone(), root_event_id.clone());
         {
             let mut threads = self.thread_timelines.lock().await;

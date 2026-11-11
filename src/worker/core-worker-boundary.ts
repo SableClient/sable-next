@@ -1,4 +1,5 @@
 import { attachmentBytes } from '../transport/attachment-bytes';
+import { transportFailure } from '../transport';
 import { createRpc } from '#src/generated/protocol';
 import type { RpcError, RpcResult, CoreEvent, SubscriptionId, Rpc } from '#src/generated/protocol';
 import type { WasmDebugImage, WorkerMessage, WorkerRequest } from './protocol';
@@ -193,6 +194,15 @@ export function createCoreWorkerBoundary(
         else routed.set(owner, [event]);
         continue;
       }
+      // Every page reports what it receives, so a failure goes to one of them.
+      if (event.type === 'failure') {
+        const reporter = ports.values().next().value;
+        if (!reporter) continue;
+        const batch = routed.get(reporter);
+        if (batch) batch.push(event);
+        else routed.set(reporter, [event]);
+        continue;
+      }
       shared.push(event);
     }
 
@@ -220,10 +230,7 @@ export function createCoreWorkerBoundary(
         if (ports.size !== 1) {
           port.postMessage({
             id: request.id,
-            err: {
-              code: 'failed',
-              log_id: 'close other Sable tabs before resetting the cache',
-            },
+            err: transportFailure('close other Sable tabs before resetting the cache'),
           });
           return;
         }
@@ -265,7 +272,7 @@ export function createCoreWorkerBoundary(
       if (panic !== null) {
         port.postMessage({
           id,
-          err: { code: 'failed', log_id: `core panicked: ${panic}` },
+          err: transportFailure(`core panicked: ${panic}`),
         });
         return;
       }
@@ -438,7 +445,7 @@ export function createCoreWorkerBoundary(
           timelineEvents.cancelPending(port);
         }
         const payload = rejectionPayload(cause);
-        let err: RpcError = { code: 'failed', log_id: payload || String(cause) };
+        let err = transportFailure(payload || String(cause));
         if (payload) {
           try {
             err = JSON.parse(payload) as RpcError;

@@ -31,7 +31,7 @@ use matrix_sdk_base::{RawStateEventWithKeys, RoomInfo, RoomInfoNotableUpdateReas
 use crate::ResultExt;
 use crate::api::rooms::PublicRoomsOk;
 use crate::api::spaces::HierarchyOk;
-use crate::protocol::{JoinRuleView, RoomPreviewView, RpcError};
+use crate::protocol::{JoinRuleView, RoomPreviewView, RpcCode, RpcError};
 
 use crate::Core;
 use crate::view;
@@ -174,7 +174,7 @@ impl Core {
     /// When no account is signed in.
     pub async fn left_rooms(&self) -> Result<(String, Vec<String>), RpcError> {
         let client = self.client().await?;
-        let user_id = client.user_id().ok_or(RpcError::NotLoggedIn)?.to_string();
+        let user_id = client.user_id().ok_or(RpcCode::NotLoggedIn)?.to_string();
         let rooms = client
             .rooms()
             .into_iter()
@@ -205,7 +205,7 @@ impl Core {
                 {
                     vec![user_id]
                 }
-                Some(_) => return Err(RpcError::Denied),
+                Some(_) => return Err(RpcCode::Denied.into()),
                 None => members
                     .iter()
                     .map(|member| member.user_id().to_owned())
@@ -240,12 +240,12 @@ impl Core {
             JoinRuleView::Knock if supports_knock => {
                 RoomJoinRulesEventContent::new(JoinRule::Knock)
             }
-            JoinRuleView::Knock => return Err(RpcError::Unsupported),
+            JoinRuleView::Knock => return Err(RpcCode::Unsupported.into()),
             JoinRuleView::Restricted if !supports_restricted => {
-                return Err(RpcError::Unsupported);
+                return Err(RpcCode::Unsupported.into());
             }
             JoinRuleView::KnockRestricted if !supports_knock_restricted => {
-                return Err(RpcError::Unsupported);
+                return Err(RpcCode::Unsupported.into());
             }
             JoinRuleView::Restricted | JoinRuleView::KnockRestricted => {
                 let client = self.client().await?;
@@ -255,7 +255,7 @@ impl Core {
                     .map(AllowRule::room_membership)
                     .collect();
                 if allow.is_empty() {
-                    return Err(RpcError::Denied);
+                    return Err(RpcCode::Denied.into());
                 }
                 if matches!(rule, JoinRuleView::Restricted) {
                     RoomJoinRulesEventContent::restricted(allow)
@@ -345,7 +345,7 @@ impl Core {
         {
             matrix_sdk::EncryptionState::Encrypted => Ok(true),
             matrix_sdk::EncryptionState::NotEncrypted => Ok(false),
-            matrix_sdk::EncryptionState::Unknown => Err(RpcError::Unavailable),
+            matrix_sdk::EncryptionState::Unknown => Err(RpcCode::Unavailable.into()),
         }
     }
 
@@ -395,7 +395,7 @@ impl Core {
         let client = self.client().await?;
         let own = client
             .user_id()
-            .ok_or(RpcError::NotLoggedIn)?
+            .ok_or(RpcCode::NotLoggedIn)?
             .server_name()
             .to_string();
 
@@ -483,13 +483,13 @@ impl Core {
         {
             Ok(content)
         } else {
-            let via = via.ok_or(RpcError::UnknownRoom)?;
+            let via = via.ok_or(RpcCode::UnknownRoom)?;
             let via: Vec<_> = via
                 .into_iter()
-                .map(|server| ServerName::parse(server).map_err(|_| RpcError::UnknownRoom))
+                .map(|server| ServerName::parse(server).map_err(|_| RpcCode::UnknownRoom))
                 .collect::<Result<_, _>>()?;
             if via.is_empty() {
-                return Err(RpcError::UnknownRoom);
+                return Err(RpcCode::UnknownRoom.into());
             }
             Ok(SpaceChildEventContent::new(via))
         }
@@ -553,7 +553,7 @@ impl Core {
         via: &[String],
         context: &str,
     ) -> Result<(OwnedRoomId, Vec<OwnedServerName>), RpcError> {
-        let address = RoomOrAliasId::parse(address).map_err(|_| RpcError::UnknownRoom)?;
+        let address = RoomOrAliasId::parse(address).map_err(|_| RpcCode::UnknownRoom)?;
         let mut servers = via
             .iter()
             .filter_map(|server| ServerName::parse(server).ok())
@@ -598,7 +598,7 @@ impl Core {
                     && let Some((_, reason)) =
                         crate::invites::own_membership(&room, &MembershipState::Ban).await
                 {
-                    return Err(RpcError::Banned { reason });
+                    return Err(RpcCode::Banned { reason }.into());
                 }
                 return Err(self.rpc_error("join_room", &error));
             }
@@ -630,7 +630,7 @@ impl Core {
         via: &[String],
     ) -> Result<RoomPreviewView, RpcError> {
         let client = self.client().await?;
-        let address = RoomOrAliasId::parse(address).map_err(|_| RpcError::UnknownRoom)?;
+        let address = RoomOrAliasId::parse(address).map_err(|_| RpcCode::UnknownRoom)?;
         let via = via
             .iter()
             .filter_map(|server| ServerName::parse(server).ok())
@@ -704,7 +704,7 @@ impl Core {
         }: PublicRoomsParams,
     ) -> Result<PublicRoomsOk, RpcError> {
         let server = match server.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            Some(name) => Some(ServerName::parse(name).map_err(|_| RpcError::UnknownHomeserver)?),
+            Some(name) => Some(ServerName::parse(name).map_err(|_| RpcCode::UnknownHomeserver)?),
             None => None,
         };
 
@@ -792,7 +792,7 @@ impl Core {
                     .is_some_and(|id| id == transaction_id)
             })
             .and_then(matrix_sdk_ui::timeline::EventTimelineItem::local_echo_send_handle)
-            .ok_or(RpcError::UnknownLocalEcho)
+            .ok_or_else(|| RpcCode::UnknownLocalEcho.into())
     }
 }
 

@@ -4,7 +4,7 @@ use matrix_sdk::ruma::push::{HttpPusherData, PushFormat};
 use url::Url;
 
 use crate::api::push::PusherView;
-use crate::errors::CoreError;
+use crate::errors::{CoreError, ReportExt};
 
 pub(crate) const GATEWAY_PATH: &str = "/_matrix/push/v1/notify";
 
@@ -130,7 +130,7 @@ pub async fn set_pusher(client: &Client, pusher: PusherView) -> Result<(), CoreE
             pusher.append,
         )
         .await
-        .map_err(CoreError::backend)
+        .backend()
 }
 
 /// # Errors
@@ -145,7 +145,7 @@ pub async fn remove_pusher(
         .pusher()
         .delete(PusherIds::new(pushkey, app_id))
         .await
-        .map_err(CoreError::backend)
+        .backend()
 }
 
 #[cfg(test)]

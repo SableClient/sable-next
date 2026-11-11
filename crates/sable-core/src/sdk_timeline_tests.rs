@@ -33,7 +33,7 @@ use wiremock::{
 use super::{
     Core,
     api::timeline::TimelineFocusView,
-    protocol::{CoreEvent, Outgoing, RpcError},
+    protocol::{CoreEvent, Outgoing, RpcCode, RpcError},
     session::{self, Session},
     store::MemorySessionStore,
 };
@@ -532,7 +532,13 @@ async fn oversized_sends_return_message_too_large() {
         .await;
 
     assert!(
-        matches!(result, Err(RpcError::MessageTooLarge)),
+        matches!(
+            result,
+            Err(RpcError {
+                code: RpcCode::MessageTooLarge,
+                ..
+            })
+        ),
         "{result:?}"
     );
     assert!(room.send_queue().subscribe().await.unwrap().0.is_empty());
@@ -574,7 +580,13 @@ async fn oversized_edits_return_message_too_large() {
         .await;
 
     assert!(
-        matches!(result, Err(RpcError::MessageTooLarge)),
+        matches!(
+            result,
+            Err(RpcError {
+                code: RpcCode::MessageTooLarge,
+                ..
+            })
+        ),
         "{result:?}"
     );
     assert!(room.send_queue().subscribe().await.unwrap().0.is_empty());
@@ -615,7 +627,13 @@ async fn oversized_direct_sends_return_message_too_large() {
         .await;
 
     assert!(
-        matches!(result, Err(RpcError::MessageTooLarge)),
+        matches!(
+            result,
+            Err(RpcError {
+                code: RpcCode::MessageTooLarge,
+                ..
+            })
+        ),
         "{result:?}"
     );
 }
@@ -1049,7 +1067,10 @@ async fn a_locked_profile_override_document_refuses_a_write() {
     let core = core_for(&server, client).await;
     assert!(matches!(
         core.run(clear_override("@s:example.org")).await,
-        Err(crate::protocol::RpcError::DocumentLocked)
+        Err(crate::protocol::RpcError {
+            code: crate::protocol::RpcCode::DocumentLocked,
+            ..
+        })
     ));
 }
 
@@ -2002,7 +2023,13 @@ async fn attachments_use_the_server_upload_limit_instead_of_100_mib() {
         let result =
             Box::pin(core.send_attachment(request, attachment_bytes(&vec![0; file_size]))).await;
         if u64::try_from(file_size).unwrap() > upload_size {
-            assert!(matches!(result, Err(RpcError::InvalidMedia)));
+            assert!(matches!(
+                result,
+                Err(RpcError {
+                    code: RpcCode::InvalidMedia,
+                    ..
+                })
+            ));
         } else {
             result.unwrap();
         }
@@ -3377,7 +3404,13 @@ async fn a_forbidden_room_write_is_reported_as_denied() {
     .expect("the mocked server rejects the write");
 
     assert!(
-        matches!(error, RpcError::Denied),
+        matches!(
+            error,
+            RpcError {
+                code: RpcCode::Denied,
+                ..
+            }
+        ),
         "expected Denied, got {error:?}"
     );
 }
@@ -3394,8 +3427,8 @@ async fn a_rate_limited_room_write_carries_the_delay_in_milliseconds() {
 
     assert!(
         matches!(
-            error,
-            RpcError::RateLimited {
+            error.code,
+            RpcCode::RateLimited {
                 retry_after_ms: Some(5000)
             }
         ),
@@ -3410,7 +3443,13 @@ async fn an_unavailable_homeserver_is_retryable_rather_than_a_logged_failure() {
         .expect("the mocked server rejects the write");
 
     assert!(
-        matches!(error, RpcError::Unavailable),
+        matches!(
+            error,
+            RpcError {
+                code: RpcCode::Unavailable,
+                ..
+            }
+        ),
         "expected Unavailable, got {error:?}"
     );
 }
@@ -5598,7 +5637,10 @@ async fn thread_actions_accept_linked_context_only_for_its_inferred_root() {
             Some(result.subscription)
         )
         .await,
-        Err(RpcError::UnknownSubscription)
+        Err(RpcError {
+            code: RpcCode::UnknownSubscription,
+            ..
+        })
     ));
     assert!(matches!(
         core.subscribed_timeline(
@@ -5607,7 +5649,10 @@ async fn thread_actions_accept_linked_context_only_for_its_inferred_root() {
             Some(result.subscription)
         )
         .await,
-        Err(RpcError::UnknownSubscription)
+        Err(RpcError {
+            code: RpcCode::UnknownSubscription,
+            ..
+        })
     ));
 }
 

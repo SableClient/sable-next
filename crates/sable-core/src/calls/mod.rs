@@ -50,8 +50,8 @@ use crate::ResultExt;
 use crate::api::calls::JoinOk;
 use crate::delayed_events::{self, DelayedEvent, DelayedEventsSupport};
 use crate::protocol::{
-    CallCompatibilityView, CallMemberView, CallMode, CallSessionId, CallSupportView, RpcError,
-    RtcTransportSource,
+    CallCompatibilityView, CallMemberView, CallMode, CallSessionId, CallSupportView, RpcCode,
+    RpcError, RtcTransportSource,
 };
 use crate::{CallSession, Core};
 
@@ -560,7 +560,7 @@ impl Core {
         let user_id = room
             .client()
             .user_id()
-            .ok_or(RpcError::NotLoggedIn)?
+            .ok_or(RpcCode::NotLoggedIn)?
             .to_owned();
 
         let members = membership::active_members(&room).await;
@@ -882,14 +882,15 @@ impl Core {
 
     fn provision_error(&self, service_url: &str, error: &ProvisionError) -> RpcError {
         match error {
-            ProvisionError::NotLoggedIn => RpcError::NotLoggedIn,
+            ProvisionError::NotLoggedIn => RpcCode::NotLoggedIn.into(),
             ProvisionError::Unreachable | ProvisionError::OpenIdUnavailable => {
                 tracing::warn!(service_url, "{error}");
-                RpcError::Unavailable
+                RpcCode::Unavailable.into()
             }
-            ProvisionError::Refused(_) | ProvisionError::MalformedResponse => {
-                self.failed("join_call_provision", format!("{service_url}: {error}"))
-            }
+            ProvisionError::Refused(_) | ProvisionError::MalformedResponse => self.failed_report(
+                "join_call_provision",
+                crate::errors::CoreError::new(error).wrap(service_url),
+            ),
         }
     }
 
@@ -921,7 +922,7 @@ impl Core {
             .lock()
             .await
             .remove(&session)
-            .ok_or(RpcError::UnknownCall)?;
+            .ok_or(RpcCode::UnknownCall)?;
 
         drop(call.updates.take());
         drop(call.postpone.take());
@@ -938,7 +939,7 @@ impl Core {
     ) -> Result<(), RpcError> {
         let (room_id, state) = {
             let calls = self.call_sessions.lock().await;
-            let call = calls.get(&session).ok_or(RpcError::UnknownCall)?;
+            let call = calls.get(&session).ok_or(RpcCode::UnknownCall)?;
             (call.room_id.clone(), call.state.clone())
         };
         let room = self.room(&room_id).await?;

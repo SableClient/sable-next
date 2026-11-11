@@ -11,7 +11,7 @@ use serde_json::value::RawValue;
 use web_time::Instant;
 
 use crate::Core;
-use crate::protocol::RpcError;
+use crate::protocol::{RpcCode, RpcError};
 
 /// Registers a domain's methods by wire name; `user_profile` is handled by `UserProfileParams`.
 macro_rules! domain {
@@ -126,9 +126,9 @@ const SLOW_CALL: Duration = Duration::from_secs(2);
 
 async fn invoke<H: Handler>(core: &Arc<Core>, params: &str) -> Result<Box<RawValue>, RpcError> {
     let handler: H = serde_json::from_str(params)
-        .map_err(|error| core.failed(std::any::type_name::<H>(), error))?;
+        .map_err(|error| core.failed_with(std::any::type_name::<H>(), &error))?;
     let ok = handler.run(core).await?;
-    serde_json::value::to_raw_value(&ok).map_err(|error| core.failed("call", error))
+    serde_json::value::to_raw_value(&ok).map_err(|error| core.failed_with("call", &error))
 }
 
 async fn timed<T>(
@@ -162,16 +162,20 @@ impl Core {
         params: &str,
     ) -> Result<Box<RawValue>, RpcError> {
         if self.shut_down.load(std::sync::atomic::Ordering::SeqCst) {
-            return Err(RpcError::Unavailable);
+            return Err(RpcCode::Unavailable.into());
         }
         let Some((domain, name)) = method.split_once('.') else {
-            return Err(RpcError::Unsupported);
+            return Err(RpcCode::Unsupported.into());
         };
-        timed(method, async {
-            route(self, domain, name, params)
-                .await
-                .unwrap_or(Err(RpcError::Unsupported))
-        })
+        let span = tracing::info_span!("rpc", method);
+        tracing::Instrument::instrument(
+            timed(method, async {
+                route(self, domain, name, params)
+                    .await
+                    .unwrap_or_else(|| Err(RpcCode::Unsupported.into()))
+            }),
+            span,
+        )
         .await
     }
 
@@ -182,7 +186,7 @@ impl Core {
     /// `Unavailable` after shutdown, otherwise the handler's error.
     pub async fn run<H: Handler>(self: &Arc<Self>, handler: H) -> Result<H::Ok, RpcError> {
         if self.shut_down.load(std::sync::atomic::Ordering::SeqCst) {
-            return Err(RpcError::Unavailable);
+            return Err(RpcCode::Unavailable.into());
         }
         timed(std::any::type_name::<H>(), Box::pin(handler.run(self))).await
     }

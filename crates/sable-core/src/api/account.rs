@@ -11,7 +11,7 @@ use super::{Handler, Json};
 use crate::media::mxc_uri;
 use crate::profile_overrides::OverrideEdit;
 use crate::profiles::profile_view;
-use crate::protocol::{BookmarkView, NotificationModeView, RpcError, FieldEdit, InviteTriageView, MediaPreviewConfigView, MediaPreviewsView, MutualRoomView, PresenceSharingEdit, PresenceOverrideView, PresenceSharingView, PresenceView, ProfileOverridesView, ProfileView, SealedAccountDataView, UserDirectoryEntryView};
+use crate::protocol::{BookmarkView, NotificationModeView, RpcCode, RpcError, FieldEdit, InviteTriageView, MediaPreviewConfigView, MediaPreviewsView, MutualRoomView, PresenceSharingEdit, PresenceOverrideView, PresenceSharingView, PresenceView, ProfileOverridesView, ProfileView, SealedAccountDataView, UserDirectoryEntryView};
 use crate::{Core, ResultExt};
 
 domain! {
@@ -250,7 +250,7 @@ impl Handler for SetDataParams {
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         // Server-managed since MSC4010.
         if matches!(self.event_type.as_str(), "m.push_rules" | "m.fully_read") {
-            return Err(RpcError::Unsupported);
+            return Err(RpcCode::Unsupported.into());
         }
         core.set_account_data(&self.event_type, &self.content).await
     }
@@ -319,7 +319,7 @@ impl Handler for SetDisplayNameParams {
             )
             .or_failed(core, "set_display_name")?;
             let mut request = set_profile_field::v3::Request::new(
-                client.user_id().ok_or(RpcError::NotLoggedIn)?.to_owned(),
+                client.user_id().ok_or(RpcCode::NotLoggedIn)?.to_owned(),
                 value,
             );
             request.propagate_to = profile_propagation(self.propagate_to);
@@ -372,7 +372,7 @@ impl Handler for SetAvatarUrlParams {
             )
             .or_failed(core, "set_avatar_url")?;
             let mut request = set_profile_field::v3::Request::new(
-                client.user_id().ok_or(RpcError::NotLoggedIn)?.to_owned(),
+                client.user_id().ok_or(RpcCode::NotLoggedIn)?.to_owned(),
                 value,
             );
             request.propagate_to = profile_propagation(self.propagate_to);
@@ -417,7 +417,7 @@ impl Handler for SetProfileFieldParams {
         match self.value {
             Some(value) => {
                 let value = ProfileFieldValue::new(&self.field, value)
-                    .map_err(|error| core.failed("set_profile_field_invalid_value", error))?;
+                    .map_err(|error| core.failed_with("set_profile_field_invalid_value", &error))?;
                 account
                     .set_profile_field(value)
                     .await

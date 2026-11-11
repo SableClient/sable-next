@@ -4,7 +4,7 @@ use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 use serde::{Deserialize, Serialize};
 
 use super::Handler;
-use crate::protocol::{RpcError, SidebarItemView, SpaceHierarchyRoomView, SpaceParentView};
+use crate::protocol::{RpcCode, RpcError, SidebarItemView, SpaceHierarchyRoomView, SpaceParentView};
 use crate::{Core, ResultExt, view};
 
 domain! {
@@ -162,7 +162,7 @@ impl Handler for SetSidebarParams {
             .iter()
             .any(|room_id| RoomId::parse(room_id).is_err())
         {
-            return Err(RpcError::UnknownRoom);
+            return Err(RpcCode::UnknownRoom.into());
         }
         core.set_space_sidebar(&self.items).await
     }

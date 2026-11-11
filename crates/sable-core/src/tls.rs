@@ -1,5 +1,5 @@
 #[cfg(not(target_family = "wasm"))]
-use crate::errors::CoreError;
+use crate::errors::{CoreError, ReportExt};
 use matrix_sdk::reqwest::ClientBuilder;
 
 #[cfg(not(target_family = "wasm"))]
@@ -10,10 +10,10 @@ static PROXY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 /// When `url` is not a proxy `reqwest` can use, or a proxy was already set.
 #[cfg(not(target_family = "wasm"))]
 pub fn set_proxy(url: String) -> Result<(), CoreError> {
-    matrix_sdk::reqwest::Proxy::all(&url).map_err(CoreError::backend)?;
+    matrix_sdk::reqwest::Proxy::all(&url).backend()?;
     PROXY
         .set(url)
-        .map_err(|_| CoreError::Invalid("the proxy is already set"))
+        .map_err(|_| CoreError::invalid("the proxy is already set"))
 }
 
 #[cfg(not(target_family = "wasm"))]

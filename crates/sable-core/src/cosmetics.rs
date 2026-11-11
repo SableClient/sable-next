@@ -13,7 +13,9 @@ use serde_json::Value;
 
 use crate::Core;
 use crate::profiles::{profile_hex_color, pronoun_sets};
-use crate::protocol::{CoreEvent, PronounView, RoomCosmeticsView, RpcError, SenderCosmeticsView};
+use crate::protocol::{
+    CoreEvent, PronounView, RoomCosmeticsView, RpcCode, RpcError, SenderCosmeticsView,
+};
 
 pub(crate) const MEMBER_EVENT: &str = "m.room.member";
 pub(crate) const MEMBER_COLOR_FIELD: &str = "eu.she-a.color";
@@ -314,7 +316,7 @@ impl Core {
         space_id: Option<OwnedRoomId>,
     ) -> Result<RoomCosmeticsView, RpcError> {
         let client = self.client().await?;
-        let room = client.get_room(room_id).ok_or(RpcError::UnknownRoom)?;
+        let room = client.get_room(room_id).ok_or(RpcCode::UnknownRoom)?;
         Ok(self.cosmetics_for(&client, &room, space_id).await)
     }
 

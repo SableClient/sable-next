@@ -23,7 +23,7 @@ use crate::profiles::pronoun_sets;
 use crate::protocol::PersonaAlternateAvatarView;
 use crate::protocol::{
     PerMessageProfileView, PersonaCatalogView, PersonaSelectionView, PersonaSortFlagsView,
-    PersonaTriggerView, PersonaView, PluralkitImportView, PronounView, RpcError,
+    PersonaTriggerView, PersonaView, PluralkitImportView, PronounView, RpcCode, RpcError,
 };
 
 const CATALOG_V3: &str = "fi.mau.msc4461.per_message_profiles.v3";
@@ -1133,12 +1133,12 @@ impl Core {
     pub(crate) fn check_persona_backup(backup: &str) -> Result<(), RpcError> {
         catalog_from_backup(backup)
             .map(drop)
-            .ok_or(RpcError::InvalidBackup)
+            .ok_or_else(|| RpcCode::InvalidBackup.into())
     }
 
     pub(crate) async fn restore_persona_backup(&self, backup: &str) -> Result<(), RpcError> {
         let _guard = self.account_data_lock.lock().await;
-        let catalog = catalog_from_backup(backup).ok_or(RpcError::InvalidBackup)?;
+        let catalog = catalog_from_backup(backup).ok_or(RpcCode::InvalidBackup)?;
         self.put_global_account_data(
             GlobalAccountDataEventType::from(CATALOG_V3),
             &catalog,

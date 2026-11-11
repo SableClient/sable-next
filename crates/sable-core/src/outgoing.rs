@@ -71,7 +71,7 @@ impl Core {
             Err(ReplyError::StateEvent) => {
                 Ok(reply_relation_fallback(content, event_id, thread_root))
             }
-            Err(error) => Err(self.failed(label, error)),
+            Err(error) => Err(self.failed_with(label, &error)),
         }
     }
 }

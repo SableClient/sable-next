@@ -34,7 +34,7 @@ impl Core {
             Err(OAuthDiscoveryError::NotSupported) if client.oauth().full_session().is_none() => {
                 Ok(None)
             }
-            Err(error) => Err(self.failed(operation, error)),
+            Err(error) => Err(self.failed_with(operation, &error)),
         }
     }
 

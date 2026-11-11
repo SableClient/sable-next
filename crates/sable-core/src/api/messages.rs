@@ -30,7 +30,7 @@ use crate::outgoing::{gif_content, location_content, message_content, reply_to, 
 use crate::protocol::{
     AttachmentInfoView, ComposerContent, ComposerPill, GestureView, ImageSourcePackReferenceView,
     ImageSourcePackView, MessageKind, PackImageInfoView, PerMessageProfileView,
-    ReactionShortcodeView, RpcError, ScheduledMessageView, SubscriptionId, UrlPreviewView,
+    ReactionShortcodeView, RpcCode, RpcError, ScheduledMessageView, SubscriptionId, UrlPreviewView,
 };
 use crate::{Core, ResultExt, view};
 
@@ -292,7 +292,7 @@ impl Handler for SendStickerParams {
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         let url = OwnedMxcUri::from(self.url);
         if url.parts().is_err() {
-            return Err(RpcError::InvalidMedia);
+            return Err(RpcCode::InvalidMedia.into());
         }
         let source = image_source_pack_extra(url.as_str(), self.source_pack);
 
@@ -363,7 +363,7 @@ impl Handler for SendGifParams {
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         let url = OwnedMxcUri::from(self.url);
         if url.parts().is_err() {
-            return Err(RpcError::InvalidMedia);
+            return Err(RpcCode::InvalidMedia.into());
         }
 
         let mut info = ImageInfo::new();
@@ -691,7 +691,7 @@ impl Handler for SendLocationParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         if view::geo_coordinates(&self.geo_uri).is_none() {
-            return Err(RpcError::InvalidLocation);
+            return Err(RpcCode::InvalidLocation.into());
         }
 
         let room_id = self.room_id;
@@ -967,7 +967,7 @@ impl Handler for CreatePollParams {
             self.undisclosed,
             self.max_selections,
         )
-        .ok_or(RpcError::InvalidPoll)?;
+        .ok_or(RpcCode::InvalidPoll)?;
         let content =
             matrix_sdk::ruma::events::poll::unstable_start::UnstablePollStartEventContent::from(
                 content,

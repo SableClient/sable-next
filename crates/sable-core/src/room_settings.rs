@@ -6,7 +6,7 @@ use crate::api::room_state::EnableEncryptionParams;
 use crate::api::room_state::SetHistoryVisibilityParams;
 use crate::api::room_state::SetMemberListThresholdParams;
 use crate::probed_state::Probed;
-use crate::protocol::{CoreEvent, CreateJoinRuleView, RoomStateEventView, RpcError};
+use crate::protocol::{CoreEvent, CreateJoinRuleView, RoomStateEventView, RpcCode, RpcError};
 use crate::view;
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
 use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
@@ -593,7 +593,7 @@ impl Core {
     ) -> Result<OwnedEventId, RpcError> {
         let content = &serde_json::to_value(content).or_failed(self, "send_state")?;
         if has_out_of_range_integer(content) {
-            return Err(RpcError::IntegerOutOfRange);
+            return Err(RpcCode::IntegerOutOfRange.into());
         }
         let response = self
             .room(&room_id)

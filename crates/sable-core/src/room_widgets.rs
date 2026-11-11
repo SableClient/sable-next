@@ -3,7 +3,7 @@ use serde::Serialize;
 use url::Url;
 
 use crate::Core;
-use crate::protocol::RpcError;
+use crate::protocol::{RpcCode, RpcError};
 use crate::room_settings::EmptyContent;
 
 const WIDGET_STATE_TYPE: &str = "im.vector.modular.widgets";
@@ -60,12 +60,12 @@ impl Core {
         name: &str,
         url: &str,
     ) -> Result<String, RpcError> {
-        let url = widget_url(url).ok_or(RpcError::InvalidUrl)?;
+        let url = widget_url(url).ok_or(RpcCode::InvalidUrl)?;
         let user_id = self
             .client()
             .await?
             .user_id()
-            .ok_or(RpcError::NotLoggedIn)?
+            .ok_or(RpcCode::NotLoggedIn)?
             .to_owned();
         let id = TransactionId::new().to_string();
         let content = WidgetOut::Custom {

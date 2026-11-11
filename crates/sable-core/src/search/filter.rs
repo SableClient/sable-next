@@ -1,6 +1,6 @@
 use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId};
 
-use crate::protocol::{self, RpcError, SearchAttachment};
+use crate::protocol::{self, RpcCode, RpcError, SearchAttachment};
 
 /// [`protocol::SearchFilter`] with its ids parsed.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -27,7 +27,7 @@ pub(crate) struct IndexFilter {
 
 fn parsed_ids<T: TryFrom<String>>(ids: Vec<String>) -> Result<Vec<T>, RpcError> {
     ids.into_iter()
-        .map(|id| T::try_from(id).map_err(|_| RpcError::InvalidSearchFilter))
+        .map(|id| T::try_from(id).map_err(|_| RpcCode::InvalidSearchFilter.into()))
         .collect()
 }
 

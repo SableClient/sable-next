@@ -57,6 +57,8 @@ specta-typescript = { workspace = true, optional = true }
 url = { workspace = true }
 percent-encoding = { workspace = true }
 thiserror = { workspace = true }
+error-stack = { version = "0.8.0", default-features = false, features = ["std", "spantrace"] }
+tracing-error = "0.2.1"
 parking_lot = { workspace = true }
 reqwest = { version = "0.13", default-features = false, features = ["stream"] }
 ammonia = "4.2.3"

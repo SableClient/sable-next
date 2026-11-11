@@ -7,7 +7,7 @@ use matrix_sdk::{Client, config::RequestConfig};
 use matrix_sdk_ui::sync_service::State;
 use matrix_sdk_ui::sync_service::SyncService;
 
-use crate::{Core, ResultExt, protocol::RpcError};
+use crate::{Core, ResultExt, RpcError, protocol::RpcCode};
 
 #[cfg(target_family = "wasm")]
 pub(crate) const SYNC_STALL: Duration = Duration::from_secs(90);
@@ -106,7 +106,7 @@ impl Core {
         {
             Ok(())
         } else {
-            Err(RpcError::SlidingSyncUnsupported)
+            Err(RpcCode::SlidingSyncUnsupported.into())
         }
     }
 }
@@ -165,7 +165,10 @@ mod tests {
             if supported != Some(true) {
                 assert!(matches!(
                     outcome,
-                    Err(crate::protocol::RpcError::SlidingSyncUnsupported)
+                    Err(crate::protocol::RpcError {
+                        code: crate::protocol::RpcCode::SlidingSyncUnsupported,
+                        ..
+                    })
                 ));
             }
         }
@@ -185,7 +188,10 @@ mod tests {
         );
         assert!(matches!(
             core.require_sliding_sync(&client).await,
-            Err(crate::protocol::RpcError::Unavailable)
+            Err(crate::protocol::RpcError {
+                code: crate::protocol::RpcCode::Unavailable,
+                ..
+            })
         ));
     }
 

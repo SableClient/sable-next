@@ -1,5 +1,6 @@
+use std::collections::BTreeSet;
 use std::sync::{
-    Arc,
+    Arc, Mutex, PoisonError,
     atomic::{AtomicBool, Ordering},
 };
 
@@ -26,6 +27,7 @@ fn persist_consent(enabled: bool) {
     let _ = std::fs::write(path, if enabled { b"1" } else { b"0" });
 }
 
+use sable_core::protocol::{ErrorFrameView, ErrorReportView};
 use sentry::protocol::Event;
 
 fn scrub_text(value: &str) -> String {
@@ -35,7 +37,7 @@ fn scrub_text(value: &str) -> String {
     static PATTERNS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
         [
             (r"(?i)\bhttps?://[^/?#\s]+", "https://[HOMESERVER]"),
-            (r"(?i)(access_token|password|token|refresh_token|session_id|sync_token|next_batch)([=:\s]+)([^\s&]+)", "$1$2[REDACTED]"),
+            (r#"(?i)(access_token|password|token|refresh_token|session_id|sync_token|next_batch)(["']?[=:\s]+["']?)([^\s&"']+)"#, "$1$2[REDACTED]"),
             (r#"@[^\s:@]+:[^\s,'"(){}\[\]]+"#, "@[USER_ID]"),
             (r#"![^\s:]+:[^\s,'"(){}\[\]]+"#, "![ROOM_ID]"),
             (r"![A-Za-z0-9_-]{43}", "![ROOM_ID]"),
@@ -75,6 +77,79 @@ fn tag_fields(event: &mut Event<'static>) {
     event.tags.extend(tags);
 }
 
+fn source_frame(frame: &ErrorFrameView) -> Option<sentry::protocol::Frame> {
+    let mut parts = frame.location.as_deref()?.rsplitn(3, ':');
+    let colno = parts.next()?.parse().ok();
+    let lineno = parts.next()?.parse().ok();
+    Some(sentry::protocol::Frame {
+        filename: Some(parts.next()?.to_owned()),
+        lineno,
+        colno,
+        function: Some(frame.message.clone()),
+        in_app: Some(true),
+        ..Default::default()
+    })
+}
+
+/// Reports a core failure, grouped by the line that raised it and sent once a
+/// run, so one failing in a retry loop cannot spend the quota.
+pub(crate) fn capture_failure(log_id: &str, context: &str, report: &ErrorReportView) {
+    static REPORTED: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+
+    let origin = report
+        .frames
+        .iter()
+        .rev()
+        .find_map(|frame| frame.location.as_deref());
+    let key = origin.unwrap_or(context);
+    if !REPORTED
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .insert(key.to_owned())
+    {
+        return;
+    }
+    let chain: Vec<_> = report
+        .frames
+        .iter()
+        .map(|frame| frame.message.as_str())
+        .collect();
+    let mut event = Event {
+        exception: vec![sentry::protocol::Exception {
+            ty: "CoreFailure".to_owned(),
+            value: Some(chain.join(": ")),
+            stacktrace: Some(sentry::protocol::Stacktrace {
+                frames: report.frames.iter().filter_map(source_frame).collect(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }]
+        .into(),
+        level: sentry::Level::Error,
+        fingerprint: vec!["core".into(), key.to_owned().into()].into(),
+        ..Event::default()
+    };
+    let mut tag = |key: &str, value: Option<String>| {
+        if let Some(value) = value {
+            event.tags.insert(key.to_owned(), value);
+        }
+    };
+    tag("context", Some(context.to_owned()));
+    tag("log_id", Some(log_id.to_owned()));
+    tag("core.origin", origin.map(ToOwned::to_owned));
+    if let Some(http) = &report.http {
+        tag("http.status", http.status.map(|status| status.to_string()));
+        tag("matrix.errcode", http.errcode.clone());
+    }
+    if let Ok(serde_json::Value::Object(fields)) = serde_json::to_value(report) {
+        event.contexts.insert(
+            "core".to_owned(),
+            sentry::protocol::Context::Other(fields.into_iter().collect()),
+        );
+    }
+    sentry::capture_event(event);
+}
+
 fn scrub_event(mut event: Event<'static>) -> Event<'static> {
     tag_fields(&mut event);
     if let Some(message) = event.message.as_mut() {
@@ -84,11 +159,22 @@ fn scrub_event(mut event: Event<'static>) -> Event<'static> {
         if let Some(value) = exception.value.as_mut() {
             *value = scrub_text(value);
         }
+        let frames = exception
+            .stacktrace
+            .iter_mut()
+            .flat_map(|trace| &mut trace.frames);
+        for function in frames.filter_map(|frame| frame.function.as_mut()) {
+            *function = scrub_text(function);
+        }
     }
     scrub_fields(&mut event.extra);
-    for context in event.contexts.values_mut() {
+    for (name, context) in &mut event.contexts {
         if let sentry::protocol::Context::Other(fields) = context {
-            scrub_fields(fields);
+            if name == "core" {
+                fields.values_mut().for_each(scrub_value);
+            } else {
+                scrub_fields(fields);
+            }
         }
     }
     event.user = None;
@@ -494,25 +580,6 @@ mod tests {
     }
 
     #[test]
-    fn keeps_the_rpc_name_and_log_id_of_a_core_failure() {
-        let transport = record(|| {
-            tracing::error!(target: "sable_core::errors", log_id = "e7", context = "send_message", "boom");
-        });
-        let envelopes = transport.0.lock().unwrap();
-        let event = envelopes
-            .iter()
-            .find_map(sentry::Envelope::event)
-            .expect("the failure is reported");
-        assert_eq!(
-            event.tags.get("context").map(String::as_str),
-            Some("send_message")
-        );
-        let sent = serde_json::to_string(&event).unwrap();
-        assert!(sent.contains("send_message"), "{sent}");
-        assert!(sent.contains("e7"), "{sent}");
-    }
-
-    #[test]
     fn reports_decryption_failures_but_not_other_sdk_warnings() {
         let transport = record(|| {
             tracing::warn!(
@@ -622,5 +689,77 @@ mod tests {
         let mut kept: Vec<_> = log.attributes.keys().map(String::as_str).collect();
         kept.sort_unstable();
         assert_eq!(kept, ["age", "cause", "megolm_session"]);
+    }
+
+    #[test]
+    fn a_core_failure_is_grouped_by_where_it_was_raised_and_keeps_its_report() {
+        let transport = record(|| {
+            let (core, mut events) = sable_core::Core::new(
+                "test",
+                Box::new(sable_core::store::MemorySessionStore::default()),
+            );
+            let _ = core.failed_with(
+                "join_room",
+                &std::io::Error::other("refused by !private:example.org"),
+            );
+            let Ok(sable_core::protocol::CoreEvent::Failure {
+                log_id,
+                context,
+                report,
+            }) = events.try_recv()
+            else {
+                panic!("the core did not emit the failure");
+            };
+            capture_failure(&log_id, &context, &report);
+            capture_failure("e2", &context, &report);
+        });
+        let envelopes = transport.0.lock().unwrap();
+        let events: Vec<_> = envelopes
+            .iter()
+            .filter_map(sentry::Envelope::event)
+            .collect();
+        let [event] = events.as_slice() else {
+            panic!("expected one event, got {}", events.len());
+        };
+
+        assert_eq!(event.fingerprint[0], "core");
+        assert!(
+            event.fingerprint[1].starts_with("src-tauri/src/sentry.rs:"),
+            "{:?}",
+            event.fingerprint
+        );
+        assert_eq!(
+            event.tags.get("context").map(String::as_str),
+            Some("join_room")
+        );
+        assert_eq!(event.tags.get("log_id").map(String::as_str), Some("e1"));
+        let frames = &event.exception.values[0]
+            .stacktrace
+            .as_ref()
+            .unwrap()
+            .frames;
+        let functions: Vec<_> = frames
+            .iter()
+            .filter_map(|frame| frame.function.as_deref())
+            .collect();
+        assert_eq!(functions, ["join_room", "refused by ![ROOM_ID]"]);
+        let raised = frames.last().unwrap();
+        assert_eq!(raised.filename.as_deref(), Some("src-tauri/src/sentry.rs"));
+        assert!(raised.lineno.is_some() && raised.colno.is_some());
+        let Some(sentry::protocol::Context::Other(report)) = event.contexts.get("core") else {
+            panic!("{:?}", event.contexts.keys().collect::<Vec<_>>());
+        };
+        let sent = serde_json::to_string(report).unwrap();
+        assert!(
+            sent.contains("join_room") && sent.contains("refused by"),
+            "{sent}"
+        );
+        assert!(!serde_json::to_string(event).unwrap().contains("private"));
+    }
+
+    #[test]
+    fn a_json_quoted_token_is_scrubbed() {
+        let text = super::scrub_text(r#"{"access_token": "syt_secret", "error": "x"}"#);
+        assert!(!text.contains("syt_secret"), "{text}");
     }
 }

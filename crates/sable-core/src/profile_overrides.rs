@@ -10,7 +10,7 @@ use crate::Core;
 use crate::cosmetics::MEMBER_COLOR_FIELD;
 use crate::protocol::{
     CoreEvent, FieldEdit, OverrideColorView, OverrideTextView, ProfileOverrideView,
-    ProfileOverridesView, RpcError, SealStateView,
+    ProfileOverridesView, RpcCode, RpcError, SealStateView,
 };
 
 const PROFILE_OVERRIDES_EVENT: &str = "m.profile_overrides";
@@ -328,7 +328,7 @@ impl Core {
         let _guard = self.account_data_lock.lock().await;
         let stored = self.stored_overrides().await?;
         if stored.protection == SealStateView::Locked {
-            return Err(RpcError::DocumentLocked);
+            return Err(RpcCode::DocumentLocked.into());
         }
         let content = edited_overrides(stored.content, user_id.as_str(), edit);
         let event_type = if stored.sealed_type {

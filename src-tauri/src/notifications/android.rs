@@ -5,7 +5,7 @@ use super::registration::{
     PUSH_REGISTRATION_LOCK, PushConfig, RegisteredPusher, pusher_client, registered_pushers,
     remember_pusher, retire_old_pushers,
 };
-use sable_core::protocol::{NotificationView, RpcError};
+use sable_core::protocol::{NotificationView, RpcCode, RpcError};
 use tauri::{AppHandle, Runtime};
 
 #[derive(serde::Deserialize)]
@@ -53,7 +53,7 @@ pub(crate) async fn maintain_background_push(
                     return Ok(());
                 }
             }
-            Err(RpcError::Unavailable)
+            Err(RpcCode::Unavailable.into())
         }
         BackgroundPush::Rotate {
             user_id,
@@ -64,7 +64,7 @@ pub(crate) async fn maintain_background_push(
             auth,
         } => {
             if !is_unified_push_endpoint(&endpoint) {
-                return Err(RpcError::Unavailable);
+                return Err(RpcCode::Unavailable.into());
             }
             let registration = Registration {
                 token: endpoint,
@@ -82,7 +82,7 @@ pub(crate) async fn maintain_background_push(
                 })
                 .collect();
             if affected.is_empty() {
-                return Err(RpcError::Unavailable);
+                return Err(RpcCode::Unavailable.into());
             }
             for pusher in affected {
                 rotate_pusher(root, pusher, &registration).await?;
@@ -113,7 +113,7 @@ async fn rotate_pusher(
                 auth: auth.clone(),
             }),
             (None, None) => None,
-            _ => return Err(RpcError::Unavailable),
+            _ => return Err(RpcCode::Unavailable.into()),
         };
         client
             .retry(|| {
@@ -131,17 +131,17 @@ async fn rotate_pusher(
                 )
             })
             .await
-            .map_err(|_| RpcError::Unavailable)?;
+            .map_err(|_| RpcCode::Unavailable)?;
         (key, pusher.app_id.clone())
     } else {
         let rotated =
-            server_web_pusher(registration, pusher.event_id_only).ok_or(RpcError::Unavailable)?;
+            server_web_pusher(registration, pusher.event_id_only).ok_or(RpcCode::Unavailable)?;
         let key = rotated.pushkey.clone();
         let app_id = rotated.app_id.clone();
         client
             .retry(|| sable_core::webpush::set_pusher(&client, rotated.clone()))
             .await
-            .map_err(|_| RpcError::Unavailable)?;
+            .map_err(|_| RpcCode::Unavailable)?;
         (key, app_id)
     };
     let identity = (pusher.user_id.clone(), pusher.device_id.clone());

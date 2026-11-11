@@ -15,7 +15,7 @@ import type {
 vi.mock('#lib/core/context.js');
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
-import { CoreError } from '#src/transport';
+import { CoreError, transportFailure } from '#src/transport';
 
 const core = Object.assign(baseCore, {
   session: { user_id: '@me:example.org' },
@@ -801,7 +801,7 @@ test('shows a permission message when the kick is refused', async () => {
 });
 
 test('shows a generic message when the kick fails for another reason', async () => {
-  core.rpc.members.kick.mockRejectedValue(new CoreError({ code: 'failed', log_id: 'e1' }));
+  core.rpc.members.kick.mockRejectedValue(new CoreError(transportFailure('e1')));
   render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',

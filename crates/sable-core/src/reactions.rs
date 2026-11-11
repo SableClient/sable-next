@@ -12,7 +12,7 @@ use serde_with::{DefaultOnError, serde_as};
 use crate::Core;
 use crate::ResultExt;
 use crate::api::packs::ListOk;
-use crate::protocol::{ReactionShortcodeView, RpcError};
+use crate::protocol::{ReactionShortcodeView, RpcCode, RpcError};
 
 const MAX_SHORTCODE_BYTES: usize = 100;
 
@@ -79,7 +79,7 @@ impl Core {
         if can_annotate(event.raw()) && !is_redacted(event.raw()) {
             Ok(())
         } else {
-            Err(RpcError::Unsupported)
+            Err(RpcCode::Unsupported.into())
         }
     }
 
@@ -97,7 +97,7 @@ impl Core {
         let client = room.client();
         let (cache, _handles) = client
             .event_cache()
-            .ok_or(RpcError::Unavailable)?
+            .ok_or(RpcCode::Unavailable)?
             .room(room_id)
             .await
             .or_failed(self, "reaction_shortcodes")?;
@@ -220,7 +220,10 @@ mod tests {
         use std::sync::Arc;
 
         use crate::{
-            Core, api::timeline::TimelineFocusView, protocol::RpcError, session::Session,
+            Core,
+            api::timeline::TimelineFocusView,
+            protocol::{RpcCode, RpcError},
+            session::Session,
             store::MemorySessionStore,
         };
         use matrix_sdk::{
@@ -361,7 +364,10 @@ mod tests {
                         subscription: None,
                     }))
                     .await,
-                    Err(RpcError::Unsupported)
+                    Err(RpcError {
+                        code: RpcCode::Unsupported,
+                        ..
+                    })
                 ));
             }
         }

@@ -1091,7 +1091,7 @@ async fn setting_many_rooms_sets_each_of_them() {
 #[tokio::test]
 async fn push_rules_are_not_written_as_account_data() {
     use crate::api::account::SetDataParams;
-    use crate::protocol::RpcError;
+    use crate::protocol::{RpcCode, RpcError};
 
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
@@ -1104,7 +1104,16 @@ async fn push_rules_are_not_written_as_account_data() {
                 content: serde_json::json!({}),
             })
             .await;
-        assert!(matches!(result, Err(RpcError::Unsupported)), "{event_type}");
+        assert!(
+            matches!(
+                result,
+                Err(RpcError {
+                    code: RpcCode::Unsupported,
+                    ..
+                })
+            ),
+            "{event_type}"
+        );
     }
 }
 

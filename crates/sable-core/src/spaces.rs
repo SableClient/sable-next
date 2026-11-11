@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Core;
 use crate::ResultExt;
-use crate::protocol::{RpcError, SidebarItemView};
+use crate::protocol::{RpcCode, RpcError, SidebarItemView};
 
 /// The sidebar written over whatever else the account data already carries.
 #[derive(Serialize)]
@@ -195,7 +195,7 @@ impl Core {
         url: Option<&str>,
     ) -> Result<(), RpcError> {
         if url.is_some_and(|url| !url.starts_with("mxc://")) {
-            return Err(RpcError::InvalidMedia);
+            return Err(RpcCode::InvalidMedia.into());
         }
         let room = self.room(room_id).await?;
         let content = url.map_or_else(

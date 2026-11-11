@@ -10,6 +10,7 @@ import {
   recoverStaleAsset,
 } from '#lib/observability/dynamic-import-recovery.js';
 import { sanitizePayload, scrubMatrixIds, scrubMatrixUrl } from '#lib/observability/scrubbers.js';
+import { tagCoreError } from '#lib/observability/core-failure.js';
 import { scrubSentryEvent } from '#lib/observability/sentry-event.js';
 import { untrackFetch } from '#lib/observability/untracked-fetch.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -99,11 +100,12 @@ if (dsn && preferences.errorReporting) {
 
     beforeSend(event, hint) {
       if (isReloadingForNewBuild(hint.originalException)) return null;
-      if (hint.originalException instanceof CoreError) {
-        event.fingerprint = ['{{ default }}', hint.originalException.detail.code];
-      }
+      const tagged =
+        hint.originalException instanceof CoreError
+          ? tagCoreError(event, hint.originalException)
+          : event;
 
-      return scrubSentryEvent(event);
+      return tagged && scrubSentryEvent(tagged);
     },
   });
   untrackFetch(window);

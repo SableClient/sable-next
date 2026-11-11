@@ -10,7 +10,12 @@ import {
 import { reportSessionFailure } from '#lib/observability/session-telemetry.js';
 
 import type { AttachmentInfoView, CoreEvent, SessionInfo } from '#src/generated/protocol';
-import { CoreError, type GalleryAttachment, type Transport } from '#src/transport';
+import {
+  CoreError,
+  transportFailure,
+  type GalleryAttachment,
+  type Transport,
+} from '#src/transport';
 
 import { recentSearches, rememberSearch } from '#lib/search/recent-searches.svelte.js';
 import { activeRoomTimeline } from '#lib/rooms/timeline.svelte.js';
@@ -419,7 +424,7 @@ test('a restored session survives an account-list failure and a retry', async ()
   const fake = fakeTransport({ 'session.restore': session });
   fake.call.mockImplementation((method) =>
     method === 'session.list_accounts'
-      ? Promise.reject(new CoreError({ code: 'failed', log_id: 'e1' }))
+      ? Promise.reject(new CoreError(transportFailure('e1')))
       : Promise.resolve(session)
   );
   const recovered = fakeTransport({
@@ -457,7 +462,7 @@ test.each(['list_accounts', 'switch_account'])(
     await core.start();
     initial.call.mockImplementation((method) =>
       method === `session.${failedCommand}`
-        ? Promise.reject(new CoreError({ code: 'failed', log_id: 'e1' }))
+        ? Promise.reject(new CoreError(transportFailure('e1')))
         : Promise.resolve([retired, otherSession])
     );
     initial.emit({ type: 'session_ended', reason: 'soft_logout' });
@@ -480,7 +485,7 @@ test('failed crypto restoration exposes saved accounts for deliberate recovery',
   const fake = fakeTransport({ 'session.list_accounts': [session, otherSession] });
   fake.call.mockImplementation((method) =>
     method === 'session.restore'
-      ? Promise.reject(new CoreError({ code: 'failed', log_id: 'e1' }))
+      ? Promise.reject(new CoreError(transportFailure('e1')))
       : Promise.resolve([session, otherSession])
   );
   const core = createCoreClient(() => fake.transport);

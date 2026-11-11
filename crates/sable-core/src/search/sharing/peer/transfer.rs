@@ -9,7 +9,7 @@ use web_time::Instant;
 use super::super::{History, MAX_SEGMENT_JSON, SegmentPayload, settled_history, sha256};
 use super::{RESYNC_AFTER, age};
 use crate::Core;
-use crate::protocol::{RpcError, SearchPeerCopyView};
+use crate::protocol::{RpcCode, RpcError, SearchPeerCopyView};
 use crate::search::now_ms;
 
 const STORE_KEY: &[u8] = b"sable.search.peers.v1";
@@ -43,7 +43,7 @@ impl CopyError {
     fn into_rpc(self) -> RpcError {
         match self {
             Self::Session(error) => error,
-            _ => RpcError::Unavailable,
+            _ => RpcCode::Unavailable.into(),
         }
     }
 }
@@ -192,11 +192,7 @@ impl Core {
         RpcError,
     > {
         let session = self.session.read().await;
-        let client = session
-            .as_ref()
-            .ok_or(RpcError::NotLoggedIn)?
-            .client
-            .clone();
+        let client = session.as_ref().ok_or(RpcCode::NotLoggedIn)?.client.clone();
         Ok((session, client))
     }
 
@@ -510,7 +506,7 @@ impl Core {
         payload: SegmentPayload,
     ) -> Result<(), CopyError> {
         if !self.peers_allowed() {
-            return Err(CopyError::Session(RpcError::Unavailable));
+            return Err(CopyError::Session(RpcCode::Unavailable.into()));
         }
         if !joined(client, room) {
             return Err(CopyError::NotJoined(room.clone()));

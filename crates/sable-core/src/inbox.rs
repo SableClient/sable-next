@@ -22,7 +22,7 @@ use crate::Core;
 use crate::ResultExt;
 use crate::notifications;
 use crate::preview;
-use crate::protocol::{CoreEvent, InboxItemView, RpcError};
+use crate::protocol::{CoreEvent, InboxItemView, RpcCode, RpcError};
 use crate::push_rules;
 
 const SCHEMA: u32 = 1;
@@ -206,7 +206,7 @@ async fn load(client: &matrix_sdk::Client) -> Result<Stored, RpcError> {
         Ok(None) => return Ok(Stored::default()),
         Err(error) => {
             warn!("reading the inbox store failed: {error}");
-            return Err(RpcError::Unavailable);
+            return Err(RpcCode::Unavailable.into());
         }
     };
     match serde_json::from_slice::<Stored>(&bytes) {
@@ -223,7 +223,7 @@ fn encode(stored: &mut Stored) -> Result<Vec<u8>, RpcError> {
     stored.version = SCHEMA;
     serde_json::to_vec(stored).map_err(|error| {
         warn!("serialising the inbox store failed: {error}");
-        RpcError::Unavailable
+        crate::errors::coded("inbox_encode", RpcCode::Unavailable, &error)
     })
 }
 
@@ -234,7 +234,7 @@ async fn write(client: &matrix_sdk::Client, bytes: Vec<u8>) -> Result<(), RpcErr
         .await
     {
         warn!("persisting the inbox store failed: {error}");
-        return Err(RpcError::Unavailable);
+        return Err(RpcCode::Unavailable.into());
     }
     Ok(())
 }
@@ -396,7 +396,7 @@ async fn read_state(core: &Core, room: &Room) -> Result<RoomReadState, RpcError>
     Ok(RoomReadState {
         receipt_ts: receipt_ts.map_err(|error| {
             warn!("resolving the inbox read receipt failed: {error}");
-            RpcError::Unavailable
+            RpcCode::Unavailable
         })?,
         remaining,
     })
@@ -559,7 +559,7 @@ impl Core {
         let mut inbox = self.inbox.lock().await;
         // The session changed during the read, so `loaded` belongs to the previous account.
         if inbox.resets != resets {
-            return Err(RpcError::Unavailable);
+            return Err(RpcCode::Unavailable.into());
         }
         inbox.stored.get_or_insert(loaded);
         Ok(inbox)
@@ -813,7 +813,7 @@ impl Core {
                     Ok(messages) => messages,
                     Err(error) => {
                         warn!(room_id = %room.room_id(), "inbox backfill failed: {error}");
-                        failure = Some(self.failed("inbox_backfill", error));
+                        failure = Some(self.failed_with("inbox_backfill", &error));
                         continue 'rooms;
                     }
                 };
@@ -839,7 +839,7 @@ impl Core {
                 }
                 let exhausted = messages.end.is_none() || messages.chunk.is_empty();
                 if !exhausted && messages.end == scan.from {
-                    failure = Some(RpcError::Unavailable);
+                    failure = Some(RpcCode::Unavailable.into());
                     continue 'rooms;
                 }
                 scan.from = messages.end.clone();

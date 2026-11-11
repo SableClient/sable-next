@@ -68,7 +68,7 @@ pub(crate) fn install(allow: &[String]) -> Result<(), Box<dyn std::error::Error 
     if !wait.recv()? {
         return Err("could not start outbound guard".into());
     }
-    sable_core::tls::set_proxy(format!("http://{address}"))?;
+    sable_core::tls::set_proxy(format!("http://{address}")).map_err(|error| error.to_string())?;
     INSTALLED
         .set(allow.to_vec())
         .map_err(|_| "outbound guard already installed")?;

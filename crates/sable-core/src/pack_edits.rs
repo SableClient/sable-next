@@ -12,7 +12,8 @@ use crate::image_packs::{
     EMOTE_ROOMS, EmoteRooms, IMAGE_PACK_ROOMS, ROOM_EMOTES, ROOM_IMAGE_PACK, USER_EMOTES,
 };
 use crate::protocol::{
-    ImageUsageView, PackAddressView, PackDraftView, PackImageDraftView, PackImageInfoView, RpcError,
+    ImageUsageView, PackAddressView, PackDraftView, PackImageDraftView, PackImageInfoView, RpcCode,
+    RpcError,
 };
 use crate::room_settings::EmptyContent;
 use crate::{Core, ResultExt};
@@ -99,9 +100,10 @@ pub(crate) fn pack_content(
         draft.images.iter().map(|image| image.shortcode.as_str()),
         original,
     ) {
-        return Err(RpcError::InvalidShortcode {
+        return Err(RpcCode::InvalidShortcode {
             shortcode: shortcode.to_owned(),
-        });
+        }
+        .into());
     }
     Ok(PackContentOut {
         pack: PackOut {
@@ -463,7 +465,7 @@ mod tests {
     };
     use crate::protocol::{
         ImageUsageView, PackAddressView, PackDraftView, PackImageDraftView, PackImageInfoView,
-        RpcError,
+        RpcCode, RpcError,
     };
 
     fn to_json(content: impl serde::Serialize) -> serde_json::Value {
@@ -609,7 +611,7 @@ mod tests {
 
         assert!(matches!(
             pack_content(&draft, None),
-            Err(RpcError::InvalidShortcode { shortcode }) if shortcode == "bad code"
+            Err(RpcError { code: RpcCode::InvalidShortcode { shortcode }, .. }) if shortcode == "bad code"
         ));
     }
 
@@ -643,19 +645,19 @@ mod tests {
         draft.images.push(image("blob wave", &BOTH));
         assert!(matches!(
             pack_content(&draft, Some(&current)),
-            Err(RpcError::InvalidShortcode { shortcode }) if shortcode == "blob wave"
+            Err(RpcError { code: RpcCode::InvalidShortcode { shortcode }, .. }) if shortcode == "blob wave"
         ));
         draft.images.pop();
         draft.images.push(image("bad code", &BOTH));
         assert!(matches!(
             pack_content(&draft, Some(&current)),
-            Err(RpcError::InvalidShortcode { shortcode }) if shortcode == "bad code"
+            Err(RpcError { code: RpcCode::InvalidShortcode { shortcode }, .. }) if shortcode == "bad code"
         ));
         draft.images.pop();
         draft.images[0].shortcode = "bad code".to_owned();
         assert!(matches!(
             pack_content(&draft, Some(&current)),
-            Err(RpcError::InvalidShortcode { shortcode }) if shortcode == "bad code"
+            Err(RpcError { code: RpcCode::InvalidShortcode { shortcode }, .. }) if shortcode == "bad code"
         ));
     }
 

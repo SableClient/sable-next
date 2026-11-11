@@ -4,7 +4,7 @@ import type { CoreEvent } from '#src/generated/protocol';
 import type { WasmDebugImage, WorkerMessage, WorkerRequest } from '#src/worker/protocol';
 import wasmVersion from '#src/generated/wasm/sable_wasm_version.js';
 import coreWorkerUrl from '../worker/core.worker.ts?sharedworker&url';
-import { CoreError, type Transport } from './index';
+import { CoreError, commandFailed, transportFailure, type Transport } from './index';
 import { applyWasmDebugImage } from './wasm-debug';
 import { on } from 'svelte/events';
 import { recordDebugLog } from '../lib/observability/debug-log.svelte.js';
@@ -16,13 +16,6 @@ import {
 } from '../lib/observability/wasm-log.js';
 import { readText, writeText } from '../lib/platform/local-json.js';
 import { deleteAccountWebStorage, resetWebStorage } from '../lib/platform/session-storage.js';
-
-const QUIET_COMMAND_FAILURES = new Set([
-  'media:unavailable',
-  'account.user_profile:unavailable',
-  'timeline.unsubscribe:denied',
-  'timeline.unsubscribe:unknown_subscription',
-]);
 
 const reportedCoreErrors = new Set<string>();
 
@@ -239,7 +232,7 @@ export function createWebTransport(open: () => CoreConnection = openSharedWorker
     pending.clear();
     pendingCommands.clear();
     for (const { reject } of waiting) {
-      reject(new CoreError({ code: 'failed', log_id: logId }));
+      reject(new CoreError(transportFailure(logId)));
     }
   }
 
@@ -353,10 +346,7 @@ export function createWebTransport(open: () => CoreConnection = openSharedWorker
       } else if ('bytes' in data) waiting.resolve(data.bytes);
       else if ('uri' in data) waiting.resolve(data.uri);
       else {
-        if (!QUIET_COMMAND_FAILURES.has(`${String(command)}:${data.err.code}`)) {
-          console.warn('[sable transport] command failed', { command, ...data.err });
-        }
-        waiting.reject(new CoreError(data.err));
+        waiting.reject(commandFailed(data.err, command));
       }
     };
 
@@ -411,7 +401,7 @@ export function createWebTransport(open: () => CoreConnection = openSharedWorker
     transfers: Transferable[] = []
   ): Promise<T> {
     return (async () => {
-      if (closed) throw new CoreError({ code: 'failed', log_id: 'transport closed' });
+      if (closed) throw new CoreError(transportFailure('transport closed'));
       const id = nextId++;
       const activeWorker = connect();
 

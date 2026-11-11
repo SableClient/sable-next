@@ -14,7 +14,7 @@ use tokio::sync::{Mutex, RwLock, broadcast};
 
 use super::direct::{self, DirectDefault};
 use super::pushes_every_encrypted_event;
-use crate::errors::CoreError;
+use crate::errors::{CoreError, ReportExt};
 use crate::protocol::NotificationModeView;
 
 pub struct PushRules {
@@ -79,11 +79,8 @@ impl PushRules {
             .account()
             .fetch_account_data(direct::DEFAULT_EVENT.into())
             .await
-            .map_err(CoreError::backend)?
-            .map(|raw| {
-                raw.deserialize_as_unchecked::<DirectDefault>()
-                    .map_err(CoreError::backend)
-            })
+            .backend()?
+            .map(|raw| raw.deserialize_as_unchecked::<DirectDefault>().backend())
             .transpose()
     }
 
@@ -92,12 +89,10 @@ impl PushRules {
             .account()
             .set_account_data_raw(
                 direct::DEFAULT_EVENT.into(),
-                Raw::new(preference)
-                    .map_err(CoreError::backend)?
-                    .cast_unchecked(),
+                Raw::new(preference).backend()?.cast_unchecked(),
             )
             .await
-            .map_err(CoreError::backend)?;
+            .backend()?;
         let _ = self.changes.send(());
         Ok(())
     }
@@ -107,7 +102,7 @@ impl PushRules {
             .client
             .send(get_pushrules_all::v3::Request::new())
             .await
-            .map_err(CoreError::backend)?
+            .backend()?
             .global;
         *self.rules.write().await = rules.clone();
         Ok(rules)
@@ -166,8 +161,8 @@ impl PushRules {
             .account()
             .fetch_account_data_static::<DirectEventContent>()
             .await
-            .map_err(CoreError::backend)?
-            .map(|raw| raw.deserialize().map_err(CoreError::backend))
+            .backend()?
+            .map(|raw| raw.deserialize().backend())
             .transpose()?
             .unwrap_or_default()
             .values()
@@ -276,7 +271,7 @@ impl PushRules {
                 }
             }
         };
-        sent.map_err(CoreError::backend)
+        sent.backend()
     }
 }
 

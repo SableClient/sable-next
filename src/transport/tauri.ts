@@ -3,7 +3,7 @@ import * as Sentry from '@sentry/sveltekit';
 import { Channel, invoke } from '@tauri-apps/api/core';
 
 import type { RpcError, CoreEvent } from '#src/generated/protocol';
-import { CoreError, type Transport } from './index';
+import { commandFailed, type Transport } from './index';
 import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { wasmLogLevel } from '#lib/observability/wasm-log.js';
 import { rawInvoke } from '#lib/platform/raw-invoke.js';
@@ -17,7 +17,7 @@ async function carry<T>(
   try {
     return await rawInvoke<T>(command, bytes, headers);
   } catch (error) {
-    throw new CoreError(error as RpcError);
+    throw commandFailed(error as RpcError, command);
   }
 }
 
@@ -59,7 +59,7 @@ export function createTauriTransport(): Transport {
       try {
         return await invoke<unknown>('call', { method, params });
       } catch (error) {
-        throw new CoreError(error as RpcError);
+        throw commandFailed(error as RpcError, method);
       }
     },
 
@@ -74,7 +74,7 @@ export function createTauriTransport(): Transport {
         });
         return new Uint8Array(bytes);
       } catch (error) {
-        throw new CoreError(error as RpcError);
+        throw commandFailed(error as RpcError, 'fetch_media');
       }
     },
 
@@ -82,7 +82,7 @@ export function createTauriTransport(): Transport {
       try {
         await invoke('forget_media', { source });
       } catch (error) {
-        throw new CoreError(error as RpcError);
+        throw commandFailed(error as RpcError, 'forget_media');
       }
     },
 

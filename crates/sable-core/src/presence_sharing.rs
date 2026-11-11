@@ -619,7 +619,7 @@ mod tests {
     };
     use crate::protocol::{
         PresenceHintView, PresencePromptView, PresenceSharingEdit, PresenceUserSharingView,
-        RpcError,
+        RpcCode, RpcError,
     };
 
     #[test]
@@ -878,7 +878,10 @@ mod tests {
         assert!(matches!(
             core.edit_presence_sharing(&PresenceSharingEdit::ShareLocally { enabled: true })
                 .await,
-            Err(RpcError::Failed { .. })
+            Err(RpcError {
+                code: RpcCode::Failed { .. },
+                ..
+            })
         ));
     }
 

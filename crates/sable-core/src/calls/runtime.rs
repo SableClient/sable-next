@@ -21,7 +21,8 @@ use super::membership::{self, CallMember, StickyMemberships};
 use super::{HANGUP_DELAY, USE_KEY_DELAY, sfu, sticky};
 use crate::api::calls::JoinOk;
 use crate::protocol::{
-    CallBackendView, CallIntent, CallMemberView, CallMode, CallSessionId, CoreEvent, RpcError,
+    CallBackendView, CallIntent, CallMemberView, CallMode, CallSessionId, CoreEvent, RpcCode,
+    RpcError,
 };
 use crate::{CallSession, Core};
 
@@ -387,7 +388,7 @@ async fn publish_where_allowed(
         let state = state.lock().await;
         (state.own.clone(), state.intent)
     };
-    let service = own.foci.first().cloned().ok_or(RpcError::NoCallFocus)?;
+    let service = own.foci.first().cloned().ok_or(RpcCode::NoCallFocus)?;
     let mut published = publish(core, room, &own, &service, encrypted, intent).await?;
     if !published.provision.can_publish
         && let Some((moved, provision)) =
@@ -544,7 +545,7 @@ pub(super) async fn join(
     let state_key = state_key(&room, &own);
     if !core.is_current(generation) {
         abort_join(core, &room, &own, delay, postpone).await;
-        return Err(RpcError::NotLoggedIn);
+        return Err(RpcCode::NotLoggedIn.into());
     }
     let Some((publisher_id, backends)) = confirm_join(
         core,
@@ -564,7 +565,7 @@ pub(super) async fn join(
     if !core.is_current(generation) {
         drop(calls);
         abort_join(core, &room, &own, delay, postpone).await;
-        return Err(RpcError::NotLoggedIn);
+        return Err(RpcCode::NotLoggedIn.into());
     }
     let shared = state.clone();
     let delay = super::DelayState::shared(delay);
@@ -600,7 +601,7 @@ pub(super) async fn join(
     core.apply_app_activity(core.activity.app_active()).await;
     core.refresh_presence().await;
     if !core.is_current(generation) {
-        return Err(RpcError::NotLoggedIn);
+        return Err(RpcCode::NotLoggedIn.into());
     }
     Ok(join_ok(
         session,

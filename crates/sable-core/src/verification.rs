@@ -29,7 +29,7 @@ use qrcode::{Color, EcLevel, QrCode, Version};
 use crate::ResultExt;
 use crate::protocol::{
     CoreEvent, DeviceView, EmojiView, EncryptionStatusView, IdentityResetStep, QrCodeView,
-    RecoveryStateView, RpcError, SignOutSafetyView, SigningKeysView, UserDeviceView,
+    RecoveryStateView, RpcCode, RpcError, SignOutSafetyView, SigningKeysView, UserDeviceView,
     UserSecurityView, VerificationStateView, VerificationView,
 };
 
@@ -95,27 +95,30 @@ impl Core {
         let generation = self.lifecycle.current();
         let handle = match &*self.pending_identity_reset.lock().await {
             Some(pending) if pending.generation == generation => pending.handle.clone(),
-            _ => return Err(RpcError::Unavailable),
+            _ => return Err(RpcCode::Unavailable.into()),
         };
 
         let auth = match (handle.auth_type(), password) {
             (CrossSigningResetAuthType::OAuth(info), _) => info.as_auth_data(),
             (CrossSigningResetAuthType::Uiaa(uiaa), Some(password)) => {
-                let user_id = client.user_id().ok_or(RpcError::NotLoggedIn)?.to_owned();
+                let user_id = client.user_id().ok_or(RpcCode::NotLoggedIn)?.to_owned();
                 let mut auth = Password::new(UserIdentifier::Matrix(user_id.into()), password);
                 auth.session = Some(uiaa.session().to_owned());
                 AuthData::Password(auth)
             }
             (CrossSigningResetAuthType::Uiaa(_), None) => {
-                return Err(RpcError::InteractiveAuthRequired {
+                return Err(RpcCode::InteractiveAuthRequired {
                     stages: vec![AuthType::Password.as_str().to_owned()],
-                });
+                }
+                .into());
             }
         };
 
         handle.reset(auth).await.map_err(|error| match &error {
-            RecoveryError::Sdk(sdk) if sdk.as_uiaa_response().is_some() => RpcError::Denied,
-            _ => self.failed("reset_identity_auth", error),
+            RecoveryError::Sdk(sdk) if sdk.as_uiaa_response().is_some() => {
+                crate::errors::coded("reset_identity_auth", RpcCode::Denied, &error)
+            }
+            _ => self.failed_with("reset_identity_auth", &error),
         })?;
 
         {
@@ -124,7 +127,7 @@ impl Core {
                 .as_ref()
                 .is_some_and(|pending| Arc::ptr_eq(&pending.handle, &handle))
             {
-                return Err(RpcError::Unavailable);
+                return Err(RpcCode::Unavailable.into());
             }
             pending.take();
         }
@@ -234,7 +237,7 @@ impl Core {
                         let qr = match request.generate_qr_code().await {
                             Ok(qr) => qr,
                             Err(error) => {
-                                core.failed("verification_generate_qr_code", error);
+                                core.failed_with("verification_generate_qr_code", &error);
                                 None
                             }
                         };
@@ -243,7 +246,7 @@ impl Core {
                             if request.we_started()
                                 && let Err(error) = request.start_sas().await
                             {
-                                core.failed("verification_start_sas", error);
+                                core.failed_with("verification_start_sas", &error);
                             }
 
                             core.emit_verification(&user_id, &flow_id, VerificationView::Waiting);
@@ -313,9 +316,9 @@ impl Core {
             core.emit_verification(&user_id, &flow_id, sas_view(&sas, &sas.state()));
 
             if let Err(error) = sas.accept().await {
-                core.failed("verification_accept_sas", error);
+                core.failed_with("verification_accept_sas", &error);
                 if let Err(error) = sas.cancel().await {
-                    core.failed("verification_cancel_sas", error);
+                    core.failed_with("verification_cancel_sas", &error);
                 }
                 core.emit_verification(
                     &user_id,
@@ -420,7 +423,7 @@ impl Core {
                 matrix_sdk::sleep::sleep(Duration::from_millis(delay_ms)).await;
             }
             if let Err(error) = client.encryption().request_user_identity(user_id).await {
-                self.failed("verification_refresh_identity", error);
+                self.failed_with("verification_refresh_identity", &error);
             }
             if client
                 .encryption()
@@ -444,7 +447,7 @@ impl Core {
             .encryption()
             .get_verification_request(user_id, flow_id)
             .await
-            .ok_or(RpcError::UnknownVerification)
+            .ok_or_else(|| RpcCode::UnknownVerification.into())
     }
 
     pub(crate) async fn scan_verification_qr(
@@ -457,14 +460,14 @@ impl Core {
             .decode(data)
             .ok()
             .and_then(|bytes| QrVerificationData::from_bytes(bytes).ok())
-            .ok_or(RpcError::InvalidVerificationCode)?;
+            .ok_or(RpcCode::InvalidVerificationCode)?;
         let qr = self
             .verification_request(&user_id, &flow_id)
             .await?
             .scan_qr_code(data)
             .await
             .or_failed(self, "scan_verification_qr")?
-            .ok_or(RpcError::Unavailable)?;
+            .ok_or(RpcCode::Unavailable)?;
         self.watch_qr(user_id, flow_id, qr);
         Ok(())
     }
@@ -480,7 +483,7 @@ impl Core {
             .get_verification(user_id, flow_id)
             .await
             .and_then(matrix_sdk::encryption::verification::Verification::qr)
-            .ok_or(RpcError::UnknownVerification)
+            .ok_or_else(|| RpcCode::UnknownVerification.into())
     }
 
     pub(crate) async fn sas(
@@ -494,7 +497,7 @@ impl Core {
             .get_verification(user_id, flow_id)
             .await
             .and_then(matrix_sdk::encryption::verification::Verification::sas)
-            .ok_or(RpcError::UnknownVerification)
+            .ok_or_else(|| RpcCode::UnknownVerification.into())
     }
 }
 
@@ -736,7 +739,7 @@ pub(crate) async fn set_device_blocked(
         .get_device(user_id, device_id)
         .await
         .or_failed(core, "set_device_blocked_device")?
-        .ok_or(RpcError::Unavailable)?;
+        .ok_or(RpcCode::Unavailable)?;
     if device.is_blacklisted() == blocked {
         return Ok(());
     }

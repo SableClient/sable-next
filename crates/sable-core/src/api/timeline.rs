@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use super::{Handler, Json};
 use crate::protocol::{
     EditVersionView, PaginationDirection, PinReadStateView, RelationsView, RoomListItemView,
-    RoomListOptionsView, RpcError, SubscriptionId, TimelineItemView,
+    RoomListOptionsView, RpcCode, RpcError, SubscriptionId, TimelineItemView,
 };
 use crate::thread_receipts::thread_receipts;
 use crate::timelines::receipt_thread_root;
@@ -144,7 +144,7 @@ impl Handler for UnsubscribeParams {
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         let mut subscribed = core.room_subscriptions.lock().await;
         let Some(removed) = core.subscriptions.lock().await.remove(&self.subscription) else {
-            return Err(RpcError::UnknownSubscription);
+            return Err(RpcCode::UnknownSubscription.into());
         };
         let has_room = !matches!(removed.kind, SubscriptionKind::Other);
         drop(removed);
@@ -208,9 +208,9 @@ impl Handler for PaginateParams {
                     )
                 })
             })
-            .ok_or(RpcError::UnknownSubscription)?;
+            .ok_or(RpcCode::UnknownSubscription)?;
         if matches!(direction, PaginationDirection::Forward) && !focused {
-            return Err(RpcError::InvalidPaginationDirection);
+            return Err(RpcCode::InvalidPaginationDirection.into());
         }
         if matches!(direction, PaginationDirection::Forward) && thread {
             return Ok(PaginateOk {
@@ -466,7 +466,7 @@ fn receipt_sent<T>(core: &Core, result: matrix_sdk::Result<T>) -> Result<(), Rpc
             tracing::info!(context = "mark_read", "the receipt target is gone");
             Ok(())
         }
-        Err(error) => Err(core.failed("mark_read", error)),
+        Err(error) => Err(core.failed_with("mark_read", &error)),
     }
 }
 

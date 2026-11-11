@@ -37,8 +37,8 @@ use serde_with::{DefaultOnError, serde_as};
 use crate::calls::sticky;
 use crate::delayed_events::{self, DelayedEvent};
 use crate::protocol::{
-    CoreEvent, OpenIdTokenView, PaginationDirection, RelationsView, RpcError, TermsPolicyView,
-    TurnServerView, UserDirectoryEntryView,
+    CoreEvent, OpenIdTokenView, PaginationDirection, RelationsView, RpcCode, RpcError,
+    TermsPolicyView, TurnServerView, UserDirectoryEntryView,
 };
 use crate::view::ObjectOnly;
 use crate::{Core, ResultExt};
@@ -441,7 +441,7 @@ impl Core {
         const LABEL: &str = "widget_send_delayed_event";
         let support = self.delayed_events_support().await?;
         if !support.any() {
-            return Err(RpcError::DelayedEventsUnsupported);
+            return Err(RpcCode::DelayedEventsUnsupported.into());
         }
         let room = self.room(room_id).await?;
         let client = self.client().await?;
@@ -462,7 +462,7 @@ impl Core {
         }
         if let Some(duration) = sticky_duration_ms {
             if self.room_is_encrypted(&room).await? {
-                return Err(RpcError::EncryptedScheduleUnsupported);
+                return Err(RpcCode::EncryptedScheduleUnsupported.into());
             }
             return sticky::send_delayed_event(
                 &client, support, &room, event_type, content, delay, duration,
@@ -471,7 +471,7 @@ impl Core {
             .or_failed(self, LABEL);
         }
         if self.room_is_encrypted(&room).await? {
-            return Err(RpcError::EncryptedScheduleUnsupported);
+            return Err(RpcCode::EncryptedScheduleUnsupported.into());
         }
         let event = DelayedEvent {
             room_id: room_id.clone(),
@@ -1059,7 +1059,7 @@ impl Core {
 
     pub(crate) async fn openid_token(&self) -> Result<OpenIdTokenView, RpcError> {
         let client = self.client().await?;
-        let user_id = client.user_id().ok_or(RpcError::NotLoggedIn)?.to_owned();
+        let user_id = client.user_id().ok_or(RpcCode::NotLoggedIn)?.to_owned();
 
         let response = client
             .send(request_openid_token::v3::Request::new(user_id))
@@ -1082,7 +1082,7 @@ mod tests {
         Core,
         api::calls::RtcLivekitEndpoint,
         api::room_state::SendEventParams,
-        protocol::{CoreEvent, RpcError},
+        protocol::{CoreEvent, RpcCode, RpcError},
         session::Session,
         store::MemorySessionStore,
     };
@@ -1192,7 +1192,10 @@ mod tests {
                 None,
             )
             .await,
-            Err(RpcError::DelayedEventsUnsupported)
+            Err(RpcError {
+                code: RpcCode::DelayedEventsUnsupported,
+                ..
+            })
         ));
         assert!(core.delayed_events_support().await.unwrap().any());
     }
@@ -1252,7 +1255,10 @@ mod tests {
             .await;
         assert!(matches!(
             refused,
-            Err(RpcError::EncryptedScheduleUnsupported)
+            Err(RpcError {
+                code: RpcCode::EncryptedScheduleUnsupported,
+                ..
+            })
         ));
 
         let refused = core
@@ -1267,7 +1273,10 @@ mod tests {
             .await;
         assert!(matches!(
             refused,
-            Err(RpcError::EncryptedScheduleUnsupported)
+            Err(RpcError {
+                code: RpcCode::EncryptedScheduleUnsupported,
+                ..
+            })
         ));
         let refused = core
             .widget_send_delayed_event(
@@ -1281,7 +1290,10 @@ mod tests {
             .await;
         assert!(matches!(
             refused,
-            Err(RpcError::EncryptedScheduleUnsupported)
+            Err(RpcError {
+                code: RpcCode::EncryptedScheduleUnsupported,
+                ..
+            })
         ));
     }
 
@@ -1491,7 +1503,13 @@ mod tests {
             .rtc_livekit(RtcLivekitEndpoint::GetToken, &json!({}))
             .await;
 
-        assert!(matches!(result, Err(RpcError::Unsupported)));
+        assert!(matches!(
+            result,
+            Err(RpcError {
+                code: RpcCode::Unsupported,
+                ..
+            })
+        ));
     }
 
     #[tokio::test]

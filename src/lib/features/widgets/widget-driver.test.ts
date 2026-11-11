@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { CoreError } from '#src/transport';
+import { CoreError, transportFailure } from '#src/transport';
 import { SableWidgetDriver } from './widget-driver.js';
 
 test('returns the created IDs for messages, state events and redactions', async () => {
@@ -313,7 +313,7 @@ test('expresses core refusals as Matrix API errors', () => {
   expect(driver.processError(new CoreError({ code: 'denied' }))).toMatchObject({
     matrix_api_error: { http_status: 403, response: { errcode: 'M_FORBIDDEN' } },
   });
-  expect(driver.processError(new CoreError({ code: 'failed', log_id: 'e1' }))).toBeUndefined();
+  expect(driver.processError(new CoreError(transportFailure('e1')))).toBeUndefined();
   expect(driver.processError(new Error('boom'))).toBeUndefined();
 });
 

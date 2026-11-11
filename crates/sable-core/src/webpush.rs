@@ -1,7 +1,7 @@
 //! MSC4174 web push. The homeserver encrypts and delivers, and custom pusher data stays raw.
 
 use crate::api::push::WebPusherView;
-use crate::errors::CoreError;
+use crate::errors::{CoreError, ReportExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
@@ -44,7 +44,7 @@ pub async fn support(client: &Client) -> Result<Option<String>, CoreError> {
     let capabilities = client
         .send(get_capabilities::v3::Request::new())
         .await
-        .map_err(CoreError::backend)?;
+        .backend()?;
 
     Ok(CAPABILITIES.iter().find_map(|name| {
         capabilities
@@ -60,14 +60,13 @@ pub async fn support(client: &Client) -> Result<Option<String>, CoreError> {
 pub async fn set_pusher(client: &Client, mut pusher: WebPusherView) -> Result<(), CoreError> {
     pusher.device_display_name =
         crate::notifications::pusher_display_name(client, pusher.device_display_name).await;
-    let body = pusher_body(pusher, client.user_id().map(ToString::to_string))
-        .map_err(CoreError::backend)?;
+    let body = pusher_body(pusher, client.user_id().map(ToString::to_string)).backend()?;
 
     client
         .send(SetWebPusher { body })
         .await
         .map(|response| drop(response.body))
-        .map_err(CoreError::backend)
+        .backend()
 }
 
 /// MSC4174's pusher body: `url` is the subscription, not a gateway, and the
@@ -183,10 +182,7 @@ pub async fn pushers(client: &Client) -> Result<Vec<RegisteredPusherView>, CoreE
 }
 
 pub(crate) async fn raw_pushers(client: &Client) -> Result<Vec<RawPusher>, CoreError> {
-    let response = client
-        .send(ListWebPushers {})
-        .await
-        .map_err(CoreError::backend)?;
+    let response = client.send(ListWebPushers {}).await.backend()?;
 
     Ok(response.pushers)
 }
@@ -278,7 +274,7 @@ pub async fn ack(client: &Client, app_id: String, ack_token: String) -> Result<(
         .send(AckWebPusher { app_id, ack_token })
         .await
         .map(|response| drop(response.body))
-        .map_err(CoreError::backend)
+        .backend()
 }
 
 use acknowledge_web_pusher::Request as AckWebPusher;

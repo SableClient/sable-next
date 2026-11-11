@@ -32,7 +32,7 @@ use crate::{
         SubscribeOk, SubscribeParams, SubscribeRoomListOk, SubscribeRoomListParams,
         UnsubscribeParams,
     },
-    protocol::{CoreEvent, IdentityResetStep, RpcError},
+    protocol::{CoreEvent, IdentityResetStep, RpcCode, RpcError},
     session::Session,
     store::MemorySessionStore,
 };
@@ -2253,7 +2253,10 @@ async fn corrupt_encrypted_media_is_rejected_before_returning_plaintext() {
     .unwrap();
     assert!(matches!(
         core.fetch_media(source, 0, 0, false).await,
-        Err(RpcError::Unavailable)
+        Err(RpcError {
+            code: RpcCode::Unavailable,
+            ..
+        })
     ));
 }
 
@@ -2786,14 +2789,17 @@ async fn a_server_whose_media_keeps_failing_is_refused_without_a_request() {
         assert!(matches!(
             core.fetch_media(format!("mxc://dead.example/{id}"), 64, 64, false)
                 .await,
-            Err(RpcError::Unavailable)
+            Err(RpcError {
+                code: RpcCode::Unavailable,
+                ..
+            })
         ));
     }
 
     assert!(matches!(
         core.fetch_media("mxc://dead.example/four".to_owned(), 64, 64, false)
             .await,
-        Err(RpcError::MediaServerUnavailable { retry_after_ms }) if retry_after_ms > 0
+        Err(RpcError { code: RpcCode::MediaServerUnavailable { retry_after_ms }, .. }) if retry_after_ms > 0
     ));
 }
 
@@ -2861,7 +2867,10 @@ async fn forbidden_media_never_opens_the_circuit() {
         assert!(matches!(
             core.fetch_media(format!("mxc://policy.example/{id}"), 0, 0, false)
                 .await,
-            Err(RpcError::Unavailable)
+            Err(RpcError {
+                code: RpcCode::Unavailable,
+                ..
+            })
         ));
     }
 }
@@ -2894,7 +2903,10 @@ async fn missing_media_never_opens_the_circuit() {
         assert!(matches!(
             core.fetch_media(format!("mxc://gone.example/{id}"), 0, 0, false)
                 .await,
-            Err(RpcError::MediaNotFound)
+            Err(RpcError {
+                code: RpcCode::MediaNotFound,
+                ..
+            })
         ));
     }
     core.fetch_media("mxc://gone.example/ok".to_owned(), 0, 0, false)
@@ -3093,7 +3105,10 @@ async fn forgetting_an_invalid_uri_is_refused() {
 
     assert!(matches!(
         core.forget_media("not-a-uri".to_owned()).await,
-        Err(RpcError::InvalidMedia)
+        Err(RpcError {
+            code: RpcCode::InvalidMedia,
+            ..
+        })
     ));
 }
 
@@ -3173,15 +3188,24 @@ async fn recover_identity_accepts_the_passphrase_as_well_as_the_key() {
 
     assert!(matches!(
         recover("wrong horse".to_owned()).await,
-        Err(RpcError::Denied)
+        Err(RpcError {
+            code: RpcCode::Denied,
+            ..
+        })
     ));
     assert!(matches!(
         recover("correct horse".to_owned()).await,
-        Err(RpcError::KeyStorageOutOfSync)
+        Err(RpcError {
+            code: RpcCode::KeyStorageOutOfSync,
+            ..
+        })
     ));
     assert!(matches!(
         recover(key.to_base58()).await,
-        Err(RpcError::KeyStorageOutOfSync)
+        Err(RpcError {
+            code: RpcCode::KeyStorageOutOfSync,
+            ..
+        })
     ));
 }
 
@@ -3298,7 +3322,10 @@ async fn an_identity_reset_retries_a_wrong_password_and_returns_the_new_key() {
             password: Some("wrong".into())
         })
         .await,
-        Err(RpcError::Denied)
+        Err(RpcError {
+            code: RpcCode::Denied,
+            ..
+        })
     ));
     let Ok(recovery_key) = core
         .run(ContinueIdentityResetParams {
@@ -3312,7 +3339,10 @@ async fn an_identity_reset_retries_a_wrong_password_and_returns_the_new_key() {
     assert!(matches!(
         core.run(ContinueIdentityResetParams { password: None })
             .await,
-        Err(RpcError::Unavailable)
+        Err(RpcError {
+            code: RpcCode::Unavailable,
+            ..
+        })
     ));
 }
 
@@ -3340,7 +3370,13 @@ async fn a_cancelled_oauth_identity_reset_hands_back_no_key() {
             core.run(CancelIdentityResetParams {}).await.unwrap();
         }
     );
-    assert!(matches!(waiting, Err(RpcError::Unavailable)));
+    assert!(matches!(
+        waiting,
+        Err(RpcError {
+            code: RpcCode::Unavailable,
+            ..
+        })
+    ));
 }
 
 #[tokio::test]
@@ -3569,7 +3605,10 @@ async fn recovery_adopts_an_account_data_key_that_seals_our_documents() {
             content: json!({}),
         })
         .await,
-        Err(RpcError::Unsupported)
+        Err(RpcError {
+            code: RpcCode::Unsupported,
+            ..
+        })
     ));
 
     core.adopt_account_data_key(&client, &key.to_base58()).await;
@@ -3710,7 +3749,13 @@ async fn a_sidebar_naming_something_that_is_not_a_room_is_refused() {
         })
         .await;
 
-    assert!(matches!(refused, Err(RpcError::UnknownRoom)));
+    assert!(matches!(
+        refused,
+        Err(RpcError {
+            code: RpcCode::UnknownRoom,
+            ..
+        })
+    ));
 }
 
 #[tokio::test]
@@ -3926,7 +3971,13 @@ async fn a_remote_profile_the_homeserver_rejects_is_unavailable() {
     .run(&core)
     .await;
 
-    assert!(matches!(result, Err(RpcError::Unavailable)));
+    assert!(matches!(
+        result,
+        Err(RpcError {
+            code: RpcCode::Unavailable,
+            ..
+        })
+    ));
 }
 
 #[tokio::test]
@@ -4041,7 +4092,7 @@ async fn joining_a_room_we_are_banned_from_says_so_with_the_reason() {
     let error = core.join_room(room_id.as_str(), &[]).await.unwrap_err();
 
     assert!(
-        matches!(&error, RpcError::Banned { reason: Some(reason) } if reason == "spam"),
+        matches!(&error, RpcError { code: RpcCode::Banned { reason: Some(reason) }, .. } if reason == "spam"),
         "{error:?}"
     );
 }
@@ -4227,7 +4278,13 @@ async fn a_revoked_token_reads_as_logged_out() {
         .fetch_user_profile()
         .await
         .or_failed(&core, "webpusher_support");
-    assert!(matches!(result, Err(RpcError::NotLoggedIn)));
+    assert!(matches!(
+        result,
+        Err(RpcError {
+            code: RpcCode::NotLoggedIn,
+            ..
+        })
+    ));
 }
 
 #[tokio::test]
@@ -4351,11 +4408,17 @@ async fn missing_media_is_reported_apart_from_a_failing_server() {
     assert!(matches!(
         core.fetch_media("mxc://example.org/gone".to_owned(), 0, 0, true)
             .await,
-        Err(crate::protocol::RpcError::MediaNotFound)
+        Err(crate::protocol::RpcError {
+            code: crate::protocol::RpcCode::MediaNotFound,
+            ..
+        })
     ));
     assert!(matches!(
         core.fetch_media("mxc://example.org/flaky".to_owned(), 0, 0, true)
             .await,
-        Err(crate::protocol::RpcError::Unavailable)
+        Err(crate::protocol::RpcError {
+            code: crate::protocol::RpcCode::Unavailable,
+            ..
+        })
     ));
 }

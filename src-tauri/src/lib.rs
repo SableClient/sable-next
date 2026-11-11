@@ -31,7 +31,7 @@ use std::{
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use sable_core::{
     Core,
-    protocol::{CoreEvent, RpcError},
+    protocol::{CoreEvent, RpcCode, RpcError},
 };
 use tauri::{
     AppHandle, Manager, State,
@@ -159,7 +159,7 @@ trait Carried {
     fn metadata<T: serde::de::DeserializeOwned>(&self) -> Result<T, RpcError> {
         self.header("request")
             .and_then(|json| serde_json::from_str(&json).ok())
-            .ok_or(RpcError::InvalidMedia)
+            .ok_or_else(|| RpcCode::InvalidMedia.into())
     }
 }
 
@@ -167,7 +167,7 @@ impl Carried for Base64Invoke {
     fn bytes(&self) -> Result<Vec<u8>, RpcError> {
         STANDARD
             .decode(&self.bytes)
-            .map_err(|_| RpcError::InvalidMedia)
+            .map_err(|_| RpcCode::InvalidMedia.into())
     }
 
     fn header(&self, name: &str) -> Option<String> {
@@ -184,7 +184,7 @@ impl Carried for Request<'_> {
 
     fn bytes(&self) -> Result<Vec<u8>, RpcError> {
         let InvokeBody::Raw(bytes) = self.body() else {
-            return Err(RpcError::InvalidMedia);
+            return Err(RpcCode::InvalidMedia.into());
         };
         Ok(bytes.clone())
     }
@@ -202,7 +202,7 @@ async fn carried_upload(
     core: &sable_core::Core,
     request: &impl Carried,
 ) -> Result<String, RpcError> {
-    let mime = request.header("mime").ok_or(RpcError::InvalidMedia)?;
+    let mime = request.header("mime").ok_or(RpcCode::InvalidMedia)?;
     core.upload_media(mime, request.bytes()?).await
 }
 
@@ -212,7 +212,7 @@ async fn carried_gallery(core: &sable_core::Core, request: &impl Carried) -> Res
 }
 
 async fn carried_rtc(core: &Arc<Core>, request: &impl Carried) -> Result<Response, RpcError> {
-    let session = request.header("session").ok_or(RpcError::InvalidMedia)?;
+    let session = request.header("session").ok_or(RpcCode::InvalidMedia)?;
     let bytes = core.rtc_data(&session, &request.bytes()?).await?;
     Ok(Response::new(bytes))
 }
@@ -381,10 +381,10 @@ async fn set_notification_policy(
                 quiet_when_active_elsewhere,
             })
             .await
-            .map_err(|_| RpcError::Unavailable)?;
+            .map_err(|_| RpcCode::Unavailable)?;
     }
     #[cfg(target_os = "ios")]
-    ios::write_push_policy(policy).map_err(|_| RpcError::Unavailable)?;
+    ios::write_push_policy(policy).map_err(|_| RpcCode::Unavailable)?;
     #[cfg(not(target_os = "android"))]
     let _ = &app;
     #[cfg(desktop)]
@@ -656,14 +656,14 @@ async fn dismiss_read_room_notifications(
     reason = "tauri extracts command inputs by value"
 )]
 fn open_external_url(app: AppHandle<tauri::Wry>, url: String) -> Result<(), RpcError> {
-    let parsed = tauri::Url::parse(&url).map_err(|_| RpcError::Denied)?;
+    let parsed = tauri::Url::parse(&url).map_err(|_| RpcCode::Denied)?;
     if !matches!(parsed.scheme(), "http" | "https" | "mailto" | "tel") {
-        return Err(RpcError::Denied);
+        return Err(RpcCode::Denied.into());
     }
 
     app.opener()
         .open_url(parsed.to_string(), None::<String>)
-        .map_err(|_| RpcError::Unavailable)
+        .map_err(|_| RpcCode::Unavailable.into())
 }
 
 async fn restore_ahead_of_webview(core: Arc<Core>) {
@@ -688,6 +688,16 @@ fn spawn_event_pump<R: tauri::Runtime>(
                     _ => None,
                 })
                 .collect();
+            for event in &batch {
+                if let CoreEvent::Failure {
+                    log_id,
+                    context,
+                    report,
+                } = event
+                {
+                    sentry::capture_failure(log_id, context, report);
+                }
+            }
             event_sink.send(std::mem::take(&mut batch));
 
             if showing.is_empty() {
@@ -720,6 +730,7 @@ fn install_logging() {
     #[cfg(not(target_os = "android"))]
     let console = tracing_subscriber::fmt::layer();
     let subscriber = tracing_subscriber::registry()
+        .with(sable_core::binding::ErrorLayer::default().with_filter(filter()))
         .with(console.with_filter(filter()))
         .with(
             tracing_subscriber::fmt::layer()

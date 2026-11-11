@@ -54,8 +54,8 @@ fn log_targets(filter: &str) -> tracing_subscriber::filter::Targets {
     })
 }
 
-fn js_err(error: &RpcError) -> napi::Error {
-    napi::Error::new(Status::GenericFailure, rpc_error_json(error))
+fn js_err(error: impl Into<RpcError>) -> napi::Error {
+    napi::Error::new(Status::GenericFailure, rpc_error_json(&error.into()))
 }
 
 struct JsLogWriter {
@@ -131,6 +131,7 @@ fn init(filter: &str) {
         let (targets, handle) = tracing_subscriber::reload::Layer::new(log_targets(filter));
         if tracing_subscriber::registry()
             .with(targets)
+            .with(sable_core::binding::ErrorLayer::default())
             .with(
                 tracing_subscriber::fmt::layer()
                     .with_ansi(false)
@@ -255,7 +256,7 @@ impl SableCore {
             Box::pin(core.call(&method, &params))
                 .await
                 .map(|json| Box::<str>::from(json).into_string())
-                .map_err(|error| js_err(&error))
+                .map_err(js_err)
         })
     }
 
@@ -273,7 +274,7 @@ impl SableCore {
             async move {
                 core.fetch_media(source, width, height, background)
                     .await
-                    .map_err(|error| js_err(&error))
+                    .map_err(js_err)
             },
             |_env, bytes| Ok(Buffer::from(bytes)),
         )
@@ -286,11 +287,7 @@ impl SableCore {
         source: String,
     ) -> napi::Result<PromiseRaw<'env, ()>> {
         let core = self.core.clone();
-        env.spawn_future(async move {
-            core.forget_media(source)
-                .await
-                .map_err(|error| js_err(&error))
-        })
+        env.spawn_future(async move { core.forget_media(source).await.map_err(js_err) })
     }
 
     #[napi]
@@ -304,10 +301,8 @@ impl SableCore {
         let bytes = Vec::from(bytes);
         env.spawn_future(async move {
             let request = serde_json::from_str(&request)
-                .map_err(|error| js_err(&core.failed("send_attachment", error)))?;
-            core.send_attachment(request, bytes)
-                .await
-                .map_err(|error| js_err(&error))
+                .map_err(|error| js_err(core.failed_with("send_attachment", &error)))?;
+            core.send_attachment(request, bytes).await.map_err(js_err)
         })
     }
 
@@ -322,10 +317,8 @@ impl SableCore {
         let bytes = Vec::from(bytes);
         env.spawn_future(async move {
             let request = serde_json::from_str(&request)
-                .map_err(|error| js_err(&core.failed("send_gallery", error)))?;
-            core.send_gallery(request, bytes)
-                .await
-                .map_err(|error| js_err(&error))
+                .map_err(|error| js_err(core.failed_with("send_gallery", &error)))?;
+            core.send_gallery(request, bytes).await.map_err(js_err)
         })
     }
 
@@ -338,11 +331,7 @@ impl SableCore {
     ) -> napi::Result<PromiseRaw<'env, String>> {
         let core = self.core.clone();
         let bytes = Vec::from(bytes);
-        env.spawn_future(async move {
-            core.upload_media(mime, bytes)
-                .await
-                .map_err(|error| js_err(&error))
-        })
+        env.spawn_future(async move { core.upload_media(mime, bytes).await.map_err(js_err) })
     }
 
     #[napi]
@@ -355,11 +344,7 @@ impl SableCore {
         let core = self.core.clone();
         let frame = Vec::from(frame);
         env.spawn_future_with_callback(
-            async move {
-                core.rtc_data(&session_id, &frame)
-                    .await
-                    .map_err(|error| js_err(&error))
-            },
+            async move { core.rtc_data(&session_id, &frame).await.map_err(js_err) },
             |_env, bytes| Ok(Buffer::from(bytes)),
         )
     }

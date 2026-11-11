@@ -25,8 +25,8 @@ use session_store::JsSessionStore;
 use tokio::sync::mpsc::UnboundedReceiver;
 use wasm_bindgen::{JsValue, prelude::*};
 
-fn js_err(error: &RpcError) -> String {
-    rpc_error_json(error)
+fn js_err(error: impl Into<RpcError>) -> String {
+    rpc_error_json(&error.into())
 }
 
 static LOG_FILTER: OnceLock<
@@ -42,8 +42,7 @@ fn log_targets(filter: &str) -> tracing_subscriber::filter::Targets {
     })
 }
 
-/// Without this the core's `tracing` output is discarded and a
-/// `Failed { log_id }` names a line that was never written.
+/// Without this the core's `tracing` output is discarded.
 fn init_tracing() {
     use tracing_subscriber::prelude::*;
 
@@ -61,6 +60,7 @@ fn init_tracing() {
     // A second call fails, so a reconnecting port must stay harmless.
     if tracing_subscriber::registry()
         .with(targets)
+        .with(sable_core::binding::ErrorLayer::default())
         .with(console_layer)
         .with(debug_layer)
         .with(
@@ -133,7 +133,7 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeJsLogWriter {
         }
     }
 
-    /// Error lines always reach the page, since `Failed` carries only a `log_id`.
+    /// Error lines always reach the page, which shows them in its debug log.
     fn make_writer_for(&'a self, meta: &tracing::Metadata<'_>) -> Self::Writer {
         let reported = is_reported_event(meta);
         JsLogWriter {
@@ -230,7 +230,7 @@ impl SableCore {
         Box::pin(self.core.call(&method, &params))
             .await
             .map(|json| Box::<str>::from(json).into_string())
-            .map_err(|error| js_err(&error))
+            .map_err(js_err)
     }
 
     /// Stops syncing and refuses further calls, before another worker takes the stores.
@@ -260,7 +260,7 @@ impl SableCore {
         self.core
             .fetch_media(source, width, height, background)
             .await
-            .map_err(|error| js_err(&error))
+            .map_err(js_err)
     }
 
     /// Resolves once every stored copy of the source is gone.
@@ -270,10 +270,7 @@ impl SableCore {
     /// Returns a JSON-encoded command error when the media store cannot be written.
     #[wasm_bindgen(js_name = forgetMedia)]
     pub async fn forget_media(&self, source: String) -> Result<(), String> {
-        self.core
-            .forget_media(source)
-            .await
-            .map_err(|error| js_err(&error))
+        self.core.forget_media(source).await.map_err(js_err)
     }
 
     /// Resolves once the event is queued.
@@ -284,12 +281,12 @@ impl SableCore {
     #[wasm_bindgen(js_name = sendAttachment)]
     pub async fn send_attachment(&self, request: String, bytes: Vec<u8>) -> Result<(), String> {
         let request = serde_json::from_str(&request)
-            .map_err(|error| js_err(&self.core.failed("send_attachment", error)))?;
+            .map_err(|error| js_err(self.core.failed_with("send_attachment", &error)))?;
 
         self.core
             .send_attachment(request, bytes)
             .await
-            .map_err(|error| js_err(&error))
+            .map_err(js_err)
     }
 
     /// # Errors
@@ -298,11 +295,8 @@ impl SableCore {
     #[wasm_bindgen(js_name = sendGallery)]
     pub async fn send_gallery(&self, request: String, bytes: Vec<u8>) -> Result<(), String> {
         let request = serde_json::from_str(&request)
-            .map_err(|error| js_err(&self.core.failed("send_gallery", error)))?;
-        self.core
-            .send_gallery(request, bytes)
-            .await
-            .map_err(|error| js_err(&error))
+            .map_err(|error| js_err(self.core.failed_with("send_gallery", &error)))?;
+        self.core.send_gallery(request, bytes).await.map_err(js_err)
     }
 
     /// # Errors
@@ -310,10 +304,7 @@ impl SableCore {
     /// Returns a JSON-encoded command error when the upload fails.
     #[wasm_bindgen(js_name = uploadMedia)]
     pub async fn upload_media(&self, mime: String, bytes: Vec<u8>) -> Result<String, String> {
-        self.core
-            .upload_media(mime, bytes)
-            .await
-            .map_err(|error| js_err(&error))
+        self.core.upload_media(mime, bytes).await.map_err(js_err)
     }
 
     /// Resolves with the bytes to send back, empty when there is nothing to send.
@@ -326,7 +317,7 @@ impl SableCore {
         self.core
             .rtc_data(&session_id, &frame)
             .await
-            .map_err(|error| js_err(&error))
+            .map_err(js_err)
     }
 
     /// Called once; each call carries a `CoreEvent[]` as JSON.

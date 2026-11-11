@@ -30,7 +30,8 @@ use crate::ResultExt;
 use crate::api::timeline::{SubscribeOk, SubscribeRoomListOk};
 use crate::notifications;
 use crate::protocol::{
-    CoreEvent, RoomListItemView, RoomListOptionsView, RpcError, SubscriptionId, TimelineItemView,
+    CoreEvent, RoomListItemView, RoomListOptionsView, RpcCode, RpcError, SubscriptionId,
+    TimelineItemView,
 };
 use crate::push_rules::PushRules;
 use crate::room_list_batch::DiffBatch;
@@ -693,7 +694,7 @@ impl Core {
 
         let mut subscriptions = self.subscriptions.lock().await;
         let Some(entry) = subscriptions.get_mut(&subscription) else {
-            return Err(RpcError::Unavailable);
+            return Err(RpcCode::Unavailable.into());
         };
         entry.tasks = status_task
             .into_iter()
@@ -964,7 +965,7 @@ impl Core {
                 context = "fetch_event_details",
                 "the event left the timeline"
             );
-            return Err(RpcError::Unavailable);
+            return Err(RpcCode::Unavailable.into());
         }
         let unresolved = timeline
             .item_by_event_id(event_id)

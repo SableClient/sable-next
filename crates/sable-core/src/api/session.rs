@@ -126,7 +126,7 @@ impl Handler for ResetLocalCacheParams {
 
     #[cfg(target_family = "wasm")]
     fn run(self, _core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
-        std::future::ready(Err(RpcError::Unsupported))
+        std::future::ready(Err(crate::protocol::RpcCode::Unsupported.into()))
     }
 }
 

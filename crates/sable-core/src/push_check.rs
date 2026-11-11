@@ -1,7 +1,7 @@
 #[cfg(not(target_family = "wasm"))]
 use backon::Retryable;
 
-use crate::errors::CoreError;
+use crate::errors::{CoreError, ReportExt};
 use matrix_sdk::Client;
 use matrix_sdk::ruma::TransactionId;
 use serde::Serialize;
@@ -85,7 +85,7 @@ where
         .notify(|error, _| tracing::debug!(%error, "retrying push gateway request"))
         .sleep(matrix_sdk::sleep::sleep)
         .await
-        .map_err(CoreError::backend)
+        .backend()
 }
 
 pub enum GatewayAnswer {
@@ -99,7 +99,7 @@ pub enum GatewayAnswer {
 async fn notify_endpoint(url: &str, sealed: Vec<u8>) -> Result<bool, CoreError> {
     let http = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
         .build()
-        .map_err(CoreError::backend)?;
+        .backend()?;
     let response = retry_transient(
         || async {
             http.post(url)
@@ -125,8 +125,8 @@ async fn notify_endpoint(url: &str, sealed: Vec<u8>) -> Result<bool, CoreError> 
 fn seal(p256dh: &str, auth: &str, plaintext: &[u8]) -> Result<Vec<u8>, CoreError> {
     let mut secret = [0u8; 32];
     let mut salt = [0u8; 16];
-    getrandom::fill(&mut secret).map_err(CoreError::backend)?;
-    getrandom::fill(&mut salt).map_err(CoreError::backend)?;
+    getrandom::fill(&mut secret).backend()?;
+    getrandom::fill(&mut salt).backend()?;
     seal_with(p256dh, auth, plaintext, &secret, salt)
 }
 
@@ -201,8 +201,8 @@ async fn notify(url: &str, body: &impl Serialize) -> Result<GatewayAnswer, CoreE
 
     let http = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
         .build()
-        .map_err(CoreError::backend)?;
-    let body = serde_json::to_string(body).map_err(CoreError::backend)?;
+        .backend()?;
+    let body = serde_json::to_string(body).backend()?;
     let response = retry_transient(
         || async {
             http.post(url)
@@ -223,9 +223,9 @@ async fn notify(url: &str, body: &impl Serialize) -> Result<GatewayAnswer, CoreE
     ) {
         return Ok(GatewayAnswer::Unforwarded);
     }
-    let response = response.error_for_status().map_err(CoreError::backend)?;
-    let bytes = response.bytes().await.map_err(CoreError::backend)?;
-    let answer: NotifyResponse = serde_json::from_slice(&bytes).map_err(CoreError::backend)?;
+    let response = response.error_for_status().backend()?;
+    let bytes = response.bytes().await.backend()?;
+    let answer: NotifyResponse = serde_json::from_slice(&bytes).backend()?;
     Ok(GatewayAnswer::Read(answer.rejected))
 }
 
@@ -245,7 +245,7 @@ async fn notify(url: &str, body: &impl Serialize) -> Result<GatewayAnswer, CoreE
     init.set_method("POST");
     init.set_mode(web_sys::RequestMode::NoCors);
     init.set_body(&wasm_bindgen::JsValue::from_str(
-        &serde_json::to_string(body).map_err(CoreError::backend)?,
+        &serde_json::to_string(body).backend()?,
     ));
     let request = web_sys::Request::new_with_str_and_init(url, &init).map_err(js_error)?;
     wasm_bindgen_futures::JsFuture::from(js_fetch(&request))
@@ -350,7 +350,7 @@ pub async fn send_diagnostic_push(
             .to_owned();
         let event_id = format!("{DIAGNOSTIC_EVENT_PREFIX}{}", TransactionId::new());
         let body = notify_body(&event_id, app_id, pushkey, pusher.data);
-        let body = serde_json::to_vec(&body).map_err(CoreError::backend)?;
+        let body = serde_json::to_vec(&body).backend()?;
         return Ok(direct_delivery(
             notify_endpoint(endpoint.as_str(), seal(pushkey, &auth, &body)?).await?,
             event_id,

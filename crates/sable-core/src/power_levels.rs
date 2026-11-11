@@ -9,7 +9,7 @@ use serde_with::{DefaultOnError, serde_as};
 
 use crate::protocol::{
     PowerLevelAction, PowerLevelLocation, PowerLevelTagView, PowerLevelTagsView,
-    RoomPowerLevelsView, RpcError,
+    RoomPowerLevelsView, RpcCode, RpcError,
 };
 use crate::view;
 use crate::{Core, ResultExt};
@@ -301,7 +301,7 @@ impl Core {
         let user_id = room
             .client()
             .user_id()
-            .ok_or(RpcError::NotLoggedIn)?
+            .ok_or(RpcCode::NotLoggedIn)?
             .to_owned();
         let levels = room.power_levels_or_default().await;
         Ok((

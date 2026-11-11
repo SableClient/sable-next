@@ -3,7 +3,14 @@ import { WebSocket as ReconnectingWebSocket } from 'partysocket';
 import { stringToBase64 } from 'uint8array-extras';
 
 import { boundServerIdentity } from '#lib/notifications/room-names.js';
-import { CoreError, type Attachment, type Gallery, type Transport } from './index';
+import {
+  CoreError,
+  commandFailed,
+  transportFailure,
+  type Attachment,
+  type Gallery,
+  type Transport,
+} from './index';
 import { attachmentBytes } from './attachment-bytes';
 
 export type WsTransportOptions = {
@@ -11,6 +18,7 @@ export type WsTransportOptions = {
 };
 
 type Pending = {
+  method: string;
   resolve: (value: unknown) => void;
   reject: (error: unknown) => void;
 };
@@ -31,7 +39,7 @@ function errorDetail(value: unknown): RpcError {
     const code = value.code;
     if (typeof code === 'string') return value as RpcError;
   }
-  return { code: 'failed', log_id: 'invalid server error' };
+  return transportFailure('invalid server error');
 }
 
 function websocketUrl(url: string, runId: string | null, lastReceivedEvent: number): string {
@@ -61,7 +69,7 @@ async function responseError(response: Response): Promise<CoreError> {
   try {
     return new CoreError(errorDetail(await response.json()));
   } catch {
-    return new CoreError({ code: 'failed', log_id: `server returned HTTP ${response.status}` });
+    return new CoreError(transportFailure(`server returned HTTP ${response.status}`));
   }
 }
 
@@ -163,7 +171,7 @@ export function createWsTransport(options: WsTransportOptions): Transport {
     }
     setStalled(false);
     if ('ok' in data) request.resolve(data.ok);
-    else request.reject(new CoreError(errorDetail(data.error)));
+    else request.reject(commandFailed(errorDetail(data.error), request.method));
   }
 
   function setStalled(next: boolean): void {
@@ -173,7 +181,7 @@ export function createWsTransport(options: WsTransportOptions): Transport {
   }
 
   function rejectPending(message: string): void {
-    const error = new CoreError({ code: 'failed', log_id: message });
+    const error = new CoreError(transportFailure(message));
     for (const request of pending.values()) request.reject(error);
     pending.clear();
     if (stallTimer !== undefined) clearTimeout(stallTimer);
@@ -213,12 +221,11 @@ export function createWsTransport(options: WsTransportOptions): Transport {
 
   function request(method: string, params: unknown): Promise<unknown> {
     if (Date.now() - lastSessionRefresh >= 5 * 60_000) refreshSession();
-    if (closed)
-      return Promise.reject(new CoreError({ code: 'failed', log_id: 'transport closed' }));
+    if (closed) return Promise.reject(new CoreError(transportFailure('transport closed')));
     const id = nextId++;
     const message = JSON.stringify({ id, method, params });
     const promise = new Promise<unknown>((resolve, reject) => {
-      pending.set(id, { resolve, reject });
+      pending.set(id, { method, resolve, reject });
     });
     if (stallTimer === undefined) {
       stallTimer = setTimeout(() => {

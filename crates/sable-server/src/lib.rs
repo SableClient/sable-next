@@ -265,6 +265,17 @@ struct EventEnvelope<'a> {
 struct EventRecord {
     sequence: u64,
     message: Arc<str>,
+    /// Set on a core failure, which every client would report: the first
+    /// socket to take it forwards the event and the others skip it.
+    unclaimed: Option<AtomicBool>,
+}
+
+impl EventRecord {
+    fn claim(&self) -> bool {
+        self.unclaimed
+            .as_ref()
+            .is_none_or(|unclaimed| unclaimed.swap(false, Ordering::AcqRel))
+    }
 }
 
 struct EventBuffer {
@@ -560,9 +571,11 @@ impl UserRuntime {
             return;
         };
         buffer.next_sequence = sequence.saturating_add(1);
+        let failure = matches!(event, sable_core::protocol::CoreEvent::Failure { .. });
         let record = Arc::new(EventRecord {
             sequence,
             message: Arc::from(message),
+            unclaimed: failure.then(|| AtomicBool::new(true)),
         });
         if buffer.records.len() == EVENT_BUFFER {
             buffer.records.pop_front();
@@ -618,7 +631,21 @@ async fn health() -> &'static str {
 }
 
 pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    tracing_subscriber::fmt::init();
+    {
+        use tracing_subscriber::filter::Targets;
+        use tracing_subscriber::layer::SubscriberExt as _;
+        use tracing_subscriber::util::SubscriberInitExt as _;
+        // What `fmt::init` did before the error layer needed a registry.
+        let targets = std::env::var("RUST_LOG")
+            .ok()
+            .and_then(|filter| filter.parse::<Targets>().ok())
+            .unwrap_or_else(|| Targets::new().with_default(tracing::Level::INFO));
+        tracing_subscriber::registry()
+            .with(targets)
+            .with(sable_core::binding::ErrorLayer::default())
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+    }
     let cli = Cli::parse();
     if let Some(command) = cli.command {
         return command.run(cli.config);
@@ -850,5 +877,38 @@ mod tests {
             .await;
         assert!(!reset);
         assert_eq!(replay.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_core_failure_goes_to_one_client_and_other_events_to_all() {
+        let dir = tempfile::tempdir().unwrap();
+        let runtime = UserRuntime::new(dir.path().join("user")).unwrap();
+        let (mut first, _, _) = runtime.resume_and_subscribe(None, None).await;
+        let (mut second, _, _) = runtime.resume_and_subscribe(None, None).await;
+        runtime
+            .publish_event(sable_core::protocol::CoreEvent::Failure {
+                log_id: "e1".to_owned(),
+                context: "join_room".to_owned(),
+                report: Box::default(),
+            })
+            .await;
+        runtime
+            .publish_event(sable_core::protocol::CoreEvent::SessionEnded {
+                reason: "signed out".to_owned(),
+            })
+            .await;
+
+        let (failure, ended) = (first.try_recv().unwrap(), first.try_recv().unwrap());
+        assert!(failure.claim());
+        assert!(ended.claim());
+        let (failure, ended) = (second.try_recv().unwrap(), second.try_recv().unwrap());
+        assert!(!failure.claim(), "a second client would report it again");
+        assert!(ended.claim());
+
+        let (_, replay, _) = runtime
+            .resume_and_subscribe(Some(&runtime.run_id), Some(0))
+            .await;
+        let resent = replay.iter().filter(|event| event.claim()).count();
+        assert_eq!(resent, 1, "a reconnect must not replay the failure");
     }
 }

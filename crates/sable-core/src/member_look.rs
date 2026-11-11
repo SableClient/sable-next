@@ -6,7 +6,7 @@ use serde_with::{DefaultOnError, NoneAsEmptyString, VecSkipError, serde_as};
 
 use crate::Core;
 use crate::cosmetics::{COLOR_EVENT, MEMBER_COLOR_FIELD, MEMBER_EVENT, PRONOUNS_EVENT};
-use crate::protocol::{FieldEdit, MemberLookView, PronounView, RpcError};
+use crate::protocol::{FieldEdit, MemberLookView, PronounView, RpcCode, RpcError};
 use crate::room_settings::EmptyContent;
 
 pub(crate) struct LookEdit {
@@ -181,7 +181,7 @@ impl Core {
             .client()
             .await?
             .user_id()
-            .ok_or(RpcError::NotLoggedIn)?
+            .ok_or(RpcCode::NotLoggedIn)?
             .to_string())
     }
 

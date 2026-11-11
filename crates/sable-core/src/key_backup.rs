@@ -1,4 +1,5 @@
-use crate::errors::CoreError;
+use crate::errors::CoreResultExt as _;
+use crate::errors::{CoreError, ReportExt};
 use matrix_sdk::{
     Client,
     ruma::api::{
@@ -10,21 +11,23 @@ use matrix_sdk_base::crypto::{
     olm::ExportedRoomKey, store::types::BackupDecryptionKey, types::RoomKeyBackupInfo,
 };
 
+use crate::Core;
 use crate::protocol::{
-    CoreEvent, KeyBackupDownloadState, KeyBackupDownloadView, KeyBackupStatusView, RpcError,
+    CoreEvent, KeyBackupDownloadState, KeyBackupDownloadView, KeyBackupStatusView, RpcCode,
+    RpcError,
 };
-use crate::{Core, ResultExt};
 
 impl Core {
     pub(crate) async fn key_backup_status(&self) -> Result<KeyBackupStatusView, RpcError> {
         let (account_id, client) = self
             .session
             .current(|session| (session.account_id.clone(), session.client.clone()))
-            .ok_or(RpcError::NotLoggedIn)?;
+            .ok_or(RpcCode::NotLoggedIn)?;
+        let base = self.base_client().await?;
         let status = self
-            .backup_status(&client)
+            .backup_status(&base, &client)
             .await
-            .or_failed(self, "key_backup_status")?;
+            .or_report(self, "key_backup_status")?;
         let download = self
             .key_backup_download
             .lock()
@@ -47,11 +50,11 @@ impl Core {
         let _permit = self
             .key_backup_downloads
             .try_acquire()
-            .map_err(|_| RpcError::Unavailable)?;
+            .map_err(|_| RpcCode::Unavailable)?;
         let (account_id, client) = self
             .session
             .current(|session| (session.account_id.clone(), session.client.clone()))
-            .ok_or(RpcError::NotLoggedIn)?;
+            .ok_or(RpcCode::NotLoggedIn)?;
         let generation = self.lifecycle.current();
         let initial = KeyBackupDownloadView {
             account_id,
@@ -63,8 +66,9 @@ impl Core {
             failed: 0,
         };
         self.report_key_backup_download(generation, initial.clone());
+        let base = self.base_client().await?;
         let result = self
-            .download_all_room_keys(&client, |progress| {
+            .download_all_room_keys(&base, &client, |progress| {
                 self.report_key_backup_download(
                     generation,
                     KeyBackupDownloadView {
@@ -85,27 +89,19 @@ impl Core {
             KeyBackupDownloadState::Failed
         };
         self.report_key_backup_download(generation, download.clone());
-        result.or_failed(self, "download_key_backup")?;
+        result.or_report(self, "download_key_backup")?;
         Ok(download)
     }
 
-    pub(crate) async fn backup_status(&self, client: &Client) -> Result<BackupStatus, CoreError> {
-        let base = self
-            .base_client()
-            .await
-            .map_err(|error| CoreError::Message(format!("{error:?}")))?;
+    pub(crate) async fn backup_status(
+        &self,
+        base: &crate::session::SharedBaseClient,
+        client: &Client,
+    ) -> Result<BackupStatus, CoreError> {
         let machine = base.olm_machine().await;
         let machine = machine.as_ref().ok_or("no olm machine")?;
-        let counts = machine
-            .backup_machine()
-            .room_key_counts()
-            .await
-            .map_err(CoreError::backend)?;
-        let keys = machine
-            .store()
-            .load_backup_keys()
-            .await
-            .map_err(CoreError::backend)?;
+        let counts = machine.backup_machine().room_key_counts().await.backend()?;
+        let keys = machine.store().load_backup_keys().await.backend()?;
         let current = current_backup(client).await?;
         let same_version = current
             .as_ref()
@@ -128,20 +124,13 @@ impl Core {
 
     pub(crate) async fn download_all_room_keys(
         &self,
+        base: &crate::session::SharedBaseClient,
         client: &Client,
         progress: impl Fn(BackupDownloadProgress),
     ) -> Result<BackupDownloadProgress, CoreError> {
-        let base = self
-            .base_client()
-            .await
-            .map_err(|error| CoreError::Message(format!("{error:?}")))?;
         let machine = base.olm_machine().await;
         let machine = machine.as_ref().ok_or("no olm machine")?;
-        let keys = machine
-            .store()
-            .load_backup_keys()
-            .await
-            .map_err(CoreError::backend)?;
+        let keys = machine.store().load_backup_keys().await.backend()?;
         let (Some(key), Some(version)) = (keys.decryption_key, keys.backup_version) else {
             return Err("backup is not enabled".into());
         };
@@ -154,7 +143,7 @@ impl Core {
         let response = client
             .send(get_backup_keys::v3::Request::new(version.clone()))
             .await
-            .map_err(CoreError::backend)?;
+            .backend()?;
         let sessions: Vec<_> = response
             .rooms
             .into_iter()
@@ -186,7 +175,7 @@ impl Core {
                 .store()
                 .import_room_keys(exported, Some(&version), |_, _| {})
                 .await
-                .map_err(CoreError::backend)?;
+                .backend()?;
             counts.processed += batch.len();
             counts.imported += result.imported_count;
             counts.failed += batch.len() - result.total_count;

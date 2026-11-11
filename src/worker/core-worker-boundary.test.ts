@@ -1,4 +1,5 @@
 import { attachmentBytes } from '../transport/attachment-bytes';
+import { transportFailure } from '../transport';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { createCoreWorkerBoundary, type WorkerCore, type WorkerPort } from './core-worker-boundary';
@@ -86,7 +87,7 @@ test('a core rejecting with a plain message fails the command', async () => {
 
   await port.send({ id: 1, call: { method: 'session.restore', params: {} } });
 
-  expect(port.messages).toEqual([{ id: 1, err: { code: 'failed', log_id: 'the media is gone' } }]);
+  expect(port.messages).toEqual([{ id: 1, err: transportFailure('the media is gone') }]);
 });
 
 test.each([undefined, false, true])(
@@ -321,6 +322,26 @@ test('sends the subscription snapshot before startup events buffered for its por
   expect(second.messages).toEqual([]);
 });
 
+test('a core failure reaches one page, so it is reported once', () => {
+  const boundary = createCoreWorkerBoundary(Promise.resolve(fakeCore(() => Promise.resolve('{}'))));
+  const first = new FakePort();
+  const second = new FakePort();
+  boundary.connect(first);
+  boundary.connect(second);
+  const failure = {
+    type: 'failure',
+    log_id: 'e1',
+    context: 'join_room',
+    report: { frames: [], http: null, span_trace: null },
+  };
+
+  boundary.handleEvent(JSON.stringify([failure, { type: 'sync_status', status: 'running' }]));
+
+  const status = { events: [{ type: 'sync_status', status: 'running' }] };
+  expect(first.messages).toEqual([status, { events: [failure] }]);
+  expect(second.messages).toEqual([status]);
+});
+
 test('forwards a core batch as one message per port', async () => {
   const boundary = createCoreWorkerBoundary(
     Promise.resolve(fakeCore(() => Promise.resolve(JSON.stringify({ subscription: 7, items: [] }))))
@@ -482,7 +503,7 @@ test('a panic reaches every port and later commands fail instead of hanging', as
   expect(second.messages).toEqual([{ panic: { message: 'index out of bounds' } }]);
   expect(first.messages).toEqual([
     { panic: { message: 'index out of bounds' } },
-    { id: 1, err: { code: 'failed', log_id: 'core panicked: index out of bounds' } },
+    { id: 1, err: transportFailure('core panicked: index out of bounds') },
   ]);
 });
 
@@ -646,7 +667,7 @@ test('a reset request fails while another port is connected', () => {
 
   expect(terminate).not.toHaveBeenCalled();
   expect(first.messages).toEqual([
-    { id: 1, err: { code: 'failed', log_id: 'close other Sable tabs before resetting the cache' } },
+    { id: 1, err: transportFailure('close other Sable tabs before resetting the cache') },
   ]);
   expect(second.messages).toEqual([]);
 });
