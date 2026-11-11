@@ -68,6 +68,17 @@ pub fn visible_name(name: &str) -> Option<String> {
     sable_model::text::visible_name(name).map(str::to_owned)
 }
 
+#[wasm_bindgen(js_name = proxyBody)]
+#[must_use]
+pub fn proxy_body(
+    prefix: Option<String>,
+    suffix: Option<String>,
+    keep_trigger: bool,
+    body: &str,
+) -> Option<String> {
+    sable_model::proxy::proxy_body(prefix.as_deref(), suffix.as_deref(), keep_trigger, body)
+}
+
 #[wasm_bindgen(js_name = parseSearchQuery)]
 pub fn parse_search_query(input: &str) -> Result<String, JsError> {
     json(&search_query::parse_search_query(input))

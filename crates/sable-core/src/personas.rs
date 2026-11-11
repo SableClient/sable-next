@@ -878,10 +878,81 @@ async fn space_associations(
 }
 
 #[cfg(not(target_family = "wasm"))]
-pub(crate) async fn notification_profile(
+fn persona_profile(
+    persona: &PersonaView,
+    alternate_avatar_id: Option<&str>,
+) -> PerMessageProfileView {
+    let avatar_url = alternate_avatar_id
+        .and_then(|id| {
+            persona
+                .alternate_avatars
+                .as_ref()?
+                .iter()
+                .find(|avatar| avatar.id == id)
+        })
+        .map_or_else(
+            || persona.avatar_url.clone(),
+            |avatar| Some(avatar.avatar_url.clone()),
+        );
+    PerMessageProfileView {
+        id: Some(persona.id.clone()),
+        display_name: sable_model::text::visible_name(persona.display_name.clone()),
+        avatar_url,
+        pronouns: persona.pronouns.clone(),
+        color_on_light: persona.color_on_light.clone(),
+        color_on_dark: persona.color_on_dark.clone(),
+        has_fallback: false,
+        biography: None,
+        banner_url: None,
+        is_animal: None,
+        has_animal: None,
+        animal_need: None,
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn proxied<'catalog>(
+    personas: &'catalog [PersonaView],
+    body: &str,
+) -> Option<(String, &'catalog PersonaView, Option<&'catalog str>)> {
+    personas.iter().find_map(|persona| {
+        persona.triggers.iter().find_map(|trigger| {
+            let text = sable_model::proxy::proxy_body(
+                trigger.prefix.as_deref(),
+                trigger.suffix.as_deref(),
+                trigger.keep_trigger,
+                body,
+            )?;
+            Some((text, persona, trigger.alternate_avatar_id.as_deref()))
+        })
+    })
+}
+
+/// Off when the synced settings cannot be read: shorthands are opt-in.
+#[cfg(not(target_family = "wasm"))]
+async fn proxying_enabled(client: &matrix_sdk::Client) -> bool {
+    const SETTINGS: &str = "moe.sable.next.settings";
+    let key = crate::sealed_account_data::cached_key(client).await;
+    match crate::sealed_account_data::read_document(client, SETTINGS, true, key).await {
+        Ok(settings) => settings
+            .content
+            .as_ref()
+            .and_then(|content| content.pointer("/settings/personaProxying"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        Err(error) => {
+            tracing::warn!("synced settings unavailable for a notification reply: {error}");
+            false
+        }
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub(crate) async fn notification_reply(
     client: &matrix_sdk::Client,
     room_id: &matrix_sdk::ruma::RoomId,
-) -> matrix_sdk::Result<Option<PerMessageProfileView>> {
+    body: &str,
+) -> matrix_sdk::Result<(String, Option<PerMessageProfileView>)> {
     async fn data(
         client: &matrix_sdk::Client,
         event_type: GlobalAccountDataEventType,
@@ -893,6 +964,20 @@ pub(crate) async fn notification_profile(
             .map(|raw| raw.deserialize_as::<Value>().map_err(Into::into))
             .transpose()
     }
+    let catalog = match data(client, CATALOG_V3.into()).await? {
+        Some(catalog) => Some(catalog),
+        None => data(client, CATALOG_V2.into()).await?,
+    };
+    let personas = catalog
+        .as_ref()
+        .map(personas_from_catalog)
+        .unwrap_or_default();
+    if proxying_enabled(client).await
+        && let Some((text, persona, alternate)) = proxied(&personas, body)
+    {
+        return Ok((text, Some(persona_profile(persona, alternate))));
+    }
+
     let associations = data(client, selection_event("roomassociation"))
         .await?
         .as_ref()
@@ -902,7 +987,7 @@ pub(crate) async fn notification_profile(
         associations.get(room_id.as_str()),
         Some(RoomAssociation::Account | RoomAssociation::Disabled)
     ) {
-        return Ok(None);
+        return Ok((body.to_owned(), None));
     }
     let account = data(client, selection_event("globalassociation"))
         .await?
@@ -913,20 +998,12 @@ pub(crate) async fn notification_profile(
                 .association?
                 .into_view()
         });
-    let catalog = match data(client, CATALOG_V3.into()).await? {
-        Some(catalog) => Some(catalog),
-        None => data(client, CATALOG_V2.into()).await?,
-    };
-    let personas = catalog
-        .as_ref()
-        .map(personas_from_catalog)
-        .unwrap_or_default();
     let mut selections = space_associations(client, room_id, &associations).await;
     selections.extend(account.map(RoomAssociation::Persona));
     let now = crate::now_ms();
     for association in selections {
         let selection = match association {
-            RoomAssociation::Account | RoomAssociation::Disabled => return Ok(None),
+            RoomAssociation::Account | RoomAssociation::Disabled => break,
             RoomAssociation::Persona(selection) => selection,
         };
         if selection.valid_until.is_some_and(|until| until <= now) {
@@ -936,37 +1013,11 @@ pub(crate) async fn notification_profile(
             .iter()
             .find(|profile| profile.id == selection.persona_id)
         {
-            let avatar_url = selection
-                .alternate_avatar_id
-                .as_ref()
-                .and_then(|id| {
-                    persona
-                        .alternate_avatars
-                        .as_ref()?
-                        .iter()
-                        .find(|avatar| &avatar.id == id)
-                })
-                .map_or_else(
-                    || persona.avatar_url.clone(),
-                    |avatar| Some(avatar.avatar_url.clone()),
-                );
-            return Ok(Some(PerMessageProfileView {
-                id: Some(persona.id.clone()),
-                display_name: sable_model::text::visible_name(persona.display_name.clone()),
-                avatar_url,
-                pronouns: persona.pronouns.clone(),
-                color_on_light: persona.color_on_light.clone(),
-                color_on_dark: persona.color_on_dark.clone(),
-                has_fallback: false,
-                biography: None,
-                banner_url: None,
-                is_animal: None,
-                has_animal: None,
-                animal_need: None,
-            }));
+            let profile = persona_profile(persona, selection.alternate_avatar_id.as_deref());
+            return Ok((body.to_owned(), Some(profile)));
         }
     }
-    Ok(None)
+    Ok((body.to_owned(), None))
 }
 
 impl Core {

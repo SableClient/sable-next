@@ -5518,7 +5518,7 @@ async fn notification_replies_resolve_room_and_account_profiles() {
                 .mount(server.server())
                 .await;
         }
-        let profile = crate::personas::notification_profile(&client, room_id)
+        let (_, profile) = crate::personas::notification_reply(&client, room_id, "hi")
             .await
             .unwrap();
         assert_eq!(
@@ -5526,6 +5526,61 @@ async fn notification_replies_resolve_room_and_account_profiles() {
                 .as_ref()
                 .and_then(|profile| profile.display_name.as_deref()),
             expected
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_notification_reply_follows_a_profile_shorthand_when_proxying_is_on() {
+    for (proxying, body, expected_text, expected_profile) in [
+        (true, "k: hi", "hi", "Kris"),
+        (true, "hello", "hello", "Account profile"),
+        (false, "k: hi", "k: hi", "Account profile"),
+    ] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!profile:example.org");
+        server.sync_joined_room(&client, room_id).await;
+        for (event_type, content) in [
+            (
+                "fyi.cisnt.permessageprofile.roomassociation",
+                json!({"associations": {}}),
+            ),
+            (
+                "fyi.cisnt.permessageprofile.globalassociation",
+                json!({"association": {"profileId": "account"}}),
+            ),
+            (
+                "fi.mau.msc4461.per_message_profiles.v3",
+                json!({"profiles": [
+                    {"id": "account", "displayname": "Account profile"},
+                    {"id": "kris", "displayname": "Kris", "triggers": [{"prefix": "k:"}]},
+                ]}),
+            ),
+            (
+                "moe.sable.next.settings",
+                json!({"settings": {"personaProxying": proxying}}),
+            ),
+        ] {
+            Mock::given(method("GET"))
+                .and(path_regex(format!(
+                    "/account_data/{}$",
+                    event_type.replace('.', "\\.")
+                )))
+                .respond_with(ResponseTemplate::new(200).set_body_json(content))
+                .mount(server.server())
+                .await;
+        }
+
+        let (text, profile) = crate::personas::notification_reply(&client, room_id, body)
+            .await
+            .unwrap();
+
+        assert_eq!(text, expected_text, "{body}");
+        assert_eq!(
+            profile.and_then(|profile| profile.display_name),
+            Some(expected_profile.to_owned()),
+            "{body}"
         );
     }
 }

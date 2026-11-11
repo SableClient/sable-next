@@ -100,6 +100,15 @@ export function visibleName(name: string): string | null {
   return wasm.visibleName(name) ?? null;
 }
 
+export function proxyBody(
+  prefix: string | null,
+  suffix: string | null,
+  keepTrigger: boolean,
+  body: string
+): string | null {
+  return wasm.proxyBody(prefix ?? undefined, suffix ?? undefined, keepTrigger, body) ?? null;
+}
+
 export function searchOperators(): SearchOperator[] {
   return JSON.parse(wasm.searchOperators()) as SearchOperator[];
 }

@@ -342,19 +342,19 @@ impl PushSession {
         let Some(room) = self.host.client().get_room(&self.room_id) else {
             return false;
         };
-        let profile = match self
+        let (text, profile) = match self
             .host
-            .retry(|| crate::personas::notification_profile(self.host.client(), &self.room_id))
+            .retry(|| crate::personas::notification_reply(self.host.client(), &self.room_id, text))
             .await
         {
-            Ok(profile) => profile,
+            Ok(reply) => reply,
             Err(error) => {
                 tracing::warn!("notification reply profile unavailable: {error}");
                 return false;
             }
         };
         let content = crate::outgoing::message_content(
-            text.to_owned(),
+            text,
             None,
             crate::protocol::MessageKind::Text,
             Vec::new(),

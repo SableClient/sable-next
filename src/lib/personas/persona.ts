@@ -4,6 +4,7 @@ import type {
   PersonaTriggerView,
   PersonaView,
 } from '#src/generated/protocol';
+import { proxyBody } from '#lib/model/model.js';
 
 export function projectPersona(persona: PersonaView, fallback: boolean): PerMessageProfileView {
   return {
@@ -113,30 +114,15 @@ export interface ProxyMatch {
   trigger: PersonaTriggerView;
 }
 
-function matches(trigger: PersonaTriggerView, body: string): boolean {
-  const prefix = trigger.prefix ?? '';
-  const suffix = trigger.suffix ?? '';
-  if (prefix === '' && suffix === '') return false;
-  if (body.length < prefix.length + suffix.length) return false;
-  return body.startsWith(prefix) && body.endsWith(suffix);
-}
-
 export function resolveProxy(
   personas: readonly PersonaView[],
   body: string
 ): ProxyMatch | undefined {
   for (const persona of personas) {
-    const trigger = persona.triggers.find((candidate) => matches(candidate, body));
-    if (!trigger) continue;
-    if (trigger.keep_trigger) return { persona, body, trigger };
-
-    return {
-      persona,
-      body: body
-        .slice(trigger.prefix?.length ?? 0, body.length - (trigger.suffix?.length ?? 0))
-        .trim(),
-      trigger,
-    };
+    for (const trigger of persona.triggers) {
+      const proxied = proxyBody(trigger.prefix, trigger.suffix, trigger.keep_trigger, body);
+      if (proxied !== null) return { persona, body: proxied, trigger };
+    }
   }
   return undefined;
 }
