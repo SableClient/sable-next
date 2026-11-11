@@ -2583,11 +2583,14 @@ test('a failed bot command does not restore into another room', async () => {
   setRoom?.('!other:example.org');
   await flushed();
   rejectSend?.(new Error('offline'));
+  await flushed();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
-  await vi.waitFor(() => {
-    expect(screen.getByRole('alert')).toBeInTheDocument();
-  });
+  expect(screen.queryByRole('alert')).toBeNull();
   expect(editorText()).toBe('');
+  setRoom?.('!room:example.org');
+  await flushed();
+  expect(editorText()).toBe('/register payload');
 });
 
 test('a bot command lookup does not clear a newer draft', async () => {
@@ -2897,4 +2900,51 @@ test('without bot command support an unknown command still goes to the slash han
       room: false,
     });
   });
+});
+
+test('a send that fails after leaving the room returns its text to that room, not the open one', async () => {
+  let failSend: ((error: Error) => void) | undefined;
+  const send = vi.fn(
+    () =>
+      new Promise<void>((_, reject) => {
+        failSend = reject;
+      })
+  );
+  let switchRoom: ((roomId: string) => void) | undefined;
+  const doc = composerSchema.node('doc', null, [
+    composerSchema.nodes.paragraph.create(null, [composerSchema.text('meant for the first room')]),
+  ]);
+  writeDraft('!first:example.org', { doc: doc.toJSON(), staged: [], nextStagedId: 0 });
+  setup({
+    roomId: '!first:example.org',
+    onSend: send,
+    registerRoom: (set) => {
+      switchRoom = set;
+    },
+  });
+  await flushed();
+
+  submit();
+  await vi.waitFor(() => {
+    expect(send).toHaveBeenCalled();
+  });
+  switchRoom?.('!second:example.org');
+  await flushed();
+  expect(editorText()).toBe('');
+  failSend?.(new Error('network'));
+  await flushed();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushed();
+
+  expect(send).toHaveBeenCalledWith(
+    '!first:example.org',
+    'meant for the first room',
+    null,
+    expect.anything()
+  );
+  expect(editorText()).toBe('');
+  expect(screen.queryByRole('alert')).toBeNull();
+  switchRoom?.('!first:example.org');
+  await flushed();
+  expect(editorText()).toBe('meant for the first room');
 });
