@@ -131,3 +131,25 @@ test('disabling receipts hides indicators and removes controls until the account
   expect(settings.preferences.hideReadReceipts).toBe(false);
   expect(send?.supported?.({ oauth: false })).toBe(true);
 });
+
+test('each account keeps its own online status and starts from the shared one', async () => {
+  const settings = await loadWith({ sendPresence: false, theme: 'dark' });
+  settings.selectPreferenceAccount('a');
+  expect(settings.preferences.sendPresence).toBe(false);
+
+  settings.selectPreferenceAccount('b');
+  expect(settings.preferences.sendPresence).toBe(false);
+  settings.setPreference('sendPresence', true);
+  settings.setPreference('theme', 'light');
+
+  settings.selectPreferenceAccount('a');
+  expect(settings.preferences.sendPresence).toBe(false);
+  expect(settings.preferences.theme).toBe('light');
+
+  vi.resetModules();
+  const restored = await import('./preferences.svelte.js');
+  restored.selectPreferenceAccount('b');
+  expect(restored.preferences.sendPresence).toBe(true);
+  restored.selectPreferenceAccount('c');
+  expect(restored.preferences.sendPresence).toBe(false);
+});

@@ -85,6 +85,7 @@
   import { startSystemBarSync } from '#lib/platform/system-bars.js';
   import { installAndroidBack } from '#lib/platform/android-back.js';
   import {
+    selectPreferenceAccount,
     preferences,
     readReceiptIsPrivate,
     setPreference,
@@ -202,6 +203,9 @@
   $effect(() => {
     const inputMode = preferences.callInputMode;
     untrack(() => callSession.setInputMode(inputMode));
+  });
+  $effect.pre(() => {
+    selectPreferenceAccount(core.session?.account_id ?? null);
   });
   $effect(() => {
     void core.accountRevision;

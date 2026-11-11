@@ -5,12 +5,14 @@ import { migrateSettings, SETTINGS_SCHEMA } from './migrations.js';
 import {
   ACCOUNT_PREFERENCES,
   DEFAULTS,
+  PER_ACCOUNT_PREFERENCES,
   PREFERENCE_KEYS,
   sanitize,
   type Preferences,
 } from './definitions.js';
 
 const STORAGE_KEY = 'sable-preferences';
+const ACCOUNT_STORAGE_KEY = 'sable-account-preferences';
 const LEGACY_STORAGE_KEY = 'sable-timeline-preferences';
 
 function read(key: string): Record<string, unknown> | null {
@@ -46,6 +48,32 @@ function load(): Preferences {
 
 export const preferences = $state<Preferences>(load());
 for (const key of explicit) userValues.set(key, preferences[key]);
+
+// eslint-disable-next-line svelte/prefer-svelte-reactivity -- read only when switching accounts
+const sharedValues = new Map([...userValues].filter(([key]) => PER_ACCOUNT_PREFERENCES.has(key)));
+let activeAccount: string | null = null;
+
+function storedAccounts(): Record<string, Record<string, unknown>> {
+  return (read(ACCOUNT_STORAGE_KEY) ?? {}) as Record<string, Record<string, unknown>>;
+}
+
+export function selectPreferenceAccount(accountId: string | null): void {
+  if (accountId === activeAccount) return;
+  activeAccount = accountId;
+  const own = accountId === null ? undefined : storedAccounts()[accountId];
+  const values = own ? sanitize(own, DEFAULTS) : null;
+  for (const key of PER_ACCOUNT_PREFERENCES) {
+    const value = own && key in own ? values?.[key] : sharedValues.get(key);
+    if (value === undefined) {
+      userValues.delete(key);
+      explicit.delete(key);
+    } else {
+      userValues.set(key, value);
+      explicit.add(key);
+    }
+  }
+  resolvePolicy();
+}
 
 export function readReceiptIsPrivate(): boolean {
   return !preferences.sendReadReceipts;
@@ -147,8 +175,23 @@ function resolvePolicy(): void {
 function persist(): void {
   untrack(() => {
     const stored: Record<string, unknown> = { schema: SETTINGS_SCHEMA };
+    const own: Record<string, unknown> = {};
     for (const key of explicit) {
-      stored[key] = userValues.get(key);
+      if (activeAccount !== null && PER_ACCOUNT_PREFERENCES.has(key))
+        own[key] = userValues.get(key);
+      else stored[key] = userValues.get(key);
+    }
+    if (activeAccount === null) {
+      for (const key of PER_ACCOUNT_PREFERENCES) {
+        if (explicit.has(key)) sharedValues.set(key, userValues.get(key));
+      }
+    } else {
+      for (const [key, value] of sharedValues) stored[key] = value;
+      writeJson(
+        ACCOUNT_STORAGE_KEY,
+        { ...storedAccounts(), [activeAccount]: own },
+        '[sable settings] account preferences not persisted'
+      );
     }
     writeJson(STORAGE_KEY, stored, '[sable settings] preferences not persisted');
   });
