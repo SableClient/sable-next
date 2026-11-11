@@ -33,7 +33,7 @@ export interface RoomGroup {
 
 export class MessageSearch {
   query = $state('');
-  order = $state<SearchOrder>('rank');
+  order = $state<SearchOrder>('recent');
   hits = $state.raw<SearchHitView[]>([]);
   searching = $state(false);
   refining = $state(false);

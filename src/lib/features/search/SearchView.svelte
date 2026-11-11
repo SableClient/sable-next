@@ -77,7 +77,7 @@
   let destroyed = false;
 
   search.query = untrack(() => (panel ? initialQuery : (page.url.searchParams.get('q') ?? '')));
-  search.order = untrack(() => (panel ? 'rank' : orderFrom(page.url.searchParams.get('order'))));
+  search.order = untrack(() => (panel ? 'recent' : orderFrom(page.url.searchParams.get('order'))));
   if (search.query !== '') {
     search.schedule();
     scheduleLookup();
@@ -211,7 +211,7 @@
   });
 
   function orderFrom(value: string | null): SearchOrder {
-    return value === 'recent' || value === 'oldest' ? value : 'rank';
+    return value === 'rank' || value === 'oldest' ? value : 'recent';
   }
 
   function knownSenders(): SenderIdentity[] {
@@ -469,7 +469,7 @@
     if (panel) return;
     const parts: string[] = [];
     if (search.query !== '') parts.push(`q=${encodeURIComponent(search.query)}`);
-    if (search.order !== 'rank') parts.push(`order=${search.order}`);
+    if (search.order !== 'recent') parts.push(`order=${search.order}`);
     const space = page.url.searchParams.get('space');
     if (space !== null) parts.push(`space=${encodeURIComponent(space)}`);
 

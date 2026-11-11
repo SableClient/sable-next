@@ -93,7 +93,7 @@ test('typing again before the debounce elapses searches once', async () => {
 
   expect(searchMessages).toHaveBeenCalledTimes(1);
   expect(searchMessages).toHaveBeenCalledWith(
-    expect.objectContaining({ query: 'deploy', order: 'rank', limit: 30, offset: 0, context: 1 })
+    expect.objectContaining({ query: 'deploy', order: 'recent', limit: 30, offset: 0, context: 1 })
   );
 });
 
