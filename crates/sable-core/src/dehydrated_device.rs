@@ -98,7 +98,7 @@ impl Core {
     pub(crate) async fn dehydrated_device(&self) -> Result<DehydratedDeviceView, RpcError> {
         let client = self.client().await?;
         let present = match client
-            .send(get_dehydrated_device::unstable::Request::new())
+            .send(get_dehydrated_device::msc3814::Request::new())
             .await
         {
             Ok(_) => true,

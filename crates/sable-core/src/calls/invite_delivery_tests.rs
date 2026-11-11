@@ -132,9 +132,9 @@ async fn sends(server: &MatrixMockServer) -> Vec<Request> {
 
 async fn sticky_update(room: &Room, value: Value) {
     let mut response =
-        matrix_sdk::ruma::api::client::sync::sync_events::v5::Response::new("next".to_owned());
+        matrix_sdk::ruma::api::client::sync::sync_events::msc4186::Response::new("next".to_owned());
     let mut events =
-        matrix_sdk::ruma::api::client::sync::sync_events::v5::response::StickyEventsRoom::default();
+        matrix_sdk::ruma::api::client::sync::sync_events::msc4186::response::StickyEventsRoom::default();
     events.events.push(
         matrix_sdk::ruma::serde::Raw::new(&value)
             .unwrap()

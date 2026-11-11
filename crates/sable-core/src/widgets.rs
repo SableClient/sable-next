@@ -1568,9 +1568,10 @@ mod tests {
         let room_id = room_id!("!stickyread:example.org");
         server.sync_joined_room(&client, room_id).await;
         let now = crate::now_ms();
-        let mut response = ruma::api::client::sync::sync_events::v5::Response::new("1".to_owned());
+        let mut response =
+            ruma::api::client::sync::sync_events::msc4186::Response::new("1".to_owned());
         let mut sticky_room =
-            ruma::api::client::sync::sync_events::v5::response::StickyEventsRoom::default();
+            ruma::api::client::sync::sync_events::msc4186::response::StickyEventsRoom::default();
         sticky_room.events.push(
             matrix_sdk::ruma::serde::Raw::new(&json!({
                 "type": "com.example.presence", "event_id": "$sticky", "sender": "@a:example.org",

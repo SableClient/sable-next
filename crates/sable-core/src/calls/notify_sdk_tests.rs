@@ -81,7 +81,7 @@ async fn core_declines_legacy_notifications_but_rejects_invalid_and_own_events()
 }
 
 async fn sticky_update(room: &matrix_sdk::Room, events: Vec<serde_json::Value>) {
-    use ruma::{api::client::sync::sync_events::v5, serde::Raw};
+    use ruma::{api::client::sync::sync_events::msc4186 as v5, serde::Raw};
     let mut response = v5::Response::new("invites".to_owned());
     let mut sticky = v5::response::StickyEventsRoom::default();
     sticky.events = events

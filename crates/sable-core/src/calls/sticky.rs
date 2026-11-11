@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::delayed_events::DelayedEventsSupport;
 use matrix_sdk::deserialized_responses::{EncryptionInfo, VerificationLevel, VerificationState};
 use matrix_sdk::{Client, Room};
-use ruma::api::client::sync::sync_events::v5;
+use ruma::api::client::sync::sync_events::msc4186 as v5;
 use ruma::events::{StateEventType, room::encrypted::OriginalSyncRoomEncryptedEvent};
 use ruma::serde::Raw;
 use ruma::{OwnedDeviceId, OwnedEventId};

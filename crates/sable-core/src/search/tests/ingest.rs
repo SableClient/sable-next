@@ -94,7 +94,7 @@ fn test_a_cache_refill_costs_nothing_when_the_index_already_holds_it() {
             TimelineEvent::from_plaintext(
                 factory
                     .text_msg(*body)
-                    .event_id(&EventId::parse(format!("$refill{index}")).expect("an event id"))
+                    .event_id(EventId::parse(format!("$refill{index}")).expect("an event id"))
                     .into_raw_sync(),
             )
         })

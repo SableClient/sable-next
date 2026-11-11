@@ -681,7 +681,7 @@ mod tests {
     async fn joined(server: &MatrixMockServer, rooms: &[&RoomId]) -> matrix_sdk::Client {
         let client = server.client_builder().build().await;
         for room_id in rooms {
-            server.sync_joined_room(&client, room_id).await;
+            server.sync_joined_room(&client, *room_id).await;
         }
         client
     }

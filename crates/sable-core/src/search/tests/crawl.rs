@@ -63,7 +63,7 @@ async fn test_search_watcher_releases_paginated_room_cache() {
         .map(|index| {
             factory
                 .text_msg("archaeology")
-                .event_id(&EventId::parse(format!("$history{index}")).unwrap())
+                .event_id(EventId::parse(format!("$history{index}")).unwrap())
         })
         .collect();
     server

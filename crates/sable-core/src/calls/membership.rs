@@ -736,7 +736,7 @@ fn alias_foci(event: &mut serde_json::Value, room_id: &str) {
 fn livekit_urls(foci: &[Focus]) -> Vec<String> {
     foci.iter()
         .filter_map(|focus| match focus {
-            Focus::Livekit(livekit) => livekit.service_url.clone(),
+            Focus::Livekit(livekit) | Focus::LegacyLivekit(livekit) => livekit.service_url.clone(),
             _ => None,
         })
         .filter(|url| !url.is_empty())

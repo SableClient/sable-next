@@ -26,7 +26,7 @@ pub(super) fn content(
 fn service_focus(alias: String, service: String) -> Focus {
     let mut focus = RumaLivekitFocus::with_service_url(service);
     focus.alias = Some(alias);
-    Focus::Livekit(focus)
+    Focus::LegacyLivekit(focus)
 }
 
 pub(super) fn content_at(

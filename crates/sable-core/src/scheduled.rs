@@ -210,7 +210,7 @@ impl Core {
         }
         let client = self.client().await?;
         let response = client
-            .send(get_all_delayed_events::unstable::Request::new())
+            .send(get_all_delayed_events::msc4140::Request::new())
             .await
             .or_failed(self, "scheduled_messages")?;
 

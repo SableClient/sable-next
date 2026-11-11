@@ -95,7 +95,7 @@ sable-link-preview = { workspace = true, features = ["reqwest"] }
 reqwest = { version = "0.13", default-features = false, features = ["socks", "gzip"] }
 matrix-sdk = { workspace = true, features = ["bundled-sqlite", "automatic-room-key-forwarding"] }
 tempfile = { workspace = true }
-rusqlite = { version = "0.40.2", default-features = false, features = ["backup"] }
+rusqlite = { version = "0.41.1", default-features = false, features = ["backup"] }
 tokio = { workspace = true }
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]

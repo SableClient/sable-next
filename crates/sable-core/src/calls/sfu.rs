@@ -166,7 +166,7 @@ pub(crate) async fn provision_stable(
     member_id: &str,
 ) -> Result<Provisioned, ProvisionError> {
     use matrix_sdk::ruma::api::client::rtc::livekit::get_token;
-    let mut request = get_token::v1::Request::new(
+    let mut request = get_token::msc4195::Request::new(
         url.to_owned(),
         room.room_id().to_owned(),
         "m.call#room".to_owned(),

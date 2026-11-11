@@ -917,7 +917,7 @@ async fn mount_fetch_with(
     own_member: bool,
     encrypted: bool,
 ) -> (wiremock::MockGuard, wiremock::MockGuard) {
-    use matrix_sdk::ruma::api::client::sync::sync_events::v5;
+    use matrix_sdk::ruma::api::client::sync::sync_events::msc4186 as v5;
 
     let mut room = v5::response::Room::new();
     room.initial = Some(true);
@@ -1614,8 +1614,16 @@ async fn a_notification_mark_read_stays_in_the_events_thread_and_privacy() {
     remove_data_dir(&fixture.data_dir).await;
 }
 
-const OAUTH_USER: &str = "@example:localhost";
-const OAUTH_DEVICE: &str = "DEVICEID";
+static OAUTH_USER: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    matrix_sdk::test_utils::client::mock_session_meta()
+        .user_id
+        .to_string()
+});
+static OAUTH_DEVICE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    matrix_sdk::test_utils::client::mock_session_meta()
+        .device_id
+        .to_string()
+});
 
 fn oauth_session(server: &MatrixMockServer) -> PersistedSession {
     use matrix_sdk::test_utils::client::{mock_prev_session_tokens_with_refresh, oauth};
@@ -1727,7 +1735,7 @@ async fn mount_whoami(server: &MatrixMockServer) {
         .and(path("/_matrix/client/v3/account/whoami"))
         .and(header("authorization", "Bearer new-access"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "user_id": OAUTH_USER, "device_id": OAUTH_DEVICE
+            "user_id": &*OAUTH_USER, "device_id": &*OAUTH_DEVICE
         })))
         .mount(server.server())
         .await;
@@ -1746,7 +1754,7 @@ async fn a_cold_push_never_uses_embedded_tokens_when_the_login_file_is_corrupt()
         access_token: "repaired-access".to_owned(),
         refresh_token: Some("repaired-refresh".to_owned()),
     };
-    logins.save("a1", OAUTH_DEVICE, &repaired).unwrap();
+    logins.save("a1", &OAUTH_DEVICE, &repaired).unwrap();
     let path = std::fs::read_dir(store_dir.join("login-tokens"))
         .unwrap()
         .map(|entry| entry.unwrap().path())
@@ -1759,7 +1767,7 @@ async fn a_cold_push_never_uses_embedded_tokens_when_the_login_file_is_corrupt()
     let requests = settled_request_count(&server).await;
 
     assert!(
-        restore_push_client(&store_dir, OAUTH_USER, OAUTH_DEVICE)
+        restore_push_client(&store_dir, &OAUTH_USER, &OAUTH_DEVICE)
             .await
             .is_none()
     );
@@ -1770,8 +1778,8 @@ async fn a_cold_push_never_uses_embedded_tokens_when_the_login_file_is_corrupt()
     assert_eq!(store.load().await.unwrap().unwrap(), saved);
     assert_eq!(std::fs::read(path).unwrap(), b"corrupt tokens");
 
-    logins.save("a1", OAUTH_DEVICE, &repaired).unwrap();
-    let client = restore_push_client(&store_dir, OAUTH_USER, OAUTH_DEVICE)
+    logins.save("a1", &OAUTH_DEVICE, &repaired).unwrap();
+    let client = restore_push_client(&store_dir, &OAUTH_USER, &OAUTH_DEVICE)
         .await
         .unwrap();
     assert_eq!(client.session_tokens().unwrap(), repaired);
@@ -1788,7 +1796,7 @@ async fn a_cold_push_saves_the_tokens_it_refreshes() {
     mount_oauth_refresh(&server, 1, std::time::Duration::ZERO).await;
     mount_whoami(&server).await;
 
-    let client = restore_push_client(&store_dir, OAUTH_USER, OAUTH_DEVICE)
+    let client = restore_push_client(&store_dir, &OAUTH_USER, &OAUTH_DEVICE)
         .await
         .unwrap();
     client.retry(|| client.whoami()).await.unwrap();
@@ -1815,7 +1823,7 @@ async fn a_cold_push_cut_short_still_saves_the_rotated_tokens() {
             .block_on(super::settle_refreshes(tokio::time::timeout(
                 std::time::Duration::from_millis(500),
                 async {
-                    let client = restore_push_client(&cold_dir, OAUTH_USER, OAUTH_DEVICE)
+                    let client = restore_push_client(&cold_dir, &OAUTH_USER, &OAUTH_DEVICE)
                         .await
                         .unwrap();
                     let _ = client.retry(|| client.whoami()).await;
@@ -1843,13 +1851,13 @@ async fn a_cold_push_failure_with_a_live_token_does_not_rotate_it() {
     Mock::given(method("GET"))
         .and(path("/_matrix/client/v3/account/whoami"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "user_id": OAUTH_USER, "device_id": OAUTH_DEVICE
+            "user_id": &*OAUTH_USER, "device_id": &*OAUTH_DEVICE
         })))
         .mount(server.server())
         .await;
     mount_oauth_refresh(&server, 0, std::time::Duration::ZERO).await;
 
-    let client = restore_push_client(&store_dir, OAUTH_USER, OAUTH_DEVICE)
+    let client = restore_push_client(&store_dir, &OAUTH_USER, &OAUTH_DEVICE)
         .await
         .unwrap();
     client
@@ -1946,8 +1954,8 @@ impl SharedLogin {
     async fn push_client(&self) -> super::PushClient {
         super::cold::open_push_client(
             &self.base,
-            OAUTH_USER,
-            OAUTH_DEVICE,
+            &OAUTH_USER,
+            &OAUTH_DEVICE,
             matrix_sdk::store::RoomLoadSettings::default(),
         )
         .await
