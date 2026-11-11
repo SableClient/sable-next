@@ -168,7 +168,7 @@
         <iframe
           title={i18n.t('widgets.integrationManager')}
           src={url}
-          sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+          sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-modals"
           allow="microphone; camera; encrypted-media; autoplay; clipboard-write; display-capture"
           class={{ loaded }}
           onload={() => (loaded = true)}

@@ -101,6 +101,7 @@ test('renders a sandboxed iframe for the chosen widget, templated', async () => 
   const iframe = screen.getByTitle<HTMLIFrameElement>('Jitsi');
   expect(iframe.tagName).toBe('IFRAME');
   expect(iframe).toHaveAttribute('sandbox', expect.stringContaining('allow-scripts'));
+  expect(iframe.getAttribute('sandbox')?.split(' ')).toContain('allow-modals');
   expect(iframe).toHaveAttribute('allow', expect.stringContaining('camera'));
   const src = new URL(iframe.src);
   expect(src.searchParams.get('user')).toBe(commonProps.userId);
