@@ -172,6 +172,11 @@ impl Core {
         self.activity.set_app_active(active)
     }
 
+    #[must_use]
+    pub fn is_app_active(&self) -> bool {
+        self.activity.app_active()
+    }
+
     pub async fn update_app_active(self: &Arc<Self>, active: bool) {
         self.set_app_active(active);
         self.apply_activity(active, None).await;

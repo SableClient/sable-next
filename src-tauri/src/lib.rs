@@ -773,7 +773,15 @@ fn app_builder(sentry_client: Option<&::sentry::Client>) -> tauri::Builder<tauri
     let builder = tauri::Builder::<tauri::Wry>::new();
     #[cfg(target_os = "ios")]
     let builder = builder.on_web_content_process_terminate(|webview| {
-        tracing::error!("webview content process terminated");
+        // iOS reclaims a suspended app's page, which is routine.
+        let visible = webview
+            .try_state::<AppState>()
+            .is_some_and(|state| state.core.is_app_active());
+        if visible {
+            tracing::error!("webview content process terminated");
+        } else {
+            tracing::warn!("webview content process terminated in the background");
+        }
         // WebKit leaves the page blank until reloaded.
         if let Err(error) = webview.reload() {
             tracing::error!(%error, "webview reload failed");
