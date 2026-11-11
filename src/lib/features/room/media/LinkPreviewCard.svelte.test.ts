@@ -586,6 +586,29 @@ test('the theme colour becomes the card accent and a summary card is compact', a
   expect((card as HTMLElement).style.getPropertyValue('--link-preview-accent')).toBe('#ff4500');
 });
 
+test.each([
+  ['image/gif', 'https://site.example/cat.gif'],
+  ['image/webp', 'https://klipy.com/gifs/goatplaybanjo-chat-4'],
+])('a square %s GIF preview fills the card instead of a side thumbnail', async (mime, url) => {
+  preferences.clientEmbeds = true;
+  core.rpc.messages.urlPreview.mockResolvedValue(
+    preview({
+      url,
+      image: 'mxc://example.org/gif',
+      image_mime: mime,
+      image_width: 220,
+      image_height: 229,
+    })
+  );
+  const { container } = render(LinkPreviewCard, { url, encrypted: false });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(container.querySelector('.link-preview')).not.toHaveClass('compact');
+});
+
 test('a GIF video preview loops muted without controls or a play button', async () => {
   preferences.urlPreviews = true;
   core.rpc.messages.urlPreview.mockResolvedValue(

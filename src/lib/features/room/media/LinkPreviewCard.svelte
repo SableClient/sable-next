@@ -52,23 +52,25 @@
 
   let shown = $derived(preview ? [preview] : []);
   let title = $derived(preview?.title ?? preview?.site_name ?? url);
+  let gif = $derived(
+    preview?.video?.gif === true || preview?.image_mime === 'image/gif' || isGifHostUrl(url)
+  );
   let compactImage = $derived(
-    preview?.card === 'summary'
-      ? true
-      : preview?.card === 'summary_large_image'
-        ? false
-        : preview?.image_width != null &&
-          preview.image_height != null &&
-          preview.image_width > 0 &&
-          preview.image_width <= preview.image_height
+    !gif &&
+      (preview?.card === 'summary'
+        ? true
+        : preview?.card === 'summary_large_image'
+          ? false
+          : preview?.image_width != null &&
+            preview.image_height != null &&
+            preview.image_width > 0 &&
+            preview.image_width <= preview.image_height)
   );
   const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
   let mediaHidden = $derived(roomMedia?.hidden ?? false);
   let Presentation = $derived(preview && findLinkPresentation(url, preview));
   let videoPlayback = $derived.by(() => {
-    if (!preview?.video?.gif && preview?.image_mime !== 'image/gif' && !isGifHostUrl(url)) {
-      return null;
-    }
+    if (!gif) return null;
     return preferences.autoplayGifs
       ? GIF_PLAYBACK
       : { ...GIF_PLAYBACK, gif: false, autoplay: false };

@@ -11,7 +11,7 @@ export const GIF_PLAYBACK: VideoPlaybackView = {
   no_audio: true,
 };
 
-const GIF_HOSTS = ['tenor.com', 'giphy.com'];
+const GIF_HOSTS = ['tenor.com', 'giphy.com', 'klipy.com'];
 
 export function isGifHostUrl(href: string): boolean {
   try {
