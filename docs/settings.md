@@ -244,7 +244,7 @@ except those marked deployment only.
 - `composerButtonOrder`: List of `gif`, `sticker`, `emoticon`, `persona`, `format`, `separator:0`, `separator:1`, `separator:2`, `separator:3`, `separator:4`, `separator:5`, `separator:6`, `separator:7`, `separator:8`. Default `["gif","sticker","emoticon","separator:0","persona","format"]`.
 - `personaGrid`: `true` or `false`. Default `true`.
 - `personaAlternateAvatar`: `true` or `false`. Default `false`.
-- `presence`: One of `online`, `unavailable`, `offline`. Default `online`. Deployment only.
+- `presence`: One of `online`, `unavailable`, `busy`, `offline`. Default `online`. Deployment only.
 - `presenceStatusMessage`: Text. Default empty. Deployment only.
 - `loadingAnimal`: Text. Default empty.
 - `badgeDefaultDirect`: One of `all`, `mentions`, `quiet`. Default `all`.

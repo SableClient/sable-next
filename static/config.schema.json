@@ -1087,6 +1087,7 @@
           "enum": [
             "online",
             "unavailable",
+            "busy",
             "offline"
           ],
           "default": "online"
@@ -2530,6 +2531,7 @@
           "enum": [
             "online",
             "unavailable",
+            "busy",
             "offline"
           ],
           "default": "online"
