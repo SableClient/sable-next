@@ -538,6 +538,17 @@ fn classify_one(error: &(dyn Error + 'static)) -> Option<Expected> {
         ));
     }
     if matches!(
+        error.downcast_ref::<matrix_sdk::paginators::PaginatorError>(),
+        Some(matrix_sdk::paginators::PaginatorError::EventNotFound(_))
+    ) {
+        return Some(Expected::new(
+            RpcCode::NotFound,
+            Level::DEBUG,
+            "missing_event",
+            "the event is gone or out of reach",
+        ));
+    }
+    if matches!(
         error.downcast_ref::<matrix_sdk::Error>(),
         Some(matrix_sdk::Error::ConcurrentRequestFailed)
     ) {
@@ -1011,6 +1022,26 @@ mod tests {
             result,
             Err(RpcError {
                 code: RpcCode::Unavailable,
+                ..
+            })
+        ));
+        assert!(!log.contains("ERROR"), "{log}");
+    }
+
+    #[test]
+    fn a_jump_to_a_missing_event_is_not_found() {
+        let missing = super::TimelineError::from(matrix_sdk_ui::timeline::PaginationError::from(
+            matrix_sdk::paginators::PaginatorError::EventNotFound(
+                matrix_sdk::ruma::owned_event_id!("$gone:example.org"),
+            ),
+        ));
+        let (result, log) =
+            capture(|core| Err::<(), _>(missing).or_failed(core, "build_focused_timeline"));
+
+        assert!(matches!(
+            result,
+            Err(RpcError {
+                code: RpcCode::NotFound,
                 ..
             })
         ));
