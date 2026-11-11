@@ -153,3 +153,15 @@ test('each account keeps its own online status and starts from the shared one', 
   restored.selectPreferenceAccount('c');
   expect(restored.preferences.sendPresence).toBe(false);
 });
+
+test('link previews and server search stay with the account that turned them on', async () => {
+  const settings = await loadWith();
+  settings.selectPreferenceAccount('trusted');
+  settings.setPreference('urlPreviews', true);
+  settings.setPreference('serverSearch', false);
+
+  settings.selectPreferenceAccount('other');
+
+  expect(settings.preferences.urlPreviews).toBe(false);
+  expect(settings.preferences.serverSearch).toBe(true);
+});
