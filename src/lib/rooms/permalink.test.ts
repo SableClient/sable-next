@@ -13,6 +13,7 @@ import {
   matrixToUrl,
   permalinkTarget,
   roomSectionPath,
+  setSidebarSpaceOrder,
   viaFor,
 } from './permalink';
 
@@ -426,10 +427,13 @@ test('a room under several spaces lands under the one highest in the sidebar', (
   ];
   const order = ['!main:example.org', '!archive:example.org'];
 
-  expect(roomSectionPath(rooms, '!inner:example.org', null, [], order)).toBe(
+  setSidebarSpaceOrder(order);
+  expect(roomSectionPath(rooms, '!inner:example.org')).toBe(
     '/space/!main%3Aexample.org/!inner%3Aexample.org'
   );
-  expect(roomSectionPath(rooms, '!inner:example.org', null, [], order.toReversed())).toBe(
+  setSidebarSpaceOrder(order.toReversed());
+  expect(roomSectionPath(rooms, '!inner:example.org')).toBe(
     '/space/!archive%3Aexample.org/!inner%3Aexample.org'
   );
+  setSidebarSpaceOrder([]);
 });

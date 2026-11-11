@@ -261,3 +261,48 @@ test('a late read from a previous session does not overwrite the current one', a
 
   expect(sidebar.items).toEqual([]);
 });
+
+test('room links open under the space the sidebar shows first', async () => {
+  const { roomSectionPath, setSidebarSpaceOrder } = await import('#lib/rooms/permalink.js');
+  const space = (roomId: string) =>
+    ({
+      room_id: roomId,
+      room_kind: 'space',
+      state: 'joined',
+      is_tombstoned: false,
+      is_direct: false,
+      canonical_alias: null,
+      space_children: [
+        {
+          room_id: '!room:example.org',
+          via: [],
+          order: null,
+          origin_server_ts: 0,
+          suggested: false,
+        },
+      ],
+    }) as never;
+  const rooms = [
+    space('!archive:example.org'),
+    space('!main:example.org'),
+    {
+      room_id: '!room:example.org',
+      room_kind: 'text',
+      is_direct: false,
+      canonical_alias: null,
+    } as never,
+  ];
+  const { core } = fakeCore({
+    sidebar: vi.fn(() =>
+      Promise.resolve<SidebarItem[]>([
+        { kind: 'space', room_id: '!main:example.org' },
+        { kind: 'space', room_id: '!archive:example.org' },
+      ])
+    ),
+  });
+
+  await new SpaceSidebar().start(core);
+
+  expect(roomSectionPath(rooms, '!room:example.org')).toContain('!main%3Aexample.org');
+  setSidebarSpaceOrder([]);
+});

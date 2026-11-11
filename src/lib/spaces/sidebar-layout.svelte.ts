@@ -3,6 +3,7 @@ import { SvelteSet } from 'svelte/reactivity';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { t } from '#lib/i18n.js';
+import { setSidebarSpaceOrder } from '#lib/rooms/permalink.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 
@@ -124,6 +125,7 @@ export class SpaceSidebar {
     this.revision += 1;
     this.loaded = true;
     this.items = items;
+    setSidebarSpaceOrder(layoutSpaceIds(items));
 
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const folderIds = new Set(items.filter(isFolder).map((folder) => folder.id));
@@ -135,10 +137,6 @@ export class SpaceSidebar {
       pruned = true;
     }
     if (pruned) this.persistOpenFolders();
-  }
-
-  get spaceOrder(): string[] {
-    return layoutSpaceIds(this.items);
   }
 
   adoptOpenFolders(ids: readonly string[]): void {

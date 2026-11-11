@@ -10,6 +10,12 @@ import { matrixLinkAction, matrixLinkParameters, parseMatrixLink } from '#lib/ro
 
 import { findRoomByPathId, roomPathParam, roomPathParamFromId } from './room-list.svelte';
 
+let sidebarOrder: readonly string[] = [];
+
+export function setSidebarSpaceOrder(order: readonly string[]): void {
+  sidebarOrder = order;
+}
+
 function parentSpacesOf(rooms: readonly RoomListItemView[], roomId: string): RoomListItemView[] {
   return rooms.filter(
     (space) =>
@@ -79,15 +85,14 @@ export function roomSectionPath(
   rooms: readonly RoomListItemView[],
   roomIdOrAlias: string,
   eventId?: string | null,
-  via: readonly string[] = [],
-  spaceOrder: readonly string[] = []
+  via: readonly string[] = []
 ): string {
   const room = findRoomByPathId(rooms, roomIdOrAlias);
   const base = sectionPath(
     rooms,
     room,
     room ? roomPathParam(room, rooms) : roomPathParamFromId(roomIdOrAlias),
-    spaceOrder
+    sidebarOrder
   );
 
   const query = new URLSearchParams();
