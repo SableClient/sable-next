@@ -1,13 +1,21 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { isTauri } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 
-import { browserGatesCoreNetwork, localNetworkDenied } from './local-network';
+import {
+  browserGatesCoreNetwork,
+  localNetworkDenied,
+  requestAndroidLocalNetwork,
+} from './local-network';
 
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: vi.fn(() => false) }));
+const android = vi.hoisted(() => ({ value: true }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn(), isTauri: vi.fn(() => false) }));
+vi.mock('./os.js', () => ({ isAndroid: () => android.value }));
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.mocked(invoke).mockReset();
+  android.value = true;
 });
 
 test('only the browser gates the core network', () => {
@@ -35,4 +43,23 @@ test('a browser without the permission reports nothing denied', async () => {
 
   vi.stubGlobal('navigator', {});
   expect(await localNetworkDenied()).toBe(false);
+});
+
+test('on Android it asks for local network access and reports the grant', async () => {
+  vi.mocked(invoke).mockResolvedValue({ localNetwork: 'granted' });
+
+  expect(await requestAndroidLocalNetwork()).toBe(true);
+  expect(invoke).toHaveBeenCalledWith('plugin:sable-push|request_permissions', {
+    permissions: ['localNetwork'],
+  });
+});
+
+test('a refusal or another platform leaves access blocked', async () => {
+  vi.mocked(invoke).mockResolvedValue({ localNetwork: 'denied' });
+  expect(await requestAndroidLocalNetwork()).toBe(false);
+
+  android.value = false;
+  vi.mocked(invoke).mockClear();
+  expect(await requestAndroidLocalNetwork()).toBe(false);
+  expect(invoke).not.toHaveBeenCalled();
 });

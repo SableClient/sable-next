@@ -8,6 +8,7 @@ import androidx.core.app.ActivityCompat
 import androidx.work.WorkManager
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
+import app.tauri.annotation.Permission
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.JSArray
 import app.tauri.plugin.JSObject
@@ -76,7 +77,11 @@ class ChimeArgs {
 
 private const val CHIME_ASSET = "msg.webm"
 
-@TauriPlugin
+@TauriPlugin(
+    permissions = [
+        Permission(strings = ["android.permission.ACCESS_LOCAL_NETWORK"], alias = "localNetwork"),
+    ],
+)
 class SablePushPlugin(private val activity: Activity) : Plugin(activity) {
     private val manager = activity.getSystemService(NotificationManager::class.java)
 

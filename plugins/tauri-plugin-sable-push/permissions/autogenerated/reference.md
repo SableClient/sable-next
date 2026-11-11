@@ -1,6 +1,6 @@
 ## Default Permission
 
-Plays the notification chime and reads and clears the push history and diagnostics.
+Plays the notification chime, reads and clears the push history and diagnostics, and asks for local network access.
 
 #### This default permission set includes the following:
 
@@ -8,6 +8,8 @@ Plays the notification chime and reads and clears the push history and diagnosti
 - `allow-push-history`
 - `allow-clear-push-history`
 - `allow-take-push-diagnostics`
+- `allow-check-permissions`
+- `allow-request-permissions`
 
 ## Permission Table
 
@@ -17,6 +19,32 @@ Plays the notification chime and reads and clears the push history and diagnosti
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`sable-push:allow-check-permissions`
+
+</td>
+<td>
+
+Enables the check_permissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sable-push:deny-check-permissions`
+
+</td>
+<td>
+
+Denies the check_permissions command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
@@ -92,6 +120,32 @@ Enables the push_history command without any pre-configured scope.
 <td>
 
 Denies the push_history command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sable-push:allow-request-permissions`
+
+</td>
+<td>
+
+Enables the request_permissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sable-push:deny-request-permissions`
+
+</td>
+<td>
+
+Denies the request_permissions command without any pre-configured scope.
 
 </td>
 </tr>

@@ -295,6 +295,18 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the check_permissions command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-check-permissions",
+          "markdownDescription": "Enables the check_permissions command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the check_permissions command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-check-permissions",
+          "markdownDescription": "Denies the check_permissions command without any pre-configured scope."
+        },
+        {
           "description": "Enables the clear_push_history command without any pre-configured scope.",
           "type": "string",
           "const": "allow-clear-push-history",
@@ -331,6 +343,18 @@
           "markdownDescription": "Denies the push_history command without any pre-configured scope."
         },
         {
+          "description": "Enables the request_permissions command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-request-permissions",
+          "markdownDescription": "Enables the request_permissions command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the request_permissions command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-request-permissions",
+          "markdownDescription": "Denies the request_permissions command without any pre-configured scope."
+        },
+        {
           "description": "Enables the take_push_diagnostics command without any pre-configured scope.",
           "type": "string",
           "const": "allow-take-push-diagnostics",
@@ -343,10 +367,10 @@
           "markdownDescription": "Denies the take_push_diagnostics command without any pre-configured scope."
         },
         {
-          "description": "Plays the notification chime and reads and clears the push history and diagnostics.\n#### This default permission set includes:\n\n- `allow-play-chime`\n- `allow-push-history`\n- `allow-clear-push-history`\n- `allow-take-push-diagnostics`",
+          "description": "Plays the notification chime, reads and clears the push history and diagnostics, and asks for local network access.\n#### This default permission set includes:\n\n- `allow-play-chime`\n- `allow-push-history`\n- `allow-clear-push-history`\n- `allow-take-push-diagnostics`\n- `allow-check-permissions`\n- `allow-request-permissions`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Plays the notification chime and reads and clears the push history and diagnostics.\n#### This default permission set includes:\n\n- `allow-play-chime`\n- `allow-push-history`\n- `allow-clear-push-history`\n- `allow-take-push-diagnostics`"
+          "markdownDescription": "Plays the notification chime, reads and clears the push history and diagnostics, and asks for local network access.\n#### This default permission set includes:\n\n- `allow-play-chime`\n- `allow-push-history`\n- `allow-clear-push-history`\n- `allow-take-push-diagnostics`\n- `allow-check-permissions`\n- `allow-request-permissions`"
         }
       ]
     }

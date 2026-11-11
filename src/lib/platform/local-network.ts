@@ -1,4 +1,6 @@
-import { isTauri } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+
+import { isAndroid } from './os.js';
 
 const permissionNames = ['local-network', 'loopback-network', 'local-network-access'];
 
@@ -26,4 +28,17 @@ export async function localNetworkDenied(): Promise<boolean> {
     }
   }
   return false;
+}
+
+export async function requestAndroidLocalNetwork(): Promise<boolean> {
+  if (!isAndroid()) return false;
+  try {
+    const states = await invoke<Record<string, string>>('plugin:sable-push|request_permissions', {
+      permissions: ['localNetwork'],
+    });
+    return states.localNetwork === 'granted';
+  } catch (error) {
+    console.warn('[sable auth] local network permission unavailable', error);
+    return false;
+  }
 }
