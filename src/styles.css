@@ -767,6 +767,12 @@ input[type='range'] {
   accent-color: var(--primary-main);
 }
 
+input[type='checkbox'] {
+  block-size: var(--icon-size-small);
+  inline-size: var(--icon-size-small);
+  margin: 0;
+}
+
 ::placeholder {
   color: inherit;
   opacity: var(--opacity-placeholder);

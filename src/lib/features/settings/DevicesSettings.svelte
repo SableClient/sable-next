@@ -201,9 +201,10 @@
   }
 
   function toggleSelectAll(): void {
-    bulkSelected.clear();
     if (!allSelected) {
       for (const device of selectableDevices) bulkSelected.add(device.device_id);
+    } else {
+      bulkSelected.clear();
     }
   }
 
