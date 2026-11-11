@@ -165,7 +165,8 @@
     "listOptions": "List options",
     "displayOptions": "Sidebar display options",
     "alerts": "Alerts",
-    "noAlerts": "No alerts"
+    "noAlerts": "No alerts",
+    "voiceActive": "Someone is in a voice channel"
   },
   "inbox": {
     "invitesTab": "Invites",

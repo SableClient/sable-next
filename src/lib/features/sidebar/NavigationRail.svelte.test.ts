@@ -265,6 +265,23 @@ test('badges a space with its mentions and dots one with only unread messages', 
   expect(tab('nav.unspaced')).toHaveAccessibleDescription('');
 });
 
+test('a space where someone is in voice says so, and one with your call keeps its own mark', async () => {
+  renderRail({
+    props: {
+      spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
+      voiceSpaces: new Set(['!a:example.org', '!b:example.org']),
+      callSpaces: new Set(['!b:example.org']),
+      mobile: true,
+    },
+  });
+  await tick();
+
+  expect(tab('Alpha').querySelector('.call-mark.others')).toBeInTheDocument();
+  expect(tab('Alpha')).toHaveAccessibleDescription('nav.voiceActive');
+  expect(tab('Beta').querySelector('.call-mark.others')).not.toBeInTheDocument();
+  expect(tab('Beta').querySelector('.call-mark')).toBeInTheDocument();
+});
+
 test('a space badge follows unread changes without re-running its avatar', async () => {
   const alpha = { ...space('!a:example.org', 'Alpha'), avatar_url: 'mxc://example.org/alpha' };
   const { rerender } = renderRail({

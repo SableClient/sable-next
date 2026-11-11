@@ -90,6 +90,7 @@
     spaces: readonly RoomListItemView[];
     spaceUnread?: ReadonlyMap<string, UnreadCount>;
     callSpaces?: ReadonlySet<string>;
+    voiceSpaces?: ReadonlySet<string>;
     homeUnread?: UnreadCount;
     unspacedUnread?: UnreadCount;
     directRooms?: readonly RoomListItemView[];
@@ -119,6 +120,7 @@
     spaces,
     spaceUnread = new Map(),
     callSpaces = new Set(),
+    voiceSpaces = new Set(),
     homeUnread = NO_UNREAD,
     unspacedUnread = NO_UNREAD,
     directRooms = [],
@@ -148,6 +150,10 @@
 
   function unreadId(key: string): string {
     return `${uid}-unread-${key}`;
+  }
+
+  function voiceId(key: string): string {
+    return `${uid}-voice-${key}`;
   }
 
   function unreadLabel(count: UnreadCount | undefined): string | undefined {
@@ -620,6 +626,12 @@
   {/if}
   {#if item.space && item.roomId ? callSpaces.has(item.roomId) : item.inCall}
     <span class="call-mark" aria-hidden="true"><SpeakerHighIcon weight="fill" /></span>
+  {:else if item.space && item.roomId && voiceSpaces.has(item.roomId)}
+    <span class="call-mark others" id={voiceId(item.roomId)}
+      ><SpeakerHighIcon aria-hidden="true" /><span class="screen-reader-only"
+        >{i18n.t('nav.voiceActive')}</span
+      ></span
+    >
   {/if}
 {/snippet}
 
@@ -641,7 +653,12 @@
         }
       : undefined}
     aria-label={i18n.t(item.label)}
-    aria-describedby={describedBy(props, unreadId(item.roomId ?? item.href))}
+    aria-describedby={describedBy(
+      props,
+      item.space && item.roomId && voiceSpaces.has(item.roomId)
+        ? `${unreadId(item.roomId)} ${voiceId(item.roomId)}`
+        : unreadId(item.roomId ?? item.href)
+    )}
     aria-current={active ? 'page' : undefined}
   >
     <span class="nav-tab-hit-area" aria-hidden="true"></span>
@@ -1165,6 +1182,12 @@
     right: -0.25rem;
     top: -0.25rem;
     z-index: 1;
+  }
+
+  .call-mark.others {
+    background: var(--bg-container);
+    border-color: var(--success-main);
+    color: var(--success-main);
   }
 
   .call-mark :global(svg) {

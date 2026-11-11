@@ -9,6 +9,7 @@ import {
   inheritedNotificationModes,
   joinedSpaceRooms,
   rootSpaceNames,
+  spacesContaining,
   spacesContainingRoom,
 } from './spaces';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
@@ -245,4 +246,31 @@ test('names the top-level space of each room, through nested spaces and cycles',
   expect(names.get('!general-2:example.org')).toBe('Other');
   expect(names.get('!a:example.org')).toBe('B');
   expect(names.has('!loose:example.org')).toBe(false);
+});
+
+test('a space shows voice activity from any joined room under it', () => {
+  const caller = { user_id: '@ada:example.org', device_id: 'D', member_id: 'm' } as never;
+  const root = room({
+    room_id: '!root:example.org',
+    room_kind: 'space',
+    space_children: [child('!sub:example.org')],
+  });
+  const sub = room({
+    room_id: '!sub:example.org',
+    room_kind: 'space',
+    space_children: [child('!voice:example.org'), child('!left:example.org')],
+  });
+  const quiet = room({
+    room_id: '!quiet:example.org',
+    room_kind: 'space',
+    space_children: [child('!left:example.org')],
+  });
+  const voice = room({ room_id: '!voice:example.org', call_participants: [caller] });
+  const left = room({ room_id: '!left:example.org', state: 'left', call_participants: [caller] });
+  const live = (candidate: typeof voice) =>
+    candidate.state === 'joined' && candidate.call_participants.length > 0;
+
+  expect(spacesContaining([root, quiet], [root, sub, quiet, voice, left], live)).toEqual(
+    new Set(['!root:example.org'])
+  );
 });

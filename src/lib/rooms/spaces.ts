@@ -132,9 +132,16 @@ export function spacesContainingRoom(
   rooms: readonly RoomListItemView[],
   roomId: string | null
 ): Set<string> {
-  const found = new Set<string>();
-  if (roomId === null) return found;
+  if (roomId === null) return new Set();
+  return spacesContaining(spaces, rooms, (room) => room.room_id === roomId);
+}
 
+export function spacesContaining(
+  spaces: readonly RoomListItemView[],
+  rooms: readonly RoomListItemView[],
+  matches: (room: RoomListItemView) => boolean
+): Set<string> {
+  const found = new Set<string>();
   const roomsById = new Map(rooms.map((room) => [room.room_id, room]));
 
   function contains(spaceId: string, visited: Set<string>): boolean {
@@ -144,9 +151,10 @@ export function spacesContainingRoom(
     const space = roomsById.get(spaceId);
     if (!space) return false;
 
-    return space.space_children.some(
-      (child) => child.room_id === roomId || contains(child.room_id, visited)
-    );
+    return space.space_children.some((child) => {
+      const room = roomsById.get(child.room_id);
+      return (room !== undefined && matches(room)) || contains(child.room_id, visited);
+    });
   }
 
   for (const space of spaces) {
