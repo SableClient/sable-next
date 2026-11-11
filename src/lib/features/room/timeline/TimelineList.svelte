@@ -408,6 +408,7 @@
     }
     return null;
   });
+  let atLatest = $derived(windowState.pinned && timeline.reachesLatest);
   let unreadCount = $derived(unread.count(eventItems));
   let unreadInView = $derived.by(() => {
     const index = entries.findIndex(({ value }) => holdsEvent(value, unread.firstEventId));
@@ -426,8 +427,7 @@
     unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
     if (!reading || !revealed || !focused) return;
     if (unreadInView) unread.observe(unread.firstEventId);
-    else if (live && windowState.pinned && opened && !jumpingUnread && !unread.background)
-      unread.reachLatest();
+    else if (atLatest && opened && !jumpingUnread && !unread.background) unread.reachLatest();
   });
   let holdAtLatest = $state(untrack(() => !preferences.openRoomsAtUnread));
   let hadUnread = untrack(() => hasUnread);
@@ -507,8 +507,7 @@
     historyController.clearUserScrollPending();
     if (!revealed) return;
     if (delta < 0) holdAtLatest = false;
-    if (delta > 0 && windowState.pinned && windowActivity.active && !holdAtLatest)
-      unread.reachLatest();
+    if (delta > 0 && atLatest && windowActivity.active && !holdAtLatest) unread.reachLatest();
     historyController.observeScroll(delta < 0, nearLatest);
     if (
       timeline.mode.kind !== 'live' &&
@@ -1188,14 +1187,10 @@
   {timeline}
   visibleEventId={readEventId}
   enabled={reading && !unread.blocking && !markingRead && !timeline.resumingLive}
-  atLatest={windowState.pinned && timeline.forwardPagination === 'end'}
+  {atLatest}
   onRead={markRead}
 />
-<TimelineAnnouncements
-  {timeline}
-  {visibleItems}
-  atLiveEdge={windowState.pinned && timeline.reachesLatest}
-/>
+<TimelineAnnouncements {timeline} {visibleItems} atLiveEdge={atLatest} />
 <MessageContextMenu menu={messageMenu} />
 <MessageDialogHost
   {dialogs}

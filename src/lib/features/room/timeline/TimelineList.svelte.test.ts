@@ -1049,6 +1049,37 @@ test('a notification context stays put at its forward end until the reader jumps
   expect(resume).toHaveBeenCalledTimes(1);
 });
 
+test('a notification context loaded up to the newest message marks the room read', async () => {
+  const read = vi.fn().mockResolvedValue(undefined);
+  const roomTimeline = timeline();
+  roomTimeline.items = [readMarker('marker'), item('latest')];
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        hasUnread: true,
+        landingEventId: '$elsewhere',
+        onRequestUnread: (eventId: string) => {
+          roomTimeline.mode = { kind: 'unread', eventId };
+          roomTimeline.forwardPagination = 'end';
+          roomTimeline.items = [item('before'), item('elsewhere'), item('after')];
+          return Promise.resolve();
+        },
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: () => Promise.resolve(),
+        onRead: read,
+      },
+    },
+  });
+
+  viewport();
+  await flushed();
+  await runAnimationFrames();
+  await new Promise((resolve) => setTimeout(resolve, 550));
+
+  expect(read).toHaveBeenCalledWith('$after', true);
+});
+
 test('a notification for an unloaded thread reply lands on its root', async () => {
   const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
   const roomTimeline = timeline();
