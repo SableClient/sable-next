@@ -43,6 +43,7 @@ export type CallTransportState = {
   /** A native transport's failure code, such as `permission_denied` or `media_failed`. */
   errorCode?: string;
   disconnectReason?: string;
+  unreachableBackends?: string[];
 };
 
 export type CallTransportConnectOptions = {

@@ -66,6 +66,8 @@
     )
   );
 
+  let backendUnreachable = $derived((session.transport.unreachableBackends?.length ?? 0) > 0);
+
   let byIdentity = $derived(
     new Map(session.members.map((member) => [member.identity, member.user_id]))
   );
@@ -354,6 +356,11 @@
         <p>{i18n.t('call.listenOnly')}</p>
       </Alert>
     {/if}
+    {#if backendUnreachable}
+      <Alert variant="warning" class="notice">
+        <p>{i18n.t('call.backendUnreachable')}</p>
+      </Alert>
+    {/if}
     {#if session.deviceError}
       <Alert variant="critical" class="notice" role="alert">
         <WarningCircleIcon aria-hidden="true" weight="fill" />
@@ -386,7 +393,10 @@
   <div
     class={[
       'media',
-      { 'with-notice': session.deviceError !== null || session.listenOnly, locked: busy },
+      {
+        'with-notice': session.deviceError !== null || session.listenOnly || backendUnreachable,
+        locked: busy,
+      },
     ]}
     style:--tile-aspect={aspect}
     style:--notice-height="{noticeHeight}px"

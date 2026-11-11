@@ -217,6 +217,81 @@ test('retries a failed subscriber on the next backend snapshot', async () => {
   expect(remoteAttempts).toBe(2);
 });
 
+test('reports a failed subscriber as unreachable and retries it without a new snapshot', async () => {
+  vi.useFakeTimers();
+  try {
+    let remoteAttempts = 0;
+    const transport = createMultiSfuTransport(false, undefined, {
+      createTransport: (options) => {
+        const next = fakeTransport();
+        if (options.publishMedia === false) {
+          next.connect = vi.fn(() => {
+            remoteAttempts += 1;
+            if (remoteAttempts === 1) return Promise.reject(new Error('ConnectionError'));
+            next.emitConnection('connected');
+            return Promise.resolve();
+          });
+        }
+        return next;
+      },
+    });
+    await transport.connect({
+      url: '',
+      token: '',
+      microphoneEnabled: false,
+      cameraEnabled: false,
+      publisherId: 'publish',
+      backends: [
+        { id: 'publish', url: 'wss://one', jwt: 'one', identity: 'me' },
+        { id: 'remote', url: 'wss://two', jwt: 'two', identity: 'other' },
+      ],
+      encryptionKeys: [],
+    });
+    expect(transport.getState().unreachableBackends).toEqual(['remote']);
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(remoteAttempts).toBe(2);
+    expect(transport.getState().unreachableBackends).toEqual([]);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test('retries a subscriber that drops mid-call', async () => {
+  vi.useFakeTimers();
+  try {
+    const created: ReturnType<typeof fakeTransport>[] = [];
+    const transport = createMultiSfuTransport(false, undefined, {
+      createTransport: () => {
+        const next = fakeTransport();
+        created.push(next);
+        return next;
+      },
+    });
+    await transport.connect({
+      url: '',
+      token: '',
+      microphoneEnabled: false,
+      cameraEnabled: false,
+      publisherId: 'publish',
+      backends: [
+        { id: 'publish', url: 'wss://one', jwt: 'one', identity: 'me' },
+        { id: 'remote', url: 'wss://two', jwt: 'two', identity: 'other' },
+      ],
+      encryptionKeys: [],
+    });
+    created[1].emitConnection('disconnected');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(transport.getState().unreachableBackends).toEqual(['remote']);
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(created).toHaveLength(3);
+    expect(transport.getState().unreachableBackends).toEqual([]);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 test('retains a backend key when a subscriber connect fails and retries', async () => {
   let remoteAttempts = 0;
   const created: ReturnType<typeof fakeTransport>[] = [];

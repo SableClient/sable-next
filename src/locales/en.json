@@ -3698,6 +3698,7 @@
     "resizeStage": "Resize call",
     "failed": "Call failed",
     "listenOnly": "This call’s server does not let your account speak. You can listen, but others will not hear you.",
+    "backendUnreachable": "Can’t reach another participant’s call server, so you may not hear them. Retrying…",
     "microphoneUnavailable": "Microphone unavailable. Check that {{appName}} is allowed to use it.",
     "cameraUnavailable": "Camera unavailable. Check that {{appName}} is allowed to use it.",
     "screenShareUnavailable": "Could not share your screen.",

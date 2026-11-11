@@ -18,6 +18,8 @@ export type MultiSfuTransportDeps = {
 };
 
 const MAX_CACHED_KEYS = 512;
+const RETRY_FIRST_MS = 2_000;
+const RETRY_MAX_MS = 30_000;
 
 const publishes = (participant: CallParticipant): boolean =>
   Boolean(participant.microphone ?? participant.camera ?? participant.screenShare);
@@ -40,6 +42,28 @@ export function createMultiSfuTransport(
   let queue = Promise.resolve();
   let disposed = false;
   let desiredBackends = new Map<string, CallBackendGrant>();
+  const unreachable = new Set<string>();
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  let retryDelay = RETRY_FIRST_MS;
+
+  const scheduleRetry = (): void => {
+    if (disposed || retryTimer !== undefined || unreachable.size === 0) return;
+    retryTimer = setTimeout(() => {
+      retryTimer = undefined;
+      if (disposed) return;
+      retryDelay = Math.min(retryDelay * 2, RETRY_MAX_MS);
+      const expectedGeneration = generation;
+      queue = queue
+        .catch(() => undefined)
+        .then(() => reconcile([...desiredBackends.values()], connectOptions, expectedGeneration))
+        .finally(scheduleRetry);
+    }, retryDelay);
+  };
+
+  const markUnreachable = (backendId: string): void => {
+    unreachable.add(backendId);
+    scheduleRetry();
+  };
 
   const cacheKey = (key: CallEncryptionKey): void => {
     keys.set(`${key.identity}\u0000${key.keyIndex}`, key);
@@ -64,6 +88,7 @@ export function createMultiSfuTransport(
         unsubscribes.get(backendId)?.();
         unsubscribes.delete(backendId);
         await transport.disconnect().catch(ignoreError);
+        markUnreachable(backendId);
         publish();
       });
   };
@@ -87,6 +112,7 @@ export function createMultiSfuTransport(
       ...(publisher ?? idleTransportState()),
       connection: publisher?.connection ?? 'disconnected',
       participants: [...byIdentity.values()],
+      unreachableBackends: [...unreachable],
     };
     for (const listener of listeners) listener({ ...state, participants: [...state.participants] });
   };
@@ -113,7 +139,10 @@ export function createMultiSfuTransport(
     unsubscribes.set(
       backend.id,
       transport.subscribe((next) => {
-        if (next.connection === 'connected') connected = true;
+        if (next.connection === 'connected') {
+          connected = true;
+          if (unreachable.delete(backend.id) && unreachable.size === 0) retryDelay = RETRY_FIRST_MS;
+        }
         publish();
         if (backend.id !== publisherId && connected && next.connection === 'disconnected') {
           removeSubscriber(backend.id, transport);
@@ -145,6 +174,7 @@ export function createMultiSfuTransport(
       unsubscribes.get(backend.id)?.();
       unsubscribes.delete(backend.id);
       await transport.disconnect();
+      if (!disposed && desiredBackends.has(backend.id)) markUnreachable(backend.id);
     }
   };
 
@@ -169,6 +199,7 @@ export function createMultiSfuTransport(
       if (expectedGeneration !== generation) return;
     }
     const wanted = new Set(backends.map((backend) => backend.id));
+    for (const id of unreachable) if (!wanted.has(id)) unreachable.delete(id);
     await Promise.all(
       [...transports.entries()]
         .filter(([id]) => !wanted.has(id))
@@ -218,6 +249,8 @@ export function createMultiSfuTransport(
       if (disposed) return;
       disposed = true;
       generation += 1;
+      clearTimeout(retryTimer);
+      unreachable.clear();
       keys.clear();
       const results = await Promise.allSettled(
         [...transports.values()].map((transport) => transport.disconnect())
