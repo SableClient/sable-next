@@ -609,6 +609,30 @@ test.each([
   expect(container.querySelector('.link-preview')).not.toHaveClass('compact');
 });
 
+test('a GIF card image is treated as a GIF, so it follows the autoplay setting', async () => {
+  preferences.clientEmbeds = true;
+  preferences.autoplayGifs = false;
+  const url = 'https://klipy.com/gifs/goatplaybanjo-chat-4';
+  core.rpc.messages.urlPreview.mockResolvedValue(
+    preview({
+      url,
+      title: 'Chatty Cat',
+      image: 'mxc://example.org/gif',
+      image_mime: 'image/webp',
+      image_width: 220,
+      image_height: 229,
+    })
+  );
+  const { container } = render(LinkPreviewCard, { url, encrypted: false });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(container.querySelector('.link-preview .gif-preview-source')).not.toBeNull();
+  preferences.autoplayGifs = true;
+});
+
 test('a GIF video preview loops muted without controls or a play button', async () => {
   preferences.urlPreviews = true;
   core.rpc.messages.urlPreview.mockResolvedValue(

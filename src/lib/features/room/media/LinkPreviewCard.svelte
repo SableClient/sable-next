@@ -120,6 +120,7 @@
       intrinsicWidth={view.image_width}
       intrinsicHeight={view.image_height}
       mime={view.image_mime ?? imageMimeFromUrl(url)}
+      animatedHint={gif || null}
       bind:spoilerHidden={imageHidden}
       href={url}
       onclick={openPreviewImage}
@@ -154,6 +155,8 @@
           height={compactImage ? 80 : 225}
           intrinsicWidth={view.image_width}
           intrinsicHeight={view.image_height}
+          mime={view.image_mime ?? imageMimeFromUrl(url)}
+          animatedHint={gif || null}
           bind:spoilerHidden={imageHidden}
           href={url}
           onclick={openPreviewImage}
