@@ -811,7 +811,7 @@
   }
 
   .message.highlighted {
-    --message-highlight-duration: 6s;
+    --message-highlight-duration: 2s;
   }
 
   .message.highlighted:not(.mention-silent, .mention-loud) {
@@ -869,15 +869,9 @@
       color: var(--primary-on-container);
     }
 
-    16% {
+    50% {
       background-color: var(--primary-container-active);
       color: var(--primary-on-container);
-    }
-
-    33%,
-    100% {
-      background-color: transparent;
-      color: inherit;
     }
   }
 
@@ -888,15 +882,10 @@
   }
 
   @keyframes jump-reduced {
-    0% {
+    0%,
+    99% {
       background-color: var(--primary-container);
       color: var(--primary-on-container);
-    }
-
-    33%,
-    100% {
-      background-color: transparent;
-      color: inherit;
     }
   }
 
