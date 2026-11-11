@@ -47,6 +47,7 @@ let excludedThemeIds: readonly string[] = [];
 
 export const settingsDocument: SyncedDocument = {
   eventType: SETTINGS_ACCOUNT_DATA_TYPE,
+  sealed: true,
 
   snapshot() {
     const prepared = prepareSettings(preferences, customThemes, isExplicitPreference);
@@ -80,6 +81,7 @@ export const settingsDocument: SyncedDocument = {
 export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
   return {
     eventType: WORKSPACE_ACCOUNT_DATA_TYPE,
+    sealed: true,
 
     snapshot: () => ({
       content: {
@@ -152,6 +154,7 @@ export function draftsDocumentFor(accountId: string): SyncedDocument {
 export function scheduledDocumentFor(accountId: string): SyncedDocument {
   return {
     eventType: SCHEDULED_ACCOUNT_DATA_TYPE,
+    sealed: true,
 
     snapshot: () => ({ content: { v: DOCUMENT_VERSION, scheduled: scheduledQueue(accountId) } }),
 

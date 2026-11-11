@@ -305,7 +305,7 @@ export const settingsPanels: Record<string, SettingsPanelDefinition[]> = {
     {
       id: 'sync-encryption',
       section: 'sync',
-      supported: () => preferences.settingsSync && preferences.syncDrafts,
+      supported: settingsSync,
       targets: targets([['sync-encryption', 'settings.syncEncryptionTitle']]),
     },
     {

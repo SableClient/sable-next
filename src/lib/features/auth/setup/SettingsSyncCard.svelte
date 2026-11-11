@@ -22,8 +22,11 @@
   $effect(() => {
     let alive = true;
     void core.rpc.account
-      .data({ event_type: SETTINGS_ACCOUNT_DATA_TYPE })
-      .then((content) => typeof content === 'object' && content !== null)
+      .sealedData({ event_type: SETTINGS_ACCOUNT_DATA_TYPE })
+      .then(
+        ({ content, state }) =>
+          state === 'locked' || (typeof content === 'object' && content !== null)
+      )
       .catch((error: unknown) => {
         console.debug('[sable setup] synced settings unavailable', error);
         return false;
