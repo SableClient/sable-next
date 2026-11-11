@@ -43,8 +43,14 @@
 </script>
 
 {#snippet body()}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <aside
     class={['side-panel', { modal }]}
+    onkeydown={(event) => {
+      if (modal || event.key !== 'Escape' || event.defaultPrevented) return;
+      event.preventDefault();
+      onClose();
+    }}
     aria-label={title}
     data-focus-region="panel"
     style:width={modal ? null : `${panelWidth.width}rem`}

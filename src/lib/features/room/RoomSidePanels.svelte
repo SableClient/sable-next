@@ -55,10 +55,6 @@
     return core.rpc.members.list({ room_id: roomId, memberships: [membership] });
   }
 
-  function closeMembers(): void {
-    panels.closeMembers(desktop);
-  }
-
   function closeWidgets(): void {
     panels.widgetsOpen = false;
   }
@@ -134,7 +130,6 @@
       powerTags={roomSession.powerTags}
       alwaysListedFrom={roomSession.alwaysListedFrom}
       {loadMembership}
-      onClose={closeMembers}
       {onMemberProfile}
     />
   {/if}
@@ -161,7 +156,6 @@
       powerTags={roomSession.powerTags}
       alwaysListedFrom={roomSession.alwaysListedFrom}
       {loadMembership}
-      onClose={closeMembers}
       {onMemberProfile}
     />
   </DialogFrame>

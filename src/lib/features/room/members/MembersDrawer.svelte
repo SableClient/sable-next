@@ -15,7 +15,6 @@
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
-  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { whenVisible } from '#lib/ui/when-visible.js';
@@ -55,7 +54,6 @@
     powerTags?: PowerLevelTagMap | null;
     alwaysListedFrom?: number | null;
     loadMembership?: ((membership: MemberView['membership']) => Promise<MemberView[]>) | null;
-    onClose: () => void;
     onMemberProfile: (userId: string, anchor: HTMLElement) => void;
   }
 
@@ -70,7 +68,6 @@
     powerTags = {},
     alwaysListedFrom = null,
     loadMembership = null,
-    onClose,
     onMemberProfile,
   }: Props = $props();
   const stage = usePanelStage();
@@ -221,10 +218,6 @@
         <Dialog.Close
           class="btn btn-ghost icon-button icon-button-small"
           aria-label={i18n.t('timeline.closeMembers')}><XIcon /></Dialog.Close
-        >
-      {:else}
-        <PanelHeaderButton label={i18n.t('timeline.closeMembers')} onclick={onClose}
-          ><XIcon /></PanelHeaderButton
         >
       {/if}
     {/snippet}

@@ -65,7 +65,6 @@ function renderDrawer(props: Partial<ComponentProps<typeof MembersDrawer>> = {})
     {
       members: [],
       loading: false,
-      onClose: vi.fn(),
       onMemberProfile: vi.fn(),
       ...props,
     },

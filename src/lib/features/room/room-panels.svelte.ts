@@ -31,7 +31,13 @@ export class RoomPanels {
 
   #set(panel: SidePanel, open: boolean): void {
     if (open) this.#show(panel);
-    else if (this.side === panel) this.#show(null);
+    else if (this.side === panel) this.#show(this.#home(panel));
+  }
+
+  #home(closing: SidePanel): SidePanel | null {
+    return closing !== 'desktopMembers' && closing !== 'members' && desktopMembersPreferred
+      ? 'desktopMembers'
+      : null;
   }
 
   get threadsOpen(): boolean {
@@ -104,7 +110,7 @@ export class RoomPanels {
     const open = this.side !== panel;
     const leavingThread = this.threadRootId !== null;
     this.threadRootId = null;
-    this.#show(open ? panel : null);
+    this.#show(open ? panel : this.#home(panel));
     if (open && leavingThread) this.swapped = true;
     return open;
   }

@@ -117,3 +117,39 @@ test('the search shortcut reaches only the room that is still open', () => {
   leaveSecond();
   expect(search.run()).toBe(false);
 });
+
+test('closing a panel opened over the member list returns to it', () => {
+  const panels = new RoomPanels();
+  panels.toggleMembers(true);
+  panels.toggleSearch();
+  panels.searchOpen = false;
+  expect(panels.desktopMembersOpen).toBe(true);
+  panels.toggleNotifications();
+  panels.toggleNotifications();
+  expect(panels.desktopMembersOpen).toBe(true);
+
+  panels.toggleMembers(true);
+  panels.toggleSearch();
+  panels.toggleSearch();
+  expect(panels.side).toBeNull();
+});
+
+test('resetting the panels from an effect does not close the next one opened', () => {
+  const panels = new RoomPanels();
+  let runs = 0;
+  const cleanup = $effect.root(() => {
+    $effect(() => {
+      runs += 1;
+      panels.reset();
+    });
+  });
+  flushSync();
+  expect(runs).toBe(1);
+
+  panels.toggleThreads();
+  flushSync();
+
+  expect(panels.threadsOpen).toBe(true);
+  expect(runs).toBe(1);
+  cleanup();
+});
