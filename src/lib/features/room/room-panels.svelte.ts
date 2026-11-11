@@ -1,3 +1,5 @@
+import { createContext, untrack } from 'svelte';
+
 import { readText, writeText } from '#lib/platform/local-json.js';
 
 const membersStorageKey = 'sable-members-open';
@@ -138,3 +140,22 @@ export class RoomPanels {
     if (desktop) preferDesktopMembers(false);
   }
 }
+
+export class OpenRoomSearch {
+  #open: (() => void) | null = null;
+
+  register(open: () => void): () => void {
+    this.#open = open;
+    return () => {
+      if (this.#open === open) this.#open = null;
+    };
+  }
+
+  run(): boolean {
+    if (!this.#open) return false;
+    this.#open();
+    return true;
+  }
+}
+
+export const [useOpenRoomSearch, provideOpenRoomSearch] = createContext<OpenRoomSearch>();

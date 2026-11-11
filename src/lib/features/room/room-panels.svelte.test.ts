@@ -2,7 +2,7 @@
 
 import { flushSync } from 'svelte';
 import { expect, test, vi } from 'vitest';
-import { RoomPanels } from './room-panels.svelte.js';
+import { OpenRoomSearch, RoomPanels } from './room-panels.svelte.js';
 
 test('opening a thread closes competing panels', () => {
   const panels = new RoomPanels();
@@ -100,4 +100,20 @@ test('the notifications panel replaces any other open panel', () => {
   expect(panels.notificationsOpen).toBe(true);
   panels.toggleNotifications();
   expect(panels.notificationsOpen).toBe(false);
+});
+
+test('the search shortcut reaches only the room that is still open', () => {
+  const search = new OpenRoomSearch();
+  expect(search.run()).toBe(false);
+  const first = vi.fn();
+  const second = vi.fn();
+  const leaveFirst = search.register(first);
+  const leaveSecond = search.register(second);
+  leaveFirst();
+
+  expect(search.run()).toBe(true);
+  expect(second).toHaveBeenCalledTimes(1);
+  expect(first).not.toHaveBeenCalled();
+  leaveSecond();
+  expect(search.run()).toBe(false);
 });

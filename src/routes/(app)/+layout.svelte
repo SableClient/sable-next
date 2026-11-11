@@ -21,6 +21,7 @@
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { HOME_SECTION, rememberLastRoom } from '#lib/rooms/last-room.js';
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
+  import { OpenRoomSearch, provideOpenRoomSearch } from '#lib/features/room/room-panels.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { Bookmarks, provideBookmarks } from '#lib/rooms/bookmarks.svelte.js';
   import { EventItems, provideEventItems } from '#lib/features/room/messages/event-items.svelte.js';
@@ -180,6 +181,8 @@
   });
   const spaceSidebar = new SpaceSidebar();
   provideSpaceSidebar(spaceSidebar);
+  const openRoomSearch = new OpenRoomSearch();
+  provideOpenRoomSearch(openRoomSearch);
   providePersonaStore(new PersonaStore(core));
   const bookmarks = new Bookmarks(core.rpc.account);
   provideBookmarks(bookmarks);
@@ -1159,6 +1162,7 @@
           paletteState.open = true;
         },
         'app.searchMessages': () => {
+          if (openRoomSearch.run()) return;
           if (page.url.pathname.startsWith(resolve('search'))) {
             document.getElementById(MESSAGE_SEARCH_FIELD_ID)?.focus();
             return;

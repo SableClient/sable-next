@@ -75,7 +75,7 @@
   import { eventBefore } from './timeline/timeline-format';
   import { RoomSession } from './room-session.svelte.js';
   import { MemberProfile } from './members/member-profile.svelte.js';
-  import { RoomPanels } from './room-panels.svelte.js';
+  import { RoomPanels, useOpenRoomSearch } from './room-panels.svelte.js';
   import { TombstoneJoin } from './room-tombstone-join.svelte.js';
   import RoomCallStage from './RoomCallStage.svelte';
   import RoomVoiceChat from './RoomVoiceChat.svelte';
@@ -95,6 +95,7 @@
   let { roomId, eventId = null, notifiedEventId = null, room }: Props = $props();
   const core = useCoreClient();
   const panels = new RoomPanels();
+  const openRoomSearch = useOpenRoomSearch();
   const memberProfile = new MemberProfile(core);
   onDestroy(() => memberProfile.close());
   trackRoomEntry();
@@ -741,6 +742,13 @@
     }
     panels.toggleSearch();
   }
+
+  $effect(() =>
+    openRoomSearch.register(() => {
+      if (!desktop) searchInRoom(resolvedRoom, resolvedRoomId);
+      else if (!panels.searchOpen) panels.toggleSearch();
+    })
+  );
 
   function openPredecessor(): void {
     if (!roomSession.predecessor) return;
