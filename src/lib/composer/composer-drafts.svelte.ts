@@ -1,3 +1,6 @@
+import type { BotCommand } from '#src/generated/protocol';
+
+import type { ArgumentDrafts } from '#lib/model/model.js';
 import { fingerprint } from '#lib/settings/fingerprint.js';
 
 import type { ComposerContext } from './composer-context';
@@ -7,6 +10,12 @@ export interface ComposerDraft {
   doc: unknown;
   staged: StagedFile[];
   nextStagedId: number;
+}
+
+export interface BotCommandDraft {
+  command: BotCommand;
+  drafts: ArgumentDrafts;
+  prefix: string;
 }
 
 const MAX_SYNCED_DRAFTS = 50;
@@ -31,6 +40,7 @@ interface DraftState {
   discarded: Map<string, string[]>;
   offered: Map<string, string[]>;
   replies: Map<string, ComposerContext>;
+  botCommands: Map<string, BotCommandDraft>;
 }
 
 // eslint-disable-next-line svelte/prefer-svelte-reactivity -- changes publish through revision
@@ -46,6 +56,7 @@ function stateFor(accountId: string): DraftState {
       discarded: new Map(),
       offered: new Map(),
       replies: new Map(),
+      botCommands: new Map(),
     };
     accounts.set(accountId, state);
   }
@@ -94,6 +105,20 @@ export function writeReply(key: string, reply: ComposerContext | null, accountId
   const { replies } = stateFor(accountId);
   if (reply === null) replies.delete(key);
   else replies.set(key, reply);
+}
+
+export function readBotCommand(key: string, accountId = ''): BotCommandDraft | undefined {
+  return stateFor(accountId).botCommands.get(key);
+}
+
+export function writeBotCommand(
+  key: string,
+  command: BotCommandDraft | null,
+  accountId = ''
+): void {
+  const { botCommands } = stateFor(accountId);
+  if (command === null) botCommands.delete(key);
+  else botCommands.set(key, command);
 }
 
 export function clearDrafts(): void {

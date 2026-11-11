@@ -67,6 +67,11 @@
   import type { AutocompleteQuery, Suggestion } from './autocomplete';
   import { formattedForEditing, type ComposerContext } from '#lib/composer/composer-context.js';
   import {
+    readBotCommand,
+    writeBotCommand,
+    type BotCommandDraft,
+  } from '#lib/composer/composer-drafts.svelte.js';
+  import {
     previewKind,
     restoreFile,
     stageFiles,
@@ -110,7 +115,6 @@
     buildInvocation,
     draftsFromText,
     matchBotCommand,
-    type ArgumentDrafts,
     type BotCommand,
     type BotCommandInvocation,
   } from './bot-commands';
@@ -318,14 +322,9 @@
   let previousContext: ComposerContext | null = untrack(() => restoredContext);
   let deleteEditTarget = $state.raw<ComposerContext | null>(null);
   let members = $derived(roomMembers?.length ? roomMembers : sources.loadedMembers);
-  let activeBotCommand = $derived.by<{
-    command: BotCommand;
-    drafts: ArgumentDrafts;
-    prefix: string;
-  } | null>(() => {
-    void roomId;
-    return null;
-  });
+  let activeBotCommand = $derived(
+    readBotCommand(draftKey(), core.session?.account_id ?? '') ?? null
+  );
 
   let desktop = $derived(appLayout.current);
   let sending = $derived(inFlight > 0);
@@ -627,14 +626,20 @@
     };
   });
 
+  function storeBotCommand(command: BotCommandDraft | null): void {
+    activeBotCommand = command;
+    writeBotCommand(draftKey(), command, core.session?.account_id ?? '');
+  }
+
   function openBotCommand(command: BotCommand, args: string, prefix: string): void {
-    activeBotCommand = { command, drafts: draftsFromText(command, args), prefix };
+    const drafts = $state(draftsFromText(command, args));
+    storeBotCommand({ command, drafts, prefix });
     error = null;
     void sources.loadMembers();
   }
 
   function closeBotCommand(): void {
-    activeBotCommand = null;
+    storeBotCommand(null);
     editor.focus();
   }
 

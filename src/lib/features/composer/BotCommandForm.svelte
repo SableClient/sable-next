@@ -55,7 +55,7 @@
   const fieldId = (key: string): string => `bot-command-${uid}-${key}`;
   const labelOf = (key: string): string => key.replaceAll('_', ' ');
 
-  const values = $state<ArgumentDrafts>(untrack(() => ({ ...drafts })));
+  const values = untrack(() => drafts);
   const pending = $state<Record<string, string>>({});
   let errors = $state<Record<string, 'required' | 'invalid'>>({});
 

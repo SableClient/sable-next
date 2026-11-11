@@ -2422,6 +2422,29 @@ test('choosing a bot command suggestion opens its argument form', async () => {
   expect(screen.getByLabelText('days')).toBeTruthy();
 });
 
+test('an open bot command form and its values survive switching rooms', async () => {
+  draftText('/wa');
+  let switchRoom: ((roomId: string) => void) | undefined;
+  setup({
+    roomId: '!room:example.org',
+    onSendBotCommand: async () => {},
+    registerRoom: (set) => {
+      switchRoom = set;
+    },
+  });
+  await press(await screen.findByRole('option', { name: /\/warn/ }));
+  await fireEvent.input(screen.getByLabelText('days'), { target: { value: '7' } });
+
+  switchRoom?.('!other:example.org');
+  await flushed();
+  expect(screen.queryByRole('form', { name: 'Arguments for /warn' })).toBeNull();
+  switchRoom?.('!room:example.org');
+  await flushed();
+
+  expect(screen.getByRole('form', { name: 'Arguments for /warn' })).toBeTruthy();
+  expect(screen.getByLabelText('days')).toHaveProperty('value', '7');
+});
+
 test.each(['command', 'argument'])('formatting a bot %s keeps its invocation', async (part) => {
   const onSendBotCommand = vi.fn(async () => {});
   const draft = composerSchema.node('doc', null, [
