@@ -1,3 +1,6 @@
+// @vitest-environment happy-dom
+
+import { flushSync } from 'svelte';
 import { expect, test, vi } from 'vitest';
 import { RoomPanels } from './room-panels.svelte.js';
 
@@ -71,6 +74,22 @@ test('the desktop member list preference survives a reload', async () => {
   const again = await import('./room-panels.svelte.js');
   expect(new again.RoomPanels().desktopMembersOpen).toBe(true);
   vi.unstubAllGlobals();
+});
+
+test('replacing one panel with another is a swap, opening or closing one is not', () => {
+  const panels = new RoomPanels();
+  panels.closeMembers(true);
+  panels.toggleSearch();
+  expect(panels.swapped).toBe(false);
+  panels.toggleNotifications();
+  expect(panels.swapped).toBe(true);
+  panels.toggleNotifications();
+  expect(panels.swapped).toBe(false);
+  panels.toggleThreads();
+  panels.openThread('$root');
+  expect(panels.swapped).toBe(true);
+  panels.toggleWidgets();
+  expect(panels.swapped).toBe(true);
 });
 
 test('the notifications panel replaces any other open panel', () => {

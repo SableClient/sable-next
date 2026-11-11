@@ -158,7 +158,7 @@
   const pinnedEvents = new PinnedEvents(core.rpc.timeline);
   const roomSession = new RoomSession(core.rpc, pinnedEvents);
   providePinnedEvents(pinnedEvents);
-  providePanelStage();
+  providePanelStage(() => panels.swapped);
   onDestroy(() => roomSession.dispose());
   const tombstoneJoin = new TombstoneJoin(
     core.rpc,

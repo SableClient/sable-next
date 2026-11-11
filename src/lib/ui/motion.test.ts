@@ -42,8 +42,17 @@ test('motion is preserved when neither setting requests a reduction', () => {
 test('a panel holds still while its stage is not live', () => {
   preferences.reducedMotion = false;
   const node = document.createElement('aside');
-  expect(panelIn(node, { stage: { live: false } }).duration).toBe(0);
-  expect(panelOut(node, { stage: { live: false } }).duration).toBe(0);
-  expect(panelIn(node, { stage: { live: true } }).duration).toBe(250);
+  const swapping = () => false;
+  expect(panelIn(node, { stage: { live: false, swapping } }).duration).toBe(0);
+  expect(panelOut(node, { stage: { live: false, swapping } }).duration).toBe(0);
+  expect(panelIn(node, { stage: { live: true, swapping } }).duration).toBe(250);
   expect(panelIn(node).duration).toBe(250);
+});
+
+test('a panel replacing another holds still', () => {
+  preferences.reducedMotion = false;
+  const node = document.createElement('aside');
+  const stage = { live: true, swapping: () => true };
+  expect(panelIn(node, { stage }).duration).toBe(0);
+  expect(panelOut(node, { stage }).duration).toBe(0);
 });

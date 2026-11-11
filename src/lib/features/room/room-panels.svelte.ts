@@ -8,82 +8,133 @@ function preferDesktopMembers(open: boolean): void {
   writeText(membersStorageKey, String(open));
 }
 
+export type SidePanel =
+  | 'threads'
+  | 'attachments'
+  | 'search'
+  | 'notifications'
+  | 'members'
+  | 'desktopMembers'
+  | 'widgets';
+
 export class RoomPanels {
   threadRootId = $state<string | null>(null);
-  threadsOpen = $state(false);
-  attachmentsOpen = $state(false);
-  searchOpen = $state(false);
-  notificationsOpen = $state(false);
-  membersOpen = $state(false);
-  desktopMembersOpen = $state(desktopMembersPreferred);
-  widgetsOpen = $state(false);
+  side = $state<SidePanel | null>(desktopMembersPreferred ? 'desktopMembers' : null);
+  swapped = $state(false);
 
+  #show(panel: SidePanel | null): void {
+    this.swapped = this.side !== null && panel !== null && this.side !== panel;
+    this.side = panel;
+  }
+
+  #set(panel: SidePanel, open: boolean): void {
+    if (open) this.#show(panel);
+    else if (this.side === panel) this.#show(null);
+  }
+
+  get threadsOpen(): boolean {
+    return this.side === 'threads';
+  }
+  set threadsOpen(open: boolean) {
+    this.#set('threads', open);
+  }
+
+  get attachmentsOpen(): boolean {
+    return this.side === 'attachments';
+  }
+  set attachmentsOpen(open: boolean) {
+    this.#set('attachments', open);
+  }
+
+  get searchOpen(): boolean {
+    return this.side === 'search';
+  }
+  set searchOpen(open: boolean) {
+    this.#set('search', open);
+  }
+
+  get notificationsOpen(): boolean {
+    return this.side === 'notifications';
+  }
+  set notificationsOpen(open: boolean) {
+    this.#set('notifications', open);
+  }
+
+  get membersOpen(): boolean {
+    return this.side === 'members';
+  }
+  set membersOpen(open: boolean) {
+    this.#set('members', open);
+  }
+
+  get desktopMembersOpen(): boolean {
+    return this.side === 'desktopMembers';
+  }
+  set desktopMembersOpen(open: boolean) {
+    this.#set('desktopMembers', open);
+  }
+
+  get widgetsOpen(): boolean {
+    return this.side === 'widgets';
+  }
+  set widgetsOpen(open: boolean) {
+    this.#set('widgets', open);
+  }
+
+  /** Called from a room-change effect, which must not come to depend on the open panel. */
   reset(): void {
     this.threadRootId = null;
-    this.threadsOpen = false;
-    this.attachmentsOpen = false;
-    this.searchOpen = false;
-    this.notificationsOpen = false;
+    const side = untrack(() => this.side);
+    if (side !== 'members' && side !== 'desktopMembers' && side !== 'widgets') {
+      untrack(() => {
+        this.#show(null);
+      });
+    }
   }
 
   openThread(rootEventId: string): void {
-    this.reset();
-    this.widgetsOpen = false;
-    this.membersOpen = false;
+    this.swapped = this.side !== null || this.threadRootId !== null;
     this.threadRootId = rootEventId;
+    if (this.side !== 'desktopMembers') this.side = null;
   }
 
-  #closeAll(): void {
-    this.reset();
-    this.membersOpen = false;
-    this.desktopMembersOpen = false;
-    this.widgetsOpen = false;
+  #toggle(panel: SidePanel): boolean {
+    const open = this.side !== panel;
+    const leavingThread = this.threadRootId !== null;
+    this.threadRootId = null;
+    this.#show(open ? panel : null);
+    if (open && leavingThread) this.swapped = true;
+    return open;
   }
 
   toggleThreads(): void {
-    const open = !this.threadsOpen;
-    this.#closeAll();
-    this.threadsOpen = open;
+    this.#toggle('threads');
   }
 
   toggleAttachments(): void {
-    const open = !this.attachmentsOpen;
-    this.#closeAll();
-    this.attachmentsOpen = open;
+    this.#toggle('attachments');
   }
 
   toggleSearch(): void {
-    const open = !this.searchOpen;
-    this.#closeAll();
-    this.searchOpen = open;
+    this.#toggle('search');
   }
 
   toggleNotifications(): void {
-    const open = !this.notificationsOpen;
-    this.#closeAll();
-    this.notificationsOpen = open;
+    this.#toggle('notifications');
   }
 
   toggleWidgets(): void {
-    const open = !this.widgetsOpen;
-    this.#closeAll();
-    this.widgetsOpen = open;
+    this.#toggle('widgets');
   }
 
   toggleMembers(desktop: boolean): boolean {
-    const open = !(desktop ? this.desktopMembersOpen : this.membersOpen);
-    this.#closeAll();
-    if (desktop) {
-      this.desktopMembersOpen = open;
-      preferDesktopMembers(open);
-    } else this.membersOpen = open;
+    const open = this.#toggle(desktop ? 'desktopMembers' : 'members');
+    if (desktop) preferDesktopMembers(open);
     return open;
   }
 
   closeMembers(desktop: boolean): void {
-    if (desktop) {
-      this.desktopMembersOpen = false;
-      preferDesktopMembers(false);
-    } else this.membersOpen = false;
+    this.#set(desktop ? 'desktopMembers' : 'members', false);
+    if (desktop) preferDesktopMembers(false);
   }
 }

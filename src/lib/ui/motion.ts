@@ -29,12 +29,13 @@ export function scrollBehavior(): ScrollBehavior {
 
 interface PanelStage {
   live: boolean;
+  swapping: () => boolean;
 }
 
 const [getPanelStage, setPanelStage, hasPanelStage] = createContext<PanelStage>();
 
-export function providePanelStage(): void {
-  const stage: PanelStage = { live: false };
+export function providePanelStage(swapping: () => boolean = () => false): void {
+  const stage: PanelStage = { live: false, swapping };
   setPanelStage(stage);
   onMount(() => {
     const frame = requestAnimationFrame(() => {
@@ -65,7 +66,7 @@ function panelFly(
   { modal = false, cover = false, stage }: PanelMotion,
   leaving: boolean
 ) {
-  const still = modal || stage?.live === false;
+  const still = modal || stage?.live === false || stage?.swapping() === true;
   const params: FlyParams = {
     x: cover ? '100%' : 24,
     opacity: cover ? 1 : 0,
