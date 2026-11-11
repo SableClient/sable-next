@@ -2,7 +2,8 @@ use sable_core::protocol::NotificationView;
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Manager, Runtime};
+use tauri_plugin_notifications::Attachment;
 use tauri_plugin_notifications::NotificationMessage;
 use tauri_plugin_notifications::NotificationsExt;
 
@@ -10,6 +11,8 @@ const MESSAGES_CHANNEL: &str = "messages.v2";
 const MESSAGE_ACTIONS: &str = "sable-message";
 const MAX_CONVERSATION_LINES: usize = 8;
 const NOTIFY_ONCE_WINDOW: Duration = Duration::from_mins(5);
+const AVATAR_SIZE: u32 = 96;
+const AVATAR_DIR: &str = "notification-avatars";
 
 fn conversation_key(user_id: &str, room_id: &str) -> String {
     format!("{user_id}\0{room_id}")
@@ -135,6 +138,41 @@ fn collapsed(lines: &[Line]) -> String {
         .join("\n")
 }
 
+fn avatar_source(view: &NotificationView) -> Option<&str> {
+    let room = view.room_avatar_url.as_deref().filter(|_| !view.is_direct);
+    room.or(view.sender_avatar_url.as_deref())
+}
+
+/// Desktop notifiers only show a local image, so the thumbnail is kept in the cache folder.
+async fn avatar_file<R: Runtime>(
+    app: &AppHandle<R>,
+    core: &sable_core::Core,
+    view: &NotificationView,
+) -> Option<tauri::Url> {
+    use std::hash::{Hash as _, Hasher as _};
+
+    let source = avatar_source(view)?;
+    let directory = app.path().app_cache_dir().ok()?.join(AVATAR_DIR);
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    source.hash(&mut hasher);
+    let path = directory.join(format!("{:016x}.img", hasher.finish()));
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
+        let bytes = core
+            .fetch_media(source.to_owned(), AVATAR_SIZE, AVATAR_SIZE, true)
+            .await
+            .map_err(|error| log::debug!("could not fetch a notification avatar: {error:?}"))
+            .ok()?;
+        let saved = match tokio::fs::create_dir_all(&directory).await {
+            Ok(()) => tokio::fs::write(&path, bytes).await,
+            Err(error) => Err(error),
+        };
+        saved
+            .map_err(|error| log::debug!("could not cache a notification avatar: {error}"))
+            .ok()?;
+    }
+    tauri::Url::from_file_path(&path).ok()
+}
+
 fn body(view: &NotificationView, content: bool) -> String {
     let sender = view
         .sender_name
@@ -185,6 +223,10 @@ pub(super) async fn show_generic<R: Runtime>(
             .extra("event_id", event_id.as_str());
     }
 
+    if let Some(avatar) = avatar_file(app, core, view).await {
+        builder = builder.attachment(Attachment::new("avatar", avatar));
+    }
+
     builder = builder.only_alert_once(core.notify_once() && cooling(view, Instant::now()));
     if !core.notification_sounds() {
         builder = builder.silent();
@@ -219,8 +261,8 @@ mod tests {
     use sable_core::protocol::NotificationView;
 
     use super::{
-        Line, MAX_CONVERSATION_LINES, MESSAGE_ACTIONS, NOTIFY_ONCE_WINDOW, body, collapsed,
-        cooling, forget, remember, shows_content,
+        Line, MAX_CONVERSATION_LINES, MESSAGE_ACTIONS, NOTIFY_ONCE_WINDOW, avatar_source, body,
+        collapsed, cooling, forget, remember, shows_content,
     };
 
     fn view(is_direct: bool) -> NotificationView {
@@ -239,6 +281,27 @@ mod tests {
             mention: false,
             noisy: Some(true),
         }
+    }
+
+    #[test]
+    fn a_room_shows_its_picture_and_a_dm_its_sender() {
+        let pictured = |is_direct, room: Option<&str>| NotificationView {
+            room_avatar_url: room.map(str::to_owned),
+            sender_avatar_url: Some("mxc://example.org/ada".to_owned()),
+            ..view(is_direct)
+        };
+        assert_eq!(
+            avatar_source(&pictured(false, Some("mxc://example.org/room"))),
+            Some("mxc://example.org/room")
+        );
+        assert_eq!(
+            avatar_source(&pictured(false, None)),
+            Some("mxc://example.org/ada")
+        );
+        assert_eq!(
+            avatar_source(&pictured(true, Some("mxc://example.org/room"))),
+            Some("mxc://example.org/ada")
+        );
     }
 
     #[test]
