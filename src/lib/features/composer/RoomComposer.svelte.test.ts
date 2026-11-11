@@ -1010,6 +1010,38 @@ test('finishing an edit keeps focus in the editor', async () => {
   expect(document.activeElement).toBe(editor);
 });
 
+test('on a phone, sending a reply keeps the keyboard up', async () => {
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+  let setContext: ((next: ComposerContext | null) => void) | undefined;
+  draftText('thanks');
+  setup({
+    roomId: '!room:example.org',
+    context: { kind: 'reply', eventId: '$one:example.org', sender: 'Alice', body: 'Hello' },
+    registerContext: (set) => {
+      setContext = set;
+    },
+    onSend: () => {
+      setContext?.(null);
+      return Promise.resolve();
+    },
+  });
+  await flushed();
+  const editor = document.querySelector('[role="combobox"]');
+  if (!(editor instanceof HTMLElement)) throw new Error('editor not found');
+  editor.focus();
+
+  submit();
+  await flushed();
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+
+  expect(document.activeElement).toBe(editor);
+  vi.unstubAllGlobals();
+});
+
 test('staging files returns focus to the editor', async () => {
   setup({ roomId: '!room:example.org' });
   await flushed();

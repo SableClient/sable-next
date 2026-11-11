@@ -609,16 +609,9 @@
   $effect(() => {
     if (context === previousContext) return;
 
-    const wasActive = previousContext !== null;
     previousContext = context;
     const frame = requestAnimationFrame(() => {
-      if (context !== null) {
-        editor.focus();
-      } else if (wasActive && !desktop && !sending) {
-        editor.blur();
-        const activeElement = document.activeElement;
-        if (activeElement instanceof HTMLElement) activeElement.blur();
-      }
+      if (context !== null) editor.focus();
     });
 
     return () => {
