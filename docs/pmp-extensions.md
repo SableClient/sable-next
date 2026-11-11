@@ -166,3 +166,5 @@ Triggers now can contain `net.f0rest.alternate_avatar_id`. This is an optional s
   ]
 }
 ```
+
+When a trigger does not specify an alternate avatar, the resulting message MUST NOT contain an alternate avatar. 'Latching' behavior must remove a latched alternate avatar.

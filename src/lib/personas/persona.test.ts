@@ -177,8 +177,8 @@ describe('alternateAvatarId', () => {
     );
   });
 
-  it('keeps the held avatar when a shorthand for the same persona names none', () => {
-    expect(alternateAvatarId(kris, trigger('k:'), held)).toBe('smile');
+  it('does not keep the held avatar when a shorthand for the same persona names none', () => {
+    expect(alternateAvatarId(kris, trigger('k:'), held)).toBe(null);
   });
 
   it('ignores an avatar held for another persona', () => {

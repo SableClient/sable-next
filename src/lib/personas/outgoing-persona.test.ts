@@ -52,7 +52,7 @@ describe('outgoingPersona alternate avatars', () => {
     expect(sent?.avatar_url).toBe('mxc://alt');
   });
 
-  it('keeps the picked alternate avatar when a shorthand without one latches', () => {
+  it('does not keep the picked alternate avatar when a shorthand without one latches', () => {
     const personas = store(
       [
         persona({
@@ -64,13 +64,13 @@ describe('outgoingPersona alternate avatars', () => {
       { '!r': selection('alt') }
     );
     const { persona: sent } = outgoingPersona(personas, '!r', [], 'a:hello');
-    expect(sent?.avatar_url).toBe('mxc://alt');
+    expect(sent?.avatar_url).toBe('mxc://main');
     expect(personas.remember).toHaveBeenCalledWith(
       'room',
       '!r',
       { target: null, order: [] },
       'p1',
-      'alt'
+      null
     );
   });
 });

@@ -100,10 +100,11 @@ export function alternateAvatarId(
   trigger: PersonaTriggerView | undefined,
   held: PersonaAssociation
 ): string | null {
-  return (
-    trigger?.alternate_avatar_id ??
-    (held && held !== 'account' && held.persona_id === persona.id ? held.alternate_avatar_id : null)
-  );
+  return trigger
+    ? trigger.alternate_avatar_id
+    : held && held !== 'account' && held.persona_id === persona.id
+      ? held.alternate_avatar_id
+      : null;
 }
 
 export interface ProxyMatch {
