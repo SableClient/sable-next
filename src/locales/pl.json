@@ -431,13 +431,17 @@
     "manageAccounts": "Zarządzaj kontami",
     "accountSignedOut": "Wylogowano",
     "accountSignInAgain": "Zaloguj się ponownie",
-    "voiceLive": "{{count, number}} w pokoju głosowym",
+    "voiceLive_one": "{{count, number}} w pokoju głosowym",
+    "voiceLive_few": "",
+    "voiceLive_many": "",
     "navigate": "Nawigacja",
     "profile": "Profil",
     "editProfile": "Edytuj profil",
     "messages": "Wiadomości",
     "createRoomInSpace": "Utwórz pokój w przestrzeni",
-    "unreadMessages": "{{count, number}} nieprzeczytanych wiadomości",
+    "unreadMessages_one": "{{count, number}} nieprzeczytanych wiadomości",
+    "unreadMessages_few": "",
+    "unreadMessages_many": "",
     "chats": "Czaty",
     "newChat": "Nowy czat",
     "folderCollapse": "Zwiń {{name}}",
@@ -486,7 +490,9 @@
     "switchAccountFailed": "Nie udało się przełączyć konta. Spróbuj ponownie.",
     "switchingAccount": "Przełączanie…",
     "resizeRooms": "Zmień rozmiar listy pokoi",
-    "unreadMentions": "{{count, number}} wzmianek"
+    "unreadMentions_one": "{{count, number}} wzmianek",
+    "unreadMentions_few": "",
+    "unreadMentions_many": ""
   },
   "inbox": {
     "invites": "Oczekujące zaproszenia",
@@ -562,7 +568,9 @@
     "bookmarkPreviewEmpty": "Brak dostępnego podglądu",
     "bookmarkRemoved": "Usunięto zakładkę w {{room}}",
     "mention": "Wzmiankuje cię",
-    "navLabel": "Skrzynka odbiorcza, {{count, number}} oczekujących",
+    "navLabel_one": "Skrzynka odbiorcza, {{count, number}} oczekujących",
+    "navLabel_few": "",
+    "navLabel_many": "",
     "filterMentions": "Wzmianki"
   },
   "common": {

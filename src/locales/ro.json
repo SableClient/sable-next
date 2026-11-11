@@ -64,7 +64,9 @@
     "sortRecent": "Activitate recentă",
     "home": "Acasă",
     "switchingAccount": "Se schimbă…",
-    "switchAccountFailed": "Schimbarea contului a eșuat. Încearcă din nou."
+    "switchAccountFailed": "Schimbarea contului a eșuat. Încearcă din nou.",
+    "navigation": "Navigație",
+    "notificationAccountMissing": "Această notificare este pentru un cont care nu mai este conectat."
   },
   "inbox": {
     "notifications": "Notificări",
@@ -145,7 +147,12 @@
     "notificationsEmptyAll": "Ai citit tot. Mențiunile, mesajele directe și notificările vor apărea aici.",
     "unlistedNotifications_one": "{{count, number}} notificare necitită",
     "unlistedNotifications_few": "{{count, number}} notificări necitite",
-    "unlistedNotifications_other": "{{count, number}} de notificări necitite"
+    "unlistedNotifications_other": "{{count, number}} de notificări necitite",
+    "filterThreads": "Fire",
+    "inThread": "Într-un fir",
+    "notificationsEmptyThreads": "Nici un fir cu răspunsuri.",
+    "reply": "Răspuns",
+    "repliedToYou": "Ți-a răspuns"
   },
   "room": {
     "createDescription": "Camerele conțin o conversații. Spațiile conțin camere.",
@@ -271,7 +278,7 @@
       "restricted": "doar membrii spațiului",
       "knock_restricted": "membrii spațiului, sau cu cerere",
       "private": "privat",
-      "unknown": "o regulă pe care {{appName}} nu o recunoaște"
+      "unknown": "o regulă pe care aplicația asta nu o recunoaște"
     },
     "menuConvertToGroup": "Transformă în grup",
     "lobbyKnockSent": "Cerere trimisă",
@@ -689,7 +696,21 @@
     "cosmeticsApplying_other": "Se aplică… {{done, number}} din {{count, number}} de camere.",
     "cosmeticsApplied_one": "Sa aplicat pentru o cameră.",
     "cosmeticsApplied_few": "Sa aplicat pentru {{count, number}} camere.",
-    "cosmeticsApplied_other": "Sa aplicat pentru {{count, number}} de camere."
+    "cosmeticsApplied_other": "Sa aplicat pentru {{count, number}} de camere.",
+    "menuClose": "Închide conversația",
+    "notifySpace": "Spațiu ({{mode}})",
+    "notificationsClose": "Închide notificări",
+    "notificationsResize": "Redimensionează notificările",
+    "notificationsEmpty": "Încă nici o notificare din aceasta cameră pe acest dispozitiv.",
+    "notificationsSearch": "Filtrează după expeditor sau text",
+    "notificationsNoResults": "Nici o notificare nu se potrivește „{{query}}”.",
+    "notificationsOpen": "Notificările acestei camere",
+    "notificationsRead": "Deja am citit",
+    "spaceModeApplied_one": "{{space}} și {{count, number}} cameră a sa folosește acum {{mode}}",
+    "spaceModeApplied_few": "{{space}} și {{count, number}} camere ale sale folosesc acum {{mode}}",
+    "spaceModeApplied_other": "{{space}} și {{count, number}} de camere ale sale folosesc acum {{mode}}",
+    "spaceModeDefault": "implicit",
+    "menuJoinSpace": "Alătură-te"
   },
   "join": {
     "knocking": "Se trimite…",
@@ -1097,11 +1118,6 @@
     "signInWithPassword": "Conectează-te cu parolă",
     "signInTitle": "Conectează-te",
     "resetPasswordTitle": "Resetează parola",
-    "stageSignInLabel": "Conectează-te în {{appName}}",
-    "stageCreateAccountLabel": "Crează-ți un cont de Matrix",
-    "stageRecoveryLabel": "Setează o metodă de recuperare",
-    "stageProfileLabel": "Alege detaliile profilului",
-    "stageConsentLabel": "Alege dacă trimiți rapoarte de erori",
     "signingIn": "Se conectează…",
     "moreWaysToSignIn": "Mai multe metode de conectare",
     "hideOtherWaysToSignIn": "Ascunde metodele suplimentare de conectare",
@@ -1109,7 +1125,6 @@
     "hideOtherWaysToCreateAccount": "Ascunde celelalte metode de a-ți crea un cont",
     "continue": "Continuă",
     "next": "Înainte",
-    "stageNavigation": "Navigarea configurării",
     "checking": "Se verifică…",
     "unableToStart": "{{appName}} nu a putut începe.",
     "chooseSignInMethod": "Alege o metodă de a te conecta oferită de server.",
@@ -2501,7 +2516,7 @@
     "askToJoin": "Alăturare prin cerere",
     "invitePeople": "Invită persoane",
     "add": "Adaugă",
-    "userIdFormatHint": "ID-ul de utilizator aree forma @cineva:server",
+    "userIdFormatHint": "ID-ul de utilizator are forma @cineva:server",
     "searchRooms": "Caută camere",
     "loadMore": "Afișează mai multe",
     "join": "Alătură-te",
@@ -2569,6 +2584,8 @@
     "sortNameDesc": "Z la A",
     "edit": "Editează",
     "sortManual": "Manuală",
-    "confirmIrreversible": "Înțeleg ca această acțiune este ireversibilă"
+    "confirmIrreversible": "Înțeleg ca această acțiune este ireversibilă",
+    "viewAvatar": "Vezi avatarul {{name}}",
+    "viewBanner": "Vezi banner-ul {{name}}"
   }
 }
