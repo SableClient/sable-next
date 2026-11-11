@@ -150,6 +150,29 @@ pub(crate) fn capture_failure(log_id: &str, context: &str, report: &ErrorReportV
     sentry::capture_event(event);
 }
 
+/// The SDK logs this before it checks for a replay, so a redelivered batch
+/// raises one per message, differing only in the message index.
+fn first_olm_report(event: Event<'static>) -> Option<Event<'static>> {
+    static REPORTED: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+
+    if event.logger.as_deref() != Some(sable_core::binding::REPORTED_SDK_WARNING) {
+        return Some(event);
+    }
+    let errors = match event.contexts.get("Rust Tracing Fields") {
+        Some(sentry::protocol::Context::Other(fields)) => fields
+            .get("errors_by_olm_session")
+            .map(ToString::to_string)
+            .unwrap_or_default(),
+        _ => String::new(),
+    };
+    let shape: String = errors.chars().filter(|c| !c.is_ascii_digit()).collect();
+    REPORTED
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .insert(shape)
+        .then_some(event)
+}
+
 fn scrub_event(mut event: Event<'static>) -> Event<'static> {
     tag_fields(&mut event);
     if let Some(message) = event.message.as_mut() {
@@ -412,6 +435,7 @@ pub(crate) fn init() -> Option<sentry::ClientInitGuard> {
         CONSENT
             .load(Ordering::Relaxed)
             .then(|| scrub_event(name_platform(event)))
+            .and_then(first_olm_report)
     }));
     options.before_send_log = Some(Arc::new(|log| {
         CONSENT
@@ -463,7 +487,7 @@ mod tests {
         let mut options = sentry::ClientOptions::default();
         options.dsn = Some("https://public@example.invalid/1".parse().unwrap());
         options.transport = Some(Arc::new(transport.clone()));
-        options.before_send = Some(Arc::new(|event| Some(scrub_event(event))));
+        options.before_send = Some(Arc::new(|event| first_olm_report(scrub_event(event))));
         options.before_send_log = Some(Arc::new(|log| Some(scrub_log(log))));
         let client = Arc::new(sentry::Client::from_config(options));
         let hub = Arc::new(sentry::Hub::new(

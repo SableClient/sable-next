@@ -28,7 +28,8 @@ function isStorageFailure(line: string): boolean {
 function reportCoreError(line: string): void {
   const fingerprint = wasmErrorFingerprint(line);
   const title = wasmErrorTitle(line);
-  const seen = wasmLogLevel(line) === 'warn' ? title : fingerprint;
+  const seen =
+    wasmLogLevel(line) === 'warn' && line.includes('megolm_session=') ? title : fingerprint;
   if (fingerprint === '' || reportedCoreErrors.has(seen)) return;
   reportedCoreErrors.add(seen);
   Sentry.captureException(Object.assign(new Error(title), { name: 'CoreLog' }), {

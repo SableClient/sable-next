@@ -11,7 +11,7 @@ pub const DEFAULT_LOG_FILTER: &str = "info,matrix_sdk::http_client=off,matrix_sd
 
 /// The one SDK warning worth an issue: it carries the decryption failures that
 /// UTD reports are investigated from.
-const REPORTED_SDK_WARNING: &str = "matrix_sdk_crypto::olm::account";
+pub const REPORTED_SDK_WARNING: &str = "matrix_sdk_crypto::olm::account";
 
 /// Prefixes a log line the policy reports, so a shell that only sees text can
 /// tell it apart. Keep in step with `REPORTED_MARK` in `wasm-log.ts`.
