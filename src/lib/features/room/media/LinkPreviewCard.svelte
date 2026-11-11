@@ -6,7 +6,7 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
-  import { GIF_PLAYBACK, hasPreviewData, imageMimeFromUrl } from './link-preview.js';
+  import { GIF_PLAYBACK, hasPreviewData, imageMimeFromUrl, isGifHostUrl } from './link-preview.js';
   import { previewSources, resolveUrlPreview } from './link-preview-cache';
   import { findLinkPresentation } from './link-presentations';
   import { hasRoomMediaPreviews, useRoomMediaPreviews } from './room-media-previews.svelte.js';
@@ -66,7 +66,9 @@
   let mediaHidden = $derived(roomMedia?.hidden ?? false);
   let Presentation = $derived(preview && findLinkPresentation(url, preview));
   let videoPlayback = $derived.by(() => {
-    if (!preview?.video?.gif && preview?.image_mime !== 'image/gif') return null;
+    if (!preview?.video?.gif && preview?.image_mime !== 'image/gif' && !isGifHostUrl(url)) {
+      return null;
+    }
     return preferences.autoplayGifs
       ? GIF_PLAYBACK
       : { ...GIF_PLAYBACK, gif: false, autoplay: false };

@@ -11,6 +11,17 @@ export const GIF_PLAYBACK: VideoPlaybackView = {
   no_audio: true,
 };
 
+const GIF_HOSTS = ['tenor.com', 'giphy.com'];
+
+export function isGifHostUrl(href: string): boolean {
+  try {
+    const { hostname } = new URL(href);
+    return GIF_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+  } catch {
+    return false;
+  }
+}
+
 export function hasPreviewData(preview: UrlPreviewView): boolean {
   return [
     preview.title,

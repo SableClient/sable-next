@@ -615,3 +615,38 @@ test('a GIF video preview loops muted without controls or a play button', async 
   expect(video).not.toHaveAttribute('controls');
   expect(screen.queryByRole('button', { name: /Play/ })).toBeNull();
 });
+
+test.each([
+  'https://tenor.com/view/anime-nichijou-sigh-gif-12179345',
+  'https://giphy.com/gifs/cat',
+])(
+  'a GIF host video preview autoplays muted without controls or a play button: %s',
+  async (url) => {
+    preferences.urlPreviews = true;
+    core.rpc.messages.urlPreview.mockResolvedValue(
+      preview({
+        url,
+        title: 'A gif',
+        site_name: 'Tenor',
+        image: 'mxc://example.org/poster',
+        image_mime: 'image/webp',
+        video: {
+          source: 'mxc://example.org/clip',
+          mime: 'video/mp4',
+          width: 480,
+          height: 480,
+          gif: false,
+        },
+      })
+    );
+    const { container } = render(LinkPreviewCard, { url, encrypted: false });
+
+    await vi.waitFor(() => {
+      expect(container.querySelector('video')).not.toBeNull();
+    });
+    const video = container.querySelector('video');
+    expect(video).toHaveAttribute('loop');
+    expect(video).not.toHaveAttribute('controls');
+    expect(screen.queryByRole('button', { name: /Play/ })).toBeNull();
+  }
+);
