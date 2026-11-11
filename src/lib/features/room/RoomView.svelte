@@ -1158,6 +1158,7 @@
 
   @media (--app-layout) {
     .room-view {
+      container-type: inline-size;
       display: grid;
       grid-auto-columns: auto;
       grid-auto-flow: column;
@@ -1178,12 +1179,12 @@
 
     .timeline {
       height: auto;
-      min-width: min(var(--room-column-min-width), 100% - var(--side-panel-min-width));
+      min-width: min(var(--room-column-min-width), 100cqi - var(--side-panel-min-width));
     }
 
     .room-view.room-view > :global(aside) {
       flex-shrink: 1;
-      max-width: calc(100% - var(--room-column-min-width));
+      max-width: calc(100cqi - var(--room-column-min-width));
       min-width: var(--side-panel-min-width);
     }
 
