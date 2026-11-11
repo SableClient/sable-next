@@ -401,6 +401,36 @@ fn http_error<'a>(error: &'a (dyn Error + 'static)) -> Option<&'a matrix_sdk::Ht
     }
 }
 
+fn refresh_error<'error>(
+    error: &'error (dyn Error + 'static),
+) -> Option<&'error matrix_sdk::RefreshTokenError> {
+    match http_error(error) {
+        Some(matrix_sdk::HttpError::RefreshToken(refresh)) => Some(refresh),
+        _ => error.downcast_ref::<matrix_sdk::RefreshTokenError>(),
+    }
+}
+
+/// Mirrors the SDK's private `session_rejection`: these end the session for good.
+fn rejects_session(refresh: &matrix_sdk::RefreshTokenError) -> bool {
+    use matrix_sdk::RefreshTokenError;
+    use matrix_sdk::authentication::oauth::error::BasicErrorResponseType;
+    match refresh {
+        RefreshTokenError::RefreshTokenRequired => true,
+        RefreshTokenError::MatrixAuth(http) => matches!(
+            http.client_api_error_kind(),
+            Some(ErrorKind::UnknownToken(_))
+        ),
+        RefreshTokenError::OAuth(oauth) => matches!(
+            &**oauth,
+            OAuthError::RefreshToken(RequestTokenError::ServerResponse(response))
+                if matches!(
+                    response.error(),
+                    BasicErrorResponseType::InvalidGrant | BasicErrorResponseType::InvalidClient
+                )
+        ),
+    }
+}
+
 fn client_api_error<'a>(
     error: &'a (dyn Error + 'static),
 ) -> Option<&'a matrix_sdk::ruma::api::error::Error> {
@@ -514,6 +544,23 @@ fn classify_one(error: &(dyn Error + 'static)) -> Option<Expected> {
             "too_large",
             "the event is too large to queue",
         ));
+    }
+    if let Some(refresh) = refresh_error(error) {
+        return Some(if rejects_session(refresh) {
+            Expected::new(
+                RpcCode::NotLoggedIn,
+                Level::DEBUG,
+                "auth",
+                "the session can no longer be refreshed",
+            )
+        } else {
+            Expected::new(
+                RpcCode::Unavailable,
+                Level::WARN,
+                "server",
+                "the access token could not be refreshed",
+            )
+        });
     }
     if let Some(expected) = client_api_error(error).and_then(classify_api_error) {
         return Some(expected);
@@ -825,7 +872,7 @@ mod tests {
 
     #[test]
     fn what_a_homeserver_answers_is_classified_below_error() {
-        let cases: [(HttpError, Check, &str); 11] = [
+        let cases: [(HttpError, Check, &str); 13] = [
             (
                 api_error(401, "M_UNKNOWN_TOKEN"),
                 |e| matches!(e, RpcCode::NotLoggedIn),
@@ -879,6 +926,18 @@ mod tests {
             (
                 api_error(403, "M_USER_LOCKED"),
                 |e| matches!(e, RpcCode::AccountLocked),
+                "WARN",
+            ),
+            (
+                HttpError::RefreshToken(matrix_sdk::RefreshTokenError::RefreshTokenRequired),
+                |e| matches!(e, RpcCode::NotLoggedIn),
+                "DEBUG",
+            ),
+            (
+                HttpError::RefreshToken(matrix_sdk::RefreshTokenError::MatrixAuth(
+                    std::sync::Arc::new(api_error(503, "M_UNKNOWN")),
+                )),
+                |e| matches!(e, RpcCode::Unavailable),
                 "WARN",
             ),
         ];
