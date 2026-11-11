@@ -15,6 +15,7 @@ vi.mock('$app/paths', () => ({
 }));
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   roomPathParamFromId: (roomId: string) => `param:${roomId}`,
+  roomPathParam: (room: RoomListItemView) => `param:${room.room_id}`,
   findRoomByPathId: (rooms: readonly RoomListItemView[], pathId: string | undefined) =>
     rooms.find((room) => room.room_id === pathId),
 }));
@@ -22,6 +23,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
 import {
   backToRoomList,
   contextSearchPath,
+  createRoomPath,
   goToPage,
   leaveRoomView,
   scopedSearchPath,
@@ -268,4 +270,12 @@ test('the back arrow reuses the list entry', () => {
 
   expect(mocks.back).toHaveBeenCalledOnce();
   expect(goto).not.toHaveBeenCalled();
+});
+
+test('a room is created inside the open space only where you may add its children', () => {
+  const space = { room_id: '!space:example.org' } as RoomListItemView;
+
+  expect(createRoomPath([space], space, true)).toBe('/space/param:!space:example.org/create-room');
+  expect(createRoomPath([space], space, false)).toBe('create-room');
+  expect(createRoomPath([space], null, true)).toBe('create-room');
 });

@@ -5,7 +5,11 @@ import { page } from '$app/state';
 
 import type { RoomListItemView } from '#src/generated/protocol';
 
-import { findRoomByPathId, roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
+import {
+  findRoomByPathId,
+  roomPathParam,
+  roomPathParamFromId,
+} from '#lib/rooms/room-list.svelte.js';
 import { isEditableTarget } from '#lib/ui/shortcuts/binding.js';
 import { matchesAppLayout } from '#lib/ui/app-layout.svelte.js';
 import { focusRegion } from '#lib/ui/shortcuts/focus-regions.js';
@@ -202,4 +206,14 @@ export function searchInRoom(room: RoomListItemView | undefined, roomId: string)
   goto(target).catch((error: unknown) => {
     console.debug('[sable room] search navigation failed', error);
   });
+}
+
+export function createRoomPath(
+  rooms: readonly RoomListItemView[],
+  space: RoomListItemView | null,
+  canAddChildren: boolean
+): string {
+  return space === null || !canAddChildren
+    ? resolve('create-room')
+    : resolve('/(app)/space/[spaceId]/create-room', { spaceId: roomPathParam(space, rooms) });
 }

@@ -32,6 +32,7 @@
   import {
     backToRoomList,
     contextSearchPath,
+    createRoomPath,
     trackRouteFocus,
   } from '#lib/features/room/room-navigation.js';
   import { MESSAGE_SEARCH_FIELD_ID } from '#lib/features/search/message-search.svelte.js';
@@ -1178,7 +1179,18 @@
           void goto(resolve('bookmarks'));
         },
         'app.createRoom': () => {
-          void goto(resolve('create-room'));
+          const space = findRoomByPathId(roomList.rooms, page.params.spaceId) ?? null;
+          void (
+            space === null
+              ? Promise.resolve(false)
+              : core.rpc.members
+                  .permissions({ room_id: space.room_id })
+                  .then((permissions) => permissions.can_manage_children)
+                  .catch(() => false)
+          ).then((canAddChildren) => {
+            // eslint-disable-next-line svelte/no-navigation-without-resolve -- createRoomPath() resolves the route itself
+            void goto(createRoomPath(roomList.rooms, space, canAddChildren));
+          });
         },
         'app.showShortcuts': () => {
           shortcutsHelpState.open = true;
