@@ -899,7 +899,8 @@ export class ComposerEditor {
   }
 
   mount(node: HTMLElement): () => void {
-    const state = this.createState();
+    const restored = this.detachedDoc;
+    const state = this.createState(restored, restored && Selection.atEnd(restored));
 
     /* The constructor calls editable() and reads the attributes, so an unguarded
        build makes every option a dependency of the attachment that mounts it. */
@@ -1048,6 +1049,11 @@ export class ComposerEditor {
     );
 
     this.view = view;
+    if (restored) {
+      untrack(() => {
+        this.report(state, false);
+      });
+    }
     const stopTrace = traceComposerInput(view.dom);
 
     if (hasIosKeyboardContextQuirk()) {
@@ -1143,7 +1149,10 @@ export class ComposerEditor {
 
   clear(): void {
     const view = this.view;
-    if (!view) return;
+    if (!view) {
+      this.detachedDoc = undefined;
+      return;
+    }
     view.dispatch(view.state.tr.delete(0, view.state.doc.content.size));
     if (this.keyboardReset && view.hasFocus()) this.resetKeyboard(view, this.keyboardReset);
   }
@@ -1169,7 +1178,10 @@ export class ComposerEditor {
 
   setDoc(doc: ProseMirrorNode): void {
     const view = this.view;
-    if (!view) return;
+    if (!view) {
+      this.detachedDoc = doc;
+      return;
+    }
     const transaction = view.state.tr
       .replaceWith(0, view.state.doc.content.size, doc.content)
       .setMeta('setDoc', true);

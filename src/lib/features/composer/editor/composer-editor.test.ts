@@ -732,6 +732,19 @@ test('the active option is written straight onto the editor node', () => {
   expect(surface?.getAttribute('aria-expanded')).toBe('false');
 });
 
+test('a document set while unmounted is shown once the editor mounts again', () => {
+  const editor = open();
+  editor.setLines('first room');
+  dispose?.();
+
+  editor.clear();
+  expect(editor.isEmpty()).toBe(true);
+  editor.setLines('second room');
+  dispose = editor.mount(document.body);
+
+  expect(editor.text()).toBe('second room');
+});
+
 function press(
   editor: ComposerEditor,
   key: string,
