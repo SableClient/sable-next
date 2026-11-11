@@ -17,6 +17,10 @@ export function openSettingsOver(event: MouseEvent, section: string): void {
   if (!plainClick(event)) return;
 
   event.preventDefault();
+  showSettingsOver(section);
+}
+
+export function showSettingsOver(section: string): void {
   void goto(resolve(`settings/${section}`), { shallow: true, state: { settings: { section } } });
 }
 

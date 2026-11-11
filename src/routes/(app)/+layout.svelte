@@ -5,7 +5,11 @@
   import { page } from '$app/state';
   import AppShell from '#lib/features/sidebar/AppShell.svelte';
   import SettingsPanel from '#lib/features/settings/SettingsPanel.svelte';
-  import { followSettingsLink } from '#lib/features/settings/settings-navigation.js';
+  import {
+    defaultSettingsSection,
+    followSettingsLink,
+    showSettingsOver,
+  } from '#lib/features/settings/settings-navigation.js';
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import {
@@ -1202,7 +1206,8 @@
           if (callSession.active) void callSession.leave();
         },
         'app.openSettings': () => {
-          void goto(resolve('/(app)/settings'));
+          if (appLayout.current) showSettingsOver(defaultSettingsSection());
+          else void goto(resolve('/(app)/settings'));
         },
         'navigation.previousRoom': () => {
           const target = roomAtOffset(openRoomId, -1);
