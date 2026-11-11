@@ -293,14 +293,14 @@ pub fn resolve_person(people: &[SearchPerson], value: &str) -> Option<String> {
     }
     let folded = wanted.to_lowercase();
     let local = folded.strip_prefix('@').unwrap_or(&folded);
+    let by_id = |person: &&SearchPerson| person.user_id.to_lowercase() == folded;
+    let by_localpart = |person: &&SearchPerson| localpart(&person.user_id.to_lowercase()) == local;
+    let by_name = |person: &&SearchPerson| person.display_name.to_lowercase() == folded;
     people
         .iter()
-        .find(|person| {
-            let user_id = person.user_id.to_lowercase();
-            user_id == folded
-                || localpart(&user_id) == local
-                || person.display_name.to_lowercase() == folded
-        })
+        .find(by_id)
+        .or_else(|| people.iter().find(by_localpart))
+        .or_else(|| people.iter().find(by_name))
         .map(|person| person.user_id.clone())
 }
 
@@ -315,11 +315,22 @@ pub fn suggest_room(
     if wanted.is_empty() {
         return None;
     }
-    let room = best(rooms.iter().filter(|room| {
-        room.is_space == spaces_only
-            && (lower(room.name.as_ref()).is_some_and(|name| name.contains(wanted))
-                || lower(room.canonical_alias.as_ref()).is_some_and(|alias| alias.contains(wanted)))
-    }))?;
+    let strength = |room: &SearchRoom| {
+        let name = lower(room.name.as_ref()).map(|name| match_strength(&name, wanted));
+        let alias = lower(room.canonical_alias.as_ref())
+            .map(|alias| match_strength(alias.trim_start_matches('#'), wanted));
+        name.max(alias).flatten()
+    };
+    let candidates = rooms
+        .iter()
+        .filter(|room| room.is_space == spaces_only)
+        .filter_map(|room| strength(room).map(|strength| (strength, room)));
+    let strongest = candidates.clone().map(|(strength, _)| strength).max()?;
+    let room = best(
+        candidates
+            .filter(|(strength, _)| *strength == strongest)
+            .map(|(_, room)| room),
+    )?;
     let value = room
         .canonical_alias
         .clone()
@@ -339,14 +350,29 @@ pub fn suggest_person(people: &[SearchPerson], value: &str) -> Option<TargetSugg
     }
     people
         .iter()
-        .find(|person| {
-            person.user_id.to_lowercase().contains(wanted)
-                || person.display_name.to_lowercase().contains(wanted)
+        .filter_map(|person| {
+            let id = match_strength(localpart(&person.user_id.to_lowercase()), wanted);
+            let name = match_strength(&person.display_name.to_lowercase(), wanted);
+            id.max(name).map(|strength| (strength, person))
         })
-        .map(|person| TargetSuggestion {
+        .fold(None, |kept: Option<(u8, &SearchPerson)>, next| match kept {
+            Some(kept) if kept.0 >= next.0 => Some(kept),
+            _ => Some(next),
+        })
+        .map(|(_, person)| TargetSuggestion {
             label: person.display_name.clone(),
             value: person.user_id.clone(),
         })
+}
+
+fn match_strength(text: &str, wanted: &str) -> Option<u8> {
+    if text == wanted {
+        Some(2)
+    } else if text.starts_with(wanted) {
+        Some(1)
+    } else {
+        text.contains(wanted).then_some(0)
+    }
 }
 
 fn later(current: Option<u64>, next: u64) -> u64 {
@@ -557,7 +583,7 @@ pub fn resolve(
 mod tests {
     use super::{
         ResolvedQuery, SearchAttachment, SearchDirectory, SearchFilter, SearchPerson, SearchRoom,
-        resolve, resolve_room_target, suggest_person, suggest_room,
+        resolve, resolve_person, resolve_room_target, suggest_person, suggest_room,
     };
     use crate::civil::{MS_PER_DAY, date};
     use crate::search_query::parse_search_query;
@@ -838,6 +864,59 @@ mod tests {
         assert_eq!(
             resolve_room_target(&rooms, "Dev").as_deref(),
             Some("!dev:example.org")
+        );
+    }
+
+    #[test]
+    fn a_suggestion_prefers_an_exact_then_a_leading_match() {
+        let rooms = [
+            room("!archive:example.org", "General archive"),
+            room("!old:example.org", "the general"),
+            room("!general:example.org", "general"),
+        ];
+        let people = [
+            SearchPerson {
+                user_id: "@sam:example.org".to_owned(),
+                display_name: "Sam Alexander".to_owned(),
+            },
+            SearchPerson {
+                user_id: "@alex:example.org".to_owned(),
+                display_name: "Alex".to_owned(),
+            },
+        ];
+
+        assert_eq!(
+            suggest_room(&rooms, "general", false).map(|found| found.value),
+            Some("!general:example.org".to_owned())
+        );
+        assert_eq!(
+            suggest_room(&rooms, "gen", false).map(|found| found.value),
+            Some("!archive:example.org".to_owned())
+        );
+        assert_eq!(
+            suggest_person(&people, "alex").map(|found| found.value),
+            Some("@alex:example.org".to_owned())
+        );
+    }
+
+    #[test]
+    fn a_typed_username_wins_over_someone_else_s_display_name() {
+        let person = |user_id: &str, display_name: &str| SearchPerson {
+            user_id: user_id.to_owned(),
+            display_name: display_name.to_owned(),
+        };
+        let people = [
+            person("@impostor:example.org", "alice"),
+            person("@alice:example.org", "Alice Liddell"),
+        ];
+
+        assert_eq!(
+            resolve_person(&people, "alice").as_deref(),
+            Some("@alice:example.org")
+        );
+        assert_eq!(
+            resolve_person(&people, "Alice Liddell").as_deref(),
+            Some("@alice:example.org")
         );
     }
 
