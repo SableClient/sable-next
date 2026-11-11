@@ -146,7 +146,13 @@
         const avatar = await avatarFor(member, existing);
         if (avatar.failed) pictures += 1;
         await personas.save(
-          personaFromPluralkit(existing?.id ?? crypto.randomUUID(), member, avatar.url, options),
+          personaFromPluralkit(
+            existing?.id ?? crypto.randomUUID(),
+            member,
+            avatar.url,
+            options,
+            existing
+          ),
           existing?.id ?? null
         );
       }

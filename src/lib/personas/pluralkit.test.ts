@@ -135,6 +135,37 @@ describe('personaFromPluralkit', () => {
   });
 });
 
+describe('personaFromPluralkit on update', () => {
+  it('keeps the fields PluralKit does not provide', () => {
+    const existing: PersonaView = {
+      ...personaFromPluralkit('kris', member, null),
+      last_used: 42,
+      alternate_avatars: [{ id: 'alt', url: 'mxc://example.org/alt' } as never],
+      biography: 'bio',
+      banner_url: 'mxc://example.org/banner',
+      is_animal: 'cat',
+      has_animal: 'dog',
+      animal_need: 'food',
+      sort_flags: { pinned: true } as never,
+      triggers: [{ prefix: 'k:', suffix: null, keep_trigger: true, alternate_avatar_id: 'alt' }],
+    };
+
+    const persona = personaFromPluralkit('kris', member, null, {}, existing);
+
+    expect(persona).toMatchObject({
+      last_used: 42,
+      alternate_avatars: existing.alternate_avatars,
+      biography: 'bio',
+      banner_url: 'mxc://example.org/banner',
+      is_animal: 'cat',
+      has_animal: 'dog',
+      animal_need: 'food',
+      sort_flags: existing.sort_flags,
+    });
+    expect(persona.triggers).toEqual(existing.triggers);
+  });
+});
+
 describe('matchImported', () => {
   const imported = personaFromPluralkit('kris', member, null);
   const handwritten: PersonaView = { ...imported, id: 'other', pluralkit: null };

@@ -95,7 +95,8 @@ export function personaFromPluralkit(
   id: string,
   member: PluralkitMember,
   avatarUrl: string | null,
-  options: PluralkitImportOptions = {}
+  options: PluralkitImportOptions = {},
+  existing?: PersonaView
 ): PersonaView {
   let display_name = member.display_name?.trim();
   let pronoun_set = pronouns(member.pronouns);
@@ -112,21 +113,32 @@ export function personaFromPluralkit(
     avatar_url: avatarUrl,
     pronouns: pronoun_set,
     ...colors(member.color),
-    triggers: triggers(member.proxy_tags),
+    triggers: triggers(member.proxy_tags).map((trigger) => {
+      const kept = existing?.triggers.find(
+        (old) => old.prefix === trigger.prefix && old.suffix === trigger.suffix
+      );
+      return kept
+        ? {
+            ...trigger,
+            keep_trigger: kept.keep_trigger,
+            alternate_avatar_id: kept.alternate_avatar_id,
+          }
+        : trigger;
+    }),
     pluralkit: {
       id: member.id,
       uuid: member.uuid ?? null,
       avatar_url: member.avatar_url ?? null,
-      description: null,
+      description: existing?.pluralkit?.description ?? null,
     },
-    last_used: null,
-    alternate_avatars: null,
-    biography: null, // don't copy PK banners, privacy concern
-    banner_url: null,
-    is_animal: null,
-    has_animal: null,
-    animal_need: null,
-    sort_flags: null,
+    last_used: existing?.last_used ?? null,
+    alternate_avatars: existing?.alternate_avatars ?? null,
+    biography: existing?.biography ?? null,
+    banner_url: existing?.banner_url ?? null,
+    is_animal: existing?.is_animal ?? null,
+    has_animal: existing?.has_animal ?? null,
+    animal_need: existing?.animal_need ?? null,
+    sort_flags: existing?.sort_flags ?? null,
   };
 }
 
