@@ -539,6 +539,18 @@ fn classify_one(error: &(dyn Error + 'static)) -> Option<Expected> {
     }
     if matches!(
         error.downcast_ref::<matrix_sdk::Error>(),
+        Some(matrix_sdk::Error::ConcurrentRequestFailed)
+    ) {
+        // The request it waited on failed, and that one was logged where it ran.
+        return Some(Expected::new(
+            RpcCode::Unavailable,
+            Level::WARN,
+            "network",
+            "a shared homeserver request failed",
+        ));
+    }
+    if matches!(
+        error.downcast_ref::<matrix_sdk::Error>(),
         Some(matrix_sdk::Error::InsufficientData)
     ) {
         return Some(Expected::new(
@@ -906,6 +918,18 @@ mod tests {
             })
         ));
         assert!(log.contains("WARN"), "{log}");
+        assert!(!log.contains("ERROR"), "{log}");
+
+        let (shared, log) = capture(|core| {
+            Err::<(), _>(matrix_sdk::Error::ConcurrentRequestFailed).or_failed(core, "room_members")
+        });
+        assert!(matches!(
+            shared,
+            Err(RpcError {
+                code: RpcCode::Unavailable,
+                ..
+            })
+        ));
         assert!(!log.contains("ERROR"), "{log}");
     }
 
