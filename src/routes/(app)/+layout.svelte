@@ -228,7 +228,7 @@
 
   async function joinSystemAnswer({ uuid, callId, roomId, hasVideo }: SystemAnswer): Promise<void> {
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath() resolves the route itself
-    void goto(roomSectionPath(roomList.rooms, roomId));
+    void goto(roomSectionPath(roomList.rooms, roomId, null, [], spaceSidebar.spaceOrder));
     await systemCalls.answer(uuid, callId, roomId, () =>
       callSession.join(roomId, {
         microphone: !preferences.callMicrophoneMuted,
@@ -308,7 +308,7 @@
     });
     await afterOverlayPops();
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath() resolves the route itself
-    await goto(roomSectionPath(roomList.rooms, call.roomId));
+    await goto(roomSectionPath(roomList.rooms, call.roomId, null, [], spaceSidebar.spaceOrder));
   }
 
   async function answerInvite(
@@ -349,7 +349,7 @@
       return;
     }
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath() resolves the route itself
-    void goto(roomSectionPath(roomList.rooms, roomId));
+    void goto(roomSectionPath(roomList.rooms, roomId, null, [], spaceSidebar.spaceOrder));
     void callSession.join(roomId, { microphone: !preferences.callMicrophoneMuted, camera: false });
   }
   const appLayout = new AppLayout();
@@ -1077,7 +1077,7 @@
       return;
     }
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath() resolves the route itself
-    await goto(roomSectionPath(roomList.rooms, roomId), {
+    await goto(roomSectionPath(roomList.rooms, roomId, null, [], spaceSidebar.spaceOrder), {
       state: eventId === null ? {} : { notified: eventId },
     });
   }
@@ -1149,7 +1149,7 @@
 
   function jumpToRoom(roomId: string): void {
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath() resolves the route itself
-    void goto(roomSectionPath(roomList.rooms, roomId));
+    void goto(roomSectionPath(roomList.rooms, roomId, null, [], spaceSidebar.spaceOrder));
   }
 
   $effect(() => {
@@ -1282,8 +1282,9 @@
           session={callSession}
           onReturn={() => {
             if (callSession.roomId !== null) {
+              const order = spaceSidebar.spaceOrder;
               // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath() resolves the route itself
-              void goto(roomSectionPath(roomList.rooms, callSession.roomId));
+              void goto(roomSectionPath(roomList.rooms, callSession.roomId, null, [], order));
             }
           }}
         />

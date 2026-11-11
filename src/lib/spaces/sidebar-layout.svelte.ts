@@ -6,7 +6,7 @@ import { t } from '#lib/i18n.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 
-import { isFolder, sameLayout, type SidebarItem } from './sidebar-layout.js';
+import { isFolder, layoutSpaceIds, sameLayout, type SidebarItem } from './sidebar-layout.js';
 
 const OPEN_FOLDERS_KEY = 'sable-open-space-folders';
 
@@ -135,6 +135,10 @@ export class SpaceSidebar {
       pruned = true;
     }
     if (pruned) this.persistOpenFolders();
+  }
+
+  get spaceOrder(): string[] {
+    return layoutSpaceIds(this.items);
   }
 
   adoptOpenFolders(ids: readonly string[]): void {
