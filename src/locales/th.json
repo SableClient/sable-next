@@ -57,9 +57,6 @@
     "unavailable": "ไม่อยู่"
   },
   "settings": {
-    "voiceParticipantPlacement": "ผู้เข้าร่วมในห้องเสียง",
-    "voiceParticipantsBelow": "ใต้ชื่อห้อง",
-    "voiceParticipantsInline": "ข้างชื่อห้อง",
     "logout": "ออกจากระบบ",
     "settingsSync": "ซิงค์การตั้งค่าระหว่างอุปกรณ์ต่าง ๆ"
   },

@@ -81,6 +81,19 @@ test('threads default to full conversations and keep a saved panel choice', () =
   );
 });
 
+test('voice participants keep both displays by default and preserve a saved layout', () => {
+  expect(sanitize({}, preferences).voiceParticipantPlacement).toBe('both');
+  expect(
+    sanitize({ voiceParticipantPlacement: 'below' }, preferences).voiceParticipantPlacement
+  ).toBe('below');
+  expect(
+    sanitize({ voiceParticipantPlacement: 'inline' }, preferences).voiceParticipantPlacement
+  ).toBe('inline');
+  expect(
+    sanitize({ voiceParticipantPlacement: 'unknown' }, preferences).voiceParticipantPlacement
+  ).toBe('both');
+});
+
 test('reads a stored boolean enterForNewline as its enum equivalent', () => {
   expect(sanitize({ enterForNewline: true }, preferences).enterForNewline).toBe('newline');
   expect(sanitize({ enterForNewline: false }, preferences).enterForNewline).toBe('adaptive');

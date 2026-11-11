@@ -224,9 +224,6 @@
     "startFailed": "Verifique sua conexão e o armazenamento do seu dispositivo."
   },
   "settings": {
-    "voiceParticipantPlacement": "Participantes das salas de voz",
-    "voiceParticipantsBelow": "Abaixo do nome da sala",
-    "voiceParticipantsInline": "Ao lado do nome da sala",
     "resetRecoveryKey": "Resetar chave de recuperação",
     "verified": "Verificado",
     "groups": {

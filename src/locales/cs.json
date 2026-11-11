@@ -1,9 +1,4 @@
 {
-  "settings": {
-    "voiceParticipantPlacement": "Účastníci hlasových místností",
-    "voiceParticipantsBelow": "Pod názvem místnosti",
-    "voiceParticipantsInline": "Vedle názvu místnosti"
-  },
   "nav": {
     "primary": "Hlavní navigace",
     "quickTools": "Rychlé nástroje",

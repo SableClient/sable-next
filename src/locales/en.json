@@ -2670,6 +2670,7 @@
     "showRoomIconSometimes": "Sometimes",
     "showRoomIconCollapsed": "Only when collapsed",
     "voiceParticipantPlacement": "Voice room participants",
+    "voiceParticipantsBoth": "Both",
     "voiceParticipantsBelow": "Below the room name",
     "voiceParticipantsInline": "Beside the room name",
     "selectDevice": "Select {{name}}",

@@ -1,9 +1,4 @@
 {
-  "settings": {
-    "voiceParticipantPlacement": "jan lon tomo pi toki kute",
-    "voiceParticipantsBelow": "lon anpa pi nimi tomo",
-    "voiceParticipantsInline": "lon poka pi nimi tomo"
-  },
   "nav": {
     "messages": "toki",
     "inbox": "poki toki",

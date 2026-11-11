@@ -91,9 +91,6 @@
     "memberCount_other": ""
   },
   "settings": {
-    "voiceParticipantPlacement": "Participantes de las salas de voz",
-    "voiceParticipantsBelow": "Debajo del nombre de la sala",
-    "voiceParticipantsInline": "Junto al nombre de la sala",
     "cancelVerification": "Cancelar verificación",
     "notificationEncryptedContent": "Mostrar contenido de salas cifradas",
     "composerTitle": "Compositor",

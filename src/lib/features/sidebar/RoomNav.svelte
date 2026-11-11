@@ -809,7 +809,7 @@
         {/if}
       {/if}
     </div>
-    {#if full && room && voicePlacement === 'below' && live > 0}
+    {#if full && room && (voicePlacement === 'both' || voicePlacement === 'below') && live > 0}
       <CallParticipantList
         {participants}
         screenSharers={room.screen_sharers}

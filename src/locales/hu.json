@@ -1302,9 +1302,6 @@
     "badgeOwnDescription": "Köszönjük, hogy támogatja a Sable fejlesztését!"
   },
   "settings": {
-    "voiceParticipantPlacement": "A hangszobák résztvevői",
-    "voiceParticipantsBelow": "A szoba neve alatt",
-    "voiceParticipantsInline": "A szoba neve mellett",
     "threadPresentation": "Szálak és beszélgetések",
     "threadPresentationHint": "Kis képernyőn a szálak mindig a teljes beszélgetésnézetet használják.",
     "threadPresentationTimeline": "Teljes beszélgetés",

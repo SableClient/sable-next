@@ -1,9 +1,4 @@
 {
-  "settings": {
-    "voiceParticipantPlacement": "Учасники голосових кімнат",
-    "voiceParticipantsBelow": "Під назвою кімнати",
-    "voiceParticipantsInline": "Поруч із назвою кімнати"
-  },
   "room": {
     "createJoinRuleRestricted": "Учасники простору",
     "createParentNone": "Без простору",

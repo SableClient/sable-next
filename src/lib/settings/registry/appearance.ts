@@ -91,6 +91,7 @@ export const appearanceCategory: SettingsCategory = {
       name: 'settings.voiceParticipantPlacement',
       type: 'select',
       options: [
+        { value: 'both', label: 'settings.voiceParticipantsBoth' },
         { value: 'below', label: 'settings.voiceParticipantsBelow' },
         { value: 'inline', label: 'settings.voiceParticipantsInline' },
       ],

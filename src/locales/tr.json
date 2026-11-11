@@ -1,9 +1,4 @@
 {
-  "settings": {
-    "voiceParticipantPlacement": "Sesli oda katılımcıları",
-    "voiceParticipantsBelow": "Oda adının altında",
-    "voiceParticipantsInline": "Oda adının yanında"
-  },
   "nav": {
     "primary": "Ana navigasyon",
     "quickTools": "Hızlı araçlar",

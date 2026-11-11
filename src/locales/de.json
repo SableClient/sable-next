@@ -1,9 +1,4 @@
 {
-  "settings": {
-    "voiceParticipantPlacement": "Teilnehmende in Sprachräumen",
-    "voiceParticipantsBelow": "Unter dem Raumnamen",
-    "voiceParticipantsInline": "Neben dem Raumnamen"
-  },
   "nav": {
     "primary": "Primärnavigation",
     "messages": "Nachrichten",
@@ -1329,6 +1324,10 @@
     "welcomeBack": "Willkommen zurück"
   },
   "settings": {
+    "voiceParticipantPlacement": "Teilnehmende in Sprachräumen",
+    "voiceParticipantsBoth": "Beides",
+    "voiceParticipantsBelow": "Unter dem Raumnamen",
+    "voiceParticipantsInline": "Neben dem Raumnamen",
     "verified": "Bestätigt",
     "notVerified": "Nicht bestätigt",
     "encryption": "Verschlüsselung",

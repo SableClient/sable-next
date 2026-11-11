@@ -159,7 +159,7 @@ afterEach(() => {
   setPreference('roomSort', 'recent');
   setPreference('directSort', 'recent');
   setPreference('showRoomIcon', 'always');
-  setPreference('voiceParticipantPlacement', 'below');
+  setPreference('voiceParticipantPlacement', 'both');
   setPreference('showDmTopics', true);
   setPreference('messagePreviews', 'off');
   globalThis.IntersectionObserver = realObserver;
@@ -884,6 +884,7 @@ test('an active call in a text room shows its participants and count in the room
 });
 
 test('a live voice room shows each participant avatar once in the list beneath it', async () => {
+  setPreference('voiceParticipantPlacement', 'below');
   observeImmediately();
   core.userProfile.mockImplementation((userId: string) =>
     Promise.resolve({
@@ -931,6 +932,12 @@ test('switching the voice participant layout moves the avatars and keeps the ful
   ];
   await mountNav();
 
+  const defaultList = screen.getByRole('list', { name: 'nav.voiceLive:4' });
+  expect(within(defaultList).getAllByRole('button')).toHaveLength(4);
+  const defaultSummary = within(row('Voice')).getByRole('img', { name: 'nav.voiceLive:4' });
+  expect(defaultSummary.querySelectorAll('.voice-face')).toHaveLength(3);
+  expect(defaultSummary.querySelector('.status-badge')).toHaveTextContent('4');
+
   setPreference('voiceParticipantPlacement', 'inline');
   await tick();
   expect(screen.queryByRole('list', { name: 'nav.voiceLive:4' })).toBeNull();
@@ -975,7 +982,7 @@ test('a participant sharing their screen is tagged live to people outside the ca
   });
 });
 
-test('a collapsed live voice room keeps participants visible in either layout', async () => {
+test('a collapsed live voice room keeps participants visible in all layouts', async () => {
   observeImmediately();
   core.userProfile.mockResolvedValue({ display_name: 'Alice', avatar_url: null });
   roomsFixture.rooms = [
@@ -993,12 +1000,18 @@ test('a collapsed live voice room keeps participants visible in either layout', 
       document.querySelector('.call-participant-list .avatar-root')?.getAttribute('aria-label')
     ).toBe('Alice');
   });
+  expect(screen.getByRole('treeitem', { name: 'Voice' }).querySelector('.voice-face')).toBeNull();
 
   setPreference('voiceParticipantPlacement', 'inline');
   await tick();
   expect(screen.queryByRole('list', { name: 'nav.voiceLive:1' })).toBeNull();
   const roomLink = screen.getByRole('treeitem', { name: 'Voice, nav.voiceLive:1' });
   expect(roomLink.querySelector('.voice-face')).toBeInTheDocument();
+
+  setPreference('voiceParticipantPlacement', 'below');
+  await tick();
+  expect(screen.getByRole('list', { name: 'nav.voiceLive:1' })).toBeInTheDocument();
+  expect(screen.getByRole('treeitem', { name: 'Voice' }).querySelector('.voice-face')).toBeNull();
 });
 
 test('a user in a voice room on two devices is listed once per device', async () => {
