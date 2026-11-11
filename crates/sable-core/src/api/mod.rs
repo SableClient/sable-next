@@ -167,6 +167,7 @@ impl Core {
         let Some((domain, name)) = method.split_once('.') else {
             return Err(RpcCode::Unsupported.into());
         };
+        self.wait_for_stores().await;
         let span = tracing::info_span!("rpc", method);
         tracing::Instrument::instrument(
             timed(method, async {
@@ -188,6 +189,7 @@ impl Core {
         if self.shut_down.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(RpcCode::Unavailable.into());
         }
+        self.wait_for_stores().await;
         timed(std::any::type_name::<H>(), Box::pin(handler.run(self))).await
     }
 }

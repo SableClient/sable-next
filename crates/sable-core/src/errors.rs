@@ -528,6 +528,15 @@ fn classify_one(error: &(dyn Error + 'static)) -> Option<Expected> {
             "homeserver request failed",
         ));
     }
+    // matrix-sdk-sqlite keeps its error type private, so its message is the only handle.
+    if error.to_string() == "The store is closed" {
+        return Some(Expected::new(
+            RpcCode::Unavailable,
+            Level::DEBUG,
+            "store_closed",
+            "the stores are closed while the app is suspended",
+        ));
+    }
     if matches!(
         error.downcast_ref::<matrix_sdk::Error>(),
         Some(matrix_sdk::Error::InsufficientData)
@@ -965,6 +974,23 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn a_read_while_the_stores_are_closed_is_unavailable() {
+        let closed = matrix_sdk::Error::StateStore(Box::new(
+            matrix_sdk_base::store::StoreError::Backend("The store is closed".into()),
+        ));
+        let (result, log) = capture(|core| Err::<(), _>(closed).or_failed(core, "room_members"));
+
+        assert!(matches!(
+            result,
+            Err(RpcError {
+                code: RpcCode::Unavailable,
+                ..
+            })
+        ));
+        assert!(!log.contains("ERROR"), "{log}");
     }
 
     #[test]
