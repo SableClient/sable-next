@@ -1989,6 +1989,47 @@ async fn a_new_dm_makes_the_invitee_a_creator() {
 }
 
 #[tokio::test]
+async fn a_dm_with_yourself_lists_no_other_creator_and_is_still_a_dm() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let own = client.user_id().unwrap().to_owned();
+    Mock::given(method("POST"))
+        .and(path("/_matrix/client/v3/createRoom"))
+        .respond_with(move |request: &wiremock::Request| {
+            let body: serde_json::Value = request.body_json().unwrap();
+            assert!(body.get("creation_content").is_none(), "{body}");
+            assert!(body.get("invite").is_none(), "{body}");
+            ResponseTemplate::new(200).set_body_json(json!({"room_id": "!notes:example.org"}))
+        })
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(wiremock::matchers::path_regex(r"/account_data/m\.direct$"))
+        .respond_with(
+            ResponseTemplate::new(404).set_body_json(
+                json!({"errcode": "M_NOT_FOUND", "error": "Account data not found"}),
+            ),
+        )
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(wiremock::matchers::path_regex(r"/account_data/m\.direct$"))
+        .and(wiremock::matchers::body_partial_json(
+            json!({ own.as_str(): ["!notes:example.org"] }),
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let params: crate::api::rooms::CreateDmParams =
+        serde_json::from_value(json!({"user_id": own, "encrypt_new": false})).unwrap();
+
+    assert_eq!(core.run(params).await.unwrap(), "!notes:example.org");
+}
+
+#[tokio::test]
 async fn memberships_follow_the_server_joined_rooms() {
     use matrix_sdk::RoomState;
     use matrix_sdk_test::{InvitedRoomBuilder, LeftRoomBuilder};

@@ -531,12 +531,16 @@ impl Handler for CreateDmParams {
             room
         } else {
             let mut request = create_room::v3::Request::new();
-            request.creation_content = Some(
-                Raw::new(&serde_json::json!({ "additional_creators": [&user_id] }))
-                    .or_failed(core, "create_dm_creation_content")?
-                    .cast_unchecked(),
-            );
-            request.invite = vec![user_id];
+            let own = client.user_id() == Some(&*user_id);
+            // The sender already creates the room, and may not be listed again.
+            if !own {
+                request.creation_content = Some(
+                    Raw::new(&serde_json::json!({ "additional_creators": [&user_id] }))
+                        .or_failed(core, "create_dm_creation_content")?
+                        .cast_unchecked(),
+                );
+                request.invite = vec![user_id.clone()];
+            }
             request.is_direct = true;
             request.preset = Some(RoomPreset::TrustedPrivateChat);
             if encrypted == Some(true) || (encrypted.is_none() && encrypt_new) {
@@ -553,10 +557,19 @@ impl Handler for CreateDmParams {
             {
                 request.initial_state.push(hint);
             }
-            client
+            let room = client
                 .create_room(request)
                 .await
-                .or_failed(core, "create_dm")?
+                .or_failed(core, "create_dm")?;
+            // The SDK marks a direct room only from its invitees.
+            if own {
+                client
+                    .account()
+                    .mark_as_dm(room.room_id(), &[user_id])
+                    .await
+                    .or_failed(core, "create_dm_mark")?;
+            }
+            room
         };
 
         Ok(room.room_id().to_string())
