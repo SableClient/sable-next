@@ -66,6 +66,7 @@ async function pushEntry(depth: number): Promise<boolean> {
 
 export function holdOverlayBack(open: () => boolean, close: () => void): void {
   let held = $state(0);
+  let heldAt = '';
   let rearm: (() => void) | null = null;
 
   $effect(() => {
@@ -80,13 +81,16 @@ export function holdOverlayBack(open: () => boolean, close: () => void): void {
       if (queued > 0) {
         queued -= 1;
         held = taken;
+        heldAt = location.href;
         return;
       }
       pushing += 1;
       void pushEntry(taken).then((ok) => {
         if (!ok) pushed = taken - 1;
-        else if (mine) held = taken;
-        else popEntries(1);
+        else if (mine) {
+          held = taken;
+          heldAt = location.href;
+        } else popEntries(1);
       });
     };
     acquire();
@@ -126,6 +130,12 @@ export function holdOverlayBack(open: () => boolean, close: () => void): void {
     if (held > 0 && current < held) {
       held = 0;
       const restore = rearm;
+      // A route change also drops the entry, but leaves the overlay meant to stay up.
+      if (location.href !== heldAt) {
+        pushed = current;
+        restore?.();
+        return;
+      }
       leaveUnlessUnsaved(close, () => restore?.());
     }
   });
