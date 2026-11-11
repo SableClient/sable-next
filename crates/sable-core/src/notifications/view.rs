@@ -96,7 +96,21 @@ pub(super) async fn related_notification(
     room_id: &RoomId,
     event_id: &EventId,
 ) -> Result<NotificationStatus, matrix_sdk_ui::notification_client::Error> {
-    let mut status = notifications.get_notification(room_id, event_id).await;
+    let mut status = match client.get_room(room_id) {
+        // The SDK's sliding sync fetch also downloads all of the account's data, which a
+        // notification process may not have the memory for.
+        Some(room) if room.state() == matrix_sdk::RoomState::Joined => {
+            notifications
+                .get_notification_with_context(room_id, event_id)
+                .await
+        }
+        _ => notifications.get_notification(room_id, event_id).await,
+    };
+    if let Ok(NotificationStatus::Event(item)) = &status
+        && client.is_user_ignored(item.event.sender()).await
+    {
+        status = Ok(NotificationStatus::EventFilteredOut);
+    }
     if let Ok(NotificationStatus::Event(item)) = &mut status
         && let (Some(actions), RawNotificationEvent::Timeline(raw), Some(room)) = (
             item.actions.take(),

@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use matrix_sdk::ruma::api::client::filter::{FilterDefinition, RoomFilter};
 use matrix_sdk::ruma::api::client::sync::sync_events;
 use matrix_sdk::ruma::presence::PresenceState;
 use matrix_sdk::ruma::{EventId, RoomId};
@@ -56,6 +55,7 @@ pub struct PushSession {
 }
 
 const READ_ROOMS_TIMEOUT: Duration = Duration::from_secs(5);
+const READ_ROOMS_CONNECTION: &str = "read-rooms";
 
 fn read_rooms_from_sync(
     joined: &std::collections::BTreeMap<matrix_sdk::ruma::OwnedRoomId, Option<u64>>,
@@ -193,24 +193,26 @@ impl PushSession {
             return Some(Vec::new());
         }
 
-        let mut filter = FilterDefinition::default();
-        filter.presence.types = Some(Vec::new());
-        filter.account_data.types = Some(Vec::new());
-        let mut rooms = RoomFilter::default();
-        rooms.rooms = Some(room_ids.clone());
-        rooms.timeline.limit = Some(matrix_sdk::ruma::uint!(0));
-        rooms.state.types = Some(Vec::new());
-        rooms.ephemeral.types = Some(Vec::new());
-        rooms.account_data.types = Some(Vec::new());
-        filter.room = rooms;
+        // Room subscriptions name exactly what to send. A `/sync` filter is advisory: a server
+        // ignoring it answers with every room and all of the account's data.
+        let subscriptions: std::collections::BTreeMap<_, _> = room_ids
+            .iter()
+            .map(|room_id| {
+                (
+                    room_id.clone(),
+                    sync_events::msc4186::request::RoomSubscription::default(),
+                )
+            })
+            .collect();
 
         let response = tokio::time::timeout(
             READ_ROOMS_TIMEOUT,
             self.host.retry(|| async {
-                let mut request = sync_events::v3::Request::new();
-                request.filter = Some(sync_events::v3::Filter::FilterDefinition(filter.clone()));
+                let mut request = sync_events::msc4186::Request::new();
+                request.conn_id = Some(READ_ROOMS_CONNECTION.to_owned());
                 request.timeout = Some(Duration::ZERO);
                 request.set_presence = PresenceState::Offline;
+                request.room_subscriptions.clone_from(&subscriptions);
                 self.host
                     .client()
                     .send(request)
@@ -226,7 +228,6 @@ impl PushSession {
         .ok()?;
         let joined = response
             .rooms
-            .join
             .iter()
             .map(|(room_id, room)| {
                 (
@@ -462,7 +463,7 @@ mod tests {
     use super::read_rooms_from_sync;
 
     #[test]
-    fn filtered_sync_response_identifies_read_rooms() {
+    fn a_sync_response_identifies_read_rooms() {
         let rooms = vec![
             room_id!("!zero:example.org").to_owned(),
             room_id!("!unread:example.org").to_owned(),

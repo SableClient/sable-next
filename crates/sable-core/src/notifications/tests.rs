@@ -908,38 +908,31 @@ async fn mount_fetch(
     fixture: &ColdFixture,
     event: &serde_json::Value,
 ) -> (wiremock::MockGuard, wiremock::MockGuard) {
-    mount_fetch_with(fixture, event, true, false).await
+    mount_fetch_with(fixture, event, false).await
 }
 
 async fn mount_fetch_with(
     fixture: &ColdFixture,
     event: &serde_json::Value,
-    own_member: bool,
     encrypted: bool,
 ) -> (wiremock::MockGuard, wiremock::MockGuard) {
-    use matrix_sdk::ruma::api::client::sync::sync_events::msc4186 as v5;
+    use matrix_sdk::deserialized_responses::TimelineEvent;
+    use matrix_sdk::test_utils::mocks::RoomContextResponseTemplate;
 
-    let mut room = v5::response::Room::new();
-    room.initial = Some(true);
-    room.timeline = vec![Raw::from_json_string(event.to_string()).unwrap()];
-    let factory = matrix_sdk_test::event_factory::EventFactory::new()
-        .room(room_id!("!cold:example.org"))
-        .sender(user_id!("@sender:example.org"));
-    room.required_state = own_member
-        .then(|| factory.member(user_id!("@alice:example.org")).into_raw())
-        .into_iter()
-        .chain(encrypted.then(|| factory.room_encryption().into_raw()))
-        .collect();
-    let mut response = v5::Response::new("1".to_owned());
-    response.rooms =
-        std::collections::BTreeMap::from([(room_id!("!cold:example.org").to_owned(), room)]);
-    let sync = fixture
+    let mut event = event.clone();
+    event["room_id"] = COLD_ROOM.into();
+    let event = TimelineEvent::from_plaintext(Raw::from_json_string(event.to_string()).unwrap());
+    let context = fixture
         .server
-        .mock_sliding_sync()
-        .ok(response)
+        .mock_room_event_context()
+        .expect_any_access_token()
+        .ok(RoomContextResponseTemplate::new(event))
         .mount_as_scoped()
         .await;
-    let encryption = fixture.server.mock_room_state_encryption();
+    let encryption = fixture
+        .server
+        .mock_room_state_encryption()
+        .expect_any_access_token();
     let encryption = if encrypted {
         encryption.encrypted()
     } else {
@@ -947,7 +940,7 @@ async fn mount_fetch_with(
     }
     .mount_as_scoped()
     .await;
-    (sync, encryption)
+    (context, encryption)
 }
 
 #[tokio::test]
@@ -956,7 +949,7 @@ async fn a_pushed_event_whose_rules_cannot_be_evaluated_is_still_fetched() {
     let message = json!({"type": "m.room.message", "event_id": "$unevaluated",
         "sender": "@sender:example.org", "origin_server_ts": 1,
         "content": {"msgtype": "m.text", "body": "rules unknown"}});
-    let _mocks = mount_fetch_with(&fixture, &message, false, false).await;
+    let _mocks = mount_fetch_with(&fixture, &message, false).await;
 
     let fetched = fetch_cold_push_event(
         &fixture.data_dir,
@@ -985,7 +978,7 @@ async fn an_unevaluated_encrypted_event_is_discarded_when_every_encrypted_event_
     let message = json!({"type": "m.room.message", "event_id": "$unevaluated",
         "sender": "@sender:example.org", "origin_server_ts": 1,
         "content": {"msgtype": "m.text", "body": "rules unknown"}});
-    let _mocks = mount_fetch_with(&fixture, &message, false, true).await;
+    let _mocks = mount_fetch_with(&fixture, &message, true).await;
 
     let fetched = fetch_cold_push_event(
         &fixture.data_dir,
@@ -997,6 +990,110 @@ async fn an_unevaluated_encrypted_event_is_discarded_when_every_encrypted_event_
     .await;
 
     assert!(matches!(fetched, PushFetchView::Discard), "{fetched:?}");
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
+async fn a_push_in_a_joined_room_is_fetched_without_syncing_account_data() {
+    let fixture = ColdFixture::new("fetch-context", cold_room_with_members(), None).await;
+    let _sync = fixture
+        .server
+        .mock_sliding_sync()
+        .ok(
+            matrix_sdk::ruma::api::client::sync::sync_events::msc4186::Response::new(
+                "1".to_owned(),
+            ),
+        )
+        .never()
+        .mount_as_scoped()
+        .await;
+    let message = json!({"type": "m.room.message", "event_id": "$context",
+        "sender": "@sender:example.org", "origin_server_ts": 1,
+        "content": {"msgtype": "m.text", "body": "one request"}});
+
+    let PushFetchView::Event { event } = fetch(&fixture, "A", message).await else {
+        panic!("a push in a joined room must be fetched");
+    };
+    assert_eq!(event.content["body"], "one request");
+
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
+async fn a_fetched_push_from_an_ignored_sender_is_discarded() {
+    let fixture = ColdFixture::new("fetch-ignored", cold_room_with_members(), None).await;
+    let client = fixture.client.as_ref().unwrap();
+    fixture
+        .server
+        .mock_sync()
+        .ok_and_run(client, |builder| {
+            builder.add_global_account_data(
+                matrix_sdk_test::event_factory::EventFactory::new()
+                    .ignored_user_list([user_id!("@sender:example.org").to_owned()]),
+            );
+        })
+        .await;
+    let message = json!({"type": "m.room.message", "event_id": "$ignored",
+        "sender": "@sender:example.org", "origin_server_ts": 1,
+        "content": {"msgtype": "m.text", "body": "ignored"}});
+
+    let fetched = fetch(&fixture, "A", message).await;
+
+    assert!(matches!(fetched, PushFetchView::Discard), "{fetched:?}");
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
+async fn read_rooms_asks_only_for_the_rooms_still_shown() {
+    use wiremock::matchers::{body_json, method, path_regex};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let fixture = ColdFixture::new("read-rooms", cold_room_with_members(), None).await;
+    Mock::given(method("POST"))
+        .and(path_regex("/sync$"))
+        .and(body_json(json!({
+            "conn_id": "read-rooms",
+            "room_subscriptions": {
+                "!read:example.org": {"timeline_limit": 0},
+                "!unread:example.org": {"timeline_limit": 0},
+                "!left:example.org": {"timeline_limit": 0},
+            },
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "pos": "1",
+            "rooms": {
+                "!read:example.org": {"notification_count": 0},
+                "!unread:example.org": {"notification_count": 3},
+            },
+        })))
+        .expect(1)
+        .mount(fixture.server.server())
+        .await;
+
+    let session = super::PushSession::open(
+        &cold_push_store_dir(&fixture.data_dir),
+        "@alice:example.org",
+        "A",
+        COLD_ROOM,
+    )
+    .await
+    .unwrap();
+    let read = session
+        .read_rooms(&[
+            "!read:example.org".to_owned(),
+            "!unread:example.org".to_owned(),
+            "!left:example.org".to_owned(),
+        ])
+        .await;
+
+    assert_eq!(
+        read,
+        Some(vec![
+            "!read:example.org".to_owned(),
+            "!left:example.org".to_owned()
+        ])
+    );
+    drop(session);
     remove_data_dir(&fixture.data_dir).await;
 }
 
@@ -1120,7 +1217,7 @@ async fn push_backup_recovery(cached: bool) {
         .await,
     )
     .unwrap();
-    let _fetch = mount_fetch_with(&fixture, &message, true, true).await;
+    let _fetch = mount_fetch_with(&fixture, &message, true).await;
     Mock::given(method("POST"))
         .and(path_regex("/sync$"))
         .and(body_partial_json(json!({"conn_id": "encryption"})))
