@@ -54,10 +54,12 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-300);
+    max-height: min(28rem, calc(100dvh - 6rem));
     width: min(22rem, calc(100vw - 2rem));
   }
 
   .receipts-dialog.sheet {
+    max-height: none;
     padding: 0 var(--space-400);
     width: auto;
   }
