@@ -916,7 +916,10 @@
         var(--page-gutter) - var(--space-100) + var(--avatar-size-small) + var(--timeline-row-gap)
       );
     }
+  }
 
+  /* A mouse reveals the actions at any width, or a narrow window would hide them. */
+  @media (any-hover: hover) and (any-pointer: fine) {
     .message:hover,
     .message.menu-open {
       background-color: var(--surface-container-hover);

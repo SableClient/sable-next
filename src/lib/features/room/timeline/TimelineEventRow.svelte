@@ -230,7 +230,7 @@
     animation: jump-reduced var(--message-highlight-duration) steps(1, end);
   }
 
-  @media (--app-layout) and (any-hover: hover) and (any-pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .message:hover {
       background-color: var(--surface-container-hover);
     }
