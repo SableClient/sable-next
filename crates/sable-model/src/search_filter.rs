@@ -203,14 +203,22 @@ fn room_target<'a>(
         return identified;
     }
 
+    let named = best(
+        rooms
+            .clone()
+            .filter(|room| lower(room.name.as_ref()).as_ref() == Some(&wanted)),
+    );
+    if named.is_some() {
+        return named;
+    }
+
     let local = format!(
         "#{}",
         tail(&aliased, 1).split(':').next().unwrap_or_default()
     );
     best(rooms.filter(|room| {
-        lower(room.name.as_ref()).as_ref() == Some(&wanted)
-            || lower(room.canonical_alias.as_ref())
-                .is_some_and(|alias| alias.split(':').next() == Some(local.as_str()))
+        lower(room.canonical_alias.as_ref())
+            .is_some_and(|alias| alias.split(':').next() == Some(local.as_str()))
     }))
 }
 
@@ -830,6 +838,22 @@ mod tests {
         assert_eq!(
             resolve_room_target(&rooms, "Dev").as_deref(),
             Some("!dev:example.org")
+        );
+    }
+
+    #[test]
+    fn a_room_named_exactly_wins_over_another_server_alias() {
+        let rooms = [
+            SearchRoom {
+                canonical_alias: Some("#general:sable.moe".to_owned()),
+                ..room("!sable:sable.moe", "Sable Client")
+            },
+            room("!general:example.org", "general"),
+        ];
+
+        assert_eq!(
+            resolve_room_target(&rooms, "general").as_deref(),
+            Some("!general:example.org")
         );
     }
 
