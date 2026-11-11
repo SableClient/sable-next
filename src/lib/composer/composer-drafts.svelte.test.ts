@@ -5,8 +5,12 @@ import {
   clearDraft,
   clearDrafts,
   draftDocuments,
+  readBotCommand,
   readDraft,
+  readReply,
+  writeBotCommand,
   writeDraft,
+  writeReply,
 } from './composer-drafts.svelte';
 
 const ROOM = '!room:example.org';
@@ -14,6 +18,23 @@ const doc = (text: string) => ({ type: 'doc', content: [{ type: 'paragraph', tex
 const draft = (text: string) => ({ doc: doc(text), staged: [], nextStagedId: 0 });
 
 afterEach(clearDrafts);
+
+test('a room keeps its reply and bot command when its text draft is cleared', () => {
+  const reply = { kind: 'reply', eventId: '$parent', body: 'hi', html: null } as const;
+  const command = { command: {} as never, drafts: { days: '7' }, prefix: '/' };
+  writeDraft(ROOM, draft('hello'));
+  writeReply(ROOM, reply);
+  writeBotCommand(ROOM, command);
+
+  clearDraft(ROOM);
+
+  expect(readDraft(ROOM)).toBeUndefined();
+  expect(readReply(ROOM)).toEqual(reply);
+  expect(readBotCommand(ROOM)).toEqual(command);
+  writeReply(ROOM, null);
+  writeBotCommand(ROOM, null);
+  expect(draftDocuments()).toEqual({});
+});
 
 test('a late echo of an earlier upload does not bring a sent draft back', () => {
   writeDraft(ROOM, draft('hello wor'));

@@ -33,14 +33,18 @@ function docFingerprint(doc: unknown): string {
   return cached;
 }
 
+interface ComposerRoom {
+  draft?: ComposerDraft;
+  reply?: ComposerContext;
+  botCommand?: BotCommandDraft;
+}
+
 interface DraftState {
-  drafts: Map<string, ComposerDraft>;
+  rooms: Map<string, ComposerRoom>;
   synced: Map<string, string>;
   adopted: Map<string, number>;
   discarded: Map<string, string[]>;
   offered: Map<string, string[]>;
-  replies: Map<string, ComposerContext>;
-  botCommands: Map<string, BotCommandDraft>;
 }
 
 // eslint-disable-next-line svelte/prefer-svelte-reactivity -- changes publish through revision
@@ -50,30 +54,44 @@ function stateFor(accountId: string): DraftState {
   let state = accounts.get(accountId);
   if (!state) {
     state = {
-      drafts: new Map(),
+      rooms: new Map(),
       synced: new Map(),
       adopted: new Map(),
       discarded: new Map(),
       offered: new Map(),
-      replies: new Map(),
-      botCommands: new Map(),
     };
     accounts.set(accountId, state);
   }
   return state;
 }
 
+function update<K extends keyof ComposerRoom>(
+  rooms: Map<string, ComposerRoom>,
+  key: string,
+  field: K,
+  value: ComposerRoom[K] | undefined
+): void {
+  const room: ComposerRoom = { ...rooms.get(key), [field]: value };
+  if (Object.values(room).every((part) => part === undefined)) rooms.delete(key);
+  else rooms.set(key, room);
+}
+
+function draftEntries(rooms: Map<string, ComposerRoom>): [string, ComposerDraft][] {
+  return [...rooms].flatMap(([key, { draft }]) => (draft ? [[key, draft] as const] : []));
+}
+
 const revision = $state({ value: 0 });
 const remote = $state({ value: 0 });
 
 export function readDraft(roomId: string, accountId = ''): ComposerDraft | undefined {
-  return stateFor(accountId).drafts.get(roomId);
+  return stateFor(accountId).rooms.get(roomId)?.draft;
 }
 
 export function writeDraft(roomId: string, draft: ComposerDraft, accountId = ''): void {
-  const { drafts, discarded } = stateFor(accountId);
-  drafts.delete(roomId);
-  drafts.set(roomId, draft);
+  const { rooms, discarded } = stateFor(accountId);
+  const room = rooms.get(roomId);
+  rooms.delete(roomId);
+  rooms.set(roomId, { ...room, draft });
   discarded.delete(roomId);
   revision.value += 1;
 }
@@ -86,9 +104,11 @@ export function injectDraft(roomId: string, draft: ComposerDraft, accountId = ''
 }
 
 export function clearDraft(roomId: string, accountId = ''): void {
-  const { drafts, discarded, offered, synced } = stateFor(accountId);
-  const doc = drafts.get(roomId)?.doc;
-  if (!drafts.delete(roomId)) return;
+  const { rooms, discarded, offered, synced } = stateFor(accountId);
+  const draft = rooms.get(roomId)?.draft;
+  if (!draft) return;
+  update(rooms, roomId, 'draft', undefined);
+  const doc = draft.doc;
   const stale = [...(offered.get(roomId) ?? []), synced.get(roomId)].filter(
     (value) => value !== undefined
   );
@@ -98,17 +118,15 @@ export function clearDraft(roomId: string, accountId = ''): void {
 }
 
 export function readReply(key: string, accountId = ''): ComposerContext | undefined {
-  return stateFor(accountId).replies.get(key);
+  return stateFor(accountId).rooms.get(key)?.reply;
 }
 
 export function writeReply(key: string, reply: ComposerContext | null, accountId = ''): void {
-  const { replies } = stateFor(accountId);
-  if (reply === null) replies.delete(key);
-  else replies.set(key, reply);
+  update(stateFor(accountId).rooms, key, 'reply', reply ?? undefined);
 }
 
 export function readBotCommand(key: string, accountId = ''): BotCommandDraft | undefined {
-  return stateFor(accountId).botCommands.get(key);
+  return stateFor(accountId).rooms.get(key)?.botCommand;
 }
 
 export function writeBotCommand(
@@ -116,9 +134,7 @@ export function writeBotCommand(
   command: BotCommandDraft | null,
   accountId = ''
 ): void {
-  const { botCommands } = stateFor(accountId);
-  if (command === null) botCommands.delete(key);
-  else botCommands.set(key, command);
+  update(stateFor(accountId).rooms, key, 'botCommand', command ?? undefined);
 }
 
 export function clearDrafts(): void {
@@ -134,8 +150,8 @@ export function remoteRevision(roomId: string, accountId = ''): number {
 export function draftDocuments(accountId = ''): Record<string, unknown> {
   void revision.value;
 
-  const { drafts, offered } = stateFor(accountId);
-  const entries = [...drafts.entries()]
+  const { rooms, offered } = stateFor(accountId);
+  const entries = draftEntries(rooms)
     .filter(([, draft]) => draft.doc !== null && draft.doc !== undefined)
     .slice(-MAX_SYNCED_DRAFTS);
   for (const [roomId, draft] of entries) {
@@ -147,11 +163,11 @@ export function draftDocuments(accountId = ''): Record<string, unknown> {
 }
 
 export function adoptDraftDocuments(documents: Record<string, unknown>, accountId = ''): void {
-  const { drafts, synced, adopted, discarded } = stateFor(accountId);
+  const { rooms, synced, adopted, discarded } = stateFor(accountId);
   let changed = false;
   const dropped = [...synced.keys()].filter((roomId) => !(roomId in documents));
   for (const roomId of [...Object.keys(documents), ...dropped]) {
-    const existing = drafts.get(roomId);
+    const existing = rooms.get(roomId)?.draft;
     const held = existing?.doc ?? null;
     const local = held === null ? null : docFingerprint(held);
     const doc = documents[roomId] ?? null;
@@ -163,9 +179,10 @@ export function adoptDraftDocuments(documents: Record<string, unknown>, accountI
     if (next === null || !discarded.get(roomId)?.includes(next)) discarded.delete(roomId);
     if (!untouched || local === next || discarded.has(roomId)) continue;
 
-    if (doc === null && (existing?.staged.length ?? 0) === 0) drafts.delete(roomId);
+    if (doc === null && (existing?.staged.length ?? 0) === 0)
+      update(rooms, roomId, 'draft', undefined);
     else
-      drafts.set(roomId, {
+      update(rooms, roomId, 'draft', {
         doc,
         staged: existing?.staged ?? [],
         nextStagedId: existing?.nextStagedId ?? 0,
