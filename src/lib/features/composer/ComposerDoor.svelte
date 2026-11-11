@@ -130,7 +130,10 @@
     {disabled}
     data-state={open ? 'open' : 'closed'}
     aria-label={i18n.t('composer.insert')}
-    onpointerdown={onBeforeOpen}
+    onpointerdown={() => {
+      onBeforeOpen?.();
+      open = true;
+    }}
     onclick={() => {
       open = true;
     }}
