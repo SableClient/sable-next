@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/sveltekit';
 import { CoreError } from '#src/transport';
 import { isTauri } from '@tauri-apps/api/core';
+import { originOf, reportContext, reportTags } from './core-failure.js';
 
 const LAST_RUN_VERSION_KEY = 'sable.lastRunVersion';
 
@@ -43,13 +44,16 @@ export function reportSessionFailure(
     runtime: isTauri() ? 'native' : 'web',
   };
   const logId = detail?.code === 'failed' ? detail.log_id : undefined;
+  const report = error instanceof CoreError ? error.report : null;
+  const origin = report ? originOf(report) : null;
   Sentry.captureMessage(`session.${operation}`, {
     level:
       operation === 'session_ended' || operation === 'restore_slow' || operation === 'switch_slow'
         ? 'warning'
         : 'error',
-    fingerprint: ['session', operation, tags['session.reason']],
-    tags,
+    fingerprint: ['session', operation, tags['session.reason'], ...(origin ? [origin] : [])],
+    tags: report ? { ...tags, ...reportTags(report, origin) } : tags,
+    contexts: report ? { core: reportContext(report) } : undefined,
     extra: logId ? { log_id: logId } : undefined,
   });
 }

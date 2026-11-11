@@ -8,7 +8,7 @@ import { scrubMatrixIds } from './scrubbers.js';
 
 type Failure = Extract<CoreEvent, { type: 'failure' }>;
 
-function reportTags(report: ErrorReportView, origin: string | null): Record<string, string> {
+export function reportTags(report: ErrorReportView, origin: string | null): Record<string, string> {
   return {
     ...(origin ? { 'core.origin': origin } : {}),
     ...(report.http?.status ? { 'http.status': String(report.http.status) } : {}),
@@ -17,13 +17,13 @@ function reportTags(report: ErrorReportView, origin: string | null): Record<stri
 }
 
 /** Sentry flattens anything nested deeper than `normalizeDepth`, so each frame gets its own key. */
-function reportContext(report: ErrorReportView): Record<string, unknown> {
+export function reportContext(report: ErrorReportView): Record<string, unknown> {
   const context: Record<string, unknown> = { http: report.http, span_trace: report.span_trace };
   for (const [index, frame] of report.frames.entries()) context[`frame_${index}`] = frame;
   return context;
 }
 
-function originOf(report: ErrorReportView): string | null {
+export function originOf(report: ErrorReportView): string | null {
   for (let index = report.frames.length - 1; index >= 0; index -= 1) {
     const location = report.frames[index]?.location;
     if (location) return location;
