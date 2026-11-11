@@ -160,6 +160,7 @@ fn livekit_service_urls(transports: Vec<RtcTransport>) -> Vec<String> {
         .into_iter()
         .filter_map(|transport| match transport {
             RtcTransport::LiveKit(livekit) => livekit.service_url,
+            RtcTransport::LegacyLiveKit(livekit) => livekit.service_url,
             _ => None,
         })
         .filter(|url| !url.trim().is_empty())
@@ -1134,7 +1135,24 @@ mod tests {
     use matrix_sdk::ruma::{device_id, owned_user_id, user_id};
 
     use super::membership::CallMember;
-    use super::{can_join_call, member_views, membership_state_key, pick_focus};
+    use super::{
+        can_join_call, livekit_service_urls, member_views, membership_state_key, pick_focus,
+    };
+
+    #[test]
+    fn test_both_livekit_transport_types_name_their_jwt_service() {
+        let transports = serde_json::from_value(serde_json::json!([
+            {"type": "livekit", "livekit_service_url": "https://legacy.example"},
+            {"type": "m.livekit", "url": "wss://sfu.example", "livekit_service_url": "https://current.example"},
+            {"type": "m.livekit", "url": "wss://sfu-only.example"},
+        ]))
+        .unwrap();
+
+        assert_eq!(
+            livekit_service_urls(transports),
+            ["https://legacy.example", "https://current.example"]
+        );
+    }
 
     #[test]
     fn test_sticky_membership_can_join_without_legacy_state_permission() {
