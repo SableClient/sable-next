@@ -13,6 +13,7 @@ function room(overrides: Partial<RoomListItemView>): RoomListItemView {
     is_tombstoned: false,
     space_children: [],
     unread: 0,
+    notifying: 0,
     highlight: 0,
     latest_event: null,
     ...overrides,
@@ -80,6 +81,7 @@ test('marks only rooms that are actually unread', () => {
     [
       room({ room_id: '!unread', unread: 3, latest_event: { event_id: '$a' } as never }),
       room({ room_id: '!highlighted', highlight: 1, latest_event: { event_id: '$b' } as never }),
+      room({ room_id: '!notifying', notifying: 1, latest_event: { event_id: '$d' } as never }),
       room({ room_id: '!read', latest_event: { event_id: '$c' } as never }),
       room({ room_id: '!empty', unread: 2, latest_event: null }),
       null,
@@ -100,6 +102,15 @@ test('marks only rooms that are actually unread', () => {
     [
       {
         room_id: '!highlighted',
+        event_id: null,
+        thread_root: null,
+        subscription: null,
+        fully_read: true,
+      },
+    ],
+    [
+      {
+        room_id: '!notifying',
         event_id: null,
         thread_root: null,
         subscription: null,

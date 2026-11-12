@@ -65,15 +65,16 @@ function matchesFilter(
   filter: NotificationFilter,
   counts: UnreadCount
 ): boolean {
+  const pending = hasUnread(counts) || notificationCount(counts) > 0;
   switch (filter) {
     case 'direct':
-      return room.is_direct && hasUnread(counts);
+      return room.is_direct && pending;
     case 'mentions':
       return counts.highlight > 0;
     case 'threads':
       return false;
     default:
-      return hasUnread(counts);
+      return pending;
   }
 }
 

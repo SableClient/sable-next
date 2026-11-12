@@ -20,7 +20,8 @@ export function markRoomsRead(
 ): void {
   for (const room of rooms) {
     if (!room) continue;
-    if (room.unread === 0 && room.highlight === 0 && !room.marked_unread) continue;
+    if (room.unread === 0 && room.notifying === 0 && room.highlight === 0 && !room.marked_unread)
+      continue;
     if (!room.latest_event) continue;
 
     void timeline

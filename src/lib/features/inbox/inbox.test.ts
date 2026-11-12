@@ -94,17 +94,19 @@ test('a room the badge counts but the list does not show is unlisted', () => {
     room({ room_id: '!listed', is_direct: true, unread: 1, notifying: 1 }),
     room({ room_id: '!stale', is_direct: true, unread: 2, notifying: 2 }),
     room({ room_id: '!quiet-room', unread: 7, notifying: 7 }),
+    room({ room_id: '!edited', notifying: 1 }),
   ];
 
   const badgeFor = badgesOf({
     '!listed': { unread: 1, notifying: 1 },
     '!stale': { unread: 2, notifying: 2 },
     '!quiet-room': { unread: 7 },
+    '!edited': { unread: 0, notifying: 1 },
   });
 
   expect(
     unlistedNotifications(rooms, 'all', badgeFor, ['!listed']).map((each) => each.room_id)
-  ).toEqual(['!stale']);
+  ).toEqual(['!stale', '!edited']);
   expect(unlistedNotifications(rooms, 'mentions', badgeFor, [])).toEqual([]);
 });
 
