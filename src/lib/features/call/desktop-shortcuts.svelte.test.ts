@@ -42,7 +42,9 @@ function setup() {
     inputMode: 'push-to-talk',
     desktopShortcutStatus: 'inactive',
     setTalking: vi.fn(async () => {}),
+    deafened: false,
     toggleMicrophone: vi.fn(async () => {}),
+    setDeafened: vi.fn(),
   });
   stop = registerDesktopCallShortcuts(session as unknown as CallSession);
   flushSync();
@@ -61,12 +63,14 @@ test('registers effective bindings during an active call and tracks rebinding', 
   expect(setCallShortcuts).toHaveBeenLastCalledWith([
     expect.objectContaining({ id: 'talk', binding: 'mod+shift+t' }),
     expect.objectContaining({ id: 'mute', binding: 'mod+shift+m' }),
+    expect.objectContaining({ id: 'deafen' }),
   ]);
   rebind('call.pushToTalk', 'alt+space');
   flushSync();
   expect(setCallShortcuts).toHaveBeenLastCalledWith([
     expect.objectContaining({ id: 'talk', binding: 'alt+space' }),
     expect.objectContaining({ id: 'mute' }),
+    expect.objectContaining({ id: 'deafen' }),
   ]);
 });
 
@@ -91,7 +95,7 @@ test('suspends desktop keys while recording a binding and restores them afterwar
   expect(session.setTalking).not.toHaveBeenCalled();
   shortcutCapture.active = false;
   flushSync();
-  expect(setCallShortcuts.mock.calls.at(-1)?.[0]).toHaveLength(2);
+  expect(setCallShortcuts.mock.calls.at(-1)?.[0]).toHaveLength(3);
 });
 
 test('leaving, listen-only calls and disabling desktop keys remove native registrations', () => {
@@ -130,11 +134,14 @@ test('typing in Sable ignores portal presses without re-registering native short
   expect(session.setTalking).not.toHaveBeenCalledWith(true, 'desktop');
 });
 
-test('voice activity mode only registers push-to-mute globally', () => {
+test('voice activity mode registers mute and deafen but not push-to-talk', () => {
   const { session, setCallShortcuts } = setup();
   session.inputMode = 'voice-activity';
   flushSync();
-  expect(setCallShortcuts).toHaveBeenLastCalledWith([expect.objectContaining({ id: 'mute' })]);
+  expect(setCallShortcuts).toHaveBeenLastCalledWith([
+    expect.objectContaining({ id: 'mute' }),
+    expect.objectContaining({ id: 'deafen' }),
+  ]);
 });
 
 test('mute toggles on press, not release', () => {
@@ -143,4 +150,12 @@ test('mute toggles on press, not release', () => {
   expect(session.toggleMicrophone).toHaveBeenCalledOnce();
   receive({ id: 'mute', pressed: false });
   expect(session.toggleMicrophone).toHaveBeenCalledOnce();
+});
+
+test('deafen toggles on press, not release', () => {
+  const { session, receive } = setup();
+  receive({ id: 'deafen', pressed: true });
+  expect(session.setDeafened).toHaveBeenCalledExactlyOnceWith(true);
+  receive({ id: 'deafen', pressed: false });
+  expect(session.setDeafened).toHaveBeenCalledOnce();
 });

@@ -7,6 +7,7 @@ import type {
 
 const talk = { id: 'talk', binding: 'mod+shift+t', description: 'Push to talk' } as const;
 const mute = { id: 'mute', binding: 'mod+shift+m', description: 'Mute microphone' } as const;
+const deafen = { id: 'deafen', binding: 'mod+shift+d', description: 'Deafen' } as const;
 
 function harness({
   passive = true,
@@ -75,17 +76,17 @@ test.each([
   [talk, talk],
   [{ ...talk, binding: 1 }],
   [{ ...talk, description: null }],
-  [talk, mute, talk],
+  [talk, mute, deafen, talk],
 ])('rejects malformed desktop bindings: %j', (bindings) => {
   expect(validBindings(bindings)).toBe(false);
 });
 
-test('accepts only the two call shortcut actions or an empty cleanup request', () => {
-  expect(validBindings([talk, mute])).toBe(true);
+test('accepts only the call shortcut actions or an empty cleanup request', () => {
+  expect(validBindings([talk, mute, deafen])).toBe(true);
   expect(validBindings([])).toBe(true);
 });
 
-test.each(['talk', 'mute'])('%s fires once per press', (id) => {
+test.each(['talk', 'mute', 'deafen'])('%s fires once per press', (id) => {
   const { shortcuts, handles, send } = harness();
   handles[0]?.notify(JSON.stringify({ id, pressed: true }));
   handles[0]?.notify(JSON.stringify({ id, pressed: true }));

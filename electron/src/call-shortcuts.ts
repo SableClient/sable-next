@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import type {
+  CallShortcutId,
   DesktopCallShortcut,
   DesktopCallShortcutBackend,
   DesktopCallShortcutEvent,
@@ -78,13 +79,15 @@ export function nativeBinding(binding: DesktopCallShortcut, isMac: boolean) {
   };
 }
 
+const SHORTCUT_IDS: unknown[] = ['talk', 'mute', 'deafen'] satisfies CallShortcutId[];
+
 export function validBindings(value: unknown): value is DesktopCallShortcut[] {
-  if (!Array.isArray(value) || value.length > 2) return false;
-  const ids = new Set<string>();
+  if (!Array.isArray(value) || value.length > SHORTCUT_IDS.length) return false;
+  const ids = new Set<unknown>();
   return value.every((item: unknown) => {
     if (typeof item !== 'object' || item === null) return false;
     const binding = item as Record<string, unknown>;
-    if ((binding.id !== 'talk' && binding.id !== 'mute') || ids.has(binding.id)) return false;
+    if (!SHORTCUT_IDS.includes(binding.id) || ids.has(binding.id)) return false;
     ids.add(binding.id);
     return (
       typeof binding.binding === 'string' &&
@@ -99,7 +102,7 @@ export function validBindings(value: unknown): value is DesktopCallShortcut[] {
 export class CallShortcuts {
   #handle: NativeHandle | undefined;
   #generation = 0;
-  #pressed = new Set<'talk' | 'mute'>();
+  #pressed = new Set<CallShortcutId>();
   #bindings: DesktopCallShortcut[] = [];
   #platform = '';
   #wayland = false;

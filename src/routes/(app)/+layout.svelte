@@ -1209,7 +1209,8 @@
             void callSession.setTalking(false);
           },
         },
-        'call.toggleDeafen': () => {
+        'call.toggleDeafen': (event) => {
+          if (event.repeat || callSession.desktopShortcutStatus === 'portal') return;
           if (callSession.active) callSession.setDeafened(!callSession.deafened);
         },
         'call.toggleCamera': () => {
