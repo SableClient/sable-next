@@ -3,7 +3,10 @@
 </script>
 
 <script lang="ts">
+  import { cubicOut } from 'svelte/easing';
   import { MediaQuery } from 'svelte/reactivity';
+  import { slide } from 'svelte/transition';
+  import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
   import type {
     ImageUsageView,
     MemberView,
@@ -1533,7 +1536,10 @@
             />
             <ComposerField {editor} {showPlaceholder} {placeholder} bind:expanded />
             {#if formattingOpen}
-              <div class="composer-formatting">
+              <div
+                class="composer-formatting"
+                transition:slide={{ duration: motionMs(MOTION_MS.quick), easing: cubicOut }}
+              >
                 <ComposerFormatting
                   active={activeFormats}
                   source={sourceMode}
