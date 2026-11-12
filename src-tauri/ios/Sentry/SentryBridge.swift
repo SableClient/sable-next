@@ -24,7 +24,9 @@ final class SableSentry: NSObject {
 
       SentrySDK.start { options in
         options.dsn = dsn
-        options.environment = (environment as String).nilIfEmpty
+        if let environment = (environment as String).nilIfEmpty {
+          options.environment = environment
+        }
         options.releaseName = (release as String).nilIfEmpty
         options.sendDefaultPii = false
       }
