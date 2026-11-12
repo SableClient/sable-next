@@ -28,7 +28,6 @@ pub(crate) fn is_mxc(source: &str) -> bool {
     source.starts_with("mxc://")
 }
 
-#[cfg(any(target_family = "wasm", test))]
 pub(crate) async fn soliditas_preview(
     base: &str,
     target: &str,
@@ -289,103 +288,6 @@ fn preview_view(
     Some(preview)
 }
 
-#[cfg(not(target_family = "wasm"))]
-mod local {
-    use std::sync::LazyLock;
-    use std::time::Duration;
-
-    use sable_link_preview::{
-        Fetch as _, MAX_DIRECT_VIDEO_BYTES, PostMediaKind, ReqwestFetch, Response as _,
-    };
-
-    use crate::protocol::{RpcCode, RpcError, UrlPreviewView};
-
-    const USER_AGENT: &str = concat!(
-        "Sable/",
-        env!("SABLE_APP_VERSION"),
-        " (link preview; +https://sable.moe)"
-    );
-
-    const MAX_IMAGE_BYTES: usize = 20 * 1024 * 1024;
-
-    const MAX_SCRAPED_MEDIA: usize = 512;
-
-    /// The media URLs a scrape handed out, with how many bytes each may take.
-    /// Only these reach the web, so an event naming a web URL as its media
-    /// cannot make the client fetch it.
-    static SCRAPED: LazyLock<parking_lot::Mutex<hashlink::LruCache<String, usize>>> =
-        LazyLock::new(|| parking_lot::Mutex::new(hashlink::LruCache::new(MAX_SCRAPED_MEDIA)));
-
-    fn client(timeout: Duration) -> Result<ReqwestFetch, RpcError> {
-        let builder = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
-            .user_agent(USER_AGENT)
-            .timeout(timeout);
-        ReqwestFetch::new(builder).map_err(|error| {
-            crate::errors::coded("link_preview_fetcher", RpcCode::Unavailable, &error)
-        })
-    }
-
-    pub(crate) async fn scrape(
-        url: &str,
-        options: &sable_link_preview::ScrapeOptions,
-    ) -> Result<Option<UrlPreviewView>, RpcError> {
-        let Some(target) = sable_link_preview::parse_public_url(url, None) else {
-            return Ok(None);
-        };
-        let fetch = client(Duration::from_secs(10))?;
-        let Some(preview) = sable_link_preview::scrape(&fetch, &target, options).await else {
-            return Ok(None);
-        };
-        {
-            let video_cap = usize::try_from(MAX_DIRECT_VIDEO_BYTES).unwrap_or(usize::MAX);
-            let mut scraped = SCRAPED.lock();
-            for (url, kind) in preview.media_urls() {
-                let cap = match kind {
-                    PostMediaKind::Image => MAX_IMAGE_BYTES,
-                    PostMediaKind::Video | PostMediaKind::Gif => video_cap,
-                };
-                scraped.insert(url.into(), cap);
-            }
-        }
-        let data = serde_json::Value::Object(preview.to_matrix(ToString::to_string));
-        Ok(sable_link_preview::PreviewData::read(&data)
-            .and_then(|data| super::preview_view(url.to_owned(), &data, |_| true)))
-    }
-
-    pub(super) async fn scraped_media(
-        source: &str,
-        limit: usize,
-    ) -> Option<Result<Vec<u8>, RpcError>> {
-        let cap = SCRAPED.lock().get(source).copied()?;
-        Some(download(source, limit.min(cap)).await)
-    }
-
-    async fn download(source: &str, limit: usize) -> Result<Vec<u8>, RpcError> {
-        let url = url::Url::parse(source).map_err(|_| RpcCode::InvalidMedia)?;
-        let fetch = client(Duration::from_secs(60))?;
-        let response = fetch
-            .get(&url, "image/*,video/*;q=0.9,*/*;q=0.5")
-            .await
-            .ok_or(RpcCode::Unavailable)?;
-        let body = response
-            .body(limit.saturating_add(1))
-            .await
-            .ok_or(RpcCode::Unavailable)?;
-        if body.is_empty() || body.len() > limit {
-            return Err(RpcCode::InvalidMedia.into());
-        }
-        Ok(body)
-    }
-}
-
-#[cfg(not(target_family = "wasm"))]
-pub(crate) use local::scrape as scrape_locally;
-
-#[cfg(not(target_family = "wasm"))]
-pub(crate) async fn scraped_media(source: &str) -> Option<Result<Vec<u8>, RpcError>> {
-    local::scraped_media(source, usize::MAX).await
-}
-
 const MAX_PREVIEW_IMAGE_BYTES: usize = 1024 * 1024;
 
 const MAX_POST_IMAGE_BYTES: usize = 10 * 1024 * 1024;
@@ -458,27 +360,15 @@ pub(crate) fn bundled_link_previews(
 }
 
 impl Core {
-    async fn preview_image_bytes(
-        client: &matrix_sdk::Client,
-        image: &str,
-        #[cfg_attr(
-            target_family = "wasm",
-            expect(unused_variables, reason = "the web fetches no scraped media")
-        )]
-        max_bytes: usize,
-    ) -> Option<Vec<u8>> {
-        if is_mxc(image) {
-            let request = MediaRequestParameters {
-                source: MediaSource::Plain(OwnedMxcUri::from(image)),
-                format: MediaFormat::File,
-            };
-            return client.media().get_media_content(&request, false).await.ok();
+    async fn preview_image_bytes(client: &matrix_sdk::Client, image: &str) -> Option<Vec<u8>> {
+        if !is_mxc(image) {
+            return None;
         }
-        #[cfg(not(target_family = "wasm"))]
-        if let Some(bytes) = local::scraped_media(image, max_bytes).await {
-            return bytes.ok();
-        }
-        None
+        let request = MediaRequestParameters {
+            source: MediaSource::Plain(OwnedMxcUri::from(image)),
+            format: MediaFormat::File,
+        };
+        client.media().get_media_content(&request, false).await.ok()
     }
 
     /// Keyed by the source they replace.
@@ -514,7 +404,7 @@ impl Core {
             max_bytes,
         } in wanted
         {
-            let Some(data) = Self::preview_image_bytes(&client, image, max_bytes).await else {
+            let Some(data) = Self::preview_image_bytes(&client, image).await else {
                 continue;
             };
             if data.is_empty() || data.len() > max_bytes {
@@ -959,36 +849,6 @@ mod tests {
         let data = serde_json::json!({ "og:type": "note", "note:content": "just text" });
         let preview = super::url_preview("https://e".to_owned(), &data).unwrap();
         assert_eq!(preview.post.unwrap().text.as_deref(), Some("just text"));
-    }
-
-    #[tokio::test]
-    async fn only_scraped_media_reaches_the_web() {
-        assert!(
-            super::scraped_media("https://tracker.example/pixel.png")
-                .await
-                .is_none()
-        );
-        assert!(
-            super::scraped_media("mxc://example.org/media")
-                .await
-                .is_none()
-        );
-    }
-
-    #[tokio::test]
-    async fn a_local_scrape_refuses_non_public_urls() {
-        for url in [
-            "http://localhost/",
-            "http://192.168.1.1/",
-            "ftp://files.example/",
-        ] {
-            assert!(
-                super::scrape_locally(url, &sable_link_preview::ScrapeOptions::default())
-                    .await
-                    .unwrap()
-                    .is_none()
-            );
-        }
     }
 
     #[tokio::test]

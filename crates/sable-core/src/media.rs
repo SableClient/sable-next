@@ -120,10 +120,6 @@ impl Core {
         height: u32,
         background: bool,
     ) -> Result<Vec<u8>, RpcError> {
-        #[cfg(not(target_family = "wasm"))]
-        if let Some(bytes) = crate::link_previews::scraped_media(&source).await {
-            return bytes;
-        }
         self.fetch_matrix_media(source, width, height, background)
             .await
     }

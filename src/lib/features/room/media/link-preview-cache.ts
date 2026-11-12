@@ -19,8 +19,7 @@ export function loadUrlPreview(
   messages: Pick<Rpc['messages'], 'urlPreview'>,
   url: string,
   client: boolean,
-  service: string | null = null,
-  klipyApiKey: string | null = null
+  service: string | null = null
 ): Promise<UrlPreviewView | null> {
   if (!client && !homeserverPreviews) return Promise.resolve(null);
 
@@ -28,9 +27,7 @@ export function loadUrlPreview(
   const cached = previews.get(key);
   if (cached) return cached;
 
-  const params = client
-    ? { url, client, service, klipy_api_key: klipyApiKey }
-    : { url, service: null };
+  const params = client ? { url, client, service } : { url, service: null };
   const request = messages.urlPreview(params).catch((error: unknown) => {
     if (!client && isCoreError(error, 'unsupported')) {
       homeserverPreviews = false;
@@ -82,7 +79,7 @@ export async function resolveUrlPreview(
 ): Promise<UrlPreviewView | null> {
   const config = sources.client ? await runtimeConfig() : null;
   const fromClient = config
-    ? await loadUrlPreview(messages, url, true, config.embeds.serviceUrl, config.gifs.klipyApiKey)
+    ? await loadUrlPreview(messages, url, true, config.embeds.serviceUrl)
     : null;
   if (fromClient !== null || !sources.server || !homeserverCanPreview(url)) return fromClient;
   return loadUrlPreview(messages, url, false);
@@ -95,13 +92,7 @@ export async function scrapedPostVideo(
   index: number
 ): Promise<string | null> {
   const config = await runtimeConfig();
-  const preview = await loadUrlPreview(
-    messages,
-    url,
-    true,
-    config.embeds.serviceUrl,
-    config.gifs.klipyApiKey
-  );
+  const preview = await loadUrlPreview(messages, url, true, config.embeds.serviceUrl);
   const post = quote ? preview?.post?.quote : preview?.post;
   const videos = post?.media.filter((media) => media.kind !== 'image') ?? [];
   return videos[index]?.source ?? null;
