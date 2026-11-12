@@ -6,6 +6,7 @@ use crate::api::auth::LoginIdentifier;
 use crate::api::auth::StartOidcLoginParams;
 use crate::api::auth::StartSsoLoginParams;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use matrix_sdk::authentication::oauth::error::OAuthDiscoveryError;
 use matrix_sdk::ruma::OwnedUserId;
@@ -405,6 +406,7 @@ impl Core {
             tracing::warn!("replacing unfinished OIDC login with a new attempt");
         }
         *pending = Some(PendingLogin {
+            attempt: self.next_login_attempt.fetch_add(1, Ordering::Relaxed),
             method: LoginMethod::Oidc,
             account_id,
             account_store_id,
@@ -428,32 +430,47 @@ impl Core {
         tracing::info!(operation = "oidc_login", "completing OAuth login callback");
         let url = Url::parse(&callback_url).or_failed(self, "complete_oidc_login_callback_url")?;
 
-        let mut pending = self.pending_login.lock().await;
-        let Some(PendingLogin {
-            redirect_uri: expected_redirect_uri,
-            client,
-            ..
-        }) = pending
-            .as_ref()
-            .filter(|pending| pending.method == LoginMethod::Oidc)
-        else {
-            tracing::warn!("no pending OIDC login: it was started elsewhere or the core restarted");
-            return Err(RpcCode::Unavailable.into());
+        let (attempt, client) = {
+            let pending = self.pending_login.lock().await;
+            let Some(PendingLogin {
+                attempt,
+                redirect_uri: expected_redirect_uri,
+                client,
+                ..
+            }) = pending
+                .as_ref()
+                .filter(|pending| pending.method == LoginMethod::Oidc)
+            else {
+                tracing::warn!(
+                    "no pending OIDC login: it was started elsewhere or the core restarted"
+                );
+                return Err(RpcCode::Unavailable.into());
+            };
+
+            if !same_redirect_target(expected_redirect_uri, &url) {
+                unexpected_callback("oidc_login", expected_redirect_uri, &url);
+                return Err(self.failed(
+                    "complete_oidc_login_callback_url",
+                    "callback URL does not match the redirect URI used to start OAuth",
+                ));
+            }
+            (*attempt, client.clone())
         };
 
-        if !same_redirect_target(expected_redirect_uri, &url) {
-            unexpected_callback("oidc_login", expected_redirect_uri, &url);
-            return Err(self.failed(
-                "complete_oidc_login_callback_url",
-                "callback URL does not match the redirect URI used to start OAuth",
-            ));
-        }
-
-        if let Err(error) = client
+        // A suspension reads the pending login to close its stores, so the request must not hold it.
+        let finished = client
             .oauth()
             .finish_login(authorization_response(&url))
-            .await
+            .await;
+        let mut pending = self.pending_login.lock().await;
+        if pending
+            .as_ref()
+            .is_none_or(|pending| pending.attempt != attempt)
         {
+            return Err(RpcCode::Unavailable.into());
+        }
+
+        if let Err(error) = finished {
             let refused = pending.take_if(|pending| {
                 refuses_device(&error)
                     && matches!(&pending.reauth, Some(account) if !account.device_invalidated)
@@ -565,6 +582,7 @@ impl Core {
             return Err(RpcCode::Unavailable.into());
         }
         *pending = Some(PendingLogin {
+            attempt: self.next_login_attempt.fetch_add(1, Ordering::Relaxed),
             method: LoginMethod::Sso,
             account_id,
             account_store_id,

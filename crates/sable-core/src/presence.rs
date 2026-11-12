@@ -212,8 +212,30 @@ impl Core {
     }
 
     pub(crate) async fn sync_presence(&self) -> PresenceState {
-        let desired = self.desired_presence();
         let revised = self.revised_presence().await.is_some();
+        self.sync_presence_for(revised).await
+    }
+
+    /// Reads the server features from the cache only, for a caller that cannot wait on a request.
+    pub(crate) async fn cached_sync_presence(&self) -> PresenceState {
+        let cached = match self.client().await {
+            Ok(client) => client.supported_versions_cached().await.ok().flatten(),
+            Err(_) => None,
+        };
+        let revised = cached.is_some_and(|supported| {
+            Revised::from_features(
+                supported
+                    .features
+                    .contains(&FeatureFlag::from(STABLE_FEATURE)),
+                supported.features.contains(&FeatureFlag::from(FEATURE)),
+            )
+            .is_some()
+        });
+        self.sync_presence_for(revised).await
+    }
+
+    async fn sync_presence_for(&self, revised: bool) -> PresenceState {
+        let desired = self.desired_presence();
         let in_call = matches!(desired, PresenceView::Online | PresenceView::Unavailable)
             && revised
             && !self.call_sessions.lock().await.is_empty();

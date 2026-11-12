@@ -818,7 +818,11 @@ fn app_builder(sentry_client: Option<&::sentry::Client>) -> tauri::Builder<tauri
                 && state.event_sink.detach()
             {
                 let core = state.core.clone();
-                tauri::async_runtime::spawn(async move { core.end_all_calls().await });
+                let dropping = core.drop_open_subscriptions();
+                tauri::async_runtime::spawn(async move {
+                    dropping.await;
+                    core.end_all_calls().await;
+                });
             }
         })
         .setup(setup)

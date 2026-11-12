@@ -143,6 +143,7 @@ pub struct Core {
     session_store_lock: Mutex<()>,
     credential_writers: Mutex<HashMap<String, u64>>,
     next_credential_writer: AtomicU64,
+    next_login_attempt: AtomicU64,
     account_clients: Mutex<HashMap<String, matrix_sdk::Client>>,
     session_handlers: parking_lot::Mutex<Vec<matrix_sdk::event_handler::EventHandlerDropGuard>>,
     probed_pinned_rooms: parking_lot::Mutex<
@@ -256,6 +257,7 @@ enum LoginMethod {
 }
 
 struct PendingLogin {
+    attempt: u64,
     method: LoginMethod,
     account_id: String,
     account_store_id: String,
@@ -337,6 +339,7 @@ impl Core {
             session_store_lock: Mutex::new(()),
             credential_writers: Mutex::new(HashMap::new()),
             next_credential_writer: AtomicU64::new(1),
+            next_login_attempt: AtomicU64::new(1),
             account_clients: Mutex::new(HashMap::new()),
             session_handlers: parking_lot::Mutex::new(Vec::new()),
             probed_pinned_rooms: parking_lot::Mutex::new(HashMap::new()),
@@ -860,6 +863,32 @@ mod tests {
         assert!(core.search_crawl_active());
         core.update_app_in_foreground(false);
         assert!(!core.search_crawl_active());
+    }
+
+    #[tokio::test]
+    async fn a_closing_page_takes_only_its_own_subscriptions() {
+        fn subscription() -> Subscription {
+            Subscription {
+                tasks: Vec::new(),
+                timeline: None,
+                overlay: None,
+                thread_root: None,
+                kind: SubscriptionKind::Other,
+            }
+        }
+
+        let (core, _rx) = Core::new("test", Box::new(store::MemorySessionStore::default()));
+        let old = core.allocate_subscription();
+        core.subscriptions.lock().await.insert(old, subscription());
+        let dropping = core.drop_open_subscriptions();
+
+        let new = core.allocate_subscription();
+        core.subscriptions.lock().await.insert(new, subscription());
+        dropping.await;
+
+        let open = core.subscriptions.lock().await;
+        assert!(!open.contains_key(&old));
+        assert!(open.contains_key(&new));
     }
 
     #[tokio::test]

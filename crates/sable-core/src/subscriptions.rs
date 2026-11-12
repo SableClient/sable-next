@@ -3,7 +3,7 @@ use crate::api::timeline::TimelineFocusView;
 use crate::api::timeline::WarmRoomsParams;
 use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
+    sync::{Arc, atomic::Ordering},
     time::Duration,
 };
 
@@ -1109,6 +1109,24 @@ impl Core {
         warm.push_back(room_id);
         while warm.len() > MAX_WARM_ROOMS {
             warm.pop_front();
+        }
+    }
+
+    /// Call when the page that owns the subscriptions goes away: nothing else unsubscribes for
+    /// it. Only what exists now is dropped, whenever the returned future runs, so the page that
+    /// replaces it keeps what it has subscribed to by then.
+    pub fn drop_open_subscriptions(self: &Arc<Self>) -> impl Future<Output = ()> + use<> {
+        let core = self.clone();
+        let end = self.next_subscription.load(Ordering::Relaxed);
+        async move {
+            let mut subscribed = core.room_subscriptions.lock().await;
+            core.subscriptions
+                .lock()
+                .await
+                .retain(|subscription, _| subscription.0 >= end);
+            if let Err(error) = core.sync_timeline_rooms_locked(&mut subscribed).await {
+                tracing::debug!(?error, "room subscriptions not released");
+            }
         }
     }
 
