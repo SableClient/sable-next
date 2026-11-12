@@ -468,11 +468,15 @@
     const activeRoomId = timelineRoomId;
     if (!activeRoomId) return;
     const targetEventId = timelineEventId;
-    const anchor = untrack(() => {
-      // A loaded event is reached by scrolling, but only while live.
-      const loaded = timeline.items.some((item) => item.event_id === targetEventId);
-      return loaded && timeline.mode.kind === 'live' ? null : targetEventId;
-    });
+    // Read outside `untrack`: the toggle only takes effect by re-subscribing.
+    const hiddenEvents = preferences.showHiddenEvents;
+    // A loaded event is reached by scrolling, in whichever context holds it.
+    const loaded = untrack(
+      () =>
+        targetEventId !== null &&
+        timeline.serves(activeRoomId, hiddenEvents) &&
+        timeline.items.some((item) => item.event_id === targetEventId)
+    );
     appliedEventId = eventId;
     const openAtUnread = untrack(() => {
       if (openedRoomId === activeRoomId) return false;
@@ -484,18 +488,18 @@
         preferences.openRoomsAtUnread
       );
     });
-    // Read outside `untrack`: the toggle only takes effect by re-subscribing.
-    const hiddenEvents = preferences.showHiddenEvents;
-    void untrack(() =>
-      activeTimeline.start(
-        timelineOwner,
-        activeRoomId,
-        anchor,
-        hiddenEvents,
-        openAtUnread,
-        landingEventId
-      )
-    );
+    if (!loaded) {
+      void untrack(() =>
+        activeTimeline.start(
+          timelineOwner,
+          activeRoomId,
+          targetEventId,
+          hiddenEvents,
+          openAtUnread,
+          landingEventId
+        )
+      );
+    }
     void untrack(() => loadMembers());
   });
 

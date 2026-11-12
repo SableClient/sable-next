@@ -120,6 +120,14 @@ export class RoomTimeline {
     return !this.resumingLive && (this.mode.kind === 'live' || this.forwardPagination === 'end');
   }
 
+  serves(roomId: string, hiddenEvents: boolean): boolean {
+    return (
+      this.subscription !== null &&
+      this.target?.roomId === roomId &&
+      this.target.hiddenEvents === hiddenEvents
+    );
+  }
+
   private subscription: SubscriptionId | null = null;
   private target: { roomId: string; mode: TimelineMode; hiddenEvents: boolean } | null = null;
   private unsubscribeEvents: (() => void) | null = null;

@@ -1724,3 +1724,50 @@ test('a reply target can be jumped to again after scrolling away', async ({
   await timeline.waitForScrollSettled();
   await expect(timeline.itemByEventId(target)).toBeInViewport();
 });
+
+test('a reply jump from a permalink context stays on its loaded target', async ({
+  page,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.setViewportSize({ width: 1280, height: 420 });
+  await page.goto(
+    `/rooms/${encodeURIComponent('!room:example.test')}?event=${encodeURIComponent('$general-2:example.test')}`
+  );
+  await timeline.expectRevealed({ timeout: 15_000 });
+  await expect(page.locator('.message.highlighted')).toContainText('General message 2');
+
+  const target = '$general-3:example.test';
+  await core.emitTimelineDiff(await core.subscription(), [
+    {
+      op: 'push_back',
+      value: {
+        ...timelineItem('context-answer', 'Answering from a context'),
+        in_reply_to: {
+          event_id: target,
+          sender: '@bob:example.test',
+          sender_mentioned: false,
+          sender_name: 'Bob',
+          body: 'General message 3',
+          fallback: null,
+        },
+      },
+    },
+  ]);
+  await timeline.scrollToBottomAndNotify();
+  await timeline.waitForScrollSettled();
+
+  await timeline.container
+    .locator('.item')
+    .filter({ hasText: 'Answering from a context' })
+    .locator('.reply-preview')
+    .click();
+
+  await expect.poll(() => new URL(page.url()).searchParams.get('event')).toBe(target);
+  await timeline.waitForScrollSettled();
+  await expect(page.locator('.message.highlighted')).toContainText('General message 3');
+  await expect(timeline.itemByEventId(target)).toBeInViewport();
+  expect(await core.subscribeCount()).toBe(1);
+});
