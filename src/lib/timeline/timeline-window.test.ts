@@ -751,6 +751,16 @@ test('a distant smooth jump animates the last viewport into its rendered destina
   expect(window.state.firstVisible).toBeGreaterThan(900);
 });
 
+test('a smooth jump to a row that cannot leave the latest position keeps following', async () => {
+  const { window } = fixture();
+  await window.update(entries(1000));
+  expect(await window.jumpTo('998', 'center', true)).toBe(true);
+  await vi.advanceTimersByTimeAsync(200);
+  expect(window.state.pinned).toBe(true);
+  await window.update(entries(1001));
+  expect(window.state.lastVisible).toBe(1000);
+});
+
 test('continuous upward scrolling reaches older rows whose measured heights exceed estimates', async () => {
   const { window, viewport } = fixture((value) => (value < 900 ? 200 : 20));
   await window.update(entries(1000));

@@ -470,13 +470,14 @@
     const targetEventId = timelineEventId;
     // Read outside `untrack`: the toggle only takes effect by re-subscribing.
     const hiddenEvents = preferences.showHiddenEvents;
+    const serving = untrack(() => timeline.serves(activeRoomId, hiddenEvents));
+    // A jump inside the open room waits to learn whether its target sits in a thread.
+    if (serving && eventId !== null && resolvedPermalink === null) return;
     // A loaded event is reached by scrolling, in whichever context holds it.
-    const loaded = untrack(
-      () =>
-        targetEventId !== null &&
-        timeline.serves(activeRoomId, hiddenEvents) &&
-        timeline.items.some((item) => item.event_id === targetEventId)
-    );
+    const loaded =
+      serving &&
+      targetEventId !== null &&
+      untrack(() => timeline.items.some((item) => item.event_id === targetEventId));
     appliedEventId = eventId;
     const openAtUnread = untrack(() => {
       if (openedRoomId === activeRoomId) return false;

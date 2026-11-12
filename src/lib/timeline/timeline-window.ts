@@ -345,7 +345,7 @@ export class TimelineWindow<T> {
       this.writeOffset(target + leadIn * Math.max(0, Math.min(viewport.clientHeight, room)));
     }
     this.writeOffset(target, smooth);
-    if (!smooth && this.atEnd(1)) this.pinned = true;
+    if (this.atEnd(1, smooth ? target : undefined)) this.pinned = true;
     if (smooth) this.scheduleSettle();
     this.publish(this.capture());
     if (this.pending) this.scheduleSettle();
