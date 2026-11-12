@@ -12,7 +12,7 @@ except those marked deployment only.
 
 ## Appearance
 
-- `language` (Language): One of `system`, `ar`, `bg`, `cs`, `de`, `en`, `es`, `fi`, `fr`, `hu`, `it`, `mi`, `nl`, `pl`, `pt`, `pt-BR`, `ro`, `ru`, `th`, `tok`, `tr`, `uk`, `zh-Hans`. Default `system`.
+- `language` (Language): One of `system`, `ar`, `bg`, `ca`, `cs`, `de`, `en`, `es`, `fi`, `fr`, `hu`, `it`, `mi`, `nl`, `pl`, `pt`, `pt-BR`, `ro`, `ru`, `th`, `tok`, `tr`, `uk`, `zh-Hans`. Default `system`.
 - `theme` (Light or dark): One of `system`, `dark`, `light`. Default `system`.
 - `underlineLinks` (Always underline links): `true` or `false`. Default `true`.
 - `renderRoomColors` (Use room colours instead of profile colours): `true` or `false`. Default `true`.
