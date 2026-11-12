@@ -736,7 +736,11 @@
       {#if collapsed && full}
         <Tooltip label={name} side="right" trigger={roomTrigger} />
       {:else}
-        {@render roomTrigger({ props: {} })}
+        {#if full && room?.canonical_alias && !room.is_direct}
+          <Tooltip label={room.canonical_alias} side="right" trigger={roomTrigger} />
+        {:else}
+          {@render roomTrigger({ props: {} })}
+        {/if}
         {#if room && full && !collapsed}
           <span class="room-options-slot">
             {#if room.room_kind === 'voice'}

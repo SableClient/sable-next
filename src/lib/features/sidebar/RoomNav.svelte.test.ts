@@ -1176,6 +1176,28 @@ test('hovering a collapsed room row shows its full name in a tooltip', async () 
   vi.useRealTimers();
 });
 
+test('hovering a room row with a published address shows the address in a tooltip', async () => {
+  visit('/rooms');
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!lobby:example.org',
+      name: 'Lobby',
+      canonical_alias: '#lobby:example.org',
+    }),
+  ];
+  await mountNav();
+  await tick();
+
+  vi.useFakeTimers();
+  const hover = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
+  await hover.hover(row('Lobby'));
+  await vi.advanceTimersByTimeAsync(400);
+  await tick();
+
+  expect(document.querySelector('.tooltip')?.textContent.trim()).toBe('#lobby:example.org');
+  vi.useRealTimers();
+});
+
 test('a muted room marked unread by hand keeps its dot and no count', async () => {
   roomsFixture.rooms = [
     makeRoom({
