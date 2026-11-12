@@ -29,6 +29,7 @@ beforeEach(() => {
   Object.assign(core, {
     accounts: [],
     crashed: null,
+    deviceList: [],
     localNetworkBlocked: null,
     verification: null,
   });

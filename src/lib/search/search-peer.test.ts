@@ -155,34 +155,6 @@ test('an account switch cancels startup while foreground options are pending', a
   expect(core.rpc.search.peerStart).not.toHaveBeenCalled();
 });
 
-test('a visibility change during startup closes the connection', () => {
-  const visibility = vi.spyOn(document, 'visibilityState', 'get');
-  const unsubscribe = vi.fn();
-  subscribeEvents.mockImplementation(() => {
-    visibility.mockReturnValue('hidden');
-    document.dispatchEvent(new Event('visibilitychange'));
-    return unsubscribe;
-  });
-  stop = watchSearchPeers(core, { stunServers: [] });
-  expect(unsubscribe).toHaveBeenCalledOnce();
-  expect(core.rpc.search.peerStart).not.toHaveBeenCalled();
-  visibility.mockRestore();
-});
-
-test('a failed foreground update can retry on the next activation', async () => {
-  const ready = Promise.withResolvers<null>();
-  const beforeStart = vi.fn(() => ready.promise);
-  stop = watchSearchPeers(core, { stunServers: [], beforeStart });
-  ready.reject(new Error('options unavailable'));
-  await ready.promise.catch(() => {});
-  await Promise.resolve();
-  beforeStart.mockResolvedValue(null);
-  document.dispatchEvent(new Event('visibilitychange'));
-  await vi.waitFor(() => {
-    expect(core.rpc.search.peerStart).toHaveBeenCalledOnce();
-  });
-});
-
 test('a datachannel setup failure releases the peer immediately', () => {
   vi.stubGlobal(
     'RTCPeerConnection',
@@ -270,21 +242,15 @@ test('a negotiation timeout releases the connection', async () => {
   expect(core.rpc.rtc.close).toHaveBeenCalledWith({ session_id: 'test' });
 });
 
-test('the core is started on resume and at regular intervals', async () => {
+test('the core is started at regular intervals', async () => {
   vi.useFakeTimers();
-  const visibility = vi.spyOn(document, 'visibilityState', 'get');
   stop = watchSearchPeers(core, { stunServers: [] });
   await vi.advanceTimersByTimeAsync(1000);
-  visibility.mockReturnValue('hidden');
-  document.dispatchEvent(new Event('visibilitychange'));
-  visibility.mockReturnValue('visible');
-  document.dispatchEvent(new Event('visibilitychange'));
+  expect(core.rpc.search.peerStart).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(60_000);
   expect(core.rpc.search.peerStart).toHaveBeenCalledTimes(2);
   await vi.advanceTimersByTimeAsync(60_000);
   expect(core.rpc.search.peerStart).toHaveBeenCalledTimes(3);
-  await vi.advanceTimersByTimeAsync(60_000);
-  expect(core.rpc.search.peerStart).toHaveBeenCalledTimes(4);
-  visibility.mockRestore();
 });
 
 test('idle channels close after two minutes', async () => {

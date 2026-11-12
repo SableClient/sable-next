@@ -149,7 +149,7 @@ test('progress names the device being copied from', async () => {
   render(SearchSharingStatus);
   await settle();
 
-  expect(status()).toContain('Copying from MacBook, 3 rooms so far');
+  expect(status()).toContain('Copying from MacBook… 3 of 3 rooms transferred');
 });
 
 test('an unanswered automatic copy says it asks again next time', async () => {

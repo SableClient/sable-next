@@ -98,6 +98,7 @@ except those marked deployment only.
 ## Developer
 
 - `coreLogLevel` (Core console log level): One of `default`, `debug`. Default `default`. Deployment only.
+- `showAlertZoo` (Show alert zoo): `true` or `false`. Default `false`. Deployment only.
 - `developerTools` (Enable developer tools): `true` or `false`. Default `false`. Deployment only.
 - `callStatsOverlay` (Show screen share statistics in calls): `true` or `false`. Default `false`. Deployment only.
 - `callDebugOverlay` (Show call debug information in calls): `true` or `false`. Default `true`. Deployment only.

@@ -813,10 +813,11 @@ mod tests {
     fn only_parts_with_unknown_hashes_are_fetched() {
         let parts = vec![part(0, 0), part(1, 10), part(10, 20)];
         let known = HashSet::from([part(1, 10).sha256]);
-        let (parts, _) =
+        let (parts, first) =
             PartsDownloadState::new("!room:localhost".try_into().unwrap(), parts, None, &known)
                 .unwrap();
-        assert_eq!(parts.missing, [0, 2]);
+        assert_eq!(first, Some(0));
+        assert_eq!(parts.missing, [2]);
         assert!(matches!(
             PartsDownloadState::new(
                 "!room:localhost".try_into().unwrap(),

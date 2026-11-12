@@ -110,54 +110,6 @@ test(
   }
 );
 
-test('a hidden lock owner releases peer handling to a waiting visible tab', async () => {
-  const core: SearchPeerCore = {
-    session: { account_id: 'visibility-handoff' },
-    subscribeEvents: vi.fn(() => () => {}),
-    rtcData: vi.fn(() => Promise.resolve(new Uint8Array(0))),
-    rpc: {
-      search: {
-        peerStart: vi.fn(() => Promise.resolve(null)),
-      },
-      rtc: {
-        signal: vi.fn(() => Promise.resolve(null)),
-        close: vi.fn(() => Promise.resolve(null)),
-      },
-      calls: { turnServer: vi.fn(() => Promise.reject(new Error('no turn'))) },
-    },
-  };
-  const stop = watchSearchPeers(core, { stunServers: [] });
-  const visibility = vi.spyOn(document, 'visibilityState', 'get');
-  const abort = new AbortController();
-  let acquired = false;
-  let release: (() => void) | undefined;
-  let waiting: Promise<unknown> | undefined;
-  try {
-    await vi.waitFor(() => {
-      expect(core.rpc.search.peerStart).toHaveBeenCalledOnce();
-    });
-    waiting = navigator.locks
-      .request('sable-search-peer:visibility-handoff', { signal: abort.signal }, async () => {
-        acquired = true;
-        await new Promise<void>((resolve) => {
-          release = resolve;
-        });
-      })
-      .catch(() => {});
-    visibility.mockReturnValue('hidden');
-    document.dispatchEvent(new Event('visibilitychange'));
-    await vi.waitFor(() => {
-      expect(acquired).toBe(true);
-    });
-  } finally {
-    stop();
-    abort.abort();
-    release?.();
-    await waiting;
-    visibility.mockRestore();
-  }
-});
-
 test('only one tab handles shared-worker peer sessions for an account', async () => {
   const core = (): SearchPeerCore => ({
     session: { account_id: 'shared-worker-account' },

@@ -480,17 +480,12 @@ impl Core {
     pub(crate) async fn refresh_search_peers(&self) {
         if self.search_peer_pause().is_some() {
             self.cancel_search_peers();
-        } else if self.app_in_foreground.load(Ordering::Relaxed) {
-            let was_interrupted = {
-                let state = self.search_sharing.state.lock();
-
-                matches!(state.phase, Phase::Idle)
-                    && state.outcome == Some(SearchPeerOutcome::Interrupted)
-            };
-
-            if was_interrupted {
-                let _ = self.find_search_peers().await;
-            }
+        } else if self.app_in_foreground.load(Ordering::Relaxed) && {
+            let state = self.search_sharing.state.lock();
+            matches!(state.phase, Phase::Idle)
+                && state.outcome == Some(SearchPeerOutcome::Interrupted)
+        } {
+            let _ = self.find_search_peers().await;
         } else {
             self.update_sharing(|_| {});
         }

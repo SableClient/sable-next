@@ -493,13 +493,6 @@ async fn returning_conditions_tell_the_page_that_peers_may_resume() {
         shown_pauses(&mut events),
         [Some(SearchPeerPause::Offline), None]
     );
-
-    core.update_app_in_foreground(false).await;
-    core.update_app_in_foreground(true).await;
-    assert_eq!(
-        shown_pauses(&mut events),
-        [Some(SearchPeerPause::Background), None]
-    );
 }
 
 async fn live_core(

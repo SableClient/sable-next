@@ -643,6 +643,11 @@
           "type": "boolean",
           "default": true
         },
+        "showAlertZoo": {
+          "title": "Show alert zoo",
+          "type": "boolean",
+          "default": false
+        },
         "hour24Clock": {
           "title": "24-hour clock",
           "type": "boolean",
@@ -2087,6 +2092,11 @@
           "title": "Show today’s events in spaces",
           "type": "boolean",
           "default": true
+        },
+        "showAlertZoo": {
+          "title": "Show alert zoo",
+          "type": "boolean",
+          "default": false
         },
         "hour24Clock": {
           "title": "24-hour clock",
