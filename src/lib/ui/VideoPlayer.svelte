@@ -17,6 +17,7 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { animationsPaused } from '#lib/ui/still-frame.js';
+  import { playsVideo } from '#lib/ui/video-codec.js';
   import { videoPlayback } from '#lib/ui/video-playback.js';
   import '#lib/ui/media-size.css';
 
@@ -87,6 +88,21 @@
     }
   });
   let unsupportedUrl = $state<string | null>(null);
+  let checkedUrl = $state<string | null>(null);
+
+  $effect(() => {
+    const current = url;
+    if (current === null) return;
+    let active = true;
+    void playsVideo(current).then((plays) => {
+      if (!active) return;
+      if (!plays) unsupportedUrl = current;
+      checkedUrl = current;
+    });
+    return () => {
+      active = false;
+    };
+  });
   let aspectRatio = $derived(
     typeof width === 'number' &&
       typeof height === 'number' &&
@@ -234,7 +250,7 @@
         {i18n.t('common.download')}
       </LinkButton>
     </span>
-  {:else if url}
+  {:else if url && checkedUrl === url}
     <video
       bind:this={videoElement}
       class="media-content media-video"
@@ -288,7 +304,7 @@
       </span>
     </button>
     {#if size !== null && size > 0}<span class="media-image-size">{formatByteSize(size)}</span>{/if}
-  {:else if !failed && !url && (started || resolving)}
+  {:else if !failed && (!url || checkedUrl !== url) && (started || resolving)}
     <span class="media-loading">
       <span class="media-loading-status">
         <Spinner small />

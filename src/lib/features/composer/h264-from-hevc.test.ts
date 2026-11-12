@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { h264FromHevc, isHevcVideo } from './h264-from-hevc';
+import { h264FromHevc } from './h264-from-hevc';
 
 const ios = vi.hoisted(() => ({ value: true }));
 const rawInvoke = vi.hoisted(() => vi.fn());
@@ -11,16 +11,6 @@ vi.mock('#lib/platform/raw-invoke.js', () => ({ rawInvoke }));
 
 const fixture = (name: string) =>
   new File([readFileSync(new URL(`./fixtures/${name}`, import.meta.url))], name);
-
-describe('isHevcVideo', () => {
-  it('reads the codec of the video track', async () => {
-    expect(await isHevcVideo(fixture('hevc.mov'))).toBe(true);
-    expect(await isHevcVideo(fixture('h264.mp4'))).toBe(false);
-    expect(await isHevcVideo(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'a.png'))).toBe(
-      false
-    );
-  });
-});
 
 describe('h264FromHevc', () => {
   afterEach(() => {

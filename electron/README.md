@@ -71,3 +71,15 @@ It applies to the window and the Sable core. `socks5://` resolves host names on 
 
 Calls use WebRTC over UDP, which SOCKS does not carry. Set Settings → Calls → Network interfaces
 for calls to "Only through a proxy" to keep them off the direct route.
+
+## HEVC video on Linux
+
+Chromium has no software HEVC decoder, so HEVC videos only play when the GPU decodes them through
+VA-API, otherwise the timeline offers a download. Check that the driver decodes HEVC:
+
+```sh
+vainfo 2>/dev/null | grep HEVC | grep VAEntrypointVLD
+```
+
+NVIDIA needs [nvidia-vaapi-driver](https://github.com/elFarto/nvidia-vaapi-driver). If `vainfo`
+lists HEVC but videos still don't play, launch with `--enable-features=VaapiIgnoreDriverChecks`.

@@ -1,18 +1,6 @@
 import { isIos } from '#lib/platform/os.js';
 import { rawInvoke } from '#lib/platform/raw-invoke.js';
-
-export async function isHevcVideo(file: Blob): Promise<boolean> {
-  const { BlobSource, Input, MP4, QTFF } = await import('mediabunny');
-  const input = new Input({ source: new BlobSource(file), formats: [MP4, QTFF] });
-  try {
-    const track = await input.getPrimaryVideoTrack();
-    return (await track?.getCodec()) === 'hevc';
-  } catch {
-    return false;
-  } finally {
-    input.dispose();
-  }
-}
+import { isHevcVideo } from '#lib/ui/video-codec.js';
 
 export async function h264FromHevc(file: File): Promise<File> {
   if (!isIos() || !(await isHevcVideo(file))) return file;

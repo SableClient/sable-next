@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { render } from '@testing-library/svelte';
+import { readFileSync } from 'node:fs';
+
+import { render, screen } from '@testing-library/svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 import { flushed } from '#lib/ui/flushed.js';
 
@@ -82,4 +84,27 @@ test('a video waiting to be played shows how much it will download', () => {
 
   expect(container.querySelector('.media-play')).not.toBeNull();
   expect(container.querySelector('.media-image-size')?.textContent).toBe('5.0 MB');
+});
+
+test.each([
+  { name: 'hevc.mov', canPlay: '', plays: false },
+  { name: 'hevc.mov', canPlay: 'probably', plays: true },
+  { name: 'h264.mp4', canPlay: '', plays: true },
+])('$name with canPlayType "$canPlay" plays: $plays', async ({ name, canPlay, plays }) => {
+  vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue(canPlay as CanPlayTypeResult);
+  const bytes = new Uint8Array(readFileSync(`src/lib/features/composer/fixtures/${name}`));
+  core.fetchMedia.mockResolvedValue(bytes);
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(bytes));
+  render(VideoPlayer, {
+    source: `mxc://example.org/${name}-${canPlay}`,
+    mime: 'video/mp4',
+    filename: name,
+    playback: gif,
+  });
+
+  await vi.waitFor(() => {
+    if (!document.querySelector('video, .media-unsupported')) throw new Error('not checked yet');
+  });
+  expect(document.querySelector('video') !== null).toBe(plays);
+  expect(screen.queryByText(/can't be played on this device/) !== null).toBe(!plays);
 });
