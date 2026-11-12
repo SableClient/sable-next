@@ -1158,7 +1158,7 @@
     width: var(--space-600);
   }
 
-  @media (any-hover: hover) and (any-pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) and (not (any-pointer: coarse)) {
     .room-list:not(.collapsed)
       .room-row-wrap:not(:has(.room-status > *, .voice-live)):is(:hover, :focus-within)
       .room-row,
