@@ -110,7 +110,7 @@
   {#if item.content.kind === 'video' && showCaption && item.content.html}
     <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
   {:else if item.content.kind === 'video' && showCaption && item.content.caption}
-    <p class="body">{item.content.caption}</p>
+    <p class="body" dir="auto">{item.content.caption}</p>
   {/if}
 {:else if item.content.kind === 'redacted'}
   {@const reason = item.content.reason ?? redactionReason}
@@ -165,7 +165,7 @@
       {/snippet}
     </Tooltip>
   {/if}
-  {#if !imageSpoilerHidden && preferences.alwaysShowAltText}<p class="body">
+  {#if !imageSpoilerHidden && preferences.alwaysShowAltText}<p class="body" dir="auto">
       {item.content.body}
     </p>{/if}
 {:else if item.content.kind === 'image'}
@@ -195,9 +195,9 @@
     {#if showCaption && item.content.html}
       <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
     {:else if showCaption && item.content.caption}
-      <p class="body">{item.content.caption}</p>
+      <p class="body" dir="auto">{item.content.caption}</p>
     {:else if !imageSpoilerHidden && !item.content.caption && preferences.alwaysShowAltText}
-      <p class="body">{item.content.filename}</p>
+      <p class="body" dir="auto">{item.content.filename}</p>
     {/if}
   </div>
 {:else if item.content.kind === 'gallery'}
@@ -252,7 +252,7 @@
     {#if showCaption && item.content.html}
       <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
     {:else if showCaption && item.content.caption}
-      <p class="body">{item.content.caption}</p>
+      <p class="body" dir="auto">{item.content.caption}</p>
     {/if}
   </div>
 {/if}
@@ -270,6 +270,7 @@
   .body {
     line-height: var(--line-height-body);
     margin: 0;
+    unicode-bidi: plaintext;
     white-space: pre-wrap;
   }
 

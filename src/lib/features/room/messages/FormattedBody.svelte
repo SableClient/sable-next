@@ -641,6 +641,7 @@
 
 <div
   class="formatted-body"
+  dir="auto"
   {@attach decorate(renderedHtml)}
   {@attach images(renderedHtml, imagesConcealed)}
   {@attach spoilerImages(renderedHtml, imagesConcealed)}
@@ -699,6 +700,16 @@
   .formatted-body {
     /* Relative so inline code keeps its ratio inside a heading too. */
     --inline-code-scale: 0.9em;
+  }
+
+  .formatted-body,
+  .formatted-body :global(:is(p, li, blockquote, h1, h2, h3, h4, h5, h6, td, th)) {
+    unicode-bidi: plaintext;
+  }
+
+  /* WebKit aligns a plaintext li to the list's direction without this. */
+  .formatted-body :global(li) {
+    text-align: start;
   }
 
   .formatted-body,
@@ -887,9 +898,9 @@
   }
 
   .formatted-body :global(blockquote) {
-    border-left: calc(var(--border-width) * 2) solid var(--surface-var-container-line);
+    border-inline-start: calc(var(--border-width) * 2) solid var(--surface-var-container-line);
     margin: var(--space-100) 0;
-    padding-left: var(--space-200);
+    padding-inline-start: var(--space-200);
   }
 
   .formatted-body :global(code:not(pre code)) {
@@ -954,6 +965,7 @@
   /* An expanded block never scrolls vertically: a scroller there would swallow
      the wheel whenever the pointer crossed it, stalling the timeline. */
   .formatted-body :global(pre) {
+    direction: ltr;
     line-height: var(--code-line-height);
     margin: 0;
     overflow: auto hidden;
@@ -1069,7 +1081,7 @@
     border: var(--border-width) solid var(--surface-container-line);
     color: var(--surface-on-container);
     padding: var(--space-050) var(--space-150);
-    text-align: left;
+    text-align: start;
   }
 
   .formatted-body :global(th) {

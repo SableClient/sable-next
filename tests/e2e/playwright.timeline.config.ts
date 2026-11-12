@@ -34,6 +34,7 @@ export default defineConfig({
     'settings-slide.spec.ts',
     'profile-card-status.spec.ts',
     'reply-name-color.spec.ts',
+    'bidi-text.spec.ts',
     'thread-panel.spec.ts',
     'thread-actions.spec.ts',
     'thread-quotes.spec.ts',

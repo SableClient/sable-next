@@ -935,6 +935,21 @@
     display: inline;
   }
 
+  /* Chromium skips an isolate when it picks the line direction, so an inline
+     body must not be one. */
+  .has-receipts,
+  .has-edited,
+  .emote {
+    unicode-bidi: plaintext;
+  }
+
+  .has-receipts :global(.formatted-body),
+  .has-receipts :global(.formatted-body > p:only-child),
+  .has-edited :global(.formatted-body),
+  .emote :global(.formatted-body) {
+    unicode-bidi: normal;
+  }
+
   .has-receipts .receipt-slot {
     inset-block-end: 0;
     inset-inline-end: 0;
@@ -1218,6 +1233,11 @@
 
   .message.layout-bubble .has-receipts :global(.formatted-body) {
     display: inline-block;
+  }
+
+  .message.layout-bubble .has-receipts :global(.formatted-body),
+  .message.layout-bubble .has-edited :global(.formatted-body) {
+    unicode-bidi: plaintext;
   }
 
   .message.layout-bubble .receipt-space,

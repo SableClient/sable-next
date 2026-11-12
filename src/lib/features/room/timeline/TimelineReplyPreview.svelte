@@ -74,7 +74,7 @@
 {#snippet copy()}
   <span class="reply-copy"
     ><SenderName displayName={name} {colors} nameClass="reply-name" compact />
-    <span class="reply-body">{body}</span></span
+    <span class="reply-body" dir="auto">{body}</span></span
   >
 {/snippet}
 
