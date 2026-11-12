@@ -5,7 +5,7 @@ import { sanitize } from './settings';
 test('a partial file preserves valid settings and supplies defaults', () => {
   expect(sanitize({ hardwareAcceleration: false, updateChannel: 'nightly' })).toEqual({
     hardwareAcceleration: false,
-    hardwareVideoEncode: true,
+    hardwareVideoEncode: process.platform !== 'linux',
     hardwareVideoDecode: true,
     smoothScrolling: true,
     webRtcIpPolicy: 'default',

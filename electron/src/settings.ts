@@ -13,7 +13,7 @@ const WEBRTC_IP_POLICIES: readonly WebRtcIpPolicy[] = [
 
 const DEFAULTS = {
   hardwareAcceleration: true,
-  hardwareVideoEncode: true,
+  hardwareVideoEncode: process.platform !== 'linux',
   hardwareVideoDecode: true,
   smoothScrolling: true,
   webRtcIpPolicy: 'default',
