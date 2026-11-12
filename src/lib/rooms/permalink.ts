@@ -1,5 +1,7 @@
 import { serverNameOf } from '#lib/matrix-id.js';
+import { t } from '#lib/i18n.js';
 import { copyText } from '#lib/platform/clipboard.js';
+import { toasts } from '#lib/ui/toasts.svelte.js';
 import { resolve } from '$app/paths';
 
 import type { RoomListItemView } from '#src/generated/protocol';
@@ -152,11 +154,13 @@ export async function copyRoomLink(
       ? []
       : await core.rpc.rooms.viaServers({ room_id: room.room_id });
     await copyText(matrixToUrl(room.canonical_alias ?? room.room_id, via, eventId));
-    return true;
   } catch (error) {
     console.debug('[sable room] copy link failed', error);
+    toasts.error(t('errors.copyFailed'));
     return false;
   }
+  toasts.info(t('timeline.linkCopied'));
+  return true;
 }
 
 /** A room link resolves to a route; a user link has no route of its own. */

@@ -19,7 +19,6 @@
   import type { RoomListItemView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import { toasts } from '#lib/ui/toasts.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { copyRoomLink } from '#lib/rooms/permalink.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
@@ -80,8 +79,7 @@
 
   async function copyLink(): Promise<void> {
     if (!room) return;
-    if (!(await copyRoomLink(core, room))) toasts.error(i18n.t('errors.copyFailed'));
-    else toasts.info(i18n.t('timeline.linkCopied'));
+    await copyRoomLink(core, room);
   }
 </script>
 

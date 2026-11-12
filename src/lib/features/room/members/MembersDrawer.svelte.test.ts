@@ -6,6 +6,7 @@ import { tick, type ComponentProps } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 import type { MemberView } from '#src/generated/protocol';
 import { core } from '#lib/core/__mocks__/context.js';
+import { memberView } from '#lib/test-support/room-views.js';
 import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 
 vi.mock('#lib/core/context.js');
@@ -73,18 +74,12 @@ function renderDrawer(props: Partial<ComponentProps<typeof MembersDrawer>> = {})
 }
 
 function member(name: string, level = 0): MemberView {
-  return {
+  return memberView({
     user_id: `@${name.toLowerCase().replaceAll(' ', '')}:example.org`,
     display_name: name,
     real_name: name,
-    avatar_url: null,
-    real_avatar_url: null,
     power_level: level,
-    membership: 'join',
-    member_ts: null,
-    kicked: false,
-    service: false,
-  };
+  });
 }
 
 async function renderPreview(props: Partial<ComponentProps<typeof MembersDrawer>> = {}) {

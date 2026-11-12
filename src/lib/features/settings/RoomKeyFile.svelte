@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CoreError } from '#src/transport';
+  import { isCoreError } from '#src/transport';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n, t } from '#lib/i18n.js';
   import { pickFiles } from '#lib/platform/files.js';
@@ -31,10 +31,10 @@
   let mismatch = $derived(exportConfirm !== '' && exportConfirm !== exportPassphrase);
 
   function importMessageFor(cause: unknown): string {
-    if (cause instanceof CoreError && cause.detail.code === 'denied') {
+    if (isCoreError(cause, 'denied')) {
       return t('settings.roomKeysWrongPassphrase');
     }
-    if (cause instanceof CoreError && cause.detail.code === 'invalid_key_export') {
+    if (isCoreError(cause, 'invalid_key_export')) {
       return t('settings.roomKeysInvalidFile');
     }
     return t('settings.roomKeysImportFailed');

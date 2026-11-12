@@ -10,7 +10,7 @@
   import { SvelteSet } from 'svelte/reactivity';
 
   import type { DeviceView, EncryptionStatusView } from '#src/generated/protocol';
-  import { CoreError } from '#src/transport';
+  import { CoreError, isCoreError } from '#src/transport';
   import { useCoreClient } from '#lib/core/context.js';
   import { formatDate, formatTime } from '#lib/ui/date-time.js';
   import {
@@ -100,7 +100,7 @@
   }
 
   function recoveryMessageFor(error: unknown): string {
-    if (error instanceof CoreError && error.detail.code === 'denied') {
+    if (isCoreError(error, 'denied')) {
       return t('settings.invalidRecoveryKey');
     }
     return messageFor(error);
@@ -270,7 +270,7 @@
       confirmingReplaceBackup = false;
       await refresh();
     } catch (cause) {
-      if (cause instanceof CoreError && cause.detail.code === 'backup_exists') {
+      if (isCoreError(cause, 'backup_exists')) {
         confirmingReplaceBackup = true;
       } else {
         error = messageFor(cause);

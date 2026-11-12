@@ -24,7 +24,7 @@ import { createMedia } from './media.svelte.js';
 import { invalidatePacks, isPackAccountDataEvent } from '#lib/emoji/load-packs.js';
 import { createTransport } from '#src/transport/create';
 import type { Transport } from '../../transport';
-import { CoreError } from '../../transport';
+import { CoreError, isCoreError } from '../../transport';
 import QuickLRU from 'quick-lru';
 import { on } from 'svelte/events';
 import { deviceDisplayName } from '#lib/deployment/policy.js';
@@ -616,7 +616,7 @@ export class CoreClient {
         return profile;
       })
       .catch((error: unknown) => {
-        const rateLimited = error instanceof CoreError && error.detail.code === 'rate_limited';
+        const rateLimited = isCoreError(error, 'rate_limited');
         const cancelled = error instanceof DOMException && error.name === 'AbortError';
         if (!rateLimited && !cancelled && this.profileRequests.get(userId)?.request === request) {
           this.profileFailures.set(userId, { accountId, error });

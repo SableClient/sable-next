@@ -589,7 +589,7 @@
                     <span class="chip-operator">{chip.negated ? '-' : ''}{chip.operator}:</span>
                     <span class="chip-value">{chipLabel(chip)}</span>
                     {#if isUnresolved(chip)}
-                      <span class="visually-hidden">{i18n.t('search.chipUnresolved')}</span>
+                      <span class="screen-reader-only">{i18n.t('search.chipUnresolved')}</span>
                     {/if}
                   </button>
                   <button
@@ -691,7 +691,7 @@
       </p>
     {/if}
 
-    <p class="announcement" role="status" aria-live="polite">{status}</p>
+    <p class="screen-reader-only" role="status" aria-live="polite">{status}</p>
 
     <div
       class={['results', { refining: search.refining && search.hits.length > 0 }]}
@@ -791,7 +791,7 @@
           {@const room = roomList.byId(group.roomId)}
           {@const label = roomList.labelFor(group.roomId)}
           <section class="group">
-            <h2 class={{ 'visually-hidden': panel && search.groups.length === 1 }}>
+            <h2 class={{ 'screen-reader-only': panel && search.groups.length === 1 }}>
               <Avatar id={group.roomId} src={room?.avatar_url ?? null} name={label} size="small" />
               <span class="group-name">{label}</span>
               <span class="group-count">{group.hits.length}</span>
@@ -1044,15 +1044,6 @@
     color: var(--warn-on-container);
   }
 
-  .visually-hidden {
-    block-size: 1px;
-    clip-path: inset(50%);
-    inline-size: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
-  }
-
   .chip-operator {
     flex: 0 0 auto;
     opacity: 0.75;
@@ -1147,16 +1138,6 @@
     .chip-remove {
       --target: var(--target-hit);
     }
-  }
-
-  .announcement {
-    block-size: 1px;
-    clip-path: inset(50%);
-    inline-size: 1px;
-    margin: 0;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
   }
 
   .count {

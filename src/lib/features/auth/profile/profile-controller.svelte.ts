@@ -14,7 +14,7 @@ import { pronounSets, pronounText } from '#lib/profile/pronouns.js';
 import { t } from '#lib/i18n.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { hexColorOrEmpty } from '#lib/ui/hex-color.js';
-import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
+import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
 
 export function revokeAvatarPreview(preview: string | null): void {
   if (preview) URL.revokeObjectURL(preview);
@@ -185,9 +185,8 @@ export class ProfileController {
         await core.setProfileField(BANNER_FIELD, null);
       }
       if (this.avatarFile) {
-        const upright = await uprightJpeg(this.avatarFile);
-        const bytes = new Uint8Array(await upright.arrayBuffer());
-        await this.options.core.uploadAvatar(upright.type || 'image/*', bytes, propagateTo);
+        const { mime, bytes } = await uprightImageBytes(this.avatarFile);
+        await this.options.core.uploadAvatar(mime, bytes, propagateTo);
       } else if (this.avatarCleared) {
         await this.options.core.rpc.account.setAvatarUrl({ url: null, propagate_to: propagateTo });
       }

@@ -1,19 +1,12 @@
 import type { MemberView } from '#src/generated/protocol';
 import { describe, expect, it } from 'vitest';
 
+import { memberView } from '#lib/test-support/room-views.js';
+
 import { groupMembers, limitGroups, matchesFilter, membershipFor } from './member-listing';
 
 function member(overrides: Partial<MemberView> & { user_id: string }): MemberView {
-  const view = {
-    display_name: null,
-    avatar_url: null,
-    power_level: 0,
-    membership: 'join',
-    member_ts: null,
-    kicked: false,
-    service: false,
-    ...overrides,
-  } as const;
+  const view = memberView(overrides);
   return { ...view, real_name: view.display_name, real_avatar_url: view.avatar_url };
 }
 

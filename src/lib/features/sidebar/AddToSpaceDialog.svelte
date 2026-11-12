@@ -62,7 +62,7 @@
     aria-label={i18n.t('room.addToSpaceSearch')}
   />
   {#if targets.length === 0}
-    <p class="empty">{i18n.t('room.addToSpaceEmpty')}</p>
+    <p class="empty-text empty">{i18n.t('room.addToSpaceEmpty')}</p>
   {:else}
     <ul class="targets" {@attach scrollHint}>
       {#each targets as space (space.room_id)}
@@ -117,9 +117,7 @@
   }
 
   .empty {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: var(--space-400) 0 0;
+    margin-top: var(--space-400);
   }
 
   .actions {

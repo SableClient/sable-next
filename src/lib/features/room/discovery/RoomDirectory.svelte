@@ -24,6 +24,7 @@
   import Pill from '#lib/ui/primitives/Pill.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import SearchField from '#lib/ui/primitives/SearchField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import {
@@ -220,11 +221,9 @@
   {/if}
 
   <form class="filters" onsubmit={submit}>
-    <TextInput
+    <SearchField
       bind:value={search}
-      type="search"
-      autocomplete="off"
-      aria-label={i18n.t('room.directorySearchLabel')}
+      label={i18n.t('room.directorySearchLabel')}
       placeholder={i18n.t('common.searchRooms')}
     />
     <Select

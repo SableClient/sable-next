@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { copyText } from '#lib/platform/clipboard.js';
+  import { Copied } from '#lib/ui/copied.svelte.js';
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
   import type { PresenceView } from '#src/generated/protocol';
@@ -110,14 +110,7 @@
   });
 
   const nameId = $props.id();
-  let copied = $state(false);
-  async function copyUserId(): Promise<void> {
-    await copyText(userId);
-    copied = true;
-    setTimeout(() => {
-      copied = false;
-    }, 2000);
-  }
+  const copied = new Copied();
   function resetStatusScroll(e: { currentTarget: HTMLElement }): void {
     const text = e.currentTarget.querySelector('.profile-card-status-text');
     if (text instanceof HTMLElement && !text.matches(':hover, :focus')) {
@@ -234,16 +227,16 @@
         {#if pronouns}{@render pronouns()}{/if}
         {#if headerAction}{@render headerAction()}{/if}
       </div>
-      <Tooltip label={i18n.t(copied ? 'common.copied' : 'common.copy')}>
+      <Tooltip label={i18n.t(copied.value ? 'common.copied' : 'common.copy')}>
         {#snippet trigger({ props })}
           <button
             {...props}
             class="profile-card-user-id"
             type="button"
-            onclick={() => void copyUserId()}
+            onclick={() => void copied.copy(userId)}
           >
             {userId}
-            {#if copied}
+            {#if copied.value}
               <CheckIcon size="1em" aria-hidden="true" />
             {:else}
               <CopySimpleIcon size="1em" aria-hidden="true" />

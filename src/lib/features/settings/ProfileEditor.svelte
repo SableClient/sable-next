@@ -31,7 +31,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { nativeFilePicker } from '#lib/platform/native-file-picker.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
-  import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
+  import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
   import '#lib/ui/primitives/settings-row.css';
   import './profile-editor.css';
   import SpaceProfileEditor from './SpaceProfileEditor.svelte';
@@ -227,10 +227,8 @@
     uploadingBanner = true;
     error = null;
     try {
-      draft.banner = await core.media.uploadMedia(
-        file.type || 'image/*',
-        new Uint8Array(await file.arrayBuffer())
-      );
+      const { mime, bytes } = await uprightImageBytes(file);
+      draft.banner = await core.media.uploadMedia(mime, bytes);
     } catch {
       error = t('settings.profileSaveFailed');
     } finally {
@@ -326,12 +324,8 @@
         });
       }
       if (avatarFile) {
-        const upright = await uprightJpeg(avatarFile);
-        await core.uploadAvatar(
-          upright.type || 'image/*',
-          new Uint8Array(await upright.arrayBuffer()),
-          preferences.profileChangePropagation
-        );
+        const { mime, bytes } = await uprightImageBytes(avatarFile);
+        await core.uploadAvatar(mime, bytes, preferences.profileChangePropagation);
       } else if (draft.avatarRemoved) {
         await core.rpc.account.setAvatarUrl({
           url: null,

@@ -800,6 +800,26 @@ input[type='checkbox'] {
   width: 1px;
 }
 
+.empty-text {
+  color: var(--surface-var-on-container);
+  font-size: var(--font-size-small);
+  margin: 0;
+}
+
+.scrollbar-hidden {
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
 :focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring);
   outline-offset: var(--focus-ring-offset);

@@ -1,7 +1,7 @@
 import type { LoginFlowsView, RegistrationFlowsView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { t } from '#lib/i18n.js';
-import { CoreError } from '#src/transport';
+import { CoreError, isCoreError } from '#src/transport';
 import { readText } from '#lib/platform/local-json.js';
 import {
   authenticationError,
@@ -114,7 +114,7 @@ export class AuthFlowController {
         this.validatedHomeserver === candidate && this.loginFlows
           ? this.loginFlows
           : await this.core.loginFlows(candidate).catch((value: unknown) => {
-              if (value instanceof CoreError && value.detail.code === 'unsupported') {
+              if (isCoreError(value, 'unsupported')) {
                 return LEGACY_REGISTRATION_FALLBACK;
               }
               throw value;

@@ -2,6 +2,7 @@
   import type { ReplyView } from '#src/generated/protocol';
 
   import '../members/avatar-button.css';
+  import './timeline-highlight.css';
   import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
   import { senderDisplayColors } from '../members/members.js';
   import { previewableLinks } from '../media/link-preview.js';
@@ -810,10 +811,6 @@
     inset-inline: auto var(--page-gutter);
   }
 
-  .message.highlighted {
-    --message-highlight-duration: 2s;
-  }
-
   .message.highlighted:not(.mention-silent, .mention-loud) {
     border-radius: var(--radius);
   }
@@ -861,42 +858,6 @@
   .jumbo-4 {
     font-size: var(--jumbo-size-4);
     line-height: 1.35;
-  }
-
-  @keyframes jump {
-    0% {
-      background-color: var(--primary-container);
-      color: var(--primary-on-container);
-    }
-
-    50% {
-      background-color: var(--primary-container-active);
-      color: var(--primary-on-container);
-    }
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    :global(html:not([data-reduced-motion='on'])) .message.highlighted {
-      animation: jump var(--message-highlight-duration) var(--motion-easing-standard);
-    }
-  }
-
-  @keyframes jump-reduced {
-    0%,
-    99% {
-      background-color: var(--primary-container);
-      color: var(--primary-on-container);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .message.highlighted {
-      animation: jump-reduced var(--message-highlight-duration) steps(1, end);
-    }
-  }
-
-  :global(html[data-reduced-motion='on']) .message.highlighted {
-    animation: jump-reduced var(--message-highlight-duration) steps(1, end);
   }
 
   @media (--app-layout) and (any-hover: hover) and (any-pointer: fine) {

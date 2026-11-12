@@ -1,6 +1,7 @@
 <script lang="ts">
   import PageTitle from '#lib/ui/primitives/PageTitle.svelte';
   import { copyText } from '#lib/platform/clipboard.js';
+  import { Copied } from '#lib/ui/copied.svelte.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
 
@@ -63,16 +64,8 @@
   const pendingUpdate = $derived(supportsAutoUpdate() ? desktopUpdate.update : null);
   const pendingStage = $derived(desktopUpdate.stage);
 
-  let versionCopied = $state(false);
+  const versionCopied = new Copied();
   const dataDir = desktopDataDir().catch(() => null);
-  async function copyVersion(): Promise<void> {
-    await copyText(version);
-    versionCopied = true;
-    setTimeout(() => {
-      versionCopied = false;
-    }, 2000);
-  }
-
   async function resetCaches(): Promise<void> {
     resetting = true;
     resetFailed = false;
@@ -138,16 +131,16 @@
     <div>
       <div class="product-name">
         <h1>{appName()}</h1>
-        <Tooltip label={i18n.t(versionCopied ? 'common.copied' : 'common.copy')}>
+        <Tooltip label={i18n.t(versionCopied.value ? 'common.copied' : 'common.copy')}>
           {#snippet trigger({ props })}
             <button
               {...props}
               class="version-copy-button"
               type="button"
-              onclick={() => void copyVersion()}
+              onclick={() => void versionCopied.copy(version)}
             >
               {version}
-              {#if versionCopied}
+              {#if versionCopied.value}
                 <CheckIcon size="1em" aria-hidden="true" />
               {:else}
                 <CopySimpleIcon size="1em" aria-hidden="true" />

@@ -11,7 +11,7 @@
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
-  import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import SearchField from '#lib/ui/primitives/SearchField.svelte';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   import MessagePreview from './messages/MessagePreview.svelte';
@@ -102,12 +102,7 @@
         </Button>
       {/each}
     </div>
-    <TextInput
-      type="search"
-      bind:value={query}
-      placeholder={i18n.t('room.notificationsSearch')}
-      aria-label={i18n.t('room.notificationsSearch')}
-    />
+    <SearchField bind:value={query} label={i18n.t('room.notificationsSearch')} />
   </div>
 
   <div class="list notifications-list" {@attach scrollHint}>

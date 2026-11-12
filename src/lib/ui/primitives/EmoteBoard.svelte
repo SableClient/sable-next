@@ -712,7 +712,7 @@
       }}
       {@attach focusSearch}
     />
-    <span class="sr-only" role="status">{enterTarget}</span>
+    <span class="screen-reader-only" role="status">{enterTarget}</span>
     {#if !gifTab && sections.length > 0}
       <p class="pack-visibility">{i18n.t('composer.packMediaVisibility')}</p>
     {/if}
@@ -891,7 +891,10 @@
         {/key}
       </div>
 
-      <nav class={['rail', { hidden: searching }]} aria-label={i18n.t('composer.packs')}>
+      <nav
+        class={['rail', 'scrollbar-hidden', { hidden: searching }]}
+        aria-label={i18n.t('composer.packs')}
+      >
         {#if frequentCells.length > 0}
           {@const frequentLabel = i18n.t('timeline.frequentlyUsed')}
           <Tooltip label={frequentLabel}>
@@ -1052,7 +1055,6 @@
     gap: var(--space-200);
     overflow-y: auto;
     overscroll-behavior: contain;
-    scrollbar-width: none;
   }
 
   .rail-divider {
@@ -1200,15 +1202,6 @@
 
   .rail.hidden {
     display: none;
-  }
-
-  .sr-only {
-    clip-path: inset(50%);
-    height: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
-    width: 1px;
   }
 
   .free-text {

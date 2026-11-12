@@ -179,7 +179,7 @@
         <h3 id="security-devices-title">{i18n.t('timeline.profileDevices')}</h3>
         <p class="security-note">{i18n.t('timeline.profileDevicePolicy')}</p>
         {#if security.devices.length === 0}
-          <p class="security-empty">{i18n.t('timeline.profileNoDevices')}</p>
+          <p class="empty-text">{i18n.t('timeline.profileNoDevices')}</p>
         {:else}
           <ul class="security-devices">
             {#each security.devices as device (device.device_id)}
@@ -265,7 +265,6 @@
 
   .security-header :global(p),
   .security-note,
-  .security-empty,
   code {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
@@ -287,8 +286,7 @@
     place-items: center;
   }
 
-  .security-note,
-  .security-empty {
+  .security-note {
     margin: 0;
   }
 

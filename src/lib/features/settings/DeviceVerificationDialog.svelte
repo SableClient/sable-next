@@ -185,7 +185,7 @@
   <Dialog.Title class="verification-title" tabindex={-1} bind:ref={title}>
     {i18n.t(selfVerification ? 'settings.verification' : 'settings.userVerification')}
   </Dialog.Title>
-  <p class="visually-hidden" role="status">{liveMessage}</p>
+  <p class="screen-reader-only" role="status">{liveMessage}</p>
   {#if core.verification}
     {#if core.verification.state.phase === 'requested'}
       {#if core.verification.state.initiated_by_us}
@@ -354,15 +354,6 @@
     margin-bottom: var(--space-300);
   }
 
-  .visually-hidden {
-    block-size: 1px;
-    clip-path: inset(50%);
-    inline-size: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
-  }
-
   .emoji {
     display: flex;
     flex-wrap: wrap;
@@ -427,12 +418,6 @@
   .decimals {
     font-feature-settings: 'tnum';
     font-weight: var(--font-weight-bold);
-  }
-
-  @keyframes pulse {
-    50% {
-      opacity: 0.3;
-    }
   }
 
   @media (width >= 42rem) {

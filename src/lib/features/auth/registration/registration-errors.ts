@@ -1,4 +1,4 @@
-import { CoreError } from '#src/transport';
+import { CoreError, isCoreError } from '#src/transport';
 import { t } from '#lib/i18n.js';
 import { LocalNetworkBlockedError } from '#lib/platform/local-network.js';
 
@@ -58,10 +58,10 @@ export function registrationError(value: unknown): string {
 }
 
 export function registrationHomeserverError(value: unknown): string {
-  if (value instanceof CoreError && value.detail.code === 'sliding_sync_unsupported') {
+  if (isCoreError(value, 'sliding_sync_unsupported')) {
     return authenticationError(value);
   }
-  if (value instanceof CoreError && value.detail.code === 'unsupported') {
+  if (isCoreError(value, 'unsupported')) {
     return t('errors.registrationUnavailable');
   }
   return t('errors.homeserverNotFound');

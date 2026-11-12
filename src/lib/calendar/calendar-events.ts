@@ -1,5 +1,6 @@
 import type { CalendarItem, Frequency, RsvpStatusView } from '#src/generated/protocol';
 
+import { DAY_MS, startOfDay } from '#lib/day.js';
 import { buildCalendarEvent, calendarWallTimes } from '#lib/model/model.js';
 
 export type { CalendarItem, Frequency } from '#src/generated/protocol';
@@ -11,7 +12,6 @@ export const RSVP_EVENT = 'moe.sable.calendar.rsvp';
 export type RsvpStatus = RsvpStatusView;
 
 const LOCAL_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
-const DAY = 86_400_000;
 
 export interface Occurrence {
   item: CalendarItem;
@@ -75,7 +75,7 @@ export function epochToLocal(epoch: number): string {
 
 /** A wall time past every start before `to` in `timeZone`, with a day to spare for its offset. */
 function wallTimeAfter(to: number, timeZone: string | null): string | null {
-  const after = to + DAY;
+  const after = to + DAY_MS;
   if (timeZone === null) return epochToLocal(after);
   try {
     return new Date(after + zoneOffset(after, timeZone)).toISOString().slice(0, 19);
@@ -101,11 +101,6 @@ function occurrences(item: CalendarItem, from: number, to: number): Occurrence[]
   return found;
 }
 
-export function startOfDay(at: number, daysAhead = 0): number {
-  const date = new Date(at);
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + daysAhead).getTime();
-}
-
 export function agenda(items: readonly CalendarItem[], from: number, to: number): Occurrence[] {
   return items
     .flatMap((item) => occurrences(item, from, to))
@@ -125,8 +120,7 @@ export function monthGrid(monthStart: number, firstDay: number): number[] {
 }
 
 export function occursOn(occurrence: Occurrence, day: number): boolean {
-  const date = new Date(day);
-  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
+  const next = startOfDay(day, 1);
   return occurrence.start < next && Math.max(occurrence.end, occurrence.start + 1) > day;
 }
 

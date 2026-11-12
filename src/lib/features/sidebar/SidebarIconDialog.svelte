@@ -5,7 +5,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
-  import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
+  import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
 
   export interface IconTarget {
     id: string;
@@ -38,11 +38,8 @@
     busy = true;
     failed = false;
     try {
-      const upright = await uprightJpeg(file);
-      icon = await core.media.uploadMedia(
-        upright.type || 'image/*',
-        new Uint8Array(await upright.arrayBuffer())
-      );
+      const { mime, bytes } = await uprightImageBytes(file);
+      icon = await core.media.uploadMedia(mime, bytes);
     } catch (error) {
       console.warn('[sable nav] icon upload failed', error);
       failed = true;

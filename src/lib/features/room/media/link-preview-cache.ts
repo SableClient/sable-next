@@ -1,6 +1,6 @@
 import QuickLRU from 'quick-lru';
 
-import { CoreError } from '#src/transport';
+import { isCoreError } from '#src/transport';
 
 import { runtimeConfig } from '#lib/config/runtime-config.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -32,7 +32,7 @@ export function loadUrlPreview(
     ? { url, client, service, klipy_api_key: klipyApiKey }
     : { url, service: null };
   const request = messages.urlPreview(params).catch((error: unknown) => {
-    if (!client && error instanceof CoreError && error.detail.code === 'unsupported') {
+    if (!client && isCoreError(error, 'unsupported')) {
       homeserverPreviews = false;
     }
     console.warn('[sable link preview] unavailable', url, error);

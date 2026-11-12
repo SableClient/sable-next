@@ -54,7 +54,7 @@ import { visit } from '#lib/test-support/app-state.js';
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
-import { withCounts } from '#lib/rooms/summary-fixtures.js';
+import { roomView } from '#lib/test-support/room-views.js';
 const notificationSettings =
   vi.fn<(params: { room_id: string }) => Promise<NotificationSettingsView>>();
 Object.assign(core.rpc.notifications, { settings: notificationSettings });
@@ -92,33 +92,10 @@ import RoomNavHarness from './RoomNavHarness.test.svelte';
 const realObserver = globalThis.IntersectionObserver;
 
 function makeRoom(overrides: Partial<RoomListItemView>): RoomListItemView {
-  return withCounts({
-    room_id: '!room:example.org',
-    canonical_alias: null,
-    name: null,
-    topic: null,
-    topic_html: null,
-    avatar_url: null,
-    is_direct: false,
-    direct_targets: [],
-    join_rule: 'invite',
-    tags: [],
-    state: 'joined',
-    encrypted: null,
-    is_tombstoned: false,
-    call_participants: [],
-    screen_sharers: [],
-    room_kind: 'text',
+  return roomView({
     supports_knock: true,
     supports_restricted: true,
     supports_knock_restricted: true,
-    space_children: [],
-    bridge: null,
-    unread: 0,
-    notifying: 0,
-    highlight: 0,
-    marked_unread: false,
-    latest_event: null,
     ...overrides,
   });
 }

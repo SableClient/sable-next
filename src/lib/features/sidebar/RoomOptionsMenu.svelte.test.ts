@@ -7,36 +7,12 @@ import { expect, test, vi } from 'vitest';
 import type { RoomListItemView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { createCoreStub } from '#lib/core/__mocks__/context.js';
+import { roomView } from '#lib/test-support/room-views.js';
 
 import RoomOptionsMenuHarness from './RoomOptionsMenuHarness.test.svelte';
 
 function room(roomId: string, overrides: Partial<RoomListItemView> = {}): RoomListItemView {
-  return {
-    room_id: roomId,
-    canonical_alias: null,
-    name: roomId,
-    topic: null,
-    avatar_url: null,
-    is_direct: false,
-    direct_targets: [],
-    join_rule: 'invite',
-    tags: [],
-    state: 'joined',
-    encrypted: null,
-    is_tombstoned: false,
-    call_participants: [],
-    screen_sharers: [],
-    room_kind: 'text',
-    supports_knock: false,
-    supports_restricted: false,
-    space_children: [],
-    unread: 0,
-    notifying: 0,
-    highlight: 0,
-    marked_unread: false,
-    latest_event: null,
-    ...overrides,
-  } as RoomListItemView;
+  return roomView({ room_id: roomId, name: roomId, ...overrides });
 }
 
 test('keeps Add to space visible while the room list refreshes', async () => {

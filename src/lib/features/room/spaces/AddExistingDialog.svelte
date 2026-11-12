@@ -56,7 +56,7 @@
       aria-label={i18n.t('room.lobbyAddSearch')}
     />
     {#if candidates.length === 0}
-      <p class="empty">
+      <p class="empty-text">
         {search.trim() === '' ? i18n.t('room.lobbyAddNothing') : i18n.t('common.noRoomsMatch')}
       </p>
     {:else}
@@ -96,12 +96,6 @@
   h2 {
     font-size: var(--font-size-heading);
     line-height: var(--line-height-heading);
-    margin: 0;
-  }
-
-  .empty {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
     margin: 0;
   }
 

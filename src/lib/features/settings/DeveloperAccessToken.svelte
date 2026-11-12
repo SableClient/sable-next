@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { copyText } from '#lib/platform/clipboard.js';
+  import { Copied } from '#lib/ui/copied.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -8,22 +8,16 @@
   import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
-  let copied = $state(false);
+  const copied = new Copied();
   let error = $state(false);
 
   async function copyToken(): Promise<void> {
     try {
       const token = await core.rpc.session.accessToken();
       if (!token) throw new Error('No access token');
-      await copyText(token);
-      copied = true;
-      error = false;
-      setTimeout(() => {
-        copied = false;
-      }, 2000);
+      error = !(await copied.copy(token, undefined, { toastOnError: false }));
     } catch {
       error = true;
-      copied = false;
     }
   }
 </script>
@@ -36,7 +30,7 @@
       onclick={() => void copyToken()}
       disabled={!core.session}
     >
-      {i18n.t(copied ? 'common.copied' : 'settings.developerAccessTokenCopy')}
+      {i18n.t(copied.value ? 'common.copied' : 'settings.developerAccessTokenCopy')}
     </Button>
   </SettingsRow>
 </ul>

@@ -391,12 +391,6 @@
     }
   }
 
-  @keyframes pulse {
-    50% {
-      opacity: 0.3;
-    }
-  }
-
   @media (width >= 42rem) {
     .qr-link {
       width: min(26rem, calc(100vw - 3rem));

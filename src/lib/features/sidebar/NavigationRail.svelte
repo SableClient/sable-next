@@ -905,7 +905,7 @@
   oncontextmenu={mouseContextMenu(openDisplayMenu)}
 >
   <div
-    class="rail-scroll"
+    class="rail-scroll scrollbar-hidden"
     role="tree"
     data-focus-region="spaces"
     aria-orientation="vertical"
@@ -1232,11 +1232,6 @@
     flex: 1;
     min-height: 0;
     overflow: hidden auto;
-    scrollbar-width: none;
-  }
-
-  .rail-scroll::-webkit-scrollbar {
-    display: none;
   }
 
   .rail-separator {

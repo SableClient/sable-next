@@ -7,7 +7,7 @@
     RoomListItemView,
   } from '#src/generated/protocol';
 
-  import { CoreError } from '#src/transport';
+  import { isCoreError } from '#src/transport';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -44,6 +44,7 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import '#lib/ui/primitives/settings-row.css';
+  import SearchField from '#lib/ui/primitives/SearchField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import {
@@ -243,7 +244,7 @@
       console.warn('[sable room] member action failed', error);
       await load();
       failed = true;
-      denied = error instanceof CoreError && error.detail.code === 'denied';
+      denied = isCoreError(error, 'denied');
     } finally {
       busy = null;
     }
@@ -370,13 +371,9 @@
   </div>
 
   <div class="search">
-    <TextInput
+    <SearchField
       bind:value={search}
-      type="search"
-      placeholder={canInviteInline
-        ? i18n.t('room.membersSearchOrInvite')
-        : i18n.t('timeline.searchMembers')}
-      aria-label={canInviteInline
+      label={canInviteInline
         ? i18n.t('room.membersSearchOrInvite')
         : i18n.t('timeline.searchMembers')}
     />
@@ -714,11 +711,6 @@
     align-items: center;
     display: flex;
     gap: var(--space-200);
-  }
-
-  .search > :global(.text-input) {
-    flex: 1;
-    min-width: 0;
   }
 
   .user-id {

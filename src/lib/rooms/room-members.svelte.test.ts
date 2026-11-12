@@ -2,23 +2,14 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { MemberView } from '#src/generated/protocol';
 
+import { memberView } from '#lib/test-support/room-views.js';
+
 import { MEMBER_RETRY_DELAYS_MS, RoomMemberLoader } from './room-members.svelte';
 
 afterEach(() => vi.useRealTimers());
 
 function member(userId: string, displayName: string | null = null): MemberView {
-  return {
-    user_id: userId,
-    display_name: displayName,
-    real_name: displayName,
-    real_avatar_url: null,
-    avatar_url: null,
-    power_level: 0,
-    membership: 'join',
-    member_ts: null,
-    kicked: false,
-    service: false,
-  };
+  return memberView({ user_id: userId, display_name: displayName, real_name: displayName });
 }
 
 function deferred<T>() {

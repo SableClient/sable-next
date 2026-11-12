@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { copyText } from '#lib/platform/clipboard.js';
+  import { Copied } from '#lib/ui/copied.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormActions from '#lib/ui/primitives/FormActions.svelte';
-  import { toasts } from '#lib/ui/toasts.svelte.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
@@ -22,17 +21,7 @@
     original = null,
     encryption = null,
   }: Props = $props();
-  let copied = $state(false);
-
-  async function copy(): Promise<void> {
-    try {
-      await copyText(source);
-      copied = true;
-    } catch (error) {
-      console.debug('[sable timeline] clipboard unavailable', error);
-      toasts.error(i18n.t('errors.actionFailed'));
-    }
-  }
+  const copied = new Copied();
 </script>
 
 <DialogFrame bind:open variant="verification" label={i18n.t('timeline.sourceTitle')}>
@@ -50,8 +39,8 @@
     <pre class="source" {@attach scrollHint}>{encryption}</pre>
   {/if}
   <FormActions>
-    <Button variant="secondary" onclick={copy}>
-      {copied ? i18n.t('common.copied') : i18n.t('common.copy')}
+    <Button variant="secondary" onclick={() => void copied.copy(source)}>
+      {copied.value ? i18n.t('common.copied') : i18n.t('common.copy')}
     </Button>
     <Button
       variant="ghost"

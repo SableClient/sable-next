@@ -1,24 +1,15 @@
 import type { ImagePackView, MemberView, RoomListItemView } from '#src/generated/protocol';
 import { expect, test } from 'vitest';
 
+import { memberView } from '#lib/test-support/room-views.js';
+
 import type { AutocompleteQuery } from './autocomplete';
 import { parseBotCommand } from './bot-commands';
 import { rememberSuggestion } from './suggestion-usage';
 import { suggestionsFor, type PackEmote } from './suggestions';
 
 function member(userId: string, displayName: string | null): MemberView {
-  return {
-    user_id: userId,
-    display_name: displayName,
-    real_name: displayName,
-    real_avatar_url: null,
-    avatar_url: null,
-    power_level: 0,
-    membership: 'join' as const,
-    member_ts: null,
-    kicked: false,
-    service: false,
-  };
+  return memberView({ user_id: userId, display_name: displayName, real_name: displayName });
 }
 
 function emote(shortcode: string, name = 'Pack'): PackEmote {

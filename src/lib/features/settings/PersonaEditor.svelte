@@ -25,7 +25,7 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { hexColorOrEmpty } from '#lib/ui/hex-color.js';
   import ColorSetting from '#lib/ui/ColorSetting.svelte';
-  import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
+  import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
   import Select from '#lib/ui/primitives/Select.svelte';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
   import BioEditor from './BioEditor.svelte';
@@ -90,11 +90,8 @@
     saving = true;
     error = null;
     try {
-      const upright = await uprightJpeg(file);
-      avatarUrl = await core.media.uploadMedia(
-        upright.type || 'image/*',
-        new Uint8Array(await upright.arrayBuffer())
-      );
+      const { mime, bytes } = await uprightImageBytes(file);
+      avatarUrl = await core.media.uploadMedia(mime, bytes);
     } catch (cause) {
       console.warn('[sable personas] uploading the picture failed', cause);
       error = i18n.t('personas.saveFailed');
@@ -139,11 +136,8 @@
     saving = true;
     error = null;
     try {
-      const upright = await uprightJpeg(file);
-      alternateAvatars[index].avatar_url = await core.media.uploadMedia(
-        upright.type || 'image/*',
-        new Uint8Array(await upright.arrayBuffer())
-      );
+      const { mime, bytes } = await uprightImageBytes(file);
+      alternateAvatars[index].avatar_url = await core.media.uploadMedia(mime, bytes);
     } catch (cause) {
       console.warn('[sable personas] uploading the picture failed', cause);
       error = i18n.t('personas.saveFailed');
@@ -160,11 +154,8 @@
     saving = true;
     error = null;
     try {
-      const upright = await uprightJpeg(file);
-      banner_url = await core.media.uploadMedia(
-        upright.type || 'image/*',
-        new Uint8Array(await upright.arrayBuffer())
-      );
+      const { mime, bytes } = await uprightImageBytes(file);
+      banner_url = await core.media.uploadMedia(mime, bytes);
     } catch (cause) {
       console.warn('[sable personas] uploading the picture failed', cause);
       error = i18n.t('personas.saveFailed');

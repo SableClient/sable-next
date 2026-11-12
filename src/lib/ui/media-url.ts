@@ -1,6 +1,6 @@
 import QuickLRU from 'quick-lru';
 
-import { CoreError } from '#src/transport';
+import { CoreError, isCoreError } from '#src/transport';
 import { mediaFailureHold } from '#lib/ui/media-retry.js';
 import { imageMime, mediaMime } from '#lib/media-signatures.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -310,13 +310,13 @@ export function loadMediaUrl(
     });
   pending.set(key, request);
   void request.catch((error: unknown) => {
-    if (error instanceof CoreError && error.detail.code === 'media_server_unavailable') {
+    if (isCoreError(error, 'media_server_unavailable')) {
       refused.set(key, Date.now() + error.detail.retry_after_ms, {
         maxAge: error.detail.retry_after_ms,
       });
       return;
     }
-    if (error instanceof CoreError && error.detail.code === 'media_not_found') {
+    if (isCoreError(error, 'media_not_found')) {
       missing.set(key, true);
       return;
     }

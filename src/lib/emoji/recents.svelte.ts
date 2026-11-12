@@ -1,9 +1,9 @@
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { DAY_MS } from '#lib/day.js';
 import { parseShortcodes } from '#lib/emoji/recent-packs.svelte.js';
 import { readJson, removeLocalValue } from '#lib/platform/local-json.js';
 
 export const REACTION_HISTORY_EVENT = 'm.recent_emoji';
-const DAY_MS = 86_400_000;
 
 export class RecentReactions {
   current = $state.raw<string[]>([]);

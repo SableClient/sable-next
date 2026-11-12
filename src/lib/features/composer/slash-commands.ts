@@ -6,7 +6,7 @@ import type {
   SlashInvocation,
   Rpc,
 } from '#src/generated/protocol';
-import { CoreError } from '#src/transport';
+import { isCoreError } from '#src/transport';
 
 import { knockRoom, openDirectMessage } from '#lib/core/api/rooms.js';
 import type { E2eePolicy } from '#lib/deployment/e2ee-policy.js';
@@ -219,7 +219,7 @@ async function addWidget(
   try {
     await rpc.room_state.addWidget({ room_id: roomId, name: widget.name, url: widget.url });
   } catch (error) {
-    if (error instanceof CoreError && error.detail.code === 'invalid_url') {
+    if (isCoreError(error, 'invalid_url')) {
       return usageError(name);
     }
     throw error;

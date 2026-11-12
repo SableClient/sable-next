@@ -263,6 +263,7 @@
     {@attach keepActiveCardCentred}
     class={[
       'rail',
+      'scrollbar-hidden',
       { 'motion-ready': motionReady, 'is-navigating': isNavigating, 'is-dragging': swipe.dragging },
     ]}
     style:height={activeCardHeight === null
@@ -370,13 +371,8 @@
     position: relative;
     scroll-padding-inline: calc((100% - var(--auth-card-width)) / 2);
     scroll-snap-type: x proximity;
-    scrollbar-width: none;
     width: 100%;
     z-index: 1;
-  }
-
-  .rail::-webkit-scrollbar {
-    display: none;
   }
 
   .rail.is-navigating {

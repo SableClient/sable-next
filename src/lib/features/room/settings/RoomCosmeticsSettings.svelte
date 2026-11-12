@@ -24,7 +24,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
-  import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
+  import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
 
   import { senderDisplayColors } from '../members/members';
   import SenderName from '../members/SenderName.svelte';
@@ -192,9 +192,8 @@
     event.currentTarget.value = '';
     if (!file) return;
     void save('avatar', async (target) => {
-      const upright = await uprightJpeg(file);
-      const bytes = new Uint8Array(await upright.arrayBuffer());
-      const uri = await core.media.uploadMedia(upright.type || 'image/*', bytes);
+      const { mime, bytes } = await uprightImageBytes(file);
+      const uri = await core.media.uploadMedia(mime, bytes);
       await writeMember(target, { avatar_url: field(uri) });
       avatar = uri;
     });

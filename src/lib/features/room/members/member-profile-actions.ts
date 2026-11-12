@@ -1,11 +1,11 @@
 import { copyText } from '#lib/platform/clipboard.js';
 import { t } from '#lib/i18n.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { CoreError } from '#src/transport';
+import { isCoreError } from '#src/transport';
 import { openExternalUrl, opensExternalUrls } from '#lib/platform/external-links.js';
 
 export function moderationErrorMessage(cause: unknown): string {
-  return cause instanceof CoreError && cause.detail.code === 'denied'
+  return isCoreError(cause, 'denied')
     ? t('timeline.profileModerationDenied')
     : t('timeline.profileModerationFailed');
 }

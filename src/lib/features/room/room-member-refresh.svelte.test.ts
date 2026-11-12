@@ -3,23 +3,13 @@
 import { flushSync } from 'svelte';
 import { expect, test, vi } from 'vitest';
 import type { CoreEvent, MemberView } from '#src/generated/protocol';
+import { memberView } from '#lib/test-support/room-views.js';
 import { refreshRoomMembers } from './room-member-refresh.svelte.js';
 
 const ROOM = '!room:example.org';
 
 function member(userId: string): MemberView {
-  return {
-    user_id: userId,
-    display_name: null,
-    avatar_url: null,
-    real_name: null,
-    real_avatar_url: null,
-    power_level: 0,
-    membership: 'join',
-    member_ts: 1,
-    kicked: false,
-    service: false,
-  };
+  return memberView({ user_id: userId, member_ts: 1 });
 }
 
 function setup(members: Pick<MemberView, 'user_id'>[] = []) {

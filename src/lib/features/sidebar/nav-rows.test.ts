@@ -2,15 +2,12 @@ import { expect, test } from 'vitest';
 
 import type { RoomListItemView } from '#src/generated/protocol';
 
+import { roomView } from '#lib/test-support/room-views.js';
+
 import { roomRow } from './nav-rows.js';
 
 function room(roomId: string, overrides: Partial<RoomListItemView> = {}): RoomListItemView {
-  return {
-    room_id: roomId,
-    tags: [],
-    latest_event: null,
-    ...overrides,
-  } as unknown as RoomListItemView;
+  return roomView({ room_id: roomId, ...overrides });
 }
 
 test('a room keeps the same row while its summary object is unchanged', () => {

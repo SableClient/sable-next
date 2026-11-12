@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { startOfDay } from '#lib/day.js';
   import { resolve } from '$app/paths';
   import type { RoomListItemView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
@@ -9,7 +10,6 @@
   import {
     agenda,
     readEntries,
-    startOfDay,
     type CalendarItem,
     type Occurrence,
   } from '#lib/calendar/calendar-events.js';

@@ -24,7 +24,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
-  import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
+  import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
 
   import '#lib/ui/primitives/settings-row.css';
 
@@ -381,9 +381,8 @@
     iconUploading = true;
     roleFailed = false;
     try {
-      const upright = await uprightJpeg(file);
-      const bytes = new Uint8Array(await upright.arrayBuffer());
-      roleIconDraft = await core.media.uploadMedia(upright.type || 'image/*', bytes);
+      const { mime, bytes } = await uprightImageBytes(file);
+      roleIconDraft = await core.media.uploadMedia(mime, bytes);
     } catch (error) {
       console.warn('[sable room] role icon upload failed', error);
       roleFailed = true;

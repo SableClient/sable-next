@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { startOfDay } from '#lib/day.js';
   import { untrack } from 'svelte';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -39,13 +40,8 @@
     return `${date}T${time}`;
   }
 
-  function startOfDay(daysAgo: number): number {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo).getTime();
-  }
-
   function setDay(daysAgo: number): void {
-    value = localInput(startOfDay(daysAgo));
+    value = localInput(startOfDay(Date.now(), -daysAgo));
     outcome = null;
   }
 

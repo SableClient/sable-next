@@ -31,6 +31,7 @@
   } from '#lib/features/room/room-navigation.js';
   import RoomSettingsDialog from '#lib/features/room/settings/RoomSettingsDialog.svelte';
   import type { RoomSettingsSectionId } from '#lib/features/room/settings/room-settings-sections.js';
+  import { DAY_MS, startOfDay, startOfMonth } from '#lib/day.js';
   import { formatDate, formatTime } from '#lib/ui/date-time.js';
   import { currentLocale, i18n } from '#lib/i18n.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -54,21 +55,14 @@
     monthGrid,
     occursOn,
     readEntries,
-    startOfDay,
     tallyRsvps,
   } from '#lib/calendar/calendar-events.js';
   import CalendarEventDialog from './CalendarEventDialog.svelte';
 
-  const DAY = 86_400_000;
-  const WINDOW = 365 * DAY;
+  const WINDOW = 365 * DAY_MS;
   const STATUSES: readonly RsvpStatus[] = ['accepted', 'tentative', 'declined'];
   const CHIPS = 3;
   const DOTS = 3;
-
-  function startOfMonth(at: number): number {
-    const date = new Date(at);
-    return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
-  }
 
   function firstWeekday(): number {
     return { sunday: 0, monday: 1, saturday: 6 }[preferences.weekStart];
@@ -122,7 +116,7 @@
 
   let grid = $derived(monthGrid(monthStart, firstWeekday()));
   let gridOccurrences = $derived(
-    agenda(items, grid[0] ?? monthStart, startOfDay(grid.at(-1) ?? monthStart) + 2 * DAY)
+    agenda(items, grid[0] ?? monthStart, startOfDay(grid.at(-1) ?? monthStart, 2))
   );
   let activeDay = $derived(
     pickedDay ?? (startOfMonth(now) === monthStart ? startOfDay(now) : monthStart)
@@ -240,8 +234,7 @@
   }
 
   function moveMonth(by: number): void {
-    const date = new Date(monthStart);
-    monthStart = new Date(date.getFullYear(), date.getMonth() + by, 1).getTime();
+    monthStart = startOfMonth(monthStart, by);
     pickedDay = null;
   }
 

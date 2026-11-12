@@ -1,6 +1,6 @@
 <script lang="ts">
   import { appName } from '#lib/deployment/brand.js';
-  import { copyText } from '#lib/platform/clipboard.js';
+  import { Copied } from '#lib/ui/copied.svelte.js';
   import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
@@ -33,7 +33,7 @@
   let error = $state<string | null>(null);
   let confirming = $state<string | null>(null);
   let removing = $state<string | null>(null);
-  let copied = $state<string | null>(null);
+  const copied = new Copied<string>();
   let ownApps = $state.raw<string[]>([]);
   let ownKey = $state<string | null>(null);
   let section = $state<HTMLElement>();
@@ -124,11 +124,7 @@
   }
 
   async function copyValue(id: string, value: string): Promise<void> {
-    await copyText(value);
-    copied = id;
-    setTimeout(() => {
-      if (copied === id) copied = null;
-    }, 2000);
+    await copied.copy(value, id);
   }
 
   async function remove(pusher: RegisteredPusherView): Promise<void> {
@@ -289,7 +285,7 @@
                       aria-label={i18n.t('settings.pushersCopyAppId')}
                       onclick={() => void copyValue(`app\u0000${key}`, pusher.app_id)}
                     >
-                      {#if copied === `app\u0000${key}`}
+                      {#if copied.value === `app\u0000${key}`}
                         {i18n.t('common.copied')}
                       {:else}
                         <code>{pusher.app_id}</code>
@@ -306,7 +302,7 @@
                       aria-label={i18n.t('settings.pushersCopyKey')}
                       onclick={() => void copyValue(`key\u0000${key}`, pusher.pushkey)}
                     >
-                      {#if copied === `key\u0000${key}`}
+                      {#if copied.value === `key\u0000${key}`}
                         {i18n.t('common.copied')}
                       {:else}
                         <code>{pusher.pushkey}</code>
@@ -323,7 +319,7 @@
                       class="pusher-gateway"
                       type="button"
                       aria-label={i18n.t(
-                        copied === `gateway\u0000${key}`
+                        copied.value === `gateway\u0000${key}`
                           ? 'common.copied'
                           : 'settings.pushersCopyProvider'
                       )}
@@ -333,14 +329,14 @@
                       <span class="pusher-gateway-copy">
                         <span class="pusher-gateway-label">
                           {i18n.t(
-                            copied === `gateway\u0000${key}`
+                            copied.value === `gateway\u0000${key}`
                               ? 'common.copied'
                               : 'settings.pushersProvider'
                           )}
                         </span>
                         <code>{gateway}</code>
                       </span>
-                      {#if copied === `gateway\u0000${key}`}
+                      {#if copied.value === `gateway\u0000${key}`}
                         <CheckIcon class="pusher-gateway-action" weight="bold" aria-hidden="true" />
                       {:else}
                         <CopyIcon class="pusher-gateway-action" aria-hidden="true" />

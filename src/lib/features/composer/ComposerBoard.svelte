@@ -334,7 +334,7 @@
   {#each triggers as id (id)}
     {@render boardSlot(id)}
   {/each}
-  {#if reorderable}<span class="sr-only" role="status">{announcement}</span>{/if}
+  {#if reorderable}<span class="screen-reader-only" role="status">{announcement}</span>{/if}
 {/snippet}
 
 {#if desktop}
@@ -500,14 +500,5 @@
 
   :global(.composer-board-slot.is-reorderable button) {
     cursor: grab;
-  }
-
-  .sr-only {
-    clip-path: inset(50%);
-    height: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
-    width: 1px;
   }
 </style>

@@ -212,7 +212,7 @@
       {/each}
     </ul>
   {:else if entries.length === 0}
-    <p class="empty">{i18n.t('settings.developerPushRulesEmpty')}</p>
+    <p class="empty-text">{i18n.t('settings.developerPushRulesEmpty')}</p>
   {:else}
     <ul class="rule-list" {@attach scrollHint}>
       {#each entries as entry (`${entry.kind}/${entry.rule.rule_id}`)}
@@ -347,8 +347,7 @@
     gap: var(--space-300);
   }
 
-  .description,
-  .empty {
+  .description {
     font-size: var(--font-size-small);
     margin: 0;
   }

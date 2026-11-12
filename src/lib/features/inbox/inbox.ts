@@ -6,6 +6,7 @@ import type {
   RoomListItemView,
 } from '#src/generated/protocol';
 
+import { DAY_MS, startOfDay } from '#lib/day.js';
 import { formatTime } from '#lib/ui/date-time.js';
 import { currentLocale } from '#lib/i18n.js';
 import { hasUnread, type RoomUnread, roomUnread } from '#lib/rooms/unread.js';
@@ -169,16 +170,10 @@ export function filteredBookmarks(
     .sort((left, right) => right.bookmarked_ts - left.bookmarked_ts);
 }
 
-const DAY_MS = 86_400_000;
-
-function startOfDay(date: Date): number {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-}
-
 export function formatCompactTimestamp(timestamp: number, now: number = Date.now()): string {
   const date = new Date(timestamp);
   const today = new Date(now);
-  const days = Math.round((startOfDay(today) - startOfDay(date)) / DAY_MS);
+  const days = Math.round((startOfDay(now) - startOfDay(timestamp)) / DAY_MS);
   if (days <= 0) return formatTime(timestamp);
   if (days < 7) return date.toLocaleDateString(currentLocale(), { weekday: 'short' });
   return date.toLocaleDateString(currentLocale(), {

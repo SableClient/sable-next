@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { BookmarkView } from '#src/generated/protocol';
   import { tick } from 'svelte';
-  import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
@@ -9,7 +8,7 @@
   import { useBookmarks } from '#lib/rooms/bookmarks.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import SearchField from '#lib/ui/primitives/SearchField.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { DisplayNames } from './display-names.svelte';
@@ -80,20 +79,14 @@
   />
 
   {#if bookmarks.entries.length > 1}
-    <label
+    <div
       class="search"
       {@attach (node) => {
         if (standalone) node.querySelector('input')?.focus();
       }}
     >
-      <MagnifyingGlassIcon aria-hidden="true" />
-      <span class="screen-reader-only">{i18n.t('inbox.bookmarksSearchLabel')}</span>
-      <TextInput
-        type="search"
-        bind:value={query}
-        placeholder={i18n.t('inbox.bookmarksSearchLabel')}
-      />
-    </label>
+      <SearchField bind:value={query} label={i18n.t('inbox.bookmarksSearchLabel')} />
+    </div>
   {/if}
 
   {#if bookmarks.entries.length === 0}
@@ -159,17 +152,7 @@
 
 <style>
   .search {
-    align-items: center;
-    display: flex;
-    gap: var(--space-300);
     margin-bottom: var(--space-300);
-  }
-
-  .search :global(svg) {
-    color: var(--surface-var-on-container);
-    flex: 0 0 auto;
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
   }
 
   .feed {

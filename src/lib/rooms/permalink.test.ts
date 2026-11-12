@@ -1,9 +1,11 @@
 import { afterEach, assert, expect, test, vi } from 'vitest';
 
+vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
+
 import type { RoomListItemView } from '#src/generated/protocol';
 
 import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
-import { withCounts } from '#lib/rooms/summary-fixtures.js';
+import { roomView } from '#lib/test-support/room-views.js';
 
 import {
   copyRoomLink,
@@ -18,33 +20,13 @@ import {
 } from './permalink';
 
 function room(roomId: string, overrides: Partial<RoomListItemView> = {}): RoomListItemView {
-  return withCounts({
+  return roomView({
     room_id: roomId,
-    canonical_alias: null,
     name: roomId,
-    topic: null,
-    topic_html: null,
-    avatar_url: null,
-    is_direct: false,
-    direct_targets: [],
     join_rule: 'public',
-    tags: [],
-    state: 'joined',
-    encrypted: null,
-    is_tombstoned: false,
-    room_kind: 'text',
-    call_participants: [],
-    screen_sharers: [],
     supports_knock: true,
     supports_restricted: true,
     supports_knock_restricted: true,
-    space_children: [],
-    bridge: null,
-    unread: 0,
-    notifying: 0,
-    highlight: 0,
-    marked_unread: false,
-    latest_event: null,
     ...overrides,
   });
 }

@@ -2,7 +2,7 @@ import { on } from 'svelte/events';
 import { uint8ArrayToBase64 } from 'uint8array-extras';
 
 import type { QrLoginFailureView, QrLoginProgressView } from '#src/generated/protocol';
-import { CoreError } from '#src/transport';
+import { isCoreError } from '#src/transport';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { isAndroid } from '#lib/platform/os.js';
@@ -155,7 +155,7 @@ export class QrFlow {
     } catch (error) {
       console.warn('[sable qr] QR sign-in step failed', error);
       void this.cancel();
-      const denied = error instanceof CoreError && error.detail.code === 'denied';
+      const denied = isCoreError(error, 'denied');
       this.progress = { stage: 'failed', reason: denied ? 'wrong_code' : 'other' };
       return false;
     } finally {

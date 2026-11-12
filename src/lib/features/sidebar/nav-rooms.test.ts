@@ -2,22 +2,12 @@ import { expect, test, vi } from 'vitest';
 
 import type { RoomListItemView, RpcParams, Rpc } from '#src/generated/protocol';
 
+import { roomView } from '#lib/test-support/room-views.js';
+
 import { claimedRoomIds, isActiveSpace, markRoomUnread, markRoomsRead } from './nav-rooms.js';
 
 function room(overrides: Partial<RoomListItemView>): RoomListItemView {
-  return {
-    room_id: '!r',
-    is_direct: false,
-    direct_targets: [],
-    state: 'joined',
-    is_tombstoned: false,
-    space_children: [],
-    unread: 0,
-    notifying: 0,
-    highlight: 0,
-    latest_event: null,
-    ...overrides,
-  } as unknown as RoomListItemView;
+  return roomView({ room_id: '!r', ...overrides });
 }
 
 test('only joined spaces claim their children', () => {

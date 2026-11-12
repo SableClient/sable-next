@@ -4,9 +4,9 @@ import { render } from 'vitest-browser-svelte';
 
 import type { NotificationModeView, RoomListItemView } from '#src/generated/protocol';
 
-import { withCounts } from '#lib/rooms/summary-fixtures.js';
 import { roomNotifications, roomUnread } from '#lib/rooms/unread.js';
 import { expectNoA11yViolations, ICONS_HIDDEN_BY_LAYOUT } from '#lib/test-support/a11y.js';
+import { roomView } from '#lib/test-support/room-views.js';
 
 const roomsFixture = vi.hoisted(() => {
   const fixture = {
@@ -63,32 +63,10 @@ afterEach(async () => {
 });
 
 function room(overrides: Partial<RoomListItemView>): RoomListItemView {
-  return withCounts({
-    room_id: '!room:example.org',
-    canonical_alias: null,
-    name: null,
-    topic: null,
-    topic_html: null,
-    avatar_url: null,
-    is_direct: false,
-    direct_targets: [],
-    join_rule: 'invite',
-    tags: [],
-    state: 'joined',
-    encrypted: null,
-    is_tombstoned: false,
-    call_participants: [],
-    screen_sharers: [],
-    room_kind: 'text',
+  return roomView({
     supports_knock: true,
     supports_restricted: true,
     supports_knock_restricted: true,
-    space_children: [],
-    bridge: null,
-    unread: 0,
-    notifying: 0,
-    highlight: 0,
-    marked_unread: false,
     latest_event: { sender: null, body: 'hi', timestamp: 1, sending: false, event_id: null },
     ...overrides,
   });

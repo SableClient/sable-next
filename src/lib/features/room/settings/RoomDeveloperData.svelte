@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { copyText } from '#lib/platform/clipboard.js';
+  import { Copied } from '#lib/ui/copied.svelte.js';
   import type {
     RoomPermissionsView,
     RoomPowerLevelsView,
@@ -29,12 +29,11 @@
   let data = $state('');
   let loading = $state(false);
   let failed = $state(false);
-  let copied = $state(false);
+  const copied = new Copied();
 
   async function load(): Promise<void> {
     loading = true;
     failed = false;
-    copied = false;
     try {
       data = await collectRoomDebugData(
         core.rpc,
@@ -51,14 +50,7 @@
   }
 
   async function copy(): Promise<void> {
-    failed = false;
-    try {
-      await copyText(data);
-      copied = true;
-    } catch (error) {
-      console.warn('[sable room] copying debug data failed', error);
-      failed = true;
-    }
+    failed = !(await copied.copy(data, undefined, { toastOnError: false }));
   }
 
   async function download(): Promise<void> {
@@ -94,7 +86,7 @@
       </Button>
       {#if data}
         <Button variant="secondary" disabled={loading} onclick={() => void copy()}>
-          {i18n.t(copied ? 'common.copied' : 'room.devDataCopy')}
+          {i18n.t(copied.value ? 'common.copied' : 'room.devDataCopy')}
         </Button>
         <Button variant="secondary" disabled={loading} onclick={() => void download()}>
           {i18n.t('room.devDataDownload')}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { copyText } from '#lib/platform/clipboard.js';
+  import { Copied } from '#lib/ui/copied.svelte.js';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
 
@@ -8,7 +8,6 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
-  import { toasts } from '#lib/ui/toasts.svelte.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   const MAX_HIGHLIGHT_CHARS = 100_000;
@@ -26,7 +25,7 @@
 
   let text = $state<string | null>(null);
   let open = $state(false);
-  let copied = $state(false);
+  const copied = new Copied();
   let html = $state<string | null>(null);
   let previewHtml = $state<string | null>(null);
 
@@ -97,13 +96,7 @@
 
   async function copy(): Promise<void> {
     if (text === null) return;
-    try {
-      await copyText(text);
-      copied = true;
-    } catch (error) {
-      console.debug('[sable media] clipboard unavailable', error);
-      toasts.error(i18n.t('errors.actionFailed'));
-    }
+    await copied.copy(text);
   }
 </script>
 
@@ -141,7 +134,7 @@
         {i18n.t('common.download')}
       </LinkButton>
       <Button variant="primary" size="small" onclick={copy}>
-        {copied ? i18n.t('common.copied') : i18n.t('timeline.copyAll')}
+        {copied.value ? i18n.t('common.copied') : i18n.t('timeline.copyAll')}
       </Button>
     </header>
     <div class="text-viewer-scroll" {@attach scrollHint}>

@@ -270,8 +270,7 @@
   }
 
   async function copyLink(): Promise<void> {
-    if (!(await copyRoomLink(core, room))) toasts.error(i18n.t('errors.copyFailed'));
-    else toasts.info(i18n.t('timeline.linkCopied'));
+    await copyRoomLink(core, room);
   }
 
   async function copyId(): Promise<void> {

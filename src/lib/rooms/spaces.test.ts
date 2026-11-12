@@ -12,36 +12,13 @@ import {
   spacesContaining,
   spacesContainingRoom,
 } from './spaces';
-import { withCounts } from '#lib/rooms/summary-fixtures.js';
+import { roomView } from '#lib/test-support/room-views.js';
 
 function room(overrides: Partial<RoomListItemView>): RoomListItemView {
-  return withCounts({
-    room_id: '!room:example.org',
-    canonical_alias: null,
-    name: null,
-    topic: null,
-    topic_html: null,
-    avatar_url: null,
-    is_direct: false,
-    direct_targets: [],
-    join_rule: 'invite',
-    tags: [],
-    state: 'joined',
-    encrypted: null,
-    room_kind: 'text',
-    is_tombstoned: false,
-    call_participants: [],
-    screen_sharers: [],
+  return roomView({
     supports_knock: true,
     supports_restricted: true,
     supports_knock_restricted: true,
-    space_children: [],
-    bridge: null,
-    unread: 0,
-    notifying: 0,
-    highlight: 0,
-    marked_unread: false,
-    latest_event: null,
     ...overrides,
   });
 }

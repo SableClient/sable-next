@@ -73,6 +73,13 @@ export class CoreError extends Error {
   }
 }
 
+export function isCoreError<C extends RpcError['code']>(
+  value: unknown,
+  code: C
+): value is CoreError & { detail: Extract<RpcError, { code: C }> } {
+  return value instanceof CoreError && value.detail.code === code;
+}
+
 /**
  * Sentry turns `console.error` and `console.warn` into events, and the core
  * already reports a failure, so the report goes out on levels it leaves alone.

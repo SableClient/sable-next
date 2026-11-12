@@ -57,7 +57,7 @@
       aria-label={i18n.t('common.searchRooms')}
     />
     {#if targets.length === 0}
-      <p class="empty">{i18n.t('common.noRoomsMatch')}</p>
+      <p class="empty-text">{i18n.t('common.noRoomsMatch')}</p>
     {:else}
       <RoomChecklist
         class="targets"
@@ -76,7 +76,7 @@
       />
     </div>
     {#if metadataLocked}
-      <p class="empty">{i18n.t('timeline.forwardMetadataPreserved')}</p>
+      <p class="empty-text">{i18n.t('timeline.forwardMetadataPreserved')}</p>
     {/if}
 
     <div class="actions">
@@ -103,12 +103,6 @@
   h2 {
     font-size: var(--font-size-heading);
     line-height: var(--line-height-heading);
-    margin: 0;
-  }
-
-  .empty {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
     margin: 0;
   }
 

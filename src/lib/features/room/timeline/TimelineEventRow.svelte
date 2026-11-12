@@ -1,5 +1,6 @@
 <script lang="ts">
   import '#lib/ui/primitives/menu.css';
+  import './timeline-highlight.css';
   import MessageActions from '../messages/MessageActions.svelte';
   import MessageReactions from '../messages/MessageReactions.svelte';
   import { TimelineRow, type TimelineItemProps } from './timeline-row.svelte';
@@ -189,45 +190,7 @@
   }
 
   .message.highlighted {
-    --message-highlight-duration: 2s;
-
     border-radius: var(--radius);
-  }
-
-  @keyframes jump {
-    0% {
-      background-color: var(--primary-container);
-      color: var(--primary-on-container);
-    }
-
-    50% {
-      background-color: var(--primary-container-active);
-      color: var(--primary-on-container);
-    }
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    :global(html:not([data-reduced-motion='on'])) .message.highlighted {
-      animation: jump var(--message-highlight-duration) var(--motion-easing-standard);
-    }
-  }
-
-  @keyframes jump-reduced {
-    0%,
-    99% {
-      background-color: var(--primary-container);
-      color: var(--primary-on-container);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .message.highlighted {
-      animation: jump-reduced var(--message-highlight-duration) steps(1, end);
-    }
-  }
-
-  :global(html[data-reduced-motion='on']) .message.highlighted {
-    animation: jump-reduced var(--message-highlight-duration) steps(1, end);
   }
 
   @media (hover: hover) and (pointer: fine) {

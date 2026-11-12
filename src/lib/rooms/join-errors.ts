@@ -1,4 +1,4 @@
-import { CoreError } from '#src/transport';
+import { CoreError, isCoreError } from '#src/transport';
 import { t } from '#lib/i18n.js';
 
 export function bannedMessage(reason: string | null): string {
@@ -6,7 +6,7 @@ export function bannedMessage(reason: string | null): string {
 }
 
 export function isBanned(cause: unknown): boolean {
-  return cause instanceof CoreError && cause.detail.code === 'banned';
+  return isCoreError(cause, 'banned');
 }
 
 export function joinErrorMessage(cause: unknown): string {

@@ -3,42 +3,14 @@ import { expect, test } from 'vitest';
 import type { RoomListItemView, SpaceChildEdge } from '#src/generated/protocol';
 
 import { joinedSpaceChildrenLeaveOrder, recursiveSpaceLeaveOrder } from './space-leave-order';
-import { withCounts } from '#lib/rooms/summary-fixtures.js';
+import { roomView } from '#lib/test-support/room-views.js';
 
 function edge(roomId: string): SpaceChildEdge {
   return { room_id: roomId, via: [], order: null, origin_server_ts: 0, suggested: false };
 }
 
 function room(roomId: string, overrides: Partial<RoomListItemView> = {}): RoomListItemView {
-  return withCounts({
-    room_id: roomId,
-    canonical_alias: null,
-    name: roomId,
-    topic: null,
-    topic_html: null,
-    avatar_url: null,
-    is_direct: false,
-    direct_targets: [],
-    join_rule: 'invite',
-    tags: [],
-    state: 'joined',
-    encrypted: null,
-    is_tombstoned: false,
-    call_participants: [],
-    screen_sharers: [],
-    room_kind: 'text',
-    supports_knock: false,
-    supports_restricted: false,
-    supports_knock_restricted: false,
-    space_children: [],
-    bridge: null,
-    unread: 0,
-    notifying: 0,
-    highlight: 0,
-    marked_unread: false,
-    latest_event: null,
-    ...overrides,
-  });
+  return roomView({ room_id: roomId, name: roomId, ...overrides });
 }
 
 test('leaves rooms before their space, deepest first', () => {

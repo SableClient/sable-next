@@ -103,7 +103,7 @@
 
   <div class="settings-form account-data-body">
     {#if types.length === 0}
-      <p class="empty">{i18n.t('settings.developerAccountDataEmpty')}</p>
+      <p class="empty-text">{i18n.t('settings.developerAccountDataEmpty')}</p>
     {:else}
       <ul class="event-list" {@attach scrollHint}>
         {#each [...types].sort() as type (type)}
@@ -180,11 +180,6 @@
   .editor {
     display: grid;
     gap: var(--space-300);
-  }
-
-  .empty {
-    font-size: var(--font-size-small);
-    margin: 0;
   }
 
   .settings {

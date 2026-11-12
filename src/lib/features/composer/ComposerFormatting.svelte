@@ -100,7 +100,7 @@
 </script>
 
 <div
-  class="formatting"
+  class="formatting scrollbar-hidden"
   role="group"
   aria-label={i18n.t('composer.formatting')}
   onwheel={scrollSideways}
@@ -170,11 +170,6 @@
     min-width: 0;
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    scrollbar-width: none;
-  }
-
-  .formatting::-webkit-scrollbar {
-    display: none;
   }
 
   :global(.format-button) {

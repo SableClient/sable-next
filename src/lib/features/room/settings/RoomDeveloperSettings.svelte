@@ -22,6 +22,7 @@
 
   import '#lib/ui/primitives/settings-row.css';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
+  import SearchField from '#lib/ui/primitives/SearchField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   interface Props {
@@ -179,12 +180,7 @@
       {/if}
       {#if stateTypes.length > 0}
         <div class="settings-form">
-          <TextInput
-            type="search"
-            bind:value={typeFilter}
-            placeholder={i18n.t('room.devBrowserFilter')}
-            aria-label={i18n.t('room.devBrowserFilter')}
-          />
+          <SearchField bind:value={typeFilter} label={i18n.t('room.devBrowserFilter')} />
         </div>
         <ul class="settings-rows">
           {#each shownTypes as [type, keys] (type)}

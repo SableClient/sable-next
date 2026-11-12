@@ -53,7 +53,7 @@
               viewing = item.id;
             }}
           />
-          <span class="staged-name">{item.file.name}</span>
+          <span class="staged-name screen-reader-only">{item.file.name}</span>
           <IconButton
             variant="ghost"
             size="small"
@@ -188,15 +188,6 @@
   .staged-media {
     overflow: hidden;
     width: 5.5rem;
-  }
-
-  .staged-media .staged-name {
-    clip-path: inset(50%);
-    height: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
-    width: 1px;
   }
 
   .staged-file {

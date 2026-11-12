@@ -9,37 +9,10 @@ import {
   unreadRoomAtOffset,
   unreadRoomsByPriority,
 } from './room-jump';
-import { withCounts } from '#lib/rooms/summary-fixtures.js';
+import { roomView } from '#lib/test-support/room-views.js';
 
 function room(overrides: Partial<RoomListItemView> & { room_id: string }): RoomListItemView {
-  return withCounts({
-    canonical_alias: null,
-    name: null,
-    topic: null,
-    topic_html: null,
-    avatar_url: null,
-    is_direct: false,
-    direct_targets: [],
-    join_rule: 'invite',
-    tags: [],
-    state: 'joined',
-    encrypted: null,
-    is_tombstoned: false,
-    call_participants: [],
-    screen_sharers: [],
-    room_kind: 'text',
-    supports_knock: false,
-    supports_restricted: false,
-    supports_knock_restricted: false,
-    space_children: [],
-    bridge: null,
-    unread: 0,
-    notifying: 0,
-    highlight: 0,
-    marked_unread: false,
-    latest_event: null,
-    ...overrides,
-  });
+  return roomView(overrides);
 }
 
 function latest(timestamp: number): RoomListItemView['latest_event'] {

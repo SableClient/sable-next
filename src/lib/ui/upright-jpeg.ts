@@ -35,3 +35,10 @@ export async function uprightJpeg(file: Blob): Promise<Blob> {
     return file;
   }
 }
+
+export async function uprightImageBytes(
+  file: Blob
+): Promise<{ mime: string; bytes: Uint8Array<ArrayBuffer> }> {
+  const upright = await uprightJpeg(file);
+  return { mime: upright.type || 'image/*', bytes: new Uint8Array(await upright.arrayBuffer()) };
+}

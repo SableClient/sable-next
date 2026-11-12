@@ -25,6 +25,7 @@ import {
 } from './slash-commands';
 
 import { testPersona } from '#lib/personas/persona.ts';
+import { memberView } from '#lib/test-support/room-views.js';
 
 function fakeCommands() {
   return {
@@ -857,18 +858,7 @@ test('/usepmp latches a profile and resets it', async () => {
 });
 
 function member(userId: string, membership: MemberView['membership'] = 'join'): MemberView {
-  return {
-    user_id: userId,
-    display_name: null,
-    real_name: null,
-    real_avatar_url: null,
-    avatar_url: null,
-    power_level: 0,
-    membership,
-    member_ts: null,
-    kicked: false,
-    service: false,
-  };
+  return memberView({ user_id: userId, membership });
 }
 
 test('/pronoun sets and resets your room pronouns', async () => {

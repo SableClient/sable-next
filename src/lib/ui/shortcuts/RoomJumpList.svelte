@@ -73,7 +73,7 @@
   />
   <p class="hint">{i18n.t('shortcuts.paletteHint')}</p>
   {#if results.length === 0}
-    <p class="empty">{i18n.t('shortcuts.paletteEmpty')}</p>
+    <p class="empty-text empty">{i18n.t('shortcuts.paletteEmpty')}</p>
   {:else}
     {#if heading}<p class="heading">{heading}</p>{/if}
     <ul
@@ -194,9 +194,7 @@
   }
 
   .empty {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: var(--space-400) 0 0;
+    margin-top: var(--space-400);
     text-align: center;
   }
 </style>

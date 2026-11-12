@@ -6,7 +6,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n, t } from '#lib/i18n.js';
   import { saveBytes } from '#lib/platform/files.js';
-  import { CoreError } from '#src/transport';
+  import { isCoreError } from '#src/transport';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -43,7 +43,7 @@
       });
       confirmingReplaceBackup = false;
     } catch (cause) {
-      if (cause instanceof CoreError && cause.detail.code === 'backup_exists') {
+      if (isCoreError(cause, 'backup_exists')) {
         confirmingReplaceBackup = true;
       } else {
         error = t('settings.actionFailed');

@@ -194,10 +194,7 @@
       core,
       { room_id: resolvedRoomId, canonical_alias: resolvedRoom?.canonical_alias ?? null },
       eventId
-    ).then((copied) => {
-      if (!copied) toasts.error(i18n.t('errors.copyFailed'));
-      else toasts.info(i18n.t('timeline.linkCopied'));
-    });
+    );
   }
 
   function canDeleteThread(thread: (typeof forumThreads.threads)[number]): boolean {

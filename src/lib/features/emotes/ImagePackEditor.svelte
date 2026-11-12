@@ -26,7 +26,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { holdUnsaved } from '#lib/ui/unsaved-guard.js';
-  import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
+  import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
 
   import {
     ALL_USAGES,
@@ -192,9 +192,8 @@
     avatarUploading = true;
     failed = false;
     try {
-      const upright = await uprightJpeg(file);
-      const bytes = new Uint8Array(await upright.arrayBuffer());
-      const avatarUrl = await core.media.uploadMedia(upright.type || 'image/*', bytes);
+      const { mime, bytes } = await uprightImageBytes(file);
+      const avatarUrl = await core.media.uploadMedia(mime, bytes);
       await onApply?.({ ...$state.snapshot(saved), avatar_url: avatarUrl });
       if (draft !== null) draft = { ...draft, avatar_url: avatarUrl };
     } catch (error) {

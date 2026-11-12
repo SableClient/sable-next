@@ -2,7 +2,6 @@
   import { isPlainClick } from '#lib/ui/plain-click.js';
   import { resolve } from '$app/paths';
   import type { Snippet } from 'svelte';
-  import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -19,7 +18,7 @@
     settingsContext,
   } from '#lib/settings/registry.js';
   import SettingsNav from '#lib/ui/primitives/SettingsNav.svelte';
-  import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import SearchField from '#lib/ui/primitives/SearchField.svelte';
   import SettingsShell, { type SettingsShellNav } from './SettingsShell.svelte';
   import { findStandaloneSection, settingsNavGroups } from './sections.js';
   import { defaultSettingsSection } from './settings-navigation';
@@ -84,19 +83,11 @@
 
 {#snippet nav(state: SettingsShellNav)}
   <div class="settings-search">
-    <label class="screen-reader-only" for="settings-search-input">
-      {i18n.t('settings.searchLabel')}
-    </label>
-    <div class="search-field">
-      <MagnifyingGlassIcon aria-hidden="true" />
-      <TextInput
-        id="settings-search-input"
-        type="search"
-        bind:value={query}
-        placeholder={i18n.t('settings.searchPlaceholder')}
-        autocomplete="off"
-      />
-    </div>
+    <SearchField
+      bind:value={query}
+      label={i18n.t('settings.searchLabel')}
+      placeholder={i18n.t('settings.searchPlaceholder')}
+    />
     <p class={['search-summary', { active: trimmedQuery !== '' }]} aria-live="polite">
       {#if trimmedQuery}
         {results.length > 0
@@ -196,38 +187,13 @@
     padding: 0 var(--space-200) var(--space-300);
   }
 
-  .search-field {
-    align-items: center;
-    background: var(--surface-container);
-    border: var(--border-width) solid var(--surface-container-line);
-    border-radius: var(--radius);
-    display: flex;
-    gap: var(--space-300);
-    min-height: var(--control-height-medium);
-    padding: 0 var(--space-300);
-  }
-
-  .search-field :global(svg) {
-    color: var(--surface-on-container);
-    flex: 0 0 auto;
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
-  }
-
-  .search-field:focus-within {
-    border-color: var(--primary-main);
-    box-shadow: inset 0 0 0 var(--border-width-600) var(--primary-main);
-  }
-
-  .search-field :global(.text-input) {
+  .settings-search :global(.text-input) {
     --form-control-container: var(--surface-container);
     --form-control-container-line: var(--surface-container-line);
     --form-control-color: var(--surface-on-container);
 
-    background: transparent;
-    box-shadow: none;
+    border-radius: var(--radius);
     min-height: var(--control-height-medium);
-    padding: 0;
   }
 
   .search-summary {

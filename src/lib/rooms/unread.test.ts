@@ -2,19 +2,12 @@ import { expect, test } from 'vitest';
 
 import type { RoomListItemView } from '#src/generated/protocol';
 
-import { withCounts } from './summary-fixtures';
+import { roomView } from '#lib/test-support/room-views.js';
+
 import { hasUnread, roomNotifications, roomUnread } from './unread';
 
 function room(overrides: Partial<RoomListItemView> = {}): RoomListItemView {
-  return withCounts({
-    room_id: '!room:example.org',
-    is_direct: false,
-    unread: 0,
-    notifying: 0,
-    highlight: 0,
-    marked_unread: false,
-    ...overrides,
-  } as RoomListItemView);
+  return roomView(overrides);
 }
 
 test('the inbox counts what notified, not what is unread', () => {

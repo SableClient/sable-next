@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { DAY_MS, HOUR_MS } from '#lib/day.js';
   import { untrack } from 'svelte';
 
   import { i18n } from '#lib/i18n.js';
@@ -21,8 +22,6 @@
     localToEpoch,
   } from '#lib/calendar/calendar-events.js';
 
-  const HOUR = 3_600_000;
-  const DAY = 86_400_000;
   const NEVER = 'never';
 
   interface Props {
@@ -51,7 +50,7 @@
   let endAt = $derived.by(() => {
     if (!allDay) return localToEpoch(end, null);
     const last = dayStart(end);
-    return last === null ? null : last + DAY;
+    return last === null ? null : last + DAY_MS;
   });
   let untilDate = $derived(frequency === NEVER || until === '' ? null : until.slice(0, 10));
   let valid = $derived(
@@ -73,12 +72,12 @@
       const day = initialDay === null ? null : new Date(initialDay);
       const fresh = day
         ? new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9).getTime()
-        : Math.ceil(Date.now() / HOUR) * HOUR;
+        : Math.ceil(Date.now() / HOUR_MS) * HOUR_MS;
       const at = from ?? fresh;
-      const length = item ? item.duration_ms : HOUR;
+      const length = item ? item.duration_ms : HOUR_MS;
       title = item?.title ?? '';
       start = epochToLocal(at).slice(0, 16);
-      end = epochToLocal(at + (item?.all_day ? Math.max(0, length - DAY) : length)).slice(0, 16);
+      end = epochToLocal(at + (item?.all_day ? Math.max(0, length - DAY_MS) : length)).slice(0, 16);
       allDay = item?.all_day ?? false;
       frequency = item?.recurrence?.frequency ?? NEVER;
       until = item?.recurrence?.until?.slice(0, 10) ?? '';

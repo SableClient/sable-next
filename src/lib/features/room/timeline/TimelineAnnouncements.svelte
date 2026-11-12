@@ -38,17 +38,6 @@
   });
 </script>
 
-<div class="announcements" data-timeline-announcements aria-live="polite" aria-atomic="true">
+<div class="screen-reader-only" data-timeline-announcements aria-live="polite" aria-atomic="true">
   {#key sequence}{text}{/key}
 </div>
-
-<style>
-  .announcements {
-    clip-path: inset(50%);
-    height: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
-    width: 1px;
-  }
-</style>

@@ -16,7 +16,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import SearchField from '#lib/ui/primitives/SearchField.svelte';
 
   import ThemeTile from './ThemeTile.svelte';
   import {
@@ -192,12 +192,7 @@
       </div>
       <div class="filters">
         <div class="search">
-          <TextInput
-            type="search"
-            bind:value={filter.query}
-            placeholder={i18n.t('settings.themeCatalogSearch')}
-            aria-label={i18n.t('settings.themeCatalogSearch')}
-          />
+          <SearchField bind:value={filter.query} label={i18n.t('settings.themeCatalogSearch')} />
         </div>
         {#if tab === 'theme'}<div
             class="chips"
@@ -353,7 +348,7 @@
               {#each [0, 1, 2] as index (index)}<li class="tweak skeleton-row"></li>{/each}
             </ul>
           {:else}
-            <p class="empty">{i18n.t('settings.themeCatalogEmpty')}</p>
+            <p class="empty-text catalog-hint">{i18n.t('settings.themeCatalogEmpty')}</p>
           {/if}
         </div>
       {/if}

@@ -1,13 +1,9 @@
 <script lang="ts">
+  import { startOfDay } from '#lib/day.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { formatTime } from '#lib/ui/date-time.js';
-  import {
-    agenda,
-    readEntries,
-    startOfDay,
-    type CalendarItem,
-  } from '#lib/calendar/calendar-events.js';
+  import { agenda, readEntries, type CalendarItem } from '#lib/calendar/calendar-events.js';
 
   interface Props {
     roomId: string;

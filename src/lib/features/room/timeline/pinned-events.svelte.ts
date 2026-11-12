@@ -1,16 +1,14 @@
 import { createContext } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 
-import { CoreError } from '#src/transport';
+import { isCoreError } from '#src/transport';
 import type { Rpc } from '#src/generated/protocol';
 import { t } from '#lib/i18n.js';
 
 export type PinnedEventCommands = Pick<Rpc['timeline'], 'pinnedEvents' | 'setPinned'>;
 
 export function pinErrorMessage(cause: unknown): string {
-  return cause instanceof CoreError && cause.detail.code === 'denied'
-    ? t('room.pinDenied')
-    : t('errors.actionFailed');
+  return isCoreError(cause, 'denied') ? t('room.pinDenied') : t('errors.actionFailed');
 }
 
 export class PinnedEvents {
