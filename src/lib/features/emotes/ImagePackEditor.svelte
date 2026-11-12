@@ -9,7 +9,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { pickFiles } from '#lib/platform/files.js';
+  import { pickFiles, savesNatively } from '#lib/platform/files.js';
   import { nativeFilePicker } from '#lib/platform/native-file-picker.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
@@ -24,6 +24,7 @@
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
   import { holdUnsaved } from '#lib/ui/unsaved-guard.js';
   import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
 
@@ -211,9 +212,9 @@
     busy = true;
     transferFailed = null;
     try {
-      if ((await exportPacks(core, [$state.snapshot(current)])) === 'failed') {
-        transferFailed = 'export';
-      }
+      const outcome = await exportPacks(core, [$state.snapshot(current)]);
+      if (outcome === 'failed') transferFailed = 'export';
+      if (outcome === 'saved' && savesNatively()) toasts.info(i18n.t('viewer.saved'));
     } catch (error) {
       console.warn('[sable emotes] the pack could not be exported', error);
       transferFailed = 'export';
