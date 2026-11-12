@@ -460,6 +460,38 @@ test.each([
   }
 );
 
+test('a picked GIF is uploaded instead of linked when reuploading is on', async () => {
+  setPreference('reuploadGifs', true);
+  const fetched = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(new Response(new Uint8Array([71, 73, 70])));
+  const fixture = setup([], '@kris:example.org');
+  const gif = {
+    id: 'cat',
+    title: 'cat',
+    mediaUrl: 'https://media.tenor.com/abc123/cat.gif',
+    previewUrl: 'https://media.tenor.com/abc123/cat-tiny.gif',
+    width: 320,
+    height: 240,
+    size: 1000,
+    mimetype: 'image/gif',
+  };
+
+  await fixture.conversation.sendGif(ROOM, gif);
+  expect(fetched).toHaveBeenCalledWith(gif.mediaUrl, { referrerPolicy: 'no-referrer' });
+  expect(fixture.sendGif).not.toHaveBeenCalled();
+  const [, file] = fixture.sendAttachment.mock.lastCall as unknown as [string, File];
+  expect([file.name, file.type, file.size]).toEqual(['cat.gif', 'image/gif', 3]);
+
+  await fixture.conversation.sendGif(ROOM, { ...gif, mediaUrl: 'mxc://example.org/already' });
+  expect(fixture.sendGif).toHaveBeenCalledTimes(1);
+
+  await expect(
+    fixture.conversation.sendGif(ROOM, { ...gif, mediaUrl: 'https://evil.example/cat.gif' })
+  ).rejects.toThrow();
+  expect(fetched).not.toHaveBeenCalledWith('https://evil.example/cat.gif', expect.anything());
+});
+
 test('a reply to a persona message names the persona', () => {
   const target = withRowFields({
     ...item('$one:example.org', '@ana:example.org'),
@@ -880,6 +912,7 @@ afterEach(() => {
   clearDrafts();
   setPreference('scheduleInEncryptedRooms', true);
   setPreference('personaProxying', false);
+  setPreference('reuploadGifs', false);
 });
 
 test('an encrypted room falls back to the local queue while the preference allows it', async () => {

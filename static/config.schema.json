@@ -1140,6 +1140,11 @@
           ],
           "default": "default"
         },
+        "reuploadGifs": {
+          "title": "Upload picked GIFs to your homeserver",
+          "type": "boolean",
+          "default": false
+        },
         "urlPreviews": {
           "title": "Server-side embeds",
           "type": "boolean",
@@ -2589,6 +2594,11 @@
             "giphy"
           ],
           "default": "default"
+        },
+        "reuploadGifs": {
+          "title": "Upload picked GIFs to your homeserver",
+          "type": "boolean",
+          "default": false
         },
         "urlPreviews": {
           "title": "Server-side embeds",

@@ -827,6 +827,11 @@
           "type": "boolean",
           "default": true
         },
+        "reuploadGifs": {
+          "title": "Upload picked GIFs to your homeserver",
+          "type": "boolean",
+          "default": false
+        },
         "urlPreviews": {
           "title": "Server-side embeds",
           "type": "boolean",
@@ -1629,6 +1634,11 @@
           "title": "Autoplay stickers and emoji",
           "type": "boolean",
           "default": true
+        },
+        "reuploadGifs": {
+          "title": "Upload picked GIFs to your homeserver",
+          "type": "boolean",
+          "default": false
         },
         "urlPreviews": {
           "title": "Server-side embeds",

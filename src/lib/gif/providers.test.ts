@@ -229,6 +229,7 @@ test('tenor searches under the one client_key Google still accepts', () => {
 test('search needs both a key and a proxy', () => {
   expect(gifSearchAvailable(config)).toBe(true);
   expect(gifSearchAvailable({ ...config, proxyUrl: null })).toBe(false);
+  expect(gifSearchAvailable({ ...config, proxyUrl: null }, 'default', true)).toBe(true);
   expect(gifSearchAvailable({ ...config, tenorApiKey: null })).toBe(false);
 });
 

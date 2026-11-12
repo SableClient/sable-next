@@ -257,9 +257,12 @@ export function gifProviderLabel(config: GifsConfig, id: GifProviderSetting): st
 
 export function gifSearchAvailable(
   config: GifsConfig,
-  override: GifProviderSetting = 'default'
+  override: GifProviderSetting = 'default',
+  reupload = false
 ): boolean {
-  return gifProvider(config, override).apiKey(config) !== null && config.proxyUrl !== null;
+  return (
+    gifProvider(config, override).apiKey(config) !== null && (reupload || config.proxyUrl !== null)
+  );
 }
 
 export type ProxiedGif = { mxcUrl: string; mimetype: string };

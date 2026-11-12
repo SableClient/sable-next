@@ -94,6 +94,7 @@ except those marked deployment only.
 - `twitterEmoji` (Twitter emoji): `true` or `false`. Default `true`.
 - `pixelatedImages` (Pixelated image scaling): One of `always`, `smart`, `never`. Default `never`.
 - `gifProvider` (GIF search provider): One of `default`, `klipy`, `tenor`, `giphy`. Default `default`. Deployment only.
+- `reuploadGifs` (Upload picked GIFs to your homeserver): `true` or `false`. Default `false`.
 
 ## Developer
 

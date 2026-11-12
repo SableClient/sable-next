@@ -115,7 +115,9 @@ the shipped file refers to it with `"$schema": "./config.schema.json"`.
   unpadded base64 or base64url Ed25519 public key, indexed by key ID.
 - `gifs.provider` accepts `klipy`, `tenor` or `giphy`, defaulting to `tenor`.
   GIF search also needs `proxyUrl` (a Matrix server name, without a scheme) and
-  the API key for the selected provider.
+  the API key for the selected provider. Homeservers fetch picked GIFs from the
+  proxy over federation. The `reuploadGifs` setting uploads them to the user's
+  homeserver instead, and then `proxyUrl` is optional.
 - `calls.livekitServiceUrl` provides a fallback LiveKit service URL.
 - `searchSharing.stunServers` lists the STUN servers used to share search history between
   devices. It defaults to `stun:stun.sable.moe:3478`. An empty list keeps transfers on the

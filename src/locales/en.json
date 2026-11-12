@@ -2385,6 +2385,8 @@
     "gifProviderKlipy": "Klipy",
     "gifProviderTenor": "Tenor",
     "gifProviderGiphy": "Giphy",
+    "reuploadGifs": "Upload picked GIFs to your homeserver",
+    "reuploadGifsHint": "For homeservers with federation disabled, which cannot load GIFs from the GIF proxy.",
     "urlPreviews": "Server-side embeds",
     "themeFileCards": "Show install cards for theme files",
     "encryptedUrlPreviews": "Server-side embeds in encrypted rooms",

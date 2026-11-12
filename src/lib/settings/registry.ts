@@ -6,6 +6,7 @@ import LockKeyIcon from 'phosphor-svelte/lib/LockKeyIcon';
 import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
 import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
+import UploadSimpleIcon from 'phosphor-svelte/lib/UploadSimpleIcon';
 import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
 import type { FreeTextPreference, Preferences, RangePreference } from './definitions';
 import { appearanceCategory } from './registry/appearance';
@@ -264,6 +265,14 @@ const categories: SettingsCategory[] = [
           { value: 'tenor', label: 'settings.gifProviderTenor' },
           { value: 'giphy', label: 'settings.gifProviderGiphy' },
         ],
+      },
+      {
+        key: 'reuploadGifs',
+        section: 'gif-picker',
+        icon: UploadSimpleIcon,
+        name: 'settings.reuploadGifs',
+        description: 'settings.reuploadGifsHint',
+        type: 'boolean',
       },
     ],
   },

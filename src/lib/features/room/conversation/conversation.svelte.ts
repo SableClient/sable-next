@@ -39,7 +39,13 @@ import {
 } from '#lib/features/composer/sed-edit.js';
 import { runSlash, SlashError } from '#lib/features/composer/slash-commands.js';
 import { knockPagePath } from '#lib/rooms/join-or-knock.js';
-import { gifFilename, proxiedGif, type GifResult } from '#lib/gif/providers.js';
+import {
+  gifFilename,
+  isAllowedGifMediaUrl,
+  isUploadedGifSource,
+  proxiedGif,
+  type GifResult,
+} from '#lib/gif/providers.js';
 import { replyPreviewBody, type ReplyVersion } from '#lib/features/room/messages/reply-preview.js';
 import { isMediaCaptionContent } from '#lib/features/room/messages/media-caption.js';
 import { previewableLinks, previewWhitelistEntry } from '#lib/features/room/media/link-preview.js';
@@ -381,6 +387,18 @@ export class Conversation {
   };
 
   readonly sendGif = async (targetRoomId: string, gif: GifResult): Promise<void> => {
+    if (preferences.reuploadGifs && !isUploadedGifSource(gif.mediaUrl)) {
+      if (!isAllowedGifMediaUrl(gif.mediaUrl)) throw new Error('GIF is not from a known provider');
+      const response = await fetch(gif.mediaUrl, { referrerPolicy: 'no-referrer' });
+      if (!response.ok) throw new Error(`HTTP ${String(response.status)}`);
+      const name = gifFilename(gif.title, gif.mimetype);
+      await this.sendAttachment(
+        targetRoomId,
+        new File([await response.blob()], name, { type: gif.mimetype })
+      );
+      return;
+    }
+
     await this.#beforeSend();
     const { gifs } = await runtimeConfig();
     const proxied = proxiedGif(gif, gifs.proxyUrl);

@@ -428,6 +428,7 @@ const SETTINGS = {
   pauseAnimationsWhenInactive: toggle(false, { account: true }),
   autoplayStickers: toggle(true, { account: true }),
   gifProvider: choice<GifProviderSetting>(['default', 'klipy', 'tenor', 'giphy'], 'default'),
+  reuploadGifs: toggle(false, { account: true }),
   urlPreviews: toggle(false, { account: true, perAccount: true }),
   themeFileCards: toggle(true, { account: true }),
   encryptedUrlPreviews: toggle(false, { perAccount: true }),

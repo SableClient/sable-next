@@ -82,7 +82,9 @@
   });
 
   let gifs = $derived(
-    onPickGif && config && gifSearchAvailable(config, preferences.gifProvider)
+    onPickGif &&
+      config &&
+      gifSearchAvailable(config, preferences.gifProvider, preferences.reuploadGifs)
       ? { config, providerSetting: preferences.gifProvider }
       : null
   );
