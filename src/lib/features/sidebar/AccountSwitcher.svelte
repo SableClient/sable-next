@@ -19,6 +19,7 @@
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { ownPresence } from '#lib/rooms/presence-override.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -55,7 +56,7 @@
     resolveUserStatus(activeProfile, presenceStore.get(core.session?.user_id ?? ''))
   );
   let avatarUrl = $derived(activeProfile?.avatar_url ?? null);
-  let ownPresence = $derived(preferences.sendPresence ? preferences.presence : null);
+  let presence = $derived(preferences.sendPresence ? ownPresence() : null);
 
   onMount(() => {
     void runtimeConfig().then((config) => {
@@ -140,10 +141,10 @@
 
 {#snippet ownAvatar()}
   <Avatar size="small" src={avatarUrl} name={displayName} alt={displayName} refreshOnResume />
-  {#if ownPresence}
+  {#if presence}
     <PresenceDot
-      presence={ownPresence}
-      label={i18n.t(`presence.${ownPresence}`)}
+      {presence}
+      label={i18n.t(`presence.${presence}`)}
       class="account-presence"
       size="medium"
     />
