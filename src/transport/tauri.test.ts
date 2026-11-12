@@ -15,6 +15,7 @@ vi.mock('@sentry/sveltekit', () => ({ captureException }));
 const { createTauriTransport } = await import('./tauri');
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -152,4 +153,25 @@ test.each(['attachment', 'gallery'])('carries %s thumbnails as binary', async (k
   expect(bytes.slice(24, 29)).toEqual(new Uint8Array([1, 2, 255, 216, 255]));
   expect(decodeURIComponent(headersOf(call).request)).not.toContain('bytes');
   if (kind === 'gallery') expect(bytes.slice(29)).toEqual(bytes.slice(0, 29));
+});
+
+test.each([
+  ['answers', true, []],
+  ['stays silent', false, [true]],
+])('a slow command with a core that %s reports the right stall state', async (_, answers, seen) => {
+  vi.useFakeTimers();
+  invoke.mockImplementation((command: string, args?: { method?: string }) => {
+    if (command !== 'call') return Promise.resolve(undefined);
+    if (args?.method === 'session.sync_status' && answers) return Promise.resolve('live');
+    return new Promise(() => {});
+  });
+  const transport = createTauriTransport();
+  const stalls: boolean[] = [];
+  transport.subscribeStall((stalled) => stalls.push(stalled));
+
+  void transport.call('members.list', { room_id: '!r:example.org' });
+  await vi.advanceTimersByTimeAsync(23_000);
+
+  expect(stalls).toEqual(seen);
+  transport.close();
 });

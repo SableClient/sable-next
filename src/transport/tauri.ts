@@ -4,6 +4,7 @@ import { Channel, invoke } from '@tauri-apps/api/core';
 
 import type { RpcError, CoreEvent } from '#src/generated/protocol';
 import { commandFailed, type Transport } from './index';
+import { createStallMonitor } from './stall-monitor';
 import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { wasmLogLevel } from '#lib/observability/wasm-log.js';
 import { rawInvoke } from '#lib/platform/raw-invoke.js';
@@ -26,6 +27,19 @@ async function carry<T>(
  */
 export function createTauriTransport(): Transport {
   const listeners = new Set<(event: CoreEvent) => void>();
+  const stallListeners = new Set<(stalled: boolean) => void>();
+  // The status read waits for the core like any command, and unlike most it needs no network.
+  const stalls = createStallMonitor(
+    () => {
+      const answered = (): void => {
+        stalls.responsive();
+      };
+      invoke('call', { method: 'session.sync_status', params: {} }).then(answered, answered);
+    },
+    (stalled) => {
+      for (const listener of stallListeners) listener(stalled);
+    }
+  );
 
   const channel = new Channel<CoreEvent[]>();
   channel.onmessage = (events) => {
@@ -56,10 +70,13 @@ export function createTauriTransport(): Transport {
   return {
     async call(method, params) {
       await ready;
+      const settle = stalls.watch();
       try {
         return await invoke<unknown>('call', { method, params });
       } catch (error) {
         throw commandFailed(error as RpcError, method);
+      } finally {
+        settle();
       }
     },
 
@@ -169,8 +186,9 @@ export function createTauriTransport(): Transport {
       return () => {};
     },
 
-    subscribeStall() {
-      return () => {};
+    subscribeStall(onStall) {
+      stallListeners.add(onStall);
+      return () => stallListeners.delete(onStall);
     },
 
     async resetCaches(accountIds) {
@@ -190,6 +208,8 @@ export function createTauriTransport(): Transport {
 
     close() {
       listeners.clear();
+      stallListeners.clear();
+      stalls.reset();
     },
   };
 }
