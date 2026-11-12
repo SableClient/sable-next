@@ -25,7 +25,13 @@
   import type { FormatAction } from '#lib/features/composer/editor/formatting.js';
   import { composerSchema } from '#lib/features/composer/editor/schema.js';
   import { emoticonNode } from '#lib/features/composer/editor/shortcodes.js';
-  import { serializeComposer, textDoc } from '#lib/features/composer/editor/serialize.js';
+  import {
+    plainEditDoc,
+    serializeComposer,
+    serializePlain,
+    textDoc,
+  } from '#lib/features/composer/editor/serialize.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import '#lib/ui/primitives/form-control.css';
@@ -64,7 +70,6 @@
 
   const editor = new ComposerEditor({
     id: untrack(() => id),
-    richText: true,
     multiline: true,
     maxLength: 5000,
     media: {
@@ -84,7 +89,9 @@
       if (!change.docChanged) return;
       const doc = editor.doc();
       if (!doc) return;
-      const { body, formatted } = serializeComposer(doc);
+      const { body, formatted } = preferences.richTextComposer
+        ? serializeComposer(doc)
+        : serializePlain(doc);
       value = synced = { body, formatted };
     },
     onQuery: (next) => {
@@ -130,8 +137,9 @@
     untrack(() => {
       if (next.body === synced?.body && next.formatted === synced.formatted) return;
       synced = next;
-      if (next.formatted !== null) editor.setHtml(next.formatted);
-      else editor.setDoc(textDoc(next.body));
+      if (next.formatted === null) editor.setDoc(textDoc(next.body));
+      else if (preferences.richTextComposer) editor.setHtml(next.formatted);
+      else editor.setDoc(plainEditDoc(next.body, next.formatted));
       editor.clearHistory();
     });
   });

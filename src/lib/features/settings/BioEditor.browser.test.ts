@@ -5,6 +5,7 @@ import { render } from 'vitest-browser-svelte';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import type { ImagePackView } from '#src/generated/protocol';
+import { bioContent } from './bio-content.js';
 import Harness from './BioEditorHarness.test.svelte';
 
 const packs: ImagePackView[] = [
@@ -75,6 +76,7 @@ async function mount(html = '') {
 }
 
 test('renders saved inline images and preserves them after editing and reset', async () => {
+  setPreference('richTextComposer', true);
   const { screen, editor, content } = await mount(
     '<p>Hello <img data-mx-emoticon src="mxc://example.org/wave" alt=":wave:"> <img src="mxc://example.org/cat" alt="Cat"></p>'
   );
@@ -88,6 +90,19 @@ test('renders saved inline images and preserves them after editing and reset', a
   await userEvent.click(screen.getByRole('button', { name: 'Reset' }));
   await expect.poll(() => content().body).not.toContain('edited');
   await expect.element(editor.getByRole('img', { name: ':wave:' })).toBeVisible();
+});
+
+test('follows the markdown composer setting', async () => {
+  setPreference('richTextComposer', false);
+  const html =
+    '<p>Hello <strong>bold</strong> <img data-mx-emoticon src="mxc://example.org/wave" alt=":wave:"></p>';
+  const { editor, content } = await mount(html);
+  await expect.element(editor).toHaveTextContent('Hello **bold**');
+  await expect.element(editor.getByRole('img', { name: ':wave:' })).toBeVisible();
+  expect(content().formatted).toBe(bioContent(html).formatted);
+  await userEvent.click(editor);
+  await userEvent.keyboard('{End} *more*');
+  await expect.poll(() => content().formatted).toContain('<em>more</em>');
 });
 
 test('autocomplete inserts custom emoji and can be dismissed and reopened', async () => {
