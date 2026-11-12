@@ -54,7 +54,14 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-300);
-    max-height: min(28rem, calc(100dvh - 6rem));
+
+    /* The frame scrolls once its content passes this, so stay inside it and leave the list to scroll. */
+    max-height: min(
+      28rem,
+      calc(
+        100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-300) * 2 - var(--space-500) * 2
+      )
+    );
     width: min(22rem, calc(100vw - 2rem));
   }
 
