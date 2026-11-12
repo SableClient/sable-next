@@ -1771,3 +1771,57 @@ test('a reply jump from a permalink context stays on its loaded target', async (
   await expect(timeline.itemByEventId(target)).toBeInViewport();
   expect(await core.subscribeCount()).toBe(1);
 });
+
+test('returning to the latest message drops the jump target from the address', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.setViewportSize({ width: 1280, height: 420 });
+  await app.openRoom('!room:example.test');
+  await timeline.expectAtLatest('General message 19');
+  const replyTo = (id: string, body: string, target: string) => ({
+    ...timelineItem(id, body),
+    in_reply_to: {
+      event_id: target,
+      sender: '@bob:example.test',
+      sender_mentioned: false,
+      sender_name: 'Bob',
+      body: 'Quoted',
+      fallback: null,
+    },
+  });
+  const subscription = await core.subscription();
+  await core.emitTimelineDiff(subscription, [
+    {
+      op: 'push_back',
+      value: replyTo('near-answer', 'Answering near', '$general-19:example.test'),
+    },
+  ]);
+  await timeline.expectAtLatest('Answering near');
+  const chip = (body: string) =>
+    timeline.container.locator('.item').filter({ hasText: body }).locator('.reply-preview');
+  const target = () => new URL(page.url()).searchParams.get('event');
+
+  await chip('Answering near').click();
+  await expect.poll(target).toBe('$general-19:example.test');
+  await core.emitTimelineDiff(subscription, [
+    { op: 'push_back', value: replyTo('far-answer', 'Answering far', '$general-3:example.test') },
+  ]);
+  await timeline.expectAtLatest('Answering far');
+  expect(target()).toBe('$general-19:example.test');
+  await expect(page.locator('.message.highlighted')).toContainText('General message 19');
+
+  await chip('Answering far').click();
+  await expect.poll(target).toBe('$general-3:example.test');
+  await timeline.waitForScrollSettled();
+  await expect(timeline.itemByEventId('$general-3:example.test')).toBeInViewport();
+
+  await timeline.scrollToBottomAndNotify();
+  await expect.poll(target).toBeNull();
+  await expect(page.locator('.message.highlighted')).toHaveCount(0);
+  await timeline.expectAtLatest('Answering far');
+});

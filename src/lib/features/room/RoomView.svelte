@@ -617,6 +617,12 @@
     void setPageState({ ...page.state, notified: undefined }, true);
   }
 
+  function returnedToLatest(): void {
+    if (eventId === null || panels.threadRootId !== null) return;
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- rewrites the query of the current, already resolved URL
+    void goto(roomUrl(null), { replace: true, reset: false });
+  }
+
   function jumpToLive(): void {
     void activeTimeline.start(timelineOwner, resolvedRoomId, null, preferences.showHiddenEvents);
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- rewrites the query of the current, already resolved URL
@@ -794,6 +800,7 @@
       focusEventId={timelineEventId}
       {landingEventId}
       onLanded={landed}
+      onReturnedToLatest={returnedToLatest}
       onRequestHistory={requestHistory}
       onRequestFuture={requestFuture}
       onRead={markRead}

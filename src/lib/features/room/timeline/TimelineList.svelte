@@ -94,6 +94,7 @@
     editEventId?: string | null;
     inlineEditor?: Snippet;
     onLanded?: () => void;
+    onReturnedToLatest?: () => void;
     onRequestHistory: (count?: number) => Promise<boolean>;
     onRequestFuture: () => Promise<void>;
     onRetryLoad?: () => Promise<void>;
@@ -145,6 +146,7 @@
     editEventId = null,
     inlineEditor,
     onLanded,
+    onReturnedToLatest,
     onRequestHistory,
     onRequestFuture,
     onRetryLoad,
@@ -508,6 +510,7 @@
     if (!revealed) return;
     if (delta < 0) holdAtLatest = false;
     if (delta > 0 && atLatest && windowActivity.active && !holdAtLatest) unread.reachLatest();
+    if (delta > 0 && live && windowState.pinned) onReturnedToLatest?.();
     historyController.observeScroll(delta < 0, nearLatest);
     if (
       timeline.mode.kind !== 'live' &&
@@ -1113,6 +1116,7 @@
       return;
     }
     unread.reachLatest();
+    onReturnedToLatest?.();
     void controller?.jumpTo(null, 'start', !shouldReduceMotion());
   }
   function onEscape(event: KeyboardEvent): void {
