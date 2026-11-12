@@ -918,8 +918,8 @@
     }
   }
 
-  /* A mouse reveals the actions at any width, or a narrow window would hide them. */
-  @media (any-hover: hover) and (any-pointer: fine) {
+  /* Not any-hover: phones report it, and a tap there shows actions that vanish on release. */
+  @media (hover: hover) and (pointer: fine) {
     .message:hover,
     .message.menu-open {
       background-color: var(--surface-container-hover);
