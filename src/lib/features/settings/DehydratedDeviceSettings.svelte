@@ -6,28 +6,34 @@
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import '#lib/ui/primitives/settings-row.css';
+  import RecoveryKeyUnlock from './RecoveryKeyUnlock.svelte';
 
   const core = useCoreClient();
   let status = $state<DehydratedDeviceView | null>(null);
   let saving = $state(false);
   let error = $state<string | null>(null);
 
-  $effect(() => {
-    void core.session?.account_id;
-    void core.encryption?.recovery;
-    let active = true;
-    status = null;
+  let generation = 0;
+  function refresh(): void {
+    const current = ++generation;
     error = null;
     core.rpc.encryption
       .dehydratedDevice()
       .then((next) => {
-        if (active) status = next;
+        if (current === generation) status = next;
       })
       .catch(() => {
-        if (active) error = t('settings.dehydratedDeviceFailed');
+        if (current === generation) error = t('settings.dehydratedDeviceFailed');
       });
+  }
+
+  $effect(() => {
+    void core.session?.account_id;
+    void core.encryption?.recovery;
+    status = null;
+    refresh();
     return () => {
-      active = false;
+      generation += 1;
     };
   });
 
@@ -65,6 +71,9 @@
       />
     </SettingsRow>
   </ul>
+  {#if status === 'needs_recovery_key'}
+    <RecoveryKeyUnlock id="dehydrated-device-key" onUnlocked={refresh} />
+  {/if}
 {/if}
 {#if error}<Alert variant="critical" role="alert">{error}</Alert>{/if}
 
