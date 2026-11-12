@@ -142,7 +142,6 @@
     void roomId;
     return eventId === null;
   });
-  let timelineFollowingLive = $state<boolean>(false);
 
   const callSupport = new RoomCallSupport(core, () => resolvedRoomId);
 
@@ -446,7 +445,6 @@
 
   // Returning to live drops the anchor from the URL.
   /** The `?event=` the effect below has handed to the timeline. */
-  let appliedEventId: string | null = null;
   let openedRoomId: string | null = null;
   let timelineRoomId = $derived(resolvedRoom?.room_id);
   let roomHasUnread = $derived(
@@ -454,15 +452,6 @@
       (resolvedRoom?.highlight ?? 0) > 0 ||
       (resolvedRoom?.marked_unread ?? false)
   );
-
-  $effect(() => {
-    // A jump restarts the timeline asynchronously, so wait for the target to be applied.
-    if (eventId === null || eventId !== appliedEventId) return;
-    if (resolvedPermalink === null || resolvedPermalink.rootEventId !== null) return;
-    if (!timelineFollowingLive || timeline.mode.kind !== 'live') return;
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- rewrites the query of the current, already resolved URL
-    void goto(roomUrl(null), { replace: true, reset: false });
-  });
 
   $effect(() => {
     const activeRoomId = timelineRoomId;
@@ -478,7 +467,6 @@
       serving &&
       targetEventId !== null &&
       untrack(() => timeline.items.some((item) => item.event_id === targetEventId));
-    appliedEventId = eventId;
     const openAtUnread = untrack(() => {
       if (openedRoomId === activeRoomId) return false;
       openedRoomId = activeRoomId;
@@ -849,7 +837,6 @@
       {typingUsers}
       footTrailingVisible={showReceiptFooter && timelineAtBottom && latestReadBy.length > 0}
       bind:nearLatest={timelineAtBottom}
-      bind:followingLive={timelineFollowingLive}
       timelineStart={roomSession.predecessor ? predecessorNotice : undefined}
     >
       {#snippet footTrailing()}
