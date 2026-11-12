@@ -97,5 +97,15 @@ class RustWebViewClient(webView: RustWebView, context: Context): WebViewClient()
         }
     }
 
+    // Unhandled, WebView kills the whole app when its renderer crashes or is reclaimed for
+    // memory (wry#1901). The view is unusable from here on, so the activity builds a new one.
+    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+        Logger.error("WebView renderer gone, crashed: ${detail.didCrash()}")
+        (view.parent as? android.view.ViewGroup)?.removeView(view)
+        view.destroy()
+        (view.context as? android.app.Activity)?.takeUnless { it.isFinishing || it.isDestroyed }?.recreate()
+        return true
+    }
+
     {{class-extension}}
 }
