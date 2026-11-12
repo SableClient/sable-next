@@ -106,8 +106,10 @@ the shipped file refers to it with `"$schema": "./config.schema.json"`.
   to an empty list.
 - `pushNotificationDetails` requires all three of `pushNotifyUrl`,
   `vapidPublicKey` and `webPushAppID`. Without them, the push configuration is
-  ignored. The other fields are optional and configure native or UnifiedPush
-  clients. See the [Sygnal guide](sygnal-setup.md).
+  ignored. `pushNotifyUrl` must be a gateway that delivers web push, such as
+  Sygnal with a `webpush` app. A UnifiedPush gateway like ntfy's rejects browser
+  pushers, and the homeserver then deletes them. The other fields are optional
+  and configure native or UnifiedPush clients. See the [Sygnal guide](sygnal-setup.md).
 - `embeds.serviceUrl` enables the embed service when it is an HTTP(S) URL.
 - `supporterAwards` requires an HTTP(S) service URL and at least one 43-character
   unpadded base64 or base64url Ed25519 public key, indexed by key ID.
