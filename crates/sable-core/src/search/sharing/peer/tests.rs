@@ -241,7 +241,7 @@ fn discovery_events_use_the_documented_fields() {
     assert_eq!(
         serde_json::to_value(&content).unwrap(),
         serde_json::json!({
-            "version": 4,
+            "version": 5,
             "session": "s",
             "timestamp": 1,
             "kind": "info",
@@ -251,7 +251,7 @@ fn discovery_events_use_the_documented_fields() {
         })
     );
     let request: ToDeviceSearchPeerEventContent = serde_json::from_value(
-        serde_json::json!({"version": 4, "session": "s", "timestamp": 1, "kind": "request"}),
+        serde_json::json!({"version": 5, "session": "s", "timestamp": 1, "kind": "request"}),
     )
     .unwrap();
     assert_eq!(request.kind, Discovery::Request);
@@ -599,9 +599,16 @@ fn reopen(source: &Core, target: &Core, id: &str, devices: [&Client; 2]) {
 }
 
 async fn exchange(source: &Core, target: &Core, id: &str) -> usize {
-    let mut frames = VecDeque::from([(
-        false,
+    assert!(
         target
+            .exchange_search_peer(id, None)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let mut frames = VecDeque::from([(
+        true,
+        source
             .exchange_search_peer(id, None)
             .await
             .unwrap()

@@ -14,7 +14,7 @@ turned off, when the index is rebuilt or from the settings reset button.
 
 Discovery uses encrypted `moe.sable.search_peer.v1` to-device events (`version`, `session`,
 `timestamp`, `kind`) from verified devices of the same account. `version` is the copy
-protocol version, currently `4`. Devices ignore events with another version or none:
+protocol version, currently `5`. Devices ignore events with another version or none:
 
 - `query`: the requesting device sends it to every verified device seen in the last 90 days.
 - `info` (`documents`, `complete_rooms`, `busy`): each device that can serve answers with
@@ -38,14 +38,15 @@ The data channel is `sable-search-v1`. The app passes each binary frame to the c
 arrives, plus an empty frame when the channel opens, and sends back the bytes the core returns.
 
 Each message is a big-endian `u32` length followed by a MessagePack map of that many bytes, at
-most 6 MiB, sent in binary frames of up to 16 KiB. A message has a `kind` field. The receiver
-speaks first, and the sender only answers, one message at a time. Bytes past the end of a
-message close the channel. For each of its joined rooms the receiver sends:
+most 6 MiB, sent in binary frames of up to 16 KiB. A message has a `kind` field. The sender
+speaks first with `room_list` (`rooms`), the rooms in its index, and then only answers, one
+message at a time. Bytes past the end of a message close the channel. For each listed room the
+receiver sends:
 
-- `room` (`room`): the sender answers `parts` (`room`, `parts`, `cover`). `parts` lists
-  `start`, `end` and `sha256` per part and is empty when the sender can't share the room.
-- `get` (`room`, `part`): for each listed part whose hash the receiver hasn't imported yet.
-  The sender answers `data` (`room`, `part`, `data`).
+- `request_room` (`room`): the sender answers `list_parts` (`room`, `parts`, `cover`). `parts`
+  lists `start`, `end` and `sha256` per part and is empty when the sender can't share the room.
+- `request_part` (`room`, `part`): for each listed part whose hash the receiver hasn't imported
+  yet. The sender answers `part_data` (`room`, `part`, `data`).
 
 The first part, `[0, 0)`, carries redactions. The rest cover a contiguous time range
 without splitting events with the same timestamp. Part data is JSON compressed with zlib and

@@ -159,16 +159,19 @@ enum DownloadState {
 struct RoomDownloadState {
     pub queued_rooms: VecDeque<OwnedRoomId>,
     pub total_rooms: usize,
+    finished_rooms: usize,
     step: RoomDownloadStep,
 }
 
 impl RoomDownloadState {
     fn new(mut queued_rooms: VecDeque<OwnedRoomId>) -> Option<(Self, OwnedRoomId)> {
+        let total_rooms = queued_rooms.len();
         let pending_room = queued_rooms.pop_front()?;
 
         Some((
             Self {
-                total_rooms: queued_rooms.len(),
+                total_rooms,
+                finished_rooms: 0,
                 queued_rooms,
                 step: RoomDownloadStep::WaitingForParts {
                     pending_room: pending_room.clone(),
@@ -185,6 +188,8 @@ enum RoomDownloadStep {
     WaitingForParts { pending_room: OwnedRoomId },
     /// The receving device is downloading the room's parts.
     DownloadingParts(PartsDownloadState),
+    /// Every room was downloaded.
+    Done,
 }
 
 /// The state of an individual room download.
@@ -263,7 +268,12 @@ impl Core {
         data: Option<Vec<u8>>,
     ) -> Result<Option<Vec<u8>>, CopyError> {
         let message = data
-            .map(|data| rmp_serde::from_slice::<Message>(&data).map_err(|_| CopyError::Malformed))
+            .map(|data| {
+                rmp_serde::from_slice::<Message>(&data).map_err(|error| {
+                    tracing::debug!(%error, "search copy message did not decode");
+                    CopyError::Malformed
+                })
+            })
             .transpose()?;
         let (_copying, client) = self.copying_session().await.map_err(CopyError::Session)?;
         let transfer = self
@@ -403,7 +413,7 @@ impl Core {
             self.update_sharing(|state| {
                 if matches!(&state.phase, super::Phase::Receiving(session) if session.id == session_id)
                 {
-                    state.transferred_rooms = download_state.total_rooms - download_state.queued_rooms.len();
+                    state.transferred_rooms = download_state.finished_rooms;
                     state.total_rooms = download_state.total_rooms;
                 }
             });
@@ -471,30 +481,31 @@ impl Core {
 
         if let Some(next_part) = next_part {
             // We're done with this part, let's ask for the next one.
-            Ok(Some(Message::RequestPart {
+            return Ok(Some(Message::RequestPart {
                 room: current_room,
                 part: next_part,
-            }))
-        } else if let Some(next_room) = state.queued_rooms.pop_front() {
-            // We're out of parts for this room, let's ask for the next room.
-            let RoomDownloadStep::DownloadingParts(parts) = std::mem::replace(
-                &mut state.step,
-                RoomDownloadStep::WaitingForParts {
-                    pending_room: next_room.clone(),
-                },
-            ) else {
-                // We can't reach this point without either explicitly setting `state.step` to `DownloadingParts`
-                // or returning Err, but the compiler doesn't know that.
-                unreachable!();
-            };
-
-            self.finish_receiving_room(client, parts, epoch).await?;
-
-            Ok(Some(Message::RequestRoom { room: next_room }))
-        } else {
-            // We're out of rooms, the transfer is complete.
-            Ok(None)
+            }));
         }
+
+        // We're out of parts for this room, let's ask for the next room, if any.
+        let next_room = state.queued_rooms.pop_front();
+        let next_step = next_room
+            .clone()
+            .map_or(RoomDownloadStep::Done, |pending_room| {
+                RoomDownloadStep::WaitingForParts { pending_room }
+            });
+        let RoomDownloadStep::DownloadingParts(parts) =
+            std::mem::replace(&mut state.step, next_step)
+        else {
+            // We can't reach this point without either explicitly setting `state.step` to `DownloadingParts`
+            // or returning Err, but the compiler doesn't know that.
+            unreachable!();
+        };
+
+        self.finish_receiving_room(client, parts, epoch).await?;
+        state.finished_rooms += 1;
+
+        Ok(next_room.map(|room| Message::RequestRoom { room }))
     }
 
     pub(super) async fn mark_synced(&self, client: &Client, copy: Option<SearchPeerCopyView>) {

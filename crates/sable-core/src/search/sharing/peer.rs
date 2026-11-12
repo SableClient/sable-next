@@ -42,7 +42,7 @@ const INACTIVE_DEVICE: Duration = Duration::from_hours(90 * 24);
 const SESSION_ID_LEN: usize = 32;
 /// Devices only talk to devices using the same copy protocol. Events from
 /// releases before this field existed fail to parse and are ignored.
-const PROTOCOL_VERSION: u32 = 4;
+const PROTOCOL_VERSION: u32 = 5;
 
 #[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
 #[ruma_event(type = "moe.sable.search_peer.v1", kind = ToDevice)]
