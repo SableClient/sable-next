@@ -5,9 +5,9 @@ import Intents
 import os
 import StoreKit
 import UniformTypeIdentifiers
-import UserNotifications
+@preconcurrency import UserNotifications
 
-final class NotificationService: UNNotificationServiceExtension {
+final class NotificationService: UNNotificationServiceExtension, @unchecked Sendable {
     private let lock = NSLock()
     private var completion: ((UNNotificationContent) -> Void)?
     private var fallback: UNMutableNotificationContent?
@@ -20,6 +20,7 @@ final class NotificationService: UNNotificationServiceExtension {
     private static let inviteCategory = "sable-invite"
     private static let alertedAtKey = "sable_alerted_at"
     private static let notifyOnceWindow: TimeInterval = 5 * 60
+    private static let expiredReportWait: TimeInterval = 1
     private static let log = Logger(subsystem: "moe.sable.app.notifications", category: "push")
 
     override func didReceive(
@@ -469,7 +470,15 @@ final class NotificationService: UNNotificationServiceExtension {
         let root = policyRoot
         communication = nil
         lock.unlock()
+        // iOS may suspend the extension once the handler runs.
+        if let root {
+            let reported = DispatchSemaphore(value: 0)
+            DispatchQueue.global(qos: .userInitiated).async {
+                Self.report("expired", root: root)
+                reported.signal()
+            }
+            _ = reported.wait(timeout: .now() + Self.expiredReportWait)
+        }
         if let content { complete(content) }
-        if let root { Self.report("expired", root: root) }
     }
 }
