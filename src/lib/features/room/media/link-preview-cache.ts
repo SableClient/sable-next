@@ -87,3 +87,22 @@ export async function resolveUrlPreview(
   if (fromClient !== null || !sources.server || !homeserverCanPreview(url)) return fromClient;
   return loadUrlPreview(messages, url, false);
 }
+
+export async function scrapedPostVideo(
+  messages: Pick<Rpc['messages'], 'urlPreview'>,
+  url: string,
+  quote: boolean,
+  index: number
+): Promise<string | null> {
+  const config = await runtimeConfig();
+  const preview = await loadUrlPreview(
+    messages,
+    url,
+    true,
+    config.embeds.serviceUrl,
+    config.gifs.klipyApiKey
+  );
+  const post = quote ? preview?.post?.quote : preview?.post;
+  const videos = post?.media.filter((media) => media.kind !== 'image') ?? [];
+  return videos[index]?.source ?? null;
+}

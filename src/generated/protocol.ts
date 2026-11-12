@@ -987,7 +987,9 @@ export type PostMediaKindView = "image" | "video" | "gif";
 
 export type PostMediaView = {
 	kind: PostMediaKindView,
-	source: string,
+	/**  `None` for a bundled video, which plays by fetching the link again. */
+	source: string | null,
+	poster: string | null,
 	mime: string | null,
 	width: number | null,
 	height: number | null,

@@ -6,6 +6,12 @@ import { expect, test, vi } from 'vitest';
 import type { PostView, UrlPreviewView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
+vi.mock('#lib/config/runtime-config.js', () => ({
+  runtimeConfig: () =>
+    Promise.resolve({ embeds: { serviceUrl: null }, gifs: { klipyApiKey: null } }),
+}));
+
+import { core } from '#lib/core/__mocks__/context.js';
 
 import PostLinkPreview from './PostLinkPreview.svelte';
 
@@ -87,6 +93,7 @@ test('hides avatars and media while room media is hidden', () => {
         {
           kind: 'image',
           source: 'mxc://s/cat',
+          poster: null,
           mime: null,
           width: null,
           height: null,
@@ -124,4 +131,35 @@ test('hides the text of a sensitive post until revealed, and names the warning',
 
   expect(screen.getByText('hello')).toBeInTheDocument();
   expect(screen.queryByText('quoted')).not.toBeInTheDocument();
+});
+
+test('plays a bundled video by scraping the link again', async () => {
+  const video = {
+    kind: 'video' as const,
+    mime: 'video/mp4',
+    width: 16,
+    height: 9,
+    alt: null,
+  };
+  const scraped = preview(
+    post({ media: [{ ...video, source: 'https://pds/clip', poster: null }] })
+  );
+  core.rpc.messages.urlPreview.mockResolvedValue(scraped);
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  const { container } = renderPost(
+    post({ media: [{ ...video, source: null, poster: 'mxc://s/still' }] })
+  );
+
+  expect(container.querySelector('.media-poster')).toBeInTheDocument();
+  expect(core.rpc.messages.urlPreview).not.toHaveBeenCalled();
+
+  await fireEvent.click(screen.getByRole('button', { name: /Play/ }));
+
+  await vi.waitFor(() => {
+    expect(container.querySelector('video')).toBeInTheDocument();
+  });
+  expect(core.rpc.messages.urlPreview).toHaveBeenCalledWith(
+    expect.objectContaining({ url: scraped.url, client: true })
+  );
+  expect(core.fetchMedia).toHaveBeenCalledWith('https://pds/clip', 0, 0);
 });

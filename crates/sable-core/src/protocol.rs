@@ -1730,7 +1730,9 @@ pub enum PostMediaKindView {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct PostMediaView {
     pub kind: PostMediaKindView,
-    pub source: String,
+    /// `None` for a bundled video, which plays by fetching the link again.
+    pub source: Option<String>,
+    pub poster: Option<String>,
     pub mime: Option<String>,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub width: Option<u64>,

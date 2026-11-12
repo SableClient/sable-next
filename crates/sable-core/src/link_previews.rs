@@ -113,13 +113,19 @@ fn into_post_view(post: Post) -> PostView {
             .media
             .into_iter()
             .filter_map(|media| {
-                Some(PostMediaView {
-                    kind: match media.kind {
-                        PostMediaKind::Image => PostMediaKindView::Image,
-                        PostMediaKind::Video => PostMediaKindView::Video,
-                        PostMediaKind::Gif => PostMediaKindView::Gif,
-                    },
-                    source: encrypted_source(media.encrypted).or(media.url)?,
+                let source = encrypted_source(media.encrypted).or(media.url);
+                let poster = encrypted_source(media.poster_encrypted).or(media.poster);
+                let kind = match media.kind {
+                    PostMediaKind::Image => PostMediaKindView::Image,
+                    PostMediaKind::Video => PostMediaKindView::Video,
+                    PostMediaKind::Gif => PostMediaKindView::Gif,
+                };
+                let shown =
+                    source.is_some() || (kind != PostMediaKindView::Image && poster.is_some());
+                shown.then(|| PostMediaView {
+                    kind,
+                    source,
+                    poster,
                     mime: media.mime,
                     width: media.width,
                     height: media.height,
@@ -157,7 +163,7 @@ fn uploaded(image: &PreviewImage) -> (Option<String>, Option<serde_json::Value>,
     }
 }
 
-/// Videos are too large to upload, so a bundle leaves them out.
+/// Videos are too large to upload, so a bundle keeps their poster instead.
 fn bundle_post(post: &PostView, images: &HashMap<String, PreviewImage>) -> Post {
     let (avatar, avatar_encrypted, avatar_size) = post
         .author
@@ -180,11 +186,30 @@ fn bundle_post(post: &PostView, images: &HashMap<String, PreviewImage>) -> Post 
         media: post
             .media
             .iter()
-            .filter(|media| media.kind == PostMediaKindView::Image)
             .filter_map(|media| {
-                let (url, encrypted, size) = uploaded(images.get(&media.source)?);
+                let source = media.source.as_deref();
+                let (url, encrypted, size) = match media.kind {
+                    PostMediaKindView::Image => uploaded(images.get(source?)?),
+                    PostMediaKindView::Video | PostMediaKindView::Gif => (
+                        source
+                            .filter(|source| is_mxc(source))
+                            .map(ToOwned::to_owned),
+                        None,
+                        None,
+                    ),
+                };
+                let (poster, poster_encrypted, poster_size) = media
+                    .poster
+                    .as_deref()
+                    .filter(|_| media.kind != PostMediaKindView::Image)
+                    .and_then(|poster| images.get(poster))
+                    .map_or((None, None, None), uploaded);
                 Some(PostMedia {
-                    kind: PostMediaKind::Image,
+                    kind: match media.kind {
+                        PostMediaKindView::Image => PostMediaKind::Image,
+                        PostMediaKindView::Video => PostMediaKind::Video,
+                        PostMediaKindView::Gif => PostMediaKind::Gif,
+                    },
                     url,
                     encrypted,
                     size,
@@ -192,6 +217,9 @@ fn bundle_post(post: &PostView, images: &HashMap<String, PreviewImage>) -> Post 
                     width: media.width,
                     height: media.height,
                     alt: media.alt.clone(),
+                    poster,
+                    poster_encrypted,
+                    poster_size,
                 })
             })
             .collect(),
@@ -520,7 +548,7 @@ struct WantedImage<'a> {
     max_bytes: usize,
 }
 
-/// The main image, then the avatars and images of the post and its quote.
+/// The main image, then the avatars, images and posters of the post and its quote.
 fn preview_images(preview: &UrlPreviewView) -> Vec<WantedImage<'_>> {
     fn post_images<'a>(post: &'a PostView, images: &mut Vec<WantedImage<'a>>) {
         images.extend(post.author.avatar.as_deref().map(|avatar| WantedImage {
@@ -528,16 +556,21 @@ fn preview_images(preview: &UrlPreviewView) -> Vec<WantedImage<'_>> {
             mime: None,
             max_bytes: MAX_PREVIEW_IMAGE_BYTES,
         }));
-        images.extend(
-            post.media
-                .iter()
-                .filter(|media| media.kind == PostMediaKindView::Image)
-                .map(|media| WantedImage {
-                    source: &media.source,
+        images.extend(post.media.iter().filter_map(|media| {
+            if media.kind == PostMediaKindView::Image {
+                Some(WantedImage {
+                    source: media.source.as_deref()?,
                     mime: media.mime.as_deref(),
                     max_bytes: MAX_POST_IMAGE_BYTES,
-                }),
-        );
+                })
+            } else {
+                Some(WantedImage {
+                    source: media.poster.as_deref()?,
+                    mime: None,
+                    max_bytes: MAX_PREVIEW_IMAGE_BYTES,
+                })
+            }
+        }));
         if let Some(quote) = &post.quote {
             post_images(quote, images);
         }
@@ -701,7 +734,7 @@ mod tests {
     }
 
     #[test]
-    fn a_post_keeps_only_mxc_media_and_bundles_only_uploaded_images() {
+    fn a_post_keeps_only_mxc_media_and_bundles_only_hosted_media() {
         let data = serde_json::json!({
             "og:title": "Alice (@alice.test)",
             "og:type": "note",
@@ -730,7 +763,7 @@ mod tests {
         assert_eq!(post.author.avatar, None);
         assert_eq!(post.author.url, None);
         assert_eq!(post.media.len(), 1);
-        assert_eq!(post.media[0].source, "mxc://s/cat");
+        assert_eq!(post.media[0].source.as_deref(), Some("mxc://s/cat"));
         assert_eq!(
             post.sensitivity,
             Some(crate::protocol::PostSensitivityView::Spoiler)
@@ -741,7 +774,7 @@ mod tests {
             Some("https://bsky.app/profile/bob.test/post/1")
         );
         assert_eq!(quote.media[0].kind, crate::protocol::PostMediaKindView::Gif);
-        assert_eq!(quote.media[0].source, "mxc://s/gif");
+        assert_eq!(quote.media[0].source.as_deref(), Some("mxc://s/gif"));
 
         let bundles =
             super::bundled_link_previews(&[preview], &std::collections::HashMap::new(), true)
@@ -761,6 +794,8 @@ mod tests {
                 "related:1:og:type": "note",
                 "related:1:og:url": "https://bsky.app/profile/bob.test/post/1",
                 "related:1:note:content": "quoted",
+                "related:1:og:video": "mxc://s/gif",
+                "related:1:og:video:com.sable.gif": true,
             })
         );
     }
@@ -785,10 +820,13 @@ mod tests {
                     crate::protocol::PostMediaKindView::Image,
                     "https://cdn/dog.png",
                 ),
-                post_media(
-                    crate::protocol::PostMediaKindView::Video,
-                    "https://cdn/clip.mp4",
-                ),
+                crate::protocol::PostMediaView {
+                    poster: Some("https://cdn/still.jpg".to_owned()),
+                    ..post_media(
+                        crate::protocol::PostMediaKindView::Video,
+                        "https://cdn/clip.mp4",
+                    )
+                },
             ],
             ..Default::default()
         });
@@ -807,6 +845,15 @@ mod tests {
                         "mxc://example.org/cat".into(),
                     ),
                     size: 9,
+                },
+            ),
+            (
+                "https://cdn/still.jpg".to_owned(),
+                super::PreviewImage {
+                    source: matrix_sdk::ruma::events::room::MediaSource::Plain(
+                        "mxc://example.org/still".into(),
+                    ),
+                    size: 4,
                 },
             ),
         ]);
@@ -829,6 +876,9 @@ mod tests {
                 "og:image": "mxc://example.org/cat",
                 "og:image:alt": "alt",
                 "matrix:image:size": 9,
+                "og:video:alt": "alt",
+                "og:video:com.sable.poster": "mxc://example.org/still",
+                "matrix:video:com.sable.poster:size": 4,
             })
         );
 
@@ -838,7 +888,19 @@ mod tests {
             .unwrap();
         let avatar = read.author.avatar.unwrap();
         assert!(avatar.starts_with('{') && avatar.contains("mxc://example.org/face"));
-        assert_eq!(read.media[0].source, "mxc://example.org/cat");
+        assert_eq!(
+            read.media[0].source.as_deref(),
+            Some("mxc://example.org/cat")
+        );
+        assert_eq!(
+            read.media[1].kind,
+            crate::protocol::PostMediaKindView::Video
+        );
+        assert_eq!(read.media[1].source, None);
+        assert_eq!(
+            read.media[1].poster.as_deref(),
+            Some("mxc://example.org/still")
+        );
     }
 
     fn note_keys(bundle: &serde_json::Value) -> serde_json::Value {
@@ -854,6 +916,7 @@ mod tests {
                     "og:image",
                     "og:video",
                     "matrix:image",
+                    "matrix:video",
                 ]
                 .iter()
                 .any(|prefix| key.starts_with(prefix))
@@ -869,7 +932,8 @@ mod tests {
     ) -> crate::protocol::PostMediaView {
         crate::protocol::PostMediaView {
             kind,
-            source: source.to_owned(),
+            source: Some(source.to_owned()),
+            poster: None,
             mime: None,
             width: None,
             height: None,

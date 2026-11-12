@@ -23,7 +23,8 @@
   const BLURHASH_POSTER_WIDTH = 32;
 
   interface Props {
-    source: string;
+    source: string | null;
+    resolveSource?: () => Promise<string | null>;
     mime: string | null;
     filename: string;
     width?: number | null;
@@ -38,6 +39,7 @@
 
   let {
     source,
+    resolveSource,
     mime,
     filename,
     width = null,
@@ -63,8 +65,11 @@
   let mediaLabel = $derived(filename || i18n.t('timeline.videoAttachment'));
   /* Keyed by source: a recycled tile must not inherit another's start. */
   let startedSource = $state<string | null>(null);
+  let resolved = $state<string | null>(null);
+  let resolving = $state(false);
+  let playable = $derived(source ?? resolved);
   let video = $derived(videoPlayback(playback));
-  let started = $derived(startedSource === source || video.autoplay);
+  let started = $derived(playable !== null && (startedSource === playable || video.autoplay));
   let awaitingPlay = $derived(!started && url === null);
   let posterFailed = $state<string | null>(null);
   let videoElement = $state<HTMLVideoElement>();
@@ -107,7 +112,7 @@
     }
   });
   let retryWait = $derived(Math.max(0, retryAt - clock));
-  const loading = mediaProgress(core, () => (!url && !failed ? source : null));
+  const loading = mediaProgress(core, () => (!url && !failed ? playable : null));
   let retryLabel = $derived(
     retryWait === 0
       ? i18n.t('common.retry')
@@ -131,14 +136,19 @@
     let active = true;
     const retry = loadGeneration > 0 && retryNextLoad;
     retryNextLoad = false;
+    const wanted = playable;
+    if (wanted === null) {
+      url = null;
+      return;
+    }
     failed = false;
-    if (source !== backoffSource) {
-      backoffSource = source;
+    if (wanted !== backoffSource) {
+      backoffSource = wanted;
       retryCount = 0;
       retryAt = 0;
     }
-    const release = holdMediaUrl(core, source, 0, 0);
-    const cached = cachedMediaUrl(core, source, 0, 0);
+    const release = holdMediaUrl(core, wanted, 0, 0);
+    const cached = cachedMediaUrl(core, wanted, 0, 0);
     if (cached !== undefined) {
       url = cached;
       return release;
@@ -147,7 +157,7 @@
     url = null;
     if (!started) return release;
     const load = retry ? retryMediaUrl : loadMediaUrl;
-    void load(core, source, 0, 0, mime)
+    void load(core, wanted, 0, 0, mime)
       .then((nextUrl) => {
         if (!active) return;
         url = nextUrl;
@@ -174,12 +184,26 @@
     void downloadUrl(url, mediaLabel);
   }
 
-  function play(): void {
-    startedSource = source;
+  async function play(): Promise<void> {
+    if (playable === null) {
+      resolving = true;
+      failed = false;
+      resolved = (await resolveSource?.()) ?? null;
+      resolving = false;
+      if (resolved === null) {
+        failed = true;
+        return;
+      }
+    }
+    startedSource = playable;
   }
 
   function retry(): void {
     if (retryWait > 0) return;
+    if (playable === null) {
+      void play();
+      return;
+    }
     retryCount += 1;
     retryAt = 0;
     failed = false;
@@ -252,7 +276,7 @@
       <img class="media-loading-poster" src={posterUrl} alt="" aria-hidden="true" />
     {/if}
   {/if}
-  {#if awaitingPlay && !failed}
+  {#if awaitingPlay && !failed && !resolving}
     <button
       type="button"
       class="media-play"
@@ -264,7 +288,7 @@
       </span>
     </button>
     {#if size !== null && size > 0}<span class="media-image-size">{formatByteSize(size)}</span>{/if}
-  {:else if !failed && !url && !!started}
+  {:else if !failed && !url && (started || resolving)}
     <span class="media-loading">
       <span class="media-loading-status">
         <Spinner small />
