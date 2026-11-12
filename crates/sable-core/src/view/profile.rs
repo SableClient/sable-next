@@ -1,3 +1,4 @@
+use matrix_sdk::ruma::events::room::message::sanitize::remove_plain_reply_fallback;
 use sable_model::text::visible_name;
 
 use serde::Deserialize as _;
@@ -92,6 +93,14 @@ pub(crate) fn per_message_profile(
         has_animal: profile.has_animal,
         animal_need: profile.animal_need,
     })
+}
+
+pub(crate) fn authored_body(body: &str, content: Option<&serde_json::Value>) -> String {
+    let fallback_name = per_message_profile(content)
+        .filter(|profile| profile.has_fallback)
+        .and_then(|profile| profile.display_name);
+    let body = crate::matrix_html::strip_profile_fallback_body(body, fallback_name.as_deref());
+    remove_plain_reply_fallback(&body).to_owned()
 }
 
 #[cfg(test)]

@@ -305,21 +305,8 @@ pub(super) fn indexable_body(body: &str) -> String {
     remove_plain_reply_fallback(body).to_owned()
 }
 
-pub(super) fn without_profile_name(body: &str, raw: Option<&serde_json::Value>) -> String {
-    let Some(profile) = crate::view::per_message_profile(raw) else {
-        return body.to_owned();
-    };
-    crate::matrix_html::strip_profile_fallback_body(
-        body,
-        profile
-            .display_name
-            .as_deref()
-            .filter(|_| profile.has_fallback),
-    )
-}
-
 pub(super) fn message_text(msgtype: &MessageType, raw: Option<&serde_json::Value>) -> String {
-    let body = indexable_body(&without_profile_name(msgtype.body(), raw));
+    let body = crate::view::authored_body(msgtype.body(), raw);
     let filenames = match msgtype {
         MessageType::Gallery(gallery) => crate::view::gallery_filenames(gallery),
         MessageType::Image(image) => vec![image.filename()],

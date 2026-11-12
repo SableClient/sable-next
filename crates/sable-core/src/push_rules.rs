@@ -12,6 +12,7 @@ use crate::protocol::{
 };
 
 mod alignment;
+mod authored;
 mod categories;
 mod direct;
 mod keywords;
@@ -19,6 +20,7 @@ mod related;
 mod store;
 
 pub use alignment::plan_cleanup;
+pub use authored::authored_event;
 pub use categories::{
     event_notifications, master_muted, mention_notifications, plan_event, plan_master,
     plan_membership, plan_mention, pushes_every_encrypted_event,

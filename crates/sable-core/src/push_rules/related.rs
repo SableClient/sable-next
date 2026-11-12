@@ -44,15 +44,26 @@ pub async fn related_actions<T>(
     let Ok(rules) = room.client().account().push_rules().await else {
         return actions;
     };
-    if !rules
+    let authored = super::authored_event(event);
+    let has_related_rules = rules
         .iter()
-        .any(|rule| rule.enabled() && has_related(&rule))
-    {
+        .any(|rule| rule.enabled() && has_related(&rule));
+    if authored.is_none() && !has_related_rules {
         return actions;
     }
     let Ok(Some(context)) = room.push_condition_room_ctx().await else {
         return actions;
     };
+    let (event, actions) = match &authored {
+        Some(authored) => (
+            authored,
+            rules.get_actions(authored, &context).await.to_vec(),
+        ),
+        None => (event, actions),
+    };
+    if !has_related_rules {
+        return actions;
+    }
     let flattened = FlattenedJson::from_raw(event);
     if flattened.get_str("sender") == Some(context.user_id.as_str()) {
         return actions;

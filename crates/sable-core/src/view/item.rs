@@ -65,7 +65,7 @@ impl Highlights {
             let Some(raw) = event.latest_json().or_else(|| event.original_json()) else {
                 continue;
             };
-            let highlighted = push.for_event(raw).await.iter().any(Action::is_highlight);
+            let highlighted = highlights_me(push, raw).await;
             holds.insert(item.unique_id().0.clone(), highlighted);
         }
         Self(holds)
@@ -88,6 +88,14 @@ impl Highlights {
             .copied()
             .unwrap_or_else(|| event.is_highlighted())
     }
+}
+
+async fn highlights_me<T>(push: &PushContext, raw: &Raw<T>) -> bool {
+    let authored = crate::push_rules::authored_event(raw);
+    push.for_event(authored.as_ref().unwrap_or(raw))
+        .await
+        .iter()
+        .any(Action::is_highlight)
 }
 
 #[derive(Clone)]
@@ -456,11 +464,7 @@ pub async fn standalone_item(
         .unwrap_or_default();
     let item_content = TimelineItemContent::from_event(room, shown.clone()).await?;
     let highlighted = match push {
-        Some(push) if !is_own => push
-            .for_event(shown.raw())
-            .await
-            .iter()
-            .any(Action::is_highlight),
+        Some(push) if !is_own => highlights_me(push, shown.raw()).await,
         _ => false,
     };
     let message_profile = per_message_profile(raw.content.as_ref());
