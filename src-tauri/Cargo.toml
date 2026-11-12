@@ -67,7 +67,7 @@ sentry = { version = "0.49", default-features = false, features = [
   "ureq",
   "rustls",
 ] }
-tauri-plugin-sentry = "0.8.0"
+tauri-plugin-sentry = "0.9.0"
 
 # The plugin only compiles on a host build, which lints and tests the crate,
 # with a desktop backend.
