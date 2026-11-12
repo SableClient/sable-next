@@ -1,3 +1,4 @@
+import { localpartOf } from '#lib/matrix-id.js';
 import type {
   ImagePackView,
   MemberView,
@@ -17,10 +18,6 @@ import { descriptionKey, slashCommandNames } from './slash-commands';
 import { byUsage, usageOf } from './suggestion-usage';
 
 const limit = 8;
-
-function localpartOf(userId: string): string {
-  return userId.slice(1).split(':')[0] ?? '';
-}
 
 function rank(left: boolean, right: boolean): number {
   if (left === right) return 0;

@@ -1,3 +1,4 @@
+import { clamp } from '#lib/clamp.js';
 import { readText, writeText } from '#lib/platform/local-json.js';
 
 export class PanelWidth {
@@ -18,7 +19,7 @@ export class PanelWidth {
   }
 
   resize(next: number): void {
-    this.width = Math.max(this.min, Math.min(this.max, next));
+    this.width = clamp(next, this.min, this.max);
   }
 
   commit(): void {

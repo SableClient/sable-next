@@ -249,7 +249,7 @@
     transition: transform var(--motion-fast) var(--motion-easing-standard);
   }
 
-  .composer-send[data-pressing] svg {
+  html:not([data-reduced-motion='on']) .composer-send[data-pressing] svg {
     transform: scale(1.3);
     transition: transform var(--press-ms) linear;
   }

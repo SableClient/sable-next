@@ -1,3 +1,4 @@
+import { clamp } from '#lib/clamp.js';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { type as osType } from '@tauri-apps/plugin-os';
 import { on } from 'svelte/events';
@@ -42,7 +43,7 @@ export function opaqueArgb(color: string): number | undefined {
   const parsed = parseColor(color);
   if (!parsed) return undefined;
   const [red, green, blue] = [parsed.r, parsed.g, parsed.b].map((value) =>
-    Math.round(Math.max(0, Math.min(1, value)) * 255)
+    Math.round(clamp(value, 0, 1) * 255)
   );
   return 0xff000000 | (red << 16) | (green << 8) | blue | 0;
 }

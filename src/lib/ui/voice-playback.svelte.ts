@@ -1,3 +1,4 @@
+import { clamp } from '#lib/clamp.js';
 import { readText, writeText } from '#lib/platform/local-json.js';
 
 const SPEED_KEY = 'sable.voice.speed';
@@ -13,7 +14,7 @@ function readSpeed(): number {
 function readVolume(): number {
   const raw = readText(VOLUME_KEY);
   const stored = raw === null ? Number.NaN : Number(raw);
-  return Number.isFinite(stored) ? Math.max(0, Math.min(1, stored)) : 1;
+  return Number.isFinite(stored) ? clamp(stored, 0, 1) : 1;
 }
 
 let speed = $state(readSpeed());
@@ -31,7 +32,7 @@ export const voicePlayback = {
     writeText(SPEED_KEY, String(speed));
   },
   setVolume(next: number): void {
-    volume = Math.max(0, Math.min(1, next));
+    volume = clamp(next, 0, 1);
     writeText(VOLUME_KEY, String(volume));
   },
 };

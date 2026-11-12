@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clamp } from '#lib/clamp.js';
   import { MediaQuery } from 'svelte/reactivity';
   import type { SearchContextView, SearchHitView, SearchOrder } from '#src/generated/protocol';
   import { onDestroy, onMount, tick, untrack } from 'svelte';
@@ -430,7 +431,7 @@
     const { draft } = field;
     if (element.value === draft) return;
 
-    const position = Math.max(0, Math.min(draft.length, caret + draft.length - typed.length));
+    const position = clamp(caret + draft.length - typed.length, 0, draft.length);
     element.value = draft;
     element.setSelectionRange(position, position);
   }

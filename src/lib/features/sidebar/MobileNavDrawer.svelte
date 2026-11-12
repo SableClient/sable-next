@@ -1,19 +1,17 @@
 <script lang="ts">
+  import { clamp } from '#lib/clamp.js';
   import { untrack, type Snippet } from 'svelte';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
+  import { isPlainClick } from '#lib/ui/plain-click.js';
+  import { afterNextPaint } from '#lib/ui/after-paint.js';
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import SidebarNav from '#lib/features/sidebar/SidebarNav.svelte';
   import UserQuickTools from '#lib/features/sidebar/UserQuickTools.svelte';
   import { providePageMeta } from '#lib/core/page-meta.js';
-  import {
-    finishSwipeGesture,
-    startSwipeGesture,
-    updateSwipeGesture,
-    type SwipeGesture,
-  } from '#lib/ui/swipe-gesture.js';
+  import { HorizontalSwipe } from '#lib/ui/horizontal-swipe.svelte.js';
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import {
     backToRoomList,
@@ -29,13 +27,11 @@
 
   let { children }: Props = $props();
 
-  type Gesture = SwipeGesture & { width: number };
-
   let position = $state<number | undefined>();
-  let dragging = $state(false);
-  let gesture: Gesture | undefined;
-  let settleFrame: number | undefined;
-  let routeFrame: number | undefined;
+  const swipe = new HorizontalSwipe();
+  let swipeWidth = 0;
+  let cancelSettle: (() => void) | undefined;
+  let cancelRoute: (() => void) | undefined;
   let track: HTMLDivElement | undefined;
   let inertOpen = $state<boolean | undefined>();
   let inertTimer: ReturnType<typeof setTimeout> | undefined;
@@ -112,37 +108,29 @@
   $effect(() => {
     const next = pathname;
     cancelSettling();
-    if (routeFrame !== undefined) cancelAnimationFrame(routeFrame);
-    routeFrame = requestAnimationFrame(() => {
-      routeFrame = requestAnimationFrame(() => {
-        settledPath = next;
-        routeFrame = undefined;
-      });
+    cancelRoute?.();
+    cancelRoute = afterNextPaint(() => {
+      settledPath = next;
+      cancelRoute = undefined;
     });
     position = undefined;
-    dragging = false;
-    gesture = undefined;
+    swipe.cancel();
     return () => {
-      if (routeFrame !== undefined) cancelAnimationFrame(routeFrame);
+      cancelRoute?.();
     };
   });
 
   function cancelSettling() {
-    if (settleFrame === undefined) return;
-
-    cancelAnimationFrame(settleFrame);
-    settleFrame = undefined;
+    cancelSettle?.();
+    cancelSettle = undefined;
   }
 
   function settleDrawer() {
-    dragging = false;
     // Give the browser a rendered frame with transitions enabled before
     // releasing the drag offset to the open or closed transform.
-    settleFrame = requestAnimationFrame(() => {
-      settleFrame = requestAnimationFrame(() => {
-        position = undefined;
-        settleFrame = undefined;
-      });
+    cancelSettle = afterNextPaint(() => {
+      position = undefined;
+      cancelSettle = undefined;
     });
   }
 
@@ -165,46 +153,31 @@
     if (!(target instanceof HTMLDivElement)) return;
 
     const width = target.clientWidth;
-    if (width === 0) return;
+    if (width === 0 || pinnedClosed) return;
 
-    const swipe = startSwipeGesture(event, open ? 0 : -width);
-    if (!swipe) return;
-
-    if (pinnedClosed) return;
-
-    gesture = { ...swipe, width };
+    if (swipe.start(event, open ? 0 : -width)) swipeWidth = width;
   }
 
   function handleTouchMove(event: TouchEvent) {
-    if (!gesture) return;
-
-    const update = updateSwipeGesture(gesture, event);
-    if (!update || update.mode !== 'horizontal') return;
-
-    if (!dragging) {
-      dragging = true;
-    }
-    position = Math.max(-gesture.width, Math.min(0, gesture.startPosition + update.distanceX));
+    const next = swipe.move(event, (x) => clamp(x, -swipeWidth, 0));
+    if (next !== undefined) position = next;
   }
 
   function finishGesture(cancelled: boolean) {
-    const activeGesture = gesture;
-    gesture = undefined;
-    if (!activeGesture || activeGesture.mode !== 'horizontal') {
-      dragging = false;
+    const currentPosition = swipe.position;
+    const result = swipe.finish(cancelled);
+    if (!result) {
       position = undefined;
       return;
     }
 
-    const currentPosition = position ?? activeGesture.startPosition;
-    const result = finishSwipeGesture(activeGesture, currentPosition, cancelled);
     if (result.handled) {
       if (result.direction === 'right') {
         setOpen(true);
       } else if (result.direction === 'left') {
         setOpen(false);
       } else {
-        setOpen(currentPosition > -activeGesture.width / 2);
+        setOpen(currentPosition > -swipeWidth / 2);
       }
     }
 
@@ -215,9 +188,12 @@
     if (event.defaultPrevented || appLayout.current || !(event.target instanceof Element)) return;
     const link = event.target.closest('a[href]');
     if (!(link instanceof HTMLAnchorElement)) return;
-    const plain =
-      event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
-    if (!plain || link.origin !== page.url.origin || link.target || link.hasAttribute('download')) {
+    if (
+      !isPlainClick(event) ||
+      link.origin !== page.url.origin ||
+      link.target ||
+      link.hasAttribute('download')
+    ) {
       return;
     }
     if (link.pathname === pathname) {
@@ -270,7 +246,7 @@
   </p>
   <div
     bind:this={track}
-    class={['drawer-track', { open, dragging, 'route-changing': routeChanging }]}
+    class={['drawer-track', { open, dragging: swipe.dragging, 'route-changing': routeChanging }]}
     style:transform={position === undefined
       ? undefined
       : `translate3d(${String(position)}px, 0, 0)`}

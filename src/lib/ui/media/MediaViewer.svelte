@@ -3,8 +3,10 @@
 </script>
 
 <script lang="ts">
+  import { clamp } from '#lib/clamp.js';
   import { matchesAppLayout } from '#lib/ui/app-layout.svelte.js';
   import { mediaEvents } from '#lib/ui/media-events.js';
+  import { Velocity } from '#lib/ui/velocity.js';
   import { Dialog } from 'bits-ui';
   import { SvelteMap } from 'svelte/reactivity';
   import { flushSync, onDestroy, tick, untrack } from 'svelte';
@@ -170,9 +172,7 @@
     pointerId: number;
     startX: number;
     startY: number;
-    lastY: number;
-    lastTime: number;
-    velocityY: number;
+    velocityY: Velocity;
     axis: 'pending' | 'horizontal' | 'vertical';
   } | null = null;
   const touches = new SvelteMap<number, { x: number; y: number }>();
@@ -273,7 +273,7 @@
   let pannable = $derived(zoom > fitRatio * 1.001 || rotation % 360 !== 0);
 
   function applyZoom(next: number): void {
-    zoom = Math.min(maxZoom, Math.max(MIN_ZOOM, next));
+    zoom = clamp(next, MIN_ZOOM, maxZoom);
     void reclampPan();
   }
 
@@ -366,7 +366,7 @@
   }
 
   function zoomTowards(event: { clientX: number; clientY: number }, next: number): void {
-    const target = Math.min(maxZoom, Math.max(MIN_ZOOM, next));
+    const target = clamp(next, MIN_ZOOM, maxZoom);
     const offset = offsetFromImageCentre(event);
     const growth = target / zoom - 1;
     pan = { x: pan.x + offset.x * growth, y: pan.y + offset.y * growth };
@@ -386,15 +386,9 @@
     const factor = wheelZoomFactor(event, delta, window.innerHeight);
     if (lens) {
       if (event.shiftKey) {
-        lensSettings.size = Math.min(
-          LENS_MAX_SIZE,
-          Math.max(LENS_MIN_SIZE, lensSettings.size * factor)
-        );
+        lensSettings.size = clamp(lensSettings.size * factor, LENS_MIN_SIZE, LENS_MAX_SIZE);
       } else {
-        lensSettings.zoom = Math.min(
-          LENS_MAX_ZOOM,
-          Math.max(LENS_MIN_ZOOM, lensSettings.zoom * factor)
-        );
+        lensSettings.zoom = clamp(lensSettings.zoom * factor, LENS_MIN_ZOOM, LENS_MAX_ZOOM);
       }
       return;
     }
@@ -499,9 +493,7 @@
           pointerId: event.pointerId,
           startX: event.clientX,
           startY: event.clientY,
-          lastY: event.clientY,
-          lastTime: event.timeStamp,
-          velocityY: 0,
+          velocityY: new Velocity(),
           axis: 'pending',
         };
       }
@@ -560,12 +552,7 @@
         swipe.axis = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
       }
     }
-    const elapsed = event.timeStamp - swipe.lastTime;
-    if (elapsed >= 1) {
-      swipe.velocityY = (event.clientY - swipe.lastY) / elapsed;
-      swipe.lastY = event.clientY;
-      swipe.lastTime = event.timeStamp;
-    }
+    swipe.velocityY.track(event.clientY, event.timeStamp);
     if (swipe.axis === 'vertical') swipeY = dy;
     if (swipe.axis === 'horizontal') swipeX = dx;
   }
@@ -598,7 +585,8 @@
     endSwipe();
     if (axis === 'vertical') {
       const travelled = Math.abs(settled.y);
-      const flicked = Math.abs(velocityY) > VELOCITY_THRESHOLD && travelled > SWIPE_THRESHOLD / 2;
+      const flicked =
+        Math.abs(velocityY.value) > VELOCITY_THRESHOLD && travelled > SWIPE_THRESHOLD / 2;
       if (travelled > SWIPE_THRESHOLD || flicked) {
         onClose();
         return true;

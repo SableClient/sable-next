@@ -1,3 +1,4 @@
+import { clamp } from '#lib/clamp.js';
 import type { TimelineItemContentView } from '#src/generated/protocol';
 import type { MessageSpacing } from '#lib/settings/definitions.js';
 
@@ -48,9 +49,10 @@ function pictureRatio(width: number | null, height: number | null): number {
 }
 
 export function mediaColumnPx(columnWidth: number): number {
-  return Math.max(
+  return clamp(
+    columnWidth,
     TIMELINE_LAYOUT.mediaMinRem * ROOT_FONT_PX,
-    Math.min(columnWidth, TIMELINE_LAYOUT.mediaMaxRem * ROOT_FONT_PX)
+    TIMELINE_LAYOUT.mediaMaxRem * ROOT_FONT_PX
   );
 }
 
@@ -62,7 +64,7 @@ function pictureRow(columnPx: number, ratio: number, intrinsicPx = Infinity): nu
   const heightCapPx = TIMELINE_LAYOUT.mediaMaxRem * ROOT_FONT_PX;
   const width = Math.min(
     columnPx,
-    Math.max(TIMELINE_LAYOUT.mediaMinRem * ROOT_FONT_PX, Math.min(heightCapPx * ratio, intrinsicPx))
+    clamp(intrinsicPx, TIMELINE_LAYOUT.mediaMinRem * ROOT_FONT_PX, heightCapPx * ratio)
   );
   return Math.min(width / ratio, heightCapPx) + TIMELINE_LAYOUT.mediaRowChromePx;
 }

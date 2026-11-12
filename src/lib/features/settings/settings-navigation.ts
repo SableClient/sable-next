@@ -2,19 +2,15 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 
 import { SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
+import { isPlainClick } from '#lib/ui/plain-click.js';
 
 export function defaultSettingsSection(): string {
   return SETTINGS_ACCOUNT_SECTION;
 }
 
-/** Modified clicks keep the link's own behaviour. */
-function plainClick(event: MouseEvent): boolean {
-  return !event.shiftKey && !event.metaKey && !event.ctrlKey && event.button === 0;
-}
-
 /** Opens settings over the calling page, which stays mounted behind it. */
 export function openSettingsOver(event: MouseEvent, section: string): void {
-  if (!plainClick(event)) return;
+  if (!isPlainClick(event)) return;
 
   event.preventDefault();
   showSettingsOver(section);
@@ -26,7 +22,7 @@ export function showSettingsOver(section: string): void {
 
 /** Section-to-section moves replace, so closing returns to the opening page. */
 export function selectSettingsSection(event: MouseEvent, section: string): void {
-  if (!plainClick(event)) return;
+  if (!isPlainClick(event)) return;
 
   event.preventDefault();
 
@@ -44,7 +40,7 @@ export function followSettingsLink(
   focus: string | undefined,
   shallow: boolean
 ): void {
-  if (!plainClick(event)) return;
+  if (!isPlainClick(event)) return;
 
   event.preventDefault();
   const query = focus === undefined ? '' : `?focus=${encodeURIComponent(focus)}`;

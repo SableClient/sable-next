@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clamp } from '#lib/clamp.js';
   import { Popover } from 'bits-ui';
   import { convertHsvToRgb, convertRgbToHsv, parseHex, serializeHex } from 'culori/fn';
 
@@ -62,8 +63,8 @@
     const bounds = target.getBoundingClientRect();
     update(
       hue,
-      Math.round(Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)) * 100),
-      Math.round((1 - Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height))) * 100)
+      Math.round(clamp((event.clientX - bounds.left) / bounds.width, 0, 1) * 100),
+      Math.round((1 - clamp((event.clientY - bounds.top) / bounds.height, 0, 1)) * 100)
     );
   }
 </script>

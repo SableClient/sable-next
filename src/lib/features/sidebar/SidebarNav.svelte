@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clamp } from '#lib/clamp.js';
   import { i18n } from '#lib/i18n.js';
   import { readText, writeText } from '#lib/platform/local-json.js';
   import type { RoomListItemView } from '#src/generated/protocol';
@@ -172,7 +173,7 @@
   });
 
   function clampRoomNavWidth(width: number) {
-    const clamped = Math.max(MIN_ROOM_NAV_WIDTH, Math.min(MAX_ROOM_NAV_WIDTH, width));
+    const clamped = clamp(width, MIN_ROOM_NAV_WIDTH, MAX_ROOM_NAV_WIDTH);
 
     if (clamped > MIN_ROOM_NAV_WIDTH && clamped < COLLAPSED_ROOM_NAV_WIDTH) {
       return clamped - MIN_ROOM_NAV_WIDTH < COLLAPSED_ROOM_NAV_WIDTH - clamped

@@ -1,3 +1,4 @@
+import { clamp } from '#lib/clamp.js';
 import {
   convertOklabToRgb,
   convertRgbToOklab,
@@ -39,7 +40,7 @@ function toHex(rgb: Rgb): string {
 }
 
 function rounded(rgb: Rgb): Rgb {
-  return rgb.map((channel) => Math.round(Math.min(1, Math.max(0, channel)) * 255) / 255) as Rgb;
+  return rgb.map((channel) => Math.round(clamp(channel, 0, 1) * 255) / 255) as Rgb;
 }
 
 function ratio(first: Rgb, second: Rgb): number {

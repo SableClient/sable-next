@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { localpartOf } from '#lib/matrix-id.js';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import type {
     MentionNotificationModeView,
@@ -30,7 +31,7 @@
   let userId = $derived(core.session?.user_id ?? '');
   const ownProfile = new UserProfile(core, () => userId || null);
   let displayName = $derived(ownProfile.current?.display_name ?? '');
-  let username = $derived(userId.replace(/^@/, '').split(':')[0] ?? '');
+  let username = $derived(localpartOf(userId));
   let rules = $derived<
     { rule: MentionRuleView; key: keyof MentionNotificationsView; label: string; hint?: string }[]
   >([

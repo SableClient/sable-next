@@ -5,11 +5,18 @@ type OsType = ReturnType<typeof osType>;
 
 let reportedFallback = false;
 
-function osFromUserAgent(): OsType | null {
+/** iPadOS reports a Mac user agent, so touch support tells the two apart. */
+export function hasIosUserAgent(): boolean {
+  if (typeof navigator === 'undefined') return false;
   const agent = navigator.userAgent;
-  if (/Android/i.test(agent)) return 'android';
-  if (/iPhone|iPad|iPod/.test(agent) || (/Macintosh/.test(agent) && navigator.maxTouchPoints > 1))
-    return 'ios';
+  return (
+    /iPhone|iPad|iPod/.test(agent) || (/Macintosh/.test(agent) && navigator.maxTouchPoints > 1)
+  );
+}
+
+function osFromUserAgent(): OsType | null {
+  if (/Android/i.test(navigator.userAgent)) return 'android';
+  if (hasIosUserAgent()) return 'ios';
   return null;
 }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { serverNameOf } from '#lib/matrix-id.js';
   import PronounPill from '#lib/ui/primitives/PronounPill.svelte';
   import UserSupporterBadge from '#lib/supporter/UserSupporterBadge.svelte';
   import { profileSupporterAppearance } from '#lib/supporter/variants.js';
@@ -46,6 +47,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { formatNowInZone } from '#lib/ui/date-time.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { lastSeenBucket, lastSeenMs, usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
@@ -185,18 +187,8 @@
   let localTime = $derived.by(() => {
     const timezone = currentProfile?.timezone;
     if (!timezone) return null;
-
-    try {
-      const time = new Intl.DateTimeFormat(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: !preferences.hour24Clock,
-        timeZone: timezone,
-      }).format(new Date());
-      return { time, timezone };
-    } catch {
-      return null;
-    }
+    const time = formatNowInZone(timezone);
+    return time === null ? null : { time, timezone };
   });
   let animalText = $derived.by(() => {
     const animal = currentProfile?.animal;
@@ -237,7 +229,7 @@
     confirmingDirect = next;
     onNestedMenuOpenChange?.(next);
   }
-  let homeserver = $derived(userId.slice(userId.indexOf(':') + 1));
+  let homeserver = $derived(serverNameOf(userId));
   let elevated = $derived(roomMember !== null && roomMember.power_level >= 50);
   let roleTag = $derived(
     roomMember && powerTags !== null ? powerTag(roomMember.power_level, i18n.t, powerTags) : null

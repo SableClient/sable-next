@@ -1,3 +1,4 @@
+import { clamp } from '#lib/clamp.js';
 import type { DropEdge } from '#lib/ui/drag-list.js';
 
 const FIRST = 0x20;
@@ -73,7 +74,7 @@ export function reorderChildren(
 
   const moved = [...children];
   const [entry] = moved.splice(from, 1);
-  const to = Math.max(0, Math.min(targetIndex, moved.length));
+  const to = clamp(targetIndex, 0, moved.length);
   moved.splice(to, 0, entry);
   if (to === from) return [];
 

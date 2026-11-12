@@ -115,6 +115,19 @@ export function formatFullTimestamp(timestamp: number): string {
   }).format(timestamp);
 }
 
+export function formatNowInZone(timeZone: string): string | null {
+  try {
+    return localFormatter({
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: !preferences.hour24Clock,
+      timeZone,
+    }).format(Date.now());
+  } catch {
+    return null;
+  }
+}
+
 export function formatDate(timestamp: number): string {
   const date = new Date(timestamp);
   const day = dayOf(date);

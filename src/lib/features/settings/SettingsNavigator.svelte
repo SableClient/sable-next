@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isPlainClick } from '#lib/ui/plain-click.js';
   import { resolve } from '$app/paths';
   import type { Snippet } from 'svelte';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
@@ -59,7 +60,7 @@
   }
 
   function select(event: MouseEvent, nextSection: string, focus?: string): void {
-    if (event.shiftKey || event.metaKey || event.ctrlKey || event.button !== 0) return;
+    if (!isPlainClick(event)) return;
 
     event.preventDefault();
     onSelect(nextSection, focus);

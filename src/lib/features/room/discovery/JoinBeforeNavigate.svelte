@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { serverNameOf } from '#lib/matrix-id.js';
   import PageTitle from '#lib/ui/primitives/PageTitle.svelte';
   import { goto } from '$app/navigation';
   import { untrack } from 'svelte';
@@ -58,7 +59,7 @@
   const reasonId = $props.id();
 
   let title = $derived(preview?.name ?? roomId);
-  let localServer = $derived(core.session?.user_id.split(':').slice(1).join(':') ?? null);
+  let localServer = $derived(core.session ? serverNameOf(core.session.user_id) : null);
 
   $effect(() => {
     const address = roomId;

@@ -9,6 +9,7 @@
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
+  import { isPlainClick } from '#lib/ui/plain-click.js';
   import { isRoomSwitch } from '#lib/features/room/room-navigation.js';
   import { isBridgedSpace } from '#lib/rooms/bridged-spaces.svelte.js';
   import { findRoomByPathId, roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -504,9 +505,7 @@
       onNavigate(href);
       return;
     }
-    const plain =
-      event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
-    if (href === item.href || !plain) return;
+    if (href === item.href || !isPlainClick(event)) return;
     event.preventDefault();
     if (new URL(href, page.url.href).pathname === page.url.pathname) return;
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- every rail href is built with resolve()

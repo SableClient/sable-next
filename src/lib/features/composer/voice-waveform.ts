@@ -1,3 +1,5 @@
+import { clamp } from '#lib/clamp.js';
+
 export const WAVEFORM_BUCKETS = 40;
 
 export function downsampleWaveform(
@@ -20,5 +22,5 @@ export function downsampleWaveform(
 
   const max = Math.max(...bucketed, 0);
   if (max === 0) return bucketed.map(() => 0);
-  return bucketed.map((value) => Math.min(1, Math.max(0, value / max)));
+  return bucketed.map((value) => clamp(value / max, 0, 1));
 }

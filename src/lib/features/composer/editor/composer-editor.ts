@@ -1,3 +1,5 @@
+import { clamp } from '#lib/clamp.js';
+import { afterNextPaint } from '#lib/ui/after-paint.js';
 import {
   baseKeymap,
   chainCommands,
@@ -706,7 +708,7 @@ export class ComposerEditor {
   private iosEnter: { shift: boolean; handled: boolean } | null = null;
   private shiftHeld = false;
   private keyboardReset: HTMLTextAreaElement | undefined;
-  private keyboardResetFrame: number | undefined;
+  private cancelKeyboardReset: (() => void) | undefined;
 
   constructor(private options: ComposerEditorOptions) {}
 
@@ -929,10 +931,8 @@ export class ComposerEditor {
             const end = inputView.state.doc.content.size;
             if (from < 0 || to < from || to > end) {
               if (text === '') return true;
-              const start = Math.max(0, Math.min(from, end));
-              inputView.dispatch(
-                inputView.state.tr.insertText(text, start, Math.max(start, Math.min(to, end)))
-              );
+              const start = clamp(from, 0, end);
+              inputView.dispatch(inputView.state.tr.insertText(text, start, clamp(to, start, end)));
               return true;
             }
             if (text !== ' ' || from !== to || from !== this.pillSpace) return false;
@@ -1067,8 +1067,8 @@ export class ComposerEditor {
 
     return () => {
       stopTrace();
-      if (this.keyboardResetFrame !== undefined) cancelAnimationFrame(this.keyboardResetFrame);
-      this.keyboardResetFrame = undefined;
+      this.cancelKeyboardReset?.();
+      this.cancelKeyboardReset = undefined;
       this.keyboardReset?.remove();
       this.keyboardReset = undefined;
       view.destroy();
@@ -1159,16 +1159,14 @@ export class ComposerEditor {
 
   private resetKeyboard(view: EditorView, proxy: HTMLTextAreaElement): void {
     proxy.focus({ preventScroll: true });
-    if (this.keyboardResetFrame !== undefined) cancelAnimationFrame(this.keyboardResetFrame);
-    this.keyboardResetFrame = requestAnimationFrame(() => {
-      this.keyboardResetFrame = requestAnimationFrame(() => {
-        this.keyboardResetFrame = undefined;
-        if (this.view !== view || document.activeElement !== proxy) return;
-        const typed = proxy.value;
-        proxy.value = '';
-        view.focus();
-        if (typed) view.dispatch(view.state.tr.insertText(typed));
-      });
+    this.cancelKeyboardReset?.();
+    this.cancelKeyboardReset = afterNextPaint(() => {
+      this.cancelKeyboardReset = undefined;
+      if (this.view !== view || document.activeElement !== proxy) return;
+      const typed = proxy.value;
+      proxy.value = '';
+      view.focus();
+      if (typed) view.dispatch(view.state.tr.insertText(typed));
     });
   }
 

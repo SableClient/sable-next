@@ -9,6 +9,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { isPlainClick } from '#lib/ui/plain-click.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { pixelatedImage } from '#lib/ui/pixelated.js';
@@ -611,7 +612,7 @@
     }
 
     const anchor = target.closest<HTMLAnchorElement>('a');
-    if (!anchor || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+    if (!anchor || !isPlainClick(event)) return;
     if (anchor.href.toLowerCase().startsWith('matrix:')) event.preventDefault();
     const link = parseMatrixLink(anchor.href);
     if (!link) return;

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { localpartOf } from '#lib/matrix-id.js';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import FormActions from '#lib/ui/primitives/FormActions.svelte';
@@ -57,7 +58,7 @@
   const errorId = $props.id();
   let error = $derived(fieldError && invalidField !== 'homeserver' ? fieldError : null);
   let serverName = $derived(/^[a-z0-9.-]+(?::\d+)?$/i.test(serverLabel) ? serverLabel : null);
-  let localpart = $derived(username.trim().replace(/^@/, '').split(':')[0]);
+  let localpart = $derived(localpartOf(username.trim()));
 
   function errorFor(field: Field): string | undefined {
     return error && invalidField === field ? errorId : undefined;

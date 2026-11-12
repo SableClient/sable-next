@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clamp } from '#lib/clamp.js';
   import type { Component, Snippet } from 'svelte';
   import type { RoomListItemView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
@@ -81,7 +82,7 @@
         grow="down"
         step={16}
         shiftStep={64}
-        onResize={(next) => setPreference('roomBannerHeight', Math.max(min, Math.min(max, next)))}
+        onResize={(next) => setPreference('roomBannerHeight', clamp(next, min, max))}
       />
     </div>
   {/if}

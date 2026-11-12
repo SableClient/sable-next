@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clamp } from '#lib/clamp.js';
   import { afterNavigate } from '$app/navigation';
   import { untrack, type Snippet } from 'svelte';
   import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
@@ -6,12 +7,7 @@
   import { cubicOut } from 'svelte/easing';
   import { i18n } from '#lib/i18n.js';
   import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
-  import {
-    finishSwipeGesture,
-    startSwipeGesture,
-    updateSwipeGesture,
-    type SwipeGesture,
-  } from '#lib/ui/swipe-gesture.js';
+  import { HorizontalSwipe } from '#lib/ui/horizontal-swipe.svelte.js';
 
   interface Props {
     activeIndex: number;
@@ -35,10 +31,8 @@
   let leavingCard: HTMLElement | undefined;
   let scrollAnimation: number | undefined;
   let motionReadyFrame: number | undefined;
-  let isDragging = $state(false);
-  let swipeGesture: SwipeGesture | undefined;
+  const swipe = new HorizontalSwipe();
   let swipeStartScroll = 0;
-  let swipeOffset = 0;
 
   function focusCard(card: HTMLElement): void {
     const content = card.querySelector<HTMLElement>('.card-content');
@@ -100,12 +94,12 @@
   }
 
   function handleScroll(): void {
-    if (isDragging || isNavigating || swipeGesture) return;
+    if (isNavigating || swipe.active) return;
     const rail = railElement;
     if (rail) {
       const [min, max] = scrollBounds(rail);
       if (rail.scrollLeft < min - 1 || rail.scrollLeft > max + 1) {
-        rail.scrollLeft = Math.max(min, Math.min(max, rail.scrollLeft));
+        rail.scrollLeft = clamp(rail.scrollLeft, min, max);
         return;
       }
     }
@@ -131,44 +125,32 @@
     if (!rail || isNavigating) return;
     if (!(event.target instanceof Element) || !event.target.closest('.auth-card')) return;
 
-    const gesture = startSwipeGesture(event, 0);
-    if (!gesture) return;
+    if (!swipe.start(event)) return;
 
     window.clearTimeout(scrollTimer);
     window.cancelAnimationFrame(scrollAnimation ?? 0);
     scrollAnimation = undefined;
     isNavigating = false;
-    swipeGesture = gesture;
     swipeStartScroll = rail.scrollLeft;
-    swipeOffset = 0;
   }
 
   function handleTouchMove(event: TouchEvent): void {
     const rail = railElement;
-    const gesture = swipeGesture;
-    if (!rail || !gesture) return;
+    if (!rail) return;
 
-    const update = updateSwipeGesture(gesture, event);
-    if (!update || update.mode !== 'horizontal') return;
+    const offset = swipe.move(event);
+    if (offset === undefined) return;
 
-    isDragging = true;
-    swipeOffset = update.distanceX;
     const [min, max] = scrollBounds(rail);
-    rail.scrollLeft = Math.max(min, Math.min(max, swipeStartScroll - swipeOffset));
+    rail.scrollLeft = clamp(swipeStartScroll - offset, min, max);
   }
 
   function finishTouchGesture(cancelled: boolean): void {
     const rail = railElement;
-    const gesture = swipeGesture;
-    if (!rail || !gesture) return;
+    if (!rail) return;
 
-    swipeGesture = undefined;
-    const wasDragging = isDragging;
-    const result = finishSwipeGesture(gesture, swipeOffset, cancelled);
-    isDragging = false;
-    swipeOffset = 0;
-
-    if (!wasDragging) return;
+    const result = swipe.finish(cancelled);
+    if (!result) return;
     if (!result.handled) {
       settleToCard(activeIndex);
       return;
@@ -207,7 +189,7 @@
 
   function keepActiveCardCentred(rail: HTMLDivElement): () => void {
     const observer = new ResizeObserver(() => {
-      if (isDragging || isNavigating || swipeGesture) return;
+      if (isNavigating || swipe.active) return;
       const card = cardElements(rail)[untrack(() => activeIndex)] as HTMLElement | undefined;
       if (card) rail.scrollLeft = cardTarget(rail, card);
     });
@@ -281,7 +263,7 @@
     {@attach keepActiveCardCentred}
     class={[
       'rail',
-      { 'motion-ready': motionReady, 'is-navigating': isNavigating, 'is-dragging': isDragging },
+      { 'motion-ready': motionReady, 'is-navigating': isNavigating, 'is-dragging': swipe.dragging },
     ]}
     style:height={activeCardHeight === null
       ? undefined

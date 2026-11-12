@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clamp } from '#lib/clamp.js';
   import { MediaQuery } from 'svelte/reactivity';
   import { innerWidth } from 'svelte/reactivity/window';
   import type {
@@ -634,7 +635,7 @@
 
   function resizeBoard(width: number): void {
     writeBoardSize({
-      width: Math.max(MIN_BOARD_WIDTH, Math.min(maxBoardWidth, width)),
+      width: clamp(width, MIN_BOARD_WIDTH, maxBoardWidth),
       height: readBoardSize()?.height ?? 457,
     });
   }

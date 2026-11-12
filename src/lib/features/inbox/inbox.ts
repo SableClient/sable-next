@@ -1,3 +1,4 @@
+import { localpartOf } from '#lib/matrix-id.js';
 import type {
   BookmarkView,
   InboxFilter,
@@ -146,7 +147,7 @@ export function inviter(room: RoomListItemView): string | null {
 }
 
 export function senderName(userId: string): string {
-  return userId.startsWith('@') ? (userId.slice(1).split(':')[0] ?? userId) : userId;
+  return userId.startsWith('@') ? localpartOf(userId) : userId;
 }
 
 function matchesBookmarkQuery(bookmark: BookmarkView, needle: string): boolean {

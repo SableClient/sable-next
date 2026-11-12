@@ -1,3 +1,4 @@
+import { clamp } from '#lib/clamp.js';
 import type {
   MediaPreviewsView,
   PresenceView,
@@ -620,7 +621,7 @@ export function sanitize(stored: Record<string, unknown>, base: Preferences): Pr
         break;
       case 'number':
         if (typeof value === 'number' && Number.isFinite(value))
-          next[key] = Math.min(setting.max, Math.max(setting.min, value));
+          next[key] = clamp(value, setting.min, setting.max);
         break;
       case 'text':
         if (typeof value === 'string') next[key] = value;

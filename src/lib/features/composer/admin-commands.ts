@@ -1,3 +1,4 @@
+import { serverNameOf } from '#lib/matrix-id.js';
 import type { RoomListItemView } from '#src/generated/protocol';
 
 import type { Suggestion } from './autocomplete';
@@ -22,7 +23,7 @@ export async function loadAdminCommands(): Promise<readonly AdminCommand[]> {
 }
 
 export function adminBot(userId: string): string {
-  return `@conduit:${userId.slice(userId.indexOf(':') + 1)}`;
+  return `@conduit:${serverNameOf(userId)}`;
 }
 
 type CommandNode = { name: string; description: string; children: CommandNode[] };
@@ -82,7 +83,7 @@ export function adminScope(
 ): AdminScope {
   if (!userId) return null;
 
-  const alias = `#admins:${userId.slice(userId.indexOf(':') + 1)}`;
+  const alias = `#admins:${serverNameOf(userId)}`;
   const adminRoom = rooms.find((room) => room.canonical_alias === alias);
   if (!adminRoom) return null;
   return adminRoom.room_id === roomId ? 'adminRoom' : 'escaped';

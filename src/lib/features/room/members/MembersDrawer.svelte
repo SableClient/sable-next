@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clamp } from '#lib/clamp.js';
   import type { MemberView } from '#src/generated/protocol';
   import { Dialog } from 'bits-ui';
   import { innerWidth } from 'svelte/reactivity/window';
@@ -147,9 +148,7 @@
   const MIN_WIDTH = 224;
   const MAX_WIDTH = 640;
   let currentWidth = $derived(width ?? DEFAULT_WIDTH);
-  let maxWidth = $derived(
-    Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, (innerWidth.current ?? Infinity) / 2))
-  );
+  let maxWidth = $derived(clamp((innerWidth.current ?? Infinity) / 2, MIN_WIDTH, MAX_WIDTH));
 
   $effect(() => {
     void roomId;
@@ -177,7 +176,7 @@
   });
 
   function resize(next: number): void {
-    width = Math.min(maxWidth, Math.max(MIN_WIDTH, next));
+    width = clamp(next, MIN_WIDTH, maxWidth);
   }
 
   const storedWidth = Number.parseInt(readText(WIDTH_STORAGE_KEY) ?? '', 10);

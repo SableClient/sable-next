@@ -14,7 +14,7 @@
   import { profileSupporterAppearance } from '#lib/supporter/variants.js';
 
   import { i18n } from '#lib/i18n.js';
-  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { formatNowInZone } from '#lib/ui/date-time.js';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
 
   import { senderColor } from '../timeline/timeline-format';
@@ -59,18 +59,8 @@
   let localTime = $derived.by(() => {
     const timezone = ownerProfile?.timezone;
     if (!timezone) return null;
-
-    try {
-      const time = new Intl.DateTimeFormat(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: !preferences.hour24Clock,
-        timeZone: timezone,
-      }).format(new Date());
-      return { time, timezone };
-    } catch {
-      return null;
-    }
+    const time = formatNowInZone(timezone);
+    return time === null ? null : { time, timezone };
   });
   let animalText = $derived.by(() => {
     let identity: string;

@@ -1,3 +1,4 @@
+import { serverNameOf } from '#lib/matrix-id.js';
 import { copyText } from '#lib/platform/clipboard.js';
 import { resolve } from '$app/paths';
 
@@ -117,7 +118,7 @@ export async function joinVia(
   via: readonly string[],
   parentId: string | null
 ): Promise<string[]> {
-  const own = core.session?.user_id.split(':').slice(1).join(':');
+  const own = core.session ? serverNameOf(core.session.user_id) : undefined;
   if (parentId === null || via.some((server) => server !== own)) return [...via];
   return [...via, ...(await core.rpc.rooms.viaServers({ room_id: parentId }))];
 }

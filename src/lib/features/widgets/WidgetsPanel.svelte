@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clamp } from '#lib/clamp.js';
   import { panelIn, panelOut, usePanelStage } from '#lib/ui/motion.js';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
@@ -65,7 +66,7 @@
   let activeId = $state<string | null>(null);
 
   function clampWidth(next: number): number {
-    return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, next));
+    return clamp(next, MIN_WIDTH, MAX_WIDTH);
   }
 
   function remFromPixels(pixels: number): number {

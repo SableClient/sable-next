@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { OutlineTracker } from './settings-outline.svelte.js';
+  import { isPlainClick } from '#lib/ui/plain-click.js';
 
   interface Props {
     outline: OutlineTracker;
@@ -23,7 +24,7 @@
         aria-current={active ? 'location' : undefined}
         draggable="false"
         onclick={(event) => {
-          if (event.shiftKey || event.metaKey || event.ctrlKey || event.button !== 0) return;
+          if (!isPlainClick(event)) return;
 
           event.preventDefault();
           outline.jump(entry.id);
