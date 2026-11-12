@@ -3,6 +3,7 @@ import { onDestroy, type Snippet } from 'svelte';
 import type { MemberView, PerMessageProfileView, TimelineItemView } from '#src/generated/protocol';
 
 import { copyText } from '#lib/platform/clipboard.js';
+import { shareLink, sharesLinks } from '#lib/platform/files.js';
 import { i18n } from '#lib/i18n.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 import { useCoreClient } from '#lib/core/context.js';
@@ -153,13 +154,14 @@ export class TimelineRow {
     });
     this.press = new LongPress({
       enabled: () => this.actionable || this.canCancelSend,
-      onPress: () => {
+      onPress: (event) => {
         const { item } = this.#options();
         this.menu.set(item.id, false);
         const selected = selectedText(this.element);
+        const link = this.#linkActions(event);
         this.dialogs.open(item, {
           kind: 'sheet',
-          actions: () => withSelectedText(this.actions, selected),
+          actions: () => ({ ...withSelectedText(this.actions, selected), ...link }),
         });
       },
     });
@@ -281,21 +283,33 @@ export class TimelineRow {
     }
     event.preventDefault();
     this.#anchor = cursorAnchor(event);
+    const selected = selectedText(this.element);
+    const link = this.#linkActions(event);
+    this.menu.open(item.id, { x: event.clientX, y: event.clientY }, () => ({
+      ...withSelectedText(this.actions, selected),
+      ...link,
+    }));
+  };
+
+  #linkActions(event: Event): Pick<MessageActions, 'onCopyHref' | 'onShareHref'> {
     const link =
       event.target instanceof Element
         ? event.target.closest<HTMLAnchorElement>('a[href]')?.href
         : null;
-    const selected = selectedText(this.element);
-    this.menu.open(item.id, { x: event.clientX, y: event.clientY }, () => ({
-      ...withSelectedText(this.actions, selected),
-      onCopyHref:
-        link && this.actionable
-          ? () => {
-              void copyText(link)
-                .then(() => toasts.info(i18n.t('timeline.linkCopied')))
-                .catch(() => toasts.error(i18n.t('errors.copyFailed')));
-            }
-          : undefined,
-    }));
-  };
+    if (!link || !this.actionable) return {};
+    return {
+      onCopyHref: () => {
+        void copyText(link)
+          .then(() => toasts.info(i18n.t('timeline.linkCopied')))
+          .catch(() => toasts.error(i18n.t('errors.copyFailed')));
+      },
+      onShareHref: sharesLinks()
+        ? () => {
+            void shareLink(link).catch((error: unknown) => {
+              console.debug('[sable timeline] share dismissed', error);
+            });
+          }
+        : undefined,
+    };
+  }
 }

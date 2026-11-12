@@ -17,6 +17,7 @@ import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 import LinkBreakIcon from 'phosphor-svelte/lib/LinkBreakIcon';
 import ReceiptIcon from 'phosphor-svelte/lib/EyeIcon';
 import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
+import ShareIcon from 'phosphor-svelte/lib/ShareNetworkIcon';
 import StealIcon from 'phosphor-svelte/lib/StickerIcon';
 import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
@@ -40,6 +41,7 @@ export type MessageActions = {
   copyTextLabel?: string;
   onCopyLink?: () => void;
   onCopyHref?: () => void;
+  onShareHref?: () => void;
   onPin?: () => void;
   onBookmark?: () => void;
   onForward?: () => void;
@@ -113,6 +115,14 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       label: 'timeline.copyLink',
       icon: LinkIcon,
       run: actions.onCopyHref,
+    });
+  }
+  if (actions.onShareHref) {
+    rows.push({
+      key: 'share-href',
+      label: 'timeline.shareLink',
+      icon: ShareIcon,
+      run: actions.onShareHref,
     });
   }
   if (actions.onCopyLink) {

@@ -1220,6 +1220,7 @@
     "copyLink": "Copy link address",
     "copyMessageLink": "Copy link to message",
     "linkCopied": "Link copied",
+    "shareLink": "Share link",
     "moreActions": "More actions",
     "closeMenu": "Close menu",
     "toggleReaction_one": "{{key}}, {{count, number}} reaction. Toggle yours.",

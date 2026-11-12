@@ -25,10 +25,15 @@ test('message permalinks are labelled separately from body links', () => {
 });
 
 test('a link under the cursor adds a row beside the message permalink', () => {
-  const rows = messageMenuRows({ onCopyHref: () => {}, onCopyLink: () => {} });
+  const rows = messageMenuRows({
+    onCopyHref: () => {},
+    onShareHref: () => {},
+    onCopyLink: () => {},
+  });
 
   expect(rows.map((row) => [row.key, row.label])).toEqual([
     ['href', 'timeline.copyLink'],
+    ['share-href', 'timeline.shareLink'],
     ['link', 'timeline.copyMessageLink'],
   ]);
 });

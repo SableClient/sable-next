@@ -815,6 +815,7 @@
     "deleteReason": "Motif (facultatif, affiché dans le salon)",
     "copyMessage": "Copier le message",
     "copyLink": "Copier le lien",
+    "shareLink": "Partager le lien",
     "moreActions": "Plus d’actions",
     "closeMenu": "Fermer le menu",
     "toggleReaction": "{{key}}, {{count, number}} réactions. Activer ou désactiver la vôtre.",

@@ -8,13 +8,16 @@ import type { CoreEvent } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
-const { saveBytes } = vi.hoisted(() => ({
+const { saveBytes, shareLink } = vi.hoisted(() => ({
   saveBytes: vi.fn(() => Promise.resolve('saved' as const)),
+  shareLink: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('#lib/platform/files.js', async () => ({
   ...(await vi.importActual<typeof import('#lib/platform/files.js')>('#lib/platform/files.js')),
   saveBytes,
+  sharesLinks: () => true,
+  shareLink,
 }));
 
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
@@ -452,6 +455,33 @@ test('long pressing a reaction opens its people list without toggling it', async
   expect(document.querySelector('.sheet-list')).toBeNull();
   expect(onToggleReaction).not.toHaveBeenCalled();
   vi.useRealTimers();
+});
+
+test('long pressing a link offers to copy or share it', async () => {
+  const linked = item(false);
+  if (linked.content.kind !== 'message') throw new Error('expected a message');
+  linked.content.html = '<a href="https://example.org">Link</a>';
+  vi.useFakeTimers();
+  const instance = render(TimelineItemHarness, {
+    props: { core, item: { item: linked, collapsed: false, onReply: vi.fn() } },
+  });
+  await tick();
+
+  screen
+    .getByRole('link', { name: 'Link' })
+    .dispatchEvent(
+      new PointerEvent('pointerdown', { pointerType: 'touch', isPrimary: true, bubbles: true })
+    );
+  await vi.advanceTimersByTimeAsync(LONG_PRESS_MS);
+  window.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'touch', isPrimary: true }));
+  await vi.advanceTimersByTimeAsync(1000);
+  vi.useRealTimers();
+
+  expect(screen.getByRole('button', { name: /Copy link address/ })).not.toBeNull();
+  await press(screen.getByRole('button', { name: /Share link/ }));
+
+  expect(shareLink).toHaveBeenCalledWith('https://example.org/');
+  instance.unmount();
 });
 
 test('a touch long press opens the sheet without also opening the context menu', async () => {

@@ -167,6 +167,19 @@ export function sharesNatively(): boolean {
   return electron ? electron.platform === 'darwin' : isNativeMobile();
 }
 
+export function sharesLinks(): boolean {
+  return isNativeMobile() || typeof navigator.share === 'function';
+}
+
+export async function shareLink(url: string): Promise<void> {
+  if (isNativeMobile()) {
+    const { shareText } = await import('@choochmeque/tauri-plugin-sharekit-api');
+    await shareText(url);
+    return;
+  }
+  await navigator.share({ url });
+}
+
 export async function shareFile(
   url: string,
   filename: string,
