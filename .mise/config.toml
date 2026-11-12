@@ -224,7 +224,7 @@ run = "tofu"
 dir = "infra/web"
 raw_args = true
 hide = true
-tools = { "opentofu" = "1.13.2" }
+tools = { "opentofu" = "1.13.9" }
 
 [tasks."check:settings-changes"]
 description = "Check that the generated settings changes match the release tags"
