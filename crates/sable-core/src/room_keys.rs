@@ -974,6 +974,98 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
         .unwrap();
     }
 
+    /// On iOS a push that wrote to the crypto store makes the app rebuild its machine on resume.
+    #[tokio::test]
+    async fn a_key_received_after_the_machine_is_rebuilt_redecrypts() {
+        let server = MatrixMockServer::new().await;
+        let directory = tempfile::tempdir().unwrap();
+        let store_id = directory.path().join("a1").display().to_string();
+        let client = crate::session::mock_account_client(&server, &store_id).await;
+        let (core, _events) = Core::new(
+            directory.path().to_str().unwrap(),
+            Box::new(MemorySessionStore::default()),
+        );
+        *core.accounts.lock().await = Some(crate::session::AccountRegistry::empty());
+        let persisted = crate::session::current_session(&client, server.server().uri()).unwrap();
+        core.persist("a1", &store_id, &persisted, None)
+            .await
+            .unwrap();
+        *core.session.write().await = Some(Session {
+            account_id: "a1".to_owned(),
+            client: client.clone(),
+            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+            homeserver: server.server().uri(),
+            oauth: false,
+        });
+        core.watch_devices(&client, 1);
+        core.watch_room_keys(&client);
+        let room_id = room_id!("!rebuilt:example.org");
+        let outbound = outbound_session(room_id);
+        let key = exported(&outbound).await;
+        let content = outbound
+            .0
+            .encrypt(
+                "m.room.message",
+                &serde_json::from_value(json!({"msgtype": "m.text", "body": "after a push"}))
+                    .unwrap(),
+            )
+            .await
+            .content;
+        let event = Raw::from_json_string(
+            json!({"type": "m.room.encrypted", "event_id": "$rebuilt",
+                "sender": "@sender:example.org", "origin_server_ts": 1, "content": content})
+            .to_string(),
+        )
+        .unwrap();
+        server
+            .mock_room_state_encryption()
+            .encrypted()
+            .mount()
+            .await;
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).add_timeline_event(event),
+            )
+            .await;
+        let timeline = core
+            .live_timeline(&room_id.to_owned(), false)
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(timeline.items().await.iter().any(|item| is_utd(item)));
+
+        core.base_client()
+            .await
+            .unwrap()
+            .regenerate_olm(None)
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        client
+            .olm_machine_for_testing()
+            .await
+            .as_ref()
+            .unwrap()
+            .store()
+            .import_exported_room_keys(vec![key], |_, _| {})
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !timeline
+                .items()
+                .await
+                .iter()
+                .any(|item| body(item) == Some("after a push"))
+            {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("the key the rebuilt machine received redecrypts the event");
+    }
+
     fn is_utd(item: &TimelineItem) -> bool {
         item.as_event()
             .is_some_and(|event| event.content().is_unable_to_decrypt())

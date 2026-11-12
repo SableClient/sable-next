@@ -381,34 +381,52 @@ impl Core {
         );
     }
 
-    pub(crate) async fn watch_room_keys(self: &Arc<Self>, client: &matrix_sdk::Client) {
-        let Some(keys) = client.encryption().room_keys_received_stream().await else {
-            return;
-        };
+    pub(crate) fn watch_room_keys(self: &Arc<Self>, client: &matrix_sdk::Client) {
         let core = self.clone();
+        let client = client.clone();
         self.track_session_task(
             spawn(async move {
-                pin_mut!(keys);
-                while let Some(received) = keys.next().await {
-                    match received {
-                        Ok(keys) => {
-                            let rooms: BTreeSet<&RoomId> =
-                                keys.iter().map(|key| &*key.room_id).collect();
-                            for room in rooms {
-                                core.refresh_encrypted_replies(Some(room), |session| {
-                                    keys.iter().any(|key| {
-                                        &*key.room_id == room && key.session_id == session
+                // The stream ends when the SDK rebuilds its crypto machine, which it does after
+                // another process wrote to the crypto store.
+                while let Some(keys) = client.encryption().room_keys_received_stream().await {
+                    pin_mut!(keys);
+                    while let Some(received) = keys.next().await {
+                        match received {
+                            Ok(keys) => {
+                                let rooms: BTreeSet<&RoomId> =
+                                    keys.iter().map(|key| &*key.room_id).collect();
+                                for room in rooms {
+                                    core.refresh_encrypted_replies(Some(room), |session| {
+                                        keys.iter().any(|key| {
+                                            &*key.room_id == room && key.session_id == session
+                                        })
                                     })
-                                })
-                                .await;
+                                    .await;
+                                }
                             }
+                            Err(_) => core.refresh_encrypted_replies(None, |_| true).await,
                         }
-                        Err(_) => core.refresh_encrypted_replies(None, |_| true).await,
                     }
+                    core.refresh_encrypted_replies(None, |_| true).await;
                 }
             })
             .abort_on_drop(),
         );
+    }
+
+    /// `Encryption::devices_stream` owns the crypto machine it came from. A machine the SDK
+    /// replaced then never closes its room key stream, so the redecryptor keeps listening to it
+    /// and events stay undecryptable after their key arrives.
+    async fn identity_changes(&self) -> Option<impl futures_util::Stream<Item = ()> + use<>> {
+        let base = self.base_client().await.ok()?;
+        let machine = base.olm_machine().await;
+        Some(
+            machine
+                .as_ref()?
+                .store()
+                .identities_stream_raw()
+                .map(|_| ()),
+        )
     }
 
     /// Re-read the full status when verification, recovery, or backup changes.
@@ -487,22 +505,29 @@ impl Core {
         let watched = client.clone();
         self.track_session_task(
             spawn(async move {
-                let Ok(updates) = watched.encryption().devices_stream().await else {
-                    return;
-                };
-                pin_mut!(updates);
-                let mut known = crate::verification::local_own_devices(&watched).await;
-                while updates.next().await.is_some() {
-                    let devices = crate::verification::local_own_devices(&watched).await;
-                    if devices != known {
-                        known.clone_from(&devices);
-                        core.emit_if_current(
-                            generation,
-                            CoreEvent::EncryptionStatus {
-                                status: crate::verification::encryption_status(&watched).await,
-                            },
-                        );
-                        core.emit_if_current(generation, CoreEvent::DevicesChanged { devices });
+                let mut known = None;
+                while let Some(updates) = core.identity_changes().await {
+                    pin_mut!(updates);
+                    loop {
+                        let devices = crate::verification::local_own_devices(&watched).await;
+                        if known.as_ref().is_some_and(|known| *known != devices) {
+                            core.emit_if_current(
+                                generation,
+                                CoreEvent::EncryptionStatus {
+                                    status: crate::verification::encryption_status(&watched).await,
+                                },
+                            );
+                            core.emit_if_current(
+                                generation,
+                                CoreEvent::DevicesChanged {
+                                    devices: devices.clone(),
+                                },
+                            );
+                        }
+                        known = Some(devices);
+                        if updates.next().await.is_none() {
+                            break;
+                        }
                     }
                 }
             })
