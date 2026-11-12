@@ -1,5 +1,10 @@
 import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
-import { dismissKeyboardOnScroll, resetDocumentScroll, trackKeyboardInset } from './keyboard';
+import {
+  dismissKeyboardOnScroll,
+  keepKeyboardOnTap,
+  resetDocumentScroll,
+  trackKeyboardInset,
+} from './keyboard';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -279,4 +284,46 @@ test('a window scroll event zeroes a wedged document offset', async () => {
     stop();
     delete (document as { scrollingElement?: unknown }).scrollingElement;
   }
+});
+
+async function tapKeyboardHarness() {
+  const node = document.createElement('div');
+  const button = document.createElement('button');
+  const input = document.createElement('input');
+  const field = document.createElement('textarea');
+  node.append(button, input);
+  document.body.append(node, field);
+  field.focus();
+  const stop = keepKeyboardOnTap(node);
+  await Promise.resolve();
+  onTestFinished(() => {
+    stop();
+    node.remove();
+    field.remove();
+  });
+  const tap = (target: HTMLElement, touch = true): MouseEvent => {
+    if (touch) target.dispatchEvent(new Event('touchend', { bubbles: true }));
+    const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    target.dispatchEvent(event);
+    return event;
+  };
+  return { node, button, input, field, tap };
+}
+
+test('tapping the timeline keeps the composer focused', async () => {
+  const { node, button, tap } = await tapKeyboardHarness();
+  expect(tap(node).defaultPrevented).toBe(true);
+  expect(tap(button).defaultPrevented).toBe(true);
+});
+
+test('mouse presses and taps on editable fields move focus as usual', async () => {
+  const { node, input, tap } = await tapKeyboardHarness();
+  expect(tap(node, false).defaultPrevented).toBe(false);
+  expect(tap(input).defaultPrevented).toBe(false);
+});
+
+test('taps without a focused field outside the timeline are left alone', async () => {
+  const { node, field, tap } = await tapKeyboardHarness();
+  field.blur();
+  expect(tap(node).defaultPrevented).toBe(false);
 });

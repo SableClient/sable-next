@@ -42,6 +42,29 @@ export function dismissKeyboardOnScroll(node: HTMLElement): () => void {
   };
 }
 
+export function keepKeyboardOnTap(node: HTMLElement): () => void {
+  let touchedAt = -Infinity;
+
+  const touched = (): void => {
+    touchedAt = performance.now();
+  };
+  const press = (event: MouseEvent): void => {
+    if (performance.now() - touchedAt > 1000) return;
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement) || !isEditableTarget(active) || node.contains(active))
+      return;
+    const target = event.target;
+    if (target instanceof HTMLElement && (isEditableTarget(target) || target.closest('label')))
+      return;
+    event.preventDefault();
+  };
+
+  const stop = [on(node, 'touchend', touched, { passive: true }), on(node, 'mousedown', press)];
+  return () => {
+    for (const off of stop) off();
+  };
+}
+
 function keyboardInset(viewport: VisualViewport): number {
   const scale = viewport.scale || 1;
   const offset = scale === 1 ? viewport.offsetTop : 0;
