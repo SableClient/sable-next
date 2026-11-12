@@ -18,6 +18,7 @@
   import {
     backToRoomList,
     goToPage,
+    MOBILE_TAB_PATHS,
     setMobileDrawerOpen,
   } from '#lib/features/room/room-navigation.js';
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
@@ -45,7 +46,6 @@
       so room-list hydration cannot flash the sidebar over a room. */
   const LIST_INDEX_PATHS = new Set(['/home', '/rooms', '/direct']);
   const BLANK_INDEX_PATHS = new Set(['/home', '/rooms']);
-  const MOBILE_QUICK_TOOLS_PATHS = new Set(['/navigate', '/inbox', '/profile', '/alerts']);
   let pathname = $derived(page.url.pathname);
   let settledPath = $state(page.url.pathname);
   let routeChanging = $derived(pathname !== settledPath && page.params.roomId === undefined);
@@ -54,8 +54,8 @@
   let settingsPage = $derived(/^\/settings(\/[^/]+)?$/.test(pathname));
   let defaultOpen = $derived(LIST_INDEX_PATHS.has(pathname) || spaceIndex);
   let pinnedOpen = $derived(BLANK_INDEX_PATHS.has(pathname) || spaceIndex);
-  let pinnedClosed = $derived(MOBILE_QUICK_TOOLS_PATHS.has(pathname));
-  let showMobileQuickTools = $derived(MOBILE_QUICK_TOOLS_PATHS.has(pathname));
+  let pinnedClosed = $derived(MOBILE_TAB_PATHS.has(pathname));
+  let showMobileQuickTools = $derived(MOBILE_TAB_PATHS.has(pathname));
   let showMobileBackBar = $derived(
     !appLayout.current &&
       !pinnedOpen &&
@@ -314,7 +314,8 @@
         {@render children()}
       </div>
       {#if !appLayout.current}
-        <div class="mobile-quick-tools"><UserQuickTools mobile /></div>
+        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+        <div class="mobile-quick-tools" onclick={revealCurrentPage}><UserQuickTools mobile /></div>
       {/if}
     </section>
   </div>

@@ -166,6 +166,44 @@ test.each(['/space/space/lobby', '/rooms'])('on a phone, opening %s from a room 
   expect(goto).toHaveBeenLastCalledWith(href, { replace: false, state: {}, persistState: true });
 });
 
+test('on a phone, the first tab pushes over the list and the next ones replace it', () => {
+  visit('/space/space');
+
+  goToPage('/inbox');
+  expect(goto).toHaveBeenLastCalledWith('/inbox', {
+    replace: false,
+    state: { tabBack: true },
+    persistState: true,
+  });
+
+  visit('/inbox');
+  goToPage('/profile');
+  expect(goto).toHaveBeenLastCalledWith('/profile', {
+    replace: true,
+    state: { tabBack: true },
+    persistState: true,
+  });
+});
+
+test('on a phone, the messages tab pops back to the list the tab was opened over', () => {
+  visit('/inbox');
+  page.state.tabBack = true;
+
+  goToPage('/rooms');
+
+  expect(mocks.back).toHaveBeenCalledOnce();
+  expect(goto).not.toHaveBeenCalled();
+});
+
+test.each(['/inbox', '/space/space'])('on a phone, opening a list from %s replaces it', (from) => {
+  visit(from);
+
+  goToPage('/rooms');
+
+  expect(mocks.back).not.toHaveBeenCalled();
+  expect(goto).toHaveBeenLastCalledWith('/rooms', { replace: true, state: {}, persistState: true });
+});
+
 test.each([
   ['/rooms', {}, '/rooms/room'],
   ['/direct', {}, '/direct/room'],

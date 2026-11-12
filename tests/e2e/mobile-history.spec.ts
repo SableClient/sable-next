@@ -136,3 +136,28 @@ test('mobile: a settings section pops to the menu, and close returns to the page
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page).toHaveURL(/\/profile$/);
 });
+
+test('mobile: tabs share one history entry, and back from any of them returns to the list', async ({
+  page,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.goto('/direct');
+  const tab = (href: string) => page.locator(`.content-panel .mobile-tools a[href="${href}"]`);
+  await page.locator('.navigation-panel .mobile-tools a[href="/inbox"]').click();
+  await expect(page).toHaveURL(/\/inbox$/);
+  const length = await historyLength(page);
+
+  await tab('/navigate').click();
+  await expect(page).toHaveURL(/\/navigate$/);
+  await tab('/profile').click();
+  await expect(page).toHaveURL(/\/profile$/);
+  await tab('/rooms').click();
+  await expect(page).toHaveURL(/\/direct$/);
+  await page.locator('.navigation-panel .mobile-tools a[href="/inbox"]').click();
+  await expect(page).toHaveURL(/\/inbox$/);
+  expect(await historyLength(page)).toBe(length);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/direct$/);
+});

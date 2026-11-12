@@ -15,6 +15,8 @@ declare global {
       mobileDrawer?: 'open' | 'closed';
       /** Back returns to the room list. */
       mobileDrawerBack?: boolean;
+      /** Phone tab opened over another page, which the messages tab and Back return to. */
+      tabBack?: boolean;
       /** Event a notification tap lands the live timeline on, once. */
       notified?: string;
     }
