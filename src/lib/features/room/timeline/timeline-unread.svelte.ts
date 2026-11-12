@@ -119,6 +119,16 @@ export class TimelineUnread {
     }
   }
 
+  markUnreadFrom(eventId: string, readEventId: string | null): void {
+    this.initialized = true;
+    this.failed = false;
+    this.#readEventId = readEventId;
+    this.firstEventId = eventId;
+    this.active = true;
+    this.reached = false;
+    this.background = false;
+  }
+
   dismiss(): void {
     this.active = false;
     this.reached = true;

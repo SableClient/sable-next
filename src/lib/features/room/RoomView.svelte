@@ -674,8 +674,10 @@
   }
 
   function markUnreadFrom(eventId: string): void {
+    const readMarker = eventBefore(timeline.items, eventId);
+    timelineList?.markUnreadFrom(eventId, readMarker);
     void core.rpc.timeline
-      .markUnread({ room_id: resolvedRoomId, read_marker: eventBefore(timeline.items, eventId) })
+      .markUnread({ room_id: resolvedRoomId, read_marker: readMarker })
       .catch((error: unknown) => {
         console.warn('[sable room] mark as unread failed', error);
         toasts.error(i18n.t('errors.actionFailed'));

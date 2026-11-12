@@ -207,3 +207,21 @@ test('a read marker in a read room does not start an unread run', async () => {
   expect(unread.firstEventId).toBeNull();
   expect(unread.blocking).toBe(false);
 });
+
+test('marking unread from a message counts from that message until it is seen', async () => {
+  const unread = new TimelineUnread();
+  const items = [message('read'), message('chosen'), message('own', true), message('latest')];
+  await unread.initialize(items, false);
+  expect(unread.active).toBe(false);
+
+  unread.markUnreadFrom('$chosen', '$read');
+  expect(unread.active).toBe(true);
+  expect(unread.firstEventId).toBe('$chosen');
+  expect(unread.readEventId).toBe('$read');
+  expect(unread.count(items)).toBe(2);
+
+  unread.resolve(items, false);
+  expect(unread.firstEventId).toBe('$chosen');
+  unread.observe('$chosen');
+  expect(unread.blocking).toBe(false);
+});

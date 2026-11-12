@@ -1063,6 +1063,12 @@
     unreadNavigation?.abort();
     unread.clear();
   }
+  export function markUnreadFrom(eventId: string, readEventId: string | null): void {
+    unreadNavigation?.abort();
+    unreadError = null;
+    holdAtLatest = false;
+    unread.markUnreadFrom(eventId, readEventId);
+  }
   let replayingEventId = $state<string | null>(null);
   async function replayHighlight(eventId: string): Promise<void> {
     replayingEventId = eventId;
