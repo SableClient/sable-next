@@ -68,7 +68,7 @@ command = "git add src/generated/settings-changes.json"
 
 [[workflows.steps]]
 type = "Command"
-command = "git commit -m \"chore: prepare release $version\""
+command = "git commit --signoff -m \"chore: prepare release $version\""
 
 [[workflows.steps]]
 type = "Command"
