@@ -180,6 +180,14 @@
     return peers.length === 1 ? peers[0] : null;
   }
 
+  function messagePreview(room: RoomListItemView): string | null {
+    const mode = preferences.messagePreviews;
+    const shown = room.is_direct
+      ? mode === 'direct' || mode === 'all'
+      : mode === 'rooms' || mode === 'all';
+    return shown ? room.latest_event?.body || null : null;
+  }
+
   const peerProfiles = new PeerProfiles(core);
   let settingsRoomId = $state<string | null>(null);
   let leaveRoomId = $state<string | null>(null);
@@ -520,6 +528,7 @@
     {@const peerId = room?.is_direct ? dmPeerId(room) : null}
     {@const peerPresence = peerId ? presenceStore.peek(peerId) : null}
     {@const peerStatus = peerId ? resolveUserStatus(peerProfiles.get(peerId), peerPresence) : null}
+    {@const preview = room ? messagePreview(room) : null}
     {@const closed = sectionClosed && !(room !== undefined && (active || hasUnread(counts)))}
     {@const full = eagerKeys.has(item.key) || hydrated.has(item.key)}
     <div
@@ -636,7 +645,9 @@
             {#if !collapsed}
               <span class="room-text">
                 <span class="room-name">{name}</span>
-                {#if room?.is_direct && room.topic && preferences.showDmTopics}
+                {#if preview}
+                  <span class="room-topic">{preview}</span>
+                {:else if room?.is_direct && room.topic && preferences.showDmTopics}
                   <span class="room-topic">{room.topic}</span>
                 {:else if peerStatus}
                   {@const peerStatusLabel = [peerStatus?.emoji, peerStatus?.text]

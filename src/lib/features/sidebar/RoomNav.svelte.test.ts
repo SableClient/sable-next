@@ -7,6 +7,7 @@ import { tick } from 'svelte';
 import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 
 import type {
+  LatestEventView,
   NotificationSettingsView,
   RoomListItemView,
   RoomSectionView,
@@ -159,6 +160,7 @@ afterEach(() => {
   setPreference('directSort', 'recent');
   setPreference('showRoomIcon', 'always');
   setPreference('showDmTopics', true);
+  setPreference('messagePreviews', 'off');
   globalThis.IntersectionObserver = realObserver;
 });
 
@@ -1098,6 +1100,61 @@ test('a DM topic is hidden in favour of the peer status when topics are turned o
 
   expect(roomTopics()).toEqual(['In a meeting']);
 });
+
+test.each([
+  ['off', []],
+  ['direct', ['See you at noon']],
+  ['rooms', ['Deploy is green']],
+  ['all', ['See you at noon', 'Deploy is green']],
+] as const)(
+  'message previews set to %s show the latest message under the name',
+  async (mode, expected) => {
+    visit('/home');
+    setPreference('showHome', true);
+    setPreference('messagePreviews', mode);
+    roomsFixture.rooms = [
+      makeRoom({
+        room_id: '!dm:example.org',
+        name: 'Bob',
+        is_direct: true,
+        direct_targets: ['@bob:example.org'],
+        latest_event: latest('See you at noon', 2),
+      }),
+      makeRoom({
+        room_id: '!ops:example.org',
+        name: 'Ops',
+        latest_event: latest('Deploy is green', 1),
+      }),
+    ];
+    await mountNav();
+    await tick();
+
+    expect(roomTopics()).toEqual(expected);
+  }
+);
+
+test('a message preview replaces the DM topic', async () => {
+  visit('/direct');
+  setPreference('messagePreviews', 'direct');
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!dm:example.org',
+      name: 'Bob',
+      topic: 'Ship logs',
+      is_direct: true,
+      direct_targets: ['@bob:example.org'],
+      latest_event: latest('See you at noon', 1),
+    }),
+  ];
+  await mountNav();
+  await tick();
+
+  expect(roomTopics()).toEqual(['See you at noon']);
+});
+
+function latest(body: string, timestamp: number): LatestEventView {
+  return { sender: '@bob:example.org', body, timestamp, sending: false, event_id: `$${timestamp}` };
+}
 
 test('hovering a collapsed room row shows its full name in a tooltip', async () => {
   roomsFixture.rooms = [

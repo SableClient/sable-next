@@ -291,6 +291,16 @@
           "type": "boolean",
           "default": true
         },
+        "messagePreviews": {
+          "title": "Message previews",
+          "enum": [
+            "off",
+            "direct",
+            "rooms",
+            "all"
+          ],
+          "default": "off"
+        },
         "roomBannerHeight": {
           "type": "number",
           "minimum": 56,
@@ -1098,6 +1108,16 @@
           "title": "Show topics in direct messages",
           "type": "boolean",
           "default": true
+        },
+        "messagePreviews": {
+          "title": "Message previews",
+          "enum": [
+            "off",
+            "direct",
+            "rooms",
+            "all"
+          ],
+          "default": "off"
         },
         "roomBannerHeight": {
           "type": "number",

@@ -25,6 +25,7 @@ export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type WeekStart = 'sunday' | 'monday' | 'saturday';
 export type ThemeMode = 'system' | 'dark' | 'light';
 export type ShowRoomIcon = 'always' | 'sometimes' | 'collapsed' | 'never';
+export type MessagePreviews = 'off' | 'direct' | 'rooms' | 'all';
 export type SearchIndexLimit = '128' | '256' | '512' | '1024' | '2048' | '4096';
 export type PersonaPickerSortOrder = 'manual' | 'alphabetical-asc' | 'alphabetical-desc' | 'recent';
 
@@ -292,6 +293,9 @@ const SETTINGS = {
   }),
   showRoomBanners: toggle(true, { account: true }),
   showDmTopics: toggle(true, { account: true }),
+  messagePreviews: choice<MessagePreviews>(['off', 'direct', 'rooms', 'all'], 'off', {
+    account: true,
+  }),
   roomBannerHeight: range(56, 500, 190, { account: true, device: true }),
   subspaceHierarchyLimit: choice(SUBSPACE_DEPTHS, '3', { account: true }),
   searchIndexLimit: choice(SEARCH_INDEX_LIMITS, '512', { device: true }),

@@ -128,6 +128,20 @@ export const appearanceCategory: SettingsCategory = {
       type: 'boolean',
     },
     {
+      key: 'messagePreviews',
+      section: 'sidebar',
+      icon: ChatTextIcon,
+      name: 'settings.messagePreviews',
+      description: 'settings.messagePreviewsHint',
+      type: 'select',
+      options: [
+        { value: 'off', label: 'settings.messagePreviewsOff' },
+        { value: 'direct', label: 'settings.messagePreviewsDirect' },
+        { value: 'rooms', label: 'settings.messagePreviewsRooms' },
+        { value: 'all', label: 'settings.messagePreviewsAll' },
+      ],
+    },
+    {
       key: 'subspaceHierarchyLimit',
       section: 'sidebar',
       icon: TreeStructureIcon,
