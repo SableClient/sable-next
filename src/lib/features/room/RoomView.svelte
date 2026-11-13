@@ -1198,7 +1198,7 @@
       min-width: min(var(--room-column-min-width), 100cqi - var(--side-panel-min-width));
     }
 
-    .room-view.room-view > :global(aside) {
+    .room-view.room-view > :global(:is(aside, .thread-view.side-panel)) {
       flex-shrink: 1;
       max-width: calc(100cqi - var(--room-column-min-width));
       min-width: var(--side-panel-min-width);
