@@ -68,6 +68,7 @@
   let link = $derived(
     definitionAnchor?.tagName === 'A' ? (definitionAnchor as HTMLAnchorElement) : null
   );
+  let emoteDescription = $derived(emote ? emoteAltDescription(emote) : null);
   let definition = $derived(
     definitionAnchor?.dataset.abbrDefinition ??
       (emote ? emoteShortcode(emote) : null) ??
@@ -219,6 +220,12 @@
   function emoteShortcode(image: HTMLImageElement): string | null {
     const label = (image.dataset.shortcode || image.alt).replace(/^:|:$/g, '');
     return label ? `:${label}:` : null;
+  }
+
+  function emoteAltDescription(image: HTMLImageElement): string | null {
+    const alt = image.alt.trim();
+    const bare = (label: string) => label.replace(/^:|:$/g, '');
+    return alt && bare(alt) !== bare(image.dataset.shortcode ?? '') ? alt : null;
   }
 
   async function renderMaths(elements: NodeListOf<HTMLElement>): Promise<void> {
@@ -665,7 +672,7 @@
 {/if}
 
 {#snippet emoteCard()}
-  <EmoteCard label={definition}>
+  <EmoteCard label={definition} description={emoteDescription}>
     {#if emote?.src}
       <img class={{ pixelated: emote.classList.contains('pixelated') }} src={emote.src} alt="" />
     {/if}

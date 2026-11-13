@@ -3,14 +3,23 @@
 
   let {
     label,
+    description,
     children,
     variant = 'emote',
-  }: { label: string; children: Snippet; variant?: 'emote' | 'reaction' } = $props();
+  }: {
+    label: string;
+    description?: string | null;
+    children: Snippet;
+    variant?: 'emote' | 'reaction';
+  } = $props();
 </script>
 
 <span class={['emote-card', { reaction: variant === 'reaction' }]}>
   <span class="emote-card-image">{@render children()}</span>
-  <span class="emote-card-name">{label}</span>
+  <span class="emote-card-text">
+    <span class="emote-card-name">{label}</span>
+    {#if description}<span class="emote-card-description">{description}</span>{/if}
+  </span>
 </span>
 
 <style>
@@ -40,6 +49,18 @@
 
   .emote-card-image :global(.pixelated) {
     image-rendering: pixelated;
+  }
+
+  .emote-card-text {
+    display: grid;
+    gap: var(--space-050);
+    min-width: 0;
+  }
+
+  .emote-card-description {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    overflow-wrap: anywhere;
   }
 
   .emote-card-name {
