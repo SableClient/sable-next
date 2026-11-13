@@ -3119,8 +3119,6 @@
     "italic": "斜体",
     "insert": "插入",
     "photoOrVideo": "照片或视频",
-    "takePhoto": "拍照",
-    "recordVideo": "录制视频",
     "attachFile": "附加文件",
     "stagedFiles": "准备发送的文件",
     "removeAttachment": "移除 {{name}}",

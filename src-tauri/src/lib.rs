@@ -877,6 +877,12 @@ pub fn run() {
             #[cfg(target_os = "ios")]
             ios::save_media_to_photos,
             #[cfg(target_os = "ios")]
+            ios::recent_media,
+            #[cfg(target_os = "ios")]
+            ios::recent_media_thumbnail,
+            #[cfg(target_os = "ios")]
+            ios::recent_media_file,
+            #[cfg(target_os = "ios")]
             ios::h264_from_hevc,
             #[cfg(target_os = "ios")]
             ios::open_in_app_auth_url,
@@ -896,6 +902,8 @@ pub fn run() {
             ios::set_badge_count,
             #[cfg(target_os = "android")]
             mobile::copy_image_to_clipboard,
+            #[cfg(target_os = "android")]
+            mobile::recent_media,
             #[cfg(target_os = "android")]
             mobile::haptic_feedback,
             #[cfg(target_os = "android")]

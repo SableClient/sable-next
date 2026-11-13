@@ -13,17 +13,19 @@
 
   import { i18n } from '#lib/i18n.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
-  import Button from '#lib/ui/primitives/Button.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
   import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
-  import type { Snippet } from 'svelte';
+  import type { Component, Snippet } from 'svelte';
+
+  import RecentMediaStrip from './RecentMediaStrip.svelte';
 
   interface Props {
     desktop: boolean;
     disabled?: boolean;
     onPick: (accept: string) => void;
     onCapture?: (accept: string) => void;
+    onFiles?: (files: File[]) => void;
     onPoll?: () => void;
     onLocation?: () => void;
     onSchedule?: () => void;
@@ -37,6 +39,7 @@
     disabled = false,
     onPick,
     onCapture,
+    onFiles,
     onPoll,
     onLocation,
     onSchedule,
@@ -49,6 +52,20 @@
   const media = 'image/*,video/*';
   const any = '*';
 </script>
+
+{#snippet action(label: string, Icon: Component, run: () => void)}
+  <button
+    type="button"
+    class="door-action"
+    onclick={() => {
+      open = false;
+      run();
+    }}
+  >
+    <span class="door-action-icon"><Icon /></span>
+    {label}
+  </button>
+{/snippet}
 
 {#if extras}
   {#each Object.entries(extras) as [id, extra] (id)}
@@ -146,104 +163,42 @@
     closeLabel={i18n.t('composer.closeInsert')}
   >
     <div class="door-sheet">
-      <Button
-        variant="ghost"
-        class="door-action"
-        onclick={() => {
-          open = false;
+      {#if onFiles}
+        <RecentMediaStrip
+          onFile={(file) => {
+            open = false;
+            onFiles([file]);
+          }}
+        />
+      {/if}
+      <div class="door-actions scrollbar-hidden" data-sheet-no-drag>
+        {@render action(i18n.t('composer.doorPhotos'), ImageIcon, () => {
           onPick(media);
-        }}
-      >
-        <ImageIcon />
-        {i18n.t('composer.photoOrVideo')}
-      </Button>
-      {#if onCapture}
-        <Button
-          variant="ghost"
-          class="door-action"
-          onclick={() => {
-            open = false;
+        })}
+        {#if onCapture}
+          {@render action(i18n.t('composer.doorCamera'), CameraIcon, () => {
             onCapture('image/*');
-          }}
-        >
-          <CameraIcon />
-          {i18n.t('composer.takePhoto')}
-        </Button>
-        <Button
-          variant="ghost"
-          class="door-action"
-          onclick={() => {
-            open = false;
+          })}
+          {@render action(i18n.t('composer.doorVideo'), VideoCameraIcon, () => {
             onCapture('video/*');
-          }}
-        >
-          <VideoCameraIcon />
-          {i18n.t('composer.recordVideo')}
-        </Button>
-      {/if}
-      <Button
-        variant="ghost"
-        class="door-action"
-        onclick={() => {
-          open = false;
+          })}
+        {/if}
+        {@render action(i18n.t('composer.doorFile'), PaperclipIcon, () => {
           onPick(any);
-        }}
-      >
-        <PaperclipIcon />
-        {i18n.t('composer.attachFile')}
-      </Button>
-      {#if onVoice}
-        <Button
-          variant="ghost"
-          class="door-action"
-          onclick={() => {
-            open = false;
-            onVoice();
-          }}
-        >
-          <MicrophoneIcon />
-          {i18n.t('composer.voiceRecord')}
-        </Button>
-      {/if}
-      {#if onPoll}
-        <Button
-          variant="ghost"
-          class="door-action"
-          onclick={() => {
-            open = false;
-            onPoll();
-          }}
-        >
-          <ChartBarIcon />
-          {i18n.t('composer.poll')}
-        </Button>
-      {/if}
-      {#if onLocation}
-        <Button
-          variant="ghost"
-          class="door-action"
-          onclick={() => {
-            open = false;
-            onLocation();
-          }}
-        >
-          <MapPinIcon />
-          {i18n.t('composer.location')}
-        </Button>
-      {/if}
-      {#if onSchedule}
-        <Button
-          variant="ghost"
-          class="door-action"
-          onclick={() => {
-            open = false;
-            onSchedule();
-          }}
-        >
-          <ClockIcon />
-          {i18n.t('composer.scheduleMessage')}
-        </Button>
-      {/if}
+        })}
+        {#if onVoice}
+          {@render action(i18n.t('composer.doorVoice'), MicrophoneIcon, onVoice)}
+        {/if}
+        {#if onPoll}
+          {@render action(i18n.t('composer.poll'), ChartBarIcon, onPoll)}
+        {/if}
+        {#if onLocation}
+          {@render action(i18n.t('composer.location'), MapPinIcon, onLocation)}
+        {/if}
+        {#if onSchedule}
+          {@render action(i18n.t('composer.doorSchedule'), ClockIcon, onSchedule)}
+        {/if}
+      </div>
     </div>
   </BottomSheet>
 {/if}
@@ -251,37 +206,54 @@
 <style>
   .door-sheet {
     display: grid;
-    gap: var(--space-100);
-    padding: 0 var(--space-300) var(--space-300);
+    gap: var(--space-300);
+    padding-bottom: var(--space-300);
   }
 
-  :global(.btn.door-action) {
-    background: transparent;
-    border-color: transparent;
-    border-radius: var(--radius);
-    color: inherit;
-    gap: var(--space-300);
-    justify-content: flex-start;
-    min-height: 3rem;
+  .door-actions {
+    display: flex;
+    gap: var(--space-200);
+    overflow-x: auto;
     padding: 0 var(--space-300);
-    text-align: left;
+    touch-action: pan-x;
+  }
+
+  .door-action {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    font: inherit;
+    font-size: var(--font-size-small);
+    gap: var(--space-100);
+    padding: 0;
+    width: 4.5rem;
+  }
+
+  .door-action-icon {
+    align-items: center;
+    background: var(--surface-container-hover);
+    border-radius: 999px;
+    display: flex;
+    height: 3.25rem;
+    justify-content: center;
     width: 100%;
   }
 
-  @media (any-hover: hover) and (any-pointer: fine) {
-    :global(.door-action:hover:not(:disabled)) {
-      background: var(--surface-container-hover);
-    }
-
-    :global(.composer-door:hover) {
-      background: var(--surface-container-hover);
-    }
-  }
-
-  :global(.door-action svg) {
+  .door-action-icon :global(svg) {
     color: var(--surface-var-on-container);
     height: var(--icon-size-medium);
     width: var(--icon-size-medium);
+  }
+
+  @media (any-hover: hover) and (any-pointer: fine) {
+    :global(.composer-door:hover) {
+      background: var(--surface-container-hover);
+    }
   }
 
   :global(.composer-door) {

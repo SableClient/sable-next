@@ -180,6 +180,7 @@ targets:
         CFBundleShortVersionString: {{apple.bundle-version-short}}
         CFBundleVersion: "{{apple.bundle-version}}"
         NSPhotoLibraryAddUsageDescription: Sable saves images and videos to your photo library.
+        NSPhotoLibraryUsageDescription: Sable shows your recent photos and videos so you can send them.
         # Mirrors plugins.deep-link in tauri.conf.json: the plugin only patches
         # these in when cargo reruns its build script, so a fresh `tauri ios
         # init` silently loses them unless they live here.

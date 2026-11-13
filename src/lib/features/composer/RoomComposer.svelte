@@ -1500,6 +1500,7 @@
                 {desktop}
                 onPick={pick}
                 onCapture={capturesFromCamera() ? capture : undefined}
+                onFiles={(files) => void stage(files)}
                 onPoll={onCreatePoll
                   ? () => {
                       pollOpen = true;

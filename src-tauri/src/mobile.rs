@@ -4,7 +4,7 @@
 
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
-use jni::objects::{Global, JClass, JObject, JValue};
+use jni::objects::{Global, JClass, JObject, JString, JValue};
 use jni::signature::MethodSignature;
 use jni::strings::JNIString;
 use jni::{EnvUnowned, JavaVM, jni_sig, jni_str};
@@ -189,6 +189,31 @@ pub(crate) extern "system" fn Java_moe_sable_client_MainActivity_nativeInitSyste
 }
 
 /// `light` asks for the icon treatment a light background needs: dark icons.
+#[tauri::command]
+pub(crate) async fn recent_media(limit: i32) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let vm = JAVA_VM.get().ok_or("java vm not initialized")?;
+        let class = MAIN_ACTIVITY
+            .get()
+            .ok_or("activity class not initialized")?;
+        let listed = vm
+            .attach_current_thread(|env| {
+                let result = env.call_static_method(
+                    class,
+                    jni_str!("recentMediaNative"),
+                    jni_sig!("(I)Ljava/lang/String;"),
+                    &[JValue::Int(limit)],
+                );
+                let listed = caught(env, result)?.l()?;
+                env.cast_local::<JString>(listed)?.try_to_string(env)
+            })
+            .map_err(|error| describe(&error))?;
+        serde_json::from_str(&listed).map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 #[tauri::command]
 pub(crate) fn set_status_bar_light(light: bool) -> Result<(), String> {
     call_activity_bool("setStatusBarLightNative", light)

@@ -2548,8 +2548,6 @@
   "composer": {
     "insert": "Beszúrás",
     "photoOrVideo": "Fotó vagy videó",
-    "takePhoto": "Fotó készítése",
-    "recordVideo": "Videó rögzítése",
     "attachFile": "Fájl csatolása",
     "stagedFiles": "Küldésre kész fájlok",
     "linkPreviews": "Előnézettel megjelenő hivatkozások",

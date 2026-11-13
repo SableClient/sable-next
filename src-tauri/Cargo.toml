@@ -120,13 +120,27 @@ objc2-foundation = { version = "0.3", features = [
   "NSBundle",
   "NSData",
   "NSValue",
+  "NSArray",
+  "NSSortDescriptor",
+] }
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "CFCGTypes",
+  "objc2",
 ] }
 objc2-photos = { version = "0.3.2", default-features = false, features = [
   "std",
   "PHPhotoLibrary",
+  "PHAsset",
   "PHAssetChangeRequest",
   "PHAssetCreationRequest",
+  "PHAssetResource",
+  "PHAssetResourceManager",
   "PHChangeRequest",
+  "PHFetchOptions",
+  "PHFetchResult",
+  "PHImageManager",
+  "PHObject",
   "PhotosTypes",
   "block2",
   "dispatch2",
