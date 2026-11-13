@@ -63,6 +63,7 @@ export function createMultiSfuTransport(
   const markUnreachable = (backendId: string): void => {
     unreachable.add(backendId);
     scheduleRetry();
+    publish();
   };
 
   const cacheKey = (key: CallEncryptionKey): void => {
@@ -89,7 +90,6 @@ export function createMultiSfuTransport(
         unsubscribes.delete(backendId);
         await transport.disconnect().catch(ignoreError);
         markUnreachable(backendId);
-        publish();
       });
   };
 
@@ -135,6 +135,12 @@ export function createMultiSfuTransport(
       telemetryAttributes,
     });
     transports.set(backend.id, transport);
+    const forget = (): void => {
+      if (transports.get(backend.id) !== transport) return;
+      transports.delete(backend.id);
+      unsubscribes.get(backend.id)?.();
+      unsubscribes.delete(backend.id);
+    };
     let connected = false;
     unsubscribes.set(
       backend.id,
@@ -161,18 +167,14 @@ export function createMultiSfuTransport(
       });
       if (disposed || expectedGeneration !== generation) {
         if (!disposed && desiredBackends.has(backend.id)) return;
-        transports.delete(backend.id);
-        unsubscribes.get(backend.id)?.();
-        unsubscribes.delete(backend.id);
+        forget();
         await transport.disconnect();
         return;
       }
     } catch (error) {
       telemetry?.failure('call.backend.connect', error, telemetryAttributes);
       if (backend.id === publisherId) throw error;
-      transports.delete(backend.id);
-      unsubscribes.get(backend.id)?.();
-      unsubscribes.delete(backend.id);
+      forget();
       await transport.disconnect();
       if (!disposed && desiredBackends.has(backend.id)) markUnreachable(backend.id);
     }
@@ -215,11 +217,10 @@ export function createMultiSfuTransport(
       const publisher = backends.find((backend) => backend.id === publisherId);
       if (publisher) await ensure(publisher, options, expectedGeneration);
       if (expectedGeneration === generation) {
-        await Promise.all(
-          backends
-            .filter((backend) => backend.id !== publisherId)
-            .map((backend) => ensure(backend, options, expectedGeneration))
-        );
+        for (const backend of backends) {
+          if (backend.id === publisherId) continue;
+          void ensure(backend, options, expectedGeneration).catch(ignoreError);
+        }
       }
     }
     publish();

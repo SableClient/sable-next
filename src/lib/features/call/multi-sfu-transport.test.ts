@@ -75,7 +75,7 @@ test('lists a peer subscribed on several backends once, on the backend it publis
   ]);
 });
 
-test('starts the publisher and healthy subscribers while another subscriber is blocked', async () => {
+test('finishes connecting once the publisher is up while a subscriber is still blocked', async () => {
   let releaseBlocked!: () => void;
   const blocked = new Promise<void>((resolve) => {
     releaseBlocked = resolve;
@@ -92,33 +92,25 @@ test('starts the publisher and healthy subscribers while another subscriber is b
       return next;
     },
   });
-  let completed = false;
-  const connecting = transport
-    .connect({
-      url: '',
-      token: '',
-      microphoneEnabled: false,
-      cameraEnabled: false,
-      publisherId: 'publish',
-      backends: [
-        { id: 'blocked', url: 'wss://blocked', jwt: 'blocked', identity: 'blocked' },
-        { id: 'publish', url: 'wss://publish', jwt: 'publish', identity: 'me' },
-        { id: 'healthy', url: 'wss://healthy', jwt: 'healthy', identity: 'healthy' },
-      ],
-      encryptionKeys: [],
-    })
-    .then(() => {
-      completed = true;
-    });
-
-  await vi.waitFor(() => {
-    expect(created).toHaveLength(3);
+  await transport.connect({
+    url: '',
+    token: '',
+    microphoneEnabled: false,
+    cameraEnabled: false,
+    publisherId: 'publish',
+    backends: [
+      { id: 'blocked', url: 'wss://blocked', jwt: 'blocked', identity: 'blocked' },
+      { id: 'publish', url: 'wss://publish', jwt: 'publish', identity: 'me' },
+      { id: 'healthy', url: 'wss://healthy', jwt: 'healthy', identity: 'healthy' },
+    ],
+    encryptionKeys: [],
   });
+
+  expect(created).toHaveLength(3);
   expect(created[0].getState().connection).toBe('connected');
   expect(created[2].getState().connection).toBe('connected');
-  expect(completed).toBe(false);
+  expect(transport.getState().connection).toBe('connected');
   releaseBlocked();
-  await connecting;
 });
 
 test('delivers a remote key while that subscriber is still connecting', async () => {
@@ -247,7 +239,9 @@ test('reports a failed subscriber as unreachable and retries it without a new sn
       ],
       encryptionKeys: [],
     });
-    expect(transport.getState().unreachableBackends).toEqual(['remote']);
+    await vi.waitFor(() => {
+      expect(transport.getState().unreachableBackends).toEqual(['remote']);
+    });
 
     await vi.advanceTimersByTimeAsync(2_000);
     expect(remoteAttempts).toBe(2);
