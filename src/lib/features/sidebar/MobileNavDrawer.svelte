@@ -359,7 +359,7 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .content {
+    .drawer-track:not(.open) .content {
       view-transition-name: tab-page;
     }
   }
