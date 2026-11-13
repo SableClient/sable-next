@@ -93,6 +93,7 @@ test.each(['light', 'dark'] as const)(
     await userEvent.keyboard('{ArrowUp}');
     expectHighlight(beta.element(), alpha.element());
     await userEvent.keyboard('{Enter}');
+    await expect.element(dialog).not.toBeInTheDocument();
     expect(goto).toHaveBeenCalledWith('/rooms/!beta%3Aexample.org');
   }
 );

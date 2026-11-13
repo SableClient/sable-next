@@ -3,6 +3,7 @@
 
   import type { RoomListItemView } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
+  import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -20,8 +21,10 @@
   const roomList = useRoomList();
 
   function select(room: RoomListItemView): void {
+    open = false;
+    const target = roomSectionPath(roomList.rooms, room.room_id);
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath() resolves the route itself
-    void goto(roomSectionPath(roomList.rooms, room.room_id));
+    void afterOverlayPops().then(() => goto(target));
   }
 
   function openShortcutsHelp(): void {
