@@ -61,7 +61,7 @@
   import RoomHeaderMenu from './RoomHeaderMenu.svelte';
   import { canSendState } from './settings/permission-groups';
   import { WATCHED_LISTS_EVENT } from '#lib/rooms/meowlnir-config.js';
-  import { noteRoomOpened } from '#lib/rooms/meowlnir-registry.svelte.js';
+  import { discoverMeowlnirRooms, noteRoomOpened } from '#lib/rooms/meowlnir-registry.svelte.js';
   import RoomPinMenu from './RoomPinMenu.svelte';
   import RoomPredecessorNotice from './RoomPredecessorNotice.svelte';
   import RoomPresencePrompt from './RoomPresencePrompt.svelte';
@@ -438,6 +438,11 @@
       WATCHED_LISTS_EVENT
     );
     void noteRoomOpened(core, target, userId, admin);
+  });
+
+  $effect(() => {
+    const userId = core.session?.user_id;
+    if (userId) void discoverMeowlnirRooms(core, userId, roomList.rooms);
   });
 
   let canManageWidgets = $derived(

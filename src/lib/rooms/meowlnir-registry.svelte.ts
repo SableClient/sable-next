@@ -2,12 +2,21 @@ import { untrack } from 'svelte';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { isRecord, stringList } from '#lib/guards.js';
+import { canSendState } from '#lib/model/model.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
+import type { RoomListItemView } from '#src/generated/protocol';
 
-import { protectedRooms, watchedLists } from './meowlnir-config.js';
+import {
+  PROTECTED_ROOMS_EVENT,
+  WATCHED_LISTS_EVENT,
+  protectedRooms,
+  watchedLists,
+} from './meowlnir-config.js';
 import { isMeowlnirRoom, loadMeowlnirConfig, type MeowlnirConfig } from './meowlnir.svelte.js';
 
 const STORAGE_KEY = 'sable-meowlnir-rooms';
+const PROBED_KEY = 'sable-meowlnir-probed';
+const PROBES_AT_ONCE = 4;
 
 export interface MeowlnirList {
   shortcode: string;
@@ -131,4 +140,71 @@ export async function noteRoomOpened(
     return;
   }
   if (remembered || (await isMeowlnirRoom(core, roomId))) await sync(core, roomId, userId);
+}
+
+function parseProbed(value: unknown): Record<string, string[]> {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(Object.entries(value).map(([user, ids]) => [user, stringList(ids)]));
+}
+
+const probed = readJson(PROBED_KEY, parseProbed, {});
+let discovering = false;
+
+async function probe(core: CoreClient, roomId: string, userId: string): Promise<void> {
+  const found = await core.rpc.room_state.event({
+    room_id: roomId,
+    event_type: PROTECTED_ROOMS_EVENT,
+    state_key: '',
+  });
+  if (!isRecord(found)) return;
+  const [levels, permissions] = await Promise.all([
+    core.rpc.members.powerLevels({ room_id: roomId }),
+    core.rpc.members.permissions({ room_id: roomId }),
+  ]);
+  if (canSendState(levels, permissions.own_power_level, WATCHED_LISTS_EVENT))
+    await sync(core, roomId, userId);
+}
+
+/**
+ * A protected room carries nothing that names its management room, so the ban
+ * action there depends on the management room having been seen. This asks each
+ * private room once per device, as the room list fills in, instead of waiting
+ * for a visit. A room that fails is asked again next time.
+ */
+export async function discoverMeowlnirRooms(
+  core: CoreClient,
+  userId: string,
+  rooms: readonly RoomListItemView[]
+): Promise<void> {
+  if (discovering) return;
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- nothing renders from this
+  const seen = new Set(probed[userId]);
+  const candidates = rooms.filter(
+    (room) =>
+      room.state === 'joined' &&
+      !room.is_direct &&
+      room.room_kind !== 'space' &&
+      room.join_rule !== 'public' &&
+      !seen.has(room.room_id)
+  );
+  if (candidates.length === 0) return;
+  discovering = true;
+  try {
+    for (let at = 0; at < candidates.length; at += PROBES_AT_ONCE) {
+      await Promise.all(
+        candidates.slice(at, at + PROBES_AT_ONCE).map(async ({ room_id }) => {
+          try {
+            await probe(core, room_id, userId);
+            seen.add(room_id);
+          } catch (error) {
+            console.debug('[sable room] meowlnir probe failed', room_id, error);
+          }
+        })
+      );
+      probed[userId] = [...seen];
+      writeJson(PROBED_KEY, probed);
+    }
+  } finally {
+    discovering = false;
+  }
 }

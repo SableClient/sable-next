@@ -1700,7 +1700,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'personas.reorder': () => [],
       'personas.backup': () => '{}',
       'room_state.event': (params) =>
-        params.state_key === '' && window.__e2eRoomState?.[params.event_type] !== undefined
+        params.room_id === room.room_id &&
+        params.state_key === '' &&
+        window.__e2eRoomState?.[params.event_type] !== undefined
           ? window.__e2eRoomState[params.event_type]
           : params.event_type === 'moe.sable.room.abbreviations'
             ? { entries: abbreviations.get(params.room_id) ?? [] }

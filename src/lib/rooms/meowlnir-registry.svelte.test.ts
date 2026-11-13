@@ -3,8 +3,10 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import type { RoomListItemView } from '#src/generated/protocol';
 
 import {
+  discoverMeowlnirRooms,
   forgetMeowlnirRoom,
   meowlnirFor,
   noteRoomOpened,
@@ -33,7 +35,34 @@ const fullState = vi.fn(() =>
     Object.entries(state).map(([type, content]) => ({ type, state_key: '', content }))
   )
 );
-const core = { rpc: { room_state: { event, fullState } } } as unknown as CoreClient;
+const levels = {
+  ban: 50,
+  kick: 50,
+  redact: 50,
+  invite: 0,
+  events_default: 0,
+  state_default: 50,
+  users_default: 0,
+  events: {},
+  users: {},
+  notifications_room: 50,
+};
+const powerLevels = vi.fn(() => Promise.resolve(levels));
+const permissions = vi.fn(() => Promise.resolve({ own_power_level: 100 }));
+const core = {
+  rpc: { room_state: { event, fullState }, members: { powerLevels, permissions } },
+} as unknown as CoreClient;
+
+function listed(room_id: string, overrides: Partial<RoomListItemView> = {}): RoomListItemView {
+  return {
+    room_id,
+    state: 'joined',
+    is_direct: false,
+    room_kind: 'text',
+    join_rule: 'invite',
+    ...overrides,
+  } as RoomListItemView;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -89,4 +118,44 @@ test('a management room is dropped once the role or the settings are gone', asyn
   state = {};
   await noteRoomOpened(core, MANAGEMENT, ME, true);
   expect(meowlnirFor('!lobby:example.org', ME)).toBeNull();
+});
+
+test('a management room is found without being opened, and each room is asked once', async () => {
+  event.mockImplementation((params: { event_type: string; room_id?: string }) =>
+    Promise.resolve(params.room_id === MANAGEMENT ? (state[params.event_type] ?? null) : null)
+  );
+  const rooms = [
+    listed(MANAGEMENT),
+    listed('!private:example.org'),
+    listed('!public:example.org', { join_rule: 'public' }),
+    listed('!dm:example.org', { is_direct: true }),
+    listed('!space:example.org', { room_kind: 'space' }),
+  ];
+
+  await discoverMeowlnirRooms(core, ME, rooms);
+
+  expect(meowlnirFor('!lobby:example.org', ME)?.roomId).toBe(MANAGEMENT);
+  expect(event.mock.calls.map(([params]) => (params as { room_id?: string }).room_id)).toEqual([
+    MANAGEMENT,
+    '!private:example.org',
+  ]);
+
+  event.mockClear();
+  await discoverMeowlnirRooms(core, ME, rooms);
+  expect(event).not.toHaveBeenCalled();
+});
+
+test('a room that could not be asked is asked again, and a room without the role is skipped', async () => {
+  const other = '@other:example.org';
+  event.mockRejectedValueOnce(new Error('offline'));
+  await discoverMeowlnirRooms(core, other, [listed('!retry:example.org')]);
+  event.mockClear();
+  await discoverMeowlnirRooms(core, other, [listed('!retry:example.org')]);
+  expect(event).toHaveBeenCalledTimes(1);
+
+  event.mockImplementation((params) => Promise.resolve(state[params.event_type] ?? null));
+  permissions.mockResolvedValueOnce({ own_power_level: 0 });
+  await discoverMeowlnirRooms(core, other, [listed('!managed:example.org')]);
+  expect(permissions).toHaveBeenCalledTimes(1);
+  expect(meowlnirFor('!lobby:example.org', other)).toBeNull();
 });
