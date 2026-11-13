@@ -69,6 +69,7 @@ import { filesFromSources, pastedImageSources } from './pasted-images';
 import { mathInputRule } from './math';
 import { mfmTimeInputRule } from './mfm';
 import { traceComposerInput } from './input-trace';
+import { applyOffers, offerKey, offersPlugin, type ComposerOffer, type OfferRule } from './offers';
 import { queryKey, queryPlugin } from './query-plugin';
 import { codeLanguage, composerSchema, parseMatrixHtml } from './schema';
 import {
@@ -670,6 +671,8 @@ export interface ComposerEditorOptions {
   onSubmit: () => void;
   onChange: (change: ComposerChange) => void;
   onQuery: (query: AutocompleteQuery | null) => void;
+  offers?: readonly OfferRule[];
+  onOffer?: (offer: ComposerOffer | null) => void;
   onNavigate: (key: NavigationKey) => boolean;
   onFiles: (files: File[]) => void;
   onLinkRequest: () => void;
@@ -798,6 +801,15 @@ export class ComposerEditor {
           ]),
       documentEdgeGuard(),
       queryPlugin(),
+      ...(this.options.offers
+        ? [
+            offersPlugin({
+              rules: this.options.offers,
+              enabled: (rule) => preferences[rule.always],
+              markdown: () => this.markdownMode(),
+            }),
+          ]
+        : []),
       inputRules({
         rules: [
           shortcodeInputRule(this.options.emotes),
@@ -894,6 +906,7 @@ export class ComposerEditor {
     view.updateState(this.createState(view.state.doc, view.state.selection));
     this.report(view.state, false);
     this.options.onQuery(queryKey.getState(view.state) ?? null);
+    this.options.onOffer?.(offerKey.getState(view.state) ?? null);
   }
 
   reconfigure(): void {
@@ -1044,6 +1057,7 @@ export class ComposerEditor {
             view.updateState(next);
             this.report(next, tr.docChanged);
             this.options.onQuery(queryKey.getState(next) ?? null);
+            this.options.onOffer?.(offerKey.getState(next) ?? null);
           },
         })
     );
@@ -1292,6 +1306,13 @@ export class ComposerEditor {
     if (!view) return;
     const { from, to } = view.state.selection;
     this.replaceRange(from, to, node);
+  }
+
+  acceptOffer(offer: ComposerOffer): void {
+    const view = this.view;
+    if (!view) return;
+    view.dispatch(applyOffers(view.state, [offer], this.markdownMode()));
+    view.focus();
   }
 
   replaceQuery(query: AutocompleteQuery, node: ProseMirrorNode): void {

@@ -540,26 +540,6 @@
     }
   },
   {
-    "markdown": "MSC1234 and msc42",
-    "pills": [],
-    "body": "MSC1234 and msc42",
-    "formatted_body": "<a href=\"https://github.com/matrix-org/matrix-spec-proposals/pull/1234\">MSC1234</a> and <a href=\"https://github.com/matrix-org/matrix-spec-proposals/pull/42\">msc42</a>",
-    "mentions": {
-      "user_ids": [],
-      "room": false
-    }
-  },
-  {
-    "markdown": "see MSC4550's text",
-    "pills": [],
-    "body": "see MSC4550's text",
-    "formatted_body": "see <a href=\"https://github.com/matrix-org/matrix-spec-proposals/pull/4550\">MSC4550</a>'s text",
-    "mentions": {
-      "user_ids": [],
-      "room": false
-    }
-  },
-  {
     "markdown": "`MSC1234`",
     "pills": [],
     "body": "`MSC1234`",

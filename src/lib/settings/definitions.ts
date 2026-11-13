@@ -375,6 +375,7 @@ const SETTINGS = {
     device: true,
   }),
   sedEdits: toggle(false, { account: true }),
+  linkMscReferences: toggle(false, { account: true }),
   inlineEditing: toggle(false, { account: true }),
   mentionInReplies: toggle(true, { account: true }),
   formattingToolbar: toggle(false, { account: true }),

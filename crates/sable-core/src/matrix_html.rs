@@ -484,10 +484,7 @@ fn render_plain_text(text: &str) -> String {
             SpanKind::Url => html.push_str(&anchor(link, link)),
             SpanKind::Msc => {
                 let number = link.get("msc".len()..).unwrap_or_default();
-                html.push_str(&anchor(
-                    &format!("https://github.com/matrix-org/matrix-spec-proposals/pull/{number}"),
-                    link,
-                ));
+                html.push_str(&anchor(&format!("https://msc.sable.moe/{number}"), link));
             }
             SpanKind::RoomMention => html.push_str("<span data-mx-room-mention>@room</span>"),
         }
@@ -1297,7 +1294,7 @@ mod tests {
                 "https://example.org",
                 "mailto:alice@example.org",
                 "matrix:u/alice:example.org",
-                "https://github.com/matrix-org/matrix-spec-proposals/pull/4144",
+                "https://msc.sable.moe/4144",
             ] {
                 assert!(html.contains(&format!("href=\"{href}\"")), "{html}");
             }
@@ -1387,23 +1384,23 @@ mod tests {
 
     #[test]
     fn linkifies_msc_references_in_plain_and_formatted_bodies() {
-        let pull = "https://github.com/matrix-org/matrix-spec-proposals/pull";
+        let msc = "https://msc.sable.moe";
 
         let plain = display_html("see MSC4144 and msc2545, not xMSC1 or MSC123456", None);
         assert!(plain.contains(&format!(
-            "<a href=\"{pull}/4144\" rel=\"noreferrer noopener\">MSC4144</a>"
+            "<a href=\"{msc}/4144\" rel=\"noreferrer noopener\">MSC4144</a>"
         )));
-        assert!(plain.contains(&format!("href=\"{pull}/2545\"")));
-        assert!(!plain.contains("/pull/1\""));
-        assert!(!plain.contains("/pull/123456"));
+        assert!(plain.contains(&format!("href=\"{msc}/2545\"")));
+        assert!(!plain.contains("sable.moe/1\""));
+        assert!(!plain.contains("sable.moe/123456"));
 
         let formatted = display_html(
             "",
             Some("<strong>MSC3391</strong> <code>MSC1</code> <a href=\"https://x.org\">MSC2</a>"),
         );
-        assert!(formatted.contains(&format!("href=\"{pull}/3391\"")));
-        assert!(!formatted.contains("/pull/1\""));
-        assert!(!formatted.contains("/pull/2\""));
+        assert!(formatted.contains(&format!("href=\"{msc}/3391\"")));
+        assert!(!formatted.contains("sable.moe/1\""));
+        assert!(!formatted.contains("sable.moe/2\""));
     }
 
     #[test]

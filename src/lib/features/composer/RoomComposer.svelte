@@ -51,6 +51,9 @@
   import BotCommandForm from './BotCommandForm.svelte';
   import ComposerAttachments from './ComposerAttachments.svelte';
   import ComposerAutocomplete from './ComposerAutocomplete.svelte';
+  import ComposerOffer, { type OfferChoice } from './ComposerOffer.svelte';
+  import { OFFER_RULES } from './editor/offer-rules';
+  import type { ComposerOffer as Offer } from './editor/offers';
   import type { GifResult } from '#lib/gif/providers.js';
   import ComposerBoard from './ComposerBoard.svelte';
   import ComposerContextBanner from './ComposerContextBanner.svelte';
@@ -323,6 +326,9 @@
   let configuredRich = preferences.richTextComposer;
   let query = $state.raw<AutocompleteQuery | null>(null);
   let dismissedAt = $state<number | null>(null);
+  let offer = $state.raw<Offer | null>(null);
+  let dismissedOffer = $state<string | null>(null);
+  let offerIndex = $state(0);
   let activeIndex = $state(0);
   let previousContext: ComposerContext | null = untrack(() => restoredContext);
   let deleteEditTarget = $state.raw<ComposerContext | null>(null);
@@ -379,6 +385,26 @@
   );
   let panelOpen = $derived(
     query !== null && dismissedAt !== query.start && (query.sigil !== '+:' || quickReactEnabled)
+  );
+  const offerKeyOf = (current: Offer) =>
+    `${current.rule.id}:${String(current.from)}:${current.text}`;
+  let offerOpen = $derived(
+    !panelOpen &&
+      offer !== null &&
+      !preferences[offer.rule.always] &&
+      dismissedOffer !== offerKeyOf(offer)
+  );
+  let offerChoices = $derived(
+    offer
+      ? [
+          { choice: 'once' as const, label: i18n.t(offer.rule.strings.once) },
+          {
+            choice: 'always' as const,
+            label: i18n.t(offer.rule.strings.always),
+            hint: i18n.t(offer.rule.strings.alwaysHint),
+          },
+        ]
+      : []
   );
   let admin = $derived(adminScope(roomId, roomList.rooms, core.session?.user_id));
   let botCommandsEnabled = $derived(
@@ -464,7 +490,17 @@
     label: () => i18n.t('timeline.messagePlaceholder'),
     describedBy: hintId,
     listboxId,
-    activeOptionId: () => (panelOpen && suggestions.length > 0 ? optionId(active) : null),
+    activeOptionId: () =>
+      panelOpen && suggestions.length > 0
+        ? optionId(active)
+        : offerOpen
+          ? optionId(offerIndex)
+          : null,
+    offers: OFFER_RULES,
+    onOffer: (next) => {
+      if (next?.from !== offer?.from || next?.text !== offer?.text) offerIndex = 0;
+      offer = next;
+    },
     editable: () => !readOnly,
     onSubmit: () => {
       void send();
@@ -1298,7 +1334,39 @@
     else if (context) onEditNext(context.eventId);
   }
 
+  function chooseOffer(choice: OfferChoice): void {
+    const current = offer;
+    if (!current) return;
+    editor.acceptOffer(current);
+    if (choice !== 'always') return;
+    const key = current.rule.always;
+    setPreference(key, true);
+    toasts.undoable(i18n.t(current.rule.strings.enabled), {
+      label: i18n.t('common.undo'),
+      onUndo: () => {
+        setPreference(key, false);
+      },
+    });
+  }
+
+  function navigateOffer(key: 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Tab' | 'Escape'): boolean {
+    if (!offer) return false;
+    if (key === 'Escape') {
+      dismissedOffer = offerKeyOf(offer);
+      return true;
+    }
+    if (key === 'ArrowDown' || key === 'ArrowUp') {
+      const step = key === 'ArrowDown' ? 1 : offerChoices.length - 1;
+      offerIndex = (offerIndex + step) % offerChoices.length;
+      return true;
+    }
+    if (key === 'Enter') return false;
+    chooseOffer(offerChoices[offerIndex].choice);
+    return true;
+  }
+
   function navigate(key: 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Tab' | 'Escape'): boolean {
+    if (offerOpen) return navigateOffer(key);
     if (!panelOpen) {
       if (
         key === 'ArrowUp' &&
@@ -1645,6 +1713,16 @@
             {suggestions}
             {active}
             onSelect={commit}
+          />
+        {:else if offerOpen && offer}
+          <ComposerOffer
+            id={listboxId}
+            {optionId}
+            heading={i18n.t(offer.rule.strings.heading, { text: offer.text })}
+            target={offer.rule.apply(offer.match).href.replace(/^https:\/\//u, '')}
+            choices={offerChoices}
+            active={offerIndex}
+            onChoose={chooseOffer}
           />
         {/if}
         <div class="composer-measurer" bind:this={measurerEl} aria-hidden="true"></div>
