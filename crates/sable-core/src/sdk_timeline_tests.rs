@@ -510,6 +510,108 @@ async fn a_failed_send_wedges_the_room_queue_until_it_is_re_enabled() {
 const MAX_EVENT_CONTENT_BYTES: usize = 65_536;
 
 #[tokio::test]
+async fn a_forbidden_image_does_not_block_later_messages() {
+    use matrix_sdk::ruma::{events::room::message::ImageMessageEventContent, mxc_uri};
+
+    for status in [400, 403] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!rejected-image:example.org");
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server.sync_joined_room(&client, room_id).await;
+        let core = core_for(&server, client.clone()).await;
+        core.watch_send_queue(&client);
+        let queue = room.send_queue();
+        queue.set_enabled(false);
+        let (_, mut updates) = queue.subscribe().await.unwrap();
+
+        Mock::given(method("PUT"))
+            .and(path_regex(
+                "/_matrix/client/v3/rooms/.*/send/m.room.message/.*",
+            ))
+            .and(body_partial_json(json!({"msgtype": "m.image"})))
+            .respond_with(ResponseTemplate::new(status).set_body_json(json!({
+                "errcode": "M_FORBIDDEN",
+                "error": "Images are not allowed in this room",
+            })))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        server
+            .mock_room_send()
+            .body_matches_partial_json(json!({"msgtype": "m.text"}))
+            .ok(event_id!("$text"))
+            .expect(2)
+            .mount()
+            .await;
+
+        let rejected = queue
+            .send(
+                RoomMessageEventContent::new(MessageType::Image(ImageMessageEventContent::plain(
+                    "image.png".to_owned(),
+                    mxc_uri!("mxc://example.org/image").to_owned(),
+                )))
+                .into(),
+            )
+            .await
+            .unwrap();
+        let queued = queue
+            .send(RoomMessageEventContent::text_plain("already queued").into())
+            .await
+            .unwrap();
+        queue.set_enabled(true);
+
+        tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                if let RoomSendQueueUpdate::SendError {
+                    transaction_id,
+                    is_recoverable,
+                    ..
+                } = updates.recv().await.unwrap()
+                {
+                    assert_eq!(transaction_id, rejected.transaction_id());
+                    assert!(!is_recoverable);
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("the image was rejected");
+
+        let following = queue
+            .send(RoomMessageEventContent::text_plain("after rejection").into())
+            .await
+            .unwrap();
+        let sent = tokio::time::timeout(Duration::from_secs(3), async {
+            let mut sent = Vec::new();
+            while sent.len() < 2 {
+                if let RoomSendQueueUpdate::SentEvent { transaction_id, .. } =
+                    updates.recv().await.unwrap()
+                {
+                    sent.push(transaction_id);
+                }
+            }
+            sent
+        })
+        .await
+        .expect("later messages are sent without retrying or cancelling the image");
+        assert_eq!(sent, [queued.transaction_id(), following.transaction_id()]);
+
+        let (echoes, _) = queue.subscribe().await.unwrap();
+        assert_eq!(echoes.len(), 1);
+        assert_eq!(echoes[0].transaction_id, rejected.transaction_id());
+        assert!(matches!(
+            echoes[0].content,
+            matrix_sdk::send_queue::LocalEchoContent::Event {
+                send_error: Some(_),
+                ..
+            }
+        ));
+        assert!(rejected.abort().await.unwrap());
+    }
+}
+
+#[tokio::test]
 async fn oversized_sends_return_message_too_large() {
     use crate::api::messages::SendParams;
 
