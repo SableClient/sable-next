@@ -46,6 +46,10 @@
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { isBridgedSpace } from '#lib/rooms/bridged-spaces.svelte.js';
+  import {
+    spaceBridgeBadgeChanges,
+    spaceHidesBridgeBadges,
+  } from '#lib/rooms/space-bridge-badges.svelte.js';
   import { roomIconOverride, showsRoomAvatar } from '#lib/rooms/room-appearance.svelte.js';
   import RoomSettingsDialog from '#lib/features/room/settings/RoomSettingsDialog.svelte';
   import { goToPage } from '#lib/features/room/room-navigation.js';
@@ -204,7 +208,24 @@
     activeSpace ? (findRoomByPathId(roomList.rooms, roomId) ?? null) : null
   );
   let iconMode = $derived(roomIconOverride(activeSpaceId) ?? preferences.showRoomIcon);
-  let showBridgeBadges = $derived(preferences.showBridgeBadges && !isBridgedSpace(activeSpaceId));
+  let spaceHidesBadges = $state(false);
+  let showBridgeBadges = $derived(
+    preferences.showBridgeBadges && !isBridgedSpace(activeSpaceId) && !spaceHidesBadges
+  );
+
+  $effect(() => {
+    const target = activeSpaceId;
+    void spaceBridgeBadgeChanges.version;
+    spaceHidesBadges = false;
+    if (!target) return;
+    let current = true;
+    void spaceHidesBridgeBadges(core, target).then((hidden) => {
+      if (current) spaceHidesBadges = hidden;
+    });
+    return () => {
+      current = false;
+    };
+  });
 
   function navigateTo(href: string): void {
     if (onNavigate) {

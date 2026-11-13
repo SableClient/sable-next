@@ -1416,3 +1416,43 @@ test('bridge badges leave the room icons when the preference is off', async () =
   expect(screen.queryByRole('img', { name: 'nav.bridgedFrom:Discord' })).toBeNull();
   setPreference('showBridgeBadges', true);
 });
+
+test('a space can hide bridge badges on its rooms for every member', async () => {
+  visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
+  core.rpc.room_state.event.mockImplementation(({ room_id, event_type }) =>
+    Promise.resolve(
+      room_id === '!root:example.org' && event_type === 'moe.sable.space.bridge_badges'
+        ? { hidden: true }
+        : null
+    )
+  );
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!root:example.org',
+      name: 'Root',
+      room_kind: 'space',
+      space_children: [
+        {
+          room_id: '!leaf:example.org',
+          via: [],
+          order: null,
+          origin_server_ts: 1,
+          suggested: false,
+        },
+      ],
+    }),
+    makeRoom({
+      room_id: '!leaf:example.org',
+      name: 'Leaf',
+      bridge: { network: 'Discord', avatar_url: null },
+    }),
+  ];
+  listSections(sectionView('!root:example.org', { rooms: ['!leaf:example.org'] }));
+  await mountNav();
+  await tick();
+
+  expect(screen.getByText('Leaf')).toBeInTheDocument();
+  expect(screen.queryByRole('img', { name: 'nav.bridgedFrom:Discord' })).toBeNull();
+  core.rpc.room_state.event.mockReset();
+  core.rpc.room_state.event.mockResolvedValue(null);
+});

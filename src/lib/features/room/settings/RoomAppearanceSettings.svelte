@@ -1,6 +1,12 @@
 <script lang="ts">
-  import type { MediaPreviewsView, RoomListItemView } from '#src/generated/protocol';
+  import type {
+    MediaPreviewsView,
+    RoomListItemView,
+    RoomPermissionsView,
+    RoomPowerLevelsView,
+  } from '#src/generated/protocol';
 
+  import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import {
     hasRoomMediaPreviews,
@@ -17,6 +23,13 @@
 
   import { isBridgedSpace, setBridgedSpace } from '#lib/rooms/bridged-spaces.svelte.js';
   import { roomIconOverride, setRoomIconOverride } from '#lib/rooms/room-appearance.svelte.js';
+  import {
+    SPACE_BRIDGE_BADGES_EVENT,
+    setSpaceHidesBridgeBadges,
+    spaceHidesBridgeBadges,
+  } from '#lib/rooms/space-bridge-badges.svelte.js';
+
+  import { canSendState } from './permission-groups';
 
   import '#lib/ui/primitives/settings-row.css';
 
@@ -24,9 +37,12 @@
 
   interface Props {
     room: RoomListItemView | null;
+    permissions?: RoomPermissionsView | null;
+    levels?: RoomPowerLevelsView | null;
   }
 
-  let { room }: Props = $props();
+  let { room, permissions = null, levels = null }: Props = $props();
+  const core = useCoreClient();
 
   let roomId = $derived(room?.room_id ?? null);
   let value = $derived(roomIconOverride(roomId) ?? DEFAULT);
@@ -91,6 +107,35 @@
     };
   });
 
+  let canHideBadges = $derived(
+    canSendState(levels, permissions?.own_power_level ?? 0, SPACE_BRIDGE_BADGES_EVENT)
+  );
+  let badgesHidden = $state(false);
+
+  $effect(() => {
+    const target = roomId;
+    badgesHidden = false;
+    if (!target) return;
+    let current = true;
+    void spaceHidesBridgeBadges(core, target).then((hidden) => {
+      if (current) badgesHidden = hidden;
+    });
+    return () => {
+      current = false;
+    };
+  });
+
+  function setBadgesHidden(hidden: boolean): void {
+    const target = roomId;
+    if (!target) return;
+    badgesHidden = hidden;
+    setSpaceHidesBridgeBadges(core, target, hidden).catch((error: unknown) => {
+      console.warn('[sable room] changing the space bridge badges failed', error);
+      badgesHidden = !hidden;
+      toasts.error(i18n.t('errors.actionFailed'));
+    });
+  }
+
   function selectMedia(next: string): void {
     const target = roomId;
     if (!target) return;
@@ -139,6 +184,18 @@
           }}
         />
       </SettingsRow>
+      {#if canHideBadges}
+        <SettingsRow
+          title={i18n.t('room.appearanceHideBridgesTitle')}
+          description={i18n.t('room.appearanceHideBridgesHint')}
+        >
+          <Switch
+            checked={badgesHidden}
+            label={i18n.t('room.appearanceHideBridgesTitle')}
+            onCheckedChange={setBadgesHidden}
+          />
+        </SettingsRow>
+      {/if}
       <SettingsRow title={i18n.t('room.mediaTitle')} description={i18n.t('room.mediaHint')}>
         <Select
           value={roomMedia ?? DEFAULT}

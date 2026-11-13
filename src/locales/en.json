@@ -793,6 +793,8 @@
     "appearanceIconDefault": "Default ({{mode}})",
     "appearanceBridgedTitle": "Bridged space",
     "appearanceBridgedHint": "Shows the bridged network on this space instead of on each of its rooms.",
+    "appearanceHideBridgesTitle": "Hide bridged networks for everyone",
+    "appearanceHideBridgesHint": "Stops Sable from showing which network each room in this space is bridged to. Applies to every member.",
     "mediaTitle": "Load media",
     "mediaHint": "Only for you. Syncs to your other devices and clients.",
     "historyVisibility": {

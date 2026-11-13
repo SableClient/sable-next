@@ -169,7 +169,7 @@
       {#snippet pending()}{/snippet}
     </svelte:boundary>
   {:else if active === 'appearance'}
-    <RoomAppearanceSettings {room} />
+    <RoomAppearanceSettings {room} {permissions} {levels} />
   {:else if active === 'bridges'}
     <svelte:boundary>
       <RoomBridgesSettings {room} />
