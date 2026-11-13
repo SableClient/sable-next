@@ -218,22 +218,18 @@ jobs:
           revision="$(git rev-parse HEAD)"
           image="$REGISTRY/${GITHUB_REPOSITORY,,}"
           [ "$IMAGE_KIND" = web ] || image="$image-server"
-          builder="ci-builder-$GITHUB_RUN_ID-$IMAGE_KIND-$ARCH"
-          cleanup() {
-            docker buildx rm --force "$builder" || {
-              docker rm -f "buildx_buildkit_${builder}0" || true
-              docker volume rm "buildx_buildkit_${builder}0_state" || true
-            }
-            docker context rm --force "ci-$GITHUB_RUN_ID-$IMAGE_KIND-$ARCH" || true
-          }
-          trap cleanup EXIT
-          docker context create "ci-$GITHUB_RUN_ID-$IMAGE_KIND-$ARCH"
-          docker buildx create "ci-$GITHUB_RUN_ID-$IMAGE_KIND-$ARCH" --name "$builder" --driver docker-container --buildkitd-config .forgejo/buildkitd.toml --use
+          # The BuildKit container outlives the job so its local cache is reused across runs.
+          builder="ci-builder-$ARCH"
+          docker context inspect "ci-$ARCH" >/dev/null 2>&1 || docker context create "ci-$ARCH"
+          docker buildx inspect "$builder" >/dev/null 2>&1 \
+            || docker buildx create "ci-$ARCH" --name "$builder" --driver docker-container --buildkitd-config .forgejo/buildkitd.toml
           # Forgejo fails the push when both arch jobs upload the same layer at once.
           for attempt in 1 2 3; do
             docker buildx build . \
+              --builder "$builder" \
               --file "$DOCKERFILE" \
               --platform "linux/$ARCH" \
+              --provenance=false \
               --label "org.opencontainers.image.source=$FORGEJO_URL/$GITHUB_REPOSITORY" \
               --label "org.opencontainers.image.revision=$revision" \
               --label "org.opencontainers.image.version=$VERSION" \
@@ -252,15 +248,6 @@ jobs:
             [ "$attempt" -lt 3 ] || exit 1
             sleep $((attempt * 5))
           done
-      - name: Remove the builder
-        if: ${{ always() }}
-        run: |
-          builder="ci-builder-$GITHUB_RUN_ID-$IMAGE_KIND-$ARCH"
-          docker buildx rm --force "$builder" || {
-            docker rm -f "buildx_buildkit_${builder}0" || true
-            docker volume rm "buildx_buildkit_${builder}0_state" || true
-          }
-          docker context rm --force "ci-$GITHUB_RUN_ID-$IMAGE_KIND-$ARCH" || true
 
   docker-manifest:
     name: Publish ${{ matrix.image }} image manifest
