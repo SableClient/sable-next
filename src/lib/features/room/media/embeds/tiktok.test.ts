@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('#lib/config/runtime-config.js', () => ({
+  runtimeConfig: () => Promise.resolve({ embeds: { serviceUrl: 'https://embeds.test' } }),
+}));
+
 import {
   isTiktokShortLink,
   parseTiktokLink,
@@ -86,7 +90,7 @@ describe('resolveTiktokShortLink', () => {
       author: '@rblxcatinho',
     });
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
-      'https://www.tiktok.com/oembed?url=https%3A%2F%2Fvm.tiktok.com%2FZNaaaa%2F'
+      'https://embeds.test/_soliditas/embed/tiktok?url=https%3A%2F%2Fvm.tiktok.com%2FZNaaaa%2F'
     );
   });
 

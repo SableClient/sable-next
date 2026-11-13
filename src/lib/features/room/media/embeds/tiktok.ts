@@ -1,3 +1,6 @@
+import { embedServiceUrl } from '#lib/config/embed-service.js';
+import { runtimeConfig } from '#lib/config/runtime-config.js';
+
 const HOSTS = new Set(['tiktok.com', 'www.tiktok.com', 'm.tiktok.com']);
 const SHORT_HOSTS = new Set(['vm.tiktok.com', 'vt.tiktok.com']);
 const SHORT_CODE = /^[\w-]{4,32}$/;
@@ -55,9 +58,9 @@ export function isTiktokShortLink(href: string): boolean {
 const resolved = new Map<string, Promise<TiktokPost | null>>();
 
 async function fetchShortLink(href: string): Promise<TiktokPost | null> {
-  const url = new URL('https://www.tiktok.com/oembed');
-  url.searchParams.set('url', href);
-  const response = await fetch(url);
+  const service = (await runtimeConfig()).embeds.serviceUrl;
+  if (service === null) return null;
+  const response = await fetch(embedServiceUrl(service, 'embed/tiktok', { url: href }));
   if (!response.ok) return null;
   const body = (await response.json()) as { html?: unknown; author_url?: unknown };
   if (typeof body.html !== 'string') return null;

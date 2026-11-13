@@ -2,6 +2,7 @@
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
   import HeartStraightIcon from 'phosphor-svelte/lib/HeartStraightIcon';
 
+  import { embedServiceUrl } from '#lib/config/embed-service.js';
   import { i18n } from '#lib/i18n.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -20,12 +21,13 @@
 
   interface Props {
     config: GifsConfig;
+    serviceUrl: string;
     providerSetting: GifProviderSetting;
     query: string;
     onPick: (gif: GifResult) => void;
   }
 
-  let { config, providerSetting, query, onPick }: Props = $props();
+  let { config, serviceUrl, providerSetting, query, onPick }: Props = $props();
 
   const search = new GifSearch();
 
@@ -35,7 +37,7 @@
   $effect(() => {
     const apiKey = provider.apiKey(config);
     if (apiKey === null) return;
-    search.search(provider, apiKey, query);
+    search.search(serviceUrl, provider, apiKey, query);
     return () => {
       search.cancel();
     };
@@ -81,7 +83,7 @@
                 />
               {:else}
                 <img
-                  src={gif.previewUrl}
+                  src={embedServiceUrl(serviceUrl, 'gifs/media', { url: gif.previewUrl })}
                   alt=""
                   width={gif.width || 4}
                   height={gif.height || 3}

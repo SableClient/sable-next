@@ -462,6 +462,12 @@ test.each([
 
 test('a picked GIF is uploaded instead of linked when reuploading is on', async () => {
   setPreference('reuploadGifs', true);
+  vi.spyOn(runtime, 'runtimeConfig').mockResolvedValue(
+    runtime.parseRuntimeConfig({
+      gifs: { proxyUrl: 'gifs.example' },
+      embeds: { serviceUrl: 'https://embeds.test' },
+    })
+  );
   const fetched = vi
     .spyOn(globalThis, 'fetch')
     .mockResolvedValue(new Response(new Uint8Array([71, 73, 70])));
@@ -478,7 +484,9 @@ test('a picked GIF is uploaded instead of linked when reuploading is on', async 
   };
 
   await fixture.conversation.sendGif(ROOM, gif);
-  expect(fetched).toHaveBeenCalledWith(gif.mediaUrl, { referrerPolicy: 'no-referrer' });
+  expect(fetched).toHaveBeenCalledWith(
+    'https://embeds.test/_soliditas/gifs/media?url=https%3A%2F%2Fmedia.tenor.com%2Fabc123%2Fcat.gif'
+  );
   expect(fixture.sendGif).not.toHaveBeenCalled();
   const [, file] = fixture.sendAttachment.mock.lastCall as unknown as [string, File];
   expect([file.name, file.type, file.size]).toEqual(['cat.gif', 'image/gif', 3]);

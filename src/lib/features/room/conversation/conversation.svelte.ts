@@ -11,6 +11,7 @@ import type {
 
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import { embedServiceUrl } from '#lib/config/embed-service.js';
 import { runtimeConfig } from '#lib/config/runtime-config.js';
 import { t } from '#lib/i18n.js';
 import type { CoreClient, OutgoingMentions } from '#lib/core/client.svelte.js';
@@ -398,7 +399,9 @@ export class Conversation {
   readonly sendGif = async (targetRoomId: string, gif: GifResult): Promise<void> => {
     if (preferences.reuploadGifs && !isUploadedGifSource(gif.mediaUrl)) {
       if (!isAllowedGifMediaUrl(gif.mediaUrl)) throw new Error('GIF is not from a known provider');
-      const response = await fetch(gif.mediaUrl, { referrerPolicy: 'no-referrer' });
+      const service = (await runtimeConfig()).embeds.serviceUrl;
+      if (service === null) throw new Error('no embed service to fetch the GIF through');
+      const response = await fetch(embedServiceUrl(service, 'gifs/media', { url: gif.mediaUrl }));
       if (!response.ok) throw new Error(`HTTP ${String(response.status)}`);
       const name = gifFilename(gif.title, gif.mimetype);
       await this.sendAttachment(

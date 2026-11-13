@@ -47,7 +47,7 @@
     /** A reaction key cannot be a sticker. */
     stickers?: boolean;
     reactions?: boolean;
-    gifs?: { config: GifsConfig; providerSetting: GifProviderSetting } | null;
+    gifs?: { config: GifsConfig; serviceUrl: string; providerSetting: GifProviderSetting } | null;
     onPick: (image: PackImageView, usage: ImageUsageView, keepOpen: boolean) => void;
     onPickUnicode?: (emoji: string, keepOpen: boolean) => void;
     onPickGif?: (gif: GifResult) => void;
@@ -721,6 +721,7 @@
   {#if gifs && gifTab}
     <GifGrid
       config={gifs.config}
+      serviceUrl={gifs.serviceUrl}
       providerSetting={gifs.providerSetting}
       {query}
       onPick={(gif: GifResult) => {

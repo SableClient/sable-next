@@ -31,13 +31,10 @@ export type GifProvider = {
   id: GifProviderId;
   label: string;
   apiKey: (config: GifsConfig) => string | null;
-  searchUrl: (apiKey: string, query: string) => string;
   parse: (payload: unknown) => GifResult[];
   isMediaUrlAllowed: (url: URL) => boolean;
   proxyPayload: (url: URL, gif: GifResult) => string | undefined;
 };
-
-const resultLimit = 50;
 
 const readString = v.parser(v.fallback(v.string(), ''));
 const readRecord = v.parser(v.fallback(v.custom<Record<string, unknown>>(isRecord), {}));
@@ -183,12 +180,6 @@ export const gifProviders: Record<GifProviderId, GifProvider> = {
     id: 'klipy',
     label: 'Klipy',
     apiKey: (config) => config.klipyApiKey,
-    searchUrl: (apiKey, query) => {
-      const url = new URL(`https://api.klipy.com/api/v1/${encodeURIComponent(apiKey)}/gifs/search`);
-      url.searchParams.set('q', query);
-      url.searchParams.set('per_page', String(resultLimit));
-      return url.toString();
-    },
     parse: parseKlipy,
     isMediaUrlAllowed: (url) =>
       isPlainHttpsUrl(url) && url.hostname === 'static.klipy.com' && /^\/ii\/.+/.test(url.pathname),
@@ -198,16 +189,6 @@ export const gifProviders: Record<GifProviderId, GifProvider> = {
     id: 'tenor',
     label: 'Tenor',
     apiKey: (config) => config.tenorApiKey,
-    searchUrl: (apiKey, query) => {
-      const url = new URL('https://tenor.googleapis.com/v2/search');
-      url.searchParams.set('key', apiKey);
-      /* Any other client_key is a 403 worded as "Tenor API is discontinued". */
-      url.searchParams.set('client_key', 'tenor_web');
-      url.searchParams.set('q', query);
-      url.searchParams.set('limit', String(resultLimit));
-      url.searchParams.set('media_filter', 'gif,mediumgif,tinygif,nanogif');
-      return url.toString();
-    },
     parse: parseTenor,
     isMediaUrlAllowed: (url) =>
       isPlainHttpsUrl(url) && /^(?:c|media\d*)\.tenor\.com$/.test(url.hostname),
@@ -217,13 +198,6 @@ export const gifProviders: Record<GifProviderId, GifProvider> = {
     id: 'giphy',
     label: 'Giphy',
     apiKey: (config) => config.giphyApiKey,
-    searchUrl: (apiKey, query) => {
-      const url = new URL('https://api.giphy.com/v1/gifs/search');
-      url.searchParams.set('api_key', apiKey);
-      url.searchParams.set('q', query);
-      url.searchParams.set('limit', String(resultLimit));
-      return url.toString();
-    },
     parse: parseGiphy,
     isMediaUrlAllowed: (url) =>
       isPlainHttpsUrl(url) && /^(?:i|media\d*)\.giphy\.com$/.test(url.hostname),

@@ -1,3 +1,5 @@
+import { embedServiceUrl } from '#lib/config/embed-service.js';
+
 import type { GifProvider, GifResult } from './providers';
 
 /* Generation-guarded: a late response for a superseded query is discarded. */
@@ -15,7 +17,7 @@ export class GifSearch {
     this.#wait = wait;
   }
 
-  search(provider: GifProvider, apiKey: string, query: string): void {
+  search(serviceUrl: string, provider: GifProvider, apiKey: string, query: string): void {
     this.cancel();
     const term = query.trim();
     if (term === '') {
@@ -28,7 +30,7 @@ export class GifSearch {
     const generation = this.#generation;
     this.#timer = setTimeout(() => {
       this.#timer = undefined;
-      void this.#run(provider, apiKey, term, generation);
+      void this.#run(serviceUrl, provider, apiKey, term, generation);
     }, this.#wait);
   }
 
@@ -48,6 +50,7 @@ export class GifSearch {
   }
 
   async #run(
+    serviceUrl: string,
     provider: GifProvider,
     apiKey: string,
     term: string,
@@ -57,9 +60,10 @@ export class GifSearch {
     this.#controller = controller;
 
     try {
-      const response = await fetch(provider.searchUrl(apiKey, term), {
-        signal: controller.signal,
-      });
+      const response = await fetch(
+        embedServiceUrl(serviceUrl, 'gifs/search', { provider: provider.id, key: apiKey, q: term }),
+        { signal: controller.signal }
+      );
       if (!response.ok) throw new Error(`HTTP ${String(response.status)}`);
       const parsed = provider.parse(await response.json());
       if (generation !== this.#generation) return;

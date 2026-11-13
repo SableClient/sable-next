@@ -5,6 +5,9 @@ import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
+vi.mock('#lib/config/runtime-config.js', () => ({
+  runtimeConfig: () => Promise.resolve({ embeds: { serviceUrl: 'https://embeds.test' } }),
+}));
 
 import TiktokEmbed from './TiktokEmbed.svelte';
 

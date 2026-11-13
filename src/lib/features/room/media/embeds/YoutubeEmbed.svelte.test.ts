@@ -64,7 +64,7 @@ test.each([
   await settle();
 
   expect(fetch).toHaveBeenCalledWith(
-    expect.objectContaining({ host: 'www.youtube.com', pathname: '/oembed' })
+    `https://embeds.test/_soliditas/embed/youtube/details?v=${id}`
   );
   expect(screen.getByRole('link', { name: 'A channel A video' })).toHaveAttribute(
     'href',
@@ -73,7 +73,7 @@ test.each([
   const play = screen.getByRole('button', { name: 'Play A video' });
   expect(play.querySelector('img')).toHaveAttribute(
     'src',
-    `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
+    `https://embeds.test/_soliditas/embed/youtube/thumbnail?v=${id}`
   );
   expect(container.querySelector('iframe')).not.toBeInTheDocument();
 
@@ -110,7 +110,7 @@ const dearrowCases = [
     videoUrl: 'https://youtu.be/12345678900',
     title: 'best title',
     thumbnailUrl:
-      'https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=12345678900&time=13.37&redirectUrl=https%3A%2F%2Fi.ytimg.com%2Fvi%2F12345678900%2Fhq2.jpg',
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=12345678900&frame=middle&time=13.37',
   },
   {
     name: 'valid title and thumbnail, random fallback still uses youtube',
@@ -138,7 +138,7 @@ const dearrowCases = [
     videoUrl: 'https://youtu.be/12345678901',
     title: 'best title',
     thumbnailUrl:
-      'https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=12345678901&time=13.37&redirectUrl=https%3A%2F%2Fi.ytimg.com%2Fvi%2F12345678901%2Fhq2.jpg',
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=12345678901&frame=middle&time=13.37',
   },
   {
     name: 'multiple valid title and thumbnail, picks first valid item',
@@ -188,7 +188,7 @@ const dearrowCases = [
     videoUrl: 'https://youtu.be/12345678902',
     title: 'best title',
     thumbnailUrl:
-      'https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=12345678902&time=13.37&redirectUrl=https%3A%2F%2Fi.ytimg.com%2Fvi%2F12345678902%2Fhq2.jpg',
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=12345678902&frame=middle&time=13.37',
   },
   {
     name: 'title with formatter chars gets stripped',
@@ -216,7 +216,7 @@ const dearrowCases = [
     videoUrl: 'https://youtu.be/12345678903',
     title: 'forced title',
     thumbnailUrl:
-      'https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=12345678903&time=13.37&redirectUrl=https%3A%2F%2Fi.ytimg.com%2Fvi%2F12345678903%2Fhq2.jpg',
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=12345678903&frame=middle&time=13.37',
   },
   {
     name: 'no title but valid thumbnail',
@@ -237,7 +237,7 @@ const dearrowCases = [
     videoUrl: 'https://youtu.be/12345678904',
     title: 'A video',
     thumbnailUrl:
-      'https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=12345678904&time=13.37&redirectUrl=https%3A%2F%2Fi.ytimg.com%2Fvi%2F12345678904%2Fhq2.jpg',
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=12345678904&frame=middle&time=13.37',
   },
   {
     name: 'no thumbnail but valid title',
@@ -256,7 +256,8 @@ const dearrowCases = [
     },
     videoUrl: 'https://youtu.be/12345678905',
     title: 'best title',
-    thumbnailUrl: 'https://i.ytimg.com/vi/12345678905/hq2.jpg',
+    thumbnailUrl:
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=12345678905&frame=middle',
   },
   {
     name: 'no valid details, youtube start',
@@ -267,7 +268,8 @@ const dearrowCases = [
     overrides: {},
     videoUrl: 'https://youtu.be/12345678906',
     title: 'A video',
-    thumbnailUrl: 'https://i.ytimg.com/vi/12345678906/hq1.jpg',
+    thumbnailUrl:
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=12345678906&frame=start',
   },
   {
     name: 'no valid details, youtube middle',
@@ -278,7 +280,8 @@ const dearrowCases = [
     overrides: {},
     videoUrl: 'https://youtu.be/12345678907',
     title: 'A video',
-    thumbnailUrl: 'https://i.ytimg.com/vi/12345678907/hq2.jpg',
+    thumbnailUrl:
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=12345678907&frame=middle',
   },
   {
     name: 'no valid details, youtube end',
@@ -289,7 +292,7 @@ const dearrowCases = [
     overrides: {},
     videoUrl: 'https://youtu.be/12345678908',
     title: 'A video',
-    thumbnailUrl: 'https://i.ytimg.com/vi/12345678908/hq3.jpg',
+    thumbnailUrl: 'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=12345678908&frame=end',
   },
   {
     name: 'no valid details, random start, has duration',
@@ -301,7 +304,7 @@ const dearrowCases = [
     videoUrl: 'https://youtu.be/12345678909',
     title: 'A video',
     thumbnailUrl:
-      'https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=12345678909&time=10&redirectUrl=https%3A%2F%2Fi.ytimg.com%2Fvi%2F12345678909%2Fhq1.jpg',
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=12345678909&frame=start&time=10',
   },
   {
     name: 'no valid details, random middle, has duration',
@@ -313,7 +316,7 @@ const dearrowCases = [
     videoUrl: 'https://youtu.be/1234567890a',
     title: 'A video',
     thumbnailUrl:
-      'https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=1234567890a&time=10&redirectUrl=https%3A%2F%2Fi.ytimg.com%2Fvi%2F1234567890a%2Fhq2.jpg',
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=1234567890a&frame=middle&time=10',
   },
   {
     name: 'no valid details, random end, has duration',
@@ -325,7 +328,7 @@ const dearrowCases = [
     videoUrl: 'https://youtu.be/1234567890b',
     title: 'A video',
     thumbnailUrl:
-      'https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=1234567890b&time=10&redirectUrl=https%3A%2F%2Fi.ytimg.com%2Fvi%2F1234567890b%2Fhq3.jpg',
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=1234567890b&frame=end&time=10',
   },
   {
     name: 'no valid details, random start, no duration',
@@ -338,7 +341,8 @@ const dearrowCases = [
     },
     videoUrl: 'https://youtu.be/1234567890c',
     title: 'A video',
-    thumbnailUrl: 'https://i.ytimg.com/vi/1234567890c/hq1.jpg',
+    thumbnailUrl:
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=1234567890c&frame=start',
   },
   {
     name: 'no valid details, random start, zero duration',
@@ -351,7 +355,8 @@ const dearrowCases = [
     },
     videoUrl: 'https://youtu.be/1234567890g',
     title: 'A video',
-    thumbnailUrl: 'https://i.ytimg.com/vi/1234567890g/hq1.jpg',
+    thumbnailUrl:
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=1234567890g&frame=start',
   },
   {
     name: 'no valid details, random middle, no duration',
@@ -364,7 +369,8 @@ const dearrowCases = [
     },
     videoUrl: 'https://youtu.be/1234567890d',
     title: 'A video',
-    thumbnailUrl: 'https://i.ytimg.com/vi/1234567890d/hq2.jpg',
+    thumbnailUrl:
+      'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=1234567890d&frame=middle',
   },
   {
     name: 'no valid details, random end, no duration',
@@ -377,7 +383,7 @@ const dearrowCases = [
     },
     videoUrl: 'https://youtu.be/1234567890e',
     title: 'A video',
-    thumbnailUrl: 'https://i.ytimg.com/vi/1234567890e/hq3.jpg',
+    thumbnailUrl: 'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=1234567890e&frame=end',
   },
   {
     name: 'no valid details, original',
@@ -389,17 +395,17 @@ const dearrowCases = [
     },
     videoUrl: 'https://youtu.be/1234567890f',
     title: 'A video',
-    thumbnailUrl: 'https://i.ytimg.com/vi/1234567890f/hqdefault.jpg',
+    thumbnailUrl: 'https://embeds.test/_soliditas/embed/youtube/thumbnail?v=1234567890f',
   },
 ];
 
 for (const { name, setPreferences, overrides, videoUrl, title, thumbnailUrl } of dearrowCases) {
   test(`falls back to correct details based on preferences: ${name}`, async () => {
     const fetch = vi.fn<typeof globalThis.fetch>((url: URL | RequestInfo) => {
-      if (!(url instanceof URL)) return Promise.reject(new Error('wut'));
-      if (url.host === 'www.youtube.com')
+      const { pathname } = new URL(url as string);
+      if (pathname === '/_soliditas/embed/youtube/details')
         return Promise.resolve(Response.json({ title: 'A video', author_name: 'A channel' }));
-      if (url.host === 'sponsor.ajay.app')
+      if (pathname === '/_soliditas/embed/youtube/dearrow')
         return Promise.resolve(
           Response.json({
             titles: [
@@ -433,12 +439,11 @@ for (const { name, setPreferences, overrides, videoUrl, title, thumbnailUrl } of
     });
     await settle();
 
-    expect(fetch).toHaveBeenCalledWith(
-      expect.objectContaining({ host: 'www.youtube.com', pathname: '/oembed' })
-    );
-    expect(fetch).toHaveBeenCalledWith(
-      expect.objectContaining({ host: 'sponsor.ajay.app', pathname: '/api/branding' })
-    );
+    const id = new URL(videoUrl).pathname.slice(1);
+    expect(fetch.mock.calls).toEqual([
+      [`https://embeds.test/_soliditas/embed/youtube/details?v=${id}`],
+      [`https://embeds.test/_soliditas/embed/youtube/dearrow?v=${id}`],
+    ]);
     expect(screen.getByRole('link', { name: `A channel ${title}` })).toHaveAttribute(
       'href',
       videoUrl

@@ -63,6 +63,7 @@
   let dropState = $state.raw<DropState<ComposerButton> | null>(null);
   let announcement = $state('');
   let config = $state.raw<GifsConfig | null>(null);
+  let serviceUrl = $state<string | null>(null);
   let anchor = $state<HTMLElement | null>(null);
   const triggerElements = $state<Partial<Record<BoardTab, HTMLButtonElement>>>({});
 
@@ -74,7 +75,9 @@
   $effect(() => {
     let cancelled = false;
     void runtimeConfig().then((loaded) => {
-      if (!cancelled) config = loaded.gifs;
+      if (cancelled) return;
+      config = loaded.gifs;
+      serviceUrl = loaded.embeds.serviceUrl;
     });
     return () => {
       cancelled = true;
@@ -84,8 +87,9 @@
   let gifs = $derived(
     onPickGif &&
       config &&
+      serviceUrl !== null &&
       gifSearchAvailable(config, preferences.gifProvider, preferences.reuploadGifs)
-      ? { config, providerSetting: preferences.gifProvider }
+      ? { config, serviceUrl, providerSetting: preferences.gifProvider }
       : null
   );
 

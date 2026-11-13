@@ -53,7 +53,7 @@ test('an empty query never reaches the network', () => {
   vi.stubGlobal('fetch', fetchMock);
 
   const search = runner();
-  search.search(provider, apiKey, '   ');
+  search.search('https://embeds.test', provider, apiKey, '   ');
   vi.runAllTimers();
 
   expect(fetchMock).not.toHaveBeenCalled();
@@ -67,13 +67,18 @@ test('a superseded query cannot overwrite the results of the current one', async
   vi.stubGlobal('fetch', fetchMock);
 
   const search = runner();
-  search.search(provider, apiKey, 'cat');
-  search.search(provider, apiKey, 'dog');
+  search.search('https://embeds.test', provider, apiKey, 'cat');
+  search.search('https://embeds.test', provider, apiKey, 'dog');
 
   await vi.waitUntil(() => !search.loading);
 
   expect(search.results.map((gif) => gif.id)).toEqual(['dog']);
-  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock.mock.calls).toEqual([
+    [
+      'https://embeds.test/_soliditas/gifs/search?provider=tenor&key=tenor-key&q=dog',
+      expect.anything(),
+    ],
+  ]);
 });
 
 test('a failing response leaves the grid empty and says so', async () => {
@@ -83,7 +88,7 @@ test('a failing response leaves the grid empty and says so', async () => {
   );
 
   const search = runner();
-  search.search(provider, apiKey, 'cat');
+  search.search('https://embeds.test', provider, apiKey, 'cat');
   await vi.waitUntil(() => !search.loading);
 
   expect(search.failed).toBe(true);
@@ -97,7 +102,7 @@ test('a reset clears a previous failure so the next query starts clean', async (
   );
 
   const search = runner();
-  search.search(provider, apiKey, 'cat');
+  search.search('https://embeds.test', provider, apiKey, 'cat');
   await vi.waitUntil(() => !search.loading);
   expect(search.failed).toBe(true);
 
