@@ -66,6 +66,7 @@
   }
 
   .receipts-dialog.sheet {
+    height: calc(16rem - var(--control-height-large) - var(--space-400));
     max-height: none;
     padding: 0 var(--space-400);
     width: auto;

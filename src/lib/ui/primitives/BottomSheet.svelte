@@ -255,7 +255,7 @@
 >
   <div
     bind:this={body}
-    class={{ 'content-inset': contentInset, expanded, collapsed: !expanded && expandable }}
+    class={{ 'content-inset': contentInset, expanded }}
     role="presentation"
     onclickcapture={contentClick}
     onpointerdown={startContentDrag}
@@ -333,10 +333,6 @@
 
   .content-inset {
     padding: var(--control-height-large) 0 var(--space-400);
-  }
-
-  .collapsed {
-    height: 16rem;
   }
 
   .expanded {
