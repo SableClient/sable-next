@@ -1,0 +1,3 @@
+- The alert list opens as a drawer on desktop and a bottom sheet on mobile, and shows the progress of a search index transfer from another device.
+- Bridge badges can be hidden in appearance settings or moved onto a bridged space, and space admins can hide them on their rooms for every member.
+- Bridged rooms get a Bridges tab in their settings listing each bridge, its network, the bridged chat with a link to it, the bridge bot and who set it up.
