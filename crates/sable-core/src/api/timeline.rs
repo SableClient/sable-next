@@ -7,9 +7,9 @@ use matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType;
 use matrix_sdk::ruma::api::client::room::get_event_by_timestamp;
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::fully_read::FullyReadEventContent;
-use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, UInt};
+use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, UInt};
 use matrix_sdk_base::read_receipts::ReadReceipts;
-use matrix_sdk_ui::timeline::{RoomExt, TimelineFocus};
+use matrix_sdk_ui::timeline::{RoomExt, Timeline, TimelineFocus};
 use serde::{Deserialize, Serialize};
 
 use super::{Handler, Json};
@@ -470,6 +470,23 @@ fn receipt_sent<T>(core: &Core, result: matrix_sdk::Result<T>) -> Result<(), Rpc
     }
 }
 
+/// Hidden events after the last shown one, such as call memberships, still count as
+/// notifications, so reading the last shown event has to cover them too.
+async fn past_hidden_events(timeline: &Timeline, event_id: &EventId) -> OwnedEventId {
+    let last_shown = timeline
+        .items()
+        .await
+        .iter()
+        .rev()
+        .find_map(|item| item.as_event()?.event_id().map(ToOwned::to_owned));
+    if last_shown.as_deref() == Some(event_id)
+        && let Some(latest) = timeline.latest_event_id().await
+    {
+        return latest;
+    }
+    event_id.to_owned()
+}
+
 impl Handler for MarkReadParams {
     type Ok = ();
 
@@ -517,8 +534,9 @@ impl Handler for MarkReadParams {
             core.timeline_for(&self.room_id, thread_root.as_ref())
                 .await?
         };
+        let receipt_target = past_hidden_events(&timeline, &event_id).await;
         receipt_sent(core, timeline
-            .send_single_receipt(receipt_type, event_id.clone()).await)?;
+            .send_single_receipt(receipt_type, receipt_target).await)?;
         if self.fully_read && thread_root.is_none() {
             receipt_sent(core, timeline
                 .send_multiple_receipts(Receipts::new().fully_read_marker(event_id)).await)?;

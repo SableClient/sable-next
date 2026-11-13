@@ -3849,6 +3849,61 @@ async fn a_private_reader_still_moves_the_marker_without_telling_the_room() {
 }
 
 #[tokio::test]
+async fn reading_the_last_shown_message_covers_the_hidden_events_after_it() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!hidden-tail:example.org");
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
+    let rtc_member = matrix_sdk::ruma::serde::Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
+        r#"{"type":"m.rtc.member","event_id":"$call","sender":"@alice:example.org","origin_server_ts":2,"content":{},"state_key":"@alice:example.org_DEVICE","unsigned":{}}"#.to_owned(),
+    )
+    .expect("a call membership event");
+
+    server.mock_room_state_encryption().plain().mount().await;
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.text_msg("read me").event_id(event_id!("$read")))
+                .add_timeline_event(rtc_member),
+        )
+        .await;
+    Mock::given(method("POST"))
+        .and(path_regex(
+            r"^/_matrix/client/v3/rooms/.*/receipt/m\.read/.*$",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+
+    dispatch_mark_read(
+        &server,
+        client,
+        room_id.to_owned(),
+        Some(event_id!("$read").to_owned()),
+        false,
+        false,
+    )
+    .await;
+
+    let requests = server
+        .server()
+        .received_requests()
+        .await
+        .expect("wiremock records requests");
+    let receipt = requests
+        .iter()
+        .find(|request| request.url.path().contains("/receipt/m.read/"))
+        .expect("a read receipt");
+    assert!(
+        receipt.url.path().ends_with("/m.read/$call"),
+        "{}",
+        receipt.url
+    );
+}
+
+#[tokio::test]
 async fn marking_a_room_read_uses_the_latest_threaded_event() {
     let (body, _, fully_read_path, read_path, receipts) = mark_read_body(false, None, true).await;
 
