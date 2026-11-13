@@ -255,7 +255,7 @@ jobs:
     strategy:
       matrix:
         image: [web, server]
-    runs-on: docker-arm64
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
