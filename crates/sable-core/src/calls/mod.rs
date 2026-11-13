@@ -446,15 +446,34 @@ fn left_membership() -> CallMemberEventContent {
     CallMemberEventContent::new_empty(None)
 }
 
-pub(crate) async fn screen_sharers(room: &Room) -> Vec<OwnedUserId> {
-    let mut members = membership::active_members(room).await;
+#[derive(Default, PartialEq, Eq)]
+pub(crate) struct VoiceRoomRoster {
+    pub(crate) participants: Vec<OwnedUserId>,
+    pub(crate) screen_sharers: Vec<OwnedUserId>,
+}
+
+pub(crate) fn affects_voice_roster(update: &matrix_sdk_base::sticky::StickyEventsUpdate) -> bool {
+    update
+        .added
+        .iter()
+        .chain(&update.updated)
+        .map(|event| &event.key)
+        .chain(update.removed.iter().map(|(key, _)| key))
+        .any(|key| membership::is_rtc_member_type(&key.event_type.to_string()))
+}
+
+async fn sticky_room_members(room: &Room) -> Vec<CallMember> {
+    let events = sticky::live_events(room);
+    if events.is_empty() {
+        return Vec::new();
+    }
     let now = crate::now_ms();
     let encrypted = !matches!(
         room.latest_encryption_state().await,
         Ok(matrix_sdk::EncryptionState::NotEncrypted)
     );
     let mut sticky = membership::StickyMemberships::default();
-    for event in sticky::live_events(room) {
+    for event in events {
         event.apply(&mut sticky, encrypted, now);
     }
     let mut sticky_members = sticky.members(now);
@@ -465,11 +484,8 @@ pub(crate) async fn screen_sharers(room: &Room) -> Vec<OwnedUserId> {
     {
         sticky_members.retain(|member| member.wire != membership::RtcWire::Stable);
     }
-    members.extend(sticky_members);
-    members.retain(|member| member.screen_sharing);
-    members.sort_by_key(|member| member.joined_ts);
-    let mut users = Vec::new();
-    for member in members {
+    let mut verified_sticky = Vec::new();
+    for member in sticky_members {
         if member.wire == membership::RtcWire::Stable
             && !room
                 .get_member(&member.user_id)
@@ -483,11 +499,36 @@ pub(crate) async fn screen_sharers(room: &Room) -> Vec<OwnedUserId> {
         {
             continue;
         }
-        if !users.contains(&member.user_id) {
-            users.push(member.user_id);
-        }
+        verified_sticky.push(member);
     }
-    users
+    verified_sticky
+}
+
+pub(crate) async fn voice_room_roster(room: &Room) -> VoiceRoomRoster {
+    let mut members = membership::active_members(room).await;
+    let verified_sticky = sticky_room_members(room).await;
+    runtime::merge_sticky(&mut members, verified_sticky);
+    members.sort_by(|a, b| (a.joined_ts, &a.identity).cmp(&(b.joined_ts, &b.identity)));
+    let mut sdk_only = room.active_room_call_participants();
+    let mut roster = VoiceRoomRoster::default();
+    for member in members {
+        if member.screen_sharing && !roster.screen_sharers.contains(&member.user_id) {
+            roster.screen_sharers.push(member.user_id.clone());
+        }
+        // Keep SDK memberships with unsupported foci, without listing devices that
+        // also published a sticky membership twice.
+        if let Some(index) = sdk_only.iter().position(|id| *id == member.user_id)
+            && member
+                .device_id
+                .as_deref()
+                .is_some_and(|device| room.is_device_in_active_room_call(&member.user_id, device))
+        {
+            sdk_only.remove(index);
+        }
+        roster.participants.push(member.user_id);
+    }
+    roster.participants.extend(sdk_only);
+    roster
 }
 
 fn member_views(members: &[CallMember]) -> Vec<CallMemberView> {

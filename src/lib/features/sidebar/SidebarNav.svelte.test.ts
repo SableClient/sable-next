@@ -5,15 +5,25 @@ import { render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 
-import type { CoreEvent, RoomListItemView, RoomSectionsUpdate } from '#src/generated/protocol';
+import type {
+  CallMemberView,
+  CoreEvent,
+  RoomListItemView,
+  RoomSectionsUpdate,
+} from '#src/generated/protocol';
+import { CallSession } from '#lib/features/call/call-session.svelte.js';
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+vi.mock('#lib/features/call/call-telemetry.js', () => ({ CallTelemetry: vi.fn() }));
 
 import { visit } from '#lib/test-support/app-state.js';
 import { navigated } from '#lib/test-support/app-navigation.js';
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
-const fixture = vi.hoisted(() => ({ roomList: null as RoomList | null }));
+const fixture = vi.hoisted(() => ({
+  roomList: null as RoomList | null,
+  call: null as CallSession | null,
+}));
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useRoomList: () => fixture.roomList,
@@ -24,8 +34,9 @@ const sidebarFixture = vi.hoisted(() => ({
 vi.mock('#lib/spaces/sidebar-layout.svelte.js', () => ({
   useSpaceSidebar: () => ({ items: sidebarFixture.items, openFolders: new Set() }),
 }));
-vi.mock('#lib/features/call/call-session.svelte.js', () => ({
-  useCallSession: () => ({ active: false, roomId: null }),
+vi.mock('#lib/features/call/call-session.svelte.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useCallSession: () => fixture.call ?? { active: false, roomId: null },
 }));
 vi.mock('#lib/core/context.js');
 vi.mock('#lib/rooms/presence.svelte.js', async (importOriginal) => ({
@@ -53,6 +64,7 @@ beforeEach(() => {
 afterEach(() => {
   localStorage.clear();
   sidebarFixture.items = [];
+  fixture.call = null;
 });
 
 function space(roomId = '!space:example.org', name = 'Space'): RoomListItemView {
@@ -122,6 +134,47 @@ function fixtureCore(rooms: RoomListItemView[]) {
   };
   return { client, emit };
 }
+
+test.each([false, true])(
+  'keeps voice channel avatars in sync with the joined call (mobile: %s)',
+  async (mobile) => {
+    const voice: RoomListItemView = {
+      ...space('!games:example.org', 'Good Games'),
+      room_kind: 'voice',
+    };
+    const empty = { ...voice, room_id: '!empty:example.org', name: 'Empty', display_name: 'Empty' };
+    const { client, emit } = fixtureCore([voice, empty]);
+    await startRoomList(client);
+    emit(sectionsUpdate([sectionView('unspaced', { rooms: [voice.room_id, empty.room_id] })]));
+    const call = new CallSession(client);
+    fixture.call = call;
+    call.lifecycle = 'active';
+    call.roomId = voice.room_id;
+    const member = (name: string): CallMemberView => ({
+      user_id: `@${name}:example.org`,
+      identity: name,
+      device_id: 'phone',
+      backend_id: null,
+      joined_ts: 1,
+      screen_sharing: false,
+    });
+    const alice = member('alice');
+    const bob = member('bob');
+    call.members = [alice, bob];
+    render(SidebarNav, { mobile });
+
+    const list = screen.getByRole('list', { name: 'nav.voiceLive:2' });
+    expect(list.previousElementSibling).toHaveTextContent('Good Games');
+    expect(within(list).getByRole('button', { name: alice.user_id })).toBeInTheDocument();
+    expect(within(list).getByRole('button', { name: bob.user_id })).toBeInTheDocument();
+    expect(list.querySelectorAll('.avatar-root')).toHaveLength(2);
+    call.members = [alice];
+    await tick();
+    expect(within(list).queryByRole('button', { name: bob.user_id })).not.toBeInTheDocument();
+    expect(list.querySelectorAll('.avatar-root')).toHaveLength(1);
+    expect(screen.getByRole('treeitem', { name: /Good Games/ })).toHaveTextContent('1');
+  }
+);
 
 function railOrder(names: readonly string[]): (string | null)[] {
   return screen

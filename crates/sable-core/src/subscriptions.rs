@@ -16,6 +16,7 @@ use matrix_sdk::ruma::push::Ruleset;
 use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId, RoomId, UserId};
 use matrix_sdk::send_queue::RoomSendQueueUpdate;
 use matrix_sdk_base::event_cache::Event;
+use matrix_sdk_base::sticky::StickyEventsUpdate;
 use matrix_sdk_ui::eyeball_im::VectorDiff;
 use matrix_sdk_ui::room_list_service::RoomListItem;
 use matrix_sdk_ui::room_list_service::filters::new_filter_non_left;
@@ -24,6 +25,7 @@ use matrix_sdk_ui::timeline::{
 };
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::{broadcast, mpsc, watch};
+use tokio_stream::{StreamMap, wrappers::BroadcastStream};
 use web_time::Instant;
 
 use crate::ResultExt;
@@ -100,6 +102,7 @@ struct RoomListWorker {
     rules: Ruleset,
     /// Refreshed from each diff before constructing synchronous summaries.
     room_cache: HashMap<OwnedRoomId, view::RoomInfo>,
+    voice_updates: StreamMap<OwnedRoomId, BroadcastStream<StickyEventsUpdate>>,
     rows: RoomListRows,
     sections: RoomSections,
     options: watch::Receiver<RoomListOptionsView>,
@@ -285,6 +288,12 @@ impl RoomListWorker {
                     let Some(diffs) = diffs else { break };
                     self.on_entries(diffs).await
                 }
+                Some((room_id, update)) = self.voice_updates.next(), if !self.voice_updates.is_empty() && *stores_open.borrow() => {
+                    if update.is_ok_and(|update| !crate::calls::affects_voice_roster(&update)) {
+                        continue;
+                    }
+                    self.on_voice_update(&room_id).await
+                }
                 changed = self.nicknames.changed() => {
                     if changed.is_err() {
                         break;
@@ -383,7 +392,18 @@ impl RoomListWorker {
         diffs: Vec<VectorDiff<RoomListItem>>,
     ) -> Vec<crate::protocol::VectorDiff<RoomListItemView>> {
         view::prime_display_names(&diffs).await;
-        view::enrich_room_batch(&diffs, &mut self.room_cache).await;
+        let rooms = view::latest_items(&diffs);
+        // Sticky-only joins, leaves and expirations do not produce SDK room-list diffs.
+        // Subscribe before reading the roster so an update cannot fall between the two.
+        for room in &rooms {
+            if room.is_call() && !self.voice_updates.contains_key(room.room_id()) {
+                self.voice_updates.insert(
+                    room.room_id().to_owned(),
+                    BroadcastStream::new(room.sticky_events().subscribe()),
+                );
+            }
+        }
+        view::enrich_rooms(rooms, &mut self.room_cache).await;
         let mut diffs: Vec<_> = diffs
             .into_iter()
             .map(|diff| {
@@ -407,6 +427,15 @@ impl RoomListWorker {
             self.rows.apply(diff);
         }
         self.rows.evict(&mut self.room_cache);
+        let removed: Vec<_> = self
+            .voice_updates
+            .keys()
+            .filter(|id| !self.room_cache.contains_key(*id))
+            .cloned()
+            .collect();
+        for id in removed {
+            self.voice_updates.remove(&id);
+        }
         let current: HashSet<_> = self
             .rows
             .rows()
@@ -422,6 +451,33 @@ impl RoomListWorker {
                 .relink(&self.room_cache, &self.dm_spaces, &self.parents.links),
         );
         diffs
+    }
+
+    async fn on_voice_update(
+        &mut self,
+        room_id: &RoomId,
+    ) -> Vec<crate::protocol::VectorDiff<RoomListItemView>> {
+        let Some(room) = self.client.get_room(room_id) else {
+            return Vec::new();
+        };
+        let Some(cached) = self
+            .room_cache
+            .get_mut(room_id)
+            .and_then(|info| info.voice_roster.as_mut())
+        else {
+            return Vec::new();
+        };
+        let roster = crate::calls::voice_room_roster(&room).await;
+        if roster == *cached {
+            return Vec::new();
+        }
+        *cached = roster;
+        self.rows.refresh(
+            &[room.into()],
+            &self.room_cache,
+            &self.rules,
+            &self.nicknames.borrow(),
+        )
     }
 
     async fn on_rules_changed(
@@ -565,6 +621,7 @@ impl Core {
                 push_rules,
                 rules,
                 room_cache: HashMap::new(),
+                voice_updates: StreamMap::new(),
                 rows: RoomListRows::default(),
                 sections: RoomSections::default(),
                 options: core.room_list_options.subscribe(),

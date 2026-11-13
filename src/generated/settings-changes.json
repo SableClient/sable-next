@@ -1,7 +1,9 @@
 {
   "v2.3.9": {
     "added": [
+      "voiceParticipantPlacement",
       "showBridgeBadges",
+      "messagePreviews",
       "showAlertZoo",
       "personaPickerShowAccountWhenDeselected",
       "jumpToLatestOnSend",

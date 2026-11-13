@@ -1447,6 +1447,97 @@ async fn space_sidebar_does_not_read_while_stores_are_closing() {
 }
 
 #[tokio::test]
+async fn voice_room_roster_follows_sticky_members_without_joining() {
+    use crate::test_support::sticky_update;
+    use ruma::{MilliSecondsSinceUnixEpoch, user_id};
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    server.mock_room_state_encryption().plain().mount().await;
+    let room_id = room_id!("!voice:example.org");
+    let now = u64::from(MilliSecondsSinceUnixEpoch::now().get());
+    let alice = user_id!("@alice:example.org");
+    let bob = user_id!("@bob:example.org");
+    let create = json!({
+        "type": "m.room.create", "state_key": "", "event_id": "$create",
+        "origin_server_ts": 1, "sender": "@alice:example.org",
+        "content": {"creator": "@alice:example.org", "room_version": "10", "type": "org.matrix.msc3417.call"}
+    });
+    let legacy = json!({
+        "type": "org.matrix.msc3401.call.member", "sender": alice,
+        "state_key": "_@alice:example.org_phone_m.call", "event_id": "$legacy", "origin_server_ts": now - 3,
+        "content": {"application": "m.call", "scope": "m.room", "call_id": "", "device_id": "phone",
+            "created_ts": now - 3, "expires": 60_000, "focus_active": {"type": "livekit", "focus_selection": "oldest_membership"},
+            "foci_preferred": []}
+    });
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(Raw::new(&create).unwrap().cast_unchecked())
+                .add_state_event(Raw::new(&legacy).unwrap().cast_unchecked()),
+        )
+        .await;
+    assert_eq!(room.active_room_call_participants(), [alice]);
+    let membership = |sender: &ruma::UserId, id: &str, ts: u64, sharing: bool| {
+        json!({
+            "type": "org.matrix.msc4143.rtc.member", "sender": sender, "event_id": id, "origin_server_ts": ts,
+            "msc4354_sticky": {"duration_ms": 60_000},
+            "content": {"msc4354_sticky_key": "member", "slot_id": "m.call#ROOM",
+                "application": {"type": "m.call"}, "member": {"id": "member", "device_id": "phone"},
+                "org.sable.screen_sharing": sharing}
+        })
+    };
+    sticky_update(&room, vec![membership(alice, "$a", now - 2, false)]).await;
+    let (core, mut events) = core_with_events(&server, client).await;
+    let SubscribeRoomListOk { subscription, .. } =
+        core.run(SubscribeRoomListParams::default()).await.unwrap();
+    let mut rows = Vec::new();
+    let mut expect_roster = async |participants: &[&ruma::UserId], sharers: &[&ruma::UserId]| {
+        let observed = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while let Some(event) = events.recv().await {
+                if let CoreEvent::RoomListDiff {
+                    subscription: current,
+                    diffs,
+                    ..
+                } = event
+                    && current == subscription
+                {
+                    for diff in &diffs {
+                        crate::view::apply_diff(&mut rows, diff);
+                    }
+                    if rows.iter().any(|row| {
+                        row.room_id == room_id
+                            && row.call_participants == participants
+                            && row.screen_sharers == sharers
+                    }) {
+                        return true;
+                    }
+                }
+            }
+            false
+        })
+        .await;
+        assert!(
+            matches!(observed, Ok(true)),
+            "expected {participants:?} with sharers {sharers:?}, got {rows:?}"
+        );
+    };
+    expect_roster(&[alice], &[]).await;
+
+    let mut event = membership(bob, "$b", now - 1, true);
+    sticky_update(&room, vec![event.clone()]).await;
+    expect_roster(&[alice, bob], &[bob]).await;
+
+    event["event_id"] = "$leave".into();
+    event["origin_server_ts"] = now.into();
+    event["content"] = json!({"msc4354_sticky_key": "member"});
+    sticky_update(&room, vec![event]).await;
+    expect_roster(&[alice], &[]).await;
+    core.run(UnsubscribeParams { subscription }).await.unwrap();
+}
+
+#[tokio::test]
 async fn room_list_waits_for_stores_to_open() {
     let server = MatrixMockServer::new().await;
     let store = tempfile::tempdir().unwrap();

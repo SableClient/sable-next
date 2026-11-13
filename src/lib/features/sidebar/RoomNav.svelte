@@ -135,6 +135,7 @@
     width?: number;
     collapsed?: boolean;
     callRoomId?: string | null;
+    callParticipants?: readonly string[];
     callVoiceStates?: ReadonlyMap<string, CallVoiceState>;
     onCallVolume?: (userId: string, volume: number) => void;
   }
@@ -147,6 +148,7 @@
     width,
     collapsed = false,
     callRoomId = null,
+    callParticipants = [],
     callVoiceStates = new Map(),
     onCallVolume,
   }: Props = $props();
@@ -537,7 +539,17 @@
           : marked
             ? i18n.t('nav.markedUnread')
             : null}
-    {@const live = room?.call_participants.length ?? 0}
+    {@const participants =
+      item.roomId === callRoomId && callParticipants.length > 0
+        ? callParticipants
+        : (room?.call_participants ?? [])}
+    {@const live = participants.length}
+    {@const voicePlacement =
+      room?.room_kind === 'voice' ? preferences.voiceParticipantPlacement : null}
+    {@const roomLabel =
+      collapsed && voicePlacement === 'inline' && live > 0
+        ? `${name}, ${i18n.t('nav.voiceLive', { count: live })}`
+        : name}
     {@const notifyMode = room ? roomList.notificationOverride(room.room_id) : null}
     {@const typing =
       !preferences.hideTypingIndicators &&
@@ -581,7 +593,11 @@
           {href}
           style:--room-depth={collapsed ? 0 : item.depth}
           onclick={() => onNavigate?.(href)}
-          aria-label={collapsed ? (unreadLabel ? `${name}, ${unreadLabel}` : name) : undefined}
+          aria-label={collapsed
+            ? unreadLabel
+              ? `${roomLabel}, ${unreadLabel}`
+              : roomLabel
+            : undefined}
           aria-current={active ? 'page' : undefined}
           {@attach full && peerId !== null && !collapsed
             ? whenVisible(() => {
@@ -687,21 +703,25 @@
                   <CalendarRowEvent roomId={room.room_id} />
                 {/if}
               </span>
-              {#if room && live > 0}
-                {@const faces = byName(
-                  room.call_participants,
-                  (userId) => peerProfiles.get(userId)?.display_name
-                ).slice(0, MAX_VOICE_FACES)}
-                {@const faceKeys = participantKeys(faces)}
-                <span
-                  class="voice-live"
-                  role="img"
-                  aria-label={i18n.t('nav.voiceLive', { count: live })}
-                  {@attach whenVisible(() => {
-                    for (const userId of faces) peerProfiles.request(userId);
-                  })}
-                >
-                  <span class="voice-faces">
+            {/if}
+            {#if room && live > 0 && (!collapsed || voicePlacement === 'inline')}
+              <span
+                class="voice-live"
+                role="img"
+                aria-label={i18n.t('nav.voiceLive', { count: live })}
+              >
+                {#if voicePlacement !== 'below'}
+                  {@const faces = byName(
+                    participants,
+                    (userId) => peerProfiles.get(userId)?.display_name
+                  ).slice(0, MAX_VOICE_FACES)}
+                  {@const faceKeys = participantKeys(faces)}
+                  <span
+                    class="voice-faces"
+                    {@attach whenVisible(() => {
+                      for (const userId of faces) peerProfiles.request(userId);
+                    })}
+                  >
                     {#each faces as userId, index (faceKeys[index])}
                       {@const profile = peerProfiles.get(userId)}
                       <Avatar
@@ -712,9 +732,13 @@
                       />
                     {/each}
                   </span>
+                {/if}
+                {#if !collapsed}
                   <StatusBadge label={String(live)} variant="primary" />
-                </span>
-              {/if}
+                {/if}
+              </span>
+            {/if}
+            {#if !collapsed}
               <span class="room-status">
                 {#if typing}
                   <span class="room-typing"><TypingDots /></span>
@@ -755,7 +779,7 @@
         <!-- eslint-enable svelte/no-navigation-without-resolve -->
       {/snippet}
       {#if collapsed && full}
-        <Tooltip label={name} side="right" trigger={roomTrigger} />
+        <Tooltip label={roomLabel} side="right" trigger={roomTrigger} />
       {:else}
         {#if full && room?.canonical_alias && !room.is_direct}
           <Tooltip label={room.canonical_alias} side="right" trigger={roomTrigger} />
@@ -785,9 +809,10 @@
         {/if}
       {/if}
     </div>
-    {#if full && room?.room_kind === 'voice' && live > 0}
+    {#if full && room && (voicePlacement === 'both' || voicePlacement === 'below') && live > 0}
       <CallParticipantList
-        {room}
+        {participants}
+        screenSharers={room.screen_sharers}
         {collapsed}
         {closed}
         voiceStates={room.room_id === callRoomId ? callVoiceStates : undefined}
@@ -1541,6 +1566,20 @@
     padding: 0;
     position: relative;
     width: var(--avatar-size-small);
+  }
+
+  .room-list.collapsed .room-row:has(.voice-live) {
+    flex-direction: column;
+    gap: var(--space-050);
+    padding-block: var(--space-100);
+  }
+
+  .room-list.collapsed .voice-live {
+    opacity: 1;
+  }
+
+  .room-list.collapsed .voice-faces :global(.avatar-root.voice-face) {
+    --avatar-size: 1rem;
   }
 
   .room-list.collapsed .room-row :global(.room-collapsed-badge) {
