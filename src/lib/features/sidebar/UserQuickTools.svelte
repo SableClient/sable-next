@@ -22,8 +22,6 @@
   import './sidebar-tools.css';
   import { useAlertProviders } from './alerts.js';
   import AlertListButton from './AlertListButton.svelte';
-  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
-  import AlertList, { alertListState } from './AlertList.svelte';
 
   interface Props {
     mobile?: boolean;
@@ -119,15 +117,6 @@
 {/snippet}
 
 {#if mobile}
-  <BottomSheet
-    bind:open={alertListState.open}
-    contentInset={false}
-    background="transparent"
-    label=""
-    closeLabel=""
-  >
-    <AlertList />
-  </BottomSheet>
   <nav
     class={['mobile-tools', { 'selection-active': mobileSelectedIndex >= 0 }]}
     style:--mobile-selected-index={String(Math.max(mobileSelectedIndex, 0))}

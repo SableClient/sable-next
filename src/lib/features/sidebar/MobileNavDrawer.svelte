@@ -20,6 +20,8 @@
     setMobileDrawerOpen,
   } from '#lib/features/room/room-navigation.js';
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
+  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
+  import AlertList, { alertListState } from './AlertList.svelte';
 
   interface Props {
     children: Snippet;
@@ -290,6 +292,15 @@
         {@render children()}
       </div>
       {#if !appLayout.current}
+        <BottomSheet
+          bind:open={alertListState.open}
+          contentInset={false}
+          background="transparent"
+          label=""
+          closeLabel=""
+        >
+          <AlertList />
+        </BottomSheet>
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
         <div class="mobile-quick-tools" onclick={revealCurrentPage}><UserQuickTools mobile /></div>
       {/if}
