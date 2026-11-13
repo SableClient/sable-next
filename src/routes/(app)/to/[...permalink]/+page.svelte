@@ -20,8 +20,13 @@
 
   const routePrefix = resolve('/(app)/to/[...permalink]', { permalink: '' });
 
+  // An overlay's history entry hands back an equal `page.url` in a new object,
+  // and resolving again would remount the card and repeat its chat prompt.
+  let href = $derived(page.url.href);
+
   $effect(() => {
-    const uri = page.url.searchParams.get('uri');
+    const url = new URL(href);
+    const uri = url.searchParams.get('uri');
     if (uri !== null) {
       const path = matrixLinkPath(uri);
       if (path === null) unresolved = true;
@@ -33,15 +38,15 @@
     // The still-encoded tail, rather than the rest param: the matrix.to parser
     // does its own decoding.
     const via = new URLSearchParams(
-      page.url.searchParams.getAll('via').map((server) => ['via', server])
+      url.searchParams.getAll('via').map((server) => ['via', server])
     );
-    const fragment = `${page.url.pathname.slice(routePrefix.length + 1)}${via.size ? `?${via}` : ''}`;
+    const fragment = `${url.pathname.slice(routePrefix.length + 1)}${via.size ? `?${via}` : ''}`;
     let active = true;
     unresolved = false;
     user = null;
     startChat = false;
 
-    const notifiedUser = page.url.searchParams.get('user');
+    const notifiedUser = url.searchParams.get('user');
 
     const open = async (): Promise<void> => {
       if (notifiedUser !== null) await selectNotificationAccount(core, notifiedUser);
@@ -60,12 +65,12 @@
 
       // A user has no route of its own, so the link opens a card here instead.
       if (target.kind === 'user') {
-        startChat = page.url.searchParams.get('action') === 'chat';
+        startChat = url.searchParams.get('action') === 'chat';
         user = target.userId;
         return;
       }
 
-      const notified = page.url.searchParams.get('notified');
+      const notified = url.searchParams.get('notified');
       // eslint-disable-next-line svelte/no-navigation-without-resolve -- permalinkTarget() resolves the route through roomSectionPath()
       await goto(target.path, { replace: true, state: notified === null ? {} : { notified } });
     };
