@@ -2,4 +2,4 @@
 default: patch
 ---
 
-On Android, notifications through ntfy and other UnifiedPush Matrix gateways are no longer dropped. Each account keeps a single subscription with the distributor, and a distributor that requires VAPID no longer makes registration fail.
+Android UnifiedPush notifications keep one subscription per account and register with distributors that require VAPID, the push troubleshooter reaches distributors again, and gateway settings explain that ntfy needs no gateway address.

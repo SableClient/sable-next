@@ -2,4 +2,4 @@
 default: feature
 ---
 
-# PMP bio editor now uses the same editor as the main profile, allowing you to easily format your PMP bios
+PMP bios use the same editor as your main profile, with rich text formatting or Markdown when the rich text composer is off.

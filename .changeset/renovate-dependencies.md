@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Update SvelteKit, Electron, PDF rendering and media metadata dependencies.
+Update Svelte, SvelteKit, Electron, localization, editor, PDF rendering and media dependencies.

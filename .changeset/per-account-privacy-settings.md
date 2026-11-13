@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Each account keeps its own online status, status message, read receipt and typing settings, so switching accounts no longer carries them over.
+Online status, status messages, read receipts, typing, homeserver link previews and server search settings are kept per account instead of carrying over when you switch accounts.

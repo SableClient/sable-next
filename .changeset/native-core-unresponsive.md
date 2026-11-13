@@ -2,4 +2,4 @@
 default: patch
 ---
 
-The mobile apps now show the "not responding" notice when the core stops answering, as the web app already did.
+The mobile apps show a "not responding" notice when the core stops answering, and sync that cannot start or stop for over a minute is included in error reports.

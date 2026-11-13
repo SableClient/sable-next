@@ -2,4 +2,4 @@
 default: feature
 ---
 
-The room header shows a lock next to search: closed when the room is end-to-end encrypted, open when it is not.
+The room header shows an open or closed encryption lock beside search, and room settings show a Not encrypted badge to members who cannot enable encryption.

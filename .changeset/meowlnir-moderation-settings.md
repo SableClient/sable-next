@@ -2,4 +2,4 @@
 default: feature
 ---
 
-Meowlnir management rooms get a Moderation tab in their room settings, to choose the protected rooms, the ban lists to follow and the automatic protections without typing bot commands.
+Meowlnir management rooms get a Moderation tab to choose protected rooms, ban lists and automatic protections, and view, add or remove rules that ban, take down, mute or exempt users, rooms and servers.

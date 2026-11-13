@@ -2,4 +2,4 @@
 default: feature
 ---
 
-Core failures and the error codes behind them now show their full report in the browser console, with every cause, where it was raised, what the homeserver answered and the command that ran, and reach Sentry grouped by where they happened.
+Core failures and error codes show their causes, location, homeserver response and command in the console and reach Sentry grouped by location, and Electron respects the core console log level setting.

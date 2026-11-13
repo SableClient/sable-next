@@ -2,4 +2,4 @@
 default: patch
 ---
 
-On iOS, messages no longer stay on "Waiting for this message" after you return to the app when a notification was handled while it was in the background.
+On iOS, actions taken while the app resumes wait for its data, and messages no longer stay on "Waiting for this message" after a background notification.

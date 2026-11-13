@@ -2,4 +2,4 @@
 default: patch
 ---
 
-On phones, swiping from a room to the room list keeps the room open behind it, and swiping a thread closed no longer opens the list.
+On phones, swiping to the room list keeps the room open behind it, closing a thread no longer opens the list, and swiping down on an expanded sheet collapses it before dismissing.

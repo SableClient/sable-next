@@ -2,4 +2,4 @@
 default: feature
 ---
 
-Bridge badges can be turned off in the appearance settings, and a space can be marked as bridged so the badge sits on the space instead of on each of its rooms.
+Bridge badges can be hidden in appearance settings or moved onto a bridged space, and space admins can hide them on their rooms for every member.

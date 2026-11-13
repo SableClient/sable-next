@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Crash reporting now works on iOS, where it never started because its bridge was left out of the app. Error reports can also be searched by the operation that failed.
+Crash reporting works on iOS, Android reports problems from startup, mobile reports identify the platform and device, failed operations are searchable, and room IDs without server names are removed from reports.

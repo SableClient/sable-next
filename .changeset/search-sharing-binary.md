@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Search sharing copies history as binary data instead of base64 text. Devices copy only from devices running this version or later.
+Search history transfers use binary data and only copy from devices with more history, skipping devices on incompatible older versions until they update.

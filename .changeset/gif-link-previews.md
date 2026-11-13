@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Tenor and GIPHY link previews play like GIFs, looping without sound or controls, instead of showing a play button or a paused video player.
+Tenor and GIPHY link previews loop without sound or controls, and GIF preview images play in full and follow the GIF autoplay setting.

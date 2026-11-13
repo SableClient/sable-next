@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Opening a room from a notification marks it read once you can see its newest message, without tapping jump to latest.
+Opening a notification marks its room read once the newest message is visible, and Mark all as read clears counts left by edits, with affected rooms listed in the inbox.

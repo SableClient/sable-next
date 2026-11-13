@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Sharing to Sable while it is closed opens the share sheet instead of losing what you shared.
+Sharing to Sable while it is closed keeps what you shared and opens the share sheet, and reopening Sable on Android from a share, notification or link no longer freezes the screen.

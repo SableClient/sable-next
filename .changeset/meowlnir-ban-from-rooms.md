@@ -2,4 +2,4 @@
 default: feature
 ---
 
-In rooms protected by Meowlnir, moderators of its management room can ban someone through Meowlnir from their profile or from one of their messages.
+Meowlnir management room moderators can ban someone from their profile or messages in protected rooms, without first opening the management room on that device.

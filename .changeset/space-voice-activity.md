@@ -2,4 +2,4 @@
 default: feature
 ---
 
-A space shows a speaker mark when someone is in one of its voice channels, even when you are not in the call.
+Spaces show a speaker mark when someone is in a voice channel, even when you are not in the call, and call participants are listed by name in the room list.
