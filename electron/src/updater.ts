@@ -1,9 +1,18 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { app, ipcMain, type WebFrameMain } from 'electron';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
 
 type IsAppFrame = (frame: WebFrameMain | null | undefined) => boolean;
+type WatchFlatpakUpdates = (notify: () => void) => void;
+
+const watchFlatpakUpdates: WatchFlatpakUpdates = (notify) => {
+  const native = createRequire(join(__dirname, 'main.cjs'))(join(__dirname, 'sable_node.node')) as {
+    watchFlatpakUpdates(notify: (commit: string) => void): void;
+  };
+  native.watchFlatpakUpdates(notify);
+};
 
 function notesOf({ releaseNotes }: UpdateInfo): string | undefined {
   if (typeof releaseNotes === 'string') return releaseNotes;
@@ -44,8 +53,18 @@ export function setUpdateChannel(channel: keyof typeof FEEDS): void {
   autoUpdater.allowDowngrade = channel !== builtChannel;
 }
 
-export function registerUpdater(isAppFrame: IsAppFrame): void {
+export function registerUpdater(
+  isAppFrame: IsAppFrame,
+  watchFlatpak: WatchFlatpakUpdates = watchFlatpakUpdates
+): void {
   const enabled = supportsAutoUpdate();
+  // Flathub and the nightly Flatpak repo publish after the release feed.
+  let flatpakUpdate = !process.env.FLATPAK_ID;
+  if (!flatpakUpdate && app.isPackaged) {
+    watchFlatpak(() => {
+      flatpakUpdate = true;
+    });
+  }
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
 
@@ -57,7 +76,7 @@ export function registerUpdater(isAppFrame: IsAppFrame): void {
   });
 
   ipcMain.handle('sable-update-latest-version', async (event) => {
-    if (enabled || !app.isPackaged || !isAppFrame(event.senderFrame)) return null;
+    if (enabled || !app.isPackaged || !flatpakUpdate || !isAppFrame(event.senderFrame)) return null;
     const feed = `${FEEDS[builtChannel]}${feedChannel(builtChannel)}-linux.yml`;
     const response = await fetch(feed, { cache: 'no-store' });
     if (!response.ok) throw new Error(`Update feed request failed: ${String(response.status)}`);

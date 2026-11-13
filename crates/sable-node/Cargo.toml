@@ -21,7 +21,7 @@ tracing.workspace = true
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "std"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-ashpd = { version = "0.14.0", default-features = false, features = ["tokio", "global_shortcuts"] }
+ashpd = { version = "0.14.0", default-features = false, features = ["tokio", "global_shortcuts", "flatpak"] }
 futures-util.workspace = true
 
 [target.'cfg(windows)'.dependencies]

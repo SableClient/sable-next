@@ -8,6 +8,8 @@
 mod screen_audio;
 
 mod call_shortcuts;
+#[cfg(target_os = "linux")]
+mod flatpak_updates;
 
 use std::{
     io::{self, Write},
