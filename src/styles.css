@@ -763,6 +763,8 @@ body {
   font-weight: var(--font-weight-normal);
   line-height: var(--line-height-body);
   margin: 0;
+  /* stylelint-disable-next-line csstools/use-logical, declaration-no-important -- overrides the bits-ui scroll lock padding, the body never scrolls */
+  padding-right: 0 !important;
   user-select: none;
 }
 
