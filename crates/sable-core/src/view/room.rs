@@ -417,7 +417,6 @@ fn bridge_view(event: &str) -> Option<BridgeView> {
             .or_else(|| text("protocol", "id"))?
             .to_owned(),
         avatar_url: avatar("protocol")
-            .or_else(|| avatar("network"))
             .map(str::to_owned),
     })
 }
