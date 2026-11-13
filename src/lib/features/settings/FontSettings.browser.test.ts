@@ -111,7 +111,9 @@ test('font preferences beat theme declarations on body and restore the theme whe
   try {
     applyFontFamily('IBM Plex Mono');
     applyFontFamilyMono('ui-monospace');
-    expect(regular()).toBe('"IBM Plex Mono", "Nunito Variable", Twemoji_DISABLED, sans-serif');
+    expect(regular()).toBe(
+      '"IBM Plex Mono", "Nunito Variable", Twemoji_DISABLED, "Vazirmatn Variable", sans-serif'
+    );
     expect(getComputedStyle(code).fontFamily).toBe(
       'ui-monospace, "Cascadia Code Variable", monospace'
     );

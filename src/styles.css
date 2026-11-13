@@ -1,5 +1,6 @@
 @import url('@fontsource-variable/nunito');
 @import url('@fontsource-variable/cascadia-code');
+@import url('@fontsource-variable/vazirmatn');
 @import url('@sableclient/twemoji-font');
 @import url('./lib/ui/primitives/selection.css');
 @import url('./lib/ui/primitives/settings-nav.css');
@@ -538,7 +539,7 @@ html {
 
   /* Font families */
   --font-family-emoji: 'Twemoji_DISABLED';
-  --font-family-base: 'Nunito Variable', var(--font-family-emoji), sans-serif;
+  --font-family-base: 'Nunito Variable', var(--font-family-emoji), 'Vazirmatn Variable', sans-serif;
   --font-family: var(--font-family-base);
   --font-family-mono-base: 'Cascadia Code Variable', monospace;
   --font-family-mono: var(--font-family-mono-base);
