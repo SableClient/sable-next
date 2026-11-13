@@ -69,6 +69,8 @@ declare global {
     __e2eFetchMedia?: (source: string, width: number, height: number) => Promise<Uint8Array>;
     __e2eMembers?: MemberView[];
     __e2eRelationEvents?: unknown[];
+    /** Extra room state by event type, with an empty state key. */
+    __e2eRoomState?: Record<string, unknown>;
     __e2eMediaReady?: Promise<void>;
     __e2eReleaseMedia: () => void;
     __e2eAnchorPositions: number[];
@@ -1698,11 +1700,13 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'personas.reorder': () => [],
       'personas.backup': () => '{}',
       'room_state.event': (params) =>
-        params.event_type === 'moe.sable.room.abbreviations'
-          ? { entries: abbreviations.get(params.room_id) ?? [] }
-          : params.event_type === 'm.room.tombstone' && params.room_id === tombstonedRoom.room_id
-            ? { replacement_room: successorRoom.room_id, body: null }
-            : null,
+        params.state_key === '' && window.__e2eRoomState?.[params.event_type] !== undefined
+          ? window.__e2eRoomState[params.event_type]
+          : params.event_type === 'moe.sable.room.abbreviations'
+            ? { entries: abbreviations.get(params.room_id) ?? [] }
+            : params.event_type === 'm.room.tombstone' && params.room_id === tombstonedRoom.room_id
+              ? { replacement_room: successorRoom.room_id, body: null }
+              : null,
       'room_state.events': (params) => roomStateEvents(params.room_id, params.event_type),
       'room_state.bot_commands': () => [],
       'room_state.account_data': (params) =>
@@ -1710,10 +1714,17 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           ? { event_id: fullyReadEventId(params.room_id) }
           : null,
       'room_state.events_raw': () => [],
-      'room_state.full_state': () => [],
+      'room_state.full_state': () =>
+        Object.entries(window.__e2eRoomState ?? {}).map(([type, content]) => ({
+          type,
+          state_key: '',
+          content,
+        })),
       'room_state.account_data_raw': () => null,
       'room_state.account_data_types': () => [],
       'room_state.send_event': (params) => {
+        if (window.__e2eRoomState && params.state_key === '')
+          window.__e2eRoomState[params.event_type] = params.content;
         if (params.event_type === 'im.vector.modular.widgets')
           roomWidgets.set(params.room_id, null);
         return `$state-${crypto.randomUUID()}`;
