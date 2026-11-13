@@ -31,6 +31,8 @@ export default defineConfig({
       'room.moderationFlagHint.*',
       'room.moderationProtection.*',
       'room.moderationProtectionHint.*',
+      'room.moderationRuleAction.*',
+      'room.moderationRuleActionChoice.*',
       'settings.*',
       'shortcuts.*',
       'sounds.*',

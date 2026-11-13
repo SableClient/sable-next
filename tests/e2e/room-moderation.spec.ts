@@ -17,9 +17,14 @@ test.beforeEach(async ({ page, app, installRoomCore }) => {
       },
       'fi.mau.meowlnir.watched_lists': {
         lists: [
-          { room_id: '!spam:example.test', name: 'Community spam list', shortcode: 'spam' },
+          { room_id: '!second:example.test', name: 'Community spam list', shortcode: 'spam' },
           { room_id: '!local:example.test', shortcode: 'local', auto_unban: true },
         ],
+      },
+      'm.policy.rule.user': {
+        entity: '@spammer:evil.example',
+        recommendation: 'm.ban',
+        reason: 'Advertising',
       },
     };
   });
@@ -42,4 +47,27 @@ test('a Meowlnir management room is managed from its Moderation settings', async
   await expect
     .poll(() => page.evaluate(() => window.__e2eRoomState?.['fi.mau.meowlnir.protected_rooms']))
     .toMatchObject({ protections: { anti_flood: { limit: 10, per: 30 }, no_media: {} } });
+});
+
+test('a ban list shows its rules and sends new ones to Meowlnir', async ({ page }) => {
+  await page.getByRole('button', { name: 'More options' }).first().click();
+  await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Moderation' }).click();
+  await page.getByRole('button', { name: 'Rules and options for Community spam list' }).click();
+
+  const lists = page.getByRole('region', { name: 'Ban lists' });
+  await expect(lists.getByText('@spammer:evil.example')).toBeVisible();
+  expect(await violations(page, { scope: '[role="dialog"]' })).toEqual([]);
+
+  await lists.getByRole('textbox', { name: 'User, room or server' }).fill('@raider:evil.example');
+  await lists.getByRole('textbox', { name: 'Reason' }).fill('raid');
+  await lists.getByRole('button', { name: 'Add rule' }).click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => window.__e2eCalls.findLast((call) => call.method === 'messages.send')?.params
+      )
+    )
+    .toMatchObject({ room_id: ROOM_ID, body: '!ban spam @raider:evil.example raid' });
 });

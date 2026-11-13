@@ -51,6 +51,7 @@
     type RawContent,
     type WatchedList,
   } from '#lib/rooms/meowlnir-config.js';
+  import ModerationListRules from './ModerationListRules.svelte';
   import { canSendState } from './permission-groups';
 
   import '#lib/ui/primitives/settings-row.css';
@@ -375,6 +376,15 @@
                   />
                 </SettingsRow>
               {/each}
+              {#if roomId}
+                <ModerationListRules
+                  managementRoomId={roomId}
+                  listRoomId={list.roomId}
+                  {name}
+                  shortcode={list.shortcode}
+                  {canEdit}
+                />
+              {/if}
             {/if}
           {/each}
         </ul>
