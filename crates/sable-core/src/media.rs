@@ -120,6 +120,9 @@ impl Core {
         height: u32,
         background: bool,
     ) -> Result<Vec<u8>, RpcError> {
+        if let Some(bytes) = self.tunnel_media(&source, usize::MAX).await {
+            return bytes;
+        }
         self.fetch_matrix_media(source, width, height, background)
             .await
     }

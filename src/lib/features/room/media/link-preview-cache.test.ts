@@ -9,7 +9,12 @@ vi.mock('#lib/config/runtime-config.js', () => ({
     }),
 }));
 
-import { loadUrlPreview, resetUrlPreviews, resolveUrlPreview } from './link-preview-cache';
+import {
+  loadUrlPreview,
+  resetUrlPreviews,
+  resolveUrlPreview,
+  usesTunnel,
+} from './link-preview-cache';
 
 afterEach(() => {
   resetUrlPreviews();
@@ -82,4 +87,25 @@ test('a Klipy link is previewed by the embed service and never by the homeserver
   await resolveUrlPreview({ urlPreview }, url, { client: false, server: true });
 
   expect(urlPreview.mock.calls).toEqual([[{ url, client: true, service: 'https://embeds.test' }]]);
+});
+
+test('only a public room without encryption asks the preview service', () => {
+  expect(usesTunnel(false, true)).toBe(false);
+  expect(usesTunnel(false, false)).toBe(true);
+  expect(usesTunnel(true, true)).toBe(true);
+  expect(usesTunnel(null, true)).toBe(true);
+});
+
+test('a tunnel preview is asked for and cached apart from a service one', async () => {
+  const urlPreview = vi.fn((_params: { url: string; tunnel?: boolean }) => Promise.resolve(null));
+  const url = 'https://example.org/both';
+
+  await loadUrlPreview({ urlPreview }, url, true, 'https://embeds.test', true);
+  await loadUrlPreview({ urlPreview }, url, true, 'https://embeds.test', false);
+  await loadUrlPreview({ urlPreview }, url, true, 'https://embeds.test', true);
+
+  expect(urlPreview.mock.calls).toEqual([
+    [{ url, client: true, service: 'https://embeds.test', tunnel: true }],
+    [{ url, client: true, service: 'https://embeds.test' }],
+  ]);
 });

@@ -1091,6 +1091,8 @@ pub struct UrlPreviewParams {
     pub client: bool,
     #[serde(default)]
     pub service: Option<String>,
+    #[serde(default)]
+    pub tunnel: bool,
 }
 
 impl Handler for UrlPreviewParams {
@@ -1102,6 +1104,9 @@ impl Handler for UrlPreviewParams {
             let Some(base) = self.service else {
                 return Ok(None);
             };
+            if self.tunnel {
+                return core.tunnel_preview(&base, &url).await;
+            }
             let data = crate::link_previews::soliditas_preview(&base, &url).await?;
             return Ok(data.and_then(|data| url_preview(url, &data)));
         }

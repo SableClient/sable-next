@@ -87,6 +87,7 @@ mod thread_receipts;
 mod timeline_overlay;
 mod timelines;
 pub mod tls;
+mod tunnel;
 mod utd;
 mod verification;
 pub mod view;
@@ -168,6 +169,7 @@ pub struct Core {
     recent_state: parking_lot::Mutex<probed_state::RecentState>,
     media_health: parking_lot::Mutex<media_health::MediaHealth>,
     media_downloads: tokio::sync::Semaphore,
+    tunnel: tunnel::Tunnel,
     key_backup_downloads: tokio::sync::Semaphore,
     key_backup_download: parking_lot::Mutex<Option<protocol::KeyBackupDownloadView>>,
     notification_routes: Mutex<HashMap<String, watchers::NotificationRoute>>,
@@ -354,6 +356,7 @@ impl Core {
             recent_state: parking_lot::Mutex::new(probed_state::RecentState::default()),
             media_health: parking_lot::Mutex::new(media_health::MediaHealth::default()),
             media_downloads: tokio::sync::Semaphore::new(media::MAX_MEDIA_DOWNLOADS),
+            tunnel: tunnel::Tunnel::new(),
             notification_routes: Mutex::new(HashMap::new()),
             accounts: Mutex::new(None),
             discovered_homeservers: Mutex::new(HashMap::new()),

@@ -10,6 +10,7 @@ export interface LinkPresentationProps {
   url: string;
   preview: UrlPreviewView;
   mediaHidden: boolean;
+  tunnel: boolean;
 }
 
 type LinkPresentation = Component<LinkPresentationProps>;

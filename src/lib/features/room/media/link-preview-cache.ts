@@ -19,15 +19,20 @@ export function loadUrlPreview(
   messages: Pick<Rpc['messages'], 'urlPreview'>,
   url: string,
   client: boolean,
-  service: string | null = null
+  service: string | null = null,
+  tunnel = false
 ): Promise<UrlPreviewView | null> {
   if (!client && !homeserverPreviews) return Promise.resolve(null);
 
-  const key = client ? `client:${service ?? ''}:${url}` : `homeserver:${url}`;
+  const key = client
+    ? `${tunnel ? 'tunnel' : 'client'}:${service ?? ''}:${url}`
+    : `homeserver:${url}`;
   const cached = previews.get(key);
   if (cached) return cached;
 
-  const params = client ? { url, client, service } : { url, service: null };
+  const params = client
+    ? { url, client, service, ...(tunnel ? { tunnel } : {}) }
+    : { url, service: null };
   const request = messages.urlPreview(params).catch((error: unknown) => {
     if (!client && isCoreError(error, 'unsupported')) {
       homeserverPreviews = false;
@@ -72,14 +77,20 @@ export function previewSources(encrypted: boolean | null): PreviewSources {
   };
 }
 
+/** Only a public room that is not encrypted lets the preview service see the whole link. */
+export function usesTunnel(encrypted: boolean | null, publicRoom: boolean): boolean {
+  return encrypted !== false || !publicRoom;
+}
+
 export async function resolveUrlPreview(
   messages: Pick<Rpc['messages'], 'urlPreview'>,
   url: string,
-  sources: PreviewSources
+  sources: PreviewSources,
+  tunnel = false
 ): Promise<UrlPreviewView | null> {
   const config = sources.client ? await runtimeConfig() : null;
   const fromClient = config
-    ? await loadUrlPreview(messages, url, true, config.embeds.serviceUrl)
+    ? await loadUrlPreview(messages, url, true, config.embeds.serviceUrl, tunnel)
     : null;
   if (fromClient !== null || !sources.server || !homeserverCanPreview(url)) return fromClient;
   return loadUrlPreview(messages, url, false);
@@ -89,10 +100,11 @@ export async function scrapedPostVideo(
   messages: Pick<Rpc['messages'], 'urlPreview'>,
   url: string,
   quote: boolean,
-  index: number
+  index: number,
+  tunnel: boolean
 ): Promise<string | null> {
   const config = await runtimeConfig();
-  const preview = await loadUrlPreview(messages, url, true, config.embeds.serviceUrl);
+  const preview = await loadUrlPreview(messages, url, true, config.embeds.serviceUrl, tunnel);
   const post = quote ? preview?.post?.quote : preview?.post;
   const videos = post?.media.filter((media) => media.kind !== 'image') ?? [];
   return videos[index]?.source ?? null;

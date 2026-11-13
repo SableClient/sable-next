@@ -92,6 +92,7 @@
     roomId: () => resolvedRoomId,
     spaceIds: (id) => personaSpaces(roomList.rooms, id, page.params.spaceId).order,
     encrypted: () => resolvedRoom?.encrypted ?? null,
+    publicRoom: () => resolvedRoom?.join_rule === 'public',
     afterSend: (id) => donateSentMessage(core, roomList.byId(id)),
   });
 

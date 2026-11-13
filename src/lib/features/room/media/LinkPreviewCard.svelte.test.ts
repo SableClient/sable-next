@@ -236,6 +236,7 @@ test('client-side embeds alone preview without asking the homeserver', async () 
     url: 'https://example.org/c1',
     client: true,
     service: 'https://embeds.test',
+    tunnel: true,
   });
   expect(screen.getByRole('link', { name: /Example/ })).toBeInTheDocument();
 });
@@ -250,7 +251,7 @@ test('the homeserver is asked only when the client side has no answer', async ()
   await settle();
 
   expect(core.rpc.messages.urlPreview.mock.calls).toEqual([
-    [{ url: 'https://example.org/c2', client: true, service: 'https://embeds.test' }],
+    [{ url: 'https://example.org/c2', client: true, service: 'https://embeds.test', tunnel: true }],
     [{ url: 'https://example.org/c2', service: null }],
   ]);
   expect(screen.getByRole('link', { name: /Example/ })).toBeInTheDocument();

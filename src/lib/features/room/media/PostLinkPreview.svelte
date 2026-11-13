@@ -25,9 +25,10 @@
     url: string;
     preview: UrlPreviewView;
     mediaHidden: boolean;
+    tunnel: boolean;
   }
 
-  let { url, preview, mediaHidden }: Props = $props();
+  let { url, preview, mediaHidden, tunnel }: Props = $props();
   const core = useCoreClient();
   let post = $derived(preview.post);
   const revealed = new SvelteSet<'post' | 'quote'>();
@@ -74,7 +75,8 @@
           {@const video = items.slice(0, index).filter((media) => media.kind !== 'image').length}
           <VideoPlayer
             source={item.source}
-            resolveSource={() => scrapedPostVideo(core.rpc.messages, url, key === 'quote', video)}
+            resolveSource={() =>
+              scrapedPostVideo(core.rpc.messages, url, key === 'quote', video, tunnel)}
             mime={item.mime ?? 'video/mp4'}
             filename={url}
             width={item.width}

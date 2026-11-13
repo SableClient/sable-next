@@ -50,7 +50,7 @@ function preview(value: PostView): UrlPreviewView {
 
 function renderPost(value: PostView, mediaHidden = false) {
   const shown = preview(value);
-  return render(PostLinkPreview, { url: shown.url, preview: shown, mediaHidden });
+  return render(PostLinkPreview, { url: shown.url, preview: shown, mediaHidden, tunnel: false });
 }
 
 test('shows the author, text, quote and the counts it knows', () => {

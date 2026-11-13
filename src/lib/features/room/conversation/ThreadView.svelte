@@ -101,6 +101,7 @@
     roomId: () => roomId,
     spaceIds: (id) => personaSpaces(roomList.rooms, id, page.params.spaceId).order,
     encrypted: () => encrypted,
+    publicRoom: () => roomList.byId(roomId)?.join_rule === 'public',
     threadRoot: untrack(() => rootEventId),
     beforeSend: () => returnToThread(),
     afterSend: (id) => donateSentMessage(core, roomList.byId(id)),

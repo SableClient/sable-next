@@ -15,6 +15,10 @@ export class RoomMediaPreviews {
 
   constructor(private readonly joinRule: () => RoomJoinRuleView | null) {}
 
+  get isPublic(): boolean {
+    return this.joinRule() === 'public';
+  }
+
   get hidden(): boolean {
     const level = this.room.media_previews ?? mediaPreviewSettings.mediaPreviews;
     return !previewsShown(level, this.joinRule());

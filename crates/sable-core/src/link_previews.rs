@@ -28,6 +28,19 @@ pub(crate) fn is_mxc(source: &str) -> bool {
     source.starts_with("mxc://")
 }
 
+pub(crate) fn service_client() -> Result<matrix_sdk::reqwest::Client, RpcError> {
+    let builder = crate::tls::apply(matrix_sdk::reqwest::Client::builder());
+    #[cfg(not(target_family = "wasm"))]
+    let builder = builder.timeout(std::time::Duration::from_secs(10));
+    builder.build().map_err(|error| {
+        crate::errors::coded(
+            "link_preview_client",
+            crate::protocol::RpcCode::Unavailable,
+            &error,
+        )
+    })
+}
+
 pub(crate) async fn soliditas_preview(
     base: &str,
     target: &str,
@@ -45,20 +58,14 @@ pub(crate) async fn soliditas_preview(
     })?;
     endpoint.query_pairs_mut().append_pair("url", target);
 
-    let builder = crate::tls::apply(matrix_sdk::reqwest::Client::builder());
-    #[cfg(not(target_family = "wasm"))]
-    let builder = builder.timeout(std::time::Duration::from_secs(10));
-    let http = builder.build().map_err(|error| {
-        crate::errors::coded(
-            "link_preview_client",
-            crate::protocol::RpcCode::Unavailable,
-            &error,
-        )
-    })?;
-    let response = http.get(endpoint).send().await.map_err(|error| {
-        tracing::warn!("soliditas preview failed: {}", error.without_url());
-        crate::protocol::RpcCode::Unavailable
-    })?;
+    let response = service_client()?
+        .get(endpoint)
+        .send()
+        .await
+        .map_err(|error| {
+            tracing::warn!("soliditas preview failed: {}", error.without_url());
+            crate::protocol::RpcCode::Unavailable
+        })?;
 
     let status = response.status();
     if status.is_client_error() {
@@ -248,7 +255,7 @@ pub(crate) fn url_preview(url: String, data: &serde_json::Value) -> Option<UrlPr
     preview_view(url, &PreviewData::read(data)?, is_mxc)
 }
 
-fn preview_view(
+pub(crate) fn preview_view(
     url: String,
     data: &PreviewData,
     media: impl Fn(&str) -> bool,
@@ -360,9 +367,14 @@ pub(crate) fn bundled_link_previews(
 }
 
 impl Core {
-    async fn preview_image_bytes(client: &matrix_sdk::Client, image: &str) -> Option<Vec<u8>> {
+    async fn preview_image_bytes(
+        &self,
+        client: &matrix_sdk::Client,
+        image: &str,
+        max_bytes: usize,
+    ) -> Option<Vec<u8>> {
         if !is_mxc(image) {
-            return None;
+            return self.tunnel_media(image, max_bytes).await?.ok();
         }
         let request = MediaRequestParameters {
             source: MediaSource::Plain(OwnedMxcUri::from(image)),
@@ -404,7 +416,7 @@ impl Core {
             max_bytes,
         } in wanted
         {
-            let Some(data) = Self::preview_image_bytes(&client, image).await else {
+            let Some(data) = self.preview_image_bytes(&client, image, max_bytes).await else {
                 continue;
             };
             if data.is_empty() || data.len() > max_bytes {

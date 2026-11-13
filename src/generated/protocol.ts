@@ -2965,6 +2965,7 @@ export type Rpc = {
 	url: string,
 	client?: boolean,
 	service?: string | null,
+	tunnel?: boolean,
 }) => Promise<UrlPreviewView | null>;
     reactionShortcodes: (params: {
 	room_id: string,
