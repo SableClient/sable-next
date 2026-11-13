@@ -148,7 +148,9 @@
       <BitsSelect.Value
         class={['select-text', { 'select-placeholder': selectedLabel === undefined }]}
         {placeholder}
-      />
+      >
+        {selectedLabel ?? placeholder ?? ''}
+      </BitsSelect.Value>
       <CaretDownIcon class="select-caret" aria-hidden="true" />
     </BitsSelect.Trigger>
     <BitsSelect.Portal>

@@ -38,3 +38,14 @@ test('options keep their height when the popup is clipped', async () => {
     expect(boxes[index].top).toBeGreaterThanOrEqual(boxes[index - 1].bottom - 0.5);
   }
 });
+
+test('shows the label of an item whose value is empty', async () => {
+  await page.viewport(1280, 800);
+  await render(Select, {
+    items: [{ value: '', label: 'Server default' }, ...items],
+    value: '',
+    'aria-label': 'Version',
+  });
+
+  await expect.element(page.getByLabelText('Version')).toHaveTextContent('Server default');
+});

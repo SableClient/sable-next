@@ -592,17 +592,21 @@ impl Handler for VersionsParams {
             .or_failed(core, "room_versions")?;
 
         let versions = response.capabilities.room_versions;
-        Ok(RoomVersionsView {
-            default: versions.default.to_string(),
-            available: versions
-                .available
-                .into_iter()
-                .map(|(id, stability)| RoomVersionView {
-                    id: id.to_string(),
-                    stable: stability == RoomVersionStability::Stable,
-                })
-                .collect(),
-        })
+        let mut available: Vec<RoomVersionView> = versions
+            .available
+            .into_iter()
+            .map(|(id, stability)| RoomVersionView {
+                id: id.to_string(),
+                stable: stability == RoomVersionStability::Stable,
+            })
+            .collect();
+        available.sort_by(|a, b| {
+            b.id.parse::<u32>()
+                .ok()
+                .cmp(&a.id.parse::<u32>().ok())
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        Ok(RoomVersionsView { default: versions.default.to_string(), available })
     }
 }
 
