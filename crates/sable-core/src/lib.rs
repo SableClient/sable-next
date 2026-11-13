@@ -611,16 +611,32 @@ impl Core {
     }
 
     pub(crate) async fn allocate_account(&self) -> Result<(String, String), RpcError> {
+        self.accounts().await?;
+        let _guard = self.session_store_lock.lock().await;
         let mut accounts = self.accounts.lock().await;
-        if accounts.is_none() {
-            drop(accounts);
-            self.accounts().await?;
-            accounts = self.accounts.lock().await;
-        }
-        let Some(accounts) = accounts.as_mut() else {
+        let Some(registry) = accounts.as_mut() else {
             return Err(self.failed("allocate_account", "account registry is not initialized"));
         };
-        Ok(accounts.allocate_account(&self.store_id))
+        let mut updated = registry.clone();
+        // An abandoned sign-in leaves its device's crypto store behind, which another device
+        // cannot open.
+        #[cfg_attr(
+            target_family = "wasm",
+            expect(unused_mut, reason = "IndexedDB stores are not probed")
+        )]
+        let mut allocated = updated.allocate_account(&self.store_id);
+        #[cfg(not(target_family = "wasm"))]
+        while tokio::fs::try_exists(&allocated.1)
+            .await
+            .or_failed(self, "allocate_account_store")?
+        {
+            allocated = updated.allocate_account(&self.store_id);
+        }
+        self.write_registry(&updated)
+            .await
+            .or_failed(self, "allocate_account_save")?;
+        *registry = updated;
+        Ok(allocated)
     }
 
     #[expect(
@@ -1016,6 +1032,29 @@ mod tests {
             revoked.kind,
             ErrorKind::UnknownToken(data) if !data.soft_logout
         ));
+    }
+
+    #[tokio::test]
+    async fn an_allocated_account_skips_a_leftover_store_and_saves_the_counter() {
+        let base = tempfile::tempdir().unwrap();
+        let base_store = base.path().join("store");
+        let bytes = Arc::new(Mutex::new(None));
+        let (core, _events) = Core::new(
+            base_store.to_str().unwrap(),
+            Box::new(TestSessionStore {
+                bytes: bytes.clone(),
+            }),
+        );
+        let leftover = session::account_store_id(base_store.to_str().unwrap(), "a1");
+        std::fs::create_dir_all(std::path::Path::new(&leftover).join("store")).unwrap();
+
+        let (account_id, _) = core.allocate_account().await.unwrap();
+
+        assert_eq!(account_id, "a2");
+        assert!(std::path::Path::new(&leftover).join("store").exists());
+        let stored: serde_json::Value =
+            serde_json::from_slice(bytes.lock().await.as_deref().unwrap()).unwrap();
+        assert_eq!(stored["next_account_id"], 3);
     }
 
     #[tokio::test]
