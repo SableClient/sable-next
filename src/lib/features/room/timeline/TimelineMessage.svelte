@@ -90,6 +90,7 @@
 
   const labelId = $props.id();
   const named = $derived(layout === 'compact' || !collapsed);
+  const ownBubble = $derived(layout === 'bubble' && item.is_own && alignOwn);
 
   const row = new TimelineRow(() => ({
     item,
@@ -251,6 +252,22 @@
   </span>
 {/snippet}
 
+{#snippet reactions()}
+  <MessageReactions
+    reactions={item.reactions}
+    eventId={item.event_id}
+    {currentUserId}
+    {members}
+    {roomId}
+    actionable={row.actionable}
+    onReact={row.actions.onReact}
+    {onToggleReaction}
+    onViewReactions={(index: number) => {
+      row.dialogs.open(item, { kind: 'reactions', active: index });
+    }}
+  />
+{/snippet}
+
 {#snippet inlineReceiptSlot()}
   {#if inlineReceipts}
     <span class="receipt-space" aria-hidden="true"></span>
@@ -405,7 +422,9 @@
       />
     {/if}
     {#if layout !== 'compact' && !collapsed}
-      {@render senderAvatarButton('small')}
+      {#if !ownBubble}
+        {@render senderAvatarButton('small')}
+      {/if}
       {@render actions()}
     {:else if layout !== 'compact' && row.pending}
       <span class="collapsed-pending">
@@ -442,7 +461,7 @@
       {/if}
       {#if !collapsed && layout !== 'compact'}
         <header>
-          {#if !emote}
+          {#if !emote && !(ownBubble && !sender.persona)}
             <SenderName
               displayName={sender.name}
               accountName={sender.persona ? sender.accountName : undefined}
@@ -597,20 +616,13 @@
             }}
           />
         {/if}
-        {#if item.reactions.length > 0}
-          <MessageReactions
-            reactions={item.reactions}
-            eventId={item.event_id}
-            {currentUserId}
-            {members}
-            {roomId}
-            actionable={row.actionable}
-            onReact={row.actions.onReact}
-            {onToggleReaction}
-            onViewReactions={(index: number) => {
-              row.dialogs.open(item, { kind: 'reactions', active: index });
-            }}
-          />
+        {#if item.reactions.length > 0 && layout === 'bubble' && trailingReceiptBadge}
+          <div class="reaction-row">
+            {@render reactions()}
+            {@render receiptSlot()}
+          </div>
+        {:else if item.reactions.length > 0}
+          {@render reactions()}
         {/if}
         {#if transfer}
           <TimelineTransfer {...transfer} />
@@ -624,14 +636,16 @@
             {onCancelSend}
           />
         {/if}
-        {#if trailingReceiptBadge}
+        {#if trailingReceiptBadge && layout === 'bubble' && item.reactions.length === 0}
+          {@render receiptSlot()}
+        {:else if trailingReceiptBadge && layout !== 'bubble'}
           <span class="receipt-tail" aria-hidden="true"></span>
         {/if}
       </div>
       {#if item.shield && (item.shield.critical || !preferences.hideMessageShields)}
         <MessageShieldNotice shield={item.shield} />
       {/if}
-      {#if trailingReceiptBadge}
+      {#if trailingReceiptBadge && layout !== 'bubble'}
         {@render receiptSlot()}
       {/if}
     </div>
@@ -809,10 +823,6 @@
 
   .message.collapsed :global(.message-actions) {
     inset-inline-end: 0;
-  }
-
-  .message.layout-bubble.own.align-own > .collapsed-pending {
-    inset-inline: auto var(--page-gutter);
   }
 
   .message.highlighted:not(.mention-silent, .mention-loud) {
@@ -1190,6 +1200,10 @@
     gap: var(--space-100);
   }
 
+  .message.layout-bubble {
+    padding-bottom: var(--space-050);
+  }
+
   .message.layout-bubble .message-main {
     align-items: flex-start;
     display: flex;
@@ -1228,16 +1242,57 @@
     width: var(--timeline-bubble-width);
   }
 
+  .message.layout-bubble.own .content-bubble,
+  .message.layout-bubble.own :global(.formatted-body) {
+    background: var(--primary-container);
+    color: var(--primary-on-container);
+  }
+
+  .message.layout-bubble.own .content-bubble :global(.formatted-body) {
+    background: none;
+  }
+
+  .message.layout-bubble.own.align-own .content-bubble {
+    text-align: end;
+  }
+
+  .message.layout-bubble.own.align-own .content-bubble :global(:is(.image, .media, .sticker)) {
+    margin-inline-start: auto;
+  }
+
+  .message.layout-bubble .content-bubble:has(:global(.image, .media-frame-video)) {
+    width: fit-content;
+  }
+
   .message.layout-bubble .has-edited :global(.formatted-body) {
     display: inline-block;
   }
 
   .message.layout-bubble .has-receipts {
-    padding-inline-end: calc(var(--receipt-reserve) + var(--space-200));
+    align-items: flex-end;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--space-100);
   }
 
-  .message.layout-bubble .has-receipts:not(.content-bubble) {
-    max-width: min(100%, calc(50rem + var(--receipt-reserve) + var(--space-200)));
+  .message.layout-bubble .has-receipts > .receipt-slot {
+    flex-basis: 100%;
+    justify-content: flex-end;
+    margin-block-start: var(--space-100);
+    position: static;
+  }
+
+  .message.layout-bubble .message-main > .receipt-slot {
+    align-self: stretch;
+    justify-content: flex-end;
+    margin-block-start: var(--space-100);
+  }
+
+  .reaction-row {
+    align-items: flex-end;
+    display: flex;
+    gap: var(--space-200);
+    justify-content: space-between;
   }
 
   .message.layout-bubble .has-receipts :global(.formatted-body) {
@@ -1275,7 +1330,7 @@
     flex: 0 1 auto;
   }
 
-  .message:not(.layout-bubble.own.align-own)
+  .message:not(.layout-bubble)
     .message-main:has(> .receipt-tail)
     > :global(.reactions):nth-last-child(2),
   .message:not(.layout-bubble)
@@ -1293,24 +1348,6 @@
     user-select: none;
   }
 
-  .message.layout-bubble:not(.own.align-own)
-    .message-main:has(> .receipt-tail)
-    > :nth-last-child(2),
-  .message.layout-bubble:not(.own.align-own)
-    .message-main:has(> .receipt-tail)
-    > :global(:where(.reply-preview, .thread-summary, .transfer, .send-failure)):nth-last-child(2) {
-    margin-inline-end: calc(var(--receipt-reserve) + var(--space-200));
-  }
-
-  .message.layout-bubble.own.align-own
-    .message-main:has(> .receipt-tail)
-    > :global(*):nth-last-child(2) {
-    margin-inline-end: max(
-      calc(var(--space-100) * 0),
-      calc(var(--receipt-reserve) + var(--space-200) - var(--avatar-size-small) - var(--space-250))
-    );
-  }
-
   .message.layout-bubble.own.align-own .has-edited {
     align-items: flex-end;
     display: flex;
@@ -1320,6 +1357,16 @@
 
   .message.layout-bubble.own.align-own .has-edited .edited {
     margin-inline-start: 0;
+  }
+
+  .message.layout-bubble.own.align-own .has-receipts {
+    flex-direction: row-reverse;
+  }
+
+  .message.layout-bubble:not(.own.align-own) .has-receipts:not(.content-bubble),
+  .message.layout-bubble:not(.own.align-own) .reaction-row {
+    align-self: stretch;
+    max-width: none;
   }
 
   /* The one mode where your own side changes. */
@@ -1337,15 +1384,7 @@
   }
 
   .message.layout-bubble.own.align-own.collapsed {
-    padding-inline: 0 calc(var(--avatar-size-small) + var(--space-250));
-  }
-
-  .message.layout-bubble.own.align-own .message-content > .receipt-slot {
-    margin-inline-end: calc(-1 * (var(--avatar-size-small) + var(--timeline-row-gap)));
-  }
-
-  .message.layout-bubble.own.align-own.collapsed .message-content > .receipt-slot {
-    margin-inline-end: calc(-1 * (var(--avatar-size-small) + var(--space-250)));
+    padding-inline: var(--page-gutter);
   }
 
   @supports not (color: color-mix(in srgb, black, white)) {

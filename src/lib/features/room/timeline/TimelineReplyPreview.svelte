@@ -255,13 +255,12 @@
   }
 
   :global(.message.layout-bubble.own.align-own) .reply-connected {
+    justify-self: end;
+    max-width: 100%;
     text-align: end;
   }
 
   :global(.message.layout-bubble.own.align-own) .reply-connected::before {
-    border-inline-end: var(--reply-connector-width) solid var(--surface-on-container);
-    border-inline-start: 0;
-    border-radius: 0 var(--radius) 0 0;
-    inset-inline: auto calc(-1 * (var(--timeline-row-gap) + var(--avatar-size-small) / 2));
+    display: none;
   }
 </style>

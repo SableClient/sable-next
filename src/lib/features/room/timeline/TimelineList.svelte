@@ -1577,6 +1577,10 @@
     padding-top: 0;
   }
 
+  .layout-bubble .item {
+    padding-bottom: 0;
+  }
+
   .unread-bar {
     align-items: center;
     background: var(--primary-container);
