@@ -90,8 +90,11 @@
       {/if}
     </button>
   {:else}
-    <Tooltip label={i18n.t('nav.alerts')} side={mode === 'compact' ? 'right' : 'top'} align="center"
-      >``
+    <Tooltip
+      label={i18n.t('nav.alerts')}
+      side={mode === 'compact' ? 'right' : 'top'}
+      align="center"
+    >
       {#snippet trigger({ props: tooltipProps }: { props: Record<string, unknown> })}
         <button
           {...tooltipProps}
@@ -198,6 +201,7 @@
     .progress.indeterminate::after {
       display: none;
       height: 10%;
+      opacity: 0.4;
       width: 100%;
     }
 
@@ -262,6 +266,7 @@
 
     :global(html:not([data-reduced-motion='on']) .desktop-tool .progress.indeterminate::after) {
       animation: progress-linear-indeterminate 1.4s var(--motion-easing-standard) infinite;
+      opacity: 1;
     }
 
     :global(html:not([data-reduced-motion='on']) .mobile-tool.indeterminate .progress) {

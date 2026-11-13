@@ -3078,20 +3078,19 @@
       "title": {
         "busy": "Transferring search index",
         "complete": "Search index transfer complete",
-        "failed": "Search index transfer failed",
-        "no_answer": "Transfer search index"
+        "failed": "Search index transfer failed"
       },
       "body": {
-        "sending": "This device is sending its search index to another device.",
-        "receiving": "{{transferred}} of {{total}} rooms transferred",
-        "discovering": "Searching for devices…",
-        "waiting": "Waiting for a device to be available…",
-        "connecting": "Connecting to another device…",
-        "complete": "{{transferred}} rooms were successfully transferred from another device.",
-        "failed": "An error occurred during the transfer.",
-        "no_answer": "Sable could not find a device to transfer your search index from. Open Sable on another device and try again."
+        "sending": "This device is sending its search index to {{device}}.",
+        "receiving": "{{transferred}} of {{total}} rooms transferred from {{device}}",
+        "waiting": "Waiting for {{device}} to be available…",
+        "connecting": "Connecting to {{device}}…",
+        "complete_one": "{{count, number}} room was transferred from {{device}}.",
+        "complete_other": "{{count, number}} rooms were transferred from {{device}}.",
+        "failed": "An error occurred during the transfer."
       },
       "explainer": "Your search index stores information about all of your messages, so you can search them easily.",
+      "anotherDevice": "another device",
       "transferProgress": "Transfer progress"
     },
     "searchIndexLimit": "Search index size",

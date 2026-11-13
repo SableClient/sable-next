@@ -9,7 +9,7 @@
   let { value, label }: Props = $props();
 </script>
 
-<Progress.Root class="progress-track" {value} aria-label={label} aria-valuetext={label}>
+<Progress.Root class="progress-track" {value} aria-label={label}>
   <span class="progress-fill" style:scale={value === null ? null : `${value / 100} 1`}></span>
 </Progress.Root>
 
@@ -30,8 +30,12 @@
     transform-origin: left center;
   }
 
+  :global(.progress-fill:dir(rtl)) {
+    transform-origin: right center;
+  }
+
   :global(.progress-track[data-indeterminate] .progress-fill) {
-    inline-size: 40%;
+    opacity: 0.4;
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -43,6 +47,8 @@
       html:not([data-reduced-motion='on']) .progress-track[data-indeterminate] .progress-fill
     ) {
       animation: progress-indeterminate 1.4s var(--motion-easing-standard) infinite;
+      inline-size: 40%;
+      opacity: 1;
     }
   }
 

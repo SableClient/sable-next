@@ -15,7 +15,7 @@
   let { icon: Icon, title, tone = 'neutral', body, actions }: Props = $props();
 </script>
 
-<div class={['banner', `banner-${tone}`]} role="status">
+<div class={['banner', `banner-${tone}`]} role="status" aria-atomic="false">
   <div class="description">
     <span class="icon">
       <IconContext values={{ 'aria-hidden': 'true' }}><Icon /></IconContext>

@@ -39,7 +39,6 @@
         if (sharing === null) {
           return null;
         } else if (
-          sharing.state === 'discovering' ||
           sharing.state === 'connecting' ||
           sharing.state === 'waiting' ||
           sharing.state === 'receiving'
@@ -53,21 +52,16 @@
             icon: CloudArrowUpIcon,
             level: 'task',
           };
-        } else if (sharing.state === 'idle' && !dismissed) {
+        } else if (sharing.state === 'idle' && !dismissed && sharing.candidates.length > 0) {
           if (sharing.outcome === 'failed') {
             return {
               icon: CloudXIcon,
               level: 'warning',
             };
-          } else if (sharing.outcome === 'completed' || sharing.outcome === 'nothing_to_copy') {
+          } else if (sharing.outcome === 'completed') {
             return {
               icon: CloudCheckIcon,
               level: 'task',
-            };
-          } else if (sharing.outcome === 'no_answer') {
-            return {
-              icon: CloudArrowDownIcon,
-              level: 'warning',
             };
           } else {
             return null;
@@ -80,10 +74,12 @@
       get progress(): AlertProgress | undefined {
         if (sharing === null) {
           return undefined;
-        } else if (sharing.state === 'discovering' || sharing.state === 'connecting') {
+        } else if (sharing.state === 'connecting') {
           return { value: null };
         } else if (sharing.state === 'receiving') {
-          return { value: sharing.transferred_rooms / sharing.total_rooms };
+          return {
+            value: sharing.total_rooms > 0 ? sharing.transferred_rooms / sharing.total_rooms : null,
+          };
         } else {
           return undefined;
         }
@@ -114,14 +110,17 @@
   };
 
   let { priority, progress, sharing, dismiss, retry }: PriorityProvider<SharingState> = $props();
+
+  const named = $derived(sharing.state === 'idle' ? sharing.last_copy : sharing.peer);
+  const device = $derived(
+    named?.name ?? named?.device_id ?? i18n.t('settings.searchTransferAlert.anotherDevice')
+  );
 </script>
 
-<AlertBanner icon={priority.icon}>
+<AlertBanner icon={priority.icon} tone={priority.level === 'warning' ? 'warning' : 'neutral'}>
   {#snippet title()}
     {#if sharing.state === 'idle' && sharing.outcome === 'failed'}
       {i18n.t('settings.searchTransferAlert.title.failed')}
-    {:else if sharing.state === 'idle' && sharing.outcome === 'no_answer'}
-      {i18n.t('settings.searchTransferAlert.title.no_answer')}
     {:else if sharing.state === 'idle'}
       {i18n.t('settings.searchTransferAlert.title.complete')}
     {:else}
@@ -136,31 +135,29 @@
       <div class="progress">
         <Progress
           label={i18n.t('settings.searchTransferAlert.transferProgress')}
-          value={progress.value ? progress.value * 100 : null}
+          value={progress.value === null ? null : progress.value * 100}
         />
       </div>
     {/if}
-    <div class="transfer-status">
+    <div class="transfer-status" aria-live={sharing.state === 'receiving' ? 'off' : undefined}>
       {#if sharing.state === 'sending'}
-        {i18n.t('settings.searchTransferAlert.body.sending')}
+        {i18n.t('settings.searchTransferAlert.body.sending', { device })}
       {:else if sharing.state === 'receiving'}
         {i18n.t('settings.searchTransferAlert.body.receiving', {
           transferred: sharing.transferred_rooms,
           total: sharing.total_rooms,
+          device,
         })}
-      {:else if sharing.state === 'discovering'}
-        {i18n.t('settings.searchTransferAlert.body.discovering')}
       {:else if sharing.state === 'connecting'}
-        {i18n.t('settings.searchTransferAlert.body.connecting')}
+        {i18n.t('settings.searchTransferAlert.body.connecting', { device })}
       {:else if sharing.state === 'waiting'}
-        {i18n.t('settings.searchTransferAlert.body.waiting')}
+        {i18n.t('settings.searchTransferAlert.body.waiting', { device })}
       {:else if sharing.state === 'idle' && sharing.outcome === 'failed'}
         {i18n.t('settings.searchTransferAlert.body.failed')}
-      {:else if sharing.state === 'idle' && sharing.outcome === 'no_answer'}
-        {i18n.t('settings.searchTransferAlert.body.no_answer')}
       {:else if sharing.state === 'idle'}
         {i18n.t('settings.searchTransferAlert.body.complete', {
-          transferred: sharing.transferred_rooms,
+          count: sharing.transferred_rooms,
+          device,
         })}
       {/if}
     </div>
@@ -171,7 +168,7 @@
         {i18n.t('common.dismiss')}
       </Button>
     {/if}
-    {#if sharing.state === 'idle' && (sharing.outcome === 'failed' || sharing.outcome === 'no_answer')}
+    {#if sharing.state === 'idle' && sharing.outcome === 'failed'}
       <Button variant="secondary" size="small" onclick={retry}>
         {i18n.t('common.retry')}
       </Button>
