@@ -18,7 +18,7 @@ jobs:
     name: Prepare release
     if: "${{ !contains(github.event.head_commit.message, 'chore: prepare release') }}"
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
@@ -40,6 +40,11 @@ jobs:
 
       - name: Trust project mise configuration
         run: mise settings set trusted_config_paths "$GITHUB_WORKSPACE"
+
+      - name: Install Lix
+        uses: https://github.com/samueldr/lix-gha-installer-action@a0fee77b2a98bb7c5c0ed7ae6d6ad4903dbdad0d # v2026-06-15
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
 
       - name: Set up git identity
         run: |
