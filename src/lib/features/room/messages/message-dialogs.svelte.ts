@@ -18,7 +18,7 @@ export type MessageDialog =
   | { kind: 'reactions'; active: number }
   | { kind: 'react'; anchor: HTMLElement | CursorAnchor | null }
   | { kind: 'sheet'; actions: () => MessageActions }
-  | { kind: 'report' | 'forward' | 'steal' | 'reproxy' | 'receipts' };
+  | { kind: 'report' | 'meowlnir-ban' | 'forward' | 'steal' | 'reproxy' | 'receipts' };
 
 export type OpenMessageDialog = MessageDialog & { key: number; item: TimelineItemView };
 

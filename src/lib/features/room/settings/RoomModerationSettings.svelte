@@ -12,6 +12,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { loadMeowlnirConfig, updateMeowlnirEvent } from '#lib/rooms/meowlnir.svelte.js';
+  import { rememberMeowlnirRoom } from '#lib/rooms/meowlnir-registry.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -89,6 +90,11 @@
   let canEdit = $derived(
     canSendState(levels, permissions?.own_power_level ?? 0, WATCHED_LISTS_EVENT)
   );
+
+  $effect(() => {
+    const userId = core.session?.user_id;
+    if (roomId && userId && config && canEdit) rememberMeowlnirRoom(roomId, userId, config);
+  });
 
   let rooms = $derived(protectedRooms(config?.protectedRooms ?? null));
   let lists = $derived(watchedLists(config?.watchedLists ?? null));

@@ -16,6 +16,7 @@
   import { projectPersona } from '#lib/personas/persona.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { outgoingPersona } from '#lib/personas/outgoing-persona.js';
+  import { meowlnirFor } from '#lib/rooms/meowlnir-registry.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { personaSpaces } from '#lib/features/composer/persona-spaces.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -23,6 +24,7 @@
   import StealEmotesDialog from '#lib/features/emotes/StealEmotesDialog.svelte';
   import { emoteCandidates } from '#lib/features/emotes/steal-emotes.js';
 
+  import MeowlnirBanDialog from '../members/MeowlnirBanDialog.svelte';
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
   import EditHistoryDialog from './EditHistoryDialog.svelte';
   import MessageActionSheet from './MessageActionSheet.svelte';
@@ -208,6 +210,16 @@
       bind:open={() => true, setOpen}
       onReport={(reason) => report(item, reason)}
     />
+  {:else if entry.kind === 'meowlnir-ban'}
+    {@const management = meowlnirFor(roomId, currentUserId)}
+    {#if management && item.sender}
+      <MeowlnirBanDialog
+        bind:open={() => true, setOpen}
+        {management}
+        userId={item.sender}
+        name={item.sender_name ?? item.sender}
+      />
+    {/if}
   {:else if entry.kind === 'steal'}
     <StealEmotesDialog bind:open={() => true, setOpen} candidates={emoteCandidates(item.content)} />
   {:else if entry.kind === 'forward'}

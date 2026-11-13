@@ -6,6 +6,7 @@ import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
 import DownloadIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
 import FavoriteIcon from 'phosphor-svelte/lib/HeartIcon';
 import ForwardIcon from 'phosphor-svelte/lib/ShareFatIcon';
+import GavelIcon from 'phosphor-svelte/lib/GavelIcon';
 import HistoryIcon from 'phosphor-svelte/lib/ClockCounterClockwiseIcon';
 import PinIcon from 'phosphor-svelte/lib/PushPinIcon';
 import ReportIcon from 'phosphor-svelte/lib/FlagIcon';
@@ -54,6 +55,7 @@ export type MessageActions = {
   onDownloadEmotes?: () => void;
   stealCount?: number;
   onReport?: () => void;
+  onMeowlnirBan?: () => void;
   onViewSource?: () => void;
   pinned?: boolean;
   bookmarked?: boolean;
@@ -253,6 +255,16 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       icon: ReportIcon,
       run: actions.onReport,
       separated: true,
+    });
+  }
+  if (actions.onMeowlnirBan) {
+    rows.push({
+      key: 'meowlnir-ban',
+      label: 'timeline.meowlnirBanSender',
+      icon: GavelIcon,
+      run: actions.onMeowlnirBan,
+      destructive: true,
+      separated: !actions.onReport,
     });
   }
   if (actions.onCancelSend) {

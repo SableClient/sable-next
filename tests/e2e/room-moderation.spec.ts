@@ -71,3 +71,38 @@ test('a ban list shows its rules and sends new ones to Meowlnir', async ({ page 
     )
     .toMatchObject({ room_id: ROOM_ID, body: '!ban spam @raider:evil.example raid' });
 });
+
+test('a moderator bans a message sender through Meowlnir from a protected room', async ({
+  page,
+  app,
+}) => {
+  await page.addInitScript(() => {
+    if (!window.__e2eRoomState) return;
+    window.__e2eRoomState['fi.mau.meowlnir.protected_rooms'] = {
+      rooms: ['!room:example.test'],
+      skip_acl: [],
+    };
+  });
+  await app.openRoom(ROOM_ID);
+
+  const message = page.locator('article.message').filter({ hasText: 'General message 19' });
+  await expect(async () => {
+    await message.click({ button: 'right' });
+    await expect(page.getByRole('menuitem', { name: 'Ban sender with Meowlnir' })).toBeVisible({
+      timeout: 1_000,
+    });
+  }).toPass();
+  await page.getByRole('menuitem', { name: 'Ban sender with Meowlnir' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Ban with Meowlnir' });
+  await dialog.getByRole('textbox', { name: 'Reason' }).fill('spam');
+  expect(await violations(page, { scope: '[role="dialog"]' })).toEqual([]);
+  await dialog.getByRole('button', { name: 'Ban with Meowlnir' }).click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => window.__e2eCalls.findLast((call) => call.method === 'messages.send')?.params
+      )
+    )
+    .toMatchObject({ room_id: ROOM_ID, body: '!ban spam @alice:example.test spam' });
+});

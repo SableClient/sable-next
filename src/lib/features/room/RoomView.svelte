@@ -60,6 +60,8 @@
   import { openSettingsOver } from '#lib/features/settings/settings-navigation.js';
   import RoomHeaderMenu from './RoomHeaderMenu.svelte';
   import { canSendState } from './settings/permission-groups';
+  import { WATCHED_LISTS_EVENT } from '#lib/rooms/meowlnir-config.js';
+  import { noteRoomOpened } from '#lib/rooms/meowlnir-registry.svelte.js';
   import RoomPinMenu from './RoomPinMenu.svelte';
   import RoomPredecessorNotice from './RoomPredecessorNotice.svelte';
   import RoomPresencePrompt from './RoomPresencePrompt.svelte';
@@ -423,6 +425,19 @@
 
   $effect(() => {
     roomSession.sync(resolvedRoomId, isTombstoned, memberListChanges.version);
+  });
+
+  $effect(() => {
+    const target = resolvedRoomId;
+    const userId = core.session?.user_id;
+    const levels = roomSession.powerLevels;
+    if (!target || !userId || !levels || resolvedRoom?.is_direct) return;
+    const admin = canSendState(
+      levels,
+      roomSession.permissions?.own_power_level ?? 0,
+      WATCHED_LISTS_EVENT
+    );
+    void noteRoomOpened(core, target, userId, admin);
   });
 
   let canManageWidgets = $derived(

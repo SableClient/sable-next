@@ -54,6 +54,7 @@
   import { roleColorOnDark, roleColorOnLight } from '#lib/ui/primitives/readable-color.js';
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { presenceSharing } from '#lib/rooms/presence-sharing.svelte.js';
+  import { meowlnirFor } from '#lib/rooms/meowlnir-registry.svelte.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
@@ -72,6 +73,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import MessageReportDialog from '../messages/MessageReportDialog.svelte';
+  import MeowlnirBanDialog from './MeowlnirBanDialog.svelte';
   import ProfileOverrideDialog from './ProfileOverrideDialog.svelte';
   import { sendReport } from '../messages/report';
   import FormattedBody from '../messages/FormattedBody.svelte';
@@ -346,6 +348,8 @@
     };
   }
 
+  let meowlnir = $derived(isSelf ? null : meowlnirFor(roomId, core.session?.user_id));
+  let meowlnirBanOpen = $state(false);
   let moderationAction = $state<'kick' | 'ban' | null>(null);
   let moderationReason = $state('');
   let moderationBusy = $state(false);
@@ -615,8 +619,14 @@
           {i18n.t('timeline.profileBan')}
         </ActionMenuItem>
       {/if}
+      {#if meowlnir}
+        <ActionMenuItem destructive onSelect={() => (meowlnirBanOpen = true)}>
+          <GavelIcon />
+          {i18n.t('timeline.meowlnirBan')}
+        </ActionMenuItem>
+      {/if}
       {#if !isSelf}
-        {#if canKick || canBan}
+        {#if canKick || canBan || meowlnir}
           <ActionMenuSeparator />
         {/if}
         <ActionMenuItem onSelect={() => (overrideOpen = true)}>
@@ -920,6 +930,15 @@
     if (selfDemotion !== null) setPowerLevel(selfDemotion);
   }}
 />
+
+{#if meowlnir}
+  <MeowlnirBanDialog
+    bind:open={meowlnirBanOpen}
+    management={meowlnir}
+    {userId}
+    name={displayName}
+  />
+{/if}
 
 <DialogFrame
   open={moderationAction !== null}

@@ -13,6 +13,7 @@ import { gifFromProxiedMxc, gifFromUploadedMxc } from '#lib/gif/providers.js';
 import { downloadCandidates, emoteCandidates } from '#lib/features/emotes/steal-emotes.js';
 import { pinErrorMessage, type PinnedEvents } from '../timeline/pinned-events.svelte.js';
 import type { Bookmarks } from '#lib/rooms/bookmarks.svelte.js';
+import { meowlnirFor } from '#lib/rooms/meowlnir-registry.svelte.js';
 import type { MessageDialogs } from './message-dialogs.svelte.js';
 import type { ReplyVersion } from './reply-preview';
 import { messageActionPolicy } from './message-action-policy';
@@ -373,6 +374,12 @@ export class MessageActionExecutor {
             dialogs.open(item, { kind: 'report' });
           }
         : undefined,
+      onMeowlnirBan:
+        !item.is_own && item.sender && meowlnirFor(roomId, core.session?.user_id)
+          ? () => {
+              dialogs.open(item, { kind: 'meowlnir-ban' });
+            }
+          : undefined,
     };
   }
 }

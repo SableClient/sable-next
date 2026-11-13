@@ -70,3 +70,12 @@ test('the gif row reads back whether the gif is already saved', () => {
   expect(saved[0]?.label).toBe('composer.gifUnfavorite');
   expect(unsaved[0]?.label).toBe('composer.gifFavorite');
 });
+
+test('banning the sender with Meowlnir sits with report, marked as destructive', () => {
+  const rows = messageMenuRows({ onReport: () => {}, onMeowlnirBan: () => {} });
+
+  expect(rows.map((row) => [row.key, row.destructive ?? false, row.separated ?? false])).toEqual([
+    ['report', false, true],
+    ['meowlnir-ban', true, false],
+  ]);
+});
