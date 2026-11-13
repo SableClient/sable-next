@@ -193,6 +193,12 @@ struct LinuxNode {
 }
 
 #[cfg(target_os = "linux")]
+struct LinuxClient {
+    pid: Option<u32>,
+    flatpak: Option<String>,
+}
+
+#[cfg(target_os = "linux")]
 fn linux_sources(
     root_pid: u32,
     processes: &HashMap<u32, Process>,
@@ -228,17 +234,21 @@ fn linux_sources(
                     let listener = client
                         .add_listener_local()
                         .info(move |info| {
-                            if let Some(pid) = info
-                                .props()
-                                .and_then(|props| {
-                                    props
+                            let Some(props) = info.props() else {
+                                return;
+                            };
+                            clients.borrow_mut().insert(
+                                id,
+                                LinuxClient {
+                                    pid: props
                                         .get("pipewire.sec.pid")
                                         .or_else(|| props.get("application.process.id"))
-                                })
-                                .and_then(|pid| pid.parse::<u32>().ok())
-                            {
-                                clients.borrow_mut().insert(id, pid);
-                            }
+                                        .and_then(|pid| pid.parse().ok()),
+                                    flatpak: props
+                                        .get("pipewire.access.portal.app_id")
+                                        .map(str::to_owned),
+                                },
+                            );
                         })
                         .register();
                     watched_clients.borrow_mut().push((client, listener));
@@ -286,6 +296,7 @@ fn linux_sources(
     sync_linux_registry(&mainloop, &core)?;
     Ok(filter_linux_sources(
         root_pid,
+        std::env::var("FLATPAK_ID").ok().as_deref(),
         processes,
         &nodes.borrow(),
         &clients.borrow(),
@@ -326,17 +337,23 @@ fn sync_linux_registry(
 #[cfg(target_os = "linux")]
 fn filter_linux_sources(
     root_pid: u32,
+    flatpak: Option<&str>,
     processes: &HashMap<u32, Process>,
     nodes: &HashMap<u32, LinuxNode>,
-    clients: &HashMap<u32, u32>,
+    clients: &HashMap<u32, LinuxClient>,
 ) -> HashMap<String, HashSet<u32>> {
     let mut names: HashMap<String, HashSet<u32>> = HashMap::new();
     let mut blocked = HashSet::new();
     for (id, node) in nodes {
-        let pid = node
-            .pid
-            .or_else(|| node.client.and_then(|id| clients.get(&id).copied()));
-        if node.relay || pid.is_none_or(|pid| is_own(pid, root_pid, processes)) {
+        let client = node.client.and_then(|id| clients.get(&id));
+        let pid = node.pid.or_else(|| client.and_then(|client| client.pid));
+        let own = match client.map(|client| client.flatpak.as_deref()) {
+            _ if node.relay => true,
+            Some(Some(app)) => flatpak == Some(app),
+            Some(None) if flatpak.is_some() => false,
+            _ => pid.is_none_or(|pid| is_own(pid, root_pid, processes)),
+        };
+        if own {
             blocked.insert(node.name.clone());
         } else {
             names.entry(node.name.clone()).or_default().insert(*id);
@@ -356,6 +373,61 @@ mod tests {
             name: name.into(),
         }
     }
+
+    #[test]
+    fn flatpak_streams_are_told_apart_by_app_id_not_pid() {
+        let processes: HashMap<u32, Process> = [
+            (
+                1,
+                Process {
+                    parent: None,
+                    name: "bwrap".into(),
+                },
+            ),
+            (
+                2,
+                Process {
+                    parent: Some(1),
+                    name: "sable".into(),
+                },
+            ),
+        ]
+        .into();
+        let node = |name: &str, client| LinuxNode {
+            name: name.into(),
+            pid: Some(2),
+            client: Some(client),
+            relay: false,
+        };
+        let client = |flatpak: Option<&str>| LinuxClient {
+            pid: Some(4000),
+            flatpak: flatpak.map(str::to_owned),
+        };
+        let nodes = [
+            (10, node("Firefox", 1)),
+            (11, node("WebKit", 2)),
+            (12, node("game", 3)),
+        ]
+        .into();
+        let clients = [
+            (1, client(Some("org.mozilla.firefox"))),
+            (2, client(Some("moe.sable.client"))),
+            (3, client(None)),
+        ]
+        .into();
+        let mut sandboxed: Vec<_> =
+            filter_linux_sources(2, Some("moe.sable.client"), &processes, &nodes, &clients)
+                .into_keys()
+                .collect();
+        sandboxed.sort();
+        assert_eq!(sandboxed, ["Firefox", "game"]);
+        let mut native: Vec<_> = filter_linux_sources(2, None, &processes, &nodes, &clients)
+            .into_keys()
+            .collect();
+        native.sort();
+        assert_eq!(native, ["Firefox", "WebKit"]);
+    }
+
     #[test]
     fn missing_or_legacy_selections_never_broaden_capture() {
         resolve(vec![source("music")], &["music".into()]).unwrap_err();
