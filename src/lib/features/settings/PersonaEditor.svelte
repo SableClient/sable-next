@@ -424,12 +424,12 @@
     <fieldset class="triggers">
       <legend>{i18n.t('settings.profile')}</legend>
 
-      <label class="field">
+      <div class="field">
         <span>{i18n.t('settings.biography')}</span>
         <BioEditor id="persona-biography" bind:value={biography} />
-      </label>
+      </div>
 
-      <label class="field">
+      <div class="field">
         <span>{i18n.t('settings.banner')}</span>
         {#if banner_url}
           <div class="profile-card-cover">
@@ -466,7 +466,7 @@
             {i18n.t('common.chooseAPicture')}
           </label>
         </div>
-      </label>
+      </div>
     </fieldset>
 
     <fieldset class="triggers">
